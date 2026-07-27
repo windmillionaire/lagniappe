@@ -15,7 +15,7 @@ from testing.utility.traceability_common import (
     decode_test_run_snapshots,
     encode_test_run_snapshots,
     load_json,
-    provenance,
+    utc_now,
     write_json,
 )
 
@@ -132,8 +132,12 @@ def _write_manifest(
     exitstatus: int,
 ) -> None:
     """Merge one pytest session into the result manifest."""
-    metadata = provenance(repo_root, command=recorded_command)
     snapshot_id, path_fingerprints = behavior_snapshot(repo_root)
+    metadata = {
+        "generated_at": utc_now(),
+        "command": recorded_command,
+        "behavior_snapshot": snapshot_id,
+    }
     destination = repo_root / LATEST_TEST_RUN
     previous = load_json(destination)
     tests: dict[str, object] = {}

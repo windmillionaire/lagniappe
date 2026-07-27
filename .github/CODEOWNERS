@@ -1,0 +1,21 @@
+# CI and test-evidence trust boundary.
+#
+# Anyone may propose changes to these files, but changes require the repository
+# owner's review when "Require review from Code Owners" is enabled for main.
+# Owning the whole .github directory also protects this file and the workflows
+# that enforce the checks.
+/.github/ @windmillionaire
+/testing/ @windmillionaire
+/run.py @windmillionaire
+/runner/ @windmillionaire
+
+# A pull request must not be able to quietly weaken the tools or dependencies
+# used by required CI or trusted local test runs.
+/.nvmrc @windmillionaire
+/biome.json @windmillionaire
+/ruff.toml @windmillionaire
+/package.json @windmillionaire
+/package-lock.json @windmillionaire
+/requirements.txt @windmillionaire
+/requirements-dev.txt @windmillionaire
+/requirements-installer.txt @windmillionaire

@@ -225,6 +225,11 @@ traceability, the committed test evidence, and the contributor artifact
 boundary. This is a trust-based contribution record, and the maintainer reruns
 the appropriate tests before merging.
 
+The CI workflow, repository runner, test tree, evidence manifest, and the
+configuration and dependency files used by those checks are code-owned by the
+maintainer. Changes to that trust boundary are welcome when needed, but GitHub
+requires a separate maintainer approval before they can merge.
+
 ## Icons
 
 Semantic icon mappings live in `src/style/icons.yaml`. Reusing an existing

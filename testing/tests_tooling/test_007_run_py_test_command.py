@@ -140,16 +140,11 @@ def test_behavior_snapshot_excludes_tracked_test_evidence(monkeypatch, tmp_path)
 def test_traceability_result_plugin_merges_focused_results_without_session_history(
     monkeypatch, tmp_path
 ):
-    fingerprint = {
-        "generated_at": "2026-01-01T00:00:00+00:00",
-        "git_head": "abc123",
-        "working_tree_fingerprint": "tree123",
-        "command": [],
-    }
+    generated_at = "2026-01-01T00:00:00+00:00"
     monkeypatch.setattr(
         traceability_results,
-        "provenance",
-        lambda repo_root, command=(): {**fingerprint, "command": list(command)},
+        "utc_now",
+        lambda: generated_at,
     )
     for nodeid in ("tests_unit/test_a.py::test_a", "tests_unit/test_b.py::test_b"):
         command = ["run.py", "test", nodeid]
@@ -167,7 +162,7 @@ def test_traceability_result_plugin_merges_focused_results_without_session_histo
     ]
     assert payload["sessions"] == [
         {
-            "generated_at": fingerprint["generated_at"],
+            "generated_at": generated_at,
             "command": [
                 "run.py",
                 "test",
@@ -180,6 +175,15 @@ def test_traceability_result_plugin_merges_focused_results_without_session_histo
             ],
         }
     ]
+    assert payload["provenance"] == {
+        "generated_at": generated_at,
+        "command": [
+            "run.py",
+            "test",
+            "tests_unit/test_b.py::test_b",
+        ],
+        "behavior_snapshot": payload["sessions"][0]["snapshot"],
+    }
 
 
 def test_traceability_result_plugin_replaces_a_tests_previous_result(
@@ -273,20 +277,10 @@ def test_traceability_result_plugin_replaces_a_completed_parameter_set(
 def test_traceability_result_plugin_keeps_other_tests_across_tree_changes(
     monkeypatch, tmp_path
 ):
-    provenances = iter(
+    generated_times = iter(
         [
-            {
-                "generated_at": "2026-01-01T00:00:00+00:00",
-                "git_head": "abc123",
-                "working_tree_fingerprint": "tree-one",
-                "command": [],
-            },
-            {
-                "generated_at": "2026-01-01T00:01:00+00:00",
-                "git_head": "abc123",
-                "working_tree_fingerprint": "tree-two",
-                "command": [],
-            },
+            "2026-01-01T00:00:00+00:00",
+            "2026-01-01T00:01:00+00:00",
         ]
     )
     snapshots = iter(
@@ -297,11 +291,8 @@ def test_traceability_result_plugin_keeps_other_tests_across_tree_changes(
     )
     monkeypatch.setattr(
         traceability_results,
-        "provenance",
-        lambda repo_root, command=(): {
-            **next(provenances),
-            "command": list(command),
-        },
+        "utc_now",
+        lambda: next(generated_times),
     )
     monkeypatch.setattr(
         traceability_results, "behavior_snapshot", lambda repo_root: next(snapshots)
