@@ -1,0 +1,41 @@
+{% from "common.html" import format_name %}
+{% import 'controls.html' as controls %}
+
+{% macro list(starred) %}
+  <ul data-widget="StarredList"
+      data-visible="false"
+      data-route='{{ url_for("home.get", kind="starred") }}'
+      class="{{ styles.home.card.list }}">
+    {% for s in starred.list %}{{ starred_entity(s) }}{% endfor %}
+    {% if starred.cursor or starred.back %}
+      <div class="{{ styles.home.pagination.container }}">
+        {% if starred.back %}
+          <button class="{{ styles.home.pagination.button }}"
+                  lp-control="previous"
+                  data-route='{{ url_for("home.get", kind="starred", cursor=None) }}'>
+            {{ render_icon("start") }}
+          </button>
+        {% endif %}
+        {% if starred.cursor %}
+          <button class="{{ styles.home.pagination.button }}"
+                  lp-control="next"
+                  data-route='{{ url_for("home.get", kind="starred", cursor=starred.cursor) }}'>
+            {{ render_icon("next") }}
+          </button>
+        {% endif %}
+      </div>
+    {% endif %}
+  </ul>
+{% endmacro %}
+
+{% macro starred_entity(entity) %}
+  <li data-key="{{ entity.urlsafe_key }}"
+      data-fingerprint="{{ entity.fingerprint }}"
+      lp-link
+      lp-entity>
+    <div class="{{ styles.home.card.item }}">
+      <div>{{ format_name(entity.column('name').column_value) }}</div>
+      {{ controls.star(True) }}
+    </div>
+  </li>
+{% endmacro %}

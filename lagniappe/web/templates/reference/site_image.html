@@ -1,0 +1,19 @@
+{% from "manual/macros.html" import callout %}
+{% from "reference/macros.html" import modal %}
+{% call modal("Site Image") %}
+  <p class="text-sm text-base-dark">
+    Site Image controls the public icons generated for this Lagniappe instance. Those images are used by browser tabs, mobile home-screen shortcuts, app manifests, and platform-specific icon slots.
+  </p>
+  {% call callout("success") %}
+    Upload one clean source image and Lagniappe generates the different icon sizes from it.
+  {% endcall %}
+  <p class="text-sm text-base-dark">
+    A square PNG with a simple centered mark works best. Leave some padding around the artwork so small favicons still read clearly. Very detailed photos or thin text usually become hard to recognize at small sizes.
+  </p>
+  {% call callout("tip") %}
+    Uploading saves the generated files to site metadata. Run <code>./setup.sh update</code> and redeploy when you want those generated files copied into the static app files used by App Engine.
+  {% endcall %}
+  {% call callout("warning") %}
+    Browsers and phones cache icons aggressively. After deployment, you may need a hard refresh, a new browser profile, or removing and re-adding a mobile home-screen shortcut before you see the new image everywhere.
+  {% endcall %}
+{% endcall %}

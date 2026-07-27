@@ -1,0 +1,76 @@
+{% macro default_form_choice(file) %}
+  <div data-role="default-form">
+    <label class="flex flex-row items-start gap-1 sm:text-sm text-base-dark font-semibold">
+      Set this form as the default form for <span class="text-kind-default" data-kind="{{ file.parent.kind }}">{{ file.parent.name }}</span>
+      <div class="{{ styles.checkbox.container }} mr-1 order-first">
+        <input type="checkbox"
+               name="set-default-form"
+               {{ 'checked' if file.properties.choose_form.set_default_form else '' }}
+               data-kind="form"
+               class="{{ styles.checkbox.default }}">
+        {{ render_icon("check", (styles.checkbox.icon)) }}
+      </div>
+    </label>
+  </div>
+{% endmacro %}
+
+{% macro form_choice(file) %}
+  {% set choose_form = file.properties.choose_form %}
+  {% set entity_type = file.properties.choose_type.entity_type %}
+  <div>
+    <h2 class="text-lg font-bold">Choose or Create a Form</h2>
+    <p class="text-sm text-base-medium italic">
+      The columns in this file will map to the fields in the form chosen. If an appropriate form doesn't exist,
+      a new form can be created using the columns in this file. You'll be able to edit the form fields
+      before importing the data.
+    </p>
+  </div>
+  <form class="flex flex-col gap-6" data-section="form-choice">
+    <fieldset class="flex flex-row gap-4 items-center">
+      <label class="{{ styles.radio.label }}">
+        <input type="radio"
+               name="form-choice"
+               value="use-columns"
+               data-option-toggle="true"
+               {{ 'checked' if choose_form.form_choice == "use-columns" and not file.form else '' }}
+               class="{{ styles.radio.default }}">
+        Create a new form
+      </label>
+      <label class="{{ styles.radio.label }}">
+        <input type="radio"
+               name="form-choice"
+               value="existing-form"
+               data-option-toggle="true"
+               {{ 'checked' if choose_form.form_choice == "existing-form" or file.form else '' }}
+               class="{{ styles.radio.default }}">
+        Use an existing form
+      </label>
+    </fieldset>
+    <div data-option="use-columns"
+         data-visible="{{ (choose_form.form_choice != 'existing-form' and not file.form)|yesno }}">
+      <h3 class="{{ styles.label.sectionHeading }}">Form Name</h3>
+      <input type="text"
+             autocomplete="off"
+             data-1p-ignore
+             name="form-name"
+             data-form-type="{{ entity_type }}"
+             value="{{ choose_form.form_name or '' }}"
+             placeholder="{{ file.name }} Form"
+             class="{{ styles.input }}">
+    </div>
+    <div data-option="existing-form"
+         data-visible="{{ (choose_form.form_choice == 'existing-form' or file.form)|yesno }}"
+         class="{{ styles.select.container }}">
+      <h3 class="{{ styles.label.sectionHeading }}">Existing Form</h3>
+      <input data-action="select-form"
+             {% if file.form %}data-preload='{{ file.form.details|tojson }}'{% endif %}
+             data-placeholder="choose a form..."
+             data-index="form"
+             name="form-id"
+             data-kind="form"
+             data-form-type="{{ entity_type }}"
+             class="{{ styles.input }}">
+    </div>
+    {% if file.parent.kind in ['category', 'model'] and not file.parent.form %}{{ default_form_choice(file) }}{% endif %}
+  </form>
+{% endmacro %}

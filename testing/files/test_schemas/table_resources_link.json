@@ -1,0 +1,15 @@
+[
+	{
+		"id": "resources",
+		"type": "table",
+		"title": "Resources",
+		"columns": [
+			{
+				"id": "website",
+				"type": "link",
+				"title": "Website",
+				"location": "out"
+			}
+		]
+	}
+]

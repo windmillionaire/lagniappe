@@ -1,0 +1,129 @@
+{
+	"test_project_description": {
+		"entities": [
+			[
+				"PROJECT",
+				{
+					"name": "Simple Desc",
+					"description": "A simple description"
+				}
+			],
+			[
+				"PROJECT",
+				{
+					"name": "HTML Desc",
+					"description": "<p>Paragraph with <strong>bold</strong> text</p>"
+				}
+			],
+			["PROJECT", { "name": "No Desc" }],
+			["PROJECT", { "name": "No Features", "attributes": [] }]
+		]
+	},
+	"test_project_document": {
+		"entities": [
+			[
+				"PROJECT",
+				{
+					"name": "Has Document",
+					"assets": { "document": { "type": "html", "path": "test.html" } },
+					"document": "This is the document text content for search and AI."
+				}
+			],
+			["PROJECT", { "name": "No Document" }],
+			[
+				"PROJECT",
+				{
+					"name": "Document With No Features",
+					"assets": { "document": { "type": "html", "path": "test.html" } },
+					"document": "Document text content with no features.",
+					"attributes": []
+				}
+			]
+		]
+	},
+	"test_project_is_public": {
+		"entities": [
+			["PROJECT", { "name": "Public Project", "public": true }],
+			["PROJECT", { "name": "Private Project" }]
+		]
+	},
+	"test_project_attributes": {
+		"entities": [
+			[
+				"PROJECT",
+				{
+					"name": "Attributes 1",
+					"attributes": ["tasks", "document"]
+				}
+			],
+			[
+				"PROJECT",
+				{ "name": "Attributes 2", "attributes": ["tasks"] }
+			],
+			[
+				"PROJECT",
+				{ "name": "Attributes 3", "attributes": ["document"] }
+			],
+			["PROJECT", { "name": "No Attributes", "attributes": [] }],
+			["PROJECT", { "name": "Default Attributes" }]
+		]
+	},
+	"test_project_filters": {
+		"entities": [
+			[
+				"PROJECT",
+				{
+					"name": "Project With Models",
+					"model_tasks": [
+						{
+							"name": "Model With Form",
+							"hash": "model1",
+							"form": {
+								"name": "Model Form",
+								"hash": "modelform1",
+								"schema": "basic_inputs"
+							}
+						},
+						{ "name": "Model Without Form", "hash": "model2" }
+					]
+				}
+			],
+			["PROJECT", { "name": "Project Without Models" }],
+			[
+				"TASK",
+				{
+					"name": "Task With Model And Form",
+					"model": { "name": "Model With Form", "hash": "model1" },
+					"form": {
+						"name": "Model Form",
+						"hash": "modelform1",
+						"schema": "basic_inputs"
+					},
+					"assigned_to": {
+						"name": "Test User",
+						"hash": "user1",
+						"page": { "name": "Test User Page", "hash": "upg001" }
+					},
+					"due_date": "2026-02-15",
+					"completed": false
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Task With Model Only",
+					"model": { "name": "Model Without Form", "hash": "model2" },
+					"completed": true
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Task With Categories",
+					"categories": [{ "name": "Cat1", "hash": "cat1" }]
+				}
+			],
+			["TASK", { "name": "Simple Task" }]
+		]
+	}
+}

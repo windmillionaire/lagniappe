@@ -1,0 +1,7 @@
+id,name,value,notes
+1,First,100,Some notes
+,,
+2,Second,200,
+3,Third,,Missing value
+
+4,Fourth,400,Last row

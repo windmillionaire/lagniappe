@@ -1,0 +1,45 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Creating Pages") %}
+  <section>
+    {{ subheading("What This Panel Does") }}
+    <p class="text-sm text-base-dark">
+      This panel creates a new page inside the current category. The new page appears in the category table and can inherit the category's default form and page features.
+    </p>
+    {% call callout("tip") %}
+      Pages are the main records in Lagniappe. They can hold structured form data, files, documents, notes, tasks, categories, and a page image.
+    {% endcall %}
+    {% call callout("note") %}
+      You can create pages in categories you can edit. Creating a brand new category is a separate permission.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Creation Options") }}
+    <div class="space-y-3">
+      {% call feature("Name and Description", icon="info", kind="page") %}
+        Give the page a clear name and an optional description so it is easy to recognize in tables, search results, and linked selectors.
+      {% endcall %}
+      {% call feature("Using Form", icon="form", kind="form") %}
+        Choose a page form for structured fields. If the category has a default form, it is preselected, but you can change it for this page.
+      {% endcall %}
+      {% call feature("Page Features", icon="settings.page", kind="page") %}
+        Enable the features this page should have, such as photo, document, files, notes, tasks, or searchability.
+      {% endcall %}
+      {% call feature("AI Autofill", icon="generate", kind="form") %}
+        If a form is attached, autofill can draft the page's structured data from the page name, description, selected form, and category context.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Basic Flow") }}
+    {% call step(1, "Fill in the essentials") %}
+      <p class="text-sm text-base-medium">Name the page and select the form and features you want enabled.</p>
+    {% endcall %}
+    {% call step(2, "Create or autofill") %}
+      <p class="text-sm text-base-medium">Create a blank page, or use autofill when you want AI to draft the attached form data.</p>
+    {% endcall %}
+    {% call step(3, "Finish from the page") %}
+      <p class="text-sm text-base-medium">Open the page to add files, tasks, document content, category links, or more detailed form data.</p>
+    {% endcall %}
+  </section>
+{% endcall %}

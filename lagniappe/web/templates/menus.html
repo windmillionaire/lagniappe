@@ -1,0 +1,59 @@
+{% macro title(label="Entity actions", margin="ml-1.5") %}
+  <span lp-menu="title"
+        class="{{ margin }} inline-flex shrink-0 items-center align-middle">
+    <button type="button"
+            data-role="menu-trigger"
+            class="{{ styles.nav.button }}"
+            aria-label="{{ label }}"
+            title="{{ label }}"
+            aria-haspopup="menu"
+            aria-expanded="false">
+      {{ render_icon("menu") }}
+    </button>
+    <span data-role="menu-items" hidden>
+      {{ caller() }}
+    </span>
+  </span>
+{% endmacro %}
+
+{% macro show(label, icon, target, kind="default") %}
+  <button type="button"
+          data-menu-item
+          data-kind="{{ kind }}"
+          lp-control="menu"
+          lp-show="{{ target }}"
+          class="{{ styles.dropdown.option.action }}">
+    {{ render_icon((icon), (styles.dropdown.icon ~ " text-kind-default")) }}
+    <span>{{ label }}</span>
+  </button>
+{% endmacro %}
+
+{% macro star(starred) %}
+  <button type="button"
+          data-menu-item
+          data-kind="starred"
+          data-active="{{ starred|yesno }}"
+          lp-control="star"
+          aria-label="{{ 'Unstar' if starred else 'Star' }}"
+          title="{{ 'Unstar' if starred else 'Star' }}"
+          class="{{ styles.dropdown.option.action }} group/toggle">
+    <span class="grid shrink-0 {{ styles.dropdown.icon }} text-kind-default">
+      {{ render_icon("star.active", (styles.toggle.icon.active ~ " [grid-area:1/1]")) }}
+      {{ render_icon("star.inactive", (styles.toggle.icon.inactive ~ " [grid-area:1/1]")) }}
+    </span>
+    <span data-role="star-label">{{ 'Unstar' if starred else 'Star' }}</span>
+  </button>
+{% endmacro %}
+
+{% macro delete(return_url=None, label="Delete") %}
+  <button type="button"
+          data-menu-item
+          data-kind="delete"
+          lp-control="delete"
+          lp-delete
+          {% if return_url %}data-return-url="{{ return_url }}"{% endif %}
+          class="{{ styles.dropdown.option.action }}">
+    {{ render_icon("delete", (styles.dropdown.icon ~ " text-kind-default")) }}
+    <span>{{ label }}</span>
+  </button>
+{% endmacro %}

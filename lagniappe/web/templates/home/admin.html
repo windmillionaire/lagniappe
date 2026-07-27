@@ -1,0 +1,144 @@
+{% extends "layouts/base.html" %}
+{% from 'home/site_settings.html' import site_settings %}
+{% from 'home/export.html' import export_tab %}
+{% import 'home/ingress.html' as ingress %}
+{% import 'controls.html' as controls %}
+
+{% macro view_header() %}
+  <nav class="{{ styles.layout.view.title }}" data-nav="view">
+    <div>
+      <span data-role="title">Admin</span>
+    </div>
+  </nav>
+{% endmacro %}
+
+{% macro toggles(nav) %}
+  <nav class="{{ styles.layout.nav.adminToggles }}"
+       data-nav="{{ nav }}"
+       data-persistent="true"
+       data-standalone="true">
+    <button lp-show="settings:active"
+            data-kind="default"
+            title="Site Settings"
+            aria-label="Site Settings"
+            class="{{ styles.entity.tabIcon }}">
+      {{ render_icon("siteOwner") }}
+    </button>
+    <button lp-show="exports:active"
+            data-kind="file"
+            title="Export"
+            aria-label="Export"
+            class="{{ styles.entity.tabIcon }}">
+      {{ render_icon("download") }}
+    </button>
+    <button lp-show="ingress:active"
+            data-kind="file"
+            title="Import Data"
+            aria-label="Import Data"
+            class="{{ styles.entity.tabIcon }}">
+      {{ render_icon("import", kind="file") }}
+    </button>
+  </nav>
+{% endmacro %}
+
+{% macro sub_toggles() %}
+  <button lp-show="ingress:IngressFileUpload"
+          data-kind="file"
+          data-visible="false"
+          title="Import data file"
+          aria-label="Import data file"
+          class="{{ styles.toggle.container }}">
+    {{ render_icon("add") }}
+  </button>
+{% endmacro %}
+
+{% macro mobile_nav() %}
+  <div lp-nav
+       class="{{ styles.layout.nav.mobile }} mt-4"
+       data-visible="false"
+       data-nav="mobile">
+    <div class="{{ styles.layout.nav.title }}" data-role="header">
+      <span class="text-kind-dark" data-kind="default" data-role="title"></span>
+      {{ sub_toggles() }}
+      {{ controls.page_controls() }}
+    </div>
+    <div class="{{ styles.layout.nav.group }}" data-flipped="false">
+      <button data-role="flipper"
+              class="{{ styles.layout.nav.flipper }} text-xl pt-0.25">
+        {{ render_icon("flipper.left") }}
+      </button>
+      {{ toggles('mobile') }}
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro settings_tab() %}
+  <div id="settings"
+       lp-component
+       data-title="Settings"
+       data-default="SiteSettings"
+       data-tab="true"
+       data-visible="false"
+       data-kind="default"
+       class="mt-4 sm:mt-0"
+       data-parent-nav="tabs">{{ site_settings('SiteSettings', 'settings', false) }}</div>
+{% endmacro %}
+
+{% macro ingress_tab() %}
+  <div id="ingress"
+       lp-component
+       data-title="Import Data"
+       data-default="IngressList"
+       data-tab="true"
+       data-visible="false"
+       data-kind="file"
+       class="mt-4 sm:mt-0"
+       data-parent-nav="tabs">
+    {{ ingress.upload_ingress_file() }}
+    <ul lp-load
+        data-widget="IngressList"
+        data-route='{{ url_for("home.get", kind="ingress") }}'
+        data-if-empty="IngressFileUpload"
+        data-persistent="true"
+        data-visible="true"
+        class="{{ styles.list.container }}">
+    </ul>
+  </div>
+{% endmacro %}
+
+{% macro main() %}
+  <div lp-view
+       data-kind="admin"
+       data-hash="admin"
+       data-default-tab="settings"
+       class="group/view max-w-5xl mx-auto"
+       data-readonly="false">
+    <div class="{{ styles.layout.view.header }}" data-flipped="false">{{ view_header() }}</div>
+    {{ mobile_nav() }}
+    <div id="layout" data-visible="false" class="sm:mt-4">
+      <div id="tabs"
+           lp-component
+           class="{{ styles.card.primary }} overflow-hidden">
+        <div lp-nav class="{{ styles.layout.nav.title }}" data-nav="tabs">
+          <div data-role="header" class="{{ styles.layout.nav.header }}">
+            <span class="text-default-dark" data-role="title"></span>
+            {{ sub_toggles() }}
+            {{ controls.page_controls() }}
+          </div>
+          {{ toggles('tabs') }}
+        </div>
+        {{ settings_tab() }}
+        {{ export_tab() }}
+        {{ ingress_tab() }}
+      </div>
+    </div>
+  </div>
+{% endmacro %}
+
+{% block title %}
+  Admin
+{% endblock title %}
+
+{% block content %}
+  {{ main() }}
+{% endblock content %}

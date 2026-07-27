@@ -1,0 +1,629 @@
+{
+	"test_submission_radio": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Radio form submission",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "radio_only"
+					},
+					"form_submission": { "radio-ab12": "opt1" },
+					"expected": {
+						"radio-ab12": {
+							"value": "opt1",
+							"form_value": "opt1",
+							"column_value": { "Option One": "opt1" },
+							"filter_value": "opt1",
+							"ai_value": "Option One"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Radio AI - using value",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "radio_only"
+					},
+					"ai_submission": { "radio-ab12": "opt2" },
+					"expected": {
+						"radio-ab12": {
+							"value": "opt2",
+							"form_value": "opt2",
+							"column_value": { "Option Two": "opt2" },
+							"filter_value": "opt2",
+							"ai_value": "Option Two"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Radio AI - using label (converts to value)",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "radio_only"
+					},
+					"ai_submission": { "radio-ab12": "Option Three" },
+					"expected": {
+						"radio-ab12": {
+							"value": "opt3",
+							"form_value": "opt3",
+							"column_value": { "Option Three": "opt3" },
+							"filter_value": "opt3",
+							"ai_value": "Option Three"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Radio import - exact match",
+					"hash": "page004",
+					"form": {
+						"name": "Form",
+						"hash": "form004",
+						"schema": "radio_only"
+					},
+					"import_submission": { "radio-ab12": ["Option One"] },
+					"expected": {
+						"radio-ab12": {
+							"value": "opt1",
+							"form_value": "opt1",
+							"column_value": { "Option One": "opt1" },
+							"filter_value": "opt1",
+							"ai_value": "Option One"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Radio import - fuzzy match",
+					"hash": "page005",
+					"form": {
+						"name": "Form",
+						"hash": "form005",
+						"schema": "radio_only"
+					},
+					"import_submission": { "radio-ab12": ["Opt Two"] },
+					"expected": {
+						"radio-ab12": {
+							"field_attrs": { "fuzzy_match": true },
+							"value": "opt2",
+							"form_value": "opt2",
+							"column_value": { "Option Two": "opt2" },
+							"filter_value": "opt2",
+							"ai_value": "Option Two"
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_select_single": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Select single form",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "select_single_only"
+					},
+					"form_submission": { "select-single-ab12": "medium" },
+					"expected": {
+						"select-single-ab12": {
+							"value": "medium",
+							"form_value": "medium",
+							"column_value": { "Medium": "medium" },
+							"filter_value": "medium",
+							"ai_value": "Medium"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Select single AI - label converts to value",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "select_single_only"
+					},
+					"ai_submission": { "select-single-ab12": "Large" },
+					"expected": {
+						"select-single-ab12": {
+							"value": "large",
+							"form_value": "large",
+							"column_value": { "Large": "large" },
+							"filter_value": "large",
+							"ai_value": "Large"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Select single import",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "select_single_only"
+					},
+					"import_submission": { "select-single-ab12": ["Small"] },
+					"expected": {
+						"select-single-ab12": {
+							"value": "small",
+							"form_value": "small",
+							"column_value": { "Small": "small" },
+							"filter_value": "small",
+							"ai_value": "Small"
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_select_multiple": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Select multiple form - list",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "select_only"
+					},
+					"form_submission": { "select-ab12": ["red", "blue"] },
+					"expected": {
+						"select-ab12": {
+							"value": ["red", "blue"],
+							"form_value": ["red", "blue"],
+							"column_value": { "Red": "red", "Blue": "blue" },
+							"filter_value": ["red", "blue"],
+							"ai_value": ["Red", "Blue"]
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Select multiple AI - labels",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "select_only"
+					},
+					"ai_submission": { "select-ab12": ["Red", "Green"] },
+					"expected": {
+						"select-ab12": {
+							"value": ["red", "green"],
+							"form_value": ["red", "green"],
+							"column_value": { "Red": "red", "Green": "green" },
+							"filter_value": ["red", "green"],
+							"ai_value": ["Red", "Green"]
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Select multiple import - comma separated",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "select_only"
+					},
+					"import_submission": { "select-ab12": ["Red, Blue, Green"] },
+					"expected": {
+						"select-ab12": {
+							"field_attrs": { "separator": "," },
+							"value": ["red", "blue", "green"],
+							"form_value": ["red", "blue", "green"],
+							"column_value": {
+								"Red": "red",
+								"Blue": "blue",
+								"Green": "green"
+							},
+							"filter_value": ["red", "blue", "green"],
+							"ai_value": ["Red", "Blue", "Green"]
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Select import - fuzzy match",
+					"hash": "page004",
+					"form": {
+						"name": "Form",
+						"hash": "form004",
+						"schema": "select_only"
+					},
+					"import_submission": { "select-ab12": ["Rd", "Gren"] },
+					"expected": {
+						"select-ab12": {
+							"field_attrs": { "fuzzy_match": true },
+							"value": ["red", "green"],
+							"form_value": ["red", "green"],
+							"column_value": {
+								"Red": "red",
+								"Green": "green"
+							},
+							"filter_value": ["red", "green"],
+							"ai_value": ["Red", "Green"]
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_link_external": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Link form - URL with title",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "link_external_only"
+					},
+					"form_submission": {
+						"link-ab12:url": "https://example.com",
+						"link-ab12:title": "Example Site"
+					},
+					"expected": {
+						"link-ab12": {
+							"value": {
+								"url": "https://example.com",
+								"title": "Example Site"
+							},
+							"form_value": {
+								"url": "https://example.com",
+								"title": "Example Site"
+							},
+							"filter_value": "Example Site",
+							"ai_value": {
+								"url": "https://example.com",
+								"title": "Example Site"
+							}
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Link form - URL without title (mock fetches)",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "link_external_only"
+					},
+					"form_submission": {
+						"link-ab12:url": "https://example.com"
+					},
+					"expected": {
+						"link-ab12": {
+							"value": {
+								"url": "https://example.com",
+								"title": "Mocked Title"
+							},
+							"form_value": {
+								"url": "https://example.com",
+								"title": "Mocked Title"
+							},
+							"filter_value": "Mocked Title",
+							"ai_value": {
+								"url": "https://example.com",
+								"title": "Mocked Title"
+							}
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Link AI - URL with title",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "link_external_only"
+					},
+					"ai_submission": {
+						"link-ab12": { "url": "https://docs.example.com", "title": "Docs" }
+					},
+					"expected": {
+						"link-ab12": {
+							"value": { "url": "https://docs.example.com", "title": "Docs" },
+							"form_value": {
+								"url": "https://docs.example.com",
+								"title": "Docs"
+							},
+							"filter_value": "Docs",
+							"ai_value": {
+								"url": "https://docs.example.com",
+								"title": "Docs"
+							}
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Link import - valid URL",
+					"hash": "page004",
+					"form": {
+						"name": "Form",
+						"hash": "form004",
+						"schema": "link_external_only"
+					},
+					"import_submission": { "link-ab12": "https://imported.example.com" },
+					"expected": {
+						"link-ab12": {
+							"value": {
+								"url": "https://imported.example.com",
+								"title": "Mocked Title"
+							},
+							"form_value": {
+								"url": "https://imported.example.com",
+								"title": "Mocked Title"
+							},
+							"filter_value": "Mocked Title",
+							"ai_value": {
+								"url": "https://imported.example.com",
+								"title": "Mocked Title"
+							}
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_bookmark": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Bookmark form - URL and title, no replace",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "bookmark_only"
+					},
+					"form_submission": {
+						"bookmark-ab12:url": "https://bookmark.example.com",
+						"bookmark-ab12:title": "Bookmarked"
+					},
+					"expected": {
+						"bookmark-ab12": {
+							"value": {
+								"url": "https://bookmark.example.com",
+								"title": "Bookmarked"
+							},
+							"form_value": {
+								"url": "https://bookmark.example.com",
+								"title": "Bookmarked"
+							},
+							"filter_value": "Bookmarked",
+							"ai_value": {
+								"url": "https://bookmark.example.com",
+								"title": "Bookmarked"
+							}
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Bookmark AI - URL and title",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "bookmark_only"
+					},
+					"ai_submission": {
+						"bookmark-ab12": {
+							"url": "https://ai-bookmark.com",
+							"title": "AI Bookmark"
+						}
+					},
+					"expected": {
+						"bookmark-ab12": {
+							"value": {
+								"url": "https://ai-bookmark.com",
+								"title": "AI Bookmark"
+							},
+							"form_value": {
+								"url": "https://ai-bookmark.com",
+								"title": "AI Bookmark"
+							},
+							"filter_value": "AI Bookmark",
+							"ai_value": {
+								"url": "https://ai-bookmark.com",
+								"title": "AI Bookmark"
+							}
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_bookmark_replace_flags_update_entity_fields": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Original Page Name",
+					"description": "Original page description",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "bookmark_only"
+					},
+					"form_submission": {
+						"bookmark-ab12:url": "https://bookmark.example.com",
+						"bookmark-ab12:title": "Original Bookmark",
+						"bookmark-ab12:replace-image": "on",
+						"bookmark-ab12:replace-name": "on",
+						"bookmark-ab12:replace-description": "on"
+					},
+					"expected": {
+						"bookmark-ab12": {
+							"value": {
+								"url": "https://bookmark.example.com",
+								"title": "Fetched Bookmark Title"
+							},
+							"form_value": {
+								"url": "https://bookmark.example.com",
+								"title": "Fetched Bookmark Title"
+							},
+							"filter_value": "Fetched Bookmark Title",
+							"ai_value": {
+								"url": "https://bookmark.example.com",
+								"title": "Fetched Bookmark Title"
+							}
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_location": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Location form - dict with id and name",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "location_only"
+					},
+					"form_submission": {
+						"location-ab12:id": "ChIJ123",
+						"location-ab12:name": "Test Location"
+					},
+					"expected": {
+						"location-ab12": {
+							"value": {
+								"id": "mock_place_123",
+								"name": "Mocked Location"
+							},
+							"form_value": {
+								"id": "mock_place_123",
+								"name": "Mocked Location"
+							},
+							"column_value": {
+								"url": "https://www.google.com/maps/search/?api=1&query=Mocked+Location&query_place_id=mock_place_123",
+								"title": "Mocked Location"
+							},
+							"filter_value": "Mocked Location",
+							"ai_value": "Mocked Location"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Location AI - string (mock returns place)",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "location_only"
+					},
+					"ai_submission": { "location-ab12": "New York City" },
+					"expected": {
+						"location-ab12": {
+							"value": {
+								"id": "mock_place_123",
+								"name": "Mocked Location"
+							},
+							"form_value": {
+								"id": "mock_place_123",
+								"name": "Mocked Location"
+							},
+							"column_value": {
+								"url": "https://www.google.com/maps/search/?api=1&query=Mocked+Location&query_place_id=mock_place_123",
+								"title": "Mocked Location"
+							},
+							"filter_value": "Mocked Location",
+							"ai_value": "Mocked Location"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Location import - string",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "location_only"
+					},
+					"import_submission": { "location-ab12": "Chicago, IL" },
+					"expected": {
+						"location-ab12": {
+							"value": {
+								"id": "mock_place_123",
+								"name": "Mocked Location"
+							},
+							"form_value": {
+								"id": "mock_place_123",
+								"name": "Mocked Location"
+							},
+							"column_value": {
+								"url": "https://www.google.com/maps/search/?api=1&query=Mocked+Location&query_place_id=mock_place_123",
+								"title": "Mocked Location"
+							},
+							"filter_value": "Mocked Location",
+							"ai_value": "Mocked Location"
+						}
+					}
+				}
+			]
+		]
+	}
+}

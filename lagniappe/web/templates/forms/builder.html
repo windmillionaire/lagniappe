@@ -1,0 +1,200 @@
+{% extends "layouts/base.html" %}
+{% from 'common.html' import desktop %}
+{% import 'controls.html' as controls %}
+{% import 'menus.html' as menus %}
+{% from 'forms/restrictions.html' import restrict_access %}
+{% set can_copy_form = Resource.FORMS.allowed(Action.CREATE) %}
+{% set can_delete_form = form.allowed(Action.DELETE) %}
+
+{% macro save() %}
+  <button class="{{ styles.nav.button }} group/toggle text-xl"
+          data-saved="true"
+          data-role="save-form"
+          data-kind="saved"
+          type="button"
+          aria-label="Save form"
+          title="Save form">
+    {{ render_icon("builder.saved", "text-kind-default invisible group-data-[saved=true]/toggle:visible", "saved") }}
+    {{ render_icon("builder.unsaved", "text-kind-default invisible group-data-[saved=false]/toggle:visible", "unsaved") }}
+  </button>
+{% endmacro %}
+
+{% macro generate() %}
+  <button data-role="generate"
+          class="{{ styles.builder.generate }} w-full mb-3"
+          data-kind="{{ form.form_type }}"
+          type="button">
+    {{ render_icon("generate", "text-form-default") }}
+    <span>Generate</span>
+  </button>
+  <form id="generate"
+        class="flex flex-col gap-3 mb-3 w-full"
+        data-visible="false"
+        data-kind="{{ form.form_type }}">
+    <input type="hidden" name="form-type" value="{{ form.form_type }}" />
+    <input type="hidden" name="form-key" value="{{ form.urlsafe_key }}" />
+    <textarea rows="10"
+              class="{{ styles.textarea }}"
+              name="description"
+              placeholder="Describe the purpose of the form you'd like to create."></textarea>
+    <button data-explain="generate"
+            data-role="explain"
+            class="{{ styles.button.explain }}"
+            data-visible="false">
+      {{ render_icon("prompt", "text-kind-default") }}
+      <span>Initial Prompt</span>
+    </button>
+    <div class="{{ styles.button.group }}" data-role="submit-group">
+      <button class="{{ styles.button.submit }}"
+              data-kind="cancel"
+              data-role="cancel"
+              type="button">Cancel</button>
+      <button class="{{ styles.button.submit }}" type="submit">Generate</button>
+    </div>
+  </form>
+{% endmacro %}
+
+{% macro header() %}
+  <div class="{{ styles.builder.header.model }}">
+    <h2 class="flex flex-row items-center gap-2">
+      {{ render_icon((form.form_type), "icon-xl text-kind-default", form.form_type) }}
+      <div data-menu-anchor class="{{ styles.entity.name.anchor }}">
+        <span id="form-name-display"
+              data-role="title"
+              class="truncate">{{ form.name }}</span>
+        <input id="form-name-input"
+               type="text"
+               value="{{ form.name }}"
+               data-visible="false"
+               class="{{ styles.builder.name }}" />
+        {% if can_copy_form or can_delete_form %}
+          {% call menus.title("Form actions") %}
+            {% if can_copy_form %}
+              <button type="button"
+                      data-menu-item
+                      data-action="copy-form"
+                      data-kind="form"
+                      data-route="{{ url_for('forms.copy_form', key=form.urlsafe_key) }}"
+                      class="{{ styles.dropdown.option.action }}">
+                {{ render_icon("form", (styles.dropdown.icon ~ " text-kind-default"), "form") }}
+                <span>Copy Form</span>
+              </button>
+            {% endif %}
+            {% if can_delete_form %}
+              {{ menus.delete(url_for('forms.form_index'), "Delete Form") }}
+            {% endif %}
+          {% endcall %}
+        {% endif %}
+      </div>
+    </h2>
+    <div class="flex flex-row items-center gap-2">
+      <button id="preview-toggle"
+              class="{{ styles.builder.switch.container }} group/toggle"
+              role="switch"
+              type="button"
+              aria-checked="false"
+              data-active="false"
+              aria-label="Preview form"
+              title="Preview form">
+        <span aria-hidden="true" class="{{ styles.builder.switch.toggle }}"></span>
+      </button>
+      {% if Resource.FORMS.allowed(Action.EDIT) %}{{ save() }}{% endif %}
+    </div>
+  </div>
+  <p id="notification"
+     data-visible="false"
+     class="sm:text-sm ml-2 italic pb-3 text-delete-default"></p>
+  <form id="schema-form"
+        data-visible="false"
+        lp-update
+        data-route="{{ url_for('forms.update', key=form.urlsafe_key) }}">
+    <input type="hidden" name="schema" />
+    <input type="hidden"
+           name="name"
+           id="form-name-hidden"
+           value="{{ form.name }}" />
+  </form>
+{% endmacro %}
+
+{% macro help(route) %}
+  <button class="{{ styles.toggle.container }} self-center"
+          lp-control="help"
+          data-controls="help"
+          lp-help="{{ route }}"
+          type="button"
+          data-kind="help">
+    {{ render_icon("help") }}
+  </button>
+{% endmacro %}
+
+{% macro main() %}
+  {{ desktop('The form builder') }}
+  <div lp-view
+       lp-entity
+       data-kind="builder"
+       data-key="{{ form.urlsafe_key }}"
+       data-fingerprint="{{ form.fingerprint }}"
+       data-form-type="{{ form.form_type }}"
+       data-schema='{{ form.schema|tojson }}'
+       data-name='{{ form.name }}'
+       data-description="{{ form.description }}"
+       data-expanded="false"
+       class="{{ styles.builder.view }}">
+    <section class="{{ styles.builder.sections.side }}" id="components-column">
+      <div class="{{ styles.builder.header.side }}">
+        <h2>Components</h2>
+        {{ help('form_components') }}
+      </div>
+      <div class="flex flex-col gap-3" id="components-panel"></div>
+    </section>
+    <section class="{{ styles.builder.sections.main }}"
+             id="main-column"
+             data-kind="form">
+      {{ header() }}
+      <div id="preview-panel"
+           data-visible="false"
+           class="{{ styles.builder.panels.preview }}"></div>
+      <div id="default-panel"
+           class="{{ styles.builder.panels.default }} group/default"
+           data-visible="false"></div>
+      <div id="model-panel"
+           class="{{ styles.builder.panels.model }}"
+           data-visible="true"></div>
+      <div id="condition-panel"
+           class="{{ styles.builder.panels.default }} group/condition"
+           data-visible="false"></div>
+    </section>
+    <section class="{{ styles.builder.sections.side }}"
+             id="settings-column"
+             data-kind="form">
+      <div class="{{ styles.builder.header.side }}">
+        <h2>Settings</h2>
+        <div class="{{ styles.home.card.actions }}">
+          {{ help('form_settings') }}
+          {% if Resource.FORMS.allowed(Action.EDIT) %}
+            <button class="{{ styles.toggle.container }}"
+                    data-role="form-settings"
+                    data-kind="{{ form.form_type }}"
+                    aria-label="Form settings"
+                    title="Form settings">
+              {{ render_icon("settings.page") }}
+            </button>
+          {% endif %}
+        </div>
+      </div>
+      <div id="form-settings-panel" data-visible="true" class="flex flex-col">
+        {% if Resource.FORMS.allowed(Action.EDIT) %}{{ generate() }}{% endif %}
+        {% if Resource.SITE.allowed(Action.PERMISSIONS) %}{{ restrict_access(form) }}{% endif %}
+      </div>
+      <div id="settings-panel" class="flex flex-col gap-3" data-visible="false"></div>
+    </section>
+  </div>
+{% endmacro %}
+
+{% block title %}
+  {{ form.name }}
+{% endblock title %}
+
+{% block content %}
+  {{ main() }}
+{% endblock content %}

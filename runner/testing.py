@@ -1,0 +1,524 @@
+import copy
+import hashlib
+import json
+import os
+import re
+import signal
+import socket
+import subprocess
+import sys
+import threading
+from pathlib import Path
+from time import sleep
+from urllib.parse import urlparse
+
+from runner.context import GCLOUD_CLI, NPM_CLI
+from config import APP_DIR, Directory, Environment, File, SETTINGS
+from runner.gcloud import activate_repository_gcloud
+from runner.process import run_command
+
+# Cursor/agent sandboxes may set PLAYWRIGHT_BROWSERS_PATH to an empty cache.
+# Prefer the normal user install when it exists.
+_DEFAULT_PLAYWRIGHT_BROWSERS = Path.home() / ".cache/ms-playwright"
+if _DEFAULT_PLAYWRIGHT_BROWSERS.is_dir():
+    os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(_DEFAULT_PLAYWRIGHT_BROWSERS)
+
+
+# Patterns to filter from test server output (static files, etc.)
+FILTERED_PATTERNS = re.compile(
+    r'"GET /(?:'
+    r"chunks/|"
+    r"fonts/|"
+    r"images/|"
+    r"style\.css|"
+    r"script\.js|"
+    r"token|"
+    r"update-session|"
+    r"validate-user|"
+    r"identity-config|"
+    r"firebase-config|"
+    r"sw\.js|"
+    r".*\.woff2|"
+    r".*\.png|"
+    r".*\.ico"
+    r')[^"]*"'
+)
+
+_TEST_FRONTEND_BUNDLE_SCHEMA = 1
+_TEST_FRONTEND_BUNDLE_STATE = Directory.REPORTS.value / "test-frontend-bundle.json"
+_TEST_FRONTEND_INPUT_ROOTS = (
+    Path("build"),
+    Path("src/script"),
+    Path("src/style"),
+)
+_TEST_FRONTEND_INPUT_FILES = (
+    Path("config/browser_protocol.json"),
+    Path("config/files/lagniappe_settings.yaml"),
+    Path("package.json"),
+    Path("package-lock.json"),
+    Path("node_modules/.package-lock.json"),
+)
+_TEST_FRONTEND_OUTPUT_FILES = (
+    Path("lagniappe/web/static/build.json"),
+    Path("lagniappe/web/static/login.js"),
+    Path("lagniappe/web/static/script.js"),
+    Path("lagniappe/web/static/style.css"),
+    Path("lagniappe/web/static/sw.js"),
+)
+
+
+# @testable false
+# @covered-by runner/testing.py::ensure_test_frontend_bundle
+# @reason private deterministic source/config fingerprint for the test-server build preflight
+def _test_frontend_input_fingerprint():
+    digest = hashlib.sha256(f"test-frontend-v{_TEST_FRONTEND_BUNDLE_SCHEMA}".encode())
+
+    for relative_root in _TEST_FRONTEND_INPUT_ROOTS:
+        root = APP_DIR / relative_root
+        digest.update(f"root:{relative_root.as_posix()}\0".encode())
+        if not root.is_dir():
+            digest.update(b"missing\0")
+            continue
+        for path in sorted(item for item in root.rglob("*") if item.is_file()):
+            relative = path.relative_to(APP_DIR).as_posix()
+            digest.update(relative.encode())
+            digest.update(b"\0")
+            digest.update(path.read_bytes())
+            digest.update(b"\0")
+
+    for relative in _TEST_FRONTEND_INPUT_FILES:
+        path = APP_DIR / relative
+        digest.update(relative.as_posix().encode())
+        digest.update(b"\0")
+        digest.update(path.read_bytes() if path.is_file() else b"missing")
+        digest.update(b"\0")
+
+    return digest.hexdigest()
+
+
+# @testable false
+# @covered-by runner/testing.py::ensure_test_frontend_bundle
+# @reason private generated-output fingerprint detects missing, partial, or restored bundles
+def _test_frontend_output_fingerprint():
+    paths = [APP_DIR / relative for relative in _TEST_FRONTEND_OUTPUT_FILES]
+    chunks = Directory.JS_CHUNKS.value
+    chunk_paths = sorted(chunks.glob("*.js")) if chunks.is_dir() else []
+    if any(not path.is_file() for path in paths) or not chunk_paths:
+        return None
+
+    digest = hashlib.sha256()
+    for path in [*paths, *chunk_paths]:
+        relative = path.relative_to(APP_DIR).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+# @testable false
+# @covered-by runner/testing.py::ensure_test_frontend_bundle
+# @reason private tolerant state reader treats missing or malformed local metadata as stale
+def _read_test_frontend_bundle_state():
+    try:
+        state = json.loads(
+            _TEST_FRONTEND_BUNDLE_STATE.read_text(encoding="utf-8")
+        )
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    return state if isinstance(state, dict) else None
+
+
+# @testable true
+# @tests tests_tooling/test_003_config.py::test_test_frontend_bundle_skips_current_build
+# @tests tests_tooling/test_003_config.py::test_test_frontend_bundle_rebuilds_stale_build
+# @pair test-server:freshness
+# @pair frontend-build:freshness
+# @pair frontend-build:no-op
+# @pair frontend-build:rebuild
+# @pair frontend-build:output-validation
+def ensure_test_frontend_bundle():
+    """Build development assets when test-server inputs or outputs changed."""
+    input_fingerprint = _test_frontend_input_fingerprint()
+    output_fingerprint = _test_frontend_output_fingerprint()
+    state = _read_test_frontend_bundle_state()
+    if output_fingerprint is not None and state == {
+        "schema": _TEST_FRONTEND_BUNDLE_SCHEMA,
+        "inputs": input_fingerprint,
+        "outputs": output_fingerprint,
+    }:
+        return False
+
+    print("Frontend test bundle is stale; running npm run dev.", flush=True)
+    try:
+        result = subprocess.run(
+            [NPM_CLI, "run", "dev"],
+            cwd=APP_DIR,
+            check=False,
+        )
+    except FileNotFoundError as error:
+        raise RuntimeError("npm is required to build the frontend test bundle.") from error
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Frontend test bundle build failed with exit code {result.returncode}."
+        )
+
+    output_fingerprint = _test_frontend_output_fingerprint()
+    if output_fingerprint is None:
+        raise RuntimeError(
+            "Frontend test bundle build completed without required outputs."
+        )
+
+    Directory.REPORTS.create()
+    state = {
+        "schema": _TEST_FRONTEND_BUNDLE_SCHEMA,
+        "inputs": input_fingerprint,
+        "outputs": output_fingerprint,
+    }
+    temporary = _TEST_FRONTEND_BUNDLE_STATE.with_suffix(".tmp")
+    temporary.write_text(
+        f"{json.dumps(state, indent=2)}\n",
+        encoding="utf-8",
+    )
+    temporary.replace(_TEST_FRONTEND_BUNDLE_STATE)
+    return True
+
+
+def prepare_test_artifacts():
+    """Reset generated E2E artifact directories before a test-server run."""
+    for artifact_dir in [Directory.TEST_FAILURES, Directory.TEST_REPORTS]:
+        artifact_dir.clean()
+        artifact_dir.get_or_create()
+
+
+# @testable infrastructure
+# @reason live test-index deployment is an operator-only provider boundary
+def update_test_indexes():
+    index_data = File.INDEX_YAML.load()
+    indexes = index_data["indexes"]
+
+    try:
+        test_indexes = []
+        for index in indexes:
+            test_index = copy.deepcopy(index)
+            if "kind" in test_index:
+                test_index["kind"] = f"test-{test_index['kind']}"
+            test_indexes.append(test_index)
+
+        combined = {"indexes": indexes + test_indexes}
+
+        File.INDEX_YAML.save(combined)
+
+        run_command(
+            [GCLOUD_CLI, "app", "deploy", File.INDEX_YAML.value, "--quiet"],
+            check=True,
+        )
+
+    finally:
+        File.INDEX_YAML.save(index_data)
+
+
+def wait_for_server(BASE_URL, max_retries=10):
+    import requests
+    from time import sleep
+
+    sleep(2)
+
+    for i in range(max_retries):
+        try:
+            response = requests.get(f"{BASE_URL}/ping")
+            if response.status_code == 200:
+                return True
+        except Exception as e:
+            print(f"Error waiting for server: {e}")
+            sleep(0.5)
+
+    return False
+
+
+def _server_port_in_use(base_url):
+    parsed = urlparse(base_url)
+    host = parsed.hostname or "127.0.0.1"
+    port = parsed.port
+
+    if not port:
+        return False
+
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(0.25)
+        return sock.connect_ex((host, port)) == 0
+
+
+def _port_listener_pids(port):
+    result = subprocess.run(
+        ["ss", "-ltnp", f"( sport = :{port} )"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return sorted({int(pid) for pid in re.findall(r"pid=(\d+)", result.stdout)})
+
+
+def _kill_existing_test_server(base_url):
+    parsed = urlparse(base_url)
+    port = parsed.port
+
+    if not port:
+        return
+
+    pids = _port_listener_pids(port)
+    if not pids:
+        return
+
+    print(
+        f"Abandoned test server process killed on port {port}: {', '.join(map(str, pids))}"
+    )
+
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            continue
+
+    for _ in range(10):
+        if not _server_port_in_use(base_url):
+            return
+        sleep(0.2)
+
+    remaining_pids = _port_listener_pids(port)
+    for pid in remaining_pids:
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            continue
+
+    for _ in range(10):
+        if not _server_port_in_use(base_url):
+            return
+        sleep(0.2)
+
+    raise RuntimeError(f"Could not free test server port {port} before startup.")
+
+
+def _filter_server_output(pipe, stream):
+    """Filter and forward server output, hiding static file requests."""
+    for line in iter(pipe.readline, b""):
+        try:
+            decoded = line.decode("utf-8", errors="replace")
+            if not FILTERED_PATTERNS.search(decoded):
+                stream.write(decoded)
+                stream.flush()
+        except Exception:
+            pass
+    pipe.close()
+
+
+def _configure_test_gcloud():
+    os.environ["FLASK_ENV"] = Environment.TESTING.value
+    activate_repository_gcloud(
+        ensure_adc=True,
+        allow_runtime_adc=True,
+        allow_adc_login=False,
+    )
+
+
+def _test_server_command():
+    return [
+        sys.executable,
+        "-m",
+        "flask",
+        "--app",
+        "main.py",
+        "run",
+        "--port",
+        SETTINGS.test_config["SERVER_PORT"],
+    ]
+
+
+def _test_server_env():
+    return {
+        **os.environ,
+        "PYTHONUNBUFFERED": "1",
+        "FLASK_ENV": Environment.TESTING.value,
+    }
+
+
+def _launch_test_server(stdout, stderr, start_new_session=False):
+    return subprocess.Popen(
+        _test_server_command(),
+        cwd=APP_DIR,
+        stdout=stdout,
+        stderr=stderr,
+        env=_test_server_env(),
+        start_new_session=start_new_session,
+    )
+
+
+# @testable infrastructure
+def run_test_server():
+    ensure_test_frontend_bundle()
+    _configure_test_gcloud()
+    base_url = SETTINGS.test_config["BASE_URL"]
+    _kill_existing_test_server(base_url)
+
+    process = _launch_test_server(stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+    stdout_thread = threading.Thread(
+        target=_filter_server_output, args=(process.stdout, sys.stdout), daemon=True
+    )
+    stderr_thread = threading.Thread(
+        target=_filter_server_output, args=(process.stderr, sys.stderr), daemon=True
+    )
+    stdout_thread.start()
+    stderr_thread.start()
+
+    if not wait_for_server(base_url):
+        exit_code = process.poll()
+        if exit_code is not None:
+            raise RuntimeError(
+                f"Test server exited before becoming healthy (exit code {exit_code})."
+            )
+        raise RuntimeError("Test server failed to start")
+
+    return process
+
+
+def terminate_test_server_process(process, timeout=15):
+    process.terminate()
+    try:
+        process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait()
+
+
+def cleanup_test_data():
+    os.environ["FLASK_ENV"] = Environment.TESTING.value
+    _configure_test_gcloud()
+
+    from lagniappe.core.tools import database, cache
+
+    database.cleanup_test_data()
+    cache.cleanup_test_data()
+
+
+# @testable false
+# @covered-by runner/testing.py::teardown_managed_test_server
+# @reason tolerant PID parsing is exercised through managed-server teardown
+def _read_managed_test_server_pid():
+    try:
+        return int(
+            File.MANAGED_TEST_SERVER_PID.value.read_text(encoding="utf-8").strip()
+        )
+    except (FileNotFoundError, ValueError):
+        return None
+
+
+def _process_is_running(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def _send_process_signal(pid, sig):
+    try:
+        os.killpg(pid, sig)
+        return True
+    except (PermissionError, ProcessLookupError):
+        pass
+
+    try:
+        os.kill(pid, sig)
+        return True
+    except ProcessLookupError:
+        return False
+
+
+def _terminate_managed_test_server_pid(pid, timeout=15):
+    if not _process_is_running(pid):
+        return False
+
+    _send_process_signal(pid, signal.SIGTERM)
+    for _ in range(timeout * 5):
+        if not _process_is_running(pid):
+            return True
+        sleep(0.2)
+
+    _send_process_signal(pid, signal.SIGKILL)
+    for _ in range(10):
+        if not _process_is_running(pid):
+            return True
+        sleep(0.2)
+
+    raise RuntimeError(f"Could not stop managed test server process {pid}.")
+
+
+# @testable infrastructure
+def start_managed_test_server():
+    """Start a detached Flask test server for manual or agent browser review."""
+    prepare_test_artifacts()
+    ensure_test_frontend_bundle()
+    _configure_test_gcloud()
+    base_url = SETTINGS.test_config["BASE_URL"]
+    _kill_existing_test_server(base_url)
+    Directory.REPORTS.create()
+
+    with File.MANAGED_TEST_SERVER_LOG.value.open(
+        "a",
+        encoding="utf-8",
+        buffering=1,
+    ) as log_file:
+        log_file.write("\n--- Starting managed test server ---\n")
+        process = _launch_test_server(
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            start_new_session=True,
+        )
+
+    if not wait_for_server(base_url):
+        exit_code = process.poll()
+        if exit_code is not None:
+            raise RuntimeError(
+                f"Test server exited before becoming healthy (exit code {exit_code}). "
+                f"See {File.MANAGED_TEST_SERVER_LOG.value}."
+            )
+        _terminate_managed_test_server_pid(process.pid, timeout=5)
+        raise RuntimeError(
+            f"Test server failed to start. See {File.MANAGED_TEST_SERVER_LOG.value}."
+        )
+
+    File.MANAGED_TEST_SERVER_PID.value.write_text(
+        f"{process.pid}\n",
+        encoding="utf-8",
+    )
+    return process.pid
+
+
+# @testable true
+# @tests tests_tooling/test_005_test_server_command.py::test_teardown_managed_test_server_stops_before_cleaning
+# @features test-server
+# @dimensions teardown process-management
+def teardown_managed_test_server():
+    """Stop the detached test server and clean test data."""
+    os.environ["FLASK_ENV"] = Environment.TESTING.value
+    pid = _read_managed_test_server_pid()
+
+    if pid:
+        _terminate_managed_test_server_pid(pid)
+
+    base_url = SETTINGS.test_config["BASE_URL"]
+    if _server_port_in_use(base_url):
+        _kill_existing_test_server(base_url)
+
+    try:
+        File.MANAGED_TEST_SERVER_PID.value.unlink()
+    except FileNotFoundError:
+        pass
+
+    cleanup_test_data()
+
+    return pid

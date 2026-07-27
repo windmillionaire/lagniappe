@@ -1,0 +1,222 @@
+{% from 'common.html' import attribute_button, autofill, explain_prompt %}
+{% from 'filters.html' import filter_form, filter_item %}
+{% import 'controls.html' as controls %}
+
+{% macro related_form_badge(form, selected_id=none) %}
+  <button type="button"
+          data-role="related-form"
+          data-form-id="{{ form.id }}"
+          data-details='{{ form|tojson }}'
+          data-kind="form"
+          data-selected="{{ (form.id == selected_id)|yesno }}"
+          class="{{ styles.attributes.form }}">
+    <span data-role="icon"
+          class="{{ styles.attributes.icon }}"
+          data-kind="form">
+      {{ render_icon("form") }}
+    </span>
+    <span data-role="text" class="font-semibold">{{ form.name }}</span>
+  </button>
+{% endmacro %}
+
+{% macro category_info(category) %}
+  {% set category_editable = category.allowed(Action.EDIT) %}
+  {% set form_preload = category.properties.form.column_value if category.form else none %}
+  <form data-widget="CategoryInfo"
+        lp-update
+        lp-offline
+        data-route="{{ url_for('categories.update', key=category.urlsafe_key) }}"
+        data-name="{{ category.name }}"
+        {% if category.description %}data-description="{{ category.description }}"{% endif %}
+        data-readonly="{{ (not category.allowed(Action.EDIT))|yesno }}"
+        data-kind="category"
+        data-visible="false"
+        data-title="Category Settings"
+        data-close="tools"
+        data-nav="true"
+        data-controls="true"
+        class="{{ styles.form.tools }}">
+    {% if category_editable %}
+      <div data-role="attributes" data-entity="category">
+        <h3 class="{{ styles.label.sectionHeading }}">Default Page Features</h3>
+        <div class="{{ styles.attributes.container }}">
+          {% for attribute in category.attributes %}{{ attribute_button(attribute) }}{% endfor %}
+        </div>
+      </div>
+    {% endif %}
+    {% if Resource.FORMS.allowed(Action.VIEW) and (category_editable or form_preload) %}
+      <div data-role="form-select"
+           data-kind="form"
+           class="{{ styles.select.container }}">
+        <h3 class="{{ styles.label.sectionHeading }}">Default Form</h3>
+        <button lp-select
+                type="button"
+                {% if form_preload %}data-preload='{{ form_preload|tojson }}'{% endif %}
+                data-action="select-form"
+                data-placeholder="attach a form..."
+                data-index="form"
+                data-creatable="true"
+                data-kind="form"
+                data-title="Attach Form"
+                data-form-type="page"
+                {% if not category_editable %}disabled{% endif %}
+                class="{{ styles.select.button }}"></button>
+      </div>
+    {% endif %}
+    {{ controls.edited_marker(url_for('categories.info', key=category.urlsafe_key)) }}
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}
+
+{% macro create_page(category) %}
+  {% set form_preload = category.properties.form.column_value if category.form else none %}
+  {% set related_forms = category.properties.forms.column_value %}
+  <form data-widget="CreatePage"
+        lp-create
+        lp-deferred
+        data-route="{{ url_for('pages.create', key=category.urlsafe_key) }}"
+        data-destination="table:IndexTable"
+        data-title="Create a Page"
+        data-close="tools"
+        data-kind="page"
+        data-visible="false"
+        data-help="create_page"
+        data-nav="true"
+        data-controls="true"
+        class="{{ styles.form.tools }}">
+    <div data-role="attributes" class="flex flex-col gap-1">
+      <h3 class="{{ styles.label.default }}">Page Features</h3>
+      <div class="{{ styles.attributes.container }}">
+        {% for attribute in category.attributes %}{{ attribute_button(attribute) }}{% endfor %}
+      </div>
+    </div>
+    {% if Resource.FORMS.allowed(Action.VIEW) %}
+      <div data-role="form-select"
+           data-kind="form"
+           class="{{ styles.select.container }}">
+        <h3 class="{{ styles.label.sectionHeading }}">Using Form</h3>
+        <button lp-select
+                type="button"
+                data-action="select-form"
+                data-placeholder="attach a form..."
+                data-index="form"
+                data-creatable="true"
+                data-title="Page Form"
+                data-form-type="page"
+                {% if form_preload %}data-preload='{{ form_preload|tojson }}'{% endif %}
+                class="{{ styles.select.button }}"></button>
+      </div>
+      {% if related_forms %}
+        <div data-role="related-forms" data-kind="form">
+          <h3 class="{{ styles.label.sectionHeading }}">Forms In This Category</h3>
+          <div class="{{ styles.attributes.container }}">
+            {% for form in related_forms %}{{ related_form_badge(form, form_preload.id if form_preload else none) }}{% endfor %}
+          </div>
+        </div>
+      {% endif %}
+    {% endif %}
+    {{ autofill(enabled=current_user.properties.restrictions.can_use_ai_tools) }}
+  </form>
+{% endmacro %}
+
+{% macro generate_pages(category) %}
+  <form data-widget="GeneratePages"
+        lp-create
+        lp-deferred
+        data-route="{{ url_for('categories.create_pages', key=category.urlsafe_key) }}"
+        data-destination="table:IndexTable"
+        data-visible="false"
+        data-title="Generate Pages"
+        data-close="tools"
+        data-nav="true"
+        data-controls="true"
+        class="{{ styles.form.tools }}">
+    {% if Resource.FORMS.allowed(Action.VIEW) %}
+      <div data-role="form-select"
+           data-kind="form"
+           class="{{ styles.select.container }}">
+        <h3 class="{{ styles.label.sectionHeading }}">Using Form</h3>
+        <button lp-select
+                type="button"
+                {% if category.form %}data-preload='{{ category.properties.form.column_value|tojson }}'{% endif %}
+                data-action="select-form"
+                data-placeholder="select a form..."
+                data-index="form"
+                data-creatable="true"
+                data-kind="form"
+                data-title="Page Form"
+                data-form-type="page"
+                class="{{ styles.select.button }}"></button>
+      </div>
+    {% endif %}
+    <div class="flex flex-col gap-2 -mt-2" data-role="submit-group">
+      {{ explain_prompt('generate') }}
+      <button type="submit" class="{{ styles.button.submit }} mt-2"></button>
+    </div>
+  </form>
+{% endmacro %}
+
+{% macro page_filters(category) %}
+  <div id="filters"
+       lp-component
+       data-visible="false"
+       data-default="Filters"
+       data-nav="filters"
+       data-title="Page Filters"
+       class="{{ styles.form.tools }}">
+    <div lp-nav class="{{ styles.form.header.container }}" data-nav="filters">
+      <h2 class="{{ styles.form.header.title }}" data-role="title"></h2>
+      <div class="{{ styles.form.header.controls }}" data-role="controls">
+        {{ controls.help() }}
+        {{ controls.close() }}
+        {{ controls.reset() }}
+        {{ controls.filter_list() }}
+      </div>
+    </div>
+    <nav data-standalone="true"
+         data-nav="filters"
+         data-close="tools"
+         data-controls="true">
+    </nav>
+    <form data-widget="Filters"
+          data-conditions='{{ category.properties.filters.preload|tojson }}'
+          data-readonly="false"
+          data-title="Page Filters"
+          data-close="tools"
+          data-controls="true"
+          data-nav="false"
+          data-visible="false"
+          class="{{ styles.form.tools }}">
+      {{ filter_form(category) }}
+    </form>
+    <div data-reset="filters:Filters"
+         data-close="tools"
+         data-title="Matching Pages"
+         data-widget="FilterResults"
+         data-controls="true"
+         data-nav="false"
+         data-visible="false"
+         data-kind="page"
+         class="flex flex-col gap-4"></div>
+  </div>
+{% endmacro %}
+
+{% macro saved_filters(category, filters=None) %}
+  <ul lp-load
+      data-close="tools"
+      data-title="Saved Filters"
+      data-controls="true"
+      data-widget="SavedFilters"
+      data-role="saved-filters"
+      data-route='{{ url_for("filters.get", key=category.urlsafe_key) }}'
+      data-visible="false"
+      data-kind="page"
+      class="outline-2 outline-kind-default rounded-md divide-y-kind-light bg-kind-bg">
+    {%- if filters -%}
+      {%- for filter in filters %}{{ filter_item(filter) }}
+      {% endfor -%}
+    {%- else -%}
+      <li data-role="empty" class="p-4 text-kind-default font-semibold italic">No filters saved yet</li>
+    {%- endif -%}
+  </ul>
+{% endmacro %}

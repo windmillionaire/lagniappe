@@ -1,0 +1,96 @@
+{
+	"test_normalize_list_drops_numeric_zero_keeps_string_zero": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Normalize zero page",
+					"hash": "nz1",
+					"form": {
+						"name": "F",
+						"hash": "nzf1",
+						"schema": "normalize_tags_multi"
+					},
+					"normalize_case": {
+						"values": { "tags": [0, "0", 1] },
+						"expected": { "tags": ["0", 1] }
+					}
+				}
+			]
+		]
+	},
+	"test_patch_submission_merges_multiple_fields": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Patch multi page",
+					"hash": "pm1",
+					"form": {
+						"name": "F",
+						"hash": "pmf1",
+						"schema": "patch_title_slug"
+					},
+					"initial_submission": { "title": "Hello", "slug": "hello" },
+					"patch_payload": { "title": "Hi", "slug": "hi" },
+					"expected_submission": { "title": "Hi", "slug": "hi" }
+				}
+			]
+		]
+	},
+	"test_import_submission_validation_error_includes_field_and_payload": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Import error page",
+					"hash": "ie1",
+					"form": {
+						"name": "F",
+						"hash": "ief1",
+						"schema": "integration_two_column_table"
+					},
+					"import_submission": { "tbl": [["only_a"]] },
+					"expected_error_substring": "tbl:"
+				}
+			]
+		]
+	},
+	"test_save_submission_writes_form_hash_and_schema_version": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Save meta page",
+					"hash": "sm1",
+					"form": {
+						"name": "F",
+						"hash": "formhash_save1",
+						"schema": "integration_one_text"
+					},
+					"form_version": "schema_version_xyz",
+					"initial_submission": { "note": "n" }
+				}
+			]
+		]
+	},
+	"test_fingerprint_mixes_entity_and_cached_form_fingerprint": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Fingerprint page",
+					"hash": "fp1",
+					"form": {
+						"name": "F",
+						"hash": "formhash_fp1",
+						"schema": "integration_one_text"
+					},
+					"modified_iso": "2024-06-01T12:00:00+00:00",
+					"cached_form_fingerprint": "cached_form_fp",
+					"form_hash_for_cache": "formhash_fp1"
+				}
+			]
+		]
+	}
+}

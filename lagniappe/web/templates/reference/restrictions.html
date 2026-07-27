@@ -1,0 +1,35 @@
+{% from "manual/macros.html" import subheading, callout %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Page Restrictions") %}
+  <section>
+    {{ subheading("What This Panel Controls") }}
+    <p class="text-sm text-base-dark">
+      Page restrictions narrow who can view this specific page. They are useful when a page belongs to a broad category but should only be visible to the owner or selected groups.
+    </p>
+    {% call callout("warning") %}
+      Restrictions override category access. If a page is restricted to the owner or to a group, other groups that can normally see the category will not see this page.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("What You See") }}
+    <div class="space-y-3">
+      {% call feature("Visible To", icon="group", kind="user") %}
+        The badges show who currently has access through the page's restrictions.
+      {% endcall %}
+      {% call feature("Restrict to Site Owner", icon="siteOwner", kind="user") %}
+        Use this for owner-only pages that should be hidden from every group.
+      {% endcall %}
+      {% call feature("Group Restrictions", icon="users", kind="user") %}
+        Add one or more groups when only those groups should be able to view the page.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Good Fit") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Use restrictions for exceptions, private records, or sensitive pages inside otherwise shared categories.</li>
+      <li>Use category or group permissions for broad access patterns that apply to many pages.</li>
+      <li>Remove restrictions when the page should go back to normal category-based visibility.</li>
+    </ul>
+  </section>
+{% endcall %}

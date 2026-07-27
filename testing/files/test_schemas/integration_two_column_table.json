@@ -1,0 +1,21 @@
+[
+	{
+		"id": "tbl",
+		"type": "table",
+		"title": "Two cols",
+		"columns": [
+			{
+				"id": "a",
+				"type": "input",
+				"input": "text",
+				"title": "A"
+			},
+			{
+				"id": "b",
+				"type": "input",
+				"input": "text",
+				"title": "B"
+			}
+		]
+	}
+]

@@ -1,0 +1,26 @@
+[
+	{
+		"id": "people",
+		"type": "table",
+		"title": "People",
+		"columns": [
+			{
+				"id": "full_name",
+				"type": "input",
+				"input": "text",
+				"title": "Full name"
+			},
+			{
+				"id": "contact_email",
+				"type": "input",
+				"input": "email",
+				"title": "Email"
+			},
+			{
+				"id": "active",
+				"type": "checkbox",
+				"title": "Active"
+			}
+		]
+	}
+]

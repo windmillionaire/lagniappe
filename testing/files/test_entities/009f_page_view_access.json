@@ -1,0 +1,116 @@
+{
+	"test_page_view_access_owner_stored_only": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Owner-only stored restriction",
+					"hash": "pgown1",
+					"restricted_to": ["owner"],
+					"model": { "name": "Cat", "hash": "cat001" }
+				}
+			]
+		]
+	},
+	"test_page_view_access_from_group_views": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Page resolved via views index",
+					"hash": "pgdb1",
+					"model": { "name": "Cat", "hash": "cat001" }
+				}
+			]
+		]
+	},
+	"test_page_view_access_returns_attached_groups": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Page with viewer groups",
+					"hash": "pggrp1",
+					"model": { "name": "Cat", "hash": "cat001" },
+					"groups": [
+						{ "name": "Editors", "hash": "grpedit", "permissions": {} },
+						{ "name": "Viewers", "hash": "grpview", "permissions": {} }
+					]
+				}
+			]
+		]
+	},
+	"test_page_restricted_access_group_match": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Restricted page",
+					"hash": "pgrstr",
+					"enforce_allowed": true,
+					"restricted_to": ["grp001"],
+					"model": { "name": "Cat", "hash": "cat001", "enforce_allowed": true }
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "Member",
+					"hash": "usrmem1",
+					"enforce_allowed": true,
+					"page": { "name": "Member page", "hash": "pgmem1" },
+					"groups": [
+						{ "name": "Team", "hash": "grp001", "permissions": {} }
+					],
+					"permissions": { "pgmem1": "EDIT", "models": "VIEW" }
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "Outsider",
+					"hash": "usrout1",
+					"enforce_allowed": true,
+					"page": { "name": "Out page", "hash": "pgout1" },
+					"permissions": { "pgout1": "EDIT" }
+				}
+			]
+		]
+	},
+	"test_page_tasks_filtered_by_task_allowed": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Task parent",
+					"hash": "pgtsk1",
+					"model": { "name": "Cat", "hash": "cat001" }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Visible task",
+					"hash": "tskv1",
+					"page": {
+						"name": "Task parent",
+						"hash": "pgtsk1",
+						"model": { "name": "Cat", "hash": "cat001" }
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Hidden task",
+					"hash": "tskh1",
+					"page": {
+						"name": "Task parent",
+						"hash": "pgtsk1",
+						"model": { "name": "Cat", "hash": "cat001" }
+					}
+				}
+			]
+		]
+	}
+}

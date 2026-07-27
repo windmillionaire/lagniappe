@@ -1,0 +1,17 @@
+{% extends "layouts/delete.html" %}
+
+{% block name -%}
+  Delete Page
+{%- endblock name %}
+
+{% block description -%}
+  <p class="text-delete-default text-sm">
+    Are you sure you want to remove this page? It will be removed from every category
+    you can edit. If no categories remain, the page and all of its tasks and files will
+    be deleted.
+  </p>
+{%- endblock description %}
+
+{% block button -%}
+  {{ delete_action(url_for('pages.delete', key=entity.urlsafe_key), "Delete " ~ entity.name) }}
+{%- endblock button %}

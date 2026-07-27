@@ -1,0 +1,29 @@
+{% from "manual/macros.html" import callout, subheading, step %}
+{% from "reference/macros.html" import modal %}
+{% call modal("HTML Archive Export") %}
+  <p class="text-sm text-base-dark">
+    HTML Archive creates a read-only copy of the workspace for safekeeping or
+    use outside Lagniappe. It runs in the background, so you can leave this
+    panel while it is being built.
+  </p>
+  {% call callout("warning") %}
+    This is an owner-only tool. The archive can include workspace content and
+    files, so treat its storage location and download command as sensitive.
+  {% endcall %}
+  {{ subheading("Create and Download an Archive") }}
+  {% call step(1, "Start Export") %}
+    <p class="text-sm text-base-medium">Select Start Export. Lagniappe creates a dated archive in the configured storage bucket.</p>
+  {% endcall %}
+  {% call step(2, "Wait for completion") %}
+    <p class="text-sm text-base-medium">The status changes as the background job runs. A notification appears when it completes or fails.</p>
+  {% endcall %}
+  {% call step(3, "Use the download command") %}
+    <p class="text-sm text-base-medium">When complete, copy the displayed <code>gcloud storage cp --recursive</code> command to download the archive. The Entry path identifies its <code>index.html</code> file.</p>
+  {% endcall %}
+  {{ subheading("Archive Details") }}
+  <p class="text-sm text-base-dark">
+    Each entry shows its status, object count, size, Cloud Storage location,
+    entry page, and download command. If an export fails, its error is shown
+    in the same entry; start a new export after resolving the reported issue.
+  </p>
+{% endcall %}

@@ -1,0 +1,511 @@
+{
+	"test_task_recurring": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Valid Recurring Weekly",
+					"hash": "rec001",
+					"page": { "name": "Parent Page", "hash": "page001" },
+					"form_data": {
+						"recurring": "on",
+						"interval": "2",
+						"unit": "week"
+					},
+					"expected": {
+						"complete": true,
+						"interval": 2,
+						"unit": "week"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Valid Recurring Monthly",
+					"hash": "rec002",
+					"page": { "name": "Parent Page", "hash": "page002" },
+					"form_data": {
+						"recurring": "on",
+						"interval": "1",
+						"unit": "month"
+					},
+					"expected": {
+						"complete": true,
+						"interval": 1,
+						"unit": "month"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Invalid Interval",
+					"hash": "rec003",
+					"page": { "name": "Parent Page", "hash": "page003" },
+					"form_data": {
+						"recurring": "on",
+						"interval": "abc",
+						"unit": "week"
+					},
+					"expected": {
+						"error": "Invalid interval"
+					}
+				}
+			]
+		]
+	},
+	"test_task_periodic": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "New prompt - triggers generation",
+					"hash": "per001",
+					"page": { "name": "Parent Page", "hash": "page001" },
+					"form_data": {
+						"periodic": "on",
+						"periodic-description": "every 3 months",
+						"start-date": "2025-06-15"
+					},
+					"ai_response": {
+						"unit": "month",
+						"interval": 3,
+						"text": "every 3 months"
+					},
+					"expected": {
+						"generate": true,
+						"complete": true,
+						"user_prompt": "every 3 months",
+						"description": "every 3 months",
+						"unit": "month",
+						"interval": 3
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Changed prompt - triggers regeneration",
+					"hash": "per002",
+					"page": { "name": "Parent Page", "hash": "page002" },
+					"existing": {
+						"user-prompt": "every 2 weeks",
+						"description": "every 2 weeks",
+						"unit": "week",
+						"interval": 2
+					},
+					"form_data": {
+						"periodic": "on",
+						"periodic-description": "every 6 months",
+						"start-date": "2025-06-15"
+					},
+					"ai_response": {
+						"unit": "month",
+						"interval": 6,
+						"text": "every 6 months"
+					},
+					"expected": {
+						"generate": true,
+						"complete": true,
+						"user_prompt": "every 6 months",
+						"description": "every 6 months",
+						"unit": "month",
+						"interval": 6
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Same prompt - no regeneration",
+					"hash": "per003",
+					"page": { "name": "Parent Page", "hash": "page003" },
+					"existing": {
+						"user-prompt": "every 3 months",
+						"description": "every 3 months",
+						"unit": "month",
+						"interval": 3
+					},
+					"form_data": {
+						"periodic": "on",
+						"periodic-description": "every 3 months",
+						"start-date": "2025-06-15"
+					},
+					"expected": {
+						"generate": true,
+						"user_prompt": "every 3 months",
+						"description": "every 3 months",
+						"unit": "month",
+						"interval": 3
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "No prompt submitted but existing description - no error",
+					"hash": "per004",
+					"page": { "name": "Parent Page", "hash": "page004" },
+					"existing": {
+						"description": "every week",
+						"unit": "week",
+						"interval": 1
+					},
+					"form_data": {
+						"periodic": "on",
+						"start-date": "2025-06-15"
+					},
+					"expected": {
+						"generate": false,
+						"description": "every week"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "No prompt and no existing - error",
+					"hash": "per005",
+					"page": { "name": "Parent Page", "hash": "page005" },
+					"form_data": {
+						"periodic": "on",
+						"start-date": "2025-06-15"
+					},
+					"expected": {
+						"error": "Please provide a description"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "AI returns error",
+					"hash": "per006",
+					"page": { "name": "Parent Page", "hash": "page006" },
+					"form_data": {
+						"periodic": "on",
+						"periodic-description": "gibberish nonsense",
+						"start-date": "2025-06-15"
+					},
+					"ai_response": {
+						"success": false,
+						"error": "Unable to generate schedule. Please try again."
+					},
+					"expected": {
+						"generate": true,
+						"error": "Unable to generate schedule. Please try again."
+					}
+				}
+			]
+		]
+	},
+	"test_task_scheduled": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Daily mode - no AI needed",
+					"hash": "sch001",
+					"page": { "name": "Parent Page", "hash": "page001" },
+					"form_data": {
+						"scheduled": "on",
+						"schedule-type": "daily"
+					},
+					"expected": {
+						"generate": false,
+						"mode": "daily"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Weekly mode with days",
+					"hash": "sch002",
+					"page": { "name": "Parent Page", "hash": "page002" },
+					"form_data": {
+						"scheduled": "on",
+						"schedule-type": "weekly",
+						"weekly-day-0": "on",
+						"weekly-day-2": "on",
+						"weekly-day-4": "on"
+					},
+					"expected": {
+						"generate": false,
+						"mode": "weekly",
+						"days": [0, 2, 4]
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Monthly - specific day (15th)",
+					"hash": "sch003",
+					"page": { "name": "Parent Page", "hash": "page003" },
+					"form_data": {
+						"scheduled": "on",
+						"schedule-type": "monthly",
+						"monthly-description": "the 15th of every month"
+					},
+					"ai_response": {
+						"type": "specific_day",
+						"day": 15,
+						"ordinal": null,
+						"weekday": null,
+						"text": "15th of the month"
+					},
+					"expected": {
+						"generate": true,
+						"complete": true,
+						"mode": "monthly",
+						"type": "specific_day",
+						"day": 15,
+						"description": "15th of the month"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Monthly - ordinal weekday (first Monday)",
+					"hash": "sch004",
+					"page": { "name": "Parent Page", "hash": "page004" },
+					"form_data": {
+						"scheduled": "on",
+						"schedule-type": "monthly",
+						"monthly-description": "first Monday of the month"
+					},
+					"ai_response": {
+						"type": "ordinal_weekday",
+						"day": null,
+						"ordinal": 1,
+						"weekday": 0,
+						"text": "first Monday of the month"
+					},
+					"expected": {
+						"generate": true,
+						"complete": true,
+						"mode": "monthly",
+						"type": "ordinal_weekday",
+						"ordinal": 1,
+						"weekday": 0,
+						"description": "first Monday of the month"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Monthly - last day",
+					"hash": "sch005",
+					"page": { "name": "Parent Page", "hash": "page005" },
+					"form_data": {
+						"scheduled": "on",
+						"schedule-type": "monthly",
+						"monthly-description": "last day of each month"
+					},
+					"ai_response": {
+						"type": "last_day",
+						"day": null,
+						"ordinal": null,
+						"weekday": null,
+						"text": "last day of the month"
+					},
+					"expected": {
+						"generate": true,
+						"complete": true,
+						"mode": "monthly",
+						"type": "last_day",
+						"description": "last day of the month"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Yearly - specific day with month",
+					"hash": "sch006",
+					"page": { "name": "Parent Page", "hash": "page006" },
+					"form_data": {
+						"scheduled": "on",
+						"schedule-type": "yearly",
+						"yearly-description": "December 25th"
+					},
+					"ai_response": {
+						"type": "specific_day",
+						"month": 12,
+						"day": 25,
+						"ordinal": null,
+						"weekday": null,
+						"text": "December 25th"
+					},
+					"expected": {
+						"generate": true,
+						"complete": true,
+						"mode": "yearly",
+						"type": "specific_day",
+						"month": 12,
+						"day": 25,
+						"description": "December 25th"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Yearly - ordinal weekday (third Thursday in November)",
+					"hash": "sch007",
+					"page": { "name": "Parent Page", "hash": "page007" },
+					"form_data": {
+						"scheduled": "on",
+						"schedule-type": "yearly",
+						"yearly-description": "third Thursday in November"
+					},
+					"ai_response": {
+						"type": "ordinal_weekday",
+						"month": 11,
+						"day": null,
+						"ordinal": 3,
+						"weekday": 3,
+						"text": "third Thursday in November"
+					},
+					"expected": {
+						"generate": true,
+						"complete": true,
+						"mode": "yearly",
+						"type": "ordinal_weekday",
+						"month": 11,
+						"ordinal": 3,
+						"weekday": 3,
+						"description": "third Thursday in November"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Monthly - no prompt, no existing - error",
+					"hash": "sch008",
+					"page": { "name": "Parent Page", "hash": "page008" },
+					"form_data": {
+						"scheduled": "on",
+						"schedule-type": "monthly"
+					},
+					"expected": {
+						"error": "Please provide a description"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "AI returns invalid type",
+					"hash": "sch009",
+					"page": { "name": "Parent Page", "hash": "page009" },
+					"form_data": {
+						"scheduled": "on",
+						"schedule-type": "monthly",
+						"monthly-description": "something invalid"
+					},
+					"ai_response": {
+						"success": false,
+						"error": "Unable to generate schedule. Please try again. Invalid schedule type generated: invalid_type"
+					},
+					"expected": {
+						"generate": true,
+						"error": "Unable to generate schedule. Please try again. Invalid schedule type generated: invalid_type"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Yearly - AI returns invalid month",
+					"hash": "sch010",
+					"page": { "name": "Parent Page", "hash": "page010" },
+					"form_data": {
+						"scheduled": "on",
+						"schedule-type": "yearly",
+						"yearly-description": "some date"
+					},
+					"ai_response": {
+						"success": false,
+						"error": "Unable to generate schedule. Please try again. Month generated was not an integer between 1 and 12."
+					},
+					"expected": {
+						"generate": true,
+						"error": "Unable to generate schedule. Please try again. Month generated was not an integer between 1 and 12."
+					}
+				}
+			]
+		]
+	},
+	"test_task_schedule": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Route to recurring",
+					"hash": "main001",
+					"page": { "name": "Parent Page", "hash": "page001" },
+					"form_data": {
+						"recurring": "on",
+						"interval": "2",
+						"unit": "week"
+					},
+					"expected": {
+						"schedule_type": "recurring",
+						"section_id": "recurring"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Route to scheduled",
+					"hash": "main002",
+					"page": { "name": "Parent Page", "hash": "page002" },
+					"form_data": {
+						"scheduled": "on",
+						"schedule-type": "daily"
+					},
+					"expected": {
+						"schedule_type": "scheduled",
+						"section_id": "scheduled"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Route to periodic",
+					"hash": "main003",
+					"page": { "name": "Parent Page", "hash": "page003" },
+					"form_data": {
+						"periodic": "on",
+						"periodic-description": "every month",
+						"start-date": "2025-06-15"
+					},
+					"expected": {
+						"schedule_type": "periodic",
+						"section_id": "periodic"
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "No schedule checkbox - returns None",
+					"hash": "main004",
+					"page": { "name": "Parent Page", "hash": "page004" },
+					"form_data": {},
+					"expected": {
+						"schedule_type": null
+					}
+				}
+			]
+		]
+	}
+}

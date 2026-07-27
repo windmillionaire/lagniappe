@@ -1,0 +1,136 @@
+{% extends "layouts/error.html" %}
+
+{% block title %}
+  {{ header_msg or 'Error' }}
+{% endblock title %}
+
+{% block message %}
+  <div class="{% if transient %}text-blue-800{% else %}text-red-600 font-semibold{% endif %}">
+    {{ description }}
+  </div>
+{% endblock message %}
+
+{% block traceback %}
+  {% if show_debug and debug %}
+    <style>
+        .debug-section {
+            margin-top: 1.5rem;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+
+        .debug-section summary {
+            padding: 0.75rem 1rem;
+            background: linear-gradient(to right, #f9fafb, #f3f4f6);
+            cursor: pointer;
+            font-weight: 600;
+            color: #374151;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .debug-section summary:hover {
+            background: linear-gradient(to right, #f3f4f6, #e5e7eb);
+        }
+
+        .debug-section[open] summary {
+            background: linear-gradient(to right, #dbeafe, #eff6ff);
+            color: #1e40af;
+        }
+
+        .debug-content {
+            padding: 1rem;
+            background: #fff;
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 0.8125rem;
+            line-height: 1.5;
+            overflow-x: auto;
+        }
+
+        .debug-content pre {
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.125rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .badge-request {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge-entity {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .error-type-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            background: #fee2e2;
+            color: #991b1b;
+            border-radius: 0.25rem;
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .timestamp {
+            font-size: 0.75rem;
+            color: #6b7280;
+            margin-top: 0.5rem;
+        }
+    </style>
+    <div class="mt-4">
+      {% if debug.error_type %}<div class="error-type-badge">{{ debug.error_type }}</div>{% endif %}
+      {% if debug.timestamp %}<div class="timestamp">Occurred at: {{ debug.timestamp }}</div>{% endif %}
+    </div>
+    {% if debug.entity %}
+      <details class="debug-section" open>
+        <summary>
+          <span class="badge badge-entity">Entity</span> Entity Data
+        </summary>
+        <div class="debug-content">
+          <pre>{{ debug.entity }}</pre>
+        </div>
+      </details>
+    {% endif %}
+    {% if debug.request %}
+      <details class="debug-section" open>
+        <summary>
+          <span class="badge badge-request">Request</span> Request Information
+        </summary>
+        <div class="debug-content">
+          <pre>{{ debug.request }}</pre>
+        </div>
+      </details>
+    {% endif %}
+    {% if debug.traceback %}
+      <details class="debug-section">
+        <summary>
+          <span class="badge badge-error">Traceback</span> Full Traceback
+        </summary>
+        <div class="debug-content">
+          <pre class="text-red-700">{{ debug.traceback }}</pre>
+        </div>
+      </details>
+    {% endif %}
+  {% endif %}
+{% endblock traceback %}

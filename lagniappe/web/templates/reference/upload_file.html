@@ -1,0 +1,48 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Uploading Files") %}
+  <section>
+    {{ subheading("What This Panel Does") }}
+    <p class="text-sm text-base-dark">
+      Upload File attaches a file to the current page. You can upload a new file or link an existing file you already have access to.
+    </p>
+    {% call callout("tip") %}
+      The original file is preserved. Processing options add extra indexed or readable content without changing the upload itself.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Upload Choices") }}
+    <div class="space-y-3">
+      {% call feature("Choose or Drop a File", icon="upload", kind="file") %}
+        Upload documents, images, PDFs, text files, spreadsheets, or other attachments from your device.
+      {% endcall %}
+      {% call feature("Link Existing File", icon="link", kind="file") %}
+        Reuse a file that is already in Lagniappe instead of uploading a duplicate.
+      {% endcall %}
+      {% call feature("Text Extraction", icon="text", kind="file") %}
+        For supported files, extract readable text so it can be viewed and optionally searched.
+      {% endcall %}
+      {% call feature("AI Summary", icon="generate", kind="file") %}
+        Generate a short description that helps people understand the file at a glance.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Typical Flow") }}
+    {% call step(1, "Pick the file") %}
+      <p class="text-sm text-base-medium">Upload a new file or select an existing one.</p>
+    {% endcall %}
+    {% call step(2, "Choose processing") %}
+      <p class="text-sm text-base-medium">Enable text extraction, summaries, and search only when they are useful.</p>
+    {% endcall %}
+    {% call step(3, "Review the file page") %}
+      <p class="text-sm text-base-medium">Open the file to download it, edit details, view extracted text, or check processing status.</p>
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Privacy Notes") }}
+    {% call callout("warning") %}
+      Files follow the permissions of the pages they are linked to. Public files can be opened by anyone with the direct link, so use public visibility carefully.
+    {% endcall %}
+  </section>
+{% endcall %}

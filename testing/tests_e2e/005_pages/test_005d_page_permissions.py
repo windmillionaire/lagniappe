@@ -1,0 +1,127 @@
+"""
+Permission tests for page view and edit affordances.
+
+Verified against:
+- lagniappe/web/templates/pages/page.html
+- lagniappe/web/templates/pages/info.html
+- lagniappe/web/routes/pages/main.py
+"""
+
+import pytest
+from playwright.sync_api import expect
+
+from testing.definitions import Pages, Users
+from testing.elements import FormElements, Tabs
+from testing.resources import Page
+
+pytestmark = pytest.mark.e2e
+
+
+# @features pages
+# @dimensions permission-gates
+def test_page_is_forbidden_without_model_or_page_permission(get_user):
+    """A user with no page/category/model access cannot open a page."""
+    owner = get_user(Users.OWNER)
+    page = Pages.test_create_page.get(owner)
+
+    blocked = get_user(Users.user_no_access)
+    blocked.navigate(page.url)
+
+    expect(blocked.page).to_have_title("Error 403")
+
+
+# @features pages
+# @dimensions load tabs readonly permission-gates
+# @template pages/info.html::info_form
+def test_page_viewer_reads_page_without_page_editing_affordances(get_user):
+    """A page-level viewer can read the page but cannot edit page-level settings."""
+    owner = get_user(Users.OWNER)
+    page = Pages.acl_lab_visible.get(owner)
+
+    viewer = get_user(Users.page_acl_one_visible)
+    viewer.go(page)
+
+    tabs = Tabs(viewer)
+    expect(tabs.info).to_be_visible()
+    expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).not_to_be_attached()
+    expect(viewer.locate(Tabs.DOCUMENT_TAB)).not_to_be_attached()
+    expect(tabs.tasks).to_be_visible()
+
+    expect(viewer.locate(Page.CREATE_TASK_TOGGLE)).not_to_be_attached()
+    expect(viewer.locate(Page.SITE_SETTINGS_TOGGLE)).not_to_be_attached()
+    expect(viewer.locate(Page.PAGE_PERMISSIONS_TOGGLE)).not_to_be_attached()
+
+    info_form = page.info_form
+    name_field = info_form.locator(Page.INFO_NAME)
+    description_field = info_form.locator(Page.INFO_DESCRIPTION)
+    expect(name_field).to_contain_text("Name")
+    expect(name_field).to_contain_text(page.definition.name)
+    expect(description_field).to_contain_text("Description")
+    expect(description_field).to_contain_text(page.definition.description)
+    expect(info_form.locator(FormElements.NAME)).not_to_be_attached()
+    expect(info_form.locator(FormElements.DESCRIPTION)).not_to_be_attached()
+    expect(info_form.locator(Page.INFO_ATTRIBUTES)).not_to_be_attached()
+    expect(info_form.locator("[data-role='categories']")).not_to_be_attached()
+    expect(info_form.locator("[data-role='autofill']")).not_to_be_attached()
+
+
+# @features pages
+# @dimensions readonly document-tab
+# @template pages/page.html::main
+def test_page_viewer_sees_document_tab_only_when_content_exists(get_user):
+    """Readonly viewers do not see empty document affordances, but can read saved docs."""
+    owner = get_user(Users.OWNER)
+    page = Pages.acl_lab_document.get(owner)
+    page.entity.properties.document.save(
+        html="<p>Readonly document content marker</p>",
+        ydoc=None,
+    )
+    page.entity.save()
+
+    viewer = get_user(Users.page_acl_one_visible)
+    viewer.go(page)
+
+    expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).to_be_visible()
+    document = Tabs(viewer).document
+    expect(document).to_be_visible()
+    expect(document).to_contain_text("Readonly document content marker")
+
+
+# @features files
+# @dimensions readonly empty-state permission-gates async-load
+# @template pages/files.html::file_list
+def test_page_viewer_sees_empty_files_tab_without_upload_affordances(get_user):
+    """Readonly viewers can open an empty files tab without upload controls."""
+    owner = get_user(Users.OWNER)
+    page = Pages.acl_lab_visible.get(owner)
+
+    viewer = get_user(Users.page_acl_one_visible)
+    viewer.go(page)
+
+    files = Tabs(viewer).files
+    expect(files).to_be_visible()
+    expect(viewer.locate(Page.FILE_LIST)).to_have_attribute("loaded", "")
+    expect(viewer.locate(Page.EMPTY_FILE_LIST_ITEM)).to_contain_text(
+        "No files have been uploaded to this page"
+    )
+
+    expect(viewer.locate(Page.UPLOAD_FILE_TOGGLE)).not_to_be_attached()
+    expect(files.locator(Page.UPLOAD_FILE_FORM)).not_to_be_attached()
+
+
+# @features pages
+# @dimensions permissions-panel permission-gates
+def test_owner_can_open_page_permissions_panel(get_user):
+    """The site owner can see who can view a page and adjust restrictions."""
+    owner = get_user(Users.OWNER)
+    owner.go(Pages.test_create_page)
+
+    Tabs(owner).info
+    permissions_toggle = owner.locate(Page.PAGE_PERMISSIONS_TOGGLE)
+    expect(permissions_toggle).to_be_visible()
+    permissions_toggle.click()
+
+    permissions = owner.locate(Page.PAGE_PERMISSIONS_FORM)
+    expect(permissions).to_be_visible()
+    expect(permissions.locator(Page.PAGE_PERMISSIONS_VISIBLE_TO)).to_be_visible()
+    expect(permissions.locator(Page.PAGE_PERMISSIONS_RESTRICT_ACCESS)).to_be_visible()

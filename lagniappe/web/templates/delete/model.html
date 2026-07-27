@@ -1,0 +1,19 @@
+{% extends "layouts/delete.html" %}
+
+{% block name -%}
+  Delete Model
+{%- endblock name %}
+
+{% block description -%}
+  <p class="text-delete-default text-sm">
+    Are you sure you want to delete this model? This will not delete any tasks created referencing it,
+    but you will no longer be able to use it in project filters or assign it to new tasks.
+  </p>
+{%- endblock description %}
+
+{% block button -%}
+  {{ delete_action(
+    url_for('projects.delete_model', key=entity.project.urlsafe_key, task_key=entity.urlsafe_key),
+    "Delete " ~ entity.name,
+  ) }}
+{%- endblock button %}

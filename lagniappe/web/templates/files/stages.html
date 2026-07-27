@@ -1,0 +1,50 @@
+{% macro stage(file, stage) %}
+  {% set status = file.stage.status(stage) %}
+  <div class="flex flex-row items-center gap-1 {{ 'opacity-50' if file.stage.comes_before(stage) }}">
+    {%- if status.error -%}
+      {{ render_icon("error", "icon-2xl text-delete-default mr-1") }}
+    {%- elif status.complete -%}
+      {{ render_icon("success", "icon-2xl text-project-default mr-1") }}
+    {%- elif stage.name == 'IMPORTING' and status.stopped -%}
+      {{ render_icon("x", "icon-2xl text-delete-default mr-1") }}
+    {%- elif stage.name == 'IMPORTING' and file.stage.name == 'IMPORTING' -%}
+      {{ render_icon("spinner", "icon-2xl text-kind-default mr-1") }}
+    {%- elif not stage.name == 'COMPLETED' and not file.stage.is_complete -%}
+      {{ render_icon("question", "icon-2xl text-kind-default mr-1") }}
+    {%- endif -%}
+    {% if not file.stage.is_complete and file.stage.can_navigate(stage) %}
+      <button type="button"
+              data-role="set-stage"
+              data-stage="{{ stage.name }}"
+              data-kind="file"
+              class="{{ styles.link.emphasized }}">{{ status.label }}</button>
+    {% else %}
+      <span class="font-semibold text-kind-default">{{ status.label }}</span>
+    {% endif %}
+  </div>
+  <div class="flex flex-row items-center gap-3 w-full font-medium my-2"
+       data-process="{{ stage.name }}"
+       data-visible="{{ (file.stage.matches(stage) and not file.stage.is_complete)|yesno }}">
+    {% if stage.name == 'VERIFY_IMPORT' %}
+      <button type="button"
+              data-role="import"
+              data-kind="project"
+              class="{{ styles.button.submit }}">
+        <span>Import</span>
+      </button>
+    {% elif stage.name == 'IMPORTING' %}
+      <button type="button"
+              data-role="stop"
+              data-stopped="{{ status.stopped|yesno }}"
+              data-kind="{{ 'project' if status.stopped else 'delete' }}"
+              class="{{ styles.button.submit }}">{{ 'Restart Import' if status.stopped else 'Stop Import' }}</button>
+    {% else %}
+      <button type="button"
+              data-role="next"
+              data-kind="file"
+              class="{{ styles.button.submit }}">
+        <span>Save & Continue</span>
+      </button>
+    {% endif %}
+  </div>
+{% endmacro %}

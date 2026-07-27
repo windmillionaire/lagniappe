@@ -1,0 +1,72 @@
+{% from "manual/macros.html" import subheading, callout %}
+{% from "reference/macros.html" import modal, feature, detail %}
+{% call modal("What is a Page?") %}
+  <section>
+    {{ subheading("What is a Page?") }}
+    {% call callout("tip") %}
+      Pages are the main building blocks of Lagniappe. Think of them as flexible workspaces where you
+      can organize information, track tasks, store files, and take notes. They can represent
+      anything - projects, recipes, clients, documents, or any other content you want to organize.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("What Pages Can Contain") }}
+    <div class="space-y-3">
+      {% call feature("Basic Information", icon="info", kind="page") %}
+        Name, description, and an optional image to identify the page.
+      {% endcall %}
+      {% call feature("Tasks", icon="task", kind="task") %}
+        Track work with task lists, due dates, and completion status.
+      {% endcall %}
+      {% call feature("Files", icon="files", kind="file") %}
+        Upload and organize documents, images, and other files.
+      {% endcall %}
+      {% call feature("Notes", icon="notes", kind="note") %}
+        Add text, a photo, or both beneath the Page title. Each note can be shared with
+        everyone who can view the Page or kept private to its creator and the site owner.
+      {% endcall %}
+      {% call feature("Documents", icon="document", kind="page") %}
+        Rich text documents that can be shared publicly or kept private.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Categories and Organization") }}
+    <div class="space-y-3">
+      {% call feature("Multiple Categories", icon="category", kind="category") %}
+        Pages can belong to multiple categories, making them easy to organize by different themes, topics, or projects.
+      {% endcall %}
+      {% call feature("Form Integration", icon="form", kind="form") %}
+        Attach forms to collect structured information. Form fields become filterable on category pages,
+        making it easy to search and sort related pages.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Your Personal User Page") }}
+    {% call callout("success") %}
+      Every user gets their own personal page, linked in the header next to the search bar.
+      When you create quick tasks from the home page, they automatically go to your user page.
+    {% endcall %}
+    <div class="space-y-3">
+      {% call feature("User Settings", icon="user", kind="user") %}
+        The user button on your page opens your profile settings and preferences.
+      {% endcall %}
+      {% call feature("User Permissions", icon="permissions", kind="user") %}
+        For owners and admins, the Info section of any user's page is where you can edit that user's
+        permissions and access levels.
+      {% endcall %}
+      {% call feature("Site Settings", icon="siteSettings", kind="default") %}
+        Owners manage whole-site settings from the Admin page in the home directory.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Navigation") }}
+    <p class="text-sm text-base-dark">
+      Use the tabs at the top of each page to switch between different views (Info, Tasks, Files, etc.).
+      The lightning bolt icon enables quick editing mode for faster task updates. Star important pages
+      for quick access from the home page.
+    </p>
+  </section>
+{% endcall %}

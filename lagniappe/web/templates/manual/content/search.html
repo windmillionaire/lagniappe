@@ -1,0 +1,118 @@
+{% from "manual/macros.html" import heading, subheading, card, callout, concept, link, nav_buttons %}
+<div class="space-y-6">
+  {% call card() %}
+    <p class="text-base-medium text-lg leading-relaxed mb-3">
+      Search and filters are how you find things once a workspace fills up.
+      Search is fast, full-text, and works across the whole workspace. Filters
+      ask more structured questions inside a single category or project.
+    </p>
+    <p class="text-base-medium">
+      Both respect access the same way the rest of the app does: you only ever
+      search and filter the records you are allowed to see.
+    </p>
+  {% endcall %}
+  {{ heading("Search", icon="search", kind="page") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Search looks across the whole workspace at once and matches on more than
+      titles.
+    </p>
+    <ul class="text-base-medium space-y-2">
+      <li>
+        <strong>Full text:</strong> names, descriptions, document text, and form field values are all searchable.
+      </li>
+      <li>
+        <strong>Highlighted results:</strong> matches come back with a short snippet so you can see why something matched.
+      </li>
+      <li>
+        <strong>Everything, together:</strong> one query can surface categories, pages, projects, tasks, files, forms, and users side by side.
+      </li>
+    </ul>
+  {% endcall %}
+  {{ heading("Facets") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Facets narrow a search to one kind of thing -- just pages, just tasks,
+      just files, and so on -- when you already know the shape of what you are
+      looking for.
+    </p>
+    <p class="text-base-medium">
+      The same search is built into the pickers used throughout the app, so
+      choosing a category, assigning a user, or attaching a form all draw on it.
+      When you have permission to create a kind of record, search can also
+      create it on the spot if it is not there yet.
+    </p>
+  {% endcall %}
+  {{ heading("Filters") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Filters answer structured questions about the records under one category
+      (its pages) or one project (its tasks). A filter is a set of conditions,
+      each a field, a comparator, and a value, combined so that every condition
+      must match.
+    </p>
+    <ul class="text-base-medium space-y-2 mb-3">
+      <li>
+        <strong>Text:</strong> contains, matches, or is one of a list.
+      </li>
+      <li>
+        <strong>Numbers:</strong> equals, less than, greater than, or between.
+      </li>
+      <li>
+        <strong>Dates:</strong> before, on or after, or between.
+      </li>
+      <li>
+        <strong>Yes/no and lists:</strong> checkbox state, and list fields that contain a value or any of several.
+      </li>
+    </ul>
+    <p class="text-base-medium">
+      You can preview a filter's results before saving it, and a saved filter
+      becomes a reusable view with its own columns. Because form fields can be
+      filtered, a filter can reach into the structured data on each record, not
+      just its name and dates.
+    </p>
+  {% endcall %}
+  {{ heading("Access Is Built In") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Search and filter results are scoped to the current user. Two people can
+      run the same query and see different results, and restricted content never
+      appears in either place -- it is left out as results are gathered, not
+      hidden afterward.
+    </p>
+    <p class="text-base-medium">
+      That makes search and filters safe to use freely: there is no query that
+      quietly reaches past someone's permissions.
+    </p>
+  {% endcall %}
+  {{ heading("Filters and AI") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      The AI assistant uses the same filter engine. It can look up which fields
+      a project or category exposes, then run a read-only structured query over
+      that project's tasks or that category's pages on your behalf.
+    </p>
+    {% call callout("tip", False) %}
+      Because the assistant runs through the same permission-scoped filters, it
+      can only return records you could have filtered for yourself. Access is
+      not a separate setting for AI; it is the same boundary.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("Good to Know") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li>Search is for finding records quickly, not a reporting or business-intelligence tool.</li>
+      <li>Filters live on a specific category or project rather than spanning the whole workspace at once.</li>
+      <li>
+        A newly changed record refreshes its search and filter data shortly after it is saved, so a brand-new value can take a moment to appear.
+      </li>
+      <li>
+        A filter with many overlapping conditions is easier to reason about when the underlying forms are named and structured with a little intention.
+      </li>
+    </ul>
+  {% endcall %}
+  {{ nav_buttons(
+  prev={"key": "permissions", "name": "Permissions", "kind": "user"},
+  next={"key": "collaboration", "name": "Collaboration", "kind": "user"}
+  ) }}
+</div>

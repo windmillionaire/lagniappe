@@ -1,0 +1,8 @@
+[
+	{
+		"id": "alpha",
+		"type": "input",
+		"input": "text",
+		"title": "Alpha"
+	}
+]

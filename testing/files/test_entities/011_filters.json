@@ -1,0 +1,249 @@
+{
+	"test_filter_conditions_string": {
+		"entities": [
+			[
+				"PROJECT",
+				{
+					"name": "Test Project",
+					"hash": "proj002"
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "Filter Creator",
+					"hash": "user002",
+					"page": { "name": "User Page", "hash": "upage02" }
+				}
+			],
+			[
+				"FILTER",
+				{
+					"name": "String Filter",
+					"hash": "filt002",
+					"parent": {
+						"_type": "PROJECT",
+						"name": "Test Project",
+						"hash": "proj002"
+					},
+					"creator": {
+						"name": "Filter Creator",
+						"hash": "user002",
+						"page": { "name": "User Page", "hash": "upage02" }
+					},
+					"related_hashes": ["proj002"],
+					"definitions_input": [
+						["proj002", "name", "string", "substring", "test"]
+					],
+					"expected_conditions": [
+						{
+							"entity_hash": "proj002",
+							"field": "name",
+							"comparator": "SUBSTRING",
+							"value": "test"
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_filter_conditions_boolean": {
+		"entities": [
+			[
+				"CATEGORY",
+				{
+					"name": "Test Category",
+					"hash": "cat001"
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "Filter Creator",
+					"hash": "user003",
+					"page": { "name": "User Page", "hash": "upage03" }
+				}
+			],
+			[
+				"FILTER",
+				{
+					"name": "Boolean Filter",
+					"hash": "filt003",
+					"parent": {
+						"_type": "CATEGORY",
+						"name": "Test Category",
+						"hash": "cat001"
+					},
+					"creator": {
+						"name": "Filter Creator",
+						"hash": "user003",
+						"page": { "name": "User Page", "hash": "upage03" }
+					},
+					"related_hashes": ["cat001"],
+					"definitions_input": [
+						["cat001", "has_document", "boolean", "is_true"],
+						["cat001", "is_public", "boolean", "is_false"]
+					],
+					"expected_conditions": [
+						{
+							"entity_hash": "cat001",
+							"field": "has_document",
+							"comparator": "IS_TRUE"
+						},
+						{
+							"entity_hash": "cat001",
+							"field": "is_public",
+							"comparator": "IS_FALSE"
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_filter_conditions_entity_valued": {
+		"entities": [
+			[
+				"CATEGORY",
+				{
+					"name": "Main Category",
+					"hash": "catmain"
+				}
+			],
+			[
+				"CATEGORY",
+				{
+					"name": "Filter Category 1",
+					"hash": "catfilt1"
+				}
+			],
+			[
+				"CATEGORY",
+				{
+					"name": "Filter Category 2",
+					"hash": "catfilt2"
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "Filter Creator",
+					"hash": "user004",
+					"page": { "name": "User Page", "hash": "upage04" }
+				}
+			],
+			[
+				"FILTER",
+				{
+					"name": "Entity-Valued Filter",
+					"hash": "filt004",
+					"parent": {
+						"_type": "CATEGORY",
+						"name": "Main Category",
+						"hash": "catmain"
+					},
+					"creator": {
+						"name": "Filter Creator",
+						"hash": "user004",
+						"page": { "name": "User Page", "hash": "upage04" }
+					},
+					"related_hashes": ["catmain", "catfilt1", "catfilt2"],
+					"definitions_input": [
+						["catmain", "categories", "list", "contains", "catfilt1", true],
+						[
+							"catmain",
+							"categories",
+							"list",
+							"contains_any",
+							["catfilt1", "catfilt2"],
+							true
+						]
+					],
+					"expected_conditions": [
+						{
+							"entity_hash": "catmain",
+							"field": "categories",
+							"comparator": "CONTAINS",
+							"value": "catfilt1"
+						},
+						{
+							"entity_hash": "catmain",
+							"field": "categories",
+							"comparator": "CONTAINS_ANY",
+							"value": ["catfilt1", "catfilt2"]
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_filter_conditions_multiple_types": {
+		"entities": [
+			[
+				"CATEGORY",
+				{
+					"name": "Test Category",
+					"hash": "catmulti"
+				}
+			],
+			[
+				"CATEGORY",
+				{
+					"name": "Child Category",
+					"hash": "catchild"
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "Filter Creator",
+					"hash": "user005",
+					"page": { "name": "User Page", "hash": "upage05" }
+				}
+			],
+			[
+				"FILTER",
+				{
+					"name": "Multi-Type Filter",
+					"hash": "filt005",
+					"parent": {
+						"_type": "CATEGORY",
+						"name": "Test Category",
+						"hash": "catmulti"
+					},
+					"creator": {
+						"name": "Filter Creator",
+						"hash": "user005",
+						"page": { "name": "User Page", "hash": "upage05" }
+					},
+					"related_hashes": ["catmulti", "catchild"],
+					"definitions_input": [
+						["catmulti", "name", "string", "substring", "test"],
+						["catmulti", "has_document", "boolean", "is_true"],
+						["catmulti", "categories", "list", "contains", "catchild", true]
+					],
+					"expected_conditions": [
+						{
+							"entity_hash": "catmulti",
+							"field": "name",
+							"comparator": "SUBSTRING",
+							"value": "test"
+						},
+						{
+							"entity_hash": "catmulti",
+							"field": "has_document",
+							"comparator": "IS_TRUE",
+							"value": null
+						},
+						{
+							"entity_hash": "catmulti",
+							"field": "categories",
+							"comparator": "CONTAINS",
+							"value": "catchild",
+							"is_entity_valued": true
+						}
+					]
+				}
+			]
+		]
+	}
+}

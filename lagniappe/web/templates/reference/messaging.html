@@ -1,0 +1,15 @@
+{% from "manual/macros.html" import callout %}
+{% from "reference/macros.html" import modal %}
+{% call modal("Messaging") %}
+  <section>
+    {% call callout("tip") %}
+      Lagniappe uses messages pushed from the server in order to manage collaboration between users.
+      If you do not allow messages, forms and documents will still be collaborative, but you will be
+      unable to see other users' changes. You also may see unexpected changes to forms and documents,
+      as the changes other users make may overwrite your own. You can allow messages by clicking the button below.
+    {% endcall %}
+    <button data-role="allow-messages"
+            data-kind="default"
+            class="{{ styles.button.submit }}">Allow Messages</button>
+  </section>
+{% endcall %}

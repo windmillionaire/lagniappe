@@ -1,0 +1,33 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal %}
+{% call modal("Creating User Groups") %}
+  <section>
+    {{ subheading("What This Does") }}
+    <p class="text-sm text-base-dark">
+      User groups collect permissions under one name so the owner can grant the same access to multiple users. After you create a group, Lagniappe opens that group's permissions panel so you can decide what its members can view, edit, create, or manage.
+    </p>
+    {% call callout("tip") %}
+      Groups are the cleanest way to manage recurring roles like Staff, Editors, Clients, Volunteers, or Project Leads.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("How to Use It") }}
+    {% call step(1, "Create the group") %}
+      <p class="text-sm text-base-medium">Enter a short, recognizable group name based on the role or access pattern.</p>
+    {% endcall %}
+    {% call step(2, "Set permissions") %}
+      <p class="text-sm text-base-medium">Use the permissions panel that opens after creation to grant only the access this role needs.</p>
+    {% endcall %}
+    {% call step(3, "Assign users") %}
+      <p class="text-sm text-base-medium">Add users to the group from the create-user form or from an individual user's settings page.</p>
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Good Group Design") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Prefer a few clear groups over many one-off groups.</li>
+      <li>Name groups by responsibility, not by a single person's name.</li>
+      <li>Start with low access and raise permissions when a workflow truly needs it.</li>
+    </ul>
+  </section>
+{% endcall %}

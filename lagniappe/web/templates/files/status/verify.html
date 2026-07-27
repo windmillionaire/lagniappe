@@ -1,0 +1,189 @@
+{% macro verify_import(file) %}
+  {% set assign = file.properties.assign_columns %}
+  {% set verify = file.properties.verify_import %}
+  {% set entity_type = file.entity_type %}
+  <div>
+    <h2 class="text-lg font-bold">Verify {{ entity_type.capitalize() }} Import</h2>
+    <ul class="text-base font-semibold flex flex-col gap-2 mt-4 text-base-dark">
+      {% if file.category %}
+        <li>
+          Category:
+          <a data-kind="category"
+             class="{{ styles.link.default }}"
+             href="{{ url_for('categories.index', key=file.category.urlsafe_key) }}">{{ file.category.name }}</a>
+        </li>
+      {% elif file.project %}
+        <li>
+          Project:
+          <a data-kind="project"
+             class="{{ styles.link.default }}"
+             href="{{ url_for('projects.view', key=file.project.urlsafe_key) }}">{{ file.project.name }}</a>
+        </li>
+        {% if file.model %}
+          <li>
+            Model Task:
+            <span class="text-kind-default" data-kind="task">{{ file.model.name }}</span>
+          </li>
+        {% endif %}
+      {% endif %}
+      <li>
+        Form:
+        <a data-kind="form"
+           class="{{ styles.link.default }}"
+           href="{{ url_for('forms.view', key=file.form.urlsafe_key) }}">{{ file.form.name }}</a>
+      </li>
+    </ul>
+  </div>
+  <form>
+    {% if entity_type == 'task' and not verify.field_map.name %}{{ page_index_field(file, verify) }}{% endif %}
+    <h3 class="text-base font-semibold text-base-dark">Column Mapping</h3>
+    <ul class="text-sm text-base-medium italic mt-2">
+      <li class="flex flex-row items-start gap-2">
+        {{ render_icon("info", "text-kind-default", "form") }}
+        For select and radio fields, you can fuzzy match the column values to the field options.
+        This will choose the field option that is closest to the column value in your data.
+      </li>
+    </ul>
+    <table class="{{ styles.form.table.table }}">
+      <thead>
+        <tr>
+          <th scope="col" class="py-3.5 pr-4 font-semibold text-left">Field</th>
+          <th scope="col" class="py-3.5 pr-4 font-semibold text-left">Column(s)</th>
+          <th scope="col" class="py-3.5 font-semibold text-center">Fuzzy Match</th>
+        </tr>
+      </thead>
+      <tbody class="{{ styles.form.table.body }}">
+        {% for field_id, columns in verify.field_map.items() %}
+          {% set field = assign.field(field_id) %}
+          <tr>
+            <td class="py-2.5 pr-4 text-kind-default max-w-24"
+                data-kind="{{ field.get('kind', 'form') }}">
+              {{ render_icon(field.get('icon', '')) }}
+              <span class="font-semibold ml-1">{{ field.label or field.get("label", "") }}</span>
+            </td>
+            <td class="py-2.5 pr-4 whitespace-pre-line max-w-24">{{ field.description }}</td>
+            <td class="py-2.5">
+              {% if field.get("fuzzy_import") %}
+                <div class="{{ styles.checkbox.container }} mx-auto">
+                  <input type="checkbox"
+                         name="fuzzy-{{ field_id }}"
+                         {% if verify.fuzzy_match(field_id) %}checked{% endif %}
+                         data-kind="form"
+                         class="{{ styles.checkbox.default }}">
+                  {{ render_icon("check", (styles.checkbox.icon)) }}
+                </div>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </form>
+{% endmacro %}
+
+{% macro page_index_field(file, verify) %}
+  {% set entity_type = file.entity_type %}
+  <div class="flex flex-col px-4 py-3 border-kind-default border-2 rounded-md gap-6 mb-6"
+       data-kind="{{ entity_type }}"
+       data-section="page-index-field">
+    <h3 class="text-base font-semibold text-base-dark">Page Index Field</h3>
+    <p class="text-sm text-base-medium italic -mt-4">
+      Created tasks must have an index that maps the task to a page. You may use either an interpolated field value or a column value
+      (regardless of whether it is an ignored column or not). The default page index field is the page's name, but if the destination pages
+      have an attached form, you can choose one of those fields instead.
+    </p>
+    <fieldset class="flex flex-row gap-4 items-center">
+      <label class="{{ styles.radio.label }}">
+        <input type="radio"
+               name="index-field-choice"
+               value="name"
+               data-option-toggle="true"
+               {{ 'checked' if verify.index_field_choice != 'page-form' else '' }}
+               class="{{ styles.radio.default }}">
+        Match to page name
+      </label>
+      <label class="{{ styles.radio.label }}">
+        <input type="radio"
+               name="index-field-choice"
+               value="page-form"
+               data-option-toggle="true"
+               {{ 'checked' if verify.index_field_choice == 'page-form' else '' }}
+               class="{{ styles.radio.default }}">
+        Match to a page form field
+      </label>
+    </fieldset>
+    {{ index_select(file) }}
+    <label class="flex flex-row items-start gap-1 sm:text-sm text-base-dark font-semibold mb-1">
+      Use fuzzy matching for the index field?
+      <div class="{{ styles.checkbox.container }} mr-1 order-first">
+        <input type="checkbox"
+               name="fuzzy-page"
+               {% if verify.fuzzy_page %}checked{% endif %}
+               data-kind="page"
+               class="{{ styles.checkbox.default }}">
+        {{ render_icon("check", (styles.checkbox.icon)) }}
+      </div>
+    </label>
+  </div>
+{% endmacro %}
+
+{% macro index_select(file) %}
+  {% set verify = file.properties.verify_import %}
+  <div data-section="page-form-index" class="flex flex-col gap-6">
+    <div data-option="page-form"
+         data-visible="{{ (verify.index_field_choice == 'page-form')|yesno }}">
+      <h3 class="{{ styles.label.sectionHeading }}">Page Form</h3>
+      <input type="text"
+             autocomplete="off"
+             data-1p-ignore
+             name="page-form-id"
+             data-index="form"
+             data-kind="form"
+             data-form-type="page"
+             data-placeholder="choose a page form..."
+             {% if verify.page_form %}data-preload='{{ verify.page_form.details|tojson }}'{% endif %}
+             class="{{ styles.input }}">
+    </div>
+    <div class="flex flex-row gap-6 items-center">
+      <div class="flex flex-col gap-1 w-full">
+        <h3 class="{{ styles.label.default }}">Source</h3>
+        <div class="{{ styles.select.wrapper }} grow basis-1/3"
+             lp-select
+             data-role="index-from">
+          <select data-kind='task'
+                  name="index-from"
+                  data-placeholder="source field..."
+                  {% if verify.index_from_field %}data-preload='{{ verify.index_from_field|tojson }}'{% endif %}
+                  class="{{ styles.select.default }}">
+            <option value="" selected disabled hidden>choose a task field...</option>
+            {% if verify.file_options %}
+              {% for option in verify.file_options %}
+                <option data-details='{{ option|tojson }}' value="{{ option.id }}">{{ option.label }}</option>
+              {% endfor %}
+            {% endif %}
+          </select>
+        </div>
+      </div>
+      <div class="flex flex-col gap-1 w-full">
+        <h3 class="{{ styles.label.default }}">Destination</h3>
+        <div class="{{ styles.select.wrapper }} grow basis-1/3"
+             lp-select
+             {% if verify.page_form_id %}data-page-form-id="{{ verify.page_form_id }}"{% endif %}
+             data-role="index-to">
+          <select data-kind='page'
+                  name="index-to"
+                  data-placeholder="destination field..."
+                  {% if verify.index_to_field %}data-preload='{{ verify.index_to_field|tojson }}'{% endif %}
+                  class="{{ styles.select.default }}">
+            <option value="" selected disabled hidden>choose a page field...</option>
+            {% if verify.page_options %}
+              {% for option in verify.page_options %}
+                <option data-details='{{ option|tojson }}' value="{{ option.id }}">{{ option.label }}</option>
+              {% endfor %}
+            {% endif %}
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endmacro %}

@@ -1,0 +1,36 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Personal Tasks") %}
+  <section>
+    {{ subheading("What This Panel Does") }}
+    <p class="text-sm text-base-dark">
+      The home-page task form creates a task on your personal user page. It is meant for quick reminders and personal follow-up items without first navigating to another page.
+    </p>
+    {% call callout("tip") %}
+      Tasks created here still behave like normal tasks. They can have a name, description, due date, schedule, and completion history.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Due Dates on Home") }}
+    <div class="space-y-3">
+      {% call feature("Today and Soon", icon="task", kind="task") %}
+        Tasks due within the next week stay visible in the home task list so they remain easy to act on.
+      {% endcall %}
+      {% call feature("Later Tasks", icon="snooze", kind="task") %}
+        Tasks scheduled farther out are created, but they drop out of the immediate home list until they become relevant.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Quick Flow") }}
+    {% call step(1, "Name the task") %}
+      <p class="text-sm text-base-medium">Use a short action phrase so the task is easy to scan from the home page.</p>
+    {% endcall %}
+    {% call step(2, "Set a schedule") %}
+      <p class="text-sm text-base-medium">Add a due date or recurring schedule if the task needs a reminder.</p>
+    {% endcall %}
+    {% call step(3, "Complete or postpone") %}
+      <p class="text-sm text-base-medium">Use the home list to mark it complete or quickly move it to tomorrow, another day this week, or a weekday next week.</p>
+    {% endcall %}
+  </section>
+{% endcall %}

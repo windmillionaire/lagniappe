@@ -1,0 +1,123 @@
+{% from 'common.html' import format_name %}
+{% from 'controls.html' import delete, expand %}
+
+{% macro table_cell_class(column) -%}
+  {{- styles.table.cell.compact.default if column.schema and column.schema.type == 'checkbox' else styles.table.cell.default -}}
+{%- endmacro %}
+
+{% macro table_header_class(column) -%}
+  {{- styles.table.cell.compact.th if column.schema and column.schema.type == 'checkbox' else styles.table.thead.th -}}
+{%- endmacro %}
+
+{% macro boolean_icon(value) -%}
+  <span class="{{ 'text-success' if value else 'text-failure' }}"
+        aria-label="{{ 'True' if value else 'False' }}"
+        title="{{ 'True' if value else 'False' }}">
+    {{ render_icon("check" if value else "x") }}
+  </span>
+{%- endmacro %}
+
+{% macro cell(column, entity, parent) %}
+  {% set field = entity.column(column.field) %}
+  {% if field is none %}
+    <td class="{{ table_cell_class(column) }}"
+        data-column="{{ column.field }}"
+        data-label="{{ column.label }}"></td>
+  {% else %}
+    {% set column = parent.table.fields.get(field.id) or column %}
+    {% set editable = field.editable %}
+    {% set sort_value = field.sort_value %}
+    {% set ordering = column.ordering %}
+    {% if ordering and ordering.value is defined %}
+      {% set ordering = ordering.value %}
+    {% endif %}
+    {% if ordering == 'exists' %}
+      {% set sort_value = true if sort_value else false %}
+    {% endif %}
+  <td class="{{ table_cell_class(column) }}"
+      {% if sort_value is not none %}data-sort-value='{{ sort_value|tojson }}'{% endif %}
+      {% if editable %}
+        data-editable="true"
+        data-edit-value='{{ field.form_value|tojson }}'
+      {% endif %}
+      data-column="{{ field.id }}"
+      data-label="{{ field.label }}">
+    {%- if field.value is not none -%}
+      {{- format_table_cell(field, entity, column, parent) -}}
+    {%- endif -%}
+  </td>
+  {% endif %}
+{% endmacro %}
+
+{% macro table_cell(value) %}
+  {% set row_count = value.get('num_rows') %}
+  <div data-role="expandable-cell" class="flex flex-row items-center gap-1">
+    {{ expand() }}
+    <div class="flex flex-col gap-2" data-kind="default">
+      <p class="text-kind-default">{{ row_count }} {{ 'row' if row_count == 1 else 'rows' }}</p>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro format_table_cell(field, entity, column, parent) %}
+  {%- set value = field.column_value -%}
+  {%- if field.id == 'image' and value -%}
+    <img src="{{ value }}"
+         width="80"
+         height="40"
+         alt="{{ entity.name }} image"
+         loading="lazy"
+         decoding="async"
+         class="object-cover">
+  {%- elif field.icon == 'table' and value -%}
+    {{- table_cell(value) -}}
+  {%- elif field.id == 'name' and value is mapping -%}
+    <div class="flex flex-row items-center justify-between">
+      <span>
+        {{- format_name(value, link=column.link, parent=column.parent, icon=value.form_type if value.kind == 'form' else False) -}}
+      </span>
+      {% if not parent.table.embedded %}
+        <span class="sm:hidden">{{ delete(label='Delete ' ~ entity.name) }}</span>
+      {% endif %}
+    </div>
+  {%- elif field.is_entity_valued and value is mapping -%}
+    {{- format_name(value) -}}
+  {%- elif field.is_entity_valued and value is iterable -%}
+    {%- for f in value -%}
+      <p>{{- format_name(f) -}}</p>
+    {%- endfor -%}
+  {%- elif field.icon == 'tel' and value -%}
+    {{- value|format_phone -}}
+  {%- elif field.icon == 'email' and value -%}
+    <a href="mailto:{{ value }}">{{- value -}}</a>
+  {%- elif value is string -%}
+    {{- value -}}
+  {%- elif field.id == 'due_date' and value -%}
+    {%- if value is in_future -%}
+      <span class="text-saved-default">{{ value|format_date }}</span>
+    {%- elif value is in_past -%}
+      <span class="text-delete-default">{{ value|format_date }}</span>
+    {%- else -%}
+      <span class="text-note-default">{{ value|format_date }}</span>
+    {%- endif -%}
+  {%- elif field.icon == 'time' and value is datetime and value -%}
+    {{- value|format_time -}}
+  {%- elif value is datetime and value -%}
+    {{- value|format_date -}}
+  {%- elif value is mapping and value.get('url') -%}
+    <a class="{{ styles.link.default }}"
+       data-kind="{{ field.kind }}"
+       href="{{ value.get('url') }}"
+       target="_blank">{{ value.get('title') }}</a>
+  {%- elif value is boolean -%}
+    {{- boolean_icon(value) -}}
+  {%- elif value is number -%}
+    {{- value|format_number -}}
+  {%- elif value is iterable -%}
+    {%- for label in value -%}
+      <p class="text-kind-default" data-kind="{{ field.kind }}">{{- label -}}</p>
+    {%- endfor -%}
+  {%- elif value is not none -%}
+    <p class="text-kind-default" data-kind="{{ field.kind }}">{{- value -}}</p>
+  {%- endif -%}
+{% endmacro %}

@@ -1,0 +1,319 @@
+# Testing Writing Tests
+
+Use this guide when adding, reviewing, or asking an agent to add tests. The goal
+is to create real coverage without turning the suite into noise.
+
+For a faster agent checklist when starting from an existing test, use
+[TESTING_TEST_REVIEW.md](TESTING_TEST_REVIEW.md).
+
+## First Decisions
+
+Before writing code:
+
+1. Read the behavior owner: route, entity/property, widget, template, or helper.
+2. Check nearby tests and helpers with `rg`.
+3. Pick the smallest test layer that proves the behavior.
+4. If source annotations exist, run a focused report:
+
+   ```bash
+   venv/bin/python run.py traceability --source path/to/source.py path/to/related.py
+   ```
+
+5. If an E2E test is tied to a Jinja macro, add or check `@template` and run:
+
+   ```bash
+   venv/bin/python run.py template-contracts test_file.py::test_name
+   ```
+
+## Choose The Layer
+
+| Use | When |
+| --- | --- |
+| Unit | Pure Python behavior, payload construction, validators, permissions math, entity/property logic |
+| JavaScript | Frontend module behavior that can run in Node with small platform fakes and no live browser/server |
+| E2E | Browser behavior, frontend modules, route integration, visible permissions, Redis/cache/search/sync effects |
+| Tooling | Setup/config behavior, report scripts, repository-health checks, offline provider-contract checks |
+
+Do not force browser behavior into unit tests. Do not start the app server for
+logic that can be tested directly.
+
+## E2E Shape
+
+Good E2E tests are thin stories over rich helpers. The test function should read
+like a user story, even when the flow has a lot of setup, waiting, widget state,
+and browser interaction under the hood:
+
+```python
+def test_example(get_user):
+    user = get_user(Users.OWNER)
+    home = user.go(SitePages.HOME)
+
+    user.locate(home.PROJECT_LIST_TOGGLE).click()
+    expect(user.locate(home.PROJECT_LIST)).to_be_visible()
+```
+
+Where things belong:
+
+| Need | Put It In |
+| --- | --- |
+| Reusable entity/scenario data | `testing/definitions/` |
+| Page/entity navigation or selectors | `testing/resources/` |
+| Shared widget interaction | `testing/elements/` |
+| Failure/report/support helpers | `testing/utility/` |
+| The user story and assertions | `testing/tests_e2e/` |
+
+Prefer durable selectors from helpers: `data-widget`, `data-role`, `lp-*`, and
+resource/element constants. A raw selector in a test is fine only when it is
+local to one assertion and would make a helper worse.
+
+Keep E2E pytest runs sequential. The managed browser test server and test data
+prefix are shared, so parallel E2E invocations can tear down each other's data
+and server state. When checking multiple focused files or nodeids, pass them to
+one pytest command.
+
+Use real pytest paths or nodeids for focused `run.py test` commands. The runner
+only expands suite aliases such as `unit`, `e2e`, `js`, `tooling`, and `setup`; legacy
+numeric or feature shorthand such as `003b` and `home` is intentionally not
+expanded.
+
+Numeric test filename prefixes are organizational, not runner aliases. The
+number groups a broad workflow in a stable browsing order; an optional letter
+identifies a smaller story within that workflow. In E2E, this also makes the
+intentional seed/state progression visible when the full suite runs
+sequentially. Always invoke the real path even when discussing a test by its
+short prefix.
+
+It is okay, and usually preferred, to add a definition, element helper, or
+resource method while filling in a test. The goal is not to avoid helpers; the
+goal is to put repeated meaning in the layer that owns it.
+
+### Definitions, Resources, Elements
+
+Use `testing/definitions/` for named test data and scenarios. Definitions
+describe what exists or should be created: users, projects, pages, categories,
+forms, upload files, schema fields, permissions, and other reusable fixtures or
+scenario variants. They should be easy for tests to name without rebuilding the
+same payload inline.
+
+Files named `*_definitions.py` own dataclasses, payload builders, or related
+definition families. A companion plural module may expose enums whose members
+give those definitions stable scenario names. These data enums are distinct
+from resource classes/enums: resources own navigation, selectors, and browser
+interaction with the application.
+
+Use `testing/elements/` for reusable UI component behavior. Elements own the
+details of browser and JavaScript interaction: spinner buttons, tabs, modals,
+dropdowns, lists, tables, comboboxes, upload controls, hover-only controls,
+disabled/loading states, and other widgets. If every test that clicks a create
+button also needs to prove the spinner, disabled state, or success transition,
+put that check in the element helper rather than repeating it in each test.
+
+Use `testing/resources/` for reusable page and entity flows. Resources generally
+correspond to real application pages, routes, entities, or stable page sections.
+They own selectors and methods such as creating an entity, opening a tab,
+opening a particular form, navigating to a page, selecting an attached form, or
+finding a row for a known definition. Resource methods should compose
+definitions and elements so tests can stay at the story level.
+
+As a rule of thumb:
+
+- add a definition when a test needs named data, a reusable scenario, or a
+  payload that should be shared across files;
+- add an element when the behavior is a reusable widget interaction or visual
+  state;
+- add a resource method when the behavior is a reusable page/entity action;
+- keep one-off business assertions in the test when extracting them would hide
+  the story.
+
+Avoid hiding the important assertion. A helper should make the story clearer,
+not turn the test into a list of mysterious verbs.
+
+## Unit Test Shape
+
+Unit tests should cover deterministic backend behavior:
+
+- entity/property transformations;
+- condition/filter/permission logic;
+- serialization and payload builders;
+- setup validators and provider request construction under mocks.
+
+Avoid importing the full Flask app, starting the server, or relying on browser
+state. If the behavior depends on routes, Redis-backed UI state, or frontend
+event plumbing, it probably belongs in E2E.
+
+Unit tests should not import `lagniappe.web` or route modules. If route logic is
+pure enough for unit coverage, move that logic into `lagniappe.core` first and
+test the core helper there.
+
+### Unit Current User
+
+Unit entity fixtures use `CONFIG.TEST_CURRENT_USER` as the ambient authenticated
+user. Prefer calling `entity.to_ai()` and `entity.to_filter_index()` without a
+user argument unless the test is specifically proving behavior for a second
+identity. For those cases, create an explicit `TestUser` or test entity user and
+pass it with `user=...`.
+
+Do not attach ad hoc `test_user` attributes to entities. Permission behavior
+should go through the real `allowed()` / `has_permission()` path, even when the
+entity itself was created with `testing=True`.
+
+For focused debugging, use config or environment flags:
+
+```bash
+DEBUG_TRACING=1 venv/bin/python run.py test unit --tb=short
+venv/bin/python run.py test --strict unit --tb=short
+```
+
+## Tooling Test Shape
+
+Tooling tests belong in `testing/tests_tooling/` and use
+`@pytest.mark.tooling`. They should not inherit E2E server setup or unit-suite
+entity/cache cleanup unless they explicitly need it.
+
+Good candidates:
+
+- setup/config smoke checks;
+- report parser/classification tests;
+- repository-health checks;
+- read-only provider/API drift probes that skip cleanly when unavailable.
+
+Tooling tests must not import `lagniappe.core` or `lagniappe.web`, or execute
+Node. Core application behavior belongs in unit tests, route and browser
+integration belongs in E2E, and isolated frontend behavior belongs in the
+JavaScript suite.
+
+## JavaScript Test Shape
+
+JavaScript behavior tests belong in `testing/tests_js/` and use
+`@pytest.mark.js`. They execute source modules in Node without starting Flask or
+a browser. Use the shared `run_node` fixture for executable discovery, working
+directory, timeouts, and subprocess failure reporting. Keep behavior-specific
+VM contexts and small browser-platform fakes in the focused test module.
+
+If the assertion depends on layout, browser event propagation, rendered Jinja,
+route responses, or a realistic DOM, use E2E instead.
+
+## Annotations
+
+Use annotations as a roadmap, not as fake coverage.
+
+Source symbols in inventoried paths should eventually have one of:
+
+```python
+# @testable true
+# @tests tests_unit/test_example.py::test_behavior
+# @features submission number-input
+# @dimensions readonly formatting
+```
+
+```python
+# @testable false
+# @covered-by lagniappe/core/properties/home.py
+# @reason helper-owned-by-property
+```
+
+For base architecture or infrastructure symbols:
+
+```python
+# @testable infrastructure
+```
+
+For tests:
+
+```python
+# @features projects
+# @dimensions create-manual search
+# @template home/projects.html::create
+# @todo add attributes check
+# Review note: consider extracting repeated info-tab setup into Project.open_info().
+def test_create_project_manual_mode(get_user):
+    ...
+```
+
+`@features` and `@dimensions` imply their full cross-product. When a test or
+source owns only selected combinations, use repeated exact tags instead:
+
+```python
+# @pair projects:create-manual
+# @pair search:project-result
+```
+
+Features should be broad product areas. Dimensions should be reusable aspects
+of those features. The `feature:dimension` pair should tell a future reader what
+behavior to look for.
+
+`@suggestion` is not a supported tag because an untracked annotation looks more
+durable than it is. Use an ordinary comment for readability or helper ideas.
+Use `@todo` when a concrete missing behavior should remain visible in
+traceability reports.
+
+## Gaps
+
+If referenced tests mostly cover the behavior but miss a small edge case, add a
+test `@todo`.
+
+If the gap is major:
+
+1. Add a focused new dimension to the source.
+2. Add an `@pytest.mark.unfinished` test stub with matching `@features`,
+   `@dimensions`, and `@todo`.
+3. Do not reference the stub from source until it has real assertions unless
+   unfinished coverage is the clearest signal.
+
+Do not tag a test just because it executes code on the way to another outcome.
+Prefer moving helper symbols to `@covered-by` when a more load-bearing symbol
+owns the behavior.
+
+## Browser Review While Writing E2E
+
+Use [REPORTS_BROWSER_REVIEW.md](REPORTS_BROWSER_REVIEW.md) (`@REPORTS_BROWSER_REVIEW`) when tests,
+stubs, or helper code describe a story that should be inspected in the real UI.
+This is useful when you want an agent to recreate the flows in a folder, compare
+the rendered experience to the tests, and write a curated browser review with
+product feedback and important coverage recommendations.
+
+Typical prompt shape:
+
+```text
+Read @REPORTS_BROWSER_REVIEW and review testing/tests_e2e/004_projects/.
+Start the test server, log in as admin, recreate the user stories covered by
+these tests, and write a browser review that includes UX/source feedback plus
+important missing, brittle, or over-specified coverage you notice.
+If you make test changes, add @todo comments or unfinished test
+stubs in the relevant test file and mention those changes in the report.
+```
+
+The browser report should stay curated. Product findings can cover hierarchy,
+readability, affordances, visual bugs, confusing states, and concrete UI/source
+suggestions. Coverage findings should name the focused test file or folder and
+stay limited to important user-visible risks. Durable test-maintenance backlog
+belongs close to the tests themselves:
+
+- add `@todo` to an existing test for known missing coverage;
+- add an ordinary review comment for a possible test/helper improvement;
+- add an `@pytest.mark.unfinished` stub when the missing story deserves its own
+  future test.
+
+## Template Contracts
+
+Use `@template path.html::macro` on UI/E2E tests when the template skeleton is
+part of the contract under test. The reporter extracts `lp-*` and `data-*`
+attributes, checks obvious frontend handlers, and shows which tests touched
+which selectors.
+
+For `lp-create` and `lp-update`, the reporter also counts
+`SpinnerButtons.CREATE.click(...)`, `SpinnerButtons.UPDATE.click(...)`, and
+uniquely resolved helper methods that call them.
+
+## Before Finishing
+
+Run the narrowest useful test command, then the relevant report:
+
+```bash
+venv/bin/python run.py test path/to/test_file.py
+venv/bin/python run.py traceability --changed --check
+venv/bin/python run.py template-contracts test_file.py
+```
+
+If you changed commands, annotation conventions, test layout, setup behavior, or
+agent-facing workflow, update `documentation/`.

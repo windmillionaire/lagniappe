@@ -1,0 +1,193 @@
+{% macro task_count(count) %}
+  {% if count > 0 %}
+    <div class="text-task-default font-bold ml-auto"
+         data-role="user-task-count">{{ count }}</div>
+  {% else %}
+    <div class="text-project-default font-bold ml-auto"
+         data-role="user-task-count">0</div>
+  {% endif %}
+{% endmacro %}
+
+{% macro url(details) %}
+  {%- if details.get('url') -%}
+    {{ details.url }}
+  {%- elif details.kind == 'task' -%}
+    {{ url_for('tasks.view', key=details.id) }}
+  {%- elif details.parent and details.kind == 'model' -%}
+    {{ url_for('projects.status', key=details.parent.id, task_key=details.id, completed="false") }}
+  {%- elif details.kind in ['page', 'user'] -%}
+    {{ url_for('pages.view', key=details.id) }}
+  {%- elif details.kind == 'group' -%}
+    {{ url_for('users.user_index', group=details.id) }}
+  {%- elif details.kind == 'category' -%}
+    {{ url_for('categories.index', key=details.id) }}
+  {%- elif details.kind == 'project' -%}
+    {{ url_for('projects.view', key=details.id) }}
+  {%- elif details.kind == 'form' -%}
+    {{ url_for('forms.view', key=details.id) }}
+  {%- elif details.kind == 'file' -%}
+    {{ url_for('files.view', key=details.id) }}
+  {%- elif details.kind == 'report' -%}
+    {{ url_for('tools.report', key=details.id) }}
+  {%- endif -%}
+{% endmacro %}
+
+{% macro name_separator() -%}
+  <span aria-hidden="true" class="{{ styles.entity.name.separator }}">/</span>
+{%- endmacro %}
+
+{% macro format_name(details, title=False, parent=True, link=True, icon=False) %}
+  {% set is_completed_task = details.kind == 'task' and details.completed is sameas true %}
+  {% set default_icon = details.icon or details.form_type or details.kind %}
+  {% set icon_id = 'selected' if is_completed_task else 'unselected' if details.kind == 'task' else default_icon %}
+  <span class="{{ styles.entity.name.wrapper }}">
+    {%- if icon -%}
+      {{ render_icon((icon_id), "text-kind-default mr-1", details.form_type or details.kind) }}
+    {%- endif -%}
+    {%- if not link or not details.get('id') -%}
+      <span class="text-kind-default">{{ details.name }}</span>
+    {%- else -%}
+      {%- if parent and details.parent -%}
+        <span class="{{ styles.entity.name.parent }}">
+          <a href="{{ url(details.parent) }}"
+             data-kind="{{ details.parent.kind }}"
+             class="{{ styles.link.default }}">{{- details.parent.name -}}</a>
+          {{- name_separator() -}}
+        </span>
+        <wbr>
+      {%- endif -%}
+      <a href="{{ url(details) }}"
+         data-kind="{{ details.kind }}"
+         data-role="title"
+         class="{{ styles.link.title }}">{{ details.name }}</a>
+    {%- endif -%}
+  </span>
+{% endmacro %}
+
+{% macro desktop(title) %}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-white lg:hidden p-4">
+    <div class="text-center">
+      <div class="flex justify-center mb-4">
+        <svg class="w-12 h-12 text-gray-400"
+             xmlns="http://www.w3.org/2000/svg"
+             fill="none"
+             viewBox="0 0 24 24"
+             stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
+      </div>
+      <h3 class="text-lg font-medium text-gray-900 mb-2">Desktop Only</h3>
+      <p class="text-gray-500">{{ title }} is designed for desktop use. Please visit this page on a larger screen.</p>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro loading(hidden=True) %}
+  <div id="loading"
+       class="{{ styles.loading.wrapper }}
+              {% if hidden %}hidden{% endif %}">
+    <div class="{{ styles.loading.pulse }}"></div>
+    <div class="{{ styles.loading.pulse }} [animation-delay:200ms]"></div>
+    <div class="{{ styles.loading.pulse }} [animation-delay:400ms]"></div>
+  </div>
+{% endmacro %}
+
+{% macro attribute_button(attribute) %}
+  <label data-role="attribute"
+         data-attribute="{{ attribute.name }}"
+         data-selected="{{ attribute.active|yesno }}"
+         data-kind="{{ attribute.entity_kind }}"
+         tabindex="0"
+         class="{{ styles.attributes.button }}">
+    <div data-role="attribute-icons" class="{{ styles.attributes.iconStack }}">
+      <div data-role="icon"
+           class="{{ styles.attributes.icon }}"
+           data-kind="{{ attribute.kind }}">{{ render_icon((attribute.icon)) }}</div>
+      <div data-role="remove"
+           class="{{ styles.attributes.icon }}"
+           data-kind="delete">{{ render_icon("attribute.remove") }}</div>
+      <div data-role="add"
+           class="{{ styles.attributes.icon }}"
+           data-kind="success">{{ render_icon("attribute.add") }}</div>
+    </div>
+    <div data-role="text" class="font-semibold">{{ attribute.title }}</div>
+    <input type="checkbox"
+           class="hidden"
+           name="{{ attribute.name }}"
+           {{ 'checked' if attribute.active else '' }}>
+  </label>
+{% endmacro %}
+
+{% macro generate(kind) %}
+  <div data-role="generate" class="flex flex-col gap-6">
+    <div class="{{ styles.form.submit.buttons }}">
+      <button class="{{ styles.home.generate }}"
+              data-role="manual"
+              data-active="true"
+              type="button">
+        {{ render_icon("edit") }}
+        <span>Manual</span>
+      </button>
+      <button class="{{ styles.home.generate }}"
+              data-role="ai"
+              data-active="false"
+              type="button">
+        {{ render_icon("generate") }}
+        <span>Generate</span>
+      </button>
+    </div>
+    <label class="{{ styles.label.default }} flex flex-col gap-2" data-role="ai">
+      <span>Description</span>
+      <textarea class="{{ styles.textarea }}"
+                data-kind="{{ kind }}"
+                name="user_description"
+                rows="6"
+                placeholder="Describe the purpose of this {{ kind }}..."></textarea>
+    </label>
+    <input data-kind="{{ kind }}" type="checkbox" name="generate" class="hidden">
+  </div>
+{% endmacro %}
+
+{% macro form_history(history) %}
+  <div class="{{ styles.dropdown.history }}">
+    <p class="font-semibold" data-role="date">{{ history.completed|format_date }}</p>
+    <p class="text-sm italic text-user-default">{{ history.completed_by.name }}</p>
+  </div>
+{% endmacro %}
+
+{% macro explain_prompt(section=None) %}
+  <button type="submit"
+          class="{{ styles.button.explain }} -mt-1 mb-1"
+          data-visible="false"
+          data-role="explain"
+          data-explain="{{ section }}">
+    {{ render_icon("prompt", "text-kind-default") }}
+    <span>Initial Prompt</span>
+  </button>
+{% endmacro %}
+
+{% macro autofill(enabled=True) %}
+  <div data-role="submit-group" class="{{ styles.button.group }}">
+    <button type="submit" class="{{ styles.button.submit }} sm:basis-1/2"></button>
+    {% if enabled %}
+      <button type="button"
+              data-role="show-autofill"
+              class="{{ styles.button.submit }} sm:basis-1/2">Autofill</button>
+    {% endif %}
+  </div>
+  {% if enabled %}
+    <div data-role="autofill"
+         data-visible="false"
+         class="flex flex-col gap-2 w-full">
+      <div data-role="autofill-submit-group" class="{{ styles.button.group }}">
+        <button type="button"
+                data-kind="default"
+                data-role="cancel-autofill"
+                class="{{ styles.button.submit }} sm:basis-1/2">Cancel Autofill</button>
+        <button type="submit"
+                data-role="autofill-submit"
+                class="{{ styles.button.submit }} sm:basis-1/2"></button>
+      </div>
+    </div>
+  {% endif %}
+{% endmacro %}

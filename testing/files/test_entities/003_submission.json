@@ -1,0 +1,285 @@
+{
+	"test_submission_value": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Page with saved submission",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "basic_inputs"
+					},
+					"submission": { "input-textab12": "Hello World", "input-numgh78": 42 }
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page without submission",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "basic_inputs"
+					}
+				}
+			]
+		]
+	},
+	"test_submission_fields": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Page with basic inputs",
+					"hash": "page001",
+					"form": {
+						"name": "Basic Form",
+						"hash": "form001",
+						"schema": "basic_inputs"
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page with selection types",
+					"hash": "page002",
+					"form": {
+						"name": "Selection Form",
+						"hash": "form002",
+						"schema": "selection_types"
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page with complex types",
+					"hash": "page003",
+					"form": {
+						"name": "Complex Form",
+						"hash": "form003",
+						"schema": "complex_types"
+					}
+				}
+			]
+		]
+	},
+	"test_submission_patch": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Page for patch test",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "basic_inputs"
+					}
+				}
+			]
+		]
+	},
+	"test_submission_save": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Page for save test",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "basic_inputs"
+					}
+				}
+			]
+		]
+	},
+	"test_submission_is_visible": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Page with visibility - checkbox unchecked",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "visibility_test"
+					},
+					"visibility": { "input-conditionalab": false }
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page with visibility - checkbox checked",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "visibility_test"
+					},
+					"submission": { "checkbox-toggleab12": true },
+					"visibility": { "input-conditionalab": true }
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "AND visibility - neither checkbox",
+					"hash": "pageand0",
+					"form": {
+						"name": "Form",
+						"hash": "formand0",
+						"schema": "visibility_and_test"
+					},
+					"submission": {
+						"checkbox-aab12": false,
+						"checkbox-bbc34": false
+					},
+					"visibility": { "input-gatedxy": false }
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "AND visibility - A only",
+					"hash": "pageand1",
+					"form": {
+						"name": "Form",
+						"hash": "formand1",
+						"schema": "visibility_and_test"
+					},
+					"submission": {
+						"checkbox-aab12": true,
+						"checkbox-bbc34": false
+					},
+					"visibility": { "input-gatedxy": false }
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "AND visibility - B only",
+					"hash": "pageand2",
+					"form": {
+						"name": "Form",
+						"hash": "formand2",
+						"schema": "visibility_and_test"
+					},
+					"submission": {
+						"checkbox-aab12": false,
+						"checkbox-bbc34": true
+					},
+					"visibility": { "input-gatedxy": false }
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "AND visibility - both",
+					"hash": "pageand3",
+					"form": {
+						"name": "Form",
+						"hash": "formand3",
+						"schema": "visibility_and_test"
+					},
+					"submission": {
+						"checkbox-aab12": true,
+						"checkbox-bbc34": true
+					},
+					"visibility": { "input-gatedxy": true }
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "OR visibility - no select value",
+					"hash": "pageor0",
+					"form": {
+						"name": "Form",
+						"hash": "formor0",
+						"schema": "visibility_select_or_test"
+					},
+					"visibility": { "input-color-notes": false }
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "OR visibility - red selected",
+					"hash": "pageor1",
+					"form": {
+						"name": "Form",
+						"hash": "formor1",
+						"schema": "visibility_select_or_test"
+					},
+					"submission": { "select-colorab12": "red" },
+					"visibility": { "input-color-notes": true }
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "OR visibility - blue selected",
+					"hash": "pageor2",
+					"form": {
+						"name": "Form",
+						"hash": "formor2",
+						"schema": "visibility_select_or_test"
+					},
+					"submission": { "select-colorab12": "blue" },
+					"visibility": { "input-color-notes": true }
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "OR visibility - green selected",
+					"hash": "pageor3",
+					"form": {
+						"name": "Form",
+						"hash": "formor3",
+						"schema": "visibility_select_or_test"
+					},
+					"submission": { "select-colorab12": "green" },
+					"visibility": { "input-color-notes": false }
+				}
+			]
+		]
+	},
+	"test_submission_tables": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Page with table",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "complex_types"
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page without table",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "basic_inputs"
+					}
+				}
+			]
+		]
+	}
+}

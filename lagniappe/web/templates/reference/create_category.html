@@ -1,0 +1,47 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Creating Categories") %}
+  <section>
+    {{ subheading("What Categories Do") }}
+    <p class="text-sm text-base-dark">
+      Categories group related pages and give them a shared starting structure. A page can belong to more than one category, so categories work like flexible folders or tags.
+    </p>
+    {% call callout("tip") %}
+      Use a category when several pages should share the same form, default features, permissions, or filters.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Creation Options") }}
+    <div class="space-y-3">
+      {% call feature("Generate or Manual", icon="generate", kind="category") %}
+        Describe the category you want and let AI draft it, or switch to manual mode and choose the details yourself.
+      {% endcall %}
+      {% call feature("Default Form", icon="form", kind="form") %}
+        Pick the page form new pages should start with. This also gives the category useful form-based filters.
+      {% endcall %}
+      {% call feature("Page Features", icon="settings.page", kind="page") %}
+        Choose whether pages in this category should normally have photos, documents, files, notes, or tasks.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Typical Flow") }}
+    {% call step(1, "Name the category") %}
+      <p class="text-sm text-base-medium">Use a name people will recognize when browsing or assigning pages.</p>
+    {% endcall %}
+    {% call step(2, "Choose structure") %}
+      <p class="text-sm text-base-medium">Attach a default form and enable the page features most pages in the category will need.</p>
+    {% endcall %}
+    {% call step(3, "Create pages") %}
+      <p class="text-sm text-base-medium">Add pages manually, generate starter pages, or attach existing pages later.</p>
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Worth Remembering") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Category defaults are a starting point. Individual pages can still be adjusted.</li>
+      <li>Form filters work best when pages in the category use the category's default form.</li>
+      <li>Set permissions thoughtfully if the category contains private or sensitive pages.</li>
+    </ul>
+  </section>
+{% endcall %}

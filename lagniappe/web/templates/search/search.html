@@ -1,0 +1,62 @@
+{% extends "layouts/base.html" %}
+{% from 'search/results.html' import search_results %}
+
+{% macro facet_button(facet) %}
+  <div data-role="attribute"
+       data-kind="{{ facet.kind }}"
+       data-selected="false"
+       tabindex="0"
+       class="{{ styles.attributes.button }} group group-data-[has-selection=true]/facets:data-[selected=false]:opacity-50 group-data-[has-selection=true]/facets:data-[selected=false]:hover:opacity-100">
+    <div data-role="attribute-icons" class="{{ styles.attributes.iconStack }}">
+      <div data-role="icon"
+           class="{{ styles.attributes.icon }}"
+           data-kind="{{ facet.kind }}">
+        {{ render_icon((facet.icon)) }}
+      </div>
+      <div data-role="remove"
+           class="{{ styles.attributes.icon }}"
+           data-kind="delete">
+        {{ render_icon("attribute.remove") }}
+      </div>
+      <div data-role="add"
+           class="{{ styles.attributes.icon }}"
+           data-kind="{{ facet.kind }}">
+        {{ render_icon("filter.active") }}
+      </div>
+    </div>
+    <div data-role="text" class="font-semibold">{{ facet.title }}</div>
+  </div>
+{% endmacro %}
+
+{% macro main() %}
+  <div lp-view data-kind="results" class="{{ styles.layout.contentView }}">
+    <div class="flex flex-col gap-4 py-4 sm:py-6 lg:py-8">
+      <div class="flex flex-row items-center gap-2">
+        <span class="text-base-medium">Query:</span>
+        <span class="text-base-dark font-semibold">{{ query }}</span>
+      </div>
+      <div class="{{ styles.attributes.container }} group/facets"
+           data-role="facets"
+           data-has-selection="false">
+        {% for facet in facets %}{{ facet_button(facet.value) }}{% endfor %}
+        <div data-role="reset"
+             tabindex="0"
+             class="{{ styles.attributes.button }} group-data-[has-selection=false]/facets:hidden"
+             data-kind="delete">
+          <div data-role="remove" class="{{ styles.attributes.icon }}">
+            {{ render_icon("filter.inactive") }}
+          </div>
+        </div>
+      </div>
+      {{ search_results(results, pagination, query) }}
+    </div>
+  </div>
+{% endmacro %}
+
+{% block title %}
+  Search
+{% endblock title %}
+
+{% block content %}
+  {{ main() }}
+{% endblock content %}

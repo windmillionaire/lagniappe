@@ -1,0 +1,14 @@
+{
+    "recommendations": [
+        "biomejs.biome",
+        "bradlc.vscode-tailwindcss",
+        "charliermarsh.ruff",
+        "hongquan.dragon-jinja",
+        "monosans.djlint",
+        "ms-playwright.playwright",
+        "ms-python.debugpy",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "redhat.vscode-yaml"
+    ]
+}

@@ -1,0 +1,62 @@
+{% from "manual/macros.html" import subheading, callout %}
+{% from "reference/macros.html" import modal, feature, detail %}
+{% call modal("Permissions") %}
+  <section>
+    {{ subheading("What This Panel Controls") }}
+    <p class="text-sm text-base-dark">
+      Permissions decide what a user or group can see, edit, create, delete, assign, or publish. Use this panel to grant access at the broad site level or to specific categories, projects, pages, and groups.
+    </p>
+    {% call callout("tip") %}
+      Start with user groups for common roles, then use individual permissions only for exceptions.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Permission Levels") }}
+    <div class="space-y-3">
+      {% call feature("View") %}
+        Lets someone see content without changing it.
+      {% endcall %}
+      {% call feature("Edit") %}
+        Lets someone update content they can access. Editing a category also lets them add pages to that category.
+      {% endcall %}
+      {% call feature("Create and Delete") %}
+        Create lets someone make new containers such as categories, projects, forms, or users. Delete removes content. These are powerful permissions, especially on broad resources.
+      {% endcall %}
+      {% call feature("Assign and Publish") %}
+        Assign controls task delegation. Publish controls public document visibility.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Broad vs Specific") }}
+    <div class="space-y-3">
+      {% call detail("Global Permissions", kind="project") %}
+        Apply across a whole resource area, such as models, forms, or users. They are convenient, but can grant more access than expected.
+      {% endcall %}
+      {% call detail("Specific Permissions", kind="page") %}
+        Apply to one category, project, page, or user group. Use these when access should stay focused.
+      {% endcall %}
+    </div>
+    {% call callout("warning") %}
+      Broad permissions can hide narrower ones because the broader permission already covers the item. If a row seems missing, check whether a higher-level permission is already granting access.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("User Types") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Owners have full access and manage site settings and user groups.</li>
+      <li>Admins can manage most user permissions, but owner-only controls remain restricted.</li>
+      <li>Regular users get access from their groups and any individual permissions.</li>
+      <li>Public users are signed-in people who have not been fully created or grouped yet.</li>
+    </ul>
+  </section>
+  <section>
+    {{ subheading("Best Practices") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Grant the least access that lets the person do the work.</li>
+      <li>Use category edit for people who should add or maintain pages in an existing category.</li>
+      <li>Avoid broad create or delete permissions unless the role truly needs them.</li>
+      <li>After changing group membership, users may need to sign out and back in.</li>
+    </ul>
+  </section>
+{% endcall %}

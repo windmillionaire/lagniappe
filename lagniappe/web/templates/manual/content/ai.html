@@ -1,0 +1,115 @@
+{% from "manual/macros.html" import heading, subheading, card, callout, code, concept, nav_buttons, link %}
+<div class="space-y-6">
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Lagniappe can use Google Vertex AI for optional generation, extraction, and
+      summarization features. AI runs only when a user invokes an AI action.
+    </p>
+    <p class="text-base-medium">
+      The goal is not to sprinkle AI everywhere, but to use it where the app
+      already knows the relevant form schema, document, file, page, task, and
+      permission context.
+    </p>
+  {% endcall %}
+  {{ heading("What AI Can Do", icon="generate", kind="form") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li>Generate draft form schemas from descriptions.</li>
+      <li>Autofill page or task forms from existing context, files, images, or user instructions.</li>
+      <li>Generate editable document text.</li>
+      <li>Generate page or document images.</li>
+      <li>Summarize uploaded files for review or search.</li>
+      <li>Create draft categories, projects, model tasks, pages, and schedules.</li>
+      <li>Use permission-checked internal search tools when a prompt is configured to allow them.</li>
+      <li>Answer questions using only the records, files, and tasks the current user can access.</li>
+      <li>Suggest workspace-native actions, such as adding pages, tasks, files, forms, or projects in the right place.</li>
+    </ul>
+  {% endcall %}
+  {{ heading("Permission-Scoped Context", icon="permissions", kind="user") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      AI tools use the same permission boundaries as the rest of Lagniappe.
+      When a user asks a question or starts an AI workflow, the app assembles
+      context through server-side permission checks instead of handing the AI
+      an owner-level view of the workspace.
+    </p>
+    <p class="text-base-medium mb-3">
+      For example, if someone is invited only to an old house category, they
+      can ask about electricians, repairs, files, or tasks in that category.
+      Other houses, other categories, and records they cannot view are left out
+      of search results and AI tool responses.
+    </p>
+    {% call callout("tip", False) %}
+      Think of AI as another reader acting on behalf of the current user, not
+      as a separate administrator. If the user cannot see a record in Lagniappe,
+      the AI should not receive that record as context.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("Privacy Model") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      AI requests go through your own Google Cloud project's Vertex AI
+      configuration. That is a meaningfully different posture from pasting
+      private data into a consumer chatbot account, though it is still a cloud
+      AI service: prompts, files, and generated output are sent to Google for
+      processing under your cloud terms and settings.
+    </p>
+    <p class="text-base-medium mb-3">
+      The training boundary is the important difference. Consumer AI products
+      may use conversations to improve or train their services depending on
+      the product, plan, and account settings. Google Cloud's managed Gemini
+      model terms say Google will not use customer data to train or fine-tune
+      AI/ML models without prior permission or instruction. That is stronger
+      than relying on a consumer account toggle, but it is not the same as
+      local-only processing.
+    </p>
+    <p class="text-base-medium mb-3">
+      If zero data retention matters for your installation, choose those
+      settings intentionally. Google's guidance calls out several retention
+      paths to review, including abuse-monitoring exceptions, request-response
+      logging, cached data, and grounding features that may keep limited logs:
+      {{ link("https://docs.cloud.google.com/gemini-enterprise-agent-platform/resources/zero-data-retention", "Gemini Enterprise Agent Platform zero data retention") }}.
+      Lagniappe setup can help disable Vertex AI caching, but that is one
+      control rather than a blanket guarantee for every AI feature or future
+      provider setting.
+    </p>
+    {% call callout("tip", False) %}
+      Permissions help avoid accidental oversharing into AI calls. As with any
+      AI output, a quick human look at generated text and extracted values is
+      a good habit before relying on them.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("Cost") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      AI usage is pay-per-use through your cloud project. Text operations are
+      usually small. Image generation and large file analysis cost more, and
+      provider pricing can shift over time.
+    </p>
+    <p class="text-base-medium mb-3">
+      Budget alerts in Google Cloud are an easy safety net. If you turn on
+      search grounding, file processing, image generation, or generate pages
+      in volume, it is worth glancing at usage a little more often.
+    </p>
+    <p class="text-base-medium">You can adjust AI settings at any time with:</p>
+    {{ code("./setup.sh ai") }}
+  {% endcall %}
+  {{ heading("Good to Know") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      AI is a helpful collaborator rather than an oracle. A few things to
+      keep in mind when reviewing its output:
+    </p>
+    <ul class="text-base-medium space-y-2">
+      <li>Generated schemas can look reasonable and still need a tweak or two.</li>
+      <li>Autofill may skip a value, or fill one in that you would rather leave blank.</li>
+      <li>File summaries occasionally miss a detail that matters.</li>
+      <li>Search-grounded answers can lean on the web rather than your own policy or records.</li>
+      <li>Model names, pricing, and retention settings live with the provider and can change.</li>
+    </ul>
+  {% endcall %}
+  {{ nav_buttons(
+  prev={"key": "personalization", "name": "Personalization", "kind": "project"},
+  next={"key": "under-the-hood", "name": "Under the Hood", "kind": "page"}
+  ) }}
+</div>

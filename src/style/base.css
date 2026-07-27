@@ -1,0 +1,24 @@
+/* ==========================================================================
+   GLOBAL DEFAULTS & FONT RENDERING
+   ========================================================================== */
+
+* {
+	/* Smooth font rendering on macOS/iOS */
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	/* Prevent scroll chaining to parent */
+	/* overscroll-behavior: contain; */
+}
+
+/* Prevent browser-synthesized bold/italic for variable fonts */
+body {
+	font-synthesis: none;
+}
+
+html {
+	overflow-y: scroll;
+}
+
+/* :focus {
+	outline: none;
+} */

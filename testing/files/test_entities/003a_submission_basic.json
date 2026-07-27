@@ -1,0 +1,910 @@
+{
+	"test_submission_date_input": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "DateInput form submission",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "date_time_inputs"
+					},
+					"form_submission": { "input-dateab12": "2025-06-15" },
+					"expected": {
+						"input-dateab12": {
+							"form_value": "2025-06-15",
+							"ai_value": "2025-06-15"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "DateInput AI submission",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "date_time_inputs"
+					},
+					"ai_submission": { "input-dateab12": "2025-06-15" },
+					"expected": {
+						"input-dateab12": {
+							"form_value": "2025-06-15",
+							"ai_value": "2025-06-15"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "DateInput import - US format",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "date_time_inputs"
+					},
+					"import_submission": { "input-dateab12": "06/15/2025" },
+					"expected": {
+						"input-dateab12": {
+							"form_value": "2025-06-15",
+							"ai_value": "2025-06-15"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "DateInput import - verbose format",
+					"hash": "page004",
+					"form": {
+						"name": "Form",
+						"hash": "form004",
+						"schema": "date_time_inputs"
+					},
+					"import_submission": { "input-dateab12": "June 15, 2025" },
+					"expected": {
+						"input-dateab12": {
+							"form_value": "2025-06-15",
+							"ai_value": "2025-06-15"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "DateInput import - ISO format with time",
+					"hash": "page005",
+					"form": {
+						"name": "Form",
+						"hash": "form005",
+						"schema": "date_time_inputs"
+					},
+					"import_submission": { "input-dateab12": "2025-06-15T14:30:00" },
+					"expected": {
+						"input-dateab12": {
+							"form_value": "2025-06-15",
+							"ai_value": "2025-06-15"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "DateInput form - year boundary preserved",
+					"hash": "page006",
+					"form": {
+						"name": "Form",
+						"hash": "form006",
+						"schema": "date_time_inputs"
+					},
+					"form_submission": { "input-dateab12": "2025-12-31" },
+					"expected": {
+						"input-dateab12": {
+							"form_value": "2025-12-31",
+							"ai_value": "2025-12-31"
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_time_input": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "TimeInput form submission",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "date_time_inputs"
+					},
+					"form_submission": { "input-timecd34": "14:30" },
+					"expected": {
+						"input-timecd34": {
+							"value": "14:30",
+							"form_value": "14:30",
+							"ai_value": "14:30"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "TimeInput AI submission",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "date_time_inputs"
+					},
+					"ai_submission": { "input-timecd34": "09:00" },
+					"expected": {
+						"input-timecd34": {
+							"value": "09:00",
+							"form_value": "09:00",
+							"ai_value": "09:00"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "TimeInput import - standard format",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "date_time_inputs"
+					},
+					"import_submission": { "input-timecd34": "14:30" },
+					"expected": {
+						"input-timecd34": {
+							"value": "14:30",
+							"form_value": "14:30",
+							"ai_value": "14:30"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "TimeInput import - midnight",
+					"hash": "page004",
+					"form": {
+						"name": "Form",
+						"hash": "form004",
+						"schema": "date_time_inputs"
+					},
+					"import_submission": { "input-timecd34": "00:00" },
+					"expected": {
+						"input-timecd34": {
+							"value": "00:00",
+							"form_value": "00:00",
+							"ai_value": "00:00"
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_text_input": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "TextInput form submission",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "text_input_only"
+					},
+					"form_submission": { "input-textab12": "Hello World" },
+					"expected": {
+						"input-textab12": {
+							"value": "Hello World",
+							"form_value": "Hello World",
+							"filter_value": "Hello World",
+							"ai_value": "Hello World",
+							"search_value": { "Text Field": "Hello World" }
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "TextInput with The prefix",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "text_input_only"
+					},
+					"form_submission": { "input-textab12": "The Quick Brown Fox" },
+					"expected": {
+						"input-textab12": {
+							"value": "The Quick Brown Fox",
+							"form_value": "The Quick Brown Fox",
+							"filter_value": "The Quick Brown Fox",
+							"ai_value": "The Quick Brown Fox",
+							"search_value": { "Text Field": "The Quick Brown Fox" }
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "TextInput AI submission",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "text_input_only"
+					},
+					"ai_submission": { "input-textab12": "AI Generated Text" },
+					"expected": {
+						"input-textab12": {
+							"value": "AI Generated Text",
+							"form_value": "AI Generated Text",
+							"filter_value": "AI Generated Text",
+							"ai_value": "AI Generated Text",
+							"search_value": { "Text Field": "AI Generated Text" }
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "TextInput import - simple text",
+					"hash": "page004",
+					"form": {
+						"name": "Form",
+						"hash": "form004",
+						"schema": "text_input_only"
+					},
+					"import_submission": { "input-textab12": "Imported Text" },
+					"expected": {
+						"input-textab12": {
+							"value": "Imported Text",
+							"form_value": "Imported Text",
+							"filter_value": "Imported Text",
+							"ai_value": "Imported Text",
+							"search_value": { "Text Field": "Imported Text" }
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "TextInput import - with whitespace",
+					"hash": "page005",
+					"form": {
+						"name": "Form",
+						"hash": "form005",
+						"schema": "text_input_only"
+					},
+					"import_submission": { "input-textab12": "  Spaced Text  " },
+					"expected": {
+						"input-textab12": {
+							"value": "  Spaced Text  ",
+							"form_value": "  Spaced Text  ",
+							"filter_value": "  Spaced Text  ",
+							"ai_value": "  Spaced Text  ",
+							"search_value": { "Text Field": "  Spaced Text  " }
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "TextInput import - list values joined",
+					"hash": "page006",
+					"form": {
+						"name": "Form",
+						"hash": "form006",
+						"schema": "text_input_only"
+					},
+					"import_submission": { "input-textab12": ["Hello", "World"] },
+					"expected": {
+						"input-textab12": {
+							"value": "Hello World",
+							"form_value": "Hello World",
+							"filter_value": "Hello World",
+							"ai_value": "Hello World",
+							"search_value": { "Text Field": "Hello World" }
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_text_input_empty_column_value_is_blank": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "TextInput empty submission",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "text_input_only"
+					}
+				}
+			]
+		]
+	},
+	"test_submission_number_input": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "NumberInput form - integer",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "number_input_only"
+					},
+					"form_submission": { "input-numab12": "42" },
+					"expected": {
+						"input-numab12": {
+							"value": 42.0,
+							"form_value": 42.0,
+							"filter_value": 42.0,
+							"ai_value": 42.0
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "NumberInput form - decimal",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "number_input_only"
+					},
+					"form_submission": { "input-numab12": "3.14159" },
+					"expected": {
+						"input-numab12": {
+							"value": 3.14159,
+							"form_value": 3.14159,
+							"filter_value": 3.14159,
+							"ai_value": 3.14159
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "NumberInput AI submission",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "number_input_only"
+					},
+					"ai_submission": { "input-numab12": 99.5 },
+					"expected": {
+						"input-numab12": {
+							"value": 99.5,
+							"form_value": 99.5,
+							"filter_value": 99.5,
+							"ai_value": 99.5
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "NumberInput import - negative",
+					"hash": "page004",
+					"form": {
+						"name": "Form",
+						"hash": "form004",
+						"schema": "number_input_only"
+					},
+					"import_submission": { "input-numab12": "-273.15" },
+					"expected": {
+						"input-numab12": {
+							"value": -273.15,
+							"form_value": -273.15,
+							"filter_value": -273.15,
+							"ai_value": -273.15
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "NumberInput import - zero",
+					"hash": "page005",
+					"form": {
+						"name": "Form",
+						"hash": "form005",
+						"schema": "number_input_only"
+					},
+					"import_submission": { "input-numab12": "0" },
+					"expected": {
+						"input-numab12": {
+							"value": 0.0,
+							"form_value": 0.0,
+							"filter_value": 0.0,
+							"ai_value": 0.0
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "NumberInput form - zero",
+					"hash": "page006",
+					"form": {
+						"name": "Form",
+						"hash": "form006",
+						"schema": "number_input_only"
+					},
+					"form_submission": { "input-numab12": "0" },
+					"expected": {
+						"input-numab12": {
+							"value": 0.0,
+							"form_value": 0.0,
+							"filter_value": 0.0,
+							"ai_value": 0.0
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_email_input": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "EmailInput form submission",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "email_input_only"
+					},
+					"form_submission": { "input-emlab12": "test@example.com" },
+					"expected": {
+						"input-emlab12": {
+							"value": "test@example.com",
+							"form_value": "test@example.com",
+							"filter_value": "test@example.com",
+							"ai_value": "test@example.com"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "EmailInput AI submission",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "email_input_only"
+					},
+					"ai_submission": { "input-emlab12": "user@domain.org" },
+					"expected": {
+						"input-emlab12": {
+							"value": "user@domain.org",
+							"form_value": "user@domain.org",
+							"filter_value": "user@domain.org",
+							"ai_value": "user@domain.org"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "EmailInput import - complex email",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "email_input_only"
+					},
+					"import_submission": {
+						"input-emlab12": "first.last+tag@sub.domain.co.uk"
+					},
+					"expected": {
+						"input-emlab12": {
+							"value": "first.last+tag@sub.domain.co.uk",
+							"form_value": "first.last+tag@sub.domain.co.uk",
+							"filter_value": "first.last+tag@sub.domain.co.uk",
+							"ai_value": "first.last+tag@sub.domain.co.uk"
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_tel_input": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "TelInput form submission - stays as-is",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "tel_input_only"
+					},
+					"form_submission": { "input-telab12": "(555) 123-4567" },
+					"expected": {
+						"input-telab12": {
+							"value": "+15551234567",
+							"form_value": "+1 (555) 123-4567",
+							"filter_value": "+15551234567",
+							"ai_value": "+15551234567"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "TelInput AI submission - normalized to E.164",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "tel_input_only"
+					},
+					"ai_submission": { "input-telab12": "(555) 123-4567" },
+					"expected": {
+						"input-telab12": {
+							"value": "+15551234567",
+							"form_value": "+1 (555) 123-4567",
+							"filter_value": "+15551234567",
+							"ai_value": "+15551234567"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "TelInput import - US format normalized",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "tel_input_only"
+					},
+					"import_submission": { "input-telab12": "555-123-4567" },
+					"expected": {
+						"input-telab12": {
+							"value": "+15551234567",
+							"form_value": "+1 (555) 123-4567",
+							"filter_value": "+15551234567",
+							"ai_value": "+15551234567"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "TelInput import - already E.164",
+					"hash": "page004",
+					"form": {
+						"name": "Form",
+						"hash": "form004",
+						"schema": "tel_input_only"
+					},
+					"import_submission": { "input-telab12": "+15551234567" },
+					"expected": {
+						"input-telab12": {
+							"value": "+15551234567",
+							"form_value": "+1 (555) 123-4567",
+							"filter_value": "+15551234567",
+							"ai_value": "+15551234567"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "TelInput AI - digits only normalized",
+					"hash": "page005",
+					"form": {
+						"name": "Form",
+						"hash": "form005",
+						"schema": "tel_input_only"
+					},
+					"ai_submission": { "input-telab12": "5551234567" },
+					"expected": {
+						"input-telab12": {
+							"value": "+15551234567",
+							"form_value": "+1 (555) 123-4567",
+							"filter_value": "+15551234567",
+							"ai_value": "+15551234567"
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_checkbox": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Checkbox form - checked",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "checkbox_only"
+					},
+					"form_submission": { "checkbox-ab12": "on" },
+					"expected": {
+						"checkbox-ab12": {
+							"value": true,
+							"form_value": true,
+							"filter_value": true,
+							"ai_value": "True"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Checkbox form - unchecked (not submitted)",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "checkbox_only"
+					},
+					"form_submission": {},
+					"expected": {
+						"checkbox-ab12": {
+							"value": false,
+							"form_value": false,
+							"filter_value": false,
+							"ai_value": "False"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Checkbox AI - true",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "checkbox_only"
+					},
+					"ai_submission": { "checkbox-ab12": true },
+					"expected": {
+						"checkbox-ab12": {
+							"value": true,
+							"form_value": true,
+							"filter_value": true,
+							"ai_value": "True"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Checkbox AI - false",
+					"hash": "page004",
+					"form": {
+						"name": "Form",
+						"hash": "form004",
+						"schema": "checkbox_only"
+					},
+					"ai_submission": { "checkbox-ab12": false },
+					"expected": {
+						"checkbox-ab12": {
+							"value": false,
+							"form_value": false,
+							"filter_value": false,
+							"ai_value": "False"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Checkbox import - yes",
+					"hash": "page005",
+					"form": {
+						"name": "Form",
+						"hash": "form005",
+						"schema": "checkbox_only"
+					},
+					"import_submission": { "checkbox-ab12": "yes" },
+					"expected": {
+						"checkbox-ab12": {
+							"value": true,
+							"form_value": true,
+							"filter_value": true,
+							"ai_value": "True"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Checkbox import - 1",
+					"hash": "page006",
+					"form": {
+						"name": "Form",
+						"hash": "form006",
+						"schema": "checkbox_only"
+					},
+					"import_submission": { "checkbox-ab12": "1" },
+					"expected": {
+						"checkbox-ab12": {
+							"value": true,
+							"form_value": true,
+							"filter_value": true,
+							"ai_value": "True"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Checkbox import - no",
+					"hash": "page007",
+					"form": {
+						"name": "Form",
+						"hash": "form007",
+						"schema": "checkbox_only"
+					},
+					"import_submission": { "checkbox-ab12": "no" },
+					"expected": {
+						"checkbox-ab12": {
+							"value": false,
+							"form_value": false,
+							"filter_value": false,
+							"ai_value": "False"
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Checkbox import - 0",
+					"hash": "page008",
+					"form": {
+						"name": "Form",
+						"hash": "form008",
+						"schema": "checkbox_only"
+					},
+					"import_submission": { "checkbox-ab12": "0" },
+					"expected": {
+						"checkbox-ab12": {
+							"value": false,
+							"form_value": false,
+							"filter_value": false,
+							"ai_value": "False"
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_textarea": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Textarea form submission",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "textarea_only"
+					},
+					"form_submission": {
+						"textarea-ab12": "This is a long text.\nWith multiple lines."
+					},
+					"expected": {
+						"textarea-ab12": {
+							"value": "This is a long text.\nWith multiple lines.",
+							"form_value": "This is a long text.\nWith multiple lines.",
+							"filter_value": "This is a long text.\nWith multiple lines.",
+							"ai_value": "This is a long text.\nWith multiple lines.",
+							"search_value": {
+								"Textarea Field": "This is a long text.\nWith multiple lines."
+							}
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Textarea AI submission",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "textarea_only"
+					},
+					"ai_submission": { "textarea-ab12": "AI generated content" },
+					"expected": {
+						"textarea-ab12": {
+							"value": "AI generated content",
+							"form_value": "AI generated content",
+							"filter_value": "AI generated content",
+							"ai_value": "AI generated content",
+							"search_value": { "Textarea Field": "AI generated content" }
+						}
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Textarea import - with whitespace",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "textarea_only"
+					},
+					"import_submission": { "textarea-ab12": "  padded text  " },
+					"expected": {
+						"textarea-ab12": {
+							"value": "  padded text  ",
+							"form_value": "  padded text  ",
+							"filter_value": "  padded text  ",
+							"ai_value": "  padded text  ",
+							"search_value": { "Textarea Field": "  padded text  " }
+						}
+					}
+				}
+			]
+		]
+	}
+}

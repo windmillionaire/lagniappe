@@ -1,0 +1,60 @@
+{% extends "layouts/base.html" %}
+{% import 'controls.html' as controls %}
+{% from 'common.html' import home %}
+{% from 'table.html' import table, mobile_toggles %}
+{% from 'filters.html' import filtered_conditions %}
+
+{% macro view_header() %}
+  <nav class="{{ styles.layout.view.title }}" data-role="page-header">
+    {% if filtered %}
+      <a href="{{ filtered.parent_filters_url }}"
+         data-role="title"
+         data-kind="project"
+         class="text-kind-default {{ styles.link.title }}">{{ filtered.parent.name }}</a>
+    {% else %}
+      <span data-role="title">Active Tasks</span>
+    {% endif %}
+    <div data-role="actions">
+      <button class="{{ styles.nav.mobileButton }}"
+              lp-show="table:MobileTableControls"
+              data-toggle="true"
+              aria-label="Table controls"
+              title="Table controls">{{ render_icon("column") }}</button>
+      {% if Resource.TASKS.allowed(Action.EDIT) %}
+        <button class="{{ styles.nav.desktopButton }}"
+                lp-show="table:TableEditor"
+                data-toggle="true"
+                aria-label="Edit table"
+                title="Edit table">{{ render_icon("tableEdit") }}</button>
+      {% endif %}
+    </div>
+  </nav>
+{% endmacro %}
+
+{% macro view() %}
+  <div lp-view
+       data-kind="task"
+       {% if filtered %}
+         {% if not filtered.temporary %}data-key="{{ filtered.urlsafe_key }}"{% endif %}
+       data-hash="{{ filtered.hash }}"
+       {% else %}
+       data-index="tasks"
+       data-fingerprint="{{ fingerprint }}"
+       {% endif %}
+       class="group">
+    <div class="{{ styles.layout.view.header }}">
+      {{ view_header() }}
+      {{ mobile_toggles((index or filtered).table.columns) }}
+    </div>
+    {% if filtered %}<div class="px-4 sm:px-0">{{ filtered_conditions(filtered) }}</div>{% endif %}
+    {{ table(tasks, index or filtered) }}
+  </div>
+{% endmacro %}
+
+{% block title %}
+  Active Tasks
+{% endblock title %}
+
+{% block content %}
+  {{ view() }}
+{% endblock content %}

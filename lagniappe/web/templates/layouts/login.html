@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html class="h-full bg-white" lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Login page">
+    <meta name="keywords" content="login, user, access, account">
+    <meta name="analytics" content="{{ CONFIG.ANALYTICS|yesno }}">
+    {% if CONFIG.capture_errors %}
+      <meta name="sentry-dsn" content="{{ CONFIG.SENTRY_DSN }}">
+    {% endif %}
+    <link rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="/images/favicon-32x32.png?v={{ CONFIG.BUILD_ID }}">
+    <link rel="preload"
+          href="/fonts/source-sans-latin.woff2"
+          as="font"
+          type="font/woff2"
+          crossorigin>
+    <link rel="preload"
+          href="/fonts/source-sans-italic-latin.woff2"
+          as="font"
+          type="font/woff2"
+          crossorigin>
+    <link rel="stylesheet" href="/style.css?v={{ CONFIG.BUILD_ID }}">
+    {% if CONFIG.capture_errors %}
+      <script type="module" src="/sentry.js?v={{ CONFIG.BUILD_ID }}"></script>
+    {% endif %}
+    <script type="module" src="/login.js?v={{ CONFIG.BUILD_ID }}"></script>
+    {% if google %}<script src="https://accounts.google.com/gsi/client" async></script>{% endif %}
+    <title>Login</title>
+  </head>
+  <body id="login"
+        {{ allow_registration and "allow-registration" }}
+        data-mode="{{ mode }}"
+        data-code="{{ code }}">
+    <input id="token" type="hidden" value="{{ csrf_token() }}" />
+    {% if google %}
+      <div id="g_id_onload"
+           data-client_id="{{ g_client_id }}"
+           data-context="signin"
+           data-ux_mode="redirect"
+           data-login_uri="{{ g_login_uri }}"
+           data-auto_prompt="false"></div>
+    {% endif %}
+    <div class="flex justify-center mt-24 mb-12">
+      <img src="/images/logo-192x192.png?v={{ CONFIG.BUILD_ID }}"
+           width="192"
+           height="192"
+           alt="logo">
+    </div>
+    <main class="px-4 sm:px-6 lg:px-8">
+
+      {% block content %}
+      {% endblock content %}
+    </main>
+  </body>
+</html>

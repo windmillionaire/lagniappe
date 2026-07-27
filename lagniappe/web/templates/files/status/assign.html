@@ -1,0 +1,105 @@
+{% macro form_element(file, assign, column_id, column) %}
+  {% set kind = file.entity_type %}
+  {% set assigned_field_id = assign.section.get(column_id) %}
+  {% set preload = assign.field(assigned_field_id) if assigned_field_id else assign.guess_field(column_id) %}
+  <div class="grid grid-cols-1" lp-select>
+    <select data-kind='{{ kind }}'
+            data-placeholder="select a field..."
+            {% if preload %}data-preload='{{ preload|tojson }}'{% endif %}
+            name="{{ column_id }}"
+            class="{{ styles.select.default }}">
+      <option value="" selected disabled hidden>select a field...</option>
+      {% for field_id, field in assign.fields.items() %}
+        <option data-details='{{ field|tojson }}' value="{{ field.id }}">{{ field.label or field.get("label", "") }}</option>
+      {% endfor %}
+    </select>
+  </div>
+{% endmacro %}
+
+{% macro assign_columns(file) %}
+  {% set assign = file.properties.assign_columns %}
+  <div>
+    <h2 class="text-lg font-bold">Assign Columns</h2>
+    <h3 class="text-base font-semibold text-base-dark">
+      Form:
+      <a data-kind="form"
+         class="{{ styles.link.default }}"
+         href="{{ url_for('forms.view', key=file.form.urlsafe_key) }}">{{ file.form.name }}</a>
+    </h3>
+    <p class="text-sm text-base-medium italic mt-2">
+      Assign the columns to the form fields.
+      You can edit this form before importing the data.
+      Ignored columns will not be imported.
+    </p>
+    <ul class="mt-4 space-y-2">
+      <li class="flex flex-row items-start gap-2">
+        {{ render_icon("info", "text-kind-default", "form") }}
+        <span class="text-sm text-base-dark">
+          If you add two columns to the same field, the values in those columns will be combined and separated by a space.
+        </span>
+      </li>
+      <li class="flex flex-row items-start gap-2">
+        {{ render_icon("info", "text-kind-default", "form") }}
+        <span class="text-sm text-base-dark">
+          If you add columns to table fields, those column values will be added to the table as new rows in the order
+          they appear in the file.
+        </span>
+      </li>
+      {% if file.entity_type == "task" %}
+        <li class="flex flex-row items-start gap-2">
+          {{ render_icon("info", "text-kind-default", "task") }}
+          <span class="text-sm text-base-dark">
+            Each row creates a new task. Columns assigned to the 'Task Name' field are combined
+            and used as the saved task's name. If a column is assigned to the 'Completed On' field,
+            the task will be marked as completed on that date. If multiple columns are mapped to 'Completed On',
+            those dates will be applied only to that new task to create its completion history; rows are never combined.
+            The other data from that row will be copied into those history records. If a column is assigned to the 'Due Date' field,
+            the task will be set to be due on that date. If multiple columns are assigned to the 'Due Date' field,
+            the earliest due date will be used.
+          </span>
+        </li>
+        <li class="flex flex-row items-start gap-2">
+          {{ render_icon("info", "text-kind-default", "page") }}
+          <span class="text-sm text-base-dark">
+            In the next step, you'll be able to choose which column will be used to match tasks to pages.
+            If that column maps to the page's name, you can set that here, otherwise it can be set to a
+            field in that page's form in the next step. It is fine to ignore that column in this step if it
+            does not map to a task form field or the page's name.
+          </span>
+        </li>
+      {% endif %}
+    </ul>
+  </div>
+  <form>
+    <table class="{{ styles.form.table.table }}">
+      <thead>
+        <tr>
+          <th scope="col" class="py-3.5 pr-4 font-semibold text-left">Column</th>
+          <th scope="col" class="py-3.5 pr-4 font-semibold text-left">Field</th>
+          <th scope="col" class="py-3.5 font-semibold text-center">Ignore</th>
+        </tr>
+      </thead>
+      <tbody class="{{ styles.form.table.body }}">
+        {% for column_id, column in assign.columns.items() %}
+          <tr>
+            <td class="py-2.5 pr-4 font-semibold text-left max-w-24">
+              {{ render_icon(column['icon']) }}
+              <span class="ml-1">{{ column['label'] }}</span>
+            </td>
+            <td class="py-2.5 pr-4 max-w-24">{{ form_element(file, assign, column_id, column) }}</td>
+            <td class="py-2.5">
+              <div class="{{ styles.checkbox.container }} mx-auto">
+                <input type="checkbox"
+                       name="ignore-{{ column_id }}"
+                       {% if assign.ignore(column_id) %}checked{% endif %}
+                       data-kind="form"
+                       class="{{ styles.checkbox.default }}">
+                {{ render_icon("check", (styles.checkbox.icon)) }}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </form>
+{% endmacro %}

@@ -1,0 +1,9 @@
+[
+	{
+		"id": "tags",
+		"type": "input",
+		"input": "text",
+		"title": "Tags",
+		"multiple": true
+	}
+]

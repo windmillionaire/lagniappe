@@ -1,0 +1,7 @@
+# Build-managed output
+lagniappe/web/static/** linguist-generated=true
+lagniappe/web/start/styles/icons.py linguist-generated=true
+lagniappe/web/start/styles/styles.py linguist-generated=true
+
+# Vendored third-party assets
+*.woff2 binary

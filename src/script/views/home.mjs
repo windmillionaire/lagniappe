@@ -1,0 +1,67 @@
+import Core from "./base/core";
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002a_home.py::test_home_mobile_dashboard_smoke
+ * @features home
+ * @dimensions load layout mobile
+ */
+export default class Home extends Core {
+	constructor(elt) {
+		super(elt);
+		this.hash = "home";
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/home.mjs::Home._refreshStarred
+	 * @covered-by src/script/views/home.mjs::Home._hideEmptyLists
+	 * @reason server-change hook delegates collection work to focused home handlers
+	 */
+	async refreshSupplementalCollections(changes = []) {
+		if (changes.some(({ type }) => ["star", "unstar"].includes(type))) {
+			await this._refreshStarred();
+		}
+		if (changes.some(({ type }) => type === "delete")) this._hideEmptyLists();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_category
+	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
+	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
+	 * @features starred
+	 * @dimensions category project page
+	 */
+	async _refreshStarred() {
+		const starredComponent = this.getComponent(
+			document.getElementById("starred"),
+		);
+		if (!starredComponent) return;
+
+		const existingWidget = starredComponent.widgets.StarredList;
+		const widget =
+			existingWidget || (await starredComponent.loadWidget("StarredList"));
+		if (!widget) return;
+
+		if (existingWidget) await starredComponent.load(widget);
+		if (starredComponent.active === widget) await starredComponent.render(true);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutation_overlay_hides_deleted_items
+	 * @features offline
+	 * @dimensions cached-overlay
+	 */
+	_hideEmptyLists() {
+		for (const component of Object.values(this.components)) {
+			for (const widget of Object.values(component.widgets)) {
+				const target = widget.target;
+				if (target?.tagName === "UL" && target.children.length === 0) {
+					target.dataset.visible = "false";
+				}
+			}
+		}
+	}
+}

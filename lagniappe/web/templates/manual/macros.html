@@ -1,0 +1,93 @@
+{% macro heading(title, icon=None, kind=None) %}
+  <h2 class="{{ styles.manual.heading }}">
+    {% if icon %}
+      {{ render_icon((icon), "text-kind-default", kind or 'page') }}
+    {% endif %}
+    {{ title }}
+  </h2>
+{% endmacro %}
+
+{% macro subheading(title) %}
+  <h3 class="text-xl font-semibold text-base-dark mb-3">{{ title }}</h3>
+{% endmacro %}
+
+{% macro card() %}
+  <div class="rounded-lg border border-base-light/50 bg-white p-5 mb-5">{{ caller() }}</div>
+{% endmacro %}
+
+{% macro callout(kind="info", margin_bottom=True) %}
+  {% if kind == "warning" %}
+    <div class="mt-3 p-4 bg-task-bg border-l-4 border-task-default {{ "mb-4" if margin_bottom else "" }}">
+      <div class="text-sm text-task-dark">{{ caller() }}</div>
+    </div>
+  {% elif kind == "tip" %}
+    <div class="mt-3 p-4 bg-page-bg border-l-4 border-page-default {{ "mb-4" if margin_bottom else "" }}">
+      <div class="text-sm text-page-dark">{{ caller() }}</div>
+    </div>
+  {% elif kind == "success" %}
+    <div class="mt-3 p-4 bg-project-bg border-l-4 border-project-default {{ "mb-4" if margin_bottom else "" }}">
+      <div class="text-sm text-project-dark">{{ caller() }}</div>
+    </div>
+  {% elif kind == "error" %}
+    <div class="mt-3 p-4 bg-delete-bg border-l-4 border-delete-default {{ "mb-4" if margin_bottom else "" }}">
+      <div class="text-sm text-delete-dark">{{ caller() }}</div>
+    </div>
+  {% else %}
+    <div class="mt-3 p-4 bg-base-bg border-l-4 border-base-light {{ "mb-4" if margin_bottom else "" }}">
+      <div class="text-sm text-base-medium">{{ caller() }}</div>
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro code(text) %}
+  <pre data-role="manual-command"
+       tabindex="0"
+       class="{{ styles.manual.code }}"><code>{{ text }}</code></pre>
+{% endmacro %}
+
+{% macro concept(title, icon=None, kind=None) %}
+  <div class="rounded-lg border border-base-light/50 bg-white p-4">
+    <h4 class="{{ styles.manual.conceptTitle }}">
+      {% if icon %}
+        {{ render_icon((icon), "text-kind-default", kind or 'page') }}
+      {% endif %}
+      {{ title }}
+    </h4>
+    <p class="text-base-medium text-sm">{{ caller() }}</p>
+  </div>
+{% endmacro %}
+
+{% macro nav_buttons(prev=None, next=None) %}
+  <div class="flex flex-row gap-4 flex-wrap justify-center mt-6">
+    {% if prev %}
+      <button data-section="{{ prev.key }}"
+              data-kind="{{ prev.kind }}"
+              class="{{ styles.manual.button }}">
+        Previous: {{ prev.name }}
+      </button>
+    {% endif %}
+    {% if next %}
+      <button data-section="{{ next.key }}"
+              data-kind="{{ next.kind }}"
+              class="{{ styles.manual.button }}">
+        Next: {{ next.name }}
+      </button>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro step(number, title) %}
+  <div class="flex items-start gap-3 mb-4">
+    <span class="shrink-0 w-7 h-7 bg-base-medium text-white rounded-full flex items-center justify-center font-semibold text-sm">{{ number }}</span>
+    <div class="flex-1 min-w-0">
+      <h4 class="font-semibold text-base-dark mb-1">{{ title }}</h4>
+      {{ caller() }}
+    </div>
+  </div>
+{% endmacro %}
+{%- macro link(url, text) -%}
+  <a href="{{ url }}"
+     class="underline text-page-default"
+     target="_blank"
+     rel="noopener noreferrer">{{ text }}</a>
+{%- endmacro -%}

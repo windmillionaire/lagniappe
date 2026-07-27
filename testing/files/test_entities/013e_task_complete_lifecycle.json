@@ -1,0 +1,31 @@
+{
+	"test_task_complete_without_schedule": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Assignable task",
+					"hash": "tcl001",
+					"page": { "name": "Parent Page", "hash": "pgtcl1" },
+					"assigned_to": {
+						"name": "Assignee",
+						"hash": "asg001",
+						"page": { "name": "Assignee Page", "hash": "apg001" }
+					}
+				}
+			]
+		]
+	},
+	"test_task_uncomplete_after_complete": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Completable task",
+					"hash": "tcl002",
+					"page": { "name": "Parent Page", "hash": "pgtcl2" }
+				}
+			]
+		]
+	}
+}

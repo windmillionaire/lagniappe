@@ -1,0 +1,93 @@
+{% from "manual/macros.html" import heading, subheading, card, callout, concept, link, nav_buttons %}
+<div class="space-y-6">
+  {% call card() %}
+    <p class="text-base-medium text-lg leading-relaxed mb-3">
+      More than one person can work in the same workspace at the same time.
+      Documents and forms update live for everyone looking at them, and you can
+      keep working when your connection drops.
+    </p>
+    <p class="text-base-medium">
+      Collaboration follows the same access rules as everything else: people
+      only see and edit the records their permissions allow.
+    </p>
+  {% endcall %}
+
+  {{ heading("Live Documents", icon="document", kind="page") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      A page or project document can be edited by several people at once.
+      Changes appear as they are made, and each person's edits show in their
+      own color so it is clear who is writing where.
+    </p>
+    <p class="text-base-medium">
+      Concurrent edits merge rather than overwrite each other, so two people
+      typing in the same document do not clobber one another's work or need to
+      take turns.
+    </p>
+  {% endcall %}
+
+  {{ heading("Live Forms", icon="form", kind="form") }}
+  {% call card() %}
+    <p class="text-base-medium">
+      Form fields stay in sync between everyone viewing the same page or task.
+      When someone else changes a value, it appears for you within a second or
+      two without reloading the page. This keeps a shared record consistent when
+      two people happen to open it together.
+    </p>
+  {% endcall %}
+
+  {{ heading("Presence", icon="users", kind="user") }}
+  {% call card() %}
+    <p class="text-base-medium">
+      When others are viewing the same document or form, you can see who is
+      there. That makes it easy to notice when a colleague is already working on
+      the same record before you both start editing.
+    </p>
+  {% endcall %}
+
+  {{ heading("Offline and Installable") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Lagniappe keeps working when the network does not. If your connection
+      drops mid-edit, document changes and form submissions are queued on your
+      device and replayed when you come back online, so a brief outage does not
+      cost you work.
+    </p>
+    <p class="text-base-medium">
+      It is also a progressive web app, so you can install it straight from the
+      browser and run it like a native app -- pinned to a phone or tablet home
+      screen, or opened from the desktop in its own window. Installed or not, it
+      caches what it needs to stay responsive between requests.
+    </p>
+  {% endcall %}
+
+  {{ heading("How Updates Travel") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Because Lagniappe runs on App Engine, live updates are delivered through
+      the browser's push channel rather than a persistent connection. In
+      practice that is invisible, but it has two honest edges worth knowing.
+    </p>
+    {% call callout("tip", False) %}
+      Live pushes rely on the browser's notification permission. If that is off,
+      or for public and read-only viewers, you still see the current state each
+      time a view loads or refreshes -- you just do not receive the moment-to-moment
+      updates that permitted, signed-in editors get.
+    {% endcall %}
+  {% endcall %}
+
+  {{ heading("Good to Know") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li>Live editing and presence work best for a handful of people on a record, not large simultaneous crowds.</li>
+      <li>Offline edits are held on the device that made them; they replay from that device when it reconnects.</li>
+      <li>Visibility still comes from permissions -- collaboration never widens who can see a document or form.</li>
+      <li>This is shared editing of ordinary records, not a full real-time design canvas or a chat tool.</li>
+    </ul>
+  {% endcall %}
+
+  {{ nav_buttons(
+    prev={"key": "search", "name": "Search & Filters", "kind": "page"},
+    next={"key": "installation", "name": "Installation", "kind": "task"}
+  ) }}
+</div>

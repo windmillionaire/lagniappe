@@ -1,0 +1,8 @@
+[
+	{
+		"id": "note",
+		"type": "input",
+		"input": "text",
+		"title": "Note"
+	}
+]

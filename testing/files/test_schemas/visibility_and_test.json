@@ -1,0 +1,22 @@
+[
+	{
+		"id": "checkbox-aab12",
+		"type": "checkbox",
+		"title": "Gate A"
+	},
+	{
+		"id": "checkbox-bbc34",
+		"type": "checkbox",
+		"title": "Gate B"
+	},
+	{
+		"id": "input-gatedxy",
+		"type": "input",
+		"input": "text",
+		"title": "Both gates required",
+		"visibility": [
+			{ "id": "checkbox-aab12", "type": "checkbox" },
+			{ "id": "checkbox-bbc34", "type": "checkbox" }
+		]
+	}
+]

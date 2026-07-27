@@ -1,0 +1,19 @@
+[
+	{
+		"id": "checkbox-trigger",
+		"type": "checkbox",
+		"title": "Complete"
+	},
+	{
+		"id": "status-ab12",
+		"type": "status",
+		"title": "Status",
+		"status": [
+			{
+				"id": "checkbox-trigger",
+				"value": true,
+				"text": "Completed"
+			}
+		]
+	}
+]

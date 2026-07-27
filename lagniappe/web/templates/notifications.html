@@ -1,0 +1,59 @@
+{% from "common.html" import url %}
+
+{% macro item(notification) %}
+  {% set target = notification.properties.target.column_value %}
+  {% set target_entity = notification.properties.target.value %}
+  {% set is_report = target and target.kind == "report" %}
+  {% set report_tool = target_entity.tool|capitalize if is_report and target_entity.tool else none %}
+  {% set report_name = target.name.split(":", 1) if report_tool and target.name.startswith(report_tool ~ ":") else [] %}
+  {% set report_summary = target_entity.summary if is_report and not notification.pending else none %}
+  <div role="option"
+       data-key="{{ notification.urlsafe_key }}"
+       class="{{ styles.dropdown.search.result }} text-base-default">
+    <button class="{{ styles.toggle.container }} float-right mb-1 ml-2 shrink-0"
+            data-kind="delete"
+            data-active="false"
+            data-action="delete-notification"
+            data-key="{{ notification.urlsafe_key }}"
+            type="button"
+            aria-label="Delete notification"
+            title="Delete notification">
+      {{ render_icon("trash.active", styles.toggle.icon.active) }}
+      {{ render_icon("trash.inactive", styles.toggle.icon.inactive) }}
+    </button>
+    <div class="whitespace-normal break-words text-sm leading-snug [overflow-wrap:anywhere]">
+      {% if notification.pending %}{{ render_icon("spinner", "mr-1") }}{% endif %}
+      {% if target %}
+        <a href="{{ url(target) }}"
+           data-role="target"
+           data-kind="{{ target.kind }}"
+           class="{{ styles.link.title }}">
+          {%- if report_name|length == 2 -%}
+            <span data-role="report-tool" class="font-normal">{{ report_name[0] }}</span>
+            <span data-role="report-title">{{ report_name[1]|trim }}</span>
+          {%- else -%}
+            {{- target.name -}}
+          {%- endif -%}
+        </a>{% if not is_report %}:{% endif %}
+      {% endif %}
+      <span class="{{ 'block' if is_report }}" data-role="notification-body">{{ notification.body }}</span>
+      {% if report_summary and report_summary != notification.body %}
+        <span class="mt-0.5 block line-clamp-2 text-base-medium"
+              data-role="report-summary">{{ report_summary }}</span>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro list(notifications) %}
+  {% for notification in notifications %}{{ item(notification) }}{% endfor %}
+{% endmacro %}
+
+{% macro processing_offline() %}
+  <div role="option"
+       class="{{ styles.dropdown.option.action }} text-base-default font-medium"
+       id="offline-processing">
+    {{ render_icon("spinner") }}
+    Processing offline...
+  </div>
+{% endmacro %}

@@ -1,0 +1,63 @@
+{% import 'controls.html' as controls %}
+
+{% macro upload_ingress_file() %}
+  <form lp-create
+        data-widget="IngressFileUpload"
+        data-kind="file"
+        data-title="Import Data"
+        data-help="import_data"
+        data-close="ingress:nav"
+        data-controls="true"
+        data-route="{{ url_for('files.ingress') }}"
+        data-destination="ingress:IngressList"
+        data-visible="false"
+        class="{{ styles.form.default }} mt-4 sm:mt-0">
+    <button type="submit"
+            data-kind="file"
+            class="{{ styles.button.submit }} hidden"></button>
+  </form>
+{% endmacro %}
+
+{% macro import_list(files) %}
+  <ul data-widget="IngressList"
+      data-persistent="true"
+      data-visible="true"
+      data-if-empty="IngressFileUpload"
+      class="{{ styles.list.container }} mt-0 sm:mt-4">
+    {%- for file in files.list -%}
+      {{ imported_file(file) }}
+    {%- endfor -%}
+  </ul>
+{% endmacro %}
+
+{% macro imported_file(file) %}
+  <li lp-entity
+      lp-link
+      data-key="{{ file.urlsafe_key }}"
+      data-fingerprint="{{ file.fingerprint }}"
+      data-name="{{ file.name }}"
+      data-kind="file"
+      class="{{ styles.list.itemHeader }}">
+    <div class="flex w-full flex-row items-start justify-between gap-2">
+      <div class="flex flex-col gap-1 min-w-0">
+        <a class="{{ styles.link.title }}"
+           data-kind="file"
+           data-role="title"
+           href="{{ url_for('files.view', key=file.urlsafe_key) }}">{{ file.name }}</a>
+        <div class="flex flex-col gap-0.5 text-sm text-base-medium">
+          <p>
+            <span class="font-semibold">Rows:</span>
+            <span class="font-normal">{{ file.properties.process_csv.row_count }}</span>
+          </p>
+          <p>
+            <span class="font-semibold">Columns:</span>
+            <span class="font-normal">{{ file.properties.process_csv.column_count }}</span>
+          </p>
+        </div>
+      </div>
+      <div class="{{ styles.home.card.actions }} translate-y-0.5">
+        {{ controls.delete(label='Delete ' ~ file.name) }}
+      </div>
+    </div>
+  </li>
+{% endmacro %}

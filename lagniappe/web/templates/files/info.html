@@ -1,0 +1,48 @@
+{% import 'controls.html' as controls %}
+
+{% macro info_form(file) %}
+  <form lp-update
+        data-widget="FileInfo"
+        data-title="File Info"
+        data-name="{{ file.name }}"
+        data-filename="{{ file.filename }}"
+        data-mimetype="{{ file.mimetype }}"
+        data-has-text="{{ file.properties.text.value|yesno }}"
+        data-extractable="{{ file.properties.text.extractable|yesno }}"
+        {% if file.encoding %}data-encoding="{{ file.encoding }}"{% endif %}
+        {% if file.options %}data-options='{{ file.properties.options.preload|tojson }}'{% endif %}
+        {% if file.summary %}data-description="{{ file.summary }}"{% endif %}
+        data-route="{{ url_for('files.update', key=file.urlsafe_key) }}"
+        data-visible="false"
+        class="{{ styles.form.default }} mt-4 sm:mt-0">
+    {% set page_property = file.properties.get("pages") %}
+    {% set page_preload = page_property.column_value if page_property else [] %}
+    {% if page_property and file.allowed(Action.VIEW) and (file.allowed(Action.EDIT) or page_preload) %}
+      <div class="{{ styles.select.container }}"
+           data-role="pages"
+           data-readonly="{{ (not file.allowed(Action.EDIT))|yesno }}"
+           lp-select
+           data-preload='{{ page_preload|tojson }}'>
+        <h3 class="{{ styles.label.sectionHeading }}">Pages</h3>
+        <input data-index="page"
+               data-multiple="true"
+               data-placeholder="add a page..."
+               name="page"
+               class="{{ styles.input }}">
+        <input type="hidden" name="pages-control" value="true">
+      </div>
+    {% endif %}
+    {{ controls.edited_marker(url_for('files.info', key=file.urlsafe_key)) }}
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}
+
+{% macro info_tab(file) %}
+  <div id="info"
+       lp-component
+       data-title="File Info"
+       data-default="FileInfo"
+       data-tab="true"
+       data-visible="false"
+       data-kind="file">{{ info_form(file) }}</div>
+{% endmacro %}

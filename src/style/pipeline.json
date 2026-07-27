@@ -1,0 +1,49 @@
+{
+	"schema_version": 3,
+	"frontend_entry": "src/script/main.mjs",
+	"registry": {
+		"styles": "src/style/styles.yaml",
+		"schema": "src/style/registry.schema.json",
+		"icons": "src/style/icons.yaml",
+		"icons_schema": "src/style/icons.schema.json",
+		"virtual_module": "styles",
+		"python_styles": "lagniappe/web/start/styles/styles.py",
+		"python_icons": "lagniappe/web/start/styles/icons.py"
+	},
+	"css": {
+		"entry": "src/style/main.css",
+		"output": "style.css",
+		"candidate_validator": "testing/utility/style_compile.mjs",
+		"tailwind_sources": ["src/style/styles.yaml"],
+		"authored_stylesheets": [
+			{ "path": "src/style/main.css", "ownership": "pipeline" },
+			{ "path": "src/style/fonts.css", "ownership": "asset" },
+			{ "path": "src/style/icons.css", "ownership": "structural" },
+			{ "path": "src/style/editor.css", "ownership": "editor" },
+			{ "path": "src/style/kinds.css", "ownership": "theme" },
+			{ "path": "src/style/base.css", "ownership": "structural" },
+			{ "path": "src/style/interaction.css", "ownership": "structural" },
+			{ "path": "src/style/media.css", "ownership": "structural" },
+			{ "path": "src/style/motion.css", "ownership": "structural" },
+			{ "path": "src/style/navigation.css", "ownership": "semantic" },
+			{ "path": "src/style/tables.css", "ownership": "semantic" },
+			{ "path": "src/style/forms.css", "ownership": "semantic" },
+			{ "path": "src/style/state.css", "ownership": "structural" },
+			{ "path": "src/style/attributes.css", "ownership": "semantic" },
+			{ "path": "src/style/buttons.css", "ownership": "semantic" },
+			{ "path": "src/style/links.css", "ownership": "semantic" },
+			{ "path": "src/style/content.css", "ownership": "semantic" }
+		],
+		"vendor_stylesheets": []
+	},
+	"builds": {
+		"development": {
+			"config": "build/rollup.dev.config.mjs",
+			"transforms": ["tailwindcss"]
+		},
+		"production": {
+			"config": "build/rollup.config.mjs",
+			"transforms": ["tailwindcss", "cssnano"]
+		}
+	}
+}

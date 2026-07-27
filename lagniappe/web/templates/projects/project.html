@@ -1,0 +1,153 @@
+{% extends "layouts/base.html" %}
+{% import 'controls.html' as controls %}
+{% import 'menus.html' as menus %}
+{% from 'projects/filters.html' import task_filters %}
+{% from 'projects/document.html' import document_tab %}
+{% from 'projects/info.html' import info_tab %}
+{% from 'projects/model_tasks.html' import create_model_task, model_task_list %}
+{% set can_edit_project = project.allowed(Action.EDIT) %}
+{% set has_tasks = project.has('tasks') %}
+{% set has_document = project.has('document') %}
+{% set has_document_content = 'document' in project.assets %}
+{% set render_tasks = has_tasks or can_edit_project %}
+{% set render_document = has_document_content or can_edit_project %}
+
+{% macro view_header(project) %}
+  <nav class="{{ styles.layout.view.title }}" data-nav="view">
+    <div>
+      <span data-menu-anchor class="{{ styles.entity.name.anchor }}">
+        <span data-role="title">{{- project.name -}}</span>
+        {% call menus.title("Project actions") %}
+          {{ menus.star(is_starred(project)) }}
+          {% if project.allowed(Action.DELETE) %}{{ menus.delete("/") }}{% endif %}
+        {% endcall %}
+      </span>
+    </div>
+  </nav>
+{% endmacro %}
+
+{% macro toggles(nav, models=false) %}
+  <nav class="{{ styles.layout.nav.toggles }}"
+       data-standalone="true"
+       data-persistent="true"
+       data-nav="{{ nav }}">
+    {% if render_tasks and models %}
+      <button lp-show="model-tasks:ModelTaskList"
+              data-kind="model-task"
+              data-attribute="tasks"
+              data-has-attribute="{{ has_tasks|yesno }}"
+              class="{{ styles.entity.tabIcon }} sm:hidden">{{ render_icon("model") }}</button>
+    {% endif %}
+    {% if render_document %}
+      <button lp-show="document:active"
+              data-kind="project"
+              data-attribute="document"
+              data-has-attribute="{{ has_document|yesno }}"
+              class="{{ styles.entity.tabIcon }}">{{ render_icon("document") }}</button>
+    {% endif %}
+    <button lp-show="info:active"
+            data-kind="project"
+            class="{{ styles.entity.tabIcon }}">{{ render_icon("info") }}</button>
+    <button lp-show="filters:active"
+            data-kind="task"
+            class="{{ styles.entity.tabIcon }}">{{ render_icon("filter.list") }}</button>
+  </nav>
+{% endmacro %}
+
+{% macro mobile_nav() %}
+  <div lp-nav
+       class="{{ styles.layout.nav.mobile }} mt-4"
+       data-visible="false"
+       data-nav="mobile">
+    <div class="{{ styles.layout.nav.title }}" data-role="header">
+      <span class="text-kind-dark" data-kind="default" data-role="title"></span>
+      {% if project.allowed(Action.EDIT) and render_tasks %}
+        <button lp-show="model-tasks:CreateModelTask"
+                data-kind="model-task"
+                data-attribute="tasks"
+                data-has-attribute="{{ has_tasks|yesno }}"
+                class="{{ styles.toggle.container }}">{{ render_icon("plus") }}</button>
+      {% endif %}
+    </div>
+    <div class="{{ styles.layout.nav.group }}" data-flipped="false">
+      <button data-role="flipper" class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>
+      {{ toggles('mobile', render_tasks) }}
+    </div>
+    {{ controls.page_controls() }}
+  </div>
+{% endmacro %}
+
+{% macro model_tasks(project, active=True) %}
+  <div id="model-tasks"
+       lp-component
+       data-title="Model Tasks"
+       data-visible="{{ active|yesno }}"
+       data-tab="true"
+       data-default="ModelTaskList"
+       data-kind="model-task"
+       data-attribute="tasks"
+       data-has-attribute="{{ active|yesno }}"
+       data-secondary-attribute="true"
+       class="{{ styles.card.secondary }}">
+    <div lp-nav class="{{ styles.layout.nav.title }}" data-nav="model-tasks">
+      <div data-role="header" class="{{ styles.layout.nav.header }}">
+        <span class="text-default-dark" data-role="title">Model Tasks</span>
+        {{ controls.page_controls() }}
+      </div>
+      <nav class="{{ styles.layout.nav.card }}">
+        {% if project.allowed(Action.EDIT) %}
+          <button lp-show="model-tasks:CreateModelTask"
+                  data-attribute="tasks"
+                  data-has-attribute="{{ active|yesno }}"
+                  class="{{ styles.toggle.container }}">{{ render_icon("plus") }}</button>
+        {% endif %}
+      </nav>
+    </div>
+    {% if project.allowed(Action.EDIT) %}{{ create_model_task(project) }}{% endif %}
+    {{ model_task_list(project) }}
+  </div>
+{% endmacro %}
+
+{% macro main() %}
+  <div lp-view
+       lp-entity
+       data-key="{{ project.urlsafe_key }}"
+       data-fingerprint="{{ project.fingerprint }}"
+       data-hash="{{ project.hash }}"
+       data-kind="project"
+       data-secondary="{{ has_tasks|yesno }}"
+       class="group/view {{ 'max-w-5xl mx-auto' if not has_tasks else 'max-w-7xl mx-auto' }}"
+       data-readonly="{{ project.readonly|yesno }}">
+    <div class="{{ styles.layout.view.header }}">
+      {{ view_header(project) }}
+      <div data-role="description"
+           class="{{ styles.entity.description }} hidden empty:hidden sm:flex">
+        {%- if project.description -%}
+          <span>{{- project.description -}}</span>
+        {%- endif -%}
+      </div>
+    </div>
+    {{ mobile_nav() }}
+    <div id="layout" class="{{ styles.entity.cards }} sm:mt-4">
+      {% if render_tasks %}{{ model_tasks(project, has_tasks) }}{% endif %}
+      <div id="tabs" lp-component class="{{ styles.card.primary }}">
+        <div lp-nav class="{{ styles.layout.nav.title }}" data-nav="tabs">
+          <span class="text-default-dark" data-role="title">Info</span>
+          {{ controls.page_controls() }}
+          {{ toggles('tabs') }}
+        </div>
+        {{ info_tab(project) }}
+        {% if render_document %}{{ document_tab(project, has_document) }}{% endif %}
+        {{ task_filters(project) }}
+      </div>
+    </div>
+  </div>
+{% endmacro %}
+
+{% block title %}
+  {{ project.name }}
+{% endblock title %}
+
+{% block content %}
+  {{ main() }}
+{% endblock content %}

@@ -1,0 +1,539 @@
+{
+	"test_table_form_single_row": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Table form - single row",
+					"hash": "page001",
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "complex_types"
+					},
+					"form_submission": {
+						"table-contactsab": "{\"rows\": [{\"row-namecd12\": \"John Doe\", \"row-emailef34\": \"john@example.com\", \"row-primarygh\": true}]}"
+					},
+					"expected": {
+						"table-contactsab": {
+							"value": {
+								"rows": [
+									{
+										"row-namecd12": "John Doe",
+										"row-emailef34": "john@example.com",
+										"row-primarygh": true
+									}
+								]
+							},
+							"form_value": {
+								"rows": [
+									{
+										"row-namecd12": "John Doe",
+										"row-emailef34": "john@example.com",
+										"row-primarygh": true
+									}
+								]
+							},
+							"column_value": { "num_rows": 1 },
+							"ai_value": {
+								"Contacts": [
+									{
+										"Name": "John Doe",
+										"Email": "john@example.com",
+										"Primary": "True"
+									}
+								]
+							},
+							"filter_value": {
+								"row-namecd12": ["John Doe"],
+								"row-emailef34": ["john@example.com"],
+								"row-primarygh": [true]
+							}
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_table_ai_multiple_rows": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Table AI - multiple rows",
+					"hash": "page002",
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "complex_types"
+					},
+					"ai_submission": {
+						"table-contactsab": {
+							"rows": [
+								{
+									"row-namecd12": "Alice",
+									"row-emailef34": "alice@example.com",
+									"row-primarygh": true
+								},
+								{
+									"row-namecd12": "Bob",
+									"row-emailef34": "bob@example.com",
+									"row-primarygh": false
+								}
+							]
+						}
+					},
+					"expected": {
+						"table-contactsab": {
+							"value": {
+								"rows": [
+									{
+										"row-namecd12": "Alice",
+										"row-emailef34": "alice@example.com",
+										"row-primarygh": true
+									},
+									{
+										"row-namecd12": "Bob",
+										"row-emailef34": "bob@example.com",
+										"row-primarygh": false
+									}
+								]
+							},
+							"form_value": {
+								"rows": [
+									{
+										"row-namecd12": "Alice",
+										"row-emailef34": "alice@example.com",
+										"row-primarygh": true
+									},
+									{
+										"row-namecd12": "Bob",
+										"row-emailef34": "bob@example.com",
+										"row-primarygh": false
+									}
+								]
+							},
+							"column_value": { "num_rows": 2 },
+							"ai_value": {
+								"Contacts": [
+									{
+										"Name": "Alice",
+										"Email": "alice@example.com",
+										"Primary": "True"
+									},
+									{
+										"Name": "Bob",
+										"Email": "bob@example.com",
+										"Primary": "False"
+									}
+								]
+							},
+							"filter_value": {
+								"row-namecd12": ["Alice", "Bob"],
+								"row-emailef34": ["alice@example.com", "bob@example.com"],
+								"row-primarygh": [true, false]
+							}
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_table_form_empty": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Table form - empty",
+					"hash": "page003",
+					"form": {
+						"name": "Form",
+						"hash": "form003",
+						"schema": "complex_types"
+					},
+					"form_submission": {
+						"table-contactsab": "{\"rows\": []}"
+					},
+					"expected": {
+						"table-contactsab": {
+							"value": { "rows": [] },
+							"form_value": null,
+							"column_value": null,
+							"ai_value": {},
+							"filter_value": {}
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_table_import_single_row": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Table import - single row",
+					"hash": "page004",
+					"form": {
+						"name": "Form",
+						"hash": "form004",
+						"schema": "complex_types"
+					},
+					"import_submission": {
+						"table-contactsab": [["Jane Doe", "jane@example.com", "yes"]]
+					},
+					"expected": {
+						"table-contactsab": {
+							"value": {
+								"rows": [
+									{
+										"row-namecd12": "Jane Doe",
+										"row-emailef34": "jane@example.com",
+										"row-primarygh": true
+									}
+								]
+							},
+							"form_value": {
+								"rows": [
+									{
+										"row-namecd12": "Jane Doe",
+										"row-emailef34": "jane@example.com",
+										"row-primarygh": true
+									}
+								]
+							},
+							"column_value": { "num_rows": 1 },
+							"ai_value": {
+								"Contacts": [
+									{
+										"Name": "Jane Doe",
+										"Email": "jane@example.com",
+										"Primary": "True"
+									}
+								]
+							},
+							"filter_value": {
+								"row-namecd12": ["Jane Doe"],
+								"row-emailef34": ["jane@example.com"],
+								"row-primarygh": [true]
+							}
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_table_import_multiple_rows": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Table import - multiple rows",
+					"hash": "page005",
+					"form": {
+						"name": "Form",
+						"hash": "form005",
+						"schema": "complex_types"
+					},
+					"import_submission": {
+						"table-contactsab": [
+							["Alice Smith", "alice@test.com", "1"],
+							["Bob Jones", "bob@test.com", "0"]
+						]
+					},
+					"expected": {
+						"table-contactsab": {
+							"value": {
+								"rows": [
+									{
+										"row-namecd12": "Alice Smith",
+										"row-emailef34": "alice@test.com",
+										"row-primarygh": true
+									},
+									{
+										"row-namecd12": "Bob Jones",
+										"row-emailef34": "bob@test.com",
+										"row-primarygh": false
+									}
+								]
+							},
+							"form_value": {
+								"rows": [
+									{
+										"row-namecd12": "Alice Smith",
+										"row-emailef34": "alice@test.com",
+										"row-primarygh": true
+									},
+									{
+										"row-namecd12": "Bob Jones",
+										"row-emailef34": "bob@test.com",
+										"row-primarygh": false
+									}
+								]
+							},
+							"column_value": { "num_rows": 2 },
+							"ai_value": {
+								"Contacts": [
+									{
+										"Name": "Alice Smith",
+										"Email": "alice@test.com",
+										"Primary": "True"
+									},
+									{
+										"Name": "Bob Jones",
+										"Email": "bob@test.com",
+										"Primary": "False"
+									}
+								]
+							},
+							"filter_value": {
+								"row-namecd12": ["Alice Smith", "Bob Jones"],
+								"row-emailef34": ["alice@test.com", "bob@test.com"],
+								"row-primarygh": [true, false]
+							}
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_table_row_submission_text_email_checkbox": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Page with contact table row",
+					"hash": "page_row_01",
+					"form": {
+						"name": "Contact Form",
+						"hash": "form_row_01",
+						"schema": "table_people_row"
+					},
+					"row_submission": {
+						"table_id": "people",
+						"values": {
+							"full_name": "Pat",
+							"contact_email": "pat@example.com",
+							"active": "on"
+						}
+					},
+					"expected_row": {
+						"full_name": "Pat",
+						"contact_email": "pat@example.com",
+						"active": true
+					}
+				}
+			]
+		]
+	},
+	"test_table_row_submission_external_link_column": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Task with link table row",
+					"hash": "task_row_01",
+					"page": { "name": "Parent Page", "hash": "page_parent_row" },
+					"form": {
+						"name": "Link Table Form",
+						"hash": "form_row_link",
+						"schema": "table_resources_link"
+					},
+					"mock_link_attributes": { "name": "Fetched Example" },
+					"row_submission": {
+						"table_id": "resources",
+						"values": {
+							"website:url": "https://example.com",
+							"website:title": "Example"
+						}
+					},
+					"expected_row": {
+						"website": { "url": "https://example.com", "title": "Example" }
+					}
+				}
+			]
+		]
+	},
+	"test_table_form_mixed_column_types": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Table mixed scalar columns (form)",
+					"hash": "page_mix_form",
+					"form": {
+						"name": "Mixed form",
+						"hash": "form_mix_form",
+						"schema": "table_scalar_columns"
+					},
+					"form_submission": {
+						"type_grid": "{\"rows\": [{\"cx_label\": \"Acme\", \"cx_time\": \"15:30\", \"cx_amt\": 3.5, \"cx_phone\": \"+12015550123\"}]}"
+					},
+					"expected": {
+						"type_grid": {
+							"value": {
+								"rows": [
+									{
+										"cx_label": "Acme",
+										"cx_time": "15:30",
+										"cx_amt": 3.5,
+										"cx_phone": "+12015550123"
+									}
+								]
+							},
+							"form_value": {
+								"rows": [
+									{
+										"cx_label": "Acme",
+										"cx_time": "15:30",
+										"cx_amt": 3.5,
+										"cx_phone": "+1 (201) 555-0123"
+									}
+								]
+							},
+							"column_value": { "num_rows": 1 },
+							"search_value": { "[Type grid] Label": "Acme" },
+							"ai_value": {
+								"Type grid": [
+									{
+										"Label": "Acme",
+										"At time": "15:30",
+										"Amount": 3.5,
+										"Phone": "+12015550123"
+									}
+								]
+							},
+							"filter_value": {
+								"cx_label": ["Acme"],
+								"cx_amt": [3.5],
+								"cx_phone": ["+12015550123"]
+							}
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_table_import_mixed_column_types": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Table mixed scalar columns (import)",
+					"hash": "page_mix_imp",
+					"form": {
+						"name": "Mixed import",
+						"hash": "form_mix_imp",
+						"schema": "table_scalar_columns"
+					},
+					"import_submission": {
+						"type_grid": [["Acme", "15:30", "3.5", "+12015550123"]]
+					},
+					"expected": {
+						"type_grid": {
+							"value": {
+								"rows": [
+									{
+										"cx_label": "Acme",
+										"cx_time": "15:30",
+										"cx_amt": 3.5,
+										"cx_phone": "+12015550123"
+									}
+								]
+							},
+							"form_value": {
+								"rows": [
+									{
+										"cx_label": "Acme",
+										"cx_time": "15:30",
+										"cx_amt": 3.5,
+										"cx_phone": "+1 (201) 555-0123"
+									}
+								]
+							},
+							"column_value": { "num_rows": 1 },
+							"search_value": { "[Type grid] Label": "Acme" },
+							"ai_value": {
+								"Type grid": [
+									{
+										"Label": "Acme",
+										"At time": "15:30",
+										"Amount": 3.5,
+										"Phone": "+12015550123"
+									}
+								]
+							},
+							"filter_value": {
+								"cx_label": ["Acme"],
+								"cx_amt": [3.5],
+								"cx_phone": ["+12015550123"]
+							}
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_table_row_submission_internal_link_column": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Page internal link table row",
+					"hash": "page_intlink",
+					"form": {
+						"name": "Refs form",
+						"hash": "form_intlink",
+						"schema": "table_internal_link_only"
+					},
+					"row_submission": {
+						"table_id": "refs",
+						"values": { "page_ref": "target_entity_a" }
+					},
+					"expected_row": {
+						"page_ref": {
+							"id": "target_entity_a",
+							"name": "Page-target_entity_a",
+							"hash": "target_entity_a"
+						}
+					},
+					"expected_link_hashes": ["target_entity_a"]
+				}
+			]
+		]
+	},
+	"test_table_import_row_length_mismatch": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Import row length page",
+					"hash": "page_badrow",
+					"form": {
+						"name": "Two col form",
+						"hash": "form_badrow",
+						"schema": "integration_two_column_table"
+					},
+					"import_submission": { "tbl": [["only_one_cell"]] },
+					"expected_error_substring": "tbl:"
+				}
+			]
+		]
+	},
+	"test_table_validate_submission_invalid_json": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Invalid JSON table page",
+					"hash": "page_badjson",
+					"form": {
+						"name": "Grid form",
+						"hash": "form_badjson",
+						"schema": "table_scalar_columns"
+					}
+				}
+			]
+		]
+	}
+}

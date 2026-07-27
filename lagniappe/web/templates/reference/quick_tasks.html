@@ -1,0 +1,58 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Quick Task Editing") %}
+  <section>
+    {{ subheading("Overview") }}
+    <p class="text-sm text-base-dark mb-4">
+      Quick task editing allows you to edit tasks directly in tables without navigating to individual task pages.
+      Click the lightning bolt toggle to activate edit mode on any task table where you have edit permissions.
+    </p>
+  </section>
+  <section>
+    {{ subheading("How It Works") }}
+    <div class="space-y-3">
+      {% call step(1, "Click to Edit") %}
+        <p class="text-sm text-base-medium">Editable fields show a hover state. Click any field to start editing.</p>
+      {% endcall %}
+      {% call step(2, "Save Changes") %}
+        <p class="text-sm text-base-medium">Changes save when you press Enter or click away from the field (blur).</p>
+      {% endcall %}
+      {% call step(3, "Cancel Edits") %}
+        <p class="text-sm text-base-medium">Press Escape to cancel changes and return to the original value.</p>
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Editable Fields") }}
+    {% call callout("tip") %}
+      <ul class="space-y-2">
+        <li>
+          <strong>Task completion:</strong> Toggle checkboxes to mark tasks complete
+        </li>
+        <li>
+          <strong>Due dates:</strong> Click date fields to update deadlines
+        </li>
+        <li>
+          <strong>Text inputs:</strong> Edit text and number fields from attached forms
+        </li>
+        <li>
+          <strong>Checkboxes:</strong> Toggle yes/no values from form fields
+        </li>
+      </ul>
+    {% endcall %}
+    <p class="text-sm text-base-medium mt-3">
+      Complex form fields (file uploads, dropdowns, signatures) are not available in quick edit mode and require the full task form.
+    </p>
+  </section>
+  <section>
+    {{ subheading("Permissions & Limitations") }}
+    <div class="space-y-3">
+      {% call feature("Read-Only Tasks") %}
+        Tasks you can't edit appear grayed out and won't respond to clicks. This typically indicates a permissions restriction.
+      {% endcall %}
+      {% call feature("Field Availability") %}
+        Only simple form fields appear in edit mode. Fields that don't show up require more complex interactions available in the full task form.
+      {% endcall %}
+    </div>
+  </section>
+{% endcall %}

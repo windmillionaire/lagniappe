@@ -1,0 +1,61 @@
+{% from 'common.html' import url, format_name %}
+
+{% macro search_results(results, pagination, query) %}
+  <div data-role="results">
+    {% if results %}
+      <ul class="{{ styles.list.container }}">
+        {% for r in results %}
+          <li class="py-4">
+            <div class="font-semibold leading-snug">{{ format_name(r.details, icon=True) }}</div>
+            {% if r.form_field %}
+              <p class="italic font-normal text-base-medium">
+                <span class="font-semibold text-kind-default" data-kind="form">{{ r.form_field }}:</span>
+                {{ r.form_value }}
+              </p>
+            {% endif %}
+            {% if r.text %}<p class="mt-1 text-sm text-base-medium">{{- r.text -}}</p>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <div class="text-delete-default italic py-4">No matches for the query "{{ query }}".</div>
+    {% endif %}
+    {{ footer(pagination) }}
+  </div>
+{% endmacro %}
+
+{% macro footer(pagination) %}
+  <div class="flex flex-row items-center justify-between border-t border-base-light/50 py-3">
+    <div class="hidden sm:block">
+      <p class="text-base-medium">
+        Showing
+        <span class="font-semibold">{{ pagination.showing }}</span>
+        to
+        <span class="font-semibold">{{ pagination.to }}</span>
+        of
+        <span class="font-semibold">{{ pagination.total }}</span>
+        results
+      </p>
+    </div>
+    <nav class="flex flex-row items-center gap-4">
+      {% if pagination.previous != None %}
+        <button data-page="{{ pagination.previous }}"
+                data-role="pagination"
+                data-kind="default"
+                class="{{ styles.button.submit }}">
+          {{ render_icon("back") }}
+          Previous
+        </button>
+      {% endif %}
+      {% if pagination.next %}
+        <button data-page="{{ pagination.next }}"
+                data-role="pagination"
+                data-kind="default"
+                class="{{ styles.button.submit }}">
+          Next
+          {{ render_icon("next") }}
+        </button>
+      {% endif %}
+    </nav>
+  </div>
+{% endmacro %}

@@ -1,0 +1,254 @@
+{% from 'common.html' import attribute_button, autofill %}
+{% import 'controls.html' as controls %}
+{% import 'pages/restrictions.html' as restrictions %}
+
+{% macro permissions_form(page, close_target='PageInfo') %}
+  <form data-widget="PagePermissions"
+        lp-update
+        data-title="Page Restrictions"
+        data-help="restrictions"
+        data-close="info:{{ close_target }}"
+        data-kind="user"
+        data-visible="false"
+        data-nav="true"
+        data-controls="true"
+        class="{{ styles.form.default }}">
+    {{ restrictions.visible_to(page) }}
+    {{ restrictions.restrict_access(page) }}
+    {{ controls.edited_marker(url_for('pages.permissions', key=page.urlsafe_key)) }}
+  </form>
+{% endmacro %}
+
+{% macro sign_out_button() %}
+  <div data-role="user-actions" class="ml-auto flex shrink-0">
+    <button type="button"
+            data-action="logout"
+            data-route="{{ url_for('users.logout') }}"
+            data-role="sign-out"
+            data-kind="user"
+            class="action-button flex w-fit grow-0 flex-row items-center justify-center gap-1 rounded-md bg-kind-default px-2 py-1 text-sm font-semibold text-white shadow-sm">
+      {{ render_icon("logout") }}
+      <span>Sign out</span>
+    </button>
+  </div>
+{% endmacro %}
+
+{% macro user_settings(page, is_own_page, is_owner_viewer, is_owner_page, view_permissions, close_target='PageInfo') %}
+  <form data-widget="UserSettings"
+        lp-update
+        data-route="{{ url_for('pages.update', key=page.urlsafe_key) }}"
+        data-title="User Settings"
+        data-help="user_settings"
+        data-close="info:{{ close_target }}"
+        data-name="{{ page.user.name }}"
+        {% if page.description %}data-description="{{ page.description }}"{% endif %}
+        data-can-edit-name="{{ (is_own_page or is_owner_viewer)|yesno }}"
+        data-can-edit-email="{{ (is_owner_viewer and not is_own_page)|yesno }}"
+        data-can-edit-groups="{{ is_owner_viewer|yesno }}"
+        data-is-public="{{ page.user.is_public|yesno }}"
+        data-group-names="{{ page.user.properties.groups.column_value or '' }}"
+        data-visible="false"
+        data-controls="true"
+        class="{{ styles.form.default }} mt-4 sm:mt-0">
+    {% if view_permissions %}
+      {{ restrictions.visible_to(page) }}
+      {{ restrictions.restrict_access(page) }}
+    {% endif %}
+    <section data-role="user-card"
+             class="rounded-md bg-white shadow-sm outline-2 outline-user-default">
+      <header class="flex flex-row items-center justify-between gap-2 rounded-t-md border-b-2 border-user-default px-3 py-1.5 text-lg font-semibold text-user-default">
+        <div class="{{ styles.iconLabel.wrapper }}">
+          {{ render_icon("user", (styles.iconLabel.icon)) }}
+          <span>User Data</span>
+        </div>
+        {% if is_own_page %}{{ sign_out_button() }}{% endif %}
+      </header>
+      <div class="flex flex-col gap-4 p-3">
+        <div data-role="user-fields" class="flex flex-col gap-4">
+          <div data-role="user-email" class="flex flex-col gap-4">
+            <div class="flex flex-col gap-4 sm:flex-row">
+              <label class="w-full sm:basis-1/2">
+                <h3 class="{{ styles.label.sectionHeading }}">Email</h3>
+                <input name="email"
+                       type="email"
+                       {% if not (is_owner_viewer and not is_own_page) %}readonly{% endif %}
+                       value="{{ page.user.email or '' }}"
+                       class="{{ styles.input }}">
+              </label>
+            </div>
+          </div>
+          {% if is_owner_viewer and not is_owner_page %}
+            <div data-role="user-groups">
+              <h3 class="{{ styles.label.sectionHeading }}">User Group(s)</h3>
+              <div class="{{ styles.select.container }}"
+                   lp-select
+                   data-kind="user"
+                   data-preload='{{ page.user.properties.groups.column_value|tojson }}'>
+                <input data-index="group"
+                       data-multiple="true"
+                       data-placeholder="select user group(s)..."
+                       name="group"
+                       class="{{ styles.input }}">
+              </div>
+            </div>
+            <div data-role="remove-page">
+              <label class="flex flex-row items-start gap-1 sm:text-sm text-base-dark font-semibold">
+                Remove user from page
+                <div class="{{ styles.checkbox.container }} mr-1 order-first">
+                  <input type="checkbox"
+                         name="remove-user"
+                         data-kind="page"
+                         class="{{ styles.checkbox.default }}">
+                  {{ render_icon("check", (styles.checkbox.icon)) }}
+                </div>
+              </label>
+            </div>
+            <div class="{{ styles.select.container }}"
+                 data-role="page-select"
+                 data-include-users="false"
+                 lp-select
+                 data-preload='{{ [page.details]|tojson }}'>
+              <h3 class="{{ styles.label.sectionHeading }}">Reassign Page</h3>
+              <input data-index="page"
+                     data-creatable="true"
+                     data-placeholder="select a page..."
+                     name="reassign-page"
+                     class="{{ styles.input }}">
+            </div>
+          {% endif %}
+        </div>
+        {{ controls.edited_marker(url_for('pages.user_settings', key=page.urlsafe_key)) }}
+        <button type="submit" data-kind="user" class="{{ styles.button.submit }}"></button>
+      </div>
+    </section>
+  </form>
+{% endmacro %}
+
+{% macro info_form(page) %}
+  <form lp-update
+        lp-offline
+        lp-deferred
+        data-widget="PageInfo"
+        data-title="Info"
+        data-help="page_info"
+        data-name="{{ page.name }}"
+        data-route="{{ url_for('pages.update', key=page.urlsafe_key) }}"
+        data-deferred-route="{{ url_for('pages.info', key=page.urlsafe_key) }}"
+        data-destination="info:PageInfo"
+        {% if page.description %}data-description="{{ page.description }}"{% endif %}
+        {% if page.form %}data-schema='{{ page.form.schema|tojson }}'{% endif %}
+        {% if page.form %}data-submission='{{ page.properties.submission.form_value|tojson }}'{% endif %}
+        data-visible="false"
+        class="{{ styles.form.default }} mt-4 sm:mt-0">
+    {% if page.allowed(Action.EDIT) %}
+      {% if not current_user.is_public and not page.image %}
+        <div data-role="photo-prompt"
+             data-visible="{{ page.has('photo')|yesno }}"
+             class="flex flex-col gap-2"
+             data-endpoint-disable="{{ url_for('pages.set_attribute', key=page.urlsafe_key, attribute='photo') }}">
+          <div class="inline-flex min-h-10 w-fit overflow-hidden rounded-md border border-base-light/50 bg-white text-base-dark shadow-sm">
+            <span class="grid w-9 place-items-center border-r border-base-light/50 bg-base-bg text-kind-default"
+                  aria-hidden="true">
+              {{ render_icon("image") }}
+            </span>
+            <button type="button"
+                    data-role="photo-upload"
+                    title="Upload page image"
+                    aria-label="Upload page image"
+                    class="grid w-9 place-items-center hover:bg-kind-bg hover:text-kind-default focus-visible:outline-2 focus-visible:outline-kind-default">
+              {{ render_icon("upload") }}
+            </button>
+            <button type="button"
+                    data-role="photo-generate"
+                    title="Generate page image"
+                    aria-label="Generate page image"
+                    class="grid w-9 place-items-center hover:bg-kind-bg hover:text-kind-default focus-visible:outline-2 focus-visible:outline-kind-default">
+              {{ render_icon("generate") }}
+            </button>
+            <button type="button"
+                    data-role="photo-disable"
+                    title="Turn photo off"
+                    aria-label="Turn photo off"
+                    class="grid w-9 place-items-center text-delete-default hover:bg-delete-bg focus-visible:outline-2 focus-visible:outline-delete-default">
+              {{ render_icon("x") }}
+            </button>
+          </div>
+          <p data-role="photo-prompt-error"
+             data-visible="false"
+             class="text-sm italic text-delete-default"></p>
+          <template data-role="photo-mobile-toggle-template">
+            <button lp-show="photo:active"
+                    data-kind="page"
+                    class="{{ styles.entity.tabIcon }} sm:hidden">
+              {{ render_icon("image") }}
+            </button>
+          </template>
+        </div>
+      {% endif %}
+      <div data-role="attributes" class="flex flex-col gap-1">
+        <h3 class="{{ styles.label.default }}">Page Features</h3>
+        <div class="{{ styles.attributes.container }}">
+          {% for attribute in page.attributes %}
+            {% if not current_user.is_public or attribute.name not in ['files', 'photo'] %}
+              {{ attribute_button(attribute) }}
+            {% endif %}
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+    {% if page.allowed(Action.VIEW) %}
+      {% set category_preload = page.properties.categories.column_value %}
+      {% if page.allowed(Action.EDIT) or category_preload %}
+        <div class="{{ styles.select.container }}"
+             data-role="categories"
+             data-readonly="{{ (not page.allowed(Action.EDIT))|yesno }}"
+             lp-select
+             data-preload='{{ category_preload|tojson }}'>
+          <h3 class="{{ styles.label.sectionHeading }}">Categories</h3>
+          <input data-index="category"
+                 data-multiple="true"
+                 data-creatable="true"
+                 data-placeholder="add a category..."
+                 name="category"
+                 class="{{ styles.input }}">
+        </div>
+      {% endif %}
+    {% endif %}
+    {% set form_preload = page.form.details if page.form else none %}
+    {% if Resource.FORMS.allowed(Action.VIEW) and (page.allowed(Action.EDIT) or form_preload) %}
+      <div data-role="form-select" class="{{ styles.select.container }}">
+        <h3 class="{{ styles.label.sectionHeading }}">Attached Form</h3>
+        <button type="button"
+                lp-select
+                data-action="select-form"
+                data-placeholder="attach a form..."
+                data-index="form"
+                data-creatable="true"
+                data-form-type="page"
+                data-title="Attach Form"
+                {% if form_preload %}data-preload='{{ form_preload|tojson }}'{% endif %}
+                class="{{ styles.select.button }}"></button>
+      </div>
+    {% endif %}
+    {{ controls.edited_marker(url_for('pages.info', key=page.urlsafe_key)) }}
+    {% if page.allowed(Action.EDIT) %}{{ autofill(enabled=current_user.properties.restrictions.can_use_ai_tools) }}{% endif %}
+  </form>
+{% endmacro %}
+
+{% macro info_tab(page, is_owner_page, is_owner_viewer, view_permissions, is_own_page, can_view_user_settings) %}
+  <div id="info"
+       lp-component
+       data-title="Info"
+       data-default="PageInfo"
+       data-tab="true"
+       data-visible="false"
+       data-kind="page"
+       class="mt-4 sm:mt-0"
+       data-parent-nav="tabs">
+    {{ info_form(page) }}
+    {% if can_view_user_settings %}
+      {{ user_settings(page, is_own_page, is_owner_viewer, is_owner_page, view_permissions, 'PageInfo') }}
+    {% endif %}
+    {% if view_permissions and not page.user %}{{ permissions_form(page, 'PageInfo') }}{% endif %}
+  </div>
+{% endmacro %}

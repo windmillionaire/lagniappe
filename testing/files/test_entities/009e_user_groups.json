@@ -1,0 +1,167 @@
+{
+	"test_group_permissions": {
+		"entities": [
+			[
+				"USER_GROUP",
+				{
+					"name": "Group with empty form",
+					"hash": "grp01",
+					"permissions": {},
+					"form_data": {},
+					"expected": {
+						"permissions": {}
+					}
+				}
+			],
+			[
+				"USER_GROUP",
+				{
+					"name": "Group with models VIEW",
+					"hash": "grp02",
+					"permissions": {},
+					"form_data": { "models": "VIEW" },
+					"expected": {
+						"permissions": { "models": "VIEW" }
+					}
+				}
+			],
+			[
+				"USER_GROUP",
+				{
+					"name": "Group with specific page permission",
+					"hash": "grp03",
+					"permissions": {},
+					"form_data": { "page001": "EDIT" },
+					"expected": {
+						"permissions": { "page001": "EDIT" },
+						"restricted": ["cat001"]
+					}
+				}
+			],
+			[
+				"USER_GROUP",
+				{
+					"name": "Group page VIEW marks parent RESTRICTED",
+					"hash": "grp04",
+					"permissions": {},
+					"form_data": { "page001": "VIEW" },
+					"expected": {
+						"permissions": { "page001": "VIEW" },
+						"restricted": ["cat001"]
+					}
+				}
+			],
+			[
+				"USER_GROUP",
+				{
+					"name": "Group multiple pages same category",
+					"hash": "grp05",
+					"permissions": {},
+					"form_data": { "page001": "VIEW", "page002": "EDIT" },
+					"expected": {
+						"permissions": { "page001": "VIEW", "page002": "EDIT" },
+						"restricted": ["cat001"]
+					}
+				}
+			],
+			[
+				"USER_GROUP",
+				{
+					"name": "Group category EDIT implies page VIEW pruned",
+					"hash": "grp06",
+					"permissions": {},
+					"form_data": { "cat001": "EDIT", "page001": "VIEW" },
+					"expected": {
+						"permissions": { "cat001": "EDIT" },
+						"restricted": []
+					}
+				}
+			],
+			[
+				"USER_GROUP",
+				{
+					"name": "Group page EDIT exceeds category VIEW",
+					"hash": "grp07",
+					"permissions": {},
+					"form_data": { "cat001": "VIEW", "page001": "EDIT" },
+					"expected": {
+						"permissions": { "cat001": "VIEW", "page001": "EDIT" },
+						"restricted": []
+					}
+				}
+			]
+		],
+		"resources": [
+			[["CATEGORY", { "name": "Category", "hash": "cat001" }], "VIEW"],
+			[
+				[
+					"PAGE",
+					{
+						"name": "Page 1 under category",
+						"hash": "page001",
+						"model": { "name": "Category", "hash": "cat001" }
+					}
+				],
+				"EDIT"
+			],
+			[
+				[
+					"PAGE",
+					{
+						"name": "Page 2 under category",
+						"hash": "page002",
+						"model": { "name": "Category", "hash": "cat001" }
+					}
+				],
+				"VIEW"
+			]
+		]
+	},
+
+	"test_public_permissions": {
+		"entities": [
+			[
+				"PUBLIC_GROUP",
+				{
+					"name": "Public group - active",
+					"hash": "public01",
+					"active": true,
+					"permissions": {},
+					"form_data": { "models": "VIEW" },
+					"expected": {
+						"permissions": { "models": "VIEW" },
+						"public": "TRUE"
+					}
+				}
+			],
+			[
+				"PUBLIC_GROUP",
+				{
+					"name": "Public group - inactive",
+					"hash": "public02",
+					"active": false,
+					"permissions": {},
+					"form_data": { "models": "VIEW" },
+					"expected": {
+						"permissions": { "models": "VIEW" },
+						"public": "FALSE"
+					}
+				}
+			]
+		],
+		"resources": [
+			[["CATEGORY", { "name": "Category", "hash": "cat001" }], "VIEW"],
+			[
+				[
+					"PAGE",
+					{
+						"name": "Page 1 under category",
+						"hash": "page001",
+						"model": { "name": "Category", "hash": "cat001" }
+					}
+				],
+				"EDIT"
+			]
+		]
+	}
+}

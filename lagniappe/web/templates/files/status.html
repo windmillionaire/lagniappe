@@ -1,0 +1,72 @@
+{% from 'badge.html' import badge %}
+{% from 'files/status/results.html' import importing, completed %}
+{% from 'files/status/verify.html' import verify_import %}
+{% from 'files/status/assign.html' import assign_columns %}
+{% from 'files/status/parent.html' import parent_choice %}
+{% from 'files/status/form.html' import form_choice %}
+
+{% macro status(file) %}
+  {% set stage = file.stage %}
+  {% if stage.name == 'PROCESS_CSV' %}
+    {{ column_values(file) }}
+  {% elif stage.name == 'CHOOSE_TYPE' %}
+    {{ row_type_choices(file) }}
+  {% elif stage.name == 'CHOOSE_PARENT' %}
+    {{ parent_choice(file) }}
+  {% elif stage.name == 'CHOOSE_FORM' %}
+    {{ form_choice(file) }}
+  {% elif stage.name == 'ASSIGN_COLUMNS' %}
+    {{ assign_columns(file) }}
+  {% elif stage.name == 'VERIFY_IMPORT' %}
+    {{ verify_import(file) }}
+  {% elif stage.name == 'IMPORTING' %}
+    {{ importing(file) }}
+  {% elif stage.name == 'COMPLETED' %}
+    {{ completed(file) }}
+  {% endif %}
+{% endmacro %}
+
+{% macro column_values(file) %}
+  {% set process_csv = file.stage.current %}
+  <div>
+    <h2 class="text-lg font-bold">Row Count</h2>
+    <p class="text-sm text-base-medium italic">The file contains {{ process_csv.row_count }} rows.</p>
+  </div>
+  <div>
+    <h2 class="text-lg font-bold">Columns Found</h2>
+    <p class="text-sm text-base-medium italic">
+      The following columns were found in the file. You'll be able to edit or delete specific columns in a later step.
+    </p>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    {% for column in process_csv.columns.values() %}{{ badge(column) }}{% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro row_type_choices(file) %}
+  {% set choose_type = file.stage.current %}
+  <div>
+    <h2 class="text-lg font-bold">Row Type</h2>
+    <p class="text-sm text-base-medium italic">Each row can represent either a page or a task.</p>
+  </div>
+  <form class="flex flex-row gap-4 items-center">
+    <fieldset class="flex flex-row gap-4 items-center">
+      <label class="{{ styles.radio.label }}">
+        <input type="radio"
+               name="entity-type"
+               value="page"
+               {{ 'checked' if choose_type.entity_type != 'task' else '' }}
+               class="{{ styles.radio.default }}">
+        Each row represents a page
+      </label>
+      <label class="{{ styles.radio.label }}">
+        <input type="radio"
+               name="entity-type"
+               value="task"
+               {{ 'checked' if choose_type.entity_type == 'task' else '' }}
+               class="{{ styles.radio.default }}">
+        Each row represents a task
+      </label>
+    </fieldset>
+  </form>
+{% endmacro %}

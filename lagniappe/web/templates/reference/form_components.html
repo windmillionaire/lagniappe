@@ -1,0 +1,55 @@
+{% from "manual/macros.html" import subheading, callout %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Form Components") %}
+  <section>
+    {{ subheading("What This Panel Does") }}
+    <p class="text-sm text-base-dark">
+      The Components panel is the form builder's palette. Drag components from here into the form area, then click a component in the form to configure its settings.
+    </p>
+    {% call callout("tip") %}
+      Use the smallest component that fits the question. Simple fields make forms easier to fill, filter, and maintain.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Common Components") }}
+    <div class="space-y-3">
+      {% call feature("Input", icon="input", kind="form") %}
+        A single-line field for names, numbers, dates, times, email addresses, and phone numbers.
+      {% endcall %}
+      {% call feature("Text", icon="textarea", kind="form") %}
+        A larger text box for notes, explanations, descriptions, and other longer answers.
+      {% endcall %}
+      {% call feature("Choice Fields", icon="select", kind="form") %}
+        Use checkbox for yes/no, radio for one choice, and select for one or many choices from a list.
+      {% endcall %}
+      {% call feature("Link", icon="link", kind="page") %}
+        Store an external URL or connect the form to another page in Lagniappe.
+      {% endcall %}
+      {% call feature("Table", icon="table", kind="form") %}
+        Collect repeated rows of related information, such as line items, contacts, or review notes.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Special Components") }}
+    <div class="space-y-3">
+      {% call feature("Bookmark", icon="bookmark", kind="page") %}
+        Page forms can use a bookmark field to fetch basic webpage details from a URL.
+      {% endcall %}
+      {% call feature("Signature", icon="signature", kind="task") %}
+        Task forms can collect a signature for sign-offs, approvals, or acknowledgements.
+      {% endcall %}
+      {% call feature("Document and Status", icon="status", kind="task") %}
+        Task forms can include rich document content and status messages that explain what is still missing.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Builder Tips") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Drag components into the form area, then reorder them there.</li>
+      <li>Use preview mode to check the form before relying on it.</li>
+      <li>Generate can draft a form from a short natural-language description.</li>
+    </ul>
+  </section>
+{% endcall %}

@@ -1,0 +1,232 @@
+{% from "manual/macros.html" import heading, subheading, card, callout, code, step, link, nav_buttons %}
+<div class="space-y-6">
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Lagniappe installs into your own Google Cloud project. The setup script
+      guides you through connecting the services it needs and deploying the
+      app.
+    </p>
+    {% call callout("tip", False) %}
+      Setup is the most hands-on part of using Lagniappe, but the installer
+      explains each choice and opens the right provider pages along the way.
+      The steps below cover what to have ready before you begin.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("Services Used") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li>
+        <strong>App Engine</strong> for hosting the app.
+      </li>
+      <li>
+        <strong>Datastore</strong> for app data.
+      </li>
+      <li>
+        <strong>Cloud Storage</strong> for uploaded files and documents.
+      </li>
+      <li>
+        <strong>Cloud Tasks</strong> for background work.
+      </li>
+      <li>
+        <strong>Document AI</strong> for OCR when enabled.
+      </li>
+      <li>
+        <strong>Vertex AI</strong> for optional AI features.
+      </li>
+      <li>
+        <strong>Google Identity Platform</strong> for sign-in and
+        <strong>Firebase Cloud Messaging</strong> for live updates.
+      </li>
+      <li>
+        <strong>Email</strong> through Gmail, Google Workspace, or an email
+        provider for your custom domain.
+      </li>
+      <li>
+        <strong>Redis</strong> for search, filters, and live collaboration.
+      </li>
+      <li>
+        <strong>Cloudflare</strong> optionally, to help connect a custom
+        domain automatically.
+      </li>
+    </ul>
+  {% endcall %}
+  {{ heading("Prerequisites") }}
+  {% call card() %}
+    <div class="grid md:grid-cols-2 gap-6">
+      <div>
+        {{ subheading("Accounts") }}
+        <ul class="text-base-medium space-y-3">
+          <li>
+            <strong>Google Cloud:</strong> an account with billing enabled
+          </li>
+          <li>
+            <strong>Email:</strong> a Gmail or Google Workspace mailbox with
+            2-Step Verification if you are not using a custom domain
+          </li>
+          <li>
+            <strong>Redis:</strong> a provider account
+          </li>
+          <li>
+            <strong>Cloudflare, optional:</strong> an account and temporary
+            API token if you want automatic custom-domain setup
+          </li>
+        </ul>
+      </div>
+      <div>
+        {{ subheading("Tools on Your Computer") }}
+        <ul class="text-base-medium space-y-3">
+          <li>
+            <strong>Python:</strong> version 3.12 or newer; setup can install
+            it for you on Windows if needed
+          </li>
+          <li>
+            <strong>Git:</strong>
+            {{ link("https://git-scm.com/downloads", "download Git") }}
+          </li>
+          <li>
+            <strong>Google Cloud CLI:</strong>
+            {{ link("https://cloud.google.com/sdk/docs/install", "installation guide") }}
+          </li>
+        </ul>
+      </div>
+    </div>
+  {% endcall %}
+  {{ heading("Running the Commands") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      The dark command boxes in this guide are meant to be copied into your
+      terminal and run from there.
+    </p>
+    <p class="text-base-medium mb-3">
+      On Windows, use PowerShell. On macOS or Linux, use your usual terminal.
+    </p>
+    {% call callout("note", False) %}
+      Windows installation and recovery use <code>setup.cmd</code>. macOS and
+      Linux use <code>setup.sh</code>.
+    {% endcall %}
+    {% call callout("tip", False) %}
+      If a command says "not found" or "not recognized", check that the named
+      tool is installed, then open a fresh terminal and try again.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("Installation") }}
+  {% call card() %}
+    {% call step(1, "Clone the repository") %}
+      <p class="text-base-medium text-sm mb-2">
+        In Windows PowerShell, use:
+      </p>
+      {{ code('$lagniappePath = Join-Path $env:LOCALAPPDATA "Lagniappe"\ngit clone https://github.com/windmillionaire/lagniappe.git $lagniappePath\nSet-Location $lagniappePath') }}
+      <p class="text-base-medium text-sm my-2">
+        On macOS or Linux, use:
+      </p>
+      {{ code("git clone https://github.com/windmillionaire/lagniappe.git lagniappe\ncd lagniappe") }}
+    {% endcall %}
+    {% call step(2, "Authenticate with Google Cloud") %}
+      <p class="text-base-medium text-sm mb-2">
+        This connects the terminal to your Google account. It may open a
+        browser and ask you to approve access.
+      </p>
+      {{ code("gcloud auth login") }}
+    {% endcall %}
+    {% call step(3, "Run setup") %}
+      <p class="text-base-medium text-sm mb-2">
+        This starts the guided installer. It asks a few questions, opens any
+        provider pages you need, and explains what to copy or approve. You can
+        review each step before setup deploys the app.
+      </p>
+      {{ code("./setup.sh") }}
+      <p class="text-base-medium text-sm my-2">
+        In Windows PowerShell, use:
+      </p>
+      {{ code(".\\setup.cmd") }}
+      <p class="text-base-medium text-sm">
+        Setup guides you through the cloud project, sign-in, email, Redis,
+        optional features, and deployment. If a provider requires a manual
+        step, setup opens the right page and tells you exactly what to do.
+      </p>
+      {% call callout("tip", False) %}
+        A new deployment can become available before Google finishes building
+        its Datastore indexes. If Lagniappe says database setup is still
+        finishing, wait a few minutes and refresh; no repair or redeployment is
+        normally required.
+      {% endcall %}
+    {% endcall %}
+  {% endcall %}
+  {{ heading("Settings File") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Setup writes your installation settings to
+      <code>config/files/lagniappe_settings.yaml</code> inside your Lagniappe
+      checkout. This file contains secrets and provider configuration, so keep
+      it private and do not commit it to a public repository. Git ignores it,
+      but you should still keep a secure backup.
+    </p>
+    <p class="text-base-medium">
+      Alongside a fresh copy of the Lagniappe source code, this is the one
+      local file you need to recreate the same installation. It does not
+      contain your records or uploaded files. Once the app is running, the
+      owner can also view or download the current settings from
+      <strong>Admin</strong>, <strong>Settings</strong>,
+      <strong>Maintenance</strong>, then <strong>Configuration</strong>.
+    </p>
+  {% endcall %}
+  {{ heading("Recover an Existing Installation") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      The owner download is always named
+      <code>lagniappe_settings.yaml</code>, even when the installation has a
+      custom name. On macOS or Linux, use a clean checkout and save it at the
+      exact path below:
+    </p>
+    {{ code("git clone <lagniappe-source>\ncd <lagniappe-source>\nmkdir -p config/files\n# Save the owner download as:\n# config/files/lagniappe_settings.yaml\n./setup.sh") }}
+    <p class="text-base-medium my-3">
+      In Windows PowerShell, recover into the same stable local folder:
+    </p>
+    {{ code('$lagniappePath = Join-Path $env:LOCALAPPDATA "Lagniappe"\ngit clone <lagniappe-source> $lagniappePath\nSet-Location $lagniappePath\nNew-Item -ItemType Directory -Force config/files\n# Save the owner download as:\n# config/files/lagniappe_settings.yaml\n.\\setup.cmd') }}
+    <p class="text-base-medium mt-3">
+      Setup recognizes the downloaded settings file and uses it to rebuild the
+      app without deleting or replacing its cloud data.
+    </p>
+  {% endcall %}
+  {{ heading("Check or Repair Setup") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      The doctor command checks the installation without changing anything. It
+      reports any files, account settings, or cloud services that need
+      attention.
+    </p>
+    {{ code("./setup.sh doctor") }}
+    <p class="text-base-medium my-3">
+      In Windows PowerShell, use:
+    </p>
+    {{ code(".\\setup.cmd doctor") }}
+    <p class="text-base-medium mt-3">
+      The <code>repair</code> command reruns setup and fixes what it can:
+    </p>
+    {{ code("./setup.sh repair") }}
+    {{ code(".\\setup.cmd repair") }}
+  {% endcall %}
+  {{ heading("Cost and Maintenance") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Light personal or small-team usage is usually inexpensive, though there
+      is no fixed price. Cost depends on traffic, App Engine instance settings,
+      your Redis plan, file storage, OCR, AI usage, and any changes in provider
+      pricing.
+    </p>
+    <p class="text-base-medium mb-3">
+      A couple of habits keep things predictable: set Google Cloud budget
+      alerts when you install, and check in on your Redis plan occasionally as
+      your data grows.
+    </p>
+    <p class="text-base-medium">
+      Day to day, the app aims to stay out of your way. Every so often, cloud
+      APIs, auth rules, or dependencies do shift in ways that ask for a small
+      bit of attention, so it is worth keeping an eye on update notes.
+    </p>
+  {% endcall %}
+  {{ nav_buttons(
+  prev={"key": "collaboration", "name": "Collaboration", "kind": "user"},
+  next={"key": "security", "name": "Security", "kind": "user"}
+  ) }}
+</div>

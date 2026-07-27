@@ -1,0 +1,38 @@
+[
+	{
+		"id": "input-textab12",
+		"type": "input",
+		"input": "text",
+		"title": "Text Field"
+	},
+	{
+		"id": "input-datecd34",
+		"type": "input",
+		"input": "date",
+		"title": "Date Field"
+	},
+	{
+		"id": "input-timeef56",
+		"type": "input",
+		"input": "time",
+		"title": "Time Field"
+	},
+	{
+		"id": "input-numgh78",
+		"type": "input",
+		"input": "number",
+		"title": "Number Field"
+	},
+	{
+		"id": "input-emlij90",
+		"type": "input",
+		"input": "email",
+		"title": "Email Field"
+	},
+	{
+		"id": "input-telkl12",
+		"type": "input",
+		"input": "tel",
+		"title": "Phone Field"
+	}
+]

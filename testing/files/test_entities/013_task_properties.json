@@ -1,0 +1,74 @@
+{
+	"test_task_description": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Task With Description",
+					"hash": "task001",
+					"description": "This is a plain text description.",
+					"page": { "name": "Parent Page", "hash": "page001" }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Task With HTML Description",
+					"hash": "task002",
+					"description": "<p>Description with <strong>HTML</strong> tags</p>",
+					"page": { "name": "Parent Page", "hash": "page002" }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Task No Description",
+					"hash": "task003",
+					"page": { "name": "Parent Page", "hash": "page003" }
+				}
+			]
+		]
+	},
+	"test_task_due_date": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Task With Due Date",
+					"hash": "due001",
+					"due_date": "2025-06-15",
+					"page": { "name": "Parent Page", "hash": "page001" }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Task No Due Date",
+					"hash": "due002",
+					"page": { "name": "Parent Page", "hash": "page002" }
+				}
+			]
+		]
+	},
+	"test_task_completed": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Completed Task",
+					"hash": "comp001",
+					"completed": true,
+					"page": { "name": "Parent Page", "hash": "page001" }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Incomplete Task",
+					"hash": "comp002",
+					"page": { "name": "Parent Page", "hash": "page002" }
+				}
+			]
+		]
+	}
+}

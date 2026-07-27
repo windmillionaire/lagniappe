@@ -1,0 +1,377 @@
+{
+	"test_entity_active": {
+		"entities": [
+			["PROJECT", { "name": "Active Project" }],
+			["PROJECT", { "name": "Inactive Project", "active": false }],
+			["PAGE", { "name": "Page" }],
+			[
+				"PAGE",
+				{
+					"name": "Public Profile Page",
+					"user": {
+						"name": "Public User",
+						"hash": "pubusr1",
+						"public": true
+					}
+				}
+			],
+			["TASK", { "name": "Task" }],
+			["CATEGORY", { "name": "Category" }],
+			[
+				"USER",
+				{ "name": "User", "page": { "name": "User Page", "hash": "usrpg01" } }
+			],
+			[
+				"MODEL_TASK",
+				{
+					"name": "Model",
+					"project": { "name": "Model Project", "hash": "mdprj01" }
+				}
+			],
+			["FORM", { "name": "Form" }],
+			["FILE", { "name": "File" }],
+			[
+				"FILTER",
+				{
+					"name": "Filter",
+					"parent": {
+						"_type": "PROJECT",
+						"name": "Filtered",
+						"hash": "flt01"
+					},
+					"creator": {
+						"name": "Creator",
+						"hash": "crt01",
+						"page": { "name": "Creator Page", "hash": "crpg01" }
+					}
+				}
+			],
+			["USER_GROUP", { "name": "Group" }],
+			["PUBLIC_GROUP", { "name": "Public Group" }],
+			["INGRESS", { "name": "Ingress" }]
+		]
+	},
+	"test_entity_requires": {
+		"entities": [
+			[
+				"PROJECT",
+				{
+					"name": "Project",
+					"hash": "proj123",
+					"should_match": ["proj123", "models"]
+				}
+			],
+			[
+				"CATEGORY",
+				{
+					"name": "Category",
+					"hash": "cat1234",
+					"should_match": ["cat1234", "models"]
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page with Categories",
+					"hash": "page123",
+					"categories": [
+						{ "name": "Cat A", "hash": "cata123" },
+						{ "name": "Cat B", "hash": "catb456" }
+					],
+					"should_match": ["page123", "cata123", "catb456", "models"]
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page No Categories",
+					"hash": "page456",
+					"should_match": ["page456"]
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page with Model",
+					"hash": "page789",
+					"model": { "name": "Model Category", "hash": "modcat1" },
+					"should_match": ["page789", "modcat1", "models"]
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "User Page",
+					"hash": "usrpg12",
+					"categories": [{ "name": "User Page Cat", "hash": "usrpcat" }],
+					"user": {
+						"name": "User Page Owner",
+						"hash": "upown12",
+						"groups": [{ "name": "User Page Group", "hash": "upgrp12" }]
+					},
+					"should_match": ["usrpg12", "users", "upgrp12", "models", "usrpcat"]
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Task",
+					"hash": "task123",
+					"page": {
+						"name": "Parent Page",
+						"hash": "ppage12",
+						"categories": [{ "name": "Task Cat", "hash": "tcat123" }]
+					},
+					"should_match": ["ppage12", "tcat123", "models"]
+				}
+			],
+			[
+				"MODEL_TASK",
+				{
+					"name": "Model",
+					"hash": "model12",
+					"project": { "name": "Parent Project", "hash": "pproj12" },
+					"should_match": ["model12", "pproj12", "models"]
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with Groups",
+					"hash": "user123",
+					"page": {
+						"name": "User Page",
+						"hash": "upage12",
+						"categories": [{ "name": "User Cat", "hash": "ucat123" }]
+					},
+					"groups": [
+						{ "name": "Group A", "hash": "grpa123" },
+						{ "name": "Group B", "hash": "grpb456" }
+					],
+					"should_match": ["users", "grpa123", "grpb456"]
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User No Groups",
+					"hash": "user456",
+					"page": { "name": "User Page 2", "hash": "upage34" },
+					"should_match": ["users"]
+				}
+			],
+			[
+				"FORM",
+				{
+					"name": "Form",
+					"hash": "form123",
+					"should_match": ["forms"]
+				}
+			],
+			[
+				"FILE",
+				{
+					"name": "File with Pages",
+					"hash": "file123",
+					"pages": [
+						{ "name": "File Page", "hash": "fpage12", "categories": [] }
+					],
+					"should_match": ["file123", "models", "fpage12"]
+				}
+			],
+			[
+				"FILE",
+				{
+					"name": "File No Pages",
+					"hash": "file456",
+					"should_match": ["file456", "models"]
+				}
+			],
+			[
+				"FILTER",
+				{
+					"name": "Filter",
+					"hash": "filt123",
+					"parent": {
+						"_type": "PROJECT",
+						"name": "Filtered Project",
+						"hash": "fproj12"
+					},
+					"creator": {
+						"name": "Creator",
+						"hash": "creat12",
+						"page": { "name": "Creator Page", "hash": "crpg12" }
+					},
+					"should_match": ["filt123", "fproj12", "creat12"]
+				}
+			],
+			[
+				"USER_GROUP",
+				{
+					"name": "User Group",
+					"hash": "ugrp123",
+					"should_match": ["ugrp123", "users"]
+				}
+			],
+			[
+				"PUBLIC_GROUP",
+				{
+					"name": "Public Group",
+					"hash": "pgrp123",
+					"should_match": ["pgrp123", "site"]
+				}
+			],
+			[
+				"INGRESS",
+				{
+					"name": "Ingress",
+					"hash": "ingr123",
+					"should_match": ["ingr123", "site"]
+				}
+			]
+		]
+	},
+	"test_entity_hash": {
+		"entities": [
+			["PROJECT", { "name": "Project", "hash": "projhsh" }],
+			["PAGE", { "name": "Page", "hash": "pagehsh" }],
+			["TASK", { "name": "Task", "hash": "taskhsh" }],
+			["CATEGORY", { "name": "Category", "hash": "cathash" }],
+			[
+				"USER",
+				{
+					"name": "User",
+					"hash": "usrhash",
+					"page": { "name": "User Page", "hash": "usrpg02" }
+				}
+			],
+			[
+				"MODEL_TASK",
+				{
+					"name": "Model",
+					"hash": "modhash",
+					"project": { "name": "Model Project", "hash": "mdprj02" }
+				}
+			],
+			["FORM", { "name": "Form", "hash": "formhsh" }],
+			["FILE", { "name": "File", "hash": "filehsh" }],
+			[
+				"FILTER",
+				{
+					"name": "Filter",
+					"hash": "flthash",
+					"parent": {
+						"_type": "PROJECT",
+						"name": "Filtered",
+						"hash": "flt02"
+					},
+					"creator": {
+						"name": "Creator",
+						"hash": "crt02",
+						"page": { "name": "Creator Page", "hash": "crpg02" }
+					}
+				}
+			],
+			["USER_GROUP", { "name": "Group", "hash": "grphash" }],
+			["PUBLIC_GROUP", { "name": "Public", "hash": "pubhash" }],
+			["INGRESS", { "name": "Ingress", "hash": "inghash" }]
+		]
+	},
+	"test_entity_name": {
+		"entities": [
+			["PROJECT", { "name": "Simple Project" }],
+			["PROJECT", { "name": "The Great Project" }],
+			["PROJECT", { "name": "No Features", "attributes": [] }],
+			["PAGE", { "name": "Page Name" }],
+			["TASK", { "name": "Task Name" }],
+			["CATEGORY", { "name": "Category Name" }],
+			[
+				"USER",
+				{
+					"name": "User Name",
+					"page": { "name": "User Page", "hash": "usrpg03" }
+				}
+			],
+			[
+				"MODEL_TASK",
+				{
+					"name": "Model Name",
+					"project": { "name": "Model Project", "hash": "mdprj03" }
+				}
+			],
+			["FORM", { "name": "Form Name" }],
+			["FILE", { "name": "File Name" }],
+			[
+				"FILTER",
+				{
+					"name": "Filter Name",
+					"parent": {
+						"_type": "PROJECT",
+						"name": "Filtered",
+						"hash": "flt03"
+					},
+					"creator": {
+						"name": "Creator",
+						"hash": "crt03",
+						"page": { "name": "Creator Page", "hash": "crpg03" }
+					}
+				}
+			],
+			["USER_GROUP", { "name": "Group Name" }],
+			["PUBLIC_GROUP", { "name": "Public Group Name" }],
+			["INGRESS", { "name": "Ingress Name" }]
+		]
+	},
+	"test_entity_modified": {
+		"entities": [
+			["PROJECT", { "name": "Chicago", "timezone": "America/Chicago" }],
+			["PAGE", { "name": "Tokyo", "timezone": "Asia/Tokyo" }],
+			["TASK", { "name": "London", "timezone": "Europe/London" }],
+			["CATEGORY", { "name": "NYC", "timezone": "America/New_York" }]
+		]
+	},
+	"test_entity_kind": {
+		"entities": [
+			["PROJECT", { "name": "Project" }],
+			["PAGE", { "name": "Page" }],
+			[
+				"PAGE",
+				{ "name": "User Page", "user": { "name": "Owner", "hash": "owner12" } }
+			],
+			["TASK", { "name": "Task" }],
+			["CATEGORY", { "name": "Category" }],
+			[
+				"USER",
+				{ "name": "User", "page": { "name": "User Page", "hash": "usrpg04" } }
+			],
+			[
+				"MODEL_TASK",
+				{
+					"name": "Model",
+					"project": { "name": "Model Project", "hash": "mdprj04" }
+				}
+			],
+			["FORM", { "name": "Form" }],
+			["FILE", { "name": "File" }],
+			[
+				"FILTER",
+				{
+					"name": "Filter",
+					"parent": {
+						"_type": "PROJECT",
+						"name": "Filtered",
+						"hash": "flt04"
+					},
+					"creator": {
+						"name": "Creator",
+						"hash": "crt04",
+						"page": { "name": "Creator Page", "hash": "crpg04" }
+					}
+				}
+			],
+			["USER_GROUP", { "name": "Group" }],
+			["PUBLIC_GROUP", { "name": "Public Group" }],
+			["INGRESS", { "name": "Ingress" }]
+		]
+	}
+}

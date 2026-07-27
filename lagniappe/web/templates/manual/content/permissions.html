@@ -1,0 +1,102 @@
+{% from "manual/macros.html" import heading, subheading, card, callout, concept, nav_buttons %}
+<div class="space-y-6">
+  {% call card() %}
+    <p class="text-base-medium text-lg leading-relaxed mb-3">
+      Permissions control what each user can see and do. They are enforced on
+      the server, used in search and filters, and applied before AI context is
+      assembled.
+    </p>
+    <p class="text-base-medium">
+      The aim is for access to feel explicit enough that a small organization
+      can reason about it without permissions getting in the way.
+    </p>
+  {% endcall %}
+
+  {{ heading("Basic Model", icon="permissions", kind="user") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2 mb-3">
+      <li><strong>Owner:</strong> has access to everything and can manage site-level settings.</li>
+      <li><strong>Groups:</strong> users inherit permissions from every group they belong to.</li>
+      <li><strong>Most permissive wins:</strong> if one group grants view and another grants edit, the user can edit.</li>
+      <li><strong>Higher actions include lower actions:</strong> edit includes view; delete includes edit and view.</li>
+      <li><strong>Pages belong to categories:</strong> editing a category lets a user add pages to it. Create permissions are for making new containers such as categories or projects.</li>
+    </ul>
+    {% call callout("tip", False) %}
+      The owner role is broad by design. For organizations, it is worth naming
+      at least one trusted backup owner, or jotting down a short recovery plan
+      for the underlying Google Cloud project.
+    {% endcall %}
+  {% endcall %}
+
+  {{ heading("Permission Layers") }}
+  {% call card() %}
+    <ol class="text-base-medium space-y-2">
+      <li><strong>Global permissions</strong> govern broad areas: models/content, forms, and users.</li>
+      <li><strong>Entity permissions</strong> grant access to specific categories, projects, pages, or groups.</li>
+      <li><strong>Form restrictions</strong> hide pages or tasks that use a restricted form.</li>
+      <li><strong>Page restrictions</strong> lock a single page to the owner or selected groups.</li>
+    </ol>
+    <p class="text-base-medium mt-3">
+      The first two layers grant access; the last two only take it away. A form
+      or page restriction can hide something from people outside a chosen group,
+      but it never grants access on its own, so a restriction can only narrow
+      what someone already reaches, never widen it. That makes restrictions safe
+      to add to a working setup.
+    </p>
+  {% endcall %}
+
+  {{ heading("Why Form Restrictions Matter", icon="form", kind="form") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Forms act like content types, so restricting a form restricts that type of
+      content wherever it appears. In one category, everyone might see ordinary
+      records while only a manager group sees review, compensation, legal, or
+      finance forms.
+    </p>
+    <p class="text-base-medium mb-3">
+      Because the restriction follows the form rather than the folder, it can
+      carve an exception out of an otherwise shared space. That makes
+      "everything except" access easy to state without touching each record: a
+      group can see every page in a category except the few built on a
+      restricted form, or every task except the ones that use it. The exception
+      travels with the content type wherever it moves.
+    </p>
+    <p class="text-base-medium">
+      It is a flexible pattern, and it works best when the form and page
+      restrictions for a given record are set up intentionally rather than as
+      an afterthought.
+    </p>
+  {% endcall %}
+
+  {{ heading("Visibility") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Restricted content is left out of rendered pages, search results, filter
+      results, and direct route access, not just hidden in the browser. Access
+      is applied as results are gathered, so restricted items are never loaded
+      and then hidden after the fact -- there is no partly built page for a
+      restriction to leak out of.
+    </p>
+    <p class="text-base-medium">
+      Every page can show who is able to view it. That view is as clear as
+      your group and restriction setup, so a little care with naming groups
+      goes a long way.
+    </p>
+  {% endcall %}
+
+  {{ heading("Helpful Habits") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li>Lean on groups for the heavy lifting and use page-level restrictions for genuine exceptions.</li>
+      <li>Keep group names readable; a small naming convention helps when groups start to overlap.</li>
+      <li>Remember that global permissions can grant access more broadly than an entity-specific rule.</li>
+      <li>Grant category edit when someone should maintain records in an existing category, and reserve model create for people who should create new categories or projects.</li>
+      <li>Walk through important flows once from a non-owner account to confirm what other people will actually see.</li>
+    </ul>
+  {% endcall %}
+
+  {{ nav_buttons(
+    prev={"key": "tasks", "name": "Tasks", "kind": "task"},
+    next={"key": "search", "name": "Search & Filters", "kind": "page"}
+  ) }}
+</div>

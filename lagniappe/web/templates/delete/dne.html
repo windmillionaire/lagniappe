@@ -1,0 +1,16 @@
+{% extends "layouts/delete.html" %}
+
+{% block name -%}
+  Entity Not Found
+{%- endblock name %}
+
+{% block description -%}
+  <p class="text-delete-default text-sm">This entity does not exist. Oops!</p>
+{%- endblock description %}
+
+{% block button -%}
+  <button data-role="remove"
+          data-kind="delete"
+          data-key="{{ key }}"
+          class="{{ styles.button.submit }}">Close</button>
+{%- endblock button %}

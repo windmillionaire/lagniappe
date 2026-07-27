@@ -1,0 +1,26 @@
+{% from "manual/macros.html" import callout %}
+{% from "reference/macros.html" import modal %}
+{% call modal("Configuration") %}
+  <p class="text-sm text-base-dark">
+    This modal shows the live configuration values the app is using. It is mainly here for backup, migration, and troubleshooting when setup needs to be repaired or repeated.
+  </p>
+  {% call callout("error") %}
+    <strong>Warning — private download:</strong> Sensitive values are redacted in this
+    on-screen preview. The downloadable recovery file is complete and contains
+    secrets, so store it securely and do not share or commit it.
+  {% endcall %}
+  {% call callout("tip") %}
+    <strong>Backup & Migration</strong>
+    <p class="mt-2">
+      Download the settings file before major setup changes, before moving the app to another machine, or before changing provider credentials.
+    </p>
+    <p class="mt-2">
+      Keep the downloaded file somewhere private. It is meant for you and the setup process, not for general project documentation.
+    </p>
+  {% endcall %}
+  <div class="bg-base-dark text-project-light p-4 rounded-lg font-mono text-xs overflow-x-auto"
+       data-role="environment-variables"><pre><code>{{ environment_variables }}</code></pre></div>
+  <a href="{{ url_for('reference.download_settings') }}"
+     data-kind="page"
+     class="{{ styles.button.submit }}">Download Settings File</a>
+{% endcall %}

@@ -1,0 +1,59 @@
+{% macro specific_access(form, type) %}
+  <li class="px-3 py-2 border-t border-user-light">
+    <label class="{{ styles.checkbox.label }}">
+      <div class="{{ styles.checkbox.container }}">
+        <input type="checkbox"
+               data-role="specific-access"
+               data-kind="user"
+               name="{{ type }}"
+               {{ 'checked' if form.restricted_to and type in form.restricted_to else '' }}
+               class="{{ styles.checkbox.default }}">
+        {{ render_icon("check", (styles.checkbox.icon)) }}
+      </div>
+      <span>Restrict to site {{ type }}</span>
+    </label>
+  </li>
+{% endmacro %}
+
+{% macro group_access(group) %}
+  <li class="{{ styles.form.restriction }}">
+    <span class="text-base font-semibold text-user-default truncate">{{ group.name }}</span>
+    <button class="{{ styles.toggle.container }}"
+            data-role="remove-restriction"
+            data-key="{{ group.urlsafe_key }}"
+            data-kind="delete"
+            type="button">
+      {{ render_icon("x") }}
+    </button>
+  </li>
+{% endmacro %}
+
+{% macro restrict_access(form) %}
+  <div data-role="restrict-access"
+       class="outline-2 outline-user-default rounded-md shadow-sm"
+       data-kind="user"
+       data-route="{{ url_for('forms.restrictions', key=form.urlsafe_key) }}"
+       type="button">
+    <div class="{{ styles.iconLabel.wrapper }} rounded-t-md px-3 py-1.5 bg-user-bg text-base font-semibold">
+      {{ render_icon("group", (styles.iconLabel.icon) ~ " text-user-default") }}
+      <span>Access Restrictions</span>
+    </div>
+    <p class="text-sm text-base-dark px-3 py-2 italic"
+       data-role="restricted-description">
+      If a form is restricted to a specific group, only the site owner and users in that
+      group can view it and any tasks or forms that are defined by it.
+    </p>
+    <ul>
+      <li class="border-t border-user-light">
+        <input data-index="group"
+               data-role="restrict-group-input"
+               data-kind="user"
+               data-placeholder="add group restriction..."
+               name="group"
+               class="{{ styles.input }} rounded-none">
+      </li>
+      {{ specific_access(form, 'owner') }}
+      {% for group in form.groups %}{{ group_access(group) }}{% endfor %}
+    </ul>
+  </div>
+{% endmacro %}

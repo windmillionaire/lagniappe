@@ -1,0 +1,15 @@
+[
+	{
+		"id": "refs",
+		"type": "table",
+		"title": "Refs",
+		"columns": [
+			{
+				"id": "page_ref",
+				"type": "link",
+				"title": "Page",
+				"location": "in"
+			}
+		]
+	}
+]

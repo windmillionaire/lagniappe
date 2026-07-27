@@ -1,0 +1,27 @@
+{% extends "layouts/delete.html" %}
+
+{% block name -%}
+  Delete User
+{%- endblock name %}
+
+{% block description -%}
+  <div class="space-y-3 text-delete-default text-sm">
+    <p>Are you sure you want to delete this user?</p>
+    <label class="flex flex-row items-start gap-2 font-semibold text-base-dark">
+      <span class="{{ styles.checkbox.container }} shrink-0">
+        <input type="checkbox"
+               name="delete-page"
+               data-delete-option
+               data-kind="delete"
+               class="{{ styles.checkbox.default }}"
+               checked>
+        {{ render_icon("check", (styles.checkbox.icon)) }}
+      </span>
+      <span>Also delete the user's page and all tasks and files attached to it</span>
+    </label>
+  </div>
+{%- endblock description %}
+
+{% block button -%}
+  {{ delete_action(url_for('users.delete', key=entity.urlsafe_key), "Delete " ~ entity.name) }}
+{%- endblock button %}

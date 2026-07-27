@@ -1,0 +1,108 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Lagniappe: Test Current Test File",
+            "type": "process",
+            "command": "${workspaceFolder}/venv/bin/python",
+            "args": [
+                "run.py",
+                "test",
+                "${relativeFile}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "Lagniappe: Test Unit Suite",
+            "type": "process",
+            "command": "${workspaceFolder}/venv/bin/python",
+            "args": [
+                "run.py",
+                "test",
+                "unit"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "Lagniappe: Test Tooling Suite",
+            "type": "process",
+            "command": "${workspaceFolder}/venv/bin/python",
+            "args": [
+                "run.py",
+                "test",
+                "tooling"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "group": "test",
+            "problemMatcher": []
+        },
+        {
+            "label": "Lagniappe: Traceability Current Source",
+            "type": "process",
+            "command": "${workspaceFolder}/venv/bin/python",
+            "args": [
+                "run.py",
+                "traceability",
+                "--source",
+                "${relativeFile}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Lagniappe: Traceability Current Test",
+            "type": "process",
+            "command": "${workspaceFolder}/venv/bin/python",
+            "args": [
+                "run.py",
+                "traceability",
+                "--test",
+                "${relativeFile}",
+                "--suggest-sources"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Lagniappe: Traceability Full",
+            "type": "process",
+            "command": "${workspaceFolder}/venv/bin/python",
+            "args": [
+                "run.py",
+                "traceability"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "Lagniappe: Template Contracts Current Test",
+            "type": "process",
+            "command": "${workspaceFolder}/venv/bin/python",
+            "args": [
+                "run.py",
+                "template-contracts",
+                "${relativeFile}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": []
+        }
+    ]
+}

@@ -1,0 +1,245 @@
+{
+	"test_skipped_recurring": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Due today - no skipped",
+					"hash": "skip_rec001",
+					"page": { "name": "Parent Page", "hash": "page001" },
+					"schedule": { "unit": "day", "interval": 1 },
+					"days_ago": 0,
+					"expected": { "skipped": 0 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Due in future - no skipped",
+					"hash": "skip_rec002",
+					"page": { "name": "Parent Page", "hash": "page002" },
+					"schedule": { "unit": "day", "interval": 1 },
+					"days_ago": -5,
+					"expected": { "skipped": 0 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Daily - 1 day ago - 0 skipped (next would be today)",
+					"hash": "skip_rec003",
+					"page": { "name": "Parent Page", "hash": "page003" },
+					"schedule": { "unit": "day", "interval": 1 },
+					"days_ago": 1,
+					"expected": { "skipped": 0 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Daily - 3 days ago - 2 skipped",
+					"hash": "skip_rec004",
+					"page": { "name": "Parent Page", "hash": "page004" },
+					"schedule": { "unit": "day", "interval": 1 },
+					"days_ago": 3,
+					"expected": { "skipped": 2 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 2 days - 5 days ago - 2 skipped",
+					"hash": "skip_rec005",
+					"page": { "name": "Parent Page", "hash": "page005" },
+					"schedule": { "unit": "day", "interval": 2 },
+					"days_ago": 5,
+					"expected": { "skipped": 2 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Weekly - 14 days ago - 1 skipped (next at 7 days, now at 14)",
+					"hash": "skip_rec006",
+					"page": { "name": "Parent Page", "hash": "page006" },
+					"schedule": { "unit": "week", "interval": 1 },
+					"days_ago": 14,
+					"expected": { "skipped": 1 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 2 weeks - 15 days ago - 0 skipped (next at 14 days is today-ish)",
+					"hash": "skip_rec007",
+					"page": { "name": "Parent Page", "hash": "page007" },
+					"schedule": { "unit": "week", "interval": 2 },
+					"days_ago": 14,
+					"expected": { "skipped": 0 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 2 weeks - 29 days ago - 2 skipped",
+					"hash": "skip_rec008",
+					"page": { "name": "Parent Page", "hash": "page008" },
+					"schedule": { "unit": "week", "interval": 2 },
+					"days_ago": 29,
+					"expected": { "skipped": 2 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Invalid interval 0 - 0 skipped",
+					"hash": "skip_rec009",
+					"page": { "name": "Parent Page", "hash": "page009" },
+					"schedule": { "unit": "day", "interval": 0 },
+					"days_ago": 10,
+					"expected": { "skipped": 0 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Invalid unit - 0 skipped",
+					"hash": "skip_rec010",
+					"page": { "name": "Parent Page", "hash": "page010" },
+					"schedule": { "unit": "invalid", "interval": 1 },
+					"days_ago": 10,
+					"expected": { "skipped": 0 }
+				}
+			]
+		]
+	},
+	"test_skipped_scheduled": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Daily - due today - 0 skipped",
+					"hash": "skip_sch001",
+					"page": { "name": "Parent Page", "hash": "page001" },
+					"schedule": { "mode": "daily" },
+					"days_ago": 0,
+					"expected": { "skipped": 0 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Daily - 5 days ago - 5 skipped",
+					"hash": "skip_sch002",
+					"page": { "name": "Parent Page", "hash": "page002" },
+					"schedule": { "mode": "daily" },
+					"days_ago": 5,
+					"expected": { "skipped": 5 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Weekly Mon/Wed/Fri - 7 days ago - 2 skipped (Fri, Mon)",
+					"hash": "skip_sch003",
+					"page": { "name": "Parent Page", "hash": "page003" },
+					"schedule": { "mode": "weekly", "days": [0, 2, 4] },
+					"days_ago": 7,
+					"expected": { "skipped": 2 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Weekly Mon/Wed/Fri - 14 days ago - 5 skipped",
+					"hash": "skip_sch004",
+					"page": { "name": "Parent Page", "hash": "page004" },
+					"schedule": { "mode": "weekly", "days": [0, 2, 4] },
+					"days_ago": 14,
+					"expected": { "skipped": 5 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Weekly Saturday only - 14 days ago - 2 skipped",
+					"hash": "skip_sch005",
+					"page": { "name": "Parent Page", "hash": "page005" },
+					"schedule": { "mode": "weekly", "days": [5] },
+					"days_ago": 14,
+					"expected": { "skipped": 2 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Monthly 15th - 3 months ago from 15th - 3 skipped",
+					"hash": "skip_sch006",
+					"page": { "name": "Parent Page", "hash": "page006" },
+					"schedule": { "mode": "monthly", "type": "specific_day", "day": 15 },
+					"months_ago": 3,
+					"from_day": 15,
+					"expected": { "skipped": 3 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Monthly last day - 3 months ago - 2 skipped",
+					"hash": "skip_sch007",
+					"page": { "name": "Parent Page", "hash": "page007" },
+					"schedule": { "mode": "monthly", "type": "last_day" },
+					"months_ago": 3,
+					"from_day": 28,
+					"expected": { "skipped": 2 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Monthly first Monday - 3 months ago - 3 skipped",
+					"hash": "skip_sch008",
+					"page": { "name": "Parent Page", "hash": "page008" },
+					"schedule": {
+						"mode": "monthly",
+						"type": "ordinal_weekday",
+						"ordinal": 1,
+						"weekday": 0
+					},
+					"months_ago": 3,
+					"from_day": 1,
+					"expected": { "skipped": 3 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Yearly Dec 25 - from Jan 2 years ago - 1 skipped",
+					"hash": "skip_sch009",
+					"page": { "name": "Parent Page", "hash": "page009" },
+					"schedule": {
+						"mode": "yearly",
+						"type": "specific_day",
+						"month": 12,
+						"day": 25
+					},
+					"years_ago": 2,
+					"from_month": 1,
+					"expected": { "skipped": 1 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Yearly first day of March - from April 2 years ago - 2 skipped",
+					"hash": "skip_sch010",
+					"page": { "name": "Parent Page", "hash": "page010" },
+					"schedule": { "mode": "yearly", "type": "first_day", "month": 3 },
+					"years_ago": 2,
+					"from_month": 4,
+					"expected": { "skipped": 2 }
+				}
+			]
+		]
+	}
+}

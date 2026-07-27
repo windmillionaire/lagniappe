@@ -1,0 +1,143 @@
+{% from "manual/macros.html" import heading, subheading, card, callout, concept, link, nav_buttons %}
+{% macro open_source() %}
+  {{ heading("Open Source") }}
+  {% call card() %}
+    <p class="text-base-medium">
+      Lagniappe is licensed under the
+      {{ link("https://www.gnu.org/licenses/agpl-3.0.en.html", "AGPL 3.0 or later") }}
+      license. You can run it yourself, modify it, and inspect how your data is
+      handled. If you offer a modified version as a hosted service, the license
+      requires sharing that source code under the same terms.
+    </p>
+    {% if CONFIG.SOURCE_URL %}
+      <p class="text-base-medium mt-3">
+        {{ link(
+          CONFIG.SOURCE_URL,
+          "Source for this installation (version " ~ CONFIG.VERSION ~ ")"
+        ) }}
+      </p>
+    {% endif %}
+  {% endcall %}
+{% endmacro %}
+<div class="space-y-6">
+  {% call card() %}
+    <p class="text-base-medium text-lg leading-relaxed mb-3">
+      Lagniappe is a private, self-hosted workspace for structured records,
+      documents, tasks, files, search, and permissions. It is designed for
+      people who like keeping their operational data in infrastructure they
+      control rather than in a consumer SaaS account.
+    </p>
+    <p class="text-base-medium mb-3">
+      The closest comparison is a small internal system that borrows ideas from
+      Notion, Airtable, Evernote, Google Docs, and task trackers. The emphasis
+      is a little different: durability, ownership, access control, exportability, and
+      practical workflows come before polish or marketplace integrations.
+    </p>
+    {% call callout("tip", False) %}
+      Lagniappe runs in your own Google Cloud project. Setup is guided, and day
+      to day use feels like any other web app, but it helps to be reasonably
+      comfortable running through a setup script and looking at the occasional
+      cloud setting.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("Good Fit") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li>
+        Personal operations: properties, equipment, household records, projects, contractors, documents, and recurring work.
+      </li>
+      <li>
+        Small organizations that need private records, roles, files, tasks, and forms without buying into a large platform.
+      </li>
+      <li>Workflows where a page needs both narrative documents and structured data.</li>
+      <li>Teams that care about permission boundaries before sending context to AI.</li>
+    </ul>
+  {% endcall %}
+  {{ heading("Less of a Fit") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">A few situations where something else is probably the better tool:</p>
+    <ul class="text-base-medium space-y-2">
+      <li>You want a polished notes app with zero setup and no cloud account to manage.</li>
+      <li>You need offline-first local files, end-to-end encryption, or peer-to-peer sync.</li>
+      <li>
+        You want a general spreadsheet replacement or a full project-management suite with boards, sprints, and reporting dashboards.
+      </li>
+      <li>You would rather rely on a vendor's support contract than on source code and your own infrastructure.</li>
+    </ul>
+  {% endcall %}
+  {{ heading("Core Concepts", icon="overview", kind="category") }}
+  <div class="grid md:grid-cols-2 gap-4 mb-6">
+    {% call concept("Forms", icon="form", kind="form") %}
+      Forms define structured fields: text, dates, selects, checkboxes, tables,
+      links, locations, signatures, and more. They also act as content types.
+    {% endcall %}
+    {% call concept("Categories", icon="category", kind="category") %}
+      Categories group pages. A category can have a default form, and individual
+      pages can use different forms when a category contains several related types.
+    {% endcall %}
+    {% call concept("Pages", icon="page", kind="page") %}
+      Pages are the main records. A page can have a document, form data, tasks,
+      files, notes, and permissions.
+    {% endcall %}
+    {% call concept("Tasks", icon="tasks", kind="task") %}
+      Tasks live on pages. They can recur, collect form data, keep history, and
+      be assigned without losing the context of the page they belong to.
+    {% endcall %}
+    {% call concept("Projects", icon="project", kind="project") %}
+      Projects collect related work across many pages. They can define task
+      templates and provide an aggregated view of tasks that still live on pages.
+    {% endcall %}
+    {% call concept("Files", icon="file", kind="file") %}
+      Files are stored in your cloud storage bucket. They can be attached to
+      pages or tasks, extracted for search, summarized, or imported from CSV.
+    {% endcall %}
+  </div>
+  {{ heading("Connected Workspace", icon="sitemap", kind="page") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Lagniappe is more graph-like than a plain document folder. A page can be
+      a durable record, a document, a form submission, a task hub, and a file
+      cabinet at the same time. Categories, projects, forms, model tasks, links,
+      and attachments give those records shape without forcing everything into
+      one table or one outline.
+    </p>
+    <p class="text-base-medium mb-3">
+      That matters for operational memory. A contractor, property, repair,
+      invoice, inspection task, and uploaded photo can all stay connected while
+      still being useful on their own. Projects can gather work across many
+      pages, and model tasks can describe repeated patterns of work without
+      losing the page where each task actually belongs.
+    </p>
+    {% call callout("tip", False) %}
+      The goal is not to make a perfect knowledge graph. It is to keep ordinary
+      records close to the tasks, files, forms, and links that make them useful
+      later.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("Design Choices") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2 mb-3">
+      <li>
+        <strong>Server-rendered pages.</strong> Permissions are enforced before HTML is sent to the browser.
+      </li>
+      <li>
+        <strong>Owned infrastructure.</strong> The app runs in your Google Cloud project, using your storage, database, auth, and AI account.
+      </li>
+      <li>
+        <strong>Structured data plus documents.</strong> Freeform writing and database-like fields are designed to live together.
+      </li>
+      <li>
+        <strong>Plain web foundations.</strong> Flask, Jinja, HTML, CSS, and vanilla JavaScript keep the app less tied to frontend framework churn.
+      </li>
+    </ul>
+    <p class="text-base-medium">
+      These choices keep the app durable and inspectable. The tradeoff is a
+      bit more setup up front and a handful fewer conveniences than fully
+      hosted software.
+    </p>
+  {% endcall %}
+  {{ open_source() }}
+  {{ nav_buttons(
+  next={"key": "forms", "name": "Forms", "kind": "form"}
+  ) }}
+</div>

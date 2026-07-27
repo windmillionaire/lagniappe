@@ -1,0 +1,317 @@
+import re
+from types import SimpleNamespace
+from uuid import uuid4
+
+from playwright.sync_api import expect
+import pytest
+
+from lagniappe.core.definitions import Fetch, Levels, Site
+from lagniappe.core.entities import Entities
+from testing.definitions import Categories, SitePages, Users
+from testing.elements import Modal, Select, SpinnerButtons, Table, Tabs
+from testing.resources import Page
+
+pytestmark = pytest.mark.e2e
+
+"""
+Tests for the Users index page (/users).
+
+Tests user list, user creation, user groups, and permissions management.
+Verified against:
+- lagniappe/templates/users/index.html
+- lagniappe/templates/users/tools.html
+- src/script/views/indexes/user.mjs
+- src/script/views/forms/user.mjs
+- src/script/components/permissions.mjs
+"""
+
+
+def _set_public_users_allowed(enabled):
+    public_group = Entities.PUBLIC_GROUP.get()
+    public_group.active = enabled
+    public_group.permissions = {
+        Site.PUBLIC.value: Levels.TRUE.name if enabled else Levels.FALSE.name
+    }
+    public_group.save()
+    return public_group
+
+
+def _create_public_user(email, name):
+    user = Entities.USER.create(
+        {
+            "email": email,
+            "name": name,
+            "is_public": True,
+            "test_user": True,
+        }
+    )
+    user.save()
+    return user
+
+
+def _user_rows_response(mode):
+    suffix = "/users/rows?mode=public" if mode == "public" else "/users/rows"
+    return lambda response: (
+        response.request.method == "GET" and response.url.endswith(suffix)
+    )
+
+
+# @features users
+# @dimensions index-mode-toggle disabled
+# @template users/index.html::public_users_toggle
+def test_users_index_public_toggle_hidden_when_public_users_disabled(get_user):
+    owner = get_user(Users.OWNER)
+    _set_public_users_allowed(False)
+
+    user_index = owner.go(SitePages.USER_INDEX)
+
+    expect(owner.locate(user_index.PUBLIC_USERS_TOGGLE)).to_have_count(0)
+
+
+# @pair users:index-mode-toggle
+# @pair users:table-row
+# @pair users:refresh
+# @pair reconnect-refresh:batched-request
+# @pair reconnect-refresh:root-fingerprint
+# @pair permissions:authorization
+# @template users/index.html::public_users_toggle
+def test_users_index_public_toggle_shows_public_users(get_user):
+    owner = get_user(Users.OWNER)
+    public_name = f"Public Toggle User {uuid4().hex}"
+    public_email = f"{uuid4().hex}@public-toggle.example"
+
+    try:
+        _set_public_users_allowed(True)
+        _create_public_user(public_email, public_name)
+
+        user_index = owner.go(SitePages.USER_INDEX)
+        table = Table(owner)
+        public_toggle = owner.locate(user_index.PUBLIC_USERS_TOGGLE_DESKTOP)
+
+        expect(public_toggle).to_be_visible()
+        expect(public_toggle).to_have_attribute("data-active", "false")
+        expect(table.get_row(public_name)).to_have_count(0)
+        expect(table.get_row(owner.name)).to_be_visible()
+
+        with owner.page.expect_response(_user_rows_response("public")):
+            public_toggle.click()
+
+        expect(owner.locate("[lp-view]")).to_have_attribute("data-user-mode", "public")
+        expect(owner.locate(user_index.TABLE_BODY)).to_have_attribute("loaded", "")
+        expect(public_toggle).to_have_attribute("data-active", "true")
+        expect(public_toggle).to_have_attribute("title", "Show regular users")
+        expect(table.get_row(public_name)).to_be_visible()
+        expect(table.get_row(owner.name)).to_have_count(0)
+
+        with owner.page.expect_response("**/refresh") as refresh_info:
+            owner.page.evaluate(
+                "document.querySelector('[lp-view]')._lp_view.refresh(true)"
+            )
+
+        refresh_payload = refresh_info.value.json()
+        fingerprint = owner.locate("[lp-view]").get_attribute("data-fingerprint")
+        assert fingerprint
+        assert refresh_payload == {"fingerprint": fingerprint, "targets": []}
+
+        expect(table.get_row(public_name)).to_be_visible()
+        expect(table.get_row(owner.name)).to_have_count(0)
+
+        with owner.page.expect_response(_user_rows_response("regular")):
+            public_toggle.click()
+
+        expect(owner.locate("[lp-view]")).to_have_attribute("data-user-mode", "regular")
+        expect(owner.locate(user_index.TABLE_BODY)).to_have_attribute("loaded", "")
+        expect(public_toggle).to_have_attribute("data-active", "false")
+        expect(public_toggle).to_have_attribute("title", "Show public users")
+        expect(table.get_row(public_name)).to_have_count(0)
+        expect(table.get_row(owner.name)).to_be_visible()
+    finally:
+        _set_public_users_allowed(False)
+
+
+def _create_user(user, create_form, definition):
+    with user.page.expect_response("**/create"):
+        SpinnerButtons.CREATE.click(create_form)
+    table = Table(user)
+    new_row = table.new_row(definition.name)
+    return new_row
+
+
+# @features users
+# @dimensions create-form create-submit created-row
+# @template users/index.html::tools_section
+# @template users/tools.html::create_user
+def test_create_user_from_index(get_user):
+    """
+    Create a user through the user index tools panel UI.
+
+    Opens the tools panel, fills name and email in the CreateUser
+    widget, submits, and verifies the user appears in the table.
+    """
+    owner = get_user(Users.OWNER)
+    suffix = uuid4().hex
+    created_user = SimpleNamespace(
+        name=f"User from Index {suffix}",
+        email=f"user-from-index-{suffix}@example.test",
+    )
+    user_index = owner.go(SitePages.USER_INDEX)
+    create_form = user_index.create_user_form
+
+    create_form.locator("label").filter(has_text="Name").locator(
+        "input[name='name']"
+    ).fill(created_user.name)
+    create_form.locator("label").filter(has_text="Email").locator(
+        "input[name='email']"
+    ).fill(created_user.email)
+
+    payload = create_form.evaluate(
+        "form => Object.fromEntries(new FormData(form).entries())"
+    )
+    assert payload["name"] == created_user.name
+    assert payload["email"] == created_user.email
+
+    new_row = _create_user(owner, create_form, created_user)
+
+    new_row.locator(Table.ENTITY_URL).click()
+    expect(owner.page).to_have_title(re.compile(created_user.name))
+
+
+# @features users
+# @dimensions create-form attach-existing-page page-form-preserved
+def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user):
+    """Assigning a user to an existing form-backed page keeps normal PageInfo."""
+    owner = get_user(Users.OWNER)
+    category = Categories.test_basic_inputs_submission.get(owner)
+    form = category.definition.form.get(owner)
+    user_index = owner.go(SitePages.USER_INDEX)
+    create_form = user_index.create_user_form
+
+    suffix = uuid4().hex
+    existing_page = Entities.PAGE.create(
+        {
+            "name": f"Attach Existing Page {suffix}",
+            "model": category.entity,
+            "form": form.entity,
+            "attributes": [],
+        }
+    )
+    existing_page.save()
+    created_user = SimpleNamespace(
+        name=f"Attached Page User {suffix}",
+        email=f"attached-page-user-{suffix}@example.test",
+    )
+
+    create_form.locator("label").filter(has_text="Name").locator(
+        "input[name='name']"
+    ).fill(created_user.name)
+    create_form.locator("label").filter(has_text="Email").locator(
+        "input[name='email']"
+    ).fill(created_user.email)
+    page_select = create_form.locator("label").filter(
+        has_text="Attach to Existing Page"
+    )
+    page_select = Select(page_select)
+    page_select.input.fill(existing_page.name)
+    page_select.select_by_key(existing_page.urlsafe_key)
+
+    new_row = _create_user(owner, create_form, created_user)
+    new_row.locator(Table.ENTITY_URL).click()
+
+    expect(owner.page).to_have_title(re.compile(existing_page.name))
+    assert existing_page.urlsafe_key in owner.page.url
+
+    info_tab = Tabs(owner).info
+    expect(info_tab).to_be_visible()
+    info_form = info_tab.locator(Page.INFO_FORM)
+    expect(info_form).to_be_visible()
+    expect(info_form.locator("input[name='input-textab12']")).to_be_visible()
+
+    settings_toggle = owner.locate(Page.USER_SETTINGS_TOGGLE).first
+    expect(settings_toggle).to_be_visible()
+    settings_toggle.click()
+    settings_panel = owner.locate(Page.USER_SETTINGS_FORM)
+    expect(settings_panel).to_be_visible()
+    expect(settings_panel.locator("input[name='name']")).to_have_value(
+        created_user.name
+    )
+    expect(settings_panel.locator("input[name='email']")).to_have_value(
+        created_user.email
+    )
+
+
+# @pairs users:delete users:default-cascade users:preserve-page
+# @pairs users:category-fallback users:options
+# @pairs pages:delete pages:default-cascade pages:preserve-page
+# @pair pages:category-fallback
+def test_delete_user_can_preserve_page(get_user):
+    owner = get_user(Users.OWNER)
+    suffix = uuid4().hex
+    cascade_user = Entities.USER.create(
+        {
+            "name": f"Cascade Page User {suffix}",
+            "email": f"cascade-page-user-{suffix}@example.test",
+            "test_user": True,
+        }
+    )
+    cascade_user.save()
+    cascade_user_key = cascade_user.key
+    cascade_page_key = cascade_user.page.key
+
+    created_user = Entities.USER.create(
+        {
+            "name": f"Preserve Page User {suffix}",
+            "email": f"preserve-page-user-{suffix}@example.test",
+            "test_user": True,
+        }
+    )
+    created_user.save()
+    user_key = created_user.key
+    page_key = created_user.page.key
+
+    try:
+        owner.go(SitePages.USER_INDEX)
+        cascade_row = Table(owner).get_row(cascade_user.name)
+        expect(cascade_row).to_be_visible()
+
+        cascade_row.locator("td[data-column='delete'] button[lp-delete]").click()
+        cascade_modal = Modal(owner.page)
+        cascade_delete_page = cascade_modal.element.locator(
+            "input[name='delete-page']"
+        )
+        expect(cascade_delete_page).to_be_visible()
+        expect(cascade_delete_page).to_be_checked()
+
+        with owner.page.expect_response("**/users/*/delete") as response_info:
+            cascade_modal.delete()
+
+        assert response_info.value.request.post_data_json == {"delete-page": True}
+        assert Entities.fetch_one(cascade_user_key, request=Fetch.root()) is None
+        assert Entities.fetch_one(cascade_page_key, request=Fetch.root()) is None
+
+        row = Table(owner).get_row(created_user.name)
+        expect(row).to_be_visible()
+
+        row.locator("td[data-column='delete'] button[lp-delete]").click()
+        modal = Modal(owner.page)
+        delete_page = modal.element.locator("input[name='delete-page']")
+        expect(delete_page).to_be_visible()
+        expect(delete_page).to_be_checked()
+        delete_page.uncheck()
+
+        with owner.page.expect_response("**/users/*/delete") as response_info:
+            modal.delete()
+
+        assert response_info.value.request.post_data_json == {"delete-page": False}
+        assert Entities.fetch_one(user_key, request=Fetch.root()) is None
+
+        preserved_page = Entities.fetch_one(page_key, request=Fetch.direct())
+        assert preserved_page is not None
+        assert preserved_page.user is None
+        assert preserved_page.model.name == "Uncategorized Pages"
+    finally:
+        cascade_page = Entities.fetch_one(cascade_page_key, request=Fetch.direct())
+        if cascade_page:
+            Entities.delete(cascade_page)
+        preserved_page = Entities.fetch_one(page_key, request=Fetch.direct())
+        if preserved_page:
+            Entities.delete(preserved_page)

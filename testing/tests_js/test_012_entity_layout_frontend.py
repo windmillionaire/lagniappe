@@ -1,0 +1,258 @@
+"""Node-backed checks for frontend entity layout reconciliation."""
+
+import textwrap
+
+def run_entity_layout_check(run_node, assertion: str):
+    script = f"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const events = [];
+const storage = new Map();
+
+class FakeClassList {{
+  constructor() {{
+    this.values = new Set();
+  }}
+
+  add(...values) {{
+    values.forEach((value) => this.values.add(value));
+  }}
+
+  remove(...values) {{
+    values.forEach((value) => this.values.delete(value));
+  }}
+
+  contains(value) {{
+    return this.values.has(value);
+  }}
+
+  toggle(value, force) {{
+    if (force) {{
+      this.add(value);
+    }} else {{
+      this.remove(value);
+    }}
+  }}
+}}
+
+class FakeElement {{
+  constructor(id, dataset = {{}}) {{
+    this.id = id;
+    this.dataset = {{ ...dataset }};
+    this.children = [];
+    this.parentElement = null;
+    this.classList = new FakeClassList();
+  }}
+
+  addEventListener() {{}}
+
+  appendChild(child) {{
+    child.parentElement = this;
+    this.children.push(child);
+    return child;
+  }}
+
+  prepend(child) {{
+    child.parentElement = this;
+    this.children.unshift(child);
+    return child;
+  }}
+
+  contains(element) {{
+    if (element === this) return true;
+    return this.children.some((child) => child.contains(element));
+  }}
+
+  querySelector() {{
+    return null;
+  }}
+
+  querySelectorAll() {{
+    return [];
+  }}
+}}
+
+const root = new FakeElement("root");
+const layout = new FakeElement("layout");
+const tabsElement = new FakeElement("tabs");
+const desktopNav = new FakeElement("desktop-nav");
+const mobileNav = new FakeElement("mobile-nav");
+const infoElement = new FakeElement("info", {{ tab: "true" }});
+
+tabsElement.navElement = desktopNav;
+tabsElement.appendChild(infoElement);
+root.appendChild(layout);
+root.appendChild(tabsElement);
+root.appendChild(mobileNav);
+
+const byId = new Map([
+  [root.id, root],
+  [layout.id, layout],
+  [tabsElement.id, tabsElement],
+  [desktopNav.id, desktopNav],
+  [mobileNav.id, mobileNav],
+  [infoElement.id, infoElement],
+]);
+
+root.querySelector = (selector) => {{
+  if (selector === "#tabs") return tabsElement;
+  if (selector === "#layout") return layout;
+  if (selector === "[lp-nav][data-nav='mobile']") return mobileNav;
+  return null;
+}};
+
+root.querySelectorAll = (selector) => {{
+  if (selector === "[lp-component][data-tab='true']") return [infoElement];
+  return [];
+}};
+
+tabsElement.querySelectorAll = (selector) => {{
+  if (selector === "[lp-component][data-tab='true']") return [infoElement];
+  return [];
+}};
+
+class NavElement {{
+  constructor(component, element) {{
+    this.component = component;
+    this.element = element;
+  }}
+}}
+
+const debounce = (func) => func;
+const withTransition = async (callback) => await callback();
+
+class FakeComponent {{
+  constructor(element, view) {{
+    this.elt = element;
+    this.view = view;
+    this.name = element.id;
+    this.widgets = {{}};
+    this._nav = null;
+    this.reconcile = null;
+  }}
+
+  get nav() {{
+    if (this._nav) return this._nav;
+    if (this.elt.navElement) {{
+      this._nav = {{ element: this.elt.navElement }};
+    }}
+    return this._nav;
+  }}
+
+  set nav(value) {{
+    this._nav = value;
+  }}
+
+  async activate(show) {{
+    events.push(`${{this.name}}:activate:${{show}}`);
+  }}
+
+  async render(visible) {{
+    events.push(`${{this.name}}:render:${{visible}}`);
+    if (this.name === "info" && !this.view._nestedLayoutStarted) {{
+      this.view._nestedLayoutStarted = true;
+      await this.view._renderLayoutBody();
+      events.push("outer-render-resumed");
+    }}
+  }}
+}}
+
+class Core {{
+  constructor(node) {{
+    this.elt = node;
+    this.components = {{}};
+    this.hash = "entity-layout-test";
+    this.kind = "page";
+    this.mobile = false;
+    this.readonly = false;
+  }}
+
+  async init() {{}}
+
+  getComponent(element) {{
+    if (!element) throw new Error("Missing component element");
+    if (!this.components[element.id]) {{
+      this.components[element.id] = new FakeComponent(element, this);
+    }}
+    return this.components[element.id];
+  }}
+
+  queryParam() {{
+    return null;
+  }}
+
+  querySlug(value) {{
+    return value;
+  }}
+}}
+
+const context = {{
+  console,
+  Core,
+  CustomEvent: class CustomEvent {{}},
+  debounce,
+  document: {{
+    getElementById: (id) => byId.get(id) || null,
+  }},
+  Element: FakeElement,
+  events,
+  localStorage: {{
+    getItem: (key) => storage.get(key) || null,
+    setItem: (key, value) => storage.set(key, value),
+  }},
+  NavElement,
+  withTransition,
+}};
+
+vm.createContext(context);
+let source = fs.readFileSync("src/script/views/base/entity.mjs", "utf8");
+source = source.replace('import {{ NavElement }} from "../../elements/nav";\\n', "");
+source = source.replace('import {{ debounce, withTransition }} from "../../shared";\\n', "");
+source = source.replace('import Core from "./core";\\n', "");
+source = source.replace(
+  "export default class Entity extends Core",
+  "class Entity extends Core",
+);
+source += "\\nglobalThis.Entity = Entity;";
+vm.runInContext(source, context);
+
+(async () => {{
+{textwrap.indent(assertion, "  ")}
+}})().catch((error) => {{
+  console.error(error);
+  process.exit(1);
+}});
+"""
+
+    run_node(script)
+
+
+# @features entity-layout
+# @dimensions nested-layout reconcile-callback
+def test_entity_layout_ignores_already_consumed_reconcile_callback(run_node):
+    run_entity_layout_check(
+        run_node,
+        """
+const view = new context.Entity(root);
+await view._renderLayoutBody();
+
+const renders = events.filter((event) => event === "info:render:true").length;
+if (renders !== 2) {
+  throw new Error(`Expected nested and outer tab renders, got ${renders}`);
+}
+
+if (!events.includes("outer-render-resumed")) {
+  throw new Error(`Expected outer render to resume: ${events.join(",")}`);
+}
+
+if (layout.dataset.visible !== "true") {
+  throw new Error("Expected layout to be visible after render");
+}
+
+const tabs = view.getComponent(tabsElement);
+if (tabs.reconcile !== null) {
+  throw new Error("Expected nested layout to consume the tabs callback");
+}
+""",
+    )

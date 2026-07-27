@@ -1,0 +1,37 @@
+{
+	"test_user_index": {
+		"entities": [
+			[
+				"USER",
+				{
+					"name": "User With Groups",
+					"hash": "user001",
+					"email": "user1@example.com",
+					"page": { "name": "User With Groups", "hash": "user001" },
+					"groups": [
+						{ "name": "Editors", "hash": "grp001" },
+						{ "name": "Viewers", "hash": "grp002" }
+					]
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User No Groups",
+					"hash": "user002",
+					"email": "user2@example.com",
+					"page": { "name": "User No Groups", "hash": "user002" }
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "Another User",
+					"hash": "user003",
+					"email": "user3@example.com",
+					"page": { "name": "Another User", "hash": "user003" }
+				}
+			]
+		]
+	}
+}

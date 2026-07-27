@@ -1,0 +1,46 @@
+{% macro list() %}
+  <ul data-widget="DirectoryList"
+      data-visible="false"
+      class="{{ styles.home.card.list }}">
+    {% if Resource.TASKS.allowed(Action.RESTRICTED) %}
+      <li lp-link data-kind="task" class="{{ styles.home.card.directory }}">
+        {{ render_icon("tasks", (styles.icon.default)) }}
+        <a href='{{ url_for("tasks.task_index") }}'
+           class="{{ styles.link.title }}"
+           data-role="title">Active Tasks</a>
+      </li>
+    {% endif %}
+    {% if Resource.FORMS.allowed(Action.VIEW) %}
+      <li lp-link data-kind="form" class="{{ styles.home.card.directory }}">
+        {{ render_icon("form", (styles.icon.default)) }}
+        <a href='{{ url_for("forms.form_index") }}'
+           class="{{ styles.link.title }}"
+           data-role="title">Forms</a>
+      </li>
+    {% endif %}
+    {% if Resource.USERS.allowed(Action.RESTRICTED) %}
+      <li lp-link data-kind="user" class="{{ styles.home.card.directory }}">
+        {{ render_icon("group", (styles.icon.default)) }}
+        <a href='{{ url_for("users.user_index") }}'
+           class="{{ styles.link.title }}"
+           data-role="title">Users</a>
+      </li>
+    {% endif %}
+    {% if (CONFIG.ANALYTICS or CONFIG.AI_OBSERVABILITY) and Resource.SITE.allowed(Action.EDIT) %}
+      <li lp-link data-kind="page" class="{{ styles.home.card.directory }}">
+        {{ render_icon("analytics", (styles.icon.default)) }}
+        <a href='{{ url_for("analytics.index") }}'
+           class="{{ styles.link.title }}"
+           data-role="title">Analytics</a>
+      </li>
+    {% endif %}
+    {% if Resource.SITE.allowed(Action.EDIT) %}
+      <li lp-link data-kind="default" class="{{ styles.home.card.directory }}">
+        {{ render_icon("siteSettings", (styles.icon.default)) }}
+        <a href='{{ url_for("home.admin") }}'
+           class="{{ styles.link.title }}"
+           data-role="title">Admin</a>
+      </li>
+    {% endif %}
+  </ul>
+{% endmacro %}

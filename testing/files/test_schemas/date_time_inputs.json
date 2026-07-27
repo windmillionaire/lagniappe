@@ -1,0 +1,14 @@
+[
+	{
+		"id": "input-dateab12",
+		"type": "input",
+		"input": "date",
+		"title": "Date Field"
+	},
+	{
+		"id": "input-timecd34",
+		"type": "input",
+		"input": "time",
+		"title": "Time Field"
+	}
+]

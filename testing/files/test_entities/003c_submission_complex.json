@@ -1,0 +1,62 @@
+{
+	"test_submission_status": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Status - checkbox triggered",
+					"hash": "task001",
+					"page": { "name": "Parent Page", "hash": "page001" },
+					"form": {
+						"name": "Form",
+						"hash": "form001",
+						"schema": "status_only"
+					},
+					"form_submission": { "checkbox-trigger": "on" },
+					"expected": {
+						"checkbox-trigger": {
+							"value": true,
+							"form_value": true,
+							"filter_value": true,
+							"ai_value": "True"
+						},
+						"status-ab12": {
+							"value": ["Completed"],
+							"form_value": null,
+							"column_value": ["Completed"],
+							"ai_value": ["Completed"]
+						}
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Status - checkbox not triggered",
+					"hash": "task002",
+					"page": { "name": "Parent Page", "hash": "page002" },
+					"form": {
+						"name": "Form",
+						"hash": "form002",
+						"schema": "status_only"
+					},
+					"form_submission": {},
+					"expected": {
+						"checkbox-trigger": {
+							"value": false,
+							"form_value": false,
+							"filter_value": false,
+							"ai_value": "False"
+						},
+						"status-ab12": {
+							"value": [],
+							"form_value": null,
+							"column_value": [],
+							"ai_value": []
+						}
+					}
+				}
+			]
+		]
+	}
+}

@@ -1,0 +1,15 @@
+{% extends "layouts/delete.html" %}
+
+{% block name -%}
+  Delete AI Report
+{%- endblock name %}
+
+{% block description -%}
+  <p class="text-delete-default text-sm">
+    Are you sure you want to delete this report? Report-only uploaded files will be deleted too.
+  </p>
+{%- endblock description %}
+
+{% block button -%}
+  {{ delete_action(url_for('tools.delete_report', key=entity.urlsafe_key), "Delete " ~ entity.name) }}
+{%- endblock button %}

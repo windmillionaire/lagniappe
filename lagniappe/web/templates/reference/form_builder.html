@@ -1,0 +1,42 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Form Builder") %}
+  <section>
+    {{ subheading("What the Builder Does") }}
+    <p class="text-sm text-base-dark">
+      The form builder lets you design the fields, layout, and behavior of a page or task form. Use the side panels to add components, configure the selected component, preview the result, and save changes.
+    </p>
+    {% call callout("tip") %}
+      Build the form around the questions users actually need to answer. Short, clear forms are easier to fill and easier to filter later.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Builder Areas") }}
+    <div class="space-y-3">
+      {% call feature("Components", icon="form", kind="form") %}
+        Drag fields from the component list into the form.
+      {% endcall %}
+      {% call feature("Form Area", icon="builder.saved", kind="page") %}
+        Arrange fields in the order users should complete them.
+      {% endcall %}
+      {% call feature("Settings", icon="settings.page", kind="form") %}
+        Click a field to adjust its label, options, required state, and visibility rules.
+      {% endcall %}
+      {% call feature("Preview", icon="public", kind="project") %}
+        Toggle preview to check how the form will feel before saving.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Quick Flow") }}
+    {% call step(1, "Add fields") %}
+      <p class="text-sm text-base-medium">Drag components into the form area or generate a draft from a description.</p>
+    {% endcall %}
+    {% call step(2, "Configure fields") %}
+      <p class="text-sm text-base-medium">Select each field and set labels, choices, and rules.</p>
+    {% endcall %}
+    {% call step(3, "Preview and save") %}
+      <p class="text-sm text-base-medium">Preview the form, make adjustments, then save when it is ready.</p>
+    {% endcall %}
+  </section>
+{% endcall %}

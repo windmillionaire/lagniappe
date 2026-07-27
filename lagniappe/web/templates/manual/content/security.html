@@ -1,0 +1,262 @@
+{% from "manual/macros.html" import heading, subheading, card, callout, concept, link, nav_buttons %}
+<div class="space-y-6">
+  {% call card() %}
+    <p class="text-base-medium text-lg leading-relaxed mb-3">
+      Lagniappe is designed to be installed as your own App Engine application,
+      using your own Google Cloud project and Redis Cloud database. The most
+      important security boundary is simple: the browser is a client, and the
+      server is the authority.
+    </p>
+    <p class="text-base-medium">
+      A Lagniappe install does not depend on a centralized Lagniappe SaaS
+      control plane. Your records, files, cache data, billing, IAM policy, and
+      provider accounts live with the services you configure for your instance.
+    </p>
+  {% endcall %}
+  {{ heading("Security Model") }}
+  {% call card() %}
+    <div class="grid md:grid-cols-2 gap-4">
+      {% call concept("Server-Enforced Access", icon="security", kind="user") %}
+        Routes load entities on the server, check authentication and
+        permissions, and render only the HTML or data the user may receive.
+        Frontend code can hide controls for usability, but it is not the
+        permission source of truth.
+      {% endcall %}
+      {% call concept("Provider-Owned Data", icon="installation", kind="task") %}
+        Datastore, Cloud Storage, App Engine, Firebase, Cloud Tasks, and
+        optional AI services are in the operator's Google Cloud project. Redis
+        data lives in the Redis Cloud subscription selected during setup.
+      {% endcall %}
+    </div>
+    {% call callout("success", False) %}
+      Going directly to Google Cloud removes one extra hosted application layer:
+      there is no Lagniappe-hosted admin dashboard, tenant database, or licensing
+      service that can inspect or mediate your instance. Google Cloud and Redis
+      Cloud are still service providers, so their own account, IAM, billing,
+      support, and security settings matter.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("Client and Server Split") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Lagniappe uses server-rendered pages with JavaScript widgets layered on
+      top. That shape is useful for security because private records are not
+      shipped to the browser for the frontend to sort out later. The access
+      decision is made once, on the server, before content is sent. Since the
+      browser is never handed data it is not allowed to see, there is no
+      client-side permission logic that can be bypassed or drift out of sync
+      with the server.
+    </p>
+    <ul class="text-base-medium space-y-2">
+      <li>
+        <strong>Permission checks happen before rendering.</strong> Protected routes verify the current user and requested action before returning content.
+      </li>
+      <li>
+        <strong>Search and filters respect access.</strong> Restricted items are left out of rendered pages, search results, filter results, and direct route responses.
+      </li>
+      <li>
+        <strong>Mutations go through server routes.</strong> Forms, uploads, task changes, permissions, and settings changes use backend routes protected by CSRF and permission checks.
+      </li>
+      <li>
+        <strong>Cached pages still have server fingerprints.</strong> ETag values and service-worker invalidation headers help clients refresh stale private views after changes.
+      </li>
+    </ul>
+  {% endcall %}
+  {{ heading("App Protections") }}
+  {% call card() %}
+    <div class="grid md:grid-cols-2 gap-6">
+      <div>
+        {{ subheading("HTTP and Browser Policy") }}
+        <ul class="text-base-medium space-y-2">
+          <li>
+            <strong>Login cookies are configured defensively.</strong> They are set up to travel over HTTPS, resist ordinary JavaScript access, and avoid being sent too broadly in cross-site requests. The exact settings can be found in the Flask app configuration; MDN's {{ link("https://developer.mozilla.org/en-US/docs/Web/Security/Practical_implementation_guides/Cookies", "secure cookie guide") }} explains the browser terms.
+          </li>
+          <li>
+            <strong>Form-changing requests include anti-forgery protection.</strong> This helps prevent a malicious site from tricking a signed-in user's browser into submitting actions they did not intend. MDN has a plain overview of {{ link("https://developer.mozilla.org/en-US/docs/Web/Security/Attacks/CSRF", "CSRF attacks") }}.
+          </li>
+          <li>
+            <strong>Responses include browser security headers.</strong> Lagniappe sends HTTPS-only guidance through HSTS, framing and content-type protections, referrer limits, cache rules, and a Content Security Policy.
+          </li>
+          <li>
+            <strong>The Content Security Policy keeps the browser on a short leash.</strong> By default, resources come from this instance, with explicit allowances for the Google, Sentry, and YouTube no-cookie endpoints the app uses. Because the frontend is first-party JavaScript served from this instance rather than a large third-party framework bundle, that policy can stay narrow. MDN's {{ link("https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP", "CSP guide") }} is a good technical reference.
+          </li>
+        </ul>
+      </div>
+      <div>
+        {{ subheading("Auth and Internal Work") }}
+        <ul class="text-base-medium space-y-2">
+          <li>Identity Platform login tokens are checked for the exact project, issuer, and user before they become a Lagniappe session.</li>
+          <li>Google sign-in checks its anti-forgery token during the login flow.</li>
+          <li>
+            Background jobs from Cloud Tasks must present a Google-signed identity token for the expected service account before process routes run.
+          </li>
+          <li>Login routes slow down repeated attempts and validate redirect targets before sending a user onward.</li>
+        </ul>
+      </div>
+    </div>
+  {% endcall %}
+  {{ heading("Google Cloud Boundary") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      In the default production shape, Lagniappe runs on
+      {{ link("https://docs.cloud.google.com/appengine/docs/standard/overview", "App Engine standard environment") }}.
+      App Engine is a managed Google Cloud runtime: Google runs the underlying
+      infrastructure, starts and stops application instances, and isolates apps
+      in the standard-environment sandbox. App Engine terminates HTTPS for app
+      traffic, and the default Lagniappe configuration sends HSTS so browsers
+      remember to use HTTPS for future requests. MDN's
+      {{ link("https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Strict-Transport-Security", "HSTS reference") }}
+      explains the browser side of that header.
+    </p>
+    <p class="text-base-medium mb-3">
+      Google Cloud provides default encryption at rest for customer content and
+      protects traffic moving within its infrastructure. Those provider
+      controls reduce the infrastructure you have to operate yourself, but they
+      do not replace your responsibilities: keep Google accounts protected, use
+      least-privilege IAM, prefer Application Default Credentials and
+      short-lived impersonation over service account keys, set budget alerts,
+      and monitor who has access to the project.
+    </p>
+    <div class="grid md:grid-cols-2 gap-4">
+      {% call concept("Datastore", icon="sitemap", kind="page") %}
+        Firestore in Datastore mode is the fully managed NoSQL database
+        Lagniappe uses for entities and metadata. It is built for high
+        availability, access is controlled through Google Cloud IAM, and stored
+        data is encrypted at rest.
+        References: {{ link("https://docs.cloud.google.com/datastore/docs/concepts/overview", "Datastore overview") }}
+        and {{ link("https://docs.cloud.google.com/datastore/docs/access/iam", "Datastore IAM") }}.
+      {% endcall %}
+      {% call concept("Cloud Storage", icon="installation", kind="file") %}
+        Cloud Storage is the object store for uploaded files and generated
+        assets. Objects are encrypted server-side before they are written to
+        disk and decrypted for authorized reads; access is controlled through
+        IAM and bucket policies.
+        References: {{ link("https://docs.cloud.google.com/storage/docs/encryption/default-keys", "Cloud Storage encryption") }}
+        and {{ link("https://docs.cloud.google.com/storage/docs/access-control/iam", "Cloud Storage IAM") }}.
+      {% endcall %}
+    </div>
+  {% endcall %}
+  {{ heading("Redis Cloud Boundary") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Lagniappe uses Redis for search indexes, filters, cache entries, rate
+      limits, active viewer state, and collaboration/sync state. Redis should be
+      treated as operational application data: it is not the long-term source of
+      truth, but it can still contain meaningful names, keys, search text,
+      session-adjacent state, and workflow context.
+    </p>
+    <p class="text-base-medium mb-3">
+      Redis Cloud is a hosted Redis service, but security is still shared
+      responsibility. Redis operates the Redis Cloud software and platform, the
+      selected cloud provider handles the underlying infrastructure, and the
+      operator controls the plan, region, database security settings,
+      credentials, connectivity, and what data is stored.
+      Reference: {{ link("https://redis.io/docs/latest/operate/rc/security/shared-responsibility-model/", "Redis Cloud shared responsibility") }}.
+    </p>
+    <p class="text-base-medium mb-3">
+      Think of Redis TLS as HTTPS for the server-to-server connection between
+      Lagniappe and Redis Cloud. The Redis password is still required to
+      authenticate the application. TLS adds another layer around that
+      password-authenticated connection: it encrypts the traffic in transit
+      and verifies that Lagniappe is talking to the expected Redis Cloud
+      server. The password controls who may connect; TLS protects the
+      connection carrying that password and the application data.
+    </p>
+    <ul class="text-base-medium space-y-2">
+      <li>
+        <strong>At rest:</strong> Redis Cloud supports encryption at rest for deployments, including databases hosted on Google Cloud.
+      </li>
+      <li>
+        <strong>In transit:</strong> Redis Cloud TLS encrypts application-to-database traffic when enabled. Paid Essentials/Flex and Pro plans can enable database TLS, but Free Essentials plans cannot. Lagniappe supports verified server TLS through its guided security setup.
+      </li>
+      <li>
+        <strong>Network exposure:</strong> Redis Cloud can use CIDR allow lists on supported plans, block public endpoints on Pro plans, and connect privately to Google Cloud through Private Service Connect. CIDR allow-list automation may be added later if there is demand, but it requires a stable App Engine outbound IP path through Google Cloud networking.
+      </li>
+      <li>
+        <strong>Current app boundary:</strong> Lagniappe connects to Redis from the server side on App Engine. That keeps Redis credentials out of the browser, but App Engine alone does not automatically make a Redis public endpoint private or encrypted in transit.
+      </li>
+    </ul>
+    {% call callout("tip", False) %}
+      Run <code>./setup.sh security</code>, or
+      <code>.\setup.cmd security</code> in Windows PowerShell, to enable, refresh, or
+      disable Redis TLS. Download the Redis Cloud certificate ZIP archive,
+      unzip it, and place the extracted <code>redis_ca.pem</code> at
+      <code>config/files/redis_ca.pem</code>. Setup verifies the server
+      certificate and hostname, tests the new connection mode, and offers to
+      redeploy. Mutual TLS client certificates are not currently supported, so
+      leave that Redis Cloud option unchecked. CIDR allow lists and Private
+      Service Connect remain advanced, operator-owned paths.
+    {% endcall %}
+    <p class="text-base-medium text-sm mt-3">
+      Redis references:
+      {{ link("https://redis.io/docs/latest/operate/rc/security/encryption-at-rest/", "encryption at rest") }},
+      {{ link("https://redis.io/docs/latest/operate/rc/security/database-security/tls-ssl/", "TLS") }},
+      {{ link("https://redis.io/docs/latest/operate/rc/security/database-security/block-public-endpoints/", "public endpoint blocking") }},
+      {{ link("https://redis.io/docs/latest/operate/rc/security/cidr-whitelist/", "CIDR allow lists") }},
+      and {{ link("https://redis.io/docs/latest/operate/rc/security/private-service-connect/", "Private Service Connect") }}.
+    </p>
+  {% endcall %}
+  {{ heading("Optional Data Flows") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li>
+        <strong>Error reporting:</strong> Disabled unless the operator enables
+        it during setup. The operator can send privacy-reduced reports to the
+        maintainer or, after declining that destination, supply a DSN for
+        their own Sentry project. When enabled, Lagniappe disables backend
+        Sentry default PII collection, but may still attach diagnostic request
+        or error context such as URL, endpoint, headers, form fields, JSON
+        payloads, or file metadata. Read the
+        {{ link(url_for("home.reporting_privacy"), "maintainer error-reporting privacy notice") }}
+        before enabling the default destination.
+      </li>
+      <li>
+        <strong>Analytics:</strong> Optional owner-facing analytics can record page path, title, view type, referrer, navigation type, and user identifiers for authenticated visits.
+      </li>
+      <li>
+        <strong>AI generation observability:</strong> Setup explicitly offers
+        the default-off <code>AI_OBSERVABILITY</code> choice. When enabled, it
+        samples every text generation into an owner-only summary dataset.
+        Records exclude prompts, generated text, tool arguments/results,
+        messages, file content, and application identifiers; activity-driven
+        cleanup deletes up to 500 records older than 30 days after each new
+        summary, so stale records can remain when generation is inactive.
+        SDK-internal retries are not visible.
+      </li>
+      <li>
+        <strong>AI and OCR:</strong> Vertex AI and Document AI receive the prompts, documents, images, or extracted context needed for the feature the user invokes.
+      </li>
+      <li>
+        <strong>Browser storage:</strong> The service worker caches app responses for responsiveness and offline behavior. The app can ask clients to clear cached Lagniappe responses after permission or content changes.
+      </li>
+    </ul>
+    {% call callout("warning", False) %}
+      Optional integrations are part of the instance operator's risk decision.
+      If a field may contain sensitive information, assume it can appear in
+      provider logs or diagnostics when a feature sends that field to a
+      provider.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("Owner Checklist") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li>Use strong Google account protection and keep at least one recovery path for the Cloud project.</li>
+      <li>
+        Keep IAM narrow: only trusted operators should have broad project, App Engine, Datastore, Storage, service-account, billing, or Firebase access.
+      </li>
+      <li>Protect local settings files and service account credentials; do not commit secrets to a public repository.</li>
+      <li>Set Google Cloud budget alerts and review provider access after staff or role changes.</li>
+      <li>Review public pages, public files, public permissions, and group memberships from a non-owner account.</li>
+      <li>
+        Decide whether optional analytics, AI generation observability, AI/OCR, and error reporting match your privacy expectations before enabling them.
+      </li>
+      <li>
+        For Redis, choose the strongest connectivity controls your plan supports and treat cache/search data as sensitive operational data.
+      </li>
+    </ul>
+  {% endcall %}
+  {{ nav_buttons(
+  prev={"key": "installation", "name": "Installation", "kind": "task"},
+  next={"key": "personalization", "name": "Personalization", "kind": "project"}
+  ) }}
+</div>

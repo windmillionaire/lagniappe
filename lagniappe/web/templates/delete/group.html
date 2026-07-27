@@ -1,0 +1,16 @@
+{% extends "layouts/delete.html" %}
+
+{% block name -%}
+  Delete Group
+{%- endblock name %}
+
+{% block description -%}
+  <p class="text-delete-default text-sm">
+    Are you sure you want to delete this group? This will reset the permissions
+    for all users assigned to this group.
+  </p>
+{%- endblock description %}
+
+{% block button -%}
+  {{ delete_action(url_for('users.delete_group', key=entity.urlsafe_key), "Delete " ~ entity.name ~ " Group") }}
+{%- endblock button %}

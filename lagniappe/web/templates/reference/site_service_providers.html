@@ -1,0 +1,19 @@
+{% from "manual/macros.html" import callout %}
+{% from "reference/macros.html" import modal %}
+{% call modal("Service Provider Links") %}
+  <p class="text-sm text-base-dark">
+    These links are shortcuts to the outside services that keep Lagniappe running. They do not change anything inside Lagniappe by themselves; they take you to the provider dashboard where the underlying cloud resource lives.
+  </p>
+  {% call callout("tip") %}
+    Use these when you need to check service health, look at billing, inspect App Engine logs, manage Identity Platform sign-in, review storage uploads, or troubleshoot provider-side configuration.
+  {% endcall %}
+  <p class="text-sm text-base-dark">
+    Some provider changes are immediate, such as viewing logs or checking billing. Others may need a setup or deployment step before Lagniappe can use them.
+  </p>
+  {% call callout("warning") %}
+    Be careful with deletion, key rotation, IAM permissions, and billing settings in provider dashboards. Those changes can break login, uploads, OCR, DNS, or deployments even though they happen outside this app.
+  {% endcall %}
+  <p class="text-sm text-base-dark">
+    If you are not sure where to start, App Engine is usually the place for deploy and runtime issues, Identity Platform is the place for sign-in issues, Cloud Storage is the place for uploaded files, and Billing is the place for usage or cost questions.
+  </p>
+{% endcall %}

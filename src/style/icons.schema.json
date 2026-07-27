@@ -1,0 +1,7 @@
+{
+	"schema_version": 2,
+	"id_segment_pattern": "^[a-z][A-Za-z0-9]*$",
+	"glyph_pattern": "^[a-z][a-z0-9_]*$",
+	"record_fields": ["glyph", "fill", "weight", "spin"],
+	"weights": [300, 400, 500, 600]
+}

@@ -1,0 +1,35 @@
+{% from "manual/macros.html" import subheading, callout %}
+{% from "reference/macros.html" import modal, detail %}
+{% call modal("Public Permissions") %}
+  <section>
+    {{ subheading("What This Panel Controls") }}
+    <p class="text-sm text-base-dark">
+      Public Permissions control what signed-in people can access before they have been created as regular users or assigned to a user group. It is a site-owner tool for limited, default access.
+    </p>
+    {% call callout("warning") %}
+      Changes here affect every public user. Keep this access narrow unless the site is intentionally open to a broader audience.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("How Public Access Works") }}
+    <div class="space-y-3">
+      {% call detail("Before a user is managed", kind="user") %}
+        A public user can log in, but they are excluded from the default user index and do not inherit normal user-group permissions. When public access is enabled, use the public-users toggle on the user index to review them separately.
+      {% endcall %}
+      {% call detail("Limited permissions only", kind="page") %}
+        Public access is best for specific categories, projects, or pages that new visitors need to see. It is not meant for broad administrative access.
+      {% endcall %}
+      {% call detail("Promotion to regular user", kind="project") %}
+        Once someone is added to a normal user group, their access is controlled by that user and group setup instead of the public group.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Best Practices") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Grant only view access unless public users truly need to contribute.</li>
+      <li>Avoid global permissions for public users.</li>
+      <li>Review this panel after changing onboarding, public documents, or sign-in settings.</li>
+    </ul>
+  </section>
+{% endcall %}

@@ -1,0 +1,95 @@
+{% import 'controls.html' as controls %}
+{% from 'common.html' import generate, explain_prompt, attribute_button %}
+
+{% macro create(attributes) %}
+  <form lp-create
+        data-widget="CreateCategory"
+        data-mode="manual"
+        data-route="{{ url_for('categories.create') }}"
+        data-destination="categories:HomeCategoryList"
+        data-visible="false"
+        class="{{ styles.home.form }}">
+    <div data-role="header" class="{{ styles.form.header.container }}">
+      <h2 class="{{ styles.form.header.title }}" data-role="title">New Category</h2>
+      <div class="{{ styles.form.header.controls }}" data-role="controls">
+        {{ controls.help("create_category") }}
+        {{ controls.close("categories") }}
+      </div>
+    </div>
+    {{ generate('category') }}
+    <div data-role="attributes"
+         data-entity="category"
+         class="group-data-[mode=ai]/form:hidden">
+      <h3 class="{{ styles.label.sectionHeading }}">Page Features</h3>
+      <div class="{{ styles.attributes.container }}">
+        {% for attribute in attributes %}{{ attribute_button(attribute) }}{% endfor %}
+      </div>
+    </div>
+    {% if Resource.FORMS.allowed(Action.VIEW) %}
+      <div data-role="form-select"
+           class="{{ styles.select.container }} group-data-[mode=ai]/form:hidden">
+        <h3 class="{{ styles.label.sectionHeading }}">Default Form</h3>
+        <button lp-select
+                type="button"
+                data-action="select-form"
+                data-placeholder="attach a form..."
+                data-index="form"
+                data-creatable="true"
+                data-title="Attach Form"
+                data-form-type="page"
+                data-kind="form"
+                class="{{ styles.select.button }}"></button>
+      </div>
+    {% endif %}
+    <div class="flex flex-col gap-2 -mt-2" data-role="submit-group">
+      {{ explain_prompt('generate') }}
+      <button type="submit" class="{{ styles.button.submit }} mt-2"></button>
+    </div>
+  </form>
+{% endmacro %}
+
+{% macro list(categories) %}
+  <ul data-widget="HomeCategoryList"
+      data-route='{{ url_for("home.get", kind="categories") }}'
+      data-visible="false"
+      data-if-empty="{{ 'CreateCategory' if Resource.CATEGORY.allowed(Action.CREATE) else '' }}"
+      class="{{ styles.home.card.list }}">
+    {% for c in categories.list %}{{ category(c) }}{% endfor %}
+    {% if categories.cursor or categories.back %}
+      <div class="{{ styles.home.pagination.container }}">
+        {% if categories.back %}
+          <button class="{{ styles.home.pagination.button }} bg-category-bg/50"
+                  lp-control="previous"
+                  data-route='{{ url_for("home.get", kind="categories", cursor=None) }}'>
+            {{ render_icon("start") }}
+          </button>
+        {% endif %}
+        {% if categories.cursor %}
+          <button class="{{ styles.home.pagination.button }} bg-category-bg/50"
+                  lp-control="next"
+                  data-route='{{ url_for("home.get", kind="categories", cursor=categories.cursor) }}'>
+            {{ render_icon("next") }}
+          </button>
+        {% endif %}
+      </div>
+    {% endif %}
+  </ul>
+{% endmacro %}
+
+{% macro category(c) %}
+  <li lp-entity
+      lp-link
+      {% if c.ai_generated %}ai-generated{% endif %}
+      data-key="{{ c.urlsafe_key }}"
+      data-fingerprint="{{ c.fingerprint }}"
+      class="group/item cursor-pointer">
+    <div class="{{ styles.home.card.item }}" data-role="header">
+      <a class="{{ styles.link.title }}"
+         data-role="title"
+         href="{{ url_for('categories.index', key=c.urlsafe_key) }}">{{- c.name -}}</a>
+      <div class="{{ styles.home.card.actions }}">
+        {{ controls.star(is_starred(c)) }}
+      </div>
+    </div>
+  </li>
+{% endmacro %}

@@ -1,0 +1,75 @@
+{% from "manual/macros.html" import heading, subheading, card, callout, concept, nav_buttons %}
+<div class="space-y-6">
+  {% call card() %}
+    <p class="text-base-medium text-lg leading-relaxed mb-3">
+      Forms are the schema layer in Lagniappe. They define what fields a page or
+      task has, how values are entered, and how those values appear in tables,
+      filters, search, imports, and AI prompts.
+    </p>
+    <p class="text-base-medium">
+      They also classify records. A page with an "Invoice" form is a different
+      kind of thing from a page with a "Contact" form, even if both live in the
+      same category.
+    </p>
+  {% endcall %}
+
+  {{ heading("What Forms Are For", icon="form", kind="form") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li><strong>Data entry:</strong> fields for text, numbers, dates, selects, checkboxes, tables, locations, links, signatures, HTML blocks, and more.</li>
+      <li><strong>Tables:</strong> form fields can become sortable or filterable columns.</li>
+      <li><strong>Content types:</strong> different forms let one category hold several related record types.</li>
+      <li><strong>Permissions:</strong> a form can be restricted so pages or tasks using it are hidden from users outside allowed groups.</li>
+      <li><strong>AI context:</strong> form schemas tell AI what information should be extracted or generated.</li>
+    </ul>
+  {% endcall %}
+
+  {{ heading("Example") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      A "Properties" category might contain pages with different forms:
+    </p>
+    <ul class="text-base-medium space-y-1 mb-3">
+      <li><strong>Property</strong> -- address, owner, insurance renewal, tax parcel</li>
+      <li><strong>Vendor</strong> -- trade, phone, rate, documents</li>
+      <li><strong>Lease</strong> -- tenant, start date, deposit, renewal terms</li>
+    </ul>
+    <p class="text-base-medium">
+      You can browse the whole category, or filter to just one form and work with
+      fields specific to that type.
+    </p>
+  {% endcall %}
+
+  {{ heading("Building Forms") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Forms can be built by hand in the form builder or generated from a
+      description with AI. AI is great for getting a first draft on the page;
+      it is worth a quick pass over field types, labels, required fields, and
+      permissions before using the form for important data.
+    </p>
+    {% call callout("tip", False) %}
+      The app tracks schema versions, so adjusting a form later is fine. For
+      bigger structural changes after a lot of data is already entered, it is
+      worth reviewing how existing records should carry forward.
+    {% endcall %}
+  {% endcall %}
+
+  {{ heading("Good to Know") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      A few situations where forms are not always the perfect fit:
+    </p>
+    <ul class="text-base-medium space-y-2">
+      <li>Deeply relational data is often happier in a dedicated database.</li>
+      <li>Very spreadsheet-heavy workflows can feel a bit constrained.</li>
+      <li>A long list of nearly identical forms can make search and filtering harder to reason about.</li>
+      <li>Restricted forms are powerful, and they reward a quick test with a real non-owner account.</li>
+    </ul>
+  {% endcall %}
+
+  {{ nav_buttons(
+    prev={"key": "overview", "name": "Overview", "kind": "category"},
+    next={"key": "tasks", "name": "Tasks", "kind": "task"}
+  ) }}
+</div>

@@ -1,0 +1,148 @@
+{% macro create_model(file) %}
+  {% set choose_parent = file.properties.choose_parent %}
+  <div data-section="create-model"
+       class="flex flex-col gap-6"
+       data-visible="false"
+       data-parent-kind="{{ file.parent.kind if file.parent else 'none' }}">
+    <div>
+      <p class="text-sm text-base-medium italic">
+        A model task will be created to track these tasks, and the individual tasks will be named after the model task.
+      </p>
+    </div>
+    <label class="{{ styles.label.column }}">
+      Model Name
+      <input type="text"
+             autocomplete="off"
+             data-1p-ignore
+             name="model-name"
+             value="{{ choose_parent.model_name or '' }}"
+             placeholder="{{ file.name }}"
+             class="{{ styles.input }}">
+    </label>
+  </div>
+{% endmacro %}
+
+{% macro project_choice(file) %}
+  {% set choose_parent = file.properties.choose_parent %}
+  <div>
+    <h2 class="text-lg font-bold">Choose or Create a Project</h2>
+    <p class="text-sm text-base-medium italic">
+      Choose or create the project that these tasks will be tracked by.
+      If you do not choose a project, a default project will be created for you.
+    </p>
+  </div>
+  <form class="flex flex-col gap-6" data-section="project-choice">
+    <fieldset class="flex flex-row gap-4 items-center">
+      <label class="{{ styles.radio.label }}">
+        <input type="radio"
+               name="parent-choice"
+               value="create-parent"
+               {{ 'checked' if choose_parent.parent_choice != "existing-parent" else '' }}
+               data-option-toggle="true"
+               class="{{ styles.radio.default }}">
+        Create a new project
+      </label>
+      <label class="{{ styles.radio.label }}">
+        <input type="radio"
+               name="parent-choice"
+               value="existing-parent"
+               {{ 'checked' if choose_parent.parent_choice == "existing-parent" else '' }}
+               data-option-toggle="true"
+               class="{{ styles.radio.default }}">
+        Add to an existing project
+      </label>
+    </fieldset>
+    <div data-role="input"
+         data-option="create-parent"
+         data-visible="{{ (choose_parent.parent_choice != 'existing-parent')|yesno }}">
+      <h3 class="{{ styles.label.sectionHeading }}">Project Name</h3>
+      <input type="text"
+             autocomplete="off"
+             data-1p-ignore
+             name="parent-name"
+             value="{{ choose_parent.parent_name or '' }}"
+             placeholder="{{ file.name }}"
+             class="{{ styles.input }}">
+    </div>
+    <div data-role="select"
+         data-option="existing-parent"
+         data-visible="{{ (choose_parent.parent_choice == 'existing-parent')|yesno }}"
+         class="{{ styles.select.container }}">
+      <h3 class="{{ styles.label.sectionHeading }}">Existing Project</h3>
+      <input data-action="select-project"
+             {% if file.parent %}data-preload='{{ file.parent.details|tojson }}'{% endif %}
+             data-placeholder="choose a project..."
+             data-index="project"
+             name="parent-id"
+             data-kind="project"
+             class="{{ styles.input }}">
+    </div>
+    {{ create_model(file) }}
+  </form>
+{% endmacro %}
+
+{% macro parent_choice(file) %}
+  {% if file.entity_type == "task" %}
+    {{ project_choice(file) }}
+  {% else %}
+    {{ category_choice(file) }}
+  {% endif %}
+{% endmacro %}
+
+{% macro category_choice(file) %}
+  {% set choose_parent = file.properties.choose_parent %}
+  <div>
+    <h2 class="text-lg font-bold">Choose or Create a Category</h2>
+    <p class="text-sm text-base-medium italic">
+      Choose or create the category that this data will be added to.
+      If you do not choose a category, the pages will be added to a default category.
+    </p>
+  </div>
+  <form class="flex flex-col gap-6" data-section="category-choice">
+    <fieldset class="flex flex-row gap-4 items-center">
+      <label class="{{ styles.radio.label }}">
+        <input type="radio"
+               name="parent-choice"
+               value="create-parent"
+               data-option-toggle="true"
+               {{ 'checked' if choose_parent.parent_choice != 'existing-parent' else '' }}
+               class="{{ styles.radio.default }}">
+        Create a new category
+      </label>
+      <label class="{{ styles.radio.label }}">
+        <input type="radio"
+               name="parent-choice"
+               value="existing-parent"
+               data-option-toggle="true"
+               {{ 'checked' if choose_parent.parent_choice == 'existing-parent' else '' }}
+               class="{{ styles.radio.default }}">
+        Add to an existing category
+      </label>
+    </fieldset>
+    <div data-role="input"
+         data-option="create-parent"
+         data-visible="{{ (choose_parent.parent_choice != 'existing-parent')|yesno }}">
+      <h3 class="{{ styles.label.sectionHeading }}">Category Name</h3>
+      <input type="text"
+             autocomplete="off"
+             data-1p-ignore
+             name="parent-name"
+             value="{{ choose_parent.parent_name or '' }}"
+             placeholder="{{ file.name }}"
+             class="{{ styles.input }}">
+    </div>
+    <div data-role="select"
+         data-option="existing-parent"
+         data-visible="{{ (choose_parent.parent_choice == 'existing-parent')|yesno }}"
+         class="{{ styles.select.container }}">
+      <h3 class="{{ styles.label.sectionHeading }}">Existing Category</h3>
+      <input data-action="select-category"
+             {% if file.parent %}data-preload='{{ file.parent.details|tojson }}'{% endif %}
+             data-placeholder="choose a category..."
+             data-index="category"
+             name="parent-id"
+             data-kind="category"
+             class="{{ styles.input }}">
+    </div>
+  </form>
+{% endmacro %}

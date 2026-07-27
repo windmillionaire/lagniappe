@@ -1,0 +1,13 @@
+[
+	{
+		"id": "select-single-ab12",
+		"type": "select",
+		"title": "Single Select",
+		"multiple": false,
+		"options": [
+			{ "value": "small", "label": "Small" },
+			{ "value": "medium", "label": "Medium" },
+			{ "value": "large", "label": "Large" }
+		]
+	}
+]

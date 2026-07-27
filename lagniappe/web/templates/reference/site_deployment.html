@@ -1,0 +1,58 @@
+{% from "manual/macros.html" import callout, subheading %}
+{% from "reference/macros.html" import modal %}
+{% call modal("Deployment") %}
+  <p class="text-sm text-base-dark">
+    Deployment settings control a small, owner-managed part of the App Engine app.yaml file. Lagniappe saves your choices here, then writes them into app.yaml during the next setup update before deployment.
+  </p>
+  {% call callout("warning") %}
+    Saving these settings does not deploy immediately. They take effect the next time you run <code>./setup.sh update</code> and deploy the app.
+  {% endcall %}
+  {{ subheading("Scaling") }}
+  <p class="text-sm text-base-dark">
+    Scaling is the main cost and latency choice. The default is basic scaling,
+    so App Engine can stop the instance when the app is idle. Automatic scaling
+    keeps the app warm, which avoids most cold starts but usually costs more.
+  </p>
+  <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+    <div class="rounded-md border border-base-light/50 bg-white p-4">
+      <h4 class="mb-2 font-semibold text-base-dark">Basic</h4>
+      <p class="text-sm text-base-medium">
+        Basic scaling uses B-class instances. It is usually cheaper for a quiet personal or small-team app because App Engine can stop instances when they are not needed.
+      </p>
+      <p class="mt-2 text-sm text-base-medium">
+        The tradeoff is cold starts. The first request after the app has idled may take longer while App Engine starts the instance again.
+      </p>
+    </div>
+    <div class="rounded-md border border-base-light/50 bg-white p-4">
+      <h4 class="mb-2 font-semibold text-base-dark">Automatic</h4>
+      <p class="text-sm text-base-medium">
+        Automatic scaling uses F-class instances. It keeps the app warm, which means users are much less likely to hit a cold start.
+      </p>
+      <p class="mt-2 text-sm text-base-medium">
+        The tradeoff is cost. Keeping an instance warm can be quite a bit more
+        expensive than letting a quiet app idle down.
+      </p>
+    </div>
+  </div>
+  {{ subheading("Instance Class") }}
+  <p class="text-sm text-base-dark">
+    Instance class is the size of the App Engine instance. Larger classes have more memory and CPU, but they also cost more. Automatic scaling uses F classes, and basic scaling uses B classes.
+  </p>
+  <p class="text-sm text-base-dark">
+    The defaults are tuned for a quiet personal or small-team app, so start there unless you are solving a specific memory, latency, or cost problem.
+  </p>
+  {{ subheading("Workers") }}
+  <p class="text-sm text-base-dark">
+    Worker count changes how many Gunicorn workers the instance starts. More workers can handle more simultaneous requests, but each worker uses memory.
+  </p>
+  {% call callout("tip") %}
+    If App Engine reports memory pressure, instances are restarting, or logs show worker crashes, try fewer workers before increasing instance size. The app is already tuned fairly closely, so large worker-count changes should be rare.
+  {% endcall %}
+  {{ subheading("Instances") }}
+  <p class="text-sm text-base-dark">
+    Instance count means different things depending on scaling mode. In automatic scaling, it is the warm instance count Lagniappe writes as both the minimum idle instances and maximum instances. In basic scaling, it is the maximum number of running instances.
+  </p>
+  {% call callout("error") %}
+    More instances and larger instance classes can raise the cloud bill quickly. Change one setting at a time, deploy, then check App Engine logs, response times, and Billing before making another change.
+  {% endcall %}
+{% endcall %}

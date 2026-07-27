@@ -1,0 +1,154 @@
+source_roots:
+  - build/sentry.mjs
+  - build/utility.mjs
+  - lagniappe/core/definitions
+  - lagniappe/core/entities
+  - lagniappe/core/mixins
+  - lagniappe/core/mutations
+  - lagniappe/core/properties
+  - lagniappe/core/tools
+  - lagniappe/web/routes
+  - lagniappe/web/start
+  - installer
+  - src/script
+
+test_roots:
+  - testing/tests_unit
+  - testing/tests_e2e
+  - testing/tests_js
+  - testing/tests_tooling/test_001a_setup_validation_config.py
+  - testing/tests_tooling/test_001b_setup_providers.py
+  - testing/tests_tooling/test_001c_setup_runtime_resources.py
+  - testing/tests_tooling/test_001d_setup_drift.py
+  - testing/tests_tooling/test_001e_setup_orchestration.py
+  - testing/tests_tooling/test_001f_setup_portability.py
+  - testing/tests_tooling/test_001g_setup_release_readiness.py
+  - testing/tests_tooling/test_003_config.py
+  - testing/tests_tooling/test_005_test_server_command.py
+  - testing/tests_tooling/test_007_run_py_test_command.py
+  - testing/tests_tooling/test_008_data_recovery.py
+  - testing/tests_tooling/test_icons.py
+
+annotated_source_roots:
+  - config/__init__.py
+  - config/locations.py
+  - config/redis.py
+  - config/recovery.py
+  - config/deployment.py
+  - config/ai_models.py
+  - config/ai_settings.py
+  - run.py
+  - runner/context.py
+  - runner/adc.py
+  - runner/data_recovery.py
+  - runner/deploy.py
+  - runner/development.py
+  - runner/gcloud.py
+  - runner/icons.py
+  - runner/process.py
+  - runner/testing.py
+  - runner/upgrade.py
+  - lagniappe/__init__.py
+  - lagniappe/core/exceptions
+  - lagniappe/web/__init__.py
+  - lagniappe/web/auth.py
+  - lagniappe/web/deferred_autofill.py
+  - lagniappe/web/direct_uploads.py
+  - lagniappe/web/responses.py
+
+annotation_scan_roots:
+  - installer
+  - lagniappe
+  - src
+  - config
+
+test_scaffold_roots:
+  - testing/resources
+  - testing/elements
+
+suggestions:
+  javascript_generic_symbols:
+    - activate
+    - active
+    - create
+    - created
+    - deactivate
+    - default
+    - disable
+    - enable
+    - error
+    - formdata
+    - get
+    - init
+    - load
+    - loaded
+    - loadwidget
+    - open
+    - prefetch
+    - refresh
+    - render
+    - route
+    - show
+    - update
+    - updated
+    - value
+    - visible
+  javascript_generic_tokens:
+    - active
+    - base
+    - component
+    - create
+    - created
+    - default
+    - disable
+    - element
+    - enable
+    - error
+    - form
+    - get
+    - load
+    - open
+    - refresh
+    - render
+    - route
+    - show
+    - update
+    - updated
+    - value
+    - visible
+    - widget
+  strong_match_kinds:
+    - pair
+    - feature
+    - dimension
+    - path
+    - template
+
+exclude:
+  - "**/__pycache__/**"
+  - "**/*.pyc"
+  - "**/*.map"
+  - "**/config/**"
+  - "**/runner/**"
+  - "lagniappe/web/start/styles/**"
+
+python_extensions:
+  - ".py"
+
+javascript_extensions:
+  - ".mjs"
+
+ignore_symbols:
+  names:
+    - "__init__"
+    - "constructor"
+    - "init"
+    - "postreconcile"
+    - "destroy"
+  python_class_bases:
+    - "Enum"
+  python_data_classes: true
+  javascript_method_kinds:
+    - "constructor"
+    - "get"
+    - "set"

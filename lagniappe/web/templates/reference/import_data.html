@@ -1,0 +1,35 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Importing Data") %}
+  <section>
+    {{ subheading("What This Panel Does") }}
+    <p class="text-sm text-base-dark">
+      Import Data uploads a CSV file and starts the import workflow. Once the file is uploaded, Lagniappe reads the rows and columns, then walks you through turning that spreadsheet into pages or tasks.
+    </p>
+    {% call callout("tip") %}
+      This importer is for CSV files. Use it when you have a spreadsheet that should become structured records or task work inside Lagniappe.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("What Happens Next") }}
+    <div class="space-y-3">
+      {% call feature("CSV Processing", icon="file", kind="file") %}
+        Lagniappe validates the upload, counts rows and columns, and prepares detected column types for the wizard.
+      {% endcall %}
+      {% call feature("Import Wizard", icon="form", kind="form") %}
+        Open the uploaded import file to choose what kind of records to create, pick or build related forms, map columns, and verify the result.
+      {% endcall %}
+      {% call feature("Background Import", icon="run.active", kind="task") %}
+        Larger imports can run as a background process so progress is tracked without keeping the upload panel open.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Before Uploading") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Use a header row with clear column names.</li>
+      <li>Remove blank rows and unrelated notes from the spreadsheet.</li>
+      <li>Keep one kind of record per CSV so the wizard can map columns cleanly.</li>
+    </ul>
+  </section>
+{% endcall %}

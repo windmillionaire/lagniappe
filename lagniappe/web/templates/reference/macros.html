@@ -1,0 +1,38 @@
+{% macro modal(title) %}
+  <div id="modal"
+       class="{{ styles.modal.wrapper }}">
+    <div class="{{ styles.modal.content }}"
+         id="modal-content">
+      <div class="{{ styles.modal.header }}">
+        <h2 class="text-xl font-bold text-base-dark">{{ title }}</h2>
+        <button lp-control="close"
+                class="{{ styles.button.close }}">
+          Close
+        </button>
+      </div>
+      <div class="p-6">
+        <div class="space-y-6">{{ caller() }}</div>
+      </div>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro feature(title, icon=None, kind=None) %}
+  <div class="border border-base-light/50 rounded-lg p-4">
+    <h4 class="{{ styles.iconLabel.wrapper }} font-medium text-base-dark mb-2">
+      {% if icon %}
+        {{ render_icon(icon, (styles.iconLabel.icon) ~ " text-kind-default", kind or 'default') }}
+      {% endif %}
+      {{ title }}
+    </h4>
+    <div class="text-sm text-base-medium">{{ caller() }}</div>
+  </div>
+{% endmacro %}
+
+{% macro detail(title, kind="page") %}
+  <div class="rounded-lg bg-kind-bg border border-kind-light p-4"
+       data-kind="{{ kind }}">
+    <h4 class="font-medium text-kind-dark mb-2">{{ title }}</h4>
+    <div class="text-sm text-kind-default">{{ caller() }}</div>
+  </div>
+{% endmacro %}

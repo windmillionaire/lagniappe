@@ -1,0 +1,51 @@
+# This file specifies files that are *not* uploaded to Google Cloud
+# using gcloud. It follows the same syntax as .gitignore, with the addition of
+# "#!include" directives (which insert the entries of the given .gitignore-style
+# file at that point).
+#
+# For more information, run:
+#   $ gcloud topic gcloudignore
+#
+.gcloudignore
+.git
+.gitignore
+.npmrc
+.cursorignore
+.vscode/
+package.json
+package-lock.json
+
+# Python
+__pycache__/
+.pytest_cache/
+venv/
+
+# Development files
+# Root-anchor top-level development folders so nested runtime packages with the
+# same names, such as lagniappe/web/routes/testing/, are still uploaded.
+/build/
+/documentation/
+/node_modules/
+/reports/
+/installer/
+/runner/
+/src/
+/testing/
+/README.md
+/CONTRIBUTING.md
+/LICENSE
+/run.py
+/AGENTS.md
+
+# Interrupted atomic writes, local backups, and imported recovery snapshots.
+**/*.tmp
+**/*.bak
+**/*.backup
+**/*~
+**/*_settings.yaml
+
+# Setup state is local-only. Upload only the canonical runtime settings and
+# Redis trust material from config/files/.
+/config/files/*
+!/config/files/lagniappe_settings.yaml
+!/config/files/redis_ca.pem

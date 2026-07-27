@@ -1,0 +1,13 @@
+{% from "manual/macros.html" import callout %}
+{% from "reference/macros.html" import modal %}
+{% call modal("Site Settings") %}
+  <p class="text-sm text-base-dark">
+    Site Settings is the owner-only control panel for this Lagniappe instance. It is where you handle maintenance tasks, save deployment preferences, jump to provider dashboards, and manage the public app icons.
+  </p>
+  <p class="text-sm text-base-dark">
+    Most changes here are not everyday edits. They are meant for setup work, troubleshooting, upgrades, and the handful of settings that affect the whole application.
+  </p>
+  {% call callout("tip") %}
+    Each section has its own help button. Use those for the practical details before clicking a maintenance action or changing deployment settings.
+  {% endcall %}
+{% endcall %}

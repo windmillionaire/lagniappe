@@ -1,0 +1,39 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Model Tasks") %}
+  <section>
+    {{ subheading("What Model Tasks Do") }}
+    <p class="text-sm text-base-dark">
+      Model tasks are reusable task categories inside a project. They help split project work into phases, standard steps, or repeatable task types.
+    </p>
+    {% call callout("tip") %}
+      When a model task has a form, tasks assigned to it can inherit that form for consistent data collection.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("What You Can Do Here") }}
+    <div class="space-y-3">
+      {% call feature("Create a Model Task", icon="plus", kind="model-task") %}
+        Add a new phase or task type to the project, such as Intake, Inspection, Approval, or Final Review.
+      {% endcall %}
+      {% call feature("Attach a Task Form", icon="form", kind="form") %}
+        Choose a task form when every task in this phase should collect the same fields or status checks.
+      {% endcall %}
+      {% call feature("Open Status Views", icon="completed", kind="task") %}
+        Use the Completed and In Progress links to jump to filtered task views for that model task.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Typical Flow") }}
+    {% call step(1, "Create project phases") %}
+      <p class="text-sm text-base-medium">Keep names short and action-oriented so the project is easy to scan.</p>
+    {% endcall %}
+    {% call step(2, "Attach forms only when helpful") %}
+      <p class="text-sm text-base-medium">Use forms for structured details, approvals, or checklists, not for every simple task.</p>
+    {% endcall %}
+    {% call step(3, "Assign tasks") %}
+      <p class="text-sm text-base-medium">When creating or editing a task, link it to the project and the right model task.</p>
+    {% endcall %}
+  </section>
+{% endcall %}

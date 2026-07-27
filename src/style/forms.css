@@ -1,0 +1,189 @@
+/* ==========================================================================
+   FORM ELEMENTS
+   ========================================================================== */
+
+/* @style builder.model */
+#model-panel {
+	input,
+	select,
+	textarea {
+		&:focus-visible,
+		&:hover {
+			outline: 0.5px solid var(--color-base-light);
+		}
+	}
+	& [type="radio"],
+	& [type="checkbox"] {
+		&:focus-visible,
+		&:hover {
+			outline-offset: 2px;
+		}
+	}
+}
+
+/* @style checkbox.default input radio.default select.default textarea */
+.form-input {
+	background-color: white;
+	color: var(--color-base-dark);
+	outline: 0.5px solid var(--color-base-light);
+	outline-offset: 0;
+	&::placeholder {
+		color: var(--color-base-medium);
+	}
+	&:not(:disabled) {
+		&:focus-visible,
+		&:hover {
+			outline-style: solid;
+			outline-width: 2px;
+			outline-color: var(--kind-default);
+		}
+	}
+	&[type="checkbox"],
+	&[type="radio"] {
+		border: 0.5px solid var(--color-base-light);
+		outline: none;
+		&:not(:disabled):focus-visible,
+		&:not(:disabled):hover {
+			outline-style: solid;
+			outline-width: 2px;
+			outline-color: var(--kind-default);
+			outline-offset: 2px;
+		}
+	}
+	&[type="checkbox"] {
+		&:checked {
+			border-color: var(--kind-default);
+			background-color: var(--kind-default);
+		}
+	}
+	&[type="radio"] {
+		position: relative;
+		&::before {
+			content: "";
+			position: absolute;
+			background-color: white;
+			inset: 4px;
+			border-radius: 100%;
+			display: none;
+		}
+		&:checked {
+			border: 0.5px solid var(--color-base-default);
+			background-color: var(--color-base-default);
+			&::before {
+				display: block;
+			}
+		}
+		@media (forced-colors: active) {
+			appearance: auto;
+			&::before {
+				display: none;
+			}
+		}
+	}
+}
+
+/* @style input select.default */
+input[role="combobox"] {
+	&[data-mode="select"]:not(:disabled) {
+		cursor: pointer;
+	}
+	&::placeholder {
+		color: var(--color-base-medium);
+	}
+	&[data-values="true"] {
+		&::placeholder {
+			color: var(--kind-default);
+			font-weight: 600;
+		}
+	}
+	&[data-panel="closed"] {
+		&::placeholder {
+			opacity: 1;
+			font-style: normal;
+		}
+	}
+}
+
+/* @style select.button select.default */
+[data-role$="-select"] {
+	& > input {
+		outline: 0.5px solid var(--color-base-light);
+		&:focus-visible,
+		&:hover {
+			outline: 0.5px solid var(--color-base-light);
+		}
+	}
+	&:has(
+			a:hover,
+			a:focus-visible,
+			[data-role="clear"]:hover,
+			[data-role="clear"]:focus-visible,
+			[data-role="history-fill"]:hover,
+			[data-role="history-fill"]:focus-visible
+		) {
+		& > button[lp-select] {
+			outline: 0.5px solid var(--color-base-light);
+		}
+	}
+}
+
+/* @style form.default form.tools */
+[data-readonly="true"] {
+	& :where(input:not([data-role="complete-toggle"]), select, textarea) {
+		&:focus-visible,
+		&:hover {
+			outline: none;
+		}
+	}
+
+	& :where(button[lp-select], [lp-select] input, [lp-select] select),
+	&:where([lp-select]) :where(input, select) {
+		pointer-events: none;
+		&:focus-visible,
+		&:hover {
+			background-color: white;
+			outline: none;
+		}
+	}
+}
+
+/* @style form.default form.tools */
+[data-readonly="false"] {
+	& :where(button[lp-select], [lp-select] input, [lp-select] select),
+	&:where([lp-select]) :where(input, select) {
+		pointer-events: auto;
+	}
+
+	& :where(.form-input:not(:disabled)) {
+		&:focus-visible,
+		&:hover {
+			outline-style: solid;
+			outline-width: 2px;
+			outline-color: var(--kind-default);
+		}
+	}
+
+	& label:has([data-role="history-fill"]:is(:hover, :focus-visible)) {
+		& :where(.form-input:not(:disabled)) {
+			outline: 0.5px solid var(--color-base-light);
+		}
+	}
+}
+
+/* @style select.button */
+button[lp-select][data-readonly="true"],
+button[lp-select]:disabled {
+	pointer-events: none;
+	&:focus-visible,
+	&:hover {
+		background-color: white;
+		outline: none;
+	}
+}
+
+/* @style form.submission.default form.submission.grows */
+.submission-outline {
+	outline-style: solid;
+	outline-width: 1px;
+	outline-color: color-mix(in oklch, var(--kind-light) 50%, transparent);
+}

@@ -1,0 +1,150 @@
+import { STYLES } from "styles";
+import { setIcon } from "../../../shared/icons";
+
+/**
+ * @testable true
+ * @tests tests_js/test_033_editor_menu_items.py::test_editor_menu_item_serializes_current_active_state
+ * @features editor
+ * @dimensions menu-active-state dropdown-rerender
+ */
+class ToolbarMenuItem {
+	constructor(toolbar) {
+		this.toolbar = toolbar;
+		this.active = false;
+		this.button = document.createElement("button");
+		this.onClick = this._onClick.bind(this);
+	}
+
+	get html() {
+		return this.button.outerHTML;
+	}
+
+	_buttonIcon(icon) {
+		const iconElement = document.createElement("span");
+		setIcon(iconElement, icon, STYLES.dropdown.icon);
+		return iconElement.outerHTML;
+	}
+
+	_buttonText(text) {
+		const textElement = document.createElement("span");
+		textElement.textContent = text;
+		return textElement.outerHTML;
+	}
+
+	_buttonCheck() {
+		const checkContainer = document.createElement("div");
+		if (this.name || this.form) {
+			checkContainer.className =
+				"invisible ml-auto grid size-lh place-items-center group-data-[active=true]:visible";
+		} else {
+			checkContainer.className =
+				"invisible ml-auto grid size-lh place-items-center";
+		}
+
+		const check = checkContainer.appendChild(document.createElement("span"));
+		setIcon(check, "check");
+		return checkContainer.outerHTML;
+	}
+
+	init(settings) {
+		Object.assign(this, settings);
+		this.button.title = this.title;
+		this.button.role = "option";
+		this.button.dataset.active = "false";
+		this.button.className = `${STYLES.dropdown.option.action} group`;
+
+		this.button.innerHTML = [
+			this._buttonIcon(this.icon),
+			this._buttonText(this.title),
+			this._buttonCheck(),
+		].join("");
+	}
+
+	_onClick(option) {
+		this.button = option;
+		const editor = this.toolbar.editor;
+		const chain = editor.chain().focus();
+
+		// Use local toggle intent so the command always mirrors the clicked state.
+		if (this.active) {
+			if (this.command === "toggleHeading") {
+				chain.setParagraph().run();
+			} else if (this.command === "toggleUnderline") {
+				chain.unsetUnderline().run();
+			} else if (this.command === "toggleStrike") {
+				chain.unsetStrike().run();
+			} else if (this.command === "toggleSuperscript") {
+				chain.unsetSuperscript().run();
+			} else if (this.command === "toggleSubscript") {
+				chain.unsetSubscript().run();
+			} else if (this.command === "toggleCodeBlock") {
+				chain.unsetCodeBlock().run();
+			} else if (this.command === "toggleBlockquote") {
+				chain.lift("blockquote").run();
+			} else if (this.args === undefined) {
+				chain[this.command]().run();
+			} else {
+				chain[this.command](this.args).run();
+			}
+			this.disable();
+			return;
+		}
+
+		if (this.args === undefined) {
+			chain[this.command]().run();
+		} else {
+			chain[this.command](this.args).run();
+		}
+		if (this.name) this.enable();
+	}
+
+	enable() {
+		this.active = true;
+		this.button.dataset.active = "true";
+	}
+
+	disable() {
+		this.active = false;
+		this.button.dataset.active = "false";
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class ClearFormatMenuItem extends ToolbarMenuItem {
+	_onClick(option) {
+		this.button = option;
+		this.toolbar.editor.chain().focus().clearNodes().unsetAllMarks().run();
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class FormMenuItem extends ToolbarMenuItem {
+	_onClick(option) {
+		this.button = option;
+		this.toolbar.toggleForm(this.command);
+	}
+}
+
+export {
+	ClearFormatMenuItem as clearFormat, // Style
+	FormMenuItem as setFontFamily, // Style
+	FormMenuItem as setColor, // Style
+	FormMenuItem as addLink, // Insert
+	FormMenuItem as addImage, // Insert
+	FormMenuItem as addYouTube, // Insert
+	FormMenuItem as generateText, // Insert
+	ToolbarMenuItem as toggleUnderline, // Style
+	ToolbarMenuItem as toggleStrike, // Style
+	ToolbarMenuItem as toggleSuperscript, // Style
+	ToolbarMenuItem as toggleSubscript, // Style
+	ToolbarMenuItem as toggleHeading, // Headings
+	ToolbarMenuItem as setParagraph, // Headings
+	ToolbarMenuItem as setHorizontalRule, // Insert
+	ToolbarMenuItem as toggleCodeBlock, // Insert
+	ToolbarMenuItem as toggleBlockquote, // Insert
+	ToolbarMenuItem as setTextAlign, // Align
+};

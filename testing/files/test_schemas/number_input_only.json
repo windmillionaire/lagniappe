@@ -1,0 +1,8 @@
+[
+	{
+		"id": "input-numab12",
+		"type": "input",
+		"input": "number",
+		"title": "Number Field"
+	}
+]

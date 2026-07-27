@@ -1,0 +1,33 @@
+{% from 'common.html' import attribute_button %}
+{% import 'controls.html' as controls %}
+
+{% macro info_tab(project) %}
+  <div lp-component
+       id="info"
+       data-title="Info"
+       data-default="ProjectInfo"
+       data-tab="true"
+       data-open="false"
+       data-visible="false"
+       data-parent-nav="tabs"
+       data-kind="project"
+       class="pt-4 sm:pt-0">{{ info_form(project) }}</div>
+{% endmacro %}
+
+{% macro info_form(project) %}
+  <form lp-update
+        data-widget="ProjectInfo"
+        data-route="{{ url_for('projects.update', key=project.urlsafe_key) }}"
+        data-name="{{ project.name }}"
+        {% if project.description %}data-description="{{ project.description }}"{% endif %}
+        class="{{ styles.form.default }}">
+    <div data-role="attributes">
+      <h3 class="{{ styles.label.sectionHeading }}">Project Features</h3>
+      <div class="{{ styles.attributes.container }}">
+        {% for attribute in project.attributes %}{{ attribute_button(attribute) }}{% endfor %}
+      </div>
+    </div>
+    {{ controls.edited_marker(url_for('projects.info', key=project.urlsafe_key)) }}
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}

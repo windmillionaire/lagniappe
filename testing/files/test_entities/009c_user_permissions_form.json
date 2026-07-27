@@ -1,0 +1,60 @@
+{
+	"test_form_permissions": {
+		"entities": [
+			[
+				"USER",
+				{
+					"name": "Empty form - only own page",
+					"hash": "user01",
+					"page": { "name": "User Page 1", "hash": "puser1" },
+					"permissions": {},
+					"form_data": {},
+					"expected": {
+						"after": [false, false, false, false],
+						"restricted": []
+					}
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "General models:VIEW covers specific",
+					"hash": "user02",
+					"page": { "name": "User Page 2", "hash": "puser2" },
+					"permissions": {},
+					"form_data": { "models": "VIEW" },
+					"expected": {
+						"after": [true, false, true, true],
+						"restricted": []
+					}
+				}
+			]
+		],
+		"resources": [
+			[["CATEGORY", { "name": "Category", "hash": "cat001" }], "VIEW"],
+			[["CATEGORY", { "name": "Category", "hash": "cat001" }], "EDIT"],
+			[
+				[
+					"PAGE",
+					{
+						"name": "Page 1 under category",
+						"hash": "page001",
+						"model": { "name": "Category", "hash": "cat001" }
+					}
+				],
+				"VIEW"
+			],
+			[
+				[
+					"PAGE",
+					{
+						"name": "Page 2 under category",
+						"hash": "page002",
+						"model": { "name": "Category", "hash": "cat001" }
+					}
+				],
+				"VIEW"
+			]
+		]
+	}
+}

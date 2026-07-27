@@ -1,0 +1,192 @@
+{% extends "layouts/login.html" %}
+
+{% macro message(text, role="message") %}
+  <div data-role="{{ role }}"
+       class="{{ styles.login.message }}">{{ text }}</div>
+{% endmacro %}
+
+{% macro error(text) %}
+  <div data-role="error"
+       class="{{ styles.login.error }}">{{ text }}</div>
+{% endmacro %}
+
+{% macro success(text) %}
+  <div data-role="success"
+       class="{{ styles.login.success }}">{{ text }}</div>
+{% endmacro %}
+
+{% macro input(type, name, label) %}
+  <label class="{{ styles.label.column }}">
+    {{ label }}
+    <input type="{{ type }}"
+           name="{{ name }}"
+           required
+           data-kind="user"
+           class="{{ styles.input }}">
+  </label>
+{% endmacro %}
+
+{% macro button(text, role="submit", visible=true) %}
+  <button data-role="{{ role }}"
+          data-kind="user"
+          class="{{ styles.button.submit }} w-full {{ 'hidden' if not visible }}">
+    <span data-role="icon" data-visible="false" aria-hidden="true"></span>
+    <span data-role="text">{{ text }}</span>
+  </button>
+{% endmacro %}
+
+{% macro divider(text) %}
+  <div class="relative my-6">
+    <div class="absolute inset-0 flex items-center">
+      <div class="w-full border-t border-slate-300"></div>
+    </div>
+    <div class="relative flex justify-center text-sm">
+      <span class="px-2 bg-white text-slate-500">{{ text }}</span>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro google_signin(id, state=None) %}
+  <div class="mb-6">
+    <div class="flex justify-center">
+      <div id="{{ id }}"
+           class="g_id_signin"
+           data-type="standard"
+           data-theme="outline"
+           data-size="large"
+           data-text="signin_with"
+           data-shape="rectangular"
+           {% if state %}data-state="{{ state }}"{% endif %}
+           data-width="280"></div>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro alternate_button(role, text, inline=false) %}
+  <button type="button"
+          data-role="{{ role }}"
+          data-kind="user"
+          class="{{ styles.link.alternate }} text-kind-default hover:text-kind-dark hover:decoration-kind-dark {{ 'w-full' if not inline }}">{{ text }}</button>
+{% endmacro %}
+
+{% macro remember_me() %}
+  <div class="flex flex-row items-center">
+    <div class="{{ styles.checkbox.container }} shrink-0">
+      <input type="checkbox"
+             name="remember-me"
+             checked
+             data-kind="user"
+             class="{{ styles.checkbox.default }}">
+      {{ render_icon("check", (styles.checkbox.icon)) }}
+    </div>
+    <span class="ml-2 text-sm font-semibold">Remember me</span>
+  </div>
+{% endmacro %}
+
+{% block content %}
+  <!-- Email Check Form (shown when public registration disabled and no cookie) -->
+  <div id="emailCheck"
+       class="{{ styles.form.login }} hidden">
+    {{ message("Please enter your email address to continue") }}
+    {{ error() }}
+    <div class="space-y-4">
+      {{ input("email", "email", "Email") }}
+      {{ button("Continue", role="signin") }}
+    </div>
+  </div>
+  <!-- First Time Setup Form (for users who exist but never logged in) -->
+  <div id="firstTimeSetup"
+       class="{{ styles.form.login }} hidden">
+    {{ message("", role="welcome") }}
+    {{ message("Choose how you'd like to sign in to your account") }}
+    <!-- Google Sign-In for first time -->
+    {{ google_signin("google-signin-setup", next_url) }}
+    {{ divider("Or set a password") }}
+    {{ error() }}
+    {{ success() }}
+    <!-- Password setup -->
+    <div class="space-y-4">
+      {{ input("password", "password", "Choose a password") }}
+      {{ button("Set Password & Sign In", role="signin") }}
+      {{ alternate_button("back-to-email", "Back") }}
+    </div>
+  </div>
+  <!-- Normal Sign In Form -->
+  <div id="signIn"
+       class="{{ styles.form.login }} hidden">
+    {{ message("Sign in to your account") }}
+    <!-- Google Sign-In Button -->
+    {{ google_signin("google-signin-custom", next_url) }}
+    {{ divider("Or continue with email") }}
+    {{ error() }}
+    {{ success() }}
+    <!-- Email/Password Form -->
+    <div class="space-y-4">
+      {{ input("email", "email", "Email") }}
+      {{ input("password", "password", "Password") }}
+      {{ remember_me() }}
+      {{ button("Sign In", role="signin") }}
+      <!-- Create Account Button (hidden in sign-in mode) -->
+      {% if allow_registration %}{{ button("Create Account", role="create", visible=false) }}{% endif %}
+      <!-- Mode Toggle Links -->
+      <div class="text-center" data-role="signin-mode-links">
+        <div>
+          {{ alternate_button("show-forgot-form", "Forgot your password?") }}
+          {% if allow_registration %}
+            <div class="mt-2 text-center">
+              <span class="text-sm text-slate-600">Don't have an account?</span>
+              {{ alternate_button("switch-to-create", "Create one", inline=true) }}
+            </div>
+          {% endif %}
+        </div>
+        {% if allow_registration %}
+          <div class="hidden">
+            <span class="text-sm text-slate-600">Already have an account?</span>
+            {{ alternate_button("switch-to-signin", "Sign in", inline=true) }}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <!-- Forgot Password Form -->
+  <div id="forgotPassword"
+       class="{{ styles.form.login }} hidden">
+    {{ message("Reset Password") }}
+    {{ error() }}
+    {{ success() }}
+    <div class="space-y-4">
+      {{ input("email", "reset-email", "Email") }}
+      {{ button("Send Reset Email", role="reset-password-email") }}
+      {{ alternate_button("back-to-signin", "Back to Sign In") }}
+    </div>
+  </div>
+  <!-- Reset Password Form -->
+  <div id="resetPassword"
+       class="{{ styles.form.login }} hidden">
+    {{ message("Create New Password") }}
+    {{ error() }}
+    {{ success() }}
+    <div class="space-y-4">
+      {{ input("password", "new-password", "Password") }}
+      {{ button("Update Password", role="reset-password") }}
+    </div>
+  </div>
+  <!-- Verify Email Form -->
+  <div id="verifyEmail"
+       class="{{ styles.form.login }} hidden">
+    {{ message("Please sign in to your new account") }}
+    {{ error() }}
+    {{ success() }}
+    <!-- Email/Password Form -->
+    <div class="space-y-4">
+      {{ input("email", "email", "Email") }}
+      {{ input("password", "password", "Password") }}
+      {{ remember_me() }}
+      {{ button("Sign In", role="signin") }}
+      <!-- Mode Toggle Links -->
+      <div class="text-center" data-role="signin-mode-links">
+        {{ alternate_button("show-forgot-form", "Forgot your password?") }}
+      </div>
+    </div>
+  </div>
+{% endblock content %}

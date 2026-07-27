@@ -1,0 +1,236 @@
+{% extends "layouts/base.html" %}
+{% from 'pages/photo.html' import card as photo_card %}
+{% from 'pages/document.html' import document_tab %}
+{% from 'pages/info.html' import info_tab %}
+{% from 'pages/tasks.html' import task_tab %}
+{% from 'pages/files.html' import files_tab %}
+{% from 'pages/notes.html' import notes_section %}
+{% from 'common.html' import name_separator %}
+{% import 'controls.html' as controls %}
+{% import 'menus.html' as menus %}
+{% set is_own_page = current_user.page.key == page.key %}
+{% set is_public_user = current_user.is_public %}
+{% set is_public_own_page = is_public_user and is_own_page %}
+{% set is_owner_page = current_user.is_owner and is_own_page %}
+{% set is_owner_viewer = current_user.is_owner %}
+{% set view_permissions = Resource.USER.allowed(Action.PERMISSIONS) %}
+{% set can_view_user_settings = page.user and (is_own_page or view_permissions) %}
+{% set can_edit_page = page.allowed(Action.EDIT) %}
+{% set has_photo = page.has('photo') and not is_public_own_page %}
+{% set has_document = page.has('document') %}
+{% set has_document_content = 'document' in page.assets %}
+{% set has_tasks = page.has('tasks') %}
+{% set has_files = page.has('files') and not is_public_own_page %}
+{% set has_notes = page.has('notes') %}
+{% set has_image = has_photo and page.image %}
+{% set render_photo = has_photo or (can_edit_page and not is_public_user) %}
+{% set render_document = has_document_content or can_edit_page %}
+{% set render_tasks = has_tasks or can_edit_page %}
+{% set render_files = has_files or (can_edit_page and not is_public_user) %}
+
+{% macro view_header(page) %}
+  <nav class="{{ styles.layout.view.title }}" data-nav="view">
+    <div>
+      {%- if page.model.name == 'Users' and Resource.USERS.allowed(Action.VIEW) -%}
+        <span class="{{ styles.entity.name.parent }}">
+          <a href="{{ url_for('users.user_index') }}"
+             data-kind="user"
+             class="{{ styles.link.default }}">{{- page.model.name -}}</a>
+          {{- name_separator() -}}
+        </span><wbr>
+      {%- elif page.categories -%}
+        <span class="{{ styles.entity.name.parent }}">
+          <a href="{{ url_for('categories.index', key=page.categories[0].urlsafe_key) }}"
+             data-kind="category"
+             class="{{ styles.link.default }}">{{- page.categories[0].name -}}</a>
+          {{- name_separator() -}}
+        </span><wbr>
+      {%- endif -%}
+      <span data-menu-anchor class="{{ styles.entity.name.anchor }}">
+        {#- Prevent indentation from becoming leading inline title space. -#}
+        <span data-role="title">{{- page.name -}}</span>
+        {% call menus.title("Page actions") %}
+          {{ menus.star(is_starred(page)) }}
+          {% if can_edit_page and has_notes %}{{ menus.show("Add note", "notes", "page-notes:CreateNote", "note") }}{% endif %}
+          {% if page.allowed(Action.DELETE) %}{{ menus.delete("/") }}{% endif %}
+        {% endcall %}
+      </span>
+    </div>
+  </nav>
+{% endmacro %}
+
+{% macro toggles(nav, has_image=false) %}
+  <nav class="{{ styles.layout.nav.toggles }}"
+       data-nav="{{ nav }}"
+       data-persistent="true"
+       data-standalone="true">
+    {% if render_photo %}
+      <button lp-show="photo:active"
+              data-kind="page"
+              data-attribute="photo"
+              data-has-attribute="{{ has_image|yesno }}"
+              class="{{ styles.entity.tabIcon }} sm:hidden">
+        {{ render_icon("image") }}
+      </button>
+    {% endif %}
+    {% if render_document %}
+      <button lp-show="document:active"
+              data-kind="page"
+              data-attribute="document"
+              data-has-attribute="{{ has_document|yesno }}"
+              class="{{ styles.entity.tabIcon }}">
+        {{ render_icon("document") }}
+      </button>
+    {% endif %}
+    <button lp-show="info:active"
+            data-kind="page"
+            class="{{ styles.entity.tabIcon }}">
+      {{ render_icon("info") }}
+    </button>
+    {% if render_tasks %}
+      <button lp-show="tasks:active"
+              data-kind="task"
+              data-attribute="tasks"
+              data-has-attribute="{{ has_tasks|yesno }}"
+              class="{{ styles.entity.tabIcon }}">
+        {{ render_icon("task") }}
+      </button>
+    {% endif %}
+    {% if render_files %}
+      <button lp-show="files:active"
+              data-kind="file"
+              data-attribute="files"
+              data-has-attribute="{{ has_files|yesno }}"
+              class="{{ styles.entity.tabIcon }}">
+        {{ render_icon("files") }}
+      </button>
+    {% endif %}
+  </nav>
+{% endmacro %}
+
+{% macro sub_toggles(page) %}
+  {% if can_view_user_settings %}
+    <button lp-show="info:UserSettings"
+            data-kind="user"
+            data-visible="false"
+            class="{{ styles.toggle.container }}">
+      {{ render_icon("user") }}
+    </button>
+  {% elif view_permissions %}
+    <button lp-show="info:PagePermissions"
+            data-kind="user"
+            data-visible="false"
+            class="{{ styles.toggle.container }}">
+      {{ render_icon("permissions") }}
+    </button>
+  {% endif %}
+  {% if page.allowed(Action.PUBLISH) and render_document %}
+    <button lp-show="document:DocumentSettings"
+            data-kind="default"
+            data-visible="false"
+            data-attribute="document"
+            data-has-attribute="{{ has_document|yesno }}"
+            class="{{ styles.toggle.container }}">
+      {{ render_icon("public", styles.toggle.icon.documentSettings) }}
+    </button>
+  {% endif %}
+  {% if page.allowed(Action.EDIT) and render_tasks %}
+    <button lp-show="tasks:CreateTask"
+            data-kind="task"
+            data-visible="false"
+            data-attribute="tasks"
+            data-has-attribute="{{ has_tasks|yesno }}"
+            class="{{ styles.toggle.container }}">
+      {{ render_icon("plus") }}
+    </button>
+  {% endif %}
+  {% if page.allowed(Action.EDIT) and not is_public_user and render_files %}
+    <button lp-show="files:FileUpload"
+            data-kind="file"
+            data-visible="false"
+            data-attribute="files"
+            data-has-attribute="{{ has_files|yesno }}"
+            class="{{ styles.toggle.container }}">
+      {{ render_icon("plus") }}
+    </button>
+  {% endif %}
+{% endmacro %}
+
+{% macro mobile_nav(page, has_image) %}
+  <div lp-nav
+       class="{{ styles.layout.nav.mobile }} mt-4"
+       data-visible="false"
+       data-nav="mobile">
+    <div class="{{ styles.layout.nav.title }}" data-role="header">
+      <span class="text-kind-dark" data-kind="default" data-role="title"></span>
+      {{ sub_toggles(page) }}
+      {{ controls.page_controls() }}
+    </div>
+    <div class="{{ styles.layout.nav.group }}" data-flipped="false">
+      <button data-role="flipper"
+              class="{{ styles.layout.nav.flipper }} text-xl">
+        {{ render_icon("flipper.left") }}
+      </button>
+      {{ toggles('mobile', has_image) }}
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro page_photo(page) %}
+  {{ photo_card(page, has_image, has_photo, is_public_user) }}
+{% endmacro %}
+
+{% macro main() %}
+  <div lp-view
+       lp-entity
+       data-key="{{ page.urlsafe_key }}"
+       data-fingerprint="{{ page.fingerprint }}"
+       data-modified="{{ page.modified.isoformat() }}"
+       data-hash="{{ page.hash }}"
+       data-kind="page"
+       data-focus-task="{{ focus_task.urlsafe_key if focus_task else '' }}"
+       data-secondary="{{ has_image|yesno }}"
+       class="group/view {{ 'max-w-5xl mx-auto' if not has_image else 'max-w-7xl mx-auto' }}"
+       data-readonly="{{ page.readonly|yesno }}">
+    <div class="{{ styles.layout.view.header }}">
+      {{ view_header(page) }}
+      <div data-role="description"
+           class="{{ styles.entity.description }} hidden sm:flex">
+        {%- if page.description -%}
+          <span>{{- page.description -}}</span>
+        {%- endif -%}
+      </div>
+      {% if has_notes %}{{ notes_section(page) }}{% endif %}
+    </div>
+    {{ mobile_nav(page, has_image) }}
+    <div id="layout"
+         data-visible="false"
+         class="{{ styles.entity.cards }} sm:mt-4">
+      {% if render_photo %}{{ page_photo(page) }}{% endif %}
+      <div id="tabs"
+           lp-component
+           class="{{ styles.card.primary }}">
+        <div lp-nav class="{{ styles.layout.nav.title }}" data-nav="tabs">
+          <div data-role="header" class="{{ styles.layout.nav.header }}">
+            <span class="text-default-dark" data-role="title"></span>
+            {{ sub_toggles(page) }}
+            {{ controls.page_controls() }}
+          </div>
+          {{ toggles('tabs', false) }}
+        </div>
+        {{ info_tab(page, is_owner_page, is_owner_viewer, view_permissions, is_own_page, can_view_user_settings) }}
+        {% if render_document %}{{ document_tab(page, has_document) }}{% endif %}
+        {% if render_tasks %}{{ task_tab(page, has_tasks) }}{% endif %}
+        {% if render_files %}{{ files_tab(page, has_files) }}{% endif %}
+      </div>
+    </div>
+  </div>
+{% endmacro %}
+
+{% block title %}
+  {{ page.name }}
+{% endblock title %}
+
+{% block content %}
+  {{ main() }}
+{% endblock content %}

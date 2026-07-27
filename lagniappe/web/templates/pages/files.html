@@ -1,0 +1,85 @@
+{% import 'controls.html' as controls %}
+
+{% macro files_form(page) %}
+  <form lp-create
+        data-widget="FileUpload"
+        data-title="Upload File"
+        data-help="upload_file"
+        data-close="files:nav"
+        data-visible="false"
+        data-controls="true"
+        data-destination="files:BaseList"
+        data-route="{{ url_for('files.upload', key=page.urlsafe_key) }}"
+        class="{{ styles.form.default }} mt-4 sm:mt-0">
+    <button type="submit" class="{{ styles.button.submit }} hidden"></button>
+  </form>
+{% endmacro %}
+
+{% macro empty_file_list_item() %}
+  <li class="text-kind-default font-semibold italic text-center py-4 text-lg"
+      data-role="empty">No files have been uploaded to this page</li>
+{% endmacro %}
+
+{% macro file_list_item(file, page) %}
+  <li data-key="{{ file.urlsafe_key }}"
+      lp-entity
+      lp-link
+      data-fingerprint="{{ file.fingerprint }}"
+      data-name="{{ file.name }}"
+      data-kind="file"
+      class="{{ styles.list.itemHeader }}">
+    <div class="flex flex-row items-start justify-between gap-2 w-full">
+      <div class="flex min-w-0 items-start gap-3">
+        {% if file.properties.file.image %}
+          <img src="{{ file.properties.file.image }}"
+               alt=""
+               data-role="thumbnail"
+               class="size-16 shrink-0 rounded-md object-cover">
+        {% endif %}
+        <div class="flex min-w-0 flex-col gap-1">
+          <a data-role="title"
+             data-kind="file"
+             href="{{ url_for('files.view', key=file.urlsafe_key) }}"
+             class="{{ styles.link.title }}">{{- file.name -}}</a>
+          {% if file.summary %}
+            <p class="line-clamp-3 text-sm font-normal leading-snug text-base-medium">{{ file.summary }}</p>
+          {% endif %}
+        </div>
+      </div>
+      {% if page.allowed(Action.EDIT) and not current_user.is_public %}{{ controls.delete() }}{% endif %}
+    </div>
+  </li>
+{% endmacro %}
+
+{% macro file_list(page, files=None) %}
+  {% set can_upload = page.allowed(Action.EDIT) and not current_user.is_public %}
+  <ul data-widget="BaseList"
+      lp-load
+      data-persistent="true"
+      data-visible="true"
+      {% if can_upload %}data-if-empty="FileUpload"{% endif %}
+      data-route="{{ url_for('pages.files', key=page.urlsafe_key) }}"
+      class="{{ styles.list.container }}">
+    {%- if files -%}
+      {% for file in files %}{{ file_list_item(file, page) }}{% endfor %}
+    {%- elif files is not none and not can_upload -%}
+      {{ empty_file_list_item() }}
+    {%- endif -%}
+  </ul>
+{% endmacro %}
+
+{% macro files_tab(page, active=True) %}
+  <div id="files"
+       lp-component
+       data-title="Files"
+       data-default="BaseList"
+       data-tab="true"
+       data-visible="false"
+       data-kind="file"
+       data-attribute="files"
+       data-has-attribute="{{ active|yesno }}"
+       data-parent-nav="tabs">
+    {% if page.allowed(Action.EDIT) and not current_user.is_public %}{{ files_form(page) }}{% endif %}
+    {{ file_list(page) }}
+  </div>
+{% endmacro %}

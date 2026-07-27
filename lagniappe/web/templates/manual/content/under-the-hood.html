@@ -1,0 +1,96 @@
+{% from "manual/macros.html" import heading, subheading, card, callout, link, nav_buttons %}
+<div class="space-y-6">
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Lagniappe is a Flask/Jinja application with server-rendered HTML and
+      vanilla JavaScript modules on the frontend. It uses Google Cloud for
+      hosting, storage, auth, tasks, OCR, and optional AI, plus Redis for search,
+      filters, cache, and sync state.
+    </p>
+    <p class="text-base-medium">
+      The architecture is intentionally conservative. The tradeoff is fewer
+      frontend framework assumptions in exchange for some cloud-service and
+      operational ones.
+    </p>
+  {% endcall %}
+
+  {{ heading("Stack", icon="sitemap", kind="page") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li><strong>Backend:</strong> Python, Flask, Jinja, Datastore, Cloud Storage, Cloud Tasks.</li>
+      <li><strong>Frontend:</strong> server-rendered templates, vanilla ES modules, Rollup, Tailwind CSS.</li>
+      <li><strong>Editor:</strong> TipTap/ProseMirror with Yjs for collaborative document state.</li>
+      <li><strong>Search/cache:</strong> Redis with search and JSON features.</li>
+      <li><strong>Auth/messaging:</strong> Google Identity Platform and Firebase Cloud Messaging.</li>
+      <li><strong>AI/OCR:</strong> Vertex AI and Document AI when configured.</li>
+    </ul>
+  {% endcall %}
+
+  {{ heading("Why Server Rendering") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Pages have real URLs, links work normally, and the browser is not
+      responsible for deciding what private data exists. The server loads the
+      entity, checks permission, and renders only what the user can see.
+    </p>
+    <p class="text-base-medium">
+      JavaScript adds interactivity: widgets, forms, sync, editor behavior,
+      offline queues, uploads, and dynamic table updates. It is not the source of
+      permission truth.
+    </p>
+  {% endcall %}
+
+  {{ heading("Durability") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      The app is built to keep working with minimal routine change: ordinary
+      HTML, CSS, JavaScript, Python, and managed cloud services rather than a
+      large single-page-app framework.
+    </p>
+    <p class="text-base-medium mb-3">
+      Every so often, things outside the app shift -- cloud APIs, OAuth rules,
+      Firebase messaging behavior, Python runtimes, AI models, security
+      patches, or billing policies. The architecture is meant to make those
+      shifts small chores rather than rewrites.
+    </p>
+    {% call callout("tip", False) %}
+      The most reliable long-term safety net is the simple stuff: exports,
+      backups, source code in git, tests, and a few notes on how to recover
+      the project. With those in place, infrastructure changes stay
+      manageable.
+    {% endcall %}
+  {% endcall %}
+
+  {{ heading("Data Ownership") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Your records live in your Datastore, your files in your Cloud Storage
+      buckets, and AI requests go through your Vertex AI configuration. Lagniappe
+      itself does not have a hosted control plane or licensing server.
+    </p>
+    <p class="text-base-medium">
+      That is a real advantage. The other side of it is that you also own the
+      small ongoing housekeeping: backups, account recovery, billing alerts,
+      domain renewal, and making sure someone can pick up administrator duties
+      if needed.
+    </p>
+  {% endcall %}
+
+  {{ heading("When Something Else May Fit Better") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      A few situations where a different tool is probably a smoother match:
+    </p>
+    <ul class="text-base-medium space-y-2">
+      <li>You need contractual uptime or vendor support guarantees.</li>
+      <li>Occasional cloud-provider setup or billing work is not something you want on your plate.</li>
+      <li>You need an app that runs entirely without Google Cloud.</li>
+      <li>You want to customize the code without ever maintaining a fork.</li>
+      <li>You need formal compliance features beyond what your own cloud controls and procedures cover.</li>
+    </ul>
+  {% endcall %}
+
+  {{ nav_buttons(
+    prev={"key": "ai", "name": "AI Integration", "kind": "form"}
+  ) }}
+</div>

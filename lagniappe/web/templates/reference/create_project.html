@@ -1,0 +1,47 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Creating Projects") %}
+  <section>
+    {{ subheading("What Projects Do") }}
+    <p class="text-sm text-base-dark">
+      Projects collect related tasks into one place while the tasks still live on their original pages. They are useful for recurring workflows, multi-step processes, and shared work that needs filtering.
+    </p>
+    {% call callout("tip") %}
+      A simple project can just group tasks. A more structured project can also have a document and model tasks.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Creation Options") }}
+    <div class="space-y-3">
+      {% call feature("Generate or Manual", icon="generate", kind="project") %}
+        Describe a workflow and let AI draft a project, or create a simpler project manually.
+      {% endcall %}
+      {% call feature("Project Features", icon="settings.page", kind="project") %}
+        Enable a project document for notes or procedures, and enable tasks when you want model tasks and task filtering.
+      {% endcall %}
+      {% call feature("Model Tasks", icon="model", kind="task") %}
+        Model tasks are optional templates or phases. They can carry task forms so repeated work collects the same data every time.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Typical Flow") }}
+    {% call step(1, "Create the project") %}
+      <p class="text-sm text-base-medium">Give it a clear name and enable only the features the workflow needs.</p>
+    {% endcall %}
+    {% call step(2, "Add model tasks if useful") %}
+      <p class="text-sm text-base-medium">Use model tasks for phases like Intake, Review, Approval, or Follow-up.</p>
+    {% endcall %}
+    {% call step(3, "Assign real tasks") %}
+      <p class="text-sm text-base-medium">Tasks can be created from pages and linked back to this project for tracking.</p>
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Worth Remembering") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Projects organize tasks; they do not replace the page where each task belongs.</li>
+      <li>Use model tasks when the same kind of work repeats often.</li>
+      <li>Start simple, then add structure once the project pattern is clear.</li>
+    </ul>
+  </section>
+{% endcall %}

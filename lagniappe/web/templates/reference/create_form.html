@@ -1,0 +1,44 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Creating Forms") %}
+  <section>
+    {{ subheading("What This Form Does") }}
+    <p class="text-sm text-base-dark">
+      This panel creates a new form and adds it to the Form Index. A form is a reusable set of fields that can collect structured information on pages or tasks.
+    </p>
+    {% call callout("tip") %}
+      Pick the form type based on where the form will be used: page forms describe records, while task forms guide work that needs to be completed.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Form Types") }}
+    <div class="space-y-3">
+      {% call feature("Page Form", icon="page", kind="page") %}
+        Use page forms for information that describes something: contacts, inventory, clients, recipes, reference records, or anything you want to filter on a category page.
+      {% endcall %}
+      {% call feature("Task Form", icon="task", kind="task") %}
+        Use task forms for process checklists, approvals, inspections, intake workflows, and other work where completion status matters.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("After Creation") }}
+    {% call step(1, "Name the form") %}
+      <p class="text-sm text-base-medium">Use a name that will make sense when attaching it to pages, categories, projects, or model tasks.</p>
+    {% endcall %}
+    {% call step(2, "Choose Page or Task") %}
+      <p class="text-sm text-base-medium">The type controls which components are available in the builder and where the form can be attached.</p>
+    {% endcall %}
+    {% call step(3, "Build the schema") %}
+      <p class="text-sm text-base-medium">Open the new form from the index to add fields, configure settings, and preview the finished form.</p>
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Good Defaults") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Start small. Add the fields users truly need, then expand once the workflow is clear.</li>
+      <li>Use clear names and descriptions for values people will look up later.</li>
+      <li>Use required fields carefully on task forms because they can block task completion until filled.</li>
+    </ul>
+  </section>
+{% endcall %}

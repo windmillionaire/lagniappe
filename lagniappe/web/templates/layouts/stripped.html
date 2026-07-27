@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="mode" content="{{ CONFIG.testing and 'testing' or 'production' }}">
+    <link rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="/images/favicon-32x32.png?v={{ CONFIG.BUILD_ID }}">
+    {% if CONFIG.production %}<link rel="icon" type="image/x-icon" href="/favicon.ico?v={{ CONFIG.BUILD_ID }}">{% endif %}
+    <link rel="stylesheet" href="/style.css?v={{ CONFIG.BUILD_ID }}">
+    <title>
+
+      {% block title %}
+      {% endblock title %}
+    </title>
+  </head>
+  <body class="{{ styles.layout.body }}">
+    <nav class="main-nav fixed top-0 z-50 w-full bg-page-default">
+      <div class="px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-start w-full max-w-7xl">
+        <a class="{{ styles.nav.link }}" href="{{ url_for('home.home_page') }}">
+          <img class="h-8 w-8"
+               src="/images/favicon-32x32.png?v={{ CONFIG.BUILD_ID }}"
+               alt="logo"
+               width="32"
+               height="32">
+        </a>
+      </div>
+    </nav>
+    <main class="{{ styles.layout.main }}">
+
+      {% block content %}
+      {% endblock content %}
+    </main>
+  </body>
+</html>

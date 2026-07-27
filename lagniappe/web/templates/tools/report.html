@@ -1,0 +1,491 @@
+{% extends "layouts/base.html" %}
+{% from "common.html" import format_name %}
+{% import "controls.html" as controls %}
+{% macro proposal_details(details, classes="pl-5") %}
+  {% if details %}
+    <dl class="{{ classes }} flex flex-wrap gap-x-4 gap-y-1 text-xs text-base-medium">
+      {% for detail in details %}
+        <div class="flex min-w-0 flex-row gap-1">
+          <dt data-kind="{{ detail.kind }}"
+              class="font-semibold text-kind-default">{{ detail.label }}:</dt>
+          <dd class="min-w-0">{{ detail.value }}</dd>
+        </div>
+      {% endfor %}
+    </dl>
+  {% endif %}
+{% endmacro %}
+{% macro proposal_support(items, classes="pl-5") %}
+  {% if items %}
+    <div class="{{ classes }} flex flex-col gap-1 text-xs text-base-medium">
+      {% for item in items %}
+        <div data-skipped="{{ item.skip|yesno }}"
+             data-action-index="{{ item.action_index }}"
+             class="flex min-w-0 flex-col gap-1 data-[skipped=true]:opacity-50">
+          <div class="flex min-w-0 flex-row gap-1">
+            <span data-kind="{{ item.kind }}"
+                  class="font-semibold text-kind-default">{{ item.label }}:</span>
+            <span class="min-w-0{% if item.label == 'Summary' %} block truncate{% endif %}"
+                  {% if item.label == 'Summary' %}title="{{ item.value }}"{% endif %}>{{ item.value }}</span>
+            {% if item.skip %}
+              <span class="shrink-0 font-semibold text-delete-default">Skipped</span>
+            {% endif %}
+          </div>
+          {{ proposal_details(item.details, "pl-4") }}
+          {{ proposal_support(item.support, "pl-4") }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endmacro %}
+{% macro proposal_action_item(report, action, index) %}
+  {% set action_label = action.display_label or (action.data.name if action.data else none) or "Action" %}
+  <li data-role="proposal-action"
+      data-kind="default"
+      data-action-index="{{ action.action_index }}"
+      data-action-indexes="{{ action.group_action_indexes|join(',') }}"
+      data-skip-dependencies="{{ 'false' if action.skip_dependencies is sameas false else 'true' }}"
+      data-skipped="{{ action.skip|yesno }}"
+      class="group/action flex flex-row items-start justify-between gap-3 rounded-md bg-base-bg p-3 outline-2 outline-kind-default data-[skipped=true]:outline-delete-default">
+    <div class="flex min-w-0 flex-1 flex-col gap-1 transition-opacity group-data-[skipped=true]/action:opacity-50">
+      <div class="flex min-w-0 flex-row items-baseline gap-2">
+        <span class="shrink-0 font-semibold text-base-medium">{{ index }}.</span>
+        <span class="min-w-0 font-semibold">{{ action_label }}</span>
+        <span data-role="skipped-label"
+              data-visible="{{ action.skip|yesno }}"
+              class="shrink-0 text-delete-default font-semibold">Skipped</span>
+      </div>
+      {{ proposal_details(action.details) }}
+      {{ proposal_support(action.support) }}
+      {% if action.reason %}<p class="pl-5">{{ action.reason }}</p>{% endif %}
+    </div>
+    {% if report.status == "ready" and action.action_index and action.type not in ["needs_review", "skip"] %}
+      <button type="button"
+              data-role="skip-action"
+              data-route="{{ url_for('tools.skip_report_action', key=report.urlsafe_key, action_index=action.action_index) }}"
+              data-skip-icon="close"
+              data-restore-icon="undo"
+              data-skip-kind="delete"
+              data-restore-kind="reset"
+              data-kind="{{ 'reset' if action.skip else 'delete' }}"
+              class="{{ styles.toggle.container }} shrink-0 opacity-100"
+              aria-label="{{ 'Restore action' if action.skip else 'Skip action' }} {{ action.action_index }}"
+              title="{{ 'Restore action' if action.skip else 'Skip action' }}">
+        {{ render_icon("undo" if action.skip else "close") }}
+      </button>
+    {% endif %}
+  </li>
+{% endmacro %}
+{% macro result_meta(action, classes="mt-1 flex flex-wrap gap-3 pl-5 text-xs text-base-medium", show_page=false) %}
+  {% if (show_page and action.page) or action.project or action.model or action.form or action.file_summary or action.submission or action.updates or action.schema_updates or action.moved %}
+    <div class="{{ classes }}">
+      {% if show_page and action.page %}
+        <span>Page: {{ format_name(action.page, parent=False) }}</span>
+      {% endif %}
+      {% if action.project %}
+        <span>Project: {{ format_name(action.project, parent=False) }}</span>
+      {% endif %}
+      {% if action.model %}
+        <span>Model Task: {{ format_name(action.model, parent=False) }}</span>
+      {% endif %}
+      {% if action.form %}
+        <span>Form: {{ format_name(action.form, parent=False) }}</span>
+      {% endif %}
+      {% if action.file_summary %}
+        <span>
+          Summary:
+          {% if action.file_summary.complete %}
+            complete
+          {% elif action.file_summary.present %}
+            present
+          {% else %}
+            missing
+          {% endif %}
+        </span>
+      {% endif %}
+      {% if action.submission %}
+        <span>
+          Submission:
+          {% if action.submission.created %}
+            created
+          {% elif action.submission.empty_reason %}
+            not filled
+          {% else %}
+            missing
+          {% endif %}
+        </span>
+      {% endif %}
+      {% if action.updates %}
+        <span>Updates: {{ action.updates.applied|length }} applied</span>
+      {% endif %}
+      {% if action.schema_updates %}
+        <span>Schema updates: {{ action.schema_updates.applied|length }} applied</span>
+      {% endif %}
+      {% if action.moved and action.moved.to %}
+        <span>Moved to: {{ format_name(action.moved.to, parent=False) }}</span>
+      {% endif %}
+    </div>
+  {% endif %}
+{% endmacro %}
+{% macro result_attachments(action, classes="mt-1 flex flex-col gap-1 pl-5") %}
+  {% if action.attachments %}
+    <ul class="{{ classes }}">
+      {% for attachment in action.attachments %}
+        {% set attachment_summary = attachment.summary or attachment.file_summary %}
+        <li>
+          <span class="font-semibold">File attached:</span>
+          {{ format_name(attachment.entity, parent=False) }}
+          {% if attachment_summary %}
+            <span class="text-xs text-base-medium">
+              Summary:
+              {% if attachment_summary.complete %}
+                complete
+              {% elif attachment_summary.present %}
+                present
+              {% else %}
+                missing
+              {% endif %}
+            </span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endmacro %}
+{% macro result_histories(action, classes="mt-1 flex flex-col gap-1 pl-5") %}
+  {% if action.histories %}
+    <ul class="{{ classes }}">
+      {% for history in action.histories %}
+        <li>
+          <span class="font-semibold">History added:</span>
+          {% if history.target %}
+            {{ format_name(history.target, parent=False) }}
+          {% else %}
+            {{ history.title or history.note or "Task history" }}
+          {% endif %}
+          {% if history.submission %}
+            <span class="text-xs text-base-medium">
+              Submission:
+              {% if history.submission.created %}
+                created
+              {% elif history.submission.empty_reason %}
+                not filled
+              {% else %}
+                missing
+              {% endif %}
+            </span>
+          {% endif %}
+          {{ result_attachments(history, "mt-1 flex flex-col gap-1 pl-5") }}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endmacro %}
+{% macro result_tasks(action, classes="mt-1 flex flex-col gap-1 pl-5") %}
+  {% if action.tasks %}
+    <ul class="{{ classes }}">
+      {% for task in action.tasks %}
+        <li>
+          <span class="font-semibold">
+            {% if task.created is sameas false %}
+              Reused Task:
+            {% else %}
+              Task:
+            {% endif %}
+          </span>
+          {% if task.entity %}
+            {{ format_name(task.entity, parent=False) }}
+          {% else %}
+            {{ task.title or task.note or "task" }}
+          {% endif %}
+          {{ result_meta(task, "mt-1 flex flex-wrap gap-3 pl-5 text-xs text-base-medium") }}
+          {{ result_attachments(task, "mt-1 flex flex-col gap-1 pl-5") }}
+          {{ result_histories(task, "mt-1 flex flex-col gap-1 pl-5") }}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+{% endmacro %}
+
+{% block title %}
+  {{ ("Ask: " ~ report.instructions) if report.tool == "ask" and report.instructions else report.name }}
+{% endblock title %}
+
+{% block content %}
+  {% set has_actions = report.proposal and report.proposal.actions %}
+  {% set executable_actions = report.proposal.actions|rejectattr("type", "equalto", "needs_review")|rejectattr("type", "equalto", "skip")|list if has_actions else [] %}
+  {% set is_ask = report.tool == "ask" %}
+  {% set report_title = ("Ask: " ~ report.instructions) if is_ask and report.instructions else report.name %}
+  {% set report_icon = "ask" if report.tool == "ask" else "create" if report.tool == "create" else "organize" if report.tool == "organize" else "generate" %}
+  {% set can_revise = report.proposal and report.tool in ["organize", "ask", "create"] and report.status == "ready" %}
+  {% set completed_result_actions = report.result.actions|selectattr("status", "equalto", "complete")|list if report.result and report.result.actions else [] %}
+  {% set can_retry = report.status == "failed" and report.result and report.result.ledger_version == 1 and report.result.status == "failed" %}
+  {% set can_undo = report.status in ["complete", "failed", "undo_failed"] and completed_result_actions and report.result.status != "undone" and not report.result.undone %}
+  {% set revise_button_label = "Revise Response" if is_ask else "Revise Plan" %}
+  {% set revise_heading = "Revise Response" if is_ask else "Revise Proposal" %}
+  {% set operation_key = report.deferred_job.key if report.deferred_job else none %}
+  <main lp-view
+        lp-entity
+        data-key="{{ report.urlsafe_key }}"
+        data-fingerprint="{{ report.fingerprint }}"
+        data-kind="report"
+        data-pending="{{ 'true' if report.pending else 'false' }}"
+        data-status="{{ report.status }}"
+        {% if operation_key %}data-operation="{{ operation_key }}"{% endif %}
+        class="group/view max-w-5xl mx-auto">
+    <div class="{{ styles.layout.view.header }}" data-flipped="false">
+      <nav class="{{ styles.layout.view.title }}" data-nav="view">
+        <div class="min-w-0">
+          {{ render_icon(report_icon, "mr-3 text-kind-default") }}
+          <span data-role="title">{{ report_title }}</span>
+        </div>
+        <div class="{{ styles.layout.nav.group }}" data-role="actions">
+          <a href="{{ url_for('home.home_page') }}"
+             class="{{ styles.toggle.container }}"
+             aria-label="Close"
+             title="Close">
+            {{ render_icon("close") }}
+          </a>
+        </div>
+      </nav>
+    </div>
+
+    <div id="layout" class="sm:mt-4">
+      <div class="{{ styles.card.primary }} overflow-hidden">
+        <section class="flex flex-col gap-5 p-4 sm:p-5">
+          {% if report.pending or report.error or report.status in ["running", "failed"] or (not is_ask and not report.proposal) %}
+            <div data-role="report-status" class="flex flex-col gap-1">
+              <h2 class="text-base font-semibold text-base-dark">Status</h2>
+              <p data-role="report-status-note" class="text-base-dark">
+                {% if report.pending %}{{ render_icon("spinner", "mr-1") }}{% endif %}
+                {{ report.error or report.note }}
+              </p>
+              {% if report.pending and operation_key %}
+                <p class="text-sm text-base-medium" aria-live="polite">
+                  <span data-role="deferred-phase">Waiting to start</span>
+                  <span aria-hidden="true"> · </span>
+                  <span data-role="deferred-elapsed">just now</span>
+                </p>
+              {% endif %}
+            </div>
+          {% elif is_ask and report.proposal %}
+            <div data-role="ask-answer" class="flex flex-col gap-2">
+              <h2 class="text-base font-semibold text-base-dark">Answer</h2>
+              {% if report.properties.proposal.answer_html %}
+                <div data-role="ask-answer-html"
+                     class="html-content text-base-dark">{{ report.properties.proposal.answer_html|safe }}</div>
+              {% else %}
+                <p data-role="ask-answer-summary" class="text-base-dark">{{ report.proposal.summary or report.summary or report.note }}</p>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if report.input_files %}
+            <div class="flex flex-col gap-1">
+              <h2 class="text-base font-semibold text-base-dark">Files</h2>
+              <ul class="flex flex-col gap-1 text-sm">
+                {% for file in report.input_files %}
+                  <li>
+                    <a class="{{ styles.link.default }}"
+                       data-kind="file"
+                       href="{{ url_for('files.view', key=file.urlsafe_key) }}">{{ file.name }}</a>
+                  </li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endif %}
+
+          {% if report.proposal and (not is_ask or has_actions) %}
+            <div data-role="report-result" class="flex flex-col gap-2">
+              <h2 class="text-base font-semibold text-base-dark">{{ "Suggested Actions" if is_ask else "Proposal" }}</h2>
+              {% if report.proposal.summary and not is_ask %}
+                <p class="text-base-dark">{{ report.proposal.summary }}</p>
+              {% endif %}
+              {% if report.proposal.issues %}
+                <div class="flex flex-col gap-1 rounded-md bg-base-bg p-3 outline-2 outline-kind-default">
+                  <h3 class="text-sm font-semibold text-base-dark">Issues</h3>
+                  <ul class="list-disc pl-5 text-sm text-base-dark">
+                    {% for issue in report.proposal.issues %}
+                      <li>{{ issue }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+              {% set schema_actions = report.properties.proposal.display_actions|selectattr("type", "equalto", "schema_update_group")|list %}
+              {% set regular_actions = report.properties.proposal.display_actions|rejectattr("type", "equalto", "schema_update_group")|list %}
+              {% if schema_actions %}
+                <div class="flex flex-col gap-2">
+                  <h3 class="text-sm font-semibold text-base-dark">Schema Updates</h3>
+                  <ol class="flex flex-col gap-2 text-sm text-base-dark">
+                    {% for action in schema_actions %}
+                      {{ proposal_action_item(report, action, loop.index) }}
+                    {% endfor %}
+                  </ol>
+                </div>
+              {% endif %}
+              {% if regular_actions %}
+                <ol class="flex flex-col gap-2 text-sm text-base-dark">
+                  {% for action in regular_actions %}
+                    {{ proposal_action_item(report, action, loop.index) }}
+                  {% endfor %}
+                </ol>
+              {% endif %}
+              <div data-role="accordion" data-open="false" class="flex flex-col gap-2">
+                <button type="button"
+                        lp-expand
+                        data-role="expand"
+                        data-open="false"
+                        aria-expanded="false"
+                        class="flex w-fit items-center gap-2 text-sm font-semibold text-base-default">
+                  {{ render_icon("expand") }}
+                  <span>Proposal JSON</span>
+                </button>
+                <pre data-role="accordion-panel"
+                     data-visible="false"
+                     class="overflow-auto rounded-md bg-base-bg p-3 text-xs">{{ report.proposal|tojson(indent=2) }}</pre>
+              </div>
+            </div>
+          {% endif %}
+
+          {% if report.result and not report.pending %}
+            <div class="flex flex-col gap-2">
+              <h2 class="text-base font-semibold text-base-dark">Result</h2>
+              {% if report.result.status == "complete" %}
+                <p class="text-base-dark">Work done.</p>
+              {% elif report.result.status == "undone" %}
+                <p class="text-base-dark">Work undone.</p>
+              {% elif report.result.status == "failed" %}
+                <p class="text-delete-default">This report stopped before all actions were completed.</p>
+              {% endif %}
+              {% if report.result.actions %}
+                <ul class="flex flex-col gap-1 text-sm">
+                  {% for action in report.properties.result.grouped_actions %}
+                    {% set action_label = action.display_label or action.note or "action" %}
+                    <li {% if action.type == "delete_page" and action.entity %}
+                          lp-entity
+                          data-key="{{ action.entity.id }}"
+                          data-kind="{{ action.entity.kind }}"
+                          data-fingerprint="{{ action.entity.fingerprint }}"
+                        {% endif %}>
+                      <span class="font-semibold">{{ loop.index }}.</span>
+                      {% if action.status == "complete" and action.entity and action.type == "summarize_file" %}
+                        Summarized {{ format_name(action.entity, parent=False) }}
+                      {% elif action.status == "complete" and action.entity and action.type == "page_group" %}
+                        Existing Page: {{ format_name(action.entity, parent=False) }}
+                      {% elif action.status == "complete" and action.entity and action.type in ["attach_file_to_page", "attach_file_to_task"] %}
+                        Attached {{ format_name(action.entity, parent=False) }}{% if action.target %} to {{ format_name(action.target, parent=False) }}{% endif %}
+                      {% elif action.status == "complete" and action.entity and action.type == "add_category" %}
+                        {% if action.previous and action.previous.had_category %}
+                          Category already present:
+                        {% else %}
+                          Added category
+                        {% endif %}
+                        {% if action.target %}{{ format_name(action.target, parent=False) }} to{% endif %}
+                        {{ format_name(action.entity, parent=False) }}
+                      {% elif action.status == "complete" and action.entity and action.type in ["move_page", "move_task", "move_file"] %}
+                        Moved {{ format_name(action.entity, parent=False) }}{% if action.target %} to {{ format_name(action.target, parent=False) }}{% endif %}
+                      {% elif action.status == "complete" and action.entity and action.type == "rename_entity" %}
+                        Renamed to {{ format_name(action.entity, parent=False) }}
+                      {% elif action.status == "complete" and action.entity and action.type == "delete_page" %}
+                        Cleanup suggested:
+                        {{ format_name(action.entity, parent=False) }}
+                        <span class="ml-2 inline-flex align-middle">
+                          {{ controls.delete(label='Delete ' ~ action.entity.name) }}
+                        </span>
+                      {% elif action.status == "complete" and action.type == "update_submission_fields" %}
+                        Updated submissions
+                      {% elif action.status == "complete" and action.entity and action.type == "update_form_schema" %}
+                        Updated schema for {{ format_name(action.entity, parent=False) }}
+                      {% elif action.status == "complete" and action.entity and action.created is sameas false %}
+                        Reused {{ action.entity.kind|title }}: {{ format_name(action.entity, parent=False) }}
+                      {% elif action.status == "complete" and action.entity %}
+                        Created {{ action.entity.kind|title }}: {{ format_name(action.entity, parent=False) }}
+                      {% elif action.status == "skipped" %}
+                        Skipped {{ action.display_label or "action" }}{% if action.error %}: {{ action.error }}{% elif action.note %}: {{ action.note }}{% endif %}
+                      {% elif action.status == "failed" %}
+                        Could not finish {{ action_label }}{% if action.error %}: {{ action.error }}{% endif %}
+                      {% elif action.status == "complete" %}
+                        Completed {{ action_label }}
+                      {% else %}
+                        {{ action.status|title }} {{ action_label }}
+                      {% endif %}
+                      {{ result_meta(action, show_page=True) }}
+                      {{ result_attachments(action) }}
+                      {{ result_tasks(action) }}
+                      {{ result_histories(action) }}
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% endif %}
+              <div data-role="accordion" data-open="false" class="flex flex-col gap-2">
+                <button type="button"
+                        lp-expand
+                        data-role="expand"
+                        data-open="false"
+                        aria-expanded="false"
+                        class="flex w-fit items-center gap-2 text-sm font-semibold text-base-default">
+                  {{ render_icon("expand") }}
+                  <span>Result JSON</span>
+                </button>
+                <pre data-role="accordion-panel"
+                     data-visible="false"
+                     class="overflow-auto rounded-md bg-base-bg p-3 text-xs">{{ report.result|tojson(indent=2) }}</pre>
+              </div>
+              {% if can_undo %}
+                <form method="post"
+                      action="{{ url_for('tools.undo_report', key=report.urlsafe_key) }}"
+                      data-role="{{ 'recovery-undo-report-form' if report.status in ['failed', 'undo_failed'] else 'undo-report-form' }}"
+                      class="flex justify-end">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <button type="submit"
+                          data-kind="delete"
+                          class="{{ styles.button.submit }} w-fit">{{ "Resume Undo" if report.status == "undo_failed" else "Undo Completed Actions" if report.status == "failed" else "Undo Report" }}</button>
+                </form>
+              {% endif %}
+            </div>
+          {% endif %}
+
+          {% if can_revise %}
+            <form method="post"
+                  action="{{ url_for('tools.revise_report', key=report.urlsafe_key) }}"
+                  data-role="revise-report-form"
+                  data-submit="{{ revise_button_label }}"
+                  data-submitting="{{ 'Revising Response' if is_ask else 'Revising Plan' }}"
+                  data-submitted="Revision Started"
+                  data-icon="{{ 'ask' if is_ask else report.tool if report.tool == 'create' else 'generate' }}"
+                  class="flex flex-col gap-2 rounded-md bg-base-bg p-3 outline-2 outline-kind-default">
+              <label for="report-feedback"
+                     class="text-sm font-semibold text-base-dark">{{ revise_heading }}</label>
+              <textarea id="report-feedback"
+                        name="feedback"
+                        required
+                        rows="3"
+                        class="{{ styles.textarea }}"
+                        placeholder="Tell the AI what to change."></textarea>
+              <button type="submit"
+                      data-kind="report"
+                      class="{{ styles.button.submit }} w-fit">{{ revise_button_label }}</button>
+            </form>
+          {% endif %}
+
+          {% if (report.status == "ready" and executable_actions) or can_retry %}
+            <form method="post"
+                  action="{{ url_for('tools.run_report', key=report.urlsafe_key) }}"
+                  data-role="{{ 'retry-report-form' if can_retry else 'run-report-form' }}"
+                  class="flex flex-col gap-2">
+              {% if can_retry %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />{% endif %}
+              {% if can_retry and report.error %}
+                <div data-role="error"
+                     data-visible="true"
+                     data-kind="error"
+                     class="{{ styles.message }}">{{ report.error }}</div>
+              {% endif %}
+              <button type="submit"
+                      data-kind="report"
+                      class="{{ styles.button.submit }} w-fit self-end">{{ "Retry Proposal" if can_retry else "" }}</button>
+            </form>
+          {% endif %}
+        </section>
+      </div>
+    </div>
+  </main>
+{% endblock content %}

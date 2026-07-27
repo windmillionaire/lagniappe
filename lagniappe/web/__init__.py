@@ -1,0 +1,181 @@
+"""Construct the process-global Flask application during module import.
+
+Boot sequence: Sentry (prod only) -> Flask app + CSRF -> initialize_app
+(cache, database, AI, entities, jinja, errors, blueprints) -> LoginManager
+-> Firebase Admin. The after_request hook adds security headers and
+the X-Lagniappe-Invalidate-Cache header that triggers service worker
+cache clearing.
+"""
+
+from datetime import timedelta
+import json
+from urllib.parse import urlsplit
+
+import firebase_admin
+from flask import Flask, g, session
+from flask_wtf.csrf import CSRFProtect
+
+from lagniappe import CONFIG
+from lagniappe.core.exceptions.request import sanitize_sentry_event
+
+from .start import initialize_app
+
+# @testable false
+# @covered-by lagniappe/web/__init__.py::_filter_expected_fcm_not_found_spans
+# @reason exact provider/status matching is asserted through the transaction filter
+def _is_expected_fcm_not_found_span(span):
+    data = span.get("data") or {}
+    status = data.get("http.response.status_code")
+    description = span.get("description") or ""
+    return status in {404, "404"} and (
+        description.startswith("POST https://fcm.googleapis.com/v1/projects/")
+        and description.endswith("/messages:send")
+    )
+
+
+# @testable true
+# @tests tests_e2e/001_site/test_001c_messaging.py::test_sentry_filter_removes_only_fcm_not_found_spans
+# @pair messaging:expected-provider-failure
+# @pair observability:span-filtering
+def _filter_expected_fcm_not_found_spans(event, _hint):
+    """Sanitize transactions and hide handled stale-token FCM 404 spans."""
+    event = sanitize_sentry_event(event, _hint)
+    spans = event.get("spans")
+    if not isinstance(spans, list):
+        return event
+
+    event["spans"] = [
+        span for span in spans if not _is_expected_fcm_not_found_span(span)
+    ]
+    return event
+
+
+SENTRY_LOADED = False
+
+if CONFIG.capture_errors:
+    import sentry_sdk
+    from sentry_sdk.integrations.google_genai import GoogleGenAIIntegration
+
+    sentry_sdk.init(
+        dsn=CONFIG.SENTRY_DSN,
+        send_default_pii=False,
+        traces_sample_rate=1.0,
+        profile_session_sample_rate=1.0,
+        profile_lifecycle="trace",
+        before_send=sanitize_sentry_event,
+        before_send_transaction=_filter_expected_fcm_not_found_spans,
+        integrations=[GoogleGenAIIntegration()],
+    )
+    SENTRY_LOADED = True
+
+
+app = Flask(
+    __name__, static_url_path="", static_folder="static", template_folder="templates"
+)
+
+app.config.update(
+    USE_SESSION_FOR_NEXT=True,
+    SECRET_KEY=CONFIG.SECRET_KEY,
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_HTTPONLY=True,
+    REMEMBER_COOKIE_SECURE=True,
+    REMEMBER_COOKIE_SAMESITE="Lax",
+    REMEMBER_COOKIE_HTTPONLY=True,
+    REMEMBER_COOKIE_DURATION=timedelta(days=30),
+    PERMANENT_SESSION_LIFETIME=timedelta(days=1),
+)
+
+app.debug = CONFIG.development
+app.testing = CONFIG.testing
+
+csrf = CSRFProtect()
+csrf.init_app(app)
+initialize_app(app, csrf)
+
+SCRIPT_SRC = "script-src 'self' https://accounts.google.com"
+CONNECT_SRC = "connect-src 'self' https://*.googleapis.com"
+STORAGE_SRC = "https://storage.googleapis.com"
+
+if SENTRY_LOADED:
+    sentry_dsn = urlsplit(CONFIG.SENTRY_DSN)
+    if sentry_dsn.scheme in {"http", "https"} and sentry_dsn.hostname:
+        sentry_host = sentry_dsn.hostname
+        if ":" in sentry_host:
+            sentry_host = f"[{sentry_host}]"
+        if sentry_dsn.port:
+            sentry_host = f"{sentry_host}:{sentry_dsn.port}"
+        CONNECT_SRC += f" {sentry_dsn.scheme}://{sentry_host}"
+
+CSP = "; ".join(
+    [
+        "default-src 'self'",
+        SCRIPT_SRC,
+        "style-src 'self' 'unsafe-inline' https://accounts.google.com",
+        f"img-src 'self' blob: data: {STORAGE_SRC}",
+        f"media-src 'self' {STORAGE_SRC}",
+        "font-src 'self'",
+        CONNECT_SRC,
+        "frame-src 'self' https://www.youtube-nocookie.com https://accounts.google.com",
+        "worker-src 'self' blob:",
+        "manifest-src 'self'",
+        "base-uri 'self'",
+        "form-action 'self'",
+    ]
+)
+
+# @testable false
+# @covered-by lagniappe/web/__init__.py::add_lagniappe_headers
+# @reason local predicate for the response-header hook
+def _client_cache_invalidation_requested():
+    invalidate = bool(session.get(CONFIG.LOGIN_INVALIDATE_CACHE_KEY))
+    if invalidate and not session.get("_user_id"):
+        session.pop(CONFIG.LOGIN_INVALIDATE_CACHE_KEY, None)
+    return invalidate
+
+
+# @testable true
+# @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
+# @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
+# @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
+# @features web-headers
+# @dimensions etag security conditional-request missing-fingerprint entity-revision
+@app.after_request
+def add_lagniappe_headers(response):
+    """Add security headers, ETag fingerprinting, and cache invalidation flag."""
+    headers = {
+        "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+        "X-Frame-Options": "SAMEORIGIN",
+        "X-Content-Type-Options": "nosniff",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Cache-Control": "no-store" if g.get("NO_CACHE") else "private, no-cache",
+        "Content-Security-Policy": CSP,
+    }
+
+    if getattr(g, "fingerprint", False):
+        headers["ETag"] = f'"{g.fingerprint}"'
+
+    entity_revisions = list(
+        getattr(g, "ENTITY_RESPONSE_REVISIONS", {}).values()
+    )
+    if entity_revisions:
+        headers["X-Lagniappe-Entity-Revisions"] = json.dumps(
+            entity_revisions, separators=(",", ":")
+        )
+
+    if _client_cache_invalidation_requested():
+        headers["X-Lagniappe-Invalidate-Cache"] = True
+
+    if getattr(CONFIG, "DEBUG_TRACING", False):
+        from lagniappe.core.exceptions.entity_load import print_entity_load_trace
+
+        print_entity_load_trace(response)
+
+    response.headers.update(headers)
+    return response
+
+
+firebase_admin.initialize_app(
+    CONFIG.google_credentials,
+    options={"projectId": CONFIG.GOOGLE_CLOUD_PROJECT},
+)

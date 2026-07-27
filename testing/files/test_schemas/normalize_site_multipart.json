@@ -1,0 +1,8 @@
+[
+	{
+		"id": "site",
+		"type": "input",
+		"input": "text",
+		"title": "Site"
+	}
+]

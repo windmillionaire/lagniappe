@@ -1,0 +1,130 @@
+{% import 'controls.html' as controls %}
+
+{% macro create_model_task(project) %}
+  <form lp-create
+        data-visible="false"
+        data-widget="CreateModelTask"
+        data-title="New Model Task"
+        data-controls="true"
+        data-nav="false"
+        data-close="model-tasks:ModelTaskList"
+        data-help="model_tasks"
+        data-route="{{ url_for('projects.create_model', key=project.urlsafe_key) }}"
+        data-destination="model-tasks:ModelTaskList"
+        class="{{ styles.form.default }} mt-4 sm:mt-0">
+    {% if Resource.FORMS.allowed(Action.VIEW) %}
+      <div data-role="form-select" class="{{ styles.select.container }}">
+        <h3 class="{{ styles.label.sectionHeading }}">Add Form</h3>
+        <button lp-select
+                type="button"
+                data-action="select-form"
+                data-placeholder="Default Form"
+                data-index="form"
+                data-creatable="true"
+                data-form-type="task"
+                data-title="Default Form"
+                data-kind="form"
+                class="{{ styles.select.button }}"></button>
+      </div>
+    {% endif %}
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}
+
+{% macro model_task_list(project) %}
+  <ul data-widget="ModelTaskList"
+      data-route="{{ url_for('projects.view', key=project.urlsafe_key) }}"
+      data-title="Model Tasks"
+      data-visible="true"
+      data-persistent="true"
+      data-nav="true"
+      data-controls="false"
+      class="{{ styles.list.container }}">
+    {% for t in project.model_tasks|sort(attribute='order') if t.allowed(Action.VIEW, current_user) %}{{ model_task(t) }}{% endfor %}
+  </ul>
+{% endmacro %}
+
+{% macro card_controls(t) %}
+  <div class="{{ styles.form.header.controls }}"
+       data-role="controls"
+       data-visible="false">
+    {{ controls.help() }}
+    {{ controls.close() }}
+  </div>
+{% endmacro %}
+
+{% macro model_task(t) %}
+  {% set task_key = t.urlsafe_key %}
+  {% set project_key = t.project.urlsafe_key %}
+  <li id="{{ t.hash }}"
+      lp-component
+      lp-entity
+      data-key="{{ t.urlsafe_key }}"
+      data-fingerprint="{{ t.fingerprint }}"
+      data-open="nav"
+      data-persistent="true"
+      data-nav="{{ t.hash }}"
+      data-kind="model-task"
+      data-title="{{ t.name }}"
+      class="group">
+    <div lp-nav
+         data-nav="{{ t.hash }}"
+         lp-show="{{ t.hash }}:ModelTaskInfo"
+         data-toggle="true"
+         class="{{ styles.list.itemHeader }}">
+      <div data-role="header" class="{{ styles.layout.nav.header }}">
+        <span data-role="title">{{ t.name }}</span>
+        {{ card_controls(t) }}
+      </div>
+      <nav data-nav="{{ t.hash }}">
+        {% if t.allowed(Action.EDIT) %}{{ controls.delete() }}{% endif %}
+      </nav>
+    </div>
+    <form lp-update
+          data-widget="ModelTaskInfo"
+          data-visible="false"
+          data-name="{{ t.name or '' }}"
+          data-nav="false"
+          data-controls="true"
+          data-help="model_tasks"
+          data-close="{{ t.hash }}:nav"
+          data-route="{{ url_for('projects.update_model', key=project_key, task_key=task_key) }}"
+          class="{{ styles.form.default }}">
+      {% if Resource.FORMS.allowed(Action.VIEW) %}
+        <div data-role="form-select" class="{{ styles.select.container }}">
+          <h3 class="{{ styles.label.sectionHeading }}">Attached Form</h3>
+          <button lp-select
+                  type="button"
+                  data-action="select-form"
+                  data-placeholder="default form..."
+                  data-index="form"
+                  data-creatable="true"
+                  data-form-type="task"
+                  data-title="Default Form"
+                  {% if t.form %}data-preload='{{ t.form.details|tojson }}'{% endif %}
+                  class="{{ styles.select.button }}"></button>
+        </div>
+      {% endif %}
+      {{ controls.edited_marker(url_for('projects.model_info', key=project_key, task_key=task_key)) }}
+      <button type="submit" class="{{ styles.button.submit }}"></button>
+    </form>
+    <div class="{{ styles.list.links.container }}" data-role="status">
+      <div lp-link
+           class="{{ styles.list.links.item }} bg-project-bg/50"
+           data-kind="project">
+        <a class="{{ styles.link.title }}"
+           data-role="title"
+           href="{{ url_for('projects.status', key=project_key, task_key=task_key, completed='true') }}">Completed</a>
+        {{ render_icon("next", "text-project-default") }}
+      </div>
+      <div lp-link
+           class="{{ styles.list.links.item }} bg-task-bg/50"
+           data-kind="task">
+        <a class="{{ styles.link.title }}"
+           data-role="title"
+           href="{{ url_for('projects.status', key=project_key, task_key=task_key, completed='false') }}">In Progress</a>
+        {{ render_icon("next", "text-task-default") }}
+      </div>
+    </div>
+  </li>
+{% endmacro %}

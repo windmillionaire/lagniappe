@@ -1,0 +1,21 @@
+{% macro document_tab(project, active=True) %}
+  <div lp-component
+       id="document"
+       data-title="Document"
+       data-default="CollaborativeDocument"
+       data-kind="project"
+       data-visible="false"
+       data-tab="true"
+       data-open="false"
+       data-attribute="document"
+       data-has-attribute="{{ active|yesno }}"
+       data-parent-nav="tabs">
+    <div data-widget="CollaborativeDocument"
+         lp-sync="{{ project.sync_ids.document.id }}"
+         {% if project.sync_ids.document.fingerprint %}lp-fingerprint="{{ project.sync_ids.document.fingerprint }}"{% endif %}
+         data-fullscreen="false"
+         data-readonly="{{ project.readonly|yesno }}"
+         data-public-limited="{{ current_user.is_public|yesno }}"
+         {% if project.db.get('document_history') %}data-history="true"{% endif %}></div>
+  </div>
+{% endmacro %}
