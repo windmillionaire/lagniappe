@@ -1389,8 +1389,21 @@ def _pr_check_repository(tmp_path: Path) -> Path:
             )
         ),
         "run.py": Path(run.__file__).read_text(encoding="utf-8"),
+        "package.json": '{"name": "lagniappe", "version": "0.1.0"}\n',
+        "package-lock.json": (
+            '{"name": "lagniappe", "version": "0.1.0", '
+            '"packages": {"": {"name": "lagniappe", "version": "0.1.0"}}}\n'
+        ),
+        "documentation/releases/0.1.0.md": (
+            "# Version 0.1.0\n\n- Initial test release.\n"
+        ),
         "src/script/example.mjs": "export const value = 1;\n",
         "lagniappe/web/static/script.js": "built-main\n",
+        "lagniappe/web/static/build.json": (
+            '{"build_id": "base1234", "mode": "production", '
+            '"version": "0.1.0"}\n'
+        ),
+        "lagniappe/web/static/sw.js": 'const BUILD_ID = "base1234";\n',
         "lagniappe/web/start/styles/icons.py": "ICONS = {}\n",
         "lagniappe/web/start/styles/styles.py": "STYLES = {}\n",
         "config/constants.py": 'SENTRY_DSN = "test"\nBUILD_ID = "base1234"\n',
@@ -1434,7 +1447,7 @@ def test_run_py_pr_check_rejects_committed_static_output(tmp_path, capsys):
     assert run.run_pr_check_command(["--base", "main"], repo_root=repo) == 1
     output = capsys.readouterr().out
     assert "lagniappe/web/static/script.js" in output
-    assert "maintainer will apply the source to main" in output
+    assert "active next/* branch is prepared for release" in output
 
 
 def test_run_py_pr_check_rejects_build_id_and_staged_generated_files(
@@ -1464,6 +1477,90 @@ def test_run_py_pr_check_rejects_build_id_and_staged_generated_files(
     assert "config/constants.py (BUILD_ID)" in output
     assert "lagniappe/web/start/styles/icons.py" in output
     assert "lagniappe/web/static/chunks/contributor.js" in output
+
+
+# @features release
+# @dimensions delivery-tree
+def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
+    repo = _pr_check_repository(tmp_path)
+    build_id = "b1234567"
+    updates = {
+        "package.json": '{"name": "lagniappe", "version": "0.2.0"}\n',
+        "package-lock.json": (
+            '{"name": "lagniappe", "version": "0.2.0", '
+            '"packages": {"": {"name": "lagniappe", "version": "0.2.0"}}}\n'
+        ),
+        "documentation/releases/0.2.0.md": (
+            "# Version 0.2.0\n\n- Added the release-train workflow.\n"
+        ),
+        "lagniappe/web/static/build.json": (
+            f'{{"build_id": "{build_id}", "mode": "production", '
+            f'"version": "0.2.0"}}\n'
+        ),
+        "lagniappe/web/static/sw.js": f'const BUILD_ID = "{build_id}";\n',
+        "config/constants.py": (
+            f'SENTRY_DSN = "test"\nBUILD_ID = "{build_id}"\n'
+        ),
+    }
+    for relative, content in updates.items():
+        path = repo / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "Prepare release")
+
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 0
+    (repo / "lagniappe/web/static/build.json").write_text(
+        '{"build_id": "unstaged", "mode": "development", '
+        '"version": "unreleased"}\n',
+        encoding="utf-8",
+    )
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 0
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(repo / "run.py"),
+            "release-check",
+            "--base",
+            "main",
+        ],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert "Release check passed against main" in result.stdout
+    assert "Release check passed against main" in capsys.readouterr().out
+
+
+# @features release
+# @dimensions delivery-tree
+def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
+    repo = _pr_check_repository(tmp_path)
+    (repo / "package.json").write_text(
+        '{"name": "lagniappe", "version": "0.2"}\n',
+        encoding="utf-8",
+    )
+    (repo / "lagniappe/web/static/build.json").write_text(
+        '{"build_id": "base1234", "mode": "development", '
+        '"version": "0.1.0"}\n',
+        encoding="utf-8",
+    )
+    local_config = repo / "config/files/lagniappe_settings.yaml"
+    local_config.parent.mkdir(parents=True, exist_ok=True)
+    local_config.write_text("SECRET_KEY: do-not-publish\n", encoding="utf-8")
+    _git(repo, "add", "package.json", "lagniappe/web/static/build.json")
+    _git(repo, "add", "-f", "config/files/lagniappe_settings.yaml")
+    _git(repo, "commit", "-m", "Incomplete release")
+
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
+    output = capsys.readouterr().out
+    assert "Installation-local files are present" in output
+    assert "package.json version must use stable X.Y.Z form" in output
+    assert "was not changed by a fresh production build" in output
+    assert "does not contain a newly generated BUILD_ID" in output
+    assert "must identify a production build" in output
 
 
 def test_run_py_pr_clean_restores_generated_output_and_keeps_authored_changes(

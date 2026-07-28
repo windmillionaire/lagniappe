@@ -75,6 +75,67 @@ assert.deepEqual(precacheUrls(chunks, buildId), [
     )
 
 
+# @features frontend-build
+# @dimensions build-metadata
+def test_build_metadata_records_release_mode(run_node):
+    run_node(
+        r"""
+import assert from "node:assert/strict";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { updateServiceWorker } from "./build/utility.mjs";
+
+const originalDirectory = process.cwd();
+const outputDirectory = mkdtempSync(join(tmpdir(), "lagniappe-build-mode-"));
+try {
+  process.chdir(outputDirectory);
+  mkdirSync("src/script", { recursive: true });
+  mkdirSync("config", { recursive: true });
+  mkdirSync("lagniappe/web/static", { recursive: true });
+  writeFileSync(
+    "src/script/sw.template.mjs",
+    [
+      'const BUILD_ID = "__BUILD_ID__";',
+      "const PROTOCOL = /* __BROWSER_PROTOCOL__ */ null;",
+      "const PRECACHE = /* __PRECACHE_URLS__ */ [];",
+    ].join("\n"),
+  );
+  writeFileSync("config/browser_protocol.json", '{"version": 1}\n');
+
+  updateServiceWorker(
+    "b1234567",
+    "1.2.3",
+    "production",
+  ).writeBundle({}, {});
+
+  assert.deepEqual(
+    JSON.parse(readFileSync("lagniappe/web/static/build.json", "utf8")),
+    {
+      build_id: "b1234567",
+      mode: "production",
+      version: "1.2.3",
+    },
+  );
+  assert.match(
+    readFileSync("lagniappe/web/static/sw.js", "utf8"),
+    /b1234567/,
+  );
+} finally {
+  process.chdir(originalDirectory);
+  rmSync(outputDirectory, { recursive: true });
+}
+""",
+        module=True,
+    )
+
+
 # @features frontend-build icons
 # @dimensions font-delivery subset cache stale-cleanup
 def test_material_symbols_subset_font_is_emitted_with_content_hash(run_node):

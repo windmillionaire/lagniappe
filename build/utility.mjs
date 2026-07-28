@@ -520,16 +520,25 @@ const updateConstantsBuildId = (buildId) => {
 	writeFileSync(constantsPath, content);
 };
 
-/** @testable infrastructure */
-const writeBuildMetadata = (buildId, version) => {
+/**
+ * @testable false
+ * @covered-by build/utility.mjs::updateServiceWorker
+ * @reason private metadata serializer exercised through service-worker output
+ */
+const writeBuildMetadata = (buildId, version, mode) => {
 	writeFileSync(
 		buildMetadataPath,
-		`${JSON.stringify({ build_id: buildId, version }, null, 2)}\n`,
+		`${JSON.stringify({ build_id: buildId, mode, version }, null, 2)}\n`,
 	);
 };
 
-/** @testable infrastructure */
-const updateServiceWorker = (buildId, version) => {
+/**
+ * @testable true
+ * @tests tests_js/test_022_build_chunk_versioning.py::test_build_metadata_records_release_mode
+ * @features frontend-build
+ * @dimensions build-metadata
+ */
+const updateServiceWorker = (buildId, version, mode) => {
 	return {
 		name: "update-service-worker",
 		writeBundle(_options, bundle) {
@@ -548,7 +557,7 @@ const updateServiceWorker = (buildId, version) => {
 				JSON.stringify(precacheUrls(bundle, buildId), null, "\t"),
 			);
 
-			writeBuildMetadata(buildId, version);
+			writeBuildMetadata(buildId, version, mode);
 			writeFileSync("./lagniappe/web/static/sw.js", swContent);
 		},
 	};

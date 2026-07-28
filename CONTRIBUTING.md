@@ -131,12 +131,22 @@ Use `npm run watch` while editing frontend/style sources. `npm run build`
 creates the production bundle; Sentry source maps are generated and uploaded
 only when `SENTRY_AUTH_TOKEN` is configured.
 
-## Pull request build policy
+## Branch and pull request policy
 
-Generated delivery files are committed on `main` so ordinary installations do
-not need Node or the development toolchain. They are maintainer-built
-artifacts, not contributor-authored PR content. Contributor PRs must therefore
-exclude:
+`main` is the stable distribution branch used by ordinary installation and
+upgrade. It changes only for a complete release or hotfix. Normal development
+targets the single active branch named `next/<version>`, visible in the
+repository's branch list.
+
+Create a short-lived branch from that active `next/<version>` branch and open
+the PR back to the same branch. A PR to `main` is reserved for the maintainer's
+fully prepared `next/*` release or `hotfix/*` branch and will fail CI otherwise.
+The maintainer reviews and squash-merges accepted source PRs through GitHub.
+
+Generated delivery files are committed for releases so ordinary installations
+do not need Node or the development toolchain. They are maintainer-built
+artifacts, not contributor-authored PR content. Source PRs targeting `next/*`
+must therefore exclude:
 
 - `lagniappe/web/static/`;
 - generated server style maps in `lagniappe/web/start/styles/`;
@@ -144,46 +154,38 @@ exclude:
 - the generated root `lagniappe.yaml` and `index.yaml`; and
 - build-only `BUILD_ID` changes in `config/constants.py`.
 
-Contributors may build locally to test their work. They may exclude generated
-changes from the commit themselves or use the optional index-cleaning helper,
-then run the authoritative check:
+Contributors may build locally to test their work. Before pushing, compare
+against the exact remote branch the PR will target:
 
 ```bash
-venv/bin/python run.py pr-clean  # optional
-venv/bin/python run.py pr-check
+venv/bin/python run.py pr-clean --base origin/next/X.Y.Z  # optional
+venv/bin/python run.py pr-check --base origin/next/X.Y.Z
 ```
 
-`pr-clean` resets only the generated paths in Git's prospective commit/index to
-the PR merge base and restores only the `BUILD_ID` line. Local static output,
-style maps, and installation config remain in the working tree for continued
-testing; authored source and other constants are preserved. If generated
-output was already committed, the helper stages its reversal, which must be
-committed before pushing.
+Replace `origin` when the upstream repository uses a different remote name.
+`pr-clean` restores only the generated paths in Git's prospective commit/index
+to the PR merge base and restores only the `BUILD_ID` line. Local installation
+configuration remains in the working tree; authored source and other constants
+are preserved. If generated output was already committed, the helper stages
+its reversal, which must be committed before pushing.
 
-`pr-check` compares the prospective commit/index with the merge base. It ignores
-unstaged and untracked local build output because those files are not PR
-content. Both commands default to `origin/main`, then `main`; use `--base REF`
-for a different target. `pr-check` is validation-only and never changes Git
-state.
+`pr-check` ignores unstaged and untracked local build output because those files
+are not PR content. It is validation-only and never changes Git state. Both
+commands fall back to `origin/main`, then `main`, only when `--base` is omitted;
+source PRs should pass their actual `next/*` target explicitly.
 
-The maintainer integrates a PR locally without committing immediately, runs a
-fresh production build from the combined source, reviews the result, and
-commits the source plus maintainer-generated delivery files together:
+When the release is frozen, the maintainer creates one canonical production
+build on `next/*`, tests that complete tree through the installer's
+`--branch` path, and opens a release PR to `main`. Release CI deliberately
+permits and requires the generated files:
 
 ```bash
-git switch main
-git merge --squash CONTRIBUTOR_BRANCH
-npm ci
-npm run build
-git status
-git commit
+venv/bin/python run.py release-check --base origin/main
 ```
 
-This applies even when the PR did not directly change frontend source. The
-public `main` branch therefore never has newly integrated source paired with
-stale generated files, while the contributor PR remains source-only and
-reviewable. The hosted PR workflow invokes the same `pr-check` command as a
-hard gate; in a hosted checkout, the index represents the committed PR branch.
+The release PR is squash-merged only after the source checks, release check,
+and upgrade rehearsal pass. A hotfix follows the same complete-tree rule from
+a `hotfix/*` branch.
 
 ```bash
 venv/bin/python run.py dev          # development server (port 5050)
@@ -206,8 +208,8 @@ Run the source-quality checks before submitting a change:
 npm run check
 venv/bin/python -m ruff check .
 venv/bin/python run.py traceability --check --fail-on warning
-venv/bin/python run.py traceability --changed origin/main --check --fail-on warning
-venv/bin/python run.py pr-check
+venv/bin/python run.py traceability --changed origin/next/X.Y.Z --check --fail-on warning
+venv/bin/python run.py pr-check --base origin/next/X.Y.Z
 ```
 
 Biome checks authored JavaScript, CSS, and JSON; Ruff performs the narrow
@@ -226,9 +228,9 @@ boundary. This is a trust-based contribution record, and the maintainer reruns
 the appropriate tests before merging.
 
 The CI workflow, repository runner, test tree, evidence manifest, and the
-configuration and dependency files used by those checks are code-owned by the
-maintainer. Changes to that trust boundary are welcome when needed, but GitHub
-requires a separate maintainer approval before they can merge.
+configuration and dependency files used by those checks form a maintainer
+review boundary. Changes to that boundary are welcome when needed, but only the
+repository owner can update the protected `next/*` and `main` branches.
 
 ## Icons
 
@@ -258,12 +260,15 @@ of modified checkouts should merge source themselves and run
 
 ## Pull requests
 
-1. Fork the repository and branch from `main`.
-2. Read the relevant `documentation/` page before changing code.
-3. Follow existing patterns in the area you are editing.
-4. Add or update tests when behavior changes.
-5. Run the relevant tests and commit `testing/evidence/latest.json`.
-6. Submit a PR with a clear description of what changed and why.
+1. Fork the repository and find the single active `next/<version>` branch.
+2. Create your work branch from that `next/<version>` branch.
+3. Read the relevant `documentation/` page before changing code.
+4. Follow existing patterns in the area you are editing.
+5. Add or update tests when behavior changes.
+6. Run the relevant tests and review and commit
+   `testing/evidence/latest.json`.
+7. Run `pr-check` against the exact `next/<version>` target.
+8. Submit a PR to that target with a clear description of what changed and why.
 
 ## License
 

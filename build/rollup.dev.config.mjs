@@ -131,7 +131,7 @@ export default [
 			emitMaterialSymbols(),
 			emitPdfWorker(),
 			emitThirdPartyLicenses(),
-			updateServiceWorker(buildId, settings.VERSION),
+			updateServiceWorker(buildId, settings.VERSION, "development"),
 			visualizer({
 				filename: `${reportsDir}/bundle-stats-dev.html`,
 				gzipSize: true,

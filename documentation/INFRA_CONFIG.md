@@ -394,9 +394,16 @@ to retain disposable build output locally while removing it from the index.
 contributor gate. It computes the Git merge base and rejects those generated
 artifacts when they are present in the prospective commit/index. It ignores
 unstaged and untracked generated files because they cannot be part of the PR
-until staged. Maintainers generate and commit the delivery files while
-integrating the source onto `main`; installation-local config remains
-untracked.
+until staged. Normal contributor PRs target the active `next/<version>` branch
+and pass that exact ref with `--base`.
+
+`venv/bin/python run.py release-check [--base REF]` is the complementary
+release gate for a prepared `next/*` or `hotfix/*` PR to `main`. It rejects
+installation-local files, requires a fresh build metadata file, service
+worker, and `BUILD_ID`, and verifies that the package, package-lock, build
+metadata, and release note use one stable `X.Y.Z` version. The maintainer runs
+one canonical production build after the release tree is frozen; the complete
+branch is installer-tested before it is squash-merged into `main`.
 
 ### Deployment (`runner/deploy.py`)
 

@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - main
+      - "next/**"
   workflow_dispatch:
 
 permissions:
@@ -18,6 +19,8 @@ jobs:
     name: Source quality and traceability
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    env:
+      PR_BASE_REF: ${{ github.event.pull_request.base.sha || github.sha }}
 
     steps:
       - name: Check out the prospective change
@@ -66,11 +69,29 @@ jobs:
       - name: Check changed-source test evidence
         run: >-
           venv/bin/python run.py traceability
-          --changed origin/main
+          --changed "$PR_BASE_REF"
           --check
           --fail-on warning
           --no-report
           --no-manifest
 
       - name: Check contributor artifact boundaries
-        run: venv/bin/python run.py pr-check --base origin/main
+        if: github.event_name == 'pull_request' && startsWith(github.base_ref, 'next/')
+        run: venv/bin/python run.py pr-check --base "$PR_BASE_REF"
+
+      - name: Check release branch name
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        env:
+          PR_HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          case "$PR_HEAD_BRANCH" in
+            next/*|hotfix/*) ;;
+            *)
+              echo "Pull requests to main must come from next/* or hotfix/*."
+              exit 1
+              ;;
+          esac
+
+      - name: Check complete release tree
+        if: github.event_name == 'pull_request' && github.base_ref == 'main'
+        run: venv/bin/python run.py release-check --base "$PR_BASE_REF"

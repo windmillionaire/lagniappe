@@ -52,7 +52,6 @@ Build, configuration, installation, and test workflows.
 | [INFRA_BUILD.md](INFRA_BUILD.md) | Rollup bundles (login, icons, main), production vs dev, custom plugins, chunk splitting. |
 | [INFRA_CONFIG.md](INFRA_CONFIG.md) | Runtime-safe configuration plus the local runner boundary for GCloud switching, deployment, dev/test servers, and upgrades. |
 | [INFRA_SETUP.md](INFRA_SETUP.md) | Installation flow (GCP, Firebase, Redis, admin, AI defaults, optional modes), plus upgrades. |
-| [MAINTAINER_PULL_REQUESTS.md](MAINTAINER_PULL_REQUESTS.md) | Maintainer review and local integration workflow for source-only contributor PRs and production delivery builds. |
 | [DATA_MIGRATIONS.md](DATA_MIGRATIONS.md) | Authoring, testing, releasing, running, auditing, and retiring persisted-data migrations. |
 | [TESTING.md](TESTING.md) | Test suites, commands, fixtures, managed test server, traceability tools. |
 | [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) | Practical guide for adding or reviewing tests. |
@@ -87,7 +86,7 @@ Build, configuration, installation, and test workflows.
 | Work on durable background jobs | [AI_PIPELINE](AI_PIPELINE.md), [BACKEND_ENTITIES](BACKEND_ENTITIES.md), [BACKEND_TOOLS](BACKEND_TOOLS.md) | `lagniappe/core/tools/deferred_jobs.py`, `lagniappe/core/tools/task_queue.py`, `lagniappe/web/routes/process/` |
 | Author a template | [FRONTEND_NAVIGATION](FRONTEND_NAVIGATION.md), [BACKEND_WEB](BACKEND_WEB.md) | `lagniappe/web/templates/` |
 | Build the frontend | [INFRA_BUILD](INFRA_BUILD.md) | `build/rollup.config.mjs`, `build/utility.mjs` |
-| Review and integrate a pull request | [MAINTAINER_PULL_REQUESTS](MAINTAINER_PULL_REQUESTS.md) | `.github/workflows/ci.yml`, `.github/CODEOWNERS`, `run.py` |
+| Prepare a pull request | [CONTRIBUTING](../CONTRIBUTING.md) | `.github/workflows/ci.yml`, `run.py` |
 | Deploy the app | [INFRA_CONFIG](INFRA_CONFIG.md) | `runner/deploy.py` |
 | Set up a new instance | [INFRA_SETUP](INFRA_SETUP.md) | `setup.sh`, `setup.cmd`, `installer/` |
 | Back up or restore production data | [INFRA_SETUP](INFRA_SETUP.md#disaster-recovery-backups), [INFRA_CONFIG](INFRA_CONFIG.md#data-disaster-recovery-runpy) | `runner/data_recovery.py`, `run.py` |

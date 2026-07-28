@@ -171,7 +171,7 @@ export default [
 			emitMaterialSymbols(),
 			emitPdfWorker(),
 			emitThirdPartyLicenses(),
-			updateServiceWorker(buildId, settings.VERSION),
+			updateServiceWorker(buildId, settings.VERSION, "production"),
 			...sentryPlugins("lagniappe-frontend", {
 				filesToDeleteAfterUpload: uploadedSourceMaps,
 			}),

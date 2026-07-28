@@ -121,6 +121,12 @@ PR_GENERATED_PATHS = (
     *PR_DISPOSABLE_GENERATED_PATHS,
 )
 PR_BUILD_ID_PATH = "config/constants.py"
+RELEASE_BUILD_METADATA_PATH = "lagniappe/web/static/build.json"
+RELEASE_SERVICE_WORKER_PATH = "lagniappe/web/static/sw.js"
+RELEASE_VERSION_PATTERN = re.compile(
+    r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$"
+)
+RELEASE_BUILD_ID_PATTERN = re.compile(r"^b[0-9a-f]{7}$")
 
 
 def _strip_runner_args(test_args: list[str]) -> tuple[bool, list[str]]:
@@ -904,7 +910,8 @@ def run_pr_check_command(
         prog="run.py pr-check",
         description=(
             "Check that a contributor PR contains authored source only. "
-            "Generated delivery files are built by the maintainer during integration."
+            "Generated delivery files are built by the maintainer during "
+            "release preparation."
         ),
     )
     parser.add_argument(
@@ -935,13 +942,246 @@ def run_pr_check_command(
             f"{python_command('run.py', 'pr-clean')}, then rerun pr-check."
         )
         print(
-            "The maintainer will apply the source to main, run 'npm run build', "
-            "and commit the newly generated delivery files with the source."
+            "The maintainer will produce and commit the generated delivery files "
+            "when the active next/* branch is prepared for release."
         )
         return 1
 
     print(
         f"PR generated-artifact check passed against {base_ref} "
+        f"(merge base {merge_base[:12]})."
+    )
+    return 0
+
+
+def _read_release_text(
+    repo_root: Path,
+    relative_path: str,
+    issues: list[str],
+) -> str | None:
+    try:
+        return _run_pr_git(
+            repo_root,
+            ["show", f":{relative_path}"],
+        ).stdout
+    except RuntimeError as error:
+        issues.append(f"{relative_path} could not be read from the index: {error}")
+        return None
+
+
+def _read_release_json(
+    repo_root: Path,
+    relative_path: str,
+    issues: list[str],
+) -> dict:
+    content = _read_release_text(repo_root, relative_path, issues)
+    if content is None:
+        return {}
+    try:
+        value = json.loads(content)
+    except json.JSONDecodeError as error:
+        issues.append(f"{relative_path} could not be read as JSON: {error}")
+        return {}
+    if not isinstance(value, dict):
+        issues.append(f"{relative_path} must contain a JSON object.")
+        return {}
+    return value
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_accepts_complete_release
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_incomplete_release
+# @features release
+# @dimensions delivery-tree
+def release_readiness_issues(
+    repo_root: Path,
+    base_ref: str,
+) -> tuple[str, list[str]]:
+    """Return release-tree problems in the prospective commit."""
+    merge_base = _run_pr_git(
+        repo_root,
+        ["merge-base", "HEAD", base_ref],
+    ).stdout.strip()
+    if not merge_base:
+        raise RuntimeError(f"Could not determine a merge base with {base_ref}")
+
+    changed_paths = _nul_paths(
+        _run_pr_git(
+            repo_root,
+            ["diff", "--cached", "--name-only", "-z", merge_base],
+        )
+    )
+    issues = []
+
+    local_paths = sorted(
+        path
+        for path in changed_paths
+        if any(
+            path == root or path.startswith(f"{root}/")
+            for root in PR_PRESERVED_LOCAL_PATHS
+        )
+    )
+    if local_paths:
+        issues.append(
+            "Installation-local files are present in the release: "
+            + ", ".join(local_paths)
+        )
+
+    for required_path in (
+        RELEASE_BUILD_METADATA_PATH,
+        RELEASE_SERVICE_WORKER_PATH,
+    ):
+        if required_path not in changed_paths:
+            issues.append(
+                f"{required_path} was not changed by a fresh production build."
+            )
+
+    build_id_changed = _diff_changes_build_id(
+        _run_pr_git(
+            repo_root,
+            [
+                "diff",
+                "--cached",
+                "--unified=0",
+                "--no-color",
+                merge_base,
+                "--",
+                PR_BUILD_ID_PATH,
+            ],
+        )
+    )
+    if not build_id_changed:
+        issues.append(
+            f"{PR_BUILD_ID_PATH} does not contain a newly generated BUILD_ID."
+        )
+
+    package = _read_release_json(repo_root, "package.json", issues)
+    package_lock = _read_release_json(repo_root, "package-lock.json", issues)
+    build_metadata = _read_release_json(
+        repo_root,
+        RELEASE_BUILD_METADATA_PATH,
+        issues,
+    )
+
+    version = package.get("version")
+    if not isinstance(version, str) or not RELEASE_VERSION_PATTERN.fullmatch(version):
+        issues.append("package.json version must use stable X.Y.Z form.")
+        version = None
+
+    lock_version = package_lock.get("version")
+    lock_root = package_lock.get("packages", {})
+    lock_root_version = (
+        lock_root.get("", {}).get("version")
+        if isinstance(lock_root, dict)
+        and isinstance(lock_root.get(""), dict)
+        else None
+    )
+    if version and (lock_version != version or lock_root_version != version):
+        issues.append(
+            "package-lock.json root versions do not match package.json "
+            f"version {version}."
+        )
+
+    if version and build_metadata.get("version") != version:
+        issues.append(
+            f"{RELEASE_BUILD_METADATA_PATH} version does not match "
+            f"package.json version {version}."
+        )
+    if build_metadata.get("mode") != "production":
+        issues.append(
+            f"{RELEASE_BUILD_METADATA_PATH} must identify a production build."
+        )
+
+    if version:
+        release_note_relative = f"documentation/releases/{version}.md"
+        release_note = _read_release_text(
+            repo_root,
+            release_note_relative,
+            issues,
+        )
+        if release_note is not None:
+            if not release_note.startswith(f"# Version {version}\n"):
+                issues.append(
+                    f"{release_note_relative} has the wrong title."
+                )
+            if not re.search(r"(?m)^- \S", release_note):
+                issues.append(
+                    f"{release_note_relative} has no release entries."
+                )
+
+    constants_content = (
+        _read_release_text(repo_root, PR_BUILD_ID_PATH, issues) or ""
+    )
+    build_id_match = re.search(
+        r'^BUILD_ID\s*=\s*"([^"]+)"\s*$',
+        constants_content,
+        flags=re.MULTILINE,
+    )
+    build_id = build_id_match.group(1) if build_id_match else None
+    if not build_id or not RELEASE_BUILD_ID_PATTERN.fullmatch(build_id):
+        issues.append(
+            f"{PR_BUILD_ID_PATH} must contain a generated eight-character BUILD_ID."
+        )
+    elif build_metadata.get("build_id") != build_id:
+        issues.append(
+            f"{RELEASE_BUILD_METADATA_PATH} build_id does not match "
+            f"{PR_BUILD_ID_PATH}."
+        )
+    else:
+        service_worker = _read_release_text(
+            repo_root,
+            RELEASE_SERVICE_WORKER_PATH,
+            issues,
+        )
+        if service_worker is not None:
+            if build_id not in service_worker:
+                issues.append(
+                    f"{RELEASE_SERVICE_WORKER_PATH} does not contain "
+                    f"the current build ID {build_id}."
+                )
+
+    return merge_base, issues
+
+
+def run_release_check_command(
+    command_args: list[str],
+    *,
+    repo_root: Path | None = None,
+) -> int:
+    """Validate a complete release or hotfix PR tree."""
+    parser = argparse.ArgumentParser(
+        prog="run.py release-check",
+        description=(
+            "Check version metadata, release notes, local-file boundaries, "
+            "and the maintainer-generated delivery build."
+        ),
+    )
+    parser.add_argument(
+        "--base",
+        metavar="REF",
+        help="Release base ref. Defaults to origin/main, then main.",
+    )
+    args = parser.parse_args(command_args)
+    repo_root = (repo_root or REPOSITORY_ROOT).resolve()
+
+    try:
+        base_ref = _resolve_pr_base(repo_root, args.base)
+        merge_base, issues = release_readiness_issues(repo_root, base_ref)
+    except RuntimeError as error:
+        print(f"Release check could not run: {error}")
+        return 2
+
+    if issues:
+        print(
+            f"Release check failed against {base_ref} "
+            f"(merge base {merge_base[:12]}):"
+        )
+        for issue in issues:
+            print(f"  - {issue}")
+        return 1
+
+    print(
+        f"Release check passed against {base_ref} "
         f"(merge base {merge_base[:12]})."
     )
     return 0
@@ -982,6 +1222,8 @@ if __name__ == "__main__":
         sys.exit(run_pr_check_command(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "pr-clean":
         sys.exit(run_pr_clean_command(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "release-check":
+        sys.exit(run_release_check_command(sys.argv[2:]))
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -997,6 +1239,7 @@ if __name__ == "__main__":
             "mutation-contracts",
             "pr-clean",
             "pr-check",
+            "release-check",
             "restore",
             "test",
             "test-server",

@@ -30,22 +30,28 @@ build-output pass.
 ### Pull request ownership
 
 Tracked generated output is maintainer-owned. Contributor PRs contain authored
-source only, even when contributors build locally for testing.
+source only and target the active `next/<version>` branch, even when
+contributors build locally for testing.
 `venv/bin/python run.py pr-clean` restores disposable build output to the PR
 merge base, removes untracked build files, and restores only `BUILD_ID`.
 Pass `--keep-build` to remove generated paths only from Git's prospective
 commit/index while leaving the local build available for testing.
 `venv/bin/python run.py pr-check` compares that prospective commit with
-`origin/main` (or an explicit `--base REF`) and rejects changes under
+an explicit `--base origin/next/<version>` and rejects changes under
 `lagniappe/web/static/`, generated Python style maps, installation-local
 `config/files/`, the generated root `lagniappe.yaml` and `index.yaml`, and
 build-only `BUILD_ID` churn. Unstaged and untracked local generated files are
-not PR content and are ignored.
+not PR content and are ignored. The commands retain their `origin/main`,
+then `main`, fallback for exceptional use, but a normal source PR should name
+its exact target.
 
-For integration, the maintainer applies or squashes the source change onto
-`main` without committing, runs `npm ci` and `npm run build`, then commits the
-source and freshly generated output together. This is done for every accepted
-PR, so the installable `main` tree never pairs new source with stale bundles.
+The maintainer squash-merges accepted source PRs into `next/*` without
+committing their local builds. At release freeze, the maintainer runs one
+canonical `npm ci` and `npm run build`, commits the fresh output to `next/*`,
+and runs `venv/bin/python run.py release-check --base origin/main`. The
+complete branch is installer-tested before its release PR is squash-merged
+into `main`. CI therefore forbids build output in source PRs to `next/*` and
+requires it in release or hotfix PRs to `main`.
 
 When `SENTRY_AUTH_TOKEN` is configured, production JavaScript source maps are
 generated as hidden Rollup outputs, uploaded to Sentry, then deleted from
@@ -100,6 +106,8 @@ Run via `npm run build`.
 - **Version**: `VERSION` is read from `config/files/lagniappe_settings.yaml`
 - **Build ID**: A short `BUILD_ID` is generated and written to
   `config/constants.py` for cache busting
+- **Build metadata**: `lagniappe/web/static/build.json` records
+  `"mode": "production"` for the release gate
 - **Service worker precache**: Injects the current dynamic chunk URLs so
   the service worker can warm them after an update
 - **Icon font**: Emits the official Material Symbols subset with a
@@ -121,6 +129,8 @@ Run via `npm run dev`.
 - **Version replacement**: Timestamp-based (`new Date().toISOString()`) for dev-only frontend constants
 - **Build ID**: A short `BUILD_ID` is generated and written to
   `config/constants.py` for cache busting
+- **Build metadata**: `lagniappe/web/static/build.json` records
+  `"mode": "development"` and cannot pass the release gate
 - **Test-server freshness**: E2E and managed test-server startup hashes the
   authored build inputs plus generated outputs and runs this build only when
   that state is stale or incomplete; the local state record lives at
@@ -247,13 +257,15 @@ supported runtime. Package `__init__.py` files intentionally receive
 exceptions for unused and late imports because they act as public facades or
 route-registration modules. Ruff is pinned in `requirements-dev.txt`.
 
-### `updateServiceWorker(buildId, version)`
+### `updateServiceWorker(buildId, version, mode)`
 
 Reads `src/script/sw.template.mjs`, replaces all `__BUILD_ID__` placeholders with
 the current build ID, injects the shared browser protocol plus the
 Rollup-generated versioned dynamic chunk URLs into their placeholders, and
-writes the result to `lagniappe/web/static/sw.js`. Runs during `writeBundle()`
-so the service worker always matches the current build.
+writes the result to `lagniappe/web/static/sw.js`. It also writes
+`lagniappe/web/static/build.json` with the build ID, application version, and
+explicit production/development mode. It runs during `writeBundle()` so the
+service worker and metadata always match the current build.
 
 ### `versionChunkImports(buildId)`
 
