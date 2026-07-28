@@ -89,7 +89,7 @@ All shared code is re-exported from `shared/index.mjs` as a single import point.
 | `sync.mjs` | `SyncManager` -- real-time collaborative-document synchronization. Handles registration, polling, push updates, and offline document-patch replay. Form updates use `EditWatcher` and deliberate submissions instead. See [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md). |
 | `modal.mjs` | Modal system: `Modal` (base), `DeleteModal`, `HelpModal`, `OfflineModal`, `MessagingModal`. Handles Escape/click-outside dismissal, load-from-server, and nested view transitions. |
 | `messaging.mjs` | Firebase Cloud Messaging setup. Handles permission prompts, VAPID key registration, token caching in localStorage, diagnostics on failure, and deterministic `test:` tokens in testing mode. |
-| `offline.mjs` | IndexedDB primitives for document sync records and explicit offline mutation records. Database version 4 hard-deletes the removed `activity` store and creates `mutations`. |
+| `offline.mjs` | IndexedDB primitives for document sync records and explicit offline mutation records. |
 | `offlineQueue.mjs` | `OfflineQueue` -- serializes explicit `lp-offline` mutation commands, restores optimistic overlays, replays commands, and hands conflicts to `EditWatcher`. It does not consume server-change events. |
 | `protocol.mjs` | Versioned public browser-event names, payload validators, and connectivity worker-message construction. Element-private DOM events remain local to their owners. |
 | `user.mjs` | `updateUserData()` and `updateUserLocation()` -- sync browser timezone/geolocation to the server session, with caching and distance-threshold checks. |

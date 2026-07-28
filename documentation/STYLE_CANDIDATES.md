@@ -77,7 +77,7 @@ responsive, or JavaScript-created contract. Test-result snapshots contain
 per-style fingerprints, so changing one registry record invalidates only its
 declared evidence; owned CSS remains conservatively invalidated by stylesheet.
 
-After a migration slice:
+After a style change:
 
 ```bash
 npm run dev

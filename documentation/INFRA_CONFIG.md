@@ -213,12 +213,11 @@ readable PEM CA bundle; setup stores the project-relative
 `config/files/redis_ca.pem` path. The shared connection builder resolves that
 path against the application root and configures redis-py with TLS, required CA
 verification, and hostname checking. Invalid enabled configurations fail
-instead of falling back to plaintext. The runtime keeps its existing lazy Redis
-initialization and the JSON cache shares the same verified client.
+instead of falling back to plaintext. Redis initializes lazily, and the JSON
+cache shares the same verified client.
 
 `config/constants.py` owns the one-hour Gunicorn request timeout. Deployment
-settings generation applies that timeout to the App Engine `entrypoint`, so
-setup updates do not restore the former 15-minute worker limit.
+settings generation applies that timeout to the App Engine `entrypoint`.
 Basic-scaled App Engine services support requests longer than an hour; the
 shared Cloud Tasks HTTP target still bounds a single deferred delivery attempt
 to 30 minutes.

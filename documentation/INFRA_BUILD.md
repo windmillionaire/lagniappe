@@ -208,9 +208,8 @@ The style graph reports:
 
 Normal runs write `reports/style-traceability.md` plus the versioned
 `reports/style-manifest.json`. Use `--json` for the shared traceability report
-envelope, or `--no-report --no-manifest` for a console-only pass. The old
-standalone audit command has been retired; for candidate-review cautions, see
-[STYLE_CANDIDATES.md](STYLE_CANDIDATES.md).
+envelope, or `--no-report --no-manifest` for a console-only pass. For
+candidate-review cautions, see [STYLE_CANDIDATES.md](STYLE_CANDIDATES.md).
 
 ### Biome
 

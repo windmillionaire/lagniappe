@@ -82,8 +82,7 @@ Git provenance for local diagnostics.
 Test-run schema 3 stores each unique path/fingerprint pair once in the
 top-level `fingerprint_pairs` table. Snapshot records contain integer references
 to that table; the reporter reconstructs the same path maps before checking
-currentness. Reading schema 2 remains supported, and the next test run migrates
-an existing schema-2 manifest without discarding its merged per-test results.
+currentness.
 
 This dependency graph is deliberately declared rather than guessed. Keep
 `@tests`, `@scaffolding`, and `@template` links accurate; a shared helper with

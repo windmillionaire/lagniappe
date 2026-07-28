@@ -120,8 +120,8 @@ Properties that are `RelatedEntityMixin` or `RelatedEntityListMixin` represent r
 - `attach(key_map)` -- after bulk loading, attaches resolved entity instances to relationship properties
 - `relations` -- lists all relationship properties
 
-DB-backed relationship properties no longer lazy-load their stored keys on
-access. If code asks for a relation that has keys but was not attached by
+DB-backed relationship properties do not lazy-load their stored keys on access.
+If code asks for a relation that has keys but was not attached by
 `Entities.fetch()`/`Entity.attach()`, the mixin captures an
 `UnloadedRelationError` with request, caller, entity, property, and key context,
 then returns `[]` for list relations or `None` for single relations. This keeps
@@ -347,9 +347,8 @@ presentation-only and are not a second persistence contract.
 `schema_format` records `SCHEMA_FORMAT_VERSION` separately from the form's
 user-facing schema version. Readers project unversioned valid schemas while a
 migration is running; malformed rows remain visible in their raw shape so
-**Apply Updates** can report them instead of silently discarding data. The
-registered `FSM-001` migration canonicalizes active form rows and form-history
-rows; see [DATA_MIGRATIONS.md](DATA_MIGRATIONS.md).
+**Apply Updates** can report them instead of silently discarding data. See
+[DATA_MIGRATIONS.md](DATA_MIGRATIONS.md).
 
 ## Mixins (`mixins/`)
 
@@ -451,13 +450,12 @@ Page/user deletion cascades through attached notes and photo assets.
 
 `DeferredJob` is the internal durable envelope for user-facing background
 work. Jobs are retained as operational records and are not a general
-user-visible entity list. Version 2 adds an immutable request fingerprint,
+user-visible entity list. Version 2 stores an immutable request fingerprint,
 transactional job/notification creation, resumable adapter-start metadata,
 dispatch state/task identity, a monotonic status revision, a 24-minute attempt
-deadline, bounded progress phases, and opaque telemetry correlation. Version 1
-records remain readable and default to their original already-started behavior;
-unknown future versions fail rather than guessing at compatibility. The
-combined inline contract remains limited to 750 KiB.
+deadline, bounded progress phases, and opaque telemetry correlation. Unknown
+versions fail rather than guessing at compatibility. The combined inline
+contract is limited to 750 KiB.
 
 `DeferredJobLock` is a separate, small Datastore record keyed by a hash of the
 target and mutation scope. Page/task autofill creates its job, notification,
@@ -638,9 +636,8 @@ the declared depth, reason, root/relation stage, key counts, and database-read
 counts with the request endpoint. Root entities loaded in the same batch may
 satisfy a stored relationship only when that complete relationship is present;
 other stored relationships remain unloaded so strict checks cannot be masked.
-The older `get(load=...)` and `load(related=...)` façades have been removed.
-Application callers should use `fetch()` or `fetch_one()` and choose an
-explicit `Fetch` depth; `_load()` remains an internal implementation primitive.
+Application callers use `fetch()` or `fetch_one()` and choose an explicit
+`Fetch` depth; `_load()` is an internal implementation primitive.
 
 `Entities.delete()` handles cascade deletion: deleting a Category deletes its Pages, which deletes their Tasks, Files, and Filters. Deleting a Project deletes its ModelTasks and orphaned Forms.
 

@@ -103,7 +103,7 @@ external links still use a new tab.
 
 Extends TipTap's `Image` extension with width, float, and alignment attributes. Renders images with computed inline styles for positioning.
 
-**Added attributes:**
+**Attributes:**
 
 | Attribute | Default | Description |
 |---|---|---|
@@ -111,7 +111,7 @@ Extends TipTap's `Image` extension with width, float, and alignment attributes. 
 | `float` | `"none"` | CSS float (`left`, `right`, `none`) |
 | `alignment` | `"center"` | Horizontal alignment when not floating |
 
-**Added commands:**
+**Commands:**
 
 | Command | Description |
 |---|---|

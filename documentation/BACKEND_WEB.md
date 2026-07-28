@@ -18,7 +18,7 @@ the stack. Initialization:
 4. **`initialize_app()`**: Starts cache, database, AI, entity registry, Jinja,
    error handlers, blueprints, and Flask-Login
 5. **Login manager**: Flask-Login with `load_user()` that resolves email to a User entity; templates use the lazy `current_user` Jinja global from `web/start/jinja.py` instead of Flask-Login's eager context processor
-6. **Security headers**: Added via `after_request` -- HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
+6. **Security headers**: Applied via `after_request` -- HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
 7. **ETag support**: If `g.fingerprint` is set by a route, it's included as an `ETag` header (combined with build ID)
 8. **Cache invalidation**: If Flask-Login already loaded an authenticated user and that user has `invalidate_cache` set, adds `X-Lagniappe-Invalidate-Cache` (triggers service worker cache wipe without forcing user loads for static/health-check requests)
 9. **Firebase**: Initialized with the shared runtime ADC credential and the

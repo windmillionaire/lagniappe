@@ -22,11 +22,9 @@ element. Initializes the component map and the view-scoped managers used by
 delegated interaction and submission handling.
 
 The PascalCase instance fields in `Core` (`SyncManager`, `EditWatcher`,
-`SubmissionManager`, and the other manager/widget handles) are an established
-compatibility surface referenced by view subclasses and widgets. Lower-camel
-fields such as `offlineQueue` are internal state or newer implementation
-details. Preserve existing public handle names; a partial cosmetic rename would
-make the surface less consistent without providing a migration boundary.
+`SubmissionManager`, and the other manager/widget handles) are public handles
+used by view subclasses and widgets. Lower-camel fields such as `offlineQueue`
+are internal state. Preserve the public handle names.
 
 ### Initialization (`init()`)
 

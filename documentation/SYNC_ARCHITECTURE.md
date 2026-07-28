@@ -56,7 +56,7 @@ collaborative form state. The durable fingerprint on the surrounding
 ### Client flow
 
 `src/script/shared/sync.mjs` discovers initialized widgets with a `syncId`.
-Because documents are now the only producers, the manager contract is:
+Documents are the only producers, and the manager contract is:
 
 ```text
 register()       join document presence and reconcile document offline records
@@ -160,8 +160,7 @@ storage.
 ### Offline document deltas
 
 The IndexedDB `sync` store remains for document deltas/saves. On registration,
-`SyncManager` filters records to IDs ending in `:document`. Records left by the
-removed form-patch system are deleted and never converted into submissions.
+`SyncManager` filters records to IDs ending in `:document`.
 
 Mounted and headless `CollaborativeDocument` instances use the same replay
 path. A record is deleted only after its replay batch is accepted.
@@ -269,10 +268,9 @@ advances baselines without waiting for the next poll.
 
 ## Server-change invalidation and collection refresh
 
-The browser protocol's version 2 `server-change` event replaces the old generic
-activity event. Producers send identifiers and routing metadata, never mutable
-entity fields. The parser requires the exact protocol ID and version; old,
-unversioned envelopes are intentionally rejected.
+The browser protocol uses the version 2 `server-change` event. Producers send
+identifiers and routing metadata, never mutable entity fields. The parser
+requires the exact protocol ID and version.
 
 `Core.reconcileChange()` coalesces concurrent changes. For each batch it:
 
@@ -310,10 +308,7 @@ restoration and review.
 `OfflineQueue.queueSubmit()` serializes the complete `FormData`, including
 files, into the IndexedDB `mutations` store:
 
-Database version 5 removes the obsolete `submit` store. Explicit submissions
-have used `mutations` since the version 4 hard cutover, which also deleted the
-former `activity` store and its unsent records. There is no compatibility
-reader for either removed record contract.
+Database version 5 stores explicit submissions in `mutations`.
 
 ```json
 {

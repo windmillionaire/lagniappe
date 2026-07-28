@@ -72,9 +72,7 @@ and server state. When checking multiple focused files or nodeids, pass them to
 one pytest command.
 
 Use real pytest paths or nodeids for focused `run.py test` commands. The runner
-only expands suite aliases such as `unit`, `e2e`, `js`, `tooling`, and `setup`; legacy
-numeric or feature shorthand such as `003b` and `home` is intentionally not
-expanded.
+expands only suite aliases such as `unit`, `e2e`, `js`, `tooling`, and `setup`.
 
 Numeric test filename prefixes are organizational, not runner aliases. The
 number groups a broad workflow in a stable browsing order; an optional letter

@@ -28,8 +28,7 @@ ordered tuple of immutable `MigrationDefinition` values. Each definition has:
 - a globally stable `id`;
 - the application version in which it was `introduced_in`;
 - an operator-facing `label`;
-- an idempotent `runner`;
-- optional `legacy_audit_keys` used only to adopt an older audit format.
+- an idempotent `runner`.
 
 The catalog is append-only for the application's supported upgrade history.
 Never reuse an ID, change its sequence or introduced version, or replace its
@@ -70,26 +69,6 @@ Completed release groups are collapsed in Site Settings. Incomplete groups are
 expanded, with attempts, successful repairs, errors, and entity links shown
 under the relevant migration.
 
-## Current catalog entry
-
-`FSM-001 — Canonical form schemas`, introduced in version `0.1`, scans raw
-`models` rows with type `form` and raw `history` rows with type
-`form_history`.
-
-- Active forms are normalized to schema format 1, including required page-form
-  `name` and `description` fields.
-- Form-history fields are normalized without adding fields absent from the
-  historical snapshot.
-- Duplicate IDs, invalid field shapes, and unsupported durable field values are
-  removed deterministically. These are successful repairs, not failures, and
-  are reported with a link to the affected form.
-- Malformed JSON or a non-list schema fails because its intended contents
-  cannot be recovered safely. The form link gives the owner a repair path.
-
-The entry recognizes the former `site/2026-07-form-schema-v1` audit. A valid
-legacy success is read as complete immediately and is normalized into the new
-per-migration ledger when a later pending migration is applied.
-
 ## When to add a migration
 
 Use a data migration when a release changes the canonical shape or meaning of
@@ -117,10 +96,6 @@ identity and order.
 Put substantial transform logic in a versioned module under
 `lagniappe/core/tools/database/migration_steps/`. Keeping shipped transforms
 separate makes the supported upgrade chain reviewable.
-
-Only add `legacy_audit_keys` when adopting an audit format that was already
-released. Legacy adaptation must be a read-compatible bridge, not a way to
-silently reinterpret a failed migration as complete.
 
 ### 2. Write an idempotent transform
 

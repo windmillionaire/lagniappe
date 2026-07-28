@@ -62,14 +62,14 @@ Credentials object used by the other runtime Google clients.
 The owner-only **Apply Updates** action runs registered, idempotent raw-row
 migrations from an append-only, version-pinned catalog in chunks of 100. Raw
 writes preserve business timestamps and avoid constructing typed properties
-from malformed legacy data. A transform mutates a copy and writes only after
+from malformed persisted data. A transform mutates a copy and writes only after
 validation; deterministic cleanup is recorded as a successful repair, while
 unrecoverable rows remain unchanged and include a repair-surface link.
 
 Each migration has a durable `site/data-migration:<id>` ledger record with its
 completion version/build and five latest attempts. A transactional
 `site/data-migrations-control` lease prevents concurrent runs. Execution stops
-at the first failed catalog entry and resumes there on retry; older completed
+at the first failed catalog entry and resumes there on retry; completed
 entries stay complete across later builds. Truly fresh databases baseline the
 bundled catalog during startup without running transforms. **Refresh Cache** is
 rejected until the complete catalog is current. See the
@@ -353,7 +353,7 @@ extracted text only for a specific unresolved field, and request the original
 file only if the extracted text is insufficient. With no stored attachments,
 Autofill has no function tools. One-off request attachments are already sent
 inline and do not enable `get_file`. This behavior is recorded as Autofill
-prompt observability contract version 2; version 3 identifies the restored
+prompt observability contract version 2; version 3 identifies the
 explicit submission-output contract. Autofill keeps its dynamic field ids in
 the prompt's actual form schema and does not attach an untyped provider response
 schema, which can cause compliant models to collapse the result to `{}`.
@@ -386,7 +386,7 @@ idempotency, status, and form-revision drift protection.
 ### Report Runner (`report_runner.py`)
 
 Stored AI report proposals are executed deterministically by `run_report()`.
-Ask and Organize proposals can now include reviewed edit actions in addition to
+Ask and Organize proposals can include reviewed edit actions in addition to
 creation and file attachment actions:
 
 | Action | Behavior |
@@ -394,7 +394,7 @@ creation and file attachment actions:
 | `add_form_to_page` | Attaches an existing or report-created page form to an existing page without requiring a category reference. It checks page edit permission, rejects task forms, records the previous form, and restores that form on undo. |
 | `add_category` | Adds an existing category to an existing page without changing the page's primary category. The runner checks edit permission on both page and category, and undo removes only categories the report actually added. |
 | `move_page` | Moves an existing page to an existing category after checking edit permission on both. Existing form and submission data are preserved. |
-| `move_task` | Moves an existing task to `to_page` after checking edit permission on both. The older `page` target key remains accepted for saved proposals. Form, submission, project/model, completion, and files are preserved. |
+| `move_task` | Moves an existing task to `to_page` after checking edit permission on both. Form, submission, project/model, completion, and files are preserved. |
 | `move_file` | Moves an existing file attachment from one exact source page/task to one exact target page/task after checking edit permission on both endpoints. |
 | `rename_entity` | Changes only the `name` of an exact editable entity. It does not require a form or submission, and undo restores the previous name. |
 | `update_submission_fields` | Applies exact reviewed `{page/task, schema_id, new_value}` rows to existing pages/tasks. Values validate through the target's current form field; unknown fields or values rejected by validation do not persist. |
@@ -417,7 +417,7 @@ The job reloads the report and actor, rechecks current permission and the
 reviewed proposal fingerprint, renews its lease while saving, and publishes the
 same notification/status completion contract as report generation. The
 versioned per-action recovery ledger remains stored in `report.result` and is
-the authority for mutation recovery. A new run records the proposal fingerprint,
+the authority for mutation recovery. Each run records the proposal fingerprint,
 a deterministic idempotency key for every action, its before-state, any
 preallocated output keys, attempt count, expected committed state, and
 `pending`, `applying`, `complete`, `skipped`, or `failed` status. Action output
@@ -439,11 +439,9 @@ the ledger with `status=undone`; it is not silently discarded. The report page
 offers **Retry Proposal**, **Undo Completed Actions**, and **Resume Undo** for
 the corresponding states.
 
-Only current versioned ledgers are recoverable. There is intentionally no
-pre-ledger compatibility path, entity revision protocol, or cross-provider
-transaction. Proposal execution uses its own deferred-job adapter around the
-ledger rather than reusing the generation checkpoint contract; undo remains a
-separate synchronous action.
+Only current versioned ledgers are recoverable. Proposal execution uses its own
+deferred-job adapter around the ledger rather than reusing the generation
+checkpoint contract; undo is a separate synchronous action.
 
 The provider response schema declares the structural fields of each
 `update_submission_fields` row, including its page/task reference, `schema_id`,
@@ -525,8 +523,8 @@ response schema is a typed union of action-specific variants. Each
 variant permits only its own data fields and requires its executable references;
 for example, `add_category` requires both a page and category reference and
 cannot receive task-completion or submission-update fields. Form creation and
-additive schema updates also use typed nested variants. The application still
-validates the returned proposal before execution, but the provider schema now
+additive schema updates also use typed nested variants. The application
+validates the returned proposal before execution, and the provider schema
 prevents many malformed cross-action shapes from being generated in the first
 place. If the model's repair still contains unsafe action references or omits a
 required page/form or page/category reference, only those actions become

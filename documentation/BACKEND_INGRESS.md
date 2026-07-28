@@ -22,7 +22,7 @@ committed cursor. A failed or stale attempt can therefore overwrite an
 uncommitted slot without publishing it.
 
 Missing, malformed, or unsupported formats are rejected with an instruction to
-upload the CSV again. There is no reader or migration for older ingress shapes.
+upload the CSV again.
 
 ## Stage and execution transitions
 

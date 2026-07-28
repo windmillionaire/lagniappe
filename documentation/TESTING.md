@@ -53,9 +53,7 @@ venv/bin/python run.py test -- -k "category"
 venv/bin/python run.py test -v --tb=long
 ```
 
-Focused runs must use real pytest paths or nodeids. Legacy numeric and feature
-shorthand such as `003b`, `003b::test_preview_panel`, and `home` is not
-expanded by the runner.
+Focused runs use real pytest paths or nodeids.
 When a suite alias is combined with an explicit path or nodeid, the explicit
 target wins and the alias is treated only as a harmless scope hint.
 
@@ -83,7 +81,7 @@ Run E2E/browser-server work sequentially. Separate E2E pytest invocations,
 `test-server`, and `browser-review` all use the same managed testing server and
 test data prefix; whichever session finishes first will tear down shared state
 for the others. Put multiple focused files or nodeids in one pytest command
-instead of launching them in parallel. E2E pytest now takes an advisory session
+instead of launching them in parallel. E2E pytest takes an advisory session
 lock and cleans stale test data before starting the server, so overlapping
 pytest invocations should fail early with a clear message and interrupted runs
 should be less likely to poison the next run.

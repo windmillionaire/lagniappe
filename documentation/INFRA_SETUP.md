@@ -101,7 +101,7 @@ Installation checks are deliberately split by authority:
 Focused mutating commands that require an already-valid generated deployment
 call `prepare_existing_installation()`, whose name makes the local gcloud
 activation explicit. `update` and `upgrade` activate the saved target without
-validating the old generation because rebuilding that generation is their
+validating the existing generation because rebuilding that generation is their
 job: `update` preserves a developer's current worktree, while `upgrade`
 replaces tracked source from the selected remote branch.
 
@@ -286,7 +286,7 @@ The canonical schema stores two explicit identities:
 - `INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL` is placed in Cloud Tasks and
   Scheduler OIDC tokens and is verified by internal process routes.
 
-They must match for this release. Setup enables
+They must match. Setup enables
 `iamcredentials.googleapis.com` and grants
 `roles/iam.serviceAccountTokenCreator` only on that exact service-account
 resource to the runtime account and saved deployer. This supplies
@@ -297,8 +297,7 @@ project scope.
 
 Schema 2 and the two explicit identity settings are the only supported
 configuration contract. Runtime startup and recovery fail closed when that
-contract is absent. Service-account key JSON and the former task-OIDC identity
-alias are not accepted as configuration inputs.
+contract is absent. No other identity inputs are accepted.
 
 ### Local ADC for development and tests
 
@@ -361,8 +360,8 @@ the upgrade command resolves all direct targets together with eager transitive
 updates, runs `pip check`, writes back every direct pin, and leaves a detailed
 local report for review before the test suite is accepted. npm uses the
 committed `package-lock.json` for exact direct and transitive resolution. This
-is the v0.2 reproducibility policy; a separate Python lock/hash file and formal
-SBOM are not required release artifacts.
+is the project reproducibility policy; a separate Python lock/hash file and
+formal SBOM are not required release artifacts.
 
 ## Development Installation
 
@@ -445,11 +444,10 @@ write UTF-8.
 Secret configuration and setup-state files use owner-only modes on POSIX.
 Native Windows applies a best-effort restricted ACL with `icacls`; if that ACL
 cannot be applied, setup emits a warning and the operator must protect the
-file manually. CI is configured to exercise mocked default install/deploy and
-recovery flows on Ubuntu, macOS, and Windows across the supported Python range.
-Those jobs do not replace the outstanding real clean-machine macOS and Windows
-smoke tests, so the native Windows installer remains experimental and WSL2 is
-recommended if it encounters an environment-specific problem.
+file manually. Local setup tests exercise mocked platform branches and
+installation workflows. Hosted CI runs source-quality and traceability checks
+on Ubuntu; neither replaces real clean-machine installation smoke tests.
+Development and test workflows on Windows use WSL2.
 
 ## Installation Flow (`installer/install.py`)
 
@@ -723,8 +721,7 @@ The runtime project role set is:
 
 - `roles/datastore.user`;
 - `roles/firebaseauth.editor`, the narrower named role containing the Identity
-  Platform account lookup/delete and OOB email-code permissions (the IAM
-  permission namespace retains its historical `firebaseauth` name);
+  Platform account lookup/delete and OOB email-code permissions;
 - `roles/firebasecloudmessaging.admin`, the FCM API role containing send
   permission and no Messaging Campaigns administration;
 - `roles/cloudtasks.enqueuer` plus `roles/cloudtasks.taskDeleter`;
@@ -740,8 +737,8 @@ Campaigns Admin, Cloud Tasks Admin, or project-wide Storage roles.
 `configure_storage_buckets()` runs with installer ADC. Ordinary install,
 repair, and update modes create or reconcile the four deterministically named
 production buckets plus the recovery bucket. Only `development` requests the
-four test-prefixed counterparts. New buckets explicitly use the
-backward-compatible `US` location and `STANDARD` default storage class;
+four test-prefixed counterparts. New buckets explicitly use the `US` location
+and `STANDARD` default storage class;
 existing bucket locations are retained, while default storage-class drift is
 reconciled to `STANDARD`. Setup preserves any operator-managed retention,
 soft-delete, and lifecycle policies. It enables uniform bucket-level access,
@@ -750,17 +747,16 @@ reconciles CORS, grants the recorded human installer/deployer
 `roles/storage.objectAdmin` plus bucket-metadata read through
 `roles/storage.legacyBucketReader` on those buckets only, and grants
 `allUsers` object viewing only on each managed public bucket. Runtime startup
-now reads those application-managed buckets and fails with a setup repair
+reads those application-managed buckets and fails with a setup repair
 instruction if one is absent; it does not create buckets, patch metadata, edit
 bucket IAM, or delete buckets. Test cleanup deletes objects while preserving
-the setup-owned buckets. During upgrades, bucket-scoped grants are applied
-before old project-wide Storage grants are removed.
+the setup-owned buckets.
 
 All managed IAM writes request policy version 3 and submit the same policy
 object with its provider etag. Reconciliation consolidates duplicate
 unconditional bindings for the Lagniappe member, preserves unrelated members
 and every conditional binding, and skips writes when the desired state already
-exists. A conditional legacy broad-role grant on the runtime account is
+exists. An unexpected conditional broad-role grant on the runtime account is
 reported for manual resolution rather than silently modified.
 
 `create_deferred_job_reconciler()` enables the Cloud Scheduler API and

@@ -1,23 +1,19 @@
 # AI Pipeline
 
-**Status:** Current architecture and operating guidance.
-
-**Last source review:** 2026-07-23.
-
-This document describes the current AI pipeline from browser submission through
+This document describes the AI pipeline from browser submission through
 durable execution, Gemini generation, workspace tool calls, deterministic
 application, and browser reconciliation.
 
-Related implementation details remain documented in
+Related implementation details are documented in
 [BACKEND_TOOLS.md](BACKEND_TOOLS.md),
 [BACKEND_ENTITIES.md](BACKEND_ENTITIES.md),
 [FRONTEND_VIEWS.md](FRONTEND_VIEWS.md), and
 [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md); runtime model, retry, and caching
 configuration is documented in [INFRA_CONFIG.md](INFRA_CONFIG.md).
 
-## Executive assessment
+## Safety boundaries and known limits
 
-The pipeline is already strong in the places that matter most for data safety:
+The pipeline protects data through these boundaries:
 
 - model output is a proposal or prepared value, not an unrestricted mutation;
 - workspace tools are read-only and permission-filtered;
@@ -37,11 +33,10 @@ tool result or repeated file retrieval can be expensive even in a one-person
 workspace. Other known boundaries are narrow race, retention, and missed-push
 edges with safe recovery or reload paths already in place.
 
-Privacy-bounded generation summaries and an owner dashboard are implemented,
-but this review does not have production evidence showing that prompt size,
-serial tool execution, cache misses, queue contention, or the structured-final
-call are material latency or cost problems. Those remain hypotheses rather
-than active regressions.
+Privacy-bounded generation summaries and the owner dashboard provide the
+production evidence needed to determine whether prompt size, serial tool
+execution, cache misses, queue contention, or the structured-final call cause
+material latency or cost.
 
 ## Scope and terminology
 
@@ -56,10 +51,8 @@ This document covers:
 - runtime model settings, provider retries, Cloud Tasks delivery, and queue
   setup where they affect the AI path.
 
-Character counts below are approximate source-level serializations taken during
-this review. They are useful for relative comparison but are not provider token
-counts. Actual prompt, cached-content, output, thought, and total token counts
-are recorded by the privacy-bounded generation summary and can also appear in
+Actual prompt, cached-content, output, thought, and total token counts are
+recorded by the privacy-bounded generation summary and can also appear in
 `AI_DEBUG` response breadcrumbs.
 
 ## Architecture at a glance
@@ -123,7 +116,7 @@ pending report or target state, and calls `DeferredJobs.start()` with a typed
 binds it to an immutable canonical request fingerprint. Job and pending
 notification are transactionally get/created; replay of the same stable spec is
 idempotent and UUID reuse for a different spec is rejected. Report creation and
-site export still allocate their domain record immediately before this
+site export allocate their domain record immediately before this
 transaction, outside the durable job/notification transaction. The durable job
 contains entity references and bounded parameters rather than fully rendered
 prompts or file bytes. File processing creates only a terminal notification.
@@ -283,7 +276,7 @@ unbounded results from a few handlers, a 50-round ceiling, Google Search being
 available even for internal-only requests, and the unconditional
 structured-final call when a response schema is configured.
 
-Ask preparation now returns a prepared proposal/status value without mutating
+Ask preparation returns a prepared proposal/status value without mutating
 the input report. The generic runner checkpoints that value before
 `ReportAdapter.apply()` owns the durable report save.
 
@@ -314,7 +307,7 @@ repeating completed provider stages.
 
 ### Autofill
 
-Autofill now uses a prompt-first, single-form contract. It receives the target's
+Autofill uses a prompt-first, single-form contract. It receives the target's
 name, description, schema, partial values, compact parent/category/document
 context, and full readable projections for files attached directly to the
 target. Task history, prior completions, sibling/page tasks, parent-page files,
@@ -322,9 +315,9 @@ and general workspace lookup are deliberately out of scope. Google Search is
 available for missing public facts; `get_file` is exposed only when a stored
 target attachment exists and has a two-round extracted-text/original-file
 fallback. Existing page/task targets retain their durable form lock and
-form-revision guard. Prompt observability version 2 distinguishes this narrower
-contract from the earlier overlapping page/detail/file tool set; version 3
-identifies the explicit submission-output contract. Autofill does not attach an
+form-revision guard. Prompt observability identifies the prompt-first contract
+as version 2 and the explicit submission-output contract as version 3. Autofill
+does not attach an
 untyped provider response schema: the prompt names exact field ids and formats,
 and normal form submission validation removes unknown keys and normalizes values.
 When stored files expose `get_file`, a summary-backed response that requests no
@@ -341,7 +334,7 @@ shared durable job.
 
 The effective request is larger than `Prompt.preview()`:
 
-| Layer | Placement/lifecycle | Current concern |
+| Layer | Placement/lifecycle | Operational note |
 |---|---|---|
 | System instruction | Provider `system_instruction` | Stable and generally cache-friendly. |
 | Rendered context/instructions | `Prompt.build()` | Organize puts stable instructions first; Ask/Create/autofill usually put dynamic context first. |
@@ -353,26 +346,11 @@ The effective request is larger than `Prompt.preview()`:
 | Tool-returned original files | Added as user file parts | Organize caps two per turn, not cumulatively per generation. |
 | Structured-final instruction | New user turn after discovery | Adds one provider boundary and replays the accumulated transcript. |
 
-### Static footprint snapshot
-
-The following review-time measurements are approximate characters, not tokens:
-
-- all 16 function declarations serialize to roughly 12,000–13,000 characters;
-- representative response schemas were roughly 7,000 characters for Create,
-  13,000 for Organize, and 16,000 for Ask;
-- individual guideline bundles ranged from roughly 2,000 to 13,300 characters;
-- representative all-capability Ask/Create/Organize requests contained roughly
-  32,000–47,000 characters of static prompt, tool, and schema material before
-  dynamic entity context or tool results.
-
-These sizes are not automatically excessive for the configured models. Current
-token/cache telemetry supplies the provider-level evidence needed before tuning.
-
 ### Stable prefixes and caching
 
 Only Organize consistently calls `set_instructions_before_context()`, placing
 stable policy before request-specific summaries and evidence. Ask, Create,
-autofill, and older direct builders normally place context first.
+autofill, and direct builders normally place context first.
 
 Gemini implicit caching is automatic. Explicit cached-content resources add
 lifecycle, invalidation, regional, and privacy considerations and only make sense
@@ -422,7 +400,7 @@ not retain a guideline-evidence ledger.
 
 ### Output cleanup
 
-`GenAI.cleanup()` now removes only citation-shaped numeric markers such as
+`GenAI.cleanup()` removes only citation-shaped numeric markers such as
 `[1]`, `[1, 2]`, and `[4-6]`, including recursively cleaned JSON strings.
 Ordinary bracketed text such as `[urgent]` or `[source]` is preserved. If a
 future provider format needs broader cleanup, add its exact syntax or use
@@ -452,16 +430,17 @@ same-turn calls serially.
 Google Search is enabled for Ask, Create, autofill, and several direct generation
 flows, but not Organize planning. The model still decides whether to search.
 
-## Deferred-job reliability analysis
+## Deferred-job reliability
 
 ### Current durable contract
 
-Version 2 jobs store typed inputs, actor/policy snapshot and target
+Deferred jobs use contract version 2 and store typed inputs, actor/policy
+snapshot and target
 fingerprints, parameters, client metadata, request identity, dispatch state,
 status revision, a renewable five-minute lease, a 24-minute attempt deadline,
 bounded progress phase, checkpoint, result/error, telemetry correlation, and
-cleanup/notification/event delivery bits. Version 1 remains readable. The
-combined inline contract is limited to 750 KiB. Cloud Tasks gives a shared AI
+cleanup/notification/event delivery bits. The combined inline contract is
+limited to 750 KiB. Cloud Tasks gives a shared AI
 delivery up to 30 minutes. A production job with an initial notification also
 gets one deterministic two-minute feedback task.
 
@@ -486,7 +465,7 @@ provider calls use at most two SDK attempts, leaving longer recovery to the
 durable job schedule. Ask, Create, and Organize still allow up to 50 tool rounds;
 there is no tighter generation-wide semantic or cumulative budget.
 
-Each delivery now receives a 24-minute attempt deadline inside Cloud Tasks' 30
+Each delivery receives a 24-minute attempt deadline inside Cloud Tasks' 30
 minute deadline. A five-minute lease is renewed every 60 seconds by a lightweight
 heartbeat that also covers a blocking SDK call. `GenAI` checks the shared
 execution control before and after provider stages and tool handlers, and the
@@ -514,15 +493,15 @@ Organize additionally persists these validated intermediate stages:
 3. structural plan ready;
 4. submissions ready / ready to apply.
 
-The existing `report.upload_manifest` and saved per-file summary/process state
-remain the durable authorities for the first two stages. The job stores bounded
+The `report.upload_manifest` and saved per-file summary/process state are the
+durable authorities for the first two stages. The job stores bounded
 stage markers and the expensive structural plan before form completion rather
-than duplicating completed file records. The current protocol keeps one
+than duplicating completed file records. The protocol keeps one
 user-visible job rather than creating per-file child jobs.
 
 ### Durable start/outbox and idempotency
 
-Job and notification are now transactionally get/created from a
+Job and notification are transactionally get/created from a
 browser-generated operation UUID. The job persists a canonical immutable
 request/spec fingerprint, dispatch state, deterministic task identity, and
 dispatch time; UUID reuse with different job type, actor, inputs, parameters,
@@ -534,9 +513,9 @@ UUID, so it is not suppressed by target-key idempotency.
 
 ### Queue isolation and operations
 
-Setup currently creates a bare shared Cloud Tasks queue. AI jobs, ingress, cache
+Setup creates a bare shared Cloud Tasks queue. AI jobs, ingress, cache
 maintenance, and scheduled work can compete for the same web-service capacity.
-The application now owns bounded job status/recent-operation views and a
+The application owns bounded job status/recent-operation views and a
 five-minute stale-job reconciler. Owner-triggered retention cleanup removes
 completed terminal jobs alongside AI Analytics records while preserving active
 or delivery-pending work. Automatic compaction and a Cloud Tasks queue-lag
@@ -549,7 +528,7 @@ terminal-delivery failures. Google documents the available
 
 ### Cancellation, drift, and retention
 
-Cancellation now writes a `CANCELLED` tombstone, revokes the lease/token, and
+Cancellation writes a `CANCELLED` tombstone, revokes the lease/token, and
 deletes known deterministic tasks; replacement report work similarly writes a
 `SUPERSEDED` tombstone. A running HTTP request stops when execution control sees
 the revoked/replaced claim. Deferred-job persistence uses lease-token
@@ -562,9 +541,9 @@ and completes cleanup, notification, and event delivery before considering a
 job delivered. Terminal records remain retained and can duplicate large
 proposal/checkpoint data. Automatic compaction is not implemented.
 
-## Frontend communication analysis
+## Frontend communication
 
-### What is sound
+### Delivery contract
 
 - `deferred-complete` uses FCM as an invalidation/notification boundary rather
   than a carrier for AI context or output.
@@ -579,7 +558,7 @@ proposal/checkpoint data. Automatic compaction is not implemented.
 
 ### Classified delivery boundary and remaining gaps
 
-`responses.send_message()` now returns a provider-accepted,
+`responses.send_message()` returns a provider-accepted,
 permanently-invalid-token, or transient outcome. The deferred bridge converts
 only a transient outcome into incomplete/retryable terminal delivery. Ordinary
 sync and server-change routes continue to ignore the outcome and remain best-effort.
@@ -594,13 +573,13 @@ silently losing an accepted-but-uncheckpointed event.
 
 Most terminal workflows send both rendered notification HTML and a separate
 server-change event. Single-recipient delivery does not enforce the documented
-4 KiB FCM boundary, but the event itself is now a small structured invalidation:
+4 KiB FCM boundary, but the event itself is a small structured invalidation:
 generic deferred events carry operation/routing identity, while file events
 carry only type and entity key. The browser fetches authoritative target state.
 
 ### Shared status reconciliation
 
-Browser-acknowledged deferred operations now return an opaque reference to a
+Browser-acknowledged deferred operations return an opaque reference to a
 shared coordinator. It queries an owner-authorized bounded status endpoint and
 refreshes the declared destination at terminal state. It:
 
@@ -613,8 +592,8 @@ refreshes the declared destination at terminal state. It:
 - correlates a completion event with the operation generation so stale or
   superseded events cannot refresh the wrong request.
 
-FCM is now a latency accelerator rather than the correctness mechanism, and the
-coordinator replaces the report list/detail full-HTML polling loops. Standalone
+FCM is a latency accelerator rather than the correctness mechanism. The shared
+coordinator handles report list/detail status reconciliation. Standalone
 file OCR/summary use key-only invalidation plus the watched form's periodic
 fingerprint check, so their authoritative metadata also converges after a missed
 push.
@@ -623,16 +602,16 @@ push.
 
 When messaging initialization fails for an editable session, `Core` keeps
 unrelated forms editable, deferred controls use status polling, and the
-`SyncManager` retains its state-only synchronization path. This removes FCM as
-a whole-view editability dependency while preserving the distinct collaborative
-state contract.
+`SyncManager` retains its state-only synchronization path. Whole-view
+editability does not depend on FCM, and collaborative state keeps its separate
+contract.
 
 `Prompt.preview()` displays the system instruction and rendered prompt string.
 It does not automatically show provider configuration, actual tool declaration
 schemas, response schema, inline/file parts, later tool calls/results, or the
 structured-final request. Ask/Create previews are reasonably representative of
 the initial static text but cannot predict dynamic retrieval. Organize preview
-is further removed: it uses upload metadata before the deferred job finalizes
+is less representative: it uses upload metadata before the deferred job finalizes
 uploads, creates summaries, and builds retrieval candidates, and it cannot show
 the later completion generation.
 
@@ -641,7 +620,7 @@ tool/search context is dynamic. It does not show a bounded static/dynamic
 manifest.
 
 On a direct-upload-backed form with selected files—most notably Organize—clicking
-Initial Prompt currently runs `prepareSubmit()` and preuploads/reuses those files
+Initial Prompt runs `prepareSubmit()` and preuploads/reuses those files
 before the explain role is appended. Preview is not metadata-only.
 
 ## Operational measurement and evaluation
@@ -674,7 +653,7 @@ data distribution and provider limits.
 An optimization should advance only when it:
 
 1. preserves permission filtering and deterministic application safety;
-2. passes the existing Ask/Create/Organize/autofill corpus and validators;
+2. passes the Ask/Create/Organize/autofill corpus and validators;
 3. reduces the targeted call/token/latency/error metric on a representative
    workload;
 4. does not materially increase repair/fallback, missed evidence, quota bursts,
