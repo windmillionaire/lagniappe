@@ -71,6 +71,14 @@ does not execute the application test suites or use private infrastructure. It
 checks the tracked evidence against the changed source and templates;
 maintainers still rerun tests before merging.
 
+Test-evidence provenance records the command, generation time, and
+content-derived behavior snapshot. It intentionally omits Git commit and
+working-tree identities: squashes, rebases, and audited history rewrites do not
+change the evidence when the relevant behavior-bearing files are identical.
+CI currentness is determined from the manifest's per-path semantic
+fingerprints, not from a commit SHA. General traceability reports still include
+Git provenance for local diagnostics.
+
 Test-run schema 3 stores each unique path/fingerprint pair once in the
 top-level `fingerprint_pairs` table. Snapshot records contain integer references
 to that table; the reporter reconstructs the same path maps before checking
