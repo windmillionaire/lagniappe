@@ -1,5 +1,6 @@
 /**
  * @testable infrastructure
+ * @tests tests_e2e/008_users/test_008a_user_index.py::test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load
  */
 export class MobileTableControls {
 	constructor(attributes) {

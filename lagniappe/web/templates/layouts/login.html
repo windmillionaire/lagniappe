@@ -6,9 +6,6 @@
     <meta name="description" content="Login page">
     <meta name="keywords" content="login, user, access, account">
     <meta name="analytics" content="{{ CONFIG.ANALYTICS|yesno }}">
-    {% if CONFIG.capture_errors %}
-      <meta name="sentry-dsn" content="{{ CONFIG.SENTRY_DSN }}">
-    {% endif %}
     <link rel="icon"
           type="image/png"
           sizes="32x32"
@@ -25,6 +22,7 @@
           crossorigin>
     <link rel="stylesheet" href="/style.css?v={{ CONFIG.BUILD_ID }}">
     {% if CONFIG.capture_errors %}
+      <meta name="sentry-dsn" content="{{ CONFIG.SENTRY_JS_DSN }}">
       <script type="module" src="/sentry.js?v={{ CONFIG.BUILD_ID }}"></script>
     {% endif %}
     <script type="module" src="/login.js?v={{ CONFIG.BUILD_ID }}"></script>

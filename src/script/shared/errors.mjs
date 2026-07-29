@@ -403,6 +403,10 @@ const _sanitizeSentryEvent = (event) => {
 	if (request) sanitized.request = request;
 	else delete sanitized.request;
 
+	if ("breadcrumbs" in sanitized && !Array.isArray(sanitized.breadcrumbs)) {
+		delete sanitized.breadcrumbs;
+	}
+
 	for (const key of [
 		"breadcrumbs",
 		"contexts",
@@ -454,10 +458,11 @@ const _filterNotificationBlockingSpans = (event) => {
  * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_removes_invalid_trace_context_without_dropping_event
  * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_filters_notification_long_task_spans
  * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_redacts_browser_request_and_context_payloads
+ * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_drops_malformed_breadcrumb_container
  * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_uses_installation_dsn_without_default_pii
  * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_does_not_initialize_without_dsn
  * @features error-tracking
- * @dimensions malformed-blocking-operation sentry-context trace-normalization blocking-operation notification-transaction privacy redaction request-context payload-bounds configured-dsn disabled
+ * @dimensions malformed-blocking-operation malformed-breadcrumbs sentry-context trace-normalization blocking-operation notification-transaction privacy redaction request-context payload-bounds configured-dsn disabled
  */
 export const configureSentry = () => {
 	const Sentry = typeof window !== "undefined" ? window.Sentry : null;

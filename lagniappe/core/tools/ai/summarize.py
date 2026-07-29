@@ -21,6 +21,9 @@ SUMMARY_RETRIEVAL_TERM_COUNT = 2
 UNREADABLE_PDF_SUMMARY_ERROR = (
     "This PDF could not be read. It may be encrypted or password-protected."
 )
+PDF_PAGE_LIMIT_SUMMARY_ERROR = (
+    "This PDF has more pages than the AI summary service supports."
+)
 
 
 # @testable true
@@ -161,15 +164,31 @@ def _is_unreadable_pdf_error(file, error):
     )
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai/summarize.py::generate_summary
+# @reason exact provider classification is exercised through summary error handling
+def _is_pdf_page_limit_error(file, error):
+    """Return whether Gemini rejected a PDF for exceeding its page limit."""
+    if getattr(file, "mimetype", None) != "application/pdf":
+        return False
+
+    details = provider_error_details(error)
+    message = details.get("message") or details.get("raw") or ""
+    return str(details.get("code")) == "400" and (
+        "exceeds the supported page limit" in message.casefold()
+    )
+
+
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_updates_file_status_from_model_result
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_summary_generation_uses_docx_text_fallback
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_reports_ooxml_extraction_errors
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_marks_unreadable_pdf_without_capture
+# @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_marks_pdf_page_limit_without_capture
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_summary_generation_rejects_oversized_ooxml_before_download
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_populates_file_search_cache
 # @features ai
-# @dimensions summary-prompt status errors cache quota ooxml docx unreadable-pdf
+# @dimensions summary-prompt status errors cache quota ooxml docx unreadable-pdf pdf-page-limit
 def generate_summary(
     file,
     raise_quota=False,
@@ -225,6 +244,10 @@ def generate_summary(
         summarize.error = f"AI unable to generate summary: {str(e)}"
         return summarize
     except Exception as e:
+        if _is_pdf_page_limit_error(file, e):
+            summarize.status = "PDF exceeds the AI summary page limit."
+            summarize.error = PDF_PAGE_LIMIT_SUMMARY_ERROR
+            return summarize
         if _is_unreadable_pdf_error(file, e):
             summarize.status = "PDF could not be read."
             summarize.error = UNREADABLE_PDF_SUMMARY_ERROR

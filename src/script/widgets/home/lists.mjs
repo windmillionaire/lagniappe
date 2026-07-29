@@ -19,14 +19,46 @@ function _listToggle(component, widgetName) {
  */
 class LoadedHomeList extends BaseList {
 	static unlockToggleWhenPopulated = false;
+	static disableToggleWhenUnavailable = false;
 
 	constructor(attributes) {
 		super(attributes);
 		this._listToggle = _listToggle(this.component, this.name);
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002h_home_permissions.py::test_empty_home_model_lists_settle_to_disabled_zero_state
+	 * @pairs home:lazy-empty-list home:unavailable-toggle
+	 */
+	_syncUnavailableToggle() {
+		if (!this.constructor.disableToggleWhenUnavailable || !this._listToggle) {
+			return;
+		}
+
+		const unavailable = this.itemCount === 0 && !this.target.dataset.ifEmpty;
+		this._listToggle.disabled = unavailable;
+		this._listToggle.classList.toggle("opacity-50", unavailable);
+
+		const indicator = this._listToggle.querySelector(
+			`[data-indicator='${this.name}']`,
+		);
+		if (!indicator) return;
+
+		const wasUnavailable = indicator.dataset.empty === "true";
+		indicator.dataset.empty = unavailable ? "true" : "false";
+		indicator.classList.toggle("hidden", !unavailable);
+		indicator.classList.toggle("font-bold", unavailable);
+		if (unavailable) {
+			indicator.textContent = "0";
+		} else if (wasUnavailable) {
+			indicator.textContent = "";
+		}
+	}
+
 	postreconcile() {
 		super.postreconcile();
+		this._syncUnavailableToggle();
 		if (
 			this.constructor.unlockToggleWhenPopulated &&
 			this.itemCount > 0 &&
@@ -45,7 +77,9 @@ class LoadedHomeList extends BaseList {
  * @features projects
  * @dimensions create-manual ai-create
  */
-export class HomeProjectList extends LoadedHomeList {}
+export class HomeProjectList extends LoadedHomeList {
+	static disableToggleWhenUnavailable = true;
+}
 
 /**
  * @testable true
@@ -54,7 +88,9 @@ export class HomeProjectList extends LoadedHomeList {}
  * @features categories
  * @dimensions create-manual navigate
  */
-export class HomeCategoryList extends LoadedHomeList {}
+export class HomeCategoryList extends LoadedHomeList {
+	static disableToggleWhenUnavailable = true;
+}
 
 /**
  * @testable true
@@ -64,6 +100,7 @@ export class HomeCategoryList extends LoadedHomeList {}
  */
 export class HomePageList extends LoadedHomeList {
 	static unlockToggleWhenPopulated = true;
+	static disableToggleWhenUnavailable = true;
 }
 
 /**

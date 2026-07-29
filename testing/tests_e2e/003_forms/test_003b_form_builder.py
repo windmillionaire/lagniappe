@@ -109,15 +109,19 @@ def test_delete_components(get_user):
     ).not_to_be_attached()
 
 
-# @features forms
-# @dimensions builder-select-options
+# @pairs forms:builder-select-options forms:builder-field-title
+# @pairs frontend-icons:material-icon-preservation
 def test_change_select_options(get_user):
-    """Select options can be added, edited, saved, and reloaded."""
+    """Select labels and icons survive title edits while options remain editable."""
     user = get_user(Users.OWNER)
     form = Forms.test_change_select_options.get(user)
     builder = form.builder
     field = SchemaFields.SELECT.get(title="Snack Choice")
     builder.add_field(field)
+
+    label = field.element.locator("[data-role='label']").first
+    expect(label.locator(":scope > span:not([data-icon])")).to_have_text(field.title)
+    expect(label.locator(":scope > [data-icon='select'] .icon-glyph")).to_be_visible()
 
     builder.open_condition("options")
     for option in ["Apple", "Banana"]:

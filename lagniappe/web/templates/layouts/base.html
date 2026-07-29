@@ -14,9 +14,6 @@
     <meta name="messaging-disabled"
           content="{{ messaging_disabled|default(default_messaging_disabled)|yesno }}">
     <meta name="analytics" content="{{ CONFIG.ANALYTICS|yesno }}">
-    {% if CONFIG.capture_errors %}
-      <meta name="sentry-dsn" content="{{ CONFIG.SENTRY_DSN }}">
-    {% endif %}
     <link rel="icon"
           type="image/png"
           sizes="32x32"
@@ -24,6 +21,7 @@
     <link rel="manifest" href="/manifest.json?v={{ CONFIG.BUILD_ID }}">
     <link rel="stylesheet" href="/style.css?v={{ CONFIG.BUILD_ID }}">
     {% if CONFIG.capture_errors %}
+      <meta name="sentry-dsn" content="{{ CONFIG.SENTRY_JS_DSN }}">
       <script type="module" src="/sentry.js?v={{ CONFIG.BUILD_ID }}"></script>
     {% endif %}
     <script type="module" src="/script.js?v={{ CONFIG.BUILD_ID }}"></script>

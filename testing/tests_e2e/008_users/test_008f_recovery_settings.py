@@ -23,7 +23,7 @@ def route_app():
 def _persisted_settings():
     return {
         "CONFIG_KIND": recovery.CONFIG_KIND,
-        "CONFIG_SCHEMA_VERSION": recovery.CONFIG_SCHEMA_VERSION,
+        "CONFIG_SCHEMA_VERSION": str(recovery.CONFIG_SCHEMA_VERSION),
         "APP_NAME": "My Custom Installation",
         "GOOGLE_CLOUD_PROJECT": "recovered-project-1",
         "APP_ENGINE_LOCATION": "us-central",

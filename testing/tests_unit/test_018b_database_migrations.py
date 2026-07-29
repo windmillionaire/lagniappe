@@ -94,6 +94,36 @@ class _Datastore:
         return _Query()
 
 
+class _ContendedTransaction:
+    def __init__(self, datastore):
+        self.datastore = datastore
+        self.pending = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        self.datastore.attempts += 1
+        if self.datastore.attempts <= self.datastore.aborted_attempts:
+            raise migrations.google_exceptions.Aborted("transaction contention")
+        if self.pending is not None:
+            self.datastore.put(self.pending)
+        return False
+
+    def put(self, entity):
+        self.pending = entity
+
+
+class _ContendedDatastore(_Datastore):
+    def __init__(self, *, aborted_attempts):
+        super().__init__()
+        self.aborted_attempts = aborted_attempts
+        self.attempts = 0
+
+    def transaction(self):
+        return _ContendedTransaction(self)
+
+
 def _result(definition, *, changed=0, repaired=0, skipped=0, failed=0):
     errors = []
     if failed:
@@ -782,6 +812,30 @@ def test_fresh_install_baselines_catalog_without_running_steps():
     assert status["migrations"][0]["source"] == "fresh-install"
     assert status["migrations"][0]["attempts"] == []
     assert calls == []
+
+
+# @features database-migrations setup
+# @dimensions fresh-install transaction-contention retry
+def test_fresh_install_retries_transaction_contention(monkeypatch):
+    datastore = _ContendedDatastore(aborted_attempts=2)
+    definition = _definition(1, "BASELINE", lambda _context: None)
+    sleeps = []
+    monkeypatch.setattr(migrations.time, "sleep", sleeps.append)
+
+    assert migrations.initialize_fresh_install(
+        True,
+        datastore=datastore,
+        catalog=(definition,),
+        now=_Clock(),
+    )
+
+    assert datastore.attempts == 3
+    assert sleeps == [0.05, 0.1]
+    assert migrations.get_migration_status(
+        datastore=datastore,
+        catalog=(definition,),
+        now=_Clock(),
+    )["status"] == "current"
 
 
 # @features admin database-migrations

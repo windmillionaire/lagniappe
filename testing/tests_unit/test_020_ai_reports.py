@@ -10,6 +10,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.entities.ai_report import AIReport
 from lagniappe.core.entities import entity as entity_module
 from lagniappe.core.definitions import (
+    Action,
     LARGE_ASSET_BYTES,
     MutationIntent,
     MutationIntentType,
@@ -198,6 +199,30 @@ def _assert_repair_prompt_contract(prompt, *, invalid_proposal, allowed_actions)
     ]
     assert tuple(_response_action_schemas(prompt)) == tuple(allowed_actions)
     assert prompt.audit()["duplicate_headings"] == []
+
+
+# @features ai-report permissions
+# @dimensions creator owner unrelated-user delete view
+@pytest.mark.unit
+def test_ai_report_permissions_follow_creator_ownership():
+    creator = _permissioned_user("report-creator", {})
+    unrelated = _permissioned_user("unrelated-report-user", {})
+    owner = _test_user("report-site-owner")
+    report = TestEntities.get(
+        "REPORT",
+        {
+            "name": "Creator-owned report",
+            "hash": "creator-owned-report",
+            "parent": creator,
+            "user": creator,
+        },
+    )
+
+    assert report.allowed(Action.VIEW, user=creator)
+    assert report.allowed(Action.DELETE, user=creator)
+    assert not report.allowed(Action.PUBLISH, user=creator)
+    assert report.allowed(Action.DELETE, user=owner)
+    assert not report.allowed(Action.VIEW, user=unrelated)
 
 
 # @features ai-report

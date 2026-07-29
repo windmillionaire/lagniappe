@@ -105,7 +105,9 @@ CONFIG_SCHEMA_VERSION: 2
 Schema 2 stores `RUNTIME_SERVICE_ACCOUNT_EMAIL` and
 `INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL` as explicit, non-secret identities.
 Schema 2 is the only supported recovery and runtime contract. Recovery rejects
-other schema versions and requires both identities explicitly.
+other schema versions and requires both identities explicitly. Snapshot
+construction accepts the schema scalar in its serialized string or parsed
+integer representation and always emits the canonical integer value.
 
 The download merges the current Datastore `site/deployment` keys and `site/ai`
 keys into their ordinary flat application-setting names. If those live records

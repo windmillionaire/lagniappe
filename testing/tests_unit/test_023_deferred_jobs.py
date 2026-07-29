@@ -15,6 +15,7 @@ import pytest
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
     DeferredJobInspection,
+    DeferredJobPhase,
     DeferredJobRunState,
     DeferredJobSpec,
     DeferredJobStatus,
@@ -787,6 +788,34 @@ def test_file_summary_terminal_cleanup_starts_extraction_once(monkeypatch, statu
 
 
 # @features deferred-jobs file
+# @dimensions summary expected-failure no-duplicate-capture
+def test_file_summary_expected_rejection_is_not_reported_twice(monkeypatch):
+    file = SimpleNamespace(
+        properties=SimpleNamespace(
+            summarize=SimpleNamespace(
+                complete=None,
+                error="PDF exceeds the AI summary page limit.",
+            )
+        )
+    )
+    context = SimpleNamespace(
+        input=lambda name: file if name == "file" else None,
+        set_phase=lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.ai,
+        "generate_summary",
+        lambda *_args, **_kwargs: file.properties.summarize,
+    )
+
+    with pytest.raises(
+        deferred_jobs.DeferredJobDependencyFailedError,
+        match="page limit",
+    ):
+        deferred_job_adapters.FileSummarizeAdapter().prepare(context)
+
+
+# @features deferred-jobs file
 # @dimensions follow-up extraction idempotency
 def test_start_file_extraction_uses_explicit_actor_and_identity(monkeypatch):
     actor = SimpleNamespace(urlsafe_key="actor-key")
@@ -1108,6 +1137,61 @@ def test_autofill_terminal_cleanup_releases_target_lock(monkeypatch):
     )
     adapter.cleanup(missing_context, terminal=True)
     assert released[-1] == ("lock:deleted-page-key", "missing-job-key")
+
+
+# @features deferred-jobs ai files
+# @dimensions autofill summary-dependency pending failed
+def test_autofill_prepare_waits_for_attached_file_summaries(monkeypatch):
+    adapter = deferred_job_adapters.AutofillAdapter()
+    phases = []
+    context = SimpleNamespace(
+        actor=SimpleNamespace(),
+        parameters={},
+        input=lambda name: SimpleNamespace() if name == "target" else None,
+        set_phase=lambda phase, **details: phases.append((phase, details)),
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.ai,
+        "autofill_summary_dependencies",
+        lambda *_args: {
+            "complete": [SimpleNamespace()],
+            "pending": [SimpleNamespace()],
+            "failed": [],
+        },
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.ai,
+        "generate_autofilled_submission",
+        lambda _prompt: (_ for _ in ()).throw(
+            AssertionError("Gemini must not run before summaries complete")
+        ),
+    )
+
+    with pytest.raises(
+        deferred_jobs.DeferredJobDependencyPendingError,
+        match="still processing",
+    ):
+        adapter.prepare(context)
+
+    assert phases[-1] == (
+        DeferredJobPhase.SUMMARIZING,
+        {"completed": 1, "total": 2},
+    )
+
+    monkeypatch.setattr(
+        deferred_job_adapters.ai,
+        "autofill_summary_dependencies",
+        lambda *_args: {
+            "complete": [],
+            "pending": [],
+            "failed": [SimpleNamespace()],
+        },
+    )
+    with pytest.raises(
+        deferred_jobs.DeferredJobDependencyFailedError,
+        match="summary failed",
+    ):
+        adapter.prepare(context)
 
 
 def _runner(monkeypatch, job, adapter):
@@ -1608,6 +1692,67 @@ def test_runner_classifies_wrapped_transient_errors_and_schedules_retry(monkeypa
     assert job.status == DeferredJobStatus.RETRY_WAIT.value
     assert job.error["retryable"] is True
     assert dispatched == [(job, 2, 60)]
+
+
+# @features deferred-jobs
+# @dimensions dependency-wait retry provider-attempt-isolation
+def test_runner_waits_for_dependency_without_consuming_provider_retry(monkeypatch):
+    job = RunnerJob(attempt=2)
+    job.parameters = {"_dependency_waits": 1}
+    adapter = RecordingAdapter(
+        error=deferred_jobs.DeferredJobDependencyPendingError(
+            "summaries are still processing"
+        )
+    )
+    registry = _runner(monkeypatch, job, adapter)
+    dispatched = []
+    captured = []
+    monkeypatch.setattr(
+        registry,
+        "dispatch",
+        lambda current, *, attempt, delay_seconds=0: dispatched.append(
+            (current, attempt, delay_seconds)
+        ),
+    )
+    monkeypatch.setattr(
+        deferred_jobs.exceptions,
+        "capture",
+        lambda *args, **kwargs: captured.append((args, kwargs)),
+    )
+
+    result = registry.run(job.urlsafe_key)
+
+    assert result.state is DeferredJobRunState.RETRY_SCHEDULED
+    assert job.status == DeferredJobStatus.RETRY_WAIT.value
+    assert job.parameters["_dependency_waits"] == 2
+    assert job.progress["phase"] == DeferredJobPhase.SUMMARIZING.value
+    assert dispatched == [(job, 3, 60)]
+    assert captured == []
+    assert deferred_jobs._provider_retry_attempt(job) == 1
+
+
+# @features deferred-jobs
+# @dimensions dependency-failure terminal no-duplicate-capture
+def test_runner_fails_cleanly_when_dependency_failed(monkeypatch):
+    error = deferred_jobs.DeferredJobDependencyFailedError(
+        "attached file summary failed"
+    )
+    job = RunnerJob(attempt=1)
+    adapter = RecordingAdapter(error=error)
+    registry = _runner(monkeypatch, job, adapter)
+    captured = []
+    monkeypatch.setattr(
+        deferred_jobs.exceptions,
+        "capture",
+        lambda *args, **kwargs: captured.append((args, kwargs)),
+    )
+
+    result = registry.run(job.urlsafe_key)
+
+    assert result.state is DeferredJobRunState.FAILED
+    assert result.error == str(error)
+    assert job.error["message"] == str(error)
+    assert captured == []
 
 
 # @features deferred-jobs

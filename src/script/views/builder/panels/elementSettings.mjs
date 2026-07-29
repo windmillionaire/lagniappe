@@ -502,9 +502,16 @@ export class ElementSettings {
 		});
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
+	 * @pairs forms:builder-field-title frontend-icons:material-icon-preservation
+	 */
 	_setTitle(element, value) {
 		element.schema.title = value;
-		element.item.querySelector("[data-role=label] > span").textContent = value;
+		element.item.querySelector(
+			"[data-role='label'] > span:not([data-icon])",
+		).textContent = value;
 	}
 
 	_setPlaceholder(element, value) {

@@ -168,6 +168,31 @@ def test_create_basic_page_task(get_user):
     task.key = _submit_create_task_form(user, page, task, create_form)
 
 
+# @pairs tasks:create-close tasks:empty-state
+# @template pages/tasks.html::task_list
+# @template pages/tasks.html::task_empty
+def test_empty_page_task_list_shows_marker_only_after_create_closes(get_user):
+    """An editable empty task list opens CreateTask before its empty marker."""
+    user = get_user(Users.OWNER)
+    page = Pages.test_create_page_task.get(user)
+    user.go(page)
+
+    create_form = page.create_task_form
+    empty = user.locate(f"{page.TASK_LIST} [data-role='empty']")
+    expect(create_form).to_be_visible()
+    expect(empty).to_be_attached()
+    expect(empty).not_to_be_visible()
+
+    close = user.locate(
+        "#tabs [data-role='controls'] button[lp-close='tasks:PageTaskList']"
+    )
+    expect(close).to_be_visible()
+    close.click()
+
+    expect(create_form).not_to_be_visible()
+    expect(empty).to_be_visible()
+
+
 # @features tasks
 # @dimensions create attach-form
 def test_create_page_task_with_form(get_user):

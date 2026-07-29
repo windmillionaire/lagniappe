@@ -57,6 +57,25 @@ def test_category_mobile_controls_open_with_page_columns(get_user):
     expect(controls.row("modified")).to_be_visible()
 
 
+# @template categories/index.html::view_header
+# @template categories/index.html::view
+def test_category_viewer_mobile_controls_do_not_require_edit_permission(get_user):
+    """A VIEW-only phone user can initialize and open client-side table controls."""
+    owner = get_user(Users.OWNER)
+    category = Categories.acl_create_denied.get(owner)
+
+    subject = get_user(Users.single_category_create)
+    subject.go(category)
+    subject.mobile = True
+
+    controls = MobileTableControls(subject)
+    expect(controls.panel).to_be_hidden()
+    controls.open()
+
+    expect(controls.row("name")).to_be_visible()
+    expect(controls.row("modified")).to_be_visible()
+
+
 # @features table-controls
 # @dimensions mobile-controls column-visibility
 def test_category_mobile_visibility_toggle_hides_column(get_user):

@@ -9,10 +9,14 @@ import { BaseList } from "../elements/base/baseList";
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_while_another_task_is_open_keeps_rows_clear
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_page_task_refresh_create_reconcile_does_not_duplicate_rows
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_update_page_task_settings_from_row
+ * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_empty_page_task_list_shows_marker_only_after_create_closes
+ * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_completed_only_task_list_hides_empty_marker
  * @tests tests_js/test_028_form_state_split.py::test_task_list_refresh_preserves_rows_with_local_form_state
+ * @tests tests_js/test_028_form_state_split.py::test_task_list_empty_marker_requires_closed_create_form_and_no_tasks
  * @features tasks
  * @dimensions readonly assignee permission-gates refresh update-state stale-widget create while-open list-state dedupe unsaved-marker dirty-form-preservation
  * @pair tasks:dirty-form-preservation
+ * @pairs tasks:completed-only tasks:empty-state tasks:create-close
  */
 export class PageTaskList extends BaseList {
 	constructor(attributes) {
@@ -154,13 +158,30 @@ export class PageTaskList extends BaseList {
 
 	_setListVisibility() {
 		if (!this.target.hasAttribute("loaded")) return;
-		this.activeTasks.dataset.visible = this.activeCount > 0 ? "true" : "false";
+
+		const hasActive = this.activeCount > 0;
+		const hasCompleted = this.completedCount > 0;
+		const empty = this.activeTasks.querySelector("[data-role='empty']");
+		const showEmpty =
+			Boolean(empty) &&
+			!hasActive &&
+			!hasCompleted &&
+			this.component.active === this;
+
+		if (empty) empty.dataset.visible = showEmpty ? "true" : "false";
+		this.activeTasks.dataset.visible =
+			hasActive || showEmpty ? "true" : "false";
 		this.completedHeader.dataset.visible =
-			this.completedCount > 0 ? "true" : "false";
+			hasCompleted ? "true" : "false";
 	}
 
 	get ifEmpty() {
-		return this._isEmpty && this._created.length === 0
+		const createTask = this.component.widgets.CreateTask;
+		const createTaskClosing =
+			createTask?.visible === false &&
+			createTask.target?.dataset.visible === "true";
+
+		return this._isEmpty && this._created.length === 0 && !createTaskClosing
 			? this.target.dataset.ifEmpty
 			: false;
 	}
@@ -183,12 +204,16 @@ export class PageTaskList extends BaseList {
 
 	get activeCount() {
 		if (!this.activeTasks) return 0;
-		return this.activeTasks.children.length;
+		return this.activeTasks.querySelectorAll(
+			"li[lp-component][data-kind='task']",
+		).length;
 	}
 
 	get completedCount() {
 		if (!this.completedTasks) return 0;
-		return this.completedTasks.children.length;
+		return this.completedTasks.querySelectorAll(
+			"li[lp-component][data-kind='task']",
+		).length;
 	}
 
 	/**

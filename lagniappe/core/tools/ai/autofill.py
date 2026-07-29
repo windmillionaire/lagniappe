@@ -39,24 +39,52 @@ def _autofill_page(entity):
     return None
 
 
-# @testable true
-# @tests tests_unit/test_015b_ai_prompt_builders.py::test_autofill_prompt_data_keeps_attachment_context_entity_specific
-# @features ai files
-# @dimensions attached-files entity-specific
-def autofill_attached_files(entity, user):
-    """Return readable projections for files attached directly to ``entity``."""
+# @testable false
+# @covered-by lagniappe/core/tools/ai/autofill.py::autofill_attached_files
+# @covered-by lagniappe/core/tools/ai/autofill.py::autofill_summary_dependencies
+# @reason shared permission filtering is asserted through attachment and dependency projections
+def _readable_autofill_files(entity, user):
     if getattr(entity, "entity_kind", None) not in {"page", "task"}:
         return []
 
-    attached_files = []
+    files = []
     seen = set()
     for file in getattr(entity, "files", None) or []:
         key = getattr(file, "key", None) or getattr(file, "hash", None)
         if not file or key in seen or not file.allowed(Action.VIEW, user=user):
             continue
         seen.add(key)
-        attached_files.append(file.to_ai(user))
-    return attached_files
+        files.append(file)
+    return files
+
+
+# @testable true
+# @tests tests_unit/test_015b_ai_prompt_builders.py::test_autofill_prompt_data_keeps_attachment_context_entity_specific
+# @features ai files
+# @dimensions attached-files entity-specific
+def autofill_attached_files(entity, user):
+    """Return readable projections for files attached directly to ``entity``."""
+    return [file.to_ai(user) for file in _readable_autofill_files(entity, user)]
+
+
+# @testable true
+# @tests tests_unit/test_015b_ai_prompt_builders.py::test_autofill_summary_dependencies_track_enabled_processing
+# @features ai files
+# @dimensions autofill summary-dependency pending failed complete
+def autofill_summary_dependencies(entity, user):
+    """Classify enabled attached-file summaries before autofill generation."""
+    states = {"complete": [], "pending": [], "failed": []}
+    for file in _readable_autofill_files(entity, user):
+        summarize = file.properties.summarize
+        if not summarize.enabled:
+            continue
+        if summarize.complete:
+            states["complete"].append(file)
+        elif summarize.error:
+            states["failed"].append(file)
+        else:
+            states["pending"].append(file)
+    return states
 
 
 # @testable true
@@ -156,15 +184,14 @@ def validate_submission(submission):
 
 
 # @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_exception_context_survives_autofill_wrapper
+# @tests tests_unit/test_015_ai_tools.py::test_ai_exception_context_survives_autofill_wrapper_without_duplicate_capture
 # @features ai
-# @dimensions error-context
+# @dimensions error-context terminal-capture
 def generate_autofilled_submission(prompt):
     """Generate and validate an autofilled form submission from a Prompt."""
     try:
         return ai_model.generate_content(prompt, validator=validate_submission)
     except Exception as e:
-        exceptions.capture(e)
         raise exceptions.AIException(
             f"{GENERIC_MESSAGE} {str(e)}",
             context=getattr(e, "context", None),

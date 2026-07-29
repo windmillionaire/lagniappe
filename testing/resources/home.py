@@ -87,6 +87,10 @@ class HomePage(SitePage):
     CREATE_PAGE_TOGGLE = "button[lp-show='pages:CreatePage'][data-toggle]"
     CREATE_PAGE_FORM = "form[data-widget='CreatePage']"
     PAGE_LIST = "#pages ul[data-widget='HomePageList']"
+    PAGE_LOADING = (
+        "#pages [data-role='list-loading']"
+        "[data-indicator='HomePageList']"
+    )
 
     # --- Project Section ---
     # Template: lagniappe/web/templates/home/home.html

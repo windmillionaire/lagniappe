@@ -6,9 +6,10 @@ import { captureError, Modal, request, withTransition } from "../../shared";
  * @testable true
  * @tests tests_js/test_015_core_submit_frontend.py::test_submit_abandons_stale_widget_after_async_prepare
  * @tests tests_js/test_015_core_submit_frontend.py::test_submit_does_not_show_upload_error_after_stale_prepare
+ * @tests tests_js/test_015_core_submit_frontend.py::test_submit_stops_before_appending_when_form_data_is_missing
  * @tests tests_js/test_015_core_submit_frontend.py::test_submit_uses_explicit_action_route_over_active_widget_route
  * @features submit
- * @dimensions stale-widget direct-upload-navigation direct-upload-error route-override
+ * @dimensions stale-widget direct-upload-navigation direct-upload-error missing-form-data route-override
  */
 export class SubmissionManager {
 	constructor(view) {

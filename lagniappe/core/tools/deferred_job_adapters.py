@@ -23,6 +23,8 @@ from lagniappe.core.tools.database import assets as storage_assets
 from .deferred_jobs import (
     AUTOFILL_FORM_LOCK_SCOPE,
     DeferredJobAdapter,
+    DeferredJobDependencyFailedError,
+    DeferredJobDependencyPendingError,
     DeferredJobDriftError,
     active_deferred_job_lock,
     deferred_job_lock_key,
@@ -545,6 +547,7 @@ class AutofillAdapter(DeferredJobAdapter):
     requires_ai = True
     queued_message = "Autofilling form..."
     retry_message = "AI is temporarily busy; retrying autofill shortly..."
+    dependency_message = "Waiting for attached file summaries before autofilling..."
     mutation_inputs = ()
 
     # @testable true
@@ -645,9 +648,33 @@ class AutofillAdapter(DeferredJobAdapter):
                 "The form changed while autofill was running. Run autofill again."
             )
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_prepare_waits_for_attached_file_summaries
+    # @features deferred-jobs ai files
+    # @dimensions autofill summary-dependency pending failed
     def prepare(self, context):
         context.set_phase(DeferredJobPhase.PREPARING_INPUTS)
+        dependencies = ai.autofill_summary_dependencies(
+            context.input("target"),
+            context.actor,
+        )
+        if dependencies["failed"]:
+            raise DeferredJobDependencyFailedError(
+                "An attached file summary failed. Fix or remove that file, then "
+                "run autofill again."
+            )
+        if dependencies["pending"]:
+            complete = len(dependencies["complete"])
+            total = complete + len(dependencies["pending"])
+            context.set_phase(
+                DeferredJobPhase.SUMMARIZING,
+                completed=complete,
+                total=total,
+            )
+            raise DeferredJobDependencyPendingError(
+                "Attached file summaries are still processing."
+            )
+
         record = context.parameters.get("upload_record")
         upload = (
             storage_assets.direct_upload_file(
@@ -1052,13 +1079,16 @@ class FileSummarizeAdapter(FileAdapter):
     requires_ai = True
     mutation_inputs = ("file",)
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_023_deferred_jobs.py::test_file_summary_expected_rejection_is_not_reported_twice
+    # @features deferred-jobs file
+    # @dimensions summary expected-failure no-duplicate-capture
     def prepare(self, context):
         context.set_phase(DeferredJobPhase.SUMMARIZING)
         file = context.input("file")
         summarize = ai.generate_summary(file, raise_quota=True, raise_errors=True)
         if not summarize.complete:
-            raise exceptions.ValidationError(
+            raise DeferredJobDependencyFailedError(
                 summarize.error or "File summary did not complete."
             )
         return {

@@ -51,7 +51,10 @@ def test_one_category_permissions(get_user):
     expect(category_list.get_item(allowed_category)).to_be_visible()
     expect(category_list.get_item(other_category)).not_to_be_attached()
 
-    expect(user.locate(home.DIRECTORY_LIST).locator("li")).to_have_count(0)
+    expect(user.locate(home.DIRECTORY_LIST).locator("li")).to_have_count(1)
+    expect(
+        user.locate(home.DIRECTORY_LIST).locator('a:has-text("Active Tasks")')
+    ).to_be_attached()
     expect(user.locate(home.MANUAL_BUTTON)).to_be_visible()
 
     search = HeaderSearch(user)
@@ -102,27 +105,79 @@ def test_directory_general_models_view_only(get_user):
 # @features permissions
 # @dimensions global-resources
 def test_directory_general_forms_view_only(get_user):
-    """Directory: Forms; Manual is a standalone home link."""
+    """Directory: Active Tasks and Forms; Manual is a standalone home link."""
     user = get_user(Users.general_forms_view_only)
     home = user.go(SitePages.HOME)
     root = home.directory.list
     expect(user.locate(home.MANUAL_BUTTON)).to_be_visible()
     expect(root.locator('a:has-text("Forms")')).to_be_visible()
-    expect(root.locator('a:has-text("Active Tasks")')).not_to_be_attached()
+    expect(root.locator('a:has-text("Active Tasks")')).to_be_visible()
     expect(root.locator('a:has-text("Users")')).not_to_be_attached()
 
 
 # @features permissions
 # @dimensions global-resources
 def test_directory_general_users_view_only(get_user):
-    """Directory: Users; Manual is a standalone home link."""
+    """Directory: Active Tasks and Users; Manual is a standalone home link."""
     user = get_user(Users.general_users_view_only)
     home = user.go(SitePages.HOME)
     root = home.directory.list
     expect(user.locate(home.MANUAL_BUTTON)).to_be_visible()
     expect(root.locator('a:has-text("Users")')).to_be_visible()
-    expect(root.locator('a:has-text("Active Tasks")')).not_to_be_attached()
+    expect(root.locator('a:has-text("Active Tasks")')).to_be_visible()
     expect(root.locator('a:has-text("Forms")')).not_to_be_attached()
+
+
+# @pairs home:lazy-empty-list home:unavailable-toggle
+# @pairs permissions:own-page-only permissions:active-tasks-directory
+# @template home/home.html::create
+# @template home/directory.html::list
+def test_empty_home_model_lists_settle_to_disabled_zero_state(get_user):
+    """An own-page-only user sees Active Tasks and clear empty model-list states."""
+    user = get_user(Users.user_no_access)
+    home = user.go(SitePages.HOME)
+
+    directory = home.directory.list
+    expect(directory.get_by_role("link", name="Active Tasks")).to_be_visible()
+
+    page_list = user.locate(home.PAGE_LIST)
+    page_toggle = user.locate(home.PAGE_LIST_TOGGLE)
+    expect(page_list).not_to_have_attribute("loaded", "")
+    page_toggle.click()
+    assert List(page_list).is_loaded
+    expect(page_list).to_be_visible()
+    expect(page_toggle).not_to_be_disabled()
+    expect(user.locate(home.PAGE_LOADING)).to_be_hidden()
+
+    lists = [
+        (
+            home.PROJECT_LIST,
+            home.PROJECT_LIST_TOGGLE,
+            home.PROJECT_LOADING,
+        ),
+        (
+            home.CATEGORY_LIST,
+            home.CATEGORY_LIST_TOGGLE,
+            home.CATEGORY_LOADING,
+        ),
+    ]
+    for list_selector, toggle_selector, indicator_selector in lists:
+        list_root = user.locate(list_selector)
+        toggle = user.locate(toggle_selector)
+        indicator = user.locate(indicator_selector)
+
+        expect(list_root).not_to_have_attribute("loaded", "")
+        expect(toggle).not_to_be_disabled()
+        expect(indicator).to_be_hidden()
+
+        toggle.click()
+
+        assert List(list_root).is_loaded
+        expect(list_root).to_be_hidden()
+        expect(indicator).to_be_visible()
+        expect(indicator).to_have_text("0")
+        expect(toggle).to_be_disabled()
+        expect(toggle).to_contain_class("opacity-50")
 
 
 # @features permissions

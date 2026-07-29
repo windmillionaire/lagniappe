@@ -8,8 +8,9 @@ import Core from "./core";
  * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_controls_open_with_page_columns
  * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_controls_open_with_task_columns
  * @tests tests_e2e/003_forms/test_003e_form_index_mobile_ui.py::test_form_index_mobile_tools_and_column_controls_are_exclusive
+ * @tests tests_e2e/008_users/test_008a_user_index.py::test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load
  * @features table-controls
- * @dimensions mobile-controls columns mobile-tools mutual-exclusion
+ * @dimensions mobile-controls columns mobile-tools mutual-exclusion mobile-startup sorting
  */
 export default class EntityIndex extends Core {
 	constructor(node) {
@@ -23,17 +24,22 @@ export default class EntityIndex extends Core {
 		await super.init();
 
 		const table = this.getComponent(this.elt.querySelector("#table"));
+		const tools = this.elt.querySelector("#tools");
+		const mobileControls = this.elt.querySelector("#mobile-controls");
 
-		withTransition(async () => {
+		if (this.mobile && tools) {
+			this._createDropdown();
+			const toolsNav = document.querySelector("nav[data-nav='tools']");
+			if (toolsNav) toolsNav.style.display = "none";
+		}
+
+		await withTransition(async () => {
 			if (!table.elt.hasAttribute("lp-prefetch")) {
 				await table.loadWidget("IndexTable");
 			}
 			await table.loadWidget("TableVisibility");
-			table.render(true);
+			await table.render(true);
 		});
-
-		const tools = this.elt.querySelector("#tools");
-		const mobileControls = this.elt.querySelector("#mobile-controls");
 
 		this.elt.addEventListener("mobile-resize", async () => {
 			withTransition(async () => {
@@ -53,12 +59,6 @@ export default class EntityIndex extends Core {
 
 		if (!tools) {
 			return;
-		}
-
-		if (this.mobile) {
-			this._createDropdown();
-			const toolsNav = document.querySelector("nav[data-nav='tools']");
-			if (toolsNav) toolsNav.style.display = "none";
 		}
 
 		const thead = table.elt.querySelector("thead");

@@ -44,9 +44,9 @@ SDK.
 
 A separate local bundle for `@sentry/browser`. Production templates load it
 only when error reporting is enabled. It initializes from the rendered
-installation `SENTRY_DSN`, explicitly disables default PII, and applies the
-shared browser event sanitizer. Browser and backend reporting therefore follow
-the same maintainer-project, operator-project, or disabled choice.
+installation `SENTRY_JS_DSN`, explicitly disables default PII, and applies the
+shared browser event sanitizer. Browser events can therefore use a separate
+Sentry project from backend events.
 
 ## View Registry (`main.mjs`)
 

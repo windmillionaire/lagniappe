@@ -369,6 +369,26 @@ if (result.spans[0].data["http.response.status_code"] !== 500) {
 
 
 # @features error-tracking
+# @dimensions malformed-breadcrumbs privacy
+def test_configure_sentry_drops_malformed_breadcrumb_container(run_node):
+    run_error_tracking_check(
+        run_node,
+        """
+configureSentry();
+
+const result = sentryProcessorsRef[0]({
+  message: "malformed breadcrumb event",
+  breadcrumbs: { unexpected: "object instead of array" },
+});
+
+if ("breadcrumbs" in result) {
+  throw new Error(`Malformed breadcrumbs reached the SDK: ${JSON.stringify(result)}`);
+}
+""",
+    )
+
+
+# @features error-tracking
 # @dimensions configured-dsn privacy
 def test_configure_sentry_uses_installation_dsn_without_default_pii(run_node):
     run_error_tracking_check(

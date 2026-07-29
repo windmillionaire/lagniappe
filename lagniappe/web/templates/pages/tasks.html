@@ -63,10 +63,8 @@
 {% endmacro %}
 
 {% macro task_empty(page) %}
-  {% if not page.allowed(Action.EDIT) %}
-    <li class="text-kind-default font-semibold italic text-center py-4 text-lg"
-        data-role="empty">No tasks have been created for this page</li>
-  {% endif %}
+  <li class="text-kind-default font-semibold italic text-center py-4 text-lg"
+      data-role="empty">No tasks have been created for this page</li>
 {% endmacro %}
 
 {% macro task(t, page) %}

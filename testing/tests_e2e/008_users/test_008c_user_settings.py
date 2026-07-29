@@ -7,6 +7,7 @@ Verified against:
 - src/script/views/page.mjs
 """
 
+import json
 import re
 from pathlib import Path
 from types import SimpleNamespace
@@ -663,6 +664,47 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     restrictions_close.click()
     expect(settings_panel).not_to_be_visible()
     expect(info_tab.locator(created_user_page.INFO_FORM)).to_be_visible()
+
+
+# @pair user-settings:group-selector
+# @pair user-settings:preload
+# @pair user-settings:relation-loading
+# @template pages/info.html::user_settings
+def test_user_settings_preloads_existing_groups(get_user):
+    """The group selector shows every group already assigned to the user."""
+    owner = get_user(Users.OWNER)
+    created_user = get_user(Users.create_user, creator=owner)
+    first_group = Groups.general_users_view_only.get(owner)
+    second_group = Groups.test_user_one_category.get(owner)
+    created_user.entity.groups = [first_group.entity, second_group.entity]
+    created_user.entity.save()
+
+    user_page = Page(user=owner, definition=created_user.definition)
+    user_page.entity = created_user.entity.page
+    owner.go(user_page)
+
+    settings_panel = _open_user_settings(owner, user_page)
+    groups = settings_panel.locator("[data-role='user-groups']")
+    group_select = Select(groups)
+    expected_group_ids = {
+        first_group.entity.urlsafe_key,
+        second_group.entity.urlsafe_key,
+    }
+
+    preload_attribute = groups.locator("[lp-select]").get_attribute("data-preload")
+    preload = json.loads(preload_attribute)
+    assert {group["id"] for group in preload} == expected_group_ids
+    selected_group_ids = set(
+        groups.evaluate(
+            """root => Array.from(
+                root.querySelector("select[name='group']").selectedOptions,
+                option => option.value,
+            )"""
+        )
+    )
+    assert selected_group_ids == expected_group_ids
+    assert first_group.definition.name in group_select.placeholder
+    assert second_group.definition.name in group_select.placeholder
 
 
 # @features user-settings

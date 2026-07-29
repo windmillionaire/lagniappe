@@ -2,14 +2,12 @@
   <ul data-widget="DirectoryList"
       data-visible="false"
       class="{{ styles.home.card.list }}">
-    {% if Resource.TASKS.allowed(Action.RESTRICTED) %}
-      <li lp-link data-kind="task" class="{{ styles.home.card.directory }}">
-        {{ render_icon("tasks", (styles.icon.default)) }}
-        <a href='{{ url_for("tasks.task_index") }}'
-           class="{{ styles.link.title }}"
-           data-role="title">Active Tasks</a>
-      </li>
-    {% endif %}
+    <li lp-link data-kind="task" class="{{ styles.home.card.directory }}">
+      {{ render_icon("tasks", (styles.icon.default)) }}
+      <a href='{{ url_for("tasks.task_index") }}'
+         class="{{ styles.link.title }}"
+         data-role="title">Active Tasks</a>
+    </li>
     {% if Resource.FORMS.allowed(Action.VIEW) %}
       <li lp-link data-kind="form" class="{{ styles.home.card.directory }}">
         {{ render_icon("form", (styles.icon.default)) }}

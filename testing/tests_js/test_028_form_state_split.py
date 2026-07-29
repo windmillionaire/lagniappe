@@ -1219,6 +1219,89 @@ if (submitted.detail.role !== "complete-toggle" || !submitted.detail.update) {
     )
 
 
+# @pairs tasks:create-close tasks:empty-state tasks:completed-only
+def test_task_list_empty_marker_requires_closed_create_form_and_no_tasks(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const context = { BaseList: class {}, console };
+vm.createContext(context);
+let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class PageTaskList", "class PageTaskList");
+source += "\nglobalThis.PageTaskList = PageTaskList;";
+vm.runInContext(source, context);
+
+const marker = { dataset: {} };
+const activeTasks = {
+  dataset: {},
+  querySelector(selector) {
+    return selector === "[data-role='empty']" ? marker : null;
+  },
+};
+const completedHeader = { dataset: {} };
+const list = Object.create(context.PageTaskList.prototype);
+let activeCount = 0;
+let completedCount = 0;
+
+list.target = {
+  dataset: { ifEmpty: "CreateTask" },
+  hasAttribute(name) { return name === "loaded"; },
+};
+list._isEmpty = true;
+list._created = [];
+list.component = { active: { name: "CreateTask" }, widgets: {} };
+Object.defineProperties(list, {
+  activeTasks: { value: activeTasks },
+  completedHeader: { value: completedHeader },
+  activeCount: { get() { return activeCount; } },
+  completedCount: { get() { return completedCount; } },
+});
+
+if (list.ifEmpty !== "CreateTask") {
+  throw new Error("An initially empty task list did not default to CreateTask");
+}
+list.component.widgets.CreateTask = {
+  visible: false,
+  target: { dataset: { visible: "true" } },
+};
+if (list.ifEmpty !== false) {
+  throw new Error("Closing CreateTask immediately reopened it");
+}
+
+list._setListVisibility();
+if (marker.dataset.visible !== "false" || activeTasks.dataset.visible !== "false") {
+  throw new Error("Empty marker appeared while CreateTask was open");
+}
+
+list.component.active = list;
+list._setListVisibility();
+if (marker.dataset.visible !== "true" || activeTasks.dataset.visible !== "true") {
+  throw new Error("Empty marker did not appear after CreateTask closed");
+}
+
+completedCount = 1;
+list._setListVisibility();
+if (
+  marker.dataset.visible !== "false" ||
+  activeTasks.dataset.visible !== "false" ||
+  completedHeader.dataset.visible !== "true"
+) {
+  throw new Error("Empty marker appeared beside a completed task");
+}
+
+completedCount = 0;
+activeCount = 1;
+list._setListVisibility();
+if (marker.dataset.visible !== "false" || activeTasks.dataset.visible !== "true") {
+  throw new Error("Active task visibility was affected by the empty marker");
+}
+'''
+    )
+
+
 # @features forms
 # @dimensions direct-fields clear input textarea
 def test_direct_form_controls_clear_inputs_and_textareas(run_node):

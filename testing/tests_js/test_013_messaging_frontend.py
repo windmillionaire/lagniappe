@@ -28,6 +28,9 @@ class MemoryStorage {{
 const capturedErrors = [];
 const getTokenCalls = [];
 const modalCalls = [];
+let configRequestCalls = 0;
+let getMessagingCalls = 0;
+let messagingSupported = true;
 let configResponse = {{
   ok: true,
   apiKey: "api-key",
@@ -73,12 +76,16 @@ const context = {{
   document: {{
     visibilityState: "visible",
   }},
-  getMessaging: () => ({{}}),
+  getMessaging: () => {{
+    getMessagingCalls += 1;
+    return {{}};
+  }},
   getMessagingToken: async (...args) => {{
     getTokenCalls.push(args);
     return currentToken;
   }},
   getTokenCalls,
+  isMessagingSupported: async () => messagingSupported,
   indexedDB: {{
     databases: async () => [],
   }},
@@ -111,7 +118,10 @@ const context = {{
     }},
   }},
   request: {{
-    get: async () => configResponse,
+    get: async () => {{
+      configRequestCalls += 1;
+      return configResponse;
+    }},
   }},
   sessionStorage: new MemoryStorage(),
   setTimeout,
@@ -128,6 +138,9 @@ Object.defineProperties(context, {{
       configResponse = value;
     }},
   }},
+  configRequestCalls: {{
+    get: () => configRequestCalls,
+  }},
   currentToken: {{
     get: () => currentToken,
     set: (value) => {{
@@ -138,6 +151,15 @@ Object.defineProperties(context, {{
     get: () => modalPermission,
     set: (value) => {{
       modalPermission = value;
+    }},
+  }},
+  getMessagingCalls: {{
+    get: () => getMessagingCalls,
+  }},
+  messagingSupported: {{
+    get: () => messagingSupported,
+    set: (value) => {{
+      messagingSupported = value;
     }},
   }},
   notificationPermission: {{
@@ -167,9 +189,11 @@ source = source.replace(
   `import {{
 \tgetMessaging,
 \tgetToken as getMessagingToken,
+\tisSupported as isMessagingSupported,
 }} from "firebase/messaging";`,
   `const getMessaging = globalThis.getMessaging;
-const getMessagingToken = globalThis.getMessagingToken;`,
+const getMessagingToken = globalThis.getMessagingToken;
+const isMessagingSupported = globalThis.isMessagingSupported;`,
 );
 source = source.replace(
   'import {{ captureError }} from "./errors";',
@@ -263,6 +287,33 @@ if (modalCalls.length !== 0) {
 }
 if (requestPermissionCalls !== 0) {
   throw new Error("Notification.requestPermission was called while hidden");
+}
+if (capturedErrors.length !== 0) {
+  throw new Error(`Unexpected captured errors: ${capturedErrors.length}`);
+}
+""",
+    )
+
+
+# @features messaging
+# @dimensions unsupported-browser graceful-fallback
+def test_unsupported_browser_skips_firebase_messaging(run_node):
+    run_messaging_check(
+        run_node,
+        """
+messagingSupported = false;
+
+const token = await initializeMessaging();
+await nextTurn();
+
+if (token !== null) {
+  throw new Error(`Expected no token on an unsupported browser, got ${token}`);
+}
+if (configRequestCalls !== 0) {
+  throw new Error("Firebase config was requested on an unsupported browser");
+}
+if (getMessagingCalls !== 0) {
+  throw new Error("Firebase messaging was initialized on an unsupported browser");
 }
 if (capturedErrors.length !== 0) {
   throw new Error(`Unexpected captured errors: ${capturedErrors.length}`);

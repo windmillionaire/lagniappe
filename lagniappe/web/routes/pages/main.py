@@ -35,6 +35,21 @@ def _is_public_users_own_page(page):
 
 
 # @testable true
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_preloads_existing_groups
+# @pair user-settings:group-selector
+# @pair user-settings:preload
+# @pair user-settings:relation-loading
+def _load_user_settings_groups(page):
+    """Attach group relations needed by another user's settings selector."""
+    is_own_page = (
+        getattr(getattr(current_user, "page", None), "key", None) == page.key
+    )
+    if page.user and current_user.is_owner and not is_own_page:
+        Entities.fetch_one(page.user, request=Fetch.direct())
+    return page
+
+
+# @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_restricted_schedules_are_forbidden
 # @features public-users
 # @dimensions attribute-preservation
@@ -61,7 +76,7 @@ def _preserve_public_user_page_attributes(page, page_data):
 @pages.route("<key>", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def view(key, **kwargs):
-    page = kwargs["entity"]
+    page = _load_user_settings_groups(kwargs["entity"])
 
     return responses.page(page)
 
@@ -81,7 +96,7 @@ def info(key, **kwargs):
 @pages.route("<key>/user-settings/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def user_settings(key, **kwargs):
-    page = kwargs["entity"]
+    page = _load_user_settings_groups(kwargs["entity"])
     is_own_page = (
         getattr(getattr(current_user, "page", None), "key", None) == page.key
     )

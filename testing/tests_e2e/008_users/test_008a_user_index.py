@@ -7,8 +7,16 @@ import pytest
 
 from lagniappe.core.definitions import Fetch, Levels, Site
 from lagniappe.core.entities import Entities
-from testing.definitions import Categories, SitePages, Users
-from testing.elements import Modal, Select, SpinnerButtons, Table, Tabs
+from testing.definitions import Categories, Groups, SitePages, Users
+from testing.elements import (
+    Dropdown,
+    MobileTableControls,
+    Modal,
+    Select,
+    SpinnerButtons,
+    Table,
+    Tabs,
+)
 from testing.resources import Page
 
 pytestmark = pytest.mark.e2e
@@ -174,6 +182,78 @@ def test_create_user_from_index(get_user):
 
     new_row.locator(Table.ENTITY_URL).click()
     expect(owner.page).to_have_title(re.compile(created_user.name))
+
+
+# @pair users:group-selector
+# @pair users:multiple
+# @template users/tools.html::create_user
+def test_create_user_group_selector_accepts_multiple_groups(get_user):
+    """A new user can be assigned to more than one group."""
+    owner = get_user(Users.OWNER)
+    first_group = Groups.general_users_view_only.get(owner)
+    second_group = Groups.test_user_one_category.get(owner)
+    suffix = uuid4().hex
+    created_user = SimpleNamespace(
+        name=f"Multi-group User {suffix}",
+        email=f"multi-group-user-{suffix}@example.test",
+    )
+    user_index = owner.go(SitePages.USER_INDEX)
+    create_form = user_index.create_user_form
+
+    create_form.locator("input[name='name']").fill(created_user.name)
+    create_form.locator("input[name='email']").fill(created_user.email)
+    group_select = Select(
+        create_form.locator("label").filter(has_text="User Group(s)")
+    )
+    expect(group_select.input).to_have_attribute("data-multiple", "true")
+    group_select.select_by_name(first_group.definition.name)
+    group_select.select_by_name(second_group.definition.name)
+
+    selected_groups = create_form.evaluate(
+        "form => new FormData(form).getAll('group')"
+    )
+    assert set(selected_groups) == {
+        first_group.entity.urlsafe_key,
+        second_group.entity.urlsafe_key,
+    }
+
+    _create_user(owner, create_form, created_user)
+    saved_user = Entities.USER.load(created_user.email)
+    assert {group.key for group in saved_user.groups} == {
+        first_group.entity.key,
+        second_group.entity.key,
+    }
+
+
+# @pair table-controls:mobile-startup
+# @pair table-controls:mobile-tools
+# @pair table-controls:sorting
+# @template users/index.html::view_header
+# @template table.html::mobile_toggles
+def test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load(get_user):
+    """Loading the index at phone width initializes both mobile control paths."""
+    owner = get_user(Users.OWNER)
+    user_index = owner.go(SitePages.USER_INDEX)
+
+    owner.mobile = True
+    owner.page.reload()
+    user_index.initialize_view()
+
+    dropdown_button = owner.locate("[data-role='tools-dropdown']")
+    expect(dropdown_button).to_be_visible()
+    expect(dropdown_button).to_have_attribute("data-combobox-id", re.compile(".+"))
+    Dropdown(dropdown_button).select_by_name("New User")
+    expect(owner.locate(user_index.CREATE_USER_WIDGET)).to_be_visible()
+
+    controls = MobileTableControls(owner)
+    controls.open()
+    controls.filter_button("name").click()
+
+    sorting = owner.locate("#mobile-controls [data-sorts='name']")
+    expect(sorting).to_be_visible()
+    expect(
+        sorting.locator('input[type="radio"][name="name"][value="asc"]')
+    ).to_be_visible()
 
 
 # @features users

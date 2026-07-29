@@ -29,7 +29,7 @@ class ValidationError(Exception):
 
 
 # @testable true
-# @tests tests_unit/test_015_ai_tools.py::test_ai_exception_context_survives_autofill_wrapper
+# @tests tests_unit/test_015_ai_tools.py::test_ai_exception_context_survives_autofill_wrapper_without_duplicate_capture
 # @features ai
 # @dimensions error-context
 class AIException(Exception):

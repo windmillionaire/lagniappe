@@ -1869,9 +1869,11 @@ def test_ai_tool_json_generation_preserves_no_call_response_in_structured_final(
 
 
 # @features ai
-# @dimensions error-context
+# @dimensions error-context terminal-capture
 @pytest.mark.unit
-def test_ai_exception_context_survives_autofill_wrapper(monkeypatch):
+def test_ai_exception_context_survives_autofill_wrapper_without_duplicate_capture(
+    monkeypatch,
+):
     source_context = {"ai_tool_loop": {"trace": [{"iteration": 1}]}}
     source_error = exceptions.AIException("limit reached", context=source_context)
     captured = []
@@ -1891,7 +1893,7 @@ def test_ai_exception_context_survives_autofill_wrapper(monkeypatch):
 
     assert str(exc.value) == "Generation failed. Please try again.  limit reached"
     assert exc.value.context == source_context
-    assert captured == [source_error]
+    assert captured == []
 
 
 # @features ai
@@ -3114,6 +3116,45 @@ def test_ai_summary_generation_marks_unreadable_pdf_without_capture(monkeypatch)
 
     assert result.status == "PDF could not be read."
     assert result.error == summarize.UNREADABLE_PDF_SUMMARY_ERROR
+    assert result.complete is None
+    assert file.summary is None
+    assert captured == []
+
+
+# @features ai
+# @dimensions summary-prompt errors pdf-page-limit
+@pytest.mark.unit
+def test_ai_summary_generation_marks_pdf_page_limit_without_capture(monkeypatch):
+    provider_error = genai_errors.ClientError(
+        400,
+        {
+            "error": {
+                "code": 400,
+                "message": (
+                    "The document contains 1203 pages which exceeds the "
+                    "supported page limit of 1000."
+                ),
+                "status": "INVALID_ARGUMENT",
+            }
+        },
+    )
+    captured = []
+    monkeypatch.setattr(
+        summarize,
+        "ai_model",
+        SimpleNamespace(
+            generate_content=lambda prompt, validator=None: (_ for _ in ()).throw(
+                provider_error
+            )
+        ),
+    )
+    monkeypatch.setattr(summarize.exceptions, "capture", captured.append)
+
+    file = summary_file()
+    result = summarize.generate_summary(file)
+
+    assert result.status == "PDF exceeds the AI summary page limit."
+    assert result.error == summarize.PDF_PAGE_LIMIT_SUMMARY_ERROR
     assert result.complete is None
     assert file.summary is None
     assert captured == []

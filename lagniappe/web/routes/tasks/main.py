@@ -753,8 +753,10 @@ def delete_file(key, file_key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_quick_edit_updates_editable_cell
+# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_saved_filter_quick_edit_persists_attached_form_checkbox
 # @features task-index
 # @dimensions quick-edit editable-cell
+# @pairs filters:quick-edit filters:attached-form filters:checkbox filters:reload-persistence
 @tasks.route("<key>/patch", methods=["PATCH"])
 @permission(Resource.TASK, Action.EDIT)
 def patch(key, **kwargs):
@@ -798,6 +800,7 @@ def patch(key, **kwargs):
         if not field.editable:
             return responses.error("Field cannot be edited")
         field = task.properties.submission.patch(schema_id, value)
+        task.save_submission()
 
     task.save()
 

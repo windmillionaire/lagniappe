@@ -450,6 +450,13 @@ seconds. Infrastructure failures return a retryable response to Cloud Tasks;
 domain/provider failures are converted into durable job state and separately
 scheduled application attempts.
 
+Autofill has a dependency wait before provider preparation: readable attached
+files with summarization enabled must finish summarizing first. Pending
+summaries reschedule the same job after 60 seconds without consuming a provider
+retry; a terminal summary failure stops autofill and asks the user to fix or
+remove the attachment. This keeps the provider prompt from racing the file
+pipeline while preserving one user-visible autofill operation.
+
 Once task dispatch succeeds, the runner is designed for at-least-once delivery.
 Cloud Tasks itself should be assumed to deliver more than once, as described in
 Google's [Cloud Tasks overview](https://docs.cloud.google.com/tasks/docs/dual-overview).

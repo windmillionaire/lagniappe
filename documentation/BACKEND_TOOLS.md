@@ -71,8 +71,12 @@ completion version/build and five latest attempts. A transactional
 `site/data-migrations-control` lease prevents concurrent runs. Execution stops
 at the first failed catalog entry and resumes there on retry; completed
 entries stay complete across later builds. Truly fresh databases baseline the
-bundled catalog during startup without running transforms. **Refresh Cache** is
-rejected until the complete catalog is current. See the
+bundled catalog during startup without running transforms. Migration-ledger,
+lease, and fresh-install baseline transactions retry their complete
+read/check/write body after bounded Datastore contention, so concurrent
+application workers cannot turn an ordinary startup race into a failed
+initialization. **Refresh Cache** is rejected until the complete catalog is
+current. See the
 [data migration workflow](DATA_MIGRATIONS.md) for catalog authoring, failure
 recovery, compatibility, and retirement rules.
 
@@ -345,6 +349,14 @@ and directly attached files. Page targets likewise contribute only page files.
 Each visible stored attachment is included up front through its full
 `File.to_ai()` projection, whether or not it has a summary.
 
+Before making a provider call, a deferred autofill checks every readable
+attached file whose summary option is enabled. It waits in the summarizing
+phase and checks again after 60 seconds while any such summary is pending;
+dependency-only checks do not consume the provider retry allowance. A failed
+summary stops autofill with an actionable message so the user can fix or remove
+the file and run it again. Files without summarization enabled do not block
+autofill.
+
 Google Search remains available for focused missing public facts. Autofill does
 not expose entity search/lookup, page/category detail, page-task, or task-history
 functions. When the target has stored attachments, `get_file` is the only
@@ -504,7 +516,9 @@ Page file upload also supports a synchronous summary prepass when several files
 are submitted together. That HTTP route runs the shared AI restriction gate
 before creating the `File` entities or starting summary generation. Ordinary
 single-file summarization uses the deferred file-summary adapter, which runs the
-same gate again at worker authorization time.
+same gate again at worker authorization time. A provider rejection for a PDF
+that exceeds its supported page limit is stored as a clear file-summary error
+and treated as an expected input limit rather than an application exception.
 
 Planning validation performs narrow deterministic repairs before asking the
 model to rewrite a rejected proposal. In particular, otherwise complete

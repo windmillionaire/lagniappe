@@ -7,9 +7,11 @@ from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import json
+import time
 from typing import Callable, Iterable
 from uuid import uuid4
 
+from google.api_core import exceptions as google_exceptions
 from google.cloud.datastore import Entity as DatastoreEntity
 
 from lagniappe import CONFIG
@@ -32,6 +34,7 @@ MIGRATION_CONTROL_ID = "data-migrations-control"
 MAX_RECORDED_ATTEMPTS = 5
 MAX_RECORDED_ERRORS = 25
 MAX_RECORDED_REPAIRS = 25
+MIGRATION_TRANSACTION_RETRY_DELAYS = (0.05, 0.1, 0.2)
 
 
 # @testable infrastructure
@@ -399,6 +402,22 @@ def _transaction_put(datastore, transaction, entity):
         transaction.put(entity)
 
 
+# @testable true
+# @tests tests_unit/test_018b_database_migrations.py::test_fresh_install_retries_transaction_contention
+# @features database-migrations setup
+# @dimensions transaction-contention retry
+def _run_transaction(datastore, operation):
+    """Retry a complete migration-ledger transaction after contention."""
+    for attempt in range(len(MIGRATION_TRANSACTION_RETRY_DELAYS) + 1):
+        try:
+            with _transaction(datastore) as transaction:
+                return operation(transaction)
+        except google_exceptions.Aborted:
+            if attempt >= len(MIGRATION_TRANSACTION_RETRY_DELAYS):
+                raise
+            time.sleep(MIGRATION_TRANSACTION_RETRY_DELAYS[attempt])
+
+
 # @testable false
 # @covered-by lagniappe/core/tools/database/migrations.py::get_migration_status
 # @reason batch loading behavior is exercised through catalog status tests
@@ -712,7 +731,11 @@ def get_migration_status(
 # @reason transactional lease claims are exercised through concurrent runner tests
 def _claim_lease(datastore, run_id, now):
     key = _control_key(datastore)
-    with _transaction(datastore) as transaction:
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/database/migrations.py::_claim_lease
+    # @reason transaction callback is exercised through the lease claim owner
+    def claim(transaction):
         record = _transaction_get(datastore, key, transaction)
         if record and _active_lease(record, now) and record.get("run_id") != run_id:
             return False
@@ -729,7 +752,9 @@ def _claim_lease(datastore, run_id, now):
             }
         )
         _transaction_put(datastore, transaction, record)
-    return True
+        return True
+
+    return _run_transaction(datastore, claim)
 
 
 # @testable false
@@ -737,7 +762,11 @@ def _claim_lease(datastore, run_id, now):
 # @reason lease heartbeat behavior is exercised through runner recovery tests
 def _renew_lease(datastore, run_id, migration_id, now):
     key = _control_key(datastore)
-    with _transaction(datastore) as transaction:
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/database/migrations.py::_renew_lease
+    # @reason transaction callback is exercised through the lease renewal owner
+    def renew(transaction):
         record = _transaction_get(datastore, key, transaction)
         if not record or record.get("run_id") != run_id:
             raise MigrationLeaseLost("migration execution lease was lost")
@@ -750,13 +779,19 @@ def _renew_lease(datastore, run_id, migration_id, now):
         )
         _transaction_put(datastore, transaction, record)
 
+    _run_transaction(datastore, renew)
+
 
 # @testable false
 # @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
 # @reason lease cleanup is exercised through successful and failed runner tests
 def _release_lease(datastore, run_id, now):
     key = _control_key(datastore)
-    with _transaction(datastore) as transaction:
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/database/migrations.py::_release_lease
+    # @reason transaction callback is exercised through the lease release owner
+    def release(transaction):
         record = _transaction_get(datastore, key, transaction)
         if not record or record.get("run_id") != run_id:
             return
@@ -769,6 +804,8 @@ def _release_lease(datastore, run_id, now):
             }
         )
         _transaction_put(datastore, transaction, record)
+
+    _run_transaction(datastore, release)
 
 
 # @testable false
@@ -1009,6 +1046,7 @@ def run_data_migrations(
 
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_fresh_install_baselines_catalog_without_running_steps
+# @tests tests_unit/test_018b_database_migrations.py::test_fresh_install_retries_transaction_contention
 # @features database-migrations setup
 # @dimensions fresh-install baseline idempotence
 def initialize_fresh_install(
@@ -1027,10 +1065,14 @@ def initialize_fresh_install(
     completed_at = _utc((now or (lambda: datetime.now(timezone.utc)))())
     for definition in catalog:
         key = _migration_key(datastore, definition.id)
-        with _transaction(datastore) as transaction:
+
+        # @testable false
+        # @covered-by lagniappe/core/tools/database/migrations.py::initialize_fresh_install
+        # @reason per-ledger callback is exercised through fresh-install baseline tests
+        def baseline(transaction, *, definition=definition, key=key):
             record = _transaction_get(datastore, key, transaction)
             if record:
-                continue
+                return
             record = _status_entity(datastore, definition)
             _set_identity(record, definition)
             record.update(
@@ -1044,6 +1086,7 @@ def initialize_fresh_install(
                 }
             )
             _transaction_put(datastore, transaction, record)
+        _run_transaction(datastore, baseline)
     return True
 
 

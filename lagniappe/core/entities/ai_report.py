@@ -1,5 +1,7 @@
 from .entity import Entity
+from ..definitions import Action
 from ..properties import activity, ai_report as report_properties
+from ..tools.user_context import current_context_user
 
 
 # @testable true
@@ -51,6 +53,24 @@ class AIReport(Entity):
     @property
     def required(self):
         return [self.parent.hash]
+
+    # @testable true
+    # @tests tests_unit/test_020_ai_reports.py::test_ai_report_permissions_follow_creator_ownership
+    # @features ai-report permissions
+    # @dimensions creator owner unrelated-user delete view
+    def allowed(self, action, user=None):
+        user = current_context_user(user)
+        if not user or not user.is_authenticated:
+            return False
+
+        if user.is_owner:
+            return True
+
+        creator_key = self.properties.user.key
+        if creator_key and creator_key == user.key:
+            return Action.DELETE.implies(action)
+
+        return False
 
     @classmethod
     def create(cls, data):

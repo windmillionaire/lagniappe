@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import {
 	getMessaging,
 	getToken as getMessagingToken,
+	isSupported as isMessagingSupported,
 } from "firebase/messaging";
 import { captureError } from "./errors";
 import { MessagingModal } from "./modal";
@@ -337,8 +338,9 @@ function _captureMessagingError(error, config) {
  * @tests tests_js/test_013_messaging_frontend.py::test_cached_token_with_existing_subscription_skips_permission_prompt
  * @tests tests_js/test_013_messaging_frontend.py::test_hidden_default_permission_skips_permission_prompt
  * @tests tests_js/test_013_messaging_frontend.py::test_messaging_diagnostics_context_is_sentry_object_shaped
+ * @tests tests_js/test_013_messaging_frontend.py::test_unsupported_browser_skips_firebase_messaging
  * @features messaging
- * @dimensions permission-modal cached-token hidden-document sentry-context diagnostics
+ * @dimensions permission-modal cached-token hidden-document unsupported-browser graceful-fallback sentry-context diagnostics
  */
 export async function initializeMessaging() {
 	let config = null;
@@ -348,6 +350,8 @@ export async function initializeMessaging() {
 			_setFirebaseConfig({ ok: true, fcmToken: token, testing: true });
 			return token;
 		}
+
+		if (!(await isMessagingSupported())) return null;
 
 		config = await _withTimeout(
 			_getFirebaseConfig(),

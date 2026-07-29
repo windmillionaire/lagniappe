@@ -16,6 +16,7 @@ from .summarize import summarize_file, generate_summary
 from .schema import form_generation_prompt, generate_schema
 from .autofill import (
     autofill_prompt_data,
+    autofill_summary_dependencies,
     form_autofill_prompt,
     generate_autofilled_submission,
 )
@@ -84,6 +85,7 @@ __all__ = [
     "generate_summary",
     "form_autofill_prompt",
     "autofill_prompt_data",
+    "autofill_summary_dependencies",
     "generate_autofilled_submission",
     "project_creation_prompt",
     "generate_project",

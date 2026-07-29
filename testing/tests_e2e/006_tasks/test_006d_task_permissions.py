@@ -102,6 +102,23 @@ def test_page_task_viewer_sees_task_without_edit_controls(get_user):
     ).not_to_be_attached()
 
 
+# @pairs tasks:completed-only tasks:empty-state
+# @template pages/tasks.html::task_list
+def test_completed_only_task_list_hides_empty_marker(get_user):
+    """A completed task prevents the page-task empty marker from appearing."""
+    owner = get_user(Users.OWNER)
+    task = Tasks.test_view_only_page_task.get(owner)
+    task.mark_completed()
+
+    viewer = get_user(Users.page_acl_one_visible)
+    viewer.go(task)
+
+    task_list = viewer.locate("[data-widget='PageTaskList']")
+    expect(task_list).to_have_attribute("loaded", "")
+    expect(task_list.locator(f"[data-key='{task.key}']")).to_be_visible()
+    expect(task_list.locator("[data-role='empty']")).not_to_be_visible()
+
+
 # @features tasks
 # @dimensions readonly attached-form empty-fields permission-gates
 # @template pages/tasks.html::task

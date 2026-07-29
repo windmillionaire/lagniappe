@@ -73,9 +73,8 @@ app.
 
 The locally bundled browser SDK and shared event-sanitization configuration.
 Templates load it only when production error reporting is enabled. It reads the
-installation's configured `SENTRY_DSN`, so browser and backend errors use the
-same maintainer- or operator-owned project without hardcoded browser loader
-keys.
+installation's configured `SENTRY_JS_DSN`, keeping browser events separate from
+the backend `SENTRY_DSN` without hardcoded browser loader keys.
 
 ### Main (`main.mjs` → `script.js` + `chunks/`)
 

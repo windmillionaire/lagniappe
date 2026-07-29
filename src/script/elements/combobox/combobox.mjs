@@ -15,18 +15,19 @@ import { primitives } from "../primitives";
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_aria_and_keyboard_state_follow_the_open_panel
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_pointer_and_dismissal_events_preserve_trigger_focus
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_hides_empty_recent_panel_but_keeps_server_empty_result_row
+ * @tests tests_js/test_016_combobox_frontend.py::test_combobox_copies_only_supported_dataset_configuration
  * @features combobox
- * @dimensions positioning aria keyboard pointer dismissal empty-results
+ * @dimensions positioning aria keyboard pointer dismissal empty-results dataset-configuration
  */
 export class Combobox {
 	constructor(element) {
 		this.parent = element;
 		this.element = this.parent.querySelector("select, input") || element;
-		this.index = this.element.dataset.index;
 		this.mobile = window.matchMedia("(max-width: 768px)").matches;
 		this.options = [];
 		this.values = new Set();
 		this.focusedIndex = -1;
+		this.panel = null;
 		this.popupRole = "listbox";
 		this.optionRole = "option";
 		this.triggerRole = "combobox";
@@ -49,9 +50,16 @@ export class Combobox {
 		this.placement = this.placement || "bottom-start";
 		this.styles = { panel: STYLES.dropdown.panel };
 
-		Object.assign(this, { ...this.parent.dataset, ...this.element?.dataset });
+		const data = { ...this.parent.dataset, ...this.element?.dataset };
+		this.index = data.index;
+		this.kind = data.kind || this.index || "default";
+		this.placeholder = data.placeholder;
+		this.preload = data.preload;
+		this.multiple =
+			data.multiple === undefined ? undefined : JSON.parse(data.multiple);
+		this.creatable = data.creatable;
+
 		this.name = this.element?.name || this.element?.id || this.index;
-		this.kind = this.kind || this.index || "default";
 		this.id = this.element?.id || generateElementId("combobox");
 	}
 

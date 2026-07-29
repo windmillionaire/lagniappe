@@ -289,6 +289,79 @@ if (capturedErrors.length !== 0) {
 
 
 # @features submit
+# @dimensions missing-form-data
+def test_submit_stops_before_appending_when_form_data_is_missing(run_node):
+    run_submission_manager_check(
+        run_node,
+        """
+const componentElt = {
+  closest(selector) {
+    return selector === "[lp-component]" ? this : null;
+  },
+};
+const submitTarget = {
+  isConnected: true,
+  closest(selector) {
+    return selector === "[lp-component]" ? componentElt : null;
+  },
+};
+const submitter = {
+  dataset: {},
+  disabled: false,
+};
+const widget = {
+  form: { syncOfflineState() { return false; } },
+  target: {
+    isConnected: true,
+    hasAttribute() { return false; },
+  },
+};
+const component = {
+  active: widget,
+  formData: undefined,
+  widgets: {},
+};
+const view = {
+  components: {},
+  fcmToken: null,
+  getComponent() { return component; },
+  online: true,
+};
+const manager = new SubmissionManager(view);
+let createCalls = 0;
+let updateCalls = 0;
+manager.create = () => {
+  createCalls += 1;
+};
+manager.update = () => {
+  updateCalls += 1;
+};
+
+await manager.submit({
+  detail: { update: true },
+  preventDefault() {},
+  stopPropagation() {},
+  submitter,
+  target: submitTarget,
+});
+
+if (capturedErrors.length !== 1) {
+  throw new Error(`Expected one diagnostic, got ${capturedErrors.length}`);
+}
+if (capturedErrors[0][0]?.message !== "No form data found") {
+  throw new Error(`Unexpected diagnostic: ${capturedErrors[0][0]?.message}`);
+}
+if (createCalls !== 0 || updateCalls !== 0) {
+  throw new Error(`Missing data still sent request: ${createCalls}/${updateCalls}`);
+}
+if (submitter.disabled) {
+  throw new Error("submitter was not re-enabled after missing form data");
+}
+""",
+    )
+
+
+# @features submit
 # @dimensions route-override active-widget
 def test_submit_uses_explicit_action_route_over_active_widget_route(run_node):
     run_submission_manager_check(

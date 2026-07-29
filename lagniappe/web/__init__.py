@@ -50,6 +50,34 @@ def _filter_expected_fcm_not_found_spans(event, _hint):
     return event
 
 
+# @testable false
+# @covered-by lagniappe/web/__init__.py::_filter_expected_sentry_errors
+# @reason exact exception matching is asserted through the public before-send filter
+def _is_expected_ai_document_limit(event):
+    exception = event.get("exception") if isinstance(event, dict) else None
+    values = exception.get("values") if isinstance(exception, dict) else None
+    if not isinstance(values, list):
+        return False
+    return any(
+        isinstance(value, dict)
+        and value.get("type") == "ClientError"
+        and "exceeds the supported page limit"
+        in str(value.get("value") or "").casefold()
+        for value in values
+    )
+
+
+# @testable true
+# @tests tests_e2e/001_site/test_001c_messaging.py::test_sentry_filter_drops_only_expected_ai_document_page_limit
+# @features error-reporting ai files
+# @dimensions expected-provider-failure pdf-page-limit privacy
+def _filter_expected_sentry_errors(event, hint):
+    """Drop known user-input limits, then sanitize every reported error."""
+    if _is_expected_ai_document_limit(event):
+        return None
+    return sanitize_sentry_event(event, hint)
+
+
 SENTRY_LOADED = False
 
 if CONFIG.capture_errors:
@@ -62,7 +90,7 @@ if CONFIG.capture_errors:
         traces_sample_rate=1.0,
         profile_session_sample_rate=1.0,
         profile_lifecycle="trace",
-        before_send=sanitize_sentry_event,
+        before_send=_filter_expected_sentry_errors,
         before_send_transaction=_filter_expected_fcm_not_found_spans,
         integrations=[GoogleGenAIIntegration()],
     )
@@ -98,7 +126,7 @@ CONNECT_SRC = "connect-src 'self' https://*.googleapis.com"
 STORAGE_SRC = "https://storage.googleapis.com"
 
 if SENTRY_LOADED:
-    sentry_dsn = urlsplit(CONFIG.SENTRY_DSN)
+    sentry_dsn = urlsplit(CONFIG.SENTRY_JS_DSN)
     if sentry_dsn.scheme in {"http", "https"} and sentry_dsn.hostname:
         sentry_host = sentry_dsn.hostname
         if ":" in sentry_host:

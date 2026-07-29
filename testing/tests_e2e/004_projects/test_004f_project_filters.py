@@ -323,6 +323,69 @@ def test_filter_by_attached_form_checkbox_condition(get_user):
     _expect_only_matching_task(results, matching_task, excluded_task)
 
 
+# @pairs filters:quick-edit filters:attached-form filters:checkbox filters:reload-persistence
+def test_saved_filter_quick_edit_persists_attached_form_checkbox(get_user):
+    """A task form checkbox edited in a saved filter persists after reload."""
+    user = get_user(Users.OWNER)
+    filters, _matching_task, task = _attached_form_filter_context(user)
+
+    badges = (
+        filters.set_form_condition("Inspection Notes")
+        .text("contains", "Routine")
+        .add_filter()
+    )
+    expect(badges).to_contain_text("Inspection Notes")
+
+    saved = filters.save_filter()
+    saved_filter = saved.locator("li").filter(has_text="Inspection Notes")
+    expect(saved_filter).to_be_visible()
+    saved_filter.locator("a[aria-label='Run saved filter']").click()
+
+    view = user.locate("[lp-view][data-kind='task']")
+    expect(view).to_have_attribute("initialized", "")
+    table = view.locator("#table")
+
+    visibility_toggle = table.locator(
+        "button[lp-show='table:TableVisibility'][aria-label='Choose visible columns']"
+    )
+    visibility_toggle.click()
+    visibility = table.locator("tr[data-widget='TableVisibility']")
+    expect(visibility).to_have_attribute("data-visible", "true")
+
+    field = "filter-flagged"
+    visible_toggle = visibility.locator(f"input[type='checkbox'][name='{field}']")
+    expect(visible_toggle).to_be_visible()
+    visible_toggle.set_checked(True)
+    visibility_toggle.click()
+
+    row = table.locator(f"tbody tr[data-key='{task.key}']")
+    expect(row).to_be_visible()
+    cell = row.locator(f"td[data-column='{field}']")
+    expect(cell).to_be_visible()
+    expect(cell).to_have_attribute("data-edit-value", "false")
+
+    edit_toggle = view.locator("button[lp-show='table:TableEditor']")
+    edit_toggle.click()
+    checkbox = cell.locator(f"input[type='checkbox'][name='{field}']")
+    expect(checkbox).to_be_visible()
+    expect(checkbox).not_to_be_checked()
+
+    with user.page.expect_response("**/tasks/*/patch"):
+        checkbox.set_checked(True)
+
+    expect(checkbox).to_be_checked()
+    expect(cell).to_have_attribute("data-edit-value", "true")
+
+    user.reload()
+    expect(view).to_have_attribute("initialized", "")
+
+    row = table.locator(f"tbody tr[data-key='{task.key}']")
+    cell = row.locator(f"td[data-column='{field}']")
+    expect(cell).to_be_visible()
+    expect(cell).to_have_attribute("data-edit-value", "true")
+    expect(cell.locator("[aria-label='True']")).to_be_visible()
+
+
 # @features filters
 # @dimensions attached-form select-condition run-results
 def test_filter_by_attached_form_select_condition(get_user):

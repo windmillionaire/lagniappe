@@ -201,7 +201,7 @@ def test_authenticated_home_response_headers_include_etag(get_user):
     assert "img-src 'self' blob: data: https://storage.googleapis.com" in csp
     assert "media-src 'self' https://storage.googleapis.com" in csp
     if CONFIG.capture_errors:
-        sentry_dsn = urlsplit(CONFIG.SENTRY_DSN)
+        sentry_dsn = urlsplit(CONFIG.SENTRY_JS_DSN)
         sentry_origin = f"{sentry_dsn.scheme}://{sentry_dsn.hostname}"
         if sentry_dsn.port:
             sentry_origin += f":{sentry_dsn.port}"

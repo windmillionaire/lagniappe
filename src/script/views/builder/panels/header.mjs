@@ -114,6 +114,12 @@ export class Header {
 		this.nameInput.select();
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
+	 * @pairs forms:builder-form-name entity-menu:title-menu
+	 * @pairs frontend-icons:material-icon-preservation
+	 */
 	_nameBlur() {
 		const newName = this.nameInput.value.trim();
 		if (newName !== this.nameDisplay.textContent) {

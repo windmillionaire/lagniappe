@@ -226,10 +226,11 @@ def test_create_task_form(get_user):
 
 
 # @pairs forms:builder-copy forms:schema forms:form-type forms:navigation forms:delete
+# @pairs forms:builder-form-name frontend-icons:material-icon-preservation
 # @pairs entity-menu:builder-copy entity-menu:title-menu
 # @template forms/builder.html::header
 def test_copy_form_from_builder_title_menu(get_user):
-    """The builder title menu exposes delete and opens an independent form copy."""
+    """Renaming preserves the title menu before it opens an independent form copy."""
     user = get_user(Users.OWNER)
     source = Form(
         user=user,
@@ -253,6 +254,23 @@ def test_copy_form_from_builder_title_menu(get_user):
     expect(modal.element).to_contain_text(source.definition.name)
     modal.click("Cancel")
 
+    renamed = "Renamed Builder Copy Source"
+    name_display = user.locate(Builder.FORM_NAME)
+    name_display.click()
+    name_input = user.locate("#form-name-input")
+    expect(name_input).to_be_visible()
+    name_input.fill(renamed)
+    name_input.press("Enter")
+    expect(name_display).to_have_text(renamed)
+
+    menu_icon = actions.locator(".icon[data-icon='menu']")
+    expect(menu_icon.locator(":scope > .icon-glyph")).to_have_text(
+        "keyboard_arrow_down"
+    )
+    assert menu_icon.locator(":scope > .icon-glyph").evaluate(
+        "(glyph) => glyph.scrollWidth <= glyph.parentElement.clientWidth + 1"
+    )
+
     actions.click()
     menu = user.page.get_by_role("menu", name="Form actions")
     copy_action = menu.get_by_role("menuitem", name="Copy Form")
@@ -262,9 +280,7 @@ def test_copy_form_from_builder_title_menu(get_user):
     with user.page.expect_response("**/forms/*/copy"):
         copy_action.click()
 
-    expect(user.locate(Builder.FORM_NAME)).to_have_text(
-        f"Copy of {source.definition.name}"
-    )
+    expect(user.locate(Builder.FORM_NAME)).to_have_text(f"Copy of {renamed}")
     copied_view = user.locate("[lp-view][data-kind='builder']")
     expect(copied_view).to_have_attribute("initialized", "")
     expect(copied_view).not_to_have_attribute("data-key", source.key)

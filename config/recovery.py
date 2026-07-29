@@ -86,9 +86,10 @@ def build_recovery_snapshot(
     """Return a complete flat recovery snapshot without redacting persisted values."""
     snapshot = dict(settings)
     snapshot.pop("BUILD_ID", None)
+    schema_version = snapshot.get("CONFIG_SCHEMA_VERSION")
     if (
         snapshot.get("CONFIG_KIND") != CONFIG_KIND
-        or snapshot.get("CONFIG_SCHEMA_VERSION") != CONFIG_SCHEMA_VERSION
+        or str(schema_version).strip() != str(CONFIG_SCHEMA_VERSION)
     ):
         raise RecoveryConfigurationError(
             "Recovery export requires current schema-2 application settings."

@@ -675,6 +675,83 @@ if (
     )
 
 
+# @features combobox
+# @dimensions dataset-configuration
+# @style dropdown.panel
+def test_combobox_copies_only_supported_dataset_configuration(run_node):
+    run_combobox_check(
+        run_node,
+        r"""
+const { initial, parent } = makeComboboxElements();
+parent.dataset.kind = "user";
+parent.dataset.preload = '[{"id":"existing-user"}]';
+parent.dataset.placeholder = "parent placeholder";
+initial.dataset.placeholder = "choose a user...";
+initial.dataset.multiple = "true";
+initial.dataset.creatable = "true";
+
+// Runtime and unrelated DOM state must not become instance fields.
+initial.dataset.panel = "closed";
+initial.dataset.values = "true";
+initial.dataset.options = "corrupted-options";
+initial.dataset.element = "corrupted-element";
+initial.dataset.hidePanel = "corrupted-method";
+initial.dataset.mobile = "corrupted-mobile-state";
+initial.dataset.unrelated = "unrelated-value";
+
+const combobox = new Combobox(parent);
+if (
+  combobox.index !== "people" ||
+  combobox.kind !== "user" ||
+  combobox.placeholder !== "choose a user..." ||
+  combobox.preload !== '[{"id":"existing-user"}]' ||
+  combobox.multiple !== true ||
+  combobox.creatable !== "true"
+) {
+  throw new Error(`Supported dataset configuration changed: ${JSON.stringify({
+    index: combobox.index,
+    kind: combobox.kind,
+    placeholder: combobox.placeholder,
+    preload: combobox.preload,
+    multiple: combobox.multiple,
+    creatable: combobox.creatable,
+  })}`);
+}
+
+if (
+  combobox.element !== initial ||
+  combobox.panel !== null ||
+  !Array.isArray(combobox.options) ||
+  typeof combobox.values?.add !== "function" ||
+  typeof combobox.values?.has !== "function" ||
+  typeof combobox.hidePanel !== "function" ||
+  typeof combobox.mobile !== "boolean" ||
+  "unrelated" in combobox
+) {
+  throw new Error("Unapproved dataset state replaced combobox internals");
+}
+
+combobox.init();
+combobox.updatePanel("");
+if (
+  !(combobox.panel instanceof FakeElement) ||
+  combobox.panelOpen ||
+  !combobox.panel.classList.contains("hidden") ||
+  combobox.element.dataset.panel !== "closed"
+) {
+  throw new Error("Panel did not initialize and close safely");
+}
+combobox.destroy();
+
+const single = makeComboboxElements();
+single.initial.dataset.multiple = "false";
+if (new Combobox(single.parent).multiple !== false) {
+  throw new Error('data-multiple="false" was retained as a truthy string');
+}
+""",
+    )
+
+
 # @features dropdown
 # @dimensions dynamic-options rerender mixed-options callback-index
 # @style dropdown.panel

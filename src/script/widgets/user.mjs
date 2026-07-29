@@ -7,8 +7,10 @@ import { PermissionsForm } from "../elements/permissions";
  * @testable true
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_from_index
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_attached_to_existing_page_preserves_page_info_form
+ * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_group_selector_accepts_multiple_groups
  * @features users
  * @dimensions create-form create-submit created-row attach-existing-page page-form-preserved
+ * @pairs users:group-selector users:multiple
  */
 export class CreateUser extends FormElement {
 	init() {
@@ -58,6 +60,7 @@ export class CreateUser extends FormElement {
 			label: "User Group(s)",
 			placeholder: "select user group(s)...",
 			index: "group",
+			multiple: true,
 		});
 
 		this.destroyables.push(page, group);

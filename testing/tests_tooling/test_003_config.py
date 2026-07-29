@@ -686,7 +686,7 @@ def test_recovery_snapshot_is_complete_flat_and_merges_live_settings():
 
     persisted = {
         "CONFIG_KIND": recovery.CONFIG_KIND,
-        "CONFIG_SCHEMA_VERSION": recovery.CONFIG_SCHEMA_VERSION,
+        "CONFIG_SCHEMA_VERSION": str(recovery.CONFIG_SCHEMA_VERSION),
         "APP_NAME": "Custom Name",
         "GOOGLE_CLOUD_PROJECT": "custom-project-1",
         "RUNTIME_SERVICE_ACCOUNT_EMAIL": (

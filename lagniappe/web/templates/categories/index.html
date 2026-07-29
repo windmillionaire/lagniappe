@@ -23,15 +23,13 @@
         </span>
       {% endif %}
     </div>
-    {% if not filtered %}
-      <div data-role="actions">
-        {% if category.allowed(Action.EDIT) %}
-          <button class="{{ styles.nav.mobileButton }}"
-                  lp-show="table:MobileTableControls"
-                  data-toggle="true"
-                  aria-label="Table controls"
-                  title="Table controls">{{ render_icon("column") }}</button>
-        {% endif %}
+    <div data-role="actions">
+      <button class="{{ styles.nav.mobileButton }}"
+              lp-show="table:MobileTableControls"
+              data-toggle="true"
+              aria-label="Table controls"
+              title="Table controls">{{ render_icon("column") }}</button>
+      {% if not filtered %}
         {% if category.allowed(Action.EDIT) %}
           <button class="{{ styles.nav.desktopButton }}"
                   lp-show="table:TableEditor"
@@ -51,8 +49,8 @@
                   aria-label="Category tools"
                   title="Category tools">{{ render_icon("columns") }}</button>
         {% endif %}
-      </div>
-    {% endif %}
+      {% endif %}
+    </div>
   </nav>
 {% endmacro %}
 
@@ -120,8 +118,8 @@
       {{ view_header(category) }}
       {% if not filtered %}
         {% if category.allowed(Action.EDIT) or category.allowed(Action.VIEW) %}{{ tools_section(category) }}{% endif %}
-        {% if category.allowed(Action.EDIT) %}{{ mobile_toggles((index or filtered).table.columns) }}{% endif %}
       {% endif %}
+      {{ mobile_toggles((index or filtered).table.columns) }}
     </div>
     {% if filtered %}{{ filtered_conditions(filtered) }}{% endif %}
     {{ table(pages, index or filtered) }}

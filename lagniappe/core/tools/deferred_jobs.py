@@ -80,6 +80,7 @@ TRANSIENT_GOOGLE_ERRORS = (
     google_exceptions.TooManyRequests,
 )
 MODEL_BUSY_MESSAGE = "The model is too busy right now. Try again later."
+DEPENDENCY_RETRY_DELAY_SECONDS = 60
 MISSING_INPUT_MESSAGE = (
     "This operation stopped because the item it was working on was deleted."
 )
@@ -95,6 +96,14 @@ class DeferredJobClaimLostError(DeferredJobInfrastructureError):
 
 class DeferredJobDeadlineError(RuntimeError):
     """One attempt reached its bounded execution deadline."""
+
+
+class DeferredJobDependencyPendingError(RuntimeError):
+    """A required background dependency has not completed yet."""
+
+
+class DeferredJobDependencyFailedError(exceptions.ValidationError):
+    """A required background dependency cannot complete successfully."""
 
 
 class DeferredJobDriftError(exceptions.ValidationError):
@@ -359,6 +368,7 @@ class DeferredJobAdapter:
     mutation_inputs = ()
     queued_message = "Working..."
     retry_message = "Work is temporarily delayed; retrying shortly..."
+    dependency_message = "Waiting for required background work..."
     active_message = (
         "Still working. This is taking longer than usual; we'll keep trying."
     )
@@ -1290,6 +1300,7 @@ class DeferredJobRegistry:
     # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_runner_checkpoints_before_apply_and_resumes_without_prepare
     # @tests tests_unit/test_023_deferred_jobs.py::test_runner_classifies_wrapped_transient_errors_and_schedules_retry
+    # @tests tests_unit/test_023_deferred_jobs.py::test_runner_waits_for_dependency_without_consuming_provider_retry
     # @tests tests_unit/test_023_deferred_jobs.py::test_runner_treats_deleted_active_job_as_cancellation
     # @tests tests_unit/test_023_deferred_jobs.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
     # @features deferred-jobs
@@ -1484,6 +1495,24 @@ class DeferredJobRegistry:
             self._finish_terminal_delivery(job, adapter, context=context)
             self._release(job, lease_token)
             return DeferredJobResult(DeferredJobRunState.COMPLETE, job=job)
+        except DeferredJobDependencyPendingError as error:
+            return self._schedule_dependency_wait(
+                job,
+                adapter,
+                context,
+                lease_token,
+                error,
+                now,
+            )
+        except DeferredJobDependencyFailedError as error:
+            return self._fail(
+                job,
+                adapter,
+                context,
+                lease_token,
+                error,
+                capture_error=False,
+            )
         except DeferredJobClaimLostError as error:
             return DeferredJobResult(
                 DeferredJobRunState.FAILED,
@@ -1504,7 +1533,9 @@ class DeferredJobRegistry:
                 raise DeferredJobInfrastructureError(
                     "Deferred job terminal delivery is incomplete."
                 ) from error
-            if _retryable(error) and int(job.attempt or 0) <= len(_retry_delays(error)):
+            if _retryable(error) and _provider_retry_attempt(job) <= len(
+                _retry_delays(error)
+            ):
                 return self._schedule_retry(
                     job,
                     adapter,
@@ -1645,7 +1676,7 @@ class DeferredJobRegistry:
     # @pairs deferred-jobs:retry
     def _schedule_retry(self, job, adapter, context, lease_token, error, now):
         attempt = int(job.attempt or 0)
-        delay = _retry_delay(error, attempt)
+        delay = _retry_delay(error, _provider_retry_attempt(job))
         scheduled_at = max(_utc(), now)
         next_attempt_at = scheduled_at + timedelta(seconds=delay)
         self._persist_claimed(
@@ -1700,19 +1731,106 @@ class DeferredJobRegistry:
             error=str(error),
         )
 
-    # @testable infrastructure
-    def _fail(self, job, adapter, context, lease_token, error):
-        exceptions.capture(
-            error,
-            context={
-                "deferred_job": {
-                    "id": job.urlsafe_key,
-                    "type": job.job_type,
-                    "attempt": job.attempt,
-                }
-            },
-            wait_for_delivery=True,
+    # @testable true
+    # @tests tests_unit/test_023_deferred_jobs.py::test_runner_waits_for_dependency_without_consuming_provider_retry
+    # @features deferred-jobs
+    # @dimensions dependency-wait retry provider-attempt-isolation
+    def _schedule_dependency_wait(
+        self,
+        job,
+        adapter,
+        context,
+        lease_token,
+        error,
+        now,
+    ):
+        attempt = int(job.attempt or 0)
+        scheduled_at = max(_utc(), now)
+        next_attempt_at = scheduled_at + timedelta(
+            seconds=DEPENDENCY_RETRY_DELAY_SECONDS
         )
+        parameters = dict(job.parameters or {})
+        parameters["_dependency_waits"] = (
+            int(parameters.get("_dependency_waits", 0) or 0) + 1
+        )
+        self._persist_claimed(
+            job,
+            lease_token,
+            status=DeferredJobStatus.RETRY_WAIT.value,
+            dispatch_state="pending",
+            next_attempt_at=next_attempt_at,
+            lease_expires=scheduled_at,
+            deadline_at=None,
+            parameters=parameters,
+            error=_error_record(error, retryable=True, attempt=attempt),
+            progress={
+                "phase": DeferredJobPhase.SUMMARIZING.value,
+                "updated_at": scheduled_at.isoformat(),
+            },
+            status_revision=int(getattr(job, "status_revision", 0) or 0) + 1,
+        )
+        try:
+            task_identity = self.dispatch(
+                job,
+                attempt=attempt + 1,
+                delay_seconds=DEPENDENCY_RETRY_DELAY_SECONDS,
+            )
+            self._persist_claimed(
+                job,
+                lease_token,
+                dispatch_state="dispatched",
+                task_identity=task_identity,
+                dispatched_at=_utc(),
+                status_revision=int(getattr(job, "status_revision", 0) or 0) + 1,
+            )
+        except Exception as schedule_error:
+            self._persist_claimed(
+                job,
+                lease_token,
+                next_attempt_at=scheduled_at,
+                lease_expires=scheduled_at,
+            )
+            raise DeferredJobInfrastructureError(
+                "Deferred job dependency check could not be scheduled."
+            ) from schedule_error
+
+        if context.notification is not None:
+            context.notification.body = adapter.dependency_message
+            context.notification.pending = True
+            Entities.save(context.notification, context.actor)
+            _send_notification(context.notification, (job.client or {}).get("token"))
+        return DeferredJobResult(
+            DeferredJobRunState.RETRY_SCHEDULED,
+            job=job,
+            error=str(error),
+        )
+
+    # @testable true
+    # @tests tests_unit/test_023_deferred_jobs.py::test_runner_fails_cleanly_when_dependency_failed
+    # @features deferred-jobs
+    # @dimensions dependency-failure terminal no-duplicate-capture
+    def _fail(
+        self,
+        job,
+        adapter,
+        context,
+        lease_token,
+        error,
+        *,
+        capture_error=True,
+    ):
+        if capture_error:
+            exceptions.capture(
+                error,
+                context={
+                    "deferred_job": {
+                        "id": job.urlsafe_key,
+                        "type": job.job_type,
+                        "attempt": job.attempt,
+                    }
+                },
+                wait_for_delivery=True,
+            )
         terminal_error = _terminal_error(
             error,
             requires_ai=adapter.requires_ai,
@@ -2221,6 +2339,17 @@ def _retry_delays(error):
     if _quota_error(error):
         return DEFERRED_JOB_QUOTA_RETRY_DELAYS
     return DEFERRED_JOB_RETRY_DELAYS
+
+
+# @testable true
+# @tests tests_unit/test_023_deferred_jobs.py::test_runner_waits_for_dependency_without_consuming_provider_retry
+# @features deferred-jobs
+# @dimensions dependency-wait provider-attempt-isolation
+def _provider_retry_attempt(job):
+    """Return the provider attempt number after excluding dependency-only runs."""
+    parameters = getattr(job, "parameters", None) or {}
+    dependency_waits = int(parameters.get("_dependency_waits", 0) or 0)
+    return max(int(getattr(job, "attempt", 0) or 0) - dependency_waits, 1)
 
 
 # @testable true

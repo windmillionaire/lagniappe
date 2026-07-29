@@ -549,6 +549,45 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
     assert page_file.to_ai(user) not in _context_json(task_prompt, "Attached Files")
 
 
+# @features ai files
+# @dimensions autofill summary-dependency pending failed complete
+@pytest.mark.unit
+def test_autofill_summary_dependencies_track_enabled_processing():
+    user = SimpleNamespace(is_authenticated=True)
+
+    class EvidenceFile:
+        def __init__(self, key, *, enabled=True, complete=None, error=None):
+            self.key = key
+            self.hash = key
+            self.properties = SimpleNamespace(
+                summarize=SimpleNamespace(
+                    enabled=enabled,
+                    complete=complete,
+                    error=error,
+                )
+            )
+
+        def allowed(self, action, user=None):
+            return True
+
+    complete = EvidenceFile("complete", complete=True)
+    pending = EvidenceFile("pending")
+    failed = EvidenceFile("failed", error="page limit")
+    disabled = EvidenceFile("disabled", enabled=False)
+    target = SimpleNamespace(
+        entity_kind="page",
+        files=[complete, pending, failed, disabled],
+    )
+
+    dependencies = autofill.autofill_summary_dependencies(target, user)
+
+    assert dependencies == {
+        "complete": [complete],
+        "pending": [pending],
+        "failed": [failed],
+    }
+
+
 # @pair ai:summary-prompt
 # @pair ai:summary-fallback
 # @pair files:ooxml
