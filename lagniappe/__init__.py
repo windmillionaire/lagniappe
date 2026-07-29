@@ -73,12 +73,8 @@ class Config:
                 "APP_ENGINE_LOCATION and RESOURCE_REGION are required. "
                 "Regenerate the installation configuration with setup."
             )
-        self.APP_ENGINE_LOCATION = normalize_app_engine_location(
-            app_engine_location
-        )
-        self.RESOURCE_REGION = normalize_resource_region(
-            resource_region
-        )
+        self.APP_ENGINE_LOCATION = normalize_app_engine_location(app_engine_location)
+        self.RESOURCE_REGION = normalize_resource_region(resource_region)
         runtime_email = getattr(self, "RUNTIME_SERVICE_ACCOUNT_EMAIL", None)
         internal_caller_email = getattr(
             self, "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL", None
@@ -105,9 +101,7 @@ class Config:
                 "account in GOOGLE_CLOUD_PROJECT."
             )
         self.RUNTIME_SERVICE_ACCOUNT_EMAIL = runtime_email.casefold()
-        self.INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL = (
-            internal_caller_email.casefold()
-        )
+        self.INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL = internal_caller_email.casefold()
         self._google_credentials = None
         self.BUILD_ID = getattr(constants, "BUILD_ID", None) or self.VERSION
 
@@ -152,6 +146,9 @@ class Config:
             "assign",
             "create_pages",
         )
+        sentry_dsn = getattr(app_settings, "SENTRY_DSN", None)
+        if sentry_dsn and not getattr(self, "SENTRY_JS_DSN", None):
+            self.SENTRY_JS_DSN = sentry_dsn
 
         self._set_bucket_names()
 

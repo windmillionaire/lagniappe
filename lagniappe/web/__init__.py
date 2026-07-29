@@ -20,6 +20,7 @@ from lagniappe.core.exceptions.request import sanitize_sentry_event
 
 from .start import initialize_app
 
+
 # @testable false
 # @covered-by lagniappe/web/__init__.py::_filter_expected_fcm_not_found_spans
 # @reason exact provider/status matching is asserted through the transaction filter
@@ -125,7 +126,7 @@ SCRIPT_SRC = "script-src 'self' https://accounts.google.com"
 CONNECT_SRC = "connect-src 'self' https://*.googleapis.com"
 STORAGE_SRC = "https://storage.googleapis.com"
 
-if SENTRY_LOADED:
+if SENTRY_LOADED and CONFIG.SENTRY_JS_DSN:
     sentry_dsn = urlsplit(CONFIG.SENTRY_JS_DSN)
     if sentry_dsn.scheme in {"http", "https"} and sentry_dsn.hostname:
         sentry_host = sentry_dsn.hostname
@@ -151,6 +152,7 @@ CSP = "; ".join(
         "form-action 'self'",
     ]
 )
+
 
 # @testable false
 # @covered-by lagniappe/web/__init__.py::add_lagniappe_headers
@@ -183,9 +185,7 @@ def add_lagniappe_headers(response):
     if getattr(g, "fingerprint", False):
         headers["ETag"] = f'"{g.fingerprint}"'
 
-    entity_revisions = list(
-        getattr(g, "ENTITY_RESPONSE_REVISIONS", {}).values()
-    )
+    entity_revisions = list(getattr(g, "ENTITY_RESPONSE_REVISIONS", {}).values())
     if entity_revisions:
         headers["X-Lagniappe-Entity-Revisions"] = json.dumps(
             entity_revisions, separators=(",", ":")
