@@ -36,6 +36,14 @@ BOOTSTRAP_GOOGLE_CLOUD_APIS = {
     "serviceusage.googleapis.com",
 }
 BOOTSTRAP_API_TIMEOUT = 300
+GOOGLE_AUTH_PERMISSION_GUIDANCE = (
+    "On Google's permission screen, choose Select all if it appears, then "
+    "Continue or Allow. In practical terms, you are granting these permissions "
+    "to yourself: they let Google Cloud CLI and the setup code on this computer "
+    "act for you in your project, and do not give the Lagniappe maintainer "
+    "access. Every requested permission is needed to configure, verify, or "
+    "deploy your installation."
+)
 
 
 # @testable false
@@ -515,8 +523,8 @@ def _get_gcloud_project(project_id, sanitized_app_name):
     while True:
         entered = input(
             f.info(
-                "Enter a Google Cloud project ID, or press Enter to use the "
-                f"unique suggestion [{suggestion}]: "
+                "Press Enter to use the suggested Google Cloud project ID "
+                f"[{suggestion}], or type a different project ID: "
             )
         ).strip()
         candidate = entered or suggestion
@@ -580,6 +588,7 @@ def _set_adc_quota_project(project_id, sp):
     def refresh_adc(reason, *, force=False):
         nonlocal adc_refreshed
         sp.write(f.warning(reason))
+        sp.write(f.warning(GOOGLE_AUTH_PERMISSION_GUIDANCE))
         sp.write("Opening browser to authenticate ADC with the selected CLI account:")
         sp.write(
             f"  {_adc_login_command(account, project_id, force=force)}"
@@ -778,6 +787,7 @@ def _ensure_adc_principal(account, project_id=None):
             f"  {_adc_login_command(account, project_id)}"
         )
     )
+    print(f.warning(GOOGLE_AUTH_PERMISSION_GUIDANCE))
     result = _run_adc_login(account, project_id)
     if result.returncode != 0:
         print(f.error("ADC authentication did not complete."))
@@ -1011,7 +1021,12 @@ def _apply_target_preflight(project_id, preflight, project_ready=None):
         BOOTSTRAP_GOOGLE_CLOUD_APIS - set(preflight["enabled_apis"])
     )
     if bootstrap_missing:
-        print(f.info("Preparing Google Cloud project APIs..."))
+        print(
+            f.info(
+                "Preparing Google Cloud project APIs. This may take up to "
+                "5 minutes..."
+            )
+        )
         result = run_gcloud_command(
             [
                 "services",
@@ -1195,6 +1210,7 @@ def _display_install_identity_summary(preflight, adc_identity):
 def _build_app_settings():
     from config import SETTINGS, constants
 
+    SETTINGS.APP.pop("FIREBASE_CONFIG", None)
     unsupported = sorted(UNSUPPORTED_SETTING_KEYS.intersection(SETTINGS.APP))
     if unsupported:
         raise RuntimeError(

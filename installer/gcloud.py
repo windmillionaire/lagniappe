@@ -8,7 +8,9 @@ from installer import iam as iam_access
 from .package_install import install_if_missing
 from .utils import run_gcloud_command
 from .errors import (
+    ProviderConflict,
     ProviderNotFound,
+    ProviderTimeout,
     ProviderTransientError,
     SetupCancelled,
     classify_provider_error,
@@ -21,6 +23,8 @@ GCLOUD_SERVICE_DISCOVERY_TIMEOUT = 60
 GCLOUD_SERVICE_ENABLE_TIMEOUT = 300
 GCLOUD_API_PROPAGATION_ATTEMPTS = 8
 GCLOUD_API_PROPAGATION_DELAYS = (2, 4, 8, 15, 20, 30, 30)
+APP_ENGINE_RPC_TIMEOUT = 60
+APP_ENGINE_CREATE_TIMEOUT = 300
 
 
 # @testable true
@@ -64,6 +68,11 @@ def enable_gcloud_apis():
 
         missing_apis = sorted(set(required_apis) - set(enabled_apis))
         if missing_apis:
+            sp.write(
+                f.info(
+                    "Enabling Google Cloud APIs may take up to 5 minutes..."
+                )
+            )
             retry_provider_call(
                 lambda: run_gcloud_command(
                     [
@@ -452,8 +461,9 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_app_engine_persists_provider_location_hostname_and_oidc_subject
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_app_engine_creation_prompt_and_bounded_failures
 # @features setup
-# @dimensions app-engine immutable-location provider-state
+# @dimensions app-engine immutable-location provider-state interactive-input timeout
 def create_app_engine_app():
     """Get the immutable App Engine application or create it after confirmation."""
     from config import SETTINGS
@@ -476,13 +486,13 @@ def create_app_engine_app():
         SETTINGS.APP["APP_ENGINE_LOCATION"]
     )
 
-    with f.yaspin(text=f.success("Configure App Engine")) as sp:
-        client = appengine_admin_v1.ApplicationsClient()
-
+    client = appengine_admin_v1.ApplicationsClient()
+    with f.yaspin(text=f.success("Discover App Engine application")) as sp:
         try:
             application = retry_provider_call(
                 lambda: client.get_application(
-                    request={"name": f"apps/{project_id}"}
+                    request={"name": f"apps/{project_id}"},
+                    timeout=APP_ENGINE_RPC_TIMEOUT,
                 ),
                 description=f"Discover App Engine application {project_id}",
             )
@@ -495,38 +505,57 @@ def create_app_engine_app():
             sp.ok(f.ok_glyph)
             return application
         except ProviderNotFound:
-            sp.write(f.info("Creating new App Engine app..."))
+            sp.write(f.info("No App Engine application exists yet."))
 
-        sp.write(
-            f.warning(
-                "App Engine location is permanent and cannot be changed after "
-                f"creation. Selected location: {location}"
-            )
+    print(
+        f.warning(
+            "App Engine location is permanent and cannot be changed after "
+            f"creation. Selected location: {location}"
         )
+    )
+    print(
+        f.info(
+            "Creating the App Engine application may take up to 5 minutes. "
+            "The next prompt is waiting for your response."
+        )
+    )
+    try:
         confirmation = input(
             f.warning(
                 f"Create the App Engine application in '{location}'? [y/N]: "
             )
         )
-        if confirmation.strip().lower() not in ("y", "yes"):
-            sp.fail(f.fail_glyph)
-            print(f.error("App Engine application creation cancelled."))
-            raise SetupCancelled("App Engine application creation was cancelled.")
+    except EOFError as error:
+        message = (
+            "App Engine confirmation could not read from this terminal. "
+            "Run setup again in an interactive terminal."
+        )
+        print(f.error(message))
+        raise SetupCancelled(message) from error
+    if confirmation.strip().lower() not in ("y", "yes"):
+        print(f.error("App Engine application creation cancelled."))
+        raise SetupCancelled("App Engine application creation was cancelled.")
 
+    with f.yaspin(
+        text=f.success(
+            "Create App Engine application (may take up to 5 minutes)"
+        )
+    ) as sp:
         application_to_create = appengine_admin_v1.Application()
         application_to_create.id = project_id
         application_to_create.location_id = location
 
         try:
             operation = client.create_application(
-                request={"application": application_to_create}
+                request={"application": application_to_create},
+                timeout=APP_ENGINE_RPC_TIMEOUT,
             )
             sp.write(
                 f.info(
-                    "Waiting for App Engine app creation to complete (this can take a few minutes)..."
+                    "Waiting for Google to finish App Engine provisioning..."
                 )
             )
-            created_app = operation.result(timeout=300)
+            created_app = operation.result(timeout=APP_ENGINE_CREATE_TIMEOUT)
             record_mutation(
                 "reconcile App Engine",
                 action="created",
@@ -543,12 +572,42 @@ def create_app_engine_app():
             sp.ok(f.ok_glyph)
             return created_app
         except Exception as e:
-            sp.write(f.error(f"Failed to create App Engine app.\n{str(e)}"))
-            sp.fail(f.fail_glyph)
-            raise classify_provider_error(
+            classified = classify_provider_error(
                 e,
-                message="Failed to create the App Engine application.",
-            ) from e
+                message=f"Failed to create the App Engine application: {e}",
+            )
+            if isinstance(classified, ProviderTimeout):
+                message = (
+                    "App Engine provisioning did not finish within the "
+                    "5-minute setup window. Google may still be completing it. "
+                    "Run setup again; it will discover and reuse the application "
+                    "if creation finished."
+                )
+                sp.write(f.error(message))
+                sp.fail(f.fail_glyph)
+                raise type(classified)(message) from e
+            if isinstance(classified, ProviderTransientError):
+                message = (
+                    "Google returned a temporary error while provisioning App "
+                    "Engine, so the final provider state is not yet known. Run "
+                    "setup again; it will discover and reuse the application if "
+                    "creation finished."
+                )
+                sp.write(f.error(message))
+                sp.fail(f.fail_glyph)
+                raise type(classified)(message) from e
+            if isinstance(classified, ProviderConflict):
+                message = (
+                    "Google reports that App Engine already exists or another "
+                    "creation request won the race. Run setup again so it can "
+                    "discover and reuse the provider application."
+                )
+                sp.write(f.error(message))
+                sp.fail(f.fail_glyph)
+                raise ProviderConflict(message) from e
+            sp.write(f.error(str(classified)))
+            sp.fail(f.fail_glyph)
+            raise classified from e
 
 
 # @testable true

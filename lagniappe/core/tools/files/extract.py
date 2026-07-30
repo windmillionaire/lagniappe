@@ -14,12 +14,11 @@ from .constants import DOCUMENT_AI_MIMETYPES
 # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
 # @features file
 # @dimensions extract, text-asset, process-complete, deferred-dispatch
-def get_file_text(file, token, *, dispatch=True):
+def get_file_text(file, *, dispatch=True):
     """Initiate text extraction for a file, dispatching to OCR or a background task.
 
     Args:
         file: File entity with mimetype and URI accessors.
-        token: Optional FCM token retained until terminal delivery.
 
     Returns:
         Dict with extraction status, and 'text' or 'error' when complete.
@@ -34,7 +33,7 @@ def get_file_text(file, token, *, dispatch=True):
     elif text.extractable:
         extract.status = "Extracting text..."
         if dispatch:
-            start_file_extraction(file, token)
+            start_file_extraction(file)
     else:
         extract.error = "Unsupported file type."
 
@@ -47,7 +46,6 @@ def get_file_text(file, token, *, dispatch=True):
 # @dimensions follow-up extraction idempotency
 def start_file_extraction(
     file,
-    token,
     *,
     actor=None,
     idempotency_key=None,
@@ -63,7 +61,7 @@ def start_file_extraction(
             actor=actor or current_user._get_current_object(),
             inputs={"file": file},
             notification_body=None,
-            client={"token": token},
+            client={},
             idempotency_key=idempotency_key,
             delay_seconds=delay_seconds,
         )

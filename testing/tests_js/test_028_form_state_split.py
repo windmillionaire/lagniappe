@@ -482,8 +482,225 @@ vm.runInContext(source, context);
     )
 
 
-# @features edited-entity-notice
-# @dimensions renderer-capability schema-only local-values submission-choice latest-schema whole-form-selection
+# @features offline
+# @dimensions replay acknowledgement-order dispatch
+def test_offline_replay_removes_committed_record_before_acknowledgement(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+class FakeFormData {
+  constructor() { this.values = []; }
+  append(name, value) { this.values.push([name, value]); }
+  set(name, value) {
+    this.values = this.values.filter(([key]) => key !== name);
+    this.values.push([name, value]);
+  }
+}
+const events = [];
+const record = {
+  id: "update:page:one",
+  action: "update",
+  kind: "page",
+  method: "PUT",
+  route: "/pages/page-one/update",
+  target_key: "page-one",
+  fingerprint: "originating-fingerprint",
+  fields: [["name", "Queued name"]],
+  files: [],
+  created_at: 1,
+};
+let queue = null;
+const context = {
+  console,
+  CustomEvent: class {
+    constructor(type, options) { this.type = type; this.detail = options.detail; }
+  },
+  deleteOfflineMutations: async (ids) => {
+    events.push({ type: "delete", ids, remaining: queue.records.length });
+  },
+  document: { querySelector() { return null; } },
+  File: class {},
+  FormData: FakeFormData,
+  getOfflineMutations: async () => [],
+  request: {
+    async put() {
+      return {
+        ok: true,
+        entities: [{
+          key: "page-one",
+          fingerprint: "saved-fingerprint",
+        }],
+      };
+    },
+  },
+  setOfflineMutation: async () => {},
+  window: {
+    dispatchEvent(event) {
+      events.push({
+        type: event.type,
+        remaining: queue.recordsFor({ kind: "page" }).length,
+      });
+    },
+  },
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/offlineQueue.mjs", "utf8");
+source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
+source = source.replace("export class OfflineQueue", "class OfflineQueue");
+source += "\nglobalThis.OfflineQueue = OfflineQueue;";
+vm.runInContext(source, context);
+
+(async () => {
+  queue = new context.OfflineQueue({ online: true, components: {} });
+  queue.records = [record];
+  queue._dispatch = async ({ phase }) => {
+    events.push({
+      type: phase,
+      remaining: queue.recordsFor({ kind: "page" }).length,
+    });
+  };
+
+  const completed = await queue.replay();
+  if (completed !== 1 || queue.records.length !== 0) {
+    throw new Error("Committed replay remained in the live queue");
+  }
+  if (
+    events.map(({ type }) => type).join(",") !==
+      "delete,entity-updated,replayed" ||
+    events[1].remaining !== 0 ||
+    events[2].remaining !== 0
+  ) {
+    throw new Error(
+      `Replay acknowledgement observed stale queue state: ${JSON.stringify(events)}`,
+    );
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
+# @features offline
+# @dimensions replay conflict-rebase acknowledgement-order
+def test_offline_replay_retries_a_conflict_rebased_by_the_form(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+class FakeFormData {
+  constructor() { this.values = []; }
+  append(name, value) { this.values.push([name, value]); }
+  set(name, value) {
+    this.values = this.values.filter(([key]) => key !== name);
+    this.values.push([name, value]);
+  }
+}
+const deleted = [];
+const phases = [];
+const fingerprints = [];
+const record = {
+  id: "update:page:one",
+  action: "update",
+  kind: "page",
+  method: "PUT",
+  route: "/pages/page-one/update",
+  target_key: "page-one",
+  fingerprint: "originating-fingerprint",
+  fields: [["name", "Queued name"]],
+  files: [],
+  created_at: 1,
+};
+const context = {
+  console,
+  CustomEvent: class {
+    constructor(type, options) { this.type = type; this.detail = options.detail; }
+  },
+  deleteOfflineMutations: async (ids) => { deleted.push(...ids); },
+  document: { querySelector() { return null; } },
+  File: class {},
+  FormData: FakeFormData,
+  getOfflineMutations: async () => [],
+  request: {
+    async put(_route, data) {
+      const fingerprint = Object.fromEntries(data.values)["offline-fingerprint"];
+      fingerprints.push(fingerprint);
+      if (fingerprint === "originating-fingerprint") {
+        return {
+          ok: true,
+          conflict: true,
+          entities: [{
+            key: "page-one",
+            fingerprint: "current-fingerprint",
+          }],
+        };
+      }
+      return {
+        ok: true,
+        entities: [{
+          key: "page-one",
+          fingerprint: "saved-fingerprint",
+        }],
+      };
+    },
+  },
+  setOfflineMutation: async () => {},
+  window: { dispatchEvent() {} },
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/offlineQueue.mjs", "utf8");
+source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
+source = source.replace("export class OfflineQueue", "class OfflineQueue");
+source += "\nglobalThis.OfflineQueue = OfflineQueue;";
+vm.runInContext(source, context);
+
+(async () => {
+  const queue = new context.OfflineQueue({ online: true, components: {} });
+  queue.records = [record];
+  queue._dispatch = async ({ phase, record: dispatched }) => {
+    phases.push(phase);
+    if (phase !== "conflict") return;
+    await queue._store({
+      ...dispatched,
+      fingerprint: "current-fingerprint",
+    });
+  };
+
+  const completed = await queue.replay();
+  if (
+    completed !== 1 ||
+    fingerprints.join(",") !==
+      "originating-fingerprint,current-fingerprint" ||
+    phases.join(",") !== "conflict,replayed" ||
+    deleted.join(",") !== record.id ||
+    queue.records.length !== 0
+  ) {
+    throw new Error(
+      `Rebased conflict was not retried in order: ${JSON.stringify({
+        completed,
+        fingerprints,
+        phases,
+        deleted,
+        remaining: queue.records,
+      })}`,
+    );
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
+# @pairs edited-entity-notice:renderer-capability edited-entity-notice:schema-only
+# @pairs edited-entity-notice:local-values edited-entity-notice:submission-choice
+# @pairs edited-entity-notice:latest-schema edited-entity-notice:whole-form-selection
+# @pairs edited-entity-notice:active-state
 def test_edit_watcher_separates_schema_and_renderer_value_changes(
     run_node,
 ):
@@ -662,6 +879,37 @@ vm.runInContext(source, context);
   }
   if (events.filter((event) => event.type === "apply-schema").length !== 1) {
     throw new Error("Later saved values were applied before review");
+  }
+
+  const activeWidget = makeWidget([{ id: "same" }], { same: "active-local" });
+  activeWidget.unsavedState = false;
+  activeWidget.visible = true;
+  activeWidget.component = { active: activeWidget };
+  const activeMarker = makeMarker(activeWidget);
+  watcher._state(activeMarker).token = {};
+  await watcher._stageRevision(
+    activeMarker,
+    activeWidget,
+    {
+      schema: [{ id: "same" }],
+      submission: { same: "active-server" },
+      snapshot: "active-server-newer",
+    },
+    {
+      fingerprint: "active-submission-fingerprint",
+      modified: "2026-07-22T11:15:00+00:00",
+    },
+  );
+  const activeState = watcher._state(activeMarker);
+  if (
+    !activeState.submissionChoice ||
+    activeState.mode !== "review" ||
+    activeMarker.dataset.visible !== "true"
+  ) {
+    throw new Error("An active clean form did not offer revision review");
+  }
+  if (events.filter((event) => event.type === "apply-schema").length !== 1) {
+    throw new Error("An active clean form applied saved values before review");
   }
 
   const matchingWidget = makeWidget([{ id: "same" }], { same: "saved" });
@@ -866,65 +1114,130 @@ if (tracked.length !== 1 || tracked[0].options.node !== widget.target) {
     )
 
 
-# @features sync
-# @dimensions document-only legacy-form-patch-cleanup
-def test_document_sync_registration_discards_legacy_form_patch_records(run_node):
+# @pairs edited-entity-notice:owned-deferred-completion
+# @pairs deferred-jobs:owned-deferred-completion
+# @pairs edited-entity-notice:active-state edited-entity-notice:dirty-state
+def test_owned_deferred_completion_replaces_clean_active_form(run_node):
     run_node(
         r'''
 const fs = require("node:fs");
 const vm = require("node:vm");
 
-const deleted = [];
-let registerBody = null;
-const widget = {
-  component: { key: "page-key" },
-  fingerprint: "document-fingerprint",
-  initialized: true,
-  syncId: "page-hash:document",
-  get syncData() { return null; },
-  get saveData() { return null; },
+const applications = [];
+const anchor = {
+  dataset: {
+    key: "page-one",
+    fingerprint: "old-fingerprint",
+    modified: "2026-07-22T10:00:00+00:00",
+  },
 };
+function formCase({ unsaved = false } = {}) {
+  const button = { textContent: "", disabled: false };
+  const message = { textContent: "" };
+  const widget = {
+    name: "PageInfo",
+    _deferredOperation: "operation-one",
+    unsavedState: unsaved,
+    visible: true,
+    form: { _queued: false },
+    revisionBaseline: "local",
+    revisionCanReset() { return true; },
+    revisionSnapshot() { return "local"; },
+    buildLocalRevision(response) {
+      return { response: { ...response, snapshot: "local" } };
+    },
+    commitRevisionBaseline() {},
+    async applyRevision(response) {
+      applications.push({ widget, response });
+    },
+  };
+  widget.component = { active: widget };
+  const form = { dataset: { widget: "PageInfo" }, _lp_widget: widget };
+  const marker = {
+    isConnected: true,
+    dataset: {
+      visible: "false",
+      editedRoute: "/pages/page-one/info/replace",
+    },
+    querySelector(selector) {
+      return selector === "[data-role='edited-message']" ? message : button;
+    },
+    closest(selector) {
+      if (selector === "[lp-entity]") return anchor;
+      if (selector === "form[data-widget]") return form;
+      return null;
+    },
+  };
+  widget.target = {
+    querySelector() { return marker; },
+    contains() { return true; },
+  };
+  return { marker, widget };
+}
+
 const context = {
-  clearTimeout() {},
+  areEqual(left, right) { return JSON.stringify(left) === JSON.stringify(right); },
+  captureError(error) { throw error; },
   console,
-  deleteSyncRecord: async () => {},
-  deleteSyncRecords: async (ids) => { deleted.push(ids); },
-  ENDPOINTS: { register: "/register" },
-  EVENTS: { SYNC_UPDATE: "sync-update" },
-  getAllOfflineRecords: async () => ({
-    sync: [{ key: "page-key", sync_id: "page-hash:form-hash:form" }],
-  }),
-  getSyncRecord: async () => null,
-  loadHeadlessWidget: async () => null,
+  document: { activeElement: {} },
+  loadRevisionPreview(_widget, response) {
+    return {
+      revisionSnapshot() { return response.snapshot; },
+      destroy() {},
+    };
+  },
+  Modal: class {},
   request: {
-    async post(url, body) {
-      registerBody = body;
-      return { ok: true, modified: [] };
+    async get() {
+      return { ok: true, snapshot: "saved" };
     },
   },
-  setTimeout() { return 1; },
-  updateSyncRecord: async () => {},
-  waitForAttribute: async () => {},
+  STYLES: {},
+  withTransition(callback) { return callback(); },
+  window: { addEventListener() {}, removeEventListener() {} },
 };
 vm.createContext(context);
-let source = fs.readFileSync("src/script/shared/sync.mjs", "utf8");
-source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
-source = source.replace("export class SyncManager", "class SyncManager");
-source += "\nglobalThis.SyncManager = SyncManager;";
+let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class EditWatcher", "class EditWatcher");
+source += "\nglobalThis.EditWatcher = EditWatcher;";
 vm.runInContext(source, context);
 
 (async () => {
-  const manager = new context.SyncManager({
-    components: { document: { widgets: { CollaborativeDocument: widget } } },
-    fcmToken: "token-1",
-    online: true,
+  const watcher = new context.EditWatcher({
+    addFlash() {},
+    components: {},
+    elt: { addEventListener() {}, querySelectorAll() { return []; } },
   });
-  await manager.register();
-  if (registerBody.offline.length !== 0) {
-    throw new Error("Legacy form patch was sent to document registration");
+
+  const clean = formCase();
+  watcher.expectDeferredCompletion("page-one", "operation-one");
+  await watcher._probe(
+    clean.marker,
+    "saved-fingerprint",
+    "2026-07-22T11:00:00+00:00",
+  );
+  if (
+    applications.length !== 1 ||
+    clean.marker.dataset.visible !== "false" ||
+    watcher._deferredCompletions.has("page-one")
+  ) {
+    throw new Error("A clean active form did not apply its own deferred completion");
   }
-  if (deleted.length !== 1 || deleted[0][0] !== "page-hash:form-hash:form") {
-    throw new Error(`Legacy form patch was not discarded: ${JSON.stringify(deleted)}`);
+
+  const dirty = formCase({ unsaved: true });
+  watcher.expectDeferredCompletion("page-one", "operation-one");
+  await watcher._probe(
+    dirty.marker,
+    "newer-fingerprint",
+    "2026-07-22T12:00:00+00:00",
+  );
+  if (
+    applications.length !== 1 ||
+    dirty.marker.dataset.visible !== "true" ||
+    watcher._state(dirty.marker).mode !== "reset"
+  ) {
+    throw new Error("An unsaved form bypassed revision protection for its deferred completion");
   }
 })().catch((error) => {
   console.error(error);
@@ -932,6 +1245,7 @@ vm.runInContext(source, context);
 });
 '''
     )
+
 
 
 # @features reconnect-refresh edited-entity-notice forms
@@ -962,14 +1276,13 @@ vm.createContext(context);
 
 let source = fs.readFileSync("src/script/views/base/core.mjs", "utf8");
 source = source.replace(
-  /^import [\s\S]*?(?=const MESSAGING_FEATURE_SELECTOR)/,
+  /^import [\s\S]*?(?=const COLLECTION_ONLY_CHANGE_TYPES)/,
   `
 const SearchBox = class {};
 const EntityMenu = class {};
 const Notifications = class {};
 const OfflineQueue = class {};
 const ENDPOINTS = {};
-const EVENTS = { SERVER_CHANGE: "server-change" };
 const clearRecentSearchResults = () => {};
 const captureError = (error) => { throw error; };
 const connectivity = { online: true, hidden: true };
@@ -977,7 +1290,6 @@ const DeferredOperationManager = class {};
 const DeleteModal = class {};
 const EditWatcher = class {};
 const HelpModal = class {};
-const initializeMessaging = async () => null;
 const Modal = class {};
 const OfflineModal = class {};
 const request = {};
@@ -1100,7 +1412,8 @@ component.view = {
 
 
 # @features tasks reconnect-refresh forms offline
-# @dimensions dirty-row queued-row staged-review replacement removal preservation
+# @dimensions active-row dirty-row queued-row staged-review replacement removal preservation
+# @pair tasks:active-form-preservation
 # @pair tasks:dirty-form-preservation
 def test_task_list_refresh_preserves_rows_with_local_form_state(run_node):
     run_node(
@@ -1123,9 +1436,35 @@ const replaced = {
   replaceWith() { throw new Error("Queued replacement row was discarded"); },
 };
 const replacement = {};
+const active = {
+  replaceWith() { throw new Error("Active form row was replaced before revision review"); },
+};
+const activeReplacement = {};
+let hiddenReplaced = false;
+const hidden = {
+  replaceWith() { hiddenReplaced = true; },
+};
+const hiddenReplacement = {};
+const activeWidget = { visible: true, unsavedState: false };
+const hiddenWidget = { visible: false, unsavedState: false };
 const components = new Map([
   [removed, { widgets: { TaskForm: { unsavedState: true } } }],
   [replaced, { widgets: { TaskForm: { form: { _queued: true } } } }],
+  [
+    active,
+    {
+      active: activeWidget,
+      widgets: { TaskForm: activeWidget },
+    },
+  ],
+  [
+    hidden,
+    {
+      active: hiddenWidget,
+      widgets: { TaskForm: hiddenWidget },
+      destroy() {},
+    },
+  ],
 ]);
 const list = Object.create(context.PageTaskList.prototype);
 list.component = { active: null };
@@ -1133,10 +1472,15 @@ list.view = { getComponent(node) { return components.get(node); } };
 list.target = { setAttribute() {} };
 list._updated = [];
 list._removed = [removed];
-list._replaced = [{ from: replaced, to: replacement }];
+list._replaced = [
+  { from: replaced, to: replacement },
+  { from: active, to: activeReplacement },
+  { from: hidden, to: hiddenReplacement },
+];
 list._added = [];
 list._created = [];
 list._setListVisibility = () => {};
+list._moveTaskIfNecessary = () => {};
 Object.defineProperty(list, "activeCount", { value: 1 });
 Object.defineProperty(list, "completedCount", { value: 0 });
 
@@ -1144,6 +1488,9 @@ Object.defineProperty(list, "completedCount", { value: 0 });
   await list.postreconcile();
   if (list._removed.length || list._replaced.length) {
     throw new Error("Refresh work queues were not cleared");
+  }
+  if (!hiddenReplaced) {
+    throw new Error("A hidden clean form row was not silently refreshed");
   }
 })().catch((error) => {
   console.error(error);

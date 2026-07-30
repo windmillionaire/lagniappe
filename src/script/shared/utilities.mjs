@@ -227,7 +227,7 @@ export const uint8ArrayToBase64 = (bytes) => {
 
 /**
  * @testable false
- * @reason browser cache cleanup helper is exercised through service-worker and server-change refresh flows
+ * @reason browser cache cleanup helper is exercised through service-worker and polling refresh flows
  */
 export const clearRecentSearchResults = () => {
 	const recentKeys = Array.from({ length: localStorage.length }, (_, index) =>

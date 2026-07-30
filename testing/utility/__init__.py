@@ -7,19 +7,13 @@ helpers, and other support code here rather than in test modules.
 """
 
 from .error_tracking import capture_on_failure
-from .messaging import (
-    simulate_collaboration_message,
-    simulate_fcm_message,
-    simulate_window_message,
-)
+from .polling import trigger_poll
 from .test_file import TestFile
 from .test_reporting import TestResults
 
 __all__ = [
     "capture_on_failure",
-    "simulate_collaboration_message",
-    "simulate_fcm_message",
-    "simulate_window_message",
+    "trigger_poll",
     "TestFile",
     "TestResults",
 ]

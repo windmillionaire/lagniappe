@@ -2702,8 +2702,10 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
         constants.REQUIRED_GOOGLE_CLOUD_APIS
     )
     _install_config_package(monkeypatch, constants, settings=settings)
-    monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
-    monkeypatch.setattr(gcloud, "FORMATTER", _fake_formatter())
+    spinner = SpinnerRecorder()
+    formatter = _fake_formatter(spinner)
+    monkeypatch.setattr(setup_pkg, "FORMATTER", formatter)
+    monkeypatch.setattr(gcloud, "FORMATTER", formatter)
     monkeypatch.setattr(gcloud, "constants", constants)
 
     calls = []
@@ -2738,6 +2740,9 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
         )
     ]
     assert mutations[-1][1]["identifier"] == missing
+    assert any(
+        "may take up to 5 minutes" in message for message in spinner.messages
+    )
 
     del settings._SETUP_ENABLED_GOOGLE_CLOUD_APIS
     calls.clear()
@@ -2767,7 +2772,7 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
 
 # @features setup
 # @dimensions gcloud-command deploy
-def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch):
+def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     from installer import utils
 
     monkeypatch.setattr(utils, "GCLOUD_CLI", None)
@@ -2837,6 +2842,7 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch):
 
     utils.deploy_to_app_engine()
 
+    assert "may take up to 10 minutes" in capsys.readouterr().out
     assert deploy_commands == [
         (
             "deploy",
@@ -2990,7 +2996,6 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     _install_config_package(monkeypatch, constants, settings=settings)
 
     from installer import admin
-    from installer import firebase
     from installer import identity
     from installer import optional
     from installer import redis as redis_setup
@@ -3053,45 +3058,6 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
 
     settings.APP.clear()
     settings._saves.clear()
-    monkeypatch.setattr(
-        firebase,
-        "_configure_firebase",
-        lambda: {
-            "apiKey": "key",
-            "appId": "app-1",
-            "authDomain": "project-1.firebaseapp.com",
-            "messagingSenderId": "123456",
-            "projectId": "project-1",
-            "storageBucket": "project-1.firebasestorage.app",
-        },
-    )
-    monkeypatch.setattr(firebase, "print_vapid_instructions", lambda: None)
-    monkeypatch.setattr(firebase, "_get_vapid_key", lambda: "vapid")
-
-    assert firebase.setup_firebase()
-    assert settings.APP["FIREBASE_CONFIG"] == {
-        "apiKey": "key",
-        "appId": "app-1",
-        "messagingSenderId": "123456",
-        "projectId": "project-1",
-        "vapidKey": "vapid",
-    }
-    assert len(settings._saves) == 2
-
-    settings.APP["FIREBASE_CONFIG"]["authDomain"] = (
-        "project-1.firebaseapp.com"
-    )
-    settings._saves.clear()
-
-    assert firebase.setup_firebase()
-    assert settings.APP["FIREBASE_CONFIG"] == {
-        "apiKey": "key",
-        "appId": "app-1",
-        "messagingSenderId": "123456",
-        "projectId": "project-1",
-        "vapidKey": "vapid",
-    }
-    assert len(settings._saves) == 1
 
     settings.GCLOUD_CONFIG["PROJECT"] = "project-1"
     settings.APP["APP_URL"] = "https://project-1.example"
@@ -3221,41 +3187,6 @@ def test_oauth_instructions_open_current_project_clients_page(
         "Authorized redirect URI: "
         "https://app.example.com/users/google-signin"
     ) in output
-
-
-# @features setup
-# @dimensions firebase-web-push browser operator-guidance
-def test_vapid_instructions_open_current_project_cloud_messaging_page(
-    monkeypatch,
-    capsys,
-):
-    constants = _load_config_constants()
-    settings = _fake_settings(gcloud={"PROJECT": "demo-project"})
-    _install_config_package(monkeypatch, constants, settings=settings)
-
-    import installer as setup_pkg
-    from installer import firebase
-
-    monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
-    opened = []
-    monkeypatch.setattr(
-        firebase.webbrowser,
-        "open_new_tab",
-        lambda url: opened.append(url) or True,
-    )
-
-    firebase.print_vapid_instructions()
-
-    expected_url = (
-        "https://console.firebase.google.com/project/"
-        "demo-project/settings/cloudmessaging"
-    )
-    assert opened == [expected_url]
-    output = capsys.readouterr().out
-    assert "Opening Firebase Cloud Messaging for project 'demo-project'" in output
-    assert expected_url in output
-    assert "Look for the 'Web Push certificates' section" in output
-    assert "Copy the 'Key pair' value and paste it below" in output
 
 
 # @features setup iam
@@ -3528,7 +3459,6 @@ def test_runtime_role_plan_excludes_provisioning_and_administration():
         "roles/cloudtasks.enqueuer",
         "roles/cloudtasks.taskDeleter",
         "roles/firebaseauth.editor",
-        "roles/firebasecloudmessaging.admin",
     }.issubset(runtime_roles)
     assert {
         "roles/cloudtasks.admin",
@@ -3542,6 +3472,9 @@ def test_runtime_role_plan_excludes_provisioning_and_administration():
         "roles/cloudbuild.builds.editor",
         "roles/iam.serviceAccountUser",
     }.isdisjoint(runtime_roles)
+    assert "roles/firebasecloudmessaging.admin" in (
+        constants.REMOVED_RUNTIME_PROJECT_ROLES
+    )
     assert set(constants.RUNTIME_BUCKET_ROLES) == {
         "roles/storage.legacyBucketReader",
         "roles/storage.objectAdmin",
@@ -3958,19 +3891,61 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
             self.default_hostname = None
 
     app_requests = []
+    app_engine_events = []
+
+    class AppEngineSpinner:
+        def __init__(self, text):
+            self.text = text
+
+        def __enter__(self):
+            app_engine_events.append(("spinner-enter", self.text))
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            app_engine_events.append(("spinner-exit", self.text))
+            return False
+
+        def write(self, message):
+            app_engine_events.append(("spinner-write", message))
+
+        def ok(self, mark):
+            app_engine_events.append(("spinner-ok", mark))
+
+        def fail(self, mark):
+            app_engine_events.append(("spinner-fail", mark))
+
+    app_engine_formatter = types.SimpleNamespace(
+        success=lambda message: message,
+        info=lambda message: message,
+        warning=lambda message: message,
+        error=lambda message, error=None: message,
+        ok_glyph="[OK]",
+        fail_glyph="[X]",
+        yaspin=lambda **kwargs: AppEngineSpinner(kwargs["text"]),
+    )
+    monkeypatch.setattr(
+        gcloud,
+        "FORMATTER",
+        types.SimpleNamespace(initialize=lambda: app_engine_formatter),
+    )
 
     class ApplicationsClient:
-        def get_application(self, request):
+        def get_application(self, request, timeout):
+            assert timeout == gcloud.APP_ENGINE_RPC_TIMEOUT
             raise AppNotFound()
 
-        def create_application(self, request):
+        def create_application(self, request, timeout):
+            assert timeout == gcloud.APP_ENGINE_RPC_TIMEOUT
+            app_engine_events.append(("create", request))
             app_requests.append(request)
-            return types.SimpleNamespace(
-                result=lambda timeout: types.SimpleNamespace(
+            def result(timeout):
+                app_engine_events.append(("result", timeout))
+                return types.SimpleNamespace(
                     default_hostname="project-1.appspot.com",
                     location_id=request["application"].location_id,
                 )
-            )
+
+            return types.SimpleNamespace(result=result)
 
     appengine_admin_v1 = types.ModuleType("appengine_admin_v1")
     appengine_admin_v1.ApplicationsClient = ApplicationsClient
@@ -3980,7 +3955,11 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
     location_prompts = []
     monkeypatch.setattr(
         "builtins.input",
-        lambda prompt: location_prompts.append(prompt) or "y",
+        lambda prompt: (
+            location_prompts.append(prompt)
+            or app_engine_events.append(("input", prompt))
+            or "y"
+        ),
     )
 
     created_app = gcloud.create_app_engine_app()
@@ -3991,6 +3970,23 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
     assert location_prompts == [
         "Create the App Engine application in 'us-central'? [y/N]: "
     ]
+    discovery_exit = app_engine_events.index(
+        ("spinner-exit", "Discover App Engine application")
+    )
+    prompt_event = app_engine_events.index(
+        (
+            "input",
+            "Create the App Engine application in 'us-central'? [y/N]: ",
+        )
+    )
+    creation_enter = app_engine_events.index(
+        (
+            "spinner-enter",
+            "Create App Engine application (may take up to 5 minutes)",
+        )
+    )
+    assert discovery_exit < prompt_event < creation_enter
+    assert ("result", gcloud.APP_ENGINE_CREATE_TIMEOUT) in app_engine_events
 
     provider_app = types.SimpleNamespace(
         id="project-1",
@@ -3999,11 +3995,12 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
     )
 
     class ExistingApplicationsClient:
-        def get_application(self, request):
+        def get_application(self, request, timeout):
             assert request == {"name": "apps/project-1"}
+            assert timeout == gcloud.APP_ENGINE_RPC_TIMEOUT
             return provider_app
 
-        def create_application(self, request):
+        def create_application(self, request, timeout):
             raise AssertionError("existing App Engine app must not be recreated")
 
     appengine_admin_v1.ApplicationsClient = ExistingApplicationsClient
@@ -4124,6 +4121,86 @@ def test_setup_gcloud_resource_client_contracts(monkeypatch):
             "OCR_PROCESSOR",
         ),
     ]
+
+
+# @features setup
+# @dimensions app-engine interactive-input timeout failure-isolation
+def test_app_engine_creation_prompt_and_bounded_failures(monkeypatch, capsys):
+    import installer as setup_pkg
+
+    constants = _load_config_constants()
+    settings = _fake_settings(
+        app={"APP_ENGINE_LOCATION": "us-central"},
+        gcloud={"PROJECT": "project-1"},
+    )
+    _install_config_package(monkeypatch, constants, settings=settings)
+
+    from installer import gcloud
+
+    spinner = SpinnerRecorder()
+    formatter = _fake_formatter(spinner)
+    monkeypatch.setattr(setup_pkg, "FORMATTER", formatter)
+    monkeypatch.setattr(gcloud, "FORMATTER", formatter)
+    monkeypatch.setattr(gcloud, "install_if_missing", lambda *args, **kwargs: None)
+
+    class AppNotFound(Exception):
+        pass
+
+    class Application:
+        def __init__(self):
+            self.id = None
+            self.location_id = None
+
+    create_requests = []
+    operation_timeouts = []
+
+    class ApplicationsClient:
+        def get_application(self, request, timeout):
+            assert timeout == gcloud.APP_ENGINE_RPC_TIMEOUT
+            raise AppNotFound()
+
+        def create_application(self, request, timeout):
+            assert timeout == gcloud.APP_ENGINE_RPC_TIMEOUT
+            create_requests.append(request)
+
+            def result(timeout):
+                operation_timeouts.append(timeout)
+                raise TimeoutError("provider operation remained pending")
+
+            return types.SimpleNamespace(result=result)
+
+    appengine_admin_v1 = types.ModuleType("appengine_admin_v1")
+    appengine_admin_v1.ApplicationsClient = ApplicationsClient
+    appengine_admin_v1.Application = Application
+    _install_cloud_module(monkeypatch, "appengine_admin_v1", appengine_admin_v1)
+    _install_api_core_exceptions(monkeypatch, AppNotFound)
+
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: (_ for _ in ()).throw(EOFError()),
+    )
+    with pytest.raises(
+        SetupCancelled,
+        match="could not read from this terminal",
+    ):
+        gcloud.create_app_engine_app()
+    assert create_requests == []
+    assert "Run setup again in an interactive terminal" in capsys.readouterr().out
+
+    monkeypatch.setattr("builtins.input", lambda prompt: "y")
+    with pytest.raises(
+        ProviderTimeout,
+        match="Run setup again",
+    ):
+        gcloud.create_app_engine_app()
+    assert len(create_requests) == 1
+    assert operation_timeouts == [gcloud.APP_ENGINE_CREATE_TIMEOUT]
+    output = capsys.readouterr().out
+    assert "may take up to 5 minutes" in output
+    assert any(
+        "Google may still be completing it" in message
+        for message in spinner.messages
+    )
 
 
 # @features setup

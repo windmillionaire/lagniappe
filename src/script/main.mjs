@@ -9,7 +9,6 @@ import {
 	connectivityMessage,
 	initializeLogoutForms,
 	isSkippedViewTransitionError,
-	parseServiceWorkerMessage,
 	updateUserData,
 } from "./shared";
 
@@ -50,7 +49,6 @@ const VIEWS = {
 	results: () => import("./views/results"),
 	file: () => import("./views/file"),
 	report: () => import("./views/report"),
-	testing: () => import("./views/testing"),
 	analytics: () => import("./views/analytics"),
 	admin: () => import("./views/admin"),
 };
@@ -164,6 +162,20 @@ let _sync = null;
 let _syncPending = null;
 
 /**
+ * Treat a visible tab in an unfocused browser window as inactive. Focus runs
+ * an explicit catch-up cycle, so periodic work can stop while the user is
+ * working elsewhere.
+ *
+ * @testable false
+ * @covered-by src/script/main.mjs::syncViewOnce
+ * @covered-by src/script/main.mjs::initialize
+ * @reason shared inactivity predicate is exercised through lifecycle entry points
+ */
+function documentInactive() {
+	return document.hidden || document.hasFocus?.() === false;
+}
+
+/**
  * @testable false
  * @covered-by src/script/main.mjs::syncViewOnce
  * @covered-by src/script/main.mjs::suspendCurrentView
@@ -205,7 +217,10 @@ function queueSync({ hidden, force = false } = {}) {
  * @features offline
  * @dimensions server-health transitions view-reset reconnect indicator browser-state coalescing rapid-transitions
  */
-async function syncViewOnce({ hidden = document.hidden, force = false } = {}) {
+async function syncViewOnce({
+	hidden = documentInactive(),
+	force = false,
+} = {}) {
 	const controller = navigator.serviceWorker?.controller
 		? "controlled"
 		: "uncontrolled";
@@ -273,12 +288,7 @@ function suspendCurrentView() {
 			: "uncontrolled",
 		visibility: "hidden",
 	});
-	const view = document.querySelector("[lp-view]")?._lp_view;
-	if (view?.sync) {
-		view.sync({ hidden: true });
-		return;
-	}
-	syncView({ hidden: true });
+	return syncView({ hidden: true });
 }
 
 /**
@@ -310,6 +320,7 @@ function pageMode() {
  * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
  * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
  * @tests tests_js/test_017_main_lifecycle.py::test_controller_replacement_receives_current_versioned_connectivity_state
+ * @tests tests_js/test_017_main_lifecycle.py::test_window_blur_suspends_polling_until_focus_catchup
  * @pair offline:server-health
  * @pair offline:view-reset
  * @pair connectivity:controller-replacement
@@ -318,6 +329,10 @@ function pageMode() {
  * @pair service-worker:controller-replacement
  * @pair service-worker:state-publication
  * @pair service-worker:version
+ * @pair polling:blur
+ * @pair polling:focus
+ * @pair polling:visibility
+ * @pair polling:catch-up
  */
 function initialize() {
 	if (window.__INITIALIZED__) return;
@@ -328,27 +343,20 @@ function initialize() {
 	syncView();
 
 	document.addEventListener("visibilitychange", () => {
-		document.hidden ? suspendCurrentView() : syncView({ hidden: false });
+		document.hidden ? suspendCurrentView() : syncView();
 	});
 	window.addEventListener("offline", () => syncView());
 	window.addEventListener("online", () => syncView());
+	window.addEventListener("blur", suspendCurrentView);
 	window.addEventListener("focus", () => syncView());
 	window.addEventListener("pagehide", suspendCurrentView);
 	window.addEventListener("pageshow", (e) => {
-		syncView({ hidden: false, force: e.persisted });
+		syncView({ force: e.persisted });
 	});
 
 	if ("serviceWorker" in navigator) {
 		navigator.serviceWorker.register("/sw.js").catch((error) => {
 			captureNetworkError(error, "/sw.js", { context: "service_worker" });
-		});
-
-		navigator.serviceWorker.addEventListener("message", (event) => {
-			const message = parseServiceWorkerMessage(event.data);
-			if (!message) return;
-			window.dispatchEvent(
-				new CustomEvent(message.type, { detail: message.detail }),
-			);
 		});
 
 		navigator.serviceWorker.addEventListener("controllerchange", () => {

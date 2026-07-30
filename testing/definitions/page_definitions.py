@@ -57,6 +57,13 @@ page_for_tasks = PageDefinition(
     category=Categories.test_create_page_task,
 )
 
+empty_page_task_list = PageDefinition(
+    name="Empty Page Task List",
+    description="A page reserved for testing the empty task-list state.",
+    attributes=["tasks"],
+    category=Categories.test_create_page_task,
+)
+
 page_for_tasks_with_project = PageDefinition(
     name="Attach Project to Task",
     description="A page used for testing task creation with a project.",

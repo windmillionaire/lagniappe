@@ -124,7 +124,7 @@ def test_update_site_fingerprints_upserts_missing_users_fingerprint(monkeypatch)
 
 
 # @features mutations database
-# @dimensions property-mask update full-upsert site-fingerprint
+# @dimensions property-mask update full-upsert site-fingerprint document-checkpoint
 # @source lagniappe/core/tools/database/utility.py::save_mutations
 @pytest.mark.unit
 def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
@@ -163,23 +163,49 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
         key=("instances", "masked"),
         db={"type": "category", "modified": "now"},
     )
+    activity = SimpleNamespace(
+        key=("users", "activity"),
+        db={"type": "user", "notification_revision": 3},
+    )
+    document = SimpleNamespace(
+        key=("instances", "document"),
+        db={
+            "type": "page",
+            "assets": {"document": {"fingerprint": "next"}},
+            "document_history": True,
+        },
+    )
     fingerprint = {"type": "site", "fingerprint": "next"}
+    fingerprinted = []
 
     monkeypatch.setattr(utility, "DATA", SimpleNamespace(datastore=datastore))
     monkeypatch.setattr(
         utility,
         "update_site_fingerprints",
-        lambda *_entities: [fingerprint],
+        lambda *entities: fingerprinted.extend(entities) or [fingerprint],
     )
 
     utility.save_mutations(
-        ((full, None), (masked, ("modified", "forms")))
+        (
+            (full, None),
+            (masked, ("modified", "forms")),
+            (activity, ("notification_revision",)),
+            (document, ("assets", "document_history")),
+        )
     )
 
+    assert fingerprinted == [full.db, masked.db]
     assert batch.mutations[0].upsert is full.db
     assert batch.mutations[0].update is None
     assert batch.mutations[0].property_mask.paths == []
     assert batch.mutations[1].upsert is None
     assert batch.mutations[1].update is masked.db
     assert batch.mutations[1].property_mask.paths == ["modified", "forms"]
-    assert batch.mutations[2].upsert is fingerprint
+    assert batch.mutations[2].update is activity.db
+    assert batch.mutations[2].property_mask.paths == ["notification_revision"]
+    assert batch.mutations[3].update is document.db
+    assert batch.mutations[3].property_mask.paths == [
+        "assets",
+        "document_history",
+    ]
+    assert batch.mutations[4].upsert is fingerprint

@@ -16,6 +16,16 @@ from runner import context as runner_context
 pytestmark = pytest.mark.tooling
 
 
+def _load_recovery_module(monkeypatch):
+    """Load recovery contracts without executing runtime config file reads."""
+    config_path = Path(__file__).resolve().parents[2] / "config"
+    config_package = types.ModuleType("config")
+    config_package.__path__ = [str(config_path)]
+    monkeypatch.setitem(sys.modules, "config", config_package)
+    monkeypatch.delitem(sys.modules, "config.recovery", raising=False)
+    return importlib.import_module("config.recovery")
+
+
 # @features config setup
 # @dimensions permissions transactional-state utf8
 def test_atomic_config_write_preserves_valid_file_and_restricts_secrets(
@@ -679,10 +689,9 @@ def test_runtime_upload_boundary_has_no_local_orchestration_imports():
     assert excluded_import_issues == []
 
 
-# @features config
-# @dimensions recovery-export current-schema
-def test_recovery_snapshot_is_complete_flat_and_merges_live_settings():
-    from config import recovery
+# @pairs config:recovery-export config:current-schema config:messaging-removal
+def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch):
+    recovery = _load_recovery_module(monkeypatch)
 
     persisted = {
         "CONFIG_KIND": recovery.CONFIG_KIND,
@@ -699,6 +708,7 @@ def test_recovery_snapshot_is_complete_flat_and_merges_live_settings():
         "DEPLOY_MAX_INSTANCES": "1",
         "AI_MODEL": "persisted-model",
         "BUILD_ID": "generated-build",
+        "FIREBASE_CONFIG": {"apiKey": "retired"},
         "REDIS_TLS": False,
     }
 
@@ -725,6 +735,7 @@ def test_recovery_snapshot_is_complete_flat_and_merges_live_settings():
     assert snapshot["CONFIG_KIND"] == recovery.CONFIG_KIND
     assert snapshot["CONFIG_SCHEMA_VERSION"] == recovery.CONFIG_SCHEMA_VERSION
     assert "BUILD_ID" not in snapshot
+    assert "FIREBASE_CONFIG" not in snapshot
     assert "version" not in snapshot
     assert "IGNORED" not in snapshot
     assert persisted["DEPLOY_MAX_INSTANCES"] == "1"
@@ -826,7 +837,7 @@ def test_recovery_document_cross_checks_all_persisted_project_identities():
     assert recovered["GOOGLE_CLOUD_PROJECT"] == "recovered-project-1"
     assert recovered["CONFIG_SCHEMA_VERSION"] == recovery.CONFIG_SCHEMA_VERSION
     assert recovered["RUNTIME_SERVICE_ACCOUNT_EMAIL"].startswith("runtime@")
-    assert recovered["FIREBASE_CONFIG"]["projectId"] == "recovered-project-1"
+    assert "FIREBASE_CONFIG" not in recovered
     assert recovered["IDENTITY_PLATFORM_CONFIG"] == {
         "apiKey": "identity-api-key",
         "projectId": "recovered-project-1",
@@ -851,6 +862,19 @@ def test_recovery_document_cross_checks_all_persisted_project_identities():
     assert recovery.validate_recovery_document(numeric_ocr_parent)
 
 
+# @pairs config:recovery-validation config:schema-upgrade config:messaging-removal
+def test_recovery_upgrades_schema_2_and_discards_legacy_messaging_config(monkeypatch):
+    recovery = _load_recovery_module(monkeypatch)
+
+    document = _valid_recovery_document()
+    document["CONFIG_SCHEMA_VERSION"] = 2
+
+    recovered = recovery.validate_recovery_document(document)
+
+    assert recovered["CONFIG_SCHEMA_VERSION"] == 3
+    assert "FIREBASE_CONFIG" not in recovered
+
+
 # @features config
 # @dimensions recovery-validation current-schema required-settings
 @pytest.mark.parametrize(
@@ -864,7 +888,6 @@ def test_recovery_document_cross_checks_all_persisted_project_identities():
             "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL",
             "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL",
         ),
-        ("FIREBASE_CONFIG", "FIREBASE_CONFIG"),
         ("IDENTITY_PLATFORM_CONFIG", "IDENTITY_PLATFORM_CONFIG"),
         ("AUTH_EMAIL_CONFIG", "AUTH_EMAIL_CONFIG"),
     ],
@@ -927,12 +950,6 @@ def test_recovery_rejects_current_configuration_identity_mismatch():
                 )
             ),
             "RUNTIME_SERVICE_ACCOUNT_EMAIL",
-        ),
-        (
-            lambda value: value.update(
-                FIREBASE_CONFIG={"projectId": "wrong-project-1"}
-            ),
-            "FIREBASE_CONFIG.projectId",
         ),
         (
             lambda value: value.update(

@@ -3,6 +3,7 @@
 from ..definitions import MutationOperation
 from .base import MutationPlanBuilder, RootMutation, StandardMutation
 from .delete import DELETE_PLANNERS, plan_delete
+from .document import plan_document_checkpoint, plan_document_parent_touch
 from .executor import (
     consume_mutation_intents,
     execute_mutation,
@@ -63,6 +64,8 @@ __all__ = [
     "execute_mutation",
     "execute_post_commit",
     "plan_mutation",
+    "plan_document_checkpoint",
+    "plan_document_parent_touch",
     "plan_root",
     "planner_for",
     "prepare_durable_writes",

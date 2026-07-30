@@ -33,18 +33,11 @@ class Keys(Enum):
 
 
 class Sync(Enum):
-    """Redis key templates for sync state.
+    """Redis key templates for revisioned documents and expiring presence."""
 
-    ``WIDGET`` registrations target a specific syncable widget (e.g. the form
-    or document on a page) and drive update broadcasts. ``ENTITY`` viewers
-    target the owning entity and drive delete broadcasts to anyone looking at
-    the entity in any widget.
-    """
-
-    WIDGET = f"{CONFIG.PREFIX}SYNC:WIDGET:{{}}"
-    ENTITY = f"{CONFIG.PREFIX}SYNC:ENTITY:{{}}"
-    STATE = f"{CONFIG.PREFIX}SYNC:STATE"
-    USERS = f"{CONFIG.PREFIX}SYNC:USERS"
+    DOCUMENTS = f"{CONFIG.PREFIX}SYNC:DOCUMENTS:{{}}"
+    PRESENCE = f"{CONFIG.PREFIX}SYNC:PRESENCE:{{}}"
+    CLIENTS = f"{CONFIG.PREFIX}SYNC:CLIENTS"
 
     # @testable infrastructure
     def key(self, key):

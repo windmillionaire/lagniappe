@@ -64,15 +64,15 @@
   {{ heading("How Updates Travel") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
-      Because Lagniappe runs on App Engine, live updates are delivered through
-      the browser's push channel rather than a persistent connection. In
-      practice that is invisible, but it has two honest edges worth knowing.
+      Because Lagniappe runs on App Engine, open views check a single adaptive
+      polling endpoint rather than holding a persistent connection. Document
+      editors and active background jobs check quickly; quiet views
+      progressively check less often.
     </p>
     {% call callout("tip", False) %}
-      Live pushes rely on the browser's notification permission. If that is off,
-      or for public and read-only viewers, you still see the current state each
-      time a view loads or refreshes -- you just do not receive the moment-to-moment
-      updates that permitted, signed-in editors get.
+      Polling pauses while a tab is hidden or offline and runs immediately when
+      the tab becomes visible or reconnects. Updates may arrive a few seconds
+      later than a persistent real-time connection.
     {% endcall %}
   {% endcall %}
 

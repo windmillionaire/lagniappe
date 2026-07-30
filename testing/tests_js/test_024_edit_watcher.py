@@ -147,7 +147,7 @@ if (target.dataset?.revisionFingerprint) {
 
 
 # @features edited-entity-notice
-# @dimensions entity-ancestor batching per-form comparison acknowledgement targeted-reset reload-fallback overlap-follow-up acknowledgement-no-probe clean-state focused-state transition
+# @dimensions entity-ancestor batching per-form comparison acknowledgement targeted-reset reload-fallback overlap-follow-up acknowledgement-no-probe active-state focused-state clean-state transition visibility subscription-lifecycle
 def test_edit_watcher_compares_and_resets_each_form_independently(run_node):
     run_node(
         r'''
@@ -217,13 +217,21 @@ const widgetC = {
   commitRevisionBaseline() { events.push({ type: "commit-c" }); },
   async applyRevision(response) { events.push({ type: "apply-c", response }); },
 };
+widgetA.component = { active: null, visible: false };
+widgetA.visible = false;
+widgetB.component = { active: widgetB, visible: true };
+widgetB.visible = true;
+widgetC.component = { active: widgetC, visible: true };
+widgetC.visible = true;
 const { marker: markerA } = makeMarker("/form-a", widgetA);
 const { marker: markerB, button: buttonB } = makeMarker("/form-b", widgetB);
 const { marker: markerC } = makeMarker("/form-c", widgetC);
 const viewListeners = new Map();
 const windowListeners = new Map();
+const pollSubscriptions = new Map();
+const pollTriggers = [];
 const view = {
-  key: "entity-key",
+  key: "root-key",
   online: true,
   hidden: false,
   elt: {
@@ -235,13 +243,45 @@ const view = {
     },
   },
   addFlash(marker) { events.push({ type: "flash", marker }); },
+  PollingCoordinator: {
+    subscribe(descriptor, hooks) {
+      pollSubscriptions.set(descriptor.id, { descriptor, hooks });
+      return () => pollSubscriptions.delete(descriptor.id);
+    },
+    acknowledge(id, revision) {
+      const subscription = pollSubscriptions.get(id);
+      if (subscription) subscription.descriptor.revision = revision;
+    },
+    async trigger(ids) {
+      pollTriggers.push(ids);
+      for (const id of ids) {
+        const subscription = pollSubscriptions.get(id);
+        if (!subscription) continue;
+        if (subscription.descriptor.type === "entity") {
+          await subscription.hooks.onResult({
+            status: "changed",
+            revision: "new",
+            payload: {
+              fingerprint: "new",
+              modified: "2026-07-22T11:00:00+00:00",
+            },
+          });
+        } else {
+          await subscription.hooks.onResult({
+            status: "unchanged",
+            revision: "unlocked",
+          });
+        }
+      }
+      return [];
+    },
+  },
 };
 const context = {
   areEqual(left, right) { return JSON.stringify(left) === JSON.stringify(right); },
   clearTimeout() {},
   console,
   document: { activeElement: focusedElement },
-  ENDPOINTS: { edited: "/edited" },
   captureError(error) { throw error; },
   Modal: class {},
   STYLES: {},
@@ -259,17 +299,6 @@ const context = {
     };
   },
   request: {
-    async post(url, payload) {
-      events.push({ type: "edited-request", url, payload });
-      return {
-        ok: true,
-        edited: [{
-          key: "entity-key",
-          fingerprint: "new",
-          modified: "2026-07-22T11:00:00+00:00",
-        }],
-      };
-    },
     async get(url, params, options) {
       events.push({ type: "form-request", url, options });
       return { ok: true, remote: url === "/form-a" ? "same" : "new" };
@@ -295,16 +324,11 @@ vm.runInContext(source, context);
 (async () => {
   const watcher = new context.EditWatcher(view);
   await watcher.check();
-  const requestEvent = events.find((event) => event.type === "edited-request");
-  if (requestEvent.payload.entities.length !== 1) {
+  if (pollSubscriptions.size !== 2 || pollTriggers[0].length !== 2) {
     throw new Error("Duplicate markers were not deduplicated by entity key");
   }
-  if (markerA.dataset.visible !== "false" || !events.some(({ type }) => type === "apply-a")) {
-	throw new Error("Inactive clean form change did not remount without a notice");
-  }
-  const cleanTransition = events.find((event) => event.type === "transition");
-  if (!cleanTransition) {
-    throw new Error("Clean form replacement did not use a view transition");
+  if (markerA.dataset.visible !== "false" || events.some(({ type }) => type === "apply-a")) {
+	throw new Error("Inactive form performed hidden reconciliation work");
   }
   if (markerB.dataset.visible !== "true") {
     throw new Error("Changed form did not display its notice");
@@ -316,11 +340,26 @@ vm.runInContext(source, context);
     throw new Error("Form probes did not advance the checked fingerprint");
   }
   const probes = events.filter((event) => event.type === "form-request");
-  if (probes.length !== 3 || probes.some((event) => event.options.acknowledgeEntities !== false)) {
-    throw new Error("Forms were not probed independently without acknowledgement");
+  if (
+    probes.length !== 2 ||
+    probes.some((event) => event.url === "/form-a") ||
+    probes.some((event) => event.options.acknowledgeEntities !== false)
+  ) {
+    throw new Error("Only active forms should be probed without acknowledgement");
   }
   if (events.some((event) => event.type === "reload")) {
     throw new Error("Fingerprint mismatch reloaded without user action");
+  }
+
+  widgetA.component.active = widgetA;
+  widgetA.component.visible = true;
+  widgetA.visible = true;
+  await watcher.reconcileSubscriptions();
+  const catchupProbes = events.filter(
+    (event) => event.type === "form-request" && event.url === "/form-a",
+  );
+  if (catchupProbes.length !== 1 || markerA.dataset.visible !== "true") {
+    throw new Error("Newly active form did not catch up from its retained revision");
   }
 
   const timersBeforeAcknowledgement = events.filter(
@@ -352,7 +391,7 @@ vm.runInContext(source, context);
   }
 
   view.elt.querySelectorAll = () => [];
-  watcher.acknowledge({ key: "entity-key", fingerprint: "newer" });
+  watcher.acknowledge({ key: "root-key", fingerprint: "newer" });
   if (view.elt.dataset.fingerprint !== "newer") {
     throw new Error("Marker-free view root did not accept its local revision");
   }
@@ -372,27 +411,150 @@ vm.runInContext(source, context);
     throw new Error("Explicit fallback action did not reload");
   }
 
-  let releaseFirstCheck;
-  let firstCheckStarted;
-  const started = new Promise((resolve) => { firstCheckStarted = resolve; });
-  let checkRuns = 0;
-  watcher._checkNow = async () => {
-    checkRuns += 1;
-    if (checkRuns === 1) {
-      firstCheckStarted();
-      await new Promise((resolve) => { releaseFirstCheck = resolve; });
-    }
-  };
-  const firstCheck = watcher.check();
-  await started;
-  const overlappingCheck = watcher.check();
-  if (firstCheck !== overlappingCheck) {
-    throw new Error("Overlapping checks did not share one completion promise");
+  const triggersBefore = pollTriggers.length;
+  await watcher.check();
+  if (pollTriggers.length !== triggersBefore + 1) {
+    throw new Error("Explicit recheck did not delegate to the coordinator");
   }
-  releaseFirstCheck();
-  await overlappingCheck;
-  if (checkRuns !== 2) {
-    throw new Error(`Overlapping check did not queue one follow-up: ${checkRuns}`);
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
+# @features edited-entity-notice
+# @dimensions overlap-follow-up coalescing clean-state
+def test_edit_watcher_coalesces_overlapping_revision_probes(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const requests = [];
+const applications = [];
+const anchor = {
+  dataset: {
+    key: "entity-key",
+    fingerprint: "old",
+    modified: "2026-07-22T10:00:00+00:00",
+  },
+};
+const button = { textContent: "", disabled: false };
+const message = { textContent: "" };
+const widget = {
+  name: "FormA",
+  visible: false,
+  unsavedState: false,
+  form: { _queued: false },
+  revisionBaseline: "old",
+  revisionCanReset() { return true; },
+  revisionSnapshot() { return "old"; },
+  buildLocalRevision(response) {
+    return { response: { ...response, snapshot: "old" } };
+  },
+  commitRevisionBaseline() {},
+  async applyRevision(response) { applications.push(response); },
+};
+widget.component = { active: null };
+const form = { dataset: { widget: "FormA" }, _lp_widget: widget };
+const marker = {
+  isConnected: true,
+  dataset: { visible: "false", editedRoute: "/form-a" },
+  querySelector(selector) {
+    return selector === "[data-role='edited-message']" ? message : button;
+  },
+  closest(selector) {
+    if (selector === "[lp-entity]") return anchor;
+    if (selector === "form[data-widget]") return form;
+    return null;
+  },
+};
+widget.target = {
+  querySelector() { return marker; },
+  contains() { return false; },
+};
+
+const context = {
+  areEqual(left, right) { return JSON.stringify(left) === JSON.stringify(right); },
+  captureError(error) { throw error; },
+  console,
+  document: { activeElement: null },
+  loadRevisionPreview(_widget, response) {
+    return {
+      revisionSnapshot() { return response.snapshot; },
+      destroy() {},
+    };
+  },
+  Modal: class {},
+  request: {
+    get(url, _params, options) {
+      return new Promise((resolve) => {
+        requests.push({ url, options, resolve });
+      });
+    },
+  },
+  setImmediate,
+  STYLES: {},
+  withTransition(callback) { return callback(); },
+  window: { addEventListener() {}, removeEventListener() {} },
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class EditWatcher", "class EditWatcher");
+source += "\nglobalThis.EditWatcher = EditWatcher;";
+vm.runInContext(source, context);
+
+(async () => {
+  const watcher = new context.EditWatcher({
+    addFlash() {},
+    components: {},
+    elt: { addEventListener() {}, querySelectorAll() { return []; } },
+  });
+
+  const first = watcher._probe(
+    marker,
+    "fingerprint-one",
+    "2026-07-22T11:00:00+00:00",
+  );
+  const duplicate = watcher._probe(
+    marker,
+    "fingerprint-one",
+    "2026-07-22T11:00:00+00:00",
+  );
+  const followup = watcher._probe(
+    marker,
+    "fingerprint-two",
+    "2026-07-22T12:00:00+00:00",
+  );
+  if (requests.length !== 1) {
+    throw new Error(`Overlapping probes were not coalesced: ${requests.length}`);
+  }
+
+  requests[0].resolve({ ok: true, snapshot: "saved-one" });
+  while (requests.length < 2) {
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  requests[1].resolve({ ok: true, unchanged: true });
+  await Promise.all([first, duplicate, followup]);
+
+  if (requests.length !== 2) {
+    throw new Error(`Expected one newer follow-up probe, received ${requests.length}`);
+  }
+  if (
+    requests.some(({ options }) => options.acknowledgeEntities !== false) ||
+    applications.length !== 1 ||
+    applications[0].snapshot !== "saved-one"
+  ) {
+    throw new Error(
+      `A later unchanged response displaced the authoritative response: ${JSON.stringify(applications)}`,
+    );
+  }
+  const revision = watcher._markerRevisions.get(marker);
+  if (revision?.fingerprint !== "fingerprint-two") {
+    throw new Error(`The newest probe revision was not retained: ${JSON.stringify(revision)}`);
   }
 })().catch((error) => {
   console.error(error);

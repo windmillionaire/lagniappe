@@ -114,7 +114,6 @@ export default class Report extends Core {
 		const form = event.currentTarget;
 		const data = new FormData(form);
 		data.append("operation-id", this.operationId());
-		data.append("fcm-token", this.fcmToken);
 		this.RunReportForm?.submitting();
 
 		const response = await request.post(form.action, data);
@@ -152,7 +151,6 @@ export default class Report extends Core {
 		this._undoingReport = true;
 		const form = event.currentTarget;
 		const data = new FormData(form);
-		data.append("fcm-token", this.fcmToken);
 		this.UndoReportForm?.submitting();
 
 		const response = await request.post(form.action, data);
@@ -177,7 +175,6 @@ export default class Report extends Core {
 		const form = event.currentTarget;
 		const data = new FormData(form);
 		data.append("operation-id", this.operationId());
-		data.append("fcm-token", this.fcmToken);
 		this.ReviseReportForm?.submitting();
 
 		const response = await request.post(form.action, data);

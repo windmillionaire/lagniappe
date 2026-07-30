@@ -141,6 +141,7 @@ const makeTable = (target) => {
 # @pair reconnect-refresh:mounted-collection
 # @pair reconnect-refresh:committed-delete
 # @pair reconnect-refresh:destination-invalidation
+# @pair polling:reentrancy
 def test_core_refresh_batches_supported_widgets_and_falls_back_per_target(run_node):
     run_node(
         r'''
@@ -174,20 +175,18 @@ vm.createContext(context);
 
 let source = fs.readFileSync("src/script/views/base/core.mjs", "utf8");
 source = source.replace(
-  /^import [\s\S]*?(?=const MESSAGING_FEATURE_SELECTOR)/,
+  /^import [\s\S]*?(?=const COLLECTION_ONLY_CHANGE_TYPES)/,
   `
 const SearchBox = class {};
 const EntityMenu = class {};
 const Notifications = class {};
 const OfflineQueue = class {};
 const ENDPOINTS = {};
-const EVENTS = { SERVER_CHANGE: "server-change" };
 const clearRecentSearchResults = () => {};
 const captureError = (error) => { throw error; };
 const connectivity = { online: true, hidden: false };
 const DeleteModal = class {};
 const HelpModal = class {};
-const initializeMessaging = async () => null;
 const Modal = class {};
 const OfflineModal = class {};
 const request = {
@@ -369,6 +368,9 @@ view.Notifications = { async refresh() { events.push({ type: "notifications" });
     async invalidate(keys) {
       events.push({ type: "invalidate", keys });
     },
+    enqueue(keys) {
+      events.push({ type: "enqueue-invalidation", keys });
+    },
   };
   view.refreshCollections = async () => {
     events.push({ type: "refresh-mounted" });
@@ -416,6 +418,24 @@ view.Notifications = { async refresh() { events.push({ type: "notifications" });
     invalidation?.keys?.join(",") !== "page-key-a,task-key-a"
   ) {
     throw new Error(`Destination form key was not invalidated: ${JSON.stringify(destinationEvents)}`);
+  }
+
+  view.PollingCoordinator = { activePoll: Promise.resolve([]) };
+  const reentrantStart = events.length;
+  await view.reconcileChange({
+    type: "entity-poll",
+    key: "page-key-a",
+  });
+  const reentrantEvents = events.slice(reentrantStart);
+  const queuedInvalidation = reentrantEvents.find(
+    (event) => event.type === "enqueue-invalidation",
+  );
+  if (
+    queuedInvalidation ||
+    reentrantEvents.some((event) => event.type === "invalidate") ||
+    !reentrantEvents.some((event) => event.type === "refresh-mounted")
+  ) {
+    throw new Error(`Root polling duplicated form reconciliation: ${JSON.stringify(reentrantEvents)}`);
   }
 })().catch((error) => {
   console.error(error);

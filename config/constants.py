@@ -1,5 +1,5 @@
 SENTRY_DSN = "https://6ad2f168c5abc9f35de261d98b588633@o4511027028033536.ingest.us.sentry.io/4511218693242880"
-BUILD_ID = "b69685b2"
+BUILD_ID = "b9f8bba5"
 RUNTIME = "python314"
 DEFAULT_EXPIRATION = "31536000s"
 DEFAULT_APP_ENGINE_LOCATION = "us-central"
@@ -71,7 +71,6 @@ REQUIRED_APPLICATION_SETTINGS = {
     "RUNTIME_SERVICE_ACCOUNT_EMAIL": "Google Cloud runtime identity",
     "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": "Internal request identity",
     **{key: "Deployment" for key in DEFAULT_DEPLOYMENT_SETTINGS},
-    "FIREBASE_CONFIG": "Messaging",
     "IDENTITY_PLATFORM_CONFIG": "Authentication",
     "GIBBERISH": "Security",
     "GOOGLE_CLIENT_ID": "Authentication",
@@ -380,11 +379,6 @@ INSTALLER_PROJECT_PERMISSIONS = [
     "documentai.processors.create",
     "documentai.processors.get",
     "documentai.processors.list",
-    "firebase.clients.create",
-    "firebase.clients.get",
-    "firebase.clients.list",
-    "firebase.projects.get",
-    "firebase.projects.update",
     "firebaseauth.configs.create",
     "firebaseauth.configs.get",
     "firebaseauth.configs.getSecret",
@@ -441,7 +435,6 @@ DEPLOYER_PROJECT_ROLES = [
 RUNTIME_PROJECT_ROLES = [
     "roles/datastore.user",
     "roles/firebaseauth.editor",
-    "roles/firebasecloudmessaging.admin",
     "roles/cloudtasks.enqueuer",
     "roles/cloudtasks.taskDeleter",
     "roles/documentai.apiUser",
@@ -475,6 +468,7 @@ REMOVED_RUNTIME_PROJECT_ROLES = [
     "roles/storage.objectViewer",
     "roles/firebase.admin",
     "roles/firebaseauth.admin",
+    "roles/firebasecloudmessaging.admin",
     "roles/firebasemessagingcampaigns.admin",
     "roles/serviceusage.serviceUsageAdmin",
     "roles/cloudtasks.admin",
@@ -497,7 +491,6 @@ REQUIRED_GOOGLE_CLOUD_APIS = {
     "cloudbilling.googleapis.com": "Cloud Billing",
     "iam.googleapis.com": "Identity and Access Management (IAM)",
     "iamcredentials.googleapis.com": "Service Account Credentials API",
-    "firebase.googleapis.com": "Firebase",
     "identitytoolkit.googleapis.com": "Identity Platform",
     "cloudtasks.googleapis.com": "Cloud Tasks API",
     "cloudscheduler.googleapis.com": "Cloud Scheduler API",

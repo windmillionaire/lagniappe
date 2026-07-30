@@ -9,7 +9,7 @@ import { captureError, Modal, request, withTransition } from "../../shared";
  * @tests tests_js/test_015_core_submit_frontend.py::test_submit_stops_before_appending_when_form_data_is_missing
  * @tests tests_js/test_015_core_submit_frontend.py::test_submit_uses_explicit_action_route_over_active_widget_route
  * @features submit
- * @dimensions stale-widget direct-upload-navigation direct-upload-error missing-form-data route-override
+ * @dimensions stale-widget direct-upload-navigation direct-upload-error missing-form-data route-override active-widget
  */
 export class SubmissionManager {
 	constructor(view) {
@@ -110,8 +110,6 @@ export class SubmissionManager {
 
 		const explain = event.submitter?.dataset?.explain;
 		if (explain) data.append("explain", explain);
-
-		data.append("fcm-token", this.view.fcmToken);
 
 		if (submitWidget.target?.hasAttribute("lp-create")) {
 			this.create(component, data, route);

@@ -91,14 +91,26 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     expect(form).to_have_attribute("data-autofill-probe", "mounted")
     expect(form.locator(f"[name='{FIELD_ID}']")).to_be_disabled()
 
-    with user.page.expect_response("**/edited") as edited_response:
+    def form_lock_poll(response):
+        if not response.url.endswith("/poll"):
+            return False
+        payload = response.request.post_data_json or {}
+        return any(
+            descriptor.get("type") == "form-lock"
+            and descriptor.get("key") == page.key
+            for descriptor in payload.get("subscriptions", [])
+        )
+
+    with user.page.expect_response(form_lock_poll) as poll_response:
         user.page.reload()
-    operations = edited_response.value.json()["operations"]
+    assert poll_response.value.ok
     operation = next(
-        (operation for operation in operations if operation["key"] == page.key),
-        None,
+        result["payload"]
+        for result in poll_response.value.json()["results"]
+        if result.get("type") == "form-lock"
+        and result.get("payload", {}).get("key") == page.key
     )
-    assert operation is not None
+    assert operation["locked"] is True
     form = user.page.locator("[data-widget='PageInfo']")
     expect(form).to_have_attribute("data-operation", re.compile(r".+"))
     expect(form.locator("[data-role='deferred-progress']")).to_be_visible()

@@ -1,5 +1,7 @@
 """Executable entity mutation contract and ordering regressions."""
 
+from datetime import datetime, timezone
+
 import pytest
 
 from lagniappe.core.definitions import (
@@ -11,8 +13,12 @@ from lagniappe.core.definitions.mutation_contracts import (
     ENTITY_MUTATION_CONTRACTS,
 )
 from lagniappe.core.entities import Entities
+from lagniappe.core.entities.notification import Notification
+from lagniappe.core.entities.user import User
 from lagniappe.core.mutations import (
     execute_mutation,
+    plan_document_checkpoint,
+    plan_document_parent_touch,
     plan_mutation,
     plan_root,
     registered_kinds,
@@ -173,6 +179,196 @@ def test_touch_uses_masked_root_save_and_only_updates_modified(monkeypatch):
     assert category.modified != original
     assert category.db.exclude_from_indexes == category.exclude_from_index
     assert saved == [(category, ("modified",))]
+    assert outcome.complete is True
+
+
+# @features mutations sync
+# @dimensions document checkpoint property-mask history parent-fingerprint list-owner
+# @source lagniappe/core/entities/__init__.py::EntityRegistry.save_document_checkpoint
+# @source lagniappe/core/mutations/document.py::plan_document_checkpoint
+def test_document_checkpoint_masks_parent_state_and_optionally_advances_lists(
+    monkeypatch,
+):
+    page = TestEntities.get(
+        "PAGE",
+        {
+            "name": "Document page",
+            "hash": "document-page",
+            "categories": [
+                {"name": "Document category", "hash": "document-category"}
+            ],
+        },
+    )
+    page._db = SaveDB(page.db)
+    history = TestEntities.get(
+        "CATEGORY",
+        {"name": "Document history intent", "hash": "document-history-intent"},
+    )
+    history._db = SaveDB(history.db)
+    page.add_mutation_intents(
+        MutationIntent.standard(history, reason="document-history")
+    )
+    saved = []
+    monkeypatch.setattr(
+        mutation_executor.database,
+        "save_mutations",
+        lambda writes: saved.extend(writes),
+    )
+    monkeypatch.setattr(mutation_executor.cache, "update", lambda *_entities: None)
+
+    original_modified = page.modified
+    outcome = Entities.save_document_checkpoint(page)
+
+    assert saved == [
+        (page, ("assets", "document_history")),
+        (history, None),
+    ]
+    assert page.modified == original_modified
+    assert page.mutation_intents == []
+    assert outcome.complete is True
+
+    saved.clear()
+    plan = plan_document_checkpoint(
+        page,
+        advance_parent=True,
+        registry=Entities,
+    )
+    writes = {effect.entity.key: effect for effect in _writes(plan)}
+
+    assert writes[page.key].property_mask == (
+        "assets",
+        "document_history",
+        "modified",
+    )
+    assert writes[page.key].property_updates == ("modified",)
+    assert writes["document-category"].property_mask == ("modified",)
+
+
+# @features mutations sync
+# @dimensions document parent-fingerprint property-mask list-owner
+# @source lagniappe/core/entities/__init__.py::EntityRegistry.advance_document_parent
+# @source lagniappe/core/mutations/document.py::plan_document_parent_touch
+def test_document_parent_touch_only_advances_parent_and_list_fingerprints(
+    monkeypatch,
+):
+    page = TestEntities.get(
+        "PAGE",
+        {
+            "name": "Touched document page",
+            "hash": "touched-document-page",
+            "categories": [
+                {
+                    "name": "Touched document category",
+                    "hash": "touched-document-category",
+                }
+            ],
+        },
+    )
+    page._db = SaveDB(page.db)
+    saved = []
+    monkeypatch.setattr(
+        mutation_executor.database,
+        "save_mutations",
+        lambda writes: saved.extend(writes),
+    )
+    monkeypatch.setattr(mutation_executor.cache, "update", lambda *_entities: None)
+
+    plan = plan_document_parent_touch(page, registry=Entities)
+    writes = {effect.entity.key: effect for effect in _writes(plan)}
+    outcome = Entities.advance_document_parent(page)
+
+    assert writes[page.key].property_mask == ("modified",)
+    assert "assets" not in writes[page.key].property_mask
+    assert writes["touched-document-category"].property_mask == ("modified",)
+    assert {
+        (entity.key, property_mask)
+        for entity, property_mask in saved
+    } == {
+        ("touched-document-page", ("modified",)),
+        ("touched-document-category", ("modified",)),
+    }
+    assert outcome.complete is True
+
+
+# @pairs notifications:personal-activity notifications:revision notifications:cache-isolation
+# @pairs polling:personal-activity polling:revision
+# @source lagniappe/core/entities/__init__.py::EntityRegistry.advance_notifications
+def test_advance_notifications_only_updates_personal_revision(monkeypatch):
+    user = User(testing=True)
+    user._key = "activity-user"
+    user._db = SaveDB(
+        {
+            "type": "user",
+            "modified": datetime(2026, 7, 30, tzinfo=timezone.utc),
+        }
+    )
+    original_fingerprint = user.fingerprint
+    saved = []
+
+    monkeypatch.setattr(
+        mutation_executor.database,
+        "save_mutations",
+        lambda writes: saved.extend(writes),
+    )
+    cache_updates = []
+    monkeypatch.setattr(
+        mutation_executor.cache,
+        "update",
+        lambda *entities: cache_updates.extend(entities),
+    )
+
+    outcome = Entities.advance_notifications(user)
+
+    assert user.notification_revision == 1
+    assert user.operation_revision == 0
+    assert user.fingerprint == original_fingerprint
+    assert saved == [(user, ("notification_revision",))]
+    assert cache_updates == []
+    assert outcome.complete is True
+
+
+# @pairs notifications:personal-activity notifications:mutation notifications:cache-isolation
+# @source lagniappe/core/mutations/save.py::NotificationMutation.plan_save
+def test_notification_save_advances_owner_revision_without_touching_user(monkeypatch):
+    modified = datetime(2026, 7, 30, tzinfo=timezone.utc)
+    user = User(testing=True)
+    user._key = "notification-user"
+    user._db = SaveDB(
+        {
+            "type": "user",
+            "name": "Notification User",
+            "email": "notification@example.test",
+            "hash": "notification-user-hash",
+            "modified": modified,
+        }
+    )
+    notification = Notification(testing=True)
+    notification._key = "notification"
+    notification.kind = "notification"
+    notification.db["hash"] = "notification-hash"
+    notification.parent = user
+    notification.body = "Ready"
+    saved = []
+
+    monkeypatch.setattr(
+        mutation_executor.database,
+        "save_mutations",
+        lambda writes: saved.extend(writes),
+    )
+    cache_updates = []
+    monkeypatch.setattr(
+        mutation_executor.cache,
+        "update",
+        lambda *entities: cache_updates.extend(entities),
+    )
+
+    outcome = Entities.save(notification)
+
+    assert user.notification_revision == 1
+    assert user.operation_revision == 0
+    assert user.modified == modified
+    assert (user, ("notification_revision",)) in saved
+    assert user not in cache_updates
     assert outcome.complete is True
 
 

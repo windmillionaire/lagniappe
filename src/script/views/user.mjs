@@ -132,7 +132,7 @@ export default class Users extends EntityIndex {
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008b_user_groups.py::test_delete_group_refreshes_group_navigation
 	 * @features user-groups
-	 * @dimensions group-delete nav-refresh server-change
+	 * @dimensions group-delete nav-refresh polling
 	 */
 	async refreshSupplementalCollections(changes = []) {
 		if (changes.some(({ type }) => type === "delete")) {

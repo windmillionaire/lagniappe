@@ -1,13 +1,9 @@
 import { STYLES } from "styles";
 import { loadRevisionPreview } from "../widgets/loader";
-import { ENDPOINTS } from "./endpoints";
 import { captureError } from "./errors";
 import { Modal } from "./modal";
 import { request } from "./request";
 import { areEqual, withTransition } from "./utilities";
-
-const POLL_INTERVAL = 15_000;
-const MAX_EDITED_ENTITIES = 32;
 
 /**
  * @testable true
@@ -327,22 +323,38 @@ class WholeFormRevisionModal extends Modal {
  *
  * @testable true
  * @tests tests_js/test_024_edit_watcher.py::test_edit_watcher_compares_and_resets_each_form_independently
+ * @tests tests_js/test_024_edit_watcher.py::test_edit_watcher_coalesces_overlapping_revision_probes
  * @tests tests_js/test_028_form_state_split.py::test_edit_watcher_separates_schema_and_renderer_value_changes
  * @tests tests_js/test_028_form_state_split.py::test_edit_watcher_reconciles_independent_field_selections
+ * @tests tests_js/test_028_form_state_split.py::test_owned_deferred_completion_replaces_clean_active_form
  * @tests tests_e2e/004_projects/test_004b_info.py::test_project_revision_notice_only_resets_changed_form
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_form_submission_reconciliation_uses_latest_schema
  * @features edited-entity-notice
- * @dimensions entity-ancestor batching per-form comparison acknowledgement acknowledgement-no-probe targeted-reset reload-fallback timestamp-only formdata staged-reset no-reload dirty-state focused-state replacement info-form side-effect-free overlap-follow-up renderer-capability latest-schema schema-only submission-choice per-field-selection whole-form-selection clean-state transition
+ * @dimensions entity-ancestor batching per-form comparison acknowledgement acknowledgement-no-probe targeted-reset reload-fallback timestamp-only formdata staged-reset no-reload dirty-state active-state focused-state replacement info-form side-effect-free overlap-follow-up coalescing renderer-capability latest-schema schema-only local-values submission-choice per-field-selection whole-form-selection clean-state transition owned-deferred-completion
+ * @pairs edited-entity-notice:entity-ancestor edited-entity-notice:batching
+ * @pairs edited-entity-notice:per-form edited-entity-notice:comparison
+ * @pairs edited-entity-notice:acknowledgement edited-entity-notice:acknowledgement-no-probe
+ * @pairs edited-entity-notice:targeted-reset edited-entity-notice:reload-fallback
+ * @pairs edited-entity-notice:overlap-follow-up edited-entity-notice:clean-state
+ * @pair edited-entity-notice:coalescing
+ * @pair edited-entity-notice:dirty-state
+ * @pairs edited-entity-notice:active-state
+ * @pairs edited-entity-notice:owned-deferred-completion
+ * @pair deferred-jobs:owned-deferred-completion
+ * @pairs edited-entity-notice:focused-state edited-entity-notice:transition
+ * @pairs edited-entity-notice:renderer-capability edited-entity-notice:latest-schema
+ * @pairs edited-entity-notice:schema-only edited-entity-notice:local-values
+ * @pairs edited-entity-notice:whole-form-selection
+ * @pairs edited-entity-notice:visibility edited-entity-notice:subscription-lifecycle
  * @pairs edited-entity-notice:submission-choice reconnect-refresh:dirty-form-preservation form-schema:notice
  */
 export class EditWatcher {
 	constructor(view) {
 		this.view = view;
-		this._timer = null;
-		this._checkPromise = null;
-		this._checkQueued = false;
-		this._checkAllQueued = false;
-		this._invalidatedKeys = new Set();
+		this._unsubscribers = new Map();
+		this._markerRevisions = new WeakMap();
+		this._latestRevisions = new Map();
+		this._deferredCompletions = new Map();
 		this._destroyed = false;
 
 		this._click = this._click.bind(this);
@@ -353,6 +365,12 @@ export class EditWatcher {
 	init() {
 		this.view.elt.addEventListener("click", this._click);
 		window.addEventListener("entity-updated", this._entityUpdated);
+		if (this.view.key && this.view.elt.dataset.fingerprint) {
+			this._latestRevisions.set(this.view.key, {
+				fingerprint: this.view.elt.dataset.fingerprint,
+				modified: this.view.elt.dataset.modified ?? null,
+			});
+		}
 		for (const component of Object.values(this.view.components ?? {})) {
 			for (const widget of Object.values(component.widgets ?? {})) {
 				if (widget._offlineConflict) {
@@ -364,13 +382,50 @@ export class EditWatcher {
 	}
 
 	get entities() {
+		return this._entities();
+	}
+
+	_componentVisible(component) {
+		if (component?.visible !== true) return false;
+		let ancestor = component.elt?.parentElement?.closest?.("[lp-component]");
+		while (ancestor) {
+			if (ancestor.dataset.visible === "false") return false;
+			ancestor = ancestor.parentElement?.closest?.("[lp-component]");
+		}
+		return true;
+	}
+
+	_markerActive(marker) {
+		const widget = marker.closest?.("form[data-widget]")?._lp_widget;
+		return Boolean(
+			widget &&
+				widget.component?.active === widget &&
+				this._componentVisible(widget.component) &&
+				widget.visible === true,
+		);
+	}
+
+	_markerRevision(marker, anchor) {
+		let revision = this._markerRevisions.get(marker);
+		if (!revision) {
+			revision = {
+				fingerprint: anchor.dataset.fingerprint ?? null,
+				modified: anchor.dataset.modified ?? null,
+			};
+			this._markerRevisions.set(marker, revision);
+		}
+		return revision;
+	}
+
+	_entities({ activeOnly = true } = {}) {
 		const entities = new Map();
 		const markers = this.view.elt.querySelectorAll("[lp-edited-marker]");
 
 		for (const marker of markers) {
 			const anchor = marker.closest("[lp-entity]");
 			const key = anchor?.dataset.key;
-			const fingerprint = anchor?.dataset.fingerprint;
+			const revision = anchor ? this._markerRevision(marker, anchor) : null;
+			const fingerprint = revision?.fingerprint;
 			if (!anchor || !key || !fingerprint) {
 				captureError(
 					new Error("Edited marker has no fingerprinted entity anchor"),
@@ -378,10 +433,12 @@ export class EditWatcher {
 				);
 				continue;
 			}
+			if (activeOnly && !this._markerActive(marker)) continue;
 
 			const entity = entities.get(key) ?? {
 				key,
 				fingerprint,
+				modified: revision.modified,
 				anchors: new Set(),
 				markers: new Set(),
 			};
@@ -391,13 +448,6 @@ export class EditWatcher {
 		}
 
 		return entities;
-	}
-
-	_descriptors(entities) {
-		return Array.from(entities.values(), ({ key, fingerprint }) => ({
-			key,
-			fingerprint,
-		}));
 	}
 
 	_state(marker) {
@@ -411,8 +461,40 @@ export class EditWatcher {
 			schemaChanged: false,
 			submissionChoice: false,
 			token: null,
+			probePromise: null,
+			probeRevision: null,
+			pendingProbe: null,
+			conflictPromise: null,
 		};
 		return marker._lp_edited_state;
+	}
+
+	expectDeferredCompletion(key, operation) {
+		if (!key || !operation) return false;
+		const operations = this._deferredCompletions.get(key) ?? new Set();
+		operations.add(operation);
+		this._deferredCompletions.set(key, operations);
+		return true;
+	}
+
+	_ownedDeferredCompletion(marker, widget) {
+		const key = marker.closest?.("[lp-entity]")?.dataset?.key;
+		const operation = widget?._deferredOperation;
+		if (
+			!key ||
+			!operation ||
+			!this._deferredCompletions.get(key)?.has(operation)
+		) {
+			return null;
+		}
+		return { key, operation };
+	}
+
+	_forgetDeferredCompletion(completion) {
+		if (!completion) return;
+		const operations = this._deferredCompletions.get(completion.key);
+		operations?.delete(completion.operation);
+		if (!operations?.size) this._deferredCompletions.delete(completion.key);
 	}
 
 	_setAction(marker, mode, message = null) {
@@ -554,12 +636,20 @@ export class EditWatcher {
 		remotePreview.destroy?.();
 
 		const queued = Boolean(record || widget.form?._queued === true);
+		const unsaved = widget.unsavedState === true;
 		const focused = Boolean(
 			typeof document !== "undefined" &&
 				widget.target?.contains?.(document.activeElement),
 		);
-		const dirty = widget.unsavedState === true || queued || focused;
-		if (!dirty) {
+		const active =
+			widget.component?.active === widget && widget.visible === true;
+		const ownedDeferredCompletion =
+			!unsaved && !queued
+				? this._ownedDeferredCompletion(marker, widget)
+				: null;
+		const protectedRevision =
+			unsaved || queued || (!ownedDeferredCompletion && (active || focused));
+		if (!protectedRevision) {
 			await withTransition(async () => {
 				await widget.applyRevision(response);
 				this._hide(
@@ -675,13 +765,6 @@ export class EditWatcher {
 		this._show(marker);
 	}
 
-	_schedule() {
-		if (this._timer) clearTimeout(this._timer);
-		this._timer = null;
-		if (this._destroyed || !this.view.online || this.view.hidden) return;
-		this._timer = setTimeout(this.check, POLL_INTERVAL);
-	}
-
 	async _installUninitialized(marker, response) {
 		const form = marker.closest("form[data-widget]");
 		const name = form?.dataset.widget;
@@ -697,7 +780,63 @@ export class EditWatcher {
 		return true;
 	}
 
-	async _probe(marker, fingerprint, modified = null) {
+	_sameProbeRevision(left, right) {
+		return Boolean(
+			left &&
+				right &&
+				left.fingerprint === right.fingerprint &&
+				left.modified === right.modified,
+		);
+	}
+
+	_probe(marker, fingerprint, modified = null) {
+		const state = this._state(marker);
+		const requested = { fingerprint, modified };
+		if (state.conflictPromise) {
+			state.pendingProbe = requested;
+			return state.conflictPromise.then(() => {
+				const pending = state.pendingProbe;
+				if (!pending) return;
+				state.pendingProbe = null;
+				return this._probe(
+					marker,
+					pending.fingerprint,
+					pending.modified,
+				);
+			});
+		}
+		if (
+			state.probePromise &&
+			this._sameProbeRevision(state.probeRevision, requested)
+		) {
+			return state.probePromise;
+		}
+		if (!this._sameProbeRevision(state.pendingProbe, requested)) {
+			state.pendingProbe = requested;
+		}
+		if (state.probePromise) return state.probePromise;
+
+		const drain = async () => {
+			let processed = null;
+			while (state.pendingProbe) {
+				const next = state.pendingProbe;
+				state.pendingProbe = null;
+				if (this._sameProbeRevision(processed, next)) continue;
+				state.probeRevision = next;
+				await this._runProbe(marker, next.fingerprint, next.modified);
+				processed = next;
+			}
+		};
+		const promise = drain().finally(() => {
+			if (state.probePromise !== promise) return;
+			state.probePromise = null;
+			state.probeRevision = null;
+		});
+		state.probePromise = promise;
+		return promise;
+	}
+
+	async _runProbe(marker, fingerprint, modified = null) {
 		if (!marker?.isConnected && marker?.isConnected !== undefined) return;
 		const state = this._state(marker);
 		const token = {};
@@ -717,17 +856,21 @@ export class EditWatcher {
 				replaceErrorPage: false,
 			});
 			if (state.token !== token) return;
+			const form = marker.closest("form[data-widget]");
+			const widget = form?._lp_widget;
+			const completion = this._ownedDeferredCompletion(marker, widget);
 			if (response?.unchanged) {
 				this._hide(marker);
+				this._markerRevisions.set(marker, { fingerprint, modified });
+				this._forgetDeferredCompletion(completion);
 				return;
 			}
 			if (!response?.ok) {
 				this._fallback(marker);
+				this._forgetDeferredCompletion(completion);
 				return;
 			}
 
-			const form = marker.closest("form[data-widget]");
-			const widget = form?._lp_widget;
 			if (!widget) {
 				if (await this._installUninitialized(marker, response)) return;
 				this._fallback(marker, new Error("Replacement response has no form"));
@@ -739,6 +882,8 @@ export class EditWatcher {
 				fingerprint,
 				modified,
 			});
+			this._markerRevisions.set(marker, { fingerprint, modified });
+			this._forgetDeferredCompletion(completion);
 		} catch (error) {
 			if (state.token === token) this._fallback(marker, error);
 		}
@@ -747,15 +892,65 @@ export class EditWatcher {
 	async _probeEntity(key, fingerprint, modified = null) {
 		const entity = this.entities.get(key);
 		if (!entity) return;
+		const revision = { fingerprint, modified };
+		const stale = Array.from(entity.markers).filter((marker) => {
+			const current = this._markerRevisions.get(marker);
+			return (
+				current?.fingerprint !== fingerprint ||
+				(Boolean(modified) && current?.modified !== modified) ||
+				Boolean(
+					this._ownedDeferredCompletion(
+						marker,
+						marker.closest?.("form[data-widget]")?._lp_widget,
+					),
+				)
+			);
+		});
 		await Promise.all(
-			Array.from(entity.markers, (marker) =>
-				this._probe(marker, fingerprint, modified),
-			),
+			stale.map((marker) => this._probe(marker, fingerprint, modified)),
 		);
+		const latest = this._latestRevisions.get(key);
+		const anchorRevision = latest?.fingerprint ? latest : revision;
 		for (const anchor of entity.anchors) {
-			anchor.dataset.fingerprint = fingerprint;
-			if (modified) anchor.dataset.modified = modified;
+			anchor.dataset.fingerprint = anchorRevision.fingerprint;
+			if (anchorRevision.modified) {
+				anchor.dataset.modified = anchorRevision.modified;
+			}
 		}
+	}
+
+	async receiveEntityResult(key, result) {
+		if (!key || !result) return;
+		if (result.status === "unavailable") {
+			for (const marker of this.entities.get(key)?.markers ?? []) {
+				this._fallback(marker);
+			}
+			return;
+		}
+		if (
+			result.status === "unchanged" &&
+			this._deferredCompletions.has(key)
+		) {
+			const revision = this._latestRevisions.get(key) ?? {
+				fingerprint: result.revision ?? null,
+				modified: null,
+			};
+			if (revision.fingerprint) {
+				await this._probeEntity(
+					key,
+					revision.fingerprint,
+					revision.modified,
+				);
+			}
+			return;
+		}
+		if (result.status !== "changed" || !result.payload?.fingerprint) return;
+		const revision = {
+			fingerprint: result.payload.fingerprint,
+			modified: result.payload.modified ?? null,
+		};
+		this._latestRevisions.set(key, revision);
+		await this._probeEntity(key, revision.fingerprint, revision.modified);
 	}
 
 	/**
@@ -805,79 +1000,110 @@ export class EditWatcher {
 		}
 	}
 
-	async _checkNow(keys = null) {
-		if (this._timer) clearTimeout(this._timer);
-		this._timer = null;
-		if (this._destroyed || !this.view.online || this.view.hidden) return;
-
+	_syncSubscriptions() {
 		const mounted = this.entities;
-		const entities = keys
-			? new Map(
-					Array.from(keys)
-						.map((key) => [key, mounted.get(key)])
-						.filter(([, entity]) => Boolean(entity)),
-				)
-			: mounted;
-		const descriptors = this._descriptors(entities);
-		if (!descriptors.length) return;
-
-		for (
-			let offset = 0;
-			offset < descriptors.length;
-			offset += MAX_EDITED_ENTITIES
-		) {
-			const response = await request.post(ENDPOINTS.edited, {
-				entities: descriptors.slice(offset, offset + MAX_EDITED_ENTITIES),
-			});
-			if (!response?.ok || !Array.isArray(response.edited)) return;
-
-			for (const operation of response.operations ?? []) {
-				this._lockEntity(entities.get(operation.key), operation);
+		const active = new Set();
+		for (const entity of mounted.values()) {
+			const entityId = `edit:${entity.key}`;
+			const lockId = `lock:${entity.key}`;
+			active.add(lockId);
+			if (entity.key !== this.view.key) active.add(entityId);
+			if (entity.key !== this.view.key && !this._unsubscribers.has(entityId)) {
+				this._unsubscribers.set(
+					entityId,
+					this.view.PollingCoordinator?.subscribe(
+						{
+							id: entityId,
+							type: "entity",
+							key: entity.key,
+							revision: entity.fingerprint,
+						},
+						{
+							onResult: (result) =>
+								this.receiveEntityResult(entity.key, result),
+						},
+					) ?? (() => {}),
+				);
 			}
-
-			for (const edited of response.edited) {
-				const entity = entities.get(edited.key);
-				if (!entity) continue;
-				if (edited.unavailable || !edited.fingerprint) {
-					for (const marker of entity.markers) this._fallback(marker);
-					continue;
-				}
-				await this._probeEntity(
-					edited.key,
-					edited.fingerprint,
-					edited.modified ?? null,
+			if (!this._unsubscribers.has(lockId)) {
+				this._unsubscribers.set(
+					lockId,
+					this.view.PollingCoordinator?.subscribe(
+						{
+							id: lockId,
+							type: "form-lock",
+							key: entity.key,
+							revision: "unlocked",
+						},
+						{
+							onResult: async (result) => {
+								if (result.status !== "changed") return;
+								if (result.payload?.locked) {
+									this._lockEntity(
+										this.entities.get(entity.key),
+										result.payload,
+									);
+								} else if (
+									Array.from(this.entities.get(entity.key)?.markers ?? []).some(
+										(marker) =>
+											marker
+												.closest?.("form[data-widget]")
+												?.hasAttribute("data-deferred-lock"),
+									)
+								) {
+									await this.view.reconcileChange?.({
+										type: "poll",
+										key: entity.key,
+									});
+								}
+							},
+						},
+					) ?? (() => {}),
 				);
 			}
 		}
+		for (const [id, unsubscribe] of this._unsubscribers) {
+			if (active.has(id)) continue;
+			unsubscribe();
+			this._unsubscribers.delete(id);
+		}
+		return mounted;
+	}
+
+	async reconcileSubscriptions() {
+		const mounted = this._syncSubscriptions();
+		await Promise.all(
+			Array.from(mounted.values(), async (entity) => {
+				const latest = this._latestRevisions.get(entity.key);
+				if (!latest) return;
+				await this._probeEntity(
+					entity.key,
+					latest.fingerprint,
+					latest.modified,
+				);
+			}),
+		);
+		return mounted;
 	}
 
 	check(keys = null) {
-		if (keys === null) {
-			this._checkAllQueued = true;
-		} else {
-			for (const key of keys) this._invalidatedKeys.add(key);
-		}
-		if (this._checkPromise) {
-			this._checkQueued = true;
-			return this._checkPromise;
-		}
+		const mounted = this._syncSubscriptions();
+		const requested = keys === null ? [...mounted.keys()] : Array.from(keys);
+		const ids = requested.flatMap((key) => [
+			key === this.view.key ? `view:entity:${key}` : `edit:${key}`,
+			`lock:${key}`,
+		]);
+		return this.view.PollingCoordinator?.trigger(ids);
+	}
 
-		this._checkPromise = (async () => {
-			try {
-				do {
-					this._checkQueued = false;
-					const checkAll = this._checkAllQueued;
-					this._checkAllQueued = false;
-					const invalidated = new Set(this._invalidatedKeys);
-					this._invalidatedKeys.clear();
-					await this._checkNow(checkAll ? null : invalidated);
-				} while (this._checkQueued);
-			} finally {
-				this._checkPromise = null;
-				this._schedule();
-			}
-		})();
-		return this._checkPromise;
+	enqueue(keys = null) {
+		const mounted = this._syncSubscriptions();
+		const requested = keys === null ? [...mounted.keys()] : Array.from(keys);
+		const ids = requested.flatMap((key) => [
+			key === this.view.key ? `view:entity:${key}` : `edit:${key}`,
+			`lock:${key}`,
+		]);
+		this.view.PollingCoordinator?.enqueue(ids);
 	}
 
 	invalidate(keys) {
@@ -888,10 +1114,16 @@ export class EditWatcher {
 
 	acknowledge({ key, fingerprint, modified = null } = {}) {
 		if (!key || !fingerprint) return;
+		this._latestRevisions.set(key, { fingerprint, modified });
 		if (this.view.key === key) {
 			this.view.elt.dataset.fingerprint = fingerprint;
 			if (modified) this.view.elt.dataset.modified = modified;
 		}
+		this.view.PollingCoordinator?.acknowledge(`edit:${key}`, fingerprint);
+		this.view.PollingCoordinator?.acknowledge(
+			`view:entity:${key}`,
+			fingerprint,
+		);
 
 		const entity = this.entities.get(key);
 		if (!entity) return;
@@ -899,16 +1131,16 @@ export class EditWatcher {
 			anchor.dataset.fingerprint = fingerprint;
 			if (modified) anchor.dataset.modified = modified;
 		}
+		for (const marker of entity.markers) {
+			this._markerRevisions.set(marker, { fingerprint, modified });
+		}
 	}
 
-	pause() {
-		if (this._timer) clearTimeout(this._timer);
-		this._timer = null;
-	}
+	pause() {}
 
 	resume() {
 		if (this._destroyed || !this.view.online || this.view.hidden) return;
-		return this.check();
+		return this.reconcileSubscriptions();
 	}
 
 	async stageConflict(widget, { record, response } = {}) {
@@ -918,15 +1150,26 @@ export class EditWatcher {
 			(entity) => entity.key === record.target_key,
 		);
 		const state = this._state(marker);
-		state.token = {};
-		if (widget.revisionBaseline === null) widget.commitRevisionBaseline();
-		await this._stageRevision(marker, widget, response, {
-			fingerprint: revision?.fingerprint ?? null,
-			modified: revision?.modified ?? null,
-			record,
-		});
-		delete widget._offlineConflict;
-		return true;
+		const reconcile = (async () => {
+			if (state.probePromise) await state.probePromise;
+			state.token = {};
+			if (widget.revisionBaseline === null) widget.commitRevisionBaseline();
+			await this._stageRevision(marker, widget, response, {
+				fingerprint: revision?.fingerprint ?? null,
+				modified: revision?.modified ?? null,
+				record,
+			});
+			delete widget._offlineConflict;
+			return true;
+		})();
+		state.conflictPromise = reconcile;
+		try {
+			return await reconcile;
+		} finally {
+			if (state.conflictPromise === reconcile) {
+				state.conflictPromise = null;
+			}
+		}
 	}
 
 	async resolveRevision(marker, choice) {
@@ -1044,8 +1287,9 @@ export class EditWatcher {
 
 	destroy() {
 		this._destroyed = true;
-		this.pause();
-		this._invalidatedKeys.clear();
+		for (const unsubscribe of this._unsubscribers.values()) unsubscribe();
+		this._unsubscribers.clear();
+		this._deferredCompletions.clear();
 		this.view.elt.removeEventListener("click", this._click);
 		window.removeEventListener("entity-updated", this._entityUpdated);
 	}

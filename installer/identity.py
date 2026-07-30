@@ -10,11 +10,11 @@ from .errors import (
     ProviderInvalidInput,
     ProviderTimeout,
 )
-from .firebase import (
-    FIREBASE_OPERATION_POLL_DELAYS,
-    FIREBASE_OPERATION_TIMEOUT_SECONDS,
+from .google_provider import (
+    PROVIDER_OPERATION_POLL_DELAYS,
+    PROVIDER_OPERATION_TIMEOUT_SECONDS,
     _api_request,
-    _firebase_request_headers,
+    _google_request_headers,
     _get_access_token,
 )
 from .package_install import install_if_missing
@@ -103,14 +103,14 @@ def identity_platform_config_matches(config, app_url):
 # @covered-by installer/identity.py::reconcile_identity_platform
 # @reason bounded convergence polling is owned by provider reconciliation
 def _wait_for_config(session, project_id, headers, predicate):
-    deadline = time.monotonic() + FIREBASE_OPERATION_TIMEOUT_SECONDS
+    deadline = time.monotonic() + PROVIDER_OPERATION_TIMEOUT_SECONDS
     attempt = 0
     while time.monotonic() < deadline:
         config = get_identity_platform_config(session, project_id, headers)
         if config is not None and predicate(config):
             return config
-        delay = FIREBASE_OPERATION_POLL_DELAYS[
-            min(attempt, len(FIREBASE_OPERATION_POLL_DELAYS) - 1)
+        delay = PROVIDER_OPERATION_POLL_DELAYS[
+            min(attempt, len(PROVIDER_OPERATION_POLL_DELAYS) - 1)
         ]
         time.sleep(delay)
         attempt += 1
@@ -119,9 +119,10 @@ def _wait_for_config(session, project_id, headers, predicate):
     )
 
 
-# @testable false
-# @covered-by installer/identity.py::reconcile_identity_platform
-# @reason subtype guard is owned by provider reconciliation
+# @testable true
+# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_verification_preserves_standalone_subtype
+# @features setup
+# @dimensions identity-platform provider-state auth-separation
 def _ensure_standalone_subtype(config, project_id):
     subtype = str((config or {}).get("subtype") or "").strip()
     if subtype != IDENTITY_PLATFORM_SUBTYPE:
@@ -133,7 +134,7 @@ def _ensure_standalone_subtype(config, project_id):
 
 
 # @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_initializes_and_reconciles_provider_state
+# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_initialization_retries_api_activation
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_initialization_accepts_existing_provider
 # @features setup
@@ -252,7 +253,6 @@ def _public_client_config(config, project_id):
 
 
 # @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_initializes_and_reconciles_provider_state
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
 # @features setup
@@ -274,7 +274,7 @@ def setup_identity_platform(app_url=None):
     with f.yaspin(text=f.success("Configure Identity Platform")) as sp:
         try:
             access_token = _get_access_token()
-            headers = _firebase_request_headers(access_token, project_id)
+            headers = _google_request_headers(access_token, project_id)
             config = reconcile_identity_platform(
                 requests.Session(),
                 project_id,
@@ -299,37 +299,6 @@ def setup_identity_platform(app_url=None):
     if SETTINGS.APP.get("IDENTITY_PLATFORM_CONFIG") != client_config:
         SETTINGS.APP["IDENTITY_PLATFORM_CONFIG"] = client_config
         SETTINGS.save()
-    return True
-
-
-# @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_verification_preserves_standalone_subtype
-# @features setup
-# @dimensions identity-platform provider-state auth-separation
-def verify_standalone_identity_platform(app_url=None):
-    """Verify Firebase attachment preserved standalone Identity Platform."""
-    from config import SETTINGS
-
-    install_if_missing("requests", "HTTP library for Python")
-    import requests
-
-    project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
-    app_url = app_url or (
-        f"https://{SETTINGS.APP['CUSTOM_DOMAIN']}"
-        if SETTINGS.APP.get("CUSTOM_DOMAIN")
-        else SETTINGS.APP["APP_URL"]
-    )
-    config = get_identity_platform_config(
-        requests.Session(),
-        project_id,
-        _firebase_request_headers(_get_access_token(), project_id),
-    )
-    _ensure_standalone_subtype(config, project_id)
-    if not _core_matches(config, app_url):
-        raise ProviderError(
-            "Identity Platform configuration changed while Firebase Messaging "
-            "was attached."
-        )
     return True
 
 
@@ -376,7 +345,7 @@ def setup_google_provider(client_id, client_secret=None):
 
     project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
     access_token = _get_access_token()
-    headers = _firebase_request_headers(
+    headers = _google_request_headers(
         access_token,
         project_id,
         json_content=True,

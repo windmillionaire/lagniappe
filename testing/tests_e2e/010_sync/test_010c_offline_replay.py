@@ -58,6 +58,18 @@ def _unique(label):
     return f"test-sync-{label}-{uuid4().hex[:8]}"
 
 
+def _document_save_response(*parts):
+    def predicate(response):
+        post_data = response.request.post_data or ""
+        return (
+            response.url.endswith("/sync")
+            and '"save":true' in post_data
+            and all(part in post_data for part in parts)
+        )
+
+    return predicate
+
+
 def _fresh_submission(page):
     return Entities.fetch_one(
         page.key, request=Fetch.direct()
@@ -215,6 +227,51 @@ def test_offline_replay_does_not_duplicate_after_reload(get_user):
     user.go(project)
     replayed = project.editor.get_text()
     assert replayed.count(text) == 1
+
+
+# @pairs sync:offline-replay sync:headless sync:concurrency sync:merge
+# @pairs sync:revision sync:checkpoint sync:queue-clear
+# @pairs polling:document polling:current-state polling:cursor
+def test_headless_offline_replay_merges_concurrent_remote_edits(get_user):
+    owner = get_user(Users.OWNER)
+    collaborator = get_user(Users.admin, creator=owner)
+    project = Projects.test_offline_document_concurrent_replay.get(owner)
+
+    owner.go(project)
+    owner_editor = project.editor
+    collaborator.go(project)
+    collaborator_editor = project.editor
+
+    offline_text = _unique("offline-branch")
+    _offline_document_edit(owner, owner_editor, offline_text)
+
+    remote_text = _unique("remote-branch")
+    collaborator_editor.focus()
+    collaborator_editor.type_text(remote_text)
+    collaborator_editor.wait_for_render()
+    with collaborator.page.expect_response(
+        _document_save_response(remote_text)
+    ) as remote_response:
+        collaborator_editor.text_entry.blur()
+    assert remote_response.value.ok
+
+    _replace_page(owner)
+    with owner.page.expect_response(
+        _document_save_response(offline_text, remote_text)
+    ) as replay_response:
+        owner.go(SitePages.HOME)
+
+    assert replay_response.value.ok
+    acknowledgement = replay_response.value.json()["updates"][0]
+    assert acknowledgement["checkpoint_accepted"] is True
+    _wait_for_offline_sync_records(owner, exact=0)
+
+    owner.go(project)
+    replayed = project.editor.get_text()
+    assert offline_text in replayed
+    assert remote_text in replayed
+    assert replayed.count(offline_text) == 1
+    assert replayed.count(remote_text) == 1
 
 
 # @features sync

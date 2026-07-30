@@ -1,347 +1,425 @@
-"""Node-backed checks for the frontend SyncManager request contract."""
+"""Node-backed checks for the polling-based SyncManager."""
 
-import textwrap
 
-def run_sync_manager_check(run_node, assertion: str):
-    script = f"""
+# @features sync polling
+# @dimensions document collaboration offline-replay cursor-retention presence lifecycle batching active-widget visibility
+def test_sync_manager_uses_polling_subscriptions(run_node):
+    run_node(
+        r"""
 const fs = require("node:fs");
 const vm = require("node:vm");
 
 const requestCalls = [];
-let activeRequests = 0;
-let maxActiveRequests = 0;
-let blockFirstSync = false;
-let releaseFirstSync = null;
-const windowListeners = new Map();
-
-const ENDPOINTS = {{
-  register: "/register",
-  deregister: "/deregister",
-  sync: "/sync",
-  state: "/state",
-}};
-
-const offline = {{
-  deleteSyncRecord: async () => undefined,
+const offlineWrites = [];
+const deletedSyncIds = [];
+const closed = [];
+let checkpointAccepted = true;
+let headlessFactory = async () => null;
+let offlineRecords = [];
+let pollResult = null;
+let responseOk = true;
+const subscriptions = new Map();
+const coordinator = {
+  clientId: "client-1",
+  subscribe(descriptor, hooks) {
+    subscriptions.set(descriptor.id, { descriptor: { ...descriptor }, ...hooks });
+    return () => subscriptions.delete(descriptor.id);
+  },
+  get(id) { return subscriptions.get(id)?.descriptor ?? null; },
+  update(id, patch) {
+    const subscription = subscriptions.get(id);
+    if (subscription) Object.assign(subscription.descriptor, patch);
+  },
+  async trigger(id) {
+    const result = {
+      id,
+      ...(pollResult ?? {
+        status: "changed",
+        revision: 0,
+        payload: {
+          mode: "snapshot",
+          generation: "generation-1",
+          revision: 0,
+          ydoc: "snapshot-1",
+        },
+      }),
+    };
+    const subscription = subscriptions.get(id);
+    if (subscription) {
+      subscription.descriptor.revision = result.revision;
+      if (result.payload?.generation) {
+        subscription.descriptor.generation = result.payload.generation;
+      }
+      await subscription.onResult?.(result);
+    }
+    return [result];
+  },
+  async closeDocuments(ids) { closed.push(...ids); },
+};
+const offline = {
+  deleteSyncRecord: async (syncId) => deletedSyncIds.push(syncId),
   deleteSyncRecords: async () => undefined,
-  getAllOfflineRecords: async () => ({{ sync: [] }}),
+  getAllOfflineRecords: async () => ({ sync: offlineRecords }),
   getSyncRecord: async () => null,
-  updateSyncRecord: async () => undefined,
-}};
-
-const request = {{
-  post: async (url, body, options = {{}}) => {{
-    activeRequests += 1;
-    maxActiveRequests = Math.max(maxActiveRequests, activeRequests);
-    requestCalls.push({{ url, body, options }});
-    const syncCallCount = requestCalls.filter((call) => call.url === "/sync").length;
-    try {{
-      if (blockFirstSync && url === "/sync" && syncCallCount === 1) {{
-        await new Promise((resolve) => {{
-          releaseFirstSync = resolve;
-        }});
-      }}
-      return {{ ok: true, modified: [] }};
-    }} finally {{
-      activeRequests -= 1;
-    }}
-  }},
-}};
-
-const context = {{
-  clearTimeout,
+  updateSyncRecord: async (record) => offlineWrites.push(record),
+};
+const context = {
   console,
-  ENDPOINTS,
-  EVENTS: {{ SYNC_UPDATE: "sync-update" }},
-  loadHeadlessWidget: async () => null,
+  ENDPOINTS: { sync: "/sync" },
+  loadHeadlessWidget: async (settings) => headlessFactory(settings),
   offline,
-  request,
-  setTimeout,
+  request: {
+    async post(url, body, options = {}) {
+      requestCalls.push({ url, body, options });
+      if (!responseOk) return { ok: false, error: "temporarily unavailable" };
+      return {
+        ok: true,
+        updates: body.updates.map((update) => {
+          const accepted = Boolean(checkpointAccepted && update.ydoc);
+          const persisted = Boolean(
+            accepted && update.save && Object.hasOwn(update, "html"),
+          );
+          const touchOnly = Boolean(
+            update.touch_parent &&
+            !update.update &&
+            !update.ydoc &&
+            !Object.hasOwn(update, "html"),
+          );
+          return {
+            sync_id: update.sync_id,
+            generation: "generation-1",
+            revision: requestCalls.length,
+            checkpoint_accepted: accepted,
+            checkpoint_persisted: persisted,
+            entity_touched: Boolean(
+              update.touch_parent && (persisted || touchOnly),
+            ),
+          };
+        }),
+      };
+    },
+  },
   waitForAttribute: async () => undefined,
-  window: {{
-    addEventListener(type, listener) {{
-      windowListeners.set(type, listener);
-    }},
-    removeEventListener(type, listener) {{
-      if (windowListeners.get(type) === listener) windowListeners.delete(type);
-    }},
-  }},
-}};
-
+  window: { addEventListener() {}, removeEventListener() {} },
+};
 vm.createContext(context);
 let source = fs.readFileSync("src/script/shared/sync.mjs", "utf8");
 source = source.replace(
-  'import {{ loadHeadlessWidget }} from "../widgets/loader";',
+  'import { loadHeadlessWidget } from "../widgets/loader";',
   "const loadHeadlessWidget = globalThis.loadHeadlessWidget;",
 );
 source = source.replace(
-  'import {{ ENDPOINTS }} from "./endpoints";',
+  'import { ENDPOINTS } from "./endpoints";',
   "const ENDPOINTS = globalThis.ENDPOINTS;",
 );
 source = source.replace(
-  'import {{ EVENTS }} from "./protocol";',
-  "const EVENTS = globalThis.EVENTS;",
+  /import \{[\s\S]*?\} from "\.\/offline";/,
+  `const {
+    deleteSyncRecord,
+    deleteSyncRecords,
+    getAllOfflineRecords,
+    getSyncRecord,
+    updateSyncRecord,
+  } = globalThis.offline;`,
 );
 source = source.replace(
-  `import {{
-\tdeleteSyncRecord,
-\tdeleteSyncRecords,
-\tgetAllOfflineRecords,
-\tgetSyncRecord,
-\tupdateSyncRecord,
-}} from "./offline";`,
-  `const {{
-\tdeleteSyncRecord,
-\tdeleteSyncRecords,
-\tgetAllOfflineRecords,
-\tgetSyncRecord,
-\tupdateSyncRecord,
-}} = globalThis.offline;`,
-);
-source = source.replace(
-  'import {{ request }} from "./request";',
+  'import { request } from "./request";',
   "const request = globalThis.request;",
 );
 source = source.replace(
-  'import {{ waitForAttribute }} from "./utilities";',
+  'import { waitForAttribute } from "./utilities";',
   "const waitForAttribute = globalThis.waitForAttribute;",
 );
 source = source.replace("export class SyncManager", "class SyncManager");
-source += "\\nglobalThis.SyncManager = SyncManager;";
+source += "\nglobalThis.SyncManager = SyncManager;";
 vm.runInContext(source, context);
-const SyncManager = context.SyncManager;
 
-function nextTurn() {{
-  return new Promise((resolve) => setTimeout(resolve, 0));
-}}
+const payloads = [{ update: "delta-1", ydoc: "checkpoint-1" }];
+const savePayloads = [];
+const component = { key: "entity-key", visible: true, widgets: {} };
+const widget = {
+  component,
+  fingerprint: "fingerprint-1",
+  initialized: false,
+  syncId: "entity:document",
+  visible: true,
+  get syncData() { return payloads.shift() ?? null; },
+  get saveData() { return savePayloads.shift() ?? null; },
+  async sync() {},
+};
+component.active = widget;
+component.widgets.document = widget;
+const hiddenAncestor = {
+  dataset: { visible: "false" },
+  parentElement: { closest() { return null; } },
+};
+const hiddenComponent = {
+  key: "entity-key",
+  visible: true,
+  widgets: {},
+  elt: {
+    parentElement: {
+      closest(selector) {
+        return selector === "[lp-component]" ? hiddenAncestor : null;
+      },
+    },
+  },
+};
+const hiddenWidget = {
+  component: hiddenComponent,
+  fingerprint: "fingerprint-hidden",
+  initialized: true,
+  syncId: "hidden:document",
+  visible: true,
+  get syncData() { return null; },
+  get saveData() { return null; },
+  async sync() {},
+};
+hiddenComponent.active = hiddenWidget;
+hiddenComponent.widgets.document = hiddenWidget;
+const view = {
+  components: { document: component, hiddenDocument: hiddenComponent },
+  hidden: false,
+  online: true,
+  PollingCoordinator: coordinator,
+};
+const manager = new context.SyncManager(view);
 
-function makeWidget({{
-  syncId = "entity:document",
-  syncPayloads = [],
-  savePayloads = [],
-}} = {{}}) {{
-  return {{
-    component: {{ key: "entity-key" }},
-    fingerprint: "fp0",
+(async () => {
+  const remote = await manager.state(widget);
+  if (remote?.generation !== "generation-1") {
+    throw new Error(`State did not come from polling: ${JSON.stringify(remote)}`);
+  }
+  let subscription = subscriptions.get("document:entity:document");
+  if (!subscription || subscription.descriptor.type !== "document") {
+    throw new Error("Document polling subscription was not installed");
+  }
+  if (
+    subscription.descriptor.generation !== "generation-1" ||
+    subscription.descriptor.revision !== 0
+  ) {
+    throw new Error("Initial document state did not retain its accepted cursor");
+  }
+  await manager.reconcileSubscriptions();
+  if (!subscriptions.has("document:entity:document")) {
+    throw new Error("Mounting active document lost its polling subscription");
+  }
+  widget.initialized = true;
+  if (subscriptions.has("document:hidden:document")) {
+    throw new Error("Document inside a hidden parent received a subscription");
+  }
+  await manager.sendUpdates(false);
+  if (requestCalls.length !== 1 ||
+      requestCalls[0].body.client_id !== "client-1" ||
+      requestCalls[0].body.updates[0].generation !== "generation-1" ||
+      requestCalls[0].body.updates[0].revision !== 0) {
+    throw new Error(`Revisioned sync request was malformed: ${JSON.stringify(requestCalls)}`);
+  }
+  if (subscription.descriptor.revision !== 1) {
+    throw new Error("Sync acknowledgement did not advance the poll cursor");
+  }
+
+  checkpointAccepted = false;
+  await manager.sendUpdates(true, [{
+    key: "entity-key",
+    sync_id: "entity:document",
+    generation: "generation-1",
+    revision: 1,
+    ydoc: "stale-checkpoint",
+    html: "<p>Stale</p>",
+    save: true,
+  }]);
+  if (subscription.descriptor.revision !== 1 ||
+      offlineWrites.at(-1)?.ydoc !== "stale-checkpoint") {
+    throw new Error("Rejected checkpoint advanced the cursor or was not retained");
+  }
+
+  checkpointAccepted = true;
+  Object.assign(subscription.descriptor, { generation: "generation-1", revision: 2 });
+  savePayloads.push({ ydoc: "merged-checkpoint", html: "<p>Merged</p>" });
+  await subscription.beforePoll();
+  if (requestCalls.length !== 2) {
+    throw new Error("Rejected checkpoint was retried before polling missing deltas");
+  }
+  await subscription.onResult({
+    id: subscription.descriptor.id,
+    status: "changed",
+    payload: {
+      mode: "delta",
+      generation: "generation-1",
+      revision: 2,
+      updates: [{ revision: 2, update: "remote-delta" }],
+    },
+  });
+  if (requestCalls.length !== 3 ||
+      requestCalls[2].body.updates[0].ydoc !== "merged-checkpoint" ||
+      subscription.descriptor.revision !== 3 ||
+      widget.snapshot !== "merged-checkpoint") {
+    throw new Error("Rejected checkpoint was not retried after polling");
+  }
+
+  responseOk = false;
+  savePayloads.push({
+    ydoc: "retry-after-transport-error",
+    html: "<p>Retry</p>",
+  });
+  await manager.sendUpdates(true);
+  if (offlineWrites.at(-1)?.ydoc !== "retry-after-transport-error") {
+    throw new Error("Failed checkpoint was not retained for retry");
+  }
+  responseOk = true;
+  savePayloads.push({
+    ydoc: "retry-after-transport-error",
+    html: "<p>Retry</p>",
+  });
+  await subscription.beforePoll();
+  if (requestCalls.length !== 5 ||
+      widget.snapshot !== "retry-after-transport-error") {
+    throw new Error("Retained checkpoint was not retried before document poll");
+  }
+
+  widget.visible = false;
+  component.active = null;
+  await manager.reconcileSubscriptions();
+  const deactivationTouch = requestCalls.at(-1)?.body?.updates?.[0];
+  if (
+      subscriptions.has("document:entity:document") ||
+      closed.at(-1) !== "entity:document" ||
+      deactivationTouch?.touch_parent !== true ||
+      deactivationTouch?.ydoc !== undefined ||
+      manager._pendingParentTouches.has("entity:document")
+  ) {
+    throw new Error(
+      `Deactivated document did not mask its lifecycle touch: ${JSON.stringify({
+        deactivationTouch,
+        closed,
+      })}`,
+    );
+  }
+  component.active = widget;
+  widget.visible = true;
+  await manager.reconcileSubscriptions();
+  subscription = subscriptions.get("document:entity:document");
+  if (!subscription) {
+    throw new Error("Reactivated document did not restore polling");
+  }
+
+  view.online = false;
+  savePayloads.push({
+    ydoc: "offline-checkpoint",
+    html: "<p>Offline checkpoint</p>",
+  });
+  const descriptorBeforeDeregister = { ...subscription.descriptor };
+  await manager.deregister();
+  if (closed.at(-1) !== "entity:document" || closed.length !== 2) {
+    throw new Error(`Presence was not closed: ${JSON.stringify(closed)}`);
+  }
+  const offlineCheckpoint = offlineWrites.at(-1);
+  if (
+      offlineCheckpoint?.generation !== descriptorBeforeDeregister.generation ||
+      offlineCheckpoint?.revision !== descriptorBeforeDeregister.revision ||
+      offlineCheckpoint?.ydoc !== "offline-checkpoint" ||
+      offlineCheckpoint?.touch_parent !== true) {
+    throw new Error(
+      `Deregister discarded the document cursor before saving: ${JSON.stringify(offlineCheckpoint)}`,
+    );
+  }
+
+  payloads.push({ update: "offline-delta", ydoc: "offline-state" });
+  await manager.sendUpdates(false);
+  const offlineDelta = offlineWrites.at(-1);
+  if (
+      offlineDelta?.update !== "offline-delta" ||
+      offlineDelta?.generation !== descriptorBeforeDeregister.generation ||
+      offlineDelta?.revision !== descriptorBeforeDeregister.revision) {
+    throw new Error(
+      `Offline document update lost its retained cursor: ${JSON.stringify(offlineDelta)}`,
+    );
+  }
+
+  const replayRecord = {
+    key: "replay-key",
+    sync_id: "replay:document",
+    fingerprint: "fingerprint-replay",
+    generation: "generation-1",
+    revision: 2,
+    ydoc: "offline-state",
+    html: "<p>Offline</p>",
+    save: true,
+    touch_parent: true,
+  };
+  offlineRecords = [replayRecord];
+  pollResult = {
+    status: "changed",
+    revision: 4,
+    payload: {
+      mode: "delta",
+      generation: "generation-1",
+      revision: 4,
+      updates: [{ revision: 4, update: "remote-delta" }],
+    },
+  };
+  let merged = false;
+  let replayDestroyed = false;
+  headlessFactory = async ({ sync_id }) => ({
+    syncId: sync_id,
+    key: replayRecord.key,
+    fingerprint: replayRecord.fingerprint,
     initialized: true,
-    syncId,
-    get syncData() {{
-      return syncPayloads.shift() ?? null;
-    }},
-    get saveData() {{
-      return savePayloads.shift() ?? null;
-    }},
-  }};
-}}
+    readonly: true,
+    remote: null,
+    offlineRecord: null,
+    async init() {},
+    async sync() {
+      merged = (
+        this.remote?.updates?.[0]?.update === "remote-delta" &&
+        this.offlineRecord?.ydoc === "offline-state"
+      );
+      this.remote = null;
+      this.offlineRecord = null;
+    },
+    get saveData() {
+      return merged
+        ? {
+            update: "merged-update",
+            ydoc: "merged-checkpoint",
+            html: "<p>Remote Offline</p>",
+          }
+        : null;
+    },
+    destroy() { replayDestroyed = true; },
+  });
 
-function makeManager(widget, fcmToken = "token-1") {{
-  const widgetList = Array.isArray(widget) ? widget : [widget];
-  const widgets = Object.fromEntries(
-    widgetList.map((item, index) => [item.syncId || `widget-${{index}}`, item]),
-  );
-  const view = {{
-    components: {{ document: {{ widgets }} }},
-    fcmToken,
+  const replayView = {
+    components: {},
     online: true,
-  }};
-  return new SyncManager(view);
-}}
-
-(async () => {{
-{textwrap.indent(assertion, "  ")}
-}})().catch((error) => {{
+    PollingCoordinator: coordinator,
+  };
+  const replayManager = new context.SyncManager(replayView).init();
+  await replayManager.ready;
+  const replayRequest = requestCalls.at(-1)?.body?.updates?.[0];
+  if (
+      !merged ||
+      replayRequest?.generation !== "generation-1" ||
+      replayRequest?.revision !== 4 ||
+      replayRequest?.ydoc !== "merged-checkpoint" ||
+      replayRequest?.touch_parent !== true ||
+      !deletedSyncIds.includes("replay:document") ||
+      !replayDestroyed ||
+      closed.at(-1) !== "replay:document") {
+    throw new Error(
+      `Headless replay did not fetch, merge, checkpoint, and clear: ${JSON.stringify({
+        merged,
+        replayRequest,
+        deletedSyncIds,
+        replayDestroyed,
+        closed,
+      })}`,
+    );
+  }
+})().catch((error) => {
   console.error(error);
   process.exit(1);
-}});
+});
 """
-
-    run_node(script)
-
-
-# @features sync
-# @dimensions request-queue keepalive
-def test_send_updates_queues_save_behind_in_flight_sync_without_keepalive(run_node):
-    run_sync_manager_check(
-        run_node,
-        """
-const widget = makeWidget({
-  syncPayloads: [{ update: "delta-1", ydoc: "ydoc-1" }],
-  savePayloads: [{ update: null, ydoc: "ydoc-save", html: "<p>Save</p>" }],
-});
-const manager = makeManager(widget);
-
-blockFirstSync = true;
-const first = manager.sendUpdates(false);
-await nextTurn();
-
-if (requestCalls.length !== 1) {
-  throw new Error(`Expected first sync request, got ${requestCalls.length}`);
-}
-if (requestCalls[0].options.keepalive) {
-  throw new Error("Normal sync unexpectedly used keepalive");
-}
-
-const second = manager.sendUpdates(true);
-await nextTurn();
-
-if (requestCalls.length !== 1) {
-  throw new Error("Queued save started before the first sync settled");
-}
-
-releaseFirstSync();
-await Promise.all([first, second]);
-
-const syncCalls = requestCalls.filter((call) => call.url === "/sync");
-if (syncCalls.length !== 2) {
-  throw new Error(`Expected two serialized sync calls, got ${syncCalls.length}`);
-}
-if (maxActiveRequests !== 1) {
-  throw new Error(`Expected no overlapping sync requests, saw ${maxActiveRequests}`);
-}
-if (syncCalls[1].body.updates[0].save !== true) {
-  throw new Error("Queued save did not run after the in-flight sync");
-}
-if (syncCalls.some((call) => call.options.keepalive)) {
-  throw new Error("Normal queued sync unexpectedly used keepalive");
-}
-""",
-    )
-
-
-# @features sync
-# @dimensions state-only
-def test_state_without_token_fetches_without_registering(run_node):
-    run_sync_manager_check(
-        run_node,
-        """
-const widget = makeWidget();
-const manager = makeManager(widget, null);
-
-const remote = await manager.state(widget);
-
-const stateCall = requestCalls.find((call) => call.url === "/state");
-if (!stateCall) {
-  throw new Error("State-only manager did not fetch /state");
-}
-if ("token" in stateCall.body) {
-  throw new Error("Tokenless state request unexpectedly included a token");
-}
-if ("version" in stateCall.body) {
-  throw new Error("Document state request included the removed form version field");
-}
-if (manager._registeredIds.size !== 0) {
-  throw new Error("Tokenless state request registered a widget");
-}
-if (remote?.ok !== true) {
-  throw new Error("State-only manager did not return remote state");
-}
-""",
-    )
-
-
-# @features sync
-# @dimensions hidden-view
-def test_hidden_view_does_not_register(run_node):
-    run_sync_manager_check(
-        run_node,
-        """
-const manager = makeManager(makeWidget());
-manager.view.hidden = true;
-
-await manager.register();
-
-if (requestCalls.some((call) => call.url === "/register")) {
-  throw new Error("Hidden view registered document presence");
-}
-if (manager._registered) {
-  throw new Error("Hidden view entered registered state");
-}
-""",
-    )
-
-
-# @features sync
-# @dimensions lifecycle-listeners
-def test_destroy_removes_sync_listeners(run_node):
-    run_sync_manager_check(
-        run_node,
-        """
-const manager = makeManager(makeWidget(), null);
-
-manager.init();
-if (!windowListeners.has("sync-update") || !windowListeners.has("sync-save")) {
-  throw new Error("SyncManager did not install its lifecycle listeners");
-}
-
-manager.destroy();
-if (windowListeners.size !== 0) {
-  throw new Error("SyncManager left lifecycle listeners installed after destroy");
-}
-""",
-    )
-
-
-# @features sync
-# @dimensions tokenless-save document registration-exclusion
-def test_tokenless_document_save_posts_without_registering(run_node):
-    run_sync_manager_check(
-        run_node,
-        """
-const widget = makeWidget({
-  savePayloads: [{ update: "delta-save", ydoc: "ydoc-save", html: "<p>Save</p>" }],
-});
-const manager = makeManager(widget, null);
-
-const response = await manager.sendUpdates(true);
-
-const syncCall = requestCalls.find((call) => call.url === "/sync");
-if (!syncCall) {
-  throw new Error("Tokenless document save did not post /sync");
-}
-if ("token" in syncCall.body) {
-  throw new Error("Tokenless document save unexpectedly included a token");
-}
-if (syncCall.body.updates.length !== 1) {
-  throw new Error(`Expected one tokenless save update, got ${syncCall.body.updates.length}`);
-}
-if (syncCall.body.updates[0].sync_id !== "entity:document") {
-  throw new Error("Tokenless save sent the wrong sync_id");
-}
-if (syncCall.body.updates[0].html !== "<p>Save</p>") {
-  throw new Error("Tokenless save did not include document HTML");
-}
-if (manager._registeredIds.size !== 0) {
-  throw new Error("Tokenless document save registered a widget");
-}
-if (response?.ok !== true) {
-  throw new Error("Tokenless document save did not return the sync response");
-}
-""",
-    )
-
-
-# @features sync
-# @dimensions deregistration keepalive
-def test_deregister_keeps_unload_sync_and_cleanup_keepalive(run_node):
-    run_sync_manager_check(
-        run_node,
-        """
-const widget = makeWidget({
-  savePayloads: [{ update: null, ydoc: "ydoc-save", html: "<p>Save</p>" }],
-});
-const manager = makeManager(widget);
-manager._registeredIds.add(widget.syncId);
-
-await manager.deregister();
-
-const syncCall = requestCalls.find((call) => call.url === "/sync");
-if (!syncCall?.options.keepalive) {
-  throw new Error("Deregister save did not use keepalive");
-}
-
-const deregisterCall = requestCalls.find((call) => call.url === "/deregister");
-if (!deregisterCall?.options.keepalive) {
-  throw new Error("Deregister cleanup did not use keepalive");
-}
-""",
     )

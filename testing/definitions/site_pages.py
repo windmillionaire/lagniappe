@@ -55,7 +55,6 @@ class SitePages(Enum):
         PRIVACY_POLICY: Public privacy policy at /privacy-policy
         REPORTING_PRIVACY: Maintainer error-reporting notice at /reporting_privacy
         NONEXISTENT_PAGE: Invalid route for 404 testing
-        CHECK_MESSAGING_PAGE: Test-only route for collaboration messaging
     """
 
     HOME = HomePage(url="/", title="Home")
@@ -71,7 +70,6 @@ class SitePages(Enum):
         url="/reporting_privacy", title="Error-Reporting Privacy Notice"
     )
     NONEXISTENT_PAGE = SitePage(url="/nonexistent")
-    CHECK_MESSAGING_PAGE = SitePage(url="/testing/messaging")
 
     def get(self, user):
         """

@@ -12,7 +12,10 @@ const fetchCalls = [];
 const syncCalls = [];
 const controllerMessages = [];
 const serviceWorkerListeners = new Map();
+const documentListeners = new Map();
+const windowListeners = new Map();
 let viewElement = null;
+let focused = true;
 
 const connectivityState = {{
   browser: "online",
@@ -34,7 +37,7 @@ const connectivity = {{
 }};
 const connectivityMessage = (state) => ({{
   protocol: "lagniappe-browser",
-  protocol_version: 2,
+  protocol_version: 3,
   type: "connectivity-state",
   state: {{ ...state }},
 }});
@@ -69,7 +72,8 @@ const context = {{
     body: {{}},
     hidden: false,
     readyState: "loading",
-    addEventListener() {{}},
+    addEventListener(type, listener) {{ documentListeners.set(type, listener); }},
+    hasFocus() {{ return focused; }},
     querySelector(selector) {{
       return selector === "[lp-view]" ? viewElement : null;
     }},
@@ -84,13 +88,15 @@ const context = {{
   parseServiceWorkerMessage,
   setTimeout,
   syncCalls,
+  documentListeners,
   serviceWorkerListeners,
   updateUserData() {{}},
   window: {{
     __TESTING__: true,
-    addEventListener() {{}},
+    addEventListener(type, listener) {{ windowListeners.set(type, listener); }},
     dispatchEvent() {{}},
   }},
+  windowListeners,
 }};
 context.document.activeElement = context.document.body;
 context.fetch = async (url, options = {{}}) => {{
@@ -100,6 +106,7 @@ context.fetch = async (url, options = {{}}) => {{
 context.Response = Response;
 context.globalThis = context;
 context.setView = (view) => {{ viewElement = view; }};
+context.setFocused = (value) => {{ focused = value; }};
 
 let source = fs.readFileSync("src/script/main.mjs", "utf8");
 source = source.replace('import "../style/main.css";', "");
@@ -141,13 +148,62 @@ setView({
   },
 });
 
-suspendCurrentView();
+await suspendCurrentView();
 
 if (syncCalls.length !== 1 || syncCalls[0].hidden !== true) {
-  throw new Error(`View was not suspended directly: ${JSON.stringify(syncCalls)}`);
+  throw new Error(`View was not suspended: ${JSON.stringify(syncCalls)}`);
 }
 if (fetchCalls.length !== 0) {
   throw new Error("Suspending the view performed a health check");
+}
+""",
+    )
+
+
+# @pair polling:blur
+# @pair polling:focus
+# @pair polling:visibility
+# @pair polling:catch-up
+def test_window_blur_suspends_polling_until_focus_catchup(run_node):
+    run_main_check(
+        run_node,
+        """
+setView({
+  _lp_view: {
+    async sync(options) {
+      syncCalls.push(options);
+    },
+  },
+});
+initialize();
+await syncView();
+fetchCalls.splice(0);
+syncCalls.splice(0);
+
+context.setFocused(false);
+await windowListeners.get("blur")();
+if (
+  fetchCalls.length !== 0 ||
+  syncCalls.length !== 1 ||
+  syncCalls[0].hidden !== true
+) {
+  throw new Error(
+    `Blur did not suspend without a health request: ${JSON.stringify({ fetchCalls, syncCalls })}`,
+  );
+}
+
+fetchCalls.splice(0);
+syncCalls.splice(0);
+context.setFocused(true);
+await windowListeners.get("focus")();
+if (
+  fetchCalls.length !== 1 ||
+  syncCalls.length !== 1 ||
+  syncCalls[0].hidden !== false
+) {
+  throw new Error(
+    `Focus did not run one catch-up cycle: ${JSON.stringify({ fetchCalls, syncCalls })}`,
+  );
 }
 """,
     )
@@ -237,7 +293,7 @@ const replacement = controllerMessages.find(({ owner }) => owner === "second");
 if (!replacement) throw new Error("Replacement controller did not receive state");
 const { message } = replacement;
 if (message.protocol !== "lagniappe-browser" ||
-    message.protocol_version !== 2 ||
+    message.protocol_version !== 3 ||
     message.type !== "connectivity-state" ||
     message.state.controller !== "controlled" ||
     message.state.visibility !== "visible") {

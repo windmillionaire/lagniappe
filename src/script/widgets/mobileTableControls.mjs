@@ -18,6 +18,11 @@ export class MobileTableControls {
 		this.target.addEventListener("click", (e) => this._handleButtonClick(e));
 	}
 
+	postreconcile() {
+		const sorting = this.component.widgets.TableSorting;
+		if (sorting?.initialized) sorting.refreshRows();
+	}
+
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_controls_open_with_task_columns

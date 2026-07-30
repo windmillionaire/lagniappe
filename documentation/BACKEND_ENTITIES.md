@@ -227,6 +227,14 @@ facades. `Entities.save_root(entity, property_mask=...)` uses a minimal
 root-only plan: it persists the root and its complete index-exclusion set
 without lifecycle updates, typed-intent consumption, or cache work.
 `Entities.touch(...)` uses that same boundary with a `modified` property mask.
+Collaborative-document persistence uses its own masked contract:
+`Entities.save_document_checkpoint(...)` writes only `assets` and
+`document_history`, consumes document-history intents, and refreshes cache
+without changing the parent fingerprint. A later
+`Entities.advance_document_parent(...)` writes only the parent/list-owner
+`modified` fields when the changed document leaves its active lifecycle.
+Document-only Page/Project masks are also neutral to global site fingerprints;
+the lifecycle `modified` touch is the collection-invalidation boundary.
 
 ## Property Base Classes (`properties/`)
 
@@ -438,7 +446,14 @@ mutation replay can set `offline=True` on a route request; routes that want a
 durable user-visible completion message create a `Notification` with
 `parent=current_user` and the affected target. Deferred routes create the
 notification as pending, update the same entity when the process finishes, and
-push replacement notification HTML.
+advance the personal notification channel revision.
+
+`User.notification_revision` and `User.operation_revision` are unindexed,
+monotonic polling cursors. They are deliberately separate from `modified` and
+`permissions_fingerprint`: notification/job activity must not invalidate the
+user entity, global users list, or permission-derived response caches. The
+request authentication path loads the user directly on every request, so
+`/poll` can compare these cursors without another Datastore read.
 
 Notes are activity entities with an author `user`, owning `parent`, optional
 plain-text `body` and photo asset, a server-assigned `scope` (`home` or `page`),
@@ -456,6 +471,12 @@ dispatch state/task identity, a monotonic status revision, a 24-minute attempt
 deadline, bounded progress phases, and opaque telemetry correlation. Unknown
 versions fail rather than guessing at compatibility. The combined inline
 contract is limited to 750 KiB.
+
+Client-visible job revision transactions also advance the ancestor user's
+`operation_revision`; lease-only heartbeats do not. Because jobs are children
+of their actor user, this stays inside the transaction's existing entity group.
+Quiet operation polls compare the loaded-user cursor first and avoid loading
+job rows until some operation has actually advanced.
 
 `DeferredJobLock` is a separate, small Datastore record keyed by a hash of the
 target and mutation scope. Page/task autofill creates its job, notification,
@@ -496,13 +517,12 @@ body after Datastore contention, using three bounded delays before surfacing an
 exhausted `ABORTED` response. This preserves lease and revision checks while
 preventing expected worker/heartbeat races from stranding active work.
 
-Terminal push attempts are classified as accepted, permanently invalid token,
-or transient failure. A job remains `delivery_pending` until cleanup,
-notification, and event markers have all completed. A later Cloud Task or the
+A job remains `delivery_pending` until cleanup, notification persistence, and
+terminal visibility markers have completed. A later Cloud Task or the
 scheduled reconciler resumes at the incomplete marker without repeating
-provider preparation or domain apply. Notification and event markers remain
-separate, so an accepted notification is not resent when only its following
-event failed.
+provider preparation or domain apply. The legacy field names remain in the
+durable job schema for upgrade compatibility; they no longer represent
+provider sends.
 
 Cloud Tasks sends only `{ "job_key": "..." }` to `/process/jobs`. Deterministic
 task IDs make duplicate scheduling harmless, and a delivery may run for up to
@@ -518,21 +538,21 @@ minutes. After a two-minute grace period it compare-and-set claims missing
 dispatches, expired-running leases, overdue retry waits, and incomplete
 terminal delivery. It redispatches with a revision-qualified deterministic task
 ID. Work older than three hours transitions atomically to failed before normal
-failure cleanup/notification/event delivery runs. Terminal records are retained
+failure cleanup and notification persistence run. Terminal records are retained
 for operational review until an owner applies the AI Analytics retention
 controls. That manual cleanup deletes terminal jobs in the selected age window
 but preserves active work and terminal jobs whose delivery is still pending;
 automatic terminal compaction remains disabled. If a retained job's referenced
 input has already been deleted, reconciliation skips input-dependent
-failure/event callbacks, resolves its pending notification without sending
-another push, records the missing input in diagnostics, and completes delivery
+failure callbacks, resolves its pending notification, records the missing input
+in diagnostics, and completes delivery
 so the orphan is not retried indefinitely.
 
 The owner-only AI analytics view shows each retained job's opaque ID and links
 to a transferable JSON diagnostic. That projection includes bounded timing,
 dispatch/recovery state, safe input entity references, checkpoint stage, and
 AI-generation summaries correlated through the opaque telemetry ID. It excludes
-push tokens, parameters/feedback, checkpoint payloads, generated content,
+legacy client tokens, parameters/feedback, checkpoint payloads, generated content,
 authorization data, lease tokens, and provider/tool payloads.
 
 Deferred provider requests use at most two SDK attempts before durable job
@@ -571,6 +591,8 @@ The `Entities` singleton (`EntityRegistry`) is the central access point for all 
 | `Entities._load(*identifiers, related=...)` | Internal batch/attachment primitive used by the explicit-depth fetch API. |
 | `Entities.save(*entities)` | Plan and execute entity upserts; auto-set timestamps, active state, and permissions. |
 | `Entities.save_root(entity, property_mask=...)` | Persist one root, optionally with a Datastore property mask, with full index exclusions and without lifecycle, intent, or cache work. |
+| `Entities.save_document_checkpoint(entity, advance_parent=False)` | Persist only collaborative-document assets/history and their typed history intents; optionally combine the lifecycle parent/list-owner advancement in the same masked plan. |
+| `Entities.advance_document_parent(entity)` | Advance only the document parent and Page list-owner `modified` fields after a previously persisted checkpoint. |
 | `Entities.delete(*entities)` | Plan and execute merged survivor repairs and cascade deletion. |
 | `Entities.touch(*entities)` | Update only `modified`, then persist it with a property mask through the same exclusion-preserving boundary as `save_root`. |
 

@@ -114,10 +114,13 @@ an HTTP field.
 
 `EditWatcher` builds detached revision-preview widgets from the form's focused
 GET response. Preview mode does not register sync, navigate, update page
-metadata, or issue secondary requests. Clean forms apply the authoritative
-replacement immediately. Schema drift is applied through the latest schema
-while retaining local values by stable field ID; the client does not retain a
-selectable historical schema.
+metadata, or issue secondary requests. Inactive forms do not subscribe or
+request replacements; each marker retains its last-seen revision and performs a
+single catch-up probe if stale when its widget becomes active. A component's
+visible active widget enters revision comparison even when clean, so changes
+remain visible to someone currently viewing that form. Schema drift is applied
+through the latest schema while retaining local values by stable field ID; the
+client does not retain a selectable historical schema.
 
 Field-by-field reconciliation is reserved for forms where both the live and
 saved revisions provide a renderer, a non-empty schema, and structured

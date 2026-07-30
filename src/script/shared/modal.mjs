@@ -1,7 +1,6 @@
 import { STYLES } from "styles";
 import { ENDPOINTS } from "./endpoints";
 import { captureError } from "./errors";
-import { EVENTS } from "./protocol";
 import { request } from "./request";
 import { withTransition } from "./utilities";
 
@@ -215,11 +214,7 @@ export class DeleteModal extends Modal {
 				return;
 			}
 
-			window.dispatchEvent(
-				new CustomEvent(EVENTS.SERVER_CHANGE, {
-					detail: { type: "delete", key: this.key },
-				}),
-			);
+			await this.view?.reconcileChange?.({ type: "delete", key: this.key });
 		} catch (error) {
 			this.deleteButton.disabled = false;
 			this.deleteButton.querySelector("#spinner").dataset.visible = "false";
@@ -289,51 +284,5 @@ export class OfflineModal extends Modal {
 	enable() {
 		if (!this.trigger) return;
 		this.trigger.addEventListener("click", this.attach.bind(this));
-	}
-}
-
-/**
- * @testable true
- * @tests tests_e2e/001_site/test_001c_messaging.py::test_allow_messages
- * @features messaging
- * @dimensions permission-modal
- */
-export class MessagingModal extends Modal {
-	get allowMessagesButton() {
-		return this.modal.querySelector("[data-role='allow-messages']");
-	}
-
-	async init({ timeoutMs = null } = {}) {
-		await this.load(ENDPOINTS.messaging);
-		const button = this.allowMessagesButton;
-		button.focus();
-
-		return new Promise((resolve) => {
-			let timeoutId = null;
-			this._resolvePermission = (permission) => {
-				if (timeoutId) clearTimeout(timeoutId);
-				this._resolvePermission = null;
-				resolve(permission);
-			};
-			if (timeoutMs) {
-				timeoutId = setTimeout(() => {
-					this.remove();
-				}, timeoutMs);
-			}
-			button.addEventListener("click", async () => {
-				button.disabled = true;
-				const permission = await Notification.requestPermission();
-				this._resolvePermission?.(permission);
-				await this.remove();
-			});
-		});
-	}
-
-	async remove() {
-		if (this._resolvePermission) {
-			this._resolvePermission(Notification.permission);
-			this._resolvePermission = null;
-		}
-		await super.remove();
 	}
 }

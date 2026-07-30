@@ -12,8 +12,6 @@ from lagniappe.core.tools.deferred_jobs import (
     DeferredJobs,
 )
 from lagniappe.core.tools.ingress import IngressService
-from lagniappe.web import responses
-
 from . import process
 
 
@@ -22,7 +20,7 @@ from . import process
 # @features activity notifications
 # @dimensions create body task-queue
 def _create_notification(payload, body):
-    """Create a notification entity and send an FCM push."""
+    """Create a notification entity for the user's polled notification channel."""
     user_key = payload.get("user_key")
     if not user_key:
         return
@@ -35,9 +33,7 @@ def _create_notification(payload, body):
         return
 
     notification = Entities.NOTIFICATION.create({"parent": user, "body": body})
-    Entities.save(notification, user)
-
-    responses.send_notification(notification, payload.get("token"))
+    Entities.save(notification)
 
 
 # Validate OIDC token from Cloud Tasks
@@ -233,8 +229,8 @@ def ingress():
     if payload is None:
         return make_response("Unauthorized", 401)
     if (
-        not set(payload).issubset({"key", "token", "timezone", "user_key"})
-        or not all(payload.get(key) for key in ("key", "token", "user_key"))
+        not set(payload).issubset({"key", "timezone", "user_key"})
+        or not all(payload.get(key) for key in ("key", "user_key"))
     ):
         return jsonify({"success": False, "error": "Invalid ingress payload."}), 400
 
@@ -250,27 +246,11 @@ def ingress():
         )
         service = IngressService(file)
         outcome = service.run_batch()
-        for _result in outcome.results:
-            message_data = {
-                "type": "import-result",
-                "key": service.entity.urlsafe_key,
-                "count": outcome.processed,
-            }
-            responses.send_message(message_data, payload["token"])
 
         if outcome.state == "stopped":
-            responses.send_message(
-                {"type": "import-stopped", "key": service.entity.urlsafe_key},
-                payload["token"],
-            )
             return jsonify({"success": True}), 200
 
         if outcome.state == "completed":
-            message_data = {
-                "type": "import-complete",
-                "key": service.entity.urlsafe_key,
-            }
-            responses.send_message(message_data, payload["token"])
             _create_notification(
                 payload,
                 f"Data import complete for {service.entity.name}",
@@ -303,28 +283,6 @@ def ingress():
                 "file": file.db if file else None,
             },
         )
-        if file:
-            try:
-                responses.send_message(
-                    {
-                        "type": "import-error",
-                        "key": (
-                            service.entity.urlsafe_key
-                            if service is not None
-                            else file.urlsafe_key
-                        ),
-                    },
-                    payload.get("token"),
-                )
-            except Exception as save_error:
-                exceptions.capture(
-                    save_error,
-                    context={
-                        "operation": "ingress_error_status",
-                        "payload": payload,
-                        "file": service.entity.db if service is not None else file.db,
-                    },
-                )
         return jsonify({"success": False, "error": str(e)}), 200
 
     return jsonify({"success": True}), 200

@@ -24,14 +24,14 @@ The pipeline protects data through these boundaries:
 - deferred jobs carry only a durable job key through Cloud Tasks, reload their
   actor and inputs, and inspect durable state before apply; most adapters also
   checkpoint a prepared final output first;
-- `deferred-complete` events act as invalidations and the browser refetches
-  authoritative server-rendered state; file OCR and summary events likewise use
-  key-only invalidation followed by watched-form refetch.
+- terminal operation revisions act as invalidations and the browser refetches
+  authoritative server-rendered state; file OCR and summaries additionally
+  converge through watched entity fingerprints and durable notifications.
 
 The pipeline does not yet have generation-wide budgets, so one unusually broad
 tool result or repeated file retrieval can be expensive even in a one-person
-workspace. Other known boundaries are narrow race, retention, and missed-push
-edges with safe recovery or reload paths already in place.
+workspace. Other known boundaries are narrow race and retention edges with
+safe recovery or reload paths already in place.
 
 Privacy-bounded generation summaries and the owner dashboard provide the
 production evidence needed to determine whether prompt size, serial tool
@@ -46,8 +46,8 @@ This document covers:
   guidelines, function declarations, validation, repair, and report execution;
 - `lagniappe/core/tools/deferred_jobs.py` and
   `lagniappe/core/tools/deferred_job_adapters.py`;
-- AI entry routes, uploads, notifications, FCM delivery, service-worker relay,
-  and frontend destination refresh/polling;
+- AI entry routes, uploads, durable notifications, operation polling, and
+  frontend destination reconciliation;
 - runtime model settings, provider retries, Cloud Tasks delivery, and queue
   setup where they affect the AI path.
 
@@ -74,11 +74,9 @@ Browser form
   -> most adapters save final prepared output in DeferredJob.checkpoint
   -> adapter inspects current durable state and applies idempotently
   -> job/result/notification terminal state saved
-  -> terminal notification + workflow-specific server-change event, where configured
-  -> terminal delivery markers remain durable until every side effect completes
-  -> service worker forwards to open tabs
-  -> shared status coordinator refetches with batched ETags; push accelerates it
-  -> file events invalidate the watched file form for authoritative refetch
+  -> operation status revision becomes visible through POST /poll
+  -> shared polling coordinator refetches the authoritative destination
+  -> notification/entity channel revisions refresh other mounted surfaces
 ```
 
 There are three different checkpoint systems and they should not be conflated:
@@ -98,17 +96,17 @@ There are three different checkpoint systems and they should not be conflated:
 | Provider lifecycle | `ai/core.py` | Runtime model selection, Gemini configuration, SDK calls, tool loop, structured-final call, cleanup, and debug usage. |
 | Workspace retrieval | `ai/functions.py` and `function_definitions/` | Tool declaration, hash normalization, permission-filtered handler execution, exact-call cache, result/file parts, and failure trace. |
 | AI workflow | `ai/ask.py`, `create.py`, `organize.py`, `autofill.py` | Workflow-specific context, tool set, generation stages, validation, repair, and fallback. |
-| Durable generation | `deferred_jobs.py` and adapters | Job creation, claim/lease, retries, checkpoint, inspect/apply, cleanup, notification, and event delivery. |
+| Durable generation | `deferred_jobs.py` and adapters | Job creation, claim/lease, retries, checkpoint, inspect/apply, cleanup, and durable notification state. |
 | Proposal application | `ai/report_runner.py` | Deterministic reviewed action execution, recovery ledger, retry, and undo. |
-| Browser completion | responses, service worker, protocol, `Core`, `DeferredOperationManager`, and `EditWatcher` | Operation acknowledgement, owner-safe batched status, push acceleration, revision validation, notification replacement, collection refresh, watched-form refetch, and workflow-specific file events. |
+| Browser completion | `/poll`, `PollingCoordinator`, `DeferredOperationManager`, `Core`, and `EditWatcher` | Operation acknowledgement, owner-safe status, revision validation, notification refresh, collection reconciliation, and watched-form refetch. |
 
 ## End-to-end workflow
 
 ### 1. Request and durable start
 
 An AI-enabled form is prepared in the browser before submission. Preparation
-can include direct uploads. The request includes the submitter role, optional
-explain/preview intent, and the current FCM token when one exists.
+can include direct uploads. The request includes the submitter role and optional
+explain/preview intent.
 
 The route performs its ordinary request and permission checks, persists the
 pending report or target state, and calls `DeferredJobs.start()` with a typed
@@ -232,29 +230,19 @@ ledger.
 
 ### 6. Terminal notification and browser refresh
 
-Terminal delivery is split into cleanup, notification, and server-change-event bits,
-so infrastructure retry can resume an incomplete delivery without rerunning the
-domain apply. Single-recipient push attempts return accepted,
-permanently-invalid-token, or transient outcomes. Accepted and permanent-token
-outcomes complete the current bit; a transient outcome returns retryable
-infrastructure failure and leaves that bit incomplete. Typical
-report/autofill/export jobs update a durable notification and send a separate
-`deferred-complete` event. Completion here means terminal, not necessarily
-successful; authoritative job/report/target state carries the outcome. File
-OCR/summary jobs instead create terminal-only notifications and emit
-workflow-specific `extract-complete`/`summarize-complete` events.
+Terminal progression remains split into cleanup, notification, and final
+visibility markers so infrastructure retry can resume an incomplete durable
+transition without rerunning domain apply. These are Datastore checkpoints,
+not provider deliveries. Completion means terminal, not necessarily
+successful; authoritative job/report/target state carries the outcome.
 
-The service worker forwards the push to every open same-origin window for that
-browser token. The page validates the protocol and rejects an older operation
-revision before locating the still-mounted source widget by source name and
-destination. It refetches the destination or its `data-deferred-route`. This
-keeps `deferred-complete` as an invalidation rather than authoritative domain
-state. Independently, the shared status coordinator batches active operation
-references, conditionally fetches their authoritative state, and performs the
-same refresh at terminal state. It pauses while hidden/offline and backs off
-with jitter when status is unchanged or unavailable. File completion events
-carry only type/key invalidation data; `EditWatcher` refetches and remounts the
-authoritative `FileInfo` form.
+The shared polling coordinator batches active operation references. A terminal
+status includes only bounded source/destination/entity identifiers and a
+monotonic revision. The browser rejects older revisions, locates the mounted
+destination, and fetches its authoritative replacement route. It pauses while
+hidden, unfocused, or offline and backs off with jitter while quiet. File
+completion converges through the durable notification channel plus
+`EditWatcher`'s entity fingerprint refetch.
 
 ## Workflow comparison
 
@@ -439,7 +427,7 @@ snapshot and target
 fingerprints, parameters, client metadata, request identity, dispatch state,
 status revision, a renewable five-minute lease, a 24-minute attempt deadline,
 bounded progress phase, checkpoint, result/error, telemetry correlation, and
-cleanup/notification/event delivery bits. The combined inline contract is
+cleanup/notification delivery bits. The combined inline contract is
 limited to 750 KiB. Cloud Tasks gives a shared AI
 delivery up to 30 minutes. A production job with an initial notification also
 gets one deterministic two-minute feedback task.
@@ -544,74 +532,48 @@ its final active check. A domain mutation that cannot share a transaction with
 the job still has a small validate-to-write race.
 
 The reconciler fails work older than three hours, clears active claim fields,
-and completes cleanup, notification, and event delivery before considering a
+and completes cleanup and durable terminal state before considering a
 job delivered. Terminal records remain retained and can duplicate large
 proposal/checkpoint data. Automatic compaction is not implemented.
 
 ## Frontend communication
 
-### Delivery contract
+### Completion contract
 
-- `deferred-complete` uses FCM as an invalidation/notification boundary rather
-  than a carrier for AI context or output.
-- The service worker fans one browser token's event out to its open tabs.
-- The server-change protocol validates event shape and reconciliation fetches
-  authoritative HTML.
-- Durable notifications reconcile on later page initialization.
-- The shared operation coordinator makes report/autofill/page/export completion
-  independent of push receipt.
-- `lp-deferred` is online-only and does not replay later against potentially
-  changed permissions or target state.
-
-### Classified delivery boundary and remaining gaps
-
-`responses.send_message()` returns a provider-accepted,
-permanently-invalid-token, or transient outcome. The deferred bridge converts
-only a transient outcome into incomplete/retryable terminal delivery. Ordinary
-sync and server-change routes continue to ignore the outcome and remain best-effort.
-Unregistered or sender-mismatched tokens terminate the step; missing and test
-tokens are accepted no-op steps.
-
-Provider acceptance still cannot guarantee device receipt, which is why
-polling/status reconciliation remains necessary. A crash after acceptance but
-before saving the delivery bit can send a duplicate push on retry. Existing
-notification upsert and authoritative destination refetch make that safer than
-silently losing an accepted-but-uncheckpointed event.
-
-Most terminal workflows send both rendered notification HTML and a separate
-server-change event. Single-recipient delivery does not enforce the documented
-4 KiB FCM boundary, but the event itself is a small structured invalidation:
-generic deferred events carry operation/routing identity, while file events
-carry only type and entity key. The browser fetches authoritative target state.
+- The job's `status_revision`, terminal status, and destination metadata are
+  durable.
+- `operation` subscriptions return that bounded projection through `/poll`.
+- The already loaded request user's `operation_revision` gates those job
+  projections, so a quiet poll does not read durable-job rows. Notification
+  mutations use a separate `notification_revision` and cannot invalidate the
+  operation gate.
+- A terminal result fetches authoritative destination HTML/data; it never
+  carries AI context or output in the polling payload.
+- Notification entities are saved durably and the personal notification
+  channel refreshes all active tabs.
+- `lp-deferred` remains online-only and does not replay later against
+  potentially changed permissions or target state.
 
 ### Shared status reconciliation
 
-Browser-acknowledged deferred operations return an opaque reference to a
-shared coordinator. It queries an owner-authorized bounded status endpoint and
-refreshes the declared destination at terminal state. It:
+Browser-acknowledged deferred operations install an `operation` subscription
+with the shared coordinator and refresh the declared destination at terminal
+state. It:
 
 - batches all active operations in one request;
+- echoes the loaded-user operation revision and only loads owner-safe job rows
+  after that gate changes;
 - exposes only type, state, coarse phase, retry time, destination, and terminal
   outcome/revision—not checkpoint, prompt, inputs, or token;
-- uses ETags/conditional responses, exponential backoff, jitter, and
-  visibility/connectivity checks;
+- uses adaptive backoff, jitter, and visibility/connectivity checks;
 - stops cleanly when the view/widget is destroyed;
-- correlates a completion event with the operation generation so stale or
-  superseded events cannot refresh the wrong request.
+- rejects stale/superseded operation revisions before reconciliation.
 
-FCM is a latency accelerator rather than the correctness mechanism. The shared
-coordinator handles report list/detail status reconciliation. Standalone
-file OCR/summary use key-only invalidation plus the watched form's periodic
-fingerprint check, so their authoritative metadata also converges after a missed
-push.
+Standalone file OCR/summary converge through the durable notification channel
+and watched entity fingerprint. Collaborative documents use their separate
+revisioned Redis contract.
 
-### Messaging availability and prompt preview
-
-When messaging initialization fails for an editable session, `Core` keeps
-unrelated forms editable, deferred controls use status polling, and the
-`SyncManager` retains its state-only synchronization path. Whole-view
-editability does not depend on FCM, and collaborative state keeps its separate
-contract.
+### Prompt preview
 
 `Prompt.preview()` displays the system instruction and rendered prompt string.
 It does not automatically show provider configuration, actual tool declaration
@@ -645,7 +607,7 @@ attempt:
 - validation failure, local repair, model repair, safe fallback, and terminal
   failure rates;
 - SDK retry, durable retry, quota, timeout, lease loss, and deadline outcomes;
-- notification/event send classification and missed-push recovery;
+- operation-poll latency, terminal reconciliation, and notification refresh;
 - job depth/age, stage resume, duplicate operation, cancellation, and drift
   conflict counts.
 
@@ -674,7 +636,7 @@ An optimization should advance only when it:
 - Use explicit checkpoint nouns: deferred-job provider checkpoint,
   `report.upload_manifest` ingestion checkpoint, or `report.result` execution
   ledger.
-- Describe `deferred-complete` as a terminal refresh event, not a success event.
+- Describe terminal operation status as a refresh signal, not a success event.
 - Do not describe deterministic Cloud Task IDs as user-operation
   deduplication.
 

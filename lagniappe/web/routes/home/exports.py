@@ -42,8 +42,6 @@ def site_export_widget():
 @permission(Resource.SITE)
 def create_site_export():
     body = request.get_json(silent=True) or request.form
-    token = body.get("token") or body.get("fcm-token")
-
     record = site_export.create_export_record()
     job, notification = DeferredJobs.start(
         DeferredJobSpec(
@@ -54,7 +52,6 @@ def create_site_export():
             parameters={"export_id": record["id"]},
             notification_body="Building HTML export archive...",
             client={
-                "token": token,
                 "source_widget": "SiteExport",
                 "destination": "exports:SiteExport",
             },

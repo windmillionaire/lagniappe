@@ -41,6 +41,9 @@ class Projects(ResourceEnumMixin, Enum):
     test_offline_document_replay = Project(definition=pd.offline_document_replay)
     test_offline_document_retry = Project(definition=pd.offline_document_retry)
     test_offline_document_reload = Project(definition=pd.offline_document_reload)
+    test_offline_document_concurrent_replay = Project(
+        definition=pd.offline_document_concurrent_replay
+    )
 
     # Editor tests (005c, 005e, 005f) - reuse existing project with document
     test_formatting_persists = test_create_project_manual_mode

@@ -28,6 +28,7 @@ Test Framework:
 """
 
 import json
+import re
 from datetime import datetime
 
 import pytest
@@ -547,26 +548,30 @@ def test_filter_save(get_user):
 
     saved = filters.save_filter()
     expect(saved).to_be_visible()
-    expect(saved.locator("li")).to_have_count(1, timeout=5000)
+    saved_filter_pattern = re.compile(r"Task Name\s*contains\s*Filter")
+    saved_filter = saved.locator("li").filter(has_text=saved_filter_pattern)
+    expect(saved_filter).to_have_count(1, timeout=5000)
 
     user.reload(project)
     reloaded_filters = Filters(user, project)
     reloaded_saved = reloaded_filters.section.locator(Filters.SAVED_FILTERS)
     expect(reloaded_saved).to_be_visible()
-    expect(reloaded_saved.locator("li").filter(has_text="Filter")).to_be_visible()
+    expect(
+        reloaded_saved.locator("li").filter(has_text=saved_filter_pattern)
+    ).to_be_visible()
 
     viewer = get_user(Users.general_models_view_only)
     viewer.go(project)
     viewer_filters = Filters(viewer, project)
     viewer_saved = viewer_filters.section.locator(Filters.SAVED_FILTERS)
-    viewer_filter = viewer_saved.locator("li").filter(has_text="Filter")
+    viewer_filter = viewer_saved.locator("li").filter(has_text=saved_filter_pattern)
     expect(viewer_filter).to_be_visible()
     expect(viewer_filter.locator("[lp-delete]")).to_have_count(0)
 
     user.go(project)
     owner_filters = Filters(user, project)
     owner_saved = owner_filters.section.locator(Filters.SAVED_FILTERS)
-    owner_filter = owner_saved.locator("li").filter(has_text="Filter")
+    owner_filter = owner_saved.locator("li").filter(has_text=saved_filter_pattern)
     expect(owner_filter).to_be_visible()
     owner_filter.locator(Buttons.LP_DELETE).click()
     Modal(user.page).delete()
@@ -575,7 +580,9 @@ def test_filter_save(get_user):
     user.reload(project)
     reloaded_filters = Filters(user, project)
     reloaded_saved = reloaded_filters.section.locator(Filters.SAVED_FILTERS)
-    expect(reloaded_saved.locator("li").filter(has_text="Filter")).to_have_count(0)
+    expect(
+        reloaded_saved.locator("li").filter(has_text=saved_filter_pattern)
+    ).to_have_count(0)
 
 
 # @features filters

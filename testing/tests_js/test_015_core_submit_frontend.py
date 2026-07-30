@@ -140,7 +140,6 @@ componentElt._lp_component = component;
 
 const view = {
 	components: {},
-	fcmToken: null,
 	getComponent() { return component; },
 	online: true,
 	operationId() { return "operation-1"; },
@@ -256,7 +255,6 @@ componentElt._lp_component = component;
 
 const view = {
 	components: {},
-	fcmToken: null,
 	getComponent() { return component; },
 	online: true,
 	operationId() { return "operation-1"; },
@@ -323,7 +321,6 @@ const component = {
 };
 const view = {
   components: {},
-  fcmToken: null,
   getComponent() { return component; },
   online: true,
 };
@@ -398,7 +395,6 @@ const component = {
 };
 const view = {
   components: {},
-  fcmToken: null,
   getComponent() { return component; },
   online: true,
 };

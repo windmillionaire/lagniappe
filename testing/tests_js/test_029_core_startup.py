@@ -2,9 +2,17 @@
 
 
 # @pair startup:queue-hydration
-# @pair startup:background-messaging
+# @pair startup:polling
 # @pair offline:background-replay
-def test_core_init_does_not_wait_for_messaging_or_initial_replay(run_node):
+# @pair polling:channel
+# @pair polling:entity
+# @pair polling:refresh
+# @pair polling:startup
+# @pair polling:active-widget
+# @pair polling:visibility
+# @pair polling:subscription-lifecycle
+# @pair sync:editor-readiness
+def test_core_init_starts_polling_without_waiting_for_initial_replay(run_node):
     run_node(
         r'''
 const fs = require("node:fs");
@@ -12,10 +20,8 @@ const vm = require("node:vm");
 
 const events = [];
 let resolveQueueInit;
-let resolveMessaging;
 let resolveReplay;
 const queueInit = new Promise((resolve) => { resolveQueueInit = resolve; });
-const messaging = new Promise((resolve) => { resolveMessaging = resolve; });
 const replay = new Promise((resolve) => { resolveReplay = resolve; });
 
 const context = {
@@ -28,8 +34,6 @@ const context = {
     querySelector() { return null; },
   },
   events,
-  messaging,
-  Notification: { permission: "granted" },
   queueInit,
   replay,
   URLSearchParams,
@@ -47,7 +51,7 @@ vm.createContext(context);
 
 let source = fs.readFileSync("src/script/views/base/core.mjs", "utf8");
 source = source.replace(
-  /^import [\s\S]*?(?=const MESSAGING_FEATURE_SELECTOR)/,
+  /^import [\s\S]*?(?=const COLLECTION_ONLY_CHANGE_TYPES)/,
   `
 const SearchBox = class {};
 const EntityMenu = class { destroy() {} };
@@ -65,9 +69,7 @@ const EditWatcher = class {
   destroy() {}
 };
 const ENDPOINTS = {};
-const EVENTS = { SERVER_CHANGE: "server-change" };
 const HelpModal = class {};
-const initializeMessaging = async () => await messaging;
 const OfflineQueue = class {
   async init() {
     events.push("queue-init");
@@ -80,11 +82,16 @@ const OfflineQueue = class {
   }
 };
 const OfflineModal = class { enable() {} };
+const PollingCoordinator = class {
+  constructor() { events.push("polling-created"); }
+  init() { events.push("polling-init"); return this; }
+  subscribe(descriptor, options) {
+    events.push(["subscription", descriptor, options]);
+  }
+  destroy() {}
+};
 const request = {};
 const SyncManager = class {
-  constructor(view) {
-    this.token = view.fcmToken;
-  }
   init() { events.push("sync-init"); }
   destroy() {}
 };
@@ -103,7 +110,7 @@ vm.runInContext(source, context);
 
 const attributes = new Set();
 const root = {
-  dataset: { kind: "page" },
+  dataset: { fingerprint: "pages-v1", index: "pages", kind: "page" },
   addEventListener() {},
   dispatchEvent() {},
   querySelector() { return {}; },
@@ -134,8 +141,11 @@ const root = {
   if (!attributes.has("initialized") || root._lp_view !== view) {
     throw new Error("Core did not publish itself after queue hydration");
   }
-  if (view.SyncManager !== null) {
-    throw new Error("Core waited for messaging before becoming ready");
+  if (!view.SyncManager || !events.includes("sync-init")) {
+    throw new Error("Core did not initialize sync during startup");
+  }
+  if (!view.PollingCoordinator || !events.includes("polling-init")) {
+    throw new Error("Core did not initialize the polling coordinator");
   }
   if (!events.includes("replay-started")) {
     throw new Error("Initial replay was not scheduled in the background");
@@ -144,16 +154,104 @@ const root = {
     throw new Error("Prefetch started before replay readiness was installed");
   }
 
-  resolveMessaging("token-1");
   const manager = await view.syncReady;
-  if (!manager || manager.token !== "token-1" || !events.includes("sync-init")) {
-    throw new Error("Background messaging did not initialize SyncManager");
+  if (manager !== view.SyncManager) {
+    throw new Error("Sync readiness did not resolve to the initialized manager");
   }
 
   resolveReplay(1);
   await view._initialReplayTask;
   if (events.filter((event) => event === "refresh").length !== 1) {
     throw new Error("Successful background replay did not refresh once");
+  }
+
+  const channelSubscription = events.find(
+    (event) => Array.isArray(event) && event[0] === "subscription"
+      && event[1]?.type === "channel",
+  );
+  if (
+    channelSubscription?.[1]?.channel !== "pages"
+    || channelSubscription[1].revision !== "pages-v1"
+  ) {
+    throw new Error("Core did not install its collection polling subscription");
+  }
+  await channelSubscription[2].onResult({ status: "changed" });
+  if (events.filter((event) => event === "refresh").length !== 2) {
+    throw new Error("Changed collection polling result did not refresh the view");
+  }
+
+  const reconciled = [];
+  const editResults = [];
+  const entityView = Object.create(context.Core.prototype);
+  Object.assign(entityView, {
+    PollingCoordinator: view.PollingCoordinator,
+    EditWatcher: {
+      async receiveEntityResult(key, result) {
+        editResults.push([key, result.status]);
+      },
+    },
+    elt: { dataset: { fingerprint: "entity-v1" } },
+    key: "entity-key",
+    async reconcileChange(change) { reconciled.push(change); },
+  });
+  entityView._initPollingSubscription();
+  const entitySubscription = events.find(
+    (event) => Array.isArray(event) && event[0] === "subscription"
+      && event[1]?.type === "entity",
+  );
+  if (
+    entitySubscription?.[1]?.key !== "entity-key"
+    || entitySubscription[1].revision !== "entity-v1"
+  ) {
+    throw new Error("Core did not install its entity polling subscription");
+  }
+  await entitySubscription[2].onResult({
+    status: "changed",
+    payload: { fingerprint: "entity-v2" },
+  });
+  await entitySubscription[2].onResult({ status: "unavailable" });
+  if (
+    reconciled.length !== 2
+    || reconciled[0].type !== "entity-poll"
+    || reconciled[1].type !== "delete"
+    || editResults.map((entry) => entry.join(":")).join(",") !==
+      "entity-key:changed,entity-key:unavailable"
+  ) {
+    throw new Error("Entity polling results were not reconciled");
+  }
+
+  const lifecycleEvents = [];
+  const lifecycle = Object.create(context.Core.prototype);
+  Object.assign(lifecycle, {
+    _destroyed: false,
+    hidden: false,
+    online: true,
+    EditWatcher: {
+      async reconcileSubscriptions() { lifecycleEvents.push("forms"); },
+    },
+    SyncManager: {
+      async reconcileSubscriptions() { lifecycleEvents.push("documents"); },
+    },
+    components: {
+      active: {
+        widgets: {
+          ingress: {
+            async syncPollingSubscription() { lifecycleEvents.push("ingress"); },
+          },
+        },
+      },
+    },
+  });
+  await lifecycle.reconcilePollingSubscriptions();
+  if (lifecycleEvents.join(",") !== "forms,documents,ingress") {
+    throw new Error(
+      `Widget polling ownership was not reconciled: ${lifecycleEvents}`,
+    );
+  }
+  lifecycle.hidden = true;
+  await lifecycle.reconcilePollingSubscriptions();
+  if (lifecycleEvents.length !== 3) {
+    throw new Error("Inactive view reconciled widget subscriptions");
   }
 })().catch((error) => {
   console.error(error);

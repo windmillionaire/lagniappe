@@ -131,27 +131,28 @@ def redis_cloud_instructions():
     except webbrowser.Error:
         pass
 
+    print(wrap_text("\n1. Sign in to Redis Cloud or create an account."))
     print(
         wrap_text(
-            "\n1. In Redis Cloud, open Databases and create a database or "
+            "2. In Redis Cloud, open Databases and create a database or "
             "select an existing one."
         )
     )
     print(
         wrap_text(
-            "2. Keep the Public endpoint and Default user enabled. Lagniappe's "
+            "3. Keep the Public endpoint and Default user enabled. Lagniappe's "
             "guided setup currently uses both."
         )
     )
     print(
         wrap_text(
-            "3. Copy the Public endpoint from Access (Essentials) or General "
+            "4. Copy the Public endpoint from Access (Essentials) or General "
             "(Pro). It normally includes both the host and port."
         )
     )
     print(
         wrap_text(
-            "4. Copy the Default user password from Security. For Essentials, "
+            "5. Copy the Default user password from Security. For Essentials, "
             "select Default user, then Configure, to reveal it."
         )
     )

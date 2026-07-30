@@ -10,23 +10,14 @@ export {
 	isSkippedViewTransitionError,
 } from "./errors";
 export { initializeLogoutForms } from "./logout";
-export { initializeMessaging } from "./messaging";
-export {
-	DeleteModal,
-	HelpModal,
-	MessagingModal,
-	Modal,
-	OfflineModal,
-} from "./modal";
+export { DeleteModal, HelpModal, Modal, OfflineModal } from "./modal";
 export { OfflineQueue } from "./offlineQueue";
+export { PollingCoordinator } from "./polling";
 export {
 	BROWSER_PROTOCOL_ID,
 	BROWSER_PROTOCOL_VERSION,
 	connectivityMessage,
-	EVENTS,
-	parseServiceWorkerMessage,
 	validateConnectivityState,
-	validatePublicEvent,
 	WORKER_MESSAGES,
 } from "./protocol";
 export { request } from "./request";

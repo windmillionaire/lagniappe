@@ -10,11 +10,8 @@ import time
 from uuid import uuid4
 from xml.etree import ElementTree
 
-import firebase_admin
 import pytest
 import requests
-from firebase_admin import exceptions as firebase_exceptions
-from firebase_admin import messaging
 from google.api_core.client_options import ClientOptions
 from google.auth import impersonated_credentials
 from google.auth.transport.requests import Request
@@ -68,18 +65,6 @@ def _unconditional_members(policy, role):
         )
         members.update(binding_members)
     return members
-
-
-@pytest.fixture
-def firebase_runtime_app():
-    """Initialize Firebase Admin with local ADC and the explicit project."""
-    try:
-        return firebase_admin.get_app()
-    except ValueError:
-        return firebase_admin.initialize_app(
-            CONFIG.google_credentials,
-            options={"projectId": CONFIG.GOOGLE_CLOUD_PROJECT},
-        )
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -346,25 +331,3 @@ def test_runtime_document_ai_vertex_ai_and_places_operations():
     place = location.get_place_details("ChIJN1t_tDeuEmsRUsoyG83frY4")
     assert place["id"] == "ChIJN1t_tDeuEmsRUsoyG83frY4"
     assert place["address"]
-
-
-def test_runtime_fcm_send_validation(firebase_runtime_app):
-    """Authorize the runtime's messaging-only Firebase operation."""
-    assert firebase_runtime_app.project_id == CONFIG.GOOGLE_CLOUD_PROJECT
-    probe_id = _probe_id()
-
-    try:
-        message_id = messaging.send(
-            messaging.Message(
-                data={"probe": probe_id},
-                fid=f"{probe_id}:{'A' * 140}",
-            ),
-            dry_run=True,
-        )
-    except (
-        firebase_exceptions.InvalidArgumentError,
-        messaging.UnregisteredError,
-    ):
-        pass
-    else:
-        assert message_id

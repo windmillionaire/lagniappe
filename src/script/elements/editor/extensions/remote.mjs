@@ -4,12 +4,18 @@ import { Decoration, DecorationSet } from "@tiptap/pm/view";
 
 const FLASH_FADE_DURATION_MS = 1000;
 
+/**
+ * @testable true
+ * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
+ * @pair editor:remote-highlight
+ */
 export const FlashRemoteChanges = Extension.create({
 	name: "flashRemoteChanges",
 
 	addStorage() {
 		return {
 			color: "",
+			author: "",
 		};
 	},
 
@@ -45,6 +51,7 @@ export const FlashRemoteChanges = Extension.create({
 							return decorations.map(tr.mapping, tr.doc);
 						}
 						const userColor = storage.color;
+						const author = storage.author;
 						if (!userColor) {
 							return decorations.map(tr.mapping, tr.doc);
 						}
@@ -146,6 +153,7 @@ export const FlashRemoteChanges = Extension.create({
 
 								if (highlightTo > highlightFrom) {
 									const decorationId = `flash-${Date.now()}-${Math.random()}`;
+									let authorLabelAssigned = false;
 
 									newState.doc.nodesBetween(
 										highlightFrom,
@@ -155,12 +163,20 @@ export const FlashRemoteChanges = Extension.create({
 											const start = Math.max(highlightFrom, pos);
 											const end = Math.min(highlightTo, pos + node.nodeSize);
 											if (end > start) {
+												const attributes = {
+													style: `color: ${userColor}; --remote-change-color: ${userColor};`,
+													class: "remote-change-flash",
+													"data-decoration-id": decorationId,
+												};
+												if (author) {
+													attributes.title = `Edited by ${author}`;
+													if (!authorLabelAssigned) {
+														attributes["data-editor-author"] = author;
+														authorLabelAssigned = true;
+													}
+												}
 												newDecorations.push(
-													Decoration.inline(start, end, {
-														style: `color: ${userColor};`,
-														class: "remote-change-flash",
-														"data-decoration-id": decorationId,
-													}),
+													Decoration.inline(start, end, attributes),
 												);
 											}
 											return true;

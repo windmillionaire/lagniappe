@@ -93,7 +93,6 @@ class SitePage(SiteResource):
     Used for simple pages that only need URL navigation:
     - /ping (health check)
     - /nonexistent (404 testing)
-    - /testing/messaging (collaboration testing)
     """
 
     pass

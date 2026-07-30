@@ -485,8 +485,15 @@ def test_manual_security_section_loads(get_user):
 
 # @template manual/macros.html::code
 # @style manual.code
+# @style manual.codeShell
+# @style manual.codeToolbar
+# @style manual.copyButton
+# @features manual
+# @dimensions command-copy mobile-overflow
 @pytest.mark.e2e
-def test_manual_installation_command_scrolls_horizontally_on_mobile(get_user):
+def test_manual_installation_commands_are_copyable_and_scroll_on_mobile(
+    get_user,
+):
     anonymous = get_user(Users.ANONYMOUS)
     anonymous.page.set_viewport_size({"width": 360, "height": 740})
     base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
@@ -497,6 +504,7 @@ def test_manual_installation_command_scrolls_horizontally_on_mobile(get_user):
     )
 
     assert response.ok
+    expect(anonymous.locate("[lp-view]")).to_have_attribute("initialized", "")
     commands = anonymous.locate("[data-role='manual-command']")
     clone_commands = commands.filter(
         has_text="https://github.com/windmillionaire/lagniappe.git"
@@ -512,9 +520,18 @@ def test_manual_installation_command_scrolls_horizontally_on_mobile(get_user):
         "git clone https://github.com/windmillionaire/lagniappe.git lagniappe\n"
         "cd lagniappe"
     )
-    gcloud_commands = commands.filter(has_text="gcloud")
-    expect(gcloud_commands).to_have_count(1)
-    expect(gcloud_commands).to_have_text("gcloud auth login")
+    copy_buttons = anonymous.locate("[data-role='manual-command-copy']")
+    expect(copy_buttons).to_have_count(commands.count())
+    auth_command = commands.filter(has_text=re.compile(r"^gcloud auth login$"))
+    expect(auth_command).to_have_count(1)
+    copy_button = auth_command.locator(
+        "xpath=ancestor::*[@data-role='manual-command-shell']"
+    ).locator("[data-role='manual-command-copy']")
+    copy_button.click()
+    expect(copy_button).to_have_text("Copied!")
+    assert anonymous.page.evaluate(
+        "() => navigator.clipboard.readText()"
+    ) == "gcloud auth login"
 
     command = clone_commands.first
     expect(command).to_have_css("overflow-x", "auto")
@@ -536,7 +553,7 @@ def test_public_manual_loads_without_login_or_auth_bootstrap(get_user):
 
     def track_auth_bootstrap(request):
         path = urlparse(request.url).path
-        if path in {"/update-session", "/register", "/sync", "/state"}:
+        if path in {"/update-session", "/poll", "/sync"}:
             auth_bootstrap_paths.append(path)
 
     anonymous.page.on("request", track_auth_bootstrap)

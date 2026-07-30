@@ -201,7 +201,6 @@ def create_pages(key, **kwargs):
     explain = request.form.get("role") == "explain"
     form = Entities.fetch_one(request.form.get("form"), request=Fetch.direct())
     fields = request.form.to_dict(flat=True)
-    token = fields.pop("fcm-token", None)
     operation_id = fields.pop("operation-id", None)
 
     if explain:
@@ -218,7 +217,6 @@ def create_pages(key, **kwargs):
             notification_body="Generating pages...",
             notification_target=category,
             client={
-                "token": token,
                 "key": category.urlsafe_key,
                 "source_widget": "GeneratePages",
                 "destination": "table:IndexTable",

@@ -101,7 +101,7 @@ def execute_post_commit(plan):
 
     for effect in post_commit:
         if effect.effect is MutationEffectType.CACHE_STATE_DELETE:
-            cache.clear_state(effect.cache_key)
+            cache.clear_document(effect.cache_key)
             complete(MutationEffectType.CACHE_STATE_DELETE)
         elif effect.effect is MutationEffectType.CACHE_SEARCH_DELETE:
             cache.delete_entity_from_search(effect.cache_kind, effect.entity)

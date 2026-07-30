@@ -36,7 +36,6 @@ from lagniappe.core.definitions import (
     DeferredJobStatus,
     DeferredJobType,
     Fetch,
-    PushDeliveryOutcome,
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database, task_queue
@@ -469,22 +468,6 @@ class DeferredJobAdapter:
         return None
 
     # @testable infrastructure
-    def event(self, context):
-        client = context.job.client or {}
-        if not client.get("source_widget") and not client.get("destination"):
-            return None
-        event = {
-            "type": "deferred-complete",
-            "source_widget": client.get("source_widget"),
-            "destination": client.get("destination"),
-            "operation": context.job.urlsafe_key,
-            "revision": int(getattr(context.job, "status_revision", 0) or 0),
-        }
-        if client.get("key"):
-            event["key"] = client["key"]
-        return event
-
-    # @testable infrastructure
     def terminal_message(self, context, *, succeeded, error=None):
         if succeeded:
             return self.success_message
@@ -553,7 +536,11 @@ class DeferredJobRegistry:
         adapter = self.adapter(spec.job_type)
         inputs = _serialize_inputs(spec.inputs)
         parameters = _json_copy(spec.parameters)
-        client = _json_copy(spec.client)
+        client = {
+            key: value
+            for key, value in _json_copy(spec.client).items()
+            if key != "token"
+        }
         if bool(client.get("source_widget")) != bool(client.get("destination")):
             raise exceptions.ValidationError(
                 "Deferred completion routing requires both a source and destination."
@@ -653,7 +640,7 @@ class DeferredJobRegistry:
                     "Deferred operation identifier was reused for a different request."
                 )
             return existing, existing.notification
-        Entities.save(*[entity for entity in (job, notification, spec.actor) if entity])
+        Entities.save(*[entity for entity in (job, notification) if entity])
 
         context = DeferredJobContext(
             job=job,
@@ -692,7 +679,7 @@ class DeferredJobRegistry:
                 )
                 notification.pending = False
             Entities.save(
-                *[entity for entity in (job, notification, spec.actor) if entity]
+                *[entity for entity in (job, notification) if entity]
             )
             raise
 
@@ -703,7 +690,6 @@ class DeferredJobRegistry:
         job.status_revision = dispatch_revision
         Entities.save(job)
 
-        dispatch_accepted = False
         try:
             task_identity = self.dispatch(
                 job,
@@ -735,7 +721,6 @@ class DeferredJobRegistry:
                         )
                     job = current
                     notification = getattr(job, "notification", notification)
-            dispatch_accepted = True
         except Exception as error:
             error_record = _error_record(error, retryable=True, attempt=0)
             dispatch_pending = database.update_deferred_job_recovery_dispatch(
@@ -760,7 +745,6 @@ class DeferredJobRegistry:
                     raise
                 job = current
                 notification = getattr(job, "notification", notification)
-                dispatch_accepted = True
             exceptions.capture(
                 error,
                 context={
@@ -810,7 +794,7 @@ class DeferredJobRegistry:
                     )
                     notification.pending = False
                 Entities.save(
-                    *[entity for entity in (job, notification, spec.actor) if entity]
+                    *[entity for entity in (job, notification) if entity]
                 )
                 raise
 
@@ -829,26 +813,6 @@ class DeferredJobRegistry:
                 level="warning",
             )
 
-        if (
-            dispatch_accepted
-            and job.status in ACTIVE_STATUSES
-            and notification is not None
-            and notification.pending
-        ):
-            try:
-                _send_notification(notification, client.get("token"))
-            except DeferredJobInfrastructureError as error:
-                exceptions.capture(
-                    error,
-                    context={
-                        "deferred_job": {
-                            "id": job.urlsafe_key,
-                            "type": job.job_type,
-                            "operation": "initial_notification",
-                        }
-                    },
-                    level="warning",
-                )
         return job, notification
 
     # @testable true
@@ -1031,14 +995,13 @@ class DeferredJobRegistry:
         notification = job.notification
         notification.body = adapter.active_message
         notification.pending = True
-        Entities.save(notification, job.actor)
-        _send_notification(notification, (job.client or {}).get("token"))
+        Entities.save(notification)
         return True
 
     # @testable true
-    # @tests tests_e2e/002_home/test_002o_deferred_jobs.py::test_deferred_status_is_owner_safe_and_batched
+    # @tests tests_e2e/002_home/test_002o_deferred_jobs.py::test_poll_operation_is_owner_safe
     # @features deferred-jobs
-    # @dimensions status owner batch progress timing
+    # @dimensions status owner batching progress timing
     def statuses(self, job_keys, actor, *, now=None):
         """Project a bounded owner-safe status list for browser reconciliation."""
         actor_key = getattr(actor, "urlsafe_key", None)
@@ -1185,7 +1148,6 @@ class DeferredJobRegistry:
                                 "failure": False,
                                 "cleanup": False,
                                 "notification": False,
-                                "event": False,
                             }
                         ),
                     },
@@ -1488,7 +1450,7 @@ class DeferredJobRegistry:
                     "phase": DeferredJobPhase.COMPLETE.value,
                     "updated_at": _utc().isoformat(),
                 },
-                delivery={"cleanup": False, "notification": False, "event": False},
+                delivery={"cleanup": False, "notification": False},
                 status_revision=int(getattr(job, "status_revision", 0) or 0) + 1,
             )
             context.checkpoint = job.checkpoint or context.checkpoint
@@ -1723,8 +1685,7 @@ class DeferredJobRegistry:
         if context.notification is not None:
             context.notification.body = adapter.retry_message
             context.notification.pending = True
-            Entities.save(context.notification, context.actor)
-            _send_notification(context.notification, (job.client or {}).get("token"))
+            Entities.save(context.notification)
         return DeferredJobResult(
             DeferredJobRunState.RETRY_SCHEDULED,
             job=job,
@@ -1797,8 +1758,7 @@ class DeferredJobRegistry:
         if context.notification is not None:
             context.notification.body = adapter.dependency_message
             context.notification.pending = True
-            Entities.save(context.notification, context.actor)
-            _send_notification(context.notification, (job.client or {}).get("token"))
+            Entities.save(context.notification)
         return DeferredJobResult(
             DeferredJobRunState.RETRY_SCHEDULED,
             job=job,
@@ -1860,7 +1820,6 @@ class DeferredJobRegistry:
                 "failure": True,
                 "cleanup": False,
                 "notification": False,
-                "event": False,
             },
             status_revision=int(getattr(job, "status_revision", 0) or 0) + 1,
         )
@@ -1885,9 +1844,6 @@ class DeferredJobRegistry:
         )
 
     # @testable true
-    # @tests tests_unit/test_023_deferred_jobs.py::test_terminal_notification_transient_retries_without_reapplying_domain
-    # @tests tests_unit/test_023_deferred_jobs.py::test_terminal_event_transient_retries_after_notification_without_reapplying_domain
-    # @tests tests_unit/test_023_deferred_jobs.py::test_terminal_notification_can_duplicate_after_acceptance_before_delivery_checkpoint
     # @tests tests_unit/test_023_deferred_jobs.py::test_reconciler_completes_terminal_delivery_when_input_was_deleted
     # @pair deferred-jobs:orphaned-input
     def _finish_terminal_delivery(
@@ -1933,13 +1889,7 @@ class DeferredJobRegistry:
                 if context.notification is not None:
                     context.notification.body = MISSING_INPUT_MESSAGE
                     context.notification.pending = False
-                    Entities.save(
-                        *[
-                            entity
-                            for entity in (context.notification, context.actor)
-                            if entity is not None
-                        ]
-                    )
+                    Entities.save(context.notification)
             elif context.notification is None and adapter.completion_notification_only:
                 context.notification = Entities.NOTIFICATION.create(
                     {
@@ -1953,7 +1903,7 @@ class DeferredJobRegistry:
                         "pending": False,
                     }
                 )
-                Entities.save(context.notification, context.actor)
+                Entities.save(context.notification)
                 job.notification = context.notification
                 self._save_terminal_fields(job, notification=context.notification)
             if inputs_available and context.notification is not None:
@@ -1964,29 +1914,14 @@ class DeferredJobRegistry:
                     error=message_error,
                 )
                 context.notification.pending = False
-                Entities.save(
-                    *[
-                        entity
-                        for entity in (context.notification, context.actor)
-                        if entity is not None
-                    ]
-                )
-                _send_notification(
-                    context.notification,
-                    (job.client or {}).get("token"),
-                )
+                Entities.save(context.notification)
             delivery["notification"] = True
             self._save_terminal_fields(job, delivery=delivery)
 
-        if not delivery.get("event"):
-            if inputs_available:
-                event = adapter.event(context)
-                if event:
-                    _send_event(event, (job.client or {}).get("token"))
-            delivery["event"] = True
-            client = dict(job.client or {})
+        client = dict(job.client or {})
+        if "token" in client:
             client.pop("token", None)
-            self._save_terminal_fields(job, delivery=delivery, client=client)
+            self._save_terminal_fields(job, client=client)
 
     # @testable infrastructure
     def _save_terminal_fields(self, job, **values):
@@ -2068,9 +2003,9 @@ def _new_idempotency_key(spec):
 
 
 # @testable true
-# @tests tests_unit/test_023_deferred_jobs.py::test_request_fingerprint_excludes_refreshable_push_token
+# @tests tests_unit/test_023_deferred_jobs.py::test_request_fingerprint_ignores_legacy_browser_token
 # @features deferred-jobs
-# @dimensions operation-fingerprint token-exclusion routing-identity
+# @dimensions operation-fingerprint legacy-token-exclusion routing-identity
 def _request_fingerprint(
     *,
     job_type,
@@ -2080,7 +2015,7 @@ def _request_fingerprint(
     parameters,
     client,
 ):
-    """Hash immutable operation data without binding a refreshed push token."""
+    """Hash immutable operation data while ignoring retired legacy client tokens."""
     public_client = {
         key: value for key, value in (client or {}).items() if key != "token"
     }
@@ -2151,7 +2086,7 @@ def _elapsed_seconds(start, now):
 
 
 # @testable true
-# @tests tests_e2e/002_home/test_002o_deferred_jobs.py::test_deferred_status_is_owner_safe_and_batched
+# @tests tests_e2e/002_home/test_002o_deferred_jobs.py::test_poll_operation_is_owner_safe
 # @tests tests_unit/test_023_deferred_jobs.py::test_status_projection_is_bounded_and_marks_stale_work
 # @features deferred-jobs
 # @dimensions status progress timing stale-state privacy
@@ -2263,7 +2198,6 @@ def _admin_projection(job, *, now):
                     "failure",
                     "cleanup",
                     "notification",
-                    "event",
                     "input_missing",
                 )
                 if key in delivery
@@ -2380,32 +2314,3 @@ def _retry_delay(error, attempt):
     if delays is DEFERRED_JOB_QUOTA_RETRY_DELAYS:
         delay += random.randint(0, DEFERRED_JOB_QUOTA_RETRY_JITTER_SECONDS)
     return delay
-
-
-# @testable infrastructure
-def _send_notification(notification, token):
-    if notification is None:
-        return PushDeliveryOutcome.ACCEPTED
-    from lagniappe.web import responses
-
-    outcome = responses.send_notification(notification, token)
-    if outcome is PushDeliveryOutcome.TRANSIENT_FAILURE:
-        raise DeferredJobInfrastructureError(
-            "Deferred job notification delivery is temporarily unavailable."
-        )
-    return outcome
-
-
-# @testable infrastructure
-def _send_event(event, token):
-    from lagniappe.web import responses
-
-    outcome = responses.send_message(
-        {"type": "server-change", "message": json.dumps(event)},
-        token,
-    )
-    if outcome is PushDeliveryOutcome.TRANSIENT_FAILURE:
-        raise DeferredJobInfrastructureError(
-            "Deferred job event delivery is temporarily unavailable."
-        )
-    return outcome

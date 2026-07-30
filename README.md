@@ -43,7 +43,7 @@ On Windows, run `setup.cmd` in the Google Cloud CLI Shell or Command Prompt.
 The platform launcher creates Lagniappe's isolated `venv` once, reusing Google
 Cloud CLI's bundled Python when available, and then starts the guided setup
 flow. It walks through configuration files, Google Cloud services, App Engine,
-Identity Platform, Firebase Messaging, Redis, optional AI settings, generated
+Identity Platform, Redis, optional AI settings, generated
 site assets, and deployment.
 Google clients use Application Default Credentials: setup runs as the
 authenticated human installer, while App Engine uses its attached runtime
@@ -69,8 +69,8 @@ local modifications. Forks should merge source changes themselves and use
 
 The app deploys to Google App Engine in your cloud project. Your records live
 in Datastore, files live in Cloud Storage, auth is handled through Google
-Identity Platform, Firebase Cloud Messaging accelerates live updates, and
-Redis supports search, filters, cache, and sync behavior.
+Identity Platform, and Redis supports search, filters, cache, and revisioned
+collaborative-document state. Browser updates use adaptive polling.
 
 The operator owns infrastructure monitoring, backups, restoration testing,
 provider retention settings, and account security. Project support is
@@ -102,7 +102,7 @@ Chromium, and a development frontend build. Start with
 [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, the Sentry rule for
 development installations, and test commands.
 
-For full local E2E/provider testing, including Firebase Admin, use short-lived
+For full local E2E/provider testing, use short-lived
 runtime impersonation as documented in
 [INFRA_SETUP.md](documentation/INFRA_SETUP.md#local-adc-for-development-and-tests);
 switch ADC back to the human installer before running setup or repair.

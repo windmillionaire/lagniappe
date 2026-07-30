@@ -3,16 +3,14 @@
 from .add import delete_entity_from_search, update
 from .core import filter_cache, initialize
 from .keys import Keys
-from .sync import (
-    active_viewers,
-    clear_state,
-    deregister,
-    discard_viewer_tokens,
-    get_cached_state,
-    get_state,
-    set_state,
-)
 from .details import get_details_by_hash
+from .documents import (
+    apply_document_update,
+    clear_document,
+    close_presence,
+    poll_document,
+    update_document_asset,
+)
 from .query import entity_search, kind_search, search
 from .utility import (
     check_hash,
@@ -35,11 +33,9 @@ __all__ = [
     "delete_cache",
     "cleanup_test_data",
     "filter_cache",
-    "get_cached_state",
-    "get_state",
-    "set_state",
-    "clear_state",
-    "deregister",
-    "discard_viewer_tokens",
-    "active_viewers",
+    "apply_document_update",
+    "clear_document",
+    "close_presence",
+    "poll_document",
+    "update_document_asset",
 ]

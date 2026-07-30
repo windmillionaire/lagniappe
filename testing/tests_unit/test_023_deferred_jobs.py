@@ -137,6 +137,63 @@ class ContendedDatastore:
         return transaction.entity
 
 
+# @features deferred-jobs polling
+# @dimensions personal-activity revision transaction
+# @source lagniappe/core/tools/database/utility.py::_advance_deferred_job_revision
+def test_deferred_job_operation_revision_tracks_client_visible_status(monkeypatch):
+    class JobKey:
+        def __init__(self, parent):
+            self.parent = parent
+
+    now = datetime(2026, 7, 30, tzinfo=timezone.utc)
+    actor_key = object()
+    job_key = JobKey(actor_key)
+    actor = KeyedEntity(
+        actor_key,
+        type="user",
+        operation_revision=4,
+    )
+    job = KeyedEntity(
+        job_key,
+        type="job",
+        status="queued",
+        status_revision=1,
+        attempt=0,
+    )
+    datastore = KeyedDatastore(actor, job)
+    monkeypatch.setattr(
+        database_utility,
+        "DATA",
+        SimpleNamespace(datastore=datastore),
+    )
+    monkeypatch.setattr(database_utility, "_deferred_job_key", lambda value: value)
+
+    claimed = database_utility.claim_deferred_job(
+        job_key,
+        "lease-one",
+        now + timedelta(minutes=15),
+        now,
+    )
+    assert claimed["claimed"] is True
+    assert actor["operation_revision"] == 5
+
+    assert database_utility.update_claimed_deferred_job(
+        job_key,
+        "lease-one",
+        {"status_revision": 3, "progress": {"phase": "generating"}},
+        now,
+    )
+    assert actor["operation_revision"] == 6
+
+    assert database_utility.update_claimed_deferred_job(
+        job_key,
+        "lease-one",
+        {"lease_expires": now + timedelta(minutes=15)},
+        now,
+    )
+    assert actor["operation_revision"] == 6
+
+
 # @features deferred-jobs
 # @dimensions lease claim duplicate-delivery checkpoint compare-and-set
 def test_deferred_job_claim_and_checkpoint_are_compare_and_set(monkeypatch):
@@ -633,8 +690,7 @@ def test_deferred_job_terminal_transition_revokes_the_active_lease(monkeypatch):
     assert entity["status"] == "cancelled"
 
 
-# @features deferred-jobs file
-# @dimensions checkpoint extraction text-asset event-invalidation
+# @pairs deferred-jobs:checkpoint file:extraction file:text-asset
 def test_file_extract_adapter_checkpoints_and_applies_text_asset(monkeypatch):
     adapter = deferred_job_adapters.FileExtractAdapter()
     process = SimpleNamespace(
@@ -695,12 +751,6 @@ def test_file_extract_adapter_checkpoints_and_applies_text_asset(monkeypatch):
     assert json.loads(applied_file.db["assets"])["text"] == checkpoint["text_asset"]
     assert applied_extract.section == checkpoint["process"]
     assert saved == [True]
-    assert adapter.event(
-        SimpleNamespace(
-            job=SimpleNamespace(status="succeeded"),
-            input=lambda name: applied_file if name == "file" else None,
-        )
-    ) == {"key": "file-key", "type": "extract-complete"}
 
 
 # @features deferred-jobs file
@@ -739,7 +789,7 @@ def test_file_adapter_drift_tracks_the_original_asset():
 
 
 # @features deferred-jobs file
-# @dimensions terminal follow-up extraction idempotency summary-first event-invalidation
+# @dimensions terminal follow-up extraction idempotency summary-first
 @pytest.mark.parametrize("status", ["succeeded", "failed"])
 def test_file_summary_terminal_cleanup_starts_extraction_once(monkeypatch, status):
     adapter = deferred_job_adapters.FileSummarizeAdapter()
@@ -752,7 +802,7 @@ def test_file_summary_terminal_cleanup_starts_extraction_once(monkeypatch, statu
         job=SimpleNamespace(
             status=status,
             idempotency_key="summary-operation",
-            client={"token": "push-token"},
+            client={},
         ),
         input=lambda name: file if name == "file" else None,
     )
@@ -768,23 +818,12 @@ def test_file_summary_terminal_cleanup_starts_extraction_once(monkeypatch, statu
 
     assert len(starts) == 1
     args, kwargs = starts[0]
-    assert args == (file, "push-token")
+    assert args == (file,)
     assert kwargs["actor"] is actor
     assert kwargs["delay_seconds"] == 0
     assert kwargs["idempotency_key"].startswith("file-extract-follow-up:")
     assert file.properties.extract.status == "Extracting text..."
     assert parameters == {}
-    event_context = SimpleNamespace(
-        job=context.job,
-        input=lambda name: (
-            SimpleNamespace(urlsafe_key="file-key") if name == "file" else None
-        ),
-    )
-    assert adapter.event(event_context) == (
-        {"key": "file-key", "type": "summarize-complete"}
-        if status == "succeeded"
-        else None
-    )
 
 
 # @features deferred-jobs file
@@ -829,7 +868,6 @@ def test_start_file_extraction_uses_explicit_actor_and_identity(monkeypatch):
 
     result = file_extract.start_file_extraction(
         file,
-        "push-token",
         actor=actor,
         idempotency_key="follow-up-identity",
         delay_seconds=0,
@@ -841,7 +879,7 @@ def test_start_file_extraction_uses_explicit_actor_and_identity(monkeypatch):
     assert spec.job_type is DeferredJobType.FILE_EXTRACT
     assert spec.actor is actor
     assert spec.inputs == {"file": file}
-    assert spec.client == {"token": "push-token"}
+    assert spec.client == {}
     assert spec.idempotency_key == "follow-up-identity"
     assert spec.delay_seconds == 0
 
@@ -1496,177 +1534,6 @@ def test_execution_control_renews_and_observes_lost_claim(monkeypatch):
         expired.ensure_active()
 
 
-def test_terminal_notification_transient_retries_without_reapplying_domain(
-    monkeypatch,
-):
-    job = _terminal_delivery_job()
-    adapter = RecordingAdapter()
-    registry = _terminal_delivery_runner(monkeypatch, job, adapter)
-    notification_attempts = []
-    event_attempts = []
-
-    def send_notification(notification, token):
-        notification_attempts.append((notification, token))
-        if len(notification_attempts) == 1:
-            raise deferred_jobs.DeferredJobInfrastructureError(
-                "notification temporarily unavailable"
-            )
-
-    monkeypatch.setattr(deferred_jobs, "_send_notification", send_notification)
-    monkeypatch.setattr(
-        deferred_jobs,
-        "_send_event",
-        lambda event, token: event_attempts.append((event, token)),
-    )
-
-    with pytest.raises(
-        deferred_jobs.DeferredJobInfrastructureError,
-        match="notification temporarily unavailable",
-    ):
-        registry.run(job.urlsafe_key)
-
-    assert job.status == DeferredJobStatus.SUCCEEDED.value
-    assert job.delivery == {
-        "cleanup": True,
-        "notification": False,
-        "event": False,
-    }
-    assert adapter.calls.count("apply") == 1
-    assert event_attempts == []
-
-    result = registry.run(job.urlsafe_key)
-
-    assert result.state is DeferredJobRunState.COMPLETE
-    assert adapter.calls.count("prepare") == 1
-    assert adapter.calls.count("apply") == 1
-    assert len(notification_attempts) == 2
-    assert len(event_attempts) == 1
-    assert job.delivery == {
-        "cleanup": True,
-        "notification": True,
-        "event": True,
-    }
-    assert "token" not in job.client
-
-
-def test_terminal_event_transient_retries_after_notification_without_reapplying_domain(
-    monkeypatch,
-):
-    job = _terminal_delivery_job()
-    adapter = RecordingAdapter()
-    registry = _terminal_delivery_runner(monkeypatch, job, adapter)
-    notification_attempts = []
-    event_attempts = []
-
-    monkeypatch.setattr(
-        deferred_jobs,
-        "_send_notification",
-        lambda notification, token: notification_attempts.append(
-            (notification, token)
-        ),
-    )
-
-    def send_event(event, token):
-        event_attempts.append((event, token))
-        if len(event_attempts) == 1:
-            raise deferred_jobs.DeferredJobInfrastructureError(
-                "event temporarily unavailable"
-            )
-
-    monkeypatch.setattr(deferred_jobs, "_send_event", send_event)
-
-    with pytest.raises(
-        deferred_jobs.DeferredJobInfrastructureError,
-        match="event temporarily unavailable",
-    ):
-        registry.run(job.urlsafe_key)
-
-    assert job.delivery == {
-        "cleanup": True,
-        "notification": True,
-        "event": False,
-    }
-    assert len(notification_attempts) == 1
-    assert len(event_attempts) == 1
-    assert adapter.calls.count("apply") == 1
-
-    result = registry.run(job.urlsafe_key)
-
-    assert result.state is DeferredJobRunState.COMPLETE
-    assert len(notification_attempts) == 1
-    assert len(event_attempts) == 2
-    assert adapter.calls.count("prepare") == 1
-    assert adapter.calls.count("apply") == 1
-    assert job.delivery["event"] is True
-    assert "token" not in job.client
-
-
-def test_terminal_notification_can_duplicate_after_acceptance_before_delivery_checkpoint(
-    monkeypatch,
-):
-    job = _terminal_delivery_job()
-    adapter = RecordingAdapter()
-    checkpoint_failure = {"pending": True}
-
-    def persist(current, _token, **values):
-        delivery = values.get("delivery") or {}
-        if (
-            checkpoint_failure["pending"]
-            and delivery.get("notification")
-            and not delivery.get("event")
-        ):
-            checkpoint_failure["pending"] = False
-            raise deferred_jobs.DeferredJobInfrastructureError(
-                "delivery checkpoint temporarily unavailable"
-            )
-        for name, value in values.items():
-            setattr(current, name, dict(value) if name == "delivery" else value)
-
-    registry = _terminal_delivery_runner(
-        monkeypatch,
-        job,
-        adapter,
-        persist=persist,
-    )
-    notification_attempts = []
-    event_attempts = []
-    monkeypatch.setattr(
-        deferred_jobs,
-        "_send_notification",
-        lambda notification, token: notification_attempts.append(
-            (notification, token)
-        ),
-    )
-    monkeypatch.setattr(
-        deferred_jobs,
-        "_send_event",
-        lambda event, token: event_attempts.append((event, token)),
-    )
-
-    with pytest.raises(
-        deferred_jobs.DeferredJobInfrastructureError,
-        match="delivery checkpoint temporarily unavailable",
-    ):
-        registry.run(job.urlsafe_key)
-
-    assert len(notification_attempts) == 1
-    assert job.delivery == {
-        "cleanup": True,
-        "notification": False,
-        "event": False,
-    }
-    assert adapter.calls.count("apply") == 1
-
-    result = registry.run(job.urlsafe_key)
-
-    assert result.state is DeferredJobRunState.COMPLETE
-    assert len(notification_attempts) == 2
-    assert len(event_attempts) == 1
-    assert adapter.calls.count("prepare") == 1
-    assert adapter.calls.count("apply") == 1
-    assert job.delivery["notification"] is True
-    assert job.delivery["event"] is True
-
 
 # @features deferred-jobs
 # @dimensions retry
@@ -2093,7 +1960,7 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
     job = SimpleNamespace(
         urlsafe_key="execution-job",
         idempotency_key="execution-operation",
-        client={"token": "push-token"},
+        client={},
         authorization={},
     )
     context = deferred_jobs.DeferredJobContext(
@@ -2126,8 +1993,8 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
     adapter.authorize(context)
     adapter.validate_apply(context)
 
-    def run_report(current, user, token, *, ensure_active):
-        calls.append((current, user, token))
+    def run_report(current, user, *, ensure_active):
+        calls.append((current, user))
         ensure_active()
         current.status = "complete"
         current.pending = False
@@ -2147,7 +2014,7 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
         "status": "complete",
         "action_count": 1,
     }
-    assert calls == [(report, actor, "push-token")]
+    assert calls == [(report, actor)]
     assert adapter.inspect(context) is DeferredJobInspection.APPLIED
     assert report.deferred_job == {
         "key": "execution-job",
@@ -2432,9 +2299,8 @@ def test_long_running_feedback_updates_pending_notification(monkeypatch):
     registry.register(adapter)
     job = RunnerJob()
     job.notification = SimpleNamespace(body="Working...", pending=True)
-    job.client = {"token": "test:feedback"}
+    job.client = {}
     saved = []
-    sent = []
 
     monkeypatch.setattr(
         Entities,
@@ -2442,25 +2308,16 @@ def test_long_running_feedback_updates_pending_notification(monkeypatch):
         lambda key, request: job if key == job.urlsafe_key else None,
     )
     monkeypatch.setattr(Entities, "save", lambda *entities: saved.extend(entities))
-    monkeypatch.setattr(
-        deferred_jobs,
-        "_send_notification",
-        lambda notification, token: sent.append((notification, token)),
-    )
-
     assert registry.feedback(job.urlsafe_key) is True
     assert job.notification.body == adapter.active_message
     assert job.notification.pending is True
-    assert saved == [job.notification, job.actor]
-    assert sent == [(job.notification, "test:feedback")]
+    assert saved == [job.notification]
 
     job.status = DeferredJobStatus.SUCCEEDED.value
     saved.clear()
-    sent.clear()
 
     assert registry.feedback(job.urlsafe_key) is False
     assert saved == []
-    assert sent == []
 
 
 # @features deferred-jobs notifications
@@ -2684,7 +2541,6 @@ def test_start_dispatch_marker_does_not_overwrite_a_fast_worker(monkeypatch):
     adapter = RecordingAdapter()
     registry._defaults_loaded = True
     registry.register(adapter)
-    monkeypatch.setattr(deferred_jobs, "_send_notification", lambda *_args: None)
 
     def fast_dispatch(job, **_kwargs):
         job.status = DeferredJobStatus.RUNNING.value
@@ -2743,8 +2599,8 @@ def test_start_rejects_operation_id_reuse_for_different_request(monkeypatch):
 
 
 # @features deferred-jobs
-# @dimensions operation-fingerprint token-exclusion routing-identity
-def test_request_fingerprint_excludes_refreshable_push_token():
+# @dimensions operation-fingerprint legacy-token-exclusion routing-identity
+def test_request_fingerprint_ignores_legacy_browser_token():
     values = {
         "job_type": "autofill",
         "actor": "actor-key",
@@ -3083,7 +2939,6 @@ def test_reconciler_completes_terminal_delivery_when_input_was_deleted(
         "failure": False,
         "cleanup": False,
         "notification": False,
-        "event": False,
     }
     job.error = {
         "message": "This operation could not finish after automatic recovery."
@@ -3118,21 +2973,6 @@ def test_reconciler_completes_terminal_delivery_when_input_was_deleted(
         "capture",
         lambda *args, **kwargs: captured.append((args, kwargs)),
     )
-    monkeypatch.setattr(
-        deferred_jobs,
-        "_send_notification",
-        lambda *_args, **_kwargs: pytest.fail(
-            "deleted input must not trigger a new notification"
-        ),
-    )
-    monkeypatch.setattr(
-        deferred_jobs,
-        "_send_event",
-        lambda *_args, **_kwargs: pytest.fail(
-            "deleted input must not trigger a completion event"
-        ),
-    )
-
     first = registry.reconcile(now=now)
 
     assert first == {
@@ -3147,7 +2987,6 @@ def test_reconciler_completes_terminal_delivery_when_input_was_deleted(
         "failure": True,
         "cleanup": True,
         "notification": True,
-        "event": True,
         "input_missing": True,
     }
     assert job.notification.pending is False

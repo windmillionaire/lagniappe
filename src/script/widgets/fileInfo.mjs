@@ -8,11 +8,11 @@ import { setIcon } from "../shared/icons";
 
 /**
  * @testable true
- * @tests tests_e2e/011_files/test_011c_file_processing_reconciliation.py::test_file_summary_completion_remounts_authoritative_info
- * @tests tests_e2e/011_files/test_011c_file_processing_reconciliation.py::test_file_extract_completion_prompts_reload_for_text_tab
+ * @tests tests_e2e/011_files/test_011c_file_processing_reconciliation.py::test_file_summary_completion_stages_authoritative_info_until_reset
+ * @tests tests_e2e/011_files/test_011c_file_processing_reconciliation.py::test_file_extract_completion_prompts_reload_for_text_tab_after_reset
  * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_page_links_can_be_added_and_removed
  * @features file
- * @dimensions extract summarize server-change browser-event status summary reload authoritative-remount linked-pages
+ * @dimensions extract summarize polling status summary reload text-tab active-reset linked-pages
  */
 export class FileInfo extends FormElement {
 	constructor(attributes) {

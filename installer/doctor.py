@@ -258,7 +258,7 @@ def _keyless_identity_issues(settings, deploy):
     issues = []
     if settings.get("CONFIG_KIND") != "lagniappe-settings":
         issues.append("CONFIG_KIND is missing or unsupported")
-    if settings.get("CONFIG_SCHEMA_VERSION") != 2:
+    if settings.get("CONFIG_SCHEMA_VERSION") != 3:
         issues.append("CONFIG_SCHEMA_VERSION is missing or unsupported")
     if not runtime_email:
         issues.append("RUNTIME_SERVICE_ACCOUNT_EMAIL is not configured")

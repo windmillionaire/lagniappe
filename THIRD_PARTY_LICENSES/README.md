@@ -18,7 +18,7 @@ version, and SHA-256 digest are recorded in
 
 ## Generated browser code
 
-The production browser bundles include code from Firebase, Floating UI,
+The production browser bundles include code from Floating UI,
 Sentry, Tiptap and ProseMirror, Yjs, Sortable, PDF.js, and their small runtime
 dependencies. Their notices are collected in
 [browser-bundle-NOTICES.md](browser-bundle-NOTICES.md).

@@ -26,15 +26,6 @@ def section(section):
 
 
 # @testable true
-# @tests tests_e2e/001_site/test_001c_messaging.py::test_allow_messages
-@reference.route("/messaging")
-@logged_in
-def messaging():
-    """Messaging help page."""
-    return responses.reference_topic("messaging")
-
-
-# @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_is_owner_only
 @reference.route("/environment-variables")
 @permission(Resource.SITE)

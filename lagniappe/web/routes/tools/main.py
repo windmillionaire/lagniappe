@@ -1,10 +1,9 @@
 """Routes for AI tool reports."""
 
-import hashlib
 import json
 from types import SimpleNamespace
 
-from flask import abort, jsonify, make_response, redirect, request, url_for
+from flask import abort, redirect, request, url_for
 from flask_login import current_user
 
 from lagniappe.core.definitions import (
@@ -197,7 +196,6 @@ def _start_tool_report(
     )
     Entities.save(*input_files, report, current_user)
 
-    token = request.form.get("fcm-token")
     try:
         job, notification = DeferredJobs.start(
             DeferredJobSpec(
@@ -208,7 +206,6 @@ def _start_tool_report(
                 notification_body=f"Creating {_tool_label(tool).lower()} report...",
                 notification_target=report,
                 client={
-                    "token": token,
                     "source_widget": "CreateToolReport",
                     "destination": "tools:ToolReportList",
                 },
@@ -411,7 +408,6 @@ def run_report(key):
     if report.status != "ready" and not retryable:
         return responses.error("Only ready or recoverable failed reports can be run.")
 
-    token = request.form.get("fcm-token")
     try:
         job, notification = DeferredJobs.start(
             DeferredJobSpec(
@@ -422,7 +418,6 @@ def run_report(key):
                 notification_body="Saving report changes...",
                 notification_target=report,
                 client={
-                    "token": token,
                     "key": report.urlsafe_key,
                     "source_widget": "CreateToolReport",
                     "destination": "tools:ToolReportList",
@@ -514,7 +509,6 @@ def revise_report(key):
     Entities.save(report, current_user)
 
     tool_label = _tool_label(report.tool)
-    token = request.form.get("fcm-token")
     try:
         job, notification = DeferredJobs.start(
             DeferredJobSpec(
@@ -526,7 +520,6 @@ def revise_report(key):
                 notification_body=f"Revising {tool_label.lower()} report...",
                 notification_target=report,
                 client={
-                    "token": token,
                     "source_widget": "CreateToolReport",
                     "destination": "tools:ToolReportList",
                 },
@@ -548,49 +541,6 @@ def revise_report(key):
         return responses.tool_report(report)
 
     return responses.deferred_tool_report(report, notification, job=job)
-
-
-# @testable true
-# @tests tests_e2e/002_home/test_002o_deferred_jobs.py::test_deferred_status_is_owner_safe_and_batched
-# @features deferred-jobs
-# @dimensions status owner batch progress timing etag
-@tools.route("/operations/status", methods=["POST"])
-@logged_in
-def deferred_operation_status():
-    """Return bounded status projections for operations owned by this user."""
-    payload = request.get_json(silent=True) or {}
-    operations = payload.get("operations") or []
-    if not isinstance(operations, list):
-        return responses.error("Deferred operations must be a list.")
-    try:
-        statuses = DeferredJobs.statuses(operations, current_user)
-    except exceptions.ValidationError as error:
-        return responses.error(str(error))
-    etag_statuses = [
-        {
-            key: value
-            for key, value in status.items()
-            if key not in {"elapsed_seconds", "phase_elapsed_seconds"}
-        }
-        for status in statuses
-    ]
-    etag = hashlib.sha256(
-        json.dumps(
-            {
-                "requested": [str(operation) for operation in operations],
-                "operations": etag_statuses,
-            },
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
-    ).hexdigest()
-    if request.if_none_match.contains(etag):
-        response = make_response("", 304)
-    else:
-        response = jsonify({"operations": statuses})
-    response.set_etag(etag)
-    response.headers["Cache-Control"] = "private, no-cache"
-    return response
 
 
 # @testable true

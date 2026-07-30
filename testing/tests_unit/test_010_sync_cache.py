@@ -1,195 +1,344 @@
-"""Unit coverage for Redis sync registration helpers."""
+"""Unit coverage for revisioned Redis document state."""
 
-import json
 from importlib import import_module
 
 import pytest
 
-from lagniappe.core.tools.cache.keys import Sync
-
-sync_cache = import_module("lagniappe.core.tools.cache.sync")
+documents = import_module("lagniappe.core.tools.cache.documents")
 
 
-class _FakePipeline:
-    def __init__(self):
-        self.commands = []
-        self.hget_result = None
-        self.smembers_result = {b"token-1"}
+class _DocumentPipeline:
+    def __init__(self, redis):
+        self.redis = redis
+        self.key = None
+        self.pending = None
 
     def __enter__(self):
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *_args):
+        return False
+
+    def watch(self, key):
+        self.key = key
+        self.redis.watched.append(key)
+
+    def get(self, key):
+        assert key == self.key
+        return self.redis.values.get(key)
+
+    def multi(self):
+        return None
+
+    def set(self, key, value, *, ex):
+        assert key == self.key
+        self.pending = (key, value, ex)
+
+    def execute(self):
+        key, value, expires = self.pending
+        self.redis.values[key] = value
+        self.redis.expirations[key] = expires
+        return [True]
+
+
+class _DocumentRedis:
+    def __init__(self):
+        self.expirations = {}
+        self.values = {}
+        self.watched = []
+
+    def pipeline(self):
+        return _DocumentPipeline(self)
+
+
+# @pairs sync:document sync:concurrency sync:isolation sync:ttl
+# @pairs polling:document polling:concurrency polling:isolation polling:ttl
+@pytest.mark.unit
+def test_document_transactions_are_key_isolated_and_expiring(monkeypatch):
+    redis = _DocumentRedis()
+    monkeypatch.setattr(documents.cache, "_redis", redis)
+
+    first, _ = documents._mutate(
+        "page-one:document",
+        {"fingerprint": "first"},
+        lambda state: state.update(revision=1),
+    )
+    second, _ = documents._mutate(
+        "page-two:document",
+        {"fingerprint": "second"},
+        lambda state: state.update(revision=2),
+    )
+
+    assert first["fingerprint"] == "first"
+    assert second["fingerprint"] == "second"
+    assert len(set(redis.watched)) == 2
+    assert all(
+        expires == documents.DOCUMENT_TTL_SECONDS
+        for expires in redis.expirations.values()
+    )
+
+
+class _PresenceRegistrationPipeline:
+    def __init__(self):
+        self.commands = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
         return False
 
     def sadd(self, key, value):
         self.commands.append(("sadd", key, value))
 
-    def expire(self, key, value):
-        self.commands.append(("expire", key, value))
+    def expire(self, key, seconds):
+        self.commands.append(("expire", key, seconds))
 
     def hset(self, key, field, value):
         self.commands.append(("hset", key, field, value))
 
-    def hexpire(self, key, ttl, field):
-        self.commands.append(("hexpire", key, ttl, field))
-
-    def hget(self, key, field):
-        self.commands.append(("hget", key, field))
-
-    def hdel(self, key, *fields):
-        self.commands.append(("hdel", key, *fields))
-
-    def srem(self, key, value):
-        self.commands.append(("srem", key, value))
+    def hexpire(self, key, seconds, field):
+        self.commands.append(("hexpire", key, seconds, field))
 
     def smembers(self, key):
         self.commands.append(("smembers", key))
 
     def execute(self):
-        results = []
-        for command, *_args in self.commands:
-            if command == "hget":
-                results.append(self.hget_result)
-            elif command == "smembers":
-                results.append(self.smembers_result)
-            else:
-                results.append(True)
-        return results
+        return [1, True, 1, [1], {b"client-1"}]
 
 
-class _FakeCache:
-    def __init__(self):
-        self.pipe = _FakePipeline()
-        self.hmget_calls = []
-        self.valid_tokens = None
-
-    def pipeline(self):
-        return self.pipe
-
-    def hmget(self, key, tokens):
-        self.hmget_calls.append((key, list(tokens)))
-        return [
-            json.dumps({"name": "Test User", "token": token})
-            if self.valid_tokens is None or token in self.valid_tokens
-            else None
-            for token in tokens
-        ]
-
-
-# @features sync
-# @dimensions composite-sync-id registration
+# @features sync polling
+# @dimensions presence ttl hash-field
 @pytest.mark.unit
-def test_sync_id_hashes_parse_widget_ids():
-    assert sync_cache._entity_hashes("abc:document") == ["abc"]
-    assert sync_cache._entity_hashes("abc:form") == ["abc"]
-    assert sync_cache._entity_hashes("abc:def:form") == ["abc", "def"]
-    assert sync_cache._entity_hashes(None) == []
-
-
-# @features sync
-# @dimensions document sync-state composite-sync-id registration
-@pytest.mark.unit
-def test_get_state_registers_every_hash_in_composite_sync_id(monkeypatch):
-    fake_cache = _FakeCache()
-    monkeypatch.setattr(sync_cache, "cache", fake_cache)
-
-    state, users = sync_cache.get_state(
-        "pagehash:formhash:form",
-        "token-1",
-        {"name": "Test User"},
+def test_presence_uses_expiring_client_hash_fields(monkeypatch):
+    pipeline = _PresenceRegistrationPipeline()
+    user = {"hash": "user-1", "name": "Example User"}
+    monkeypatch.setattr(documents.cache, "pipeline", lambda: pipeline)
+    monkeypatch.setattr(
+        documents.cache,
+        "hmget",
+        lambda key, fields: [
+            documents._presence_payload("client-1", user).encode("utf-8")
+        ],
     )
 
-    assert state == {}
-    assert users == [{"name": "Test User", "token": "token-1"}]
+    users, digest = documents._register_presence(
+        "page:document",
+        "client-1",
+        user,
+    )
 
-    sadd_keys = [entry[1] for entry in fake_cache.pipe.commands if entry[0] == "sadd"]
-    assert Sync.WIDGET.key("pagehash:formhash:form") in sadd_keys
-    assert Sync.ENTITY.key("pagehash") in sadd_keys
-    assert Sync.ENTITY.key("formhash") in sadd_keys
-
-
-# @features sync
-# @dimensions sync-state state-only
-@pytest.mark.unit
-def test_get_cached_state_does_not_register_viewer(monkeypatch):
-    fake_cache = _FakeCache()
-    fake_cache.pipe.hget_result = json.dumps({"submission": {"field": "value"}})
-    monkeypatch.setattr(sync_cache, "cache", fake_cache)
-
-    state = sync_cache.get_cached_state("pagehash:formhash:form")
-
-    assert state == {"submission": {"field": "value"}}
-    assert ("hget", Sync.STATE.value, "pagehash:formhash:form") in fake_cache.pipe.commands
     assert (
         "hexpire",
-        Sync.STATE.value,
-        sync_cache.FIVE_MINUTES,
-        "pagehash:formhash:form",
-    ) in fake_cache.pipe.commands
-    assert not any(command[0] == "sadd" for command in fake_cache.pipe.commands)
-    assert not any(command[0] == "hset" for command in fake_cache.pipe.commands)
+        documents.Sync.CLIENTS.value,
+        documents.PRESENCE_TTL_SECONDS,
+        "client-1",
+    ) in pipeline.commands
+    assert users == [{**user, "client_id": "client-1"}]
+    assert len(digest) == 64
 
 
-# @features sync
-# @dimensions sync-state invalidation
-@pytest.mark.unit
-def test_clear_state_deletes_cached_widget_state(monkeypatch):
-    fake_cache = _FakeCache()
-    monkeypatch.setattr(sync_cache, "cache", fake_cache)
-
-    sync_cache.clear_state("pagehash:formhash:form")
-
-    assert fake_cache.pipe.commands == [
-        ("hdel", Sync.STATE.value, "pagehash:formhash:form")
-    ]
-
-
-# @features sync
-# @dimensions document stale-sessions composite-sync-id deregistration
-@pytest.mark.unit
-def test_deregister_removes_token_from_composite_hashes(monkeypatch):
-    fake_cache = _FakeCache()
-    monkeypatch.setattr(sync_cache, "cache", fake_cache)
-
-    sync_cache.deregister("token-1", ["pagehash:formhash:form"])
-
-    srem_keys = [entry[1] for entry in fake_cache.pipe.commands if entry[0] == "srem"]
-    assert Sync.WIDGET.key("pagehash:formhash:form") in srem_keys
-    assert Sync.ENTITY.key("pagehash") in srem_keys
-    assert Sync.ENTITY.key("formhash") in srem_keys
-
-
-# @features sync
-# @dimensions stale-token invalidation
-@pytest.mark.unit
-def test_discard_viewer_tokens_invalidates_registrations(monkeypatch):
-    fake_cache = _FakeCache()
-    monkeypatch.setattr(sync_cache, "cache", fake_cache)
-
-    sync_cache.discard_viewer_tokens(["token-1", "token-2", "token-1", None])
-
-    assert ("hdel", Sync.USERS.value, "token-1", "token-2") in (
-        fake_cache.pipe.commands
+@pytest.fixture
+def document_state(monkeypatch):
+    state = documents._new_state(
+        {"ydoc": "snapshot-0", "fingerprint": "fingerprint-0"}
     )
 
+    def mutate(_sync_id, _seed, transform):
+        result = transform(state)
+        return state, result
 
-# @features sync
-# @dimensions active-viewers entity-registration dedupe empty-input stale-sessions
+    monkeypatch.setattr(documents, "_mutate", mutate)
+    monkeypatch.setattr(
+        documents,
+        "_register_presence",
+        lambda *_args: (
+            [{"client_id": "client-1", "hash": "user-1"}],
+            "presence-1",
+        ),
+    )
+    return state
+
+
+# @features sync polling
+# @dimensions document revision snapshot delta presence author-attribution
 @pytest.mark.unit
-def test_active_viewers_unions_entity_registration_sets(monkeypatch):
-    fake_cache = _FakeCache()
-    monkeypatch.setattr(sync_cache, "cache", fake_cache)
+def test_revisioned_document_poll_returns_snapshot_then_deltas(document_state):
+    initial = documents.poll_document(
+        "page:document",
+        seed={},
+        client_id="client-1",
+        user={"hash": "user-1"},
+    )
+    assert initial["mode"] == "snapshot"
+    assert initial["ydoc"] == "snapshot-0"
+    assert "user_hash" not in initial
+    assert initial["users"][0]["client_id"] == "client-1"
 
-    assert sync_cache.active_viewers([]) == set()
-    assert fake_cache.pipe.commands == []
+    acknowledgement = documents.apply_document_update(
+        "page:document",
+        seed={},
+        generation=document_state["generation"],
+        revision=0,
+        update="delta-1",
+        author={"hash": "user-1", "name": "First User"},
+    )
+    assert acknowledgement["revision"] == 1
 
-    assert sync_cache.active_viewers(["pagehash", "formhash"]) == {"token-1"}
-    assert fake_cache.hmget_calls == [(Sync.USERS.value, ["token-1"])]
-    assert fake_cache.pipe.commands == [
-        ("smembers", Sync.ENTITY.key("pagehash")),
-        ("smembers", Sync.ENTITY.key("formhash")),
+    changed = documents.poll_document(
+        "page:document",
+        seed={},
+        client_id="client-1",
+        user={"hash": "user-1"},
+        generation=document_state["generation"],
+        revision=0,
+        presence_digest="presence-1",
+    )
+    assert changed["mode"] == "delta"
+    assert changed["updates"] == [
+        {"revision": 1, "update": "delta-1", "user_hash": "user-1"}
+    ]
+    assert changed["authors"] == {
+        "user-1": {"hash": "user-1", "name": "First User"}
+    }
+    assert "users" not in changed
+
+    checkpoint = documents.apply_document_update(
+        "page:document",
+        seed={},
+        generation=document_state["generation"],
+        revision=1,
+        update="delta-2",
+        ydoc="snapshot-2",
+        author={"hash": "user-1", "name": "First User"},
+    )
+    assert checkpoint["checkpoint_accepted"] is True
+
+    compacted = documents.poll_document(
+        "page:document",
+        seed={},
+        client_id="client-1",
+        user={"hash": "user-1"},
+        generation=document_state["generation"],
+        revision=1,
+        presence_digest="presence-1",
+    )
+    assert compacted["mode"] == "snapshot"
+    assert compacted["ydoc"] == "snapshot-2"
+    assert compacted["user_hash"] == "user-1"
+    assert compacted["authors"] == {
+        "user-1": {"hash": "user-1", "name": "First User"}
+    }
+    assert compacted["updates"] == []
+
+    documents.apply_document_update(
+        "page:document",
+        seed={},
+        generation=document_state["generation"],
+        revision=2,
+        update="delta-3",
+        author={"hash": "user-1", "name": "First User"},
+    )
+    documents.apply_document_update(
+        "page:document",
+        seed={},
+        generation=document_state["generation"],
+        revision=3,
+        update="delta-4",
+        ydoc="snapshot-4",
+        author={"hash": "user-2", "name": "Second User"},
+    )
+    mixed_authors = documents.poll_document(
+        "page:document",
+        seed={},
+        client_id="client-1",
+        user={"hash": "user-1"},
+        generation=document_state["generation"],
+        revision=2,
+        presence_digest="presence-1",
+    )
+    assert mixed_authors["mode"] == "snapshot"
+    assert "user_hash" not in mixed_authors
+    assert "authors" not in mixed_authors
+
+
+# @features sync polling
+# @dimensions document revision concurrency compaction
+@pytest.mark.unit
+def test_revisioned_document_update_preserves_stale_branch_delta(document_state):
+    current = documents.apply_document_update(
+        "page:document",
+        seed={},
+        generation=document_state["generation"],
+        revision=0,
+        update="delta-current",
+    )
+    stale = documents.apply_document_update(
+        "page:document",
+        seed={},
+        generation=document_state["generation"],
+        revision=0,
+        update="delta-stale",
+        ydoc="stale-checkpoint",
+    )
+
+    assert current["revision"] == 1
+    assert stale["revision"] == 2
+    assert stale["checkpoint_accepted"] is False
+    assert document_state["ydoc"] == "snapshot-0"
+    assert [item["update"] for item in document_state["updates"]] == [
+        "delta-current",
+        "delta-stale",
     ]
 
-    fake_cache.valid_tokens = set()
-    assert sync_cache.active_viewers(["pagehash"]) == set()
+
+# @features sync polling
+# @dimensions document persistence fingerprint
+@pytest.mark.unit
+def test_revisioned_document_asset_refresh_keeps_live_generation(document_state):
+    generation = document_state["generation"]
+    document_state["updates"].append({"revision": 1, "update": "delta"})
+    documents.update_document_asset(
+        "page:document",
+        seed={"fingerprint": "fingerprint-1", "markup": "<p>Saved</p>"},
+    )
+
+    assert document_state["generation"] == generation
+    assert document_state["fingerprint"] == "fingerprint-1"
+    assert document_state["updates"] == [{"revision": 1, "update": "delta"}]
+
+
+class _PresencePipeline:
+    def __init__(self):
+        self.commands = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def srem(self, key, value):
+        self.commands.append(("srem", key, value))
+
+    def hdel(self, key, value):
+        self.commands.append(("hdel", key, value))
+
+    def execute(self):
+        return [True] * len(self.commands)
+
+
+# @features sync polling
+# @dimensions document presence lifecycle
+@pytest.mark.unit
+def test_revisioned_presence_close_removes_client(monkeypatch):
+    pipeline = _PresencePipeline()
+    monkeypatch.setattr(documents.cache, "pipeline", lambda: pipeline)
+
+    documents.close_presence(
+        "client-1",
+        ["page:document", "page:document", "project:document"],
+    )
+
+    assert sum(command[0] == "srem" for command in pipeline.commands) == 2
+    assert pipeline.commands[-1][0] == "hdel"

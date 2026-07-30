@@ -40,12 +40,11 @@ AGENT_ACCESS_SCOPE = "agent-login"
 # @covered-by lagniappe/web/routes/users/login.py::login_agent
 # @covered-by lagniappe/web/routes/users/login.py::login_identity
 # @reason tiny wrapper keeps Flask-Login and Lagniappe session seeding together
-def _login_and_seed(user, remember=False, messaging_disabled=False):
+def _login_and_seed(user, remember=False):
     invalidate_cache = login_cache_invalidation_required(user)
     login_user(user, remember=remember)
     seed_login_session(
         user,
-        messaging_disabled=messaging_disabled,
         invalidate_cache=invalidate_cache,
     )
 
@@ -366,11 +365,7 @@ def login_agent():
         return _agent_login_template("Invalid access code", status=401)
 
     user = agent_access.get_or_create_user()
-    _login_and_seed(
-        user,
-        remember=_remember_preference(default=True),
-        messaging_disabled=True,
-    )
+    _login_and_seed(user, remember=_remember_preference(default=True))
     record_login(user, "agent")
 
     if wants_json:

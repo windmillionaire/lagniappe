@@ -21,7 +21,6 @@ from lagniappe.core.tools import database
 
 LOGIN_USER_KEY = CONFIG.LOGIN_USER_KEY
 LOGIN_USER_PAGE_KEY = CONFIG.LOGIN_USER_PAGE_KEY
-LOGIN_MESSAGING_DISABLED_KEY = CONFIG.LOGIN_MESSAGING_DISABLED_KEY
 LOGIN_INVALIDATE_CACHE_KEY = CONFIG.LOGIN_INVALIDATE_CACHE_KEY
 AUTH_SESSION_CACHE_KEYS = CONFIG.AUTH_SESSION_CACHE_KEYS
 
@@ -137,10 +136,9 @@ def login_cache_invalidation_required(user):
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_switching_session_user_requests_client_cache_invalidation
 # @tests tests_e2e/001_site/test_001b_login.py::test_stale_preloaded_session_keys_fall_back_to_flask_login_user
-# @tests tests_e2e/001_site/test_001c_messaging.py::test_public_user_suppresses_messaging_permission
 # @features auth
-# @dimensions session-keys user-key page-key messaging-disabled invalidation
-def seed_login_session(user, messaging_disabled=False, invalidate_cache=False):
+# @dimensions session-keys user-key page-key invalidation
+def seed_login_session(user, invalidate_cache=False):
     """Store direct entity keys for faster auth loads on later requests."""
     clear_login_session()
 
@@ -152,14 +150,6 @@ def seed_login_session(user, messaging_disabled=False, invalidate_cache=False):
     if invalidate_cache or getattr(user, "invalidate_cache", False):
         request_client_cache_invalidation()
 
-    agent_email = str(getattr(CONFIG, "AGENT_ACCESS_EMAIL", "") or "").strip().lower()
-    user_email = str(getattr(user, "email", "") or "").strip().lower()
-    if (
-        messaging_disabled
-        or getattr(user, "is_public", False)
-        or (agent_email and user_email == agent_email)
-    ):
-        session[LOGIN_MESSAGING_DISABLED_KEY] = True
 
 
 # @testable true
@@ -330,7 +320,6 @@ def permission(resource=None, requested=None):
 
     return decorator
 
-
 # @testable true
 # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_anonymous_home_redirects_to_login
 # @features home permissions
@@ -419,26 +408,3 @@ def manual_permission():
         return wrapped
 
     return decorator
-
-
-# @testable true
-# @tests tests_e2e/001_site/test_001c_messaging.py::test_allow_messages
-# @features messaging
-# @dimensions permission-modal
-def test_permission(f):
-    """Only allows authenticated test users. Returns 404 (not 403) to hide the endpoint."""
-
-    # @testable false
-    # @covered-by lagniappe/web/auth.py::test_permission
-    # @reason route wrapper behavior is owned by the parent decorator contract
-    @wraps(f)
-    def wrapped(*args, **kwargs):
-        user, _entity = _load_request_context()
-        if not user.is_authenticated:
-            abort(401)
-        if not user.db.get("test_user"):
-            abort(404)
-
-        return f(*args, **kwargs)
-
-    return wrapped

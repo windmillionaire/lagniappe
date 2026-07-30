@@ -73,10 +73,10 @@
   </button>
 {% endmacro %}
 
-{% macro filter(label="Sort or filter column") %}
+{% macro filter(label="Sort or filter column", visible=true) %}
   <button class="{{ styles.toggle.container }} hover:outline-2 hover:outline-kind-default"
           data-active="false"
-          data-visible="true"
+          data-visible="{{ visible|yesno }}"
           data-toggle="filter"
           aria-label="{{ label }}"
           title="{{ label }}">

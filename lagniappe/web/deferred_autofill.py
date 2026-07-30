@@ -121,7 +121,7 @@ def autofill_job_spec(
         },
         notification_body=f"Autofilling {'task' if isinstance(entity, Entities.TASK) else 'page'}...",
         notification_target=entity,
-        client={"token": form.get("fcm-token"), **destination_context},
+        client=destination_context,
     )
 
 

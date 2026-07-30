@@ -12,7 +12,7 @@ from testing.definitions import DueDates, Pages, SitePages, Users
 from testing.definitions.task_definitions import TaskDefinition
 from testing.elements import Buttons, FormElements, List, Modal
 from testing.resources import Task
-from testing.utility import TestFile as _TestFile, simulate_fcm_message
+from testing.utility import TestFile as _TestFile, trigger_poll
 from testing.utility.local_time import local_date_from_utc_datetime
 
 pytestmark = pytest.mark.e2e
@@ -257,7 +257,7 @@ def test_delete_activity_item_from_home(get_user):
     user = get_user(Users.OWNER)
     other_user = get_user(Users.create_user, creator=user)
     own_body = _unique("Activity note delete")
-    remote_body = _unique("Activity fcm delete")
+    remote_body = _unique("Activity polling delete")
     other_body = _unique("Other user activity note")
     own_note = _save_note(user, own_body)
     remote_note = _save_note(user, remote_body)
@@ -286,11 +286,7 @@ def test_delete_activity_item_from_home(get_user):
     remote_item = _activity_item(home, remote_body)
     expect(remote_item).to_be_visible()
     Entities.delete(remote_note)
-    simulate_fcm_message(
-        user,
-        "server-change",
-        {"type": "delete", "key": remote_note.urlsafe_key},
-    )
+    trigger_poll(user)
     expect(remote_item).not_to_be_visible()
     expect(activity_list).to_contain_text(other_body)
 
@@ -332,21 +328,28 @@ def test_home_note_visibility_across_users(get_user):
     expect(_activity_item(owner_home, private_body)).to_be_visible()
 
 
-# @features activity notifications
-# @dimensions create body parent task-queue html-stripping notes-exclusion
+# @pairs activity:create activity:body activity:parent activity:task-queue
+# @pairs activity:html-stripping activity:notes-exclusion activity:load
+# @pairs activity:cached-response activity:notes-only
+# @pairs notes:load notes:cached-response notes:notes-only
+# @pairs notifications:create notifications:body notifications:parent
+# @pairs notifications:task-queue notifications:html-stripping
 # @template notifications.html::item
 def test_process_notification_uses_menu_not_home_notes(get_user):
     user = get_user(Users.OWNER)
+    note_body = _unique("Process notification control note")
     raw_body = f"<em>{_unique('Process notification complete')}</em>"
     visible_body = raw_body.replace("<em>", "").replace("</em>", "")
 
+    _save_note(user, note_body)
     _create_notification(
-        {"user_key": _user_key(user), "token": "test:activity-notification"},
+        {"user_key": _user_key(user)},
         raw_body,
     )
 
     home = user.go(SitePages.HOME)
     home.activity_list
+    expect(_activity_item(home, note_body)).to_be_visible()
     expect(_activity_item(home, visible_body)).not_to_be_attached()
 
     notifications = user.locate("[data-role='notifications']")

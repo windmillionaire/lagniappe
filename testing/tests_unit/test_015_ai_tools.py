@@ -3034,22 +3034,19 @@ def test_summary_eligibility_includes_ooxml_fallback(monkeypatch):
     assert summarize.can_summarize_file(office_file) is True
     assert summarize.can_summarize_file(unsupported) is False
 
-    assert (
-        summarize.summarize_file(office_file, "token")
-        is office_file.properties.summarize
-    )
+    assert summarize.summarize_file(office_file) is office_file.properties.summarize
     assert started[0].inputs == {"file": office_file}
     assert started[0].actor is actor
-    assert started[0].client == {"token": "token"}
+    assert started[0].client == {}
     assert started[0].delay_seconds == 10
 
-    result = summarize.summarize_file(unsupported, "token")
+    result = summarize.summarize_file(unsupported)
 
     assert result.error == "Unsupported file type."
 
-    queued_summary = summarize.summarize_file(office_file, "second-token")
+    queued_summary = summarize.summarize_file(office_file)
     assert queued_summary.status == "Summarizing file..."
-    assert started[-1].client == {"token": "second-token"}
+    assert started[-1].client == {}
 
 
 # @pair ai:summary-prompt

@@ -40,9 +40,18 @@
 {% endmacro %}
 
 {% macro code(text) %}
-  <pre data-role="manual-command"
-       tabindex="0"
-       class="{{ styles.manual.code }}"><code>{{ text }}</code></pre>
+  <div data-role="manual-command-shell" class="{{ styles.manual.codeShell }}">
+    <div class="{{ styles.manual.codeToolbar }}">
+      <button type="button"
+              data-role="manual-command-copy"
+              aria-label="Copy command"
+              aria-live="polite"
+              class="{{ styles.manual.copyButton }}">Copy</button>
+    </div>
+    <pre data-role="manual-command"
+         tabindex="0"
+         class="{{ styles.manual.code }}"><code>{{ text }}</code></pre>
+  </div>
 {% endmacro %}
 
 {% macro concept(title, icon=None, kind=None) %}

@@ -96,6 +96,32 @@ def _deferred_job_key(identifier):
 
 
 # @testable true
+# @tests tests_unit/test_023_deferred_jobs.py::test_deferred_job_operation_revision_tracks_client_visible_status
+# @features deferred-jobs polling
+# @dimensions personal-activity revision transaction
+def _advance_deferred_job_revision(transaction, job_key):
+    """Advance the owning user's activity cursor in the job transaction."""
+    actor_key = getattr(job_key, "parent", None)
+    if actor_key is None:
+        return
+    actor = DATA.datastore.get(actor_key, transaction=transaction)
+    if actor is None or actor.get("type") != "user":
+        return
+    actor["operation_revision"] = int(actor.get("operation_revision") or 0) + 1
+    try:
+        actor.exclude_from_indexes = frozenset(
+            {
+                *actor.exclude_from_indexes,
+                "notification_revision",
+                "operation_revision",
+            }
+        )
+    except AttributeError:
+        pass
+    transaction.put(actor)
+
+
+# @testable true
 # @tests tests_unit/test_023_deferred_jobs.py::test_deferred_job_transactions_retry_aborted_contention
 # @features deferred-jobs
 # @dimensions transaction-contention retry
@@ -248,6 +274,7 @@ def claim_deferred_job(identifier, lease_token, lease_expires, now):
         entity.pop("next_attempt_at", None)
         entity["modified"] = now
         transaction.put(entity)
+        _advance_deferred_job_revision(transaction, key)
         return {"claimed": True, "reason": "claimed", "entity": entity}
 
 
@@ -273,6 +300,8 @@ def update_claimed_deferred_job(identifier, lease_token, updates, now):
                 entity[name] = value
         entity["modified"] = now
         transaction.put(entity)
+        if "status_revision" in updates:
+            _advance_deferred_job_revision(transaction, key)
         return True
 
 
@@ -359,6 +388,7 @@ def claim_deferred_job_recovery(
             entity["status_revision"] = int(entity.get("status_revision") or 0) + 1
             entity["modified"] = now
             transaction.put(entity)
+            _advance_deferred_job_revision(transaction, key)
             return {
                 "claimed": True,
                 "reason": "maximum-age",
@@ -376,6 +406,7 @@ def claim_deferred_job_recovery(
             entity["next_attempt_at"] = now
         entity["modified"] = now
         transaction.put(entity)
+        _advance_deferred_job_revision(transaction, key)
         return {
             "claimed": True,
             "reason": "stale",
@@ -442,6 +473,7 @@ def transition_active_deferred_job(identifier, updates, now):
         entity["status_revision"] = int(entity.get("status_revision") or 0) + 1
         entity["modified"] = now
         transaction.put(entity)
+        _advance_deferred_job_revision(transaction, key)
         return {"transitioned": True, "reason": "transitioned", "entity": entity}
 
 
@@ -608,20 +640,28 @@ class Fingerprint(Enum, metaclass=DefaultEnum):
     # kind name
     category = "categories"
     project = "projects"
+    page = "pages"
     ingress = "ingress"
     task = "tasks"
     form = "forms"
     user = "users"
+    group = "users"
+    public_group = "users"
     note = "home"
+    notification = "notifications"
+    report = "reports"
 
     # url segment
     categories = category
     projects = project
+    pages = page
     tasks = task
     forms = form
     users = user
     notes = note
     activity = note
+    notifications = notification
+    reports = report
 
     DEFAULT = None
 
@@ -638,10 +678,28 @@ def save(*entities):
     DATA.datastore.put_multi(list(to_save.values()) + to_update)
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/database/utility.py::save_mutations
+# @reason neutral-mask selection is asserted through the public mutation writer
+def _advances_site_fingerprint(entity, mask):
+    fields = set(mask or ())
+    if not fields:
+        return True
+    if entity.db.get("type") == "user" and fields.issubset(
+        {"notification_revision", "operation_revision"}
+    ):
+        return False
+    return not (
+        entity.db.get("type") in {"page", "project"}
+        and "document_history" in fields
+        and fields.issubset({"assets", "document_history"})
+    )
+
+
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_save_mutations_applies_property_masks_and_fingerprints
 # @features mutations database
-# @dimensions property-mask update full-upsert site-fingerprint
+# @dimensions property-mask update full-upsert site-fingerprint document-checkpoint
 def save_mutations(writes):
     """Persist full and property-masked entity writes in one Datastore batch.
 
@@ -664,8 +722,15 @@ def save_mutations(writes):
         if mask is not None and getattr(entity.key, "is_partial", False):
             raise ValueError("Property-masked writes require a complete entity key")
 
-    fingerprints = update_site_fingerprints(
-        *(entity.db for entity, _ in writes)
+    fingerprint_entities = [
+        entity.db
+        for entity, mask in writes
+        if _advances_site_fingerprint(entity, mask)
+    ]
+    fingerprints = (
+        update_site_fingerprints(*fingerprint_entities)
+        if fingerprint_entities
+        else []
     )
     with DATA.datastore.batch() as batch:
         for entity, mask in writes:

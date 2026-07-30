@@ -312,26 +312,6 @@ self.addEventListener("message", (event) => {
 	receiveConnectivityMessage(event.data);
 });
 
-/**
- * @testable false
- * @reason service-worker client message delivery is exercised through browser messaging flows rather than focused unit checks
- */
-function messageClients(data) {
-	return self.clients
-		.matchAll({ type: "window", includeUncontrolled: true })
-		.then((clients) =>
-			Promise.all(clients.map((client) => client.postMessage(data))),
-		);
-}
-
-self.addEventListener("push", (event) => {
-	if (event.data) {
-		const payload = event.data.json();
-
-		event.waitUntil(messageClients(payload.data));
-	}
-});
-
 self.addEventListener("install", (event) => {
 	event.waitUntil(self.skipWaiting());
 });

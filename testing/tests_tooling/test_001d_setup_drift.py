@@ -21,23 +21,6 @@ def _fetch_json(url):
 # @features setup
 # @dimensions api-drift
 @pytest.mark.setup_drift
-def test_firebase_management_discovery_has_used_endpoints():
-    data = _fetch_json(
-        "https://firebase.googleapis.com/$discovery/rest?version=v1beta1"
-    )
-    text = json.dumps(data)
-
-    assert (
-        data["resources"]["projects"]["methods"]["addFirebase"]["httpMethod"]
-        == "POST"
-    )
-    assert "firebase.projects.webApps.create" in text
-    assert "firebase.projects.webApps.getConfig" in text
-
-
-# @features setup
-# @dimensions api-drift
-@pytest.mark.setup_drift
 def test_app_engine_discovery_has_domain_mapping_create():
     data = _fetch_json(
         "https://appengine.googleapis.com/$discovery/rest?version=v1"

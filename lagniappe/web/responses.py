@@ -1,5 +1,3 @@
-from firebase_admin import messaging
-import json
 from types import SimpleNamespace
 from flask import (
     Response,
@@ -14,14 +12,12 @@ from flask_login import current_user
 from smartypants import smartypants
 import yaml
 
-from config import SETTINGS
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
     Action,
     Fetch,
     IngressStage,
-    PushDeliveryOutcome,
     Resource,
     SearchFacets,
 )
@@ -129,164 +125,14 @@ def entity_response(response, *entities):
     return response
 
 
-# --- Messaging Responses ---
-
-
-def _is_test_messaging_token(token):
-    return isinstance(token, str) and token.startswith("test:")
-
-
-# @testable true
-# @tests tests_e2e/001_site/test_001c_messaging.py::test_browser_message_producers_add_protocol_version
-# @tests tests_e2e/002_home/test_002o_deferred_jobs.py::test_deferred_push_classifies_provider_delivery_outcomes
-# @features browser-protocol
-# @dimensions single-recipient producer version
-def send_message(data, send_to):
-    if not send_to:
-        return PushDeliveryOutcome.ACCEPTED
-    if _is_test_messaging_token(send_to):
-        return PushDeliveryOutcome.ACCEPTED
-    data = {
-        **data,
-        "protocol": SETTINGS.BROWSER_PROTOCOL["id"],
-        "protocol_version": SETTINGS.BROWSER_PROTOCOL["version"],
-    }
-    data = {str(k): "" if v is None else str(v) for k, v in data.items()}
-
-    message = messaging.Message(
-        data=data,
-        fid=send_to,
-    )
-    try:
-        messaging.send(message)
-        return PushDeliveryOutcome.ACCEPTED
-    except (messaging.UnregisteredError, messaging.SenderIdMismatchError):
-        return PushDeliveryOutcome.PERMANENT_TOKEN_FAILURE
-    except Exception as e:
-        exceptions.capture(
-            e,
-            context={
-                "operation": "send_message",
-                "keys": sorted(data.keys()),
-                "payload_bytes": len(
-                    json.dumps(data, separators=(",", ":")).encode("utf-8")
-                ),
-            },
-        )
-        return PushDeliveryOutcome.TRANSIENT_FAILURE
-
-
 # @testable false
 # @manual true
-# @reason pending/completed notification replacement depends on provider FCM delivery
+# @reason pending/completed notification replacement is exercised through notification workflows
 # @features notifications
 # @dimensions item-html pending target
 def notification_item(notification):
     template = get_template_attribute("notifications.html", "item")
     return template(notification).strip()
-
-
-# @testable false
-# @reason FCM delivery is provider-owned; deferred process tests patch the sender
-def send_notification(notification, send_to):
-    if not send_to or _is_test_messaging_token(send_to):
-        return PushDeliveryOutcome.ACCEPTED
-
-    return send_message(
-        {"type": "notification", "html": notification_item(notification)},
-        send_to,
-    )
-
-
-# @testable false
-# @covered-by lagniappe/web/responses.py::send_message
-# @reason notification template adapter delegates its provider envelope to send_message
-def notify_offline_processing(send_to):
-    template = get_template_attribute("notifications.html", "processing_offline")
-    send_message(
-        {"type": "notification", "html": template().strip()},
-        send_to,
-    )
-
-
-MAX_PAYLOAD_BYTES = 4000
-
-
-# @testable true
-# @tests tests_e2e/001_site/test_001c_messaging.py::test_browser_message_producers_add_protocol_version
-# @tests tests_e2e/001_site/test_001c_messaging.py::test_multicast_message_discards_permanently_invalid_tokens
-# @pair browser-protocol:multicast
-# @pair browser-protocol:producer
-# @pair browser-protocol:version
-# @pair messaging:stale-token
-def send_multicast_message(message_type, data, send_to):
-    tokens = [t for t in send_to if t and not _is_test_messaging_token(t)]
-    if not tokens:
-        return
-
-    payload = {
-        "message": json.dumps(data, separators=(",", ":")),
-        "protocol": SETTINGS.BROWSER_PROTOCOL["id"],
-        "protocol_version": str(SETTINGS.BROWSER_PROTOCOL["version"]),
-        "type": message_type,
-    }
-    message = messaging.MulticastMessage(data=payload, fids=tokens)
-    batch = messaging.send_each_for_multicast(message)
-    permanent_failures = [
-        token
-        for token, response in zip(tokens, getattr(batch, "responses", ()))
-        if isinstance(
-            getattr(response, "exception", None),
-            (messaging.UnregisteredError, messaging.SenderIdMismatchError),
-        )
-    ]
-    cache.discard_viewer_tokens(permanent_failures)
-    return batch
-
-
-# @testable true
-# @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_sync_response_contract_is_browser_visible
-# @features sync
-# @dimensions document response-contract
-def sync_update(update, tokens):
-    """Broadcast a widget update to the given FCM ``tokens``.
-
-    If the full payload doesn't fit in an FCM message we fall back to a
-    fetch flag that keeps the routing identifiers (``sync_id``,
-    ``user_hash``) intact so the client can re-fetch the state directly.
-    """
-    update_data = {
-        "sync_id": update.get("sync_id"),
-        "user_hash": current_user.hash,
-        "fetch": update.get("fetch"),
-        "update": update.get("update"),
-        "fingerprint": update.get("fingerprint"),
-    }
-
-    payload = {"update": update_data}
-    encoded = json.dumps(payload, separators=(",", ":"))
-    if len(encoded.encode("utf-8")) > MAX_PAYLOAD_BYTES:
-        payload = {
-            "update": {
-                "sync_id": update.get("sync_id"),
-                "user_hash": current_user.hash,
-                "fetch": True,
-            }
-        }
-
-    send_multicast_message("sync-update", payload, tokens)
-
-
-# @testable infrastructure
-def broadcast_delete(key, hashes):
-    """Notify everyone currently viewing any of ``hashes`` that ``key`` was deleted."""
-    viewers = cache.active_viewers(hashes)
-    if not viewers:
-        return
-
-    send_multicast_message(
-        "server-change", {"type": "delete", "key": key}, list(viewers)
-    )
 
 
 # --- Index Responses ---
@@ -1004,6 +850,7 @@ def delete_entity(entity=None, key=None):
 # --- Manual & Reference Responses ---
 
 
+# @testable infrastructure
 def manual_index(section, index):
     page_content = smartypants(render_template(f"manual/content/{section}.html"))
     public_page = bool(CONFIG.PUBLIC_MANUAL and not current_user.is_authenticated)
@@ -1013,7 +860,7 @@ def manual_index(section, index):
         "public_page": public_page,
     }
     if public_page:
-        context.update(page_mode="public", messaging_disabled=True)
+        context.update(page_mode="public")
 
     return render_template("manual/index.html", **context), 200
 

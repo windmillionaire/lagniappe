@@ -56,8 +56,14 @@ def print_summary():
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_validate_input_retries_allows_empty_and_exits
 # @features setup
 # @dimensions interactive-input
-def validate_input(prompt, validation_fn=None, error_msg=None, allow_empty=False):
-    """Decorator factory for validating user input with custom validation."""
+def validate_input(
+    prompt,
+    validation_fn=None,
+    error_msg=None,
+    allow_empty=False,
+    default=None,
+):
+    """Decorator factory for validated input with an optional Enter default."""
 
     # @testable false
     # @covered-by installer/utils.py::validate_input
@@ -71,12 +77,23 @@ def validate_input(prompt, validation_fn=None, error_msg=None, allow_empty=False
             from installer import FORMATTER
 
             f = FORMATTER.initialize()
+            has_default = default not in (None, "")
+            default_value = str(default).strip() if has_default else ""
+            if has_default:
+                prompt_suffix = (
+                    f" [{default_value}] "
+                    "(press Enter to use the bracketed value; x to exit): "
+                )
+            else:
+                prompt_suffix = " (x to exit): "
 
             while True:
-                value = input(f.info(f"{prompt} (x to exit): "))
+                value = input(f.info(f"{prompt}{prompt_suffix}"))
                 if value.lower() == "x":
                     print(f.error("Setup cancelled."))
                     raise SetupCancelled("Setup cancelled by the operator.")
+                if not value and has_default:
+                    value = default_value
                 if not value and not allow_empty:
                     print(f.error("Input cannot be empty. Please try again."))
                     continue
@@ -147,6 +164,10 @@ def run_gcloud_command(command, check=True, timeout=GCLOUD_TIMEOUT):
 def deploy_to_app_engine(*, print_final_summary=True):
     from runner.deploy import deploy
 
+    print(
+        "Deploying the App Engine indexes and application may take up to "
+        "10 minutes. Deployment progress will appear below."
+    )
     deploy(
         build_assets=False,
         deploy_indexes=True,

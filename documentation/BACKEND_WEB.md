@@ -21,8 +21,8 @@ the stack. Initialization:
 6. **Security headers**: Applied via `after_request` -- HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
 7. **ETag support**: If `g.fingerprint` is set by a route, it's included as an `ETag` header (combined with build ID)
 8. **Cache invalidation**: If Flask-Login already loaded an authenticated user and that user has `invalidate_cache` set, adds `X-Lagniappe-Invalidate-Cache` (triggers service worker cache wipe without forcing user loads for static/health-check requests)
-9. **Firebase**: Initialized with the shared runtime ADC credential and the
-   explicit Google Cloud project
+9. **Polling routes**: Registers the versioned, permission-checked `/poll`
+   contract used by mounted browser state
 
 ## Startup (`web/start/`)
 
@@ -188,12 +188,11 @@ test rejects route-level `Entities.load`,
 |---|---|
 | `@logged_in` | Simple authentication check (no authorization) |
 | `@home_permission()` | Home page -- uses route-based or starred fingerprints |
-| `@test_permission` | Test-only endpoints -- requires test_user flag |
 
 ### Agent Access
 
 `/users/agent-login` is an optional form-based login for browser agents or
-manual review sessions that cannot use Google/Firebase confirmation flows. It
+manual review sessions that cannot use Google confirmation flows. It
 is disabled unless `AGENT_ACCESS_ENABLED`, `AGENT_ACCESS_EMAIL`, and
 `AGENT_ACCESS_CODE` are present in app settings. A successful code submission
 creates or loads the configured user as a normal user account, including its
@@ -238,23 +237,15 @@ def tasks(key, **kwargs):
 
 `get_template_attribute` renders a single Jinja macro from a template file, returning just the HTML fragment. This is how widgets load their content -- the frontend's `request.mjs` fetches the fragment and the widget inserts it into the DOM.
 
-### Deferred Push Delivery
+### Unified Polling
 
-`responses.send_message()` returns a `PushDeliveryOutcome`: accepted,
-permanently invalid token, or transient failure. Missing and test-only tokens
-are accepted no-op delivery steps. Unregistered and sender-mismatched tokens are
-permanent; other provider exceptions are captured and classified transient.
-Ordinary route, sync, and server-change callers ignore this return value and remain
-best-effort.
-
-The shared deferred-job bridge is stricter. A transient outcome raises
-`DeferredJobInfrastructureError`, causing `/process/jobs` to return 503 while
-leaving the current notification or event marker incomplete. Accepted and
-permanent-token outcomes complete that marker. A later Cloud Task delivery sees
-the already-terminal job and resumes delivery without rerunning prepare or
-apply. Because provider acceptance precedes the marker save, a persistence
-failure in that narrow window may produce a duplicate push; notification upsert
-and destination refetch keep that safer than silently losing the event.
+`POST /poll` accepts a bounded versioned batch of typed subscriptions. It
+deduplicates entity loads, checks viewer permissions, and returns a common
+changed/unchanged/unavailable/error envelope. Entity and collection cursors are
+durable fingerprints; document cursors are Redis generations/revisions;
+deferred operations use `status_revision`. Large HTML or data remains on
+focused replacement routes. See
+[SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md).
 
 ### Deferred Admin Export
 
@@ -270,14 +261,13 @@ request, claims the job, and rechecks the actor's current site permission.
 `SiteExportAdapter` marks the export record running, calls
 `lagniappe.core.tools.site_export.build_site_export()`, and persists the returned
 complete metadata only after the builder writes `manifest.json` last. Generic
-terminal delivery then completes the notification and sends
-`deferred-complete` so the admin widget refreshes on success or failure. If the
-initial production enqueue raises or returns no task identity, start
-compensation instead marks both the export record and durable job failed,
-completes the pending notification, and returns the enqueue failure to the
-request boundary without running the export builder. See
-[AI_PIPELINE.md](AI_PIPELINE.md) for the shared job and browser-delivery
-architecture.
+terminal delivery then completes the notification. The browser's `operation`
+subscription observes terminal status and reconciles the admin widget on
+success or failure. If the initial production enqueue raises or returns no task
+identity, start compensation instead marks both the export record and durable
+job failed, completes the pending notification, and returns the enqueue failure
+to the request boundary without running the export builder. See
+[AI_PIPELINE.md](AI_PIPELINE.md) for the shared job and polling architecture.
 
 ### Index Pages with ETag Caching
 

@@ -18,7 +18,6 @@ from runner.process import run_command
 PACKAGE_IMPORTS = {
     "bs4": "beautifulsoup4",
     "dateutil": "python-dateutil",
-    "firebase_admin": "firebase-admin",
     "flask_login": "flask-login",
     "flask_wtf": "flask-wtf",
     "google.api_core": "google-api-core",

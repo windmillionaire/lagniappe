@@ -194,8 +194,14 @@ def _print_gmail_instructions():
 # @covered-by installer/auth_email.py::_setup_provider_auth_email
 # @reason interactive retry and cancellation behavior is owned by setup
 def _prompt(label, default=None):
-    suffix = f" [{default}]" if default not in (None, "") else ""
-    value = input(f"{label}{suffix} (x to exit): ").strip()
+    if default not in (None, ""):
+        suffix = (
+            f" [{default}] "
+            "(press Enter to use the bracketed value; x to exit): "
+        )
+    else:
+        suffix = " (x to exit): "
+    value = input(f"{label}{suffix}").strip()
     if value.casefold() == "x":
         raise SetupCancelled("Installation cancelled during email installer.")
     return value or str(default or "").strip()

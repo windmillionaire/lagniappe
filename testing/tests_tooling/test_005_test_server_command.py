@@ -64,7 +64,6 @@ def make_demo_app(tmp_path: Path) -> Path:
                 "AI_MODEL": "gemini-test",
                 "AI_UTILITY_MODEL": "gemini-lite-test",
                 "AI_IMAGE_MODEL": "imagen-test",
-                "FIREBASE_CONFIG": '{"apiKey": "demo"}',
             }
         )
     )

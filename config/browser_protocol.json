@@ -1,18 +1,10 @@
 {
   "id": "lagniappe-browser",
-  "version": 2,
+  "version": 3,
   "messages": {
     "CONNECTIVITY": "connectivity-state"
   },
-  "events": {
-    "SERVER_CHANGE": "server-change",
-    "NOTIFICATION": "notification",
-    "SYNC_UPDATE": "sync-update",
-    "IMPORT_RESULT": "import-result",
-    "IMPORT_COMPLETE": "import-complete",
-    "IMPORT_STOPPED": "import-stopped",
-    "IMPORT_ERROR": "import-error"
-  },
+  "events": {},
   "connectivity": {
     "browser": ["online", "offline"],
     "server": ["unknown", "online", "offline"],

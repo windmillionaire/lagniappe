@@ -167,17 +167,6 @@ def _document_save_response(text):
     return predicate
 
 
-def _disable_sync_token(user):
-    user.page.evaluate(
-        """() => {
-            const view = document.querySelector("[lp-view]")?._lp_view;
-            if (!view) return;
-            view.fcmToken = null;
-            if (view.SyncManager) view.SyncManager.token = null;
-        }"""
-    )
-
-
 def _fetch_status(user, path, method="POST", data=None):
     return user.page.evaluate(
         """async ({ path, method, data }) => {
@@ -401,7 +390,6 @@ def test_public_user_edits_document_without_ai_or_image_tools(limited_public_use
     user = scenario.user
     page = scenario.page
     editor = page.editor
-    _disable_sync_token(user)
     text = f"public document edit {uuid4().hex}"
     editor.clear_text()
     editor.type_text(text)
@@ -410,6 +398,7 @@ def test_public_user_edits_document_without_ai_or_image_tools(limited_public_use
         editor.text_entry.blur()
     assert response_info.value.ok
     post_data = response_info.value.request.post_data or ""
+    assert json.loads(post_data)["client_id"]
     assert '"token"' not in post_data
     saved_page = Entities.fetch_one(
         scenario.entity.page.key, request=Fetch.direct()

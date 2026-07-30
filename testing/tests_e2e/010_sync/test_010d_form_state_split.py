@@ -7,11 +7,13 @@ from uuid import uuid4
 import pytest
 from playwright.sync_api import expect
 
-from lagniappe.web.routes.home import edited as edited_routes
+from lagniappe.core.definitions import Fetch, FetchReason
+from lagniappe.core.entities import Entities
+from lagniappe.web.routes.home import poll as poll_routes
 from lagniappe.web.routes.home import sync as sync_routes
 from lagniappe.web.routes.pages import main as page_routes
 from lagniappe.web.routes.tasks import main as task_routes
-from testing.definitions import Pages, Users
+from testing.definitions import Pages, Tasks, Users
 
 
 pytestmark = pytest.mark.e2e
@@ -21,6 +23,7 @@ pytestmark = pytest.mark.e2e
 def test_live_sync_rejects_form_widget_payloads():
     error = sync_routes._validate_sync_payload(
         {
+            "client_id": "form-contract-test",
             "updates": [
                 {
                     "key": "page-key",
@@ -30,10 +33,11 @@ def test_live_sync_rejects_form_widget_payloads():
             ]
         }
     )
-    assert error == "Only document widgets may use live sync."
+    assert error == "Only identified document widgets may use live sync."
     assert (
         sync_routes._validate_sync_payload(
             {
+                "client_id": "document-contract-test",
                 "updates": [
                     {
                         "key": "page-key",
@@ -47,38 +51,57 @@ def test_live_sync_rejects_form_widget_payloads():
     )
 
 
-# @pairs deferred-jobs:form-lock edited-entity-notice:active-operation
-def test_edited_operations_are_independent_of_fingerprint_drift(monkeypatch):
+# @pairs deferred-jobs:form-lock polling:revision
+def test_poll_form_lock_revision_is_independent_of_entity_fingerprint(monkeypatch):
     class Page:
         urlsafe_key = "page-key"
+        fingerprint = "entity-fingerprint"
 
         def allowed(self, action, user=None):
             return user == "editor"
 
-    monkeypatch.setattr(edited_routes.Entities, "PAGE", Page)
-    monkeypatch.setattr(edited_routes.Entities, "TASK", type(None))
-    monkeypatch.setattr(
-        edited_routes,
-        "deferred_job_lock_descriptors",
-        lambda targets: {
-            targets[0].urlsafe_key: (
-                SimpleNamespace(scope="form-autofill"),
-                SimpleNamespace(urlsafe_key="operation-key", status_revision=6),
-            )
-        },
-    )
+    monkeypatch.setattr(poll_routes, "current_user", "editor")
+    entity = Page()
+    active_locks = {
+        entity.urlsafe_key: (
+            SimpleNamespace(scope="form-autofill"),
+            SimpleNamespace(urlsafe_key="operation-key", status_revision=6),
+        )
+    }
+    descriptor = {
+        "id": "form-lock:page-key",
+        "type": "form-lock",
+        "key": entity.urlsafe_key,
+        "revision": "operation-key:5",
+    }
 
-    operations = edited_routes._active_operations([Page()], "editor")
-
-    assert operations == [
-        {
+    assert poll_routes._lock_result(descriptor, entity, active_locks) == {
+        "id": "form-lock:page-key",
+        "type": "form-lock",
+        "status": "changed",
+        "revision": "operation-key:6",
+        "poll_after_ms": 15000,
+        "payload": {
             "key": "page-key",
             "locked": True,
             "scope": "form-autofill",
             "operation": "operation-key",
             "revision": 6,
-        }
-    ]
+        },
+    }
+
+    entity.fingerprint = "changed-entity-fingerprint"
+    assert poll_routes._lock_result(
+        {**descriptor, "revision": "operation-key:6"},
+        entity,
+        active_locks,
+    ) == {
+        "id": "form-lock:page-key",
+        "type": "form-lock",
+        "status": "unchanged",
+        "revision": "operation-key:6",
+        "poll_after_ms": 15000,
+    }
 
 
 # @pairs offline:replay-precondition forms:conflict-review
@@ -226,3 +249,60 @@ def test_form_submission_reconciliation_uses_latest_schema(get_user):
             other.close()
         form.schema = original_schema
         form.save()
+
+
+# @pair tasks:active-form-preservation
+# @template controls.html::edited_marker
+# @template pages/tasks.html::task_form
+def test_task_collection_refresh_preserves_active_form_for_revision_review(
+    get_user,
+):
+    owner = get_user(Users.OWNER)
+    task = Tasks.test_task_update_preserves_open_widget.get(owner)
+    owner.go(task)
+    task_form = task.task_form
+    field_id = "input-textab12"
+    field = task_form.locator(f"input[name='{field_id}']")
+    local_value = field.input_value()
+    saved_value = f"Saved task value {uuid4().hex[:8]}"
+    saved_task = Entities.fetch_one(
+        task.key,
+        request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
+    )
+
+    try:
+        submission = dict(saved_task.properties.submission.form_value)
+        submission[field_id] = saved_value
+        saved_task.form_submission(submission)
+        saved_task.save()
+
+        owner.page.evaluate(
+            """async () => {
+                const view = document.querySelector("[lp-view]")._lp_view;
+                await view.PollingCoordinator.trigger();
+            }"""
+        )
+
+        task_form = task.element.locator(task.TASK_FORM)
+        marker = task_form.locator("[lp-edited-marker]")
+        expect(marker).to_be_visible()
+        expect(field).to_have_value(local_value)
+        marker.locator("[data-role='edited-reset']").click()
+
+        modal = owner.page.locator("#modal")
+        expect(modal).to_be_visible()
+        expect(
+            modal.locator("[data-revision-source='local']").get_by_text(
+                local_value, exact=True
+            )
+        ).to_be_visible()
+        expect(
+            modal.locator("[data-revision-source='server']").get_by_text(
+                saved_value, exact=True
+            )
+        ).to_be_visible()
+    finally:
+        restored = dict(saved_task.properties.submission.form_value)
+        restored[field_id] = local_value
+        saved_task.form_submission(restored)
+        saved_task.save()

@@ -1,5 +1,5 @@
 import { STYLES } from "styles";
-import { ENDPOINTS, EVENTS, request } from "../shared";
+import { ENDPOINTS, request } from "../shared";
 import { createIcon } from "../shared/icons";
 import { Dropdown } from "./combobox/dropdown";
 
@@ -20,7 +20,6 @@ export class Notifications {
 		this.count = document.querySelector("[data-role='notification-count']");
 		this.notifications = [];
 
-		this.receiveNotification = this.receiveNotification.bind(this);
 		this._selectNotification = this._selectNotification.bind(this);
 		this._clearNotifications = this._clearNotifications.bind(this);
 		this._closeOnNotificationClick = this._closeOnNotificationClick.bind(this);
@@ -46,20 +45,28 @@ export class Notifications {
 				panel: `${STYLES.dropdown.panel} mt-2 w-80 max-w-[calc(100vw-1rem)] sm:w-96`,
 			},
 		});
-		window.addEventListener(EVENTS.NOTIFICATION, this.receiveNotification);
 		this._updateCount();
-		void this.refresh();
-	}
-
-	receiveNotification(event) {
-		const { html } = event.detail;
-		this.upsertNotification(html);
+		this._unsubscribe = this.view.PollingCoordinator?.subscribe(
+			{
+				id: "personal:notifications",
+				type: "channel",
+				channel: "notifications",
+				revision: null,
+			},
+			{
+				onResult: async (result) => {
+					if (result.status !== "changed") return;
+					if (!(await this.refresh())) return false;
+					return true;
+				},
+			},
+		);
 	}
 
 	/**
 	 * @testable false
 	 * @manual true
-	 * @reason pending/completed notification replacement depends on provider FCM delivery
+	 * @reason pending/completed replacement is covered through dropdown refresh
 	 * @features notifications
 	 * @dimensions upsert pending-complete
 	 */
@@ -80,13 +87,14 @@ export class Notifications {
 	}
 
 	async refresh() {
-		if (!this.dropdown || !this.view.online) return;
+		if (!this.dropdown || !this.view.online) return false;
 
 		const response = await request.get(ENDPOINTS.notifications);
-		if (!response?.ok || !response.html) return;
+		if (!response?.ok || !response.html) return false;
 
 		this.notifications = this._optionsFromHtml(response.html);
 		this._updateDropdown();
+		return true;
 	}
 
 	_optionsFromHtml(html) {
@@ -194,5 +202,12 @@ export class Notifications {
 			this.button.setAttribute("aria-label", `Notifications: ${count}`);
 		}
 		this.visible = count > 0;
+	}
+
+	destroy() {
+		this._unsubscribe?.();
+		this._unsubscribe = null;
+		this.dropdown?.destroy?.();
+		this.dropdown = null;
 	}
 }

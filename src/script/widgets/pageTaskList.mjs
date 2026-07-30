@@ -12,9 +12,11 @@ import { BaseList } from "../elements/base/baseList";
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_empty_page_task_list_shows_marker_only_after_create_closes
  * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_completed_only_task_list_hides_empty_marker
  * @tests tests_js/test_028_form_state_split.py::test_task_list_refresh_preserves_rows_with_local_form_state
+ * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_task_collection_refresh_preserves_active_form_for_revision_review
  * @tests tests_js/test_028_form_state_split.py::test_task_list_empty_marker_requires_closed_create_form_and_no_tasks
  * @features tasks
- * @dimensions readonly assignee permission-gates refresh update-state stale-widget create while-open list-state dedupe unsaved-marker dirty-form-preservation
+ * @dimensions readonly assignee permission-gates refresh update-state stale-widget create while-open list-state dedupe unsaved-marker active-form-preservation dirty-form-preservation
+ * @pair tasks:active-form-preservation
  * @pair tasks:dirty-form-preservation
  * @pairs tasks:completed-only tasks:empty-state tasks:create-close
  */
@@ -378,6 +380,7 @@ export class PageTaskList extends BaseList {
 	_hasPendingLocalFormState(component) {
 		return Object.values(component?.widgets ?? {}).some(
 			(widget) =>
+				(component.active === widget && widget.visible === true) ||
 				widget.unsavedState === true ||
 				widget.form?._queued === true ||
 				Boolean(

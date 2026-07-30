@@ -60,10 +60,10 @@ class Config:
             setattr(self, key, value)
         if (
             getattr(self, "CONFIG_KIND", None) != "lagniappe-settings"
-            or getattr(self, "CONFIG_SCHEMA_VERSION", None) != 2
+            or getattr(self, "CONFIG_SCHEMA_VERSION", None) != 3
         ):
             raise RuntimeError(
-                "Lagniappe requires a current schema-2 settings file. "
+                "Lagniappe requires a current schema-3 settings file. "
                 "Regenerate the installation configuration with setup."
             )
         app_engine_location = getattr(self, "APP_ENGINE_LOCATION", None)
@@ -134,12 +134,10 @@ class Config:
         self.REDIS_CA_CERT = getattr(self, "REDIS_CA_CERT", None)
         self.LOGIN_USER_KEY = "_lagniappe_user_key"
         self.LOGIN_USER_PAGE_KEY = "_lagniappe_user_page_key"
-        self.LOGIN_MESSAGING_DISABLED_KEY = "_lagniappe_messaging_disabled"
         self.LOGIN_INVALIDATE_CACHE_KEY = "_lagniappe_invalidate_cache"
         self.AUTH_SESSION_CACHE_KEYS = (
             self.LOGIN_USER_KEY,
             self.LOGIN_USER_PAGE_KEY,
-            self.LOGIN_MESSAGING_DISABLED_KEY,
             self.LOGIN_INVALIDATE_CACHE_KEY,
             "restrictions",
             "belongs_to",

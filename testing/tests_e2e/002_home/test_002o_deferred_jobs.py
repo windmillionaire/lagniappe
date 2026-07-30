@@ -2,67 +2,21 @@
 
 from uuid import uuid4
 
-from firebase_admin import messaging
 import pytest
 
 from lagniappe.core.definitions import (
     DeferredJobSpec,
     DeferredJobType,
     Fetch,
-    PushDeliveryOutcome,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import deferred_jobs
 from lagniappe.core.tools import deferred_job_adapters
 from lagniappe.core.tools.deferred_jobs import DeferredJobs
-from lagniappe.web import app as web_app, responses
+from lagniappe.web import app as web_app
 from testing.definitions import SitePages, Users
 
 
 pytestmark = pytest.mark.e2e
-
-
-def test_deferred_push_classifies_provider_delivery_outcomes(monkeypatch):
-    event = {"type": "deferred-complete", "destination": "test:Destination"}
-    sent = []
-    captured = []
-    monkeypatch.setattr(responses.messaging, "send", sent.append)
-    monkeypatch.setattr(
-        responses.exceptions,
-        "capture",
-        lambda error, **kwargs: captured.append((error, kwargs)),
-    )
-
-    assert (
-        deferred_jobs._send_event(event, "browser-token")
-        is PushDeliveryOutcome.ACCEPTED
-    )
-    assert len(sent) == 1
-
-    def unregistered(_message):
-        raise messaging.UnregisteredError("token is no longer registered")
-
-    monkeypatch.setattr(responses.messaging, "send", unregistered)
-    assert (
-        deferred_jobs._send_event(event, "expired-token")
-        is PushDeliveryOutcome.PERMANENT_TOKEN_FAILURE
-    )
-    assert captured == []
-
-    def quota_failure(_message):
-        raise messaging.QuotaExceededError("provider quota unavailable")
-
-    monkeypatch.setattr(responses.messaging, "send", quota_failure)
-    assert (
-        responses.send_message({"type": "ordinary"}, "browser-token")
-        is PushDeliveryOutcome.TRANSIENT_FAILURE
-    )
-    with pytest.raises(
-        deferred_jobs.DeferredJobInfrastructureError,
-        match="event delivery is temporarily unavailable",
-    ):
-        deferred_jobs._send_event(event, "browser-token")
-    assert len(captured) == 2
 
 
 def test_report_generation_runs_through_durable_job_checkpoint(get_user, monkeypatch):
@@ -143,9 +97,12 @@ def test_report_generation_runs_through_durable_job_checkpoint(get_user, monkeyp
     assert saved_report.status == "ready"
 
 
-# @features deferred-jobs
-# @dimensions status owner batch etag progress timing
-def test_deferred_status_is_owner_safe_and_batched(get_user):
+# @pairs polling:protocol polling:operation polling:owner polling:batching
+# @pairs polling:progress polling:timing polling:revision polling:unavailable
+# @pair polling:permissions
+# @pairs deferred-jobs:status deferred-jobs:owner deferred-jobs:batching
+# @pairs deferred-jobs:progress deferred-jobs:timing
+def test_poll_operation_is_owner_safe(get_user):
     owner_browser = get_user(Users.OWNER)
     other_browser = get_user(Users.create_user, creator=owner_browser)
     owner = Entities.USER.load(owner_browser.email)
@@ -177,28 +134,62 @@ def test_deferred_status_is_owner_safe_and_batched(get_user):
                 "X-CSRFToken": document.getElementById("token")?.value || "",
                 "X-Lagniappe-Request": "true",
             };
-            const first = await fetch("/tools/operations/status", {
+            const response = await fetch("/poll", {
                 method: "POST",
                 headers,
-                body: JSON.stringify({operations}),
+                body: JSON.stringify({
+                    version: 1,
+                    client_id: "operation-owner-test",
+                    subscriptions: operations.map((key, index) => ({
+                        id: index === 0 ? `operation:${key}` : `operation-${index}`,
+                        type: "operation",
+                        key,
+                        revision: null,
+                    })),
+                }),
             });
-            const body = await first.json();
-            const etag = first.headers.get("ETag");
-            const second = await fetch("/tools/operations/status", {
+            const body = await response.json();
+            const current = body.results[0];
+            const unchangedResponse = await fetch("/poll", {
                 method: "POST",
-                headers: {...headers, "If-None-Match": etag},
-                body: JSON.stringify({operations}),
+                headers,
+                body: JSON.stringify({
+                    version: 1,
+                    client_id: "operation-owner-test",
+                    subscriptions: [{
+                        id: `operation:${operations[0]}`,
+                        type: "operation",
+                        key: operations[0],
+                        revision: current.revision,
+                        operation_revision: current.operation_revision,
+                    }],
+                }),
             });
-            return {body, etag, secondStatus: second.status};
+            return {
+                status: response.status,
+                body,
+                unchangedStatus: unchangedResponse.status,
+                unchangedBody: await unchangedResponse.json(),
+            };
         }""",
         [owner_job.urlsafe_key, other_job.urlsafe_key, "missing-operation"],
     )
 
-    assert [status["key"] for status in result["body"]["operations"]] == [
-        owner_job.urlsafe_key
-    ]
-    assert result["body"]["operations"][0]["phase"] == "queued"
-    assert result["body"]["operations"][0]["elapsed_seconds"] >= 0
-    assert result["body"]["operations"][0]["phase_elapsed_seconds"] >= 0
-    assert result["etag"]
-    assert result["secondStatus"] == 304
+    assert result["status"] == 200
+    statuses = result["body"]["results"]
+    assert statuses[0]["id"] == f"operation:{owner_job.urlsafe_key}"
+    assert len(statuses[0]["id"]) > 128
+    assert statuses[0]["status"] == "changed"
+    assert statuses[0]["payload"]["key"] == owner_job.urlsafe_key
+    assert statuses[0]["payload"]["phase"] == "queued"
+    assert statuses[0]["payload"]["elapsed_seconds"] >= 0
+    assert statuses[0]["payload"]["phase_elapsed_seconds"] >= 0
+    assert statuses[0]["revision"] == statuses[0]["payload"]["revision"]
+    assert isinstance(statuses[0]["operation_revision"], int)
+    assert statuses[1]["status"] == "unavailable"
+    assert statuses[2]["status"] == "unavailable"
+    assert result["unchangedStatus"] == 200
+    unchanged = result["unchangedBody"]["results"][0]
+    assert unchanged["status"] == "unchanged"
+    assert unchanged["revision"] == statuses[0]["revision"]
+    assert unchanged["operation_revision"] == statuses[0]["operation_revision"]

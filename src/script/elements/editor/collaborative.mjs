@@ -179,7 +179,6 @@ export class CollaborativeDocument {
 		if (html.trim() === "<p></p>" || html.trim() === "<p><br></p>") html = "";
 
 		const update = this._packageUpdates();
-		this.snapshot = ydoc;
 
 		if (html) {
 			this.target.dataset.history = "true";
@@ -194,48 +193,39 @@ export class CollaborativeDocument {
 	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
 	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_presence_appears_and_clears
 	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
+	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
 	 * @features sync
-	 * @dimensions document collaboration presence offline-replay replay-order
+	 * @dimensions document collaboration presence lifecycle offline-replay replay-order concurrency merge author-color
 	 */
 	async sync() {
-		if (this.toolbar && this.remote) {
+		if (this.toolbar && this.remote?.users) {
 			const others = this.remote.users.filter(
-				(u) => u.hash !== this.remote.user.hash,
+				(u) => u.hash !== this.remote.user?.hash,
 			);
 			this.toolbar.userManager.setUsers(others);
-		} else if (this.toolbar && this.update) {
-			this.toolbar.userManager.remoteUpdate(this.update.user_hash);
 		}
 
-		if (this.update?.update) {
-			Y.applyUpdate(
-				this.ydoc,
-				base64ToUint8Array(this.update.update),
-				"remote",
+		if (!this.remote) {
+			if (this.offlineRecord?.ydoc) {
+				Y.applyUpdate(
+					this.ydoc,
+					base64ToUint8Array(this.offlineRecord.ydoc),
+					"local",
+				);
+			}
+			this.offlineRecord = null;
+			return;
+		}
+
+		if (this.remote.mode === "snapshot" && this.remote.ydoc) {
+			this.toolbar?.userManager.remoteUpdate(
+				this.remote.user_hash,
+				this.remote.authors?.[this.remote.user_hash],
 			);
-			this.fingerprint = this.update.fingerprint;
-		}
-		this.update = null;
-
-		if (this.offlineRecord?.ydoc) {
-			Y.applyUpdate(
-				this.ydoc,
-				base64ToUint8Array(this.offlineRecord.ydoc),
-				"local",
-			);
-		}
-		this.offlineRecord = null;
-
-		if (!this.remote) return;
-
-		if (
-			this.remote.ydoc &&
-			(!this.snapshot || this.remote.fingerprint !== this.fingerprint)
-		) {
 			Y.applyUpdate(this.ydoc, base64ToUint8Array(this.remote.ydoc), "remote");
 			this.snapshot = this.remote.ydoc;
 			this.fingerprint = this.remote.fingerprint;
-		} else if (this.remote.markup) {
+		} else if (this.remote.mode === "snapshot" && this.remote.markup) {
 			this._applyingRemote = true;
 			try {
 				this.editor.commands.setContent(this.remote.markup, {
@@ -251,6 +241,23 @@ export class CollaborativeDocument {
 			this.snapshot = this._packageState();
 			this.fingerprint = this.remote.fingerprint;
 		}
+		if (this.offlineRecord?.ydoc) {
+			Y.applyUpdate(
+				this.ydoc,
+				base64ToUint8Array(this.offlineRecord.ydoc),
+				"local",
+			);
+		}
+		this.offlineRecord = null;
+		for (const update of this.remote.updates ?? []) {
+			if (!update?.update) continue;
+			this.toolbar?.userManager.remoteUpdate(
+				update.user_hash,
+				this.remote.authors?.[update.user_hash],
+			);
+			Y.applyUpdate(this.ydoc, base64ToUint8Array(update.update), "remote");
+		}
+		if (this.remote.fingerprint) this.fingerprint = this.remote.fingerprint;
 
 		this.remote = null;
 	}

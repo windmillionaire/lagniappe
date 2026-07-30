@@ -24,7 +24,7 @@ def _write_generation(root):
         },
         "config/files/lagniappe_settings.yaml": {
             "CONFIG_KIND": "lagniappe-settings",
-            "CONFIG_SCHEMA_VERSION": 2,
+            "CONFIG_SCHEMA_VERSION": 3,
             "APP_NAME": "Demo",
             "APP_URL": "https://demo.example.test",
             "GOOGLE_CLOUD_PROJECT": "demo-project",
@@ -104,10 +104,6 @@ def test_redacted_install_summary_is_allowlisted():
         "OCR_LOCATION": "us",
         "TASK_QUEUE_NAME": "lagniappe-tasks",
         "OCR_PROCESSOR_ID": "projects/demo/locations/us/processors/123",
-        "FIREBASE_CONFIG": {
-            "appId": "firebase-app",
-            "apiKey": "firebase-secret",
-        },
         "REDIS_HOST": "redis.example.test",
         "REDIS_PORT": 6379,
         "REDIS_PASSWORD": "redis-secret",
@@ -140,7 +136,6 @@ def test_redacted_install_summary_is_allowlisted():
         "bucket-source-secret",
         "redis-secret",
         "flask-secret",
-        "firebase-secret",
         "sentry-secret",
     ):
         assert secret not in text
@@ -153,7 +148,7 @@ def test_doctor_reports_keyless_identity_drift():
     assert doctor._keyless_identity_issues(
         {
             "CONFIG_KIND": "lagniappe-settings",
-            "CONFIG_SCHEMA_VERSION": 2,
+            "CONFIG_SCHEMA_VERSION": 3,
             "GOOGLE_CLOUD_PROJECT": "demo-project",
             "RUNTIME_SERVICE_ACCOUNT_EMAIL": runtime_email,
             "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": runtime_email,
@@ -163,7 +158,7 @@ def test_doctor_reports_keyless_identity_drift():
     issues = doctor._keyless_identity_issues(
         {
             "CONFIG_KIND": "lagniappe-settings",
-            "CONFIG_SCHEMA_VERSION": 2,
+            "CONFIG_SCHEMA_VERSION": 3,
             "GOOGLE_CLOUD_PROJECT": "demo-project",
             "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": (
                 "other@demo-project.iam.gserviceaccount.com"

@@ -36,7 +36,6 @@ FILTERED_PATTERNS = re.compile(
     r"update-session|"
     r"validate-user|"
     r"identity-config|"
-    r"firebase-config|"
     r"sw\.js|"
     r".*\.woff2|"
     r".*\.png|"

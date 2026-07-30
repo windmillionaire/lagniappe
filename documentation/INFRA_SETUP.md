@@ -2,7 +2,7 @@
 
 The setup system (`installer/`) is an interactive CLI installer that configures a
 new Lagniappe instance from scratch. The full installer handles core GCP,
-Firebase, Redis, optional Sentry, AI defaults/observability, manifest creation,
+Identity Platform, Redis, optional Sentry, AI defaults/observability, manifest creation,
 and deployment. Custom domain, AI-only configuration, Redis transport
 security, development tooling, and app-side settings updates are separate
 entry-point modes. Replacing an installed checkout with a current remote branch
@@ -161,7 +161,14 @@ after the installer has added `gcloud` to `PATH`.
 
 Setup requests Application Default Credentials itself. For a new project, it
 waits until the project has been created before opening that authentication
-flow and assigning the ADC quota project.
+flow and assigning the ADC quota project. Before either ADC browser path, setup
+instructs the operator to choose **Select all** when Google displays granular
+permission controls. The requested access authorizes the Google Cloud CLI and
+local setup code to act as the operator in their own project—in practical
+terms, the operator is granting the permissions to themselves. It does not
+grant the Lagniappe maintainer access to their account, project, or
+credentials. Every requested permission is required to configure, verify, or
+deploy the installation.
 
 When the canonical settings file exists and `lagniappe_dev.yaml` does not,
 setup announces recovery before installing dependencies or changing
@@ -171,10 +178,10 @@ candidate. The authenticated account becomes the installer/deployer, while the
 recovered `ADMIN_EMAIL` remains the application owner.
 
 Before recreating `lagniappe_dev.yaml`, setup validates the file's schema and
-cross-checks its project, service-account, Firebase, App Engine, OCR, queue, and
+cross-checks its project, service-account, Identity Platform, App Engine, OCR, queue, and
 bucket identities. It then authenticates CLI and ADC against that exact project
 and performs read-only discovery of saved service-account, App Engine,
-deployed-version, queue, OCR, Firebase, Storage, and Redis markers. Discovery
+deployed-version, queue, OCR, Identity Platform, Storage, and Redis markers. Discovery
 reports `AVAILABLE`, `ABSENT`, or `UNAVAILABLE`. Permission, authentication,
 network, malformed-response, and ambiguous failures are `UNAVAILABLE` and stop
 recovery; they are never treated as permission to create a replacement.
@@ -268,7 +275,7 @@ successful install prints an allowlisted final summary of the application,
 installer/deployer/owner/runtime identities, resource names, regions,
 Lagniappe/Python/runtime versions, deployment state, and exact doctor/repair
 commands. It never serializes the settings mapping and therefore cannot print
-private keys, passwords, tokens, Flask secrets, Firebase API keys, or a Sentry
+private keys, passwords, tokens, Flask secrets, legacy messaging API keys, or a Sentry
 DSN.
 
 ## Keyless Runtime Authentication
@@ -367,7 +374,7 @@ formal SBOM are not required release artifacts.
 
 Lagniappe does not use a synthetic configuration for development. The
 application and its browser/server tests depend on the ignored configuration,
-GCP project, Firebase, and Redis resources created by ordinary setup. Developer
+GCP project, Identity Platform, and Redis resources created by ordinary setup. Developer
 onboarding is therefore intentionally two-stage:
 
 ```bash
@@ -471,7 +478,11 @@ The full installation runs these steps in order:
    offered only when its active configuration name exactly matches the
    normalized installation name. Declining that existing project continues to
    the randomized new-project suggestion; declining a proposed new project
-   exits setup.
+   exits setup. Every value prompt that displays a bracketed suggestion
+   explicitly says that Enter accepts it and substitutes that value before
+   validation. This includes randomized project IDs, the default administrator
+   name, and suggested email/SMTP values. Choice prompts use the conventional
+   capitalized Enter default, such as `Y` in `[Y/n]` or `N` in `[y/N]`.
 3. **Draft and mutation confirmation** -- for recovery, validates the exact
    target and surviving resources before recreating the development file. It
    then writes the complete generated local draft, displays a concise
@@ -498,17 +509,14 @@ The full installation runs these steps in order:
    provider's actual location/hostname, provisions the production and recovery
    Storage buckets, creates the Cloud Tasks queue, and creates the OCR
    processor.
-6. **Domain, authentication email, Identity Platform, and Firebase Messaging**
+6. **Domain, authentication email, and Identity Platform**
    -- asks whether the operator already has a custom domain. When they do,
    setup creates the App Engine mapping, reconciles or prints its DNS records,
    and tests an operator-selected SMTP provider directly. Otherwise it opens a
    Google account picker for App Passwords and tests a Gmail or Google
    Workspace mailbox over SMTP/STARTTLS as the zero-domain bootstrap. It then
    initializes standalone Identity Platform against the selected public
-   origin, enables email/password authentication, and attaches Firebase only
-   for FCM/Web Push. Setup
-   re-reads the provider afterward and stops if Firebase changed the required
-   `IDENTITY_PLATFORM` subtype or authentication configuration.
+   origin and enables email/password authentication.
 7. **Admin/OAuth** -- sets the admin user, opens the target project's current
    Google Auth Platform Clients page, and guides the remaining one-time
    registration and Web OAuth client creation. If the platform is not
@@ -526,7 +534,8 @@ The full installation runs these steps in order:
 The required-API preflight lists enabled services once before confirmation.
 The mutation phase reuses that confirmed set: when no required APIs are
 pending, it makes no additional `gcloud services list` calls. When services are
-missing, it enables them in one bounded command. A defensive fallback for
+missing, it announces that API enablement may take up to five minutes and
+enables them in one bounded command. A defensive fallback for
 callers without preflight state performs one enabled-service listing with a
 60-second timeout rather than one unbounded lookup per API.
 Google may report a newly enabled service before its backend is ready. Setup
@@ -548,7 +557,21 @@ instead of dumping the provider's structured error.
     recovery provisioning fails after deployment, update reports a
     warning, leaves the successful deployment intact, and returns nonzero;
     active deferred jobs may fail until the operator repairs the schedule with
-    `./setup.sh jobs`.
+    `./setup.sh jobs`. The deploy helper announces its ten-minute upper wait
+    estimate before handing progress output to `gcloud`.
+
+App Engine discovery and confirmation have separate terminal lifecycles.
+Discovery's progress context exits completely before setup prints the immutable
+location warning and calls `input()`, so an animated terminal redraw cannot
+cover or consume the response. EOF is a typed cancellation with instructions to
+rerun in an interactive terminal. Only an affirmative response starts the
+creation request and a new progress context. The long-running operation has a
+300-second timeout, and its initial discovery/create RPCs each have a 60-second
+timeout; timeout or ambiguous transient failure explains that Google may still
+complete the application and that rerunning setup will discover and reuse it.
+Permission, invalid-location, conflict, and other provider failures remain typed
+nonzero exits. Existing applications skip the confirmation and reuse their
+provider-reported immutable location and hostname.
 
 Custom domain mapping is available during the default install when the
 operator already owns a domain; `url` remains the post-install entry point.
@@ -565,9 +588,9 @@ Creates/verifies `lagniappe.yaml`, `config/files/lagniappe_dev.yaml`, and
 `config/constants.py` for default values, validates required files, and can
 create fresh settings from the active gcloud account and selected project.
 The canonical settings file carries `CONFIG_KIND: lagniappe-settings` and
-`CONFIG_SCHEMA_VERSION: 2`. Recovery accepts only that current schema and
-rejects missing, unknown, or inconsistent identity metadata rather than
-retargeting the installation.
+`CONFIG_SCHEMA_VERSION: 3`. Recovery accepts that current schema, upgrades
+schema 2 snapshots, and rejects missing, unknown, or inconsistent identity
+metadata rather than retargeting the installation.
 `BUILD_ID` is not written to local settings; it is tracked in
 `config/constants.py` so updated source checkouts receive the repo's current
 asset cache-busting value.
@@ -722,8 +745,6 @@ The runtime project role set is:
 - `roles/datastore.user`;
 - `roles/firebaseauth.editor`, the narrower named role containing the Identity
   Platform account lookup/delete and OOB email-code permissions;
-- `roles/firebasecloudmessaging.admin`, the FCM API role containing send
-  permission and no Messaging Campaigns administration;
 - `roles/cloudtasks.enqueuer` plus `roles/cloudtasks.taskDeleter`;
 - `roles/documentai.apiUser`; and
 - `roles/aiplatform.user`.
@@ -731,8 +752,9 @@ The runtime project role set is:
 `roles/serviceusage.serviceUsageConsumer` is intentionally absent until the
 opt-in live runtime contract demonstrates that it is required. Runtime
 credentials never receive App Engine deployer, Cloud Build editor, Service
-Usage Admin, project IAM, key administration, Firebase Admin, Messaging
-Campaigns Admin, Cloud Tasks Admin, or project-wide Storage roles.
+Usage Admin, project IAM, key administration, Cloud Tasks Admin, or
+project-wide Storage roles. Upgrade/repair also removes the retired messaging
+roles listed in `REMOVED_RUNTIME_PROJECT_ROLES`.
 
 `configure_storage_buckets()` runs with installer ADC. Ordinary install,
 repair, and update modes create or reconcile the four deterministically named
@@ -821,45 +843,44 @@ service account, and gcloud account. Local unit, JavaScript, tooling, and E2E
 tests do not call Cloud Scheduler or mutate IAM; they mock the provisioning
 commands or call the reconciliation logic directly.
 
-### Identity Platform and Firebase Messaging
+### Identity Platform
 
-`installer/identity.py` initializes standalone Identity Platform before the project
-is added to Firebase:
+`installer/identity.py` initializes standalone Identity Platform:
 
-- Calls `projects.identityPlatform.initializeAuth` while the project is still
-  non-Firebase and requires the resulting subtype to be standalone
-  `IDENTITY_PLATFORM`; any other existing authentication subtype is a
-  provider conflict
+- Calls `projects.identityPlatform.initializeAuth` and requires the resulting
+  subtype to be standalone `IDENTITY_PLATFORM`; any other existing
+  authentication subtype is a provider conflict
 - Accepts the provider's already-initialized response, and gives a fresh
   project's API activation a bounded retry window with visible progress
 - Enables email/password sign-in, preserves existing authorized domains, and
   adds the App Engine or custom-domain host
 - Stores a public auth client config containing only project ID and Web API
-  key; login does not depend on the Firebase WebApp config
+  key
 - Sends the confirmed ADC target as `x-goog-user-project` so API quota is
   charged to the selected project
 - Reports failed REST calls as a compact HTTP status, Google status/reason,
   and provider message instead of printing the request URL and complete
   structured response
 
-`installer/firebase.py` then adds Firebase only for Cloud Messaging:
+The generic authenticated Google REST helpers live in
+`installer/google_provider.py`. Setup re-reads Identity Platform after
+reconciliation and fails closed unless the subtype is `IDENTITY_PLATFORM`,
+email/password remains enabled, and the authorized domain remains intact.
 
-- Retries transient ADC access-token refresh failures, including native
-  Windows connection resets, with bounded backoff
-- Adds Firebase only after a real `404`; a `403` remains a permission failure
-- Polls `addFirebase` and WebApp long-running operations with bounded
-  backoff/timeouts and consumes the completed operation response
-- Lists every WebApp page and waits for an already-running create operation
-  instead of creating a duplicate
-- Keeps VAPID setup as the only manual Firebase step because the supported FCM
-  management API does not expose Web Push certificate generation or import;
-  setup opens the target project's Firebase Cloud Messaging settings and
-  prints the same URL as a fallback
-- Generates the Firebase config JSON used only by push notifications
+#### Retiring resources from older installations
 
-Immediately afterward, setup re-reads the Identity Platform configuration and
-fails closed unless the subtype is still `IDENTITY_PLATFORM`, email/password
-remains enabled, and the authorized domain remains intact.
+Schema-2 recovery upgrades to schema 3 and discards `FIREBASE_CONFIG`.
+Upgrade/repair removes the runtime Cloud Messaging IAM role. It deliberately
+does not delete cloud APIs, Web Apps, or project resources because that is an
+operator-owned destructive action and an older deployed version may still use
+them.
+
+After the schema-3 release is deployed and rollback to an FCM-dependent version
+is no longer required, the operator may remove the obsolete Firebase Web App,
+Web Push certificate, and Messaging API/resource configuration in Google
+Cloud/Firebase Console. Keep Identity Platform itself: authentication still
+uses it, and Google names its Identity Platform permissions and token verifier
+with `firebaseauth`/`verify_firebase_token` identifiers.
 
 `installer/auth_email.py` runs immediately before Identity Platform setup. If the
 installation does not already have a custom domain, it first asks whether the
@@ -908,10 +929,9 @@ login origin (including a custom domain), and the configured SMTP service sends
 that URL. The browser never receives the runtime Google access token or SMTP
 password/API key.
 
-Recovery directly gets the saved Firebase project, immutable WebApp ID, and
-WebApp configuration, then independently checks live standalone Identity
-Platform state. Missing, forbidden, mismatched, and unavailable states remain
-distinct and cannot silently replace the canonical snapshot.
+Recovery checks live standalone Identity Platform state. Missing, forbidden,
+mismatched, and unavailable states remain distinct and cannot silently replace
+the canonical snapshot.
 
 ### Admin (`installer/admin.py`)
 
@@ -949,15 +969,15 @@ generation observability setting and preserves the existing choice on reruns.
 ### Redis (`installer/redis.py`)
 
 Configures Redis Cloud as the caching layer. On a fresh installation it opens
-the Redis Cloud console and explains how to create or select a database, keep
-its public endpoint and default user enabled, and copy the public endpoint and
-default-user password from the current Essentials or Pro configuration screens.
-It then prompts for those values, provides instructions for setting the
-`volatile-ttl` eviction policy, and offers server-verified TLS. Redis Cloud
-exposes database TLS on paid Essentials/Flex and Pro plans, not Free Essentials
-plans. A failed fresh-install connection clears the entered endpoint, port, and
-password without retaining them, then defaults to prompting for all three again
-inside the same setup run.
+the Redis Cloud console and explains how to sign in or create an account, create
+or select a database, keep its public endpoint and default user enabled, and
+copy the public endpoint and default-user password from the current Essentials
+or Pro configuration screens. It then prompts for those values, provides
+instructions for setting the `volatile-ttl` eviction policy, and offers
+server-verified TLS. Redis Cloud exposes database TLS on paid Essentials/Flex
+and Pro plans, not Free Essentials plans. A failed fresh-install connection
+clears the entered endpoint, port, and password without retaining them, then
+defaults to prompting for all three again inside the same setup run.
 
 The TLS flow instructs the operator to enable TLS in Redis Cloud, leave Mutual
 TLS unchecked, download and unzip the certificate archive, and place the
@@ -1136,7 +1156,7 @@ Cloudflare DNS-only automation or provider-neutral manual DNS setup.
      provider
 6. **`installer/domain/oauth.py`** -- provides instructions for updating the Google
    OAuth redirect URI and JavaScript origin
-7. **`installer/firebase.py`** -- automatically adds the custom host to Firebase
+7. **`installer/identity.py`** -- adds the custom host to Identity Platform
    authorized domains and moves the email action-handler callback to the custom
    `/users/login` URL
 

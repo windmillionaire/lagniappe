@@ -129,7 +129,6 @@ class File(AssetMixin, Entity):
             {
                 "extract": extract,
                 "summarize": summarize,
-                "token": data.get("fcm-token"),
             }
             if extract or summarize
             else None

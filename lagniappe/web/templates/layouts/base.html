@@ -1,6 +1,5 @@
 {% from 'nav.html' import navbar with context %}
 {% set default_page_mode = CONFIG.testing and 'testing' or 'production' %}
-{% set default_messaging_disabled = current_user.is_authenticated and session.get(CONFIG.LOGIN_MESSAGING_DISABLED_KEY) %}
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -11,8 +10,6 @@
     <meta name="description" content="Private application, not for indexing">
     <meta name="keywords" content="private, internal, non-indexed">
     <meta name="mode" content="{{ page_mode|default(default_page_mode) }}">
-    <meta name="messaging-disabled"
-          content="{{ messaging_disabled|default(default_messaging_disabled)|yesno }}">
     <meta name="analytics" content="{{ CONFIG.ANALYTICS|yesno }}">
     <link rel="icon"
           type="image/png"

@@ -173,7 +173,6 @@ def site_update():
 def site_settings():
     project_id = CONFIG.GOOGLE_CLOUD_PROJECT
     google_console_url = "https://console.cloud.google.com"
-    firebase_console_url = "https://console.firebase.google.com"
 
     # Generate list of service provider links
     links = [
@@ -194,12 +193,6 @@ def site_settings():
             "url": f"{google_console_url}/customer-identity/providers?project={project_id}",
             "description": "Manage sign-in providers and user authentication",
             "icon": "security",
-        },
-        {
-            "title": "Firebase Cloud Messaging",
-            "url": f"{firebase_console_url}/project/{project_id}/settings/cloudmessaging",
-            "description": "Manage web-push messaging and VAPID keys",
-            "icon": "firebase",
         },
         {
             "title": "Cloud Tasks",
@@ -417,14 +410,6 @@ def reporting_privacy():
 def refresh_token():
     g.NO_CACHE = True
     return generate_csrf()
-
-
-# @testable true
-# @tests tests_e2e/001_site/test_001c_messaging.py::test_allow_messages
-@home.route("/firebase-config")
-def firebase_config():
-    g.NO_CACHE = True
-    return responses.json_response(getattr(CONFIG, "FIREBASE_CONFIG", {}))
 
 
 # @testable true

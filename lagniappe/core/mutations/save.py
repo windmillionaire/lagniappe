@@ -172,7 +172,9 @@ class NoteMutation(StandardMutation):
 
 # @testable infrastructure
 class NotificationMutation(StandardMutation):
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_022_mutation_contracts.py::test_notification_save_advances_owner_revision_without_touching_user
+    # @pairs notifications:personal-activity notifications:mutation notifications:cache-isolation
     def plan_save(self, entity, builder, *, reason, depends_on=()):
         super().plan_save(
             entity,
@@ -181,7 +183,12 @@ class NotificationMutation(StandardMutation):
             depends_on=depends_on,
         )
         if entity.parent:
-            builder.touch(entity.parent, reason="notification-list-owner")
+            builder.patch(
+                entity.parent,
+                property_updates=("notification_revision",),
+                refresh_cache=False,
+                reason="notification-list-owner",
+            )
 
 
 # @testable infrastructure
@@ -195,6 +202,11 @@ class JobMutation(StandardMutation):
             depends_on=depends_on,
         )
         if entity.actor:
-            builder.touch(entity.actor, reason="job-actor-owner")
+            builder.patch(
+                entity.actor,
+                property_updates=("operation_revision",),
+                refresh_cache=False,
+                reason="job-actor-owner",
+            )
         if entity.notification:
             builder.touch(entity.notification, reason="job-notification-owner")

@@ -14,7 +14,7 @@ shared infrastructure such as analytics. On DOM ready it:
 3. Runs `syncView()` to initialize the current view and server-health state.
 4. Registers global `error` and `unhandledrejection` listeners that route to Sentry via `captureError`.
 5. Registers `visibilitychange`, `focus`, `pagehide`/`pageshow`, and `online`/`offline` listeners for server health, view sync, and sync deregistration/registration. `ConnectivityState` retains separate browser, server, visibility, and service-worker-controller signals. Hiding a view suspends it directly without an unnecessary `/ping`; foreground transitions perform the health check.
-6. Registers the service worker (`sw.js`) and listens for service-worker messages. Only version-compatible public event names with valid payloads are dispatched as window `CustomEvent`s.
+6. Registers the service worker (`sw.js`) and publishes versioned connectivity state to its cache policy. The worker does not carry application update events.
 7. Calls `updateUserData()` to sync the user's timezone and location to the server, except when `<meta name="mode" content="public">` marks a public page.
 
 `getView()` finds the `[lp-view]` element, reads its `data-kind` attribute,
@@ -37,8 +37,8 @@ between forms happens via custom `login:show-*` events. Email/password sign-in
 and action-code consumption call Identity Platform directly. Verification and
 password-reset email requests go to Lagniappe so the backend can generate an
 Identity Platform OOB code and deliver the local action URL through the
-operator-configured SMTP service. The bundle does not load the Firebase Auth
-SDK.
+operator-configured SMTP service. The bundle does not load a provider-owned
+authentication SDK.
 
 ### `sentry.mjs` (conditional production monitoring)
 
@@ -59,8 +59,7 @@ home     → views/home       (extends Core)
 manual   → views/manual     (extends Core)
 results  → views/results    (extends Core)
 builder  → views/builder    (extends Core)
-testing  → views/testing    (extends Core)
-user     → views/base/index (EntityIndex)
+user     → views/user       (extends EntityIndex)
 form     → views/base/index (EntityIndex)
 category → views/base/index (EntityIndex)
 task     → views/base/index (EntityIndex)
@@ -73,6 +72,12 @@ dynamically imports the matching module, instantiates it with the DOM node, and
 calls `init()`. The active view is stored for access by the health check and
 sync systems.
 
+The manual view delegates section navigation and command-copy actions from its
+stable root. Command blocks rendered by `manual/macros.html::code` therefore
+keep working after AJAX section replacement. Copy uses the browser Clipboard
+API first, falls back to a temporary selected textarea for older browsers, and
+briefly reports `Copied!` or `Copy failed` on the originating button.
+
 ## Shared Utilities (`shared/`)
 
 All shared code is re-exported from `shared/index.mjs` as a single import point. Modules:
@@ -82,16 +87,16 @@ All shared code is re-exported from `shared/index.mjs` as a single import point.
 | `analytics.mjs` | `analytics.tag()` and `analytics.view()` -- fire-and-forget page-load, login, and public-view tracking using metadata from the current page. |
 | `connectivity.mjs` | `ConnectivityState` and the shared `connectivity` instance -- explicit browser-link, server-reachability, visibility, and service-worker-controller state. |
 | `endpoints.mjs` | API route definitions, organized by widget name. Widget-specific endpoints are functions keyed by widget name (e.g. `ENDPOINTS.Filters(settings)`); global endpoints are static properties. |
+| `polling.mjs` | `PollingCoordinator` -- one adaptive, visibility-aware scheduler for entity, channel, document, operation, form-lock, and ingress subscriptions. |
 | `editWatcher.mjs` | `EditWatcher` -- fingerprint-based authoritative replacement for watched forms, including capability-aware draft and queued-mutation reconciliation. |
-| `deferredOperations.mjs` | `DeferredOperationManager` -- owner-authorized batched terminal status polling and revision-aware destination reconciliation. |
+| `deferredOperations.mjs` | `DeferredOperationManager` -- owner-authorized operation subscriptions and revision-aware terminal destination reconciliation. |
 | `errors.mjs` | `captureError()`, `captureNetworkError()`, and `configureSentry()` -- collect DOM context from the nearest widget/component/view elements and forward to the configured local Sentry bundle + console. The client initializes only when an installation DSN is rendered. Its event processor removes SDK request payloads and identity context, applies the exact diagnostic-header allowlist, recursively redacts recognized credentials/payloads, and bounds nested context. |
 | `request.mjs` | `request.get/post/put/patch/delete` -- wraps `fetch` with CSRF token injection, targeted retry for responses explicitly identified as CSRF failures, 422 validation error handling, redirect following, and JSON/HTML content-type detection. A service-worker `X-Lagniappe-Updated: false` marker is exposed as `response.updated === false` so refresh consumers can skip unchanged DOM work. |
-| `sync.mjs` | `SyncManager` -- real-time collaborative-document synchronization. Handles registration, polling, push updates, and offline document-patch replay. Form updates use `EditWatcher` and deliberate submissions instead. See [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md). |
-| `modal.mjs` | Modal system: `Modal` (base), `DeleteModal`, `HelpModal`, `OfflineModal`, `MessagingModal`. Handles Escape/click-outside dismissal, load-from-server, and nested view transitions. |
-| `messaging.mjs` | Firebase Cloud Messaging setup. Handles permission prompts, VAPID key registration, token caching in localStorage, diagnostics on failure, and deterministic `test:` tokens in testing mode. |
+| `sync.mjs` | `SyncManager` -- revisioned collaborative-document synchronization through `/sync` and shared document polling, including offline document-delta replay. See [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md). |
+| `modal.mjs` | Modal system: `Modal` (base), `DeleteModal`, `HelpModal`, and `OfflineModal`. Handles Escape/click-outside dismissal, load-from-server, and nested view transitions. |
 | `offline.mjs` | IndexedDB primitives for document sync records and explicit offline mutation records. |
-| `offlineQueue.mjs` | `OfflineQueue` -- serializes explicit `lp-offline` mutation commands, restores optimistic overlays, replays commands, and hands conflicts to `EditWatcher`. It does not consume server-change events. |
-| `protocol.mjs` | Versioned public browser-event names, payload validators, and connectivity worker-message construction. Element-private DOM events remain local to their owners. |
+| `offlineQueue.mjs` | `OfflineQueue` -- serializes explicit `lp-offline` mutation commands, restores optimistic overlays, replays commands, and hands conflicts to `EditWatcher`. |
+| `protocol.mjs` | Connectivity worker-message validation and construction. Server state does not cross the service-worker boundary. |
 | `user.mjs` | `updateUserData()` and `updateUserLocation()` -- sync browser timezone/geolocation to the server session, with caching and distance-threshold checks. |
 | `utilities.mjs` | `withTransition()` (View Transitions API wrapper with debug mode), `debounce()`, `waitForAttribute()` (MutationObserver-based attribute wait), `simpleHash()`, `generateElementId()`, `areEqual()` (deep JSON comparison), `base64ToUint8Array()`, `uint8ArrayToBase64()`. |
 

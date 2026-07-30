@@ -427,6 +427,7 @@ export default class ViewComponent {
 		}
 
 		this.elt.dataset.open = open || "false";
+		await this.view.reconcilePollingSubscriptions?.();
 	}
 
 	destroy() {

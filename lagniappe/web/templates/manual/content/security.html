@@ -23,7 +23,7 @@
         permission source of truth.
       {% endcall %}
       {% call concept("Provider-Owned Data", icon="installation", kind="task") %}
-        Datastore, Cloud Storage, App Engine, Firebase, Cloud Tasks, and
+        Datastore, Cloud Storage, App Engine, Identity Platform, Cloud Tasks, and
         optional AI services are in the operator's Google Cloud project. Redis
         data lives in the Redis Cloud subscription selected during setup.
       {% endcall %}
@@ -242,7 +242,7 @@
     <ul class="text-base-medium space-y-2">
       <li>Use strong Google account protection and keep at least one recovery path for the Cloud project.</li>
       <li>
-        Keep IAM narrow: only trusted operators should have broad project, App Engine, Datastore, Storage, service-account, billing, or Firebase access.
+        Keep IAM narrow: only trusted operators should have broad project, App Engine, Datastore, Storage, service-account, billing, or Identity Platform access.
       </li>
       <li>Protect local settings files and service account credentials; do not commit secrets to a public repository.</li>
       <li>Set Google Cloud budget alerts and review provider access after staff or role changes.</li>

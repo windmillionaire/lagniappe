@@ -43,146 +43,31 @@ vm.runInContext(source, context);
 PROTOCOL_EXPORTS = [
     "BROWSER_PROTOCOL_ID",
     "BROWSER_PROTOCOL_VERSION",
-    "EVENTS",
     "WORKER_MESSAGES",
     "connectivityMessage",
-    "parseServiceWorkerMessage",
     "validateConnectivityState",
-    "validatePublicEvent",
 ]
 
 
-# @pair browser-protocol:notification
-# @pair browser-protocol:server-change
-# @pair browser-protocol:sync-update
-# @pair browser-protocol:import-progress
-# @pair browser-protocol:validation
+# @pair browser-protocol:connectivity-only
 # @pair browser-protocol:version
 # @pair browser-protocol:envelope
-def test_public_event_contract_accepts_current_messages(run_node):
+def test_browser_protocol_contains_only_connectivity_messages(run_node):
     run_shared_module_check(
         run_node,
         "src/script/shared/protocol.mjs",
         PROTOCOL_EXPORTS,
         """
-const messages = [
-  {
-    protocol: "lagniappe-browser",
-    protocol_version: "2",
-    type: "notification",
-    html: '<li data-key="notice-1">Ready</li>',
-  },
-  {
-    protocol: "lagniappe-browser",
-    protocol_version: "2",
-    type: "server-change",
-    message: JSON.stringify({
-      type: "deferred-complete",
-      source_widget: "CreateToolReport",
-      destination: "tools:ToolReportList",
-    }),
-  },
-  {
-    protocol: "lagniappe-browser",
-    protocol_version: "2",
-    type: "sync-update",
-    message: JSON.stringify({ update: { sync_id: "page-1:document" } }),
-  },
-  {
-    protocol: "lagniappe-browser",
-    protocol_version: "2",
-    type: "sync-update",
-    message: JSON.stringify({
-      update: { fetch: true, sync_id: "page-1:document" },
-    }),
-  },
-  {
-    protocol: "lagniappe-browser",
-    protocol_version: "2",
-    type: "import-result",
-    key: "file-1",
-    count: "3",
-  },
-  ...["import-complete", "import-stopped", "import-error"].map((type) => ({
-    protocol: "lagniappe-browser",
-    protocol_version: "2",
-    type,
-    key: "file-1",
-  })),
-];
-
-for (const data of messages) {
-  const parsed = context.parseServiceWorkerMessage(data);
-  if (!parsed || parsed.type !== data.type || parsed.version !== 2) {
-    throw new Error(`Current message was rejected: ${JSON.stringify(data)}`);
-  }
+if (Object.keys(context.WORKER_MESSAGES).length !== 1 ||
+    context.WORKER_MESSAGES.CONNECTIVITY !== "connectivity-state") {
+  throw new Error("The worker protocol contains a non-connectivity message");
 }
 """,
     )
 
 
 # @features browser-protocol
-# @dimensions identifiers malformed-payload unknown-event incompatible-version strict-version
-def test_public_event_contract_rejects_unknown_or_malformed_messages(run_node):
-    run_shared_module_check(
-        run_node,
-        "src/script/shared/protocol.mjs",
-        PROTOCOL_EXPORTS,
-        """
-const current = (data) => ({
-  protocol: "lagniappe-browser",
-  protocol_version: "2",
-  ...data,
-});
-const invalid = [
-  null,
-  { type: "notification", html: "<li>Unversioned</li>" },
-  current({ type: "unknown-event", key: "entity-1" }),
-  current({ type: "notification", html: "" }),
-  current({
-    type: "activity",
-    message: JSON.stringify({ type: "delete", key: "entity-1" }),
-  }),
-  current({
-    type: "server-change",
-    message: JSON.stringify({ type: "delete" }),
-  }),
-  current({
-    type: "server-change",
-    message: JSON.stringify({
-      type: "deferred-complete",
-      source_widget: "CreateToolReport",
-    }),
-  }),
-  current({ type: "server-change", message: "plain text" }),
-  current({ type: "sync-update", message: JSON.stringify({ update: {} }) }),
-  current({ type: "import-result", key: "file-1", count: "many" }),
-  current({ type: "import-complete" }),
-  {
-    protocol: "lagniappe-browser",
-    protocol_version: "1",
-    type: "notification",
-    html: "<li>Old message</li>",
-  },
-  {
-    protocol: "lagniappe-browser",
-    protocol_version: "3",
-    type: "notification",
-    html: "<li>Future message</li>",
-  },
-];
-
-for (const data of invalid) {
-  if (context.parseServiceWorkerMessage(data) !== null) {
-    throw new Error(`Malformed message was accepted: ${JSON.stringify(data)}`);
-  }
-}
-""",
-    )
-
-
-# @features connectivity
-# @dimensions worker-message state-validation version producer
+# @dimensions connectivity validation version producer
 def test_connectivity_messages_are_versioned_and_validated(run_node):
     run_shared_module_check(
         run_node,
@@ -200,7 +85,7 @@ if (!context.validateConnectivityState(state)) {
 }
 const message = context.connectivityMessage(state);
 if (message.protocol !== "lagniappe-browser" ||
-    message.protocol_version !== 2 ||
+    message.protocol_version !== 3 ||
     message.type !== "connectivity-state" ||
     message.state === state) {
   throw new Error(`Connectivity message was not versioned: ${JSON.stringify(message)}`);

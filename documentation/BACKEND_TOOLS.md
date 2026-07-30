@@ -1,6 +1,6 @@
 # Backend Tools
 
-The tools layer (`lagniappe/core/tools/`) provides infrastructure services used by entities and routes. It wraps Google Cloud services (Datastore, Cloud Storage, Vertex AI, Cloud Tasks, Firebase Messaging), Redis caching, and various utility functions.
+The tools layer (`lagniappe/core/tools/`) provides infrastructure services used by entities and routes. It wraps Google Cloud services (Datastore, Cloud Storage, Vertex AI, Cloud Tasks), Redis caching, and various utility functions.
 
 ## Database (`tools/database/`)
 
@@ -200,18 +200,20 @@ also lives here so query code does not need to know the detail storage format.
 Ingress execution state is durable database state managed by
 `core/tools/ingress.py`; Redis is not an authority for import progress.
 
-### Sync (`sync.py`)
+### Collaborative documents (`documents.py`)
 
-Real-time document sync state. Widget-level sets drive update broadcasts;
-entity-level sets drive delete broadcasts.
+Revisioned collaborative-document state and expiring presence. One isolated
+Redis string key per document stores compact checkpoints and bounded Yjs deltas
+under optimistic transactions. Presence sets reference expiring client-detail
+hash fields; no browser-routing or broadcast registrations are stored.
 
 | Function | Description |
 |---|---|
-| `get_state(sync_id, token, user)` | Register a token for a widget, refresh TTLs, and return cached state plus co-viewers |
-| `set_state(sync_id, state)` | Store cached widget state |
-| `clear_state(sync_id)` | Drop cached widget state |
-| `deregister(token, sync_ids)` | Remove a token from widget/entity registrations and user details |
-| `active_viewers(hashes)` | Return tokens viewing any of the given entity hashes |
+| `poll_document(...)` | Refresh presence and return a snapshot or the deltas after a known revision |
+| `apply_document_update(...)` | Append a Yjs delta and accept a checkpoint only from the current generation/revision |
+| `update_document_asset(...)` | Refresh durable document metadata without replacing the live generation |
+| `close_presence(client_id, sync_ids)` | Remove a page-scoped client from its document presence sets |
+| `clear_document(sync_id)` | Drop externally invalidated live document state |
 
 ## AI (`tools/ai/`)
 
@@ -379,21 +381,21 @@ and the user's partial submission, create a pending notification, and start a
 shared `DeferredJob`; production delivers it to `/process/jobs`. The worker
 reloads the target and user, rechecks current edit/AI permission, rebuilds the
 shared context, applies the generated submission, and sends a terminal
-`deferred-complete` event for the exact source/destination widget. Optional
+operation status for the exact source/destination widget. Optional
 one-off prompt attachments use direct-upload records so they remain available
 across retries; terminal job cleanup deletes the temporary object after success
 or failure.
 
 Existing page/task targets also acquire a durable `form-autofill` lock in the
 same transaction as the job. While it is active, form submit/quick-edit/default
-routes reject conflicting mutations. `/edited` returns the active operation
-independently of fingerprint drift, allowing the browser to disable the form
-and replace the complete submit/autofill-context action area with progress on
-reload or in another tab. Forms do not register with document sync. Target
-editors may read the bounded operation status even when a different editor
-started the job. CreatePage autofill explicitly skips the target lock because
-the new Page is not an already-mounted shared edit surface; it retains deferred
-idempotency, status, and form-revision drift protection.
+routes reject conflicting mutations. The unified `/poll` contract returns an
+active `form-lock` independently of fingerprint drift, allowing the browser to
+disable the form and replace the complete submit/autofill-context action area
+with progress on reload or in another tab. Forms do not register with document
+sync. Target editors may read the bounded operation status even when a
+different editor started the job. CreatePage autofill explicitly skips the
+target lock because the new Page is not an already-mounted shared edit surface;
+it retains deferred idempotency, status, and form-revision drift protection.
 
 ### Report Runner (`report_runner.py`)
 
@@ -613,7 +615,7 @@ Modular prompt guidelines organized by concern:
 | `generate_project(prompt)` | Built project prompt | Project JSON |
 | `generate_pages(prompt)` | Built page-generation prompt | Page JSON array |
 | `generate_schedule(prompt)` | Built scheduling prompt | Schedule JSON |
-| `summarize_file(file, token)` | File and initiating FCM token | Starts a deferred file-summary job |
+| `summarize_file(file)` | File | Starts a deferred file-summary job |
 | `generate_summary(file, ...)` | File and summary options | Immediate utility-model summary result |
 | `generate_autofilled_submission(prompt)` | Built form prompt | Submission JSON |
 

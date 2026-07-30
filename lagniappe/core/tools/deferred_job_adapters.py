@@ -162,21 +162,6 @@ class ReportAdapter(DeferredJobAdapter):
         Entities.save(report, context.actor)
 
     # @testable infrastructure
-    def event(self, context):
-        event = super().event(context) or {}
-        event.update(
-            {
-                "type": "deferred-complete",
-                "key": getattr(context.input("report"), "urlsafe_key", None),
-                "source_widget": (context.job.client or {}).get("source_widget")
-                or "CreateToolReport",
-                "destination": (context.job.client or {}).get("destination")
-                or "tools:ToolReportList",
-            }
-        )
-        return event
-
-    # @testable infrastructure
     def terminal_message(self, context, *, succeeded, error=None):
         label = self.job_type.value.removeprefix("report-").title()
         revision = context.parameters.get("mode") == "revise"
@@ -452,7 +437,6 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         result = ai.run_report(
             report,
             context.actor,
-            (context.job.client or {}).get("token"),
             ensure_active=context.ensure_active,
         )
         if result.get("status") != "complete":
@@ -506,20 +490,6 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         if (report.deferred_job or {}).get("key") == context.job.urlsafe_key:
             report.deferred_job = None
             Entities.save(report, context.actor)
-
-    def event(self, context):
-        event = super().event(context) or {}
-        event.update(
-            {
-                "type": "deferred-complete",
-                "key": getattr(context.input("report"), "urlsafe_key", None),
-                "source_widget": (context.job.client or {}).get("source_widget")
-                or "CreateToolReport",
-                "destination": (context.job.client or {}).get("destination")
-                or "tools:ToolReportList",
-            }
-        )
-        return event
 
     def terminal_message(self, context, *, succeeded, error=None):
         if succeeded:
@@ -1052,18 +1022,6 @@ class FileExtractAdapter(FileAdapter):
             file.properties.extract.error = str(error)
             file.save()
 
-    # @testable true
-    # @tests tests_unit/test_023_deferred_jobs.py::test_file_extract_adapter_checkpoints_and_applies_text_asset
-    # @features deferred-jobs file
-    # @dimensions event-invalidation
-    def event(self, context):
-        if context.job.status != "succeeded":
-            return None
-        return {
-            "key": context.input("file").urlsafe_key,
-            "type": "extract-complete",
-        }
-
     # @testable infrastructure
     def terminal_message(self, context, *, succeeded, error=None):
         file = context.input("file")
@@ -1154,25 +1112,11 @@ class FileSummarizeAdapter(FileAdapter):
         ).hexdigest()
         files.start_file_extraction(
             file,
-            (context.job.client or {}).get("token"),
             actor=context.actor,
             idempotency_key=f"file-extract-follow-up:{identity}",
             delay_seconds=0,
         )
         context.parameters.pop("extract_after_summary", None)
-
-    # @testable true
-    # @tests tests_unit/test_023_deferred_jobs.py::test_file_summary_terminal_cleanup_starts_extraction_once
-    # @features deferred-jobs file
-    # @dimensions event-invalidation
-    def event(self, context):
-        if context.job.status != "succeeded":
-            return None
-        file = context.input("file")
-        return {
-            "key": file.urlsafe_key,
-            "type": "summarize-complete",
-        }
 
     # @testable infrastructure
     def terminal_message(self, context, *, succeeded, error=None):

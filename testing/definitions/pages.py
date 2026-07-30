@@ -26,6 +26,7 @@ class Pages(ResourceEnumMixin, Enum):
     test_navigate_to_page = test_create_page
     test_star_page = test_create_page
     test_create_page_task = Page(definition=pd.page_for_tasks)
+    test_empty_page_task_list = Page(definition=pd.empty_page_task_list)
     test_create_page_task_with_project = Page(definition=pd.page_for_tasks_with_project)
     test_task_pages_move_source = Page(definition=pd.task_pages_move_source)
     test_task_pages_move_target = Page(definition=pd.task_pages_move_target)

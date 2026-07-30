@@ -45,11 +45,7 @@ class Extract(ProcessProperty):
         self.search = data.get("search-text") is not None
 
         if self.enabled and not self.complete and not self.error:
-            process = get_file_text(
-                self.entity,
-                data.get("fcm-token"),
-                dispatch=False,
-            )
+            process = get_file_text(self.entity, dispatch=False)
             return bool(
                 not process.complete
                 and not process.error
@@ -77,12 +73,12 @@ class Summarize(ProcessProperty):
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_summarize_process
     # @tests tests_unit/test_006_file_properties.py::test_summarize_update_uses_enable_field_name
-    # @tests tests_unit/test_006_file_properties.py::test_summarize_update_without_fcm_token_does_not_call_summarize_file
     # @tests tests_unit/test_006_file_properties.py::test_summarize_update_upload_search_summary_remains_opt_in
+    # @tests tests_unit/test_006_file_properties.py::test_summarize_update_starts_without_browser_routing_identity
     # @tests tests_unit/test_006_file_properties.py::test_file_update_preserves_processing_options_when_controls_absent
     # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
     # @features file
-    # @dimensions summarize, update, no-token, option-preservation, search-opt-in, deferred-dispatch
+    # @dimensions summarize, update, option-preservation, search-opt-in, deferred-dispatch
     def update(self, data):
         if not _has_any(data, "enable-summarize", "summarize", "search-summary"):
             return False
@@ -99,9 +95,8 @@ class Summarize(ProcessProperty):
             )
         )
 
-        token = data.get("fcm-token")
-        if self.enabled and not self.complete and not self.error and token:
-            process = summarize_file(self.entity, token, dispatch=False)
+        if self.enabled and not self.complete and not self.error:
+            process = summarize_file(self.entity, dispatch=False)
             return bool(
                 not process.complete
                 and not process.error
@@ -116,11 +111,9 @@ class Summarize(ProcessProperty):
 # @dimensions post-save-dispatch summary-first extraction-follow-up deferred-dispatch
 def dispatch_file_processing(file, request):
     """Start persisted file work, chaining extraction behind summarization."""
-    token = request.get("token")
     if request.get("summarize"):
         return summarize_file(
             file,
-            token,
             parameters=(
                 {"extract_after_summary": True}
                 if request.get("extract")
@@ -128,7 +121,7 @@ def dispatch_file_processing(file, request):
             ),
         )
     if request.get("extract"):
-        return get_file_text(file, token)
+        return get_file_text(file)
     return None
 
 

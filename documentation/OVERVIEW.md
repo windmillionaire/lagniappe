@@ -25,7 +25,7 @@ Working on browser-side code in `src/`.
 | [FRONTEND_COMBOBOX.md](FRONTEND_COMBOBOX.md) | Combobox system — SelectBox, FacetsBox, LocationBox, SearchBox, Dropdown, Submitter mixin, Results. |
 | [FRONTEND_EDITOR.md](FRONTEND_EDITOR.md) | TipTap rich text editor — CollaborativeDocument (Yjs), IndependentDocument, toolbar, custom extensions, UserManager. |
 | [FRONTEND_BUILDER.md](FRONTEND_BUILDER.md) | Form builder — drag-and-drop, panels, settings, conditions system, AI schema generation. |
-| [FRONTEND_SERVICE_WORKER.md](FRONTEND_SERVICE_WORKER.md) | Service worker caching — static (cache-first), cacheable (network-first + ETag), quota management, push notifications. |
+| [FRONTEND_SERVICE_WORKER.md](FRONTEND_SERVICE_WORKER.md) | Service worker caching — static (cache-first), cacheable (network-first + ETag), quota management, connectivity state. |
 | [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md) | Document collaboration, form edit detection, offline submission replay, and durable deferred-form locks. |
 | [FRONTEND_NAVIGATION.md](FRONTEND_NAVIGATION.md) | Template authoring for the nav system — `lp-show`, `lp-component`, `data-widget`, toggle bars, entity tabs. |
 | [TEMPLATES_ATTRIBUTES.md](TEMPLATES_ATTRIBUTES.md) | Canonical `lp-*` template attribute reference and the `data-*` attributes frontend code reads from templates. |
@@ -37,7 +37,7 @@ Working on server-side code in `lagniappe/`.
 | Document | Covers |
 |---|---|
 | [BACKEND_WEB.md](BACKEND_WEB.md) | Flask app initialization, blueprints, Jinja environment, error handling, permission decorators, route patterns, deferred responses, template structure. |
-| [BACKEND_TOOLS.md](BACKEND_TOOLS.md) | Database (Datastore + Cloud Storage), Redis cache, Vertex AI, durable deferred jobs, file processing, messaging (FCM), task queue (Cloud Tasks), dates, utilities. |
+| [BACKEND_TOOLS.md](BACKEND_TOOLS.md) | Database (Datastore + Cloud Storage), Redis cache, Vertex AI, durable deferred jobs, file processing, task queue (Cloud Tasks), dates, utilities. |
 | [AI_PIPELINE.md](AI_PIPELINE.md) | End-to-end AI context, tool, generation, durable-job, deterministic-application, and browser-reconciliation architecture. |
 | [BACKEND_DEFINITIONS.md](BACKEND_DEFINITIONS.md) | Permission enums, filter definitions, entity attributes, ordering, asset types, exceptions. |
 | [BACKEND_FILTERS.md](BACKEND_FILTERS.md) | End-to-end filter system — Condition, Filter entity, FilterCache (Redis JSON), FilterExpression (JSONPath), value alignment. |
@@ -51,7 +51,7 @@ Build, configuration, installation, and test workflows.
 |---|---|
 | [INFRA_BUILD.md](INFRA_BUILD.md) | Rollup bundles (login, icons, main), production vs dev, custom plugins, chunk splitting. |
 | [INFRA_CONFIG.md](INFRA_CONFIG.md) | Runtime-safe configuration plus the local runner boundary for GCloud switching, deployment, dev/test servers, and upgrades. |
-| [INFRA_SETUP.md](INFRA_SETUP.md) | Installation flow (GCP, Firebase, Redis, admin, AI defaults, optional modes), plus upgrades. |
+| [INFRA_SETUP.md](INFRA_SETUP.md) | Installation flow (GCP, Identity Platform, Redis, admin, AI defaults, optional modes), plus upgrades. |
 | [DATA_MIGRATIONS.md](DATA_MIGRATIONS.md) | Authoring, testing, releasing, running, auditing, and retiring persisted-data migrations. |
 | [TESTING.md](TESTING.md) | Test suites, commands, fixtures, managed test server, traceability tools. |
 | [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) | Practical guide for adding or reviewing tests. |
@@ -81,7 +81,7 @@ Build, configuration, installation, and test workflows.
 | Work on permissions | [BACKEND_DEFINITIONS](BACKEND_DEFINITIONS.md) | `lagniappe/core/definitions/permissions.py`, `lagniappe/web/auth/auth.py` |
 | Change styles or icons | [FRONTEND_OVERVIEW](FRONTEND_OVERVIEW.md), [INFRA_BUILD](INFRA_BUILD.md), [STYLE_CANDIDATES](STYLE_CANDIDATES.md) | `src/style/styles.yaml`, `src/style/icons.yaml` |
 | Work on caching/ETags | [FRONTEND_SERVICE_WORKER](FRONTEND_SERVICE_WORKER.md), [BACKEND_TOOLS](BACKEND_TOOLS.md) | `src/script/sw.template.mjs`, `lagniappe/core/tools/cache/` |
-| Work on real-time sync/collaboration | [SYNC_ARCHITECTURE](SYNC_ARCHITECTURE.md), [FRONTEND_EDITOR](FRONTEND_EDITOR.md) | `src/script/shared/sync.mjs`, `src/script/elements/editor/collaborative.mjs`, `lagniappe/core/tools/cache/sync.py`, `lagniappe/web/routes/home/sync.py` |
+| Work on real-time sync/collaboration | [SYNC_ARCHITECTURE](SYNC_ARCHITECTURE.md), [FRONTEND_EDITOR](FRONTEND_EDITOR.md) | `src/script/shared/sync.mjs`, `src/script/elements/editor/collaborative.mjs`, `lagniappe/core/tools/cache/documents.py`, `lagniappe/web/routes/home/sync.py` |
 | Work on AI features | [AI_PIPELINE](AI_PIPELINE.md), [BACKEND_TOOLS](BACKEND_TOOLS.md) | `lagniappe/core/tools/ai/`, `lagniappe/core/tools/deferred_jobs.py`, `lagniappe/core/tools/deferred_job_adapters.py` |
 | Work on durable background jobs | [AI_PIPELINE](AI_PIPELINE.md), [BACKEND_ENTITIES](BACKEND_ENTITIES.md), [BACKEND_TOOLS](BACKEND_TOOLS.md) | `lagniappe/core/tools/deferred_jobs.py`, `lagniappe/core/tools/task_queue.py`, `lagniappe/web/routes/process/` |
 | Author a template | [FRONTEND_NAVIGATION](FRONTEND_NAVIGATION.md), [BACKEND_WEB](BACKEND_WEB.md) | `lagniappe/web/templates/` |

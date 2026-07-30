@@ -131,37 +131,12 @@ export class IngressList extends LoadedHomeList {
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_lazy_report_list_reconciles_active_job_status
  * @features ai-report
- * @dimensions list delete-modal deferred-refresh pending-poll stage-labels lazy-load status-reconciliation
+ * @dimensions list delete-modal deferred-refresh operation-poll stage-labels lazy-load status-reconciliation
  */
 export class ToolReportList extends BaseList {
 	constructor(attributes) {
 		super(attributes);
 		this._listToggle = _listToggle(this.component, this.name);
-		this._pendingRefresh = null;
-	}
-
-	get hasPendingReports() {
-		return Boolean(this.target.querySelector("[data-pending='true']"));
-	}
-
-	_schedulePendingRefresh() {
-		if (this._pendingRefresh || !this.hasPendingReports) return;
-
-		this._pendingRefresh = setTimeout(async () => {
-			this._pendingRefresh = null;
-			if (!this.hasPendingReports) return;
-			if (document.hidden) {
-				this._schedulePendingRefresh();
-				return;
-			}
-
-			const response = await this.view.load(this.component, this.route);
-			if (response && response.updated !== false) {
-				this.refresh(response);
-			} else {
-				this._schedulePendingRefresh();
-			}
-		}, 5000);
 	}
 
 	postreconcile() {
@@ -171,12 +146,6 @@ export class ToolReportList extends BaseList {
 			this._listToggle.classList.remove("opacity-50", "pointer-events-none");
 		}
 		this.target.setAttribute("loaded", "");
-		this._schedulePendingRefresh();
-	}
-
-	destroy() {
-		if (this._pendingRefresh) clearTimeout(this._pendingRefresh);
-		this._pendingRefresh = null;
 	}
 }
 

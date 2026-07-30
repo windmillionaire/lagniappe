@@ -148,7 +148,7 @@ route returns `403`.
 
 ## Manual Provider Workflows
 
-Some workflows depend on real Cloud Tasks, provider callbacks, or FCM delivery
+Some workflows depend on real Cloud Tasks or provider callbacks
 and should be validated manually instead of kept as skipped E2E tests:
 
 - deferred category page generation completion, including pending-to-complete
@@ -268,7 +268,7 @@ runtime credential to prove deployment, API enablement, project IAM, key
 administration, and bucket-administration permissions are absent. It then
 exercises that credential against Datastore, all four Storage buckets, Cloud
 Tasks, the Scheduler OIDC target, Document AI, Vertex AI, Places, Identity
-Platform token verification, and FCM. Its Scheduler probe also verifies that a
+Platform token verification. Its Scheduler probe also verifies that a
 valid OIDC request with an
 invalid body receives `400`, not a success acknowledgement. Run it only after
 setup has reconciled the test project. It creates

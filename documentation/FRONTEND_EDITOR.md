@@ -36,7 +36,7 @@ Used for entity documents (project documents, page documents). Manages real-time
    `initialized`; headless replay marks `initialized` immediately after editor
    creation because there is no visible surface and background tabs may pause
    animation frames.
-7. The view-scoped `SyncManager` handles polling and incoming push updates.
+7. The view-scoped `SyncManager` handles revisioned document polling and deltas.
 
 **Collaboration:**
 
@@ -44,9 +44,9 @@ Used for entity documents (project documents, page documents). Manages real-time
 - **Update queue**: Local Yjs updates are queued in `updateQueue`. `syncData`
   merges the queue into a base64 delta and includes the full base64 `ydoc`
   snapshot for the server cache.
-- **Remote updates**: Incoming updates arrive as `sync-update` window events
-  handled by `SyncManager.receiveUpdate()`. Remote updates are applied to the
-  Yjs doc with `"remote"` origin so they do not re-queue.
+- **Remote updates**: Document poll results contain revisioned Yjs deltas.
+  `CollaborativeDocument.sync()` applies them with `"remote"` origin so they
+  do not re-queue.
 - **Saving**: On blur, the editor dispatches `sync-save`. `saveData` includes
   the merged delta, full `ydoc`, and rendered `html`; document HTML persistence
   happens through the `/sync` route when `html` is present.
@@ -189,14 +189,27 @@ On `selectionUpdate`, the toolbar reads the current marks and node attributes fr
 
 Manages the list of active collaborators in a collaborative document. Displays a "Users" dropdown in the toolbar showing each user with a colored dot.
 
-**User colors** are assigned from a predefined palette (`USER_COLORS` from config). Colors are stable per session -- once assigned to a user, they keep the same color. When colors run out, the palette resets.
+**User colors** are assigned from a predefined palette (`USER_COLORS` from
+config). Colors are stable for the mounted document session, including after a
+collaborator leaves live presence. Departed users remain only in the in-memory
+color lookup and are not rendered in the Users menu.
 
 **`setUsers(users)`** is called by `CollaborativeDocument.sync()` after
-`/state` or `/register` returns a co-viewer list. It rebuilds the dropdown with
+the document poll returns a changed co-viewer list. It rebuilds the dropdown with
 the current user list.
 
-**`remoteUpdate(userHash)`** is called by `CollaborativeDocument.sync()` when a
-remote `sync-update` arrives. It marks the collaborator responsible for the
-latest remote edit so `FlashRemoteChanges` can use that user's color.
+**`remoteUpdate(userHash, user)`** is called by
+`CollaborativeDocument.sync()` when a remote revision arrives. Ordinary deltas
+carry their individual author hashes and a poll response supplies minimal
+identity projections for the authors it references. A checkpoint snapshot
+carries an author only when all compacted revisions have the same author and an
+already-connected client fell behind the compaction. New clients do not flash
+historical document content, and mixed-author snapshots are left uncolored
+rather than attributed incorrectly. The author color and name are selected
+immediately before each attributed Yjs update because the ProseMirror
+decoration is created synchronously during that update. The first fragment of
+each temporary highlight displays an absolutely positioned author badge and
+also exposes `Edited by {name}` as a native-tooltip fallback; neither changes
+editor layout.
 
 **`getUserColor(hash)`** returns the color assigned to a user, used by `FlashRemoteChanges` to color remote edit highlights.

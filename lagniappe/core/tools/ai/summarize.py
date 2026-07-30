@@ -47,7 +47,6 @@ def can_summarize_file(file):
 # @pairs ai:summary-prompt ai:ooxml ai:eligibility ai:task-queue
 def summarize_file(
     file,
-    token,
     *,
     dispatch=True,
     parameters=None,
@@ -57,7 +56,6 @@ def summarize_file(
 
     Args:
         file: The file entity to summarize.
-        token: Optional FCM token retained until terminal delivery.
     """
     summarize = file.properties.summarize
     eligible = can_summarize_file(file)
@@ -75,7 +73,7 @@ def summarize_file(
                     inputs={"file": file},
                     parameters=dict(parameters or {}),
                     notification_body=None,
-                    client={"token": token},
+                    client={},
                     idempotency_key=idempotency_key,
                     delay_seconds=10,
                 )

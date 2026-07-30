@@ -139,7 +139,6 @@ def ingress_next(key, **kwargs):
 def ingress_import(key, **kwargs):
     file = kwargs["entity"]
     body = request.get_json(silent=True) or {}
-    token = body.get("token")
     service = IngressService(file)
     already_active = False
     try:
@@ -153,7 +152,6 @@ def ingress_import(key, **kwargs):
         )
         service.start(
             {
-                "token": token,
                 "timezone": session.get("timezone", "UTC"),
                 "user_key": current_user.urlsafe_key,
             }
@@ -177,7 +175,6 @@ def ingress_import(key, **kwargs):
 
     task_endpoint = url_for("process.ingress", _external=True)
     payload = {
-        "token": token,
         "key": file.urlsafe_key,
         "timezone": session.get("timezone", "UTC"),
         "user_key": current_user.urlsafe_key,

@@ -180,12 +180,6 @@ def _install_harness(monkeypatch, *, fail_at=None, deploy=False):
     _module(
         monkeypatch,
         setup_package,
-        "firebase",
-        setup_firebase=step("setup_firebase", True),
-    )
-    _module(
-        monkeypatch,
-        setup_package,
         "auth_email",
         setup_auth_email=step("setup_auth_email", True),
     )
@@ -194,10 +188,6 @@ def _install_harness(monkeypatch, *, fail_at=None, deploy=False):
         setup_package,
         "identity",
         setup_identity_platform=step("setup_identity_platform", True),
-        verify_standalone_identity_platform=step(
-            "verify_standalone_identity_platform",
-            True,
-        ),
     )
     _module(
         monkeypatch,
@@ -257,8 +247,6 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
         "create_ocr_processor",
         "setup_auth_email",
         "setup_identity_platform",
-        "setup_firebase",
-        "verify_standalone_identity_platform",
         "setup_admin_and_oauth",
         "setup_redis",
         "setup_error_monitoring",
@@ -513,13 +501,6 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
         "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": (
             f"runtime@{recovered_project}.iam.gserviceaccount.com"
         ),
-        "FIREBASE_CONFIG": {
-            "apiKey": "firebase-key",
-            "projectId": recovered_project,
-            "appId": "firebase-app-1",
-            "messagingSenderId": "123456789",
-            "vapidKey": "firebase-vapid-key",
-        },
         "IDENTITY_PLATFORM_CONFIG": {
             "apiKey": "identity-key",
             "projectId": recovered_project,
@@ -731,10 +712,6 @@ def _recovery_provider_settings():
             "runtime@recovered-project-1.iam.gserviceaccount.com"
         ),
         "DEPLOYER_EMAIL": "deployer@example.com",
-        "FIREBASE_CONFIG": {
-            "projectId": "recovered-project-1",
-            "appId": "firebase-app-1",
-        },
         "IDENTITY_PLATFORM_CONFIG": {
             "apiKey": "identity-api-key",
             "projectId": "recovered-project-1",
@@ -838,25 +815,6 @@ def test_recovery_provider_discovery_targets_only_recovered_project(monkeypatch)
             "details": {
                 "name": name,
                 "display_name": settings["OCR_PROCESSOR"],
-            },
-            "error": None,
-        },
-    )
-    monkeypatch.setattr(
-        recovery,
-        "_probe_firebase",
-        lambda project, firebase: {
-            "state": recovery.AVAILABLE,
-            "details": {
-                "project": {"projectId": project},
-                "app": {
-                    "projectId": project,
-                    "appId": firebase["appId"],
-                },
-                "config": {
-                    "projectId": project,
-                    "appId": firebase["appId"],
-                },
             },
             "error": None,
         },
@@ -1034,23 +992,6 @@ def test_recovery_reports_missing_signing_setup_as_repairable_drift(monkeypatch)
             {
                 "name": name,
                 "display_name": settings["OCR_PROCESSOR"],
-            }
-        ),
-    )
-    monkeypatch.setattr(
-        recovery,
-        "_probe_firebase",
-        lambda project, firebase: available(
-            {
-                "project": {"projectId": project},
-                "app": {
-                    "projectId": project,
-                    "appId": firebase["appId"],
-                },
-                "config": {
-                    "projectId": project,
-                    "appId": firebase["appId"],
-                },
             }
         ),
     )
@@ -1260,7 +1201,6 @@ REMOTE_MUTATION_BOUNDARIES = (
     "create_ocr_processor",
     "setup_auth_email",
     "setup_identity_platform",
-    "setup_firebase",
     "setup_admin_and_oauth",
     "setup_redis",
     "setup_error_monitoring",

@@ -1,8 +1,10 @@
 """Tooling tests for setup provider API helpers."""
 
+import importlib
 import smtplib
 import sys
 import types
+from pathlib import Path
 
 import pytest
 
@@ -430,10 +432,10 @@ def test_provider_auth_email_saves_only_after_successful_smtp_test(monkeypatch):
 
 
 # @features setup
-# @dimensions firebase-api authentication retry
-def test_firebase_access_token_refresh_retries_connection_resets(monkeypatch):
+# @dimensions google-provider authentication retry
+def test_google_provider_access_token_refresh_retries_connection_resets(monkeypatch):
     import google.auth
-    from installer import firebase
+    from installer import google_provider
 
     attempts = []
     delays = []
@@ -448,30 +450,32 @@ def test_firebase_access_token_refresh_retries_connection_resets(monkeypatch):
                     10054,
                     "An existing connection was forcibly closed by the remote host",
                 )
-            self.token = "firebase-token"
+            self.token = "provider-token"
 
     credentials = Credentials()
-    monkeypatch.setattr(firebase, "install_if_missing", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        google_provider, "install_if_missing", lambda *args, **kwargs: None
+    )
     monkeypatch.setattr(
         google.auth,
         "default",
         lambda scopes: (credentials, "target-project-1"),
     )
-    monkeypatch.setattr(firebase.time, "sleep", delays.append)
+    monkeypatch.setattr(google_provider.time, "sleep", delays.append)
 
-    assert firebase._get_access_token() == "firebase-token"
+    assert google_provider._get_access_token() == "provider-token"
     assert len(attempts) == 3
     assert delays == [1, 2]
 
 
 # @features setup
-# @dimensions firebase-api
-# @pair setup:firebase-api
-# @pair firebase-api:quota-project
-def test_firebase_helpers_use_timeouts_and_report_errors(monkeypatch):
-    from installer import firebase
+# @dimensions google-provider-api
+# @pair setup:google-provider-api
+# @pair google-provider-api:quota-project
+def test_google_provider_helpers_use_timeouts_and_report_errors(monkeypatch):
+    from installer import google_provider
 
-    assert firebase._firebase_request_headers(
+    assert google_provider._google_request_headers(
         "token",
         "quota-project-1",
         json_content=True,
@@ -481,26 +485,18 @@ def test_firebase_helpers_use_timeouts_and_report_errors(monkeypatch):
         "Content-Type": "application/json",
     }
 
-    apps = [
-        {"appId": "one", "displayName": "First"},
-        {"appId": "two", "displayName": "Second"},
-    ]
-    assert firebase._find_web_app(apps, app_id="two") == apps[1]
-    assert firebase._find_web_app(apps, display_name="First") == apps[0]
-    assert firebase._find_web_app(apps, app_id="missing") is None
-
     session = FakeSession([FakeResponse(200, {"ok": True})])
-    _, data = firebase._api_request(
+    _, data = google_provider._api_request(
         session,
         "GET",
-        "https://firebase.googleapis.com/v1beta1/projects/demo",
+        "https://identitytoolkit.googleapis.com/admin/v2/projects/demo/config",
         {"Authorization": "Bearer token"},
     )
     assert data == {"ok": True}
-    assert session.calls[0]["timeout"] == firebase.FIREBASE_API_TIMEOUT
+    assert session.calls[0]["timeout"] == google_provider.PROVIDER_API_TIMEOUT
 
     patch_session = FakeSession([FakeResponse(200, {"updated": True})])
-    _, data = firebase._api_request(
+    _, data = google_provider._api_request(
         patch_session,
         "PATCH",
         "https://identitytoolkit.googleapis.com/admin/v2/projects/demo/config",
@@ -517,33 +513,35 @@ def test_firebase_helpers_use_timeouts_and_report_errors(monkeypatch):
             ),
             "headers": {"Authorization": "Bearer token"},
             "json": {"signIn": {"email": {"enabled": True}}},
-            "timeout": firebase.FIREBASE_API_TIMEOUT,
+            "timeout": google_provider.PROVIDER_API_TIMEOUT,
         }
     ]
 
     bad_session = FakeSession(
         [FakeResponse(500, {"error": "boom"}, text="boom")] * 4
     )
-    monkeypatch.setattr(firebase.time, "sleep", lambda delay: None)
+    monkeypatch.setattr(google_provider.time, "sleep", lambda delay: None)
     with pytest.raises(ProviderTransientError):
-        firebase._api_request(bad_session, "POST", "https://firebase.example", {})
+        google_provider._api_request(
+            bad_session, "POST", "https://provider.example", {}
+        )
     assert len(bad_session.calls) == 4
 
 
 # @features setup
-# @dimensions firebase-api diagnostics retry
-def test_firebase_api_request_reports_google_reason_and_retries_service_activation(
+# @dimensions google-provider-api diagnostics retry
+def test_google_provider_api_request_reports_reason_and_retries_service_activation(
     monkeypatch,
     capsys,
 ):
-    from installer import firebase
+    from installer import google_provider
 
     formatter = types.SimpleNamespace(
         initialize=lambda: types.SimpleNamespace(info=lambda message: message)
     )
-    monkeypatch.setattr(firebase, "FORMATTER", formatter)
+    monkeypatch.setattr(google_provider, "FORMATTER", formatter)
     delays = []
-    monkeypatch.setattr(firebase.time, "sleep", delays.append)
+    monkeypatch.setattr(google_provider.time, "sleep", delays.append)
     service_disabled = {
         "error": {
             "code": 403,
@@ -565,7 +563,7 @@ def test_firebase_api_request_reports_google_reason_and_retries_service_activati
         ]
     )
 
-    _, data = firebase._api_request(
+    _, data = google_provider._api_request(
         session,
         "POST",
         "https://identitytoolkit.googleapis.com/v2/projects/demo/"
@@ -582,7 +580,7 @@ def test_firebase_api_request_reports_google_reason_and_retries_service_activati
 
     failure_session = FakeSession([FakeResponse(403, service_disabled)])
     with pytest.raises(ProviderTransientError) as caught:
-        firebase._api_request(
+        google_provider._api_request(
             failure_session,
             "POST",
             "https://identitytoolkit.googleapis.com/v2/projects/demo/"
@@ -598,509 +596,12 @@ def test_firebase_api_request_reports_google_reason_and_retries_service_activati
 
 
 # @features setup
-# @dimensions firebase-api recovery provider-discovery settings-preservation
-def test_firebase_recovery_discovers_saved_app_without_overwriting_snapshot(
-    monkeypatch,
-):
-    import requests
-    import installer as setup_package
-    from installer import firebase
-
-    saved_config = {
-        "projectId": "recovered-project-1",
-        "appId": "saved-app-id",
-        "apiKey": "saved-api-key",
-    }
-    settings = types.SimpleNamespace(
-        APP={
-            "APP_NAME": "Recovered App",
-            "FIREBASE_CONFIG": saved_config.copy(),
-        },
-        GCLOUD_CONFIG={"PROJECT": "recovered-project-1"},
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "config",
-        types.SimpleNamespace(SETTINGS=settings),
-    )
-    monkeypatch.setattr(
-        setup_package,
-        "FORMATTER",
-        types.SimpleNamespace(
-            initialize=lambda: types.SimpleNamespace(
-                success=lambda message: message,
-                warning=lambda message: message,
-                info=lambda message: message,
-                error=lambda message, error=None: message,
-                ok_glyph="[OK]",
-                fail_glyph="[X]",
-                yaspin=lambda **kwargs: spinner_factory(SpinnerRecorder())(),
-            )
-        ),
-    )
-    monkeypatch.setattr(firebase, "FORMATTER", setup_package.FORMATTER)
-    monkeypatch.setattr(firebase, "install_if_missing", lambda *args, **kwargs: None)
-    monkeypatch.setattr(firebase, "_get_access_token", lambda: "access-token")
-    session = FakeSession([FakeResponse(200, {"projectId": "recovered-project-1"})])
-    monkeypatch.setattr(requests, "Session", lambda: session)
-
-    calls = []
-
-    def api_request(
-        request_session,
-        method,
-        url,
-        headers,
-        data=None,
-        allow_codes=None,
-    ):
-        calls.append((method, url, data))
-        if url.endswith("/projects/recovered-project-1"):
-            return FakeResponse(200), {
-                "projectId": "recovered-project-1"
-            }
-        if url.endswith("/webApps"):
-            return FakeResponse(200), {
-                "apps": [
-                    {
-                        "appId": "different-app-id",
-                        "displayName": "Recovered App",
-                    },
-                    {
-                        "appId": "saved-app-id",
-                        "displayName": "Old Display Name",
-                    },
-                ]
-            }
-        assert url.endswith("/webApps/saved-app-id/config")
-        return FakeResponse(200), {
-            "projectId": "recovered-project-1",
-            "appId": "saved-app-id",
-            "apiKey": "live-api-key",
-        }
-
-    monkeypatch.setattr(firebase, "_api_request", api_request)
-
-    live_config = firebase._configure_firebase()
-
-    assert live_config["apiKey"] == "live-api-key"
-    assert [method for method, _url, _data in calls] == ["GET", "GET", "GET"]
-    assert calls[-1][1].endswith("/webApps/saved-app-id/config")
-    assert settings.APP["FIREBASE_CONFIG"] == saved_config
-
-
-# @features setup
-# @dimensions firebase-api
-def test_firebase_operation_polling_uses_operation_endpoint(monkeypatch):
-    from installer import firebase
-
-    session = FakeSession(
-        [
-            FakeResponse(200, {"done": False}),
-            FakeResponse(200, {"done": True, "response": {"name": "projects/demo"}}),
-        ]
-    )
-    monkeypatch.setattr(firebase.time, "sleep", lambda seconds: None)
-
-    response = firebase._poll_operation(
-        session, "operations/provision-demo", {}, SpinnerRecorder()
-    )
-
-    assert response == {"name": "projects/demo"}
-    assert [call["url"] for call in session.calls] == [
-        "https://firebase.googleapis.com/v1beta1/operations/provision-demo",
-        "https://firebase.googleapis.com/v1beta1/operations/provision-demo",
-    ]
-
-
-# @features setup
-# @dimensions firebase-api
-def test_firebase_operation_polling_exits_on_error_and_timeout(monkeypatch):
-    from installer import firebase
-
-    error_spinner = SpinnerRecorder()
-    error_session = FakeSession(
-        [FakeResponse(200, {"done": True, "error": {"message": "provision failed"}})]
-    )
-
-    with pytest.raises(ProviderError):
-        firebase._poll_operation(
-            error_session, "operations/error-demo", {}, error_spinner
-        )
-
-    assert error_spinner.fails == ["✗"]
-
-    timeout_spinner = SpinnerRecorder()
-    timeout_session = FakeSession()
-    monotonic_values = iter([0, firebase.FIREBASE_OPERATION_TIMEOUT_SECONDS + 1])
-    monkeypatch.setattr(firebase.time, "monotonic", lambda: next(monotonic_values))
-
-    with pytest.raises(ProviderTimeout):
-        firebase._poll_operation(
-            timeout_session, "operations/timeout-demo", {}, timeout_spinner
-        )
-
-    assert timeout_session.calls == []
-    assert timeout_spinner.fails == ["✗"]
-
-
-# @features setup
-# @dimensions firebase-api pagination operation-response
-def test_firebase_web_app_pagination_and_operation_response(monkeypatch):
-    import requests
-    import installer as setup_package
-    from installer import firebase
-
-    settings = types.SimpleNamespace(
-        APP={"APP_NAME": "Demo"},
-        GCLOUD_CONFIG={"PROJECT": "project-1"},
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "config",
-        types.SimpleNamespace(SETTINGS=settings),
-    )
-    formatter = types.SimpleNamespace(
-        initialize=lambda: types.SimpleNamespace(
-            success=lambda message: message,
-            warning=lambda message: message,
-            info=lambda message: message,
-            error=lambda message, error=None: message,
-            ok_glyph="[OK]",
-            fail_glyph="[X]",
-            yaspin=lambda **kwargs: spinner_factory(SpinnerRecorder())(),
-        )
-    )
-    monkeypatch.setattr(setup_package, "FORMATTER", formatter)
-    monkeypatch.setattr(firebase, "FORMATTER", formatter)
-    monkeypatch.setattr(firebase, "install_if_missing", lambda *args, **kwargs: None)
-    monkeypatch.setattr(firebase, "_get_access_token", lambda: "token")
-    monkeypatch.setattr(firebase.time, "sleep", lambda seconds: None)
-    session = FakeSession(
-        [
-            FakeResponse(200, {"projectId": "project-1"}),
-            FakeResponse(200, {"apps": [], "nextPageToken": "page two"}),
-            FakeResponse(200, {"apps": []}),
-            FakeResponse(200, {"name": "operations/create-web-app"}),
-            FakeResponse(200, {"done": False}),
-            FakeResponse(
-                200,
-                {
-                    "done": True,
-                    "response": {
-                        "projectId": "project-1",
-                        "appId": "1:123:web:abc",
-                        "displayName": "Demo",
-                    },
-                },
-            ),
-            FakeResponse(
-                200,
-                {
-                    "projectId": "project-1",
-                    "appId": "1:123:web:abc",
-                    "apiKey": "live-key",
-                },
-            ),
-        ]
-    )
-    monkeypatch.setattr(requests, "Session", lambda: session)
-
-    assert firebase._configure_firebase()["appId"] == "1:123:web:abc"
-    assert session.calls[2]["url"].endswith(
-        "/webApps?pageToken=page%20two"
-    )
-    assert session.calls[3]["method"] == "POST"
-    assert session.calls[4]["url"].endswith("/operations/create-web-app")
-    assert session.calls[5]["url"].endswith("/operations/create-web-app")
-    assert session.calls[6]["url"].endswith(
-        "/webApps/1:123:web:abc/config"
-    )
-
-
-# @features setup
-# @dimensions firebase-api conflict provider-convergence
-def test_firebase_already_running_web_app_create_is_discovered(monkeypatch):
-    import requests
-    import installer as setup_package
-    from installer import firebase
-
-    settings = types.SimpleNamespace(
-        APP={"APP_NAME": "Demo"},
-        GCLOUD_CONFIG={"PROJECT": "project-1"},
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "config",
-        types.SimpleNamespace(SETTINGS=settings),
-    )
-    formatter = types.SimpleNamespace(
-        initialize=lambda: types.SimpleNamespace(
-            success=lambda message: message,
-            warning=lambda message: message,
-            info=lambda message: message,
-            error=lambda message, error=None: message,
-            ok_glyph="[OK]",
-            fail_glyph="[X]",
-            yaspin=lambda **kwargs: spinner_factory(SpinnerRecorder())(),
-        )
-    )
-    monkeypatch.setattr(setup_package, "FORMATTER", formatter)
-    monkeypatch.setattr(firebase, "FORMATTER", formatter)
-    monkeypatch.setattr(firebase, "install_if_missing", lambda *args, **kwargs: None)
-    monkeypatch.setattr(firebase, "_get_access_token", lambda: "token")
-    monkeypatch.setattr(firebase.time, "sleep", lambda seconds: None)
-    session = FakeSession(
-        [FakeResponse(200, {"projectId": "project-1"})]
-    )
-    monkeypatch.setattr(requests, "Session", lambda: session)
-    list_results = iter(
-        [
-            [],
-            [
-                {
-                    "projectId": "project-1",
-                    "appId": "1:123:web:existing",
-                    "displayName": "Demo",
-                }
-            ],
-        ]
-    )
-    monkeypatch.setattr(
-        firebase,
-        "_list_web_apps",
-        lambda *args: next(list_results),
-    )
-
-    def api_request(
-        request_session,
-        method,
-        url,
-        headers,
-        data=None,
-        allow_codes=None,
-    ):
-        if method == "POST":
-            return FakeResponse(409, {"error": "already running"}), {
-                "error": "already running"
-            }
-        return FakeResponse(200), {
-            "projectId": "project-1",
-            "appId": "1:123:web:existing",
-            "apiKey": "live-key",
-        }
-
-    monkeypatch.setattr(firebase, "_api_request", api_request)
-
-    assert firebase._configure_firebase()["appId"] == "1:123:web:existing"
-
-
-# @features setup
-# @dimensions firebase-api permissions not-found
-def test_firebase_project_permission_failure_is_not_treated_as_absent(
-    monkeypatch,
-):
-    import requests
-    import installer as setup_package
-    from installer import firebase
-
-    settings = types.SimpleNamespace(
-        APP={"APP_NAME": "Demo"},
-        GCLOUD_CONFIG={"PROJECT": "project-1"},
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "config",
-        types.SimpleNamespace(SETTINGS=settings),
-    )
-    formatter = types.SimpleNamespace(
-        initialize=lambda: types.SimpleNamespace(
-            success=lambda message: message,
-            warning=lambda message: message,
-            info=lambda message: message,
-            error=lambda message, error=None: message,
-            ok_glyph="[OK]",
-            fail_glyph="[X]",
-            yaspin=lambda **kwargs: spinner_factory(SpinnerRecorder())(),
-        )
-    )
-    monkeypatch.setattr(setup_package, "FORMATTER", formatter)
-    monkeypatch.setattr(firebase, "FORMATTER", formatter)
-    monkeypatch.setattr(firebase, "install_if_missing", lambda *args, **kwargs: None)
-    monkeypatch.setattr(firebase, "_get_access_token", lambda: "token")
-    session = FakeSession([FakeResponse(403, {"error": "forbidden"})])
-    monkeypatch.setattr(requests, "Session", lambda: session)
-
-    with pytest.raises(ProviderPermissionDenied):
-        firebase._configure_firebase()
-
-    assert [call["method"] for call in session.calls] == ["GET"]
-
-
-# @features setup
-# @dimensions firebase-messaging public-config auth-separation
-def test_firebase_messaging_client_config_excludes_auth_fields():
-    from installer import firebase
-
-    assert firebase._messaging_client_config(
-        {
-            "apiKey": "public-key",
-            "appId": "1:123:web:abc",
-            "authDomain": "project-1.firebaseapp.com",
-            "measurementId": "G-MEASURE",
-            "messagingSenderId": "123",
-            "projectId": "project-1",
-            "storageBucket": "project-1.firebasestorage.app",
-        }
-    ) == {
-        "apiKey": "public-key",
-        "appId": "1:123:web:abc",
-        "messagingSenderId": "123",
-        "projectId": "project-1",
-    }
-
-
-# @features setup
-# @dimensions identity-platform provider-discovery provider-state permissions authorized-domain
-def test_identity_platform_config_contract():
-    from installer import identity
-
-    enabled = {
-        "subtype": "IDENTITY_PLATFORM",
-        "client": {"apiKey": "public-key"},
-        "signIn": {
-            "email": {
-                "enabled": True,
-                "passwordRequired": True,
-            }
-        },
-        "authorizedDomains": ["demo.example"],
-        "notification": {
-            "sendEmail": {
-                "callbackUri": "https://demo.example/users/login",
-            }
-        },
-    }
-    assert identity.identity_platform_config_matches(
-        enabled,
-        "https://demo.example",
-    )
-    assert identity.identity_platform_target("https://demo.example/") == (
-        "demo.example",
-        "https://demo.example/users/login",
-    )
-    assert not identity.identity_platform_config_matches(
-        {},
-        "https://demo.example",
-    )
-    with pytest.raises(ProviderError):
-        identity.identity_platform_target("http://demo.example")
-
-    session = FakeSession(
-        [
-            FakeResponse(200, enabled),
-            FakeResponse(404, {"error": "not found"}),
-            FakeResponse(403, {"error": "forbidden"}),
-        ]
-    )
-    assert identity.get_identity_platform_config(
-        session, "project-1", {}
-    ) == enabled
-    assert identity.get_identity_platform_config(
-        session, "project-1", {}
-    ) is None
-    with pytest.raises(ProviderPermissionDenied):
-        identity.get_identity_platform_config(session, "project-1", {})
-
-
-# @features setup
-# @dimensions identity-platform provider-state settings-save authorized-domain provider-convergence
-def test_identity_platform_setup_initializes_and_reconciles_provider_state(
-    monkeypatch,
-):
-    import requests
-    from installer import identity
-
-    saves = []
-    settings = types.SimpleNamespace(
-        APP={"APP_URL": "https://demo.example"},
-        GCLOUD_CONFIG={"PROJECT": "project-1"},
-        save=lambda: saves.append(True),
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "config",
-        types.SimpleNamespace(SETTINGS=settings),
-    )
-    formatter = types.SimpleNamespace(
-        initialize=lambda: types.SimpleNamespace(
-            success=lambda message: message,
-            warning=lambda message: message,
-            info=lambda message: message,
-            error=lambda message, error=None: message,
-            ok_glyph="[OK]",
-            fail_glyph="[X]",
-            yaspin=lambda **kwargs: spinner_factory(SpinnerRecorder())(),
-        )
-    )
-    monkeypatch.setattr(identity, "FORMATTER", formatter)
-    monkeypatch.setattr(identity, "install_if_missing", lambda *args, **kwargs: None)
-    monkeypatch.setattr(identity, "_get_access_token", lambda: "token")
-    current = {
-        "subtype": "IDENTITY_PLATFORM",
-        "client": {"apiKey": "public-key"},
-        "signIn": {"email": {"enabled": False, "passwordRequired": False}},
-        "authorizedDomains": ["localhost"],
-        "notification": {"sendEmail": {}},
-    }
-    core_expected = {
-        **current,
-        "signIn": {"email": {"enabled": True, "passwordRequired": True}},
-        "authorizedDomains": ["localhost", "demo.example"],
-    }
-    session = FakeSession(
-        [
-            FakeResponse(404, {"error": "not initialized"}),
-            FakeResponse(200, {}),
-            FakeResponse(200, current),
-            FakeResponse(200, {}),
-            FakeResponse(200, core_expected),
-        ]
-    )
-    monkeypatch.setattr(requests, "Session", lambda: session)
-    mutations = []
-    monkeypatch.setattr(
-        identity,
-        "record_mutation",
-        lambda description, **kwargs: mutations.append((description, kwargs)),
-    )
-
-    assert identity.setup_identity_platform()
-    assert settings.APP["IDENTITY_PLATFORM_CONFIG"] == {
-        "apiKey": "public-key",
-        "projectId": "project-1",
-    }
-    assert saves == [True]
-    assert [call["method"] for call in session.calls] == [
-        "GET",
-        "POST",
-        "GET",
-        "PATCH",
-        "GET",
-    ]
-    assert [mutation[1]["action"] for mutation in mutations] == [
-        "created",
-        "updated",
-    ]
-
-
-# @features setup
 # @dimensions identity-platform provider-state provider-convergence retry diagnostics
 def test_identity_platform_initialization_retries_api_activation(
     monkeypatch,
     capsys,
 ):
-    from installer import firebase, identity
+    from installer import google_provider, identity
 
     current = {
         "subtype": "IDENTITY_PLATFORM",
@@ -1131,9 +632,9 @@ def test_identity_platform_initialization_retries_api_activation(
     formatter = types.SimpleNamespace(
         initialize=lambda: types.SimpleNamespace(info=lambda message: message)
     )
-    monkeypatch.setattr(firebase, "FORMATTER", formatter)
+    monkeypatch.setattr(google_provider, "FORMATTER", formatter)
     delays = []
-    monkeypatch.setattr(firebase.time, "sleep", delays.append)
+    monkeypatch.setattr(google_provider.time, "sleep", delays.append)
     mutations = []
     monkeypatch.setattr(
         identity,
@@ -1244,51 +745,18 @@ def test_identity_platform_setup_is_idempotent_for_matching_provider_state(
     assert saves == []
 
 
-# @features setup
-# @dimensions identity-platform provider-state auth-separation
-def test_identity_platform_verification_preserves_standalone_subtype(
-    monkeypatch,
-):
-    import requests
+# @pairs setup:identity-platform setup:provider-state setup:auth-separation
+def test_identity_platform_verification_preserves_standalone_subtype():
     from installer import identity
 
-    settings = types.SimpleNamespace(
-        APP={"APP_URL": "https://demo.example"},
-        GCLOUD_CONFIG={"PROJECT": "project-1"},
-    )
-    monkeypatch.setitem(
-        sys.modules,
-        "config",
-        types.SimpleNamespace(SETTINGS=settings),
-    )
-    monkeypatch.setattr(identity, "install_if_missing", lambda *args, **kwargs: None)
-    monkeypatch.setattr(identity, "_get_access_token", lambda: "token")
     standalone = {
         "subtype": "IDENTITY_PLATFORM",
-        "client": {"apiKey": "public-key"},
-        "signIn": {"email": {"enabled": True, "passwordRequired": True}},
-        "authorizedDomains": ["demo.example"],
-        "notification": {
-            "sendEmail": {
-                "callbackUri": "https://demo.example/users/login",
-            }
-        },
     }
-    monkeypatch.setattr(
-        requests,
-        "Session",
-        lambda: FakeSession([FakeResponse(200, standalone)]),
-    )
-    assert identity.verify_standalone_identity_platform()
+    identity._ensure_standalone_subtype(standalone, "project-1")
 
     firebase_auth = {**standalone, "subtype": "FIREBASE_AUTH"}
-    monkeypatch.setattr(
-        requests,
-        "Session",
-        lambda: FakeSession([FakeResponse(200, firebase_auth)]),
-    )
     with pytest.raises(ProviderConflict, match="FIREBASE_AUTH"):
-        identity.verify_standalone_identity_platform()
+        identity._ensure_standalone_subtype(firebase_auth, "project-1")
 
 
 # @features setup
@@ -1337,38 +805,19 @@ def test_identity_platform_google_provider_reconciliation(monkeypatch):
 # @pairs setup:identity-platform setup:recovery
 def test_identity_platform_recovery_gets_live_config(monkeypatch):
     import requests
-    from installer import firebase, identity, recovery
+    import installer
+    from installer import google_provider
 
-    monkeypatch.setattr(firebase, "_get_access_token", lambda: "token")
-    firebase_session = FakeSession(
-        [
-            FakeResponse(200, {"projectId": "project-1"}),
-            FakeResponse(
-                200,
-                {
-                    "projectId": "project-1",
-                    "appId": "1:123:web:abc",
-                },
-            ),
-            FakeResponse(
-                200,
-                {
-                    "projectId": "project-1",
-                    "appId": "1:123:web:abc",
-                    "apiKey": "live-key",
-                },
-            ),
-        ]
-    )
-    monkeypatch.setattr(requests, "Session", lambda: firebase_session)
-    observation = recovery._probe_firebase(
-        "project-1",
-        {"projectId": "project-1", "appId": "1:123:web:abc"},
-    )
-    assert observation["state"] == recovery.AVAILABLE
-    assert observation["details"]["app"]["appId"] == "1:123:web:abc"
+    config_module = types.ModuleType("config")
+    config_module.__path__ = [
+        str(Path(__file__).resolve().parents[2] / "config")
+    ]
+    monkeypatch.setitem(sys.modules, "config", config_module)
+    monkeypatch.delitem(sys.modules, "installer.recovery", raising=False)
+    monkeypatch.delattr(installer, "recovery", raising=False)
+    recovery = importlib.import_module("installer.recovery")
 
-    monkeypatch.setattr(identity, "_get_access_token", lambda: "token")
+    monkeypatch.setattr(google_provider, "_get_access_token", lambda: "token")
     identity_session = FakeSession(
         [
             FakeResponse(

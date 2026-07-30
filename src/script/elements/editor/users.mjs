@@ -35,6 +35,7 @@ export class UserManager {
 	constructor(toolbar) {
 		this.toolbar = toolbar;
 		this.users = [];
+		this.knownUsers = new Map();
 		this.user = null;
 		this.button = null;
 		this.dropdown = null;
@@ -44,27 +45,31 @@ export class UserManager {
 		};
 	}
 
-	getUserColor(hash) {
-		return (
-			this.users.find((user) => user.hash === hash)?.color || DEFAULT_USER_COLOR
-		);
+	getUserColor(hash, user = null) {
+		if (!hash) return "";
+		let known = this.knownUsers.get(hash);
+		if (!known && user?.name) {
+			known = {
+				name: user.name,
+				hash,
+				color:
+					USER_COLORS[this.knownUsers.size % USER_COLORS.length] ??
+					DEFAULT_USER_COLOR,
+			};
+			this.knownUsers.set(hash, known);
+		} else if (known && user?.name) {
+			known.name = user.name;
+		}
+		return known?.color || DEFAULT_USER_COLOR;
 	}
 
-	remoteUpdate(userHash) {
-		const flash = this.getUserColor(userHash);
-		this.toolbar.editor.storage.flashRemoteChanges.color = flash;
+	remoteUpdate(userHash, user = null) {
+		const storage = this.toolbar.editor.storage.flashRemoteChanges;
+		storage.color = this.getUserColor(userHash, user);
+		storage.author = this.knownUsers.get(userHash)?.name ?? "";
 	}
 
 	setUsers(users) {
-		const incoming = new Set(users.map((u) => u.hash));
-		const current = new Set(this.users.map((u) => u.hash));
-		if (
-			incoming.size === current.size &&
-			[...incoming].every((h) => current.has(h))
-		) {
-			return;
-		}
-
 		const menuRow = this.toolbar.element.querySelector(
 			'[data-role="toolbar-menus"]',
 		);
@@ -78,35 +83,15 @@ export class UserManager {
 			this.dropdown = null;
 		}
 
-		// Reset users if empty
-		if (users.length === 0) {
-			this.users = [];
-			return;
+		const activeUsers = new Map();
+		for (const user of users) {
+			if (user?.hash && user?.name) activeUsers.set(user.hash, user);
 		}
-
-		// Get available colors (colors not already assigned)
-		let availableColors = new Set(
-			USER_COLORS.filter(
-				(color) => !this.users.map((user) => user.color).includes(color),
-			),
-		);
-
-		// Add new users with colors
-		users.forEach((user) => {
-			if (!this.users.find((u) => u.hash === user.hash)) {
-				const color = availableColors.values().next().value;
-				availableColors.delete(color);
-				// Reset available colors if we run out
-				if (availableColors.size === 0) {
-					availableColors = new Set(USER_COLORS);
-				}
-				this.users.push({
-					name: user.name,
-					hash: user.hash,
-					color,
-				});
-			}
+		this.users = [...activeUsers.values()].map((user) => {
+			const color = this.getUserColor(user.hash, user);
+			return this.knownUsers.get(user.hash) ?? { ...user, color };
 		});
+		if (this.users.length === 0) return;
 
 		// Create the dropdown button
 		this.button = createMenuButton(this.menuSettings);
@@ -127,6 +112,7 @@ export class UserManager {
 		this.button?._lp_combobox?.destroy();
 		this.button?.remove();
 		this.users = [];
+		this.knownUsers.clear();
 		this.button = null;
 		this.dropdown = null;
 	}

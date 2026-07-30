@@ -1,6 +1,9 @@
 # Frontend Service Worker
 
-The service worker (`src/script/sw.template.mjs`) handles offline support, caching, and push notifications. It is a template file -- the build process replaces `__BUILD_ID__` placeholders with the current build cache ID before writing it to `lagniappe/web/static/sw.js`.
+The service worker (`src/script/sw.template.mjs`) handles offline support,
+caching, and connectivity state. It is a template file -- the build process
+replaces `__BUILD_ID__` placeholders with the current build cache ID before
+writing it to `lagniappe/web/static/sw.js`.
 
 ## Caching Strategy
 
@@ -144,17 +147,12 @@ reachability; `navigator.onLine` remains a scheduling hint.
 
 Routes requests through the classification logic above. Extension URLs (`extension://`) are ignored entirely.
 
-## Push Notifications
+## Connectivity Messages
 
-The service worker listens for `push` events from Firebase Cloud Messaging.
-Push payloads are JSON objects containing a `data` field. The data is forwarded
-to all open browser tabs via `postMessage()`. The main app's `main.mjs` listens
-for these messages and dispatches only the event names declared in
-`config/browser_protocol.json`: notification, server change, sync update, and import
-progress/completion events. `shared/protocol.mjs` checks the protocol version
-and required payload identifiers before dispatch. The current protocol requires
-an exact ID and version; unversioned, incompatible, unknown, or malformed owned
-payloads are rejected.
+The service worker receives only the versioned `connectivity-state` message
+from the active page. It uses that state to make cache/network decisions. It
+does not receive push data or relay server state to tabs; application updates
+are owned by the visible view's polling coordinator.
 
 ## Error Handling
 

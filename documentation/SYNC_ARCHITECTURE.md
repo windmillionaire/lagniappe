@@ -1,416 +1,350 @@
-# Sync Architecture
+# Sync and Polling Architecture
 
-The application deliberately uses different state mechanisms for documents,
-forms, and explicit offline submissions:
+Lagniappe uses one browser polling coordinator for server-state invalidation.
+The coordinator batches every due subscription into `POST /poll`; individual
+features no longer own timers or push registrations.
 
-| Surface | Mechanism | Meaning |
+| Surface | Durable authority | Poll contract |
 |---|---|---|
-| Documents | `SyncManager` + Yjs + Redis + FCM | Live collaborative editing and offline document-delta replay |
-| Forms | `EditWatcher` + entity fingerprint/modified stamps | Local drafts with schema notices and explicit saved-value reconciliation |
-| Offline submits | `OfflineQueue` + IndexedDB | Complete user-authorized submit commands replayed when online |
-| Autofill ownership | `DeferredJobLock` + `EditWatcher` | Durable exclusion while an existing Page/Task autofill job runs |
+| Entity and focused forms | Datastore entity `fingerprint` and `modified` | `entity`, `form-lock` |
+| Collection/list membership | Existing Datastore `site` fingerprints | `channel` |
+| Deferred work | User `operation_revision`, then `DeferredJob.status_revision` and status projection | `operation` |
+| File ingress | Ingress entity fingerprint | `ingress` |
+| Collaborative documents | Entity document asset plus revisioned Redis working state | `document` |
+| Explicit offline submits | IndexedDB mutation records | replayed on reconnect |
 
-Forms do not register presence, send field patches, merge Redis submissions, or
-participate in `/register`, `/sync`, `/state`, or `/deregister`. This avoids
-conflicts between local drafts, deliberate submits, and deferred autofill while
-preserving the two behaviors users need independently: committed-change notices
-and explicit offline submit/replay.
+This division is intentional. Entity and collection revisions must survive
+Redis loss, so they remain in Datastore. Redis is used only for high-churn
+collaborative document deltas and expiring presence. A second Redis copy of
+every entity fingerprint would introduce invalidation and recovery work without
+improving correctness.
 
-> **Push transport note.** Google App Engine installations do not provide the
-> WebSocket topology this application would need. Document collaboration uses
-> FCM multicast for update notification, with the existing fetch fallback for
-> payloads above the provider limit. Form correctness does not depend on FCM.
+## Browser scheduler
 
----
+`src/script/shared/polling.mjs` owns all polling for one mounted view. A
+subscription has a stable client ID, type-specific fields, and an opaque
+`revision` cursor. The coordinator:
 
-## Document collaboration
+- batches at most 64 due subscriptions into one request;
+- runs a shared `beforePoll` hook once, allowing document edits to flush before
+  their revision is checked;
+- permits only one in-flight poll and reuses it only when it already contains
+  every subscription requested by an awaited trigger;
+- queues an immediate follow-up when an awaited trigger requests a subscription
+  outside the active cycle, so initialization cannot complete without its
+  requested result;
+- provides a non-awaiting enqueue path for reconciliation initiated inside a
+  poll callback, preventing a callback from waiting on its own active cycle;
+- adds ten-percent jitter to avoid synchronized clients, using one jitter factor
+  and one scheduling timestamp per response so subscriptions with the same
+  cadence remain in the same request instead of gradually fanning out;
+- backs ordinary entity/channel checks from 15 seconds to 30 and then 60
+  seconds while quiet;
+- polls the active visible document every 2 seconds, active visible ingress
+  every 2.5 seconds, and deferred operations at 4, 8, 16, then 30 seconds while
+  quiet;
+- backs transport errors off exponentially to 60 seconds;
+- stops when the tab is hidden, the browser window is unfocused, or the view is
+  offline;
+- immediately polls after visibility, focus, browser-online, or server-online
+  recovery.
 
-### Document sync IDs
+The existing connectivity health check remains separate: it determines whether
+the server is reachable and drives the offline UI. It does not fetch feature
+state. It also stops on window blur; focus performs the explicit catch-up before
+the normal long health-check interval resumes.
 
-A collaborative document has an ID ending in `:document`, such as
-`page_hash:document`. Page and Project expose only their document reference in
-`entity.sync_ids`:
+### Subscription ownership
 
-```python
-{
-    "document": {
-        "id": page.properties.document.sync_id,
-        "fingerprint": page.properties.document.fingerprint,
-    }
-}
-```
+Recurring work is owned by the narrowest visible surface that can consume it.
+Component rendering reconciles these owners after every activation or
+deactivation. Visibility includes the complete component ancestry, so a child
+that retains its active selection beneath a closed parent does not subscribe.
 
-Templates put the reference on `CollaborativeDocument`:
+| Subscription | Lifetime | Notes |
+|---|---|---|
+| Root `entity` or collection `channel` | Mounted view while focused/visible | The page or index itself remains the durable invalidation authority. |
+| `notifications` channel | Mounted authenticated view while focused/visible | Global chrome must learn about a newly created notification even when the menu is closed. |
+| Watched-form `entity` and `form-lock` | Active visible form widget only | A root form shares the root entity subscription, avoiding a duplicate entity descriptor and Datastore read. |
+| `document` | Active visible collaborative document only | Deactivation checkpoints local state, unsubscribes, and explicitly closes presence. |
+| `ingress` | Active visible import wizard while its import is running | Hidden running imports retain local running state and catch up when reopened. |
+| `operation` | From durable deferred acknowledgement until terminal reconciliation | This is the deliberate visibility exception: completion and notification delivery remain useful when the source widget is closed. |
+| Offline document replay | One shot during reconnect | It is never a recurring mounted-widget subscription. |
 
-```html
-<div data-widget="CollaborativeDocument"
-     lp-sync="{{ page.sync_ids.document.id }}"
-     lp-fingerprint="{{ page.sync_ids.document.fingerprint }}">
-</div>
-```
+Hidden form widgets retain their own last-seen fingerprint/modified baseline in
+memory. The root entity subscription retains the newest observed revision.
+When a form becomes active, those values are compared and only a stale form
+uses its focused replacement route. Advancing the root DOM fingerprint while a
+form is hidden therefore cannot make that form miss an update.
 
-No form template should carry `lp-sync`, `lp-fingerprint`, or `lp-version` for
-collaborative form state. The durable fingerprint on the surrounding
-`[lp-entity]` remains the committed form-revision signal.
+## `POST /poll`
 
-### Client flow
-
-`src/script/shared/sync.mjs` discovers initialized widgets with a `syncId`.
-Documents are the only producers, and the manager contract is:
-
-```text
-register()       join document presence and reconcile document offline records
-state(widget)    fetch one document snapshot and co-viewers
-sendUpdates()    batch Yjs deltas or explicit HTML saves
-receiveUpdate()  apply a pushed delta or fetch the document snapshot
-deregister()     flush the final document save and remove presence
-```
-
-`CollaborativeDocument` supplies:
-
-- `syncData`: a merged Yjs update plus full encoded Yjs state;
-- `saveData`: encoded state, any pending update, and saved HTML;
-- `sync()`: remote update, offline state, and authoritative snapshot handling.
-
-The view still creates a tokenless `SyncManager` when messaging is unavailable.
-That path supports state fetches and the existing tokenless personal-document
-save exception without registering presence.
-
-Core starts messaging without awaiting it. Its `syncReady` promise resolves
-after the token or state-only path has created the manager, and only
-`CollaborativeDocument` waits for that promise before requesting `/state`.
-Registration remains a background startup action because it also reconciles
-offline document records through headless document widgets. A manager that
-finishes initialization while its view is hidden does not register presence.
-
-### Server routes
-
-The routes in `lagniappe/web/routes/home/sync.py` accept document IDs only.
-Form-shaped updates receive `422 Only document widgets may use live sync.`
-
-`POST /register`:
+The version 1 request envelope is:
 
 ```json
 {
-  "token": "<fcm token>",
-  "active": [
+  "version": 1,
+  "client_id": "browser-session-id",
+  "subscriptions": [
     {
-      "key": "<entity key>",
-      "sync_id": "page_hash:document",
-      "fingerprint": "<asset fingerprint>"
+      "id": "edit:entity-key",
+      "type": "entity",
+      "key": "entity-key",
+      "revision": "known-fingerprint"
     }
   ],
-  "offline": []
+  "closed_documents": []
 }
 ```
 
-The response contains only document snapshots whose server fingerprint differs:
+Every descriptor ID must be unique. The server allowlists descriptor types and
+channel names, bounds IDs and batch sizes, batches entity loads, and applies
+viewer permissions before returning state.
+
+Each result has the same outer contract:
 
 ```json
 {
-  "modified": [
-    {
-      "key": "<entity key>",
-      "sync_id": "page_hash:document",
-      "ydoc": "<base64 state>",
-      "fingerprint": "<asset fingerprint>",
-      "users": []
-    }
-  ]
+  "id": "edit:entity-key",
+  "type": "entity",
+  "status": "changed",
+  "revision": "new-opaque-revision",
+  "poll_after_ms": 15000,
+  "payload": {}
 }
 ```
 
-`POST /sync` accepts a batch of document updates:
+`status` is one of:
+
+- `unchanged`: the cursor is current and no payload is needed;
+- `changed`: the new cursor and typed payload are present;
+- `unavailable`: the object is missing or no longer visible to this user;
+- `error`: this descriptor failed without failing the rest of the batch.
+
+Typed payloads are deliberately narrow:
+
+| Type | Identifier | Changed payload |
+|---|---|---|
+| `entity` | `key` | `fingerprint`, `modified` |
+| `channel` | allowlisted `channel` | `refresh: true` |
+| `form-lock` | entity `key` | lock state and operation identity |
+| `operation` | deferred-job `key` | owner-safe status projection |
+| `ingress` | ingress `key` | `refresh: true` |
+| `document` | entity `key` and `sync_id` | generation, revision, snapshot/deltas, presence |
+
+Payload routes still exist for focused HTML or large content. Polling tells a
+mounted consumer that its contract changed; the consumer then uses its normal
+authoritative replacement route. This keeps `/poll` bounded and prevents it
+from becoming a second rendering API.
+
+### Channel revisions
+
+Collection revisions normally reuse `database.site_fingerprint()`. Entity
+saves already update these durable records in the same persistence workflow.
+The `home` channel combines the fingerprints for notes, categories, projects,
+pages, and tasks because the dashboard renders several collections. Personal
+channels use state already present on the directly loaded request user where
+that is the narrower authority:
+
+- `notifications` uses the user's monotonic `notification_revision`, avoiding a
+  separate collection-fingerprint read;
+- `starred` uses the user revision;
+- `tool-reports` uses report and user revisions.
+
+Permission fingerprints are part of each channel revision, so a permission
+change invalidates the viewer's collection even when membership did not change.
+Notification-only and operation-only user revision patches do not change the
+user's `modified` fingerprint, refresh its Redis search cache, or invalidate the
+global users collection.
+
+## Collaborative documents
+
+Documents are the only live collaborative widgets. Forms do not register
+presence or send field patches.
+
+A document subscription includes:
 
 ```json
 {
-  "token": "<optional fcm token>",
-  "updates": [
-    {
-      "key": "<entity key>",
-      "sync_id": "page_hash:document",
-      "fingerprint": "<asset fingerprint>",
-      "update": "<base64 Yjs delta>",
-      "ydoc": "<base64 Yjs state>",
-      "html": "<saved HTML when explicitly saving>",
-      "save": true
-    }
-  ]
+  "id": "document:page-hash:document",
+  "type": "document",
+  "key": "entity-key",
+  "sync_id": "page-hash:document",
+  "generation": "redis-generation",
+  "revision": 12,
+  "presence_digest": "opaque-digest"
 }
 ```
 
-`POST /state` accepts one document descriptor. `POST /deregister` accepts the
-token and the document `sync_ids` joined by that view.
-
-### Redis state
-
-`lagniappe/core/tools/cache/sync.py` stores only collaboration/presence state:
+Redis uses three keys:
 
 | Key | Contents |
 |---|---|
-| `Sync.WIDGET:{sync_id}` | Tokens registered for one document widget |
-| `Sync.ENTITY:{entity_hash}` | Tokens viewing an entity, also used by delete broadcasts |
-| `Sync.USERS` | Token-to-user projection with expiring fields |
-| `Sync.STATE` | Document sync ID to encoded state/fingerprint/timestamp |
+| `Sync.DOCUMENTS:{sync_id}` | Isolated JSON state: generation, revision, base revision, checkpoint, deltas, bounded author projections, asset fingerprint |
+| `Sync.PRESENCE:{sync_id}` | Client IDs currently viewing one document |
+| `Sync.CLIENTS` | Expiring client-to-user projections |
 
-The five-minute TTL is refreshed by active registration and state work. Cache
-state remains recoverable from the document entity; Redis is not authoritative
-storage.
+Document keys expire after five minutes; client presence expires after one
+minute unless refreshed by the 2-second document poll. Redis loss creates a new
+generation seeded from the durable entity document asset.
 
-### Offline document deltas
+### Revisions, deltas, and checkpoints
 
-The IndexedDB `sync` store remains for document deltas/saves. On registration,
-`SyncManager` filters records to IDs ending in `:document`.
+`POST /sync` appends Yjs deltas under a Redis optimistic transaction. Each delta
+gets a monotonically increasing revision. A client receives:
 
-Mounted and headless `CollaborativeDocument` instances use the same replay
-path. A record is deleted only after its replay batch is accepted.
+- a full snapshot when its generation differs or its cursor predates the
+  compacted base revision;
+- only deltas newer than its revision otherwise;
+- a presence list only when its presence digest changed.
 
----
+Each retained delta includes its author hash. Poll responses also include the
+minimal `{hash, name}` projection for authors referenced by the returned
+revisions, allowing transient colorization and attribution even after live
+presence has closed. Author projections are pruned with the checkpoint/delta
+window; they are not durable edit history. When an already-connected client
+falls behind a newly compacted checkpoint, the snapshot carries an author only
+when every compacted revision has that same author, so the transient highlight
+is not attributed to mixed-author work. Initial clients and clients entering a
+new Redis generation receive no historical author attribution.
 
-## Form state
+A full Yjs checkpoint is accepted only when the submitted generation and
+revision match the current Redis state. Stale writers may still append their
+commutative Yjs delta, but cannot replace the checkpoint. The client then keeps
+its old cursor, polls all missing concurrent deltas, and retries a merged
+checkpoint. A rejected explicit save remains in IndexedDB until that retry is
+accepted. This prevents both skipped concurrent edits and Redis-only data loss.
 
-### Local drafts
+The client retains the last accepted generation/revision independently of its
+active presence subscription. Edits made after an offline transition therefore
+store the originating cursor with their IndexedDB checkpoint. IndexedDB keeps
+one coalesced record per document: a compact Yjs state/update plus the latest
+HTML checkpoint, not an indefinitely growing edit log.
 
-`FormElement` and `Renderer` are local rendering/submission components. They do
-not expose the live-sync widget contract and do not fetch `/state` during
-initialization. Ordinary edits update the rendered controls and generic
-unsaved-state indicator until the user deliberately submits or resets.
+A later headless replay uses the stored cursor for a one-shot document poll,
+applies the returned snapshot or newer deltas, and then applies the compact
+offline Yjs state. It submits that merged checkpoint against the cursor returned
+by the poll. If another writer wins the poll-to-save race, Redis still appends
+the commutative local delta but rejects the stale checkpoint; the compact record
+remains in IndexedDB for another poll-and-merge pass. The record is removed only
+after Redis accepts the merged checkpoint.
 
-Authoritative server responses still use the form's normal reset lifecycle:
+After 64 retained deltas, the poll response asks an editable client for a
+checkpoint. Explicit editor blur also sends a checkpoint and HTML. Accepted
+checkpoints persist the document asset/history through a property-masked write;
+they do not advance or overwrite the parent entity's `modified`, fingerprint,
+form submission, or other sibling fields. The document asset fingerprint and
+Redis revision remain the document-sync authorities.
 
-1. `updated(response)` stores replacement HTML and any schema/submission data.
-2. `postreconcile()` calls `reset()`.
-3. `BaseForm` and `Renderer` rebuild the complete surface, including nested
-   controls and uploads.
+The client remembers documents with a persisted checkpoint whose parent has
+not yet been advanced. Document-widget deactivation, window/tab hide, and
+navigation send one `touch_parent` lifecycle update. That update either combines
+the checkpoint with masked parent/list-owner `modified` writes or, when the
+checkpoint was already persisted on blur, sends a touch-only update. This makes
+the changed Page visible to Category/list polling without turning every live
+document checkpoint into a form conflict. Offline records retain this lifecycle
+intent and coalesce document state rather than retaining individual edits.
+Redis remains disposable working state.
 
-Reconciliation uses that same full reset boundary. A local draft can be
-projected through the latest server schema before the reset: retained field IDs
-keep local values, fields added by the new schema keep the server value, and
-removed fields disappear. The client never selects or persists an alternate
-schema version; historical schemas remain owned by form history.
+`closed_documents` removes presence during widget deactivation, window blur,
+tab hide, navigation, and teardown. The client first detaches the document
+subscription and waits for any active poll before sending the close, so a late
+presence refresh cannot recreate the entry. Stale presence also disappears
+through field expiry if a browser closes without running cleanup.
 
-### Committed edit detection
+## Committed form edits
 
-Forms that should notice changes elsewhere render `controls.edited_marker(...)`
-inside a fingerprinted `[lp-entity]` anchor. Current marked form surfaces
-include PageInfo, TaskForm, TaskSettings, CategoryInfo, and the other focused
-settings forms documented in `FRONTEND_VIEWS.md`.
+`EditWatcher` discovers fingerprinted `[lp-entity]` markers, records a separate
+baseline for every marker, and installs `entity` plus `form-lock` subscriptions
+only for active visible form widgets. A watched form for the view's root entity
+consumes the root `view:entity` result instead of installing a duplicate
+descriptor. On an entity change it fetches only stale active markers through
+their focused replacement routes and follows the existing reconciliation
+rules:
 
-`EditWatcher` posts at mount, foreground/reconnect, and every 15 seconds:
+- inactive forms perform no polling or replacement request and catch up when
+  activated;
+- visible active widgets enter revision review even when clean;
+- equivalent baselines acknowledge automatically;
+- schema drift projects the local draft through the latest schema;
+- renderer-capable value drift offers per-field saved/local choices;
+- non-renderer dirty forms offer reset/reload;
+- unsafe or unavailable replacements fall back to a full reload.
 
-```json
-{
-  "entities": [
-    {"key": "<entity key>", "fingerprint": "<committed fingerprint>"}
-  ]
-}
-```
+Mutation responses still carry `X-Lagniappe-Entity-Revisions`, allowing the
+originating tab to acknowledge its own successful edit immediately.
 
-`POST /edited` checks at most 32 unique, authorized entities and returns two
-independent lists:
+An active `DeferredJobLock` disables the owned Page/Task form. Other tabs learn
+about it through `form-lock`, subscribe to its `operation`, and reconcile the
+authoritative form when the job becomes terminal. A clean form applies its own
+terminal operation result even while active, but only when the operation
+identity matches its durable lock; unsaved and queued forms retain normal
+revision review. An unlocked result also reconciles a form that still shows a
+stale lock. Replacement probes are serialized per marker and revision so
+identical overlap shares one request and a newer follow-up cannot invalidate an
+earlier authoritative response.
 
-```json
-{
-  "edited": [
-    {
-      "key": "<entity key>",
-      "fingerprint": "<new fingerprint>",
-      "modified": "<entity modified ISO timestamp>"
-    }
-  ],
-  "operations": [
-    {
-      "key": "<entity key>",
-      "locked": true,
-      "scope": "form-autofill",
-      "operation": "<deferred job key>",
-      "revision": 4
-    }
-  ]
-}
-```
+## Deferred operations and notifications
 
-For a changed fingerprint, the watcher fetches the marker's focused replacement
-route and builds detached revision previews. Fingerprint drift detects both
-entity and attached-form changes. Reconciliation depends on current local state
-and on whether both revisions expose a renderer, non-empty schema, and structured
-submission:
+Deferred job state is durable and correctness no longer depends on a delivery
+attempt. `operation` polling returns `status_revision`, phase, elapsed time,
+retry timing, terminal state, and bounded destination metadata. The manager
+reconciles the configured entity/widget route when terminal and then removes
+the subscription. Pending report lists do not run a second refresh timer; their
+operation marker is the sole automatic completion authority.
 
-- clean form: apply the authoritative replacement immediately;
-- baseline equals remote or local and remote are equal: acknowledge the new
-  baseline automatically;
-- renderer-capable schema drift: project the draft through the latest schema
-  and show a schema-update notice, with no historical schema choice;
-- renderer-capable submission drift: show **Review values**, rendering only
-  changed fields side by side through the latest schema; saved values are
-  selected by default, and each field can be switched to the tab/queued value
-  before **Update values**;
-- dirty non-renderer form: show inline **Reset form**;
-- queued non-renderer form: offer a compact whole-form saved-versus-retry choice;
-- unavailable or unsafe replacement: show **Reload page**.
+Notifications are durable entities. The `notifications` channel refreshes the
+dropdown; entity, operation, and ingress subscriptions independently reconcile
+their owned active surfaces. There is no completion-event payload or provider
+retry path.
 
-Foreground/reconnect waits for this immediate watcher pass before collection
-refresh. It retains the pre-check root fingerprint for the batched collection
-request, so the watcher cannot accidentally suppress task/table deltas. Only
-widgets with `refreshScope = "collection"` participate; forms are excluded.
-PageTaskList row replacement also skips dirty, queued, or staged-review forms.
+The request user has separate monotonic `notification_revision` and
+`operation_revision` fields. Notification mutations advance the first; every
+client-visible deferred status revision advances the second in the same
+user-ancestor transaction as the job. An operation descriptor echoes the last
+seen `operation_revision`. When it still matches the already loaded request
+user, `/poll` returns `unchanged` without loading that job. A mismatch causes
+one bounded owner-safe batch load and advances the descriptor gate. Separate
+counters prevent job progress from refetching the notification list and prevent
+a new notification from reloading every active operation.
 
-This comparison is why CategoryInfo can use the category's existing durable
-fingerprint. Page-list membership may touch that same category fingerprint, but
-unchanged CategoryInfo form data suppresses the irrelevant notice. No separate
-category-form revision is required.
+## Offline submissions
 
-Successful mutation responses carry `X-Lagniappe-Entity-Revisions`. The request
-wrapper dispatches fingerprint and modified acknowledgements so the watcher
-advances baselines without waiting for the next poll.
+`OfflineQueue` remains separate from collaborative document sync. Only forms
+with `lp-offline` and an `offline(context)` method opt in. IndexedDB stores the
+complete user-authorized command, its entity fingerprint/modified precondition,
+structured renderer values, ordinary fields, and files.
 
----
+Reconnect replays commands in order. A fingerprint mismatch retains the command
+and uses `EditWatcher`'s schema/value reconciliation. When that reconciliation
+can safely project the queued form onto the newer entity, the queue persists the
+rebased fingerprint and retries it inside the same ordered replay; a conflict
+that still needs a user choice remains queued. Local drafts that were never
+submitted are not durable. After the server accepts a command, the queue deletes
+it from IndexedDB and live queue lookups before broadcasting the entity revision
+or replay-success UI phase. Reconciliation therefore cannot mistake the
+committed command for a still-queued mutation.
 
-## Server-change invalidation and collection refresh
+## Service worker boundary
 
-The browser protocol uses the version 2 `server-change` event. Producers send
-identifiers and routing metadata, never mutable entity fields. The parser
-requires the exact protocol ID and version.
+The service worker handles application caching and receives only the versioned
+connectivity-state message. It has no `push` listener and does not relay server
+state to windows. Browser protocol version 3 intentionally contains no public
+server events.
 
-`Core.reconcileChange()` coalesces concurrent changes. For each batch it:
+## Extending polling
 
-1. applies immediate control-only state such as star/unstar and search-cache
-   invalidation for deletes;
-2. invalidates the changed entity keys through `EditWatcher`;
-3. refreshes only explicit collection widgets;
-4. runs narrow view hooks for supplemental collections or workflow UI.
+Prefer an existing type whenever its payload contract fits. A new type should
+be added only when it needs a distinct permission check, cadence, or bounded
+payload:
 
-File extraction and summary events contain only `{type, key}`. `FileInfo` is a
-normal watched form, so a clean form fetches and remounts its authoritative
-focused response. The File view's extraction hook only reveals the reload-text
-notice when the text tab was not mounted; it does not patch file metadata.
-Deferred completion with an operation reference nudges the authoritative
-operation coordinator, which performs its own revision-aware destination fetch.
+1. add and validate its descriptor in `home/poll.py`;
+2. return the common result envelope with an opaque revision;
+3. add one coordinator subscription in the owning component;
+4. use an existing focused route for large HTML/data;
+5. add backend authorization/contract coverage and a Node scheduler/consumer
+   test;
+6. document its authority and inactive-tab behavior here.
 
----
-
-## Offline submit and replay
-
-Offline form submission is owned by `OfflineQueue`, not `SyncManager` or
-`EditWatcher`.
-Only a form with `lp-offline` and a widget `offline(context)` method opts in.
-PageInfo, TaskForm, and CategoryInfo use deterministic update record IDs so a
-later explicit offline submit replaces the earlier queued command for the same
-entity.
-
-Core awaits queue hydration so every consumer sees the durable record set, but
-does not await the initial online replay. An `lp-offline` form waits on the
-tracked replay promise immediately before restoring queued values. This avoids
-mounting stale queued state if replay succeeds while the widget itself is still
-initializing; replay failures and conflicts retain the record for normal form
-restoration and review.
-
-`OfflineQueue.queueSubmit()` serializes the complete `FormData`, including
-files, into the IndexedDB `mutations` store:
-
-Database version 5 stores explicit submissions in `mutations`.
-
-```json
-{
-  "id": "update:page:<key>",
-  "action": "update",
-  "kind": "page",
-  "method": "PUT",
-  "route": "/pages/<key>/update",
-  "target_key": "<key>",
-  "fingerprint": "<entity fingerprint when submitted>",
-  "modified": "<entity modified ISO timestamp when submitted>",
-  "renderer_submission": {"field-id": "structured form value"},
-  "form_controls": [],
-  "fields": [["name", "Offline edit"]],
-  "files": [],
-  "created_at": 1780000000000
-}
-```
-
-The fingerprint and modified stamp are replay preconditions/reconciliation
-metadata. `renderer_submission` is likewise internal mutation metadata: the
-renderer packages its fields in the same structured `form_value` shape used by normal
-schema/submission rendering. `form_controls` retains selected option details for
-non-renderer facets. Neither field is added to the replay request.
-
-When an offline-capable update form mounts, it looks for a queued PUT command
-for the same entity and route. The cached/server form is rendered first and
-kept as the `EditWatcher` revision baseline. A second render then overlays the
-saved ordinary fields/files, non-renderer facet selections, and structured
-renderer submission. The submit control returns to **Queued Sync**. This also
-means reset or cached offline reload restores the explicit queued submission,
-not the older cached values.
-
-When online, replay reconstructs `FormData`, adds `offline=True` and, when the
-record has one, `offline-fingerprint`, then calls the original route/method.
-Page and Task update routes compare that fingerprint before applying any mutation. An
-unchanged fingerprint replays normally. A mismatch returns the latest focused
-form response and leaves the mutation record durable.
-
-The same `EditWatcher` reconciliation boundary handles that response. An equal
-saved `modified` stamp on a renderer-capable form means schema-only drift: the
-queued values are projected into the latest schema, called out, rebased to the
-current fingerprint, and replayed after confirmation. A later renderer value
-change shows only differing queued and saved fields, with the saved value
-selected initially for each. A queued form without renderer/schema/submission
-capability instead offers one whole-form choice: retry the queued version or use
-the saved version. Keeping any queued values rebases the complete command
-(preserving IndexedDB files) and replays it; accepting the saved version cancels
-the queued command. Failed or repeatedly conflicting commands remain queued.
-
-This is intentionally submit semantics rather than draft semantics:
-
-- an explicit offline submit survives reload and reconnect;
-- cached form HTML is overlaid with that submitted version while it is queued;
-- a local draft that was never submitted is not durable;
-- an update command is complete and ordered, not a stream of field patches;
-- create commands use unique IDs while update commands may coalesce by entity.
-
-Deferred AI subforms remain online-only. A normal CreatePage autofill is tracked
-as a deferred create operation, but it does not use the update-form offline
-queue described here.
-
----
-
-## Deferred autofill ownership
-
-Existing PageInfo and TaskForm autofill jobs acquire a deterministic
-`DeferredJobLock` in the same Datastore transaction that creates the job. The
-lock stores target, operation, idempotency key, and scope; it has no sync ID or
-Redis dependency.
-
-While active:
-
-- mutation routes reject conflicting full form submits, direct uploads, and
-  form-field quick edits with a structured `409` response;
-- the originating tab locks immediately from the deferred response;
-- `/edited` exposes the active operation on reload and to other mounted tabs;
-- `EditWatcher` calls `FormElement.lockDeferredOperation()` and registers the
-  operation with `DeferredOperationManager`;
-- the whole form is disabled and the full submit/context area is replaced by
-  one progress control;
-- status polling remains authoritative; push only accelerates it.
-
-Terminal cleanup uses compare-and-delete so an old worker cannot remove a newer
-operation's lock. Successful terminal reconciliation fetches authoritative form
-HTML through the configured deferred replacement route and clears the progress
-state by replacing the locked form.
-
-CreatePage autofill explicitly sets `lock_target=False`. The new Page is not an
-already-mounted shared edit surface, so the job keeps idempotency, status,
-notification, and form-revision drift validation without creating a target
-lock. The source CreatePage still shows deferred progress.
-
----
-
-## Choosing a mechanism
-
-- Use document sync only for a Yjs-backed collaborative asset.
-- Add `lp-edited-marker` plus a focused GET replacement route when a form needs
-  committed-change detection.
-- Add `lp-offline` plus `offline(context)` when an explicit submit should queue
-  through `OfflineQueue`.
-- Use `DeferredJobLock` when background work must exclusively own an existing
-  entity mutation surface.
-- Do not add ordinary form controls to `SyncManager` or Redis state.
+Do not add feature-owned intervals, service-worker event relays, or a Redis copy
+of durable entity metadata.

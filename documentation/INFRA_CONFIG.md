@@ -99,15 +99,16 @@ Every snapshot identifies its contract with:
 
 ```yaml
 CONFIG_KIND: lagniappe-settings
-CONFIG_SCHEMA_VERSION: 2
+CONFIG_SCHEMA_VERSION: 3
 ```
 
-Schema 2 stores `RUNTIME_SERVICE_ACCOUNT_EMAIL` and
+Schema 3 stores `RUNTIME_SERVICE_ACCOUNT_EMAIL` and
 `INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL` as explicit, non-secret identities.
-Schema 2 is the only supported recovery and runtime contract. Recovery rejects
-other schema versions and requires both identities explicitly. Snapshot
-construction accepts the schema scalar in its serialized string or parsed
-integer representation and always emits the canonical integer value.
+It is the only current export and runtime contract. Recovery upgrades schema 2
+documents to schema 3, rejects other schema versions, and requires both
+identities explicitly. Snapshot construction accepts the schema scalar in its
+serialized string or parsed integer representation and always emits the
+canonical integer value.
 
 The download merges the current Datastore `site/deployment` keys and `site/ai`
 keys into their ordinary flat application-setting names. If those live records
@@ -192,8 +193,9 @@ boundary without a private key.
 Successful setup output is built from an explicit safe-field allowlist. It may
 show identities, project/resource names, regions, versions, and commands, but
 never dumps the `APP` mapping. In particular it omits service-account private
-keys, `GIBBERISH`, `SECRET_KEY`, Redis passwords, Firebase API keys, Sentry
-DSNs, SMTP passwords/API keys, and access tokens.
+keys, `GIBBERISH`, `SECRET_KEY`, Redis passwords, legacy messaging API keys, Sentry
+DSNs, SMTP passwords/API keys, and access tokens. Legacy schema-2 recovery
+also discards the retired `FIREBASE_CONFIG` value.
 
 Google locations are intentionally split:
 
@@ -301,11 +303,8 @@ The app does not create explicit cached-content resources for these short-lived
 jobs; caching reduces repeated-prefix processing but does not replace quota
 backoff or Priority service.
 
-Production Sentry transaction filtering removes only FCM v1 `messages:send`
-child spans that return HTTP 404. Firebase reports permanently unregistered
-browser tokens through that response, and multicast delivery consumes the batch
-result to invalidate those registrations. Other FCM statuses and unrelated 404s
-remain visible so provider outages and application routing errors are not hidden.
+Production Sentry no longer needs a messaging-provider span filter. Application
+poll failures retain their normal route/HTTP diagnostics.
 
 ## Local Runner Boundary
 

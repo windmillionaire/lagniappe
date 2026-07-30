@@ -224,10 +224,6 @@ ICONS = {
 		"glyph": "work",
 		"fill": 1
 	},
-	"firebase": {
-		"glyph": "local_fire_department",
-		"fill": 1
-	},
 	"filter": {
 		"active": {
 			"glyph": "filter_list",

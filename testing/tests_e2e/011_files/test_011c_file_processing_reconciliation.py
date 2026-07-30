@@ -16,14 +16,14 @@ from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Uploads, Users
 from testing.resources import File
-from testing.utility.messaging import simulate_window_message
+from testing.utility.polling import trigger_poll
 
 pytestmark = pytest.mark.e2e
 
 
 # @features file
-# @dimensions summarize server-change browser-event status summary authoritative-remount
-def test_file_summary_completion_remounts_authoritative_info(get_user):
+# @dimensions summarize polling status summary active-reset
+def test_file_summary_completion_stages_authoritative_info_until_reset(get_user):
     user = get_user(Users.OWNER)
     file = File.upload_from_page(
         user,
@@ -44,11 +44,14 @@ def test_file_summary_completion_remounts_authoritative_info(get_user):
     saved_file.save()
 
     with user.page.expect_response("**/files/*/info/replace"):
-        simulate_window_message(
-            user,
-            "server-change",
-            {"type": "summarize-complete", "key": file.key},
-        )
+        trigger_poll(user)
+
+    marker = info_form.locator("[lp-edited-marker]")
+    expect(marker).to_be_visible()
+    expect(marker.get_by_role("button", name="Reset form")).to_be_visible()
+    expect(info_form).to_have_attribute("data-original-revision", "true")
+
+    marker.get_by_role("button", name="Reset form").click()
 
     info_form = file.info_form
     expect(info_form).not_to_have_attribute("data-original-revision", "true")
@@ -59,8 +62,8 @@ def test_file_summary_completion_remounts_authoritative_info(get_user):
 
 
 # @features file
-# @dimensions extract server-change browser-event reload text-tab authoritative-remount
-def test_file_extract_completion_prompts_reload_for_text_tab(get_user):
+# @dimensions extract polling reload text-tab active-reset
+def test_file_extract_completion_prompts_reload_for_text_tab_after_reset(get_user):
     user = get_user(Users.OWNER)
     file = File.upload_from_page(
         user,
@@ -90,11 +93,14 @@ def test_file_extract_completion_prompts_reload_for_text_tab(get_user):
     saved_file.save()
 
     with user.page.expect_response("**/files/*/info/replace"):
-        simulate_window_message(
-            user,
-            "server-change",
-            {"type": "extract-complete", "key": file.key},
-        )
+        trigger_poll(user)
+
+    marker = file.info_form.locator("[lp-edited-marker]")
+    expect(marker).to_be_visible()
+    expect(marker.get_by_role("button", name="Reset form")).to_be_visible()
+    expect(user.locate(file.EXTRACT_RELOAD_NOTICE)).to_be_hidden()
+
+    marker.get_by_role("button", name="Reset form").click()
 
     expect(file.info_form.locator(file.INFO_DESCRIPTION)).to_have_value(summary)
     expect(user.locate(file.EXTRACT_RELOAD_NOTICE)).to_be_visible()

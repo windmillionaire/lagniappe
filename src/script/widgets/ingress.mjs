@@ -2,7 +2,7 @@ import { buttons } from "../elements/buttons.mjs";
 import { FacetsBox, SelectBox } from "../elements/combobox";
 import { formatting } from "../elements/formatting";
 import { primitives } from "../elements/primitives";
-import { EVENTS, Modal, request, withTransition } from "../shared";
+import { Modal, request, withTransition } from "../shared";
 
 /**
  * @testable infrastructure
@@ -21,12 +21,9 @@ export class ImportData {
 		this.runStatus = "idle";
 		this.pollAfterMs = null;
 		this.importRequestStarted = false;
-		this.importListenersAdded = false;
-		this.resultRefresh = null;
-		this.importPoll = null;
+		this._unsubscribeImport = null;
 
 		this._parser = new DOMParser();
-		this._appendResult = this._appendResult.bind(this);
 		this._refreshProgress = this._refreshProgress.bind(this);
 		this._updateVisibility = this._updateVisibility.bind(this);
 		this._click = this._click.bind(this);
@@ -118,7 +115,7 @@ export class ImportData {
 			run_status: runStatus = "idle",
 			poll_after_ms: pollAfterMs = null,
 		} = resp;
-		if (!stage) return;
+		if (!stage) return false;
 
 		withTransition(() => {
 			this.stageElt.innerHTML = progress;
@@ -168,6 +165,7 @@ export class ImportData {
 				this._clearError();
 			}
 		});
+		return true;
 	}
 
 	_updateVisibility(e) {
@@ -412,67 +410,72 @@ export class ImportData {
 
 	_setImportStopped() {
 		this.importRequestStarted = false;
-		this._stopImportListeners();
 		this._stopImportPolling();
 	}
 
-	_stopImportListeners() {
-		if (!this.importListenersAdded) return;
-
-		window.removeEventListener(EVENTS.IMPORT_RESULT, this._appendResult);
-		window.removeEventListener(EVENTS.IMPORT_COMPLETE, this._refreshProgress);
-		window.removeEventListener(EVENTS.IMPORT_STOPPED, this._refreshProgress);
-		window.removeEventListener(EVENTS.IMPORT_ERROR, this._refreshProgress);
-		this.importListenersAdded = false;
-	}
-
-	async _refreshProgress(e) {
-		const key = e?.detail?.key;
-		if (key && key !== this.key) return;
-
-		this._setStage(await request.get(this.endpoints.get(this.key)));
+	async _refreshProgress() {
+		const response = await request.get(this.endpoints.get(this.key));
+		if (!response?.ok) return false;
+		return this._setStage(response);
 	}
 
 	_startImportPolling() {
-		if (this.importPoll) return;
+		this.importRequestStarted = true;
+		return this.syncPollingSubscription();
+	}
 
-		this.importPoll = setInterval(() => {
-			if (this.stage !== "IMPORTING" || this.stopped) {
-				this._stopImportPolling();
-				return;
-			}
-			this._refreshProgress();
-		}, this.pollAfterMs || 2500);
+	_pollingVisible() {
+		if (
+			this.component?.active !== this ||
+			this.component?.visible !== true ||
+			this.visible !== true
+		)
+			return false;
+		let ancestor =
+			this.component?.elt?.parentElement?.closest?.("[lp-component]");
+		while (ancestor) {
+			if (ancestor.dataset.visible === "false") return false;
+			ancestor = ancestor.parentElement?.closest?.("[lp-component]");
+		}
+		return true;
+	}
+
+	/**
+	 * Import progress is only useful while its wizard is the active visible
+	 * widget. A running import is remembered and catches up when reopened.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_polling_tracks_widget_visibility
+	 * @features ingress polling
+	 * @dimensions active-widget visibility subscription-lifecycle catch-up
+	 * @pairs ingress:active-widget ingress:visibility ingress:subscription-lifecycle ingress:catch-up
+	 * @pairs polling:active-widget polling:visibility polling:subscription-lifecycle polling:catch-up
+	 */
+	syncPollingSubscription() {
+		if (!this.importRequestStarted || !this._pollingVisible()) {
+			this._stopImportPolling();
+			return;
+		}
+		if (this._unsubscribeImport) return;
+		this._unsubscribeImport = this.view.PollingCoordinator?.subscribe(
+			{
+				id: `ingress:${this.key}`,
+				type: "ingress",
+				key: this.key,
+				revision: this.target.dataset.fingerprint ?? null,
+			},
+			{
+				onResult: (result) => {
+					if (!this._pollingVisible()) return false;
+					if (result.status === "changed") return this._refreshProgress();
+				},
+			},
+		);
 	}
 
 	_stopImportPolling() {
-		if (!this.importPoll) return;
-
-		clearInterval(this.importPoll);
-		this.importPoll = null;
-	}
-
-	_scheduleResultRefresh() {
-		if (this.resultRefresh) return;
-
-		this.resultRefresh = setTimeout(async () => {
-			this.resultRefresh = null;
-			await this._refreshProgress();
-		}, 200);
-	}
-
-	_appendResult(e) {
-		const { key, result } = e.detail;
-		if (key && key !== this.key) return;
-		if (!result) {
-			this._scheduleResultRefresh();
-			return;
-		}
-
-		const html = this._parser.parseFromString(result, "text/html");
-		const results = this.progressElt.querySelector("[data-role='completed']");
-		if (!results) return;
-		results.appendChild(html.body.firstElementChild);
+		this._unsubscribeImport?.();
+		this._unsubscribeImport = null;
 	}
 
 	async _deleteImported(button) {
@@ -509,39 +512,26 @@ export class ImportData {
 		this.importRequestStarted = true;
 		this.stopButton?.deactivate("Stop Import", "delete");
 
-		if (!this.importListenersAdded) {
-			window.addEventListener(EVENTS.IMPORT_RESULT, this._appendResult);
-			window.addEventListener(EVENTS.IMPORT_COMPLETE, this._refreshProgress);
-			window.addEventListener(EVENTS.IMPORT_STOPPED, this._refreshProgress);
-			window.addEventListener(EVENTS.IMPORT_ERROR, this._refreshProgress);
-			this.importListenersAdded = true;
-		}
 		this._startImportPolling();
 
-		request
-			.post(this.endpoints.import(this.key), {
-				token: this.view.fcmToken,
-			})
-			.then((resp) => {
-				if (!resp.ok) {
-					this._setImportStopped();
-					this._showError(
-						resp.error || "Import could not be started. Please try again.",
-					);
-					return;
-				}
-				if (resp.stage) {
-					this._setStage(resp);
-				} else {
-					this._refreshProgress();
-				}
-			});
+		request.post(this.endpoints.import(this.key), {}).then((resp) => {
+			if (!resp.ok) {
+				this._setImportStopped();
+				this._showError(
+					resp.error || "Import could not be started. Please try again.",
+				);
+				return;
+			}
+			if (resp.stage) {
+				this._setStage(resp);
+			} else {
+				this._refreshProgress();
+			}
+		});
 	}
 
 	destroy() {
-		if (this.resultRefresh) clearTimeout(this.resultRefresh);
 		this._destroyStage();
 		this._stopImportPolling();
-		this._stopImportListeners();
 	}
 }

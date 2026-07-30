@@ -313,7 +313,7 @@ def test_extract_process(get_test_entities):
         # Test update method if status provided
         if "update_status" in file.test_spec:
             with patch("lagniappe.core.properties.file_options.get_file_text") as extract:
-                def _complete(entity, token, *, dispatch):
+                def _complete(entity, *, dispatch):
                     assert dispatch is False
                     entity.properties.extract.complete = True
                     entity.properties.extract.status = expected["status"]
@@ -323,14 +323,13 @@ def test_extract_process(get_test_entities):
                 file.properties.extract.update(
                     {
                         "enable-extract": "on",
-                        "fcm-token": "token",
                         "search-text": "on"
                         if file.test_spec.get("search")
                         else None,
                     }
                 )
 
-            extract.assert_called_once_with(file, "token", dispatch=False)
+            extract.assert_called_once_with(file, dispatch=False)
             assert file.properties.extract.complete == expected.get("complete", False)
             assert file.properties.extract.enabled is True
 
@@ -358,14 +357,13 @@ def test_summarize_process(get_test_entities):
                 file.properties.summarize.update(
                     {
                         "enable-summarize": "on",
-                        "fcm-token": "token",
                         "search-summary": "on"
                         if file.test_spec.get("search")
                         else None,
                     }
                 )
 
-            summarize.assert_called_once_with(file, "token", dispatch=False)
+            summarize.assert_called_once_with(file, dispatch=False)
             assert file.properties.summarize.enabled is True
 
 
@@ -377,13 +375,11 @@ def test_summarize_update_uses_enable_field_name():
     file = TestEntities.get("FILE", {"filename": "document.pdf"})
 
     with patch("lagniappe.core.properties.file_options.summarize_file") as summarize:
-        file.properties.summarize.update(
-            {"enable-summarize": "on", "fcm-token": "token"}
-        )
+        file.properties.summarize.update({"enable-summarize": "on"})
 
     assert file.properties.summarize.enabled is True
     assert file.properties.summarize.search is True
-    summarize.assert_called_once_with(file, "token", dispatch=False)
+    summarize.assert_called_once_with(file, dispatch=False)
 
 
 # @features file
@@ -394,18 +390,17 @@ def test_summarize_update_upload_search_summary_remains_opt_in():
     file = TestEntities.get("FILE", {"filename": "document.pdf"})
 
     with patch("lagniappe.core.properties.file_options.summarize_file") as summarize:
-        file.properties.summarize.update({"summarize": "on", "fcm-token": "token"})
+        file.properties.summarize.update({"summarize": "on"})
 
     assert file.properties.summarize.enabled is True
     assert file.properties.summarize.search is False
-    summarize.assert_called_once_with(file, "token", dispatch=False)
+    summarize.assert_called_once_with(file, dispatch=False)
 
     indexed_file = TestEntities.get("FILE", {"filename": "document.pdf"})
     with patch("lagniappe.core.properties.file_options.summarize_file"):
         indexed_file.properties.summarize.update(
             {
                 "summarize": "on",
-                "fcm-token": "token",
                 "search-summary": "on",
             }
         )
@@ -420,16 +415,14 @@ def test_file_processing_dispatches_summary_before_extraction():
     """Selecting both operations queues one summary with extraction as its successor."""
     file = TestEntities.get("FILE", {"filename": "photo.png"})
 
-    def prepare_extract(entity, token, *, dispatch):
+    def prepare_extract(entity, *, dispatch):
         assert entity is file
-        assert token == "push-token"
         assert dispatch is False
         entity.properties.extract.status = "Extracting text..."
         return entity.properties.extract
 
-    def prepare_summary(entity, token, *, dispatch):
+    def prepare_summary(entity, *, dispatch):
         assert entity is file
-        assert token == "push-token"
         assert dispatch is False
         entity.properties.summarize.status = "Summarizing file..."
         return entity.properties.summarize
@@ -448,12 +441,11 @@ def test_file_processing_dispatches_summary_before_extraction():
             {
                 "extract": "on",
                 "summarize": "on",
-                "fcm-token": "push-token",
             }
         )
 
-    extract.assert_called_once_with(file, "push-token", dispatch=False)
-    summarize.assert_called_once_with(file, "push-token", dispatch=False)
+    extract.assert_called_once_with(file, dispatch=False)
+    summarize.assert_called_once_with(file, dispatch=False)
     assert file.properties.extract.status == "Waiting for file summary..."
 
     with (
@@ -472,23 +464,21 @@ def test_file_processing_dispatches_summary_before_extraction():
     assert duplicate is None
     start_summary.assert_called_once_with(
         file,
-        "push-token",
         parameters={"extract_after_summary": True},
     )
     start_extract.assert_not_called()
 
 
-# @features file
-# @dimensions summarize update no-token
+# @pairs file:summarize file:update
 @pytest.mark.unit
-def test_summarize_update_without_fcm_token_does_not_call_summarize_file():
-    """Summarize.update enables the option but skips AI until a token is present."""
+def test_summarize_update_starts_without_browser_routing_identity():
+    """Summarization starts without any browser-specific client identity."""
     file = TestEntities.get("FILE", {"filename": "document.pdf"})
 
     with patch("lagniappe.core.properties.file_options.summarize_file") as summarize:
         file.properties.summarize.update({"enable-summarize": "on"})
 
-    summarize.assert_not_called()
+    summarize.assert_called_once_with(file, dispatch=False)
     assert file.properties.summarize.enabled is True
 
 

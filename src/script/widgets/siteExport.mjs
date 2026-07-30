@@ -47,7 +47,6 @@ export class SiteExport {
 		this.startButton.activate();
 
 		const response = await request.post(this.endpoints.start, {
-			token: this.view.fcmToken,
 			operation_id: this.view.operationId(),
 		});
 		if (!response?.ok) {

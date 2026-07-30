@@ -32,31 +32,24 @@ are internal state. Preserve the public handle names.
 - Sets up drag detection (distinguishes clicks from drags using a 5px threshold)
 - Creates an `OfflineModal` bound to the offline indicator
 - Listens for mobile breakpoint changes and dispatches `mobile-resize` events
-- Starts Firebase messaging in the background and exposes `syncReady`, which
-  resolves to the view-scoped document `SyncManager`. Core readiness does not
-  wait for service-worker readiness, notification permission, or token lookup;
-  `CollaborativeDocument` waits for `syncReady` only when it needs its initial
-  authoritative state. In production, notification permission prompting is
-  skipped unless permission is already granted or the view contains a
-  messaging-dependent feature such as `lp-sync`, `lp-deferred`, import progress,
-  or report action controls. Startup also avoids showing the permission modal
-  from a hidden document and reuses a cached FCM token when the browser still
-  has an existing push subscription. Readonly views and sessions marked with
-  `messaging-disabled` (public users and agent access) skip messaging so they
-  do not see the notification permission modal. Those sessions still get a
-  state-only `SyncManager` so collaborative documents can fetch `/state` without
-  registering for live sync. Messaging failure uses the same state-only path
-  without making unrelated controls readonly.
-- Creates the view-scoped `EditWatcher`, which batches fingerprints for forms
-  with inline committed-edit markers. It polls only while the view is online
-  and visible and runs immediately again after reconnect/foreground.
+- Creates one view-scoped `PollingCoordinator` and exposes `syncReady`, which
+  resolves to the document `SyncManager`. Documents, committed form edits,
+  deferred jobs, notifications, and ingress register typed subscriptions with
+  that coordinator. It batches due work, backs quiet checks off, stops while
+  hidden, unfocused, or offline, and triggers immediately on
+  foreground/reconnect. Same-cadence subscriptions retain a shared due time so
+  they stay batched.
+- Creates the view-scoped `EditWatcher`, which retains per-marker revision
+  baselines and registers entity/form-lock subscriptions only for active
+  visible forms with inline committed-edit markers. Root forms consume the
+  existing root entity subscription.
 - Creates the view-scoped `OfflineQueue`, which owns only explicit offline
   mutation persistence, optimistic overlays, replay, and replay conflicts. Core
   waits for IndexedDB hydration but runs initial online replay in the background.
   Offline-enabled forms wait for that replay before restoring a queued record;
   unrelated components continue mounting immediately.
-- Listens for the versioned `server-change` browser event. Core treats the
-  payload as an invalidation hint, not as authoritative entity data.
+- Registers the root entity or collection channel so active views reconcile
+  durable changes through the same poll contract.
 - Stores itself as `node._lp_view` for external access
 
 ### Click Delegation (`_click()`)
@@ -133,18 +126,19 @@ source form successful without running ordinary create/update reconciliation.
 The acknowledgement includes an opaque operation reference. The AI Tools
 create form declares `data-deferred-status="false"`, so the coordinator tracks
 its operation without ever decorating that source form. Status is presented by
-the destination report-list item and the pending/completed notification. A
-shared deferred operation coordinator batches at most 50 references into the owner-authorized
-`POST /tools/operations/status` contract, uses ETags for unchanged state, and
-applies jittered exponential polling from roughly four to 30 seconds. It pauses
-while the document is hidden or offline, resumes promptly on visibility or
-connectivity, keeps elapsed time moving after a `304`, and displays a delayed
-status/retry message instead of an indefinite silent spinner when the status
-request fails.
+the destination report-list item and the pending/completed notification. The
+shared polling coordinator includes operation descriptors in its bounded
+`POST /poll` batch. The owner-authorized result carries the current durable
+status revision and applies jittered backoff from roughly four to 30 seconds.
+Each descriptor also retains the user's last-seen operation revision; when it
+matches the user already loaded for the request, the server acknowledges the
+quiet operation without reading its job row.
+Polling pauses while the tab is hidden, the window is unfocused, or the view is
+offline, resumes promptly on focus/visibility/connectivity, keeps elapsed time
+moving between responses, and displays a delayed status/retry message instead
+of an indefinite silent spinner when a status check fails.
 
-The server still sends pending/completed notification HTML. An eventual
-`deferred-complete` server-change event accelerates the same authoritative
-status reconciliation; it is not the only completion mechanism. The
+The operation subscription is the authoritative completion mechanism. The
 coordinator rejects stale revisions before refreshing the form's
 `data-destination` widget. When several widgets share a name (for example, page
 task forms), the destination is also part of source matching. A source can
@@ -154,14 +148,12 @@ coordinator for operation status. The lazy-loaded report list registers
 operation markers after every reconciliation, including after a server refresh
 replaces the list, so its phase/recovery text comes from the same status response
 as report detail. A small report-list refresh still keeps domain fields such as
-the saved report summary current. Messaging failure does not make the whole view
-read-only: deferred status polling continues and collaborative state retains its
-state-only synchronization path.
+the saved report summary current.
 
 The report detail's revision and **Execute Proposal** forms use the same
 operation contract directly. Execution immediately changes the detail to a
 saving state, decorates it with the returned operation reference, and reloads
-authoritative report/result HTML when polling or push observes a terminal job.
+authoritative report/result HTML when polling observes a terminal job.
 Retrying a partially applied proposal follows the same path and resumes from
 the report's server-side action ledger.
 
@@ -176,7 +168,7 @@ the report's server-side action ledger.
 
 **`update(component, data)`** -- sends PUT, then calls `component.updated(response)` inside a view transition. Deferred acknowledgements instead show the pending notification and mark the active subform successful. Offline `lp-offline` updates are queued and keep the form in `Queued Sync` state until replay.
 
-**`create(component, data)`** -- sends POST, then calls `component.created(response)` inside a view transition. Offline `lp-offline` creates use the same mutation queue and optimistic destination rendering. Online `lp-deferred` creates stop after the deferred acknowledgement and wait for status polling or a server-change completion event to refresh the destination.
+**`create(component, data)`** -- sends POST, then calls `component.created(response)` inside a view transition. Offline `lp-offline` creates use the same mutation queue and optimistic destination rendering. Online `lp-deferred` creates stop after the deferred acknowledgement and wait for their operation subscription to refresh the destination.
 
 **`load(component)`** -- sends GET (or uses a prefetched response from `window._prefetch`). Used for lazy-loading widget content.
 
@@ -185,31 +177,37 @@ the report's server-side action ledger.
 Durable server-rendered `[lp-entity]` anchors carry `data-key`,
 `data-fingerprint`, and (for Page/Task form reconciliation) `data-modified`. A
 watched form contains an `lp-edited-marker`; it does not repeat those
-attributes. `EditWatcher` walks from each marker to its nearest entity anchor,
-deduplicates by key, and posts at most 32 descriptors per view to `POST /edited`
-every 15 seconds. Missing, inaccessible, or fingerprint-changed entities
-trigger a focused probe of each marked form's `data-edited-route`.
+attributes. `EditWatcher` walks from each marker to its nearest entity anchor
+and retains that marker's own fingerprint/modified baseline. It deduplicates
+active visible markers by key and installs `entity`/`form-lock` subscriptions
+with the shared polling coordinator. A root marker shares Core's `view:entity`
+subscription. Missing, inaccessible, or fingerprint-changed entities trigger a
+focused probe only for active stale forms through `data-edited-route`.
 
 The collector starts from markers; it never enumerates every `lp-entity` in the
-view. `Core.reconcileChange()` can invalidate specific watched entity keys as
-soon as a server-change event arrives. Unmarked list and table rows remain
+view. `Core.reconcileChange()` can invalidate specific watched entity keys from
+a changed poll result. Unmarked list and table rows remain
 exclusively under the collection refresh flow. If foregrounding or a manual trigger overlaps an
 in-flight poll, the triggers share one promise and run one follow-up pass after
 the current snapshot completes so a just-committed revision is not deferred to
-the next polling interval.
+the next polling interval. Focused replacement probes use the same rule per
+marker and revision: identical overlap shares the active request, while one
+genuinely newer revision may run afterward. A later unchanged response cannot
+supersede an earlier authoritative replacement.
 
 The probe renders detached previews and compares normalized form state with the
-live widget's committed baseline and current inputs. A clean watched form applies
-the authoritative replacement inside a view transition, so `FileInfo` and other
-ordinary forms remount without workflow-specific field patching. A form with
-focus is protected like a dirty form even before an input or change event fires.
-A dirty or focused form only gets the field-by-field reconciliation UI when
-both revisions expose a renderer, a
-non-empty schema, and structured submissions. Schema drift projects stable
-local field IDs into the latest schema. A changed fingerprint with an unchanged
-entity `data-modified` stamp is a schema-only revision: EditWatcher applies the
-latest schema, keeps compatible local values, and shows the schema-update
-notice. When both stamps change, actual renderer value differences show
+live widget's committed baseline and current inputs. An inactive watched form
+does not poll or remount. Its retained marker baseline is compared with the
+newest root/entity revision on activation, at which point it performs one
+catch-up probe if stale. A component's visible active widget is protected even
+when clean, and a form with focus remains protected before an input or change
+event fires. A protected form only gets the field-by-field reconciliation UI
+when both revisions expose a renderer, a non-empty schema, and structured
+submissions. Schema drift projects stable local field IDs into the latest
+schema. A changed fingerprint with an unchanged entity `data-modified` stamp is
+a schema-only revision: EditWatcher applies the latest schema, keeps compatible
+local values, and shows the schema-update notice. When both stamps change,
+actual renderer value differences show
 **Review values** with saved values selected by default.
 
 Dirty non-renderer forms instead show an inline **Reset form** notice. A queued
@@ -218,26 +216,31 @@ version and the saved version. Equal revisions apply automatically, and the
 field modal is never opened with zero differences. Missing, inaccessible, or
 unsafe replacements use **Reload page**. A local response acknowledgement does
 not probe or remount forms because that response has already reconciled its
-component. External server-change invalidation performs the authoritative
-reconciliation. A deferred destination also contributes its mounted widget key,
-so nested task forms are invalidated even when the operation itself is owned by
-the surrounding page.
+component. External polling invalidation performs the authoritative
+reconciliation. The terminal result of a form's own deferred operation is the
+narrow exception to active-widget protection: it applies automatically only
+when the operation identity matches the form lock and the form has no unsaved
+or queued state. A deferred destination also contributes its mounted widget
+key, so nested task forms are invalidated even when the operation itself is
+owned by the surrounding page.
 
 Collection widgets explicitly opt into generic refresh with
 `refreshScope = "collection"`. `Core.refreshCollections()` batches supported
 table/list manifests and falls back to their normal GET routes; forms are never
-generic refresh targets. Dirty, queued, and staged-review task rows are also
-protected from collection replacement. When a changed entity is already
-rendered inside a collection whose widget has not been instantiated, Core loads
-that collection owner before refreshing it. Delete and star changes remain
+generic refresh targets. Active visible, dirty, queued, and staged-review task
+rows are also protected from collection replacement, so the parent Page refresh
+cannot replace a TaskForm before its entity revision is reviewed. Hidden clean
+task forms still refresh silently. When a changed entity is already rendered
+inside a collection whose widget has not been instantiated, Core loads that
+collection owner before refreshing it. Delete and star changes remain
 collection-only and are not sent through form reconciliation. A committed
 delete removes elements with that exact entity key before collection and
 supplemental-navigation refresh, allowing non-collection selectors to reconcile
 without restoring widget-specific message handlers.
 
-The same `/edited` response independently carries active durable autofill
-operations. PageInfo and TaskForm reconstruct their lock/progress state from
-that list on reload or in another tab even when their committed fingerprint is
+The same `/poll` batch independently carries active durable `form-lock`
+results. PageInfo and TaskForm reconstruct their lock/progress state from those
+results on reload or in another tab even when their committed fingerprint is
 unchanged. This recovery does not register the form with `SyncManager`.
 
 Successful entity mutation responses carry `X-Lagniappe-Entity-Revisions` with
@@ -291,6 +294,14 @@ Extends Core for list/index pages (users, forms, categories, tasks). Adds:
 - **Tools panel**: A component for create/edit/settings widgets
 - **Table editing**: Inline edit support via table widgets
 - **Mobile controls**: Compact controls for mobile table views
+
+Large index tables deliberately have two readiness stages. The page, table
+shell, and `TableVisibility` initialize after the first response. Chained row
+loading remains asynchronous and does not block those surfaces. Sorting/filter
+buttons start hidden and become available only after `IndexTable` finishes the
+chained load and initializes `TableSorting`; opening mobile controls can
+retarget already-initialized sorting state but never starts or awaits that row
+load.
 
 Views using EntityIndex: user, form, category, task (all mapped to `views/base/index`).
 
@@ -450,7 +461,7 @@ DOMContentLoaded
       → find [lp-view], import view module from VIEWS registry
       → new View(node), view.init()
         → Core.init(): hydrate OfflineQueue; initialize shell/managers; publish view
-        → background: messaging/SyncManager readiness and initial offline replay
+        → background: SyncManager readiness and initial offline replay
         → CollaborativeDocument/FormElement await only their relevant readiness promise
         → Core.prefetch(): prefetch [lp-component][lp-prefetch] components
     → register service worker, error handlers, visibility/focus/offline/page lifecycle listeners

@@ -60,7 +60,6 @@ from .deferred_jobs import (
     DeferredJobSpec,
     DeferredJobStatus,
     DeferredJobType,
-    PushDeliveryOutcome,
 )
 from .mutations import (
     DeletePolicy,

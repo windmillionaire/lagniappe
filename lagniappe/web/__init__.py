@@ -1,8 +1,8 @@
 """Construct the process-global Flask application during module import.
 
 Boot sequence: Sentry (prod only) -> Flask app + CSRF -> initialize_app
-(cache, database, AI, entities, jinja, errors, blueprints) -> LoginManager
--> Firebase Admin. The after_request hook adds security headers and
+(cache, database, AI, entities, jinja, errors, blueprints) -> LoginManager.
+The after_request hook adds security headers and
 the X-Lagniappe-Invalidate-Cache header that triggers service worker
 cache clearing.
 """
@@ -11,7 +11,6 @@ from datetime import timedelta
 import json
 from urllib.parse import urlsplit
 
-import firebase_admin
 from flask import Flask, g, session
 from flask_wtf.csrf import CSRFProtect
 
@@ -19,36 +18,6 @@ from lagniappe import CONFIG
 from lagniappe.core.exceptions.request import sanitize_sentry_event
 
 from .start import initialize_app
-
-
-# @testable false
-# @covered-by lagniappe/web/__init__.py::_filter_expected_fcm_not_found_spans
-# @reason exact provider/status matching is asserted through the transaction filter
-def _is_expected_fcm_not_found_span(span):
-    data = span.get("data") or {}
-    status = data.get("http.response.status_code")
-    description = span.get("description") or ""
-    return status in {404, "404"} and (
-        description.startswith("POST https://fcm.googleapis.com/v1/projects/")
-        and description.endswith("/messages:send")
-    )
-
-
-# @testable true
-# @tests tests_e2e/001_site/test_001c_messaging.py::test_sentry_filter_removes_only_fcm_not_found_spans
-# @pair messaging:expected-provider-failure
-# @pair observability:span-filtering
-def _filter_expected_fcm_not_found_spans(event, _hint):
-    """Sanitize transactions and hide handled stale-token FCM 404 spans."""
-    event = sanitize_sentry_event(event, _hint)
-    spans = event.get("spans")
-    if not isinstance(spans, list):
-        return event
-
-    event["spans"] = [
-        span for span in spans if not _is_expected_fcm_not_found_span(span)
-    ]
-    return event
 
 
 # @testable false
@@ -69,7 +38,7 @@ def _is_expected_ai_document_limit(event):
 
 
 # @testable true
-# @tests tests_e2e/001_site/test_001c_messaging.py::test_sentry_filter_drops_only_expected_ai_document_page_limit
+# @tests tests_e2e/001_site/test_001c_error_reporting.py::test_sentry_filter_drops_only_expected_ai_document_page_limit
 # @features error-reporting ai files
 # @dimensions expected-provider-failure pdf-page-limit privacy
 def _filter_expected_sentry_errors(event, hint):
@@ -92,7 +61,7 @@ if CONFIG.capture_errors:
         profile_session_sample_rate=1.0,
         profile_lifecycle="trace",
         before_send=_filter_expected_sentry_errors,
-        before_send_transaction=_filter_expected_fcm_not_found_spans,
+        before_send_transaction=sanitize_sentry_event,
         integrations=[GoogleGenAIIntegration()],
     )
     SENTRY_LOADED = True
@@ -201,9 +170,3 @@ def add_lagniappe_headers(response):
 
     response.headers.update(headers)
     return response
-
-
-firebase_admin.initialize_app(
-    CONFIG.google_credentials,
-    options={"projectId": CONFIG.GOOGLE_CLOUD_PROJECT},
-)

@@ -91,18 +91,6 @@ _IDENTITY_PLATFORM_API = re.compile(
 )
 
 
-def _force_production_messaging_mode(page):
-    page.add_init_script(
-        """
-        Object.defineProperty(window, "__TESTING__", {
-            configurable: true,
-            get: () => false,
-            set: () => {},
-        });
-        """
-    )
-
-
 def _json_response(route, data, status=200):
     route.fulfill(
         status=status,
@@ -510,7 +498,6 @@ def test_login_accepts_google_state_redirect_target(get_user):
 # @template users/agent_login.html::agent_login_form
 def test_agent_access_login_form_creates_session(get_user):
     user = get_user(Users.ANONYMOUS)
-    _force_production_messaging_mode(user.page)
     user.page.goto(_site_url("/users/agent-login"))
 
     expect(user.locate("[data-role='message']")).to_have_text("Agent access")
@@ -528,17 +515,10 @@ def test_agent_access_login_form_creates_session(get_user):
 
     expect(user.page).to_have_title("Home")
     expect(user.locate("[lp-view]")).to_have_attribute("initialized", "")
-    expect(user.locate("meta[name='messaging-disabled']")).to_have_attribute(
-        "content",
-        "true",
-    )
-    assert user.page.evaluate(
-        """() => document.querySelector("[lp-view]")?._lp_view?.messagingDisabled === true"""
-    )
     assert user.page.evaluate(
         """() => {
-            const manager = document.querySelector("[lp-view]")?._lp_view?.SyncManager;
-            return Boolean(manager) && manager.token === null && manager._registered === false;
+            const view = document.querySelector("[lp-view]")?._lp_view;
+            return Boolean(view?.PollingCoordinator && view?.SyncManager);
         }"""
     )
     agent = Entities.fetch_one(

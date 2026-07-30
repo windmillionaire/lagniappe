@@ -7,77 +7,47 @@ import {
 	getSyncRecord,
 	updateSyncRecord,
 } from "./offline";
-import { EVENTS } from "./protocol";
 import { request } from "./request";
 import { waitForAttribute } from "./utilities";
 
 /**
- * SyncManager — view-scoped sync coordinator.
+ * Coordinate Yjs document updates through the shared polling protocol.
  *
- * Wires the syncable widgets on the page to the /register, /sync, /state,
- * and /deregister endpoints. The flow is:
- *
- *   • register() — at view start, send every widget's (sync_id, fingerprint)
- *     plus any offline records. Widgets that drifted come back in the
- *     response; we merge offline edits into them and ship the result.
- *   • sendUpdates(save) — poll loop (every 2s) that batches each widget's
- *     syncData (or saveData on explicit save) and posts to /sync.
- *   • receiveUpdate(event) — service worker push handler; routes the update
- *     to the right widget and lets it apply.
- *   • deregister() — best-effort cleanup on tab hide / unload / offline.
- *
- * Widget contract (anything in `component.widgets` that opts in):
- *   syncId, fingerprint, component, initialized,
- *   syncData (incremental payload or null),
- *   saveData (full save payload or null),
- *   async sync() — consumes `remote` / `update` / `offlineRecord` slots set by
- *   the manager and clears them when done.
- *
- * @testable infrastructure
+ * @testable true
+ * @tests tests_js/test_010_sync_manager_frontend.py::test_sync_manager_uses_polling_subscriptions
+ * @features sync polling
+ * @dimensions document collaboration offline-replay cursor-retention presence lifecycle batching
  */
 export class SyncManager {
 	constructor(view) {
 		this.view = view;
-		this.token = view.fcmToken;
-
-		this._registered = false;
 		this._initialized = false;
-		this._timeout = null;
-		this._registeredIds = new Set();
+		this._subscriptions = new Map();
+		this._cursors = new Map();
+		this._checkpointRetries = new Set();
+		this._checkpointPollFirst = new Set();
+		this._pendingParentTouches = new Set();
+		this._activating = new Set();
+		this._registerPromise = null;
 		this._sendPromise = null;
 		this._queuedSend = null;
-
-		this.receiveUpdate = this.receiveUpdate.bind(this);
-		this._poll = this._poll.bind(this);
+		this.ready = Promise.resolve(this);
 		this._syncSave = () => this.sendUpdates(true);
-		this.register = this.register.bind(this);
-		this.deregister = this.deregister.bind(this);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_010_sync_manager_frontend.py::test_destroy_removes_sync_listeners
-	 * @pair sync:lifecycle-listeners
-	 */
 	init() {
-		if (this._initialized) return;
+		if (this._initialized) return this;
 		this._initialized = true;
-		this.register();
-
-		window.addEventListener(EVENTS.SYNC_UPDATE, this.receiveUpdate);
 		window.addEventListener("sync-save", this._syncSave);
+		this.ready = this.register();
+		return this;
 	}
 
-	// ------------------------------------------------------------------
-	// Widget discovery
-	// ------------------------------------------------------------------
-
-	/** Live snapshot of every initialized document widget keyed by sync_id. */
 	get widgets() {
 		const entries = [];
-		for (const component of Object.values(this.view.components)) {
-			for (const widget of Object.values(component.widgets)) {
-				if (widget.syncId && widget.initialized) {
+		for (const component of Object.values(this.view.components ?? {})) {
+			for (const widget of Object.values(component.widgets ?? {})) {
+				if (widget.syncId) {
 					entries.push([widget.syncId, widget]);
 				}
 			}
@@ -85,69 +55,137 @@ export class SyncManager {
 		return Object.fromEntries(entries);
 	}
 
-	/** Compact descriptor of a widget for the wire format. */
+	_componentVisible(component) {
+		if (component?.visible !== true) return false;
+		let ancestor = component.elt?.parentElement?.closest?.("[lp-component]");
+		while (ancestor) {
+			if (ancestor.dataset.visible === "false") return false;
+			ancestor = ancestor.parentElement?.closest?.("[lp-component]");
+		}
+		return true;
+	}
+
+	_widgetVisible(widget) {
+		return Boolean(
+			widget?.component?.active === widget &&
+				this._componentVisible(widget.component) &&
+				widget.visible === true,
+		);
+	}
+
 	_descriptor(widget) {
+		const protocol =
+			this.view.PollingCoordinator?.get(`document:${widget.syncId}`) ??
+			this._cursors.get(widget.syncId);
 		return {
-			key: widget.component.key,
+			key: widget.component?.key ?? widget.key,
 			sync_id: widget.syncId,
 			fingerprint: widget.fingerprint,
+			generation: protocol?.generation ?? null,
+			revision: Number(protocol?.revision) || 0,
 		};
 	}
 
-	// ------------------------------------------------------------------
-	// Single-widget state fetch (called from widget.init())
-	// ------------------------------------------------------------------
-
-	/**
-	 * @testable true
-	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_presence_appears_and_clears
-	 * @tests tests_js/test_010_sync_manager_frontend.py::test_state_without_token_fetches_without_registering
-	 * @pair sync:state-registration
-	 * @pair sync:state-only
-	 * @pair sync:deregistration
-	 * @pair sync:presence
-	 */
-	async state(widget) {
-		const offline = await getSyncRecord(widget.syncId);
-		if (offline) widget.offlineRecord = offline;
-
-		if (!this.view.online) return null;
-
-		const remote = await request.post(ENDPOINTS.state, {
-			...(this.token ? { token: this.token } : {}),
-			sync_id: widget.syncId,
-			key: widget.component.key,
-			fingerprint: widget.fingerprint,
+	_rememberCursor(syncId, patch = null) {
+		const active = this.view.PollingCoordinator?.get(`document:${syncId}`);
+		const current = this._cursors.get(syncId) ?? {};
+		const source = { ...current, ...active, ...patch };
+		this._cursors.set(syncId, {
+			generation: source.generation ?? null,
+			revision: Number(source.revision) || 0,
 		});
-
-		if (remote?.ok === false) return null;
-		if (this.token) {
-			this._registeredIds.add(widget.syncId);
-			if (offline) await deleteSyncRecord(widget.syncId);
-		}
-		return remote;
 	}
 
-	// ------------------------------------------------------------------
-	// Registration / deregistration
-	// ------------------------------------------------------------------
+	_subscribe(widget, { force = false } = {}) {
+		if (!widget?.syncId || this._subscriptions.has(widget.syncId)) return;
+		if (!force && !this._widgetVisible(widget)) return;
+		const id = `document:${widget.syncId}`;
+		const descriptor = {
+			id,
+			type: "document",
+			...this._descriptor(widget),
+		};
+		const unsubscribe = this.view.PollingCoordinator?.subscribe(descriptor, {
+			beforePoll: () => {
+				const current = this.widgets[widget.syncId] ?? widget;
+				if (
+					!this._widgetVisible(current) &&
+					!this._activating.has(widget.syncId)
+				)
+					return;
+				return this.sendUpdates(
+					this._checkpointRetries.has(widget.syncId) &&
+						!this._checkpointPollFirst.has(widget.syncId),
+				);
+			},
+			onResult: async (result) => {
+				const current = this.widgets[widget.syncId] ?? widget;
+				if (
+					!this._widgetVisible(current) &&
+					!this._activating.has(widget.syncId)
+				)
+					return false;
+				this._rememberCursor(widget.syncId);
+				if (result.status !== "changed" || !result.payload) return;
+				// state() consumes its forced result directly, so its cursor is
+				// safe to accept while the editor's async create event is still
+				// completing. Any later result must wait for the mounted widget.
+				if (!current.initialized) return this._activating.has(widget.syncId);
+				current.remote = result.payload;
+				await current.sync();
+				if (
+					!current.readonly &&
+					(result.payload.checkpoint_required ||
+						this._checkpointRetries.has(widget.syncId))
+				) {
+					this._checkpointPollFirst.delete(widget.syncId);
+					await this.sendUpdates(true);
+				}
+			},
+		});
+		if (unsubscribe) {
+			this._subscriptions.set(widget.syncId, unsubscribe);
+			this._rememberCursor(widget.syncId, descriptor);
+		}
+	}
 
 	/**
 	 * @testable true
-	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
-	 * @tests tests_js/test_028_form_state_split.py::test_document_sync_registration_discards_legacy_form_patch_records
-	 * @tests tests_js/test_010_sync_manager_frontend.py::test_hidden_view_does_not_register
-	 * @features sync
-	 * @dimensions document collaboration document-only legacy-form-patch-cleanup hidden-view
+	 * @tests tests_js/test_010_sync_manager_frontend.py::test_sync_manager_uses_polling_subscriptions
+	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_waits_for_sync_manager_before_state
+	 * @pairs sync:editor-readiness sync:state-only sync:offline-replay polling:document
 	 */
-	async register() {
-		if (!this.token || !this.view.online || this.view.hidden) return;
-		if (this._timeout) {
-			clearTimeout(this._timeout);
-			this._timeout = null;
+	async state(widget) {
+		await this.ready;
+		const offline = await getSyncRecord(widget.syncId);
+		if (offline) widget.offlineRecord = offline;
+		if (!this.view.online) return null;
+		this._activating.add(widget.syncId);
+		try {
+			this._subscribe(widget, { force: true });
+			const results = await this.view.PollingCoordinator?.trigger(
+				`document:${widget.syncId}`,
+			);
+			return results?.find(
+				(result) => result.id === `document:${widget.syncId}`,
+			)?.payload;
+		} finally {
+			this._activating.delete(widget.syncId);
 		}
-		this._registered = true;
+	}
 
+	register() {
+		if (this._registerPromise) return this._registerPromise;
+		const pending = this._register();
+		this._registerPromise = pending;
+		const complete = () => {
+			if (this._registerPromise === pending) this._registerPromise = null;
+		};
+		void pending.then(complete, complete);
+		return pending;
+	}
+
+	async _register() {
 		const { sync: allOffline } = await getAllOfflineRecords();
 		const offline = allOffline.filter(({ sync_id }) =>
 			sync_id?.endsWith(":document"),
@@ -158,249 +196,303 @@ export class SyncManager {
 		if (obsolete.length) {
 			await deleteSyncRecords(obsolete.map(({ sync_id }) => sync_id));
 		}
-		const offlineDescriptors = offline.map(({ key, sync_id, fingerprint }) => ({
-			key,
-			sync_id,
-			fingerprint,
-		}));
-
-		const active = Object.values(this.widgets).map((w) => this._descriptor(w));
-		const response = await request.post(ENDPOINTS.register, {
-			token: this.token,
-			active,
-			offline: offlineDescriptors,
-		});
-
-		await this._reconcile(offline, response?.modified ?? []);
-		this._trackRegisteredIds();
-		this._timeout = setTimeout(this._poll, 2000);
+		for (const widget of Object.values(this.widgets)) this._subscribe(widget);
+		if (offline.length) await this._reconcile(offline);
 	}
 
 	/**
+	 * Keep document presence and its fast polling cadence scoped to the active,
+	 * visible document widget.
+	 *
 	 * @testable true
-	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_presence_appears_and_clears
-	 * @tests tests_js/test_010_sync_manager_frontend.py::test_deregister_keeps_unload_sync_and_cleanup_keepalive
-	 * @features sync
-	 * @dimensions document deregistration stale-sessions presence keepalive
+	 * @tests tests_js/test_010_sync_manager_frontend.py::test_sync_manager_uses_polling_subscriptions
+	 * @features sync polling
+	 * @dimensions active-widget visibility presence lifecycle
+	 * @pairs sync:active-widget sync:visibility
+	 * @pairs polling:active-widget polling:visibility
 	 */
-	async deregister() {
-		if (this._timeout) clearTimeout(this._timeout);
-		this._timeout = null;
-		if (!this.token) return;
-
-		if (!this.view.online) {
-			await this.sendUpdates(true, null, { keepalive: true });
-			return;
+	async reconcileSubscriptions() {
+		if (!this.view.online || this.view.hidden) return;
+		const widgets = this.widgets;
+		const active = new Map(
+			Object.entries(widgets).filter(([, widget]) =>
+				this._widgetVisible(widget),
+			),
+		);
+		const closing = [...this._subscriptions.keys()].filter(
+			(syncId) => !active.has(syncId) && !this._activating.has(syncId),
+		);
+		if (closing.length) {
+			await this.sendUpdates(true, null, { touchSyncIds: closing });
+			for (const syncId of closing) {
+				this._rememberCursor(syncId);
+				this._subscriptions.get(syncId)?.();
+				this._subscriptions.delete(syncId);
+			}
+			await this.view.PollingCoordinator?.closeDocuments(closing);
 		}
-
-		const sync_ids = [...this._registeredIds];
-		this._registeredIds.clear();
-		this._registered = false;
-
-		await this.sendUpdates(true, null, { keepalive: true });
-
-		if (sync_ids.length) {
-			await request.post(
-				ENDPOINTS.deregister,
-				{ token: this.token, sync_ids },
-				{ keepalive: true },
-			);
-		}
-
-		if (this._timeout) clearTimeout(this._timeout);
-		this._timeout = null;
-		this._registeredIds.clear();
+		for (const widget of active.values()) this._subscribe(widget);
 	}
 
-	_trackRegisteredIds() {
-		for (const sync_id of Object.keys(this.widgets)) {
-			this._registeredIds.add(sync_id);
-		}
+	async deregister() {
+		const syncIds = [...this._subscriptions.keys()];
+		await this.sendUpdates(true, null, {
+			keepalive: true,
+			touchSyncIds: syncIds,
+		});
+		for (const syncId of syncIds) this._rememberCursor(syncId);
+		for (const unsubscribe of this._subscriptions.values()) unsubscribe();
+		this._subscriptions.clear();
+		await this.view.PollingCoordinator?.closeDocuments(syncIds);
 	}
 
 	async _waitForWidgetInitialized(widget) {
 		if (widget.initialized) return;
 		const target = widget.container ?? widget.target;
-		if (!target) return;
-		await waitForAttribute(target, "initialized");
+		if (target) await waitForAttribute(target, "initialized");
+	}
+
+	/**
+	 * Fetch the authoritative state newer than an offline record's base cursor.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_010_sync_manager_frontend.py::test_sync_manager_uses_polling_subscriptions
+	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
+	 * @pairs sync:offline-replay sync:headless sync:merge
+	 * @pairs polling:document polling:current-state polling:cursor
+	 */
+	async _pollOfflineState(offline) {
+		const id = `replay:${offline.sync_id}`;
+		const unsubscribe = this.view.PollingCoordinator?.subscribe({
+			id,
+			type: "document",
+			key: offline.key,
+			sync_id: offline.sync_id,
+			fingerprint: offline.fingerprint,
+			generation: offline.generation ?? null,
+			revision: Number(offline.revision) || 0,
+		});
+		if (!unsubscribe) return null;
+
+		try {
+			const results = await this.view.PollingCoordinator.trigger(id);
+			const result = results?.find((candidate) => candidate.id === id);
+			if (
+				!result ||
+				!["changed", "unchanged"].includes(result.status) ||
+				(result.status === "changed" && !result.payload)
+			) {
+				return null;
+			}
+			const descriptor = this.view.PollingCoordinator.get(id);
+			if (!descriptor?.generation) return null;
+			const cursor = {
+				generation: descriptor.generation,
+				revision: Number(descriptor.revision) || 0,
+			};
+			this._rememberCursor(offline.sync_id, cursor);
+			return { cursor, payload: result.payload ?? null };
+		} finally {
+			unsubscribe();
+		}
 	}
 
 	/**
 	 * @testable true
-	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
-	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_failed_offline_replay_keeps_queue_and_retries
-	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_replay_does_not_duplicate_after_reload
-	 * @features sync
-	 * @dimensions offline-replay replay-error queue-preserved retry
-	 *
-	 * Reconcile everything that needs attention after /register:
-	 *   - widgets the server flagged as drifted (`modified`),
-	 *   - offline records the client still has (`offlineRecords`).
-	 *
-	 * Both lists key on sync_id, so we union them and walk once. Mounted
-	 * widgets and headless stand-ins (see `loadHeadlessWidget`) share the
-	 * same path: assign remote/offlineRecord slots, `sync()`, then `saveData`.
-	 *
-	 * Offline records are deleted only after the replay batch is accepted by
-	 * /sync, so a transient server/network failure can be retried.
+	 * @tests tests_js/test_010_sync_manager_frontend.py::test_sync_manager_uses_polling_subscriptions
+	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
+	 * @pairs sync:offline-replay sync:headless sync:merge sync:queue-clear
 	 */
-	async _reconcile(offlineRecords, modified) {
-		if (!modified.length && !offlineRecords.length) return;
-
-		const widgets = this.widgets;
-		const work = new Map();
-		for (const m of modified) work.set(m.sync_id, { remote: m, offline: null });
-		for (const o of offlineRecords) {
-			const entry = work.get(o.sync_id) ?? { remote: null, offline: null };
-			entry.offline = o;
-			work.set(o.sync_id, entry);
-		}
-
+	async _reconcile(offlineRecords) {
 		const replays = [];
 		const headless = [];
+		try {
+			for (const offline of offlineRecords) {
+				if (
+					offline.touch_parent &&
+					!offline.update &&
+					!offline.ydoc &&
+					!Object.hasOwn(offline, "html")
+				) {
+					replays.push({
+						key: offline.key,
+						sync_id: offline.sync_id,
+						fingerprint: offline.fingerprint,
+						generation: offline.generation ?? null,
+						revision: Number(offline.revision) || 0,
+						save: true,
+						touch_parent: true,
+					});
+					continue;
+				}
+				let widget = this.widgets[offline.sync_id];
+				if (!widget) {
+					widget = await loadHeadlessWidget({
+						sync_id: offline.sync_id,
+						offline,
+					});
+					if (!widget) continue;
+					headless.push(widget);
+					await widget.init();
+					await this._waitForWidgetInitialized(widget);
+				}
 
-		for (const [sync_id, { remote, offline }] of work) {
-			let widget = widgets[sync_id];
-			let destroy = false;
+				const current = await this._pollOfflineState(offline);
+				if (!current) continue;
+				widget.remote = current.payload;
+				widget.offlineRecord = offline;
+				await widget.sync();
 
-			if (!widget) {
-				widget = await loadHeadlessWidget({ sync_id, remote, offline });
-				if (!widget) continue;
-				destroy = true;
-				await widget.init();
-				await this._waitForWidgetInitialized(widget);
-			}
-
-			widget.remote = remote;
-			widget.offlineRecord = offline;
-			await widget.sync();
-
-			const saveData = widget.saveData;
-			if (saveData) {
+				const saveData = widget.saveData;
+				if (!saveData) {
+					if (offline.touch_parent) {
+						replays.push({
+							key: widget.component?.key ?? widget.key ?? offline.key,
+							sync_id: offline.sync_id,
+							fingerprint: widget.fingerprint ?? offline.fingerprint,
+							...current.cursor,
+							save: true,
+							touch_parent: true,
+						});
+					} else {
+						await deleteSyncRecord(offline.sync_id);
+					}
+					continue;
+				}
 				replays.push({
-					key:
-						widget.component?.key ?? widget.key ?? remote?.key ?? offline?.key,
-					sync_id,
-					fingerprint: widget.fingerprint,
+					key: widget.component?.key ?? widget.key ?? offline.key,
+					sync_id: offline.sync_id,
+					fingerprint: widget.fingerprint ?? offline.fingerprint,
+					...current.cursor,
 					...saveData,
 					save: true,
-				});
-			} else if (offline?.save) {
-				replays.push({
-					...offline,
-					key: widget.component?.key ?? widget.key ?? offline.key,
-					sync_id,
-					fingerprint: widget.fingerprint ?? offline.fingerprint,
-					save: true,
+					touch_parent: true,
 				});
 			}
-
-			if (destroy) headless.push(widget);
+			if (replays.length) await this.sendUpdates(false, replays);
+		} finally {
+			for (const widget of headless) {
+				widget.destroy();
+			}
+			await this.view.PollingCoordinator?.closeDocuments(
+				headless.map((widget) => widget.syncId),
+			);
 		}
-
-		const response = replays.length
-			? await this.sendUpdates(false, replays)
-			: null;
-		const replayAccepted = response?.ok !== false;
-		if (offlineRecords.length && replayAccepted) {
-			await deleteSyncRecords(offlineRecords.map((o) => o.sync_id));
-		}
-		for (const w of headless) w.destroy();
 	}
 
-	// ------------------------------------------------------------------
-	// Outgoing updates
-	// ------------------------------------------------------------------
-
-	_poll() {
-		this.sendUpdates(false);
-	}
-
-	_tokenlessSaveBatch(batch) {
-		return batch.filter(
-			(update) =>
-				update.save === true &&
-				update.sync_id?.endsWith(":document") &&
-				Object.hasOwn(update, "html"),
-		);
-	}
-
-	/** Collect each active widget's payload, tagged with the save intent. */
-	_collect(save, { documentOnly = false } = {}) {
+	_collect(save, { touchSyncIds = [] } = {}) {
 		const batch = [];
+		const touches = new Set(touchSyncIds);
+		const included = new Set();
 		for (const widget of Object.values(this.widgets)) {
-			if (documentOnly && !widget.syncId?.endsWith(":document")) continue;
 			const payload = save ? widget.saveData : widget.syncData;
 			if (!payload) continue;
-			batch.push({ ...this._descriptor(widget), ...payload, save });
+			const update = { ...this._descriptor(widget), ...payload, save };
+			if (save && touches.has(widget.syncId)) update.touch_parent = true;
+			batch.push(update);
+			included.add(widget.syncId);
+		}
+		if (save) {
+			for (const syncId of touches) {
+				if (
+					included.has(syncId) ||
+					!this._pendingParentTouches.has(syncId)
+				)
+					continue;
+				const widget = this.widgets[syncId];
+				if (!widget) continue;
+				batch.push({
+					...this._descriptor(widget),
+					save: true,
+					touch_parent: true,
+				});
+			}
 		}
 		return batch;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_prevents_sync_requests
-	 * @features offline
-	 * @dimensions sync-queue reconnect
-	 */
 	async _sendUpdatesNow(
 		save = false,
 		updates = null,
-		{ keepalive = false } = {},
+		{ keepalive = false, touchSyncIds = [] } = {},
 	) {
-		if (!this.token && !save && !updates) return;
-		if (this._timeout) {
-			clearTimeout(this._timeout);
-			this._timeout = null;
-		}
-
-		let batch = updates ?? this._collect(save, { documentOnly: !this.token });
-		if (!this.token) batch = this._tokenlessSaveBatch(batch);
-
-		if (!batch.length) {
-			if (this._registered) this._timeout = setTimeout(this._poll, 2000);
-			return;
-		}
-
-		let response = null;
-		if (this.view.online) {
-			response = await request.post(
-				ENDPOINTS.sync,
-				{ ...(this.token ? { token: this.token } : {}), updates: batch },
-				{ keepalive },
-			);
-		} else if (this.token) {
+		const batch = updates ?? this._collect(save, { touchSyncIds });
+		if (!batch.length) return null;
+		if (!this.view.online) {
 			for (const update of batch) await updateSyncRecord(update);
+			return null;
 		}
-
-		if (this.token) this._trackRegisteredIds();
-		if (this._registered) this._timeout = setTimeout(this._poll, 2000);
+		const response = await request.post(
+			ENDPOINTS.sync,
+			{
+				client_id: this.view.PollingCoordinator?.clientId,
+				updates: batch,
+			},
+			{ keepalive },
+		);
+		if (response?.ok === false) {
+			for (const update of batch) {
+				await updateSyncRecord(update);
+				this._checkpointRetries.add(update.sync_id);
+				this._checkpointPollFirst.delete(update.sync_id);
+			}
+			return response;
+		}
+		const submitted = new Map(batch.map((update) => [update.sync_id, update]));
+		for (const acknowledgement of response?.updates ?? []) {
+			const update = submitted.get(acknowledgement.sync_id);
+			if (acknowledgement.checkpoint_accepted) {
+				const cursor = {
+					generation: acknowledgement.generation,
+					revision: acknowledgement.revision,
+				};
+				this.view.PollingCoordinator?.update(
+					`document:${acknowledgement.sync_id}`,
+					cursor,
+				);
+				this._rememberCursor(acknowledgement.sync_id, cursor);
+				this._checkpointRetries.delete(acknowledgement.sync_id);
+				this._checkpointPollFirst.delete(acknowledgement.sync_id);
+			}
+			if (acknowledgement.checkpoint_persisted) {
+				if (update?.save && update.ydoc) {
+					const widget = this.widgets[acknowledgement.sync_id];
+					if (widget) widget.snapshot = update.ydoc;
+				}
+				if (acknowledgement.entity_touched) {
+					this._pendingParentTouches.delete(acknowledgement.sync_id);
+				} else {
+					this._pendingParentTouches.add(acknowledgement.sync_id);
+				}
+				await deleteSyncRecord(acknowledgement.sync_id);
+			} else if (acknowledgement.entity_touched) {
+				this._pendingParentTouches.delete(acknowledgement.sync_id);
+				await deleteSyncRecord(acknowledgement.sync_id);
+			} else if (update?.save) {
+				this._checkpointRetries.add(acknowledgement.sync_id);
+				this._checkpointPollFirst.add(acknowledgement.sync_id);
+				await updateSyncRecord(update);
+			}
+		}
 		return response;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_010_sync_manager_frontend.py::test_send_updates_queues_save_behind_in_flight_sync_without_keepalive
-	 * @tests tests_js/test_010_sync_manager_frontend.py::test_tokenless_document_save_posts_without_registering
-	 * @features sync
-	 * @dimensions request-queue keepalive tokenless-save document registration-exclusion
-	 */
 	async sendUpdates(save = false, updates = null, options = {}) {
-		if (!this.token && !save && !updates) return;
-
 		if (this._sendPromise) {
 			if (updates) {
 				await this._sendPromise;
 				return this.sendUpdates(save, updates, options);
 			}
-
 			this._queuedSend = {
 				save: Boolean(this._queuedSend?.save || save),
 				keepalive: Boolean(this._queuedSend?.keepalive || options.keepalive),
+				touchSyncIds: new Set([
+					...(this._queuedSend?.touchSyncIds ?? []),
+					...(options.touchSyncIds ?? []),
+				]),
 			};
 			return this._sendPromise;
 		}
-
 		this._sendPromise = (async () => {
 			let response = await this._sendUpdatesNow(save, updates, options);
 			while (this._queuedSend) {
@@ -408,11 +500,11 @@ export class SyncManager {
 				this._queuedSend = null;
 				response = await this._sendUpdatesNow(queued.save, null, {
 					keepalive: queued.keepalive,
+					touchSyncIds: queued.touchSyncIds,
 				});
 			}
 			return response;
 		})();
-
 		try {
 			return await this._sendPromise;
 		} finally {
@@ -420,35 +512,15 @@ export class SyncManager {
 		}
 	}
 
-	// ------------------------------------------------------------------
-	// Incoming push updates
-	// ------------------------------------------------------------------
-
-	/**
-	 * @testable true
-	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
-	 * @features sync
-	 * @dimensions document collaboration
-	 */
-	async receiveUpdate(event) {
-		const update = event.detail?.update;
-		if (!update) return;
-
-		const widget = this.widgets[update.sync_id];
-		if (!widget) return;
-
-		if (update.fetch) {
-			widget.remote = await this.state(widget);
-		} else {
-			widget.update = update;
-		}
-
-		await widget.sync();
-	}
 	destroy() {
-		if (this._timeout) clearTimeout(this._timeout);
-		this._timeout = null;
-		window.removeEventListener(EVENTS.SYNC_UPDATE, this.receiveUpdate);
+		for (const unsubscribe of this._subscriptions.values()) unsubscribe();
+		this._subscriptions.clear();
+		this._cursors.clear();
+		this._checkpointRetries.clear();
+		this._checkpointPollFirst.clear();
+		this._pendingParentTouches.clear();
+		this._activating.clear();
+		this._registerPromise = null;
 		window.removeEventListener("sync-save", this._syncSave);
 		this._initialized = false;
 	}

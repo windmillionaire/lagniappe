@@ -1,7 +1,7 @@
 """Read-only provider discovery for canonical settings recovery."""
 
 import json
-from urllib.parse import quote, urlparse
+from urllib.parse import urlparse
 
 from config.locations import normalize_app_engine_location, normalize_resource_region
 from config.storage import recovery_bucket_name, storage_bucket_names
@@ -238,79 +238,6 @@ def _probe_ocr(project_id, location, processor_name):
         }
 
 
-# @testable false
-# @covered-by installer/recovery.py::verify_recovery_resources
-# @reason Firebase Messaging discovery adapter is owned by recovery verification
-def _probe_firebase(project_id, firebase_config):
-    try:
-        import requests
-        from installer.firebase import _get_access_token
-
-        headers = {"Authorization": f"Bearer {_get_access_token()}"}
-        base_url = "https://firebase.googleapis.com/v1beta1"
-        session = requests.Session()
-        project_response = session.get(
-            f"{base_url}/projects/{project_id}",
-            headers=headers,
-            timeout=20,
-        )
-        if project_response.status_code == 404:
-            return {"state": ABSENT, "details": None, "error": None}
-        if project_response.status_code != 200:
-            return {
-                "state": UNAVAILABLE,
-                "details": None,
-                "error": f"Firebase project lookup returned {project_response.status_code}",
-            }
-
-        app_id = str(firebase_config.get("appId") or "")
-        app_response = session.get(
-            f"{base_url}/projects/{project_id}/webApps/{quote(app_id, safe='')}",
-            headers=headers,
-            timeout=20,
-        )
-        if app_response.status_code == 404:
-            return {"state": ABSENT, "details": None, "error": None}
-        if app_response.status_code != 200:
-            return {
-                "state": UNAVAILABLE,
-                "details": None,
-                "error": f"Firebase app lookup returned {app_response.status_code}",
-            }
-        config_response = session.get(
-            f"{base_url}/projects/{project_id}/webApps/"
-            f"{quote(app_id, safe='')}/config",
-            headers=headers,
-            timeout=20,
-        )
-        if config_response.status_code == 404:
-            return {"state": ABSENT, "details": None, "error": None}
-        if config_response.status_code != 200:
-            return {
-                "state": UNAVAILABLE,
-                "details": None,
-                "error": (
-                    "Firebase app config lookup returned "
-                    f"{config_response.status_code}"
-                ),
-            }
-        return {
-            "state": AVAILABLE,
-            "details": {
-                "project": project_response.json(),
-                "app": app_response.json(),
-                "config": config_response.json(),
-            },
-            "error": None,
-        }
-    except Exception as error:
-        return {
-            "state": UNAVAILABLE,
-            "details": None,
-            "error": str(error),
-        }
-
-
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_recovery_gets_live_config
 # @features setup
@@ -318,9 +245,9 @@ def _probe_firebase(project_id, firebase_config):
 def _probe_identity_platform(project_id):
     try:
         import requests
-        from installer.firebase import (
+        from installer.google_provider import (
             _get_access_token,
-            _firebase_request_headers,
+            _google_request_headers,
         )
         from installer.identity import (
             IDENTITY_PLATFORM_SUBTYPE,
@@ -331,7 +258,7 @@ def _probe_identity_platform(project_id):
         config = get_identity_platform_config(
             requests.Session(),
             project_id,
-            _firebase_request_headers(_get_access_token(), project_id),
+            _google_request_headers(_get_access_token(), project_id),
         )
         if config is None:
             return {"state": ABSENT, "details": None, "error": None}
@@ -559,34 +486,6 @@ def verify_recovery_resources(settings, project_id, *, project_details=None):
             ):
                 raise RecoveryResourceError(
                     "Recovered OCR processor name does not match the provider."
-                )
-
-    firebase_config = settings.get("FIREBASE_CONFIG")
-    if firebase_config:
-        report["firebase-app"] = _require_observable(
-            "Firebase app",
-            _probe_firebase(project_id, firebase_config),
-        )
-        if report["firebase-app"]["state"] == AVAILABLE:
-            details = report["firebase-app"]["details"] or {}
-            project = details.get("project") or {}
-            app = details.get("app") or {}
-            live_config = details.get("config") or {}
-            if project.get("projectId") not in (None, project_id):
-                raise RecoveryResourceError(
-                    "Recovered Firebase project does not match the provider."
-                )
-            if (
-                app.get("projectId") not in (None, project_id)
-                or app.get("appId") != firebase_config.get("appId")
-                or live_config.get("projectId") not in (None, project_id)
-                or live_config.get("appId") not in (
-                    None,
-                    firebase_config.get("appId"),
-                )
-            ):
-                raise RecoveryResourceError(
-                    "Recovered Firebase app does not match the provider."
                 )
 
     identity_config = settings.get("IDENTITY_PLATFORM_CONFIG")

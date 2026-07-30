@@ -1,7 +1,8 @@
 """Tooling tests for setup validation and configuration helpers."""
 
-import base64
 import json
+from pathlib import Path
+import shutil
 import sys
 import types
 
@@ -18,9 +19,17 @@ from testing.utility.setup_fakes import (
 
 pytestmark = pytest.mark.tooling
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
 
 def _use_isolated_app_dir(monkeypatch, app_dir):
     (app_dir / "main.py").write_text("", encoding="utf-8")
+    config_dir = app_dir / "config"
+    config_dir.mkdir()
+    shutil.copyfile(
+        REPOSITORY_ROOT / "config" / "constants.py",
+        config_dir / "constants.py",
+    )
     for name in list(sys.modules):
         if name == "config" or name.startswith("config."):
             sys.modules.pop(name, None)
@@ -117,19 +126,10 @@ def _stub_existing_install_preflight(
 # @dimensions validation
 def test_setup_validators_cover_expected_inputs():
     from installer import admin
-    from installer import firebase
     from installer import redis as redis_setup
     from installer.domain.validation import (
         validate_cloudflare_api_token,
         validate_domain,
-    )
-
-    vapid_key = base64.urlsafe_b64encode(bytes([4]) + (b"a" * 64)).decode().rstrip("=")
-    short_vapid_key = (
-        base64.urlsafe_b64encode(bytes([4]) + (b"a" * 63)).decode().rstrip("=")
-    )
-    compressed_vapid_key = (
-        base64.urlsafe_b64encode(bytes([3]) + (b"a" * 64)).decode().rstrip("=")
     )
 
     assert validate_domain("app.example.com")
@@ -138,10 +138,6 @@ def test_setup_validators_cover_expected_inputs():
     assert not validate_cloudflare_api_token("short")
     assert admin.validate_oauth_client_id("1234-test.apps.googleusercontent.com")
     assert not admin.validate_oauth_client_id("not-google")
-    assert firebase._validate_vapid_key(vapid_key)
-    assert not firebase._validate_vapid_key("not-base64")
-    assert not firebase._validate_vapid_key(short_vapid_key)
-    assert not firebase._validate_vapid_key(compressed_vapid_key)
     assert redis_setup._is_redis_cloud_host(
         "redis-12345.c123.us-east-1-2.ec2.redislabs.com:12345"
     )
@@ -169,6 +165,22 @@ def test_validate_input_retries_allows_empty_and_exits(monkeypatch):
         return value
 
     assert get_optional_value() == ""
+
+    prompts = []
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: prompts.append(prompt) or "",
+    )
+
+    @validate_input("Suggested", default="chosen-value")
+    def get_default_value(value):
+        return value
+
+    assert get_default_value() == "chosen-value"
+    assert prompts == [
+        "Suggested [chosen-value] "
+        "(press Enter to use the bracketed value; x to exit): "
+    ]
 
     monkeypatch.setattr("builtins.input", lambda prompt: "x")
 
@@ -334,8 +346,8 @@ def test_project_id_selection_uses_unique_confirmed_candidate(monkeypatch):
     assert prompts == [
         "Use the existing project 'active-project-1'? [y/N]: ",
         (
-            "Enter a Google Cloud project ID, or press Enter to use the "
-            "unique suggestion [demo-app-abc123]: "
+            "Press Enter to use the suggested Google Cloud project ID "
+            "[demo-app-abc123], or type a different project ID: "
         ),
         "Create a new project 'demo-app-abc123'? [y/N]: ",
     ]

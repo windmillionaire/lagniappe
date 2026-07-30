@@ -198,8 +198,8 @@ class Cache:
 
     # @testable false
     # @covered-by lagniappe/core/tools/cache/details.py::get_details_by_hash
-    # @covered-by lagniappe/core/tools/cache/sync.py::get_state
-    # @reason Redis hash api-wrapper used by detail and sync workflows
+    # @covered-by lagniappe/core/tools/cache/documents.py::poll_document
+    # @reason Redis hash api-wrapper used by detail and document-presence workflows
     def hmget(self, key, fields):
         """Return values for multiple hash fields."""
         try:

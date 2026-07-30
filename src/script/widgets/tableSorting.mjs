@@ -83,7 +83,15 @@ export class TableSorting {
 		this._clearState();
 		this.containers = new Map();
 		this.toggles = new Map();
+		this.headers = new Map();
+		this.lastReorderColumn = null;
 		this._setSortingToggles();
+		this.header.querySelectorAll("th[data-ordering]").forEach((th) => {
+			const column = th.dataset.column;
+			this.headers.set(column, th);
+			th.dataset.sorting = "false";
+			this._enableSort(this._createSort(column, th.dataset.ordering));
+		});
 	}
 
 	/**

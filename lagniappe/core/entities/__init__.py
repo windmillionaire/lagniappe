@@ -1,6 +1,12 @@
 from ..definitions import Fetch, FetchDepth, MutationOperation
 from ..exceptions import capture, record_entity_load_trace
-from ..mutations import execute_mutation, plan_mutation, plan_root
+from ..mutations import (
+    execute_mutation,
+    plan_document_checkpoint,
+    plan_document_parent_touch,
+    plan_mutation,
+    plan_root,
+)
 from ..mutations.delete import plan_delete
 from ..tools import database
 
@@ -207,6 +213,45 @@ class EntityRegistry:
                 *entities,
                 property_mask=("modified",),
                 property_updates=("modified",),
+            )
+        )
+
+    # @testable true
+    # @tests tests_unit/test_022_mutation_contracts.py::test_document_checkpoint_masks_parent_state_and_optionally_advances_lists
+    # @features mutations sync
+    # @dimensions document checkpoint property-mask history parent-fingerprint
+    def save_document_checkpoint(self, entity, *, advance_parent=False):
+        """Persist a document checkpoint without rewriting sibling state."""
+        return execute_mutation(
+            plan_document_checkpoint(
+                entity,
+                advance_parent=advance_parent,
+                registry=self,
+            )
+        )
+
+    # @testable true
+    # @tests tests_unit/test_022_mutation_contracts.py::test_document_parent_touch_only_advances_parent_and_list_fingerprints
+    # @features mutations sync
+    # @dimensions document parent-fingerprint property-mask list-owner
+    def advance_document_parent(self, entity):
+        """Advance document ownership metadata through masked writes."""
+        return execute_mutation(
+            plan_document_parent_touch(entity, registry=self)
+        )
+
+    # @testable true
+    # @tests tests_unit/test_022_mutation_contracts.py::test_advance_notifications_only_updates_personal_revision
+    # @pairs notifications:personal-activity notifications:revision notifications:cache-isolation
+    # @pairs polling:personal-activity polling:revision
+    def advance_notifications(self, *users):
+        """Advance notification polling state without changing user fingerprints."""
+        users = tuple(user for user in users if hasattr(user, "db"))
+        return execute_mutation(
+            plan_root(
+                *users,
+                property_mask=("notification_revision",),
+                property_updates=("notification_revision",),
             )
         )
 

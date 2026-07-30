@@ -6,6 +6,45 @@ from .base_property import UNSET
 from ..tools import utility
 
 
+# @testable false
+# @covered-by lagniappe/core/properties/user_entity.py::NotificationRevision
+# @covered-by lagniappe/core/properties/user_entity.py::OperationRevision
+# @reason concrete user polling cursors exercise the shared monotonic value behavior
+class PersonalRevision(DBProperty):
+    @property
+    def value(self):
+        return int(super().value or 0)
+
+    @value.setter
+    def value(self, value):
+        DBProperty.value.fset(self, max(int(value or 0), 0))
+
+    def update(self):
+        self.value = self.value + 1
+
+
+# @testable true
+# @tests tests_unit/test_009a_user.py::test_user_personal_revisions_default_and_advance_independently
+# @pairs user:personal-activity user:revision
+# @pairs polling:personal-activity polling:revision
+# @pairs notifications:personal-activity notifications:revision
+class NotificationRevision(PersonalRevision):
+    """Monotonic cursor for this user's notification collection."""
+
+    _id = "notification_revision"
+
+
+# @testable true
+# @tests tests_unit/test_009a_user.py::test_user_personal_revisions_default_and_advance_independently
+# @pairs user:personal-activity user:revision
+# @pairs polling:personal-activity polling:revision
+# @pairs deferred-jobs:personal-activity deferred-jobs:revision
+class OperationRevision(PersonalRevision):
+    """Monotonic cursor for this user's durable-operation statuses."""
+
+    _id = "operation_revision"
+
+
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_last_login
 # @features user

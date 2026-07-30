@@ -9,11 +9,10 @@ import {
 	DeleteModal,
 	EditWatcher,
 	ENDPOINTS,
-	EVENTS,
 	HelpModal,
-	initializeMessaging,
 	OfflineModal,
 	OfflineQueue,
+	PollingCoordinator,
 	request,
 	SyncManager,
 	withTransition,
@@ -22,15 +21,11 @@ import ViewComponent from "./component";
 import { SubmissionManager } from "./submission";
 import { Task } from "./task";
 
-const MESSAGING_FEATURE_SELECTOR = [
-	"[lp-sync]",
-	"[lp-deferred]",
-	"[data-widget='ImportData']",
-	"[data-role='run-report-form']",
-	"[data-role='revise-report-form']",
-].join(",");
-
 const COLLECTION_ONLY_CHANGE_TYPES = new Set(["delete", "star", "unstar"]);
+const FORM_ALREADY_RECONCILED_CHANGE_TYPES = new Set([
+	...COLLECTION_ONLY_CHANGE_TYPES,
+	"entity-poll",
+]);
 
 /**
  * @testable infrastructure
@@ -42,19 +37,15 @@ export default class Core {
 		this.hash = node.dataset.hash || node.dataset.index;
 		this.key = node.dataset.key;
 		this.readonly = node.dataset.readonly === "true";
-		this.messagingDisabled =
-			this.readonly ||
-			document.querySelector("meta[name='messaging-disabled']")?.content ===
-				"true";
 		this.mobile = window.matchMedia("(max-width: 640px)").matches;
 		this.offlineIndicator = document.querySelector('[data-role="offline"]');
 		this.offlineModal = null;
 		this.online = connectivity.online;
 		this.hidden = connectivity.hidden;
-		this.fcmToken = null;
 
 		this.Notifications = null;
 		this.offlineQueue = null;
+		this.PollingCoordinator = null;
 		this.DeferredOperations = null;
 		this.SyncManager = null;
 		this.EditWatcher = null;
@@ -72,7 +63,6 @@ export default class Core {
 		this._destroyed = false;
 
 		this._click = this._click.bind(this);
-		this._receiveServerChange = this._receiveServerChange.bind(this);
 	}
 
 	/**
@@ -110,12 +100,13 @@ export default class Core {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_core_init_does_not_wait_for_messaging_or_initial_replay
+	 * @tests tests_js/test_029_core_startup.py::test_core_init_starts_polling_without_waiting_for_initial_replay
 	 * @pair startup:queue-hydration
-	 * @pair startup:background-messaging
+	 * @pair startup:polling
 	 */
 	async init() {
 		await this._initOfflineQueue();
+		this.PollingCoordinator = new PollingCoordinator(this).init();
 		this.syncReady = this._initSync();
 		this._startInitialReplay();
 		this.DeferredOperations = new DeferredOperationManager(this).init();
@@ -125,6 +116,7 @@ export default class Core {
 		this._initSearch();
 		this._initNotifications();
 		this._initEditWatcher();
+		this._initPollingSubscription();
 
 		this.elt.setAttribute("initialized", "");
 		this.elt._lp_view = this;
@@ -133,7 +125,7 @@ export default class Core {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_core_init_does_not_wait_for_messaging_or_initial_replay
+	 * @tests tests_js/test_029_core_startup.py::test_core_init_starts_polling_without_waiting_for_initial_replay
 	 * @pair offline:background-replay
 	 */
 	_startInitialReplay() {
@@ -179,39 +171,15 @@ export default class Core {
 
 	/**
 	 * @testable true
-	 * @tests tests_e2e/001_site/test_001c_messaging.py::test_manual_page_does_not_prompt_for_messaging_without_messaging_features
-	 * @features messaging
-	 * @dimensions permission-modal feature-gate
-	 */
-	_shouldInitializeMessaging() {
-		if (window.__TESTING__) return true;
-		if (globalThis.Notification?.permission === "granted") return true;
-		return Boolean(this.elt.querySelector(MESSAGING_FEATURE_SELECTOR));
-	}
-
-	/**
-	 * @testable true
-	 * @tests tests_js/test_023_deferred_operations.py::test_core_keeps_non_push_controls_editable_without_fcm_token
-	 * @pair messaging:unavailable-token
-	 * @pair messaging:editability
-	 * @pair sync:state-only
-	 * @pair deferred-jobs:polling
+	 * @tests tests_js/test_029_core_startup.py::test_core_init_starts_polling_without_waiting_for_initial_replay
+	 * @pair polling:startup
+	 * @pair sync:editor-readiness
 	 */
 	_initSync() {
 		if (this._syncPromise) return this._syncPromise;
 
 		this._syncPromise = (async () => {
 			if (this.SyncManager) return this.SyncManager;
-			const shouldInitializeMessaging =
-				(!this.messagingDisabled || window.__TESTING__) &&
-				this._shouldInitializeMessaging();
-			if (shouldInitializeMessaging) {
-				try {
-					this.fcmToken = await initializeMessaging();
-				} catch (error) {
-					captureError(error, this.elt, { context: "messaging-startup" });
-				}
-			}
 			if (this._destroyed) return null;
 
 			try {
@@ -227,6 +195,70 @@ export default class Core {
 		return this._syncPromise;
 	}
 
+	/**
+	 * Subscribe the root view to its durable entity or collection revision.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_core_init_starts_polling_without_waiting_for_initial_replay
+	 * @features polling
+	 * @dimensions entity channel refresh
+	 */
+	_initPollingSubscription() {
+		if (!this.PollingCoordinator) return;
+		if (this.key) {
+			const id = `view:entity:${this.key}`;
+			this.PollingCoordinator.subscribe(
+				{
+					id,
+					type: "entity",
+					key: this.key,
+					revision: this.elt.dataset.fingerprint || null,
+				},
+				{
+					onResult: async (result) => {
+						await this.EditWatcher?.receiveEntityResult?.(this.key, result);
+						if (result.status === "unavailable") {
+							await this.reconcileChange({ type: "delete", key: this.key });
+							return;
+						}
+						if (result.status !== "changed") return;
+						await this.reconcileChange({
+							type: "entity-poll",
+							key: this.key,
+						});
+					},
+				},
+			);
+			return;
+		}
+
+		const channel = this.elt.dataset.index || this.kind;
+		const supported = new Set([
+			"categories",
+			"projects",
+			"pages",
+			"tasks",
+			"forms",
+			"users",
+			"ingress",
+			"home",
+		]);
+		if (!supported.has(channel)) return;
+		this.PollingCoordinator.subscribe(
+			{
+				id: `view:channel:${channel}`,
+				type: "channel",
+				channel,
+				revision: this.elt.dataset.fingerprint || null,
+			},
+			{
+				onResult: async (result) => {
+					if (result.status === "changed") await this.refresh();
+				},
+			},
+		);
+	}
+
 	async _initSearch() {
 		const search = document.querySelector("[lp-search]");
 		if (search) {
@@ -238,7 +270,6 @@ export default class Core {
 	_addListeners() {
 		this.elt.addEventListener("click", this._click);
 		this.elt.addEventListener("submit", this.SubmissionManager.submit);
-		window.addEventListener(EVENTS.SERVER_CHANGE, this._receiveServerChange);
 
 		const mobileQuery = window.matchMedia("(max-width: 640px)");
 		mobileQuery.addEventListener("change", (e) => {
@@ -247,21 +278,6 @@ export default class Core {
 		});
 
 		this._initDrag();
-	}
-
-	/**
-	 * @testable true
-	 * @tests tests_js/test_023_deferred_operations.py::test_server_change_defers_completion_to_authoritative_status
-	 * @pairs deferred-jobs:operation-order deferred-jobs:stale-event
-	 * @pairs messaging:push-acceleration messaging:stale-event
-	 */
-	_receiveServerChange(event) {
-		const change = event.detail || {};
-		if (change.type === "deferred-complete" && change.operation) {
-			this.DeferredOperations?.nudge(change.operation, change.revision);
-			return;
-		}
-		void this.reconcileChange(change);
 	}
 
 	/**
@@ -322,14 +338,16 @@ export default class Core {
 	}
 
 	/**
-	 * Reconcile committed server changes without treating push payloads as data.
-	 * Concurrent messages share one pass and any messages received mid-pass are
+	 * Reconcile committed server invalidations without treating poll payloads as
+	 * authoritative replacement data. Concurrent invalidations share one pass
+	 * and any invalidations received mid-pass are
 	 * handled by the next iteration.
 	 *
 	 * @testable true
 	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
 	 * @pairs reconnect-refresh:mounted-collection reconnect-refresh:committed-delete
 	 * @pair reconnect-refresh:destination-invalidation
+	 * @pair polling:reentrancy
 	 */
 	reconcileChange(change = {}) {
 		this._pendingChanges.push({ ...change });
@@ -366,13 +384,21 @@ export default class Core {
 					const formKeys = [
 						...new Set([
 							...changes
-								.filter(({ type }) => !COLLECTION_ONLY_CHANGE_TYPES.has(type))
+								.filter(
+									({ type }) => !FORM_ALREADY_RECONCILED_CHANGE_TYPES.has(type),
+								)
 								.map(({ key }) => key)
 								.filter(Boolean),
 							...destinationKeys,
 						]),
 					];
-					if (formKeys.length) await this.EditWatcher?.invalidate(formKeys);
+					if (formKeys.length) {
+						if (this.PollingCoordinator?.activePoll) {
+							this.EditWatcher?.enqueue(formKeys);
+						} else {
+							await this.EditWatcher?.invalidate(formKeys);
+						}
+					}
 					await this.refreshCollections(false, { fingerprint });
 					await this.refreshSupplementalCollections(changes);
 					for (const item of changes) await this.afterReconcileChange(item);
@@ -487,7 +513,8 @@ export default class Core {
 
 		if (!online || hidden) {
 			this.EditWatcher?.pause();
-			this.SyncManager?.deregister();
+			this.PollingCoordinator?.pause();
+			await this.SyncManager?.deregister();
 		} else {
 			if (wasInactive && !hidden) {
 				const refreshFingerprint = this.elt.dataset.fingerprint || null;
@@ -500,7 +527,34 @@ export default class Core {
 				await this.EditWatcher?.resume();
 			}
 			await this.SyncManager?.register();
+			await this.reconcilePollingSubscriptions();
+			await this.PollingCoordinator?.resume();
 		}
+	}
+
+	/**
+	 * Reconcile widget-owned polling after a component activation or a return
+	 * to the foreground. Managers retain state for hidden widgets, but only the
+	 * active visible widget may own recurring form, document, or ingress work.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_core_init_starts_polling_without_waiting_for_initial_replay
+	 * @features polling
+	 * @dimensions active-widget visibility subscription-lifecycle
+	 * @pairs polling:active-widget polling:visibility
+	 * @pair polling:subscription-lifecycle
+	 */
+	async reconcilePollingSubscriptions() {
+		if (this._destroyed || this.hidden || !this.online) return;
+		await this.EditWatcher?.reconcileSubscriptions?.();
+		await this.SyncManager?.reconcileSubscriptions?.();
+		await Promise.all(
+			Object.values(this.components).flatMap((component) =>
+				Object.values(component.widgets).map((widget) =>
+					widget.syncPollingSubscription?.(),
+				),
+			),
+		);
 	}
 
 	async prefetch() {
@@ -868,12 +922,13 @@ export default class Core {
 		this._destroyed = true;
 		this.elt.removeEventListener("click", this._click);
 		this.elt.removeEventListener("submit", this.SubmissionManager.submit);
-		window.removeEventListener(EVENTS.SERVER_CHANGE, this._receiveServerChange);
 		this.SubmissionManager?.destroy();
 		this.SyncManager?.destroy();
 		this.DeferredOperations?.destroy();
 		this.EntityMenu?.destroy();
 		this.EditWatcher?.destroy();
+		this.Notifications?.destroy?.();
+		this.PollingCoordinator?.destroy();
 
 		Object.values(this.components).forEach((component) => {
 			if (component.destroy) component.destroy();

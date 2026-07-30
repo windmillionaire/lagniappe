@@ -299,7 +299,10 @@ STYLES = {
 	},
 	"manual": {
 		"button": "flex grow flex-row items-center justify-center gap-2 rounded-md bg-kind-default px-3 py-1.5 text-base font-semibold text-white shadow-sm",
-		"code": "bg-base-dark text-project-light p-4 rounded-lg font-mono text-sm my-2 max-w-full overflow-x-auto whitespace-pre",
+		"codeShell": "bg-base-dark rounded-lg my-2 max-w-full overflow-hidden",
+		"codeToolbar": "flex justify-end px-2 pt-2",
+		"copyButton": "rounded-md border border-base-light/50 px-2 py-1 text-xs font-semibold text-white hover:bg-base-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+		"code": "text-project-light px-4 pb-4 pt-2 font-mono text-sm max-w-full overflow-x-auto whitespace-pre",
 		"content": "sm:rounded-lg sm:shadow-sm w-full sm:border bg-white sm:border-base-light/50 sm:p-6",
 		"heading": "flex items-center gap-3 text-2xl font-semibold text-base-dark mb-4",
 		"conceptTitle": "flex items-center gap-2.5 text-lg font-semibold mb-2",

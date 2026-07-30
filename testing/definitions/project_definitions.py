@@ -136,3 +136,8 @@ offline_document_reload = ProjectDefinition(
     name="Offline Document Reload Project",
     description="Project used for offline replay reload/dedupe tests.",
 )
+
+offline_document_concurrent_replay = ProjectDefinition(
+    name="Concurrent Offline Document Replay Project",
+    description="Project used to merge offline and concurrent document edits.",
+)

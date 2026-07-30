@@ -74,7 +74,6 @@ def install():
     from installer import (
         admin,
         auth_email,
-        firebase,
         gcloud,
         identity,
         optional,
@@ -92,11 +91,6 @@ def install():
         (
             "reconcile standalone Identity Platform",
             identity.setup_identity_platform,
-        ),
-        ("reconcile Firebase messaging", firebase.setup_firebase),
-        (
-            "verify standalone Identity Platform after Firebase",
-            identity.verify_standalone_identity_platform,
         ),
         (
             "configure administrator and Google identity provider",

@@ -987,7 +987,7 @@ def test_worker_accepts_only_versioned_valid_connectivity_messages(run_node):
         """
 const valid = {
   protocol: "lagniappe-browser",
-  protocol_version: 2,
+  protocol_version: 3,
   type: "connectivity-state",
   state: {
     browser: "online",
@@ -1005,7 +1005,7 @@ if (accepted.server !== "offline" || accepted.visibility !== "hidden") {
 }
 
 for (const invalid of [
-	{ ...valid, protocol_version: 1 },
+	{ ...valid, protocol_version: 2 },
   { ...valid, type: "server-status" },
   { ...valid, state: { ...valid.state, server: "maybe" } },
 ]) {

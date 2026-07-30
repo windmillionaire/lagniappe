@@ -266,7 +266,7 @@ def _offline_update_notification(page):
             "body": "Offline page update synced.",
         }
     )
-    Entities.save(notification, current_user)
+    Entities.save(notification)
     return notification
 
 
@@ -599,7 +599,6 @@ def delete(key, **kwargs):
         page.save()
         Entities.save(*editable_categories)
 
-    responses.broadcast_delete(page.urlsafe_key, notify_hashes)
     return responses.ok()
 
 

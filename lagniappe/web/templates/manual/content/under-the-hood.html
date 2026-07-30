@@ -21,7 +21,7 @@
       <li><strong>Frontend:</strong> server-rendered templates, vanilla ES modules, Rollup, Tailwind CSS.</li>
       <li><strong>Editor:</strong> TipTap/ProseMirror with Yjs for collaborative document state.</li>
       <li><strong>Search/cache:</strong> Redis with search and JSON features.</li>
-      <li><strong>Auth/messaging:</strong> Google Identity Platform and Firebase Cloud Messaging.</li>
+      <li><strong>Auth/updates:</strong> Google Identity Platform and adaptive polling.</li>
       <li><strong>AI/OCR:</strong> Vertex AI and Document AI when configured.</li>
     </ul>
   {% endcall %}
@@ -49,7 +49,7 @@
     </p>
     <p class="text-base-medium mb-3">
       Every so often, things outside the app shift -- cloud APIs, OAuth rules,
-      Firebase messaging behavior, Python runtimes, AI models, security
+      cloud APIs, Python runtimes, AI models, security
       patches, or billing policies. The architecture is meant to make those
       shifts small chores rather than rewrites.
     </p>

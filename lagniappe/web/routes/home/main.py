@@ -37,8 +37,10 @@ def get(kind):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_notes_exclude_notifications
+# @tests tests_e2e/002_home/test_002i_home_activity.py::test_process_notification_uses_menu_not_home_notes
 # @features activity notes
 # @dimensions load cached-response notes-only
+# @pair activity:notes-exclusion
 @home.route("/activity")
 @home_permission()
 def activity():
@@ -72,7 +74,7 @@ def clear_notifications():
     notification_keys = Entities.NOTIFICATION.keys_for_parent(current_user)
     notifications = Entities.fetch(*notification_keys, request=Fetch.root())
     Entities.delete(*notifications)
-    Entities.touch(current_user)
+    Entities.advance_notifications(current_user)
 
     return responses.ok()
 
@@ -130,12 +132,9 @@ def delete_activity(key):
     ):
         abort(403)
 
-    parent = activity.parent
     Entities.delete(activity)
     if activity.kind == "notification":
-        Entities.touch(current_user)
-    elif parent:
-        responses.broadcast_delete(activity.urlsafe_key, [parent.hash])
+        Entities.advance_notifications(current_user)
 
     return responses.ok()
 

@@ -12,7 +12,7 @@ import Entity from "./base/entity";
  * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_page_shows_linked_page_and_task_badges
  * @tests tests_e2e/011_files/test_011c_file_processing_reconciliation.py::test_file_extract_completion_prompts_reload_for_text_tab
  * @features file
- * @dimensions load tabs text-tab file-mobile preview pdf-preview pdf-toolbar file-upload page-upload extract server-change reload authoritative-remount linked-entities reverse-links badges
+ * @dimensions load tabs text-tab file-mobile preview pdf-preview pdf-toolbar file-upload page-upload extract polling reload authoritative-remount linked-entities reverse-links badges
  */
 export default class File extends Entity {
 	constructor(node) {

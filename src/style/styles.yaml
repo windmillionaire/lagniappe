@@ -943,8 +943,20 @@ manual:
     classes: flex grow flex-row items-center justify-center gap-2 rounded-md bg-kind-default px-3 py-1.5 text-base font-semibold text-white shadow-sm
     intent: button presentation within manual
     surfaces: [server]
+  codeShell:
+    classes: bg-base-dark rounded-lg my-2 max-w-full overflow-hidden
+    intent: command block shell with a copy control
+    surfaces: [server]
+  codeToolbar:
+    classes: flex justify-end px-2 pt-2
+    intent: command block action row
+    surfaces: [server]
+  copyButton:
+    classes: rounded-md border border-base-light/50 px-2 py-1 text-xs font-semibold text-white hover:bg-base-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white
+    intent: copy a manual command to the clipboard
+    surfaces: [server]
   code:
-    classes: bg-base-dark text-project-light p-4 rounded-lg font-mono text-sm my-2 max-w-full overflow-x-auto whitespace-pre
+    classes: text-project-light px-4 pb-4 pt-2 font-mono text-sm max-w-full overflow-x-auto whitespace-pre
     intent: line-preserving, horizontally scrollable command block within manual content
     surfaces: [server]
   content:

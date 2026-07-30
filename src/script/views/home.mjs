@@ -16,7 +16,7 @@ export default class Home extends Core {
 	 * @testable false
 	 * @covered-by src/script/views/home.mjs::Home._refreshStarred
 	 * @covered-by src/script/views/home.mjs::Home._hideEmptyLists
-	 * @reason server-change hook delegates collection work to focused home handlers
+	 * @reason polling reconciliation delegates collection work to focused home handlers
 	 */
 	async refreshSupplementalCollections(changes = []) {
 		if (changes.some(({ type }) => ["star", "unstar"].includes(type))) {

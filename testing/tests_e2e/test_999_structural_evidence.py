@@ -227,7 +227,6 @@ def _run_job(job_type, owner, inputs, parameters=None):
             actor=owner,
             inputs=inputs,
             parameters=parameters or {},
-            client={"token": "test:structural-evidence"},
         )
     )
     return DeferredJobs.run(job.urlsafe_key)
@@ -523,17 +522,6 @@ def test_structural_evidence_after_full_e2e_suite(
         "generate_organize_plan",
         fake_organize,
     )
-    monkeypatch.setattr(
-        process_main.responses,
-        "send_notification",
-        lambda *args, **kwargs: None,
-    )
-    monkeypatch.setattr(
-        process_main.responses,
-        "send_message",
-        lambda *args, **kwargs: None,
-    )
-
     try:
         owner_browser = get_user(Users.OWNER)
         owner = Entities.USER.load(owner_browser.email)

@@ -1,19 +1,4 @@
-import { ENDPOINTS } from "./endpoints";
 import { createIcon } from "./icons";
-import { request } from "./request";
-
-const POLL_INTERVAL_MS = 4000;
-const MAX_POLL_INTERVAL_MS = 30000;
-const MAX_OPERATIONS_PER_REQUEST = 50;
-
-/**
- * @testable false
- * @covered-by src/script/shared/deferredOperations.mjs::DeferredOperationManager
- * @reason coordinator-owned polling schedule helper
- */
-function jitter(delay) {
-	return Math.round(delay * (0.85 + Math.random() * 0.3));
-}
 
 /**
  * @testable false
@@ -42,29 +27,24 @@ function operationNodes(key) {
 }
 
 /**
- * Reconcile every visible deferred operation through one owner-safe request.
- * Push messages only accelerate this loop; correctness does not depend on FCM.
+ * Reconcile every visible deferred operation through the shared poll contract.
  *
  * @testable true
  * @tests tests_js/test_023_deferred_operations.py::test_deferred_operation_manager_batches_orders_and_renders_status
  * @features deferred-jobs
- * @dimensions status batch request-limit revision polling progress timing push-acceleration etag backoff teardown decoration-opt-out
+ * @dimensions status revision polling progress timing backoff teardown decoration-opt-out
  */
 export class DeferredOperationManager {
 	constructor(view) {
 		this.view = view;
 		this.operations = new Map();
-		this.timer = null;
-		this.inflight = null;
 		this.destroyed = false;
-		this.etags = new Map();
-		this.pollInterval = POLL_INTERVAL_MS;
 		this.ignored = new Set();
+		this.unsubscribers = new Map();
 	}
 
 	init() {
 		this.scan();
-		this.schedule(0);
 		return this;
 	}
 
@@ -86,6 +66,8 @@ export class DeferredOperationManager {
 		const previous = decorationNode?.dataset?.operation;
 		if (previous && previous !== key) {
 			this.operations.delete(previous);
+			this.unsubscribers.get(previous)?.();
+			this.unsubscribers.delete(previous);
 			this._ignore(previous);
 		}
 		if (decorationNode) this.decorate(decorationNode, key);
@@ -94,9 +76,32 @@ export class DeferredOperationManager {
 			...current,
 			revision: Math.max(Number(current?.revision) || 0, Number(revision) || 0),
 		});
-		this.etags.clear();
-		this.pollInterval = POLL_INTERVAL_MS;
-		this.schedule(0);
+		if (!this.unsubscribers.has(key)) {
+			const unsubscribe = this.view.PollingCoordinator?.subscribe(
+				{
+					id: `operation:${key}`,
+					type: "operation",
+					key,
+					revision: null,
+					operation_revision: null,
+				},
+				{
+					onResult: async (result) => {
+						if (result.status === "changed" && result.payload) {
+							return await this.receive(result.payload);
+						} else if (
+							result.status === "error" ||
+							result.status === "unavailable"
+						) {
+							this._renderStatusDelay([key]);
+						} else {
+							this._refreshCachedStatuses([key]);
+						}
+					},
+				},
+			);
+			if (unsubscribe) this.unsubscribers.set(key, unsubscribe);
+		}
 		return true;
 	}
 
@@ -157,95 +162,14 @@ export class DeferredOperationManager {
 		)
 			return false;
 		if (key && !this.track(key, { revision })) return false;
-		this.etags.clear();
-		this.pollInterval = POLL_INTERVAL_MS;
-		this.schedule(0);
+		this.view.PollingCoordinator?.trigger(key ? `operation:${key}` : null);
 		return true;
 	}
 
-	schedule(delay = this.pollInterval) {
-		if (this.destroyed || this.timer || !this.operations.size) return;
-		this.timer = window.setTimeout(
-			() => {
-				this.timer = null;
-				this.poll();
-			},
-			delay ? jitter(delay) : 0,
-		);
-	}
-
 	async poll() {
-		if (this.destroyed || this.inflight || !this.operations.size) return;
-		if (document.hidden || !this.view.online) {
-			this.schedule();
-			return;
-		}
-
-		const batches = [];
-		const keys = Array.from(this.operations.keys());
-		for (
-			let index = 0;
-			index < keys.length;
-			index += MAX_OPERATIONS_PER_REQUEST
-		) {
-			batches.push(keys.slice(index, index + MAX_OPERATIONS_PER_REQUEST));
-		}
-		this.inflight = Promise.all(
-			batches.map((batch) => {
-				const signature = batch.join("\n");
-				const etag = this.etags.get(signature);
-				return request
-					.post(
-						ENDPOINTS.deferredOperations,
-						{ operations: batch },
-						{
-							headers: etag ? { "If-None-Match": etag } : {},
-						},
-					)
-					.then((response) => ({ batch, signature, response }));
-			}),
+		return this.view.PollingCoordinator?.trigger(
+			Array.from(this.operations.keys(), (key) => `operation:${key}`),
 		);
-		try {
-			let changed = false;
-			let delayed = false;
-			const responses = await this.inflight;
-			if (this.destroyed) return;
-			for (const { batch, signature, response } of responses) {
-				if (!response?.ok) {
-					this._renderStatusDelay(batch);
-					delayed = true;
-					continue;
-				}
-				if (response.etag) this.etags.set(signature, response.etag);
-				if (response.unchanged) {
-					this._refreshCachedStatuses(batch);
-					continue;
-				}
-				if (!Array.isArray(response.operations)) {
-					this._renderStatusDelay(batch);
-					delayed = true;
-					continue;
-				}
-				const received = new Set();
-				for (const status of response.operations) {
-					received.add(status?.key);
-					changed = (await this.receive(status)) || changed;
-				}
-				const missing = batch.filter((key) => !received.has(key));
-				if (missing.length) this._renderStatusDelay(missing);
-			}
-			this.pollInterval = delayed
-				? Math.min(this.pollInterval * 2, MAX_POLL_INTERVAL_MS)
-				: changed
-					? POLL_INTERVAL_MS
-					: Math.min(Math.round(this.pollInterval * 1.5), MAX_POLL_INTERVAL_MS);
-		} catch {
-			this._renderStatusDelay();
-			this.pollInterval = Math.min(this.pollInterval * 2, MAX_POLL_INTERVAL_MS);
-		} finally {
-			this.inflight = null;
-			this.schedule();
-		}
 	}
 
 	async receive(status) {
@@ -268,6 +192,10 @@ export class DeferredOperationManager {
 		if (status.terminal) {
 			let reconciled = true;
 			try {
+				this.view.EditWatcher?.expectDeferredCompletion?.(
+					status.entity_key,
+					status.key,
+				);
 				await this.view.reconcileChange?.({
 					type: "deferred-complete",
 					key: status.entity_key,
@@ -280,15 +208,15 @@ export class DeferredOperationManager {
 			}
 			if (reconciled) {
 				this.operations.delete(status.key);
+				this.unsubscribers.get(status.key)?.();
+				this.unsubscribers.delete(status.key);
 				this._ignore(status.key);
-				this.etags.clear();
 			} else {
-				this.etags.clear();
 				this._renderStatusDelay([status.key]);
 			}
 			return reconciled;
 		}
-		return revision > previousRevision || Boolean(status.terminal);
+		return true;
 	}
 
 	_render(status, elapsedSeconds = status.elapsed_seconds) {
@@ -340,10 +268,9 @@ export class DeferredOperationManager {
 
 	destroy() {
 		this.destroyed = true;
-		window.clearTimeout(this.timer);
-		this.timer = null;
+		for (const unsubscribe of this.unsubscribers.values()) unsubscribe();
+		this.unsubscribers.clear();
 		this.operations.clear();
 		this.ignored.clear();
-		this.etags.clear();
 	}
 }

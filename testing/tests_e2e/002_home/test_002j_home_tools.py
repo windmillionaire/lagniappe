@@ -15,7 +15,6 @@ from lagniappe.core.tools import ai
 from testing.definitions import SitePages, Uploads, Users
 from testing.elements import Buttons, List, Modal
 from testing.resources import Report
-from testing.utility.messaging import simulate_window_message
 
 pytestmark = pytest.mark.e2e
 
@@ -587,7 +586,7 @@ def _create_uploaded_report_item(user):
 
 
 # @features ai-report
-# @dimensions list create upload async deferred-refresh pending-poll stage-labels
+# @dimensions list create upload async deferred-refresh operation-poll stage-labels
 # @template home/tools.html::report_stage_label
 # @template home/tools.html::report_item
 def test_report_list_item_refreshes_stage_labels(get_user):
@@ -601,6 +600,14 @@ def test_report_list_item_refreshes_stage_labels(get_user):
     expect(item.locator("[lp-delete]")).to_be_visible()
 
     report_key = item.get_attribute("data-key")
+
+    def reload_item():
+        home = user.go(SitePages.HOME)
+        user.locate(home.TOOL_REPORT_LIST_TOGGLE).click()
+        report_list = List(user.locate(home.TOOL_REPORT_LIST))
+        assert report_list.is_loaded
+        return report_list.list.locator(f"li[data-key='{report_key}']")
+
     assert report.input_files == []
     assert len(report.upload_manifest) == 1
     assert report.upload_manifest[0]["filename"] == "sample_notes.txt"
@@ -622,7 +629,10 @@ def test_report_list_item_refreshes_stage_labels(get_user):
             },
         ],
     }
-    Entities.save(report, _owner(user))
+    job = Entities.fetch_one(report.deferred_job["key"], request=Fetch.direct())
+    job.status = DeferredJobStatus.SUCCEEDED.value
+    job.status_revision += 1
+    Entities.save(job, report, _owner(user))
 
     expect(item.locator("[data-role='report-stage']")).to_have_text(
         "Needs review",
@@ -641,16 +651,7 @@ def test_report_list_item_refreshes_stage_labels(get_user):
         ],
     }
     Entities.save(report, _owner(user))
-    simulate_window_message(
-        user,
-        "server-change",
-        {
-            "type": "deferred-complete",
-            "key": report_key,
-            "source_widget": "CreateToolReport",
-            "destination": "tools:ToolReportList",
-        },
-    )
+    item = reload_item()
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal ready")
 
     report.tool = "create"
@@ -660,16 +661,7 @@ def test_report_list_item_refreshes_stage_labels(get_user):
         "actions": [{"type": "create_page", "data": {}}],
     }
     Entities.save(report, _owner(user))
-    simulate_window_message(
-        user,
-        "server-change",
-        {
-            "type": "deferred-complete",
-            "key": report_key,
-            "source_widget": "CreateToolReport",
-            "destination": "tools:ToolReportList",
-        },
-    )
+    item = reload_item()
     expect(item.locator("[data-role='report-stage']")).to_have_text("Proposal executed")
 
     report.tool = "ask"
@@ -679,16 +671,7 @@ def test_report_list_item_refreshes_stage_labels(get_user):
         "actions": [],
     }
     Entities.save(report, _owner(user))
-    simulate_window_message(
-        user,
-        "server-change",
-        {
-            "type": "deferred-complete",
-            "key": report_key,
-            "source_widget": "CreateToolReport",
-            "destination": "tools:ToolReportList",
-        },
-    )
+    item = reload_item()
     expect(item.locator("[data-role='report-stage']")).to_have_text("Answer ready")
 
 

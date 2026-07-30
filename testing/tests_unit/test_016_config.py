@@ -22,7 +22,7 @@ class FakeEnvironment(Enum):
 def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
     app_settings = {
         "CONFIG_KIND": "lagniappe-settings",
-        "CONFIG_SCHEMA_VERSION": 2,
+        "CONFIG_SCHEMA_VERSION": 3,
         "BUILD_ID": "stale-local-build",
         "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
             "runtime@project-1.iam.gserviceaccount.com"
@@ -72,12 +72,10 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
     assert module.CONFIG.SOURCE_URL == "https://example.test/default-source"
     assert module.CONFIG.LOGIN_USER_KEY == "_lagniappe_user_key"
     assert module.CONFIG.LOGIN_USER_PAGE_KEY == "_lagniappe_user_page_key"
-    assert module.CONFIG.LOGIN_MESSAGING_DISABLED_KEY == "_lagniappe_messaging_disabled"
     assert module.CONFIG.LOGIN_INVALIDATE_CACHE_KEY == "_lagniappe_invalidate_cache"
     assert module.CONFIG.AUTH_SESSION_CACHE_KEYS == (
         "_lagniappe_user_key",
         "_lagniappe_user_page_key",
-        "_lagniappe_messaging_disabled",
         "_lagniappe_invalidate_cache",
         "restrictions",
         "belongs_to",
@@ -91,7 +89,7 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
 def test_config_honors_ai_observability_setting(monkeypatch):
     app_settings = {
         "CONFIG_KIND": "lagniappe-settings",
-        "CONFIG_SCHEMA_VERSION": 2,
+        "CONFIG_SCHEMA_VERSION": 3,
         "AI_OBSERVABILITY": True,
         "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
             "runtime@project-1.iam.gserviceaccount.com"
@@ -137,7 +135,7 @@ def test_config_honors_ai_observability_setting(monkeypatch):
 def test_config_honors_configured_source_url(monkeypatch):
     app_settings = {
         "CONFIG_KIND": "lagniappe-settings",
-        "CONFIG_SCHEMA_VERSION": 2,
+        "CONFIG_SCHEMA_VERSION": 3,
         "GIBBERISH": "bucket-seed",
         "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
             "runtime@project-1.iam.gserviceaccount.com"

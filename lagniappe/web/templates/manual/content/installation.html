@@ -34,8 +34,8 @@
         <strong>Vertex AI</strong> for optional AI features.
       </li>
       <li>
-        <strong>Google Identity Platform</strong> for sign-in and
-        <strong>Firebase Cloud Messaging</strong> for live updates.
+        <strong>Google Identity Platform</strong> for sign-in and adaptive
+        polling for live updates.
       </li>
       <li>
         <strong>Email</strong> through Gmail, Google Workspace, or an email
@@ -52,50 +52,152 @@
   {% endcall %}
   {{ heading("Prerequisites") }}
   {% call card() %}
-    <div class="grid md:grid-cols-2 gap-6">
+    {{ subheading("Accounts") }}
+    <ul class="text-base-medium space-y-3 mb-6">
+      <li>
+        <strong>Google Cloud:</strong> a regular Gmail address is enough; you
+        do not need to create a separate Google Cloud identity, project,
+        service account, or App Engine application beforehand. Sign in to
+        {{ link("https://console.cloud.google.com/billing", "Manage billing accounts") }}
+        with that Gmail address. If Google presents its first-time Cloud setup,
+        accept the terms and follow it; otherwise choose
+        <strong>Create account</strong>. Enter the requested country and
+        payments-profile details, add a payment method, then choose
+        <strong>Submit and enable billing</strong>.
+        <div class="text-sm mt-2">
+          You are ready when the Billing page lists an active Cloud Billing
+          account. A free-trial or paid billing account can be linked to a
+          project; even Google services with free usage allowances require an
+          active billing account. Stop there—the Lagniappe installer creates
+          the project, links this billing account, enables its APIs, and
+          creates the cloud resources in the right order. Google's
+          {{ link("https://docs.cloud.google.com/billing/docs/how-to/create-billing-account", "billing-account guide") }}
+          has screenshots and country-specific details if your screen differs.
+        </div>
+      </li>
+      <li>
+        <strong>Email, if you are not using a custom domain:</strong> a Gmail
+        or Google Workspace mailbox that Lagniappe can use to send account
+        verification and password-reset messages. Before running setup, open
+        {{ link("https://support.google.com/accounts/answer/185839?hl=en", "Google's 2-Step Verification instructions") }},
+        go to <strong>Security &amp; sign-in</strong>, then
+        <strong>How you sign in to Google</strong>, choose
+        <strong>Turn on 2-Step Verification</strong>, and follow Google's
+        prompts.
+        <div class="text-sm mt-2">
+          <strong>Why:</strong> a second sign-in step protects the mailbox if
+          its password is stolen, and Google only allows you to create the
+          separate 16-character
+          {{ link("https://support.google.com/accounts/answer/185833?hl=en", "App Password") }}
+          that Lagniappe needs after 2-Step Verification is enabled. During
+          setup, you create an App Password named <strong>Lagniappe</strong>;
+          the installer tests and saves that dedicated password, never your
+          normal Google password. Work or school administrators can disable
+          App Passwords, in which case use a custom-domain email provider or
+          ask the administrator to enable them.
+        </div>
+      </li>
+      <li>
+        <strong>Redis Cloud:</strong> you do not need to create this account
+        before starting. When setup reaches Redis, it opens the
+        {{ link("https://cloud.redis.io/", "Redis Cloud console") }} and walks
+        you through creating or signing in to an account, creating or choosing
+        a database, and locating its public endpoint and default-user password.
+        You copy those two values back into the terminal, and setup tests the
+        connection before saving anything. The
+        {{ link("https://redis.io/docs/latest/operate/rc/rc-quickstart/", "Redis Cloud quick start") }}
+        shows the same account and database screens if you want to preview
+        them.
+      </li>
+      <li>
+        <strong>Cloudflare, optional:</strong> an account and temporary API
+        token if you want automatic custom-domain setup
+      </li>
+    </ul>
+    {{ subheading("Install Git and Google Cloud CLI") }}
+    <p class="text-base-medium mb-4">
+      Git downloads the Lagniappe source code. Google Cloud CLI lets the setup
+      script work in your Google Cloud account. Install both before continuing;
+      you do not need to know Git beyond the commands in this guide.
+    </p>
+    <div class="grid lg:grid-cols-2 gap-6">
       <div>
-        {{ subheading("Accounts") }}
-        <ul class="text-base-medium space-y-3">
+        <h4 class="font-semibold text-base-dark mb-2">Windows</h4>
+        <ol class="text-base-medium text-sm space-y-3 list-decimal ml-5">
           <li>
-            <strong>Google Cloud:</strong> an account with billing enabled
+            Download and run
+            {{ link("https://git-scm.com/install/windows.html", "Git for Windows") }}.
+            The installer has several screens; its default choices are fine
+            for Lagniappe. Finish the installer, then close and reopen
+            PowerShell.
           </li>
           <li>
-            <strong>Email:</strong> a Gmail or Google Workspace mailbox with
-            2-Step Verification if you are not using a custom domain
+            Download and run the
+            {{ link("https://dl.google.com/dl/cloudsdk/channels/rapid/GoogleCloudSDKInstaller.exe", "Google Cloud CLI installer") }}.
+            Keep the bundled Python option selected. The other default choices
+            are fine. Finish the installer, then close and reopen PowerShell.
           </li>
           <li>
-            <strong>Redis:</strong> a provider account
+            Verify both tools in the new PowerShell window:
           </li>
-          <li>
-            <strong>Cloudflare, optional:</strong> an account and temporary
-            API token if you want automatic custom-domain setup
-          </li>
-        </ul>
+        </ol>
+        {{ code("git --version\ngcloud.cmd --version") }}
       </div>
       <div>
-        {{ subheading("Tools on Your Computer") }}
-        <ul class="text-base-medium space-y-3">
+        <h4 class="font-semibold text-base-dark mb-2">macOS</h4>
+        <ol class="text-base-medium text-sm space-y-3 list-decimal ml-5">
           <li>
-            <strong>Python:</strong> version 3.12 or newer; setup can install
-            it for you on Windows if needed
+            Open Terminal and run the command below to install Apple's Command
+            Line Tools, which include Git. Choose <strong>Install</strong> in
+            the macOS dialog. If macOS says the tools are already installed,
+            continue.
           </li>
+        </ol>
+        {{ code("xcode-select --install") }}
+        <p class="text-base-medium text-sm mt-2">
+          After the installation finishes, verify Git:
+        </p>
+        {{ code("git --version") }}
+        <ol start="2"
+            class="text-base-medium text-sm space-y-3 list-decimal ml-5 mt-3">
           <li>
-            <strong>Git:</strong>
-            {{ link("https://git-scm.com/downloads", "download Git") }}
+            Run Google's interactive Cloud CLI installer. Accept the default
+            install folder and answer <strong>Y</strong> when it asks to add
+            <code>gcloud</code> to your PATH. Restart the shell and verify the
+            command:
           </li>
-          <li>
-            <strong>Google Cloud CLI:</strong>
-            {{ link("https://cloud.google.com/sdk/docs/install", "installation guide") }}
-          </li>
-        </ul>
+        </ol>
+        {{ code("curl https://sdk.cloud.google.com | bash") }}
+        {{ code("exec -l $SHELL") }}
+        {{ code("gcloud --version") }}
       </div>
     </div>
+    <p class="text-base-medium text-sm mt-5">
+      On Linux, use your distribution's package manager for
+      {{ link("https://git-scm.com/install/linux", "Git") }} and follow the
+      {{ link("https://docs.cloud.google.com/sdk/docs/install-sdk", "Google Cloud CLI package instructions") }}
+      for your distribution.
+    </p>
+    {% call callout("warning", False) %}
+      <strong>Lagniappe keeps its Python software isolated.</strong> The setup
+      launcher creates a <code>venv</code> folder inside the Lagniappe checkout
+      and installs all Lagniappe Python packages there. It does not install
+      those packages globally or alter another virtual environment. Git and
+      Google Cloud CLI remain normal system tools.
+    {% endcall %}
+    {% call callout("note", False) %}
+      Lagniappe needs Python 3.12 or newer. On macOS, the current Google Cloud
+      CLI's bundled Python can usually supply it. On Windows, setup can offer
+      to install a supported standalone Python with WinGet if one is not
+      already available.
+    {% endcall %}
   {% endcall %}
   {{ heading("Running the Commands") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
-      The dark command boxes in this guide are meant to be copied into your
-      terminal and run from there.
+      Use <strong>Copy</strong> in any dark command box, paste the command into
+      your terminal, and press Enter. You can still select and copy the text
+      manually if you prefer.
     </p>
     <p class="text-base-medium mb-3">
       On Windows, use PowerShell. On macOS or Linux, use your usual terminal.
@@ -107,6 +209,56 @@
     {% call callout("tip", False) %}
       If a command says "not found" or "not recognized", check that the named
       tool is installed, then open a fresh terminal and try again.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("What the Setup Script Does") }}
+  {% call card() %}
+    <p class="text-base-medium mb-4">
+      Here is the order to expect. Setup is safe to rerun after an interruption:
+      it discovers existing resources before creating or updating them.
+    </p>
+    <ol class="text-base-medium space-y-3 list-decimal ml-5">
+      <li>
+        <strong>Prepare the local environment.</strong> The launcher creates
+        or reuses the checkout's private <code>venv</code>, verifies Python and
+        Google Cloud CLI, and installs the Python packages setup needs.
+      </li>
+      <li>
+        <strong>Choose and verify the Google Cloud target.</strong> Setup asks
+        for an installation name, account, project ID, and billing account. It
+        opens the Application Default Credentials browser sign-in and verifies
+        that the CLI and local Google clients use the same account and project.
+      </li>
+      <li>
+        <strong>Show the plan before cloud changes.</strong> Setup writes a
+        local draft, displays the selected identities and project, and asks you
+        to continue. New cloud resources are not created until you approve
+        this summary.
+      </li>
+      <li>
+        <strong>Build the cloud foundation.</strong> Setup creates or verifies
+        the project and billing link, enables the required APIs, creates the
+        keyless runtime service account, and provisions App Engine. It then
+        creates Storage buckets, the background task queue, and the OCR
+        processor. App Engine comes first because its permanent location and
+        hostname are needed by later authentication settings.
+      </li>
+      <li>
+        <strong>Connect application services.</strong> Setup walks through
+        authentication email, Identity Platform, the administrator and Google
+        OAuth client, Redis, and optional monitoring and AI settings. Provider
+        pages open only when a browser step is required.
+      </li>
+      <li>
+        <strong>Save and optionally deploy.</strong> Setup writes the private
+        settings files, then can deploy the database indexes and application
+        and configure background-job recovery.
+      </li>
+    </ol>
+    {% call callout("tip", False) %}
+      Keep the terminal visible while setup runs. Longer operations announce
+      an estimated maximum time. When setup needs you, it stops progress output
+      and displays a question ending in a colon.
     {% endcall %}
   {% endcall %}
   {{ heading("Installation") }}
@@ -123,10 +275,32 @@
     {% endcall %}
     {% call step(2, "Authenticate with Google Cloud") %}
       <p class="text-base-medium text-sm mb-2">
-        This connects the terminal to your Google account. It may open a
-        browser and ask you to approve access.
+        On macOS or Linux, this connects the terminal to your Google account:
       </p>
       {{ code("gcloud auth login") }}
+      <p class="text-base-medium text-sm my-2">
+        In Windows PowerShell, use:
+      </p>
+      {{ code("gcloud.cmd auth login") }}
+      <p class="text-base-medium text-sm mt-2">
+        The command opens a browser. Later, setup opens a second Google sign-in
+        for Application Default Credentials; the first authorizes the
+        <code>gcloud</code> command, while the second authorizes the local
+        Google client libraries used by setup.
+      </p>
+      {% call callout("warning", False) %}
+        If Google shows permission checkboxes or a <strong>Select all</strong>
+        option during either sign-in, choose <strong>Select all</strong> before
+        clicking <strong>Continue</strong> or <strong>Allow</strong>. Do not
+        deselect individual permissions: Google supports partial approval, but
+        every permission requested here is needed to configure, verify, or
+        deploy your installation.
+        <br><br>
+        In practical terms, you are granting these permissions to
+        <strong>yourself</strong>: they let Google Cloud CLI and the setup code
+        on your own computer act for you in your project. They do not give the
+        Lagniappe maintainer access to your account, project, or credentials.
+      {% endcall %}
     {% endcall %}
     {% call step(3, "Run setup") %}
       <p class="text-base-medium text-sm mb-2">
@@ -144,6 +318,14 @@
         optional features, and deployment. If a provider requires a manual
         step, setup opens the right page and tells you exactly what to do.
       </p>
+      {% call callout("note", False) %}
+        Throughout setup, a value in brackets is the suggested default:
+        pressing Enter accepts that exact value. In choice prompts such as
+        <code>[Y/n]</code>, the capitalized choice is the Enter default. App
+        Engine creation can take up to five minutes, and the final deployment
+        can take up to ten minutes; setup prints those estimates before it
+        begins waiting.
+      {% endcall %}
       {% call callout("tip", False) %}
         A new deployment can become available before Google finishes building
         its Datastore indexes. If Lagniappe says database setup is still

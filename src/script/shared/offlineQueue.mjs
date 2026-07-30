@@ -98,8 +98,10 @@ function field(record, name) {
  * @tests tests_js/test_028_form_state_split.py::test_offline_submit_record_keeps_originating_entity_fingerprint
  * @tests tests_js/test_028_form_state_split.py::test_offline_submit_record_keeps_renderer_snapshot_out_of_replay_payload
  * @tests tests_js/test_028_form_state_split.py::test_offline_replay_keeps_stale_submission_queued_for_reconciliation
+ * @tests tests_js/test_028_form_state_split.py::test_offline_replay_removes_committed_record_before_acknowledgement
+ * @tests tests_js/test_028_form_state_split.py::test_offline_replay_retries_a_conflict_rebased_by_the_form
  * @features offline
- * @dimensions queue-submit cached-overlay replay notification fingerprint immutable-command form-restore reload renderer-snapshot replay-payload replay-precondition conflict-review fingerprint-precondition conflict-durability dispatch
+ * @dimensions queue-submit cached-overlay replay notification fingerprint immutable-command form-restore reload renderer-snapshot replay-payload replay-precondition conflict-review fingerprint-precondition conflict-durability conflict-rebase dispatch acknowledgement-order
  */
 export class OfflineQueue {
 	constructor(view) {
@@ -240,35 +242,49 @@ export class OfflineQueue {
 
 		try {
 			for (const record of this._sortedRecords()) {
-				const response = await this._send(record);
-				if (response?.conflict) {
-					record.conflictResponse = response;
+				let current = record;
+				while (current) {
+					const response = await this._send(current);
+					if (response?.conflict) {
+						const attemptedFingerprint = current.fingerprint;
+						current.conflictResponse = response;
+						await this._dispatch({
+							phase: "conflict",
+							queue: this,
+							record: current,
+							response,
+						});
+						const rebased = this.records.find(
+							(queued) => queued.id === current.id,
+						);
+						if (
+							!rebased ||
+							rebased.fingerprint === attemptedFingerprint
+						) {
+							break;
+						}
+						current = rebased;
+						continue;
+					}
+					if (!response?.ok || response.error) break;
+
+					await deleteOfflineMutations([current.id]);
+					this.records = this.records.filter(
+						(queued) => queued.id !== current.id,
+					);
+					completed.push(current.id);
+					if (current.method === "PUT") {
+						this._acknowledgeResponse(response);
+					}
+					this._finalize(current, response);
 					await this._dispatch({
-						phase: "conflict",
+						phase: "replayed",
 						queue: this,
-						record,
+						record: current,
 						response,
 					});
-					continue;
+					break;
 				}
-				if (!response?.ok || response.error) continue;
-
-				completed.push(record.id);
-				if (record.method === "PUT") this._acknowledgeResponse(response);
-				this._finalize(record, response);
-				await this._dispatch({
-					phase: "replayed",
-					queue: this,
-					record,
-					response,
-				});
-			}
-
-			if (completed.length > 0) {
-				await deleteOfflineMutations(completed);
-				this.records = this.records.filter((record) => {
-					return !completed.includes(record.id);
-				});
 			}
 		} finally {
 			this._replaying = false;

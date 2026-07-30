@@ -61,7 +61,8 @@ def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
     group = Groups.general_users_view_only.get(owner)
     user_index = owner.go(SitePages.USER_INDEX)
 
-    row = Table(owner).get_row(member.definition.name)
+    row = owner.locate(f"#table tbody tr[data-key='{member.key}']")
+    expect(row).to_be_visible()
     group_link = row.locator("td[data-column='groups'] a[data-kind='group']")
     expect(group_link).to_have_attribute(
         "href", re.compile(rf"/users/index\?group={re.escape(group.key)}$")
@@ -162,7 +163,7 @@ def test_set_public_permissions(get_user):
 
 
 # @features user-groups
-# @dimensions group-delete nav-refresh server-change
+# @dimensions group-delete nav-refresh polling
 # @template users/tools.html::group_nav
 def test_delete_group_refreshes_group_navigation(get_user):
     user = get_user(Users.OWNER)

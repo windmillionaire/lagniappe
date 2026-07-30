@@ -20,15 +20,6 @@ DEFERRED_JOB_QUOTA_RETRY_DELAYS = (60, 300)
 DEFERRED_JOB_QUOTA_RETRY_JITTER_SECONDS = 30
 
 
-# @testable infrastructure
-class PushDeliveryOutcome(Enum):
-    """Provider-facing result for one single-recipient push attempt."""
-
-    ACCEPTED = "accepted"
-    PERMANENT_TOKEN_FAILURE = "permanent-token"
-    TRANSIENT_FAILURE = "transient"
-
-
 class DeferredJobType(Enum):
     """Domain executors supported by the shared deferred-job runner."""
 

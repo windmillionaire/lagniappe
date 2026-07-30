@@ -421,6 +421,33 @@ body.editor-focus-mode {
 	animation: flash-fade-in 0.4s ease-in;
 }
 
+.remote-change-flash[data-editor-author] {
+	position: relative;
+}
+
+.remote-change-flash[data-editor-author]::after {
+	position: absolute;
+	bottom: calc(100% + 0.25rem);
+	left: 0;
+	z-index: 20;
+	display: block;
+	box-sizing: border-box;
+	max-width: 14rem;
+	padding: 0.2rem 0.4rem;
+	overflow: hidden;
+	color: white;
+	font-size: 0.75rem;
+	font-weight: 600;
+	line-height: 1;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	pointer-events: none;
+	content: attr(data-editor-author);
+	background-color: var(--remote-change-color);
+	border-radius: 0.25rem;
+	box-shadow: 0 1px 3px rgb(15 23 42 / 25%);
+}
+
 @keyframes flash-fade-in {
 	from {
 		color: inherit;

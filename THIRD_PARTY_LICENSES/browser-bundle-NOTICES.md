@@ -7,7 +7,6 @@ the distributed browser code.
 
 ## Apache License 2.0 components
 
-- Firebase JavaScript SDK and its `@firebase/*` packages
 - PDF.js (`pdfjs-dist`); additional notices for its copied worker and WebAssembly
   decoders are in [pdfjs-dist-NOTICES.md](pdfjs-dist-NOTICES.md)
 

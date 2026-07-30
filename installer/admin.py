@@ -84,9 +84,9 @@ def validate_oauth_client_id(client_id):
 # @testable false
 # @covered-by installer/admin.py::setup_admin_and_oauth
 # @reason interactive input wrapper owned by the admin/OAuth setup flow
-@validate_input("Enter admin name", allow_empty=True)
+@validate_input("Enter admin name", default="Admin")
 def _get_admin_name(value):
-    return value or "Admin"
+    return value
 
 
 # @testable false

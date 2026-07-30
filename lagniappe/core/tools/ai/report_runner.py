@@ -58,8 +58,8 @@ class ReportActionAdapter:
         return _inspect_action_applied(action, report, user, record)
 
     # @testable infrastructure
-    def apply(self, action, report, user, created, context, token=None):
-        return _execute_action(action, report, user, created, context, token)
+    def apply(self, action, report, user, created, context):
+        return _execute_action(action, report, user, created, context)
 
     # @testable infrastructure
     def compensate(self, record, report, user):
@@ -127,7 +127,7 @@ REPORT_ACTION_ADAPTERS = {
 # @tests tests_e2e/002_home/test_002l_home_tools_ai.py::test_organize_completion_corpus_executes_usable_submissions*
 # @features ai-report
 # @dimensions deterministic-run create-order partial-result completed-task validation recoverable continue page-form moves batch-field-patch schema-update skip-action execute persistence attachments default-category recovery create idempotency completed-prefix post-commit-checkpoint reuse compensation permissions rename cancellation
-def run_report(report, user, token=None, ensure_active=None):
+def run_report(report, user, ensure_active=None):
     """Execute or resume a stored AI report proposal from durable checkpoints."""
     ensure_active = ensure_active or (lambda: None)
     ensure_active()
@@ -234,7 +234,6 @@ def run_report(report, user, token=None, ensure_active=None):
                 user,
                 created,
                 context,
-                token,
             )
             ensure_active()
             _record_action_result(
@@ -1374,7 +1373,7 @@ def _normalize_handler_result(result):
 # @testable false
 # @covered-by lagniappe/core/tools/ai/report_runner.py::run_report
 # @reason action dispatch is exercised through deterministic report-run tests
-def _execute_action(action, report, user, created, context=None, token=None):
+def _execute_action(action, report, user, created, context=None):
     action_type = action.get("type")
     handlers = {
         "create_form": _create_form,

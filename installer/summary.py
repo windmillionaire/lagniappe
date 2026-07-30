@@ -67,7 +67,6 @@ def install_summary_lines(
     deploy = deploy or {}
     node = node or {}
     gcloud_config = gcloud_config or {}
-    firebase = _mapping(settings.get("FIREBASE_CONFIG"))
     identity = _mapping(settings.get("IDENTITY_PLATFORM_CONFIG"))
     project = (
         settings.get("GOOGLE_CLOUD_PROJECT")
@@ -116,7 +115,6 @@ def install_summary_lines(
             "Identity Platform project: "
             f"{_value(identity.get('projectId'))}"
         ),
-        f"Firebase Messaging app: {_value(firebase.get('appId'))}",
         f"Redis endpoint: {_value(redis_endpoint)}",
     ]
     for kind, name in _bucket_names(settings).items():

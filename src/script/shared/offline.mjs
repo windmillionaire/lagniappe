@@ -165,7 +165,7 @@ export function getAllOfflineRecords() {
 
 /**
  * @testable false
- * @covered-by src/script/shared/sync.mjs::SyncManager.state
+ * @covered-by src/script/shared/sync.mjs::SyncManager._reconcile
  * @reason single-record deletion is owned by successful state reconciliation
  */
 export function deleteSyncRecord(sync_id) {

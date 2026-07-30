@@ -129,7 +129,6 @@ def delete(key, **kwargs):
 
     Entities.delete(task)
 
-    responses.broadcast_delete(task.urlsafe_key, notify_hashes)
     return responses.ok()
 
 
@@ -199,8 +198,6 @@ def combine(key, **kwargs):
     for removed in result.removed:
         notify_hashes = {removed.page.hash} if removed.page else set()
         notify_hashes.update(page.hash for page in removed.linked_pages if page)
-        responses.broadcast_delete(removed.urlsafe_key, notify_hashes)
-
     return responses.task_combine_delta(result.main, result.removed, page)
 
 

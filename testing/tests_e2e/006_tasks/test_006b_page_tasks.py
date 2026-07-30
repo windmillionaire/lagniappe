@@ -174,7 +174,7 @@ def test_create_basic_page_task(get_user):
 def test_empty_page_task_list_shows_marker_only_after_create_closes(get_user):
     """An editable empty task list opens CreateTask before its empty marker."""
     user = get_user(Users.OWNER)
-    page = Pages.test_create_page_task.get(user)
+    page = Pages.test_empty_page_task_list.get(user)
     user.go(page)
 
     create_form = page.create_task_form

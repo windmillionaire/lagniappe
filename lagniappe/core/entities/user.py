@@ -27,7 +27,14 @@ class User(AssetMixin, UserMixin, Entity):
 
     @property
     def exclude_from_index(self):
-        return frozenset({"permissions", "photo"})
+        return frozenset(
+            {
+                "notification_revision",
+                "operation_revision",
+                "permissions",
+                "photo",
+            }
+        )
 
     # @testable true
     # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
@@ -63,6 +70,8 @@ class User(AssetMixin, UserMixin, Entity):
                 "permissions": user_permissions.UserPermissions,
                 "photo": user_entity.ProfilePhoto,
                 "starred": user_related.Starred,
+                "notification_revision": user_entity.NotificationRevision,
+                "operation_revision": user_entity.OperationRevision,
                 "invalidate_cache": user_entity.InvalidateCache,
                 "restrictions": user_restrictions.Restrictions,
                 "is_public": common_entity.IsPublic,

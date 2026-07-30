@@ -131,12 +131,11 @@ export const ENDPOINTS = {
 		return `/toggle-star/${key}`;
 	},
 	activity: (key) => `/activity/${key}`,
-	deferredOperations: "/tools/operations/status",
+	poll: "/poll",
 	notifications: "/notifications",
 	help: (key) => {
 		return `/reference/section/${key}`;
 	},
-	messaging: "/reference/messaging",
 	createSchema: "/forms/create-schema",
 	restrictions: (key) => `/forms/${key}/restrictions`,
 	PagePermissions: (settings) => {
@@ -148,9 +147,5 @@ export const ENDPOINTS = {
 	UserSettings: (settings) => {
 		return ENDPOINTS.PagePermissions(settings);
 	},
-	register: "/register",
-	deregister: "/deregister",
 	sync: "/sync",
-	state: "/state",
-	edited: "/edited",
 };

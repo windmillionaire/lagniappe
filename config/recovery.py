@@ -18,19 +18,9 @@ from config.redis import redis_tls_enabled, validate_redis_ca_cert
 
 
 CONFIG_KIND = "lagniappe-settings"
-CONFIG_SCHEMA_VERSION = 2
+CONFIG_SCHEMA_VERSION = 3
 REDIS_CA_PEM = "REDIS_CA_PEM"
 REDACTED_VALUE = "[REDACTED]"
-FIREBASE_MESSAGING_SETTING_KEYS = frozenset(
-    {
-        "apiKey",
-        "appId",
-        "messagingSenderId",
-        "projectId",
-        "vapidKey",
-    }
-)
-
 _SECRET_KEY_MARKERS = (
     "ACCESS_CODE",
     "API_KEY",
@@ -75,7 +65,7 @@ def _mapping(value, name):
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_recovery_snapshot_is_complete_flat_and_merges_live_settings
 # @features config
-# @dimensions recovery-export current-schema
+# @dimensions recovery-export current-schema messaging-removal
 def build_recovery_snapshot(
     settings,
     *,
@@ -86,13 +76,14 @@ def build_recovery_snapshot(
     """Return a complete flat recovery snapshot without redacting persisted values."""
     snapshot = dict(settings)
     snapshot.pop("BUILD_ID", None)
+    snapshot.pop("FIREBASE_CONFIG", None)
     schema_version = snapshot.get("CONFIG_SCHEMA_VERSION")
     if (
         snapshot.get("CONFIG_KIND") != CONFIG_KIND
         or str(schema_version).strip() != str(CONFIG_SCHEMA_VERSION)
     ):
         raise RecoveryConfigurationError(
-            "Recovery export requires current schema-2 application settings."
+            "Recovery export requires current schema-3 application settings."
         )
     unsupported = sorted(UNSUPPORTED_SETTING_KEYS.intersection(snapshot))
     if unsupported:
@@ -235,8 +226,9 @@ def _require_project_resource(value, name, project_id):
 # @tests tests_tooling/test_003_config.py::test_recovery_rejects_current_configuration_identity_mismatch
 # @tests tests_tooling/test_003_config.py::test_recovery_requires_complete_current_configuration
 # @tests tests_tooling/test_003_config.py::test_recovery_validates_and_normalizes_auth_email_smtp
+# @tests tests_tooling/test_003_config.py::test_recovery_upgrades_schema_2_and_discards_legacy_messaging_config
 # @features config
-# @dimensions recovery-validation project-identity project-number current-schema required-settings authentication-email secrets
+# @dimensions recovery-validation project-identity project-number current-schema required-settings authentication-email secrets schema-upgrade messaging-removal
 def validate_recovery_document(settings):
     """Validate and normalize a canonical recovery document before provider access."""
     from config.locations import (
@@ -250,10 +242,12 @@ def validate_recovery_document(settings):
             f"CONFIG_KIND must be '{CONFIG_KIND}'."
         )
     schema_version = recovered.get("CONFIG_SCHEMA_VERSION")
-    if schema_version != CONFIG_SCHEMA_VERSION:
+    if schema_version not in {2, CONFIG_SCHEMA_VERSION}:
         raise RecoveryConfigurationError(
-            f"CONFIG_SCHEMA_VERSION must be {CONFIG_SCHEMA_VERSION}."
+            "CONFIG_SCHEMA_VERSION must be 2 or 3."
         )
+    recovered["CONFIG_SCHEMA_VERSION"] = CONFIG_SCHEMA_VERSION
+    recovered.pop("FIREBASE_CONFIG", None)
     unsupported = sorted(UNSUPPORTED_SETTING_KEYS.intersection(recovered))
     if unsupported:
         raise RecoveryConfigurationError(
@@ -313,34 +307,6 @@ def validate_recovery_document(settings):
             "recovered runtime service account for this release."
         )
     recovered["INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL"] = internal_caller_email
-
-    firebase_value = recovered.get("FIREBASE_CONFIG")
-    if not firebase_value:
-        raise RecoveryConfigurationError(
-            "FIREBASE_CONFIG is required for Firebase Cloud Messaging."
-        )
-    firebase = _mapping(firebase_value, "FIREBASE_CONFIG")
-    unsupported_firebase_keys = sorted(
-        set(firebase) - FIREBASE_MESSAGING_SETTING_KEYS
-    )
-    if unsupported_firebase_keys:
-        raise RecoveryConfigurationError(
-            "FIREBASE_CONFIG contains unsupported non-messaging fields: "
-            + ", ".join(unsupported_firebase_keys)
-        )
-    if firebase.get("projectId") != project_id:
-        raise RecoveryConfigurationError(
-            "FIREBASE_CONFIG.projectId does not match GOOGLE_CLOUD_PROJECT."
-        )
-    if any(
-        not str(firebase.get(name) or "").strip()
-        for name in FIREBASE_MESSAGING_SETTING_KEYS
-    ):
-        raise RecoveryConfigurationError(
-            "FIREBASE_CONFIG must contain complete Firebase Cloud Messaging "
-            "WebApp and VAPID settings."
-        )
-    recovered["FIREBASE_CONFIG"] = firebase
 
     identity_value = recovered.get("IDENTITY_PLATFORM_CONFIG")
     if not identity_value:

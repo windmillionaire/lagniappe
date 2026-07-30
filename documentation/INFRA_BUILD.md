@@ -65,7 +65,7 @@ Three Rollup entry points produce independent bundles:
 ### Login (`login.mjs` → `login.js`)
 
 The unauthenticated login page. Includes the focused Identity Platform REST
-client and the existing custom forms, but not the Firebase Auth SDK. It remains
+client and the existing custom forms, but not a provider-owned Auth SDK. It remains
 separate from the main bundle so unauthenticated users do not download the full
 app.
 
@@ -294,7 +294,7 @@ must not let an installation reuse an older cached font that lacks it.
 
 Both configs suppress two known warnings:
 
-- **EVAL**: Suppressed for `node_modules` (Firebase SDK uses eval internally)
+- **EVAL**: Suppressed for `node_modules` (third-party bundles may use eval internally)
 - **CIRCULAR_DEPENDENCY**: Suppressed for `y-prosemirror` (known circular dependency in the Yjs ProseMirror bindings)
 
 ## Settings And Build Metadata
