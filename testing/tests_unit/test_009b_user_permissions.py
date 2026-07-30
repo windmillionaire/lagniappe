@@ -132,6 +132,66 @@ def test_entity_permissions(get_permissions_test_data):
             )
 
 
+# @pairs users:owner users:users-view users:group-view
+# @pair users:restriction-independence
+@pytest.mark.unit
+def test_user_visibility_uses_users_and_group_permissions_without_page_restrictions():
+    """A user row is governed by Users/group permissions, not its page or form."""
+    from lagniappe.core.definitions import Action
+
+    target = TestEntities.get(
+        "USER",
+        {
+            "name": "Scoped User",
+            "hash": "scoped-user",
+            "groups": [{"name": "Scoped Group", "hash": "scoped-group"}],
+        },
+    )
+    owner = TestEntities.get(
+        "USER",
+        {"name": "Owner Viewer", "hash": "owner-viewer", "owner": True},
+    )
+    global_viewer = TestEntities.get(
+        "USER",
+        {
+            "name": "Global User Viewer",
+            "hash": "global-user-viewer",
+            "permissions": {"users": "VIEW"},
+        },
+    )
+    group_viewer = TestEntities.get(
+        "USER",
+        {
+            "name": "Group User Viewer",
+            "hash": "group-user-viewer",
+            "permissions": {"scoped-group": "VIEW"},
+        },
+    )
+    unrelated_viewer = TestEntities.get(
+        "USER",
+        {
+            "name": "Unrelated Viewer",
+            "hash": "unrelated-viewer",
+            "permissions": {"other-group": "VIEW"},
+        },
+    )
+
+    def unexpected_restriction_traversal(_viewer):
+        raise AssertionError("User visibility traversed page/form restrictions")
+
+    target.restricted_access = unexpected_restriction_traversal
+
+    assert target.allowed(Action.DELETE, owner)
+    assert target.allowed(Action.VIEW, global_viewer)
+    assert not target.allowed(Action.EDIT, global_viewer)
+    assert target.allowed(Action.VIEW, group_viewer)
+    assert not target.allowed(Action.VIEW, unrelated_viewer)
+    assert not target.allowed(
+        Action.VIEW,
+        SimpleNamespace(is_authenticated=False),
+    )
+
+
 # @features category permissions users
 # @dimensions users-category models-scope
 @pytest.mark.unit

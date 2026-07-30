@@ -79,6 +79,7 @@ class Users(ResourceEnumMixin, Enum):
     user_one_category = User(definition=ud.user_one_category)
     user_no_access = User(definition=ud.user_no_access)
     admin = User(definition=ud.admin_users)
+    admin_ask = User(definition=ud.admin_ask)
     admin_cannot_create_users = User(definition=ud.admin_cannot_create_users)
     general_models_view_only = User(definition=ud.general_models_view_only)
     general_forms_view_only = User(definition=ud.general_forms_view_only)

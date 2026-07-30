@@ -377,18 +377,37 @@ export class PageTaskList extends BaseList {
 		return taskElt.querySelector(`[data-widget='${widget}']`) ? widget : null;
 	}
 
-	_hasPendingLocalFormState(component) {
-		return Object.values(component?.widgets ?? {}).some(
-			(widget) =>
-				(component.active === widget && widget.visible === true) ||
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_refresh_closes_when_open_widget_is_missing
+	 * @tests tests_js/test_028_form_state_split.py::test_task_list_refresh_preserves_rows_with_local_form_state
+	 * @pairs tasks:active-form-preservation tasks:dirty-form-preservation
+	 * @pair tasks:stale-widget
+	 */
+	_hasPendingLocalFormState(component, replacement = null) {
+		return Object.values(component?.widgets ?? {}).some((widget) => {
+			if (
 				widget.unsavedState === true ||
 				widget.form?._queued === true ||
-				Boolean(
-					widget.target?.querySelector?.(
-						"[lp-edited-marker][data-visible='true']",
-					),
-				),
-		);
+				widget.target?.querySelector?.(
+					"[lp-edited-marker][data-visible='true']",
+				)
+			) {
+				return true;
+			}
+
+			if (
+				component.active !== widget ||
+				widget.visible !== true ||
+				!widget.name
+			) {
+				return false;
+			}
+
+			return Boolean(
+				replacement?.querySelector?.(`[data-widget='${widget.name}']`),
+			);
+		});
 	}
 
 	async postreconcile() {
@@ -419,7 +438,7 @@ export class PageTaskList extends BaseList {
 
 		for (const { from, to } of this._replaced) {
 			let component = this.view.getComponent(from);
-			if (this._hasPendingLocalFormState(component)) continue;
+			if (this._hasPendingLocalFormState(component, to)) continue;
 			const open = this._restorableWidgetName(to, component?.open);
 			from.replaceWith(to);
 			component?.destroy?.();

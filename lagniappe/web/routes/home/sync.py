@@ -18,8 +18,11 @@ def _is_document(sync_id):
 
 # @testable true
 # @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_sync_response_contract_is_browser_visible
-# @features sync
-# @dimensions validation document-only client-identity
+# @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_live_sync_rejects_form_widget_payloads
+# @pair sync:validation
+# @pair sync:document-only
+# @pair sync:client-identity
+# @pair forms:no-live-sync
 def _validate_sync_payload(payload):
     if not isinstance(payload, dict):
         return "Invalid sync payload."

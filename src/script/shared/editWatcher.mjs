@@ -477,17 +477,25 @@ export class EditWatcher {
 		return true;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_owned_deferred_completion_replaces_clean_active_form
+	 * @pair deferred-jobs:owned-deferred-completion
+	 * @pair edited-entity-notice:owned-deferred-completion
+	 */
 	_ownedDeferredCompletion(marker, widget) {
 		const key = marker.closest?.("[lp-entity]")?.dataset?.key;
 		const operation = widget?._deferredOperation;
-		if (
-			!key ||
-			!operation ||
-			!this._deferredCompletions.get(key)?.has(operation)
-		) {
-			return null;
+		if (!key || !operation) return null;
+
+		if (this._deferredCompletions.get(key)?.has(operation)) {
+			return { key, operation };
 		}
-		return { key, operation };
+
+		for (const [ownerKey, operations] of this._deferredCompletions) {
+			if (operations.has(operation)) return { key: ownerKey, operation };
+		}
+		return null;
 	}
 
 	_forgetDeferredCompletion(completion) {

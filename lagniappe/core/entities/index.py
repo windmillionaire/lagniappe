@@ -388,8 +388,15 @@ class UserIndex(Index):
     # @tests tests_unit/test_009_user_index.py::test_user_index_regular_mode_excludes_public_users
     # @tests tests_unit/test_009_user_index.py::test_user_index_public_mode_loads_public_group_users_and_preserves_append_mode
     # @tests tests_unit/test_009_user_index.py::test_user_index_public_mode_returns_empty_when_public_users_disabled
-    # @features user-index
-    # @dimensions pagination restrictions public-users mode
+    # @pair user-index:pagination
+    # @pair user-index:restrictions
+    # @pair user-index:public-users
+    # @pair user-index:mode
+    # @pair user-index:regular-mode
+    # @pair user-index:public-mode
+    # @pair public-users:mode
+    # @pair public-users:pagination
+    # @pair public-users:public-mode
     @property
     def users(self):
         if self._users is not None:
@@ -412,7 +419,7 @@ class UserIndex(Index):
         self._users = [
             u
             for u in Entities.fetch(*db.results, request=Fetch.direct())
-            if not u.is_public and u.allowed(Action.VIEW)
+            if not u.is_public and u.allowed(Action.VIEW, self.user)
         ]
         self.cursor = db.next_cursor
 
@@ -436,7 +443,7 @@ class UserIndex(Index):
         self._users = [
             u
             for u in Entities.fetch(*db.results, request=Fetch.direct())
-            if u.is_public and u.allowed(Action.VIEW)
+            if u.is_public and u.allowed(Action.VIEW, self.user)
         ]
         self.cursor = db.next_cursor
 
@@ -474,6 +481,7 @@ class UserIndex(Index):
             for user in Entities.fetch(*db.results, request=Fetch.root())
             if isinstance(user, Entities.USER)
             and bool(user.is_public) is expected_public
+            and user.allowed(Action.VIEW, self.user)
         ]
 
     @property

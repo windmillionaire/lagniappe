@@ -113,8 +113,8 @@ def test_user_index_loads_users_groups_public_group_and_append_cursor():
         "PUBLIC_GROUP",
         {"name": "public", "hash": "public", "public": True},
     )
-    visible_user.allowed = lambda action: True
-    hidden_user.allowed = lambda action: False
+    visible_user.allowed = lambda action, user=None: True
+    hidden_user.allowed = lambda action, user=None: False
     allowed_group.allowed = lambda action: True
     denied_group.allowed = lambda action: False
 
@@ -213,8 +213,8 @@ def test_user_index_regular_mode_excludes_public_users():
             "page": {"name": "Public Page", "hash": "pgusr004"},
         },
     )
-    regular_user.allowed = lambda action: True
-    public_user.allowed = lambda action: True
+    regular_user.allowed = lambda action, user=None: True
+    public_user.allowed = lambda action, user=None: True
 
     def fake_url_for(endpoint, **kwargs):
         pieces = [endpoint]
@@ -287,9 +287,9 @@ def test_user_index_public_mode_loads_public_group_users_and_preserves_append_mo
             "page": {"name": "Public Hidden Page", "hash": "pgusr007"},
         },
     )
-    public_user.allowed = lambda action: True
-    regular_user.allowed = lambda action: True
-    hidden_public_user.allowed = lambda action: False
+    public_user.allowed = lambda action, user=None: True
+    regular_user.allowed = lambda action, user=None: True
+    hidden_public_user.allowed = lambda action, user=None: False
 
     def fake_url_for(endpoint, **kwargs):
         pieces = [endpoint]

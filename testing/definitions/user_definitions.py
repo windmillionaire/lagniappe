@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from config import SETTINGS
+from lagniappe.core.definitions import AI
 
 from .groups import Groups
 from .pages import Pages
@@ -29,12 +30,14 @@ class UserDefinition:
         email: Email address (used for auth). If None, generates from name.
         groups: List of groups to add user to (not yet implemented)
         user_page: Existing page to link as user's page (not yet implemented)
+        ai_access: Explicit AI entitlement for permission-focused test users.
     """
 
     name: str = ""
     email: Optional[str] = None
     groups: Optional[list[Groups]] = field(default_factory=list)
     user_page: Optional[Pages] = None
+    ai_access: Optional[AI] = None
 
 
 owner = UserDefinition(
@@ -72,6 +75,14 @@ admin_users = UserDefinition(
     name="All Create Permissions",
     email="all_create_permissions@test.com",
     groups=[Groups.all_create],
+    ai_access=AI.CREATE,
+)
+
+admin_ask = UserDefinition(
+    name="All Create Permissions With Ask",
+    email="all_create_permissions_ask@test.com",
+    groups=[Groups.all_create],
+    ai_access=AI.ASK,
 )
 
 admin_cannot_create_users = UserDefinition(
@@ -126,6 +137,7 @@ single_category_create = UserDefinition(
     name="Single Category Create",
     email="single_category_create@test.com",
     groups=[Groups.single_category_create],
+    ai_access=AI.CREATE,
 )
 
 assignable_user = UserDefinition(

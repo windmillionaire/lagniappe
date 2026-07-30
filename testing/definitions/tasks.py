@@ -77,6 +77,9 @@ class Tasks(ResourceEnumMixin, Enum):
     test_task_update_preserves_open_widget = Task(
         definition=td.page_task_update_state_submission
     )
+    test_task_revision_review = Task(
+        definition=td.page_task_revision_review_submission
+    )
     test_completed_task_readonly_form = Task(
         definition=td.page_task_completed_readonly_form
     )

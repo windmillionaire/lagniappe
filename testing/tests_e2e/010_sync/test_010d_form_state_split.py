@@ -43,6 +43,7 @@ def test_live_sync_rejects_form_widget_payloads():
                         "key": "page-key",
                         "sync_id": "page-hash:document",
                         "ydoc": "encoded-state",
+                        "save": False,
                     }
                 ]
             }
@@ -258,7 +259,7 @@ def test_task_collection_refresh_preserves_active_form_for_revision_review(
     get_user,
 ):
     owner = get_user(Users.OWNER)
-    task = Tasks.test_task_update_preserves_open_widget.get(owner)
+    task = Tasks.test_task_revision_review.get(owner)
     owner.go(task)
     task_form = task.task_form
     field_id = "input-textab12"

@@ -1124,14 +1124,14 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 
 const applications = [];
-const anchor = {
-  dataset: {
-    key: "page-one",
-    fingerprint: "old-fingerprint",
-    modified: "2026-07-22T10:00:00+00:00",
-  },
-};
-function formCase({ unsaved = false } = {}) {
+function formCase({ unsaved = false, entityKey = "page-one" } = {}) {
+  const anchor = {
+    dataset: {
+      key: entityKey,
+      fingerprint: "old-fingerprint",
+      modified: "2026-07-22T10:00:00+00:00",
+    },
+  };
   const button = { textContent: "", disabled: false };
   const message = { textContent: "" };
   const widget = {
@@ -1210,7 +1210,7 @@ vm.runInContext(source, context);
     elt: { addEventListener() {}, querySelectorAll() { return []; } },
   });
 
-  const clean = formCase();
+  const clean = formCase({ entityKey: "task-one" });
   watcher.expectDeferredCompletion("page-one", "operation-one");
   await watcher._probe(
     clean.marker,
@@ -1225,7 +1225,7 @@ vm.runInContext(source, context);
     throw new Error("A clean active form did not apply its own deferred completion");
   }
 
-  const dirty = formCase({ unsaved: true });
+  const dirty = formCase({ unsaved: true, entityKey: "task-one" });
   watcher.expectDeferredCompletion("page-one", "operation-one");
   await watcher._probe(
     dirty.marker,
@@ -1439,13 +1439,29 @@ const replacement = {};
 const active = {
   replaceWith() { throw new Error("Active form row was replaced before revision review"); },
 };
-const activeReplacement = {};
+const activeReplacement = {
+  querySelector(selector) {
+    return selector === "[data-widget='TaskForm']" ? {} : null;
+  },
+};
+let incompatibleReplaced = false;
+const incompatible = {
+  replaceWith() { incompatibleReplaced = true; },
+};
+const incompatibleReplacement = {
+  querySelector() { return null; },
+};
 let hiddenReplaced = false;
 const hidden = {
   replaceWith() { hiddenReplaced = true; },
 };
 const hiddenReplacement = {};
-const activeWidget = { visible: true, unsavedState: false };
+const activeWidget = { name: "TaskForm", visible: true, unsavedState: false };
+const incompatibleWidget = {
+  name: "TaskForm",
+  visible: true,
+  unsavedState: false,
+};
 const hiddenWidget = { visible: false, unsavedState: false };
 const components = new Map([
   [removed, { widgets: { TaskForm: { unsavedState: true } } }],
@@ -1455,6 +1471,14 @@ const components = new Map([
     {
       active: activeWidget,
       widgets: { TaskForm: activeWidget },
+    },
+  ],
+  [
+    incompatible,
+    {
+      active: incompatibleWidget,
+      widgets: { TaskForm: incompatibleWidget },
+      destroy() {},
     },
   ],
   [
@@ -1475,6 +1499,7 @@ list._removed = [removed];
 list._replaced = [
   { from: replaced, to: replacement },
   { from: active, to: activeReplacement },
+  { from: incompatible, to: incompatibleReplacement },
   { from: hidden, to: hiddenReplacement },
 ];
 list._added = [];
@@ -1491,6 +1516,9 @@ Object.defineProperty(list, "completedCount", { value: 0 });
   }
   if (!hiddenReplaced) {
     throw new Error("A hidden clean form row was not silently refreshed");
+  }
+  if (!incompatibleReplaced) {
+    throw new Error("An active row survived after its form disappeared");
   }
 })().catch((error) => {
   console.error(error);

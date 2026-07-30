@@ -14,6 +14,7 @@ from ..properties import (
 )
 from ..mixins import AssetMixin
 from ..tools import database
+from ..tools.user_context import current_context_user
 from .entity import Entity
 from . import Entities
 
@@ -48,6 +49,19 @@ class User(AssetMixin, UserMixin, Entity):
     @property
     def required(self):
         return ["users", *[g.hash for g in self.groups]]
+
+    # @testable true
+    # @tests tests_unit/test_009b_user_permissions.py::test_user_visibility_uses_users_and_group_permissions_without_page_restrictions
+    # @pairs users:owner users:users-view users:group-view
+    # @pair users:restriction-independence
+    def allowed(self, action, user=None):
+        """Authorize user rows from their own Users/group permission scope."""
+        viewer = current_context_user(user)
+        return bool(
+            viewer
+            and viewer.is_authenticated
+            and viewer.has_permission(self, action)
+        )
 
     # @testable false
     # @covered-by lagniappe/core/properties/user_entity.py::Email

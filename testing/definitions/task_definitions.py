@@ -240,6 +240,28 @@ page_task_update_state_submission = TaskDefinition(
     ],
 )
 
+page_task_revision_review_submission = TaskDefinition(
+    name="Task Revision Review Submission",
+    origin=Pages.test_create_page_task,
+    form=Forms.test_task_history_form,
+    submission=[
+        SubmissionFields.INPUT.get(
+            _task_history_fields["input-textab12"], "Task revision review text"
+        ),
+        SubmissionFields.INPUT.get(
+            _task_history_fields["input-datecd34"], "2026-06-17"
+        ),
+        SubmissionFields.INPUT.get(_task_history_fields["input-timeef56"], "11:15"),
+        SubmissionFields.INPUT.get(_task_history_fields["input-numgh78"], "84"),
+        SubmissionFields.INPUT.get(
+            _task_history_fields["input-emlij90"], "task-review@example.com"
+        ),
+        SubmissionFields.INPUT.get(
+            _task_history_fields["input-telkl12"], "5552468101"
+        ),
+    ],
+)
+
 page_task_completed_readonly_form = TaskDefinition(
     name="Completed Readonly Form Task",
     origin=Pages.test_create_page_task,

@@ -28,6 +28,7 @@ def _user_restrictions():
 
 def _viewer():
     return SimpleNamespace(
+        is_authenticated=True,
         properties=SimpleNamespace(restrictions=_user_restrictions()),
         has_permission=lambda *_args: True,
     )

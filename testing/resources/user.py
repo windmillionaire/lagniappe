@@ -86,9 +86,13 @@ class User(SiteResource):
             "groups": [g.get(self.user).entity for g in self.definition.groups],
             "test_user": True,
         }
+        if self.definition.ai_access is not None:
+            data["ai_access"] = self.definition.ai_access.name
 
         entity = Entities.USER.create(data)
         self.entity = entity
+        if self.definition.ai_access is not None:
+            entity.ai_access = self.definition.ai_access.name
 
         if self.definition.email == SETTINGS.test_config["ADMIN_EMAIL"]:
             entity.last_login = datetime.now(timezone.utc)

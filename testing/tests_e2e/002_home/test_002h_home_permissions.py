@@ -68,7 +68,7 @@ def test_admin_permissions(get_user):
     """
     Verify that an admin can access the home page and see model lists and tools.
     """
-    user = get_user(Users.admin)
+    user = get_user(Users.admin_ask)
     cat_one = Categories.test_create_category_manual_mode.get(user)
     cat_two = Categories.test_create_page.get(user)
     project_one = Projects.test_create_project_manual_mode.get(user)

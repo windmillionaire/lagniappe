@@ -1,25 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="10364de2-6793-4cf9-a51d-8897dfb09bab",e._sentryDebugIdIdentifier="sentry-dbid-10364de2-6793-4cf9-a51d-8897dfb09bab");}catch(e){}}();import{E as r}from"./entity.js?v=b5856137";import"./core.js?v=b5856137";import"./entityMenu.js?v=b5856137";import"./shared.js?v=b5856137";import"./combobox.js?v=b5856137";import"./primitives.js?v=b5856137";import"./results2.js?v=b5856137";import"./formatting.js?v=b5856137";import"./dropdown.js?v=b5856137";class i extends r{constructor(t){super(t),this._defaultTabId=t.dataset.defaultTab||"settings"}}export{i as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as Entity } from './entity.js?v=bda9a134';
-import './core.js?v=bda9a134';
-import './entityMenu.js?v=bda9a134';
-import './shared.js?v=bda9a134';
-import './combobox.js?v=bda9a134';
-import './primitives.js?v=bda9a134';
-import './results2.js?v=bda9a134';
-import './formatting.js?v=bda9a134';
-import './dropdown.js?v=bda9a134';
-
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002f_home_directory.py::test_admin_directory_link_opens_admin_settings
- * @features admin
- * @dimensions page-load site-settings
- */
-class Admin extends Entity {
-	constructor(node) {
-		super(node);
-		this._defaultTabId = node.dataset.defaultTab || "settings";
-	}
-}
-
-export { Admin as default };
