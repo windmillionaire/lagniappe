@@ -650,12 +650,6 @@ owner-only, secret-free operation journal. An interrupt reports the last
 completed step, completed resource mutations/identifiers, and the exact safe
 resume command. Concurrent setup processes fail before provider work.
 
-Contributor PRs must not contain anything under `config/files/` or the
-generated root `lagniappe.yaml` and `index.yaml`. The optional
-`venv/bin/python run.py pr-clean` removes any such files from Git's prospective
-commit while leaving local installation configuration available; the required
-`venv/bin/python run.py pr-check` enforces that boundary.
-
 Redis TLS uses `REDIS_TLS` plus the conditional `REDIS_CA_CERT` setting. The
 managed CA bundle lives at `config/files/redis_ca.pem`; setup stores that
 project-relative path so it resolves both locally and after App Engine upload.

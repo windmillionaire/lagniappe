@@ -14,7 +14,6 @@ from runner.context import (
     GIT_CLI,
     REPOSITORY_ROOT,
     format_command,
-    python_command,
 )
 from runner.gcloud import activate_repository_gcloud
 
@@ -106,21 +105,12 @@ REPORTING_PRIVACY_MARKDOWN_PATH = REPOSITORY_ROOT / "ERROR_REPORTING_PRIVACY.md"
 REPORTING_PRIVACY_TEMPLATE_PATH = (
     REPOSITORY_ROOT / "lagniappe/web/templates/home/reporting_privacy.html"
 )
-PR_DISPOSABLE_GENERATED_PATHS = (
-    "lagniappe/web/static",
-    "lagniappe/web/start/styles/icons.py",
-    "lagniappe/web/start/styles/styles.py",
-)
-PR_PRESERVED_LOCAL_PATHS = (
+RELEASE_LOCAL_PATHS = (
     "config/files",
     "index.yaml",
     "lagniappe.yaml",
 )
-PR_GENERATED_PATHS = (
-    *PR_PRESERVED_LOCAL_PATHS,
-    *PR_DISPOSABLE_GENERATED_PATHS,
-)
-PR_BUILD_ID_PATH = "config/constants.py"
+RELEASE_BUILD_ID_PATH = "config/constants.py"
 RELEASE_BUILD_METADATA_PATH = "lagniappe/web/static/build.json"
 RELEASE_SERVICE_WORKER_PATH = "lagniappe/web/static/sw.js"
 RELEASE_VERSION_PATTERN = re.compile(
@@ -590,7 +580,10 @@ def run_restore_command(command_args: list[str]) -> int:
     return 0 if restored else 1
 
 
-def _run_pr_git(repo_root: Path, args: list[str]) -> subprocess.CompletedProcess:
+def _run_release_git(
+    repo_root: Path,
+    args: list[str],
+) -> subprocess.CompletedProcess:
     result = subprocess.run(
         [GIT_CLI, *args],
         cwd=repo_root,
@@ -604,7 +597,7 @@ def _run_pr_git(repo_root: Path, args: list[str]) -> subprocess.CompletedProcess
     return result
 
 
-def _resolve_pr_base(repo_root: Path, requested: str | None) -> str:
+def _resolve_release_base(repo_root: Path, requested: str | None) -> str:
     candidates = [requested] if requested else ["origin/main", "main"]
     for candidate in candidates:
         result = subprocess.run(
@@ -620,7 +613,7 @@ def _resolve_pr_base(repo_root: Path, requested: str | None) -> str:
     if requested:
         raise RuntimeError(f"Git base ref does not exist: {requested}")
     raise RuntimeError(
-        "Could not find origin/main or main. Pass the PR base with --base REF."
+        "Could not find origin/main or main. Pass the release base with --base REF."
     )
 
 
@@ -636,331 +629,13 @@ def _diff_changes_build_id(result: subprocess.CompletedProcess) -> bool:
     )
 
 
-def pr_generated_artifact_changes(repo_root: Path, base_ref: str) -> tuple[str, list[str]]:
-    """Return build-managed artifacts present in the prospective PR index."""
-    merge_base = _run_pr_git(
-        repo_root,
-        ["merge-base", "HEAD", base_ref],
-    ).stdout.strip()
-    if not merge_base:
-        raise RuntimeError(f"Could not determine a merge base with {base_ref}")
-
-    changed_paths = _nul_paths(
-        _run_pr_git(
-            repo_root,
-            [
-                "diff",
-                "--cached",
-                "--name-only",
-                "-z",
-                merge_base,
-                "--",
-                *PR_GENERATED_PATHS,
-            ],
-        )
-    )
-
-    build_id_changed = _diff_changes_build_id(
-        _run_pr_git(
-            repo_root,
-            [
-                "diff",
-                "--cached",
-                "--unified=0",
-                "--no-color",
-                merge_base,
-                "--",
-                PR_BUILD_ID_PATH,
-            ],
-        )
-    )
-    if build_id_changed:
-        changed_paths.add(f"{PR_BUILD_ID_PATH} (BUILD_ID)")
-
-    return merge_base, sorted(changed_paths)
-
-
-def _restore_pr_build_id(repo_root: Path, merge_base: str) -> bool:
-    base_content = _run_pr_git(
-        repo_root,
-        ["show", f"{merge_base}:{PR_BUILD_ID_PATH}"],
-    ).stdout
-    path = repo_root / PR_BUILD_ID_PATH
-    if not path.is_file():
-        raise RuntimeError(
-            f"Cannot selectively restore BUILD_ID because {PR_BUILD_ID_PATH} "
-            "is missing."
-        )
-
-    base_match = re.search(r"^BUILD_ID\s*=.*$", base_content, flags=re.MULTILINE)
-    current_content = path.read_text(encoding="utf-8")
-    current_match = re.search(
-        r"^BUILD_ID\s*=.*$",
-        current_content,
-        flags=re.MULTILINE,
-    )
-    if not base_match or not current_match:
-        raise RuntimeError(
-            f"Cannot locate BUILD_ID in the merge-base and current "
-            f"{PR_BUILD_ID_PATH} files."
-        )
-
-    index_changed = _diff_changes_build_id(
-        _run_pr_git(
-            repo_root,
-            [
-                "diff",
-                "--cached",
-                "--unified=0",
-                "--no-color",
-                merge_base,
-                "--",
-                PR_BUILD_ID_PATH,
-            ],
-        )
-    )
-    worktree_changed = current_match.group(0) != base_match.group(0)
-    if not worktree_changed and not index_changed:
-        return False
-
-    if worktree_changed:
-        updated = (
-            current_content[: current_match.start()]
-            + base_match.group(0)
-            + current_content[current_match.end() :]
-        )
-        path.write_text(updated, encoding="utf-8")
-    _run_pr_git(repo_root, ["add", "--", PR_BUILD_ID_PATH])
-    return True
-
-
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_pr_clean_restores_unstaged_generated_worktree
-def _pr_disposable_artifact_changes(
-    repo_root: Path,
-    merge_base: str,
-) -> tuple[list[str], list[str]]:
-    """Return tracked and untracked disposable generated worktree changes."""
-    tracked_paths: set[str] = set()
-    for diff_args in (
-        ["diff", "--cached", "--name-only", "-z", merge_base],
-        ["diff", "--name-only", "-z", merge_base],
-    ):
-        tracked_paths.update(
-            _nul_paths(
-                _run_pr_git(
-                    repo_root,
-                    [*diff_args, "--", *PR_DISPOSABLE_GENERATED_PATHS],
-                )
-            )
-        )
-
-    untracked_paths = _nul_paths(
-        _run_pr_git(
-            repo_root,
-            [
-                "ls-files",
-                "--others",
-                "--exclude-standard",
-                "-z",
-                "--",
-                *PR_DISPOSABLE_GENERATED_PATHS,
-            ],
-        )
-    )
-    return sorted(tracked_paths), sorted(untracked_paths)
-
-
-def run_pr_clean_command(
-    command_args: list[str],
-    *,
-    repo_root: Path | None = None,
-) -> int:
-    """Restore disposable generated output and exclude local config from the PR."""
-    parser = argparse.ArgumentParser(
-        prog="run.py pr-clean",
-        description=(
-            "Restore maintainer-owned generated files, exclude installation "
-            "configuration from the PR index, and restore BUILD_ID."
-        ),
-    )
-    parser.add_argument(
-        "--base",
-        metavar="REF",
-        help="PR base ref. Defaults to origin/main, then main.",
-    )
-    parser.add_argument(
-        "--keep-build",
-        action="store_true",
-        help=(
-            "Keep disposable generated files in the working tree while "
-            "excluding them from the PR index."
-        ),
-    )
-    args = parser.parse_args(command_args)
-    repo_root = (repo_root or REPOSITORY_ROOT).resolve()
-
-    try:
-        base_ref = _resolve_pr_base(repo_root, args.base)
-        merge_base, changes = pr_generated_artifact_changes(repo_root, base_ref)
-        prospective_paths = [
-            path for path in changes if path != f"{PR_BUILD_ID_PATH} (BUILD_ID)"
-        ]
-        if args.keep_build:
-            cleaned_paths = prospective_paths
-            if cleaned_paths:
-                _run_pr_git(
-                    repo_root,
-                    [
-                        "restore",
-                        f"--source={merge_base}",
-                        "--staged",
-                        "--",
-                        *cleaned_paths,
-                    ],
-                )
-        else:
-            preserved_paths = [
-                path
-                for path in prospective_paths
-                if not any(
-                    path == root or path.startswith(f"{root}/")
-                    for root in PR_DISPOSABLE_GENERATED_PATHS
-                )
-            ]
-            if preserved_paths:
-                _run_pr_git(
-                    repo_root,
-                    [
-                        "restore",
-                        f"--source={merge_base}",
-                        "--staged",
-                        "--",
-                        *preserved_paths,
-                    ],
-                )
-
-            tracked_paths, untracked_paths = _pr_disposable_artifact_changes(
-                repo_root,
-                merge_base,
-            )
-            if tracked_paths:
-                _run_pr_git(
-                    repo_root,
-                    [
-                        "restore",
-                        f"--source={merge_base}",
-                        "--staged",
-                        "--worktree",
-                        "--",
-                        *tracked_paths,
-                    ],
-                )
-            for relative in untracked_paths:
-                try:
-                    (repo_root / relative).unlink()
-                except FileNotFoundError:
-                    pass
-            cleaned_paths = sorted(
-                {*preserved_paths, *tracked_paths, *untracked_paths}
-            )
-        build_id_restored = _restore_pr_build_id(repo_root, merge_base)
-    except RuntimeError as error:
-        print(f"PR clean could not run: {error}")
-        return 2
-
-    if not cleaned_paths and not build_id_restored:
-        print(f"No generated PR artifacts need cleaning against {base_ref}.")
-        return 0
-
-    action = (
-        "Removed generated artifacts from the PR index"
-        if args.keep_build
-        else "Restored generated artifacts"
-    )
-    print(f"{action} against {base_ref} (merge base {merge_base[:12]}):")
-    for path in cleaned_paths:
-        print(f"  - {path}")
-    if build_id_restored:
-        print(f"  - {PR_BUILD_ID_PATH} (BUILD_ID only)")
-    if args.keep_build:
-        print(
-            "Disposable generated files remain in the working tree for testing; "
-            "pr-check ignores files that are not part of the prospective commit."
-        )
-    else:
-        print(
-            "Local installation configuration remains in place; authored "
-            "source and test evidence were not changed."
-        )
-    print(
-        "If this cleanup reverses generated files from an earlier commit, "
-        "commit the staged cleanup before pushing the PR."
-    )
-    return 0
-
-
-def run_pr_check_command(
-    command_args: list[str],
-    *,
-    repo_root: Path | None = None,
-) -> int:
-    """Reject contributor PRs that contain maintainer-owned build output."""
-    parser = argparse.ArgumentParser(
-        prog="run.py pr-check",
-        description=(
-            "Check that a contributor PR contains authored source only. "
-            "Generated delivery files are built by the maintainer during "
-            "release preparation."
-        ),
-    )
-    parser.add_argument(
-        "--base",
-        metavar="REF",
-        help="PR base ref. Defaults to origin/main, then main.",
-    )
-    args = parser.parse_args(command_args)
-    repo_root = (repo_root or REPOSITORY_ROOT).resolve()
-
-    try:
-        base_ref = _resolve_pr_base(repo_root, args.base)
-        merge_base, changes = pr_generated_artifact_changes(repo_root, base_ref)
-    except RuntimeError as error:
-        print(f"PR check could not run: {error}")
-        return 2
-
-    if changes:
-        print(
-            f"PR check failed against {base_ref} "
-            f"(merge base {merge_base[:12]}):"
-        )
-        for path in changes:
-            print(f"  - {path}")
-        print(
-            "\nContributor PRs must contain authored source only. Remove these "
-            "generated changes from the PR yourself or run "
-            f"{python_command('run.py', 'pr-clean')}, then rerun pr-check."
-        )
-        print(
-            "The maintainer will produce and commit the generated delivery files "
-            "when the active next/* branch is prepared for release."
-        )
-        return 1
-
-    print(
-        f"PR generated-artifact check passed against {base_ref} "
-        f"(merge base {merge_base[:12]})."
-    )
-    return 0
-
-
 def _read_release_text(
     repo_root: Path,
     relative_path: str,
     issues: list[str],
 ) -> str | None:
     try:
-        return _run_pr_git(
+        return _run_release_git(
             repo_root,
             ["show", f":{relative_path}"],
         ).stdout
@@ -990,15 +665,16 @@ def _read_release_json(
 
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_accepts_complete_release
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_development_build
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_incomplete_release
 # @features release
-# @dimensions delivery-tree
+# @dimensions delivery-tree build-mode
 def release_readiness_issues(
     repo_root: Path,
     base_ref: str,
 ) -> tuple[str, list[str]]:
     """Return release-tree problems in the prospective commit."""
-    merge_base = _run_pr_git(
+    merge_base = _run_release_git(
         repo_root,
         ["merge-base", "HEAD", base_ref],
     ).stdout.strip()
@@ -1006,7 +682,7 @@ def release_readiness_issues(
         raise RuntimeError(f"Could not determine a merge base with {base_ref}")
 
     changed_paths = _nul_paths(
-        _run_pr_git(
+        _run_release_git(
             repo_root,
             ["diff", "--cached", "--name-only", "-z", merge_base],
         )
@@ -1018,7 +694,7 @@ def release_readiness_issues(
         for path in changed_paths
         if any(
             path == root or path.startswith(f"{root}/")
-            for root in PR_PRESERVED_LOCAL_PATHS
+            for root in RELEASE_LOCAL_PATHS
         )
     )
     if local_paths:
@@ -1037,7 +713,7 @@ def release_readiness_issues(
             )
 
     build_id_changed = _diff_changes_build_id(
-        _run_pr_git(
+        _run_release_git(
             repo_root,
             [
                 "diff",
@@ -1046,13 +722,13 @@ def release_readiness_issues(
                 "--no-color",
                 merge_base,
                 "--",
-                PR_BUILD_ID_PATH,
+                RELEASE_BUILD_ID_PATH,
             ],
         )
     )
     if not build_id_changed:
         issues.append(
-            f"{PR_BUILD_ID_PATH} does not contain a newly generated BUILD_ID."
+            f"{RELEASE_BUILD_ID_PATH} does not contain a newly generated BUILD_ID."
         )
 
     package = _read_release_json(repo_root, "package.json", issues)
@@ -1110,7 +786,7 @@ def release_readiness_issues(
                 )
 
     constants_content = (
-        _read_release_text(repo_root, PR_BUILD_ID_PATH, issues) or ""
+        _read_release_text(repo_root, RELEASE_BUILD_ID_PATH, issues) or ""
     )
     build_id_match = re.search(
         r'^BUILD_ID\s*=\s*"([^"]+)"\s*$',
@@ -1120,12 +796,13 @@ def release_readiness_issues(
     build_id = build_id_match.group(1) if build_id_match else None
     if not build_id or not RELEASE_BUILD_ID_PATTERN.fullmatch(build_id):
         issues.append(
-            f"{PR_BUILD_ID_PATH} must contain a generated eight-character BUILD_ID."
+            f"{RELEASE_BUILD_ID_PATH} must contain a generated "
+            "eight-character BUILD_ID."
         )
     elif build_metadata.get("build_id") != build_id:
         issues.append(
             f"{RELEASE_BUILD_METADATA_PATH} build_id does not match "
-            f"{PR_BUILD_ID_PATH}."
+            f"{RELEASE_BUILD_ID_PATH}."
         )
     else:
         service_worker = _read_release_text(
@@ -1165,7 +842,7 @@ def run_release_check_command(
     repo_root = (repo_root or REPOSITORY_ROOT).resolve()
 
     try:
-        base_ref = _resolve_pr_base(repo_root, args.base)
+        base_ref = _resolve_release_base(repo_root, args.base)
         merge_base, issues = release_readiness_issues(repo_root, base_ref)
     except RuntimeError as error:
         print(f"Release check could not run: {error}")
@@ -1218,10 +895,6 @@ if __name__ == "__main__":
         sys.exit(run_backup_command(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "restore":
         sys.exit(run_restore_command(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "pr-check":
-        sys.exit(run_pr_check_command(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "pr-clean":
-        sys.exit(run_pr_clean_command(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "release-check":
         sys.exit(run_release_check_command(sys.argv[2:]))
 
@@ -1237,8 +910,6 @@ if __name__ == "__main__":
             "deploy",
             "icons",
             "mutation-contracts",
-            "pr-clean",
-            "pr-check",
             "release-check",
             "restore",
             "test",

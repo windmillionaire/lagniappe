@@ -329,12 +329,12 @@ results. Review the file before committing it: failed results may contain
 diagnostic tracebacks, which must not include credentials, private data, or
 other sensitive output.
 
-Pull-request CI intentionally runs no application tests and receives no GCP,
-Redis, or deployment credentials. Contributors run the necessary tests on
-their own configured infrastructure and commit the updated evidence manifest.
-CI runs Biome, Ruff, repository-wide traceability, changed-source traceability,
-and the generated-artifact PR check. This evidence is trust-based; the
-maintainer reruns the appropriate tests before merging.
+The main release workflow intentionally runs no application tests and receives
+no GCP, Redis, or deployment credentials. The maintainer runs the necessary
+tests on configured infrastructure and commits the updated evidence manifest
+before opening the release pull request. Hosted CI runs Biome, Ruff,
+repository-wide traceability, changed-source traceability, and the release-tree
+check against the exact base commit.
 
 The structural baseline is regenerated as the last E2E test in either a full
 `run.py test e2e` or full `run.py test` invocation. It inventories the data

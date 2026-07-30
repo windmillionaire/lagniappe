@@ -195,8 +195,17 @@ class FormBuilder {
 		this.selectedElement = null;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_table_creation_defaults_columns_for_unsaved_preview
+	 * @features forms form-table
+	 * @dimensions builder-defaults unsaved-preview empty-columns
+	 */
 	createElement(schema) {
 		schema.id = schema.id ?? generateElementId(schema.type);
+		if (schema.type === "table" && !Array.isArray(schema.columns)) {
+			schema.columns = [];
+		}
 		const element = ModelElement[schema.type](schema);
 
 		this.elements.set(schema.id, {

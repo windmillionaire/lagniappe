@@ -1,2 +1,169 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="7a76d765-8e32-429e-a3fd-b2f6225fb328",e._sentryDebugIdIdentifier="sentry-dbid-7a76d765-8e32-429e-a3fd-b2f6225fb328");}catch(e){}}();import{D as n}from"./dropdown.js?v=b583c6e1";import{E as r,r as c}from"./shared.js?v=b583c6e1";import{C as l}from"./core.js?v=b583c6e1";import"./combobox.js?v=b583c6e1";import"./primitives.js?v=b583c6e1";import"./entityMenu.js?v=b583c6e1";import"./results2.js?v=b583c6e1";import"./formatting.js?v=b583c6e1";class m extends l{async init(){if(await super.init(),this.endpoints=r.manual,this.copyResetTimers=new Map,!this.elt)return;this.elt.addEventListener("click",o=>{const e=o.target.closest("[data-role='manual-command-copy']");if(e){o.preventDefault(),this.copyCommand(e);return}const i=o.target.closest("[data-section]");i&&(o.preventDefault(),this.fetchSection(i.dataset.section,!0))}),this._onPopState=o=>{o.state?.manualSection&&this.fetchSection(o.state.manualSection,!1)},window.addEventListener("popstate",this._onPopState);const t=this.elt.querySelector("#manual-nav-button");if(t){const e={items:JSON.parse(t.dataset.sections).map(i=>({name:i.name,icon:i.icon,kind:i.kind,onClick:()=>{this.fetchSection(i.key,!0)}}))};this.mobileDropdown=new n(t).init(e)}}initManual(){return{elt:this.elt}}async copyCommand(t){const o=t.closest("[data-role='manual-command-shell']")?.querySelector("[data-role='manual-command'] code")?.textContent;if(!o)return;let e=!1;try{navigator.clipboard?.writeText&&(await navigator.clipboard.writeText(o),e=!0)}catch{e=!1}if(!e){const a=document.createElement("textarea");a.value=o,a.setAttribute("readonly",""),a.style.position="fixed",a.style.opacity="0",document.body.append(a),a.select();try{e=document.execCommand("copy")}catch{e=!1}a.remove(),t.focus()}const i=this.copyResetTimers.get(t);i&&clearTimeout(i),t.textContent=e?"Copied!":"Copy failed",t.setAttribute("aria-label",e?"Command copied":"Command could not be copied"),this.copyResetTimers.set(t,setTimeout(()=>{t.isConnected&&(t.textContent="Copy",t.setAttribute("aria-label","Copy command")),this.copyResetTimers.delete(t)},2e3))}async fetchSection(t,o){if(this.loading)return;this.loading=!0;const e=await c.get(this.endpoints.section(t));if(e?.html){const i=this.elt.querySelector("[data-role='manual-content']"),a=e.html.querySelector("body");if(a&&i.replaceChildren(a),o){const s=`/manual/${t}`;history.pushState({manualSection:t},"",s)}}this.loading=!1,window.scrollTo({top:0})}destroy(){for(const t of this.copyResetTimers?.values()||[])clearTimeout(t);this.copyResetTimers?.clear(),this._onPopState&&window.removeEventListener("popstate",this._onPopState),this.mobileDropdown?.destroy&&this.mobileDropdown.destroy(),super.destroy()}}export{m as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { D as Dropdown } from './dropdown.js?v=bda9a134';
+import { E as ENDPOINTS, r as request } from './shared.js?v=bda9a134';
+import { C as Core } from './core.js?v=bda9a134';
+import './combobox.js?v=bda9a134';
+import './primitives.js?v=bda9a134';
+import './entityMenu.js?v=bda9a134';
+import './results2.js?v=bda9a134';
+import './formatting.js?v=bda9a134';
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
+ * @features manual
+ * @dimensions section-navigation popstate
+ */
+class Manual extends Core {
+	async init() {
+		await super.init();
+		this.endpoints = ENDPOINTS.manual;
+		this.copyResetTimers = new Map();
+
+		if (!this.elt) return;
+
+		this.elt.addEventListener("click", (e) => {
+			const copyButton = e.target.closest(
+				"[data-role='manual-command-copy']",
+			);
+			if (copyButton) {
+				e.preventDefault();
+				this.copyCommand(copyButton);
+				return;
+			}
+
+			const button = e.target.closest("[data-section]");
+			if (button) {
+				e.preventDefault();
+				this.fetchSection(button.dataset.section, true);
+			}
+		});
+
+		this._onPopState = (e) => {
+			if (e.state?.manualSection) {
+				this.fetchSection(e.state.manualSection, false);
+			}
+		};
+		window.addEventListener("popstate", this._onPopState);
+
+		const mobileNavButton = this.elt.querySelector("#manual-nav-button");
+		if (mobileNavButton) {
+			const sections = JSON.parse(mobileNavButton.dataset.sections);
+			const menu = {
+				items: sections.map((section) => ({
+					name: section.name,
+					icon: section.icon,
+					kind: section.kind,
+					onClick: () => {
+						this.fetchSection(section.key, true);
+					},
+				})),
+			};
+			this.mobileDropdown = new Dropdown(mobileNavButton).init(menu);
+		}
+	}
+
+	initManual() {
+		return { elt: this.elt };
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_installation_commands_are_copyable_and_scroll_on_mobile
+	 * @features manual
+	 * @dimensions command-copy clipboard-fallback
+	 */
+	async copyCommand(button) {
+		const command = button
+			.closest("[data-role='manual-command-shell']")
+			?.querySelector("[data-role='manual-command'] code")?.textContent;
+		if (!command) return;
+
+		let copied = false;
+		try {
+			if (navigator.clipboard?.writeText) {
+				await navigator.clipboard.writeText(command);
+				copied = true;
+			}
+		} catch {
+			copied = false;
+		}
+
+		if (!copied) {
+			const textarea = document.createElement("textarea");
+			textarea.value = command;
+			textarea.setAttribute("readonly", "");
+			textarea.style.position = "fixed";
+			textarea.style.opacity = "0";
+			document.body.append(textarea);
+			textarea.select();
+			try {
+				copied = document.execCommand("copy");
+			} catch {
+				copied = false;
+			}
+			textarea.remove();
+			button.focus();
+		}
+
+		const resetTimer = this.copyResetTimers.get(button);
+		if (resetTimer) clearTimeout(resetTimer);
+		button.textContent = copied ? "Copied!" : "Copy failed";
+		button.setAttribute(
+			"aria-label",
+			copied ? "Command copied" : "Command could not be copied",
+		);
+		this.copyResetTimers.set(
+			button,
+			setTimeout(() => {
+				if (button.isConnected) {
+					button.textContent = "Copy";
+					button.setAttribute("aria-label", "Copy command");
+				}
+				this.copyResetTimers.delete(button);
+			}, 2000),
+		);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
+	 * @features manual
+	 * @dimensions section-navigation popstate
+	 */
+	async fetchSection(key, pushState) {
+		if (this.loading) return;
+		this.loading = true;
+
+		const response = await request.get(this.endpoints.section(key));
+		if (response?.html) {
+			const target = this.elt.querySelector("[data-role='manual-content']");
+			const newTarget = response.html.querySelector("body");
+			if (newTarget) target.replaceChildren(newTarget);
+
+			if (pushState) {
+				const url = `/manual/${key}`;
+				history.pushState({ manualSection: key }, "", url);
+			}
+		}
+
+		this.loading = false;
+		window.scrollTo({ top: 0 });
+	}
+
+	destroy() {
+		for (const timer of this.copyResetTimers?.values() || []) {
+			clearTimeout(timer);
+		}
+		this.copyResetTimers?.clear();
+		if (this._onPopState) {
+			window.removeEventListener("popstate", this._onPopState);
+		}
+		if (this.mobileDropdown?.destroy) {
+			this.mobileDropdown.destroy();
+		}
+		super.destroy();
+	}
+}
+
+export { Manual as default };

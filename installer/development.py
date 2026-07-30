@@ -209,6 +209,4 @@ def setup_development():
     print(f"Run backend tests: {python_command('run.py', 'test', 'unit')}")
     print(f"Run frontend tests: {python_command('run.py', 'test', 'js')}")
     print(f"Run browser tests: {python_command('run.py', 'test', 'e2e')}")
-    print(f"Optional PR cleanup: {python_command('run.py', 'pr-clean')}")
-    print(f"Before opening a PR: {python_command('run.py', 'pr-check')}")
     return 0

@@ -1,17 +1,15 @@
-name: Pull request quality
+name: Main release
 
 on:
   pull_request:
     branches:
       - main
-      - "next/**"
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: pr-quality-${{ github.event.pull_request.number || github.ref }}
+  group: main-release-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
@@ -20,10 +18,22 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
-      PR_BASE_REF: ${{ github.event.pull_request.base.sha || github.sha }}
+      RELEASE_BASE_REF: ${{ github.event.pull_request.base.sha }}
 
     steps:
-      - name: Check out the prospective change
+      - name: Check release branch
+        env:
+          RELEASE_HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          case "$RELEASE_HEAD_BRANCH" in
+            next/*|hotfix/*) ;;
+            *)
+              echo "Pull requests to main must come from next/* or hotfix/*."
+              exit 1
+              ;;
+          esac
+
+      - name: Check out the prospective release
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -69,29 +79,11 @@ jobs:
       - name: Check changed-source test evidence
         run: >-
           venv/bin/python run.py traceability
-          --changed "$PR_BASE_REF"
+          --changed "$RELEASE_BASE_REF"
           --check
           --fail-on warning
           --no-report
           --no-manifest
 
-      - name: Check contributor artifact boundaries
-        if: github.event_name == 'pull_request' && startsWith(github.base_ref, 'next/')
-        run: venv/bin/python run.py pr-check --base "$PR_BASE_REF"
-
-      - name: Check release branch name
-        if: github.event_name == 'pull_request' && github.base_ref == 'main'
-        env:
-          PR_HEAD_BRANCH: ${{ github.head_ref }}
-        run: |
-          case "$PR_HEAD_BRANCH" in
-            next/*|hotfix/*) ;;
-            *)
-              echo "Pull requests to main must come from next/* or hotfix/*."
-              exit 1
-              ;;
-          esac
-
       - name: Check complete release tree
-        if: github.event_name == 'pull_request' && github.base_ref == 'main'
-        run: venv/bin/python run.py release-check --base "$PR_BASE_REF"
+        run: venv/bin/python run.py release-check --base "$RELEASE_BASE_REF"

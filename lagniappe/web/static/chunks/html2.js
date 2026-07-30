@@ -1,2 +1,46 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="124886e2-2806-4497-a6cf-8eab1cf48910",e._sentryDebugIdIdentifier="sentry-dbid-124886e2-2806-4497-a6cf-8eab1cf48910");}catch(e){}}();import{r as s,E as m}from"./shared.js?v=b583c6e1";import{B as n}from"./baseElement.js?v=b583c6e1";import"./primitives.js?v=b583c6e1";class h extends n{constructor(t,e,r){super(t,e,r),this.static=!0,this.html=null}async _getHtml(){return await s.get(m.html(this.renderer.form.key,this.schema.id).getContent).then(t=>t.markup).catch(t=>{captureError(t,this.renderer.form.target,{schema:this.schema})})}create(){if(this._elt)return this._elt;const t=document.createElement("div");return t.className="html-content",this.html?t.innerHTML=this.html:this._getHtml().then(e=>{this.html=e,t.innerHTML=e}),t}}export{h as HtmlElement};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request, E as ENDPOINTS } from './shared.js?v=bda9a134';
+import { B as BaseElement } from './baseElement.js?v=bda9a134';
+import './primitives.js?v=bda9a134';
+
+/**
+ * @testable infrastructure
+ */
+class HtmlElement extends BaseElement {
+	constructor(renderer, schema, submission) {
+		super(renderer, schema, submission);
+		this.static = true;
+		this.html = null;
+	}
+
+	async _getHtml() {
+		return await request
+			.get(ENDPOINTS.html(this.renderer.form.key, this.schema.id).getContent)
+			.then((response) => response.markup)
+			.catch((error) => {
+				captureError(error, this.renderer.form.target, {
+					schema: this.schema,
+				});
+			});
+	}
+
+	create() {
+		if (this._elt) return this._elt;
+
+		const elt = document.createElement("div");
+		elt.className = "html-content";
+
+		if (!this.html) {
+			this._getHtml().then((html) => {
+				this.html = html;
+				elt.innerHTML = html;
+			});
+		} else {
+			elt.innerHTML = this.html;
+		}
+
+		return elt;
+	}
+}
+
+export { HtmlElement };

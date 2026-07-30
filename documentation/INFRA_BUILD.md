@@ -27,31 +27,20 @@ tracked. Do not edit static bundles directly. After source changes that need to
 ship generated assets, run `npm run dev` or `npm run build` in an intentional
 build-output pass.
 
-### Pull request ownership
+### Release output
 
-Tracked generated output is maintainer-owned. Contributor PRs contain authored
-source only and target the active `next/<version>` branch, even when
-contributors build locally for testing.
-`venv/bin/python run.py pr-clean` restores disposable build output to the PR
-merge base, removes untracked build files, and restores only `BUILD_ID`.
-Pass `--keep-build` to remove generated paths only from Git's prospective
-commit/index while leaving the local build available for testing.
-`venv/bin/python run.py pr-check` compares that prospective commit with
-an explicit `--base origin/next/<version>` and rejects changes under
-`lagniappe/web/static/`, generated Python style maps, installation-local
-`config/files/`, the generated root `lagniappe.yaml` and `index.yaml`, and
-build-only `BUILD_ID` churn. Unstaged and untracked local generated files are
-not PR content and are ignored. The commands retain their `origin/main`,
-then `main`, fallback for exceptional use, but a normal source PR should name
-its exact target.
+Development is committed directly to the active `next/<version>` branch.
+Development builds may update tracked generated files locally, and the branch's
+committed output may continue to describe the preceding release until the tree
+is frozen. `next/*` is not an installer channel.
 
-The maintainer squash-merges accepted source PRs into `next/*` without
-committing their local builds. At release freeze, the maintainer runs one
-canonical `npm ci` and `npm run build`, commits the fresh output to `next/*`,
-and runs `venv/bin/python run.py release-check --base origin/main`. The
-complete branch is installer-tested before its release PR is squash-merged
-into `main`. CI therefore forbids build output in source PRs to `next/*` and
-requires it in release or hotfix PRs to `main`.
+At release freeze, the maintainer runs one canonical `npm ci` and
+`npm run build`, commits the fresh output, and runs
+`venv/bin/python run.py release-check --base origin/main`. The complete
+`next/*` or `hotfix/*` branch is installer-tested before its release pull
+request is squash-merged into `main`. The main-only workflow requires the
+committed metadata to identify a production build; a later development build
+cannot pass the release gate.
 
 When `SENTRY_AUTH_TOKEN` is configured, production JavaScript source maps are
 generated as hidden Rollup outputs, uploaded to Sentry, then deleted from

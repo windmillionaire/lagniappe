@@ -380,31 +380,16 @@ authentication browser. During initialization, human ADC is wrapped in the
 runtime credential. Flask then starts in debug mode on the configured port with
 `FLASK_ENV=development`.
 
-### Pull Request Preparation (`run.py`)
+### Release Preparation (`run.py`)
 
-`venv/bin/python run.py pr-clean [--base REF]` restores disposable static
-frontend output and generated Python style maps to the PR merge base, removing
-both tracked modifications and untracked build files from the working tree. It
-removes `config/files/` content and the root `lagniappe.yaml` and `index.yaml`
-only from Git's prospective commit/index, leaving that local installation
-configuration in place. It restores only the `BUILD_ID` line in
-`config/constants.py`, preserving other constants changes. Pass `--keep-build`
-to retain disposable build output locally while removing it from the index.
-
-`venv/bin/python run.py pr-check [--base REF]` is the validation-only
-contributor gate. It computes the Git merge base and rejects those generated
-artifacts when they are present in the prospective commit/index. It ignores
-unstaged and untracked generated files because they cannot be part of the PR
-until staged. Normal contributor PRs target the active `next/<version>` branch
-and pass that exact ref with `--base`.
-
-`venv/bin/python run.py release-check [--base REF]` is the complementary
-release gate for a prepared `next/*` or `hotfix/*` PR to `main`. It rejects
-installation-local files, requires a fresh build metadata file, service
-worker, and `BUILD_ID`, and verifies that the package, package-lock, build
-metadata, and release note use one stable `X.Y.Z` version. The maintainer runs
-one canonical production build after the release tree is frozen; the complete
-branch is installer-tested before it is squash-merged into `main`.
+`venv/bin/python run.py release-check [--base REF]` validates a prepared
+`next/*` or `hotfix/*` tree before it enters `main`. It compares the prospective
+commit with the exact release base, rejects installation-local files, requires
+a fresh production build metadata file, service worker, and `BUILD_ID`, and
+verifies that the package, package lock, build metadata, and release note use
+one stable `X.Y.Z` version. The maintainer runs one canonical production build
+after the release tree is frozen; the complete branch is installer-tested
+before its main pull request is squash-merged.
 
 ### Deployment (`runner/deploy.py`)
 

@@ -32,7 +32,6 @@ venv/
 /src/
 /testing/
 /README.md
-/CONTRIBUTING.md
 /LICENSE
 /run.py
 /AGENTS.md

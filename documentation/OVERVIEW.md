@@ -2,8 +2,7 @@
 
 All project documentation lives in `documentation/`. This page is the index.
 
-For installation and local setup, see the [README](../README.md). For
-contribution expectations, see [CONTRIBUTING.md](../CONTRIBUTING.md).
+For installation and local setup, see the [README](../README.md).
 
 ## Architecture and core concepts
 
@@ -86,7 +85,7 @@ Build, configuration, installation, and test workflows.
 | Work on durable background jobs | [AI_PIPELINE](AI_PIPELINE.md), [BACKEND_ENTITIES](BACKEND_ENTITIES.md), [BACKEND_TOOLS](BACKEND_TOOLS.md) | `lagniappe/core/tools/deferred_jobs.py`, `lagniappe/core/tools/task_queue.py`, `lagniappe/web/routes/process/` |
 | Author a template | [FRONTEND_NAVIGATION](FRONTEND_NAVIGATION.md), [BACKEND_WEB](BACKEND_WEB.md) | `lagniappe/web/templates/` |
 | Build the frontend | [INFRA_BUILD](INFRA_BUILD.md) | `build/rollup.config.mjs`, `build/utility.mjs` |
-| Prepare a pull request | [CONTRIBUTING](../CONTRIBUTING.md) | `.github/workflows/ci.yml`, `run.py` |
+| Prepare a release | [INFRA_BUILD](INFRA_BUILD.md), [INFRA_CONFIG](INFRA_CONFIG.md) | `.github/workflows/release.yml`, `run.py` |
 | Deploy the app | [INFRA_CONFIG](INFRA_CONFIG.md) | `runner/deploy.py` |
 | Set up a new instance | [INFRA_SETUP](INFRA_SETUP.md) | `setup.sh`, `setup.cmd`, `installer/` |
 | Back up or restore production data | [INFRA_SETUP](INFRA_SETUP.md#disaster-recovery-backups), [INFRA_CONFIG](INFRA_CONFIG.md#data-disaster-recovery-runpy) | `runner/data_recovery.py`, `run.py` |

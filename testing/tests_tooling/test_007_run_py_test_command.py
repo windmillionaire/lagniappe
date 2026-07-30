@@ -8,6 +8,7 @@ import sys
 import types
 
 import pytest
+import yaml
 
 import run
 from testing.utility import traceability_common, traceability_results
@@ -110,7 +111,7 @@ def test_behavior_snapshot_excludes_tracked_test_evidence(monkeypatch, tmp_path)
     source = tmp_path / "src/example.py"
     source.parent.mkdir(parents=True)
     source.write_text("VALUE = 1\n")
-    workflow = tmp_path / ".github/workflows/ci.yml"
+    workflow = tmp_path / ".github/workflows/release.yml"
     workflow.parent.mkdir(parents=True)
     workflow.write_text("name: CI\n")
     evidence = tmp_path / traceability_common.LATEST_TEST_RUN
@@ -120,7 +121,7 @@ def test_behavior_snapshot_excludes_tracked_test_evidence(monkeypatch, tmp_path)
     def fake_git(repo_root, *args, **kwargs):
         del repo_root, kwargs
         stdout = (
-            b".github/workflows/ci.yml\0"
+            b".github/workflows/release.yml\0"
             b"src/example.py\0"
             b"testing/evidence/latest.json\0"
             if args == ("ls-files", "-z")
@@ -133,7 +134,7 @@ def test_behavior_snapshot_excludes_tracked_test_evidence(monkeypatch, tmp_path)
     fingerprints = traceability_common.behavior_path_fingerprints(tmp_path)
 
     assert "src/example.py" in fingerprints
-    assert ".github/workflows/ci.yml" not in fingerprints
+    assert ".github/workflows/release.yml" not in fingerprints
     assert "testing/evidence/latest.json" not in fingerprints
 
 
@@ -1363,12 +1364,12 @@ def _git(repo: Path, *args: str):
     )
 
 
-def _pr_check_repository(tmp_path: Path) -> Path:
+def _release_check_repository(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "-b", "main")
-    _git(repo, "config", "user.name", "PR Check Test")
-    _git(repo, "config", "user.email", "pr-check@example.test")
+    _git(repo, "config", "user.name", "Release Check Test")
+    _git(repo, "config", "user.email", "release-check@example.test")
 
     files = {
         ".gitignore": "config/files/\nlagniappe.yaml\nindex.yaml\n",
@@ -1415,75 +1416,16 @@ def _pr_check_repository(tmp_path: Path) -> Path:
 
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "Base")
-    _git(repo, "switch", "-c", "feature")
+    _git(repo, "switch", "-c", "next/0.2.0")
     return repo
 
 
-def test_run_py_pr_check_allows_authored_source_only(tmp_path):
-    repo = _pr_check_repository(tmp_path)
-    source = repo / "src/script/example.mjs"
-    source.write_text("export const value = 2;\n", encoding="utf-8")
-    _git(repo, "add", str(source.relative_to(repo)))
-    _git(repo, "commit", "-m", "Change source")
-
-    result = subprocess.run(
-        [sys.executable, str(repo / "run.py"), "pr-check"],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    assert result.returncode == 0
-    assert "check passed against main" in result.stdout
-
-
-def test_run_py_pr_check_rejects_committed_static_output(tmp_path, capsys):
-    repo = _pr_check_repository(tmp_path)
-    static = repo / "lagniappe/web/static/script.js"
-    static.write_text("contributor-build\n", encoding="utf-8")
-    _git(repo, "add", str(static.relative_to(repo)))
-    _git(repo, "commit", "-m", "Commit contributor build")
-
-    assert run.run_pr_check_command(["--base", "main"], repo_root=repo) == 1
-    output = capsys.readouterr().out
-    assert "lagniappe/web/static/script.js" in output
-    assert "active next/* branch is prepared for release" in output
-
-
-def test_run_py_pr_check_rejects_build_id_and_staged_generated_files(
-    tmp_path, capsys
+def _write_release_candidate(
+    repo: Path,
+    *,
+    mode: str = "production",
+    build_id: str = "b1234567",
 ):
-    repo = _pr_check_repository(tmp_path)
-    constants = repo / "config/constants.py"
-    constants.write_text(
-        'SENTRY_DSN = "test"\nBUILD_ID = "contributor-build"\n',
-        encoding="utf-8",
-    )
-    icons = repo / "lagniappe/web/start/styles/icons.py"
-    icons.write_text('ICONS = {"changed": True}\n', encoding="utf-8")
-    _git(repo, "add", str(icons.relative_to(repo)))
-    chunk = repo / "lagniappe/web/static/chunks/contributor.js"
-    chunk.parent.mkdir(parents=True)
-    chunk.write_text("untracked chunk\n", encoding="utf-8")
-    _git(
-        repo,
-        "add",
-        str(constants.relative_to(repo)),
-        str(chunk.relative_to(repo)),
-    )
-
-    assert run.run_pr_check_command(["--base", "main"], repo_root=repo) == 1
-    output = capsys.readouterr().out
-    assert "config/constants.py (BUILD_ID)" in output
-    assert "lagniappe/web/start/styles/icons.py" in output
-    assert "lagniappe/web/static/chunks/contributor.js" in output
-
-
-# @features release
-# @dimensions delivery-tree
-def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
-    repo = _pr_check_repository(tmp_path)
-    build_id = "b1234567"
     updates = {
         "package.json": '{"name": "lagniappe", "version": "0.2.0"}\n',
         "package-lock.json": (
@@ -1491,10 +1433,10 @@ def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
             '"packages": {"": {"name": "lagniappe", "version": "0.2.0"}}}\n'
         ),
         "documentation/releases/0.2.0.md": (
-            "# Version 0.2.0\n\n- Added the release-train workflow.\n"
+            "# Version 0.2.0\n\n- Added the release workflow.\n"
         ),
         "lagniappe/web/static/build.json": (
-            f'{{"build_id": "{build_id}", "mode": "production", '
+            f'{{"build_id": "{build_id}", "mode": "{mode}", '
             f'"version": "0.2.0"}}\n'
         ),
         "lagniappe/web/static/sw.js": f'const BUILD_ID = "{build_id}";\n',
@@ -1508,6 +1450,35 @@ def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
         path.write_text(content, encoding="utf-8")
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "Prepare release")
+
+
+def test_main_release_workflow_contract():
+    workflow_path = Path(run.__file__).parent / ".github/workflows/release.yml"
+    workflow_text = workflow_path.read_text(encoding="utf-8")
+    workflow = yaml.load(workflow_text, Loader=yaml.BaseLoader)
+
+    assert workflow["name"] == "Main release"
+    assert workflow["on"] == {"pull_request": {"branches": ["main"]}}
+    assert workflow["permissions"] == {"contents": "read"}
+    assert list(workflow["jobs"]) == ["quality"]
+    assert workflow["jobs"]["quality"]["name"] == "Source quality and traceability"
+    assert "workflow_dispatch" not in workflow_text
+    assert '"next/**"' not in workflow_text
+    assert "next/*|hotfix/*" in workflow_text
+    assert "npm run check" in workflow_text
+    assert "ruff check ." in workflow_text
+    assert workflow_text.count("run.py traceability") == 2
+    assert '--changed "$RELEASE_BASE_REF"' in workflow_text
+    assert 'release-check --base "$RELEASE_BASE_REF"' in workflow_text
+    assert "pr-check" not in workflow_text
+    assert "pr-clean" not in workflow_text
+
+
+# @features release
+# @dimensions delivery-tree
+def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
+    repo = _release_check_repository(tmp_path)
+    _write_release_candidate(repo)
 
     assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 0
     (repo / "lagniappe/web/static/build.json").write_text(
@@ -1535,9 +1506,22 @@ def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
 
 
 # @features release
+# @dimensions delivery-tree build-mode
+def test_run_py_release_check_rejects_development_build(tmp_path, capsys):
+    repo = _release_check_repository(tmp_path)
+    _write_release_candidate(repo, mode="development")
+
+    assert run.run_release_check_command(["--base", "main"], repo_root=repo) == 1
+    output = capsys.readouterr().out
+    assert "must identify a production build" in output
+    assert "was not changed by a fresh production build" not in output
+    assert "does not contain a newly generated BUILD_ID" not in output
+
+
+# @features release
 # @dimensions delivery-tree
 def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
-    repo = _pr_check_repository(tmp_path)
+    repo = _release_check_repository(tmp_path)
     (repo / "package.json").write_text(
         '{"name": "lagniappe", "version": "0.2"}\n',
         encoding="utf-8",
@@ -1561,136 +1545,6 @@ def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
     assert "was not changed by a fresh production build" in output
     assert "does not contain a newly generated BUILD_ID" in output
     assert "must identify a production build" in output
-
-
-def test_run_py_pr_clean_restores_generated_output_and_keeps_authored_changes(
-    tmp_path, capsys
-):
-    repo = _pr_check_repository(tmp_path)
-    source = repo / "src/script/example.mjs"
-    source.write_text("export const value = 2;\n", encoding="utf-8")
-    static = repo / "lagniappe/web/static/script.js"
-    static.write_text("contributor-build\n", encoding="utf-8")
-    icons = repo / "lagniappe/web/start/styles/icons.py"
-    icons.write_text('ICONS = {"changed": True}\n', encoding="utf-8")
-    chunk = repo / "lagniappe/web/static/chunks/contributor.js"
-    chunk.parent.mkdir(parents=True)
-    chunk.write_text("local generated chunk\n", encoding="utf-8")
-    constants = repo / "config/constants.py"
-    constants.write_text(
-        'SENTRY_DSN = "test"\n'
-        'BUILD_ID = "contributor-build"\n'
-        "FEATURE_FLAG = True\n",
-        encoding="utf-8",
-    )
-    _git(repo, "add", ".")
-
-    assert run.run_pr_clean_command(["--base", "main"], repo_root=repo) == 0
-
-    assert static.read_text(encoding="utf-8") == "built-main\n"
-    assert icons.read_text(encoding="utf-8") == "ICONS = {}\n"
-    assert not chunk.exists()
-    assert constants.read_text(encoding="utf-8") == (
-        'SENTRY_DSN = "test"\nBUILD_ID = "base1234"\nFEATURE_FLAG = True\n'
-    )
-
-    staged = set(_git(repo, "diff", "--cached", "--name-only", "main").stdout.split())
-    assert "src/script/example.mjs" in staged
-    assert "config/constants.py" in staged
-    assert "lagniappe/web/static/script.js" not in staged
-    assert "lagniappe/web/static/chunks/contributor.js" not in staged
-    assert "lagniappe/web/start/styles/icons.py" not in staged
-    assert run.run_pr_check_command(["--base", "main"], repo_root=repo) == 0
-    assert "Restored generated artifacts" in capsys.readouterr().out
-
-
-def test_run_py_pr_clean_restores_unstaged_generated_worktree(tmp_path, capsys):
-    repo = _pr_check_repository(tmp_path)
-    source = repo / "src/script/example.mjs"
-    source.write_text("export const value = 2;\n", encoding="utf-8")
-    static = repo / "lagniappe/web/static/script.js"
-    static.write_text("local development build\n", encoding="utf-8")
-    chunk = repo / "lagniappe/web/static/chunks/local-only.js"
-    chunk.parent.mkdir(parents=True)
-    chunk.write_text("local generated chunk\n", encoding="utf-8")
-
-    assert run.run_pr_clean_command(["--base", "main"], repo_root=repo) == 0
-
-    assert source.read_text(encoding="utf-8") == "export const value = 2;\n"
-    assert static.read_text(encoding="utf-8") == "built-main\n"
-    assert not chunk.exists()
-    changed = _git(repo, "status", "--short").stdout.splitlines()
-    assert changed == [" M src/script/example.mjs"]
-    output = capsys.readouterr().out
-    assert "lagniappe/web/static/script.js" in output
-    assert "lagniappe/web/static/chunks/local-only.js" in output
-
-
-def test_run_py_pr_clean_keep_build_only_cleans_index(tmp_path, capsys):
-    repo = _pr_check_repository(tmp_path)
-    static = repo / "lagniappe/web/static/script.js"
-    static.write_text("local development build\n", encoding="utf-8")
-    _git(repo, "add", str(static.relative_to(repo)))
-
-    assert (
-        run.run_pr_clean_command(
-            ["--base", "main", "--keep-build"],
-            repo_root=repo,
-        )
-        == 0
-    )
-
-    assert static.read_text(encoding="utf-8") == "local development build\n"
-    assert _git(repo, "diff", "--cached", "--name-only").stdout == ""
-    assert "remain in the working tree" in capsys.readouterr().out
-
-
-def test_run_py_pr_clean_stages_reversal_of_committed_generated_output(
-    tmp_path, capsys
-):
-    repo = _pr_check_repository(tmp_path)
-    static = repo / "lagniappe/web/static/script.js"
-    static.write_text("committed-contributor-build\n", encoding="utf-8")
-    _git(repo, "add", str(static.relative_to(repo)))
-    _git(repo, "commit", "-m", "Commit contributor build")
-
-    assert run.run_pr_clean_command(["--base", "main"], repo_root=repo) == 0
-
-    assert static.read_text(encoding="utf-8") == "built-main\n"
-    staged = _git(repo, "diff", "--cached", "--name-only").stdout.splitlines()
-    assert staged == ["lagniappe/web/static/script.js"]
-    assert run.run_pr_check_command(["--base", "main"], repo_root=repo) == 0
-    assert "commit the staged cleanup before pushing" in capsys.readouterr().out
-
-
-def test_run_py_pr_check_and_clean_exclude_installation_config(tmp_path, capsys):
-    repo = _pr_check_repository(tmp_path)
-    installation_files = {
-        "config/files/lagniappe_settings.yaml": "SECRET_KEY: local-secret\n",
-        "config/files/lagniappe_dev.yaml": "SERVER_PORT: 5050\n",
-        "lagniappe.yaml": "runtime: python314\n",
-        "index.yaml": "indexes: []\n",
-    }
-    for relative, content in installation_files.items():
-        path = repo / relative
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
-    _git(repo, "add", "-f", *installation_files)
-
-    assert run.run_pr_check_command(["--base", "main"], repo_root=repo) == 1
-    failed_output = capsys.readouterr().out
-    for relative in installation_files:
-        assert relative in failed_output
-
-    assert run.run_pr_clean_command(["--base", "main"], repo_root=repo) == 0
-    cleaned_output = capsys.readouterr().out
-    for relative, content in installation_files.items():
-        assert relative in cleaned_output
-        assert (repo / relative).read_text(encoding="utf-8") == content
-
-    staged = _git(repo, "diff", "--cached", "--name-only", "main").stdout
-    assert staged == ""
-    assert run.run_pr_check_command(["--base", "main"], repo_root=repo) == 0
 
 
 def test_run_py_version_note_appends_concise_release_entry(monkeypatch, tmp_path, capsys):

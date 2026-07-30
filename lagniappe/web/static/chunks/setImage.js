@@ -1,2 +1,63 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="9fc502b4-ed34-4bbc-b093-3dc725c4a9e6",e._sentryDebugIdIdentifier="sentry-dbid-9fc502b4-ed34-4bbc-b093-3dc725c4a9e6");}catch(e){}}();import{S as s}from"./shared.js?v=b583c6e1";import{I as r}from"./toolbar.js?v=b583c6e1";import{ToolbarButton as l}from"./toolbarButtons.js?v=b583c6e1";import"./combobox.js?v=b583c6e1";import"./primitives.js?v=b583c6e1";import"./dropdown.js?v=b583c6e1";class m{constructor(t){this.toolbar=t,this.name="setImage",this.usedWithEditor=!0,this.active=!1,this.toggles={},this.imagePosition=null}init(){const t=this.toolbar.element.appendChild(document.createElement("div"));t.dataset.option=this.name,t.dataset.position="false",t.className=`${s.editor.toolbar.imageSettings}`,r.forEach((o,i)=>{const n=t.appendChild(document.createElement("div"));if(n.className=`${s.editor.toolbar.tools}`,o.forEach(a=>{const e=new l(this.toolbar);e.init(a),e.onClick=()=>this.toggleOption(e),this.toggles[e.name]=e,e.name&&(this.toolbar.options[e.name]=e),n.appendChild(e.button)}),i<r.length-1){const a=document.createElement("div");a.className=`${s.editor.toolbar.divider}`,t.appendChild(a)}})}toggleOption(t){const o=Object.values(this.toggles).find(i=>i.active&&i.name);t.active=!t.active,t.active?t.enable():t.disable(),o?.disable(),this.toolbar.editor.chain()[t.command](t.args).run()}}export{m as setImage};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES } from './shared.js?v=bda9a134';
+import { I as IMAGE_GROUPS } from './toolbar.js?v=bda9a134';
+import { ToolbarButton } from './toolbarButtons.js?v=bda9a134';
+import './combobox.js?v=bda9a134';
+import './primitives.js?v=bda9a134';
+import './dropdown.js?v=bda9a134';
+
+/**
+ * @testable infrastructure
+ */
+class ImageOptions {
+	constructor(toolbar) {
+		this.toolbar = toolbar;
+		this.name = "setImage";
+		this.usedWithEditor = true;
+		this.active = false;
+		this.toggles = {};
+		this.imagePosition = null;
+	}
+
+	init() {
+		const imageSettings = this.toolbar.element.appendChild(
+			document.createElement("div"),
+		);
+		imageSettings.dataset.option = this.name;
+		imageSettings.dataset.position = "false";
+		imageSettings.className = `${STYLES.editor.toolbar.imageSettings}`;
+
+		IMAGE_GROUPS.forEach((group, index) => {
+			const wrapper = imageSettings.appendChild(document.createElement("div"));
+			wrapper.className = `${STYLES.editor.toolbar.tools}`;
+			group.forEach((settings) => {
+				const option = new ToolbarButton(this.toolbar);
+				option.init(settings);
+				option.onClick = () => this.toggleOption(option);
+				this.toggles[option.name] = option;
+				if (option.name) {
+					this.toolbar.options[option.name] = option;
+				}
+				wrapper.appendChild(option.button);
+			});
+			if (index < IMAGE_GROUPS.length - 1) {
+				const divider = document.createElement("div");
+				divider.className = `${STYLES.editor.toolbar.divider}`;
+				imageSettings.appendChild(divider);
+			}
+		});
+	}
+
+	toggleOption(option) {
+		const currentOption = Object.values(this.toggles).find(
+			(toggle) => toggle.active && toggle.name,
+		);
+		option.active = !option.active;
+		option.active ? option.enable() : option.disable();
+		currentOption?.disable();
+
+		this.toolbar.editor.chain()[option.command](option.args).run();
+	}
+}
+
+export { ImageOptions as setImage };

@@ -1,2 +1,141 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="b1bb32ce-60d1-4583-82de-cdbac48191bf",e._sentryDebugIdIdentifier="sentry-dbid-b1bb32ce-60d1-4583-82de-cdbac48191bf");}catch(e){}}();import{E as d,k as u,r as o}from"./shared.js?v=b583c6e1";import{C as p}from"./combobox.js?v=b583c6e1";import{R as m}from"./results2.js?v=b583c6e1";import{S as f}from"./submitter.js?v=b583c6e1";class x extends f(p){constructor(e,r={}){super(e),this.endpoint=d.facet(this.index),this.indexArgs=r;const i=this.formType;i&&(this.indexArgs["form-type"]=i),this.includeUsers==="false"&&(this.indexArgs["include-users"]="false"),this.permission&&(this.indexArgs.permission=this.permission);let t=this.index;i?t=`${this.index}-${i}`:this.indexArgs.models===!1&&(t=`${this.index}-no-models`),this.results=new m(t),this._searchSequence=0,this._input=this._input.bind(this)}init(){this.element.addEventListener("input",u(this._input,200)),super.init()}_input(e){this._search(e.target.value.trim())}elementClick(e){super.elementClick(e),this.showPanel()}selectOption(e){if(e.dataset.command==="create"){this._createOption(e);return}e.dataset.id&&(super.selectOption(e),this.results.save(e))}get selectedOptions(){return this.options.filter(e=>this.values.has(e.id))}async _search(e){const r=++this._searchSequence,i=this.options.filter(s=>this.values.has(s.id)).map(s=>s.hash),t=new URLSearchParams;t.set("q",e),this.creatable==="true"&&t.set("creatable","true"),Object.entries(this.indexArgs).forEach(([s,n])=>{t.set(s,n)}),i.forEach(s=>{t.append("preload",s)});const a=await o.get(this.endpoint,t);if(!(r!==this._searchSequence||e!==this.element.value.trim())){if(a.ok){const s=a.results||null;this.updatePanel(s)}this.showPanel()}}async _createOption(e){this._searchSequence++;const r=this.selectedOptions,i=new FormData;i.set("name",e.dataset.name||this.element.value.trim()),Object.entries(this.indexArgs).forEach(([n,h])=>{i.set(n,h)});const t=await o.post(`${this.endpoint}/create`,i);if(!t.ok)return;let a=t.results||null;this.multiple&&t.option&&(a=this.results.create([...r,t.option].filter((n,h,l)=>n?.id&&l.findIndex(c=>c?.id===n.id)===h))),this.updatePanel(a);const s=[...this.panel?.querySelectorAll("[role='option'][data-id]")||[]].find(n=>n.dataset.id===t.option?.id);s&&(super.selectOption(s),this.results.save(s))}}export{x as F};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { E as ENDPOINTS, k as debounce, r as request } from './shared.js?v=bda9a134';
+import { C as Combobox } from './combobox.js?v=bda9a134';
+import { R as Results } from './results2.js?v=bda9a134';
+import { S as Submitter } from './submitter.js?v=bda9a134';
+
+/**
+ * @testable infrastructure
+ */
+class FacetsBox extends Submitter(Combobox) {
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002k_home_pages.py::test_home_page_create_visible_for_category_editor
+	 * @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_user_assign_search_permission_filter_returns_assignable_users
+	 * @features combobox
+	 * @dimensions permission-filter
+	 */
+	constructor(element, args = {}) {
+		super(element);
+		this.endpoint = ENDPOINTS.facet(this.index);
+		this.indexArgs = args;
+
+		const formType = this.formType;
+		if (formType) {
+			this.indexArgs["form-type"] = formType;
+		}
+		if (this.includeUsers === "false") {
+			this.indexArgs["include-users"] = "false";
+		}
+		if (this.permission) {
+			this.indexArgs.permission = this.permission;
+		}
+
+		let index = this.index;
+		if (formType) {
+			index = `${this.index}-${formType}`;
+		} else if (this.indexArgs.models === false) {
+			index = `${this.index}-no-models`;
+		}
+		this.results = new Results(index);
+		this._searchSequence = 0;
+
+		this._input = this._input.bind(this);
+	}
+
+	init() {
+		this.element.addEventListener("input", debounce(this._input, 200));
+
+		super.init();
+	}
+
+	_input(event) {
+		this._search(event.target.value.trim());
+	}
+
+	elementClick(event) {
+		super.elementClick(event);
+		this.showPanel();
+	}
+
+	selectOption(option) {
+		if (option.dataset.command === "create") {
+			this._createOption(option);
+			return;
+		}
+		if (!option.dataset.id) return;
+
+		super.selectOption(option);
+		this.results.save(option);
+	}
+
+	get selectedOptions() {
+		return this.options.filter((o) => this.values.has(o.id));
+	}
+
+	async _search(query) {
+		const searchSequence = ++this._searchSequence;
+		const selectedHashes = this.options
+			.filter((o) => this.values.has(o.id))
+			.map((o) => o.hash);
+
+		const params = new URLSearchParams();
+		params.set("q", query);
+		if (this.creatable === "true") {
+			params.set("creatable", "true");
+		}
+		Object.entries(this.indexArgs).forEach(([key, value]) => {
+			params.set(key, value);
+		});
+		selectedHashes.forEach((hash) => {
+			params.append("preload", hash);
+		});
+
+		const response = await request.get(this.endpoint, params);
+		if (
+			searchSequence !== this._searchSequence ||
+			query !== this.element.value.trim()
+		) {
+			return;
+		}
+		if (response.ok) {
+			const html = response.results || null;
+			this.updatePanel(html);
+		}
+		this.showPanel();
+	}
+
+	async _createOption(option) {
+		this._searchSequence++;
+		const selectedOptions = this.selectedOptions;
+		const data = new FormData();
+		data.set("name", option.dataset.name || this.element.value.trim());
+		Object.entries(this.indexArgs).forEach(([key, value]) => {
+			data.set(key, value);
+		});
+
+		const response = await request.post(`${this.endpoint}/create`, data);
+		if (!response.ok) return;
+
+		let html = response.results || null;
+		if (this.multiple && response.option) {
+			html = this.results.create(
+				[...selectedOptions, response.option].filter(
+					(item, index, items) =>
+						item?.id && items.findIndex((i) => i?.id === item.id) === index,
+				),
+			);
+		}
+
+		this.updatePanel(html);
+		const created = [
+			...(this.panel?.querySelectorAll("[role='option'][data-id]") || []),
+		].find((item) => item.dataset.id === response.option?.id);
+		if (!created) return;
+
+		super.selectOption(created);
+		this.results.save(created);
+	}
+}
+
+export { FacetsBox as F };

@@ -51,8 +51,8 @@ check; use the dedicated template command for exhaustive selector evidence.
 
 Tests run through `run.py test` automatically record outcomes in
 `testing/evidence/latest.json`. This tracked manifest is the repository's
-reviewable evidence that contributors ran the relevant tests on their own
-configured infrastructure. It keeps only the most recent result
+reviewable evidence that the maintainer ran the relevant tests on configured
+infrastructure. It keeps only the most recent result
 for each exact test nodeid and only the newest pytest session's invocation
 metadata. Separate focused results are merged even when the working tree
 changes. Failed results also record `failed_phase` and a bounded pytest
@@ -66,10 +66,11 @@ implementation or template does.
 
 The manifest is excluded from its own behavior snapshot, so recording a test
 result does not immediately make that result stale. GitHub workflow files are
-also excluded because they do not change application behavior. Pull-request CI
+also excluded because they do not change application behavior. Main release CI
 does not execute the application test suites or use private infrastructure. It
-checks the tracked evidence against the changed source and templates;
-maintainers still rerun tests before merging.
+checks the tracked evidence against the changed source and templates; the
+maintainer completes application and installer testing before opening the
+release pull request.
 
 Test-evidence provenance records the command, generation time, and
 content-derived behavior snapshot. It intentionally omits Git commit and

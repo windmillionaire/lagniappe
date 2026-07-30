@@ -88,8 +88,13 @@ usage, and provider pricing. Set Google Cloud budget alerts during setup.
 
 ## Developers
 
-If you are changing the code, building frontend assets, running the app locally,
-or opening a pull request, complete the ordinary guided installation first,
+Lagniappe is currently a sole-maintainer project and is not accepting external
+pull requests. Bug reports and focused feature suggestions are welcome through
+GitHub issues; report suspected vulnerabilities privately as described in
+[SECURITY.md](SECURITY.md).
+
+If you are changing the code in your own checkout, building frontend assets,
+or running the app locally, complete the ordinary guided installation first,
 then run:
 
 ```bash
@@ -98,9 +103,11 @@ then run:
 
 That additive step creates the test-prefixed Cloud Storage buckets and installs
 the development/test dependencies, locked frontend packages, Playwright
-Chromium, and a development frontend build. Start with
-[CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, the Sentry rule for
-development installations, and test commands.
+Chromium, and a development frontend build. See the
+[development setup](documentation/INFRA_SETUP.md#development-installation), the
+[testing guide](documentation/TESTING.md), and the
+[documentation index](documentation/OVERVIEW.md) for prerequisites, the Sentry
+rule, commands, and architecture guidance.
 
 For full local E2E/provider testing, use short-lived
 runtime impersonation as documented in
