@@ -11,7 +11,7 @@ from playwright.sync_api import expect
 import pytest
 
 from testing.definitions import Categories, Pages, SitePages, Users
-from testing.elements import FormElements, Link, List, SpinnerButtons
+from testing.elements import FormElements, Link, List, Select, SpinnerButtons
 
 pytestmark = pytest.mark.e2e
 
@@ -59,12 +59,15 @@ def test_create_page_from_home(get_user):
     expect(user.page).to_have_title(re.compile(page_name))
 
 
-# @features permissions
-# @dimensions category-edit
+# @pair permissions:category-edit
+# @pair combobox:permission-filter
 # @template home/home.html::create
+# @template home/pages.html::create
 def test_home_page_create_visible_for_category_editor(get_user):
+    """Home page creation lists editable categories, not view-only categories."""
     owner = get_user(Users.OWNER)
-    Categories.acl_create_allowed.get(owner)
+    allowed = Categories.acl_create_allowed.get(owner)
+    denied = Categories.acl_create_denied.get(owner)
 
     user = get_user(Users.single_category_create)
     home = user.go(SitePages.HOME)
@@ -72,3 +75,20 @@ def test_home_page_create_visible_for_category_editor(get_user):
     expect(user.locate(home.CREATE_PAGE_TOGGLE)).to_be_visible()
     expect(user.locate(home.CREATE_PROJECT_TOGGLE)).not_to_be_attached()
     expect(user.locate(home.CREATE_CATEGORY_TOGGLE)).not_to_be_attached()
+
+    create_form = home.create_page_form()
+    category_select = Select(create_form.locator("[data-role='categories']"))
+    with user.page.expect_response(
+        lambda response: "/search-index/category" in response.url
+        and "permission=edit" in response.url
+    ):
+        category_select.fill("ACL Create")
+
+    panel = category_select.panel
+    expect(panel).to_be_visible()
+    expect(
+        panel.get_by_role("option", name=allowed.definition.name, exact=True)
+    ).to_be_visible()
+    expect(
+        panel.get_by_role("option", name=denied.definition.name, exact=True)
+    ).not_to_be_attached()

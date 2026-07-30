@@ -1,2 +1,77 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="3b636ae7-58ee-4945-ac61-fe19c03d0243",e._sentryDebugIdIdentifier="sentry-dbid-3b636ae7-58ee-4945-ac61-fe19c03d0243");}catch(e){}}();import{C as s}from"./core.js?v=b9f8bba5";import"./entityMenu.js?v=b9f8bba5";import"./shared.js?v=b9f8bba5";import"./combobox.js?v=b9f8bba5";import"./primitives.js?v=b9f8bba5";import"./results2.js?v=b9f8bba5";import"./formatting.js?v=b9f8bba5";import"./dropdown.js?v=b9f8bba5";class i extends s{constructor(t){super(t),this.hash="home"}async refreshSupplementalCollections(t=[]){t.some(({type:e})=>["star","unstar"].includes(e))&&await this._refreshStarred(),t.some(({type:e})=>e==="delete")&&this._hideEmptyLists()}async _refreshStarred(){const t=this.getComponent(document.getElementById("starred"));if(!t)return;const e=t.widgets.StarredList,r=e||await t.loadWidget("StarredList");r&&(e&&await t.load(r),t.active===r&&await t.render(!0))}_hideEmptyLists(){for(const t of Object.values(this.components))for(const e of Object.values(t.widgets)){const r=e.target;r?.tagName==="UL"&&r.children.length===0&&(r.dataset.visible="false")}}}export{i as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { C as Core } from './core.js?v=b30f3f24';
+import './entityMenu.js?v=b30f3f24';
+import './shared.js?v=b30f3f24';
+import './combobox.js?v=b30f3f24';
+import './primitives.js?v=b30f3f24';
+import './results2.js?v=b30f3f24';
+import './formatting.js?v=b30f3f24';
+import './dropdown.js?v=b30f3f24';
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002a_home.py::test_home_mobile_dashboard_smoke
+ * @features home
+ * @dimensions load layout mobile
+ */
+class Home extends Core {
+	constructor(elt) {
+		super(elt);
+		this.hash = "home";
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/home.mjs::Home._refreshStarred
+	 * @covered-by src/script/views/home.mjs::Home._hideEmptyLists
+	 * @reason polling reconciliation delegates collection work to focused home handlers
+	 */
+	async refreshSupplementalCollections(changes = []) {
+		if (changes.some(({ type }) => ["star", "unstar"].includes(type))) {
+			await this._refreshStarred();
+		}
+		if (changes.some(({ type }) => type === "delete")) this._hideEmptyLists();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_category
+	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
+	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
+	 * @features starred
+	 * @dimensions category project page
+	 */
+	async _refreshStarred() {
+		const starredComponent = this.getComponent(
+			document.getElementById("starred"),
+		);
+		if (!starredComponent) return;
+
+		const existingWidget = starredComponent.widgets.StarredList;
+		const widget =
+			existingWidget || (await starredComponent.loadWidget("StarredList"));
+		if (!widget) return;
+
+		if (existingWidget) await starredComponent.load(widget);
+		if (starredComponent.active === widget) await starredComponent.render(true);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutation_overlay_hides_deleted_items
+	 * @features offline
+	 * @dimensions cached-overlay
+	 */
+	_hideEmptyLists() {
+		for (const component of Object.values(this.components)) {
+			for (const widget of Object.values(component.widgets)) {
+				const target = widget.target;
+				if (target?.tagName === "UL" && target.children.length === 0) {
+					target.dataset.visible = "false";
+				}
+			}
+		}
+	}
+}
+
+export { Home as default };

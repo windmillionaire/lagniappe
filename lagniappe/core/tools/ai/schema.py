@@ -87,6 +87,6 @@ def form_generation_prompt(form_type, description=None):
 
     prompt.set_output_format("JSON")
     prompt.set_thinking_budget(1024)
-    prompt.set_model_tier("utility")
+    prompt.set_model_tier("primary")
 
     return prompt

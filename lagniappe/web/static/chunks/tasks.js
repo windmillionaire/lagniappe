@@ -1,2 +1,615 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="d198fdf8-b920-4be3-91f8-dcf8d473b48c",e._sentryDebugIdIdentifier="sentry-dbid-d198fdf8-b920-4be3-91f8-dcf8d473b48c");}catch(e){}}();import{r as b,S as l,s as v}from"./shared.js?v=b9f8bba5";import{BaseList as C}from"./baseList.js?v=b9f8bba5";import{D as x}from"./dropdown.js?v=b9f8bba5";import"./combobox.js?v=b9f8bba5";import"./primitives.js?v=b9f8bba5";function D(i=0){const e=new Date;return e.setDate(e.getDate()+i),e.toLocaleDateString("sv-SE")}function N(i){const e=D();if(i===e)return{label:"Today",due:"today"};if(i===D(1))return{label:"Tomorrow",due:"future"};if(i===D(-1))return{label:"Yesterday",due:"past"};const[t,s,o]=i.split("-");return{label:new Date(t,s-1,o).toLocaleDateString(void 0,{day:"numeric",month:"short",year:"numeric"}),due:i<e?"past":"future"}}function S(i){if(!i)return!1;const e=new Date;e.setHours(0,0,0,0);const t=new Date(e);t.setDate(t.getDate()+7);const s=new Date(`${i}T00:00:00`);return s>=e&&s<=t}function _(i,e){const t=e.dataset.dueDate;for(const s of i.querySelectorAll("[lp-entity]"))if(s.dataset.dueDate>t){s.before(e);return}i.append(e)}const O=(i,e)=>{let t=!1,s=!1,o=0;const n=["sunday","monday","tuesday","wednesday","thursday","friday","saturday"],a=new Intl.DateTimeFormat(void 0,{weekday:"long"}),r=new Intl.DateTimeFormat(void 0,{day:"numeric",month:"short"}),k=new Date().getDay()!==0,d=[{name:"Tomorrow",icon:"tomorrow",kind:"task",onClick:()=>e(i,"tomorrow")},...k?[{name:"This Week\u2026",icon:"weekend",kind:"task",closeOnClick:!1,onClick:()=>{o=1,y()}}]:[],{name:"Next Week\u2026",icon:"nextWeek",kind:"task",closeOnClick:!1,onClick:()=>{o=d.findIndex(c=>c.name==="Next Week\u2026"),u()}},{name:"No Due Date",icon:"removeDueDate",kind:"task",onClick:()=>e(i,null)}],h=()=>{s=!1,t=!1,i._lp_combobox.updateOptions(d),i._lp_combobox.focusOption(o)},y=()=>{const c=new Date;c.setHours(12,0,0,0);const f=7-c.getDay(),w=[{name:"Back",icon:"back",kind:"task",closeOnClick:!1,onClick:h},...Array.from({length:f},(T,g)=>{const m=new Date(c);m.setDate(m.getDate()+g+1);const p=n[m.getDay()];return{name:`${a.format(m)} \xB7 ${r.format(m)}`,icon:"date",kind:"task",onClick:()=>e(i,`this-week-${p}`)}})];s=!0,i._lp_combobox.updateOptions(w),i._lp_combobox.focusOption(0)},u=()=>{const c=new Date;c.setHours(12,0,0,0);const f=(8-c.getDay())%7||7;c.setDate(c.getDate()+f);const w=n.slice(1,6),T=[{name:"Back",icon:"back",kind:"task",closeOnClick:!1,onClick:h},...w.map((g,m)=>{const p=new Date(c);return p.setDate(p.getDate()+m),{name:`${a.format(p)} \xB7 ${r.format(p)}`,icon:"date",kind:"task",onClick:()=>e(i,`next-week-${g}`)}})];t=!0,i._lp_combobox.updateOptions(T),i._lp_combobox.focusOption(0)};return{placement:"bottom-end",items:d,onHide:()=>{!s&&!t||(s=!1,t=!1,i._lp_combobox.updateOptions(d))}}};class L extends C{constructor(e){super(e),this.dropdowns=[],this._change=this._change.bind(this),this._listToggle=this.component.elt.querySelector("[lp-show='tasks:HomeTaskList'][data-toggle]")}init(){this.target.addEventListener("change",this._change)}handleOfflineQueue({phase:e,queue:t,html:s,record:o,records:n}){if(e==="queued")return this._offlineQueued(o,t);e==="cancelled"&&this._offlineCancelled(o),e==="overlay"&&this._offlineOverlay({queue:t,html:s,records:n}),e==="replayed"&&o.kind==="task"&&this._syncList()}_offlineQueued(e,t){if(e.kind==="task"&&e.action==="create")return this._updateUserTaskCountOffline(1),this._offlineTaskVisible(e,t)?t.response(this._renderOfflineTask(e,t)):{ok:!0,removed:!0};e.kind==="task"&&e.action==="complete"&&(this._removeTaskByKey(e.target_key),this._syncList(),this._updateUserTaskCountOffline(-1))}_offlineCancelled(e){e.kind!=="task"||e.action!=="create"||(this._removeTaskByKey(e.client_key),this._syncList(),this._updateUserTaskCountOffline(-1))}_offlineOverlay({queue:e,html:t,records:s}){const o=t.querySelector("[data-widget='HomeTaskList']");if(o)for(const n of s)n.kind!=="task"||n.action!=="create"||this._offlineTaskVisible(n,e)&&(this._taskByKey(o,n.client_key)||_(o,this._renderOfflineTask(n,e)))}async _change(e){const t=e.target.closest("[data-role='complete']");if(!t)return;const s=t.closest("[lp-entity]");s.classList.add("opacity-50","pointer-events-none"),t.disabled=!0;const o=new FormData;o.append("completed",t.checked);const n=this.endpoints.completeTask(s.dataset.key);if(!this.view.online&&this.view.offlineQueue){s.dataset.key.startsWith("offline:")?await this.view.offlineQueue.cancel({action:"create",client_key:s.dataset.key}):await this.view.offlineQueue.queue({id:`complete:${s.dataset.key}`,kind:"task",action:"complete",method:"PUT",route:n,target_key:s.dataset.key,data:o});return}const a=await b.put(n,o);if(a.error){s.classList.remove("opacity-50","pointer-events-none"),t.disabled=!1,t.checked=!t.checked,this._showNotification(s,a.error);return}if(a.removed)s.remove();else if(a.html){const r=a.html.querySelector("[lp-entity]");r&&(s.remove(),_(this.target,r),this._initPostponeMenus(r))}this._syncList(),this._updateUserTaskCount(a.count)}updated(e){e.html&&(this._replaceUserTaskCount(e.html),super.updated(e))}_insertNewTasks(){this._created.forEach(e=>{_(this.target,e),this._initPostponeMenus(e),this.view.addFlash(e)}),this._created=[]}postreconcile(){this.visible=this.target.dataset.visible==="true",this._updated?(this.updateTarget(),this.destroy(),this.init(),this._initPostponeMenus(this.target)):this._created.length>0&&this._insertNewTasks(),this._listToggle.disabled=!1,this._listToggle.removeAttribute("aria-busy"),this._syncList(),this.target.setAttribute("loaded","")}async _postpone(e,t,s){if(!this.view.online){this._showNotification(e,"Connect to postpone this task.");return}e.classList.add("opacity-50","pointer-events-none"),t.disabled=!0;const o=new FormData;o.append("newDueDate",s);const n=this.endpoints.changeDueDate(e.dataset.key),a=await b.put(n,o);if(a.error){e.classList.remove("opacity-50","pointer-events-none"),t.disabled=!1,this._showNotification(e,a.error);return}if(a.removed)e.remove();else if(a.html){const r=a.html.querySelector("[lp-entity]");r&&(e.remove(),_(this.target,r),this._initPostponeMenus(r))}this._syncList(),this._updateUserTaskCount(a.count)}_initPostponeMenus(e){for(const t of e.querySelectorAll("[data-role='change-due-date']")){const s=O(t,(n,a)=>{const r=n.closest("[lp-entity]");this._postpone(r,n,a)}),o=new x(t);o.init(s),this.dropdowns.push(o)}}_syncList(){this._renderDateHeaders(),this._updateTaskCount(),this._updateVisibility()}_renderDateHeaders(){for(const t of this.target.querySelectorAll("[data-role='date-header']"))t.remove();let e=null;for(const t of this.target.querySelectorAll("[lp-entity]")){const s=t.dataset.dueDate;if(s&&s!==e){const{label:o,due:n}=N(s),a=document.createElement("div");a.className=l.task.home.group,a.dataset.role="date-header",a.dataset.date=s,a.dataset.due=n,a.textContent=o,t.before(a),e=s}}}_updateTaskCount(){const e=this.component.elt.querySelector("[data-role='task-count']"),t=this.target.querySelectorAll("[lp-entity]").length;e.textContent=t,e.dataset.kind=t>0?"task":"success",e.dataset.visible="true"}_updateUserTaskCount(e){if(e===void 0)return;const t=document.querySelector("[data-role='user-task-count']");t&&(t.textContent=e)}_updateUserTaskCountOffline(e){const t=document.querySelector("[data-role='user-task-count']");if(!t)return;const s=Number.parseInt(t.textContent||"0",10);Number.isNaN(s)||(t.textContent=Math.max(0,s+e))}_offlineTaskVisible(e,t){return S(t.field(e,"due-date"))}_renderOfflineTask(e,t){const s=t.field(e,"name")||"Untitled task",o=t.field(e,"due-date"),n=document.createElement("li");n.setAttribute("lp-entity",""),n.setAttribute("lp-link",""),n.dataset.key=e.client_key,n.dataset.fingerprint=`offline:${e.id}`,n.dataset.name=s,n.dataset.dueDate=o,n.dataset.offline="true",n.className=[l.task.home.item,"opacity-80"].join(" ");const a=document.createElement("div");a.className=l.task.home.header,a.dataset.role="header",n.append(a);const r=document.createElement("div");r.className=l.task.home.details,r.dataset.role="details",a.append(r);const k=document.createElement("div");k.className=l.task.home.title,r.append(k);const d=document.createElement("div");d.className=l.task.home.complete,k.append(d);const h=document.createElement("input");h.type="checkbox",h.dataset.role="complete",h.className=l.checkbox.default,d.append(h);const y=document.createElement("span");v(y,"check",l.checkbox.icon),d.append(y),k.append(document.createTextNode(s));const u=document.createElement("button");u.type="button",u.disabled=!0,u.dataset.role="change-due-date",u.className=l.task.home.snooze,r.append(u);const c=document.createElement("span");v(c,"snooze"),u.append(c);const f=document.createElement("p");return f.className=l.task.home.notification,f.dataset.role="notification",f.textContent="Pending sync",n.append(f),n}_taskByKey(e,t){return!e||!t?null:Array.from(e.querySelectorAll("[lp-entity][data-key]")).find(s=>s.dataset.key===t)}_removeTaskByKey(e){this._taskByKey(this.target,e)?.remove()}_replaceUserTaskCount(e){const t=e.querySelector("[data-role='user-task-count']"),s=document.querySelector("[data-role='user-task-count']");s&&t&&s.replaceWith(t)}_updateVisibility(){const e=this.target.querySelectorAll("[lp-entity]").length;this.target.dataset.visible=e>0&&this.visible?"true":"false"}_showNotification(e,t){e.querySelector("[data-role='notification']").textContent=t}destroy(){for(const e of this.dropdowns)e.destroy();this.dropdowns=[]}}export{L as HomeTaskList};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request, S as STYLES, s as setIcon } from './shared.js?v=b30f3f24';
+import { BaseList } from './baseList.js?v=b30f3f24';
+import { D as Dropdown } from './dropdown.js?v=b30f3f24';
+import './combobox.js?v=b30f3f24';
+import './primitives.js?v=b30f3f24';
+
+/**
+ * @testable false
+ * @covered-by src/script/widgets/home/tasks.mjs::HomeTaskList
+ * @reason internal date helper for home task due-date grouping
+ */
+function _toDateStr(offset = 0) {
+	const d = new Date();
+	d.setDate(d.getDate() + offset);
+	return d.toLocaleDateString("sv-SE");
+}
+/**
+ * @testable false
+ * @covered-by src/script/widgets/home/tasks.mjs::HomeTaskList
+ * @reason internal date helper for home task due-date grouping
+ */
+function _dateInfo(dateStr) {
+	const today = _toDateStr();
+
+	if (dateStr === today) return { label: "Today", due: "today" };
+	if (dateStr === _toDateStr(1)) return { label: "Tomorrow", due: "future" };
+	if (dateStr === _toDateStr(-1)) return { label: "Yesterday", due: "past" };
+
+	const [year, month, day] = dateStr.split("-");
+	const label = new Date(year, month - 1, day).toLocaleDateString(undefined, {
+		day: "numeric",
+		month: "short",
+		year: "numeric",
+	});
+	return { label, due: dateStr < today ? "past" : "future" };
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/widgets/home/tasks.mjs::HomeTaskList
+ * @reason homepage offline mutation helper for deciding optimistic task visibility
+ */
+function _isWithinHomeTaskWindow(dueDate) {
+	if (!dueDate) return false;
+
+	const today = new Date();
+	today.setHours(0, 0, 0, 0);
+	const nextWeek = new Date(today);
+	nextWeek.setDate(nextWeek.getDate() + 7);
+
+	const due = new Date(`${dueDate}T00:00:00`);
+	return due >= today && due <= nextWeek;
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/widgets/home/tasks.mjs::HomeTaskList._postpone
+ * @reason insertion helper exercised through home task creation and postpone flows
+ */
+function _insertSorted(target, task) {
+	const dueDate = task.dataset.dueDate;
+
+	for (const item of target.querySelectorAll("[lp-entity]")) {
+		if (item.dataset.dueDate > dueDate) {
+			item.before(task);
+			return;
+		}
+	}
+	target.append(task);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/widgets/home/tasks.mjs::HomeTaskList._postpone
+ * @reason menu configuration helper for the tested postpone action
+ */
+const _postponeMenu = (button, postponeFn) => {
+	let showingNextWeek = false;
+	let showingThisWeek = false;
+	let returnFocusIndex = 0;
+	const weekdayNames = [
+		"sunday",
+		"monday",
+		"tuesday",
+		"wednesday",
+		"thursday",
+		"friday",
+		"saturday",
+	];
+	const weekdayFormatter = new Intl.DateTimeFormat(undefined, {
+		weekday: "long",
+	});
+	const dateFormatter = new Intl.DateTimeFormat(undefined, {
+		day: "numeric",
+		month: "short",
+	});
+	const hasDaysLeftThisWeek = new Date().getDay() !== 0;
+
+	const primaryItems = [
+		{
+			name: "Tomorrow",
+			icon: "tomorrow",
+			kind: "task",
+			onClick: () => postponeFn(button, "tomorrow"),
+		},
+		...(hasDaysLeftThisWeek
+			? [
+					{
+						name: "This Week…",
+						icon: "weekend",
+						kind: "task",
+						closeOnClick: false,
+						onClick: () => {
+							returnFocusIndex = 1;
+							showThisWeek();
+						},
+					},
+				]
+			: []),
+		{
+			name: "Next Week…",
+			icon: "nextWeek",
+			kind: "task",
+			closeOnClick: false,
+			onClick: () => {
+				returnFocusIndex = primaryItems.findIndex(
+					(item) => item.name === "Next Week…",
+				);
+				showNextWeek();
+			},
+		},
+		{
+			name: "No Due Date",
+			icon: "removeDueDate",
+			kind: "task",
+			onClick: () => postponeFn(button, null),
+		},
+	];
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/home/tasks.mjs::_postponeMenu
+	 * @reason internal transition back to the primary postpone choices
+	 */
+	const showPrimary = () => {
+		showingThisWeek = false;
+		showingNextWeek = false;
+		button._lp_combobox.updateOptions(primaryItems);
+		button._lp_combobox.focusOption(returnFocusIndex);
+	};
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/home/tasks.mjs::_postponeMenu
+	 * @reason internal transition to the tested remaining dates this week
+	 */
+	const showThisWeek = () => {
+		const today = new Date();
+		today.setHours(12, 0, 0, 0);
+		const daysUntilSunday = 7 - today.getDay();
+		const items = [
+			{
+				name: "Back",
+				icon: "back",
+				kind: "task",
+				closeOnClick: false,
+				onClick: showPrimary,
+			},
+			...Array.from({ length: daysUntilSunday }, (_, index) => {
+				const date = new Date(today);
+				date.setDate(date.getDate() + index + 1);
+				const weekday = weekdayNames[date.getDay()];
+				return {
+					name: `${weekdayFormatter.format(date)} · ${dateFormatter.format(date)}`,
+					icon: "date",
+					kind: "task",
+					onClick: () => postponeFn(button, `this-week-${weekday}`),
+				};
+			}),
+		];
+
+		showingThisWeek = true;
+		button._lp_combobox.updateOptions(items);
+		button._lp_combobox.focusOption(0);
+	};
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/home/tasks.mjs::_postponeMenu
+	 * @reason internal transition to the tested next-week weekday choices
+	 */
+	const showNextWeek = () => {
+		const monday = new Date();
+		monday.setHours(12, 0, 0, 0);
+		const daysUntilMonday = (8 - monday.getDay()) % 7 || 7;
+		monday.setDate(monday.getDate() + daysUntilMonday);
+
+		const weekdays = weekdayNames.slice(1, 6);
+		const items = [
+			{
+				name: "Back",
+				icon: "back",
+				kind: "task",
+				closeOnClick: false,
+				onClick: showPrimary,
+			},
+			...weekdays.map((weekday, offset) => {
+				const date = new Date(monday);
+				date.setDate(date.getDate() + offset);
+				return {
+					name: `${weekdayFormatter.format(date)} · ${dateFormatter.format(date)}`,
+					icon: "date",
+					kind: "task",
+					onClick: () => postponeFn(button, `next-week-${weekday}`),
+				};
+			}),
+		];
+
+		showingNextWeek = true;
+		button._lp_combobox.updateOptions(items);
+		button._lp_combobox.focusOption(0);
+	};
+
+	return {
+		placement: "bottom-end",
+		items: primaryItems,
+		onHide: () => {
+			if (!showingThisWeek && !showingNextWeek) return;
+			showingThisWeek = false;
+			showingNextWeek = false;
+			button._lp_combobox.updateOptions(primaryItems);
+		},
+	};
+};
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002a_home.py::test_tasks_prefetch
+ * @features home
+ * @dimensions prefetch task-list task-count
+ */
+class HomeTaskList extends BaseList {
+	constructor(attributes) {
+		super(attributes);
+		this.dropdowns = [];
+		this._change = this._change.bind(this);
+		this._listToggle = this.component.elt.querySelector(
+			"[lp-show='tasks:HomeTaskList'][data-toggle]",
+		);
+	}
+
+	init() {
+		this.target.addEventListener("change", this._change);
+	}
+
+	handleOfflineQueue({ phase, queue, html, record, records }) {
+		if (phase === "queued") return this._offlineQueued(record, queue);
+		if (phase === "cancelled") this._offlineCancelled(record);
+		if (phase === "overlay") this._offlineOverlay({ queue, html, records });
+		if (phase === "replayed" && record.kind === "task") this._syncList();
+	}
+
+	_offlineQueued(record, queue) {
+		if (record.kind === "task" && record.action === "create") {
+			this._updateUserTaskCountOffline(1);
+			if (!this._offlineTaskVisible(record, queue)) {
+				return { ok: true, removed: true };
+			}
+			return queue.response(this._renderOfflineTask(record, queue));
+		}
+
+		if (record.kind === "task" && record.action === "complete") {
+			this._removeTaskByKey(record.target_key);
+			this._syncList();
+			this._updateUserTaskCountOffline(-1);
+		}
+	}
+
+	_offlineCancelled(record) {
+		if (record.kind !== "task" || record.action !== "create") return;
+
+		this._removeTaskByKey(record.client_key);
+		this._syncList();
+		this._updateUserTaskCountOffline(-1);
+	}
+
+	_offlineOverlay({ queue, html, records }) {
+		const list = html.querySelector("[data-widget='HomeTaskList']");
+		if (!list) return;
+
+		for (const record of records) {
+			if (record.kind !== "task" || record.action !== "create") continue;
+			if (!this._offlineTaskVisible(record, queue)) continue;
+			if (this._taskByKey(list, record.client_key)) continue;
+			_insertSorted(list, this._renderOfflineTask(record, queue));
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_task_from_home_page
+	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_recurring_task_from_home_page_reappears
+	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_task_complete_persists_after_reload
+	 * @features tasks
+	 * @dimensions complete recurring offline-queue
+	 */
+	async _change(e) {
+		const toggle = e.target.closest("[data-role='complete']");
+		if (!toggle) return;
+
+		const elt = toggle.closest("[lp-entity]");
+		elt.classList.add("opacity-50", "pointer-events-none");
+		toggle.disabled = true;
+
+		const data = new FormData();
+		data.append("completed", toggle.checked);
+
+		const route = this.endpoints.completeTask(elt.dataset.key);
+
+		if (!this.view.online && this.view.offlineQueue) {
+			if (elt.dataset.key.startsWith("offline:")) {
+				await this.view.offlineQueue.cancel({
+					action: "create",
+					client_key: elt.dataset.key,
+				});
+			} else {
+				await this.view.offlineQueue.queue({
+					id: `complete:${elt.dataset.key}`,
+					kind: "task",
+					action: "complete",
+					method: "PUT",
+					route,
+					target_key: elt.dataset.key,
+					data,
+				});
+			}
+			return;
+		}
+
+		const response = await request.put(route, data);
+
+		if (response.error) {
+			elt.classList.remove("opacity-50", "pointer-events-none");
+			toggle.disabled = false;
+			toggle.checked = !toggle.checked;
+			this._showNotification(elt, response.error);
+			return;
+		}
+
+		if (response.removed) {
+			elt.remove();
+		} else if (response.html) {
+			const newTask = response.html.querySelector("[lp-entity]");
+			if (newTask) {
+				elt.remove();
+				_insertSorted(this.target, newTask);
+				this._initPostponeMenus(newTask);
+			}
+		}
+
+		this._syncList();
+		this._updateUserTaskCount(response.count);
+	}
+
+	updated(response) {
+		if (!response.html) return;
+		this._replaceUserTaskCount(response.html);
+		super.updated(response);
+	}
+
+	_insertNewTasks() {
+		this._created.forEach((item) => {
+			_insertSorted(this.target, item);
+			this._initPostponeMenus(item);
+			this.view.addFlash(item);
+		});
+		this._created = [];
+	}
+
+	postreconcile() {
+		this.visible = this.target.dataset.visible === "true";
+
+		if (this._updated) {
+			this.updateTarget();
+			this.destroy();
+			this.init();
+			this._initPostponeMenus(this.target);
+		} else if (this._created.length > 0) {
+			this._insertNewTasks();
+		}
+
+		this._listToggle.disabled = false;
+		this._listToggle.removeAttribute("aria-busy");
+		this._syncList();
+		this.target.setAttribute("loaded", "");
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_tomorrow
+	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_this_week
+	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_next_week
+	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_no_due_date
+	 * @features tasks
+	 * @dimensions postpone due-date
+	 */
+	async _postpone(elt, button, value) {
+		if (!this.view.online) {
+			this._showNotification(elt, "Connect to postpone this task.");
+			return;
+		}
+
+		elt.classList.add("opacity-50", "pointer-events-none");
+		button.disabled = true;
+
+		const data = new FormData();
+		data.append("newDueDate", value);
+
+		const route = this.endpoints.changeDueDate(elt.dataset.key);
+		const response = await request.put(route, data);
+
+		if (response.error) {
+			elt.classList.remove("opacity-50", "pointer-events-none");
+			button.disabled = false;
+			this._showNotification(elt, response.error);
+			return;
+		}
+
+		if (response.removed) {
+			elt.remove();
+		} else if (response.html) {
+			const newTask = response.html.querySelector("[lp-entity]");
+			if (newTask) {
+				elt.remove();
+				_insertSorted(this.target, newTask);
+				this._initPostponeMenus(newTask);
+			}
+		}
+
+		this._syncList();
+		this._updateUserTaskCount(response.count);
+	}
+
+	_initPostponeMenus(root) {
+		for (const button of root.querySelectorAll(
+			"[data-role='change-due-date']",
+		)) {
+			const menu = _postponeMenu(button, (btn, value) => {
+				const elt = btn.closest("[lp-entity]");
+				this._postpone(elt, btn, value);
+			});
+			const dropdown = new Dropdown(button);
+			dropdown.init(menu);
+			this.dropdowns.push(dropdown);
+		}
+	}
+
+	_syncList() {
+		this._renderDateHeaders();
+		this._updateTaskCount();
+		this._updateVisibility();
+	}
+
+	_renderDateHeaders() {
+		for (const h of this.target.querySelectorAll("[data-role='date-header']")) {
+			h.remove();
+		}
+
+		let lastDate = null;
+		for (const item of this.target.querySelectorAll("[lp-entity]")) {
+			const dueDate = item.dataset.dueDate;
+			if (dueDate && dueDate !== lastDate) {
+				const { label, due } = _dateInfo(dueDate);
+				const header = document.createElement("div");
+				header.className = STYLES.task.home.group;
+				header.dataset.role = "date-header";
+				header.dataset.date = dueDate;
+				header.dataset.due = due;
+				header.textContent = label;
+				item.before(header);
+				lastDate = dueDate;
+			}
+		}
+	}
+
+	_updateTaskCount() {
+		const taskCount = this.component.elt.querySelector(
+			"[data-role='task-count']",
+		);
+		const count = this.target.querySelectorAll("[lp-entity]").length;
+		taskCount.textContent = count;
+		taskCount.dataset.kind = count > 0 ? "task" : "success";
+		taskCount.dataset.visible = "true";
+	}
+
+	_updateUserTaskCount(count) {
+		if (count === undefined) return;
+		const elt = document.querySelector("[data-role='user-task-count']");
+		if (elt) elt.textContent = count;
+	}
+
+	_updateUserTaskCountOffline(delta) {
+		const elt = document.querySelector("[data-role='user-task-count']");
+		if (!elt) return;
+
+		const count = Number.parseInt(elt.textContent || "0", 10);
+		if (Number.isNaN(count)) return;
+
+		elt.textContent = Math.max(0, count + delta);
+	}
+
+	_offlineTaskVisible(record, queue) {
+		return _isWithinHomeTaskWindow(queue.field(record, "due-date"));
+	}
+
+	_renderOfflineTask(record, queue) {
+		const name = queue.field(record, "name") || "Untitled task";
+		const dueDate = queue.field(record, "due-date");
+
+		const item = document.createElement("li");
+		item.setAttribute("lp-entity", "");
+		item.setAttribute("lp-link", "");
+		item.dataset.key = record.client_key;
+		item.dataset.fingerprint = `offline:${record.id}`;
+		item.dataset.name = name;
+		item.dataset.dueDate = dueDate;
+		item.dataset.offline = "true";
+		item.className = [STYLES.task.home.item, "opacity-80"].join(" ");
+
+		const header = document.createElement("div");
+		header.className = STYLES.task.home.header;
+		header.dataset.role = "header";
+		item.append(header);
+
+		const details = document.createElement("div");
+		details.className = STYLES.task.home.details;
+		details.dataset.role = "details";
+		header.append(details);
+
+		const title = document.createElement("div");
+		title.className = STYLES.task.home.title;
+		details.append(title);
+
+		const complete = document.createElement("div");
+		complete.className = STYLES.task.home.complete;
+		title.append(complete);
+
+		const checkbox = document.createElement("input");
+		checkbox.type = "checkbox";
+		checkbox.dataset.role = "complete";
+		checkbox.className = STYLES.checkbox.default;
+		complete.append(checkbox);
+
+		const checkIcon = document.createElement("span");
+		setIcon(checkIcon, "check", STYLES.checkbox.icon);
+		complete.append(checkIcon);
+
+		title.append(document.createTextNode(name));
+
+		const snooze = document.createElement("button");
+		snooze.type = "button";
+		snooze.disabled = true;
+		snooze.dataset.role = "change-due-date";
+		snooze.className = STYLES.task.home.snooze;
+		details.append(snooze);
+
+		const snoozeIcon = document.createElement("span");
+		setIcon(snoozeIcon, "snooze");
+		snooze.append(snoozeIcon);
+
+		const notification = document.createElement("p");
+		notification.className = STYLES.task.home.notification;
+		notification.dataset.role = "notification";
+		notification.textContent = "Pending sync";
+		item.append(notification);
+
+		return item;
+	}
+
+	_taskByKey(root, key) {
+		if (!root || !key) return null;
+		return Array.from(root.querySelectorAll("[lp-entity][data-key]")).find(
+			(item) => item.dataset.key === key,
+		);
+	}
+
+	_removeTaskByKey(key) {
+		this._taskByKey(this.target, key)?.remove();
+	}
+
+	_replaceUserTaskCount(html) {
+		const fresh = html.querySelector("[data-role='user-task-count']");
+		const current = document.querySelector("[data-role='user-task-count']");
+		if (current && fresh) current.replaceWith(fresh);
+	}
+
+	_updateVisibility() {
+		const count = this.target.querySelectorAll("[lp-entity]").length;
+		this.target.dataset.visible = count > 0 && this.visible ? "true" : "false";
+	}
+
+	_showNotification(elt, message) {
+		elt.querySelector("[data-role='notification']").textContent = message;
+	}
+
+	destroy() {
+		for (const d of this.dropdowns) {
+			d.destroy();
+		}
+		this.dropdowns = [];
+	}
+}
+
+export { HomeTaskList };

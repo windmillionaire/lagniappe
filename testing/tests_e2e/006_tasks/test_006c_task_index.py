@@ -76,6 +76,20 @@ def _assert_visible_task_order(user, tasks):
     assert positions == sorted(positions)
 
 
+# @pairs task-index:authenticated-access permissions:own-page-only
+def test_task_index_allows_own_page_only_users(get_user):
+    """A signed-in user with no global model access can open the task index."""
+    user = get_user(Users.user_no_access)
+
+    task_index = user.go(SitePages.TASK_INDEX)
+
+    expect(user.page).to_have_title("Active Tasks")
+    expect(user.locate(task_index.TABLE_BODY)).to_have_attribute("loaded", "")
+    expect(
+        user.locate(f"{task_index.TABLE_BODY} tr[data-role='empty']")
+    ).to_be_visible()
+
+
 # @features task-index
 # @dimensions columns
 def test_tasks_table_columns(get_user):

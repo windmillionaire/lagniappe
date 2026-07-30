@@ -1,19 +1,21 @@
 {% import 'controls.html' as controls %}
 
-{% macro visibility_selector() %}
+{% macro visibility_selector(allow_everyone=true) %}
   <fieldset class="flex flex-col gap-2">
     <legend class="text-sm font-semibold text-note-dark">Who can see this?</legend>
-    <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-      <label class="flex cursor-pointer items-center gap-2 rounded-md bg-white/70 px-3 py-2 text-sm font-medium text-base-dark outline outline-note-light has-checked:bg-white has-checked:outline-2 has-checked:outline-note-default">
-        <input type="radio"
-               name="visibility"
-               value="everyone"
-               class="accent-note-dark">
-        <span class="inline-flex items-center gap-1">
-          {{ render_icon("group", "text-note-dark") }}
-          <span>Show for everyone</span>
-        </span>
-      </label>
+    <div class="grid grid-cols-1 gap-2 {{ 'sm:grid-cols-2' if allow_everyone else '' }}">
+      {% if allow_everyone %}
+        <label class="flex cursor-pointer items-center gap-2 rounded-md bg-white/70 px-3 py-2 text-sm font-medium text-base-dark outline outline-note-light has-checked:bg-white has-checked:outline-2 has-checked:outline-note-default">
+          <input type="radio"
+                 name="visibility"
+                 value="everyone"
+                 class="accent-note-dark">
+          <span class="inline-flex items-center gap-1">
+            {{ render_icon("group", "text-note-dark") }}
+            <span>Show for everyone</span>
+          </span>
+        </label>
+      {% endif %}
       <label class="flex cursor-pointer items-center gap-2 rounded-md bg-white/70 px-3 py-2 text-sm font-medium text-base-dark outline outline-note-light has-checked:bg-white has-checked:outline-2 has-checked:outline-note-default">
         <input type="radio"
                name="visibility"
@@ -76,7 +78,7 @@
              class="hidden"
              data-role="photo-input">
     </div>
-    {{ visibility_selector() }}
+    {{ visibility_selector(surface != "home" or Resource.SITE.allowed(Action.EDIT)) }}
     <button type="submit" class="{{ styles.button.submit }}">
       <span data-role="text">Add Note</span>
     </button>

@@ -42,14 +42,23 @@ def public_permissions():
 # @testable true
 # @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
 # @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
+# @tests tests_e2e/008_users/test_008b_user_groups.py::test_rename_group
 # @features user-groups
-# @dimensions permission-update general-permissions entity-permissions
+# @dimensions permission-update general-permissions entity-permissions rename
 @users.route("/group-permissions/<key>", methods=["PUT", "GET"])
 @permission(Resource.USER_GROUPS, Action.EDIT)
 def group_permissions(key, **kwargs):
     group = kwargs["entity"]
 
     if request.method == "PUT":
+        if "name" in request.form:
+            name = request.form["name"].strip()
+            if not name:
+                return responses.error("Name this group before saving.")
+            if name == "public":
+                return responses.error("public is a reserved group name")
+            group.name = name
+
         group.save_permissions(request.form)
 
         return responses.group_permissions(group, update=True)

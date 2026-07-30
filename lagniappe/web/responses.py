@@ -739,6 +739,8 @@ def create_group(group):
 # @covered-by lagniappe/web/responses.py::entity_response
 def group_permissions(group, public=False, update=False):
     data = group.properties.permissions.permissions_form()
+    if not public:
+        data["name"] = group.name
 
     if public:
         template = get_template_attribute("users/tools.html", "public_permissions")

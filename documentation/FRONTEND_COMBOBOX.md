@@ -23,7 +23,12 @@ placeholder display. `SelectBox` and `FacetsBox` use `Submitter(Combobox)`.
 
 ### Construction
 
-The constructor receives a parent DOM element and finds the `<select>` or `<input>` inside it. It reads configuration from `data-*` attributes on both the parent and element (index, kind, name, placement, etc.) and sets up bound handlers for keyboard, click, pointer, and intersection events.
+The constructor receives a parent DOM element and finds the `<select>` or
+`<input>` inside it. It reads an explicit configuration allowlist from
+`data-*` attributes on both the parent and element: the common index, kind,
+placeholder, preload, multiple, and creatable settings plus the FacetsBox
+form-type, user-inclusion, and permission filters. It also sets up bound
+handlers for keyboard, click, pointer, and intersection events.
 
 ### Lifecycle
 
@@ -130,6 +135,10 @@ Used by the `LinkElement` for internal entity links. Searches the server index o
 **`_search(query)`** sends a GET to `/search-index/{index}` with the query,
 form type, and currently selected hashes (to keep them visible in results).
 Displays server-returned HTML in the panel.
+
+`data-permission="edit"` and `data-permission="assign"` add the corresponding
+server-side permission filter. The setting may live on either the `lp-select`
+wrapper/button or its nested input.
 
 Opt-in quick-create is enabled with `data-creatable="true"` on the FacetsBox
 trigger. When a non-empty search has zero real matches and the current user has

@@ -460,8 +460,11 @@ plain-text `body` and photo asset, a server-assigned `scope` (`home` or `page`),
 and `visibility` (`private` or `everyone`). Home-scoped shared notes appear in
 authenticated Home feeds; Page-scoped shared notes remain on their Page and
 also require Page view access. Private notes and note deletion are limited to
-the creator and site owner. Note mutations touch their parent and author, and
-Page/user deletion cascades through attached notes and photo assets.
+the creator and site owner. Any signed-in user may create a private Home-scoped
+note, but only the site owner may give it `everyone` visibility. Page-scoped
+note creation and visibility continue to follow Page edit access. Note
+mutations touch their parent and author, and Page/user deletion cascades through
+attached notes and photo assets.
 
 `DeferredJob` is the internal durable envelope for user-facing background
 work. Jobs are retained as operational records and are not a general

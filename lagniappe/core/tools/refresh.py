@@ -127,13 +127,16 @@ def _filtered_roots(filter_entity, user):
 # @testable true
 # @tests tests_unit/test_021_refresh.py::test_load_refresh_collection_resolves_component_from_view_entity
 # @tests tests_unit/test_021_refresh.py::test_load_refresh_collection_refreshes_saved_filter_cache_before_root_query
+# @tests tests_unit/test_021_refresh.py::test_load_refresh_collection_allows_task_index_without_models_permission
 # @features reconnect-refresh
 # @dimensions target-validation root-depth component-identity
 # @pair reconnect-refresh:target-validation
 # @pair reconnect-refresh:root-depth
 # @pair reconnect-refresh:component-identity
 # @pair reconnect-refresh:cache-refresh
+# @pair reconnect-refresh:authenticated-access
 # @pair filters:cache-refresh
+# @pair permissions:own-page-only
 def load_refresh_collection(view, target, user, refresh_view=None):
     """Load one allowlisted collection without expanding its row relationships."""
     if not isinstance(view, dict) or not isinstance(target, dict):
@@ -169,8 +172,6 @@ def load_refresh_collection(view, target, user, refresh_view=None):
         raise RefreshFallback("Unsupported refresh view")
 
     if view_index == "tasks" and component_id == "table":
-        if not user.has_permission(Resource.TASKS, Action.RESTRICTED):
-            raise RefreshFallback("Task index is no longer viewable")
         parent = index.TaskIndex(user=user, limit=None)
         return RefreshCollection("task-index", parent, tuple(parent.refresh_roots()))
 

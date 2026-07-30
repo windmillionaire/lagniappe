@@ -689,6 +689,9 @@ parent.dataset.placeholder = "parent placeholder";
 initial.dataset.placeholder = "choose a user...";
 initial.dataset.multiple = "true";
 initial.dataset.creatable = "true";
+initial.dataset.formType = "task";
+initial.dataset.includeUsers = "false";
+initial.dataset.permission = "assign";
 
 // Runtime and unrelated DOM state must not become instance fields.
 initial.dataset.panel = "closed";
@@ -706,7 +709,10 @@ if (
   combobox.placeholder !== "choose a user..." ||
   combobox.preload !== '[{"id":"existing-user"}]' ||
   combobox.multiple !== true ||
-  combobox.creatable !== "true"
+  combobox.creatable !== "true" ||
+  combobox.formType !== "task" ||
+  combobox.includeUsers !== "false" ||
+  combobox.permission !== "assign"
 ) {
   throw new Error(`Supported dataset configuration changed: ${JSON.stringify({
     index: combobox.index,
@@ -715,6 +721,9 @@ if (
     preload: combobox.preload,
     multiple: combobox.multiple,
     creatable: combobox.creatable,
+    formType: combobox.formType,
+    includeUsers: combobox.includeUsers,
+    permission: combobox.permission,
   })}`);
 }
 

@@ -15,7 +15,9 @@ from testing.elements import (
     ProjectSelect,
     Select,
     SpinnerButtons,
+    UserSelect,
 )
+from testing.resources import Page
 
 pytestmark = pytest.mark.e2e
 
@@ -146,8 +148,12 @@ def test_category_search_permission_filter_returns_editable_categories(get_user)
     assert denied.name not in html
 
 
-# @features search permissions
-# @dimensions permission-filter assign
+# @pair search:permission-filter
+# @pair search:assign
+# @pair permissions:permission-filter
+# @pair permissions:assign
+# @pair combobox:permission-filter
+# @template pages/tasks.html::action_buttons
 def test_user_assign_search_permission_filter_returns_assignable_users(get_user):
     owner = get_user(Users.OWNER)
     assignable = get_user(Users.assignable_user, creator=owner)
@@ -165,6 +171,26 @@ def test_user_assign_search_permission_filter_returns_assignable_users(get_user)
     html = response["json"]["results"]
     assert assignable.definition.name in html
     assert denied.definition.name not in html
+
+    home = assigner.go(SitePages.HOME)
+    with assigner.page.expect_navigation():
+        home.user_page_button.click()
+
+    user_page = Page(user=assigner, definition=assigner.definition)
+    user_select = UserSelect(user_page.create_task_form)
+    with assigner.page.expect_response(
+        lambda response: "/search-index/user" in response.url
+        and "permission=assign" in response.url
+    ):
+        panel = user_select.panel(fill="User")
+
+    expect(panel).to_be_visible()
+    expect(
+        panel.get_by_role("option", name=assignable.definition.name, exact=True)
+    ).to_be_visible()
+    expect(
+        panel.get_by_role("option", name=denied.definition.name, exact=True)
+    ).not_to_be_attached()
 
 
 # @features quick-create

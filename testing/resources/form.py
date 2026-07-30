@@ -27,6 +27,7 @@ class Builder:
 
     FORM_NAME = "#form-name-display"
     COMPONENTS_COLUMN = "#components-column"
+    READONLY_NOTICE = "[data-role='readonly-notice']"
 
     SAVE_BUTTON = "[data-role='save-form']"
     UNSAVED = "[data-role='save-form'][data-kind='unsaved']"

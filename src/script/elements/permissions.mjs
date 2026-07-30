@@ -141,7 +141,9 @@ export class PermissionsForm extends FormElement {
 	}
 
 	_change(event) {
-		const section = event.target.closest("[data-section]").dataset.section;
+		const sectionContainer = event.target.closest("[data-section]");
+		if (!sectionContainer) return;
+		const section = sectionContainer.dataset.section;
 		if (event.target.type === "checkbox" && !event.target.checked) {
 			const permission = event.target.closest("li");
 			permission.remove();

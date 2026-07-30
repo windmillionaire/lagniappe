@@ -163,17 +163,75 @@ export class PublicPermissions extends PermissionsForm {
  * @testable true
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_rename_group
  * @features user-groups
- * @dimensions permission-update general-permissions entity-permissions
+ * @dimensions permission-update general-permissions entity-permissions rename
  */
 export class GroupPermissions extends PermissionsForm {
+	constructor(attributes) {
+		super(attributes);
+		this._draftName = null;
+		this.target.addEventListener("input", (event) => {
+			if (event.target.matches("input[name='name']")) {
+				this._draftName = event.target.value;
+				this.target.dataset.name = event.target.value;
+			}
+		});
+	}
+
+	get formData() {
+		const data = super.formData;
+		if (this._draftName !== null) data.set("name", this._draftName);
+		return data;
+	}
+
+	get html() {
+		const name = new InputElement(
+			this,
+			{
+				id: "name",
+				name: "name",
+				title: "Group Name",
+				input: "text",
+			},
+			this.target.dataset.name || "",
+		);
+
+		return [name.edit, ...super.html];
+	}
+
 	init() {
 		this.messages = {
-			submit: "Update Group Permissions",
-			submitting: "Updating Group Permissions",
-			submitted: "Group Permissions Updated",
+			submit: "Update User Group",
+			submitting: "Updating User Group",
+			submitted: "User Group Updated",
 		};
 		super.init();
+	}
+
+	updated(response) {
+		if (response.name) {
+			if (
+				this._draftName !== null &&
+				response.name !== this._draftName.trim()
+			) {
+				return super.updated(response);
+			}
+
+			this._draftName = null;
+			this.target.dataset.name = response.name;
+			this.target.dataset.title = `${response.name} Permissions`;
+
+			const selector = Array.from(
+				this.component.elt.querySelectorAll(
+					"[data-role='group-selectors'] button[data-key]",
+				),
+			).find((button) => button.dataset.key === this.key);
+			const label = selector?.querySelector("[data-role='group-name']");
+			if (label) label.textContent = response.name;
+		}
+
+		return super.updated(response);
 	}
 }
 

@@ -105,6 +105,29 @@ def test_task_index_refresh_roots_uses_both_ordered_query_streams():
     fetch.assert_called_once_with("dated", "undated", request=Fetch.root())
 
 
+# @pairs reconnect-refresh:authenticated-access permissions:own-page-only
+@pytest.mark.unit
+def test_load_refresh_collection_allows_task_index_without_models_permission():
+    viewer = _viewer()
+    viewer.has_permission = lambda *_args: False
+    root = SimpleNamespace(urlsafe_key="own-task", modified=datetime.now(timezone.utc))
+    parent = SimpleNamespace(refresh_roots=lambda: [root])
+
+    with patch(
+        "lagniappe.core.tools.refresh.index.TaskIndex",
+        return_value=parent,
+    ) as task_index:
+        collection = load_refresh_collection(
+            {"index": "tasks"},
+            {"id": "table"},
+            viewer,
+            refresh_view=RefreshView(None, "task-index-fingerprint"),
+        )
+
+    task_index.assert_called_once_with(user=viewer, limit=None)
+    assert collection == RefreshCollection("task-index", parent, (root,))
+
+
 # @features reconnect-refresh category-index
 # @dimensions root-depth membership
 @pytest.mark.unit

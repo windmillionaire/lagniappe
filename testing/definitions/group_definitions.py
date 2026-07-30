@@ -24,6 +24,11 @@ delete_group_refreshes_navigation = GroupDefinition(
     public=False,
 )
 
+rename_group = GroupDefinition(
+    name="Rename Flow Group",
+    public=False,
+)
+
 user_one_category = GroupDefinition(
     name="User One Category",
     public=False,

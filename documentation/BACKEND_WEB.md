@@ -58,8 +58,10 @@ the entire object through the app server.
 Page notes use `GET` and `POST /pages/<page-key>/notes`. Home notes use
 `POST /activity/notes`; both return the shared note-card fragment and delete
 through the standard confirmation flow at `DELETE /activity/<note-key>`.
-The server assigns the note scope, validates `visibility`, and requires either
-`body` or one `note-file` image.
+Home note creation requires login, but only `SITE:EDIT` may create a Home note
+with `everyone` visibility. Page note creation and visibility choices continue
+to use the Page edit permission. The server assigns the note scope, validates
+`visibility`, and requires either `body` or one `note-file` image.
 
 ### Jinja Environment (`jinja.py`)
 
@@ -269,19 +271,24 @@ job failed, completes the pending notification, and returns the enqueue failure
 to the request boundary without running the export builder. See
 [AI_PIPELINE.md](AI_PIPELINE.md) for the shared job and polling architecture.
 
-### Index Pages with ETag Caching
+### Index Page Access and Collection Fingerprints
 
-For list/index pages, the `@permission` decorator sets `g.fingerprint` using the site fingerprint for that entity type (a UUID that changes whenever any entity of that type is saved or deleted):
+Index routes use the access decorator appropriate to the collection. Forms and
+users require their corresponding global permission. The task index only
+requires authentication because `TaskIndex` applies the current user's task
+restrictions to both its initial and lazy-row queries:
 
 ```python
 @tasks.route("/index", methods=["GET"])
-@permission(Resource.TASKS, Action.RESTRICTED)
+@logged_in
 def task_index():
-    task_index = index.TaskIndex()
-    task_index.prefetch = url_for("tasks.rows")
-    html = render_template("tasks/index.html", index=task_index)
-    return html, 200
+    return responses.index("tasks", index.TaskIndex())
 ```
+
+`responses.index()` adds the site fingerprint used by collection refresh. This
+is separate from HTTP ETag handling: routes decorated with `@permission` or
+`@home_permission` also set `g.fingerprint`, which the response hook emits as
+an ETag.
 
 ### Create/Update Pattern
 

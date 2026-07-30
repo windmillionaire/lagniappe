@@ -1,2 +1,567 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="65a60069-0b93-4919-970e-d25b3483510e",e._sentryDebugIdIdentifier="sentry-dbid-65a60069-0b93-4919-970e-d25b3483510e");}catch(e){}}();import{S as h}from"./shared.js?v=b9f8bba5";import{p as o}from"./primitives.js?v=b9f8bba5";import{F as l}from"./facets.js?v=b9f8bba5";import{f}from"./formatting.js?v=b9f8bba5";import{B as g}from"./baseElement.js?v=b9f8bba5";import{F as c}from"./form2.js?v=b9f8bba5";import{InputElement as d}from"./input.js?v=b9f8bba5";import{B as E}from"./baseForm.js?v=b9f8bba5";import"./combobox.js?v=b9f8bba5";import"./results2.js?v=b9f8bba5";import"./submitter.js?v=b9f8bba5";import"./loader.js?v=b9f8bba5";class u extends g{active(e){return this.combobox?.values.has(e)??this.values.some(t=>t?.id===e||t===e)}get values(){let e=this.submission;return typeof this.submission=="string"?(e=JSON.parse(this.submission),Array.isArray(e)?e:[e]):e&&typeof e=="object"?[e]:[]}get read(){return this._read?this._read:(this._read=document.createElement("div"),this._read.className="flex flex-row flex-wrap gap-2",this._read.dataset.kind=this.renderer.kind,this.values.forEach(e=>{const t=this._read.appendChild(document.createElement("div"));t.className=h.form.submission.default,t.appendChild(f.name(e)),this._read.appendChild(t)}),this._read.classList.add("group-data-[mode=edit]/element:hidden"),this._read)}get edit(){return this._edit?this._edit:(this._edit=o.input({label:this.schema.title||this.schema.label,name:this.schema.id||this.schema.name,data:{placeholder:this.schema.placeholder||"search...",multiple:this.schema.multiple,kind:this.renderer.kind,index:this.schema.index,creatable:this.schema.creatable}}),this._edit.querySelector("input").setAttribute("lp-select",""),this.combobox=new l(this._edit),this.values.forEach(e=>{this.combobox.addOption(e)}),this.combobox.init(),this.destroyables.push(this.combobox),this._edit.querySelector("[lp-select]").classList.add("group-data-[mode=read]/element:hidden"),this._edit)}clear(){this.combobox?.clear(),this.submission=null}destroy(){this.combobox?.destroy()}}const w=["public","models","forms","users","groups","categories","projects","pages"],x=(a,e)=>{const t=document.createElement("div");t.dataset.kind=e.kind||"default",t.className="w-full rounded-md pt-2 pb-3 px-3 outline-1 bg-slate-100 outline-user-default",t.setAttribute("data-section",a);const s=t.appendChild(document.createElement("h3"));return s.className="text-lg font-bold text-base-dark mb-3",s.textContent=e.title,t},p=(a,e={})=>{const t=e.level||a.levels?.[0],s=t==="RESTRICTED"?"NONE":t,i=a.levels.map(n=>({label:n,value:n,name:e.id||e.name,checked:s===n})),r=document.createElement("fieldset");return r.className=`${h.radio.fieldset.row} min-w-0 flex-1 flex-wrap`,i.forEach(n=>{r.appendChild(o.radio(n))}),r},b=(a,e={})=>{const t=document.createElement("li");return t.className="flex flex-row flex-wrap items-center gap-x-4 gap-y-2",t.appendChild(o.checkbox({label:e.label||e.name,checked:!0})),t.appendChild(p(a,e)),t};class m extends c{constructor(e){super(e),this.sections=new Map,this._update=this._update.bind(this),this._change=this._change.bind(this),this.target.addEventListener("updated",this._update),this.target.addEventListener("change",this._change)}get html(){return[...this.sections.values()].map(e=>e.container).filter(Boolean)}async init(){this.html.length!==0&&(this.form=new E(this),await this.form.init(),this.setVisibility(),this.commitRevisionBaseline())}async updated(e){w.forEach(t=>{e.sections[t]&&this.sections.set(t,{config:e.sections[t]})}),this.setSections(),this.form&&(this._success=!0)}async postreconcile(){this.destroy(),await this.init(),this._success&&this.form.success(),this._success=!1}_update(e){const t=this.sections.get(e.detail.name),s=Object.values(e.detail.options)[0];!t||!s?.id||(t.list.querySelector(`[name="${s.id}"]`)||t.list.appendChild(b(t.config,s)),t.select.clear())}_change(e){const t=e.target.closest("[data-section]").dataset.section;e.target.type==="checkbox"&&!e.target.checked&&e.target.closest("li").remove();const s=this.sections.get(t);["public"].includes(t)?s.set=e.target.value==="TRUE":"list"in this.sections.get(t)?s.set=this.sections.get(t).list.children.length>0:t==="users"?s.set=!["NONE","VIEW"].includes(e.target.value):s.set=e.target.value!=="NONE",this.setVisibility()}setSections(){this.sections.entries().forEach(([e,t])=>{const s=t.config;if(t.container=x(e,s),s.select){const i=t.container.appendChild(o.input(s.select));t.list=t.container.appendChild(document.createElement("ul")),t.list.className="flex flex-col gap-2 empty:hidden gap-2 mt-4",s.permissions.forEach(r=>{t.list.appendChild(b(s,r))}),t.set=s.permissions.length>0,t.select=e==="projects"?new l(i,{models:!1}):new l(i),t.select.init(),this.destroyables.push(t.select)}else{const i=s.permission??{name:e};t.container.appendChild(p(s,i));const r=s.permission?.level;["public"].includes(e)?t.set=r==="TRUE":["forms","models"].includes(e)?t.set=r!=="NONE":e==="users"&&(t.set=!["NONE","VIEW"].includes(r))}})}setVisibility(){const e=this.sections.get("public")?.set===!1,t=this.sections.get("models")?.set===!0;this.sections.forEach((s,i)=>{e&&i!=="public"||t&&["categories","projects","pages"].includes(i)||i==="groups"&&this.sections.get("users")?.set||i==="users"&&this.sections.get("groups")?.set?s.container.dataset.visible="false":s.container.dataset.visible="true"})}}class _ extends c{init(){this.messages={submit:"Create User",submitting:"Creating",submitted:"User Created"},super.init()}get html(){const e=document.createElement("div");e.className="flex flex-col gap-4 sm:flex-row",this.nameElement=new d(this,{name:"name",required:!0,type:"text",label:"Name"}),this.nameElement.edit.classList.add("w-full","sm:basis-1/2"),e.appendChild(this.nameElement.edit);const t=new d(this,{name:"email",required:!0,input:"email",label:"Email"});t.edit.classList.add("w-full","sm:basis-1/2"),e.appendChild(t.edit);const s=new u(this,{name:"page",kind:"page",label:"Attach to Existing Page",placeholder:"select a page...",index:"page",creatable:!0}),i=new u(this,{name:"group",kind:"user",label:"User Group(s)",placeholder:"select user group(s)...",index:"group",multiple:!0});return this.destroyables.push(s,i),[e,s.edit,i.edit]}postreconcile(){const e=this._created;super.postreconcile(),e&&(this.nameElement.clear(),this.success(),this.form?.resetSubmitButton()),this.nameElement.focus(),this.target.dataset.visible="true"}}class y extends c{constructor(e){super(e),this.messages={submit:"Create User Group",submitting:"Creating",submitted:"User Group Created"},this._newGroupSelector=null,this._newGroupForm=null}get html(){return[new d(this,{name:"name",required:!0,type:"text",label:"Group Name"}).edit]}get selectors(){return this.component.elt.querySelector("[data-role='group-selectors']")}async created(e){if(this._newGroupSelector=e.html?.body.querySelector("button[lp-show]:not([lp-control])"),this._newGroupSelector&&(this.selectors.appendChild(this._newGroupSelector),this._newGroupSelector=null,this.component.nav=null),this._newGroupForm=e.html?.body.querySelector("form"),this._newGroupForm){this.component.elt.appendChild(this._newGroupForm);const t=this._newGroupForm.dataset.widget;await this.component.activate(t)}}async postreconcile(){this._newGroupSelector&&(await this.reset(),this.target.dataset.visible="false")}}class C extends m{init(){this.messages={submit:"Update Public Permissions",submitting:"Updating Public Permissions",submitted:"Public Permissions Updated"},super.init()}}class v extends m{init(){this.messages={submit:"Update Group Permissions",submitting:"Updating Group Permissions",submitted:"Group Permissions Updated"},super.init()}}class N extends m{init(){this.messages={submit:"Update User Permissions",submitting:"Updating User Permissions",submitted:"User Permissions Updated"},super.init()}}export{_ as CreateUser,y as CreateUserGroup,v as GroupPermissions,C as PublicPermissions,N as UserPermissions};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES } from './shared.js?v=b30f3f24';
+import { p as primitives } from './primitives.js?v=b30f3f24';
+import { F as FacetsBox } from './facets.js?v=b30f3f24';
+import { f as formatting } from './formatting.js?v=b30f3f24';
+import { B as BaseElement } from './baseElement.js?v=b30f3f24';
+import { F as FormElement } from './form2.js?v=b30f3f24';
+import { InputElement } from './input.js?v=b30f3f24';
+import { B as BaseForm } from './baseForm.js?v=b30f3f24';
+import './combobox.js?v=b30f3f24';
+import './results2.js?v=b30f3f24';
+import './submitter.js?v=b30f3f24';
+import './loader.js?v=b30f3f24';
+
+/**
+ * @testable infrastructure
+ */
+class FacetedSearchElement extends BaseElement {
+	active(value) {
+		return (
+			this.combobox?.values.has(value) ??
+			this.values.some((v) => v?.id === value || v === value)
+		);
+	}
+
+	get values() {
+		let submission = this.submission;
+		if (typeof this.submission === "string") {
+			submission = JSON.parse(this.submission);
+			return Array.isArray(submission) ? submission : [submission];
+		} else if (submission && typeof submission === "object") {
+			return [submission];
+		}
+		return [];
+	}
+
+	get read() {
+		if (this._read) return this._read;
+
+		this._read = document.createElement("div");
+		this._read.className = "flex flex-row flex-wrap gap-2";
+		this._read.dataset.kind = this.renderer.kind;
+
+		this.values.forEach((item) => {
+			const container = this._read.appendChild(document.createElement("div"));
+			container.className = STYLES.form.submission.default;
+			container.appendChild(formatting.name(item));
+			this._read.appendChild(container);
+		});
+
+		this._read.classList.add("group-data-[mode=edit]/element:hidden");
+		return this._read;
+	}
+
+	get edit() {
+		if (this._edit) return this._edit;
+
+		this._edit = primitives.input({
+			label: this.schema.title || this.schema.label,
+			name: this.schema.id || this.schema.name,
+			data: {
+				placeholder: this.schema.placeholder || "search...",
+				multiple: this.schema.multiple,
+				kind: this.renderer.kind,
+				index: this.schema.index,
+				creatable: this.schema.creatable,
+			},
+		});
+		this._edit.querySelector("input").setAttribute("lp-select", "");
+
+		this.combobox = new FacetsBox(this._edit);
+
+		this.values.forEach((value) => {
+			this.combobox.addOption(value);
+		});
+		this.combobox.init();
+		this.destroyables.push(this.combobox);
+
+		this._edit
+			.querySelector("[lp-select]")
+			.classList.add("group-data-[mode=read]/element:hidden");
+
+		return this._edit;
+	}
+
+	clear() {
+		this.combobox?.clear();
+		this.submission = null;
+	}
+
+	destroy() {
+		this.combobox?.destroy();
+	}
+}
+
+const SECTION_ORDER = [
+	"public",
+	"models",
+	"forms",
+	"users",
+	"groups",
+	"categories",
+	"projects",
+	"pages",
+];
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/permissions.mjs::PermissionsForm
+ * @reason permission-section container is private permissions form rendering
+ */
+const container = (name, config) => {
+	const container = document.createElement("div");
+	container.dataset.kind = config.kind || "default";
+	container.className =
+		"w-full rounded-md pt-2 pb-3 px-3 outline-1 bg-slate-100 outline-user-default";
+	container.setAttribute("data-section", name);
+
+	const header = container.appendChild(document.createElement("h3"));
+	header.className = "text-lg font-bold text-base-dark mb-3";
+	header.textContent = config.title;
+
+	return container;
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/permissions.mjs::PermissionsForm
+ * @reason permission-level row is private permissions form rendering
+ */
+const row = (config, entry = {}) => {
+	// permission contains the current level, or use first available level as fallback
+	const level = entry.level || config.levels?.[0];
+	const setLevel = level === "RESTRICTED" ? "NONE" : level;
+
+	const options = config.levels.map((level) => ({
+		label: level,
+		value: level,
+		name: entry.id || entry.name,
+		checked: setLevel === level,
+	}));
+
+	const permissionRow = document.createElement("fieldset");
+	permissionRow.className = `${STYLES.radio.fieldset.row} min-w-0 flex-1 flex-wrap`;
+
+	options.forEach((option) => {
+		permissionRow.appendChild(primitives.radio(option));
+	});
+
+	return permissionRow;
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/permissions.mjs::PermissionsForm
+ * @reason specific-permission row is private permissions form rendering
+ */
+const addSpecificPermission = (config, entry = {}) => {
+	const permission = document.createElement("li");
+	permission.className = "flex flex-row flex-wrap items-center gap-x-4 gap-y-2";
+	permission.appendChild(
+		primitives.checkbox({
+			label: entry.label || entry.name,
+			checked: true,
+		}),
+	);
+	permission.appendChild(row(config, entry));
+	return permission;
+};
+
+/**
+ * @testable true
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
+ * @features user-groups
+ * @dimensions permission-update general-permissions entity-permissions selection-render responsive-layout
+ */
+class PermissionsForm extends FormElement {
+	constructor(attributes) {
+		super(attributes);
+		this.sections = new Map();
+		this._update = this._update.bind(this);
+		this._change = this._change.bind(this);
+		this.target.addEventListener("updated", this._update);
+		this.target.addEventListener("change", this._change);
+	}
+
+	get html() {
+		return [...this.sections.values()]
+			.map((section) => section.container)
+			.filter(Boolean);
+	}
+
+	async init() {
+		if (this.html.length === 0) return;
+		this.form = new BaseForm(this);
+		await this.form.init();
+		this.setVisibility();
+		this.commitRevisionBaseline();
+	}
+
+	async updated(response) {
+		SECTION_ORDER.forEach((name) => {
+			if (response.sections[name]) {
+				this.sections.set(name, { config: response.sections[name] });
+			}
+		});
+
+		this.setSections();
+
+		if (this.form) this._success = true;
+	}
+
+	async postreconcile() {
+		this.destroy();
+		await this.init();
+		if (this._success) this.form.success();
+		this._success = false;
+	}
+
+	_update(event) {
+		const section = this.sections.get(event.detail.name);
+		const newEntry = Object.values(event.detail.options)[0];
+		if (!section || !newEntry?.id) return;
+
+		if (!section.list.querySelector(`[name="${newEntry.id}"]`)) {
+			section.list.appendChild(addSpecificPermission(section.config, newEntry));
+		}
+		section.select.clear();
+	}
+
+	_change(event) {
+		const sectionContainer = event.target.closest("[data-section]");
+		if (!sectionContainer) return;
+		const section = sectionContainer.dataset.section;
+		if (event.target.type === "checkbox" && !event.target.checked) {
+			const permission = event.target.closest("li");
+			permission.remove();
+		}
+
+		const changed = this.sections.get(section);
+		if (["public"].includes(section)) {
+			changed.set = event.target.value === "TRUE";
+		} else if ("list" in this.sections.get(section)) {
+			changed.set = this.sections.get(section).list.children.length > 0;
+		} else if (section === "users") {
+			changed.set = !["NONE", "VIEW"].includes(event.target.value);
+		} else {
+			changed.set = event.target.value !== "NONE";
+		}
+
+		this.setVisibility();
+	}
+
+	setSections() {
+		this.sections.entries().forEach(([name, section]) => {
+			const config = section.config;
+			section.container = container(name, config);
+
+			if (config.select) {
+				const selectElt = section.container.appendChild(
+					primitives.input(config.select),
+				);
+
+				section.list = section.container.appendChild(
+					document.createElement("ul"),
+				);
+				section.list.className = "flex flex-col gap-2 empty:hidden gap-2 mt-4";
+				config.permissions.forEach((perm) => {
+					section.list.appendChild(addSpecificPermission(config, perm));
+				});
+				section.set = config.permissions.length > 0;
+
+				section.select =
+					name === "projects"
+						? new FacetsBox(selectElt, { models: false })
+						: new FacetsBox(selectElt);
+				section.select.init();
+				this.destroyables.push(section.select);
+			} else {
+				const entry = config.permission ?? { name: name };
+				section.container.appendChild(row(config, entry));
+
+				const level = config.permission?.level;
+				if (["public"].includes(name)) {
+					section.set = level === "TRUE";
+				} else if (["forms", "models"].includes(name)) {
+					section.set = level !== "NONE";
+				} else if (name === "users") {
+					section.set = !["NONE", "VIEW"].includes(level);
+				}
+			}
+		});
+	}
+
+	setVisibility() {
+		const publicNotAllowed = this.sections.get("public")?.set === false;
+		const hasModelPermissions = this.sections.get("models")?.set === true;
+
+		this.sections.forEach((section, name) => {
+			if (publicNotAllowed && name !== "public") {
+				section.container.dataset.visible = "false";
+			} else if (
+				hasModelPermissions &&
+				["categories", "projects", "pages"].includes(name)
+			) {
+				section.container.dataset.visible = "false";
+			} else if (name === "groups" && this.sections.get("users")?.set) {
+				section.container.dataset.visible = "false";
+			} else if (name === "users" && this.sections.get("groups")?.set) {
+				section.container.dataset.visible = "false";
+			} else {
+				section.container.dataset.visible = "true";
+			}
+		});
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_from_index
+ * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_attached_to_existing_page_preserves_page_info_form
+ * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_group_selector_accepts_multiple_groups
+ * @features users
+ * @dimensions create-form create-submit created-row attach-existing-page page-form-preserved
+ * @pairs users:group-selector users:multiple
+ */
+class CreateUser extends FormElement {
+	init() {
+		this.messages = {
+			submit: "Create User",
+			submitting: "Creating",
+			submitted: "User Created",
+		};
+
+		super.init();
+	}
+
+	get html() {
+		const details = document.createElement("div");
+		details.className = "flex flex-col gap-4 sm:flex-row";
+
+		this.nameElement = new InputElement(this, {
+			name: "name",
+			required: true,
+			type: "text",
+			label: "Name",
+		});
+		this.nameElement.edit.classList.add("w-full", "sm:basis-1/2");
+		details.appendChild(this.nameElement.edit);
+
+		const email = new InputElement(this, {
+			name: "email",
+			required: true,
+			input: "email",
+			label: "Email",
+		});
+		email.edit.classList.add("w-full", "sm:basis-1/2");
+		details.appendChild(email.edit);
+
+		const page = new FacetedSearchElement(this, {
+			name: "page",
+			kind: "page",
+			label: "Attach to Existing Page",
+			placeholder: "select a page...",
+			index: "page",
+			creatable: true,
+		});
+
+		const group = new FacetedSearchElement(this, {
+			name: "group",
+			kind: "user",
+			label: "User Group(s)",
+			placeholder: "select user group(s)...",
+			index: "group",
+			multiple: true,
+		});
+
+		this.destroyables.push(page, group);
+
+		return [details, page.edit, group.edit];
+	}
+
+	postreconcile() {
+		const created = this._created;
+		super.postreconcile();
+
+		if (created) {
+			this.nameElement.clear();
+			this.success();
+			this.form?.resetSubmitButton();
+		}
+		this.nameElement.focus();
+		this.target.dataset.visible = "true";
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
+ * @features user-groups
+ * @dimensions group-create nav
+ */
+class CreateUserGroup extends FormElement {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Create User Group",
+			submitting: "Creating",
+			submitted: "User Group Created",
+		};
+		this._newGroupSelector = null;
+		this._newGroupForm = null;
+	}
+
+	get html() {
+		const name = new InputElement(this, {
+			name: "name",
+			required: true,
+			type: "text",
+			label: "Group Name",
+		});
+
+		return [name.edit];
+	}
+
+	get selectors() {
+		return this.component.elt.querySelector("[data-role='group-selectors']");
+	}
+
+	async created(response) {
+		this._newGroupSelector = response.html?.body.querySelector(
+			"button[lp-show]:not([lp-control])",
+		);
+		if (this._newGroupSelector) {
+			this.selectors.appendChild(this._newGroupSelector);
+			this._newGroupSelector = null;
+			this.component.nav = null;
+		}
+
+		this._newGroupForm = response.html?.body.querySelector("form");
+		if (this._newGroupForm) {
+			this.component.elt.appendChild(this._newGroupForm);
+			const newGroupWidget = this._newGroupForm.dataset.widget;
+			await this.component.activate(newGroupWidget);
+		}
+	}
+
+	async postreconcile() {
+		if (this._newGroupSelector) {
+			await this.reset();
+			this.target.dataset.visible = "false";
+		}
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_public_permissions
+ * @features public-groups permissions
+ * @dimensions public active permission-update
+ */
+class PublicPermissions extends PermissionsForm {
+	init() {
+		this.messages = {
+			submit: "Update Public Permissions",
+			submitting: "Updating Public Permissions",
+			submitted: "Public Permissions Updated",
+		};
+		super.init();
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_rename_group
+ * @features user-groups
+ * @dimensions permission-update general-permissions entity-permissions rename
+ */
+class GroupPermissions extends PermissionsForm {
+	constructor(attributes) {
+		super(attributes);
+		this._draftName = null;
+		this.target.addEventListener("input", (event) => {
+			if (event.target.matches("input[name='name']")) {
+				this._draftName = event.target.value;
+				this.target.dataset.name = event.target.value;
+			}
+		});
+	}
+
+	get formData() {
+		const data = super.formData;
+		if (this._draftName !== null) data.set("name", this._draftName);
+		return data;
+	}
+
+	get html() {
+		const name = new InputElement(
+			this,
+			{
+				id: "name",
+				name: "name",
+				title: "Group Name",
+				input: "text",
+			},
+			this.target.dataset.name || "",
+		);
+
+		return [name.edit, ...super.html];
+	}
+
+	init() {
+		this.messages = {
+			submit: "Update User Group",
+			submitting: "Updating User Group",
+			submitted: "User Group Updated",
+		};
+		super.init();
+	}
+
+	updated(response) {
+		if (response.name) {
+			if (
+				this._draftName !== null &&
+				response.name !== this._draftName.trim()
+			) {
+				return super.updated(response);
+			}
+
+			this._draftName = null;
+			this.target.dataset.name = response.name;
+			this.target.dataset.title = `${response.name} Permissions`;
+
+			const selector = Array.from(
+				this.component.elt.querySelectorAll(
+					"[data-role='group-selectors'] button[data-key]",
+				),
+			).find((button) => button.dataset.key === this.key);
+			const label = selector?.querySelector("[data-role='group-name']");
+			if (label) label.textContent = response.name;
+		}
+
+		return super.updated(response);
+	}
+}
+
+/**
+ * @testable false
+ * @covered-by lagniappe/core/properties/user_permissions.py::UserPermissions.create
+ * @reason user permission persistence is owned by the backend property; this wrapper is not currently rendered by an E2E flow
+ */
+class UserPermissions extends PermissionsForm {
+	init() {
+		this.messages = {
+			submit: "Update User Permissions",
+			submitting: "Updating User Permissions",
+			submitted: "User Permissions Updated",
+		};
+		super.init();
+	}
+}
+
+export { CreateUser, CreateUserGroup, GroupPermissions, PublicPermissions, UserPermissions };

@@ -1,2 +1,176 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="83a8e3d2-c4d0-448a-ae81-c2cfc3eec59d",e._sentryDebugIdIdentifier="sentry-dbid-83a8e3d2-c4d0-448a-ae81-c2cfc3eec59d");}catch(e){}}();import{S as o,s as l}from"./shared.js?v=b9f8bba5";import{f as r}from"./formatting.js?v=b9f8bba5";const m=t=>{const e=document.createElement("div");return e.className=o.dropdown.option.flow,e.setAttribute("role","option"),t.id&&(e.id=t.id,e.dataset.id=t.id),t.icon&&e.appendChild(d(t)),e.append(r.name(t)),e.outerHTML},d=t=>{const e=t.icon||t.kind||t.type;if(e){const n=document.createElement("span");n.className="text-kind-default",n.dataset.kind=t.kind||t.index;const a=n.appendChild(document.createElement("span"));return l(a,e,o.dropdown.icon),n}},c=t=>{const e=document.createElement("p");return e.append(...[d(t),r.name(t)].filter(Boolean)),e},p=t=>{const e=document.createElement("div");if(e.className=o.dropdown.search.link,e.setAttribute("role","option"),e.dataset.result=JSON.stringify(t),e.dataset.url=t.url,e.appendChild(c(t.details)),t.form_field){const n=document.createElement("p");n.className="italic font-normal text-base-default";const a=document.createElement("span");a.className="font-semibold text-form-default",a.textContent=`${t.form_field}:`,n.appendChild(a);const i=document.createElement("span");i.className="ml-1",i.textContent=`${t.form_value}`,n.appendChild(i),e.appendChild(n)}if(t.text){const n=document.createElement("p");n.className="italic font-normal text-base-default",n.innerHTML=t.text,e.appendChild(n)}return e.outerHTML},u=t=>{const e=document.createElement("div");return e.className=`${o.dropdown.search.result}`,e.setAttribute("role","option"),e.dataset.details=JSON.stringify(t),e.dataset.id=t.id,e.dataset.name=t.name,e.dataset.kind=t.kind,e.appendChild(c(t)),e.outerHTML};class f{constructor(e){this.index=e,this.added=[]}get options(){return JSON.parse(localStorage.getItem(`recent-${this.index}`)||"[]")}add(e){this.added.unshift(e)}save(e){const n=this.options;let a;if(this.index==="search"&&e.dataset.result){a=n.filter(s=>s.url!==e.dataset.url);const i=JSON.parse(e.dataset.result);i.url=e.dataset.url,a.unshift(i)}else if(e.dataset.id){a=n.filter(s=>s.id!==e.dataset.id);const i=JSON.parse(e.dataset.details);a.unshift(i)}Array.isArray(a)&&localStorage.setItem(`recent-${this.index}`,JSON.stringify(a.slice(0,10)))}unique(e){return e.filter((n,a,i)=>a===i.findIndex(s=>s.id===n.id))}create(e=[]){let n=e;return e.length||(n=this.unique([...this.added,...this.options]).slice(0,10)),n.length?this.index==="search"?n.map(p).join(""):this.index?n.map(u).join(""):n.map(m).join(""):""}}export{f as R};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES, s as setIcon } from './shared.js?v=b30f3f24';
+import { f as formatting } from './formatting.js?v=b30f3f24';
+
+/**
+ * @testable infrastructure
+ */
+const option = (details) => {
+	const option = document.createElement("div");
+	option.className = STYLES.dropdown.option.flow;
+	option.setAttribute("role", "option");
+	if (details.id) {
+		option.id = details.id;
+		option.dataset.id = details.id;
+	}
+
+	if (details.icon) {
+		option.appendChild(icon(details));
+	}
+
+	option.append(formatting.name(details));
+
+	return option.outerHTML;
+};
+
+/**
+ * @testable infrastructure
+ */
+const icon = (details) => {
+	const iconType = details.icon || details.kind || details.type;
+	if (iconType) {
+		const container = document.createElement("span");
+		container.className = "text-kind-default";
+		container.dataset.kind = details.kind || details.index;
+		const iconElement = container.appendChild(document.createElement("span"));
+		setIcon(iconElement, iconType, STYLES.dropdown.icon);
+		return container;
+	}
+};
+
+/**
+ * @testable infrastructure
+ */
+const name = (details) => {
+	const p1 = document.createElement("p");
+
+	p1.append(...[icon(details), formatting.name(details)].filter(Boolean));
+
+	return p1;
+};
+
+/**
+ * @testable infrastructure
+ */
+const search = (result) => {
+	const option = document.createElement("div");
+	option.className = STYLES.dropdown.search.link;
+	option.setAttribute("role", "option");
+	option.dataset.result = JSON.stringify(result);
+	option.dataset.url = result.url;
+
+	option.appendChild(name(result.details));
+
+	if (result.form_field) {
+		const p2 = document.createElement("p");
+		p2.className = `italic font-normal text-base-default`;
+
+		const fieldSpan = document.createElement("span");
+		fieldSpan.className = "font-semibold text-form-default";
+		fieldSpan.textContent = `${result.form_field}:`;
+		p2.appendChild(fieldSpan);
+
+		const formValueText = document.createElement("span");
+		formValueText.className = "ml-1";
+		formValueText.textContent = `${result.form_value}`;
+		p2.appendChild(formValueText);
+
+		option.appendChild(p2);
+	}
+
+	if (result.text) {
+		const p3 = document.createElement("p");
+		p3.className = `italic font-normal text-base-default`;
+		p3.innerHTML = result.text;
+		option.appendChild(p3);
+	}
+
+	return option.outerHTML;
+};
+
+/**
+ * @testable infrastructure
+ */
+const facet = (details) => {
+	const option = document.createElement("div");
+	option.className = `${STYLES.dropdown.search.result}`;
+	option.setAttribute("role", "option");
+	option.dataset.details = JSON.stringify(details);
+	option.dataset.id = details.id;
+	option.dataset.name = details.name;
+	option.dataset.kind = details.kind;
+
+	option.appendChild(name(details));
+
+	return option.outerHTML;
+};
+
+/**
+ * @testable infrastructure
+ */
+class Results {
+	constructor(index) {
+		this.index = index;
+		this.added = [];
+	}
+
+	get options() {
+		return JSON.parse(localStorage.getItem(`recent-${this.index}`) || "[]");
+	}
+
+	add(option) {
+		this.added.unshift(option);
+	}
+
+	save(option) {
+		const recent = this.options;
+		let filtered;
+		if (this.index === "search" && option.dataset.result) {
+			filtered = recent.filter((o) => o.url !== option.dataset.url);
+			const result = JSON.parse(option.dataset.result);
+			result.url = option.dataset.url;
+			filtered.unshift(result);
+		} else if (option.dataset.id) {
+			filtered = recent.filter((o) => o.id !== option.dataset.id);
+			const details = JSON.parse(option.dataset.details);
+			filtered.unshift(details);
+		}
+		if (Array.isArray(filtered)) {
+			localStorage.setItem(
+				`recent-${this.index}`,
+				JSON.stringify(filtered.slice(0, 10)),
+			);
+		}
+	}
+
+	unique(options) {
+		return options.filter(
+			(o, index, self) => index === self.findIndex((t) => t.id === o.id),
+		);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_023_entity_name_formatting.py::test_recent_combobox_results_reuse_shared_parent_name_formatting
+	 * @pair combobox:parent-separator
+	 * @pair combobox:recent-results
+	 * @pair entity-name:recent-results
+	 */
+	create(items = []) {
+		let options = items;
+		if (!items.length) {
+			options = this.unique([...this.added, ...this.options]).slice(0, 10);
+		}
+		if (!options.length) return "";
+
+		if (this.index === "search") {
+			return options.map(search).join("");
+		} else if (this.index) {
+			return options.map(facet).join("");
+		} else {
+			return options.map(option).join("");
+		}
+	}
+}
+
+export { Results as R };

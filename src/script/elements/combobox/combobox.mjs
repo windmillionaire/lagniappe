@@ -58,6 +58,9 @@ export class Combobox {
 		this.multiple =
 			data.multiple === undefined ? undefined : JSON.parse(data.multiple);
 		this.creatable = data.creatable;
+		this.formType = data.formType;
+		this.includeUsers = data.includeUsers;
+		this.permission = data.permission;
 
 		this.name = this.element?.name || this.element?.id || this.index;
 		this.id = this.element?.id || generateElementId("combobox");

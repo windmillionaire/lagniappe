@@ -3,8 +3,10 @@
 from uuid import uuid4
 
 import pytest
+import requests
 from playwright.sync_api import expect
 
+from config import SETTINGS
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.web.routes.process.main import _create_notification
@@ -86,15 +88,20 @@ def _user_key(user):
 
 
 def _create_text_note_from_home(
-    user, home, body, expect_network=True, visible_text=None, visibility="private"
+    user, home, body, expect_network=True, visible_text=None, visibility=None
 ):
     home.user.locate(home.CREATE_NOTE_TOGGLE).click()
     form = home.user.locate(home.CREATE_NOTE_FORM)
     expect(form).to_be_visible()
     form.locator("textarea[name='body']").fill(body)
-    form.locator(
-        f"input[name='visibility'][value='{visibility}']"
-    ).check()
+    if visibility:
+        form.locator(
+            f"input[name='visibility'][value='{visibility}']"
+        ).check()
+    else:
+        expect(
+            form.locator("input[name='visibility'][value='private']")
+        ).to_be_checked()
 
     if expect_network:
         with user.page.expect_response("**/activity/notes"):
@@ -211,6 +218,7 @@ def test_home_notes_exclude_notifications(get_user):
 # @pair notes:scope
 # @pair notes:asset-lifecycle
 # @pair notes:html-stripping
+# @pair notes:private-default
 # @template home/notes.html::add_note_form
 # @template notes.html::note_item
 def test_create_note_body_and_photo_from_home(get_user):
@@ -226,6 +234,7 @@ def test_create_note_body_and_photo_from_home(get_user):
     text_note = Entities.fetch_one(text_key, request=Fetch.direct())
 
     assert text_note.body == visible_body
+    assert text_note.visibility == "private"
     assert text_note.properties.parent.key == user.entity.key
     assert text_note.properties.user.key == user.entity.key
     expect(text_item).to_contain_text(visible_body)
@@ -244,6 +253,50 @@ def test_create_note_body_and_photo_from_home(get_user):
     assert photo_note.scope == "home"
     assert "photo" in photo_note.assets
     expect(photo_item).to_contain_text("Everyone")
+
+
+# @pairs activity:owner-only-shared notes:owner-only-shared permissions:owner-only-shared
+# @template home/home.html::create
+# @template notes.html::composer
+def test_home_note_shared_visibility_is_owner_only(get_user):
+    user = get_user(Users.create_user)
+    home = user.go(SitePages.HOME)
+
+    expect(user.locate(home.CREATE_NOTE_TOGGLE)).to_be_visible()
+    user.locate(home.CREATE_NOTE_TOGGLE).click()
+    form = user.locate(home.CREATE_NOTE_FORM)
+    expect(form).to_be_visible()
+    expect(
+        form.locator("input[name='visibility'][value='everyone']")
+    ).not_to_be_attached()
+    expect(
+        form.locator("input[name='visibility'][value='private']")
+    ).to_be_checked()
+
+    private_body = _unique("Private Home note")
+    form.locator("textarea[name='body']").fill(private_body)
+    with user.page.expect_response("**/activity/notes"):
+        form.locator("button[type='submit']").click()
+    private_item = _activity_item(home, private_body)
+    expect(private_item).to_be_visible()
+    expect(private_item).to_contain_text("Private")
+
+    cookies = {
+        cookie["name"]: cookie["value"] for cookie in user.page.context.cookies()
+    }
+    response = requests.post(
+        f"{SETTINGS.test_config['BASE_URL']}/activity/notes",
+        data={"body": _unique("Forbidden Home note"), "visibility": "everyone"},
+        cookies=cookies,
+        headers={
+            "X-CSRFToken": user.locate("#token").input_value(),
+            "X-Lagniappe-Request": "true",
+        },
+        allow_redirects=False,
+        timeout=10,
+    )
+
+    assert response.status_code == 403
 
 
 # @pair activity:delete

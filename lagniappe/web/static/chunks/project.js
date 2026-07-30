@@ -1,2 +1,39 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="7ee60005-7974-4fb7-b0c1-0cee3962d168",e._sentryDebugIdIdentifier="sentry-dbid-7ee60005-7974-4fb7-b0c1-0cee3962d168");}catch(e){}}();import{E as e}from"./entity.js?v=b9f8bba5";import"./core.js?v=b9f8bba5";import"./entityMenu.js?v=b9f8bba5";import"./shared.js?v=b9f8bba5";import"./combobox.js?v=b9f8bba5";import"./primitives.js?v=b9f8bba5";import"./results2.js?v=b9f8bba5";import"./formatting.js?v=b9f8bba5";import"./dropdown.js?v=b9f8bba5";class r extends e{get secondaryCard(){const t=this.elt.querySelector("#model-tasks");return t?.dataset.hasAttribute==="false"?null:t}_prerender(t){return this._tabElement(t)?.dataset.hasAttribute==="false"&&(t=this._defaultTabId),super._prerender(t)}}export{r as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { E as Entity } from './entity.js?v=b30f3f24';
+import './core.js?v=b30f3f24';
+import './entityMenu.js?v=b30f3f24';
+import './shared.js?v=b30f3f24';
+import './combobox.js?v=b30f3f24';
+import './primitives.js?v=b30f3f24';
+import './results2.js?v=b30f3f24';
+import './formatting.js?v=b30f3f24';
+import './dropdown.js?v=b30f3f24';
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004b_info.py::test_toggle_tasks_attribute
+ * @features projects
+ * @dimensions attribute-model-tasks
+ */
+class Project extends Entity {
+	get secondaryCard() {
+		const modelTasks = this.elt.querySelector("#model-tasks");
+		if (modelTasks?.dataset.hasAttribute === "false") return null;
+		return modelTasks;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/base/entity.mjs::Entity._renderLayout
+	 * @reason project-specific inactive attribute guard feeds the shared layout renderer
+	 */
+	_prerender(tabId) {
+		const tab = this._tabElement(tabId);
+		if (tab?.dataset.hasAttribute === "false") {
+			tabId = this._defaultTabId;
+		}
+		return super._prerender(tabId);
+	}
+}
+
+export { Project as default };

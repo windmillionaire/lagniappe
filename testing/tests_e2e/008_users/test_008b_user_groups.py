@@ -123,6 +123,41 @@ def test_set_entity_specific_permissions(get_user):
     _set_and_verify_permissions(user, group, permissions)
 
 
+# @features user-groups
+# @dimensions group-create rename permission-update nav reload
+# @template users/tools.html::group_permissions
+# @template users/tools.html::group_selector
+def test_rename_group(get_user):
+    """A group name can be changed from its permissions panel."""
+    user = get_user(Users.OWNER)
+    user_index = user.go(SitePages.USER_INDEX)
+    group = Groups.rename_group.get(user, create=False)
+    _create_group(user, user_index, group)
+
+    permissions = PermissionsForm(user, group)
+    renamed = "Renamed User Group"
+    name_input = permissions.form.locator("input[name='name']")
+    expect(name_input).to_have_value(group.definition.name)
+    name_input.fill(renamed)
+    expect(name_input).to_have_value(renamed)
+    permissions.submit()
+
+    groups = user.locate(user_index.USER_GROUPS_COMPONENT)
+    selector = groups.locator(f"button[data-key='{group.key}']")
+    expect(selector.locator("[data-role='group-name']")).to_have_text(renamed)
+    expect(permissions.form).to_have_attribute(
+        "data-title", f"{renamed} Permissions"
+    )
+    expect(groups.locator("[data-role='title']")).to_have_text(
+        f"{renamed} Permissions"
+    )
+    expect(name_input).to_have_value(renamed)
+
+    user.reload(user_index)
+    expect(selector.locator("[data-role='group-name']")).to_have_text(renamed)
+    expect(name_input).to_have_value(renamed)
+
+
 # @features public-groups permissions
 # @dimensions public active permission-update
 # @template users/tools.html::public_permissions

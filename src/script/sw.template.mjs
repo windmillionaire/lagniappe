@@ -343,10 +343,12 @@ function isStatic(pathname) {
 }
 
 self.addEventListener("fetch", (event) => {
-	const url = event.request.url;
-	const pathname = new URL(url).pathname;
+	const requestUrl = event.request.url;
+	const url = new URL(requestUrl);
+	const pathname = url.pathname;
 
-	if (url.includes("extension://")) return;
+	if (requestUrl.includes("extension://")) return;
+	if (url.origin !== self.location.origin) return;
 	if (pathname === "/ping") return;
 	if (pathname === "/token" && event.request.method === "GET") {
 		event.respondWith(handleNetworkOnlyGet(event));

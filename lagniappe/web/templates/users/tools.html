@@ -59,6 +59,7 @@
         data-key="{{ group.urlsafe_key }}"
         data-fingerprint="{{ group.fingerprint }}"
         data-route="{{ url_for('users.group_permissions', key=group.urlsafe_key) }}"
+        data-name="{{ group.name }}"
         data-reset="user-groups:nav"
         data-title="{{ group.name }} Permissions"
         data-visible="false"
@@ -99,7 +100,7 @@
           data-key="{{ group.urlsafe_key }}"
           lp-show="user-groups:GroupPermissions/{{ group.hash }}">
     {{ render_icon("group") }}
-    <span>{{ group.name }}</span>
+    <span data-role="group-name">{{ group.name }}</span>
   </button>
 {% endmacro %}
 

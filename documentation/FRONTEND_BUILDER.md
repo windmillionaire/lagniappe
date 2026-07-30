@@ -140,6 +140,12 @@ Controls for the form name (inline editable), save button, and preview toggle.
 
 **Save button**: PUTs the save form data to the server. Disables during save, shows saved/error state.
 
+Readonly builders keep the component palette, settings, schema manipulation,
+and preview interactions available for exploration. Persistence controls are
+omitted, and a persistent notice beneath the title explains that changes will
+not be saved. Temporary builder feedback continues to use the separate
+notification element.
+
 ## Conditions System
 
 Conditions are property editors that open in the ConditionPanel. Each condition type is lazy-loaded from `conditions/loader.mjs`.

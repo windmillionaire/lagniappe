@@ -20,7 +20,9 @@ IndexedDB validator store to coordinate or invalidate.
 
 ### Request Classification
 
-Every fetch is classified into one of three categories:
+Cross-origin requests bypass the service worker so third-party scripts and
+provider-owned telemetry keep their browser-defined request modes and redirect
+handling. Every same-origin fetch is classified into one of three categories:
 
 **Static** (`isStatic`) -- fonts, images, chunks, the offline page, and files
 ending in `.css`, `.js`, `.map`, `.json`, `.txt`, or `.ico`:
@@ -146,6 +148,8 @@ reachability; `navigator.onLine` remains a scheduling hint.
 ### Fetch
 
 Routes requests through the classification logic above. Extension URLs (`extension://`) are ignored entirely.
+Cross-origin URLs are also ignored and proceed through the browser's normal
+network path.
 
 ## Connectivity Messages
 

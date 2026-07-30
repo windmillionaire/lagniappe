@@ -1,7 +1,7 @@
 from flask import abort, request, g
 
 from flask_login import current_user
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
 from lagniappe.web.auth import home_permission, logged_in
@@ -81,8 +81,25 @@ def clear_notifications():
 
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
+# @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_note_shared_visibility_is_owner_only
 # @features activity notes
 # @dimensions create body photo parent visibility scope
+# @pair activity:create
+# @pair activity:body
+# @pair activity:photo
+# @pair activity:parent
+# @pair activity:visibility
+# @pair activity:scope
+# @pair activity:owner-only-shared
+# @pair notes:create
+# @pair notes:body
+# @pair notes:photo
+# @pair notes:parent
+# @pair notes:visibility
+# @pair notes:scope
+# @pair notes:owner-only-shared
+# @pair notes:private-default
+# @pair permissions:owner-only-shared
 @home.route("/activity/notes", methods=["POST"])
 @logged_in
 def create_note():
@@ -95,6 +112,8 @@ def create_note():
     visibility = request.form.get("visibility") or "private"
     if visibility not in NOTE_VISIBILITIES:
         return responses.error("Choose who can see this note.")
+    if visibility == "everyone" and not Resource.SITE.allowed(Action.EDIT):
+        abort(403)
 
     note_data = {
         "parent": current_user,

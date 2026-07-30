@@ -1,2 +1,25 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="6a4deff7-7ab1-4b29-ad3c-a554c298c28a",e._sentryDebugIdIdentifier="sentry-dbid-6a4deff7-7ab1-4b29-ad3c-a554c298c28a");}catch(e){}}();import{E as r}from"./entity.js?v=b9f8bba5";import"./core.js?v=b9f8bba5";import"./entityMenu.js?v=b9f8bba5";import"./shared.js?v=b9f8bba5";import"./combobox.js?v=b9f8bba5";import"./primitives.js?v=b9f8bba5";import"./results2.js?v=b9f8bba5";import"./formatting.js?v=b9f8bba5";import"./dropdown.js?v=b9f8bba5";class i extends r{constructor(t){super(t),this._defaultTabId=t.dataset.defaultTab||"settings"}}export{i as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { E as Entity } from './entity.js?v=b30f3f24';
+import './core.js?v=b30f3f24';
+import './entityMenu.js?v=b30f3f24';
+import './shared.js?v=b30f3f24';
+import './combobox.js?v=b30f3f24';
+import './primitives.js?v=b30f3f24';
+import './results2.js?v=b30f3f24';
+import './formatting.js?v=b30f3f24';
+import './dropdown.js?v=b30f3f24';
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002f_home_directory.py::test_admin_directory_link_opens_admin_settings
+ * @features admin
+ * @dimensions page-load site-settings
+ */
+class Admin extends Entity {
+	constructor(node) {
+		super(node);
+		this._defaultTabId = node.dataset.defaultTab || "settings";
+	}
+}
+
+export { Admin as default };

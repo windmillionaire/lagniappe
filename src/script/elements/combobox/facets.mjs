@@ -7,20 +7,27 @@ import { Submitter } from "./submitter";
  * @testable infrastructure
  */
 export class FacetsBox extends Submitter(Combobox) {
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002k_home_pages.py::test_home_page_create_visible_for_category_editor
+	 * @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_user_assign_search_permission_filter_returns_assignable_users
+	 * @features combobox
+	 * @dimensions permission-filter
+	 */
 	constructor(element, args = {}) {
 		super(element);
 		this.endpoint = ENDPOINTS.facet(this.index);
 		this.indexArgs = args;
 
-		const formType = element.dataset.formType;
+		const formType = this.formType;
 		if (formType) {
 			this.indexArgs["form-type"] = formType;
 		}
-		if (element.dataset.includeUsers === "false") {
+		if (this.includeUsers === "false") {
 			this.indexArgs["include-users"] = "false";
 		}
-		if (element.dataset.permission) {
-			this.indexArgs.permission = element.dataset.permission;
+		if (this.permission) {
+			this.indexArgs.permission = this.permission;
 		}
 
 		let index = this.index;

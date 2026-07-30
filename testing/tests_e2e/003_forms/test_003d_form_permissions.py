@@ -69,6 +69,13 @@ def test_form_builder_hides_edit_affordances_without_forms_edit(get_user):
     form.builder
 
     expect(viewer.locate(Builder.FORM_NAME)).to_be_visible()
+    readonly_notice = viewer.locate(Builder.READONLY_NOTICE)
+    expect(readonly_notice).to_be_visible()
+    expect(readonly_notice).to_contain_text("Read-only mode")
+    expect(readonly_notice).to_contain_text(
+        "You can explore the builder and preview changes, "
+        "but your changes won't be saved."
+    )
     expect(viewer.locate(Builder.SAVE_BUTTON)).not_to_be_attached()
     expect(viewer.locate("[data-role='form-settings']")).not_to_be_attached()
     expect(viewer.locate("[data-role='generate']")).not_to_be_attached()
@@ -85,6 +92,7 @@ def test_form_builder_shows_edit_affordances_with_forms_edit(get_user):
     form.user = user
     form.builder
 
+    expect(user.locate(Builder.READONLY_NOTICE)).not_to_be_attached()
     expect(user.locate(Builder.SAVE_BUTTON)).to_be_attached()
     expect(user.locate("[data-role='form-settings']")).to_be_attached()
     expect(user.locate("[data-role='generate']")).to_be_attached()

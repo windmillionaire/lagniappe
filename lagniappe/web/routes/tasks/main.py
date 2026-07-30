@@ -18,6 +18,7 @@ from lagniappe.core.tools import ai, database, dates, task_combine
 from lagniappe.web.auth import (
     abort_ai_restricted_action,
     abort_public_user_action,
+    logged_in,
     permission,
 )
 from lagniappe.web import responses
@@ -43,10 +44,13 @@ def _ai_schedule_requested(form):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_tasks_table_columns
+# @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_allows_own_page_only_users
 # @features task-index
 # @dimensions columns
+# @pair task-index:authenticated-access
+# @pair permissions:own-page-only
 @tasks.route("/index", methods=["GET"])
-@permission(Resource.TASKS, Action.RESTRICTED)
+@logged_in
 def task_index():
     task_index = index.TaskIndex()
 
@@ -55,10 +59,13 @@ def task_index():
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_name_sort_ascending_reorders_rows
+# @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_allows_own_page_only_users
 # @features table-controls
 # @dimensions sorting sort-asc name
+# @pair task-index:authenticated-access
+# @pair permissions:own-page-only
 @tasks.route("/rows", methods=["GET"])
-@permission(Resource.TASKS, Action.RESTRICTED)
+@logged_in
 def rows():
     task_index = index.TaskIndex(**request.values)
     tasks = task_index.tasks

@@ -14,6 +14,7 @@ class Groups(ResourceEnumMixin, Enum):
     delete_group_refreshes_navigation = Group(
         definition=gd.delete_group_refreshes_navigation
     )
+    rename_group = Group(definition=gd.rename_group)
     test_user_one_category = Group(definition=gd.user_one_category)
     all_create = Group(definition=gd.all_create)
     admin_cannot_create_users = Group(definition=gd.admin_cannot_create_users)

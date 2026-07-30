@@ -310,7 +310,7 @@ def test_ai_prompt_builders_capture_product_context_and_tool_choices():
     assert project_prompt.examples
     assert form_prompt.output_format["type"] == "JSON"
     assert form_prompt.thinking_budget == 1024
-    assert form_prompt.model_tier == "utility"
+    assert form_prompt.model_tier == "primary"
     assert schedule_prompt.output_format["type"] == "JSON"
     assert schedule_prompt.thinking_budget == 0
     assert schedule_prompt.model_tier == "utility"

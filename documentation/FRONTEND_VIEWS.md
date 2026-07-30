@@ -92,11 +92,14 @@ bodyless request behavior.
 Notes use the shared `CreateNote` widget on Home and Pages. The textarea stays
 available while the native image chooser is open, so a submission may contain
 text, one photo, or both. The widget owns the selected-photo preview/removal
-state and resets it after creation. Home keeps its existing offline-create
-contract; the Page title menu opens an online-only composer beneath the title,
-while a persistent `BaseList` keeps existing Page notes visible. Persisted note
-controls use the normal `DeleteModal`; only an unsynced optimistic Home note
-uses the local “Discard pending note” action.
+state and resets it after creation. Home note creation is available to signed-in
+users and defaults to private; only users with `SITE:EDIT` (the site owner) see
+the “Show for everyone” option. Home keeps its existing offline-create contract.
+The Page title menu opens an online-only composer beneath the title for users
+who can edit that Page, with both visibility options unchanged, while a
+persistent `BaseList` keeps existing Page notes visible. Persisted note controls
+use the normal `DeleteModal`; only an unsynced optimistic Home note uses the
+local “Discard pending note” action.
 
 ### Submit Handling (`SubmissionManager`)
 

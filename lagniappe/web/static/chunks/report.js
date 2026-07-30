@@ -1,2 +1,342 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="b021a982-f56f-4056-b5a4-ed751227b037",e._sentryDebugIdIdentifier="sentry-dbid-b021a982-f56f-4056-b5a4-ed751227b037");}catch(e){}}();import{B as u}from"./baseForm.js?v=b9f8bba5";import{r as p,j as l,s as m}from"./shared.js?v=b9f8bba5";import{C as h}from"./core.js?v=b9f8bba5";import"./primitives.js?v=b9f8bba5";import"./loader.js?v=b9f8bba5";import"./entityMenu.js?v=b9f8bba5";import"./combobox.js?v=b9f8bba5";import"./results2.js?v=b9f8bba5";import"./formatting.js?v=b9f8bba5";import"./dropdown.js?v=b9f8bba5";class f extends h{async init(){return this._receiveDeferredOperation=this._receiveDeferredOperation.bind(this),window.addEventListener("deferred-operation",this._receiveDeferredOperation),await super.init(),await this._initRunReportForm(),await this._initUndoReportForm(),await this._initReviseReportForm(),this}async _initRunReportForm(){const t=this.elt.querySelector("[data-role='run-report-form'], [data-role='retry-report-form']");if(!t)return;const r=t.dataset.role==="retry-report-form";this.RunReportForm=new u({target:t,view:this,messages:{submit:r?"Retry Proposal":"Execute Proposal",submitting:r?"Starting Retry":"Starting Execution",submitted:r?"Retry Started":"Execution Started"},icon:"run.active"}),await this.RunReportForm.init(),t.addEventListener("submit",this._runReport.bind(this))}async _initUndoReportForm(){const t=this.elt.querySelector("[data-role='undo-report-form']");t&&(this.UndoReportForm=new u({target:t,view:this,messages:{submit:"Undo Report",submitting:"Undoing Report",submitted:"Report Undone"},icon:"undo"}),await this.UndoReportForm.init(),t.addEventListener("submit",this._undoReport.bind(this)))}async _initReviseReportForm(){const t=this.elt.querySelector("[data-role='revise-report-form']");t&&(this.ReviseReportForm=new u({target:t,view:this,messages:{submit:t.dataset.submit||"Revise Plan",submitting:t.dataset.submitting||"Revising Plan",submitted:t.dataset.submitted||"Revision Started"},icon:t.dataset.icon||"generate"}),await this.ReviseReportForm.init(),t.addEventListener("submit",this._reviseReport.bind(this)))}_click(t){const r=t.target.closest("[data-role='skip-action']");if(r&&this.elt.contains(r)){t.preventDefault(),t.stopPropagation(),this._toggleActionSkip(r);return}const o=t.target.closest("[lp-expand]");if(o&&this.elt.contains(o)){t.preventDefault(),t.stopPropagation(),this._toggleAccordion(o);return}super._click(t)}async _runReport(t){if(t.preventDefault(),t.stopPropagation(),this._runningReport)return;this._runningReport=!0;const r=t.currentTarget,o=new FormData(r);o.append("operation-id",this.operationId()),this.RunReportForm?.submitting();const e=await p.post(r.action,o);if(this._runningReport=!1,!e?.ok){this.RunReportForm?.showError(e?.error||"This report could not be run."),e?.reload&&(this.RunReportForm?.submitButton&&(this.RunReportForm.submitButton.disabled=!0),window.setTimeout(()=>window.location.reload(),1e3));return}if(e.notification&&this.Notifications?.upsertNotification?.(e.notification),this.RunReportForm?.success(),e.deferred){this.DeferredOperations?.track(e.operation,{node:this.elt}),this._showDeferredReportStatus("running","Saving report changes...");return}window.setTimeout(()=>window.location.reload(),250)}async _undoReport(t){if(t.preventDefault(),t.stopPropagation(),this._undoingReport)return;this._undoingReport=!0;const r=t.currentTarget,o=new FormData(r);this.UndoReportForm?.submitting();const e=await p.post(r.action,o);if(this._undoingReport=!1,!e?.ok){this.UndoReportForm?.showError(e?.error||"This report could not be undone.");return}this.UndoReportForm?.success(),window.setTimeout(()=>window.location.reload(),250)}async _reviseReport(t){if(t.preventDefault(),t.stopPropagation(),this._revisingReport)return;this._revisingReport=!0;const r=t.currentTarget,o=new FormData(r);o.append("operation-id",this.operationId()),this.ReviseReportForm?.submitting();const e=await p.post(r.action,o);if(this._revisingReport=!1,!e?.ok){this.ReviseReportForm?.showError(e?.error||"This report could not be revised.");return}if(e.notification&&this.Notifications?.upsertNotification?.(e.notification),this.ReviseReportForm?.success(),e.deferred){this.DeferredOperations?.track(e.operation,{node:this.elt}),this._showDeferredReportStatus("revising","Revising report...");return}window.setTimeout(()=>window.location.reload(),250)}_showDeferredReportStatus(t,r){this.elt.dataset.pending="true",this.elt.dataset.status=t;const o=this.elt.querySelector("#layout section");if(!o)return;let e=o.querySelector("[data-role='report-status']");if(!e){e=document.createElement("div"),e.dataset.role="report-status",e.className="flex flex-col gap-1";const s=document.createElement("h2");s.className="text-base font-semibold text-base-dark",s.textContent="Status";const n=document.createElement("p");n.dataset.role="report-status-note",n.className="text-base-dark",e.append(s,n),o.prepend(e)}const a=e.querySelector("[data-role='report-status-note']")||e,i=l("spinner","mr-1");i.setAttribute("aria-hidden","true"),a.replaceChildren(i,` ${r}`);let d=e.querySelector("[data-role='deferred-progress']");if(!d){d=document.createElement("p"),d.dataset.role="deferred-progress",d.className="text-sm text-base-medium";const s=document.createElement("span");s.dataset.role="deferred-phase",s.textContent="Waiting to start";const n=document.createElement("span");n.setAttribute("aria-hidden","true"),n.textContent=" \xB7 ";const c=document.createElement("span");c.dataset.role="deferred-elapsed",c.textContent="just now",d.append(s,n,c),e.append(d)}}_receiveDeferredOperation(t){const r=t.detail;!r?.terminal||r.key!==this.elt.dataset.operation||this._reloadReport()}_reloadReport(t=0){this._reportReloadScheduled||(this._reportReloadScheduled=!0,window.setTimeout(()=>window.location.reload(),t))}destroy(){window.removeEventListener("deferred-operation",this._receiveDeferredOperation),super.destroy()}async _toggleActionSkip(t){if(t.disabled)return;t.disabled=!0;const r=(t.closest("[data-action-indexes]")?.dataset.actionIndexes||"").split(",").map(i=>Number(i)).filter(Boolean),o=t.closest("[data-skip-dependencies]")?.dataset.skipDependencies!=="false",e=await p.post(t.dataset.route,{action_indexes:r,include_dependencies:o});if(t.disabled=!1,!e?.ok)return;const a=new Set(e.skipped||[]);this.elt.querySelectorAll("[data-action-index]").forEach(i=>{this._setActionSkipped(i,a.has(Number(i.dataset.actionIndex)))})}_setActionSkipped(t,r){t.dataset.skipped=r?"true":"false";const o=t.querySelector("[data-role='skipped-label']");o&&(o.dataset.visible=t.dataset.skipped);const e=t.querySelector("[data-role='skip-action']");if(!e)return;e.title=r?"Restore action":"Skip action",e.dataset.kind=r?e.dataset.restoreKind:e.dataset.skipKind,e.setAttribute("aria-label",`${e.title} ${t.dataset.actionIndex}`);const a=e.querySelector("[data-icon]");a&&m(a,r?e.dataset.restoreIcon:e.dataset.skipIcon)}_toggleAccordion(t){const r=t.closest("[data-role='accordion']"),o=r?.querySelector("[data-role='accordion-panel']");if(!r||!o)return;const e=r.dataset.open!=="true";r.dataset.open=e?"true":"false",t.dataset.open=r.dataset.open,t.setAttribute("aria-expanded",e?"true":"false"),o.dataset.visible=r.dataset.open}}export{f as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { B as BaseForm } from './baseForm.js?v=b30f3f24';
+import { r as request, j as createIcon, s as setIcon } from './shared.js?v=b30f3f24';
+import { C as Core } from './core.js?v=b30f3f24';
+import './primitives.js?v=b30f3f24';
+import './loader.js?v=b30f3f24';
+import './entityMenu.js?v=b30f3f24';
+import './combobox.js?v=b30f3f24';
+import './results2.js?v=b30f3f24';
+import './formatting.js?v=b30f3f24';
+import './dropdown.js?v=b30f3f24';
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_runs_ready_report
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_failed_report_detail_offers_retry_and_partial_undo
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_action_dependencies
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_report_detail_shows_answer_without_duplicate_proposal
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_report_detail_shows_revision_and_manual_execution
+ * @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
+ * @features ai-report
+ * @dimensions detail skip-action result-json ask answer-html links no-actions create revision execute failure reload deferred-refresh pending delete-modal
+ */
+class Report extends Core {
+	async init() {
+		this._receiveDeferredOperation = this._receiveDeferredOperation.bind(this);
+		window.addEventListener(
+			"deferred-operation",
+			this._receiveDeferredOperation,
+		);
+		await super.init();
+		await this._initRunReportForm();
+		await this._initUndoReportForm();
+		await this._initReviseReportForm();
+		return this;
+	}
+
+	async _initRunReportForm() {
+		const target = this.elt.querySelector(
+			"[data-role='run-report-form'], [data-role='retry-report-form']",
+		);
+		if (!target) return;
+		const retrying = target.dataset.role === "retry-report-form";
+
+		this.RunReportForm = new BaseForm({
+			target,
+			view: this,
+			messages: {
+				submit: retrying ? "Retry Proposal" : "Execute Proposal",
+				submitting: retrying ? "Starting Retry" : "Starting Execution",
+				submitted: retrying ? "Retry Started" : "Execution Started",
+			},
+			icon: "run.active",
+		});
+		await this.RunReportForm.init();
+		target.addEventListener("submit", this._runReport.bind(this));
+	}
+
+	async _initUndoReportForm() {
+		const target = this.elt.querySelector("[data-role='undo-report-form']");
+		if (!target) return;
+
+		this.UndoReportForm = new BaseForm({
+			target,
+			view: this,
+			messages: {
+				submit: "Undo Report",
+				submitting: "Undoing Report",
+				submitted: "Report Undone",
+			},
+			icon: "undo",
+		});
+		await this.UndoReportForm.init();
+		target.addEventListener("submit", this._undoReport.bind(this));
+	}
+
+	async _initReviseReportForm() {
+		const target = this.elt.querySelector("[data-role='revise-report-form']");
+		if (!target) return;
+
+		this.ReviseReportForm = new BaseForm({
+			target,
+			view: this,
+			messages: {
+				submit: target.dataset.submit || "Revise Plan",
+				submitting: target.dataset.submitting || "Revising Plan",
+				submitted: target.dataset.submitted || "Revision Started",
+			},
+			icon: target.dataset.icon || "generate",
+		});
+		await this.ReviseReportForm.init();
+		target.addEventListener("submit", this._reviseReport.bind(this));
+	}
+
+	_click(event) {
+		const skipButton = event.target.closest("[data-role='skip-action']");
+		if (skipButton && this.elt.contains(skipButton)) {
+			event.preventDefault();
+			event.stopPropagation();
+			this._toggleActionSkip(skipButton);
+			return;
+		}
+
+		const expandButton = event.target.closest("[lp-expand]");
+		if (expandButton && this.elt.contains(expandButton)) {
+			event.preventDefault();
+			event.stopPropagation();
+			this._toggleAccordion(expandButton);
+			return;
+		}
+
+		super._click(event);
+	}
+
+	async _runReport(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (this._runningReport) return;
+
+		this._runningReport = true;
+		const form = event.currentTarget;
+		const data = new FormData(form);
+		data.append("operation-id", this.operationId());
+		this.RunReportForm?.submitting();
+
+		const response = await request.post(form.action, data);
+		this._runningReport = false;
+		if (!response?.ok) {
+			this.RunReportForm?.showError(
+				response?.error || "This report could not be run.",
+			);
+			if (response?.reload) {
+				if (this.RunReportForm?.submitButton) {
+					this.RunReportForm.submitButton.disabled = true;
+				}
+				window.setTimeout(() => window.location.reload(), 1000);
+			}
+			return;
+		}
+
+		if (response.notification) {
+			this.Notifications?.upsertNotification?.(response.notification);
+		}
+		this.RunReportForm?.success();
+		if (response.deferred) {
+			this.DeferredOperations?.track(response.operation, { node: this.elt });
+			this._showDeferredReportStatus("running", "Saving report changes...");
+			return;
+		}
+		window.setTimeout(() => window.location.reload(), 250);
+	}
+
+	async _undoReport(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (this._undoingReport) return;
+
+		this._undoingReport = true;
+		const form = event.currentTarget;
+		const data = new FormData(form);
+		this.UndoReportForm?.submitting();
+
+		const response = await request.post(form.action, data);
+		this._undoingReport = false;
+		if (!response?.ok) {
+			this.UndoReportForm?.showError(
+				response?.error || "This report could not be undone.",
+			);
+			return;
+		}
+
+		this.UndoReportForm?.success();
+		window.setTimeout(() => window.location.reload(), 250);
+	}
+
+	async _reviseReport(event) {
+		event.preventDefault();
+		event.stopPropagation();
+		if (this._revisingReport) return;
+
+		this._revisingReport = true;
+		const form = event.currentTarget;
+		const data = new FormData(form);
+		data.append("operation-id", this.operationId());
+		this.ReviseReportForm?.submitting();
+
+		const response = await request.post(form.action, data);
+		this._revisingReport = false;
+		if (!response?.ok) {
+			this.ReviseReportForm?.showError(
+				response?.error || "This report could not be revised.",
+			);
+			return;
+		}
+
+		if (response.notification) {
+			this.Notifications?.upsertNotification?.(response.notification);
+		}
+		this.ReviseReportForm?.success();
+		if (response.deferred) {
+			this.DeferredOperations?.track(response.operation, { node: this.elt });
+			this._showDeferredReportStatus("revising", "Revising report...");
+			return;
+		}
+		window.setTimeout(() => window.location.reload(), 250);
+	}
+
+	_showDeferredReportStatus(statusValue, message) {
+		this.elt.dataset.pending = "true";
+		this.elt.dataset.status = statusValue;
+
+		const section = this.elt.querySelector("#layout section");
+		if (!section) return;
+
+		let status = section.querySelector("[data-role='report-status']");
+		if (!status) {
+			status = document.createElement("div");
+			status.dataset.role = "report-status";
+			status.className = "flex flex-col gap-1";
+
+			const heading = document.createElement("h2");
+			heading.className = "text-base font-semibold text-base-dark";
+			heading.textContent = "Status";
+
+			const note = document.createElement("p");
+			note.dataset.role = "report-status-note";
+			note.className = "text-base-dark";
+			status.append(heading, note);
+			section.prepend(status);
+		}
+
+		const note =
+			status.querySelector("[data-role='report-status-note']") || status;
+		const spinner = createIcon("spinner", "mr-1");
+		spinner.setAttribute("aria-hidden", "true");
+		note.replaceChildren(spinner, ` ${message}`);
+		let progress = status.querySelector("[data-role='deferred-progress']");
+		if (!progress) {
+			progress = document.createElement("p");
+			progress.dataset.role = "deferred-progress";
+			progress.className = "text-sm text-base-medium";
+			const phase = document.createElement("span");
+			phase.dataset.role = "deferred-phase";
+			phase.textContent = "Waiting to start";
+			const separator = document.createElement("span");
+			separator.setAttribute("aria-hidden", "true");
+			separator.textContent = " · ";
+			const elapsed = document.createElement("span");
+			elapsed.dataset.role = "deferred-elapsed";
+			elapsed.textContent = "just now";
+			progress.append(phase, separator, elapsed);
+			status.append(progress);
+		}
+	}
+
+	_receiveDeferredOperation(event) {
+		const status = event.detail;
+		if (!status?.terminal || status.key !== this.elt.dataset.operation) return;
+		this._reloadReport();
+	}
+
+	_reloadReport(delay = 0) {
+		if (this._reportReloadScheduled) return;
+		this._reportReloadScheduled = true;
+		window.setTimeout(() => window.location.reload(), delay);
+	}
+
+	destroy() {
+		window.removeEventListener(
+			"deferred-operation",
+			this._receiveDeferredOperation,
+		);
+		super.destroy();
+	}
+
+	async _toggleActionSkip(button) {
+		if (button.disabled) return;
+
+		button.disabled = true;
+		const actionIndexes = (
+			button.closest("[data-action-indexes]")?.dataset.actionIndexes || ""
+		)
+			.split(",")
+			.map((value) => Number(value))
+			.filter(Boolean);
+		const includeDependencies =
+			button.closest("[data-skip-dependencies]")?.dataset.skipDependencies !==
+			"false";
+		const response = await request.post(button.dataset.route, {
+			action_indexes: actionIndexes,
+			include_dependencies: includeDependencies,
+		});
+		button.disabled = false;
+		if (!response?.ok) return;
+
+		const skipped = new Set(response.skipped || []);
+		this.elt.querySelectorAll("[data-action-index]").forEach((item) => {
+			this._setActionSkipped(
+				item,
+				skipped.has(Number(item.dataset.actionIndex)),
+			);
+		});
+	}
+
+	_setActionSkipped(item, skipped) {
+		item.dataset.skipped = skipped ? "true" : "false";
+		const label = item.querySelector("[data-role='skipped-label']");
+		if (label) label.dataset.visible = item.dataset.skipped;
+
+		const button = item.querySelector("[data-role='skip-action']");
+		if (!button) return;
+		button.title = skipped ? "Restore action" : "Skip action";
+		button.dataset.kind = skipped
+			? button.dataset.restoreKind
+			: button.dataset.skipKind;
+		button.setAttribute(
+			"aria-label",
+			`${button.title} ${item.dataset.actionIndex}`,
+		);
+		const icon = button.querySelector("[data-icon]");
+		if (icon) {
+			setIcon(
+				icon,
+				skipped ? button.dataset.restoreIcon : button.dataset.skipIcon,
+			);
+		}
+	}
+
+	_toggleAccordion(button) {
+		const accordion = button.closest("[data-role='accordion']");
+		const panel = accordion?.querySelector("[data-role='accordion-panel']");
+		if (!accordion || !panel) return;
+
+		const open = accordion.dataset.open !== "true";
+		accordion.dataset.open = open ? "true" : "false";
+		button.dataset.open = accordion.dataset.open;
+		button.setAttribute("aria-expanded", open ? "true" : "false");
+		panel.dataset.visible = accordion.dataset.open;
+	}
+}
+
+export { Report as default };
