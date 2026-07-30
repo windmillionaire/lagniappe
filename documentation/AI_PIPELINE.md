@@ -141,12 +141,14 @@ attempt deadline, cancellation, and lease. Immediately before final application
 the runner reloads the actor and mutation inputs again, reauthorizes, compares
 their start-time fingerprints, and verifies the active claim.
 
-The generic AI gate is driven by `adapter.requires_ai`. Domain adapters add
-their own checks, such as edit access to an autofill target or owner access to
-site export. Every currently registered `requires_ai` adapter delegates to that
-shared authorization method, and a parameterized registry test protects the
-inheritance contract. The synchronous multi-file upload summary path applies
-the same AI gate at its route boundary.
+The generic AI gate is driven by `adapter.required_ai_access`. Ask jobs require
+`AI.ASK`; generation, organization, execution, autofill, page generation, and
+file summarization require `AI.CREATE`. Domain adapters add their own checks,
+such as edit access to an autofill target or owner access to site export. Every
+adapter with a required tier delegates to the shared authorization method, and
+a parameterized registry test protects the tier contract. The synchronous
+multi-file upload summary path applies the same `AI.CREATE` gate at its route
+boundary.
 
 ### 3. Prompt and model selection
 
@@ -312,9 +314,9 @@ When stored files expose `get_file`, a summary-backed response that requests no
 tool is accepted as the terminal answer instead of being regenerated.
 
 Multi-file page upload is a separate synchronous path. When batch summarization
-is selected, the HTTP upload route checks the AI restriction, runs the Organize
-summary prepass sequentially, and then saves the files. It does not use the
-shared durable job.
+is selected, the HTTP upload route checks `AI.CREATE`, runs the Organize summary
+prepass sequentially, and then saves the files. It does not use the shared
+durable job.
 
 ## Context placement and growth
 

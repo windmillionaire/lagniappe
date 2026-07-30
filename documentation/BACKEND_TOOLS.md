@@ -515,12 +515,13 @@ continues. Planning still receives the file's name, type, size classification,
 and executable report reference so it can place and preserve the attachment.
 
 Page file upload also supports a synchronous summary prepass when several files
-are submitted together. That HTTP route runs the shared AI restriction gate
-before creating the `File` entities or starting summary generation. Ordinary
-single-file summarization uses the deferred file-summary adapter, which runs the
-same gate again at worker authorization time. A provider rejection for a PDF
-that exceeds its supported page limit is stored as a clear file-summary error
-and treated as an expected input limit rather than an application exception.
+are submitted together. Whenever summarization is requested, that HTTP route
+requires `AI.CREATE` before creating the `File` entities or starting summary
+generation. Ordinary single-file summarization uses the deferred file-summary
+adapter, which checks the same tier again at worker authorization time. A
+provider rejection for a PDF that exceeds its supported page limit is stored as
+a clear file-summary error and treated as an expected input limit rather than
+an application exception.
 
 Planning validation performs narrow deterministic repairs before asking the
 model to rewrite a rejected proposal. In particular, otherwise complete

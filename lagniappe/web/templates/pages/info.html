@@ -45,6 +45,8 @@
         data-can-edit-name="{{ (is_own_page or is_owner_viewer)|yesno }}"
         data-can-edit-email="{{ (is_owner_viewer and not is_own_page)|yesno }}"
         data-can-edit-groups="{{ is_owner_viewer|yesno }}"
+        data-can-edit-ai="{{ is_owner_viewer|yesno }}"
+        data-ai-access="{{ page.user.ai_access }}"
         data-is-public="{{ page.user.is_public|yesno }}"
         data-group-names="{{ page.user.properties.groups.column_value or '' }}"
         data-visible="false"
@@ -158,13 +160,15 @@
                     class="grid w-9 place-items-center hover:bg-kind-bg hover:text-kind-default focus-visible:outline-2 focus-visible:outline-kind-default">
               {{ render_icon("upload") }}
             </button>
-            <button type="button"
-                    data-role="photo-generate"
-                    title="Generate page image"
-                    aria-label="Generate page image"
-                    class="grid w-9 place-items-center hover:bg-kind-bg hover:text-kind-default focus-visible:outline-2 focus-visible:outline-kind-default">
-              {{ render_icon("generate") }}
-            </button>
+            {% if current_user.access(AI.CREATE) %}
+              <button type="button"
+                      data-role="photo-generate"
+                      title="Generate page image"
+                      aria-label="Generate page image"
+                      class="grid w-9 place-items-center hover:bg-kind-bg hover:text-kind-default focus-visible:outline-2 focus-visible:outline-kind-default">
+                {{ render_icon("generate") }}
+              </button>
+            {% endif %}
             <button type="button"
                     data-role="photo-disable"
                     title="Turn photo off"
@@ -231,7 +235,7 @@
       </div>
     {% endif %}
     {{ controls.edited_marker(url_for('pages.info', key=page.urlsafe_key)) }}
-    {% if page.allowed(Action.EDIT) %}{{ autofill(enabled=current_user.properties.restrictions.can_use_ai_tools) }}{% endif %}
+    {% if page.allowed(Action.EDIT) %}{{ autofill(enabled=current_user.access(AI.CREATE)) }}{% endif %}
   </form>
 {% endmacro %}
 

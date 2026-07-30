@@ -25,6 +25,7 @@ export class Toolbar {
 		this.kind = document.kind || "default";
 		this.endpoints = document.endpoints;
 		this.publicLimited = document.target?.dataset?.publicLimited === "true";
+		this.aiCreate = document.target?.dataset?.aiCreate === "true";
 		this.element = null;
 		this.options = {};
 		this.forms = {};
@@ -244,8 +245,9 @@ export class Toolbar {
 	}
 
 	_toolAllowed(tool) {
-		if (!this.publicLimited) return true;
-		return !["addImage", "generateText"].includes(tool.command);
+		if (this.publicLimited && tool.command === "addImage") return false;
+		if (!this.aiCreate && tool.command === "generateText") return false;
+		return true;
 	}
 
 	async _createToolbarButton(tool) {

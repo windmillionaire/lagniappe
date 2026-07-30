@@ -1,4 +1,5 @@
-from flask import request
+from flask import abort, request
+from flask_login import current_user
 
 from lagniappe import CONFIG
 from lagniappe.core.entities import Entities, index
@@ -40,7 +41,10 @@ def rows():
 # @covered-by lagniappe/web/routes/users/main.py::create
 # @reason form parsing helper owned by user create route
 def user_data(request):
-    return {
+    if "ai_access" in request.form and not current_user.is_owner:
+        abort(403)
+
+    data = {
         "name": request.form.get("name"),
         "email": request.form.get("email"),
         "page": (
@@ -50,6 +54,9 @@ def user_data(request):
         ),
         "groups": [Entities.USER_GROUP(g) for g in request.form.getlist("group") if g],
     }
+    if "ai_access" in request.form:
+        data["ai_access"] = request.form.get("ai_access")
+    return data
 
 
 # @testable false
@@ -69,9 +76,10 @@ def _delete_identity_login_account(user):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_from_index
+# @tests tests_e2e/008_users/test_008a_user_index.py::test_non_owner_cannot_set_ai_access_when_creating_user
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_attached_to_existing_page_preserves_page_info_form
 # @features users
-# @dimensions create-submit created-row attach-existing-page page-form-preserved
+# @dimensions create-submit created-row attach-existing-page page-form-preserved ai-access owner-only
 @users.route("/create", methods=["POST"])
 @permission(Resource.USERS, Action.CREATE)
 def create():

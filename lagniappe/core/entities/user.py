@@ -4,7 +4,7 @@ from flask_login import UserMixin
 
 from lagniappe import CONFIG
 
-from ..definitions import Action, Fetch, Resource
+from ..definitions import AI, Action, Fetch, Resource
 from ..properties import (
     common_entity,
     user_related,
@@ -31,6 +31,7 @@ class User(AssetMixin, UserMixin, Entity):
             {
                 "notification_revision",
                 "operation_revision",
+                "ai_access",
                 "permissions",
                 "photo",
             }
@@ -73,6 +74,7 @@ class User(AssetMixin, UserMixin, Entity):
                 "notification_revision": user_entity.NotificationRevision,
                 "operation_revision": user_entity.OperationRevision,
                 "invalidate_cache": user_entity.InvalidateCache,
+                "ai_access": user_entity.AIAccess,
                 "restrictions": user_restrictions.Restrictions,
                 "is_public": common_entity.IsPublic,
                 "is_owner": user_entity.IsOwner,
@@ -96,6 +98,29 @@ class User(AssetMixin, UserMixin, Entity):
     def permissions_fingerprint(self):
         permissions = "" if self.is_owner else self.db.get("permissions", "{}")
         return hashlib.md5(permissions.encode("utf-8")).hexdigest()
+
+    # @testable true
+    # @tests tests_unit/test_009f_user_ai_access.py::test_user_access_is_independent_hierarchical_and_fail_closed
+    # @features ai-access
+    # @dimensions authentication hierarchy permissions-independent owner-no-bypass
+    def access(self, required):
+        """Check this user's independent AI entitlement."""
+        if (
+            not self.is_authenticated
+            or not isinstance(required, AI)
+            or required is AI.NONE
+        ):
+            return False
+        return AI[self.ai_access].implies(required)
+
+    # @testable true
+    # @tests tests_unit/test_009f_user_ai_access.py::test_authorization_fingerprint_tracks_ai_access
+    # @features ai-access cache
+    # @dimensions authorization-fingerprint permissions entitlement
+    @property
+    def authorization_fingerprint(self):
+        value = f"{self.permissions_fingerprint}:{self.ai_access}"
+        return hashlib.md5(value.encode("utf-8")).hexdigest()
 
     @property
     def is_test_user(self):
@@ -131,8 +156,10 @@ class User(AssetMixin, UserMixin, Entity):
     # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
     # @tests tests_unit/test_009a_user.py::test_user_create_does_not_leave_initial_cache_invalidation
     # @tests tests_unit/test_009a_user.py::test_user_create_public_user_assigns_public_group
+    # @tests tests_unit/test_009f_user_ai_access.py::test_user_create_defaults_non_owner_to_none
     # @pairs user:create user:owner user:page user:groups user:cache-invalidation
     # @pairs user:public-user user:public-group user:personal-page user:limited-attrs
+    # @pair user:new-user-default
     # @pairs public-users:create public-users:public-user public-users:public-group
     # @pairs public-users:personal-page public-users:limited-attrs
     @classmethod
@@ -160,6 +187,10 @@ class User(AssetMixin, UserMixin, Entity):
         if new_user.db.get("email") == CONFIG.ADMIN_EMAIL:
             new_user.is_owner = True
 
+        new_user.ai_access = data.get(
+            "ai_access",
+            AI.CREATE.name if new_user.is_owner else AI.NONE.name,
+        )
         new_user.groups = (
             [Entities.PUBLIC_GROUP.get()]
             if new_user.is_public

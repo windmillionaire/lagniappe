@@ -3,11 +3,11 @@ from copy import deepcopy
 from flask import render_template, request, url_for
 from flask_login import current_user
 
-from lagniappe.core.definitions import Action, Fetch, Resource
+from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.mixins.submitter import normalize_submission_values
 from lagniappe.core.tools import ai
-from lagniappe.web.auth import abort_ai_restricted_action, permission
+from lagniappe.web.auth import permission, require_ai_access
 
 from . import forms
 from lagniappe.web import responses
@@ -204,7 +204,7 @@ def restrictions(key, **kwargs):
 @forms.route("/create-schema", methods=["POST"])
 @permission(Resource.FORMS, Action.EDIT)
 def create_schema():
-    abort_ai_restricted_action()
+    require_ai_access(AI.CREATE)
 
     description = request.form.get("description", "")
     form_type = request.form.get("form-type", "task")

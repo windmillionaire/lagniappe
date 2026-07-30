@@ -1,5 +1,6 @@
 import { FormElement } from "../elements/form";
 import { InputElement } from "../elements/input";
+import { RadioElement } from "../elements/radio";
 import { sections } from "../elements/sections";
 import { SectionToggle } from "../elements/sectionToggle";
 import { TextareaElement } from "../elements/textarea";
@@ -436,6 +437,10 @@ export class UserSettings extends PagePermissions {
 		return this.target.dataset.canEditGroups === "true";
 	}
 
+	get canEditAi() {
+		return this.target.dataset.canEditAi === "true";
+	}
+
 	get canEditName() {
 		return this.target.dataset.canEditName === "true";
 	}
@@ -469,6 +474,25 @@ export class UserSettings extends PagePermissions {
 	 */
 	get userEmailElement() {
 		return this.target.querySelector("[data-role='user-email']");
+	}
+
+	get userAiAccessElement() {
+		if (!this.canEditAi) return null;
+		return new RadioElement(
+			this,
+			{
+				name: "ai_access",
+				label: "AI Access",
+				required: true,
+				layout: "row",
+				options: [
+					{ label: "None", value: "NONE" },
+					{ label: "Ask", value: "ASK" },
+					{ label: "Create", value: "CREATE" },
+				],
+			},
+			this.target.dataset.aiAccess || "NONE",
+		).edit;
 	}
 
 	/**
@@ -512,6 +536,7 @@ export class UserSettings extends PagePermissions {
 			...[
 				this.nameElement,
 				this.userEmailElement,
+				this.userAiAccessElement,
 				this.userGroupsElement,
 				this.removePageElement,
 				this.pageSelectElement,
@@ -532,6 +557,10 @@ export class UserSettings extends PagePermissions {
 		}
 		if (email && !email.disabled) {
 			data.set("email", email.value);
+		}
+		const aiAccess = card?.querySelector("[name='ai_access']:checked");
+		if (this.canEditAi && aiAccess) {
+			data.set("ai_access", aiAccess.value);
 		}
 		if (this._groupSelect) {
 			Array.from(this._groupSelect.select.values).forEach((value) => {

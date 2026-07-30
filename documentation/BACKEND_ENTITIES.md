@@ -440,6 +440,29 @@ The `EntityType` enum maps type names to entity classes:
 Aliases exist for convenience where shown in the table. `USERS` is its own
 reserved category class, not a `CATEGORY` alias.
 
+### Per-user AI access
+
+`User.ai_access` is a separate entitlement from resource permissions and group
+membership. Its stored values are `NONE`, `ASK`, and `CREATE`. `CREATE`
+includes `ASK`; `ASK` permits workspace questions and Ask reports but not
+generation, autofill, summarization, Organize/Create reports, or proposal
+execution. `User.access(AI.ASK)` and `User.access(AI.CREATE)` are the
+authoritative checks. They deliberately do not grant an owner bypass.
+
+Only the configured owner can set this value through user creation or User
+Settings. New owners persist `CREATE`, while every other newly created user
+persists `NONE`. For datastore compatibility, a regular user record with no
+stored value resolves to `CREATE`, while a legacy public user resolves to
+`NONE`; an explicit value always wins. No group-level AI entitlement or
+datastore migration is required.
+
+AI route handlers check the entitlement in addition to their ordinary resource
+permission checks. Deferred AI adapters declare `required_ai_access`, reload
+the actor, and reauthorize both before provider work and immediately before
+applying mutations. This makes a downgrade effective for already queued work.
+`User.authorization_fingerprint` combines permission and AI-access state so
+ETags and home polling do not reuse UI authorized under an earlier tier.
+
 Notifications are activity entities with a `parent` user, plain-text `body`,
 optional related `target`, and a `pending` flag for deferred work. Offline
 mutation replay can set `offline=True` on a route request; routes that want a
@@ -450,9 +473,9 @@ advance the personal notification channel revision.
 
 `User.notification_revision` and `User.operation_revision` are unindexed,
 monotonic polling cursors. They are deliberately separate from `modified` and
-`permissions_fingerprint`: notification/job activity must not invalidate the
-user entity, global users list, or permission-derived response caches. The
-request authentication path loads the user directly on every request, so
+the authorization fingerprint: notification/job activity must not invalidate
+the user entity, global users list, or authorization-derived response caches.
+The request authentication path loads the user directly on every request, so
 `/poll` can compare these cursors without another Datastore read.
 
 Notes are activity entities with an author `user`, owning `parent`, optional

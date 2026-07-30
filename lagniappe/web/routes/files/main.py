@@ -2,13 +2,13 @@ from types import SimpleNamespace
 
 from flask import request
 
-from lagniappe.core.definitions import Action, Fetch, Resource
+from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import ai, database
 from lagniappe.web.auth import (
-    abort_ai_restricted_action,
     abort_public_user_action,
     permission,
+    require_ai_access,
 )
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
@@ -101,6 +101,12 @@ def delete(key, **kwargs):
 @permission(Resource.FILE, Action.EDIT)
 def update(key, **kwargs):
     abort_public_user_action()
+
+    if (
+        request.form.get("enable-summarize") is not None
+        or request.form.get("summarize") is not None
+    ):
+        require_ai_access(AI.CREATE)
 
     file = kwargs["entity"]
     previous_pages = Entities.fetch(*file.pages, request=Fetch.direct())
@@ -228,7 +234,7 @@ def get_html(key, **kwargs):
 # @testable true
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_file_to_page
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_multiple_files_to_page_hides_existing_file_select
-# @tests tests_e2e/002_home/test_002n_file_consumer_routes.py::test_batch_page_upload_rejects_ai_restricted_actor_before_summary
+# @tests tests_e2e/002_home/test_002n_file_consumer_routes.py::test_batch_page_upload_rejects_actor_without_ai_create_before_summary
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_text_file_renders_original_content_in_text_tab
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_image_shows_desktop_preview
 # @pair file:file-upload
@@ -238,12 +244,16 @@ def get_html(key, **kwargs):
 # @pair pages:page-upload
 # @pair pages:multi-file
 # @pair ai:batch-summary
-# @pair ai:restriction-gate
+# @pair ai:access-gate
 # @pair ai:provider-boundary
 @files.route("/<key>/upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def upload(key, **kwargs):
     abort_public_user_action()
+
+    summarize_requested = request.form.get("summarize") is not None
+    if summarize_requested:
+        require_ai_access(AI.CREATE)
 
     page = kwargs["entity"]
 
@@ -255,11 +265,7 @@ def upload(key, **kwargs):
 
     if uploads:
         multiple_uploads = len(uploads) > 1
-        batch_summarize = (
-            multiple_uploads and request.form.get("summarize") is not None
-        )
-        if batch_summarize:
-            abort_ai_restricted_action()
+        batch_summarize = multiple_uploads and summarize_requested
         uploaded_files = [
             Entities.FILE().create(
                 page=page,

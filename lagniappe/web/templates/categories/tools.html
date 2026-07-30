@@ -115,7 +115,7 @@
         </div>
       {% endif %}
     {% endif %}
-    {{ autofill(enabled=current_user.properties.restrictions.can_use_ai_tools) }}
+    {{ autofill(enabled=current_user.access(AI.CREATE)) }}
   </form>
 {% endmacro %}
 

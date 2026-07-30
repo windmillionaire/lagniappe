@@ -1,14 +1,14 @@
 from flask import request, abort, get_template_attribute
 from flask_login import current_user
 
-from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.definitions import AI, Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.tools import ai, database, utility
 from lagniappe.web.auth import (
-    abort_ai_restricted_action,
     abort_public_user_action,
     permission,
+    require_ai_access,
 )
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
@@ -81,7 +81,7 @@ def add_document_image(key, **kwargs):
         return responses.error("field is required")
 
     if role == "generate":
-        abort_ai_restricted_action()
+        require_ai_access(AI.CREATE)
         user_prompt = request.form.get("prompt", "").strip()
         content = request.form.get("content", "").strip()
         if not user_prompt and not content:
@@ -141,7 +141,7 @@ def add_document_image_direct(key, **kwargs):
 @assets.route("<key>/document/generate", methods=["POST"])
 @permission(requested=Action.EDIT)
 def generate_text(key, **kwargs):
-    abort_ai_restricted_action()
+    require_ai_access(AI.CREATE)
 
     entity = Entities.fetch_one(
         kwargs["entity"],

@@ -7,7 +7,7 @@ from flask_login import current_user
 from markupsafe import Markup, escape
 
 from lagniappe import CONFIG
-from lagniappe.core.definitions import Action, Resource
+from lagniappe.core.definitions import AI, Action, Resource
 from lagniappe.core.tools import dates
 
 from . import formatters, styles
@@ -163,6 +163,7 @@ def initialize(app):
             "is_starred": starred,
             "current_user": current_user,
             "Action": Action,
+            "AI": AI,
             "Resource": Resource,
         }
     )

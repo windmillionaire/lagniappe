@@ -5,6 +5,7 @@
         data-widget="FileUpload"
         data-title="Upload File"
         data-help="upload_file"
+        data-ai-create="{{ current_user.access(AI.CREATE)|yesno }}"
         data-close="files:nav"
         data-visible="false"
         data-controls="true"

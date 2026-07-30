@@ -3,6 +3,7 @@ from flask_login import current_user
 
 from lagniappe.core.entities import Entities
 from lagniappe.core.definitions import (
+    AI,
     FileConsumer,
     FileConsumerLimitError,
     enforce_file_consumer,
@@ -10,10 +11,10 @@ from lagniappe.core.definitions import (
 from lagniappe.core.tools import ai, database
 from lagniappe.core.definitions import PageAttributes, Action, Fetch, Resource
 from lagniappe.web.auth import (
-    abort_ai_restricted_action,
     abort_public_user_action,
     logged_in,
     permission,
+    require_ai_access,
 )
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
@@ -186,6 +187,8 @@ def _page_data(form, page=None, category=None):
         page_data["reassign-page"] = loaded.get(form.get("reassign-page"))
     if "remove-user" in form:
         page_data["remove-user"] = form.get("remove-user") == "true"
+    if "ai_access" in form:
+        page_data["ai_access"] = form.get("ai_access")
 
     return page_data
 
@@ -324,14 +327,19 @@ def update(key, **kwargs):
     _preserve_public_user_page_attributes(page, page_data)
 
     if role == "user-settings":
-        _apply_user_settings_update(page, page_data, user=current_user)
+        try:
+            _apply_user_settings_update(page, page_data, user=current_user)
+        except PermissionError:
+            abort(403)
+        except ValueError as error:
+            return responses.error(str(error))
         page.save()
         if not page.user:
             return responses.json_response({"reload": True})
         return responses.user_settings(page)
 
     if role in ["autofill-submit", "explain"]:
-        abort_ai_restricted_action()
+        require_ai_access(AI.CREATE)
         _apply_page_metadata_update(page, page_data, user=current_user)
         if page.form:
             _apply_page_submission(page, request)
@@ -381,6 +389,9 @@ def update(key, **kwargs):
 @pages.route("<key>/update/direct-upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def update_direct(key, **kwargs):
+    upload_data = request.get_json(silent=True) or request.form
+    if upload_data.get("input_name") == "autofill-file":
+        require_ai_access(AI.CREATE)
     locked = deferred_autofill.locked_response(kwargs["entity"], request.form)
     if locked:
         return locked
@@ -485,7 +496,7 @@ def create(key, **kwargs):
     role = request.form.get("role")
 
     if role in ["autofill-submit", "explain"]:
-        abort_ai_restricted_action()
+        require_ai_access(AI.CREATE)
         if role == "explain":
             try:
                 prompt = ai.form_autofill_prompt(
@@ -528,6 +539,9 @@ def create(key, **kwargs):
 @pages.route("<key>/create/direct-upload", methods=["POST"])
 @permission(Resource.CATEGORY, Action.EDIT)
 def create_direct(key, **kwargs):
+    upload_data = request.get_json(silent=True) or request.form
+    if upload_data.get("input_name") == "autofill-file":
+        require_ai_access(AI.CREATE)
     return direct_uploads.direct_upload_response()
 
 

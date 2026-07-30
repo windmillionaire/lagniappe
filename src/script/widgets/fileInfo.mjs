@@ -17,6 +17,7 @@ import { setIcon } from "../shared/icons";
 export class FileInfo extends FormElement {
 	constructor(attributes) {
 		super(attributes);
+		this.aiCreate = this.target.dataset.aiCreate === "true";
 		this.messages = {
 			submit: "Update File",
 			submitting: "Updating File",
@@ -40,8 +41,12 @@ export class FileInfo extends FormElement {
 	get html() {
 		const status = document.createElement("div");
 		status.className = "flex flex-col gap-2";
-		status.appendChild(this._taskStatus(this._taskSettings.extract));
-		status.appendChild(this._taskStatus(this._taskSettings.summarize));
+		status.append(
+			...[
+				this._taskStatus(this._taskSettings.extract),
+				this._taskStatus(this._taskSettings.summarize),
+			].filter(Boolean),
+		);
 		return [
 			this.filenameElement,
 			this.nameElement,
@@ -131,10 +136,17 @@ export class FileInfo extends FormElement {
 	}
 
 	_taskStatus(taskSettings) {
+		const taskOptions = this.options?.[taskSettings.role];
+		if (
+			taskSettings.role === "summarize" &&
+			!this.aiCreate &&
+			!taskOptions?.enabled
+		) {
+			return null;
+		}
+
 		const status = document.createElement("div");
 		status.dataset.role = taskSettings.role;
-
-		const taskOptions = this.options?.[taskSettings.role];
 
 		if (!taskOptions?.enabled) {
 			status.appendChild(

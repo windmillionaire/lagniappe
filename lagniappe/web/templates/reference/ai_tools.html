@@ -12,6 +12,20 @@
     {% endcall %}
   </section>
   <section>
+    {{ subheading("Access Levels") }}
+    <div class="space-y-3">
+      {% call feature("Ask Access", icon="ask", kind="user") %}
+        Shows the Ask tool and allows saved questions and answers. Existing Organize or Create reports remain readable after a user is reduced from Create to Ask, but their higher-level actions stay unavailable.
+      {% endcall %}
+      {% call feature("Create Access", icon="create", kind="user") %}
+        Includes Ask and adds Organize, Create, generation, autofill, summarization, revision of creation proposals, and proposal execution.
+      {% endcall %}
+      {% call feature("Normal Permissions Still Apply", icon="permissions", kind="user") %}
+        AI access is per user and separate from groups. A user needs both the required AI level and permission to the records involved.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
     {{ subheading("Available Tools") }}
     <div class="space-y-3">
       {% call feature("Organize", icon="organize", kind="default") %}

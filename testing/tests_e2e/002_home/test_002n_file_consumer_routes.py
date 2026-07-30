@@ -38,7 +38,6 @@ def _oversized_error(consumer, label):
 
 
 def test_organize_report_accepts_oversized_input(route_app, monkeypatch):
-    monkeypatch.setattr(tool_routes, "abort_ai_restricted_action", lambda: None)
     upload = SimpleNamespace(
         filename="oversized.pdf",
         size=LARGE_ASSET_BYTES + 1,
@@ -154,17 +153,13 @@ def test_deferred_autofill_lock_response_blocks_form_mutations(
 
 
 # @pair ai:batch-summary
-# @pair ai:restriction-gate
+# @pair ai:access-gate
 # @pair ai:provider-boundary
-def test_batch_page_upload_rejects_ai_restricted_actor_before_summary(
+def test_batch_page_upload_rejects_actor_without_ai_create_before_summary(
     route_app,
     monkeypatch,
 ):
-    restricted_actor = SimpleNamespace(
-        properties=SimpleNamespace(
-            restrictions=SimpleNamespace(can_use_ai_tools=False),
-        ),
-    )
+    restricted_actor = SimpleNamespace(access=lambda _required: False)
     summary_calls = []
     monkeypatch.setattr(auth, "current_user", restricted_actor)
     monkeypatch.setattr(file_routes, "abort_public_user_action", lambda: None)

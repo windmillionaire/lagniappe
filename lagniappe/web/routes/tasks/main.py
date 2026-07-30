@@ -5,6 +5,7 @@ from flask_login import current_user
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
+    AI,
     Action,
     Fetch,
     FetchReason,
@@ -16,10 +17,10 @@ from lagniappe.core.definitions import (
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.tools import ai, database, dates, task_combine
 from lagniappe.web.auth import (
-    abort_ai_restricted_action,
     abort_public_user_action,
     logged_in,
     permission,
+    require_ai_access,
 )
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
@@ -509,7 +510,7 @@ def update(key, **kwargs):
             return responses.error(str(e))
 
         if _ai_schedule_requested(request.form):
-            abort_ai_restricted_action()
+            require_ai_access(AI.CREATE)
 
         schedule = task.properties.schedule.update(request.form)
         if schedule and schedule.generate and explain == "schedule":
@@ -527,7 +528,7 @@ def update(key, **kwargs):
             return responses.error(str(e))
 
     if role in ["autofill-submit"] or explain == "autofill":
-        abort_ai_restricted_action()
+        require_ai_access(AI.CREATE)
         if explain == "autofill":
             try:
                 prompt = ai.form_autofill_prompt(**_autofill_data(task, request))
@@ -560,6 +561,9 @@ def update(key, **kwargs):
 @tasks.route("<key>/update/direct-upload", methods=["POST"])
 @permission(Resource.TASK, Action.EDIT)
 def update_direct(key, **kwargs):
+    upload_data = request.get_json(silent=True) or request.form
+    if upload_data.get("input_name") == "autofill-file":
+        require_ai_access(AI.CREATE)
     locked = deferred_autofill.locked_response(kwargs["entity"], request.form)
     if locked:
         return locked
@@ -584,7 +588,7 @@ def create(key, **kwargs):
     explain = request.form.get("explain")
 
     if _ai_schedule_requested(request.form):
-        abort_ai_restricted_action()
+        require_ai_access(AI.CREATE)
 
     schedule = task.properties.schedule.update(request.form)
     if schedule and schedule.generate and explain == "schedule":
@@ -607,6 +611,9 @@ def create(key, **kwargs):
 @tasks.route("<key>/create/direct-upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def create_direct(key, **kwargs):
+    upload_data = request.get_json(silent=True) or request.form
+    if upload_data.get("input_name") == "autofill-file":
+        require_ai_access(AI.CREATE)
     return direct_uploads.direct_upload_response()
 
 

@@ -3,13 +3,14 @@ from flask import abort, request
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import ai, filters
 from lagniappe.core.definitions import (
+    AI,
     Action,
     MutationIntent,
     ProjectAttributes,
     Resource,
 )
 from lagniappe.core import exceptions
-from lagniappe.web.auth import abort_ai_restricted_action, permission
+from lagniappe.web.auth import permission, require_ai_access
 from lagniappe.web import responses
 
 from . import projects
@@ -156,7 +157,7 @@ def create():
     explain = request.form.get("role") == "explain"
 
     if generate:
-        abort_ai_restricted_action()
+        require_ai_access(AI.CREATE)
         prompt = ai.project_creation_prompt(request.form.get("user_description"))
         if explain:
             return responses.explain(prompt)

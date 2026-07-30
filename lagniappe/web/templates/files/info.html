@@ -7,6 +7,7 @@
         data-name="{{ file.name }}"
         data-filename="{{ file.filename }}"
         data-mimetype="{{ file.mimetype }}"
+        data-ai-create="{{ current_user.access(AI.CREATE)|yesno }}"
         data-has-text="{{ file.properties.text.value|yesno }}"
         data-extractable="{{ file.properties.text.extractable|yesno }}"
         {% if file.encoding %}data-encoding="{{ file.encoding }}"{% endif %}

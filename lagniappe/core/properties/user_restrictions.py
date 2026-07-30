@@ -129,18 +129,6 @@ class Restrictions(Property):
         return self._state_value("category_edit")
 
     # @testable true
-    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @features restrictions, permissions
-    # @dimensions ai-access public-users
-    @property
-    def can_use_ai_tools(self):
-        return bool(
-            self.entity
-            and self.entity.is_authenticated
-            and not getattr(self.entity, "is_public", False)
-        )
-
-    # @testable true
     # @tests tests_unit/test_020_ai_reports.py::test_report_prompts_filter_actions_by_user_permissions
     # @features ai-report
     # @dimensions action-capabilities permissions

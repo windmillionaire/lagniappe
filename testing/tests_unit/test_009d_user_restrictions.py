@@ -33,8 +33,11 @@ def _app():
     return app
 
 
-# @features restrictions permissions
-# @dimensions search assign facets page-list page-create category-edit ai-access public-users
+# @pairs restrictions:search permissions:search
+# @pairs restrictions:assign permissions:assign
+# @pairs restrictions:facets permissions:facets
+# @pair restrictions:page-list
+# @pairs restrictions:category-edit permissions:category-edit
 @pytest.mark.unit
 def test_restrictions(get_permissions_test_data):
     """Test restrictions property for various user permission configurations.
@@ -102,15 +105,6 @@ def test_restrictions(get_permissions_test_data):
                     f"{user.name}: category_edit = {category_edit_val}, "
                     f"expected {exp_category_edit}"
                 )
-            assert (
-                user.properties.restrictions.can_use_ai_tools
-                == expected["can_use_ai_tools"]
-            ), (
-                f"{user.name}: can_use_ai_tools = "
-                f"{user.properties.restrictions.can_use_ai_tools}, "
-                f"expected {expected['can_use_ai_tools']}"
-            )
-
             task_val = user.properties.restrictions.task
             exp_task = _expected(expected["task"])
             if isinstance(task_val, list) and isinstance(exp_task, list):

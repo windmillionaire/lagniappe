@@ -276,9 +276,10 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009a_user.py::test_page_update_user_authorization_rules
+    # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
     # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_reassign_and_remove_user_from_page
     # @features user-settings
-    # @dimensions email-edit owner-own-page owner-other-page page-preservation page-reassign page-remove
+    # @dimensions email-edit ai-access owner-own-page owner-other-page page-preservation page-reassign page-remove
     def update_user(self, data, user=None):
         user = current_context_user(user)
         target_user = self.user
@@ -289,7 +290,17 @@ class Page(AssetMixin, SubmitterMixin, Entity):
         )
         is_owner_viewer = bool(user and user.is_owner)
 
+        ai_access = None
+        if "ai_access" in data:
+            if not is_owner_viewer:
+                raise PermissionError("Only the owner can change AI access.")
+            from ..definitions import AI
+
+            ai_access = AI.name_for(data.get("ai_access"))
+
         target_user.name = data.get("name")
+        if ai_access is not None:
+            target_user.ai_access = ai_access
         self.add_mutation_intents(
             MutationIntent.standard(target_user, reason="page-user-update")
         )

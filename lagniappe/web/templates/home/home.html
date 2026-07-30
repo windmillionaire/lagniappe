@@ -75,7 +75,7 @@
         <span>Manual</span>
       </span>
     </a>
-    {% if current_user.properties.restrictions.can_use_ai_tools %}
+    {% if current_user.access(AI.ASK) %}
       <div id="tools"
            lp-component
            data-open="false"

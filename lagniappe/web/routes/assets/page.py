@@ -3,12 +3,12 @@ from flask import request
 from flask_login import current_user
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Action, Resource
+from lagniappe.core.definitions import AI, Action, Resource
 from lagniappe.core.tools import ai
 from lagniappe.web.auth import (
-    abort_ai_restricted_action,
     abort_public_user_action,
     permission,
+    require_ai_access,
 )
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
@@ -82,7 +82,7 @@ def remove_page_image(key, **kwargs):
 @assets.route("<key>/generate-page-image", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def generate_page_image(key, **kwargs):
-    abort_ai_restricted_action()
+    require_ai_access(AI.CREATE)
 
     page = kwargs["entity"]
 

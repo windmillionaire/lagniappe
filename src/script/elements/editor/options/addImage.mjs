@@ -34,7 +34,11 @@ class Image extends BaseUpload {
 		this.target.dataset.option = this.name;
 
 		this.dropzone = uploadElement.dropzone({ text: IMAGE_DROPZONE_TEXT });
-		this.menuOptions = ["remove", "generate", "paste"];
+		this.menuOptions = [
+			"remove",
+			...(this.toolbar.aiCreate ? ["generate"] : []),
+			"paste",
+		];
 		this.uploadMenu = new UploadMenu(this);
 		this.generate = uploadElement.generateDocumentImage();
 		this.submitButton = buttons.submit({
@@ -45,7 +49,11 @@ class Image extends BaseUpload {
 	}
 
 	get html() {
-		return [this.dropzone.element, this.generate.element, this.submitButton];
+		return [
+			this.dropzone.element,
+			...(this.toolbar.aiCreate ? [this.generate.element] : []),
+			this.submitButton,
+		];
 	}
 
 	async init() {

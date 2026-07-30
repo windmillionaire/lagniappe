@@ -32,6 +32,7 @@
          data-fullscreen="false"
          data-readonly="{{ page.readonly|yesno }}"
          data-public-limited="{{ current_user.is_public|yesno }}"
+         data-ai-create="{{ current_user.access(AI.CREATE)|yesno }}"
          lp-sync="{{ page.sync_ids.document.id }}"
          {% if page.sync_ids.document.fingerprint %}lp-fingerprint="{{ page.sync_ids.document.fingerprint }}"{% endif %}
          {% if page.db.get('document_history') %}data-history="true"{% endif %}></div>

@@ -1,10 +1,10 @@
 from flask import abort, request, g
 
 from flask_login import current_user
-from lagniappe.core.definitions import Action, Fetch, Resource
+from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
-from lagniappe.web.auth import home_permission, logged_in
+from lagniappe.web.auth import home_permission, logged_in, require_ai_access
 from lagniappe.web import responses
 
 from . import home
@@ -29,6 +29,8 @@ def home_page():
 @home.route("/get/<kind>")
 @home_permission()
 def get(kind):
+    if kind == "tools":
+        require_ai_access(AI.ASK)
     home = Entities.HOME()
     section = home.section(kind, **request.args)
 

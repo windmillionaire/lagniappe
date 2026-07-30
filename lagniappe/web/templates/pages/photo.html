@@ -1,6 +1,7 @@
 {% macro image(page) %}
   <form data-widget="PagePhoto"
         data-title="Image"
+        data-ai-create="{{ current_user.access(AI.CREATE)|yesno }}"
         data-visible="true"
         data-persistent="true"
         data-nav="true"

@@ -22,6 +22,21 @@
     </div>
   </section>
   <section>
+    {{ subheading("AI Access") }}
+    <p class="text-sm text-base-dark mb-3">
+      The owner can choose an AI access level independently from user groups and permissions.
+      New users default to None.
+    </p>
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li><strong>None</strong> hides AI tools and prevents AI-backed actions.</li>
+      <li><strong>Ask</strong> allows workspace questions and saved Ask reports.</li>
+      <li><strong>Create</strong> also allows generation, autofill, summarization, Organize, Create, and proposal execution.</li>
+    </ul>
+    {% call callout("tip") %}
+      AI access does not add permission to any page, category, project, form, or file. The user must have both the required AI level and the normal resource permission.
+    {% endcall %}
+  </section>
+  <section>
     {{ subheading("User Groups & Permissions") }}
     <div class="space-y-4">
       <div>
@@ -51,6 +66,7 @@
       <li>Users sign in with the Google account whose email address is on their user record.</li>
       <li>Their personal page will be automatically created and accessible</li>
       <li>You can adjust their permissions later by visiting their page as an administrator</li>
+      <li>The owner can adjust their AI access later in User Settings</li>
       <li>They can be added to or removed from user groups at any time</li>
     </ul>
   </section>

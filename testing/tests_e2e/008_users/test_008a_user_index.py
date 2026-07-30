@@ -64,6 +64,39 @@ def _user_rows_response(mode):
     )
 
 
+def _post_form_status(user, path, data):
+    return user.page.evaluate(
+        """async ({ path, data }) => {
+            const send = async () => {
+                const body = new FormData();
+                for (const [key, value] of Object.entries(data)) {
+                    body.set(key, value);
+                }
+                return fetch(path, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "X-CSRFToken":
+                            document.getElementById("token")?.value || "",
+                        "X-Lagniappe-Request": "true",
+                    },
+                    body,
+                });
+            };
+
+            let response = await send();
+            if (response.status === 400) {
+                const token = await (await fetch("/token")).text();
+                const tokenElt = document.getElementById("token");
+                if (tokenElt) tokenElt.value = token;
+                response = await send();
+            }
+            return response.status;
+        }""",
+        {"path": path, "data": data},
+    )
+
+
 # @features users
 # @dimensions index-mode-toggle disabled
 # @template users/index.html::public_users_toggle
@@ -146,7 +179,7 @@ def _create_user(user, create_form, definition):
 
 
 # @features users
-# @dimensions create-form create-submit created-row
+# @dimensions create-form create-submit created-row ai-access
 # @template users/index.html::tools_section
 # @template users/tools.html::create_user
 def test_create_user_from_index(get_user):
@@ -171,17 +204,52 @@ def test_create_user_from_index(get_user):
     create_form.locator("label").filter(has_text="Email").locator(
         "input[name='email']"
     ).fill(created_user.email)
+    ai_options = create_form.locator("input[name='ai_access']")
+    expect(ai_options).to_have_count(3)
+    expect(
+        create_form.locator("input[name='ai_access'][value='NONE']")
+    ).to_be_checked()
+    create_form.locator("input[name='ai_access'][value='ASK']").check()
 
     payload = create_form.evaluate(
         "form => Object.fromEntries(new FormData(form).entries())"
     )
     assert payload["name"] == created_user.name
     assert payload["email"] == created_user.email
+    assert payload["ai_access"] == "ASK"
 
     new_row = _create_user(owner, create_form, created_user)
+    assert Entities.USER.load(created_user.email).ai_access == "ASK"
 
     new_row.locator(Table.ENTITY_URL).click()
     expect(owner.page).to_have_title(re.compile(created_user.name))
+
+
+# @features users
+# @dimensions owner-only
+# @template users/tools.html::create_user
+def test_non_owner_cannot_set_ai_access_when_creating_user(get_user):
+    owner = get_user(Users.OWNER)
+    admin = get_user(Users.admin, creator=owner)
+    suffix = uuid4().hex
+    email = f"forged-ai-access-{suffix}@example.test"
+
+    user_index = admin.go(SitePages.USER_INDEX)
+    create_form = user_index.create_user_form
+    expect(create_form).to_have_attribute("data-can-edit-ai", "false")
+    expect(create_form.locator("input[name='ai_access']")).to_have_count(0)
+
+    status = _post_form_status(
+        admin,
+        "/users/create",
+        {
+            "name": f"Forged AI Access {suffix}",
+            "email": email,
+            "ai_access": "CREATE",
+        },
+    )
+    assert status == 403
+    assert Entities.USER.load(email) is None
 
 
 # @pair users:group-selector

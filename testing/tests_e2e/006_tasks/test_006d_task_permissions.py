@@ -36,7 +36,7 @@ def test_task_route_is_forbidden_without_model_or_page_permission(get_user):
     blocked_fingerprint = hashlib.md5(
         (
             f"{task.entity.fingerprint}-{CONFIG.BUILD_ID}-"
-            f"{blocked.entity.permissions_fingerprint}"
+            f"{blocked.entity.authorization_fingerprint}"
         ).encode("utf-8")
     ).hexdigest()
     task_url = (

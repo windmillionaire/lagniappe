@@ -1,4 +1,4 @@
-from ..definitions import Ordering
+from ..definitions import AI, Ordering
 from ..mixins import ColumnMixin, DateMixin
 from .base_db import DBProperty
 from .base_asset import AssetProperty
@@ -154,6 +154,38 @@ class InvalidateCache(DBProperty):
     @value.setter
     def value(self, value):
         DBProperty.value.fset(self, value)
+
+
+# @testable true
+# @tests tests_unit/test_009f_user_ai_access.py::test_user_ai_access_legacy_defaults_validation_and_invalidation
+# @features ai-access
+# @dimensions persistence legacy-default public validation cache-invalidation
+class AIAccess(DBProperty):
+    """Canonical per-user AI entitlement name."""
+
+    _id = "ai_access"
+
+    @property
+    def value(self):
+        stored = DBProperty.value.fget(self)
+        if stored is None:
+            return (
+                AI.NONE.name
+                if getattr(self.entity, "is_public", False)
+                else AI.CREATE.name
+            )
+        try:
+            return AI.name_for(stored)
+        except ValueError:
+            return AI.NONE.name
+
+    @value.setter
+    def value(self, value):
+        name = AI.name_for(value)
+        previous = self.value
+        DBProperty.value.fset(self, name)
+        if previous != name:
+            self.entity.invalidate_cache = True
 
 
 # @testable true

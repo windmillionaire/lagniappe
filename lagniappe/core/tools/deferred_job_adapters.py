@@ -6,6 +6,7 @@ import json
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
+    AI,
     Action,
     DeferredJobInspection,
     DeferredJobPhase,
@@ -35,7 +36,6 @@ from .deferred_jobs import (
 class ReportAdapter(DeferredJobAdapter):
     """Shared report generation and revision behavior."""
 
-    requires_ai = True
     queued_message = "Creating report..."
     retry_message = "The model is busy right now. We'll try again later."
 
@@ -183,6 +183,7 @@ class ReportAdapter(DeferredJobAdapter):
 # @pair ai-report:submission-completion
 class OrganizeReportAdapter(ReportAdapter):
     job_type = DeferredJobType.REPORT_ORGANIZE
+    required_ai_access = AI.CREATE
 
     def checkpoint_ready(self, context):
         checkpoint = context.checkpoint or {}
@@ -296,6 +297,7 @@ class OrganizeReportAdapter(ReportAdapter):
 # @testable infrastructure
 class AskReportAdapter(ReportAdapter):
     job_type = DeferredJobType.REPORT_ASK
+    required_ai_access = AI.ASK
 
     # @testable infrastructure
     def prepare(self, context):
@@ -320,6 +322,7 @@ class AskReportAdapter(ReportAdapter):
 # @testable infrastructure
 class CreateReportAdapter(ReportAdapter):
     job_type = DeferredJobType.REPORT_CREATE
+    required_ai_access = AI.CREATE
 
     # @testable infrastructure
     def prepare(self, context):
@@ -350,6 +353,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
     """Durably execute a reviewed report through its per-action ledger."""
 
     job_type = DeferredJobType.REPORT_EXECUTION
+    required_ai_access = AI.CREATE
     synchronous_testing = True
     queued_message = "Saving report changes..."
     retry_message = "Saving is taking longer than expected; retrying safely..."
@@ -390,10 +394,9 @@ class ReportExecutionAdapter(DeferredJobAdapter):
 
     def authorize(self, context):
         report = context.input("report")
+        super().authorize(context)
         if not isinstance(context.actor, Entities.USER):
             raise exceptions.ValidationError("Deferred report user is invalid.")
-        if not context.actor.properties.restrictions.can_use_ai_tools:
-            raise exceptions.ValidationError("This user cannot use AI tools.")
         if not isinstance(report, Entities.REPORT):
             raise exceptions.ValidationError("Deferred report is invalid.")
         if not report.allowed(Action.EDIT, user=context.actor):
@@ -514,7 +517,7 @@ def _report_proposal_fingerprint(report):
 # @testable infrastructure
 class AutofillAdapter(DeferredJobAdapter):
     job_type = DeferredJobType.AUTOFILL
-    requires_ai = True
+    required_ai_access = AI.CREATE
     queued_message = "Autofilling form..."
     retry_message = "AI is temporarily busy; retrying autofill shortly..."
     dependency_message = "Waiting for attached file summaries before autofilling..."
@@ -720,7 +723,7 @@ class AutofillAdapter(DeferredJobAdapter):
 # @testable infrastructure
 class PageGenerationAdapter(DeferredJobAdapter):
     job_type = DeferredJobType.PAGE_GENERATION
-    requires_ai = True
+    required_ai_access = AI.CREATE
     queued_message = "Generating pages..."
     retry_message = "AI is temporarily busy; retrying page generation shortly..."
     success_message = "Generated pages are ready."
@@ -1034,7 +1037,7 @@ class FileExtractAdapter(FileAdapter):
 # @testable infrastructure
 class FileSummarizeAdapter(FileAdapter):
     job_type = DeferredJobType.FILE_SUMMARIZE
-    requires_ai = True
+    required_ai_access = AI.CREATE
     mutation_inputs = ("file",)
 
     # @testable true

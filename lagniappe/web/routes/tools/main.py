@@ -7,6 +7,7 @@ from flask import abort, redirect, request, url_for
 from flask_login import current_user
 
 from lagniappe.core.definitions import (
+    AI,
     DeferredJobSpec,
     DeferredJobType,
     Fetch,
@@ -21,7 +22,7 @@ from lagniappe.core.tools import ai
 from lagniappe.core.tools.deferred_jobs import DeferredJobs
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
-from lagniappe.web.auth import abort_ai_restricted_action, logged_in
+from lagniappe.web.auth import ai_access, require_ai_access
 
 from . import tools
 
@@ -148,10 +149,8 @@ def _explain_create_prompt():
 # @covered-by lagniappe/web/routes/tools/main.py::create_organize_report
 # @reason route permission mirrors the final organize upload endpoint
 @tools.route("/organize/direct-upload", methods=["POST"])
-@logged_in
+@ai_access(AI.CREATE)
 def create_organize_report_direct():
-    abort_ai_restricted_action()
-
     return direct_uploads.direct_upload_response()
 
 
@@ -239,10 +238,8 @@ def _start_tool_report(
 # @features ai-report
 # @dimensions create upload async explain-button text-only ask-fallback
 @tools.route("/organize", methods=["POST"])
-@logged_in
+@ai_access(AI.CREATE)
 def create_organize_report():
-    abort_ai_restricted_action()
-
     if request.form.get("role") == "explain":
         return _explain_organize_prompt()
 
@@ -283,10 +280,8 @@ def create_organize_report():
 # @features ai-report
 # @dimensions ask explain-button tool-switcher
 @tools.route("/ask", methods=["POST"])
-@logged_in
+@ai_access(AI.ASK)
 def create_ask_report():
-    abort_ai_restricted_action()
-
     if request.form.get("role") == "explain":
         return _explain_ask_prompt()
 
@@ -306,10 +301,8 @@ def create_ask_report():
 # @features ai-report
 # @dimensions create explain-button tool-switcher async persistence
 @tools.route("/create", methods=["POST"])
-@logged_in
+@ai_access(AI.CREATE)
 def create_create_report():
-    abort_ai_restricted_action()
-
     if request.form.get("role") == "explain":
         return _explain_create_prompt()
 
@@ -354,10 +347,8 @@ def _get_report(key):
 # @features ai-report
 # @dimensions detail skip-action ask answer-html links no-actions create revision execute report-view needs-review no-execute deferred-refresh pending
 @tools.route("/reports/<key>", methods=["GET"])
-@logged_in
+@ai_access(AI.ASK)
 def report(key):
-    abort_ai_restricted_action()
-
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
@@ -370,10 +361,8 @@ def report(key):
 # @features ai-report
 # @dimensions deterministic-run recovery retry detail repeat-run idempotent
 @tools.route("/reports/<key>/run", methods=["POST"])
-@logged_in
+@ai_access(AI.CREATE)
 def run_report(key):
-    abort_ai_restricted_action()
-
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
@@ -452,10 +441,8 @@ def run_report(key):
 # @features ai-report
 # @dimensions deterministic-undo failed-prefix recovery undo
 @tools.route("/reports/<key>/undo", methods=["POST"])
-@logged_in
+@ai_access(AI.CREATE)
 def undo_report(key):
-    abort_ai_restricted_action()
-
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
@@ -488,13 +475,13 @@ def undo_report(key):
 # @features ai-report
 # @dimensions revision feedback async completed-state
 @tools.route("/reports/<key>/revise", methods=["POST"])
-@logged_in
+@ai_access(AI.ASK)
 def revise_report(key):
-    abort_ai_restricted_action()
-
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
+    if report.tool != "ask":
+        require_ai_access(AI.CREATE)
     if report.tool not in {"organize", "ask", "create"}:
         return responses.error("This report cannot be revised.")
     can_revise = bool(report.proposal) and report.status == "ready"
@@ -548,10 +535,8 @@ def revise_report(key):
 # @features ai-report
 # @dimensions skip-action dependencies
 @tools.route("/reports/<key>/actions/<int:action_index>/skip", methods=["POST"])
-@logged_in
+@ai_access(AI.CREATE)
 def skip_report_action(key, action_index):
-    abort_ai_restricted_action()
-
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")
@@ -581,10 +566,8 @@ def skip_report_action(key, action_index):
 # @features ai-report
 # @dimensions delete-modal file-cleanup
 @tools.route("/reports/<key>", methods=["DELETE"])
-@logged_in
+@ai_access(AI.ASK)
 def delete_report(key):
-    abort_ai_restricted_action()
-
     report = _get_report(key)
     if not report:
         return responses.not_found("Report not found")

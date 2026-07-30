@@ -25,6 +25,20 @@
       <li>Suggest workspace-native actions, such as adding pages, tasks, files, forms, or projects in the right place.</li>
     </ul>
   {% endcall %}
+  {{ heading("Per-User AI Access", icon="user", kind="user") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      The site owner chooses a separate AI level for each user. None disables
+      AI features, Ask allows workspace questions and saved answers, and Create
+      also enables generation, autofill, summarization, Organize, Create, and
+      proposal execution. Create includes Ask.
+    </p>
+    <p class="text-base-medium">
+      This setting is independent from user groups and permissions, so a user
+      can have broad workspace permissions without AI access, or AI access that
+      still operates only within a narrow set of permitted records.
+    </p>
+  {% endcall %}
   {{ heading("Permission-Scoped Context", icon="permissions", kind="user") }}
   {% call card() %}
     <p class="text-base-medium mb-3">

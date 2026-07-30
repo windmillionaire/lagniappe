@@ -15,7 +15,7 @@ from flask import abort, current_app, g, request, session
 from flask_login import current_user
 
 from lagniappe import CONFIG
-from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions import AI, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
 
@@ -57,8 +57,11 @@ def verify_google_csrf(response):
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_route_is_forbidden_without_model_or_page_permission
 # @pairs cache:etag cache:permissions cache:build-id
 def _etag_fingerprint(base_fingerprint, user):
-    """Hash the resource fingerprint, build id, and viewer permissions."""
-    value = f"{base_fingerprint}-{CONFIG.BUILD_ID}-{user.permissions_fingerprint}"
+    """Hash the resource fingerprint, build id, and viewer authorization."""
+    authorization = getattr(user, "authorization_fingerprint", None)
+    if authorization is None:
+        authorization = user.permissions_fingerprint
+    value = f"{base_fingerprint}-{CONFIG.BUILD_ID}-{authorization}"
     return hashlib.md5(value.encode("utf-8")).hexdigest()
 
 
@@ -165,17 +168,42 @@ def abort_public_user_action():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_ai_actions_are_forbidden
-# @features public-users
-# @dimensions metered-actions restriction-gate
-def abort_ai_restricted_action():
-    """Reject AI-backed actions for users that may edit but may not invoke AI."""
-    restrictions = getattr(
-        getattr(current_user, "properties", None),
-        "restrictions",
-        None,
-    )
-    if not restrictions or not restrictions.can_use_ai_tools:
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
+# @features ai-access
+# @dimensions route-gate
+def require_ai_access(required):
+    """Reject a request unless the current user has the required AI tier."""
+    if not getattr(current_user, "access", lambda _required: False)(required):
         abort(403)
+
+
+# @testable true
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
+# @features ai-access
+# @dimensions authentication route-gate
+def ai_access(required):
+    """Authorize an AI-only route before invoking its handler."""
+    if not isinstance(required, AI) or required is AI.NONE:
+        raise ValueError("AI route access requires ASK or CREATE.")
+
+    # @testable false
+    # @covered-by lagniappe/web/auth.py::ai_access
+    # @reason decorator factory closure is exercised through the public decorator
+    def decorator(f):
+        # @testable false
+        # @covered-by lagniappe/web/auth.py::ai_access
+        # @reason request wrapper is exercised through tier-gated tool routes
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            user, _entity = _load_request_context()
+            if not user.is_authenticated:
+                abort(401)
+            require_ai_access(required)
+            return f(*args, **kwargs)
+
+        return wrapped
+
+    return decorator
 
 
 # @testable false

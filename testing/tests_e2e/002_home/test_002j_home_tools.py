@@ -5,6 +5,7 @@ import pytest
 from playwright.sync_api import expect
 
 from lagniappe.core.definitions import (
+    AI,
     DeferredJobPhase,
     DeferredJobStatus,
     DeferredJobType,
@@ -25,6 +26,46 @@ def _suffix():
 
 def _owner(user):
     return Entities.USER.load(user.email)
+
+
+def _set_ai_access(user, value):
+    entity = Entities.USER.load(user.email)
+    entity.ai_access = value
+    entity.save()
+    user.entity = entity
+    user.clear_cache_invalidation()
+
+
+def _tool_route_status(user, path):
+    return user.page.evaluate(
+        """async (path) => {
+            const send = async () => {
+                const body = new FormData();
+                body.set("role", "explain");
+                body.set("instructions", "Explain the generated prompt.");
+                return fetch(path, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "X-CSRFToken":
+                            document.getElementById("token")?.value || "",
+                        "X-Lagniappe-Request": "true",
+                    },
+                    body,
+                });
+            };
+
+            let response = await send();
+            if (response.status === 400) {
+                const token = await (await fetch("/token")).text();
+                const tokenElt = document.getElementById("token");
+                if (tokenElt) tokenElt.value = token;
+                response = await send();
+            }
+            return response.status;
+        }""",
+        path,
+    )
 
 
 def _ready_report(user):
@@ -438,6 +479,64 @@ def test_tools_create_form_has_expected_controls(get_user):
     switcher.get_by_role("button", name="Organize").click()
     expect(dropzone).to_be_visible()
     expect(form.get_by_role("button", name="Start")).to_be_visible()
+
+
+# @features ai-access
+# @dimensions authentication route-gate
+# @template home/home.html::main
+# @template home/tools.html::create_report
+def test_ai_access_tiers_gate_tool_routes(get_user):
+    user = get_user(Users.OWNER)
+
+    try:
+        for tier, expected_statuses, visible_tools in (
+            (AI.NONE, (403, 403, 403), ()),
+            (AI.ASK, (403, 200, 403), ("Ask",)),
+            (AI.CREATE, (200, 200, 200), ("Organize", "Ask", "Create")),
+        ):
+            _set_ai_access(user, tier)
+            home = user.go(SitePages.HOME)
+
+            toggle = user.locate(home.CREATE_TOOL_REPORT_TOGGLE)
+            if tier is AI.NONE:
+                expect(toggle).to_have_count(0)
+            else:
+                expect(toggle).to_be_visible()
+                toggle.click()
+                form = user.locate(home.CREATE_TOOL_REPORT_FORM)
+                expect(form).to_be_visible()
+                switcher = form.locator("[data-role='tool-switcher']")
+                for tool in ("Organize", "Ask", "Create"):
+                    button = switcher.get_by_role("button", name=tool, exact=True)
+                    expect(button).to_have_count(1 if tool in visible_tools else 0)
+
+            statuses = tuple(
+                _tool_route_status(user, path)
+                for path in ("/tools/organize", "/tools/ask", "/tools/create")
+            )
+            assert statuses == expected_statuses
+    finally:
+        _set_ai_access(user, AI.CREATE)
+
+
+def test_ask_access_can_read_create_report_without_create_actions(get_user):
+    user = get_user(Users.OWNER)
+    report = _create_ready_report(user)
+
+    try:
+        _set_ai_access(user, AI.ASK)
+        report_page = user.go(Report.for_entity(user, report))
+
+        expect(report_page.title_element).to_have_text(report.name)
+        expect(user.page.get_by_role("heading", name="Proposal")).to_be_visible()
+        expect(report_page.proposal_actions).to_have_count(1)
+        expect(report_page.execute_button).to_have_count(0)
+        expect(user.page.get_by_role("button", name="Revise Plan")).to_have_count(0)
+        expect(
+            report_page.proposal_actions.locator("[data-role='skip-action']")
+        ).to_have_count(0)
+    finally:
+        _set_ai_access(user, AI.CREATE)
 
 
 # @features ai-report

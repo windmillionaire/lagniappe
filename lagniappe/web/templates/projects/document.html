@@ -16,6 +16,7 @@
          data-fullscreen="false"
          data-readonly="{{ project.readonly|yesno }}"
          data-public-limited="{{ current_user.is_public|yesno }}"
+         data-ai-create="{{ current_user.access(AI.CREATE)|yesno }}"
          {% if project.db.get('document_history') %}data-history="true"{% endif %}></div>
   </div>
 {% endmacro %}

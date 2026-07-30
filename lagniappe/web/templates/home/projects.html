@@ -15,7 +15,7 @@
         {{ controls.close("projects") }}
       </div>
     </div>
-    {{ generate('project') }}
+    {% if current_user.access(AI.CREATE) %}{{ generate('project') }}{% endif %}
     <div data-role="attributes"
          data-entity="project"
          class="group-data-[mode=ai]/form:hidden">
@@ -25,7 +25,7 @@
       </div>
     </div>
     <div class="{{ styles.form.submit.group }} -mt-2" data-role="submit-group">
-      {{ explain_prompt('generate') }}
+      {% if current_user.access(AI.CREATE) %}{{ explain_prompt('generate') }}{% endif %}
       <button type="submit" class="{{ styles.button.submit }} mt-2"></button>
     </div>
   </form>

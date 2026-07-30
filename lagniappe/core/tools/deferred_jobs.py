@@ -357,13 +357,16 @@ class _DeferredLeaseGuard:
                 return
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_023_deferred_jobs.py::test_registered_adapters_declare_required_ai_tiers
+# @pair deferred-jobs:tier-declaration
+# @pair ai-access:tier-declaration
 class DeferredJobAdapter:
     """Domain boundary plugged into the shared job lifecycle."""
 
     job_type = None
     synchronous_testing = False
-    requires_ai = False
+    required_ai_access = None
     mutation_inputs = ()
     queued_message = "Working..."
     retry_message = "Work is temporarily delayed; retrying shortly..."
@@ -403,14 +406,18 @@ class DeferredJobAdapter:
     # @tests tests_unit/test_023_deferred_jobs.py::test_registered_ai_adapters_reject_restricted_actor_before_prepare
     # @pair deferred-jobs:authorization
     # @pair ai:authorization
-    # @pair ai:restriction-gate
+    # @pair ai:access-gate
     # @pair ai:provider-boundary
     def authorize(self, context):
-        if (
-            self.requires_ai
-            and not context.actor.properties.restrictions.can_use_ai_tools
-        ):
-            raise exceptions.ValidationError("This user cannot use AI tools.")
+        required = self.required_ai_access
+        if required and not getattr(
+            context.actor,
+            "access",
+            lambda _required: False,
+        )(required):
+            raise exceptions.ValidationError(
+                "This user does not have the required AI access."
+            )
 
     # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_runner_rejects_changed_target_fingerprint_before_apply
@@ -1265,8 +1272,9 @@ class DeferredJobRegistry:
     # @tests tests_unit/test_023_deferred_jobs.py::test_runner_waits_for_dependency_without_consuming_provider_retry
     # @tests tests_unit/test_023_deferred_jobs.py::test_runner_treats_deleted_active_job_as_cancellation
     # @tests tests_unit/test_023_deferred_jobs.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
+    # @tests tests_unit/test_023_deferred_jobs.py::test_runner_rechecks_ai_access_before_apply
     # @features deferred-jobs
-    # @dimensions checkpoint recovery retry cancellation
+    # @dimensions checkpoint recovery retry cancellation reauthorization
     def run(self, job_key, *, now=None):
         now = _utc(now)
         lease_token = uuid.uuid4().hex
@@ -1793,7 +1801,7 @@ class DeferredJobRegistry:
             )
         terminal_error = _terminal_error(
             error,
-            requires_ai=adapter.requires_ai,
+            requires_ai=adapter.required_ai_access is not None,
         )
         try:
             adapter.failure(context, terminal_error)

@@ -3,53 +3,58 @@
 
 {% macro tool_switcher() %}
   <div class="{{ styles.form.submit.buttons }}" data-role="tool-switcher">
-    <button class="{{ styles.home.generate }}"
-            data-tool="organize"
-            data-route="{{ url_for('tools.create_organize_report') }}"
-            data-placeholder="Optional guidance for organizing these files..."
-            data-upload="true"
-            data-explain="organize"
-            data-active="true"
-            type="button">
-      {{ render_icon("organize") }}
-      <span>Organize</span>
-    </button>
+    {% if current_user.access(AI.CREATE) %}
+      <button class="{{ styles.home.generate }}"
+              data-tool="organize"
+              data-route="{{ url_for('tools.create_organize_report') }}"
+              data-placeholder="Optional guidance for organizing these files..."
+              data-upload="true"
+              data-explain="organize"
+              data-active="true"
+              type="button">
+        {{ render_icon("organize") }}
+        <span>Organize</span>
+      </button>
+    {% endif %}
     <button class="{{ styles.home.generate }}"
             data-tool="ask"
             data-route="{{ url_for('tools.create_ask_report') }}"
             data-placeholder="Ask a question about your workspace..."
             data-upload="false"
             data-explain="ask"
-            data-active="false"
+            data-active="{{ (not current_user.access(AI.CREATE))|yesno }}"
             type="button">
       {{ render_icon("ask") }}
       <span>Ask</span>
     </button>
-    <button class="{{ styles.home.generate }}"
-            data-tool="create"
-            data-route="{{ url_for('tools.create_create_report') }}"
-            data-placeholder="Describe what you want Lagniappe to create..."
-            data-upload="false"
-            data-explain="create"
-            data-active="false"
-            type="button">
-      {{ render_icon("create") }}
-      <span>Create</span>
-    </button>
+    {% if current_user.access(AI.CREATE) %}
+      <button class="{{ styles.home.generate }}"
+              data-tool="create"
+              data-route="{{ url_for('tools.create_create_report') }}"
+              data-placeholder="Describe what you want Lagniappe to create..."
+              data-upload="false"
+              data-explain="create"
+              data-active="false"
+              type="button">
+        {{ render_icon("create") }}
+        <span>Create</span>
+      </button>
+    {% endif %}
   </div>
 {% endmacro %}
 
 {% macro create_report() %}
+  {% set default_tool = "organize" if current_user.access(AI.CREATE) else "ask" %}
   <form lp-create
         lp-deferred
         data-widget="CreateToolReport"
         data-kind="default"
-        data-route="{{ url_for('tools.create_organize_report') }}"
+        data-route="{{ url_for('tools.create_organize_report') if default_tool == 'organize' else url_for('tools.create_ask_report') }}"
         data-destination="tools:ToolReportList"
         data-deferred-status="false"
         data-visible="false"
         class="{{ styles.home.form }}">
-    <input type="hidden" name="tool" value="organize" data-role="tool-input" />
+    <input type="hidden" name="tool" value="{{ default_tool }}" data-role="tool-input" />
     <div data-role="header" class="{{ styles.form.header.container }}">
       <h2 class="{{ styles.form.header.title }}"
           data-kind="default"
@@ -62,7 +67,7 @@
     {{ tool_switcher() }}
     <div class="{{ styles.form.submit.group }} -mt-2 flex flex-col gap-2"
          data-role="submit-group">
-      {{ explain_prompt('organize') }}
+      {{ explain_prompt(default_tool) }}
       <button type="submit"
               data-kind="default"
               data-role="start-report"

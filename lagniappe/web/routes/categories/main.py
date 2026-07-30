@@ -6,6 +6,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.tools import ai, filters
 from lagniappe.core.tools.deferred_jobs import DeferredJobs
 from lagniappe.core.definitions import (
+    AI,
     Action,
     CategoryAttributes,
     DeferredJobSpec,
@@ -14,7 +15,7 @@ from lagniappe.core.definitions import (
     MutationIntent,
     Resource,
 )
-from lagniappe.web.auth import abort_ai_restricted_action, permission
+from lagniappe.web.auth import permission, require_ai_access
 from lagniappe.web import responses
 from lagniappe.core.tools.utility import timed
 
@@ -129,7 +130,7 @@ def create():
     explain = request.form.get("role") == "explain"
 
     if generate:
-        abort_ai_restricted_action()
+        require_ai_access(AI.CREATE)
         prompt = ai.category_creation_prompt(request.form.get("user_description"))
         if explain:
             return responses.explain(prompt)
@@ -195,7 +196,7 @@ def page_generation_data(category, form, form_data, user):
 @categories.route("<key>/generate-pages", methods=["POST"])
 @permission(Resource.CATEGORY, Action.EDIT)
 def create_pages(key, **kwargs):
-    abort_ai_restricted_action()
+    require_ai_access(AI.CREATE)
 
     category = kwargs["entity"]
     explain = request.form.get("role") == "explain"

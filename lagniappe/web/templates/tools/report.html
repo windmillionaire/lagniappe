@@ -58,7 +58,7 @@
       {{ proposal_support(action.support) }}
       {% if action.reason %}<p class="pl-5">{{ action.reason }}</p>{% endif %}
     </div>
-    {% if report.status == "ready" and action.action_index and action.type not in ["needs_review", "skip"] %}
+    {% if current_user.access(AI.CREATE) and report.status == "ready" and action.action_index and action.type not in ["needs_review", "skip"] %}
       <button type="button"
               data-role="skip-action"
               data-route="{{ url_for('tools.skip_report_action', key=report.urlsafe_key, action_index=action.action_index) }}"
@@ -216,10 +216,11 @@
   {% set is_ask = report.tool == "ask" %}
   {% set report_title = ("Ask: " ~ report.instructions) if is_ask and report.instructions else report.name %}
   {% set report_icon = "ask" if report.tool == "ask" else "create" if report.tool == "create" else "organize" if report.tool == "organize" else "generate" %}
-  {% set can_revise = report.proposal and report.tool in ["organize", "ask", "create"] and report.status == "ready" %}
+  {% set can_create_ai = current_user.access(AI.CREATE) %}
+  {% set can_revise = report.proposal and report.tool in ["organize", "ask", "create"] and report.status == "ready" and (is_ask or can_create_ai) %}
   {% set completed_result_actions = report.result.actions|selectattr("status", "equalto", "complete")|list if report.result and report.result.actions else [] %}
   {% set can_retry = report.status == "failed" and report.result and report.result.ledger_version == 1 and report.result.status == "failed" %}
-  {% set can_undo = report.status in ["complete", "failed", "undo_failed"] and completed_result_actions and report.result.status != "undone" and not report.result.undone %}
+  {% set can_undo = can_create_ai and report.status in ["complete", "failed", "undo_failed"] and completed_result_actions and report.result.status != "undone" and not report.result.undone %}
   {% set revise_button_label = "Revise Response" if is_ask else "Revise Plan" %}
   {% set revise_heading = "Revise Response" if is_ask else "Revise Proposal" %}
   {% set operation_key = report.deferred_job.key if report.deferred_job else none %}
@@ -467,7 +468,7 @@
             </form>
           {% endif %}
 
-          {% if (report.status == "ready" and executable_actions) or can_retry %}
+          {% if can_create_ai and ((report.status == "ready" and executable_actions) or can_retry) %}
             <form method="post"
                   action="{{ url_for('tools.run_report', key=report.urlsafe_key) }}"
                   data-role="{{ 'retry-report-form' if can_retry else 'run-report-form' }}"

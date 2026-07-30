@@ -208,7 +208,7 @@
         data-close="{{ t.hash }}"
         class="{{ styles.form.default }}">
     {% if t.allowed(Action.EDIT) and not t.completed %}
-      {{ autofill(enabled=current_user.properties.restrictions.can_use_ai_tools) }}
+      {{ autofill(enabled=current_user.access(AI.CREATE)) }}
     {% endif %}
     {{ controls.edited_marker(url_for('tasks.get', key=t.urlsafe_key)) }}
   </form>
@@ -342,7 +342,7 @@
             data-action="schedule"
             data-role="date-select"
             data-title="Schedule"
-            data-ai-enabled="{{ current_user.properties.restrictions.can_use_ai_tools|yesno }}"
+            data-ai-enabled="{{ current_user.access(AI.CREATE)|yesno }}"
             data-kind="task"
             {% if task and task.properties.schedule.active %}data-schedule='{{ task.schedule|tojson }}'{% endif %}
             {% if task and task.due_date %}data-due-date='{{ task.properties.due_date.form_value }}'{% endif %}

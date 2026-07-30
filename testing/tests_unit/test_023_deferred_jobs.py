@@ -14,6 +14,7 @@ import pytest
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
+    AI,
     DeferredJobInspection,
     DeferredJobPhase,
     DeferredJobRunState,
@@ -916,7 +917,7 @@ class RunnerJob:
 
 class RecordingAdapter(deferred_jobs.DeferredJobAdapter):
     job_type = DeferredJobType.AUTOFILL
-    requires_ai = True
+    required_ai_access = AI.CREATE
 
     def __init__(self, error=None):
         self.calls = []
@@ -1330,16 +1331,41 @@ def _registered_ai_job_types():
             (
                 job_type
                 for job_type, adapter in registry._adapters.items()
-                if adapter.requires_ai
+                if adapter.required_ai_access is not None
             ),
             key=lambda job_type: job_type.value,
         )
     )
 
 
+# @pair ai-access:tier-declaration
+# @pair deferred-jobs:tier-declaration
+@pytest.mark.unit
+def test_registered_adapters_declare_required_ai_tiers():
+    registry = deferred_jobs.DeferredJobRegistry()
+    registry._load_default_adapters()
+
+    expected = {
+        DeferredJobType.REPORT_ASK: AI.ASK,
+        DeferredJobType.REPORT_ORGANIZE: AI.CREATE,
+        DeferredJobType.REPORT_CREATE: AI.CREATE,
+        DeferredJobType.REPORT_EXECUTION: AI.CREATE,
+        DeferredJobType.AUTOFILL: AI.CREATE,
+        DeferredJobType.PAGE_GENERATION: AI.CREATE,
+        DeferredJobType.FILE_SUMMARIZE: AI.CREATE,
+        DeferredJobType.FILE_EXTRACT: None,
+        DeferredJobType.SITE_EXPORT: None,
+    }
+
+    assert {
+        job_type: registry.adapter(job_type).required_ai_access
+        for job_type in expected
+    } == expected
+
+
 # @pair deferred-jobs:authorization
 # @pair ai:authorization
-# @pair ai:restriction-gate
+# @pair ai:access-gate
 # @pair ai:provider-boundary
 @pytest.mark.parametrize(
     "job_type",
@@ -1364,9 +1390,7 @@ def test_registered_ai_adapters_reject_restricted_actor_before_prepare(
     job.authorization["policy"] = job_type.value
     job.actor = SimpleNamespace(
         urlsafe_key="actor-key",
-        properties=SimpleNamespace(
-            restrictions=SimpleNamespace(can_use_ai_tools=False),
-        ),
+        access=lambda _required: False,
     )
     runner = _runner(monkeypatch, job, adapter)
     monkeypatch.setattr(
@@ -1378,8 +1402,58 @@ def test_registered_ai_adapters_reject_restricted_actor_before_prepare(
     result = runner.run(job.urlsafe_key)
 
     assert result.state is DeferredJobRunState.FAILED
-    assert result.error == "This user cannot use AI tools."
+    assert result.error == "This user does not have the required AI access."
     assert prepare_calls == []
+
+
+# @features deferred-jobs
+# @dimensions reauthorization
+@pytest.mark.unit
+def test_runner_rechecks_ai_access_before_apply(monkeypatch):
+    class RevokedBeforeApplyAdapter(deferred_jobs.DeferredJobAdapter):
+        job_type = DeferredJobType.AUTOFILL
+        required_ai_access = AI.CREATE
+
+        def __init__(self):
+            self.prepared = 0
+            self.applied = 0
+
+        def prepare(self, _context):
+            self.prepared += 1
+            return {"prepared": True}
+
+        def apply(self, _context):
+            self.applied += 1
+            return {"applied": True}
+
+    class RevokingActor:
+        urlsafe_key = "actor-key"
+
+        def __init__(self):
+            self.checks = 0
+
+        def access(self, required):
+            assert required is AI.CREATE
+            self.checks += 1
+            return self.checks == 1
+
+    job = RunnerJob()
+    job.actor = RevokingActor()
+    adapter = RevokedBeforeApplyAdapter()
+    runner = _runner(monkeypatch, job, adapter)
+    monkeypatch.setattr(
+        deferred_jobs.exceptions,
+        "capture",
+        lambda *_args, **_kwargs: None,
+    )
+
+    result = runner.run(job.urlsafe_key)
+
+    assert result.state is DeferredJobRunState.FAILED
+    assert result.error == "This user does not have the required AI access."
+    assert adapter.prepared == 1
+    assert adapter.applied == 0
+    assert job.actor.checks == 2
 
 
 # @features deferred-jobs
@@ -1921,9 +1995,10 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
         urlsafe_key = "actor-key"
 
         def __init__(self):
-            self.properties = SimpleNamespace(
-                restrictions=SimpleNamespace(can_use_ai_tools=True)
-            )
+            self.properties = SimpleNamespace()
+
+        def access(self, required):
+            return AI.CREATE.implies(required)
 
     class FakeProcess:
         def __init__(self, report):

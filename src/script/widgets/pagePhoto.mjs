@@ -18,7 +18,13 @@ export class PagePhoto extends BaseUpload {
 		});
 		this.inputName = "page-photo";
 		this.uploadType = "image";
-		this.menuOptions = ["remove", "replace", "generate", "paste"];
+		this.aiCreate = this.target.dataset.aiCreate === "true";
+		this.menuOptions = [
+			"remove",
+			"replace",
+			...(this.aiCreate ? ["generate"] : []),
+			"paste",
+		];
 		this.uploadMenu = new UploadMenu(this);
 		this.generateForm = sections.generateImageForm();
 		this.submitGroup = this.generateForm.submitGroup;
@@ -33,7 +39,10 @@ export class PagePhoto extends BaseUpload {
 	}
 
 	get html() {
-		return [this.dropzone.element, this.generateForm.element];
+		return [
+			this.dropzone.element,
+			...(this.aiCreate ? [this.generateForm.element] : []),
+		];
 	}
 
 	get fileAttached() {
@@ -56,13 +65,15 @@ export class PagePhoto extends BaseUpload {
 		await super.init();
 		if (this.readonly) return;
 
-		this.submitGroup.addEventListener("click", (e) => {
-			if (e.target.closest("[data-role='cancel']")) {
-				this.hideGenerateForm();
-			}
-		});
+		if (this.aiCreate) {
+			this.submitGroup.addEventListener("click", (e) => {
+				if (e.target.closest("[data-role='cancel']")) {
+					this.hideGenerateForm();
+				}
+			});
 
-		this.target.addEventListener("submit", this._generateImage);
+			this.target.addEventListener("submit", this._generateImage);
+		}
 	}
 
 	shouldAutoUpload() {

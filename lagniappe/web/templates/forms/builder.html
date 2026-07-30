@@ -189,7 +189,7 @@
         </div>
       </div>
       <div id="form-settings-panel" data-visible="true" class="flex flex-col">
-        {% if can_edit_form %}{{ generate() }}{% endif %}
+        {% if can_edit_form and current_user.access(AI.CREATE) %}{{ generate() }}{% endif %}
         {% if Resource.SITE.allowed(Action.PERMISSIONS) %}{{ restrict_access(form) }}{% endif %}
       </div>
       <div id="settings-panel" class="flex flex-col gap-3" data-visible="false"></div>

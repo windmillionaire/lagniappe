@@ -339,7 +339,7 @@ def test_public_user_permissions_inherit_public_group_defaults_without_mutating_
 
 
 # @features user-settings
-# @dimensions email-edit owner-own-page owner-other-page page-preservation
+# @dimensions email-edit ai-access owner-own-page owner-other-page page-preservation
 @pytest.mark.unit
 def test_page_update_user_authorization_rules():
     group = TestEntities.get("USER_GROUP", {"name": "Editors", "hash": "grp009u"})
@@ -364,6 +364,7 @@ def test_page_update_user_authorization_rules():
             "name": "Owner Renamed",
             "email": "owner-hacked@example.test",
             "groups": [],
+            "ai_access": "NONE",
         },
         user=owner,
     )
@@ -371,6 +372,7 @@ def test_page_update_user_authorization_rules():
     assert owner.name == "Owner Renamed"
     assert owner.email == "owner@example.test"
     assert owner.groups == [group]
+    assert owner.ai_access == "NONE"
 
     other_page = Page(testing=True)
     other_page._key = "other-page"
@@ -388,6 +390,7 @@ def test_page_update_user_authorization_rules():
             "name": "Other Renamed",
             "email": "other-updated@example.test",
             "groups": [group],
+            "ai_access": "ASK",
         },
         user=owner,
     )
@@ -395,6 +398,7 @@ def test_page_update_user_authorization_rules():
     assert other_user.name == "Other Renamed"
     assert other_user.email == "other-updated@example.test"
     assert other_user.groups == [group]
+    assert other_user.ai_access == "ASK"
     assert other_user.page is other_page
 
     public_page = Page(testing=True)
@@ -418,16 +422,30 @@ def test_page_update_user_authorization_rules():
 
     assert public_user.name == "Public Renamed"
     assert public_user.email == "public@example.test"
+    assert public_user.ai_access == "NONE"
+
+    with pytest.raises(PermissionError, match="Only the owner"):
+        public_page.update_user(
+            {
+                "name": "Forged Public Name",
+                "ai_access": "CREATE",
+            },
+            user=public_user,
+        )
+    assert public_user.name == "Public Renamed"
+    assert public_user.ai_access == "NONE"
 
     public_page.update_user(
         {
             "name": "Public Owner View",
             "email": "public-owner@example.test",
+            "ai_access": "CREATE",
         },
         user=owner,
     )
 
     assert public_user.name == "Public Owner View"
+    assert public_user.ai_access == "CREATE"
     assert public_user.email == "public-owner@example.test"
     assert public_user.page is public_page
 
@@ -709,6 +727,7 @@ def test_user_entity_create_save_load_owner_page_and_groups():
     ] == ["cat009user"]
     assert created.db["photo"] == "https://example.test/photo.jpg"
     assert created.is_owner is True
+    assert created.ai_access == "CREATE"
     assert created.is_public is False
     assert created.is_test_user is True
     assert created.groups == [group]
@@ -757,8 +776,8 @@ def test_user_entity_create_save_load_owner_page_and_groups():
     assert result is loaded
 
 
-# @features user cache
-# @dimensions create cache-invalidation
+# @pair user:create
+# @pair user:cache-invalidation
 @pytest.mark.unit
 def test_user_create_does_not_leave_initial_cache_invalidation():
     page = TestEntities.get(
@@ -808,6 +827,7 @@ def test_user_create_does_not_leave_initial_cache_invalidation():
                             )
 
     assert user.is_owner is True
+    assert user.ai_access == "CREATE"
     assert user.invalidate_cache is False
 
 
@@ -873,6 +893,7 @@ def test_user_create_public_user_assigns_public_group():
                                     )
 
     assert created.is_public is True
+    assert created.ai_access == "NONE"
     assert page.model is users_model
     assert created.groups == [public_group]
     assert created.db["groups"] == [public_group.key]

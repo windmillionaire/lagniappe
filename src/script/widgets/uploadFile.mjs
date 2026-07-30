@@ -24,7 +24,9 @@ export class FileUpload extends BaseUpload {
 		this.inputName = "file-upload";
 		this.multiple = true;
 		this.dropzone = uploadElement.dropzone({ text: FILE_DROPZONE_TEXT });
-		this.processing = uploadElement.processing();
+		this.processing = uploadElement.processing({
+			aiCreate: this.target.dataset.aiCreate === "true",
+		});
 		this.uploadType = "file";
 		this.menuOptions = ["remove", "replace", "paste"];
 		this.uploadMenu = new UploadMenu(this);

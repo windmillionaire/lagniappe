@@ -2,6 +2,7 @@ import { FacetedSearchElement } from "../elements/facetedSearch";
 import { FormElement } from "../elements/form";
 import { InputElement } from "../elements/input";
 import { PermissionsForm } from "../elements/permissions";
+import { RadioElement } from "../elements/radio";
 
 /**
  * @testable true
@@ -65,7 +66,26 @@ export class CreateUser extends FormElement {
 
 		this.destroyables.push(page, group);
 
-		return [details, page.edit, group.edit];
+		const aiAccess =
+			this.target.dataset.canEditAi === "true"
+				? new RadioElement(
+						this,
+						{
+							name: "ai_access",
+							label: "AI Access",
+							required: true,
+							layout: "row",
+							options: [
+								{ label: "None", value: "NONE" },
+								{ label: "Ask", value: "ASK" },
+								{ label: "Create", value: "CREATE" },
+							],
+						},
+						"NONE",
+					).edit
+				: null;
+
+		return [details, aiAccess, page.edit, group.edit].filter(Boolean);
 	}
 
 	postreconcile() {

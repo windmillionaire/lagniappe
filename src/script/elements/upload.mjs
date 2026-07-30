@@ -107,7 +107,7 @@ const access = () => {
 /**
  * @testable infrastructure
  */
-const processing = () => {
+const processing = ({ aiCreate = true } = {}) => {
 	const optionsContainer = document.createElement("div");
 	optionsContainer.dataset.role = "options";
 	optionsContainer.dataset.visible = "false";
@@ -158,7 +158,11 @@ const processing = () => {
 	const options = optionsContainer.appendChild(document.createElement("div"));
 	options.dataset.role = "processing";
 	options.className = STYLES.upload.processing;
-	options.append(extract, searchText, summarize, searchSummary);
+	options.append(
+		extract,
+		searchText,
+		...(aiCreate ? [summarize, searchSummary] : []),
+	);
 
 	/**
 	 * @testable false
@@ -206,10 +210,10 @@ const processing = () => {
 
 		if (isTextFile) {
 			setOptionVisibility(searchText, true);
-			setOptionVisibility(summarize, true);
+			if (aiCreate) setOptionVisibility(summarize, true);
 		} else {
 			setOptionVisibility(extract, true);
-			setOptionVisibility(summarize, true);
+			if (aiCreate) setOptionVisibility(summarize, true);
 		}
 	};
 

@@ -216,7 +216,11 @@ def _channel_revision(channel, user):
         )
     )
     durable_revisions = [database.site_fingerprint(path) for path in paths]
-    permissions = getattr(user, "permissions_fingerprint", entity_revision)
+    permissions = getattr(
+        user,
+        "authorization_fingerprint",
+        getattr(user, "permissions_fingerprint", entity_revision),
+    )
     source = json.dumps(
         {
             "channel": channel,

@@ -314,6 +314,20 @@ def test_user_settings_panel_opens_from_my_page(get_user):
     expect(email_input).to_have_attribute("readonly", "")
 
     expect(settings_panel.locator("[data-role='user-groups']")).to_have_count(0)
+    expect(settings_panel.locator("input[name='ai_access']")).to_have_count(0)
+
+    forged = _fetch_status(
+        user,
+        f"/pages/{user.entity.page.urlsafe_key}/update",
+        method="PUT",
+        data={
+            "role": "user-settings",
+            "name": user.name,
+            "ai_access": "CREATE",
+        },
+    )
+    assert forged["status"] == 403
+    assert Entities.USER.load(user.email).ai_access == "NONE"
 
     _assert_sign_out_button_in_user_header(settings_panel)
 
@@ -346,6 +360,8 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
     expect(email_input).to_have_attribute("readonly", "")
 
     expect(settings_panel.locator("[data-role='user-groups']")).to_have_count(0)
+    expect(settings_panel).to_have_attribute("data-can-edit-ai", "true")
+    expect(settings_panel.locator("input[name='ai_access']")).to_have_count(3)
 
     _assert_sign_out_button_in_user_header(settings_panel)
     controls = _tabs_controls(owner)
@@ -605,7 +621,7 @@ def test_public_user_restricted_schedules_are_forbidden(limited_public_user):
 
 
 # @features user-settings
-# @dimensions owner-other-page editable-email group-selector edit-groups
+# @dimensions owner-other-page editable-email group-selector edit-groups ai-access
 # @template pages/info.html::user_settings
 def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     owner = get_user(Users.OWNER)
@@ -633,6 +649,12 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
 
     expect(settings_panel).to_have_attribute("data-can-edit-groups", "true")
     expect(settings_panel.locator("[data-role='user-groups']")).to_be_visible()
+    expect(settings_panel).to_have_attribute("data-can-edit-ai", "true")
+    ai_options = settings_panel.locator("input[name='ai_access']")
+    expect(ai_options).to_have_count(3)
+    expect(
+        settings_panel.locator("input[name='ai_access'][value='NONE']")
+    ).to_be_checked()
 
     expect(settings_panel.locator("button[data-action='logout']")).to_have_count(0)
 
@@ -649,6 +671,12 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     expect(restrictions_close).to_be_visible()
     expect(restrictions_close).to_have_attribute("lp-close", "info:PageInfo")
     _open_help_and_expect(owner, restrictions_help, "User Settings")
+
+    settings_panel.locator("input[name='ai_access'][value='ASK']").check()
+    with owner.page.expect_response("**/pages/*/update"):
+        SpinnerButtons.UPDATE.click(settings_panel)
+    assert SpinnerButtons.UPDATE_SUCCESS.successful(settings_panel)
+    assert Entities.USER.load(created_user.email).ai_access == "ASK"
 
     restrictions_close.click()
     expect(settings_panel).not_to_be_visible()

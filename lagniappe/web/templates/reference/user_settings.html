@@ -4,7 +4,7 @@
   <section>
     {{ subheading("What This Panel Controls") }}
     <p class="text-sm text-base-dark">
-      User Settings manages the user account connected to this personal page. Depending on your role, it can show account details, sign-out actions, and the groups that grant this user access.
+      User Settings manages the user account connected to this personal page. Depending on your role, it can show account details, sign-out actions, AI access, and the groups that grant this user access.
     </p>
     {% call callout("tip") %}
       A user's groups are their normal access path. Add or remove groups here when someone's role changes.
@@ -20,7 +20,10 @@
         Owners can update another user's account email. Nobody can change their own email address here.
       {% endcall %}
       {% call feature("User Groups", icon="group", kind="user") %}
-        Owners and admins can add the user to one or more groups, or remove groups they no longer need.
+        The owner can add the user to one or more groups, or remove groups they no longer need.
+      {% endcall %}
+      {% call feature("AI Access", icon="generate", kind="user") %}
+        The owner can set None, Ask, or Create independently from permissions. Create includes Ask. Even the owner's own AI access can be reduced.
       {% endcall %}
       {% call feature("Sign Out", icon="logout", kind="user") %}
         On your own user page, this panel includes the sign-out action.
@@ -31,6 +34,7 @@
     {{ subheading("Worth Remembering") }}
     <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
       <li>Group membership controls broad access; page restrictions control exceptions on individual pages.</li>
+      <li>AI access only enables AI features; it never grants access to workspace records.</li>
       <li>If access looks stale after changing groups, the user may need to sign out and back in.</li>
       <li>The site owner cannot restrict their own owner access.</li>
     </ul>

@@ -77,7 +77,7 @@
         </div>
         {% if category.allowed(Action.EDIT) %}
           {{ tools.create_page(category) }}
-          {% if current_user.properties.restrictions.can_use_ai_tools %}{{ tools.generate_pages(category) }}{% endif %}
+          {% if current_user.access(AI.CREATE) %}{{ tools.generate_pages(category) }}{% endif %}
         {% endif %}
         {% if category.allowed(Action.VIEW) %}{{ tools.category_info(category) }}{% endif %}
         {{ tools.page_filters(category) }}
@@ -88,7 +88,7 @@
            data-nav="tools">
         {% if category.allowed(Action.EDIT) %}
           <button class="{{ styles.index.tools.toggle }}" lp-show="tools:CreatePage">New Page</button>
-          {% if current_user.properties.restrictions.can_use_ai_tools %}
+          {% if current_user.access(AI.CREATE) %}
             <button class="{{ styles.index.tools.toggle }}" lp-show="tools:GeneratePages">
               {{ render_icon("generate") }}<span>Generate Pages</span>
             </button>
