@@ -2276,6 +2276,7 @@ def test_setup_package_install_helpers(monkeypatch):
     ]
     assert package_install._pinned_requirement("redis") == "redis[hiredis]==8.0.1"
     assert package_install._pinned_requirement("yaspin") == "yaspin==3.4.0"
+    assert package_install._pinned_requirement("certifi") == "certifi==2026.7.22"
     assert run_calls[1][0] == [sys.executable, "-m", "pip", "check"]
     assert invalidated == [True]
     assert imported == ["yaml"]

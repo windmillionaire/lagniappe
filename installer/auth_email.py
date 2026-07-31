@@ -7,6 +7,8 @@ import webbrowser
 from email.message import EmailMessage
 from email.utils import formataddr
 
+import certifi
+
 from installer import FORMATTER, wrap_text
 from installer.errors import (
     ProviderError,
@@ -98,6 +100,17 @@ def auth_email_config_matches(config):
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_smtp_test_message_supports_tls_and_reports_transport_failures
 # @features setup
+# @dimensions authentication-email smtp tls certificate-validation
+def _create_smtp_tls_context():
+    """Build an SMTP context with system and installer-managed CA certificates."""
+    context = ssl.create_default_context()
+    context.load_verify_locations(cafile=certifi.where())
+    return context
+
+
+# @testable true
+# @tests tests_tooling/test_001b_setup_providers.py::test_smtp_test_message_supports_tls_and_reports_transport_failures
+# @features setup
 # @dimensions authentication-email smtp tls transient-retry error-reporting
 def test_smtp_delivery(
     config,
@@ -127,7 +140,7 @@ def test_smtp_delivery(
         "Lagniappe can use this email service to send account verification "
         "and password-reset links."
     )
-    context = tls_context or ssl.create_default_context()
+    context = tls_context or _create_smtp_tls_context()
 
     # @testable false
     # @covered-by installer/auth_email.py::test_smtp_delivery
@@ -185,6 +198,16 @@ def test_smtp_delivery(
             raise error_type(
                 f"{normalized['service']} rejected the SMTP request while "
                 f"trying to {stage} (SMTP {error.smtp_code}{suffix})."
+            ) from error
+        except ssl.SSLCertVerificationError as error:
+            detail = response_detail(error)
+            suffix = f" ({detail})" if detail else ""
+            raise ProviderError(
+                f"The TLS certificate from {normalized['service']} could not "
+                f"be verified while trying to {stage}{suffix}. No mailbox or "
+                "password was sent. If a VPN or security tool inspects "
+                "encrypted traffic, pause it and retry. Do not disable "
+                "certificate verification."
             ) from error
         except smtplib.SMTPServerDisconnected as error:
             detail = response_detail(error)
@@ -259,14 +282,6 @@ def _print_gmail_instructions():
             "addresses and request password resets."
         )
     )
-    print(
-        "Opening a Google account picker for App Passwords:\n"
-        f"  {GMAIL_APP_PASSWORDS_URL}"
-    )
-    try:
-        webbrowser.open_new_tab(GMAIL_APP_PASSWORDS_URL)
-    except webbrowser.Error:
-        pass
     print(wrap_text("\n1. Choose the mailbox Lagniappe should send from."))
     print(wrap_text("2. Enable 2-Step Verification if it is not already enabled."))
     print(
@@ -280,6 +295,20 @@ def _print_gmail_instructions():
             "test it and store it in the private application settings file."
         )
     )
+    ready = input(
+        "Press Enter when you are ready to open Google App Passwords "
+        "(x to exit): "
+    ).strip()
+    if ready.casefold() == "x":
+        raise SetupCancelled("Installation cancelled before Google App Passwords.")
+    print(
+        "Opening a Google account picker for App Passwords:\n"
+        f"  {GMAIL_APP_PASSWORDS_URL}"
+    )
+    try:
+        webbrowser.open_new_tab(GMAIL_APP_PASSWORDS_URL)
+    except webbrowser.Error:
+        pass
 
 
 # @testable false
@@ -386,9 +415,11 @@ def setup_auth_email():
             print(
                 f.warning(
                     "Email settings were not saved. If the message above says "
-                    "the connection failed, was interrupted, or timed out, "
-                    "retry with the same mailbox and app password. Create a "
-                    "new password only if Gmail explicitly rejects sign-in."
+                    "the connection failed, was interrupted, timed out, or "
+                    "could not verify the TLS certificate, retry with the same "
+                    "mailbox and app password after resolving that issue. "
+                    "Create a new password only if Gmail explicitly rejects "
+                    "sign-in."
                 )
             )
             retry = input("Try email setup again? [Y/n]: ").strip().casefold()

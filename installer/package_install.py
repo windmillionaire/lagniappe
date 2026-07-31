@@ -20,6 +20,7 @@ _SETUP_DEPENDENCIES = (
     ("yaml", "PyYAML", "YAML configuration"),
     ("yaspin", "yaspin", "setup progress display"),
     ("colorama", "colorama", "portable terminal output"),
+    ("certifi", "certifi", "trusted certificate authorities"),
     ("requests", "requests", "provider HTTP requests"),
     ("google.auth", "google-auth", "Google authentication"),
     ("google.api_core", "google-api-core", "Google API error handling"),

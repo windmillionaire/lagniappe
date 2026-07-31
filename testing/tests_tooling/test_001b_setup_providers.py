@@ -95,9 +95,30 @@ def test_auth_email_config_requires_canonical_smtp():
 
 
 # @features setup
-# @dimensions authentication-email smtp tls transient-retry error-reporting
-def test_smtp_test_message_supports_tls_and_reports_transport_failures():
+# @dimensions authentication-email smtp tls certificate-validation transient-retry error-reporting
+def test_smtp_test_message_supports_tls_and_reports_transport_failures(monkeypatch):
     from installer import auth_email
+
+    class FakeTLSContext:
+        def __init__(self):
+            self.ca_files = []
+
+        def load_verify_locations(self, *, cafile):
+            self.ca_files.append(cafile)
+
+    default_context = FakeTLSContext()
+    monkeypatch.setattr(
+        auth_email.ssl,
+        "create_default_context",
+        lambda: default_context,
+    )
+    monkeypatch.setattr(
+        auth_email.certifi,
+        "where",
+        lambda: "/installer/certifi-ca.pem",
+    )
+    assert auth_email._create_smtp_tls_context() is default_context
+    assert default_context.ca_files == ["/installer/certifi-ca.pem"]
 
     FakeSMTP.instances.clear()
     tls_context = object()
@@ -205,6 +226,33 @@ def test_smtp_test_message_supports_tls_and_reports_transport_failures():
             smtp_attempts=1,
         )
 
+    class InvalidCertificateSMTP(FakeSMTP):
+        attempts = 0
+
+        def starttls(self, context):
+            type(self).attempts += 1
+            raise auth_email.ssl.SSLCertVerificationError(
+                "unable to get local issuer certificate"
+            )
+
+    with pytest.raises(
+        ProviderError,
+        match=(
+            r"TLS certificate from Resend could not be verified.*"
+            r"No mailbox or password was sent.*Do not disable"
+        ),
+    ):
+        auth_email.test_smtp_delivery(
+            starttls_config,
+            "recipient@example.test",
+            smtp_factory=InvalidCertificateSMTP,
+            tls_context=tls_context,
+            retry_sleep=lambda _delay: pytest.fail(
+                "certificate failures must not be retried"
+            ),
+        )
+    assert InvalidCertificateSMTP.attempts == 1
+
 
 # @features setup
 # @dimensions authentication-email interactive-input settings-save failure-isolation
@@ -253,6 +301,7 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsy
             "",
             "",
             "",
+            "",
             "abcd efgh ijkl mnop",
             "",
             "",
@@ -260,7 +309,15 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsy
             "abcd efgh ijkl mnop",
         ]
     )
-    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+    prompts = []
+
+    def answer(prompt):
+        prompts.append(prompt)
+        if prompt.startswith("Press Enter when you are ready"):
+            assert opened_urls == []
+        return next(answers)
+
+    monkeypatch.setattr("builtins.input", answer)
 
     assert auth_email.setup_auth_email()
     assert settings.APP["AUTH_EMAIL_CONFIG"] == {
@@ -279,6 +336,9 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsy
         (settings.APP["AUTH_EMAIL_CONFIG"], "owner@example.test"),
     ]
     assert opened_urls == [auth_email.GMAIL_APP_PASSWORDS_URL]
+    assert any(
+        prompt.startswith("Press Enter when you are ready") for prompt in prompts
+    )
     assert "accounts.google.com/AccountChooser" in opened_urls[0]
     assert "myaccount.google.com%2Fapppasswords" in opened_urls[0]
     assert saves == [True]

@@ -892,10 +892,14 @@ branch:
 - tells the operator to enter `Lagniappe` in Google's App name box, click
   **Create**, and copy the displayed password, and explains that the sender
   name is what message recipients see;
+- waits for the operator to confirm that they are ready before opening the
+  Google App Passwords page;
 - accepts the visibly pasted 16-character app password, uses
   `smtp.gmail.com:587` with STARTTLS, and sends a test message to the same
   mailbox; interrupted connections and other transient transport failures are
-  retried once and reported separately from explicit SMTP rejections;
+  retried once and reported separately from explicit SMTP rejections, while
+  certificate validation uses both the local trust store and the setup-pinned
+  `certifi` CA bundle and never falls back to unverified TLS;
 - saves `AUTH_EMAIL_CONFIG` only after the test succeeds.
 
 The Gmail path deliberately bootstraps an operator who does not yet have an
