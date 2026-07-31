@@ -308,6 +308,15 @@ load.
 
 Views using EntityIndex: user, form, category, task (all mapped to `views/base/index`).
 
+## Form Builder (`views/builder/builder.mjs`)
+
+The form builder is the one specialized view that does not extend `Core`.
+Its model, settings, conditions, and preview panels operate on an unsaved local
+schema rather than `ViewComponent` widgets. It still implements the shared
+`sync()` lifecycle used by `main.mjs`, reading the canonical connectivity state
+to keep its search, save control, and offline indicator current. It does not
+publish separate global offline state.
+
 ## ViewComponent (`views/base/component.mjs`)
 
 Manages the widget lifecycle within a component. A component is a `[lp-component]` DOM element with an `id`, and it can contain multiple widget targets (`[data-widget]`).

@@ -4,6 +4,24 @@ ENTITY_NAME_HARNESS = r"""
 const fs = require("node:fs");
 const vm = require("node:vm");
 
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+class FakeText {
+  constructor(text) {
+    this.textContent = text;
+  }
+
+  get outerHTML() {
+    return escapeHtml(this.textContent);
+  }
+}
+
 class FakeElement {
   constructor(tagName) {
     this.tagName = tagName.toUpperCase();
@@ -39,7 +57,7 @@ class FakeElement {
       .join("");
     const content =
       this.innerHTML ||
-      `${this.textContent}${this.children.map((child) => child.outerHTML).join("")}`;
+      `${escapeHtml(this.textContent)}${this.children.map((child) => child.outerHTML).join("")}`;
     return `<${this.tagName.toLowerCase()}${serializedAttributes}>${content}</${this.tagName.toLowerCase()}>`;
   }
 }
@@ -49,6 +67,7 @@ const context = {
   console,
   document: {
     createElement: (tagName) => new FakeElement(tagName),
+    createTextNode: (text) => new FakeText(text),
   },
   iconDefinition(name) {
     return name === "page" ? { glyph: "draft", fill: 1 } : null;
@@ -242,6 +261,45 @@ if (
 }
 if (!recentHtml.includes(STYLES.dropdown.icon)) {
   throw new Error(`Recent result skipped shared dropdown icon spacing: ${recentHtml}`);
+}
+""",
+    )
+
+
+# @pair search:snippet-safety
+def test_recent_search_snippets_allow_only_highlight_markup(run_node):
+    run_entity_name_check(
+        run_node,
+        r"""
+const recentHtml = new Results("search").create([
+  {
+    details: {
+      id: "page-1",
+      kind: "page",
+      name: "Safe result",
+    },
+    text:
+      'Before <b>hit &lt;tag&gt;</b> ' +
+      '<img src=x onerror="globalThis.compromised=true"> ' +
+      '&#x3c;script&#x3e;globalThis.compromised=true&#x3c;/script&#x3e;',
+    url: "/pages/page-1",
+  },
+]);
+
+if (!recentHtml.includes("<b>hit &lt;tag&gt;</b>")) {
+  throw new Error(`Generated highlight markup was not preserved: ${recentHtml}`);
+}
+if (recentHtml.includes("<img") || recentHtml.includes("<script")) {
+  throw new Error(`Unexpected snippet markup reached the result DOM: ${recentHtml}`);
+}
+if (
+  !recentHtml.includes("&lt;img") ||
+  !recentHtml.includes("&lt;script&gt;globalThis.compromised=true&lt;/script&gt;")
+) {
+  throw new Error(`Unexpected markup was not rendered as inert text: ${recentHtml}`);
+}
+if (Object.hasOwn(globalThis, "compromised")) {
+  throw new Error("Snippet markup executed in the result renderer");
 }
 """,
     )

@@ -2,6 +2,64 @@ import { STYLES } from "styles";
 import { setIcon } from "../../shared/icons";
 import { formatting } from "../formatting";
 
+const SEARCH_ENTITY_PATTERN = /&(#(?:x[0-9a-f]+|\d+)|amp|apos|gt|lt|quot);/gi;
+const SEARCH_ENTITIES = Object.freeze({
+	amp: "&",
+	apos: "'",
+	gt: ">",
+	lt: "<",
+	quot: '"',
+});
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/combobox/results.mjs::Results.create
+ * @reason entity decoding is exercised through safe highlighted result rendering
+ */
+const decodeSearchEntities = (text) =>
+	String(text).replace(SEARCH_ENTITY_PATTERN, (entity, name) => {
+		if (!name.startsWith("#"))
+			return SEARCH_ENTITIES[name.toLowerCase()] ?? entity;
+
+		const hexadecimal = name[1]?.toLowerCase() === "x";
+		const value = Number.parseInt(
+			name.slice(hexadecimal ? 2 : 1),
+			hexadecimal ? 16 : 10,
+		);
+		if (
+			!Number.isInteger(value) ||
+			value <= 0 ||
+			value > 0x10ffff ||
+			(value >= 0xd800 && value <= 0xdfff)
+		) {
+			return "\uFFFD";
+		}
+		return String.fromCodePoint(value);
+	});
+
+/**
+ * Preserve only the server's generated <b> highlight markers. Every text
+ * segment is decoded and appended as a text node, so unexpected markup never
+ * becomes executable DOM.
+ *
+ * @testable false
+ * @covered-by src/script/elements/combobox/results.mjs::Results.create
+ * @reason allowlisted highlight rendering is exercised through recent search results
+ */
+const appendHighlightedSearchText = (element, markup) => {
+	let target = element;
+	for (const part of String(markup).split(/(<\/?b>)/gi)) {
+		if (part.toLowerCase() === "<b>") {
+			target = document.createElement("b");
+			element.appendChild(target);
+		} else if (part.toLowerCase() === "</b>") {
+			target = element;
+		} else if (part) {
+			target.appendChild(document.createTextNode(decodeSearchEntities(part)));
+		}
+	}
+};
+
 /**
  * @testable infrastructure
  */
@@ -81,7 +139,7 @@ const search = (result) => {
 	if (result.text) {
 		const p3 = document.createElement("p");
 		p3.className = `italic font-normal text-base-default`;
-		p3.innerHTML = result.text;
+		appendHighlightedSearchText(p3, result.text);
 		option.appendChild(p3);
 	}
 
@@ -152,9 +210,11 @@ export class Results {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_023_entity_name_formatting.py::test_recent_combobox_results_reuse_shared_parent_name_formatting
+	 * @tests tests_js/test_023_entity_name_formatting.py::test_recent_search_snippets_allow_only_highlight_markup
 	 * @pair combobox:parent-separator
 	 * @pair combobox:recent-results
 	 * @pair entity-name:recent-results
+	 * @pair search:snippet-safety
 	 */
 	create(items = []) {
 		let options = items;

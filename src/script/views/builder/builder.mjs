@@ -1,6 +1,7 @@
 import { SearchBox } from "../../elements/combobox/search";
 import { EntityMenu } from "../../elements/entityMenu";
 import {
+	connectivity,
 	DeleteModal,
 	generateElementId,
 	HelpModal,
@@ -32,6 +33,8 @@ class FormBuilder {
 		this.schemaElt = document.querySelector('input[name="schema"]');
 		this.key = node.dataset.key;
 		this.offlineIndicator = document.querySelector('[data-role="offline"]');
+		this.online = connectivity.online;
+		this.hidden = connectivity.hidden;
 		this.EntityMenu = new EntityMenu(this);
 
 		this.components = new ComponentsPanel(this);
@@ -53,6 +56,7 @@ class FormBuilder {
 
 		const offlineModal = new OfflineModal(this, this.offlineIndicator);
 		offlineModal.enable();
+		this.offline(!this.online);
 
 		document.addEventListener("click", this.click);
 		this.elt._lp_view = this;
@@ -70,8 +74,23 @@ class FormBuilder {
 		}
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_sync_uses_shared_connectivity_without_orphaned_global_state
+	 * @pairs forms:builder-lifecycle offline:builder-lifecycle
+	 */
+	async sync({ hidden = document.hidden } = {}) {
+		this.hidden = hidden;
+		this.online = connectivity.online;
+		this.offline(!this.online);
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/builder/builder.mjs::FormBuilder.sync
+	 * @reason builder connectivity controls are applied through the shared view lifecycle
+	 */
 	offline(offline) {
-		window.__LP_OFFLINE__ = offline;
 		const search = document.querySelector("[lp-search]");
 		if (this.offlineIndicator)
 			this.offlineIndicator.dataset.visible = offline ? "true" : "false";

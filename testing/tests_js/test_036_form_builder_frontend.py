@@ -53,3 +53,82 @@ if (element.id !== schema.id) {
 }
 '''
     )
+
+
+# @pairs forms:builder-lifecycle offline:builder-lifecycle
+def test_builder_sync_uses_shared_connectivity_without_orphaned_global_state(
+    run_node,
+):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+(async () => {
+const search = { dataset: {} };
+const indicator = { dataset: {} };
+const saveButton = { dataset: {} };
+const context = {
+  connectivity: {
+    hidden: false,
+    online: true,
+  },
+  document: {
+    hidden: false,
+    querySelector(selector) {
+      return selector === "[lp-search]" ? search : null;
+    },
+  },
+  window: {},
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/views/builder/builder.mjs", "utf8");
+source = source.replace(/^import(?:[\s\S]*?)from .*;\n/gm, "");
+source = source.replace(
+  "export default FormBuilder;",
+  "globalThis.FormBuilder = FormBuilder;",
+);
+vm.runInContext(source, context);
+
+const builder = {
+  header: { saveButton },
+  hidden: false,
+  offline: context.FormBuilder.prototype.offline,
+  offlineIndicator: indicator,
+  online: true,
+};
+
+context.connectivity.online = false;
+await context.FormBuilder.prototype.sync.call(builder, { hidden: true });
+if (builder.online !== false || builder.hidden !== true) {
+  throw new Error("Builder did not adopt the shared offline/hidden state");
+}
+if (
+  indicator.dataset.visible !== "true" ||
+  search.dataset.visible !== "false" ||
+  saveButton.dataset.visible !== "false"
+) {
+  throw new Error("Builder controls did not enter their offline state");
+}
+
+context.connectivity.online = true;
+await context.FormBuilder.prototype.sync.call(builder, { hidden: false });
+if (builder.online !== true || builder.hidden !== false) {
+  throw new Error("Builder did not adopt the shared online/visible state");
+}
+if (
+  indicator.dataset.visible !== "false" ||
+  search.dataset.visible !== "true" ||
+  saveButton.dataset.visible !== "true"
+) {
+  throw new Error("Builder controls did not recover their online state");
+}
+if (Object.hasOwn(context.window, "__LP_OFFLINE__")) {
+  throw new Error("Builder still published orphaned global offline state");
+}
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
+''',
+    )

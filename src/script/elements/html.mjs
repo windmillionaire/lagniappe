@@ -1,4 +1,4 @@
-import { ENDPOINTS, request } from "../shared";
+import { captureError, ENDPOINTS, request } from "../shared";
 import { BaseElement } from "./base/baseElement";
 
 /**
@@ -11,6 +11,11 @@ export class HtmlElement extends BaseElement {
 		this.html = null;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_037_html_element_frontend.py::test_html_element_reports_request_failure_without_masking_original
+	 * @pair form-html:error-reporting
+	 */
 	async _getHtml() {
 		return await request
 			.get(ENDPOINTS.html(this.renderer.form.key, this.schema.id).getContent)
@@ -19,6 +24,7 @@ export class HtmlElement extends BaseElement {
 				captureError(error, this.renderer.form.target, {
 					schema: this.schema,
 				});
+				return "";
 			});
 	}
 
