@@ -709,12 +709,36 @@ def test_google_provider_api_request_reports_reason_and_retries_service_activati
     assert "activationUrl" not in message
     assert "identityPlatform:initializeAuth" not in message
 
+    import requests
+
+    class ReadTimeoutThenSuccess:
+        def __init__(self):
+            self.calls = []
+
+        def post(self, url, **kwargs):
+            self.calls.append({"url": url, **kwargs})
+            if len(self.calls) == 1:
+                raise requests.ReadTimeout("provider response was slow")
+            return FakeResponse(200, {"ready": True})
+
+    timeout_session = ReadTimeoutThenSuccess()
+    _, data = google_provider._api_request(
+        timeout_session,
+        "POST",
+        "https://provider.example",
+        {},
+        attempts=2,
+        delays=(5,),
+    )
+    assert data == {"ready": True}
+    assert len(timeout_session.calls) == 2
+    assert delays[-1] == 5
+
 
 # @features setup
 # @dimensions identity-platform provider-state provider-convergence retry diagnostics
 def test_identity_platform_initialization_retries_api_activation(
     monkeypatch,
-    capsys,
 ):
     from installer import google_provider, identity
 
@@ -764,10 +788,6 @@ def test_identity_platform_initialization_retries_api_activation(
         "https://demo.example",
     ) == current
     assert delays == [identity.IDENTITY_INITIALIZATION_DELAYS[0]]
-    output = capsys.readouterr().out
-    assert "config is absent" in output
-    assert "still becoming available" in output
-    assert "initialization accepted" in output
     assert mutations[0][1]["action"] == "created"
 
 
@@ -775,7 +795,6 @@ def test_identity_platform_initialization_retries_api_activation(
 # @dimensions identity-platform provider-state idempotency
 def test_identity_platform_initialization_accepts_existing_provider(
     monkeypatch,
-    capsys,
 ):
     from installer import identity
 
@@ -810,8 +829,54 @@ def test_identity_platform_initialization_accepts_existing_provider(
         {},
         "https://demo.example",
     ) == current
-    assert "already exists" in capsys.readouterr().out
     assert mutations[0][1]["action"] == "existing"
+
+
+# @features setup
+# @dimensions identity-platform diagnostics spinner error-reporting
+def test_identity_platform_setup_finishes_spinner_before_reporting_error(
+    monkeypatch,
+):
+    from installer import identity
+
+    events = []
+    spinner = SpinnerRecorder()
+    spinner.fail = lambda mark: events.append(("fail", mark))
+    formatter = types.SimpleNamespace(
+        initialize=lambda: types.SimpleNamespace(
+            yaspin=spinner_factory(spinner),
+            fail_glyph="X",
+            ok_glyph="OK",
+            error=lambda message: events.append(("error", message)) or message,
+            success=lambda message: message,
+        )
+    )
+    settings = types.SimpleNamespace(
+        APP={"APP_URL": "https://demo.example"},
+        GCLOUD_CONFIG={"PROJECT": "project-1"},
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(SETTINGS=settings),
+    )
+    monkeypatch.setattr(identity, "FORMATTER", formatter)
+    monkeypatch.setattr(identity, "install_if_missing", lambda *args, **kwargs: None)
+    monkeypatch.setattr(identity, "_get_access_token", lambda: "token")
+    monkeypatch.setattr(
+        identity,
+        "reconcile_identity_platform",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            ProviderTimeout("provider response timed out")
+        ),
+    )
+
+    with pytest.raises(ProviderError, match="Could not configure Identity Platform"):
+        identity.setup_identity_platform()
+
+    assert events[0] == ("fail", "X")
+    assert events[1][0] == "error"
+    assert "provider response timed out" in events[1][1]
 
 
 # @features setup

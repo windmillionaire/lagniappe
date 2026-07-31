@@ -540,8 +540,13 @@ callers without preflight state performs one enabled-service listing with a
 60-second timeout rather than one unbounded lookup per API.
 Google may report a newly enabled service before its backend is ready. Setup
 treats `SERVICE_DISABLED` during that propagation window as transient; the
-first IAM and Identity Platform operations report bounded retry progress
-instead of dumping the provider's structured error.
+first IAM operations report bounded retry progress instead of dumping the
+provider's structured error. Identity Platform keeps its single active spinner
+while its bounded initialization retries run.
+Google provider read timeouts are transient as well. Identity Platform
+initialization retries them within the same bounded attempt schedule; if an
+earlier POST completed after the local timeout, the subsequent conflict
+response is accepted and setup continues by verifying the live configuration.
    Existing consent and destination are preserved by default on reruns.
 10. **AI defaults** -- sets default primary, utility, and Gemini image model
    names when missing, offers the AI model change flow, and records an explicit

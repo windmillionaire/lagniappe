@@ -144,10 +144,6 @@ def reconcile_identity_platform(session, project_id, headers, app_url):
     config = get_identity_platform_config(session, project_id, headers)
     initialize = config is None
     if initialize:
-        print(
-            f"Identity Platform config is absent; initializing standalone "
-            f"authentication for '{project_id}'..."
-        )
         initialize_url = (
             "https://identitytoolkit.googleapis.com/v2/"
             f"projects/{project_id}/identityPlatform:initializeAuth"
@@ -161,12 +157,7 @@ def reconcile_identity_platform(session, project_id, headers, app_url):
             allow_codes=[409],
             attempts=IDENTITY_INITIALIZATION_ATTEMPTS,
             delays=IDENTITY_INITIALIZATION_DELAYS,
-            retry_label="Identity Platform",
         )
-        if response.status_code == 200:
-            print("Identity Platform initialization accepted; verifying config...")
-        else:
-            print("Identity Platform already exists; verifying config...")
         record_mutation(
             "initialize Identity Platform",
             action="created" if response.status_code == 200 else "existing",
@@ -254,9 +245,10 @@ def _public_client_config(config, project_id):
 
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
+# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_finishes_spinner_before_reporting_error
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
 # @features setup
-# @dimensions identity-platform settings-save provider-state authorized-domain
+# @dimensions identity-platform settings-save provider-state authorized-domain diagnostics spinner error-reporting
 def setup_identity_platform(app_url=None):
     """Set up standalone Identity Platform email/password authentication."""
     from config import SETTINGS
@@ -282,12 +274,12 @@ def setup_identity_platform(app_url=None):
                 app_url,
             )
         except Exception as error:
+            sp.fail(f.fail_glyph)
             print(
                 f.error(
                     wrap_text(f"Could not configure Identity Platform: {error}")
                 )
             )
-            sp.fail(f.fail_glyph)
             raise ProviderError("Could not configure Identity Platform.") from error
 
         if not _core_matches(config, app_url):

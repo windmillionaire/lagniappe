@@ -4,7 +4,12 @@ import time
 
 from installer import FORMATTER
 
-from .errors import ProviderTimeout, classify_provider_error, retry_provider_call
+from .errors import (
+    ProviderTimeout,
+    ProviderTransientError,
+    classify_provider_error,
+    retry_provider_call,
+)
 from .package_install import install_if_missing
 
 PROVIDER_API_TIMEOUT = 10
@@ -108,7 +113,10 @@ def _api_request(
                 error,
                 message=f"Google provider {method} request failed: {error}",
             )
-            if classified.category != "transient" or attempt == attempts - 1:
+            if (
+                not isinstance(classified, ProviderTransientError)
+                or attempt == attempts - 1
+            ):
                 raise classified from error
             wait_for_retry(attempt)
             continue
@@ -149,7 +157,10 @@ def _api_request(
             message=f"Google provider {method} request failed: {status_detail}",
             status_code=response.status_code,
         )
-        if classified.category != "transient" or attempt == attempts - 1:
+        if (
+            not isinstance(classified, ProviderTransientError)
+            or attempt == attempts - 1
+        ):
             raise classified
         wait_for_retry(attempt)
     raise ProviderTimeout(f"Google provider request timed out: {method} {url}")
