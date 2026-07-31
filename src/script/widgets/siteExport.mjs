@@ -56,12 +56,14 @@ export class SiteExport {
 		}
 
 		if (response.notification) {
-			this.view.Notifications?.upsertNotification?.(response.notification);
+			const notifications = await this.view.ensureNotifications?.();
+			notifications?.upsertNotification?.(response.notification);
 		}
 		if (response.html) {
 			await this.updated(response);
 		}
-		this.view.DeferredOperations?.track(response.operation, {
+		const operations = await this.view.ensureDeferredOperations?.();
+		operations?.track(response.operation, {
 			node: this.target,
 		});
 		this.startButton.deactivate("Export Queued");

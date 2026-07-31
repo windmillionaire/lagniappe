@@ -22,8 +22,10 @@ Test Strategy:
 from playwright.sync_api import expect
 import pytest
 
+from lagniappe.core.definitions import Fetch
+from lagniappe.core.entities import Entities
 from testing.definitions import Projects, Users
-from testing.elements import EditorMenuOptions, EditorToggleOptions
+from testing.elements import EditorMenuOptions, EditorToggleOptions, Tabs
 
 
 MARKDOWN_TABLE_PASTE_FIXTURE = "\n".join(
@@ -34,6 +36,46 @@ MARKDOWN_TABLE_PASTE_FIXTURE = "\n".join(
         "| Add schemas/Pydantic models per generator | High | Medium | Worth doing generator-by-generator. |",
     ]
 )
+
+
+# @pair sync:initialization
+# @pair sync:empty-content
+# @pair sync:save-guard
+# @pair sync:parent-modified
+def test_untouched_document_does_not_save_or_touch_project(get_user):
+    user = get_user(Users.OWNER)
+    # The shared toolbar project is intentionally edited by the earlier offline
+    # lifecycle coverage. Use a dedicated fresh document so this regression
+    # test measures eager-save behavior instead of depending on suite order.
+    project = Projects.test_untouched_document.get(user)
+    before = Entities.fetch_one(project.key, request=Fetch.direct()).modified
+    sync_updates = []
+
+    def record_sync_updates(request):
+        if request.method != "POST" or not request.url.endswith("/sync"):
+            return
+        sync_updates.extend((request.post_data_json or {}).get("updates", []))
+
+    user.page.on("request", record_sync_updates)
+    user.go(project)
+    editor = project.editor
+    assert editor.get_text() == ""
+
+    Tabs(user).info
+    user.page.evaluate(
+        """async () => {
+            const view = document.querySelector('[lp-view]')._lp_view;
+            await Promise.resolve();
+            await view._pollingReconcileTask;
+        }"""
+    )
+
+    after = Entities.fetch_one(project.key, request=Fetch.direct()).modified
+    assert after == before
+    assert not any(
+        update.get("save") or update.get("touch_parent")
+        for update in sync_updates
+    )
 
 
 # @features editor

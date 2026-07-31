@@ -1,0 +1,285 @@
+{% from "manual/macros.html" import heading, card, callout, nav_buttons %}
+
+{% macro guide_item(icon, title, description, kind="page") %}
+  <div data-kind="{{ kind }}"
+       class="flex items-start gap-3 rounded-md border border-base-light/40 bg-base-bg/50 p-3">
+    <span class="grid size-9 shrink-0 place-items-center rounded-md bg-kind-bg text-kind-default">
+      {{ render_icon((icon), "icon-lg") }}
+    </span>
+    <div class="min-w-0">
+      <p class="font-semibold text-base-dark">{{ title }}</p>
+      <p class="text-sm leading-relaxed text-base-medium">{{ description }}</p>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro disclosure(title, summary, icon="overview", kind="page") %}
+  <details data-kind="{{ kind }}"
+           class="rounded-lg border border-base-light/50 bg-white shadow-sm">
+    <summary class="cursor-pointer px-5 py-4 text-base-dark marker:text-kind-default">
+      <span class="ml-1 inline-flex items-start gap-3 align-top">
+        <span class="mt-0.5 text-kind-default">{{ render_icon((icon), "icon-lg") }}</span>
+        <span>
+          <span class="block text-lg font-semibold">{{ title }}</span>
+          <span class="block text-sm font-normal leading-relaxed text-base-medium">{{ summary }}</span>
+        </span>
+      </span>
+    </summary>
+    <div class="border-t border-base-light/40 px-5 py-5">{{ caller() }}</div>
+  </details>
+{% endmacro %}
+
+<div class="space-y-6">
+  {% call card() %}
+    <p class="mb-3 text-lg leading-relaxed text-base-medium">
+      Lagniappe starts at Home, where you can open a recent list, create
+      something new, or jump into the workspace directory. Once you open a
+      record, colored icons switch between the information, documents, tasks,
+      and files that belong to it.
+    </p>
+    {% call callout("tip", False) %}
+      Controls only appear when they apply. If an icon described here is
+      missing, the feature may be turned off for that record or your account
+      may not have permission to use it. Many icon-only action controls also
+      show their name when you hover on desktop.
+    {% endcall %}
+  {% endcall %}
+
+  {{ heading("Saving: the Important Difference", icon="builder.saved", kind="page") }}
+  <div class="grid gap-4 md:grid-cols-2">
+    {{ guide_item(
+      "document",
+      "Documents save themselves",
+      "Page and project documents sync in the background, save when you leave the editor, and merge edits from other people. There is no Save button.",
+      "page"
+    ) }}
+    {{ guide_item(
+      "form",
+      "Forms wait for you",
+      "Page information, task forms, settings, and other structured forms do not autosave. Use their Save, Update, or Create button.",
+      "form"
+    ) }}
+    {{ guide_item(
+      "builder.unsaved",
+      "Cloud alert means unsaved",
+      "The alert appears after a local form change. In a task row or the form builder, the cloud control itself can be used to save.",
+      "task"
+    ) }}
+    {{ guide_item(
+      "selected",
+      "Task completion is immediate",
+      "The checkbox records completion right away. If an attached task form is open, its current values are included with that completion.",
+      "task"
+    ) }}
+  </div>
+
+  {% call disclosure(
+    "Common controls",
+    "The small actions that repeat throughout the app.",
+    "menu",
+    "page"
+  ) %}
+    <div class="grid gap-3 sm:grid-cols-2">
+      {{ guide_item("menu", "Actions", "Opens the actions beside a title, such as Star, Add note, Copy, Move, or Delete.") }}
+      {{ guide_item("star.active", "Star", "Adds or removes the record from the Starred list on Home.", "starred") }}
+      {{ guide_item("plus", "Add", "Opens the creation form for the nearby list or active tab.") }}
+      {{ guide_item("help", "Help", "Opens focused help for the form or tool you are using.", "help") }}
+      {{ guide_item("close", "Close", "Closes the current form or panel without saving new changes.", "close") }}
+      {{ guide_item("reset", "Reset", "Returns a tool, filter, or nested panel to its starting view.") }}
+      {{ guide_item("trash.inactive", "Delete", "Opens a confirmation before removing the item.", "delete") }}
+      {{ guide_item("offline", "Offline", "The server cannot be reached. Supported edits are queued; other save buttons stay disabled until reconnection.") }}
+    </div>
+  {% endcall %}
+
+  {% call disclosure(
+    "Home",
+    "What expands in place, what opens a new page, and what the plus buttons create.",
+    "home",
+    "page"
+  ) %}
+    <p class="mb-4 text-base-medium">
+      Select the main label for <strong>Starred, Directory, AI Tools, Pages,
+      Notes, Tasks, Projects,</strong> or <strong>Categories</strong> to expand
+      its list on Home; select it again to collapse it. An adjacent
+      <strong>plus</strong> opens that section's creation form instead. Select a
+      result inside a list to leave Home and open the record.
+    </p>
+    <div class="grid gap-3 sm:grid-cols-2">
+      {{ guide_item("user", "My Page", "Goes directly to your user page, including your own information and any enabled page features.", "user") }}
+      {{ guide_item("directory", "Directory", "Expands links to Active Tasks, Forms, Users, Analytics, and Admin when you have access.") }}
+      {{ guide_item("page", "Pages", "Expands recent pages; plus starts a page by choosing its category.") }}
+      {{ guide_item("notes", "Notes", "Expands workspace notes; plus opens a quick text or photo note.", "note") }}
+      {{ guide_item("tasks", "Tasks", "Expands your active tasks; plus creates a personal task on My Page.", "task") }}
+      {{ guide_item("project", "Projects", "Expands recent projects; plus creates a project that can gather work across pages.", "project") }}
+      {{ guide_item("category", "Categories", "Expands recent categories; plus creates a new collection of pages.", "category") }}
+      {{ guide_item("generate", "AI Tools", "Expands recent reports; plus opens Ask, Create, or Organize when those tools are enabled.", "form") }}
+    </div>
+    <p class="mt-4 text-sm leading-relaxed text-base-medium">
+      The logo in the top bar always returns Home. The search box searches the
+      whole workspace, while <strong>Manual</strong> and <strong>My Page</strong>
+      are direct links rather than expandable lists.
+    </p>
+  {% endcall %}
+
+  {% call disclosure(
+    "Pages",
+    "One durable record with optional structured information, a live document, tasks, files, notes, and an image.",
+    "page",
+    "page"
+  ) %}
+    <p class="mb-4 text-base-medium">
+      A page is the thing you are keeping track of: a person, property, client,
+      asset, event, or anything else. The category name above its title returns
+      to the page list. The small actions control beside the title contains
+      Star, Add note, and Delete when available.
+    </p>
+    <div class="grid gap-3 sm:grid-cols-2">
+      {{ guide_item("image", "Image", "Shows or changes the page image. Upload, Generate, and Turn photo off appear in Info when no image is set.") }}
+      {{ guide_item("document", "Document", "Opens the collaborative rich-text document. It autosaves and can be edited by several people.") }}
+      {{ guide_item("info", "Info", "Shows the page name, description, categories, attached form, structured fields, and enabled features.") }}
+      {{ guide_item("task", "Tasks", "Shows active work on this page. The contextual plus creates a task here.", "task") }}
+      {{ guide_item("files", "Files", "Shows files attached to the page. The contextual plus opens the uploader.", "file") }}
+      {{ guide_item("notes", "Notes", "Add note lives in the title actions; notes stay visible beneath the page heading when enabled.", "note") }}
+    </div>
+    <p class="mt-4 text-sm leading-relaxed text-base-medium">
+      In <strong>Info</strong>, Page Features are toggles for turning whole
+      sections on or off; those changes still need to be saved. A
+      <strong>globe</strong> opens document publishing settings, while a
+      <strong>person</strong> or <strong>open lock</strong> opens user or page
+      access settings.
+    </p>
+  {% endcall %}
+
+  {% call disclosure(
+    "Tasks",
+    "Work that stays attached to its page and builds a completion history over time.",
+    "tasks",
+    "task"
+  ) %}
+    <p class="mb-4 text-base-medium">
+      Tasks are designed to be updated and reused, especially for recurring
+      work. They can hold a due date, schedule, assignee, project link, files,
+      and an attached form. Completing a repeating task preserves the finished
+      form in History before the next cycle begins.
+    </p>
+    <div class="grid gap-3 sm:grid-cols-2">
+      {{ guide_item("selected", "Completion checkbox", "Marks the task complete immediately; clear it to reopen a completed task.", "task") }}
+      {{ guide_item("settings.page", "Task settings", "Edits the name, description, schedule, assignment, project, form, and attachments. Save with Update Task.", "task") }}
+      {{ guide_item("form", "Task form", "Opens the structured checklist or record attached to the task. Save with Update; it does not autosave.", "form") }}
+      {{ guide_item("history", "History", "Shows earlier completions and their saved form values.", "task") }}
+      {{ guide_item("builder.unsaved", "Unsaved task", "Appears after changing settings or form values. Select the cloud alert or the form's Update button to save.", "task") }}
+      {{ guide_item("snooze", "Postpone", "On Home, moves a task's due date without deleting its schedule.", "task") }}
+      {{ guide_item("expand", "Completed tasks", "Expands or collapses the completed-task list on a page.", "task") }}
+      {{ guide_item("menu", "Task actions", "Provides Move to Page, Combine with Task, and Delete when permitted.", "task") }}
+    </div>
+  {% endcall %}
+
+  {% call disclosure(
+    "Categories and index tables",
+    "Browse many records, choose columns, sort and filter, or open creation and settings tools.",
+    "category",
+    "category"
+  ) %}
+    <p class="mb-4 text-base-medium">
+      A category is a collection of pages and can provide their default form
+      and features. Select a table row to open its record. Active Tasks, Forms,
+      and Users use the same basic table layout, so these controls repeat.
+    </p>
+    <div class="grid gap-3 sm:grid-cols-2">
+      {{ guide_item("filter.active", "Column sort/filter", "Opens choices for sorting or filtering that column.") }}
+      {{ guide_item("column", "Visible columns", "Shows or hides table columns. On mobile it opens the combined table-controls panel.") }}
+      {{ guide_item("tableEdit", "Edit table", "Enables inline editing for supported cells.", "category") }}
+      {{ guide_item("indexTools", "Tools", "Opens actions such as New Page, settings, filters, saved filters, or creation forms.", "category") }}
+      {{ guide_item("filter.list", "Saved filters", "Opens reusable filters; the play button beside one runs it.") }}
+      {{ guide_item("trash.inactive", "Row delete", "Deletes that row after confirmation when you have permission.", "delete") }}
+    </div>
+  {% endcall %}
+
+  {% call disclosure(
+    "Projects",
+    "Coordinate a kind of work across many pages without moving tasks away from their original context.",
+    "project",
+    "project"
+  ) %}
+    <p class="mb-4 text-base-medium">
+      Projects collect matching work across pages. Model tasks are reusable task
+      templates: each can carry a default form and link to its In Progress and
+      Completed task views.
+    </p>
+    <div class="grid gap-3 sm:grid-cols-2">
+      {{ guide_item("model", "Model Tasks", "Shows the project's task templates. Plus creates another template.", "project") }}
+      {{ guide_item("document", "Document", "Opens the project's collaborative, autosaving document.", "project") }}
+      {{ guide_item("info", "Info", "Edits the project name, description, and enabled features. Use the save button.", "project") }}
+      {{ guide_item("filter.list", "Task Filters", "Builds and saves cross-page views of tasks tracked by the project.", "task") }}
+    </div>
+  {% endcall %}
+
+  {% call disclosure(
+    "Forms and the form builder",
+    "Define reusable structured fields, then attach the form to pages or tasks where people enter data.",
+    "form",
+    "form"
+  ) %}
+    <p class="mb-4 text-base-medium">
+      A form is a reusable schema, not a filled record by itself. Opening a row
+      in the Form Index opens the desktop builder. Page forms describe a page;
+      task forms record work and can preserve a new submission in each task
+      completion.
+    </p>
+    <div class="grid gap-3 sm:grid-cols-2">
+      {{ guide_item("form", "Components", "Drag field types from the left into the form, then select a field to configure it.", "form") }}
+      {{ guide_item("settings.page", "Settings", "Changes the selected field, form-level options, conditions, and access restrictions.", "form") }}
+      {{ guide_item("form", "Preview switch", "The pill switch at the top shows how the finished form will look and behave without saving it.", "form") }}
+      {{ guide_item("builder.unsaved", "Builder save", "Cloud alert means the schema has local changes. Select it to save; cloud check means the current schema is saved.", "form") }}
+    </div>
+    <p class="mt-4 text-sm leading-relaxed text-base-medium">
+      When filling a form on a page or task, edit the fields and use its Save or
+      Update button. Saved changes can refresh other open viewers, but unsaved
+      typing is local and is not collaborative document editing.
+    </p>
+  {% endcall %}
+
+  {% call disclosure(
+    "Files",
+    "Preview or download an upload, inspect extracted text, and see the pages or tasks it belongs to.",
+    "file",
+    "file"
+  ) %}
+    <div class="grid gap-3 sm:grid-cols-2">
+      {{ guide_item("document", "Preview", "Displays a PDF, image, audio file, or video when a browser preview is available.", "file") }}
+      {{ guide_item("document", "Text Content", "Displays searchable text extracted from the file. The tab heading distinguishes it from Preview.", "file") }}
+      {{ guide_item("info", "File Info", "Edits the file name, summary, options, and linked pages. Use the save button.", "file") }}
+      {{ guide_item("download", "Download", "Downloads the original file.", "file") }}
+    </div>
+    <p class="mt-4 text-sm leading-relaxed text-base-medium">
+      The filename at the top opens the browser preview when one exists. Colored
+      badges under the summary link back to related pages and tasks.
+    </p>
+  {% endcall %}
+
+  {% call disclosure(
+    "Search, users, and Admin",
+    "The remaining workspace-wide views follow the same list, table, and save patterns.",
+    "search",
+    "user"
+  ) %}
+    <div class="grid gap-3 sm:grid-cols-2">
+      {{ guide_item("search", "Search", "Type in the top bar for quick results; open All Results to filter matches by record kind.") }}
+      {{ guide_item("users", "Users", "User rows open user pages. Owners can use Tools for new users, groups, and permissions.", "user") }}
+      {{ guide_item("public", "Public/regular users", "On the User Index, switches between public and regular accounts when public users are enabled.", "user") }}
+      {{ guide_item("siteSettings", "Admin", "Opens site settings, exports, imports, deployment information, and owner-only maintenance tools.") }}
+    </div>
+  {% endcall %}
+
+  {% call callout("success") %}
+    A practical first pass is: create a category, create one page inside it,
+    enter its Info, write a few lines in its Document, then add a task. That
+    short loop demonstrates the difference between structured forms,
+    autosaving documents, and work that accumulates history.
+  {% endcall %}
+
+  {{ nav_buttons(
+    prev={"key": "overview", "name": "Overview", "kind": "category"},
+    next={"key": "forms", "name": "Forms", "kind": "form"}
+  ) }}
+</div>

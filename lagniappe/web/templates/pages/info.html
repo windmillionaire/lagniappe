@@ -140,7 +140,6 @@
         {% if page.description %}data-description="{{ page.description }}"{% endif %}
         {% if page.form %}data-schema='{{ page.form.schema|tojson }}'{% endif %}
         {% if page.form %}data-submission='{{ page.properties.submission.form_value|tojson }}'{% endif %}
-        data-visible="false"
         class="{{ styles.form.default }} mt-4 sm:mt-0">
     {% if page.allowed(Action.EDIT) %}
       {% if not current_user.is_public and not page.image %}

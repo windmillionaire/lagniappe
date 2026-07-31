@@ -54,12 +54,45 @@ the server is reachable and drives the offline UI. It does not fetch feature
 state. It also stops on window blur; focus performs the explicit catch-up before
 the normal long health-check interval resumes.
 
+### Startup and readiness
+
+Authenticated Core views install interaction handlers before touching storage
+or starting a manager. As soon as the concrete view publishes, they start root
+polling and component prefetching. SyncManager starts for a document capability;
+an idle storage inspection starts SyncManager or OfflineQueue only when persisted
+work exists. Visible prefetch and ordinary GET rendering never consult
+OfflineQueue. Optional EditWatcher, DeferredOperationManager, and Notifications
+warming is capability-gated and idle-scheduled with a one-second maximum delay.
+
+This scheduling is not a correctness delay. Scheduled readiness promises may
+resolve to `null` when the current surface has no matching capability or stored
+work. Direct consumers call an idempotent `ensureOfflineQueue()`,
+`ensurePollingCoordinator()`,
+`ensureSyncManager()`, `ensureEditWatcher()`, `ensureDeferredOperations()`, or
+`ensureNotifications()` method. All paths share the same single-flight manager
+instance. Collaborative documents render their toolbar and editor shell immediately,
+then keep editing inert while `initialStateReady` ensures SyncManager and fetches the
+initial document state. Hydration establishes a clean baseline: editor setup and
+untouched empty documents never produce save payloads, while a user edit (including
+intentionally clearing existing content) marks the document dirty and remains
+saveable. An accepted checkpoint clears that dirty state unless another local edit
+arrived while the save request was in flight.
+Offline forms become interactive from server HTML without reading queue state.
+Initial replay waits for view readiness. A successful write with a mounted form
+triggers an immediate poll instead of directly acknowledging the response, so
+normal EditWatcher reconciliation owns the update. Replay also remains
+fire-and-forget during reconnect: polling, sync, EditWatcher, and visible refresh
+resume without waiting on IndexedDB or queued requests. Public pages do not
+create any of these private managers.
+
 ### Subscription ownership
 
 Recurring work is owned by the narrowest visible surface that can consume it.
-Component rendering reconciles these owners after every activation or
-deactivation. Visibility includes the complete component ancestry, so a child
-that retains its active selection beneath a closed parent does not subscribe.
+Component rendering schedules a coalesced ownership reconciliation after every
+activation or deactivation and returns without awaiting it. The explicit
+reconnect path still awaits reconciliation before polling resumes. Visibility
+includes the complete component ancestry, so a child that retains its active
+selection beneath a closed parent does not subscribe.
 
 | Subscription | Lifetime | Notes |
 |---|---|---|

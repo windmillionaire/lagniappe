@@ -17,6 +17,10 @@
           href="/images/favicon-32x32.png?v={{ CONFIG.BUILD_ID }}">
     <link rel="manifest" href="/manifest.json?v={{ CONFIG.BUILD_ID }}">
     <link rel="stylesheet" href="/style.css?v={{ CONFIG.BUILD_ID }}">
+    {% if view_entry %}
+      <link rel="modulepreload"
+            href="/chunks/views/{{ view_entry }}.js?v={{ CONFIG.BUILD_ID }}">
+    {% endif %}
     {% if CONFIG.capture_errors %}
       <meta name="sentry-dsn" content="{{ CONFIG.SENTRY_JS_DSN }}">
       <script type="module" src="/sentry.js?v={{ CONFIG.BUILD_ID }}"></script>

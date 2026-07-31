@@ -1,5 +1,5 @@
 import { NavElement } from "../../elements/nav";
-import { debounce, withTransition } from "../../shared";
+import { debounce, withTransition } from "../../shared/utilities";
 import Core from "./core";
 
 /**
@@ -24,6 +24,8 @@ export default class Entity extends Core {
 			debounce(this._renderLayout, 100),
 		);
 
+		// Keep tab selection and widget enhancement atomic. Polling, offline replay,
+		// and other private services do not begin until this view publishes.
 		await this._renderLayout();
 	}
 
@@ -312,8 +314,11 @@ export default class Entity extends Core {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_012_entity_layout_frontend.py::test_entity_layout_ignores_already_consumed_reconcile_callback
+	 * @tests tests_js/test_012_entity_layout_frontend.py::test_initial_entity_layout_keeps_tab_and_widget_in_one_transition
 	 * @features entity-layout
 	 * @dimensions nested-layout reconcile-callback
+	 * @pairs entity-layout:nested-layout entity-layout:reconcile-callback
+	 * @pair startup:view-ready
 	 */
 	async _renderLayoutBody() {
 		const tabId = this._initialTabId();
@@ -332,14 +337,15 @@ export default class Entity extends Core {
 			}
 		});
 
-		await activeTab.activate("default");
-		await activeTab.render(true);
+		// Select the structural tab before widget initialization so both mutations
+		// remain part of this transition's single atomic update.
 		layout.dataset.visible = "true";
-		// Widget post-reconcile work can trigger a nested layout render that
-		// consumes these one-shot callbacks before this render resumes.
 		if (typeof tabs.reconcile === "function") tabs.reconcile();
 		if (typeof secondary?.reconcile === "function") secondary.reconcile();
 		mobileNav.element.dataset.visible = this.mobile ? "true" : "false";
+
+		await activeTab.activate("default");
+		await activeTab.render(true);
 		if (this.postRender) await this.postRender();
 		localStorage.setItem(`${this.hash}-active`, activeTabId);
 		return activeTabId;

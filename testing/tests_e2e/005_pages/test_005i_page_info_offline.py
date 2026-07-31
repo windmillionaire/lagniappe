@@ -119,7 +119,7 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_user):
         owner.offline = False
     _wait_for_mutation_records(owner, exact=0)
     expect(info_submit.locator("[data-icon='offline']")).to_have_count(0)
-    expect(info_submit.locator("[data-icon='check']")).to_be_visible()
+    expect(info_submit).to_contain_text("Update Page")
 
     saved_page = Entities.fetch_one(page.key, request=Fetch.direct())
     assert saved_page.name == updated_name
@@ -139,24 +139,19 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_user):
     expect(option).not_to_be_attached()
 
 
-# @pairs offline:queue-submit offline:reload offline:form-restore
-# @pairs pages:lp-offline forms:renderer-submission forms:queued-state
-# @pairs forms:queued-restore edited-entity-notice:queued-restore
+# @pairs offline:queue-submit offline:reload offline:replay-reconciliation
+# @pairs pages:lp-offline edited-entity-notice:replayed-response
 # @template pages/info.html::info_form
-def test_page_info_offline_submit_restores_queued_form_after_reload(get_user):
+def test_page_info_replay_reconciles_after_reload(get_user):
     owner = get_user(Users.OWNER)
     page = owner.go(Pages.test_offline_sync_form_page)
     page = page.reload()
-    updated_name = _unique("Reloaded offline page")
     updated_submission = _unique("Reloaded offline submission")
 
     info_form = page.info_form
-    _fill_form_element(info_form, Page.INFO_NAME, updated_name)
-    _fill_form_element(
-        info_form,
-        "[id^='sync-text-renderer-']",
-        updated_submission,
-    )
+    submission = info_form.locator("[id^='sync-text-renderer-']")
+    original_submission = submission.locator("input").input_value()
+    _fill_form_element(info_form, "[id^='sync-text-renderer-']", updated_submission)
 
     owner.offline = True
     info_submit = _main_submit(info_form)
@@ -167,32 +162,37 @@ def test_page_info_offline_submit_restores_queued_form_after_reload(get_user):
     page = page.reload()
     expect(owner.locate(OFFLINE_INDICATOR)).to_be_visible()
 
-    restored_form = page.info_form
-    restored_name = restored_form.locator(Page.INFO_NAME)
-    expect(restored_name.locator("input")).to_have_value(updated_name)
-    expect(restored_name.locator("[data-role='read']")).to_contain_text(
-        updated_name
-    )
-
-    restored_submission = restored_form.locator(
-        "[id^='sync-text-renderer-']"
-    )
-    expect(restored_submission.locator("input")).to_have_value(
-        updated_submission
-    )
-    expect(restored_submission.locator("[data-role='read']")).to_contain_text(
-        updated_submission
-    )
-    restored_submit = _main_submit(restored_form)
-    expect(restored_submit).to_contain_text("Queued Sync")
-    expect(restored_submit.locator("[data-icon='offline']")).to_be_visible()
+    current_form = page.info_form
+    current_submission = current_form.locator("[id^='sync-text-renderer-']")
+    expect(current_submission.locator("input")).to_have_value(original_submission)
+    current_submit = _main_submit(current_form)
+    expect(current_submit).to_contain_text("Update Page")
+    expect(current_submit.locator("[data-icon='offline']")).to_have_count(0)
 
     with owner.page.expect_response("**/pages/*/update", timeout=15000):
         owner.offline = False
     _wait_for_mutation_records(owner, exact=0)
 
+    marker = current_form.locator("[lp-edited-marker]")
+    expect(marker).to_be_visible()
+    expect(marker.locator("[data-role='edited-message']")).to_contain_text(
+        "Saved values changed elsewhere"
+    )
+    marker.locator("[data-role='edited-reset']").click()
+    modal = owner.page.locator("#modal")
+    expect(modal).to_be_visible()
+    expect(modal.get_by_text(updated_submission, exact=True)).to_be_visible()
+    saved_choice = modal.locator("[data-revision-source='server']").filter(
+        has_text=updated_submission
+    )
+    expect(saved_choice).to_have_attribute("aria-checked", "true")
+    modal.get_by_role("button", name="Update values").click()
+    expect(modal).not_to_be_attached()
+    expect(current_form.locator("input[name='sync-text']")).to_have_value(
+        updated_submission
+    )
+
     saved_page = Entities.fetch_one(page.key, request=Fetch.direct())
-    assert saved_page.name == updated_name
     assert saved_page.properties.submission.form_value["sync-text"] == (
         updated_submission
     )

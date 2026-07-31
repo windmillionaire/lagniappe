@@ -66,9 +66,17 @@ assert.match(chunks["script.js"].code, /\.\/chunks\/lazy\.js\?v=btest123/);
 assert.match(chunks["chunks/lazy.js"].code, /\.\/shared\.js\?v=btest123/);
 assert.ok(!Object.keys(chunks).some((fileName) => fileName.includes("?")));
 
-assert.deepEqual(precacheUrls(chunks, buildId), [
+const precacheBundle = {
+  ...chunks,
+  "chunks/views/manual.js": {
+    type: "chunk",
+    fileName: "chunks/views/manual.js",
+  },
+};
+assert.deepEqual(precacheUrls(precacheBundle, buildId), [
   "/chunks/lazy.js?v=btest123",
   "/chunks/shared.js?v=btest123",
+  "/chunks/views/manual.js?v=btest123",
 ]);
 """,
         module=True,

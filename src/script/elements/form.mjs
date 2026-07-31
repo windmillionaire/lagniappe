@@ -3,12 +3,8 @@ import { BaseForm } from "./base/baseForm";
 /**
  * @testable true
  * @tests tests_js/test_024_edit_watcher.py::test_form_revision_snapshot_is_canonical_and_memory_only
- * @tests tests_js/test_028_form_state_split.py::test_direct_form_controls_clear_inputs_and_textareas
- * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_offline_submit_restores_queued_form_after_reload
  * @features forms edited-entity-notice
- * @dimensions formdata canonicalization repeated-values revision-only-state queued-restore
- * @pairs forms:queued-restore edited-entity-notice:queued-restore
- * @pairs forms:queued-state forms:renderer-submission
+ * @dimensions formdata canonicalization repeated-values revision-only-state
  */
 export class FormElement {
 	constructor(attributes) {
@@ -243,33 +239,24 @@ export class FormElement {
 		this.unsavedState = false;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_offline_queue_does_not_block_initial_form_render
+	 * @pair forms:queue-independent-initial-render
+	 */
 	async init() {
 		await this._initForm();
 		this.commitRevisionBaseline();
-		await this._restoreQueuedForm();
 		this.initialized = true;
 		this.target.setAttribute("initialized", "");
-		if (this._offlineConflict) {
-			this.view?.EditWatcher?.stageConflict?.(this, this._offlineConflict);
-		}
 	}
 
-	_queuedMutation() {
-		if (this.readonly || !this.target?.hasAttribute("lp-offline")) return null;
-		const queue = this.view?.offlineQueue;
-		if (!queue) return null;
-
-		const route =
-			this.route || this.target.dataset.route || this.component?.route;
-		return queue
-			.recordsFor({ action: "update" })
-			.filter((record) => {
-				if (record.method !== "PUT" || record.target_key !== this.key) {
-					return false;
-				}
-				return !route || !record.route || record.route === route;
-			})
-			.at(-1);
+	/** @testable infrastructure */
+	async stageOfflineConflict(conflict = this._offlineConflict) {
+		if (!conflict) return;
+		const watcher =
+			this.view?.EditWatcher || (await this.view?.ensureEditWatcher?.());
+		return watcher?.stageConflict?.(this, conflict);
 	}
 
 	_applyQueuedFields(target, record) {
@@ -357,50 +344,6 @@ export class FormElement {
 		}
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_offline_form_restore_waits_for_initial_replay
-	 * @pair offline:background-replay
-	 * @pair forms:queued-restore
-	 */
-	async _restoreQueuedForm() {
-		if (this._skipQueuedRestore) return false;
-		if (this.readonly || !this.target?.hasAttribute("lp-offline")) return false;
-		await this.view?.initialReplayReady;
-		const record = this._queuedMutation();
-		if (!record) return false;
-
-		const authoritativeTarget = this.initialTarget;
-		const authoritativeSubmission = this.submission;
-		const queuedTarget = authoritativeTarget?.cloneNode(true);
-		this._applyQueuedFields(queuedTarget, record);
-
-		this.initialTarget = queuedTarget;
-		if (
-			record.renderer_submission !== null &&
-			record.renderer_submission !== undefined
-		) {
-			this.submission = record.renderer_submission;
-		}
-
-		this.destroy();
-		try {
-			await this._initForm();
-			this._restoreQueuedFiles(record);
-		} finally {
-			this.initialTarget = authoritativeTarget;
-			this.submission = authoritativeSubmission;
-		}
-		this.form?.queued();
-		if (record.conflictResponse) {
-			this._offlineConflict = {
-				record,
-				response: record.conflictResponse,
-			};
-		}
-		return true;
-	}
-
 	async _initForm() {
 		if (this.initialTarget) {
 			const visible = this.target?.dataset.visible;
@@ -417,7 +360,13 @@ export class FormElement {
 		this.form = new BaseForm(this);
 		await this.form.init();
 		this.target.addEventListener("click", this._click);
-		this.view?.DeferredOperations?.scan(this.target);
+		const hasDeferredOperation =
+			this.target.matches?.("[data-operation]") ||
+			this.target.querySelector?.("[data-operation]");
+		if (hasDeferredOperation) {
+			const manager = await this.view?.ensureDeferredOperations?.();
+			manager?.scan(this.target);
+		}
 	}
 
 	_click(e) {
@@ -456,7 +405,6 @@ export class FormElement {
 		this.destroy();
 		await this._initForm();
 		this.commitRevisionBaseline();
-		await this._restoreQueuedForm();
 	}
 
 	setEntityMetadata() {

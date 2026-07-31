@@ -127,6 +127,78 @@ vm.runInContext(source, context);
     )
 
 
+# @pairs deferred-jobs:form-lock deferred-jobs:reload
+def test_active_deferred_form_waits_for_root_operation_scan(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const scans = [];
+let ensureCalls = 0;
+let releaseManager;
+const managerReady = new Promise((resolve) => { releaseManager = resolve; });
+
+function operationForm() {
+  return {
+    dataset: { operation: "operation-1" },
+    addEventListener() {},
+    cloneNode() { return operationForm(); },
+    matches(selector) { return selector === "[data-operation]"; },
+    querySelector() { return null; },
+    replaceWith() {},
+  };
+}
+
+const context = {
+  BaseForm: class {
+    async init() {}
+  },
+  console,
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class FormElement", "class FormElement");
+source += "\nglobalThis.FormElement = FormElement;";
+vm.runInContext(source, context);
+
+(async () => {
+  const widget = new context.FormElement({
+    target: operationForm(),
+    view: {
+      ensureDeferredOperations() {
+        ensureCalls += 1;
+        return managerReady;
+      },
+    },
+  });
+
+  let initialized = false;
+  const pending = widget._initForm().then(() => { initialized = true; });
+  await new Promise((resolve) => setImmediate(resolve));
+
+  if (ensureCalls !== 1) {
+    throw new Error(`Root operation did not request its manager: ${ensureCalls}`);
+  }
+  if (initialized) {
+    throw new Error("Deferred form initialized before its manager was ready");
+  }
+
+  releaseManager({ scan(target) { scans.push(target); } });
+  await pending;
+
+  if (scans.length !== 1 || scans[0] !== widget.target) {
+    throw new Error("Deferred manager did not scan the active root form");
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
 # @features forms form-schema edited-entity-notice
 # @dimensions latest-schema local-values remote-added-values no-schema-version-choice
 def test_local_revision_uses_latest_schema_and_merges_submission_values(run_node):
@@ -483,8 +555,10 @@ vm.runInContext(source, context);
 
 
 # @features offline
-# @dimensions replay acknowledgement-order dispatch
-def test_offline_replay_removes_committed_record_before_acknowledgement(run_node):
+# @dimensions replay dispatch mounted-form-poll no-direct-acknowledgement
+# @pair offline:replay-reconciliation
+# @pair edited-entity-notice:replayed-response
+def test_offline_replay_polls_mounted_form_without_direct_acknowledgement(run_node):
     run_node(
         r'''
 const fs = require("node:fs");
@@ -514,9 +588,6 @@ const record = {
 let queue = null;
 const context = {
   console,
-  CustomEvent: class {
-    constructor(type, options) { this.type = type; this.detail = options.detail; }
-  },
   deleteOfflineMutations: async (ids) => {
     events.push({ type: "delete", ids, remaining: queue.records.length });
   },
@@ -536,14 +607,6 @@ const context = {
     },
   },
   setOfflineMutation: async () => {},
-  window: {
-    dispatchEvent(event) {
-      events.push({
-        type: event.type,
-        remaining: queue.recordsFor({ kind: "page" }).length,
-      });
-    },
-  },
 };
 vm.createContext(context);
 let source = fs.readFileSync("src/script/shared/offlineQueue.mjs", "utf8");
@@ -553,12 +616,30 @@ source += "\nglobalThis.OfflineQueue = OfflineQueue;";
 vm.runInContext(source, context);
 
 (async () => {
-  queue = new context.OfflineQueue({ online: true, components: {} });
+  const mountedForm = {
+    key: "page-one",
+    target: {
+      matches(selector) { return selector === "form[data-widget]"; },
+    },
+    handleOfflineQueue() {},
+  };
+  queue = new context.OfflineQueue({
+    online: true,
+    components: { info: { widgets: { PageInfo: mountedForm } } },
+    async ensureEditWatcher() {
+      return {
+        async invalidate(key) {
+          events.push({ type: "poll", key, remaining: queue.records.length });
+        },
+      };
+    },
+  });
   queue.records = [record];
-  queue._dispatch = async ({ phase }) => {
+  queue._dispatch = async ({ phase }, targets = []) => {
     events.push({
       type: phase,
       remaining: queue.recordsFor({ kind: "page" }).length,
+      targets: targets.length,
     });
   };
 
@@ -568,12 +649,14 @@ vm.runInContext(source, context);
   }
   if (
     events.map(({ type }) => type).join(",") !==
-      "delete,entity-updated,replayed" ||
+      "delete,replayed,poll" ||
     events[1].remaining !== 0 ||
-    events[2].remaining !== 0
+    events[1].targets !== 0 ||
+    events[2].remaining !== 0 ||
+    events[2].key !== "page-one"
   ) {
     throw new Error(
-      `Replay acknowledgement observed stale queue state: ${JSON.stringify(events)}`,
+      `Replay polling observed stale queue state: ${JSON.stringify(events)}`,
     );
   }
 })().catch((error) => {
@@ -585,7 +668,7 @@ vm.runInContext(source, context);
 
 
 # @features offline
-# @dimensions replay conflict-rebase acknowledgement-order
+# @dimensions replay conflict-rebase
 def test_offline_replay_retries_a_conflict_rebased_by_the_form(run_node):
     run_node(
         r'''
@@ -1068,6 +1151,7 @@ const vm = require("node:vm");
 
 const locked = [];
 const tracked = [];
+let ensureCalls = 0;
 const widget = {
   _deferredOperation: null,
   target: { dataset: {} },
@@ -1086,9 +1170,13 @@ const marker = {
     return selector === "form[data-widget]" ? form : null;
   },
 };
+const operations = {
+  track(operation, options) { tracked.push({ operation, options }); },
+};
 const view = {
-  DeferredOperations: {
-    track(operation, options) { tracked.push({ operation, options }); },
+  ensureDeferredOperations() {
+    ensureCalls += 1;
+    return Promise.resolve(operations);
   },
 };
 const context = { console, Modal: class {} };
@@ -1099,17 +1187,25 @@ source = source.replace("export class EditWatcher", "class EditWatcher");
 source += "\nglobalThis.EditWatcher = EditWatcher;";
 vm.runInContext(source, context);
 
-const watcher = new context.EditWatcher(view);
-watcher._lockEntity(
-  { markers: new Set([marker]) },
-  { operation: "operation-2", revision: 5, locked: true },
-);
-if (locked.length !== 1 || locked[0].operation !== "operation-2") {
-  throw new Error("EditWatcher did not restore the form lock");
-}
-if (tracked.length !== 1 || tracked[0].options.node !== widget.target) {
-  throw new Error("EditWatcher did not restore deferred progress tracking");
-}
+(async () => {
+  const watcher = new context.EditWatcher(view);
+  await watcher._lockEntity(
+    { markers: new Set([marker]) },
+    { operation: "operation-2", revision: 5, locked: true },
+  );
+  if (locked.length !== 1 || locked[0].operation !== "operation-2") {
+    throw new Error("EditWatcher did not restore the form lock");
+  }
+  if (ensureCalls !== 1) {
+    throw new Error("EditWatcher did not start the deferred manager on demand");
+  }
+  if (tracked.length !== 1 || tracked[0].options.node !== widget.target) {
+    throw new Error("EditWatcher did not restore deferred progress tracking");
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
 '''
     )
 
@@ -1251,7 +1347,11 @@ vm.runInContext(source, context);
 # @features reconnect-refresh edited-entity-notice forms
 # @dimensions visibility ordering stale-fingerprint dirty-form-preservation
 # @pair offline:dirty-form-preservation
-def test_visibility_sync_stages_remote_form_edits_before_refresh(run_node):
+# @pair offline:background-replay
+# @pair polling:nonblocking
+def test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay(
+    run_node,
+):
     run_node(
         r'''
 const fs = require("node:fs");
@@ -1274,35 +1374,62 @@ const context = {
 };
 vm.createContext(context);
 
+let replaySource = fs.readFileSync(
+  "src/script/views/base/offlineReplay.mjs",
+  "utf8",
+);
+replaySource = replaySource.replace(
+  "export const replayOfflineQueue",
+  "const replayOfflineQueue",
+);
+replaySource += "\nglobalThis.replayOfflineQueue = replayOfflineQueue;";
+vm.runInContext(replaySource, context);
+
 let source = fs.readFileSync("src/script/views/base/core.mjs", "utf8");
 source = source.replace(
-  /^import [\s\S]*?(?=const COLLECTION_ONLY_CHANGE_TYPES)/,
+  /^import [\s\S]*?(?=\/\*\*)/,
   `
-const SearchBox = class {};
-const EntityMenu = class {};
-const Notifications = class {};
-const OfflineQueue = class {};
 const ENDPOINTS = {};
-const clearRecentSearchResults = () => {};
 const captureError = (error) => { throw error; };
 const connectivity = { online: true, hidden: true };
-const DeferredOperationManager = class {};
-const DeleteModal = class {};
-const EditWatcher = class {};
-const HelpModal = class {};
-const Modal = class {};
-const OfflineModal = class {};
 const request = {};
-const SyncManager = class {};
-const SubmissionManager = class {
-  constructor() { this.submit = () => {}; }
-};
 const withTransition = async (callback) => await callback();
 const ViewComponent = class {};
+const collectRefreshTargets = () => [];
+const reconcileChange = () => {};
+const refreshCollectionComponents = () => {};
+const ensureDeferredOperations = (view) => Promise.resolve(view.DeferredOperations);
+const ensureEditWatcher = (view) => Promise.resolve(view.EditWatcher);
+const ensureEntityMenu = () => Promise.resolve(null);
+const ensureModalClasses = () => Promise.resolve(null);
+const ensureNotifications = () => Promise.resolve(null);
+const ensureOfflineModal = () => Promise.resolve(null);
+const ensureOfflineQueue = (view) => Promise.resolve(view.offlineQueue);
+const ensurePollingCoordinator = (view) => Promise.resolve(view.PollingCoordinator);
+const ensureSearchBox = () => Promise.resolve(null);
+const ensureSubmissionManager = () => Promise.resolve(null);
+const ensureSyncManager = (view) => Promise.resolve(view.SyncManager);
+const initializeCoreServices = () => {};
+const ShellView = class {
+  constructor(elt) {
+    this.elt = elt;
+    this.kind = elt.dataset.kind;
+    this.key = elt.dataset.key;
+    this.hash = elt.dataset.hash || elt.dataset.index;
+    this.online = connectivity.online;
+    this.hidden = connectivity.hidden;
+    this.components = {};
+    this._destroyed = false;
+  }
+};
 const Task = class {};
 `,
 );
 source = source.replace("export default class Core", "class Core");
+source = source.replace(
+  'import("./offlineReplay")',
+  "Promise.resolve({ replayOfflineQueue: globalThis.replayOfflineQueue })",
+);
 source += "\nglobalThis.Core = Core;";
 vm.runInContext(source, context);
 
@@ -1313,7 +1440,15 @@ const root = {
   querySelector() { return null; },
 };
 const view = new context.Core(root);
-view.offlineQueue = { async replay() { events.push("replay"); } };
+let resolveReplay;
+const replayReady = new Promise((resolve) => { resolveReplay = resolve; });
+view.offlineQueue = {
+  async replay() {
+    events.push("replay");
+    await replayReady;
+    return 1;
+  },
+};
 view.DeferredOperations = { nudge() { events.push("nudge"); } };
 view.EditWatcher = {
   async resume() {
@@ -1323,20 +1458,31 @@ view.EditWatcher = {
 };
 view.SyncManager = { async register() { events.push("register"); } };
 view.refresh = async (navigation, options) => {
-  events.push(`refresh:${navigation}:${options.fingerprint}`);
+  events.push(`refresh:${navigation}:${options?.fingerprint}`);
 };
 
 (async () => {
-  await view.sync({ hidden: false });
+  const outcome = await Promise.race([
+    view.sync({ hidden: false }).then(() => "synced"),
+    new Promise((resolve) => setTimeout(() => resolve("blocked"), 50)),
+  ]);
+  if (outcome !== "synced") {
+    throw new Error("Visibility sync waited for OfflineQueue replay");
+  }
   const expected = [
-    "replay",
     "nudge",
     "watcher",
+    "replay",
     "refresh:false:stale-root",
     "register",
   ];
   if (JSON.stringify(events) !== JSON.stringify(expected)) {
     throw new Error(`Unexpected visibility order: ${JSON.stringify(events)}`);
+  }
+  resolveReplay();
+  await view._offlineReplayTask;
+  if (events.at(-1) !== "refresh:undefined:undefined") {
+    throw new Error(`Replayed work did not reconcile afterward: ${JSON.stringify(events)}`);
   }
 })().catch((error) => {
   console.error(error);

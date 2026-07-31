@@ -120,7 +120,17 @@ class NavElement {{
 }}
 
 const debounce = (func) => func;
-const withTransition = async (callback) => await callback();
+let transitionCalls = 0;
+let transitionDepth = 0;
+const withTransition = async (callback) => {{
+  transitionCalls += 1;
+  transitionDepth += 1;
+  try {{
+    return await callback();
+  }} finally {{
+    transitionDepth -= 1;
+  }}
+}};
 
 class FakeComponent {{
   constructor(element, view) {{
@@ -202,13 +212,15 @@ const context = {{
     setItem: (key, value) => storage.set(key, value),
   }},
   NavElement,
+  transitionActive: () => transitionDepth > 0,
+  transitionCalls: () => transitionCalls,
   withTransition,
 }};
 
 vm.createContext(context);
 let source = fs.readFileSync("src/script/views/base/entity.mjs", "utf8");
 source = source.replace('import {{ NavElement }} from "../../elements/nav";\\n', "");
-source = source.replace('import {{ debounce, withTransition }} from "../../shared";\\n', "");
+source = source.replace('import {{ debounce, withTransition }} from "../../shared/utilities";\\n', "");
 source = source.replace('import Core from "./core";\\n', "");
 source = source.replace(
   "export default class Entity extends Core",
@@ -254,5 +266,40 @@ const tabs = view.getComponent(tabsElement);
 if (tabs.reconcile !== null) {
   throw new Error("Expected nested layout to consume the tabs callback");
 }
+""",
+    )
+
+
+# @pair startup:view-ready
+# @features entity-layout startup
+# @dimensions structural-selection initial-transition atomic-enhancement
+def test_initial_entity_layout_keeps_tab_and_widget_in_one_transition(run_node):
+    run_entity_layout_check(
+        run_node,
+        """
+const view = new context.Entity(root);
+const info = view.getComponent(infoElement);
+let resolveActivation;
+let markActivationStarted;
+let activationTransitioned = false;
+const activationStarted = new Promise((resolve) => { markActivationStarted = resolve; });
+info.activate = () => {
+  activationTransitioned = context.transitionActive();
+  markActivationStarted();
+  return new Promise((resolve) => { resolveActivation = resolve; });
+};
+
+const initializing = view.init();
+await activationStarted;
+
+if (layout.dataset.visible !== "true" || infoElement.dataset.visible !== "true") {
+  throw new Error("Entity tab selection was not included before widget activation");
+}
+if (context.transitionCalls() !== 1 || !activationTransitioned) {
+  throw new Error("Initial tab selection and widget activation did not share one transition");
+}
+
+resolveActivation();
+await initializing;
 """,
     )

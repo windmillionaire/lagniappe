@@ -20,7 +20,12 @@ export default class Page extends Entity {
 
 		const photo = this.elt.querySelector("#photo");
 		if (photo) {
-			await this.getComponent(photo).activate("PagePhoto");
+			const component = this.getComponent(photo);
+			const initiallyVisible =
+				component?.active || this.isSecondaryCardVisible(photo);
+			if (initiallyVisible && !component.active) {
+				await component.activate("PagePhoto");
+			}
 		}
 	}
 

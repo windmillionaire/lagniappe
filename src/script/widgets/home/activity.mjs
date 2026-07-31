@@ -64,7 +64,9 @@ export class HomeActivityList extends BaseList {
 		if (!key || !item) return;
 
 		if (key.startsWith("offline:")) {
-			await this.view.offlineQueue.cancel({
+			const queue =
+				this.view.offlineQueue || (await this.view.ensureOfflineQueue?.());
+			await queue?.cancel({
 				action: "create",
 				client_key: key,
 			});
@@ -74,7 +76,9 @@ export class HomeActivityList extends BaseList {
 
 		const route = `/activity/${key}`;
 		if (!this.view.online) {
-			await this.view.offlineQueue.queue({
+			const queue =
+				this.view.offlineQueue || (await this.view.ensureOfflineQueue?.());
+			await queue?.queue({
 				id: `delete:${key}`,
 				kind: item.dataset.kind || "activity",
 				action: "delete",

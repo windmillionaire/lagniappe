@@ -1,4 +1,6 @@
-import { captureError, Modal, request, withTransition } from "../../shared";
+import { captureError } from "../../shared/errors";
+import { request } from "../../shared/request";
+import { withTransition } from "../../shared/utilities";
 
 /**
  * Coordinates the view-scoped form submission lifecycle.
@@ -132,8 +134,10 @@ export class SubmissionManager {
 			this._clearActiveSubmitter();
 			return false;
 		} else if (response.modal) {
-			const modal = new Modal(this.view);
-			modal.attach(response.modal, component);
+			void this.view.ensureModalClasses?.().then(({ Modal } = {}) => {
+				if (!Modal || this.view?._destroyed) return;
+				new Modal(this.view).attach(response.modal, component);
+			});
 			this._clearActiveSubmitter();
 			return false;
 		}
@@ -142,13 +146,10 @@ export class SubmissionManager {
 	}
 
 	async update(component, data, route = component.route) {
-		if (!this.view.online && this.view.offlineQueue) {
-			const response = await this.view.offlineQueue.queueSubmit(
-				component,
-				data,
-				route,
-				"PUT",
-			);
+		if (!this.view.online) {
+			const queue =
+				this.view.offlineQueue || (await this.view.ensureOfflineQueue?.());
+			const response = await queue?.queueSubmit(component, data, route, "PUT");
 			if (response) {
 				await withTransition(async () => {
 					component.active?.form?.queued?.();
@@ -176,13 +177,10 @@ export class SubmissionManager {
 	}
 
 	async create(component, data, route = component.route) {
-		if (!this.view.online && this.view.offlineQueue) {
-			const response = await this.view.offlineQueue.queueSubmit(
-				component,
-				data,
-				route,
-				"POST",
-			);
+		if (!this.view.online) {
+			const queue =
+				this.view.offlineQueue || (await this.view.ensureOfflineQueue?.());
+			const response = await queue?.queueSubmit(component, data, route, "POST");
 			if (response) {
 				try {
 					await component.created(response);
@@ -218,11 +216,15 @@ export class SubmissionManager {
 	 * @dimensions deferred-submit
 	 */
 	async _deferredCreated(response, component) {
-		this.view.DeferredOperations?.track(response.operation, {
+		const [operations, notifications] = await Promise.all([
+			this.view.ensureDeferredOperations?.(),
+			response.notification ? this.view.ensureNotifications?.() : null,
+		]);
+		operations?.track(response.operation, {
 			node: component.active?.target,
 		});
 		if (response.notification) {
-			this.view.Notifications?.upsertNotification?.(response.notification);
+			notifications?.upsertNotification?.(response.notification);
 		}
 
 		if (response.html) {
@@ -255,11 +257,15 @@ export class SubmissionManager {
 		if (response.locked) {
 			component.active?.lockDeferredOperation?.(response);
 		}
-		this.view.DeferredOperations?.track(response.operation, {
+		const [operations, notifications] = await Promise.all([
+			this.view.ensureDeferredOperations?.(),
+			response.notification ? this.view.ensureNotifications?.() : null,
+		]);
+		operations?.track(response.operation, {
 			node: component.active?.target,
 		});
 		if (response.notification) {
-			this.view.Notifications?.upsertNotification?.(response.notification);
+			notifications?.upsertNotification?.(response.notification);
 		}
 
 		if (response.html) {

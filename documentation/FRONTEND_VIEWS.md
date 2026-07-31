@@ -1,56 +1,84 @@
 # Frontend Views
 
-The view system is how the frontend connects server-rendered HTML to client-side behavior. The architecture has four layers:
+The view system is how the frontend connects server-rendered HTML to client-side behavior. The architecture has five layers:
 
 ```
-View (Core / Entity / EntityIndex)
-  └── Component (ViewComponent)
-        └── Widget (loaded via loader.mjs)
-              └── Elements (form fields, tables, etc.)
+ShellView
+  └── View (Core / Entity / EntityIndex, or a shell-only view)
+        └── Component (ViewComponent)
+              └── Widget (loaded via loader.mjs)
+                    └── Elements (form fields, tables, etc.)
 ```
 
-Every page has one **view**, which manages multiple **components**, each of which can display one active **widget** at a time. Views handle event delegation and server requests; components handle widget lifecycle; widgets handle the actual UI behavior.
+Every page has one **view**. `ShellView` owns the synchronous interaction and
+publication lifecycle. `Core` adds components and private application services;
+Manual, Results, and Analytics stay shell-only. Components display one active
+**widget** at a time, and widgets own the actual UI behavior.
+
+## ShellView (`views/base/shell.mjs`)
+
+`ShellView.init()` is the first synchronous startup boundary. Before it awaits
+feature code, storage, or network work, it installs delegated click, submit,
+pointer-down, mobile-breakpoint, and cold-control handlers, sets
+`data-interactive="true"`, and records `lagniappe:interaction-ready`.
+
+Pointer tracking is installed on `window` only between pointer-down and
+pointer-up/cancel. Movement greater than five pixels suppresses the next click.
+`destroy()` removes the root, media-query, document bootstrap, and temporary
+pointer listeners, including when a lazy load is still pending.
+
+Concrete views call `publish()` only after their structural `init()` completes.
+Publication sets the existing `initialized` attribute and `_lp_view` handle,
+then records `lagniappe:view-ready`. Optional/private service completion records
+`lagniappe:services-ready` afterward. Public Manual uses the same focused shell
+behavior but does not install private polling, offline, sync, notification, or
+authenticated lifecycle work.
 
 ## Core (`views/base/core.mjs`)
 
-Base class for all views. Created by `getView()` in `main.mjs` when a page loads.
+Component-capable base class for Home, entity/detail views, indexes, Report, and
+Admin. `getView()` creates it through the stable entry in `viewRegistry.mjs`.
 
 ### Constructor
 
 Reads `data-kind`, `data-hash`, `data-key`, and `data-readonly` from the root
-element. Initializes the component map and the view-scoped managers used by
-delegated interaction and submission handling.
+element. Initializes the component map and stable manager handles without
+importing or constructing the managers themselves.
 
 The PascalCase instance fields in `Core` (`SyncManager`, `EditWatcher`,
-`SubmissionManager`, and the other manager/widget handles) are public handles
-used by view subclasses and widgets. Lower-camel fields such as `offlineQueue`
-are internal state. Preserve the public handle names.
+`SubmissionManager`, `DeferredOperations`, `Notifications`, and the other
+manager/widget handles) remain public compatibility handles. Lower-camel fields
+such as `offlineQueue` remain internal state. Consumers that require a lazy
+manager must await its readiness promise or call the corresponding idempotent
+`ensure…()` method; reading a handle directly is valid only after that point.
 
 ### Initialization (`init()`)
 
-- Registers delegated click and submit handlers on the view root
-- Sets up drag detection (distinguishes clicks from drags using a 5px threshold)
-- Creates an `OfflineModal` bound to the offline indicator
-- Listens for mobile breakpoint changes and dispatches `mobile-resize` events
-- Creates one view-scoped `PollingCoordinator` and exposes `syncReady`, which
-  resolves to the document `SyncManager`. Documents, committed form edits,
-  deferred jobs, notifications, and ingress register typed subscriptions with
-  that coordinator. It batches due work, backs quiet checks off, stops while
-  hidden, unfocused, or offline, and triggers immediately on
-  foreground/reconnect. Same-cadence subscriptions retain a shared due time so
-  they stay batched.
-- Creates the view-scoped `EditWatcher`, which retains per-marker revision
-  baselines and registers entity/form-lock subscriptions only for active
-  visible forms with inline committed-edit markers. Root forms consume the
-  existing root entity subscription.
-- Creates the view-scoped `OfflineQueue`, which owns only explicit offline
-  mutation persistence, optimistic overlays, replay, and replay conflicts. Core
-  waits for IndexedDB hydration but runs initial online replay in the background.
-  Offline-enabled forms wait for that replay before restoring a queued record;
-  unrelated components continue mounting immediately.
-- Registers the root entity or collection channel so active views reconcile
-  durable changes through the same poll contract.
-- Stores itself as `node._lp_view` for external access
+- Runs `ShellView.init()` immediately, then installs the stable readiness
+  promises `offlineQueueReady`, `syncReady`, `initialReplayReady`, and
+  `servicesReady`.
+- At concrete view publication, starts PollingCoordinator and existing
+  `[lp-prefetch]` work. SyncManager starts when a document capability exists;
+  idle storage inspection starts SyncManager or OfflineQueue only for persisted
+  work. Prefetch and ordinary GET rendering never wait for or inspect
+  OfflineQueue. The offline modal loads on first use.
+- During idle time (one-second maximum), starts correctness-sensitive
+  Notifications, DeferredOperationManager, and EditWatcher only when matching
+  DOM capabilities exist. SearchBox, EntityMenu, and modal UI load on first
+  interaction through the same single-flight `ensure…()` loaders.
+- Registers the root entity or collection subscription when the polling
+  coordinator becomes ready. Documents await `syncReady`. Offline forms render
+  authoritative server state without touching queue readiness. Initial replay
+  waits for view readiness; successful writes trigger an immediate poll when
+  their form is mounted, using normal EditWatcher reconciliation.
+- Keeps offline replay, reconnect reconciliation, polling batching, edit
+  notices, deferred operations, and notification semantics unchanged behind
+  the lazy service facades in `views/base/services.mjs`.
+
+Cold controls synchronously prevent native navigation/submission when needed,
+set `aria-busy`, and coalesce repeated activation. The intended operation is
+replayed after its chunk resolves. A failed chunk clears the single-flight and
+busy state so the next interaction retries.
 
 ### Click Delegation (`_click()`)
 
@@ -288,6 +316,11 @@ Extends Core for entity detail pages (project, page, file). Adds:
 - **Tab management**: Components with `data-tab="true"` are treated as tabs. The active tab is persisted in `localStorage` keyed by `data-hash`. On mobile, all tabs collapse into a shared container with a unified mobile nav. Page and project document tabs are rendered for editors or when saved document content exists, so readonly viewers do not see empty document affordances.
 - **Mobile layout**: Listens for `mobile-resize` events. On mobile, moves secondary card components into the tabs container and shows a shared `mobileNav`. On desktop, restores the original layout.
 
+Initial entity tab selection and active widget initialization stay together in
+one atomic transition. The transition contains only structural/widget work;
+polling, offline replay, and other deferred services begin after publication.
+Later tab, secondary-card, and responsive layout changes use the same path.
+
 Views extending Entity: `project.mjs`, `page.mjs`, `file.mjs`.
 
 ## EntityIndex (`views/base/index.mjs`)
@@ -298,13 +331,15 @@ Extends Core for list/index pages (users, forms, categories, tasks). Adds:
 - **Table editing**: Inline edit support via table widgets
 - **Mobile controls**: Compact controls for mobile table views
 
-Large index tables deliberately have two readiness stages. The page, table
-shell, and `TableVisibility` initialize after the first response. Chained row
-loading remains asynchronous and does not block those surfaces. Sorting/filter
-buttons start hidden and become available only after `IndexTable` finishes the
-chained load and initializes `TableSorting`; opening mobile controls can
-retarget already-initialized sorting state but never starts or awaits that row
-load.
+Large index tables deliberately have two readiness stages. The lightweight
+`TableVisibilityState` reads saved columns and installs visibility CSS before
+the first table render. The checkbox panel stays in the lazy `TableVisibility`
+widget. Chained row loading remains asynchronous and does not block those
+surfaces. Sorting/filter buttons start hidden and become available only after
+`IndexTable` finishes the chained load and initializes `TableSorting`; opening
+mobile controls can retarget already-initialized sorting state but never starts
+or awaits that row load. The tools `Dropdown` is imported only on mobile or
+after a later resize into mobile mode.
 
 Views using EntityIndex: user, form, category, task (all mapped to `views/base/index`).
 
@@ -316,6 +351,19 @@ schema rather than `ViewComponent` widgets. It still implements the shared
 `sync()` lifecycle used by `main.mjs`, reading the canonical connectivity state
 to keep its search, save control, and offline indicator current. It does not
 publish separate global offline state.
+
+## Startup-sensitive view behavior
+
+- Manual imports its section dropdown only in mobile mode or after a mobile
+  resize. Desktop Manual retains AJAX section navigation and copy controls
+  without the combobox chunk.
+- Page activates `PagePhoto` only when the photo card is initially visible or
+  selected. A hidden card uses normal component activation on first use.
+- Report imports `BaseForm` only when a report form exists, then initializes
+  run/retry, undo, and revise forms concurrently.
+- Home, table, note, and other `[lp-prefetch]` widgets start at concrete view
+  publication. OfflineQueue hydration and replay run separately and reconcile
+  successful late writes through polling/EditWatcher.
 
 ## ViewComponent (`views/base/component.mjs`)
 
@@ -368,13 +416,16 @@ Called after a successful POST. Reads `data-destination` from the active widget 
 
 ### `render(visible)`
 
-The reconciliation entry point. Always called inside a `withTransition()`:
+The reconciliation entry point. User-initiated component changes and initial
+entity enhancement are called inside a `withTransition()`:
 
 1. Runs `this.reconcile()` if set (deferred DOM mutations from `updated`/`created`)
 2. Sets `data-visible` and `data-open` on the component element
 3. Calls `_setParentComponent()` to manage sub-component visibility
 4. Iterates all widgets and calls `widget.reconcile()` on each
 5. Updates the nav bar
+6. Schedules polling subscription ownership reconciliation as a coalesced
+   background task; rendering never waits for manager or poll work
 
 ### Data Aggregation
 
@@ -469,15 +520,25 @@ Most widgets extend one of these base classes rather than starting from scratch:
 DOMContentLoaded
   → main.mjs: initialize()
     → setTestMode()
-    → syncView()
-      → find [lp-view], import view module from VIEWS registry
+    → getView()
+      → find [lp-view], import its stable entry from viewRegistry.mjs
       → new View(node), view.init()
-        → Core.init(): hydrate OfflineQueue; initialize shell/managers; publish view
-        → background: SyncManager readiness and initial offline replay
-        → CollaborativeDocument/FormElement await only their relevant readiness promise
-        → Core.prefetch(): prefetch [lp-component][lp-prefetch] components
-    → register service worker, error handlers, visibility/focus/offline/page lifecycle listeners
-    → updateUserData()
+        → ShellView.init(): install handlers; mark interaction-ready
+        → concrete view: finish structural initialization
+        → publish initialized/_lp_view; mark view-ready
+        → at view-ready: start root polling, document sync when present, and
+          visible prefetch
+        → idle: inspect for persisted offline work and start only the matching
+          queue/sync manager; warm correctness-sensitive managers
+        → first use: optional controls and UI managers
+        → mark services-ready
+        → CollaborativeDocument renders its editor shell immediately, then hydrates
+          through initialStateReady; FormElement renders before offline replay
+    → all pages: register the service worker immediately
+    → private pages: start session updates, health lifecycle, and analytics
+      without a paint gate
+    → public pages: analytics/error handling only beyond the service worker;
+      no authenticated lifecycle registration
 ```
 
 ### User Clicks a Toggle

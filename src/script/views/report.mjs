@@ -1,7 +1,9 @@
-import { BaseForm } from "../elements/base/baseForm";
-import { request } from "../shared";
 import { createIcon, setIcon } from "../shared/icons";
+import { request } from "../shared/request";
 import Core from "./base/core";
+
+const REPORT_FORM_SELECTOR =
+	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='undo-report-form'], [data-role='revise-report-form']";
 
 /**
  * @testable true
@@ -16,19 +18,82 @@ import Core from "./base/core";
  */
 export default class Report extends Core {
 	async init() {
+		await super.init();
 		this._receiveDeferredOperation = this._receiveDeferredOperation.bind(this);
 		window.addEventListener(
 			"deferred-operation",
 			this._receiveDeferredOperation,
 		);
-		await super.init();
-		await this._initRunReportForm();
-		await this._initUndoReportForm();
-		await this._initReviseReportForm();
+		const hasForms = this.elt.querySelector(REPORT_FORM_SELECTOR);
+		if (hasForms) {
+			this._installReportFormBootstrap();
+			try {
+				await this.ensureReportForms();
+			} catch (error) {
+				this.reportStartupError(error, hasForms, "report-forms");
+			}
+		}
 		return this;
 	}
 
-	async _initRunReportForm() {
+	ensureReportForms() {
+		if (this._reportFormsReady) return Promise.resolve(this);
+		if (this._reportFormsPromise) return this._reportFormsPromise;
+
+		const pending = import("../elements/base/baseForm")
+			.then(async ({ BaseForm }) => {
+				if (this._destroyed) return null;
+				await Promise.all([
+					this._initRunReportForm(BaseForm),
+					this._initUndoReportForm(BaseForm),
+					this._initReviseReportForm(BaseForm),
+				]);
+				if (this._destroyed) return null;
+				this._reportFormsReady = true;
+				this._removeReportFormBootstrap();
+				return this;
+			})
+			.catch((error) => {
+				if (this._reportFormsPromise === pending) {
+					this._reportFormsPromise = null;
+				}
+				throw error;
+			});
+		this._reportFormsPromise = pending;
+		return pending;
+	}
+
+	_installReportFormBootstrap() {
+		if (this._reportFormBootstrap) return;
+		this._reportFormBootstrap = (event) => {
+			const form = event.target?.matches?.(REPORT_FORM_SELECTOR)
+				? event.target
+				: null;
+			if (!form || this._reportFormsReady) return;
+			event.preventDefault();
+			event.stopImmediatePropagation?.();
+			const submitter = event.submitter;
+			void this.runColdAction(
+				form,
+				() => this.ensureReportForms(),
+				() => {
+					if (!this._destroyed && form.isConnected) {
+						form.requestSubmit(submitter || undefined);
+					}
+				},
+				submitter || form,
+			);
+		};
+		this.elt.addEventListener?.("submit", this._reportFormBootstrap, true);
+	}
+
+	_removeReportFormBootstrap() {
+		if (!this._reportFormBootstrap) return;
+		this.elt.removeEventListener?.("submit", this._reportFormBootstrap, true);
+		this._reportFormBootstrap = null;
+	}
+
+	async _initRunReportForm(BaseForm) {
 		const target = this.elt.querySelector(
 			"[data-role='run-report-form'], [data-role='retry-report-form']",
 		);
@@ -49,7 +114,7 @@ export default class Report extends Core {
 		target.addEventListener("submit", this._runReport.bind(this));
 	}
 
-	async _initUndoReportForm() {
+	async _initUndoReportForm(BaseForm) {
 		const target = this.elt.querySelector("[data-role='undo-report-form']");
 		if (!target) return;
 
@@ -67,7 +132,7 @@ export default class Report extends Core {
 		target.addEventListener("submit", this._undoReport.bind(this));
 	}
 
-	async _initReviseReportForm() {
+	async _initReviseReportForm(BaseForm) {
 		const target = this.elt.querySelector("[data-role='revise-report-form']");
 		if (!target) return;
 
@@ -132,11 +197,13 @@ export default class Report extends Core {
 		}
 
 		if (response.notification) {
-			this.Notifications?.upsertNotification?.(response.notification);
+			const notifications = await this.ensureNotifications();
+			notifications?.upsertNotification?.(response.notification);
 		}
 		this.RunReportForm?.success();
 		if (response.deferred) {
-			this.DeferredOperations?.track(response.operation, { node: this.elt });
+			const operations = await this.ensureDeferredOperations();
+			operations?.track(response.operation, { node: this.elt });
 			this._showDeferredReportStatus("running", "Saving report changes...");
 			return;
 		}
@@ -187,11 +254,13 @@ export default class Report extends Core {
 		}
 
 		if (response.notification) {
-			this.Notifications?.upsertNotification?.(response.notification);
+			const notifications = await this.ensureNotifications();
+			notifications?.upsertNotification?.(response.notification);
 		}
 		this.ReviseReportForm?.success();
 		if (response.deferred) {
-			this.DeferredOperations?.track(response.operation, { node: this.elt });
+			const operations = await this.ensureDeferredOperations();
+			operations?.track(response.operation, { node: this.elt });
 			this._showDeferredReportStatus("revising", "Revising report...");
 			return;
 		}
@@ -259,10 +328,14 @@ export default class Report extends Core {
 	}
 
 	destroy() {
+		this._removeReportFormBootstrap();
 		window.removeEventListener(
 			"deferred-operation",
 			this._receiveDeferredOperation,
 		);
+		this.RunReportForm?.destroy?.();
+		this.UndoReportForm?.destroy?.();
+		this.ReviseReportForm?.destroy?.();
 		super.destroy();
 	}
 

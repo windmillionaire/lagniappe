@@ -886,10 +886,16 @@ branch:
 - accepts any Gmail or Google Workspace mailbox that can create a Google App
   Password; the mailbox does not need project IAM or application-owner access;
 - opens a Google account picker for App Passwords and explains the 2-Step
-  Verification requirement;
+  Verification requirement, Google's app-password warning, and the limited
+  purpose of sending verification and password-reset messages from the chosen
+  mailbox on its owner's behalf;
+- tells the operator to enter `Lagniappe` in Google's App name box, click
+  **Create**, and copy the displayed password, and explains that the sender
+  name is what message recipients see;
 - accepts the visibly pasted 16-character app password, uses
   `smtp.gmail.com:587` with STARTTLS, and sends a test message to the same
-  mailbox;
+  mailbox; interrupted connections and other transient transport failures are
+  retried once and reported separately from explicit SMTP rejections;
 - saves `AUTH_EMAIL_CONFIG` only after the test succeeds.
 
 The Gmail path deliberately bootstraps an operator who does not yet have an

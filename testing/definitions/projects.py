@@ -27,6 +27,7 @@ class Projects(ResourceEnumMixin, Enum):
     test_readonly_document_visibility = Project(
         definition=pd.readonly_document_visibility
     )
+    test_untouched_document = Project(definition=pd.untouched_document)
     test_editor_markdown_table_paste = Project(definition=pd.editor_markdown_table)
     test_editor_plain_html_paste = Project(definition=pd.editor_plain_html_paste)
     test_editor_common_markdown_paste = Project(

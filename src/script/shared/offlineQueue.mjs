@@ -81,27 +81,14 @@ function formDataFromRecord(record) {
 /**
  * @testable false
  * @covered-by src/script/shared/offlineQueue.mjs::OfflineQueue
- * @reason private queued-form lookup helper used by optimistic renderers
+ * @reason private queued-record field lookup used by optimistic renderers
  */
 function field(record, name) {
 	return (record.fields || []).find(([key]) => key === name)?.[1] || "";
 }
 
 /**
- * @testable true
- * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_create_mutations_persist_after_reload
- * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutation_overlay_hides_deleted_items
- * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutations_replay_when_online
- * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
- * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_offline_submit_restores_queued_form_after_reload
- * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_offline_submission_conflict_keeps_queue_until_choice
- * @tests tests_js/test_028_form_state_split.py::test_offline_submit_record_keeps_originating_entity_fingerprint
- * @tests tests_js/test_028_form_state_split.py::test_offline_submit_record_keeps_renderer_snapshot_out_of_replay_payload
- * @tests tests_js/test_028_form_state_split.py::test_offline_replay_keeps_stale_submission_queued_for_reconciliation
- * @tests tests_js/test_028_form_state_split.py::test_offline_replay_removes_committed_record_before_acknowledgement
- * @tests tests_js/test_028_form_state_split.py::test_offline_replay_retries_a_conflict_rebased_by_the_form
- * @features offline
- * @dimensions queue-submit cached-overlay replay notification fingerprint immutable-command form-restore reload renderer-snapshot replay-payload replay-precondition conflict-review fingerprint-precondition conflict-durability conflict-rebase dispatch acknowledgement-order
+ * @testable infrastructure
  */
 export class OfflineQueue {
 	constructor(view) {
@@ -234,6 +221,17 @@ export class OfflineQueue {
 		return response;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_offline_replay_polls_mounted_form_without_direct_acknowledgement
+	 * @tests tests_js/test_028_form_state_split.py::test_offline_replay_retries_a_conflict_rebased_by_the_form
+	 * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
+	 * @features offline edited-entity-notice
+	 * @dimensions replay replay-reconciliation conflict-rebase queue-submit reload replayed-response
+	 * @pairs offline:replay offline:replay-reconciliation offline:conflict-rebase
+	 * @pairs offline:queue-submit offline:reload
+	 * @pairs edited-entity-notice:replayed-response
+	 */
 	async replay() {
 		if (!this.view.online || this._replaying) return 0;
 
@@ -257,10 +255,7 @@ export class OfflineQueue {
 						const rebased = this.records.find(
 							(queued) => queued.id === current.id,
 						);
-						if (
-							!rebased ||
-							rebased.fingerprint === attemptedFingerprint
-						) {
+						if (!rebased || rebased.fingerprint === attemptedFingerprint) {
 							break;
 						}
 						current = rebased;
@@ -273,16 +268,24 @@ export class OfflineQueue {
 						(queued) => queued.id !== current.id,
 					);
 					completed.push(current.id);
-					if (current.method === "PUT") {
-						this._acknowledgeResponse(response);
-					}
+					const targets = this.targets;
+					const mountedUpdateTargets =
+						current.method === "PUT"
+							? this._mountedUpdateTargets(current, targets)
+							: [];
 					this._finalize(current, response);
-					await this._dispatch({
-						phase: "replayed",
-						queue: this,
-						record: current,
-						response,
-					});
+					await this._dispatch(
+						{
+							phase: "replayed",
+							queue: this,
+							record: current,
+							response,
+						},
+						targets.filter((target) => !mountedUpdateTargets.includes(target)),
+					);
+					if (current.method === "PUT") {
+						await this._pollMountedUpdate(current, mountedUpdateTargets);
+					}
 					break;
 				}
 			}
@@ -291,6 +294,31 @@ export class OfflineQueue {
 		}
 
 		return completed.length;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_offline_replay_polls_mounted_form_without_direct_acknowledgement
+	 * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
+	 * @pair offline:replay-reconciliation
+	 * @pair edited-entity-notice:replayed-response
+	 */
+	_mountedUpdateTargets(record, targets = this.targets) {
+		return targets.filter(
+			(target) =>
+				target?.key === record.target_key &&
+				target.target?.matches?.("form[data-widget]"),
+		);
+	}
+
+	async _pollMountedUpdate(
+		record,
+		targets = this._mountedUpdateTargets(record),
+	) {
+		if (!targets.length) return;
+		const watcher =
+			this.view.EditWatcher || (await this.view.ensureEditWatcher?.());
+		await watcher?.invalidate?.(record.target_key);
 	}
 
 	async rebaseSubmit(record, widget, { fingerprint, modified } = {}) {
@@ -437,14 +465,6 @@ export class OfflineQueue {
 			return request.put(record.route, data, { acknowledgeEntities: false });
 		}
 		return request.post(record.route, data);
-	}
-
-	_acknowledgeResponse(response) {
-		for (const entity of response?.entities || []) {
-			window.dispatchEvent(
-				new CustomEvent("entity-updated", { detail: entity }),
-			);
-		}
 	}
 
 	_finalize(record, response) {

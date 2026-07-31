@@ -1,3 +1,4 @@
+{% set view_entry = "page" %}
 {% extends "layouts/base.html" %}
 {% from 'pages/photo.html' import card as photo_card %}
 {% from 'pages/document.html' import document_tab %}
@@ -203,9 +204,7 @@
       {% if has_notes %}{{ notes_section(page) }}{% endif %}
     </div>
     {{ mobile_nav(page, has_image) }}
-    <div id="layout"
-         data-visible="false"
-         class="{{ styles.entity.cards }} sm:mt-4">
+    <div id="layout" class="{{ styles.entity.cards }} sm:mt-4">
       {% if render_photo %}{{ page_photo(page) }}{% endif %}
       <div id="tabs"
            lp-component

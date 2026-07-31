@@ -3,6 +3,9 @@
 
 # @features sync polling
 # @dimensions document collaboration offline-replay cursor-retention presence lifecycle batching active-widget visibility
+# @pairs sync:active-widget sync:visibility sync:offline-replay
+# @pairs polling:active-widget polling:visibility polling:document
+# @pairs sync:checkpoint sync:persistence sync:dirty-state
 def test_sync_manager_uses_polling_subscriptions(run_node):
     run_node(
         r"""
@@ -145,6 +148,10 @@ const widget = {
   visible: true,
   get syncData() { return payloads.shift() ?? null; },
   get saveData() { return savePayloads.shift() ?? null; },
+  commitSavedBaseline(snapshot) {
+    this.snapshot = snapshot;
+    this.commitCalls = (this.commitCalls ?? 0) + 1;
+  },
   async sync() {},
 };
 component.active = widget;
@@ -254,7 +261,8 @@ const manager = new context.SyncManager(view);
   if (requestCalls.length !== 3 ||
       requestCalls[2].body.updates[0].ydoc !== "merged-checkpoint" ||
       subscription.descriptor.revision !== 3 ||
-      widget.snapshot !== "merged-checkpoint") {
+      widget.snapshot !== "merged-checkpoint" ||
+      widget.commitCalls !== 1) {
     throw new Error("Rejected checkpoint was not retried after polling");
   }
 

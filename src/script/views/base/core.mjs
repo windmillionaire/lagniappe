@@ -1,47 +1,40 @@
-import { SearchBox } from "../../elements/combobox/search";
-import { EntityMenu } from "../../elements/entityMenu";
-import { Notifications } from "../../elements/notifications";
-import {
-	captureError,
-	clearRecentSearchResults,
-	connectivity,
-	DeferredOperationManager,
-	DeleteModal,
-	EditWatcher,
-	ENDPOINTS,
-	HelpModal,
-	OfflineModal,
-	OfflineQueue,
-	PollingCoordinator,
-	request,
-	SyncManager,
-	withTransition,
-} from "../../shared";
+import { connectivity } from "../../shared/connectivity";
+import { ENDPOINTS } from "../../shared/endpoints";
+import { captureError } from "../../shared/errors";
+import { request } from "../../shared/request";
+import { withTransition } from "../../shared/utilities";
 import ViewComponent from "./component";
-import { SubmissionManager } from "./submission";
+import {
+	collectRefreshTargets,
+	reconcileChange,
+	refreshCollectionComponents,
+} from "./reconciliation";
+import {
+	ensureDeferredOperations,
+	ensureEditWatcher,
+	ensureEntityMenu,
+	ensureModalClasses,
+	ensureNotifications,
+	ensureOfflineModal,
+	ensureOfflineQueue,
+	ensurePollingCoordinator,
+	ensureSearchBox,
+	ensureSubmissionManager,
+	ensureSyncManager,
+	initializeCoreServices,
+} from "./services";
+import ShellView from "./shell";
 import { Task } from "./task";
-
-const COLLECTION_ONLY_CHANGE_TYPES = new Set(["delete", "star", "unstar"]);
-const FORM_ALREADY_RECONCILED_CHANGE_TYPES = new Set([
-	...COLLECTION_ONLY_CHANGE_TYPES,
-	"entity-poll",
-]);
 
 /**
  * @testable infrastructure
  */
-export default class Core {
+export default class Core extends ShellView {
 	constructor(node) {
-		this.elt = node;
-		this.kind = node.dataset.kind;
-		this.hash = node.dataset.hash || node.dataset.index;
-		this.key = node.dataset.key;
-		this.readonly = node.dataset.readonly === "true";
-		this.mobile = window.matchMedia("(max-width: 640px)").matches;
+		super(node);
+		this.hasDeferredServices = true;
 		this.offlineIndicator = document.querySelector('[data-role="offline"]');
 		this.offlineModal = null;
-		this.online = connectivity.online;
-		this.hidden = connectivity.hidden;
 
 		this.Notifications = null;
 		this.offlineQueue = null;
@@ -49,20 +42,20 @@ export default class Core {
 		this.DeferredOperations = null;
 		this.SyncManager = null;
 		this.EditWatcher = null;
-		this.SubmissionManager = new SubmissionManager(this);
+		this.SubmissionManager = null;
 		this.SearchBox = null;
-		this.EntityMenu = new EntityMenu(this);
-		this.syncReady = null;
+		this.EntityMenu = null;
+		this.ModalClasses = null;
+		this.offlineQueueReady = Promise.resolve(null);
+		this.syncReady = Promise.resolve(null);
 		this.initialReplayReady = Promise.resolve(0);
 
-		this.components = {};
 		this._pendingChanges = [];
 		this._reconcilePromise = null;
-		this._syncPromise = null;
-		this._initialReplayTask = Promise.resolve(0);
-		this._destroyed = false;
-
-		this._click = this._click.bind(this);
+		this._componentActions = new Map();
+		this._pollingReconcileTask = null;
+		this._pollingReconcileRequested = false;
+		this._offlineReplayTask = null;
 	}
 
 	/**
@@ -100,106 +93,70 @@ export default class Core {
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_core_init_starts_polling_without_waiting_for_initial_replay
-	 * @pair startup:queue-hydration
-	 * @pair startup:polling
+	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
+	 * @pair startup:interaction-ready
+	 * @pair startup:deferred-services
 	 */
 	async init() {
-		await this._initOfflineQueue();
-		this.PollingCoordinator = new PollingCoordinator(this).init();
-		this.syncReady = this._initSync();
-		this._startInitialReplay();
-		this.DeferredOperations = new DeferredOperationManager(this).init();
-		this.prefetch();
-		this._addListeners();
-		this._setOfflineIndicator();
-		this._initSearch();
-		this._initNotifications();
-		this._initEditWatcher();
-		this._initPollingSubscription();
-
-		this.elt.setAttribute("initialized", "");
-		this.elt._lp_view = this;
+		await super.init();
+		initializeCoreServices(this);
 		return this;
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_core_init_starts_polling_without_waiting_for_initial_replay
-	 * @pair offline:background-replay
-	 */
-	_startInitialReplay() {
-		this.initialReplayReady = Promise.resolve().then(async () => {
-			if (!this.online || this._destroyed) return 0;
-			try {
-				return (await this.offlineQueue?.replay()) || 0;
-			} catch (error) {
-				captureError(error, this.elt, { context: "initial-offline-replay" });
-				return 0;
-			}
-		});
-
-		this._initialReplayTask = this.initialReplayReady
-			.then(async (replayed) => {
-				if (replayed && !this._destroyed) await this.refresh();
-				return replayed;
-			})
-			.catch((error) => {
-				captureError(error, this.elt, { context: "initial-replay-refresh" });
-				return 0;
-			});
-		return this._initialReplayTask;
+	reportStartupError(error, element = this.elt, context = "lazy-control") {
+		captureError(error, element, { context });
 	}
 
-	_initNotifications() {
-		this.Notifications = new Notifications(this);
-		this.Notifications.init();
+	ensureOfflineQueue() {
+		return ensureOfflineQueue(this);
 	}
 
-	_initEditWatcher() {
-		if (this.EditWatcher) return;
-		this.EditWatcher = new EditWatcher(this);
-		this.EditWatcher.init();
+	ensurePollingCoordinator() {
+		return ensurePollingCoordinator(this);
 	}
 
-	async _initOfflineQueue() {
-		if (this.offlineQueue) return;
-
-		this.offlineQueue = new OfflineQueue(this);
-		await this.offlineQueue.init();
+	ensureSyncManager() {
+		return ensureSyncManager(this);
 	}
 
-	/**
-	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_core_init_starts_polling_without_waiting_for_initial_replay
-	 * @pair polling:startup
-	 * @pair sync:editor-readiness
-	 */
-	_initSync() {
-		if (this._syncPromise) return this._syncPromise;
+	ensureEditWatcher() {
+		return ensureEditWatcher(this);
+	}
 
-		this._syncPromise = (async () => {
-			if (this.SyncManager) return this.SyncManager;
-			if (this._destroyed) return null;
+	ensureDeferredOperations() {
+		return ensureDeferredOperations(this);
+	}
 
-			try {
-				this.SyncManager = new SyncManager(this);
-				this.SyncManager.init();
-				return this.SyncManager;
-			} catch (error) {
-				captureError(error, this.elt, { context: "sync-manager-startup" });
-				this.SyncManager = null;
-				return null;
-			}
-		})();
-		return this._syncPromise;
+	ensureNotifications() {
+		return ensureNotifications(this);
+	}
+
+	ensureSearchBox() {
+		return ensureSearchBox(this);
+	}
+
+	ensureEntityMenu() {
+		return ensureEntityMenu(this);
+	}
+
+	ensureSubmissionManager() {
+		return ensureSubmissionManager(this);
+	}
+
+	ensureOfflineModal() {
+		return ensureOfflineModal(this);
+	}
+
+	ensureModalClasses() {
+		return ensureModalClasses(this);
 	}
 
 	/**
 	 * Subscribe the root view to its durable entity or collection revision.
 	 *
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_core_init_starts_polling_without_waiting_for_initial_replay
+	 * @tests tests_js/test_029_core_startup.py::test_core_polling_subscription_lifecycle
+	 * @covered-by src/script/views/base/services.mjs::ensurePollingCoordinator
 	 * @features polling
 	 * @dimensions entity channel refresh
 	 */
@@ -216,7 +173,10 @@ export default class Core {
 				},
 				{
 					onResult: async (result) => {
-						await this.EditWatcher?.receiveEntityResult?.(this.key, result);
+						const watcher = this.elt.querySelector("[lp-edited-marker]")
+							? await this.ensureEditWatcher()
+							: this.EditWatcher;
+						await watcher?.receiveEntityResult?.(this.key, result);
 						if (result.status === "unavailable") {
 							await this.reconcileChange({ type: "delete", key: this.key });
 							return;
@@ -259,84 +219,6 @@ export default class Core {
 		);
 	}
 
-	async _initSearch() {
-		const search = document.querySelector("[lp-search]");
-		if (search) {
-			this.SearchBox = new SearchBox(search);
-			await this.SearchBox.init();
-		}
-	}
-
-	_addListeners() {
-		this.elt.addEventListener("click", this._click);
-		this.elt.addEventListener("submit", this.SubmissionManager.submit);
-
-		const mobileQuery = window.matchMedia("(max-width: 640px)");
-		mobileQuery.addEventListener("change", (e) => {
-			this.mobile = e.matches;
-			this.elt.dispatchEvent(new CustomEvent("mobile-resize"));
-		});
-
-		this._initDrag();
-	}
-
-	/**
-	 * @testable false
-	 * @covered-by src/script/views/base/core.mjs::Core.reconcileChange
-	 * @reason destination loading prepares the named widget for the shared reconciliation pass
-	 */
-	async _loadChangeDestination(destination) {
-		if (!destination) return null;
-		const [componentId, widgetName] = destination.split(":");
-		if (!componentId || !widgetName) return null;
-		const componentElt = document.getElementById(componentId);
-		const component = this.getComponent(componentElt);
-		if (!component) return null;
-		return await component.loadWidget(widgetName);
-	}
-
-	/**
-	 * Load rendered collection owners before invalidating them. Some persistent
-	 * collections are present in the initial HTML without ever becoming the
-	 * component's active widget, so they otherwise have no refresh contract yet.
-	 *
-	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
-	 * @pair reconnect-refresh:mounted-collection
-	 */
-	async _loadMountedCollectionOwners(keys) {
-		const requested = new Set(keys);
-		const targets = new Set();
-		for (const entity of this.elt.querySelectorAll("[lp-entity][data-key]")) {
-			if (!requested.has(entity.dataset.key)) continue;
-			const target = entity.parentElement?.closest?.("[data-widget]");
-			if (target?.dataset.widget && !target.matches?.("form")) {
-				targets.add(target);
-			}
-		}
-
-		await Promise.all(
-			Array.from(targets, async (target) => {
-				const component = this.getComponent(target);
-				await component?.loadWidget(target.dataset.widget);
-			}),
-		);
-	}
-
-	/**
-	 * @testable true
-	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
-	 * @tests tests_e2e/008_users/test_008b_user_groups.py::test_delete_group_refreshes_group_navigation
-	 * @pair reconnect-refresh:committed-delete
-	 */
-	_removeDeletedEntity(key) {
-		for (const element of this.elt.querySelectorAll("[data-key]")) {
-			if (element.dataset.key !== key) continue;
-			element._lp_component?.destroy?.();
-			element.remove();
-		}
-	}
-
 	/**
 	 * Reconcile committed server invalidations without treating poll payloads as
 	 * authoritative replacement data. Concurrent invalidations share one pass
@@ -350,64 +232,7 @@ export default class Core {
 	 * @pair polling:reentrancy
 	 */
 	reconcileChange(change = {}) {
-		this._pendingChanges.push({ ...change });
-		if (this._reconcilePromise) return this._reconcilePromise;
-
-		this._reconcilePromise = (async () => {
-			try {
-				do {
-					const changes = this._pendingChanges.splice(0);
-					const fingerprint = this.elt.dataset.fingerprint || null;
-					const destinationKeys = [];
-					for (const item of changes) {
-						if (item.type === "delete") clearRecentSearchResults();
-						if (["star", "unstar"].includes(item.type)) {
-							this._applyStarState(item);
-						}
-						const destination = await this._loadChangeDestination(
-							item.destination,
-						);
-						if (
-							destination?.key &&
-							!COLLECTION_ONLY_CHANGE_TYPES.has(item.type)
-						) {
-							destinationKeys.push(destination.key);
-						}
-					}
-					const keys = [
-						...new Set(changes.map(({ key }) => key).filter(Boolean)),
-					];
-					if (keys.length) await this._loadMountedCollectionOwners(keys);
-					for (const { key, type } of changes) {
-						if (type === "delete" && key) this._removeDeletedEntity(key);
-					}
-					const formKeys = [
-						...new Set([
-							...changes
-								.filter(
-									({ type }) => !FORM_ALREADY_RECONCILED_CHANGE_TYPES.has(type),
-								)
-								.map(({ key }) => key)
-								.filter(Boolean),
-							...destinationKeys,
-						]),
-					];
-					if (formKeys.length) {
-						if (this.PollingCoordinator?.activePoll) {
-							this.EditWatcher?.enqueue(formKeys);
-						} else {
-							await this.EditWatcher?.invalidate(formKeys);
-						}
-					}
-					await this.refreshCollections(false, { fingerprint });
-					await this.refreshSupplementalCollections(changes);
-					for (const item of changes) await this.afterReconcileChange(item);
-				} while (this._pendingChanges.length);
-			} finally {
-				this._reconcilePromise = null;
-			}
-		})();
-		return this._reconcilePromise;
+		return reconcileChange(this, change);
 	}
 
 	async refreshSupplementalCollections() {}
@@ -469,8 +294,6 @@ export default class Core {
 
 	_setOfflineIndicator() {
 		this.offline = !this.online;
-		const offlineModal = new OfflineModal(this, this.offlineIndicator);
-		offlineModal.enable();
 	}
 
 	get offline() {
@@ -493,7 +316,7 @@ export default class Core {
 	 * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
 	 * @tests tests_e2e/001_site/test_001d_offline.py::test_rapid_offline_online_transitions
 	 * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
-	 * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_before_refresh
+	 * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
 	 * @features offline
 	 * @dimensions indicator browser-state server-health transitions view-reset dirty-form-preservation
 	 * @pair offline:dirty-form-preservation
@@ -516,10 +339,18 @@ export default class Core {
 			this.PollingCoordinator?.pause();
 			await this.SyncManager?.deregister();
 		} else {
+			await Promise.all([
+				this.ensurePollingCoordinator(),
+				this.SyncManager || this.elt.querySelector("[lp-sync]")
+					? this.ensureSyncManager()
+					: null,
+				this.elt.querySelector("[lp-edited-marker]")
+					? this.ensureEditWatcher()
+					: null,
+			]);
 			if (wasInactive && !hidden) {
 				const refreshFingerprint = this.elt.dataset.fingerprint || null;
-				await this._initialReplayTask;
-				await this.offlineQueue?.replay();
+				this.scheduleOfflineReplay();
 				this.DeferredOperations?.nudge();
 				await this.EditWatcher?.resume();
 				await this.refresh(force, { fingerprint: refreshFingerprint });
@@ -533,12 +364,34 @@ export default class Core {
 	}
 
 	/**
+	 * Replay is background reconciliation, never a prerequisite for restoring
+	 * polling, sync, EditWatcher, or the visible server render. OfflineQueue
+	 * itself polls mounted updated forms as each replay succeeds.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
+	 * @features offline polling
+	 * @dimensions background-replay nonblocking
+	 * @pair offline:background-replay
+	 * @pair polling:nonblocking
+	 */
+	scheduleOfflineReplay() {
+		if (this._offlineReplayTask) return this._offlineReplayTask;
+		this._offlineReplayTask = import("./offlineReplay")
+			.then(({ replayOfflineQueue }) => replayOfflineQueue(this))
+			.finally(() => {
+				this._offlineReplayTask = null;
+			});
+		return this._offlineReplayTask;
+	}
+
+	/**
 	 * Reconcile widget-owned polling after a component activation or a return
 	 * to the foreground. Managers retain state for hidden widgets, but only the
 	 * active visible widget may own recurring form, document, or ingress work.
 	 *
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_core_init_starts_polling_without_waiting_for_initial_replay
+	 * @tests tests_js/test_029_core_startup.py::test_core_polling_subscription_lifecycle
 	 * @features polling
 	 * @dimensions active-widget visibility subscription-lifecycle
 	 * @pairs polling:active-widget polling:visibility
@@ -555,6 +408,48 @@ export default class Core {
 				),
 			),
 		);
+	}
+
+	/**
+	 * Schedule subscription ownership reconciliation without making component
+	 * rendering wait for manager or network work. Repeated renders coalesce and
+	 * request at most one follow-up pass if ownership changes while a pass runs.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_core_polling_subscription_lifecycle
+	 * @features polling startup
+	 * @dimensions subscription-lifecycle nonblocking single-flight
+	 * @pairs polling:subscription-lifecycle polling:nonblocking
+	 * @pairs startup:single-flight startup:nonblocking
+	 */
+	schedulePollingReconciliation() {
+		if (this._destroyed || this.hidden || !this.online) {
+			return Promise.resolve();
+		}
+		this._pollingReconcileRequested = true;
+		if (this._pollingReconcileTask) return this._pollingReconcileTask;
+
+		const pending = Promise.resolve()
+			.then(async () => {
+				while (this._pollingReconcileRequested && !this._destroyed) {
+					this._pollingReconcileRequested = false;
+					await this.reconcilePollingSubscriptions();
+				}
+			})
+			.catch((error) => {
+				this.reportStartupError(
+					error,
+					this.elt,
+					"polling-subscription-reconciliation",
+				);
+			})
+			.finally(() => {
+				if (this._pollingReconcileTask === pending) {
+					this._pollingReconcileTask = null;
+				}
+			});
+		this._pollingReconcileTask = pending;
+		return pending;
 	}
 
 	async prefetch() {
@@ -575,25 +470,7 @@ export default class Core {
 	 * @dimensions manifest batching fallback
 	 */
 	_collectRefreshTargets(components) {
-		const targets = new Map();
-
-		for (const component of components) {
-			if (component.elt && !component.elt.isConnected) continue;
-			for (const widget of Object.values(component.widgets)) {
-				if (widget.refreshScope !== "collection") continue;
-				if (!widget.refreshDescriptor || !widget.refreshDelta) continue;
-				try {
-					const descriptor = widget.refreshDescriptor();
-					if (!descriptor) continue;
-					const id = component.name;
-					if (!id || targets.has(id)) continue;
-					targets.set(id, { descriptor: { ...descriptor, id }, widget });
-				} catch (error) {
-					captureError(error);
-				}
-			}
-		}
-		return targets;
+		return collectRefreshTargets(this, components);
 	}
 
 	/**
@@ -603,61 +480,8 @@ export default class Core {
 	 * @pair reconnect-refresh:legacy-fallback
 	 * @pair reconnect-refresh:cache-invalidation
 	 */
-	async _refreshCollectionComponents(
-		components,
-		{ fingerprint = this.elt.dataset.fingerprint || null } = {},
-	) {
-		const targets = this._collectRefreshTargets(components);
-		const reconciled = new Set();
-		let refreshedFingerprint = null;
-
-		if (targets.size) {
-			const response = await request.post("/refresh", {
-				view: {
-					key: this.key || null,
-					hash: this.hash || null,
-					index: this.elt.dataset.index || null,
-					mode: this.elt.dataset.userMode || null,
-					fingerprint,
-				},
-				targets: Array.from(targets.values(), ({ descriptor }) => descriptor),
-			});
-			if (response?.reload) {
-				window.location.reload();
-				return;
-			}
-
-			if (response?.ok && Array.isArray(response.targets)) {
-				refreshedFingerprint = response.fingerprint || null;
-				if (!response.targets.length && refreshedFingerprint) {
-					for (const { widget } of targets.values()) reconciled.add(widget);
-				}
-				const results = new Map(
-					response.targets.map((target) => [target.id, target]),
-				);
-				for (const [id, { widget }] of targets) {
-					const result = results.get(id);
-					if (!result || result.fallback) continue;
-					try {
-						await widget.refreshDelta(result);
-						reconciled.add(widget);
-					} catch (error) {
-						captureError(error);
-					}
-				}
-			}
-		}
-
-		await Promise.all(
-			components.map(async (component) => {
-				if (component.elt && !component.elt.isConnected) return;
-				await component.refreshCollections(reconciled);
-			}),
-		);
-		if (refreshedFingerprint) {
-			this.elt.dataset.fingerprint = refreshedFingerprint;
-		}
-		await this.Notifications?.refresh?.();
+	async _refreshCollectionComponents(components, options = {}) {
+		return refreshCollectionComponents(this, components, options);
 	}
 
 	async refreshCollections(navigation = false, options = {}) {
@@ -676,49 +500,82 @@ export default class Core {
 	}
 
 	async notify(message) {
-		await this.Notifications.notify(message);
+		const notifications = await this.ensureNotifications();
+		await notifications?.notify?.(message);
 	}
 
-	_initDrag() {
-		this.isDragging = false;
-		this.dragStarted = false;
-		let startX, startY;
-
-		this.elt.addEventListener("mousedown", (e) => {
-			this.isDragging = false;
-			this.dragStarted = true;
-			startX = e.clientX;
-			startY = e.clientY;
-		});
-
-		this.elt.addEventListener("mousemove", (e) => {
-			if (!this.dragStarted) return;
-
-			const deltaX = Math.abs(e.clientX - startX);
-			const deltaY = Math.abs(e.clientY - startY);
-
-			if (deltaX > 5 || deltaY > 5) {
-				this.isDragging = true;
-			}
-		});
-
-		this.elt.addEventListener("mouseup", () => {
-			this.dragStarted = false;
-		});
+	_installColdControlListeners() {
+		this._coldControlEvent = this._coldControlEvent.bind(this);
+		for (const type of ["input", "click"]) {
+			document.addEventListener(type, this._coldControlEvent, true);
+		}
 	}
 
-	_click(e) {
-		if (this.isDragging) {
-			this.isDragging = false;
+	_removeColdControlListeners() {
+		if (!this._coldControlEvent) return;
+		for (const type of ["input", "click"]) {
+			document.removeEventListener(type, this._coldControlEvent, true);
+		}
+		this._coldControlEvent = null;
+	}
+
+	_coldControlEvent(event) {
+		const search = event.target?.closest?.("[lp-search]");
+		if (search && !this.SearchBox) {
+			this.runColdAction(
+				search,
+				() => this.ensureSearchBox(),
+				(box) => {
+					if (!box) return;
+					if (search.value?.trim()) box._input({ target: search });
+					else box.showPanel?.();
+				},
+				search,
+			);
 			return;
 		}
 
+		const offline = event.target?.closest?.("[data-role='offline']");
+		if (offline && !this.offlineModal && event.type === "click") {
+			event.preventDefault();
+			event.stopImmediatePropagation?.();
+			this.runColdAction(
+				offline,
+				() => this.ensureOfflineModal(),
+				(modal) => modal?.attach?.(),
+				offline,
+			);
+			return;
+		}
+
+		const notifications = event.target?.closest?.(
+			"[data-role='notifications']",
+		);
+		if (!notifications || this.Notifications) return;
+		if (event.type === "click") {
+			event.preventDefault();
+			event.stopImmediatePropagation?.();
+		}
+		this.runColdAction(
+			notifications,
+			() => this.ensureNotifications(),
+			(manager) => manager?.dropdown?.showPanel?.(),
+			notifications,
+		);
+	}
+
+	_click(e) {
 		const menuTrigger = e.target.closest("[data-role='menu-trigger']");
 		const menu = menuTrigger?.closest("[lp-menu]");
 		if (menu && this.elt.contains(menu)) {
 			e.preventDefault();
 			e.stopPropagation();
-			this.EntityMenu.toggle(menu);
+			this.runColdAction(
+				menu,
+				() => this.ensureEntityMenu(),
+				(manager) => manager?.toggle(menu),
+				menuTrigger,
+			);
 			return;
 		}
 
@@ -726,20 +583,27 @@ export default class Core {
 		const control = button?.getAttribute("lp-control");
 
 		if (button?.matches("[data-role='flipper']")) {
+			e.preventDefault();
 			const flip = button.closest("[data-flipped]");
 			const flipped = flip.dataset.flipped === "false";
 			flip.dataset.flipped = flipped ? "true" : "false";
 			return;
 		} else if (control === "help") {
-			this._showHelpModal(button);
+			e.preventDefault();
+			e.stopPropagation();
+			void this._showHelpModal(button);
 			return;
 		} else if (control === "star") {
+			e.preventDefault();
 			void this._toggleStar(button);
 			return;
 		} else if (control === "delete") {
-			this._showDeleteModal(button);
+			e.preventDefault();
+			e.stopPropagation();
+			void this._showDeleteModal(button);
 			return;
 		} else if (["previous", "next"].includes(control)) {
+			e.preventDefault();
 			if (!this.online) return;
 			const widget = e.target.closest("[data-widget]");
 			const component = this.getComponent(widget);
@@ -748,7 +612,8 @@ export default class Core {
 			});
 			return;
 		} else if (control || button?.hasAttribute("lp-show")) {
-			this.renderComponent(button);
+			e.preventDefault();
+			void this.renderComponent(button);
 			return;
 		}
 
@@ -763,7 +628,8 @@ export default class Core {
 
 		const toggle = e.target.closest("[lp-show]");
 		if (toggle) {
-			this.renderComponent(toggle);
+			e.preventDefault();
+			void this.renderComponent(toggle);
 			return;
 		}
 
@@ -775,13 +641,27 @@ export default class Core {
 	}
 
 	async _showDeleteModal(button) {
-		const modal = new DeleteModal(this, button);
-		await modal.init();
+		return this.runColdAction(
+			button,
+			() => this.ensureModalClasses(),
+			async ({ DeleteModal } = {}) => {
+				if (!DeleteModal) return;
+				const modal = new DeleteModal(this, button);
+				await modal.init();
+			},
+		);
 	}
 
 	async _showHelpModal(button) {
-		const modal = new HelpModal(this, button);
-		await modal.init();
+		return this.runColdAction(
+			button,
+			() => this.ensureModalClasses(),
+			async ({ HelpModal } = {}) => {
+				if (!HelpModal) return;
+				const modal = new HelpModal(this, button);
+				await modal.init();
+			},
+		);
 	}
 
 	getComponent(itemElt) {
@@ -807,15 +687,33 @@ export default class Core {
 	}
 
 	successfulResponse(response, component) {
-		return this.SubmissionManager.successfulResponse(response, component);
+		if (!response) return false;
+		if (response.reload) {
+			window.location.reload();
+			return false;
+		}
+		if (response.error) {
+			component?.showError?.(response.error);
+			return false;
+		}
+		if (response.modal) {
+			void this.ensureModalClasses().then(({ Modal } = {}) => {
+				if (this._destroyed || !Modal) return;
+				new Modal(this).attach(response.modal, component);
+			});
+			return false;
+		}
+		return true;
 	}
 
-	update(component, data, route = component.route) {
-		return this.SubmissionManager.update(component, data, route);
+	async update(component, data, route = component.route) {
+		const manager = await this.ensureSubmissionManager();
+		return manager?.update(component, data, route);
 	}
 
-	create(component, data, route = component.route) {
-		return this.SubmissionManager.create(component, data, route);
+	async create(component, data, route = component.route) {
+		const manager = await this.ensureSubmissionManager();
+		return manager?.create(component, data, route);
 	}
 
 	async load(component, route) {
@@ -823,7 +721,9 @@ export default class Core {
 		const response = await request.get(route);
 
 		if (!this.successfulResponse(response, component)) return null;
-		return this.offlineQueue?.applyResponse(response, route) ?? response;
+		// Ordinary rendering is authoritative and completely independent of
+		// OfflineQueue. Late replay is reconciled through polling/EditWatcher.
+		return response;
 	}
 
 	/**
@@ -834,12 +734,12 @@ export default class Core {
 	 */
 	_setLoadingTrigger(trigger, component, widgetName) {
 		const target = component.elt.querySelector(`[data-widget="${widgetName}"]`);
+		if (!target || target.hasAttribute("loaded")) return null;
+
 		const loadsAsync =
 			target?.hasAttribute("lp-load") || target?.hasAttribute("lp-prefetch");
-		if (!target || target.hasAttribute("loaded") || !loadsAsync) return null;
-
-		trigger.dataset.loading = "true";
 		trigger.setAttribute("aria-busy", "true");
+		if (loadsAsync) trigger.dataset.loading = "true";
 		return trigger;
 	}
 
@@ -856,6 +756,9 @@ export default class Core {
 
 	renderComponent(trigger) {
 		if (!trigger) return;
+		if (this._componentActions.has(trigger)) {
+			return this._componentActions.get(trigger);
+		}
 
 		const attribute =
 			trigger.getAttribute("lp-show") || trigger.getAttribute("lp-close") || "";
@@ -893,16 +796,27 @@ export default class Core {
 			? this._setLoadingTrigger(trigger, component, widgetName)
 			: null;
 
-		component
+		const pending = component
 			.activate(widgetName)
 			.then((activated) => {
+				if (this._destroyed || trigger.isConnected === false) return null;
 				return withTransition(async () => {
+					if (this._destroyed) return;
 					await component.render(activated);
 				});
 			})
+			.catch((error) => {
+				this.reportStartupError(error, trigger, "component-activation");
+				return null;
+			})
 			.finally(() => {
 				this._clearLoadingTrigger(loadingTrigger);
+				if (this._componentActions.get(trigger) === pending) {
+					this._componentActions.delete(trigger);
+				}
 			});
+		this._componentActions.set(trigger, pending);
+		return pending;
 	}
 
 	addFlash(node) {
@@ -919,9 +833,8 @@ export default class Core {
 	}
 
 	destroy() {
-		this._destroyed = true;
-		this.elt.removeEventListener("click", this._click);
-		this.elt.removeEventListener("submit", this.SubmissionManager.submit);
+		super.destroy();
+		this._pollingReconcileRequested = false;
 		this.SubmissionManager?.destroy();
 		this.SyncManager?.destroy();
 		this.DeferredOperations?.destroy();
@@ -929,6 +842,8 @@ export default class Core {
 		this.EditWatcher?.destroy();
 		this.Notifications?.destroy?.();
 		this.PollingCoordinator?.destroy();
+		this.offlineModal?.destroy?.();
+		this._componentActions.clear();
 
 		Object.values(this.components).forEach((component) => {
 			if (component.destroy) component.destroy();

@@ -6,6 +6,7 @@ import tailwindcss from "@tailwindcss/postcss";
 import * as yaml from "js-yaml";
 import postcss from "rollup-plugin-postcss";
 import { visualizer } from "rollup-plugin-visualizer";
+import { VIEW_ENTRIES } from "../src/script/viewRegistry.mjs";
 import {
 	buildStyles,
 	emitMaterialSymbols,
@@ -23,6 +24,15 @@ const reportsDir = "./reports";
 mkdirSync(reportsDir, { recursive: true });
 const thirdPartyLicenseBanner =
 	"/*! Third-party licenses: /third-party-licenses.txt */";
+const mainInputs = {
+	main: "./src/script/main.mjs",
+	...Object.fromEntries(
+		Object.entries(VIEW_ENTRIES).map(([entry, source]) => [
+			entry,
+			`./src/script/${source.replace(/^\.\//, "")}`,
+		]),
+	),
+};
 const devVersion = new Date().toISOString();
 const settings = yaml.load(
 	readFileSync("./config/files/lagniappe_settings.yaml", "utf8"),
@@ -91,19 +101,15 @@ export default [
 		},
 	},
 	{
-		input: "src/script/main.mjs",
+		input: mainInputs,
 		output: {
 			dir: "./lagniappe/web/static/",
-			entryFileNames: "script.js",
+			entryFileNames: ({ name }) =>
+				name === "main" ? "script.js" : "chunks/views/[name].js",
 			chunkFileNames: "chunks/[name].js",
 			format: "esm",
 			name: "lagniappe",
 			banner: thirdPartyLicenseBanner,
-			manualChunks: (id) => {
-				if (id.includes("script/shared/")) {
-					return "shared";
-				}
-			},
 		},
 		plugins: [
 			json(),
@@ -117,6 +123,7 @@ export default [
 				preventAssignment: true,
 				values: {
 					"process.env.NODE_ENV": JSON.stringify("development"),
+					__BUILD_ID__: JSON.stringify(buildId),
 					__VERSION__: JSON.stringify(devVersion),
 				},
 			}),

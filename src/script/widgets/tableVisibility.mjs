@@ -1,4 +1,5 @@
 import { primitives } from "../elements/primitives";
+import { TableVisibilityState } from "./tableVisibilityState";
 
 /**
  * @testable infrastructure
@@ -8,27 +9,21 @@ export class TableVisibility {
 		Object.assign(this, attributes);
 		this.selected = this.component.preload("selected") || [];
 		this.columns = this.component.preload("columns") || [];
-		this._columnIndexes = new Map();
-		this._hiddenColumns = [];
-		this._stylesheet = null;
+		this.state =
+			this.view.TableVisibilityState ||
+			new TableVisibilityState({
+				component: this.component,
+				view: this.view,
+				selected: this.selected,
+				columns: this.columns,
+			});
+		this._ownsState = !this.view.TableVisibilityState;
 		this._preservedEditor = null;
 	}
 
 	init() {
-		const headers = this.component.elt.querySelectorAll("th[data-column]");
-		headers.forEach((th, i) => {
-			this._columnIndexes.set(th.dataset.column, i + 1);
-		});
-
-		const saved = localStorage.getItem(`columns-${this.view.hash}`);
-		this._hiddenColumns = saved ? JSON.parse(saved) : this._setHiddenColumns();
-
-		this._setVisibility();
+		this.state.init();
 		this._createController();
-
-		this.view.elt.addEventListener("toggle-column-visibility", (e) => {
-			this._toggleColumn(e.detail.column, e.detail.active);
-		});
 	}
 
 	/**
@@ -39,12 +34,7 @@ export class TableVisibility {
 	 * @dimensions mobile-controls columns
 	 */
 	get visibleColumns() {
-		return this.columns
-			.map((col) => col.field)
-			.filter((field) => {
-				const index = this._columnIndexes.get(field);
-				return index && !this._hiddenColumns.includes(index);
-			});
+		return this.state.visibleColumns;
 	}
 
 	/**
@@ -58,15 +48,7 @@ export class TableVisibility {
 	 * @dimensions mobile-controls column-visibility quick-edit checkbox-cell
 	 */
 	_toggleColumn(column, visible) {
-		const index = this._columnIndexes.get(column);
-		if (!index) return;
-
-		this._hiddenColumns = visible
-			? this._hiddenColumns.filter((i) => i !== index)
-			: [...this._hiddenColumns, index];
-
-		this._setVisibility();
-		void this.component.widgets.TableEditor?.refreshCheckboxes?.();
+		this.state.toggle(column, visible);
 	}
 
 	/**
@@ -129,52 +111,7 @@ export class TableVisibility {
 		});
 	}
 
-	_setHiddenColumns() {
-		if (this.selected.length) {
-			return this.columns
-				.filter((col) => !this.selected.includes(col.field))
-				.map((col) => this._columnIndexes.get(col.field))
-				.filter(Boolean);
-		} else {
-			return this.columns
-				.filter((col) => col.selected !== true)
-				.map((col) => this._columnIndexes.get(col.field))
-				.filter(Boolean);
-		}
-	}
-
-	/**
-	 * @testable true
-	 * @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_column_visibility_persists_after_reload
-	 * @features table-controls
-	 * @dimensions column-visibility persistence
-	 */
-	_setVisibility() {
-		localStorage.setItem(
-			`columns-${this.view.hash}`,
-			JSON.stringify(this._hiddenColumns),
-		);
-
-		if (!this._stylesheet) {
-			this._stylesheet = document.createElement("style");
-			this._stylesheet.id = `column-visibility-${this.view.hash}`;
-			document.head.appendChild(this._stylesheet);
-		}
-
-		const id = this.component.elt.id;
-		const rowSelector = `#${id} tr:not([data-widget], [data-embedded], [data-role="empty"]) > td:not([data-column="delete"])`;
-		const thSelector = `#${id} th:not([data-column="selector"], [data-embedded])`;
-		const css = this._hiddenColumns
-			.map(
-				(i) =>
-					`${rowSelector}:nth-child(${i}), ${thSelector}:nth-child(${i}) { display: none; }`,
-			)
-			.join("\n");
-
-		this._stylesheet.textContent = css;
-	}
-
 	destroy() {
-		this._stylesheet?.remove();
+		if (this._ownsState) this.state.destroy();
 	}
 }

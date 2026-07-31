@@ -23,6 +23,20 @@ Widget (extends FormElement)
 primitives.mjs (DOM factory functions)
 ```
 
+## First-interaction loading
+
+Global SearchBox and entity-menu/notification combobox behavior is not part of
+the static `Core` startup closure. The shell installs capture-phase bootstrap
+listeners synchronously. Input or click activation starts the
+same idempotent loader used by idle warming, exposes `aria-busy` where
+appropriate, and replays the intended open/search action after initialization.
+Repeated activation shares one promise. Import failure clears transient state
+so a later interaction can retry.
+
+Field-specific comboboxes remain widget/element-owned and load with their
+containing form. Index tools and Manual dropdowns are further gated on mobile
+mode.
+
 ## FormElement (`elements/form.mjs`)
 
 The bridge between the widget system and the form rendering system. Most settings and create widgets (`TaskSettings`, `DocumentSettings`, `PageInfo`, `CreateUser`, `FileInfo`, etc.) extend `FormElement` rather than writing their own form logic.
@@ -104,13 +118,21 @@ files compare by metadata; widgets may add form-owned revision entries for
 visible state deliberately omitted from their submit payload. The snapshot is
 not hashed, persisted, or sent to the server.
 
-An `lp-offline` update form also checks `OfflineQueue` after establishing
-that authoritative baseline. If a matching queued PUT exists, it overlays the
-record's normal `FormData` fields and files, external facet option details, and
-the renderer's internal structured submission snapshot, then restores the
-**Queued Sync** button. The overlay is deliberately not committed as the
-revision baseline and its structured renderer snapshot is never submitted as
-an HTTP field.
+An `lp-offline` form does not inspect `OfflineQueue` during initialization.
+It renders the authoritative server state immediately. Initial replay starts
+only after the view is ready. After a successful replay for a mounted form,
+OfflineQueue asks EditWatcher/PollingCoordinator for an immediate entity check
+rather than directly acknowledging the returned revision. The normal watcher
+path then applies it to an inactive clean form or offers value reconciliation
+for an active form. This keeps persisted queue state out of the rendering
+lifecycle. Reconnect does not wait for queue hydration or replay before
+restoring polling, sync, EditWatcher, or the visible refresh.
+
+Code that needs to create a new offline mutation first calls
+`view.ensureOfflineQueue()`; it must not assume the lower-camel `offlineQueue`
+handle is already populated merely because the view is interactive. The
+renderer's internal structured submission snapshot remains queue metadata and
+is never submitted as an HTTP field.
 
 `EditWatcher` builds detached revision-preview widgets from the form's focused
 GET response. Preview mode does not register sync, navigate, update page

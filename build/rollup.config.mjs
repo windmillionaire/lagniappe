@@ -9,7 +9,9 @@ import * as yaml from "js-yaml";
 import { minify } from "rollup-plugin-esbuild";
 import postcss from "rollup-plugin-postcss";
 import { visualizer } from "rollup-plugin-visualizer";
+import { VIEW_ENTRIES } from "../src/script/viewRegistry.mjs";
 import { resolveSentryBuild } from "./sentry.mjs";
+import { startupBudget } from "./startupBudget.mjs";
 import {
 	buildStyles,
 	emitMaterialSymbols,
@@ -28,6 +30,15 @@ mkdirSync(reportsDir, { recursive: true });
 const uploadedSourceMaps = "./lagniappe/web/static/**/*.map";
 const thirdPartyLicenseBanner =
 	"/*! Third-party licenses: /third-party-licenses.txt */";
+const mainInputs = {
+	main: "./src/script/main.mjs",
+	...Object.fromEntries(
+		Object.entries(VIEW_ENTRIES).map(([entry, source]) => [
+			entry,
+			`./src/script/${source.replace(/^\.\//, "")}`,
+		]),
+	),
+};
 
 const settings = yaml.load(
 	readFileSync("./config/files/lagniappe_settings.yaml", "utf8"),
@@ -121,21 +132,17 @@ export default [
 	},
 	// Main bundle
 	{
-		input: "./src/script/main.mjs",
+		input: mainInputs,
 		output: {
 			dir: "./lagniappe/web/static/",
-			entryFileNames: "script.js",
+			entryFileNames: ({ name }) =>
+				name === "main" ? "script.js" : "chunks/views/[name].js",
 			chunkFileNames: "chunks/[name].js",
 			format: "esm",
 			sourcemap: sentry.sourcemap,
 			name: "lagniappe",
 			minifyInternalExports: true,
 			banner: thirdPartyLicenseBanner,
-			manualChunks: (id) => {
-				if (id.includes("script/shared/")) {
-					return "shared";
-				}
-			},
 		},
 		plugins: [
 			json(),
@@ -164,6 +171,7 @@ export default [
 				preventAssignment: true,
 				values: {
 					"process.env.NODE_ENV": JSON.stringify("production"),
+					__BUILD_ID__: JSON.stringify(buildId),
 					__VERSION__: settings.VERSION,
 				},
 			}),
@@ -171,6 +179,7 @@ export default [
 			emitMaterialSymbols(),
 			emitPdfWorker(),
 			emitThirdPartyLicenses(),
+			startupBudget(),
 			updateServiceWorker(buildId, settings.VERSION, "production"),
 			...sentryPlugins("lagniappe-frontend", {
 				filesToDeleteAfterUpload: uploadedSourceMaps,

@@ -1,5 +1,5 @@
 import { NavElement } from "../../elements/nav";
-import { showBriefly, withTransition } from "../../shared";
+import { showBriefly, withTransition } from "../../shared/utilities";
 import { loadWidget } from "../../widgets/loader";
 
 /**
@@ -25,6 +25,7 @@ export default class ViewComponent {
 		this._activeSubComponent = null;
 
 		this._creating = false;
+		this._destroyed = false;
 
 		this.reconcile = null;
 	}
@@ -101,6 +102,7 @@ export default class ViewComponent {
 	 * @reason foundational view lifecycle plumbing
 	 */
 	async activate(show) {
+		if (this._destroyed) return false;
 		this.active?.disable();
 
 		if (!show) {
@@ -116,6 +118,11 @@ export default class ViewComponent {
 		}
 
 		this.active = await this.loadWidget(show);
+		if (this._destroyed) {
+			this.active?.destroy?.();
+			this.active = null;
+			return false;
+		}
 
 		const createForm = this.active?.ifEmpty;
 		if (createForm && !this._creating) {
@@ -175,12 +182,16 @@ export default class ViewComponent {
 	 * @reason foundational view lifecycle plumbing
 	 */
 	async loadWidget(name) {
-		if (!name) return null;
+		if (!name || this._destroyed) return null;
 		if (this.widgets[name]) return this.widgets[name];
 		if (this.widgetLoads.has(name)) return this.widgetLoads.get(name);
 
 		const pending = (async () => {
 			const widget = await loadWidget(this, name);
+			if (this._destroyed) {
+				widget?.destroy?.();
+				return null;
+			}
 			this.widgets[name] = widget;
 			if (widget.loading || widget.loaded) return widget;
 			widget.loading = true;
@@ -403,11 +414,15 @@ export default class ViewComponent {
 		subComponent.elt.dispatchEvent(event);
 	}
 
-	// this should always be called with a transition, it will trigger the reconciliation of all widgets
-	// any DOM manipulation in a widget should be done in the widget's postreconcile() method
+	// User actions and initial entity enhancement call this within a transition.
+	// Any DOM manipulation in a widget should be done in postreconcile().
 	/**
-	 * @testable false
-	 * @reason foundational view lifecycle plumbing
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_component_render_does_not_wait_for_polling_reconciliation
+	 * @features startup polling
+	 * @dimensions component-render subscription-lifecycle nonblocking
+	 * @pairs startup:deferred-services startup:component-render startup:nonblocking
+	 * @pairs polling:subscription-lifecycle polling:component-render polling:nonblocking
 	 */
 	async render(visible) {
 		const open = visible ? this.active?.name || "true" : false;
@@ -427,10 +442,11 @@ export default class ViewComponent {
 		}
 
 		this.elt.dataset.open = open || "false";
-		await this.view.reconcilePollingSubscriptions?.();
+		void this.view.schedulePollingReconciliation?.();
 	}
 
 	destroy() {
+		this._destroyed = true;
 		Object.values(this.widgets).forEach((widget) => {
 			widget.destroy?.();
 		});

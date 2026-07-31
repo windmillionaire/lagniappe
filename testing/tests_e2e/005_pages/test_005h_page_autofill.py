@@ -112,6 +112,7 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     )
     assert operation["locked"] is True
     form = user.page.locator("[data-widget='PageInfo']")
+    expect(form).to_have_attribute("initialized", "")
     expect(form).to_have_attribute("data-operation", re.compile(r".+"))
     expect(form.locator("[data-role='deferred-progress']")).to_be_visible()
     expect(form.locator("[data-role='submit-group']")).not_to_be_attached()

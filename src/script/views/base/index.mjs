@@ -1,6 +1,6 @@
 import { STYLES } from "styles";
-import { Dropdown } from "../../elements/combobox";
-import { withTransition } from "../../shared";
+import { withTransition } from "../../shared/utilities";
+import { TableVisibilityState } from "../../widgets/tableVisibilityState";
 import Core from "./core";
 
 /**
@@ -28,21 +28,27 @@ export default class EntityIndex extends Core {
 		const mobileControls = this.elt.querySelector("#mobile-controls");
 
 		if (this.mobile && tools) {
-			this._createDropdown();
+			await this._createDropdown();
 			const toolsNav = document.querySelector("nav[data-nav='tools']");
 			if (toolsNav) toolsNav.style.display = "none";
 		}
+
+		this.TableVisibilityState = new TableVisibilityState({
+			component: table,
+			view: this,
+			selected: table.preload("selected") || [],
+			columns: table.preload("columns") || [],
+		}).init();
 
 		await withTransition(async () => {
 			if (!table.elt.hasAttribute("lp-prefetch")) {
 				await table.loadWidget("IndexTable");
 			}
-			await table.loadWidget("TableVisibility");
 			await table.render(true);
 		});
 
-		this.elt.addEventListener("mobile-resize", async () => {
-			withTransition(async () => {
+		this._indexMobileResize = async () => {
+			await withTransition(async () => {
 				const toolsNav = document.querySelector("nav[data-nav='tools']");
 				if (!this.mobile) {
 					if (mobileControls) mobileControls.dataset.visible = "false";
@@ -50,12 +56,13 @@ export default class EntityIndex extends Core {
 					toolsNav?.removeAttribute("style");
 				} else {
 					if (tools) this.getComponent(tools).deactivate(false);
-					this._createDropdown();
+					await this._createDropdown();
 					if (toolsNav) toolsNav.style.display = "none";
 				}
 				table.widgets.TableSorting?.reset();
 			});
-		});
+		};
+		this.elt.addEventListener("mobile-resize", this._indexMobileResize);
 
 		if (!tools) {
 			return;
@@ -75,6 +82,19 @@ export default class EntityIndex extends Core {
 	}
 
 	_click(e) {
+		const toolsTrigger = e.target.closest("[data-role='tools-dropdown']");
+		if (this.mobile && toolsTrigger && !this.dropdown) {
+			e.preventDefault();
+			e.stopPropagation();
+			void this.runColdAction(
+				toolsTrigger,
+				() => this._createDropdown(),
+				(dropdown) => dropdown?.showPanel?.(),
+				toolsTrigger,
+			);
+			return;
+		}
+
 		const tableControls = e.target.closest(
 			"button[lp-show='table:MobileTableControls']",
 		);
@@ -180,61 +200,81 @@ export default class EntityIndex extends Core {
 	 * @pairs pages:create pages:category-index pages:mobile-tools
 	 * @pairs table-controls:mobile-controls table-controls:mobile-tools table-controls:mutual-exclusion
 	 */
-	_createDropdown() {
+	async _createDropdown() {
 		if (this.dropdown) return;
+		if (this._dropdownPromise) return this._dropdownPromise;
 
 		const trigger = this.elt.querySelector("[data-role='tools-dropdown']");
 		if (!trigger) return;
+		this._dropdownPromise = import("../../elements/combobox/dropdown")
+			.then(({ Dropdown }) => {
+				if (this._destroyed || !this.mobile) return null;
 
-		const items = [];
+				const items = [];
 
-		const createOption = (button) => {
-			const option = button.cloneNode(true);
-			option.setAttribute("role", "option");
-			option.removeAttribute("data-selected");
-			option.className = STYLES.index.tools.dropdown.toggle;
-			return option.outerHTML;
-		};
+				const createOption = (button) => {
+					const option = button.cloneNode(true);
+					option.setAttribute("role", "option");
+					option.removeAttribute("data-selected");
+					option.className = STYLES.index.tools.dropdown.toggle;
+					return option.outerHTML;
+				};
 
-		document
-			.querySelectorAll("nav[data-nav='tools'] button")
-			.forEach((button) => {
-				if (button.dataset.visible === "false") return;
-				items.push({
-					html: createOption(button),
-					onClick: () => {
-						const mobileControls = this.elt.querySelector("#mobile-controls");
-						const table = this.getComponent(this.elt.querySelector("#table"));
-						if (table?.active?.name === "MobileTableControls") {
-							table.deactivate(false);
-						} else if (mobileControls) {
-							mobileControls.dataset.visible = "false";
-						}
-						this._setMobileControlsDropdownOpen(false);
-						this.renderComponent(button);
+				document
+					.querySelectorAll("nav[data-nav='tools'] button")
+					.forEach((button) => {
+						if (button.dataset.visible === "false") return;
+						items.push({
+							html: createOption(button),
+							onClick: () => {
+								const mobileControls =
+									this.elt.querySelector("#mobile-controls");
+								const table = this.getComponent(
+									this.elt.querySelector("#table"),
+								);
+								if (table?.active?.name === "MobileTableControls") {
+									table.deactivate(false);
+								} else if (mobileControls) {
+									mobileControls.dataset.visible = "false";
+								}
+								this._setMobileControlsDropdownOpen(false);
+								this.renderComponent(button);
+							},
+						});
+					});
+
+				this.dropdown = new Dropdown(trigger);
+
+				this.dropdown.init({
+					items,
+					placement: "bottom-end",
+					styles: {
+						panel: STYLES.index.tools.dropdown.panel,
 					},
+					onShow: () => this._setMobileControlsDropdownOpen(true),
+					onHide: () => this._setMobileControlsDropdownOpen(false),
 				});
+				return this.dropdown;
+			})
+			.catch((error) => {
+				this.reportStartupError(error, trigger, "index-tools-dropdown");
+				return null;
+			})
+			.finally(() => {
+				this._dropdownPromise = null;
 			});
-
-		this.dropdown = new Dropdown(trigger);
-
-		this.dropdown.init({
-			items,
-			placement: "bottom-end",
-			styles: {
-				panel: STYLES.index.tools.dropdown.panel,
-			},
-			onShow: () => this._setMobileControlsDropdownOpen(true),
-			onHide: () => this._setMobileControlsDropdownOpen(false),
-		});
+		return this._dropdownPromise;
 	}
 
 	destroy() {
+		this.elt.removeEventListener("mobile-resize", this._indexMobileResize);
 		super.destroy();
 		this._setMobileControlsDropdownOpen(false);
 		this.dropdown?.destroy();
 		this.dropdown = null;
 		this.toolsObserver?.disconnect();
 		this.toolsObserver = null;
+		this.TableVisibilityState?.destroy();
+		this.TableVisibilityState = null;
 	}
 }

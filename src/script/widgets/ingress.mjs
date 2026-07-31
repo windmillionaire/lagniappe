@@ -451,10 +451,14 @@ export class ImportData {
 	 * @pairs ingress:active-widget ingress:visibility ingress:subscription-lifecycle ingress:catch-up
 	 * @pairs polling:active-widget polling:visibility polling:subscription-lifecycle polling:catch-up
 	 */
-	syncPollingSubscription() {
+	async syncPollingSubscription() {
 		if (!this.importRequestStarted || !this._pollingVisible()) {
 			this._stopImportPolling();
 			return;
+		}
+		if (!this.view.PollingCoordinator) {
+			await this.view.ensurePollingCoordinator?.();
+			if (!this.importRequestStarted || !this._pollingVisible()) return;
 		}
 		if (this._unsubscribeImport) return;
 		this._unsubscribeImport = this.view.PollingCoordinator?.subscribe(

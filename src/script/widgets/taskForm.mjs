@@ -73,10 +73,7 @@ export class TaskForm extends FormElement {
 				record,
 				response: record.conflictResponse,
 			};
-			return this.view.EditWatcher?.stageConflict?.(
-				this,
-				this._offlineConflict,
-			);
+			return this.stageOfflineConflict();
 		}
 		if (phase === "replayed") this.form?.success();
 	}

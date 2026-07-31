@@ -77,6 +77,9 @@ class Task(SiteResource):
         save(): Submit update after editing a task.
     """
 
+    _initialize = True
+    _sync = True
+
     ACTION_BUTTONS = "[data-role='action-buttons']"
     HEADER = "[data-role='header']"
     COMPLETE_TASK_CHECKBOX = "input[data-role='complete-toggle']"
@@ -173,8 +176,8 @@ class Task(SiteResource):
         if task_list.count() == 0:
             return
 
+        expect(self.user.locate("[lp-view]")).to_have_attribute("initialized", "")
         expect(task_list).to_have_attribute("loaded", "")
-        self.user.page.wait_for_load_state("networkidle")
         if self.key:
             self.element = self.user.locate(f"[data-key='{self.key}']")
 

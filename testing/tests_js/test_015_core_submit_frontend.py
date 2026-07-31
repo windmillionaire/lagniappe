@@ -33,10 +33,9 @@ const context = {{
 vm.createContext(context);
 let source = fs.readFileSync("src/script/views/base/submission.mjs", "utf8");
 source = source.replace(
-	/^import .*?;$/m,
+	/^import [\\s\\S]*?(?=\\/\\*\\*)/,
 	`
 const captureError = (...args) => capturedErrors.push(args);
-const Modal = class {{}};
 const request = {{}};
 const withTransition = async (callback) => {{ await callback(); return true; }};
 `,

@@ -1,6 +1,6 @@
-import { Dropdown } from "../elements/combobox";
-import { ENDPOINTS, request } from "../shared";
-import Core from "./base/core";
+import { ENDPOINTS } from "../shared/endpoints";
+import { request } from "../shared/request";
+import ShellView from "./base/shell";
 
 /**
  * @testable true
@@ -8,7 +8,7 @@ import Core from "./base/core";
  * @features manual
  * @dimensions section-navigation popstate
  */
-export default class Manual extends Core {
+export default class Manual extends ShellView {
 	async init() {
 		await super.init();
 		this.endpoints = ENDPOINTS.manual;
@@ -16,10 +16,21 @@ export default class Manual extends Core {
 
 		if (!this.elt) return;
 
-		this.elt.addEventListener("click", (e) => {
-			const copyButton = e.target.closest(
-				"[data-role='manual-command-copy']",
-			);
+		this._manualClick = (e) => {
+			const mobileNavButton = e.target.closest("#manual-nav-button");
+			if (mobileNavButton && this.mobile && !this.mobileDropdown) {
+				e.preventDefault();
+				e.stopPropagation();
+				void this.runColdAction(
+					mobileNavButton,
+					() => this._ensureMobileDropdown(),
+					(dropdown) => dropdown?.showPanel?.(),
+					mobileNavButton,
+				);
+				return;
+			}
+
+			const copyButton = e.target.closest("[data-role='manual-command-copy']");
 			if (copyButton) {
 				e.preventDefault();
 				this.copyCommand(copyButton);
@@ -31,7 +42,8 @@ export default class Manual extends Core {
 				e.preventDefault();
 				this.fetchSection(button.dataset.section, true);
 			}
-		});
+		};
+		this.elt.addEventListener("click", this._manualClick);
 
 		this._onPopState = (e) => {
 			if (e.state?.manualSection) {
@@ -40,21 +52,50 @@ export default class Manual extends Core {
 		};
 		window.addEventListener("popstate", this._onPopState);
 
-		const mobileNavButton = this.elt.querySelector("#manual-nav-button");
-		if (mobileNavButton) {
-			const sections = JSON.parse(mobileNavButton.dataset.sections);
-			const menu = {
-				items: sections.map((section) => ({
-					name: section.name,
-					icon: section.icon,
-					kind: section.kind,
-					onClick: () => {
-						this.fetchSection(section.key, true);
-					},
-				})),
-			};
-			this.mobileDropdown = new Dropdown(mobileNavButton).init(menu);
+		this._manualMobileResize = () => {
+			if (this.mobile) void this._ensureMobileDropdown();
+			else this._destroyMobileDropdown();
+		};
+		this.elt.addEventListener("mobile-resize", this._manualMobileResize);
+		if (this.mobile) await this._ensureMobileDropdown();
+		return this;
+	}
+
+	async _ensureMobileDropdown() {
+		if (this.mobileDropdown || this._mobileDropdownPromise) {
+			return this.mobileDropdown || this._mobileDropdownPromise;
 		}
+		const mobileNavButton = this.elt.querySelector("#manual-nav-button");
+		if (!mobileNavButton) return null;
+
+		this._mobileDropdownPromise = import("../elements/combobox/dropdown")
+			.then(({ Dropdown }) => {
+				if (this._destroyed || !this.mobile) return null;
+				const sections = JSON.parse(mobileNavButton.dataset.sections);
+				const menu = {
+					items: sections.map((section) => ({
+						name: section.name,
+						icon: section.icon,
+						kind: section.kind,
+						onClick: () => this.fetchSection(section.key, true),
+					})),
+				};
+				this.mobileDropdown = new Dropdown(mobileNavButton).init(menu);
+				return this.mobileDropdown;
+			})
+			.catch((error) => {
+				this.reportStartupError(error, mobileNavButton, "manual-dropdown");
+				return null;
+			})
+			.finally(() => {
+				this._mobileDropdownPromise = null;
+			});
+		return this._mobileDropdownPromise;
+	}
+
+	_destroyMobileDropdown() {
+		this.mobileDropdown?.destroy?.();
+		this.mobileDropdown = null;
 	}
 
 	initManual() {
@@ -153,9 +194,9 @@ export default class Manual extends Core {
 		if (this._onPopState) {
 			window.removeEventListener("popstate", this._onPopState);
 		}
-		if (this.mobileDropdown?.destroy) {
-			this.mobileDropdown.destroy();
-		}
+		this.elt.removeEventListener("click", this._manualClick);
+		this.elt.removeEventListener("mobile-resize", this._manualMobileResize);
+		this._destroyMobileDropdown();
 		super.destroy();
 	}
 }

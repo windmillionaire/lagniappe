@@ -13,10 +13,7 @@ import { waitForAttribute } from "./utilities";
 /**
  * Coordinate Yjs document updates through the shared polling protocol.
  *
- * @testable true
- * @tests tests_js/test_010_sync_manager_frontend.py::test_sync_manager_uses_polling_subscriptions
- * @features sync polling
- * @dimensions document collaboration offline-replay cursor-retention presence lifecycle batching
+ * @testable infrastructure
  */
 export class SyncManager {
 	constructor(view) {
@@ -152,7 +149,7 @@ export class SyncManager {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_010_sync_manager_frontend.py::test_sync_manager_uses_polling_subscriptions
-	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_waits_for_sync_manager_before_state
+	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_renders_before_initial_state
 	 * @pairs sync:editor-readiness sync:state-only sync:offline-replay polling:document
 	 */
 	async state(widget) {
@@ -394,10 +391,7 @@ export class SyncManager {
 		}
 		if (save) {
 			for (const syncId of touches) {
-				if (
-					included.has(syncId) ||
-					!this._pendingParentTouches.has(syncId)
-				)
+				if (included.has(syncId) || !this._pendingParentTouches.has(syncId))
 					continue;
 				const widget = this.widgets[syncId];
 				if (!widget) continue;
@@ -411,6 +405,12 @@ export class SyncManager {
 		return batch;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_010_sync_manager_frontend.py::test_sync_manager_uses_polling_subscriptions
+	 * @features sync
+	 * @dimensions checkpoint persistence dirty-state
+	 */
 	async _sendUpdatesNow(
 		save = false,
 		updates = null,
@@ -457,7 +457,11 @@ export class SyncManager {
 			if (acknowledgement.checkpoint_persisted) {
 				if (update?.save && update.ydoc) {
 					const widget = this.widgets[acknowledgement.sync_id];
-					if (widget) widget.snapshot = update.ydoc;
+					if (widget?.commitSavedBaseline) {
+						widget.commitSavedBaseline(update.ydoc);
+					} else if (widget) {
+						widget.snapshot = update.ydoc;
+					}
 				}
 				if (acknowledgement.entity_touched) {
 					this._pendingParentTouches.delete(acknowledgement.sync_id);

@@ -8,7 +8,13 @@ from email.message import EmailMessage
 from email.utils import formataddr
 
 from installer import FORMATTER, wrap_text
-from installer.errors import ProviderError, SetupCancelled
+from installer.errors import (
+    ProviderError,
+    ProviderTimeout,
+    ProviderTransientError,
+    SetupCancelled,
+    retry_provider_call,
+)
 from runner.context import setup_command
 
 GMAIL_APP_PASSWORDS_URL = (
@@ -90,9 +96,9 @@ def auth_email_config_matches(config):
 
 
 # @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_smtp_test_message_supports_starttls_and_implicit_tls
+# @tests tests_tooling/test_001b_setup_providers.py::test_smtp_test_message_supports_tls_and_reports_transport_failures
 # @features setup
-# @dimensions authentication-email smtp tls
+# @dimensions authentication-email smtp tls transient-retry error-reporting
 def test_smtp_delivery(
     config,
     recipient=None,
@@ -100,6 +106,8 @@ def test_smtp_delivery(
     smtp_factory=smtplib.SMTP,
     smtp_ssl_factory=smtplib.SMTP_SSL,
     tls_context=None,
+    smtp_attempts=2,
+    retry_sleep=None,
 ):
     """Send a test message through the candidate SMTP configuration."""
     normalized = normalize_auth_email_config(config)
@@ -120,40 +128,112 @@ def test_smtp_delivery(
         "and password-reset links."
     )
     context = tls_context or ssl.create_default_context()
-    try:
-        if normalized["security"] == "ssl":
-            smtp_connection = smtp_ssl_factory(
-                normalized["host"],
-                normalized["port"],
-                timeout=SMTP_TIMEOUT,
-                context=context,
-            )
-        else:
-            smtp_connection = smtp_factory(
-                normalized["host"],
-                normalized["port"],
-                timeout=SMTP_TIMEOUT,
-            )
-        with smtp_connection as smtp:
-            if normalized["security"] == "starttls":
-                smtp.starttls(context=context)
-            smtp.login(normalized["username"], normalized["password"])
-            smtp.send_message(message)
-    except smtplib.SMTPResponseException as error:
-        response = error.smtp_error
+
+    # @testable false
+    # @covered-by installer/auth_email.py::test_smtp_delivery
+    # @reason nested response sanitizer is exercised through SMTP failure handling
+    def response_detail(response):
         if isinstance(response, bytes):
             response = response.decode("utf-8", errors="replace")
-        detail = " ".join(str(response or "").split())[:500]
-        suffix = f": {detail}" if detail else ""
-        raise ProviderError(
-            f"{normalized['service']} rejected the SMTP request "
-            f"(SMTP {error.smtp_code}{suffix})."
-        ) from error
-    except (OSError, smtplib.SMTPException) as error:
-        raise ProviderError(
-            "The email service rejected the SMTP settings or test message."
-        ) from error
-    return True
+        return " ".join(str(response or "").split())[:500]
+
+    # @testable false
+    # @covered-by installer/auth_email.py::test_smtp_delivery
+    # @reason one-attempt transport helper is exercised through bounded delivery retry
+    def send_test_message():
+        stage = "connect to the email service"
+        try:
+            if normalized["security"] == "ssl":
+                smtp_connection = smtp_ssl_factory(
+                    normalized["host"],
+                    normalized["port"],
+                    timeout=SMTP_TIMEOUT,
+                    context=context,
+                )
+            else:
+                smtp_connection = smtp_factory(
+                    normalized["host"],
+                    normalized["port"],
+                    timeout=SMTP_TIMEOUT,
+                )
+            with smtp_connection as smtp:
+                if normalized["security"] == "starttls":
+                    stage = "start the encrypted connection"
+                    smtp.starttls(context=context)
+                stage = "sign in"
+                smtp.login(normalized["username"], normalized["password"])
+                stage = "send the test message"
+                smtp.send_message(message)
+        except smtplib.SMTPRecipientsRefused as error:
+            responses = list(error.recipients.values())
+            code, response = responses[0] if responses else (None, None)
+            detail = response_detail(response)
+            code_text = f"SMTP {code}" if code is not None else "SMTP error"
+            suffix = f": {detail}" if detail else ""
+            raise ProviderError(
+                f"{normalized['service']} rejected the test recipient "
+                f"({code_text}{suffix})."
+            ) from error
+        except smtplib.SMTPResponseException as error:
+            detail = response_detail(error.smtp_error)
+            suffix = f": {detail}" if detail else ""
+            error_type = (
+                ProviderTransientError
+                if 400 <= error.smtp_code < 500
+                else ProviderError
+            )
+            raise error_type(
+                f"{normalized['service']} rejected the SMTP request while "
+                f"trying to {stage} (SMTP {error.smtp_code}{suffix})."
+            ) from error
+        except smtplib.SMTPServerDisconnected as error:
+            detail = response_detail(error)
+            suffix = f" ({detail})" if detail else ""
+            raise ProviderTransientError(
+                f"The connection to {normalized['service']} was interrupted "
+                f"while trying to {stage}{suffix}. The mailbox and app "
+                "password were not explicitly rejected. Check the internet "
+                "connection or VPN and retry."
+            ) from error
+        except TimeoutError as error:
+            raise ProviderTimeout(
+                f"The connection to {normalized['service']} timed out while "
+                f"trying to {stage}. The mailbox and app password were not "
+                "explicitly rejected. Check the internet connection or VPN "
+                "and retry."
+            ) from error
+        except smtplib.SMTPNotSupportedError as error:
+            detail = response_detail(error)
+            suffix = f": {detail}" if detail else ""
+            raise ProviderError(
+                f"{normalized['service']} could not {stage}{suffix}."
+            ) from error
+        except smtplib.SMTPException as error:
+            detail = response_detail(error)
+            suffix = f": {detail}" if detail else ""
+            raise ProviderError(
+                f"The SMTP test could not {stage} "
+                f"({type(error).__name__}{suffix})."
+            ) from error
+        except OSError as error:
+            detail = response_detail(error)
+            suffix = f" ({detail})" if detail else ""
+            raise ProviderTransientError(
+                f"The connection to {normalized['service']} failed while "
+                f"trying to {stage}{suffix}. The mailbox and app password "
+                "were not explicitly rejected. Check the internet connection "
+                "or VPN and retry."
+            ) from error
+        return True
+
+    retry_options = {
+        "description": f"Test {normalized['service']} email delivery",
+        "attempts": smtp_attempts,
+        "delays": (1,),
+    }
+    if retry_sleep is not None:
+        retry_options["sleep"] = retry_sleep
+    return retry_provider_call(send_test_message, **retry_options)
 
 
 # @testable false
@@ -171,6 +251,15 @@ def _print_gmail_instructions():
         )
     )
     print(
+        wrap_text(
+            "Google warns about app passwords because they let an app sign in "
+            "without the usual interactive Google prompt. Lagniappe uses this "
+            "one only to send email from the chosen mailbox on its owner's "
+            "behalf, so people the owner invites can verify their email "
+            "addresses and request password resets."
+        )
+    )
+    print(
         "Opening a Google account picker for App Passwords:\n"
         f"  {GMAIL_APP_PASSWORDS_URL}"
     )
@@ -180,11 +269,15 @@ def _print_gmail_instructions():
         pass
     print(wrap_text("\n1. Choose the mailbox Lagniappe should send from."))
     print(wrap_text("2. Enable 2-Step Verification if it is not already enabled."))
-    print(wrap_text("3. Create an app password named 'Lagniappe'."))
     print(
         wrap_text(
-            "4. Copy the 16-character app password. Setup will test it and "
-            "store it in the private application settings file."
+            "3. In the App name box, enter 'Lagniappe', then click Create."
+        )
+    )
+    print(
+        wrap_text(
+            "4. Copy the 16-character password Google displays. Setup will "
+            "test it and store it in the private application settings file."
         )
     )
 
@@ -257,6 +350,12 @@ def setup_auth_email():
         if not EMAIL_PATTERN.fullmatch(sender_email):
             print(f.error("Enter a valid Gmail or Google Workspace email address."))
             continue
+        print(
+            wrap_text(
+                "The sender name is what recipients will see next to the "
+                "sending email address."
+            )
+        )
         sender_name = _prompt("Sender name", suggested_name)
         app_password = normalize_app_password(
             _prompt("Google App Password (input is visible)")
@@ -276,15 +375,20 @@ def setup_auth_email():
             "senderEmail": sender_email,
             "senderName": sender_name,
         }
-        print("Testing authentication email delivery...")
+        print(
+            "Testing authentication email delivery "
+            "(an interrupted connection is retried once)..."
+        )
         try:
             test_smtp_delivery(candidate, sender_email)
         except ProviderError as error:
             print(f.error(str(error)))
             print(
                 f.warning(
-                    "Email settings were not saved. Confirm the mailbox and "
-                    "create a new app password before retrying."
+                    "Email settings were not saved. If the message above says "
+                    "the connection failed, was interrupted, or timed out, "
+                    "retry with the same mailbox and app password. Create a "
+                    "new password only if Gmail explicitly rejects sign-in."
                 )
             )
             retry = input("Try email setup again? [Y/n]: ").strip().casefold()

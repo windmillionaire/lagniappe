@@ -12,6 +12,7 @@ import { Toolbar } from "./toolbar";
 /**
  * @testable true
  * @tests tests_e2e/004_projects/test_004d_document.py::test_editor_loads_and_saves_text
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_untouched_document_does_not_save_or_touch_project
  * @tests tests_e2e/004_projects/test_004d_document.py::test_formatting_persists
  * @features editor
  * @dimensions text-save reload
@@ -26,31 +27,54 @@ export class CollaborativeDocument {
 
 		this._loader = null;
 		this._applyingRemote = false;
+		this._destroyed = false;
+		this._dirty = false;
 
 		this.update = null;
 		this.offlineRecord = null;
 		this.remote = null;
 		this.snapshot = null;
+		this.initialStateReady = Promise.resolve(null);
 	}
 
 	/**
 	 * @testable true
-	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_waits_for_sync_manager_before_state
+	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_renders_before_initial_state
 	 * @pair sync:editor-readiness
 	 * @pair sync:state-only
 	 */
-	async init() {
+	init() {
 		this._initContainer();
 		this._initEditor();
 		if (!this.headless) this._initToolbar();
 
 		if (!this.headless && this.syncId && !this.remote) {
-			const syncManager = await (this.view?.syncReady ??
-				this.view?.SyncManager);
-			if (syncManager) this.remote = await syncManager.state(this);
+			this.initialStateReady = this._loadInitialState();
+		} else {
+			this.container.setAttribute("loaded", "");
+			this.initialStateReady = Promise.resolve(this.remote);
 		}
+	}
 
-		this.container.setAttribute("loaded", "");
+	async _loadInitialState() {
+		try {
+			const syncManager = await (this.view?.ensureSyncManager?.() ??
+				this.view?.syncReady ??
+				this.view?.SyncManager);
+			if (!this._destroyed && syncManager) {
+				this.remote = await syncManager.state(this);
+			}
+			return this.remote;
+		} catch (error) {
+			this.view?.reportStartupError?.(
+				error,
+				this.target,
+				"document-initial-state",
+			);
+			return null;
+		} finally {
+			if (!this._destroyed) this.container.setAttribute("loaded", "");
+		}
 	}
 
 	get fingerprint() {
@@ -81,16 +105,26 @@ export class CollaborativeDocument {
 
 		this.editor.on("create", async () => {
 			await waitForAttribute(this.container, "loaded");
+			if (this._destroyed) return;
 			this._loader?.remove();
 
 			if (!this.headless) {
+				const hadOfflineChanges = Boolean(
+					this.offlineRecord?.ydoc ||
+						this.offlineRecord?.update ||
+						Object.hasOwn(this.offlineRecord ?? {}, "html"),
+				);
 				await this.sync();
 				await this.waitForRender();
+				if (hadOfflineChanges) this._dirty = true;
+				else this._commitInitialBaseline();
 			}
 
 			this.container.setAttribute("initialized", "");
 			if (!this.headless) {
 				this.container.classList.remove("opacity-50", "pointer-events-none");
+				this.toolbar?.element?.removeAttribute("aria-busy");
+				if (this.toolbar?.element) this.toolbar.element.inert = false;
 			}
 			this.initialized = true;
 		});
@@ -107,6 +141,7 @@ export class CollaborativeDocument {
 		this.ydoc.on("update", (update, origin) => {
 			if (origin !== "remote" && !this._applyingRemote) {
 				this.updateQueue.push(update);
+				if (this.initialized) this._dirty = true;
 			}
 		});
 	}
@@ -117,7 +152,42 @@ export class CollaborativeDocument {
 		this.toolbar = new Toolbar(this);
 		this.toolbar.init();
 		this.target.prepend(this.toolbar.element);
+		this.toolbar.element.inert = true;
+		this.toolbar.element.setAttribute("aria-busy", "true");
 		this.toolbar.element.setAttribute("initialized", "");
+	}
+
+	/**
+	 * Treat the hydrated editor as the initial baseline so Tiptap/Yjs setup
+	 * transactions cannot be mistaken for user-authored empty content.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_does_not_save_untouched_empty_state
+	 * @tests tests_e2e/004_projects/test_004d_document.py::test_untouched_document_does_not_save_or_touch_project
+	 * @features sync editor
+	 * @dimensions initialization empty-content save-guard parent-modified
+	 * @pairs sync:initialization sync:empty-content sync:save-guard sync:parent-modified
+	 * @pairs editor:initialization editor:empty-content editor:save-guard
+	 */
+	_commitInitialBaseline() {
+		this.snapshot = this._packageState();
+		this.updateQueue.length = 0;
+		this._dirty = false;
+	}
+
+	/**
+	 * Accept a persisted checkpoint without discarding an edit made while its
+	 * request was in flight. Remote-only changes do not make the document dirty.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_does_not_save_untouched_empty_state
+	 * @features sync editor
+	 * @dimensions checkpoint dirty-state concurrent-edit
+	 * @pairs sync:checkpoint sync:dirty-state sync:concurrent-edit
+	 */
+	commitSavedBaseline(snapshot) {
+		this.snapshot = snapshot;
+		if (this.updateQueue.length === 0) this._dirty = false;
 	}
 
 	waitForRender() {
@@ -163,14 +233,14 @@ export class CollaborativeDocument {
 
 	/**
 	 * @testable true
-	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
-	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
-	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_replay_does_not_duplicate_after_reload
+	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_does_not_save_untouched_empty_state
+	 * @tests tests_e2e/004_projects/test_004d_document.py::test_untouched_document_does_not_save_or_touch_project
 	 * @features sync
-	 * @dimensions document persistence queue-clear dedupe reload
+	 * @dimensions empty-content save-guard parent-modified intentional-clear
+	 * @pairs sync:empty-content sync:save-guard sync:parent-modified sync:intentional-clear
 	 */
 	get saveData() {
-		if (!this.initialized) return null;
+		if (!this.initialized || !this._dirty) return null;
 
 		const ydoc = this._packageState();
 		if (ydoc === this.snapshot) return null;
@@ -263,6 +333,7 @@ export class CollaborativeDocument {
 	}
 
 	destroy() {
+		this._destroyed = true;
 		this.editor?.destroy();
 		this.toolbar?.destroy();
 		this.ydoc?.destroy();

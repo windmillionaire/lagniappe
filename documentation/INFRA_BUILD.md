@@ -65,12 +65,16 @@ Templates load it only when production error reporting is enabled. It reads the
 installation's configured `SENTRY_JS_DSN`, keeping browser events separate from
 the backend `SENTRY_DSN` without hardcoded browser loader keys.
 
-### Main (`main.mjs` → `script.js` + `chunks/`)
+### Main and views (`main.mjs` → `script.js` + `chunks/`)
 
-The authenticated application. Code-split into chunks via Rollup's dynamic
-`import()` statements. The `shared/` directory is forced into a dedicated
-`shared` chunk via `manualChunks` so it's loaded once and cached across all
-views. The vendored Material Symbols Rounded subset is declared by
+The private application and public Manual share a small main boot entry.
+`src/script/viewRegistry.mjs` is the single source for runtime view selection
+and Rollup's stable named view entries under `chunks/views/`. A template emits
+one versioned `modulepreload` for its current view. Rollup automatically creates
+feature-level shared chunks from static and dynamic module boundaries; there is
+no blanket `shared` `manualChunks` group. Editor, PDF, modal, combobox, offline,
+sync, notification, and other feature chunks remain lazy until their owning
+surface requests them. The vendored Material Symbols Rounded subset is declared by
 `src/style/fonts.css`, bundled into `style.css`, and emitted with the other
 self-hosted fonts under `lagniappe/web/static/fonts/`.
 
@@ -87,9 +91,10 @@ Run via `npm run build`.
   are disabled
 - **Sentry**: When the upload token is present, source maps are uploaded and the
   release is tagged with `VERSION` from settings
-- **Chunk names**: Stable (`chunks/[name].js`) with build-ID query strings in
-  generated imports; the service worker warms those exact versioned URLs after
-  update, and App Engine serves each versioned URL as long-lived immutable
+- **Chunk names**: Stable named view entries in `chunks/views/[name].js` and
+  automatic feature chunks in `chunks/[name].js`, with build-ID query strings
+  in generated imports; the service worker warms those exact versioned URLs
+  after update, and App Engine serves each versioned URL as long-lived immutable
 - **Bundle analysis**: Generates `reports/bundle-stats.html` treemap visualization
 - **Version**: `VERSION` is read from `config/files/lagniappe_settings.yaml`
 - **Build ID**: A short `BUILD_ID` is generated and written to
@@ -97,7 +102,14 @@ Run via `npm run build`.
 - **Build metadata**: `lagniappe/web/static/build.json` records
   `"mode": "production"` for the release gate
 - **Service worker precache**: Injects the current dynamic chunk URLs so
-  the service worker can warm them after an update
+  the service worker can warm them after an update, including nested
+  `chunks/views/` entries and their feature chunks
+- **Startup budget**: `build/startupBudget.mjs` measures deduplicated minified
+  static-import closures and fails above 16 KiB for main, 64 KiB for main plus
+  a shell view, 96 KiB for main plus a Core view, or 192 KiB for Builder. It
+  also rejects OfflineQueue, SyncManager, EditWatcher,
+  DeferredOperationManager, modal, notification, entity-menu, and combobox
+  modules from every Core view's static closure.
 - **Icon font**: Emits the official Material Symbols subset with a
   content-derived filename
 - **Browser protocol**: Injects `config/browser_protocol.json` into the
@@ -111,8 +123,9 @@ Run via `npm run dev`.
 - **CSS**: Tailwind CSS without cssnano
 - **No source maps**: Not needed with unminified output
 - **No Sentry**: No source map upload
-- **Chunk names**: Stable (`chunks/[name].js`) for easier debugging, with the
-  same build-ID query-string contract as production
+- **Chunk names**: Stable view entries (`chunks/views/[name].js`) plus automatic
+  feature chunks (`chunks/[name].js`), with the same build-ID query-string
+  contract as production
 - **Bundle analysis**: Generates `reports/bundle-stats-dev.html`
 - **Version replacement**: Timestamp-based (`new Date().toISOString()`) for dev-only frontend constants
 - **Build ID**: A short `BUILD_ID` is generated and written to

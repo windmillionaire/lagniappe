@@ -13,6 +13,12 @@ MANUAL_SECTIONS = [
         "kind": "category",
     },
     {
+        "key": "quickstart",
+        "name": "Quickstart",
+        "icon": "launch",
+        "kind": "page",
+    },
+    {
         "key": "forms",
         "name": "Forms",
         "icon": "form",

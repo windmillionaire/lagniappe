@@ -1,25 +1,24 @@
 import "../style/main.css";
 
-import {
-	analytics,
-	captureError,
-	captureNetworkError,
-	clearRecentSearchResults,
-	connectivity,
-	connectivityMessage,
-	initializeLogoutForms,
-	isSkippedViewTransitionError,
-	updateUserData,
-} from "./shared";
+import { connectivity } from "./shared/connectivity";
+import { connectivityMessage } from "./shared/protocol";
+import { loadView } from "./viewRegistry";
 
 /**
- * @testable false
- * @covered-by src/script/shared/errors.mjs::captureError
- * @reason window error-event adapter delegates filtering, context, and capture behavior to the shared error helper
+ * @testable true
+ * @tests tests_js/test_017_main_lifecycle.py::test_navigation_fetch_abort_is_not_reported_as_application_error
+ * @features startup
+ * @dimensions error-reporting navigation transient-network
+ * @pairs startup:error-reporting startup:navigation startup:transient-network
  */
-function onError(event) {
+async function onError(event) {
+	const {
+		captureError,
+		isSkippedViewTransitionError,
+		isTransientNetworkError,
+	} = await import("./shared/errors");
 	const error = event.error || event.reason || event.message || "Unknown error";
-	if (isSkippedViewTransitionError(error)) {
+	if (isSkippedViewTransitionError(error) || isTransientNetworkError(error)) {
 		event.preventDefault();
 		return;
 	}
@@ -32,26 +31,6 @@ function onError(event) {
 
 	captureError(error, element, context);
 }
-
-window.addEventListener("unhandledrejection", onError);
-window.addEventListener("error", onError);
-
-const VIEWS = {
-	project: () => import("./views/project"),
-	page: () => import("./views/page"),
-	home: () => import("./views/home"),
-	manual: () => import("./views/manual"),
-	user: () => import("./views/user"),
-	form: () => import("./views/base/index"),
-	category: () => import("./views/base/index"),
-	task: () => import("./views/base/index"),
-	builder: () => import("./views/builder/builder"),
-	results: () => import("./views/results"),
-	file: () => import("./views/file"),
-	report: () => import("./views/report"),
-	analytics: () => import("./views/analytics"),
-	admin: () => import("./views/admin"),
-};
 
 window.__CONNECTIVITY__ = connectivity.snapshot();
 
@@ -71,8 +50,9 @@ const getView = async () => {
 	if (__activeView) return await __activeView;
 
 	__activeView = (async () => {
-		const viewLoader = VIEWS[viewElt.dataset.kind];
-		if (!viewLoader) {
+		const viewModule = await loadView(viewElt.dataset.kind);
+		if (!viewModule) {
+			const { captureError } = await import("./shared/errors");
 			captureError(
 				new Error(`Unknown view kind: ${viewElt.dataset.kind || "missing"}`),
 				viewElt,
@@ -81,9 +61,12 @@ const getView = async () => {
 			return null;
 		}
 
-		const viewModule = await viewLoader();
+		if (viewElt.isConnected === false) return null;
 		const view = new viewModule.default(viewElt);
-		return await view.init();
+		await view.init();
+		if (view._destroyed || viewElt.isConnected === false) return null;
+		view.publish?.();
+		return view;
 	})();
 
 	return await __activeView;
@@ -315,32 +298,58 @@ function pageMode() {
 	return document?.querySelector("meta[name='mode']")?.getAttribute("content");
 }
 
+async function startAnalytics() {
+	const { analytics } = await import("./shared/analytics");
+	analytics.view();
+}
+
+function startErrorHandling() {
+	window.addEventListener("unhandledrejection", onError);
+	window.addEventListener("error", onError);
+}
+
 /**
  * @testable true
- * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
- * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
- * @tests tests_js/test_017_main_lifecycle.py::test_controller_replacement_receives_current_versioned_connectivity_state
- * @tests tests_js/test_017_main_lifecycle.py::test_window_blur_suspends_polling_until_focus_catchup
- * @pair offline:server-health
- * @pair offline:view-reset
- * @pair connectivity:controller-replacement
- * @pair connectivity:state-publication
- * @pair connectivity:version
- * @pair service-worker:controller-replacement
- * @pair service-worker:state-publication
- * @pair service-worker:version
- * @pair polling:blur
- * @pair polling:focus
- * @pair polling:visibility
- * @pair polling:catch-up
+ * @tests tests_js/test_017_main_lifecycle.py::test_service_worker_registration_starts_immediately
+ * @pair startup:interaction-ready
+ * @pair service-worker:registration
  */
-function initialize() {
-	if (window.__INITIALIZED__) return;
-	window.__INITIALIZED__ = true;
-	setTestMode();
+function startServiceWorker() {
+	if (!("serviceWorker" in navigator)) return;
+	navigator.serviceWorker.register("/sw.js").catch(async (error) => {
+		const { captureNetworkError } = await import("./shared/errors");
+		captureNetworkError(error, "/sw.js", { context: "service_worker" });
+	});
+
+	navigator.serviceWorker.addEventListener("controllerchange", async () => {
+		updateConnectivity({
+			controller: navigator.serviceWorker?.controller
+				? "controlled"
+				: "uncontrolled",
+		});
+		const { clearRecentSearchResults } = await import("./shared/utilities");
+		clearRecentSearchResults();
+		syncView();
+	});
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_017_main_lifecycle.py::test_public_page_skips_authenticated_lifecycle
+ * @pair startup:public-boundary
+ * @pair startup:deferred-lifecycle
+ * @pair startup:analytics
+ */
+async function startAuthenticatedLifecycle() {
+	startErrorHandling();
+
+	const [{ initializeLogoutForms }, { updateUserData }] = await Promise.all([
+		import("./shared/logout"),
+		import("./shared/user"),
+	]);
 	initializeLogoutForms();
-	analytics.view();
-	syncView();
+	void startAnalytics();
+	void syncView();
 
 	document.addEventListener("visibilitychange", () => {
 		document.hidden ? suspendCurrentView() : syncView();
@@ -350,27 +359,32 @@ function initialize() {
 	window.addEventListener("blur", suspendCurrentView);
 	window.addEventListener("focus", () => syncView());
 	window.addEventListener("pagehide", suspendCurrentView);
-	window.addEventListener("pageshow", (e) => {
-		syncView({ force: e.persisted });
+	window.addEventListener("pageshow", (event) => {
+		syncView({ force: event.persisted });
 	});
 
-	if ("serviceWorker" in navigator) {
-		navigator.serviceWorker.register("/sw.js").catch((error) => {
-			captureNetworkError(error, "/sw.js", { context: "service_worker" });
-		});
+	updateUserData();
+}
 
-		navigator.serviceWorker.addEventListener("controllerchange", () => {
-			updateConnectivity({
-				controller: navigator.serviceWorker?.controller
-					? "controlled"
-					: "uncontrolled",
-			});
-			clearRecentSearchResults();
-			syncView();
-		});
+/**
+ * @testable infrastructure
+ */
+function initialize() {
+	if (window.__INITIALIZED__) return;
+	window.__INITIALIZED__ = true;
+	setTestMode();
+	const mode = pageMode();
+	// Registration is fire-and-forget, but the controller/cache boundary is
+	// foundational infrastructure. Establish it before view startup instead of
+	// introducing it later during live interaction.
+	startServiceWorker();
+	void getView();
+	if (mode === "public") {
+		startErrorHandling();
+		void startAnalytics();
+		return;
 	}
-
-	if (pageMode() !== "public") updateUserData();
+	void startAuthenticatedLifecycle();
 }
 
 document.readyState === "loading"

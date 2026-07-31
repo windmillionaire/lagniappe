@@ -138,6 +138,12 @@ listener in `main.mjs` clears cached recent search results, publishes the
 current connectivity state to the replacement controller, and runs
 `syncView()` when the new service worker takes control.
 
+Authenticated pages schedule registration only after the concrete view has
+published and the browser reaches an idle slot (with a one-second maximum).
+This keeps activation's chunk-warming request burst from competing with the
+structural view and its first widget imports. Public pages do not register the
+authenticated service-worker lifecycle.
+
 `main.mjs` sends the worker a versioned `connectivity-state` message with four
 independent fields: browser link state, application-server reachability,
 document visibility, and controller availability. The worker validates the

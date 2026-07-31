@@ -185,7 +185,7 @@ export class PageForm extends FormElement {
  * @testable true
  * @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
- * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_offline_submit_restores_queued_form_after_reload
+ * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
  * @pairs pages:readonly pages:permission-gates pages:lp-offline
  */
 export class PageInfo extends PageForm {
@@ -232,10 +232,7 @@ export class PageInfo extends PageForm {
 				record,
 				response: record.conflictResponse,
 			};
-			return this.view.EditWatcher?.stageConflict?.(
-				this,
-				this._offlineConflict,
-			);
+			return this.stageOfflineConflict();
 		} else if (phase === "replayed") {
 			this.form?.success();
 			this.setEntityMetadata();

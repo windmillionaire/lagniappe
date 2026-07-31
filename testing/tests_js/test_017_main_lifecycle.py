@@ -11,11 +11,16 @@ const vm = require("node:vm");
 const fetchCalls = [];
 const syncCalls = [];
 const controllerMessages = [];
+const serviceWorkerRegistrations = [];
 const serviceWorkerListeners = new Map();
 const documentListeners = new Map();
 const windowListeners = new Map();
+const analyticsCalls = [];
+const authenticatedCalls = [];
+const capturedErrors = [];
 let viewElement = null;
 let focused = true;
+let pageMode = "production";
 
 const connectivityState = {{
   browser: "online",
@@ -48,13 +53,18 @@ const serviceWorker = {{
   addEventListener(type, listener) {{
     serviceWorkerListeners.set(type, listener);
   }},
-  register: async () => ({{}}),
+  register: async (url) => {{
+    serviceWorkerRegistrations.push(url);
+    return {{}};
+  }},
 }};
+
+let viewLoader = async () => null;
 
 const context = {{
   AbortController,
-  analytics: {{ view() {{}} }},
-  captureError() {{}},
+  analytics: {{ view() {{ analyticsCalls.push("analytics"); }} }},
+  captureError(error) {{ capturedErrors.push(error); }},
   captureNetworkError() {{}},
   clearRecentSearchResults() {{}},
   clearTimeout,
@@ -75,12 +85,17 @@ const context = {{
     addEventListener(type, listener) {{ documentListeners.set(type, listener); }},
     hasFocus() {{ return focused; }},
     querySelector(selector) {{
-      return selector === "[lp-view]" ? viewElement : null;
+      if (selector === "[lp-view]") return viewElement;
+      if (selector === "meta[name='mode']") {{
+        return {{ getAttribute() {{ return pageMode; }} }};
+      }}
+      return null;
     }},
   }},
   fetchCalls,
-  initializeLogoutForms() {{}},
+  initializeLogoutForms() {{ authenticatedCalls.push("logout"); }},
   isSkippedViewTransitionError() {{ return false; }},
+  isTransientNetworkError(error) {{ return error?.message === "Failed to fetch"; }},
   navigator: {{
     onLine: true,
     serviceWorker,
@@ -90,7 +105,9 @@ const context = {{
   syncCalls,
   documentListeners,
   serviceWorkerListeners,
-  updateUserData() {{}},
+  serviceWorkerRegistrations,
+  capturedErrors,
+  updateUserData() {{ authenticatedCalls.push("user"); }},
   window: {{
     __TESTING__: true,
     addEventListener(type, listener) {{ windowListeners.set(type, listener); }},
@@ -105,14 +122,45 @@ context.fetch = async (url, options = {{}}) => {{
 }};
 context.Response = Response;
 context.globalThis = context;
+context.loadView = (...args) => viewLoader(...args);
 context.setView = (view) => {{ viewElement = view; }};
+context.setViewLoader = (loader) => {{ viewLoader = loader; }};
 context.setFocused = (value) => {{ focused = value; }};
+context.setMode = (value) => {{ pageMode = value; }};
+context.flushPaint = async () => {{
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  for (let index = 0; index < 4; index += 1) await Promise.resolve();
+}};
 
 let source = fs.readFileSync("src/script/main.mjs", "utf8");
-source = source.replace('import "../style/main.css";', "");
 source = source.replace(
-  /import \\{{[\\s\\S]*?\\}} from "\\.\\/shared";/,
+  /^import[\\s\\S]*?(?=\\/\\*\\*)/,
   "",
+);
+source = source.replaceAll(
+  'import("./shared/analytics")',
+  "Promise.resolve({{ analytics: globalThis.analytics }})",
+);
+source = source.replaceAll(
+  'import("./shared/logout")',
+  "Promise.resolve({{ initializeLogoutForms: globalThis.initializeLogoutForms }})",
+);
+source = source.replaceAll(
+  'import("./shared/user")',
+  "Promise.resolve({{ updateUserData: globalThis.updateUserData }})",
+);
+source = source.replaceAll(
+  'import("./shared/utilities")',
+  "Promise.resolve({{ clearRecentSearchResults: globalThis.clearRecentSearchResults }})",
+);
+source = source.replaceAll(
+  'import("./shared/errors")',
+  `Promise.resolve({{
+    captureError: globalThis.captureError,
+    captureNetworkError: globalThis.captureNetworkError,
+    isSkippedViewTransitionError: globalThis.isSkippedViewTransitionError,
+    isTransientNetworkError: globalThis.isTransientNetworkError,
+  }})`,
 );
 
 vm.createContext(context);
@@ -122,6 +170,7 @@ const setView = context.setView;
 const suspendCurrentView = context.suspendCurrentView;
 const syncView = context.syncView;
 const initialize = context.initialize;
+const flushPaint = context.flushPaint;
 
 (async () => {{
 {textwrap.indent(assertion, "  ")}
@@ -132,6 +181,40 @@ const initialize = context.initialize;
 """
 
     run_node(script)
+
+
+# @features startup
+# @dimensions navigation transient-network error-reporting
+def test_navigation_fetch_abort_is_not_reported_as_application_error(run_node):
+    run_main_check(
+        run_node,
+        """
+initialize();
+const handler = windowListeners.get("unhandledrejection");
+if (!handler) throw new Error("Global rejection handler was not installed");
+
+const transient = {
+  type: "unhandledrejection",
+  reason: new TypeError("Failed to fetch"),
+  prevented: false,
+  preventDefault() { this.prevented = true; },
+};
+await handler(transient);
+if (!transient.prevented || capturedErrors.length !== 0) {
+  throw new Error("A navigation fetch abort was reported as an application error");
+}
+
+const genuine = {
+  type: "unhandledrejection",
+  reason: new Error("broken startup"),
+  preventDefault() {},
+};
+await handler(genuine);
+if (capturedErrors.length !== 1 || capturedErrors[0].message !== "broken startup") {
+  throw new Error("A genuine startup error was suppressed");
+}
+""",
+    )
 
 
 # @features offline sync
@@ -176,6 +259,7 @@ setView({
   },
 });
 initialize();
+await flushPaint();
 await syncView();
 fetchCalls.splice(0);
 syncCalls.splice(0);
@@ -281,6 +365,7 @@ const secondController = {
 };
 context.navigator.serviceWorker.controller = firstController;
 initialize();
+await flushPaint();
 await syncView();
 
 context.navigator.serviceWorker.controller = secondController;
@@ -298,6 +383,83 @@ if (message.protocol !== "lagniappe-browser" ||
     message.state.controller !== "controlled" ||
     message.state.visibility !== "visible") {
   throw new Error(`Replacement state was malformed: ${JSON.stringify(message)}`);
+}
+""",
+    )
+
+
+# @pair startup:interaction-ready
+# @pair service-worker:registration
+def test_service_worker_registration_starts_immediately(run_node):
+    run_main_check(
+        run_node,
+        """
+let resolveView;
+const viewReady = new Promise((resolve) => { resolveView = resolve; });
+const root = {
+  dataset: { kind: "page" },
+  isConnected: true,
+  setAttribute() {},
+};
+context.setView(root);
+context.setViewLoader(async () => ({
+  default: class {
+    constructor(element) { this.elt = element; }
+    async init() { await viewReady; }
+    publish() { this.elt._lp_view = this; }
+  },
+}));
+
+initialize();
+if (serviceWorkerRegistrations.join(",") !== "/sw.js") {
+  throw new Error(`Service-worker registration did not start immediately: ${serviceWorkerRegistrations}`);
+}
+
+resolveView();
+await flushPaint();
+if (serviceWorkerRegistrations.length !== 1) {
+  throw new Error(`Service-worker registration was repeated: ${serviceWorkerRegistrations}`);
+}
+""",
+    )
+
+
+# @pair startup:public-boundary
+# @pair startup:deferred-lifecycle
+# @pair startup:analytics
+# @pair service-worker:registration
+def test_public_page_skips_authenticated_lifecycle(run_node):
+    run_main_check(
+        run_node,
+        """
+context.setMode("public");
+setView({
+  _lp_view: {
+    sync() { syncCalls.push("private-sync"); },
+  },
+});
+initialize();
+await flushPaint();
+if (analyticsCalls.length !== 1) {
+  throw new Error("Public analytics did not start");
+}
+if (
+  authenticatedCalls.length ||
+  fetchCalls.length ||
+  syncCalls.length
+) {
+  throw new Error("Public startup registered authenticated lifecycle work");
+}
+if (
+  serviceWorkerRegistrations.join(",") !== "/sw.js" ||
+  [...serviceWorkerListeners.keys()].join(",") !== "controllerchange"
+) {
+  throw new Error("Public startup did not install foundational service-worker infrastructure");
+}
+if ([...windowListeners.keys()].sort().join(",") !== "error,unhandledrejection") {
+  throw new Error(`Public startup registered the wrong listeners: ${[
+    ...windowListeners.keys()
+  ]}`);
 }
 """,
     )

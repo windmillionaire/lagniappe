@@ -968,7 +968,7 @@ export class EditWatcher {
 	 * @features edited-entity-notice deferred-jobs
 	 * @dimensions active-operation reload form-lock
 	 */
-	_lockEntity(entity, descriptor) {
+	async _lockEntity(entity, descriptor) {
 		if (!entity || !descriptor?.operation) return;
 		const forms = new Set();
 		for (const marker of entity.markers ?? []) {
@@ -983,6 +983,7 @@ export class EditWatcher {
 			}
 		}
 
+		const tracked = [];
 		for (const form of forms) {
 			if (
 				form.dataset.deferredLock !== "form" &&
@@ -1001,10 +1002,18 @@ export class EditWatcher {
 				);
 				form.dataset.deferredLock = "form";
 			}
-			this.view.DeferredOperations?.track(descriptor.operation, {
+			tracked.push({
 				revision: Number(descriptor.revision) || 0,
 				node: widget?.target ?? form,
 			});
+		}
+
+		if (!tracked.length) return;
+		const operations =
+			this.view.DeferredOperations ||
+			(await this.view.ensureDeferredOperations?.());
+		for (const options of tracked) {
+			operations?.track(descriptor.operation, options);
 		}
 	}
 
@@ -1047,7 +1056,7 @@ export class EditWatcher {
 							onResult: async (result) => {
 								if (result.status !== "changed") return;
 								if (result.payload?.locked) {
-									this._lockEntity(
+									await this._lockEntity(
 										this.entities.get(entity.key),
 										result.payload,
 									);

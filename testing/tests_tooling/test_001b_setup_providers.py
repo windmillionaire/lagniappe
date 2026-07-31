@@ -95,8 +95,8 @@ def test_auth_email_config_requires_canonical_smtp():
 
 
 # @features setup
-# @dimensions authentication-email smtp tls
-def test_smtp_test_message_supports_starttls_and_implicit_tls():
+# @dimensions authentication-email smtp tls transient-retry error-reporting
+def test_smtp_test_message_supports_tls_and_reports_transport_failures():
     from installer import auth_email
 
     FakeSMTP.instances.clear()
@@ -164,10 +164,51 @@ def test_smtp_test_message_supports_starttls_and_implicit_tls():
             tls_context=tls_context,
         )
 
+    class FlakySMTP(FakeSMTP):
+        attempts = 0
+
+        def starttls(self, context):
+            type(self).attempts += 1
+            if type(self).attempts == 1:
+                raise smtplib.SMTPServerDisconnected(
+                    "Connection unexpectedly closed"
+                )
+            super().starttls(context)
+
+    retry_delays = []
+    assert auth_email.test_smtp_delivery(
+        starttls_config,
+        "recipient@example.test",
+        smtp_factory=FlakySMTP,
+        tls_context=tls_context,
+        retry_sleep=retry_delays.append,
+    )
+    assert FlakySMTP.attempts == 2
+    assert retry_delays == [1]
+
+    class DisconnectedSMTP(FakeSMTP):
+        def login(self, email, password):
+            raise smtplib.SMTPServerDisconnected("Connection reset")
+
+    with pytest.raises(
+        ProviderTransientError,
+        match=(
+            r"connection to Resend was interrupted.*sign in.*"
+            r"not explicitly rejected"
+        ),
+    ):
+        auth_email.test_smtp_delivery(
+            starttls_config,
+            "recipient@example.test",
+            smtp_factory=DisconnectedSMTP,
+            tls_context=tls_context,
+            smtp_attempts=1,
+        )
+
 
 # @features setup
 # @dimensions authentication-email interactive-input settings-save failure-isolation
-def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch):
+def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsys):
     from installer import auth_email
 
     saves = []
@@ -198,16 +239,21 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch):
         lambda url: opened_urls.append(url) or True,
     )
     deliveries = []
-    monkeypatch.setattr(
-        auth_email,
-        "test_smtp_delivery",
-        lambda config, recipient: deliveries.append(
-            (config.copy(), recipient)
-        )
-        or True,
-    )
+
+    def test_delivery(config, recipient):
+        assert saves == []
+        deliveries.append((config.copy(), recipient))
+        if len(deliveries) == 1:
+            raise ProviderTransientError("The Gmail connection was interrupted.")
+        return True
+
+    monkeypatch.setattr(auth_email, "test_smtp_delivery", test_delivery)
     answers = iter(
         [
+            "",
+            "",
+            "",
+            "abcd efgh ijkl mnop",
             "",
             "",
             "",
@@ -229,12 +275,21 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch):
         "senderName": "Demo",
     }
     assert deliveries == [
-        (settings.APP["AUTH_EMAIL_CONFIG"], "owner@example.test")
+        (settings.APP["AUTH_EMAIL_CONFIG"], "owner@example.test"),
+        (settings.APP["AUTH_EMAIL_CONFIG"], "owner@example.test"),
     ]
     assert opened_urls == [auth_email.GMAIL_APP_PASSWORDS_URL]
     assert "accounts.google.com/AccountChooser" in opened_urls[0]
     assert "myaccount.google.com%2Fapppasswords" in opened_urls[0]
     assert saves == [True]
+    output = " ".join(capsys.readouterr().out.split())
+    assert "enter 'Lagniappe', then click Create" in output
+    assert "Copy the 16-character password Google displays" in output
+    assert "on its owner's behalf" in output
+    assert "people the owner invites can verify their email addresses" in output
+    assert "sender name is what recipients will see" in output
+    assert "retry with the same mailbox and app password" in output
+    assert "only if Gmail explicitly rejects sign-in" in output
 
 
 # @features setup

@@ -1,5 +1,6 @@
-import { request, withTransition } from "../shared";
-import Core from "./base/core";
+import { request } from "../shared/request";
+import { withTransition } from "../shared/utilities";
+import ShellView from "./base/shell";
 
 /**
  * @testable true
@@ -8,7 +9,7 @@ import Core from "./base/core";
  * @features analytics
  * @dimensions dashboard accordion retention-clear
  */
-export default class Analytics extends Core {
+export default class Analytics extends ShellView {
 	_click(event) {
 		const retentionToggle = event.target.closest(
 			"[data-role='analytics-retention-toggle']",

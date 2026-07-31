@@ -141,7 +141,9 @@ export class ToolReportList extends BaseList {
 
 	postreconcile() {
 		super.postreconcile();
-		this.view.DeferredOperations?.scan(this.target);
+		void this.view
+			.ensureDeferredOperations?.()
+			.then((manager) => manager?.scan(this.target));
 		if (this.itemCount > 0 && this._listToggle) {
 			this._listToggle.classList.remove("opacity-50", "pointer-events-none");
 		}

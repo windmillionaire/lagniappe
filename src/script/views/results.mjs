@@ -1,10 +1,10 @@
-import { request } from "../shared";
-import Core from "./base/core";
+import { request } from "../shared/request";
+import ShellView from "./base/shell";
 
 /**
  * @testable infrastructure
  */
-export default class Results extends Core {
+export default class Results extends ShellView {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_facets_displayed

@@ -176,7 +176,9 @@ def test_server_running(get_user):
 def test_authenticated_home_response_headers_include_etag(get_user):
     """Authenticated app responses should carry the common header envelope."""
     user = get_user(Users.OWNER)
-    user.page.goto(f"{SETTINGS.test_config['BASE_URL']}/")
+    with user.page.expect_response("**/update-session") as session_info:
+        user.page.goto(f"{SETTINGS.test_config['BASE_URL']}/")
+    assert session_info.value.ok
     expect(user.page).to_have_title("Home")
 
     cookies = {

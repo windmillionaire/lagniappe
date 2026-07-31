@@ -173,22 +173,12 @@ const context = {
 };
 vm.createContext(context);
 
-let source = fs.readFileSync("src/script/views/base/core.mjs", "utf8");
+let source = fs.readFileSync("src/script/views/base/reconciliation.mjs", "utf8");
 source = source.replace(
   /^import [\s\S]*?(?=const COLLECTION_ONLY_CHANGE_TYPES)/,
   `
-const SearchBox = class {};
-const EntityMenu = class {};
-const Notifications = class {};
-const OfflineQueue = class {};
-const ENDPOINTS = {};
 const clearRecentSearchResults = () => {};
 const captureError = (error) => { throw error; };
-const connectivity = { online: true, hidden: false };
-const DeleteModal = class {};
-const HelpModal = class {};
-const Modal = class {};
-const OfflineModal = class {};
 const request = {
   async post(url, payload) {
     events.push({ type: "request", url, payload });
@@ -209,17 +199,13 @@ const request = {
     };
   },
 };
-const SyncManager = class {};
-const SubmissionManager = class {
-  constructor() { this.submit = () => {}; }
-};
-const withTransition = async (callback) => await callback();
-const ViewComponent = class {};
-const Task = class {};
 `,
 );
-source = source.replace("export default class Core", "class Core");
-source += "\nglobalThis.Core = Core;";
+source = source.replaceAll("export const ", "const ");
+source += `
+globalThis.reconcileChange = reconcileChange;
+globalThis.refreshCollectionComponents = refreshCollectionComponents;
+`;
 vm.runInContext(source, context);
 
 const root = {
@@ -233,7 +219,31 @@ const root = {
   querySelector() { return null; },
   querySelectorAll() { return []; },
 };
-const view = new context.Core(root);
+const view = {
+  _pendingChanges: [],
+  _reconcilePromise: null,
+  components: {},
+  elt: root,
+  hash: "tasks",
+  key: null,
+  _applyStarState() {},
+  async afterReconcileChange() {},
+  ensureEditWatcher() { return Promise.resolve(this.EditWatcher); },
+  getComponent() { return null; },
+  async refresh() {
+    return context.refreshCollectionComponents(
+      this,
+      Object.values(this.components),
+    );
+  },
+  async refreshCollections() {
+    return this.refresh();
+  },
+  async refreshSupplementalCollections() {},
+  reconcileChange(change) {
+    return context.reconcileChange(this, change);
+  },
+};
 const deltaWidget = {
   refreshScope: "collection",
   refreshDescriptor() {

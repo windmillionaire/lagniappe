@@ -317,14 +317,17 @@ export class HomeTaskList extends BaseList {
 
 		const route = this.endpoints.completeTask(elt.dataset.key);
 
-		if (!this.view.online && this.view.offlineQueue) {
+		if (!this.view.online) {
+			const queue =
+				this.view.offlineQueue || (await this.view.ensureOfflineQueue?.());
+			if (!queue) return;
 			if (elt.dataset.key.startsWith("offline:")) {
-				await this.view.offlineQueue.cancel({
+				await queue.cancel({
 					action: "create",
 					client_key: elt.dataset.key,
 				});
 			} else {
-				await this.view.offlineQueue.queue({
+				await queue.queue({
 					id: `complete:${elt.dataset.key}`,
 					kind: "task",
 					action: "complete",

@@ -70,6 +70,11 @@ readonly_document_visibility = ProjectDefinition(
     description="Project used for testing readonly document tab visibility.",
 )
 
+untouched_document = ProjectDefinition(
+    name="Untouched Document Project",
+    description="Project used to verify that opening a fresh document does not save it.",
+)
+
 editor_markdown_table = ProjectDefinition(
     name="Editor Markdown Table Project",
     description="Project used for testing markdown table paste in the editor.",
