@@ -44,15 +44,31 @@ export const ENDPOINTS = {
 				`/projects/${settings.key}/attributes/${attribute}`,
 		};
 	},
-	SiteSettings: () => {
+	SiteAiModels: () => {
 		return {
-			siteSettings: "/site-settings",
 			setAiSettings: "/set-ai-settings",
+		};
+	},
+	SiteDeployment: () => {
+		return {
 			setDeploymentSettings: "/set-deployment-settings",
+		};
+	},
+	SiteImage: () => {
+		return {
 			setSiteImage: "/set-site-image",
+		};
+	},
+	SiteMaintenance: () => {
+		return {
 			siteConfiguration: "/site-configuration",
 			siteUpdate: "/site-update",
 			rebuildCache: "/rebuild-cache",
+		};
+	},
+	SiteSettings: () => {
+		return {
+			siteSettings: "/site-settings",
 		};
 	},
 	SiteExport: () => {

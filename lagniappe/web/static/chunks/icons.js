@@ -1,2 +1,63 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="09344231-1950-4146-ae37-c477ddc328ce",e._sentryDebugIdIdentifier="sentry-dbid-09344231-1950-4146-ae37-c477ddc328ce");}catch(e){}}();import{I as e}from"./styles.js?v=b8490206";const a=t=>{let i=e;for(const o of String(t||"").split(".")){if(!o||!i||typeof i!="object")return null;i=i[o]}return i?.glyph?i:null},c=(t,i,o="")=>{const n=a(i);if(!n)return t.replaceChildren(),t.removeAttribute("data-icon"),t;const r=["icon"];n.spin&&r.push("icon-spin"),o&&r.push(...String(o).split(/\s+/).filter(Boolean)),t.className=r.join(" "),t.dataset.icon=i,t.dataset.fill=String(n.fill),t.setAttribute("aria-hidden","true"),n.weight?t.dataset.weight=String(n.weight):delete t.dataset.weight;const s=document.createElement("span");return s.className="icon-glyph",s.textContent=n.glyph,t.replaceChildren(s),t},p=(t,i="")=>c(document.createElement("span"),t,i);export{p as c,a as i,c as s};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { I as ICONS } from './styles.js?v=b3f50eb1';
+
+/**
+ * @testable true
+ * @tests tests_js/test_018_style_pipeline.py::test_frontend_icon_helpers_render_structured_material_symbols
+ * @features frontend-icons
+ * @dimensions registry lookup nested-ids
+ */
+const iconDefinition = (name) => {
+	let definition = ICONS;
+	for (const part of String(name || "").split(".")) {
+		if (!part || !definition || typeof definition !== "object") return null;
+		definition = definition[part];
+	}
+	return definition?.glyph ? definition : null;
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_018_style_pipeline.py::test_frontend_icon_helpers_render_structured_material_symbols
+ * @features frontend-icons
+ * @dimensions semantic-markup fill weight animation accessibility
+ */
+const setIcon = (element, name, classes = "") => {
+	const definition = iconDefinition(name);
+	if (!definition) {
+		element.replaceChildren();
+		element.removeAttribute("data-icon");
+		return element;
+	}
+
+	const classNames = ["icon"];
+	if (definition.spin) classNames.push("icon-spin");
+	if (classes) classNames.push(...String(classes).split(/\s+/).filter(Boolean));
+
+	element.className = classNames.join(" ");
+	element.dataset.icon = name;
+	element.dataset.fill = String(definition.fill);
+	element.setAttribute("aria-hidden", "true");
+	if (definition.weight) {
+		element.dataset.weight = String(definition.weight);
+	} else {
+		delete element.dataset.weight;
+	}
+	const glyph = document.createElement("span");
+	glyph.className = "icon-glyph";
+	glyph.textContent = definition.glyph;
+	element.replaceChildren(glyph);
+	return element;
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_018_style_pipeline.py::test_frontend_icon_helpers_render_structured_material_symbols
+ * @features frontend-icons
+ * @dimensions semantic-markup element-creation
+ */
+const createIcon = (name, classes = "") => {
+	return setIcon(document.createElement("span"), name, classes);
+};
+
+export { createIcon as c, iconDefinition as i, setIcon as s };

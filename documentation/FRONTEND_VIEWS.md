@@ -99,7 +99,11 @@ control and navigation attributes:
 
 `data-role="expand"` is local widget/table behavior rather than Core control
 behavior. Table bodies own embedded table-cell expansion through `BaseTable`;
-page task lists and site settings own their own expand/collapse buttons.
+page task lists own their buttons directly. `SiteSettings` is a small composite
+coordinator: it owns the shared section headers and persisted accordion state,
+loads each persistent section body as a focused widget through its existing
+component, and forwards the aggregate settings response for normal widget
+reconciliation.
 
 Title action menus are declared with the macros in `templates/menus.html`.
 `menus.title()` supplies the trigger and hidden source items, while

@@ -1,2 +1,96 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="eb9991ef-88d7-47e9-9003-3208d7b3c480",e._sentryDebugIdIdentifier="sentry-dbid-eb9991ef-88d7-47e9-9003-3208d7b3c480");}catch(e){}}();import{S as i}from"./styles.js?v=b8490206";import{s as a}from"./icons.js?v=b8490206";class e{constructor(t){this.toolbar=t,this.active=!1,this.button=document.createElement("button")}_isInlineMarkToggle(){return["bold","italic","underline","strike","superscript","subscript"].includes(this.name)}_isListToggle(){return["toggleBulletList","toggleOrderedList","toggleTaskList"].includes(this.command)}_addButtonIcon(t){const s=document.createElement("span");a(s,t),this.button.replaceChildren(s)}init(t){Object.assign(this,t),this.button.title=this.title,this.button.type="button",this.button.dataset.active="false",this.name?this.button.className=`${i.editor.toolbar.tool} data-[active=true]:bg-slate-300`:this.button.className=`${i.editor.toolbar.tool}`,this._addButtonIcon(this.icon),this.button.addEventListener("click",()=>this.onClick())}onClick(){const t=this.toolbar.editor,s=t.chain().focus();t.isEmpty&&(this._isInlineMarkToggle()||this._isListToggle())&&s.setTextSelection(1),s[this.command](this.args).run(),this.active?this.disable():this.enable()}enable(){this.name&&(this.active=!0,this.button.dataset.active="true")}disable(){this.name&&(this.active=!1,this.button.dataset.active="false")}}class n extends e{onClick(){this.active=!this.active;const t=this.button.closest("[data-widget]");this.active?(t.dataset.fullscreen="true",this._addButtonIcon("minimize")):(t.dataset.fullscreen="false",this._addButtonIcon("maximize"))}}export{e as ToolbarButton,e as redo,e as toggleBold,e as toggleBulletList,n as toggleFocus,e as toggleItalic,e as toggleOrderedList,e as toggleTaskList,e as undo};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES } from './styles.js?v=b3f50eb1';
+import { s as setIcon } from './icons.js?v=b3f50eb1';
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_formatting_persists
+ * @tests tests_e2e/004_projects/test_004d_document.py::test_task_list_persists
+ * @features editor
+ * @dimensions formatting task-list
+ */
+class ToolbarButton {
+	constructor(toolbar) {
+		this.toolbar = toolbar;
+		this.active = false;
+		this.button = document.createElement("button");
+	}
+
+	_isInlineMarkToggle() {
+		return [
+			"bold",
+			"italic",
+			"underline",
+			"strike",
+			"superscript",
+			"subscript",
+		].includes(this.name);
+	}
+
+	_isListToggle() {
+		return ["toggleBulletList", "toggleOrderedList", "toggleTaskList"].includes(
+			this.command,
+		);
+	}
+
+	_addButtonIcon(icon) {
+		const iconElement = document.createElement("span");
+		setIcon(iconElement, icon);
+		this.button.replaceChildren(iconElement);
+	}
+
+	init(settings) {
+		Object.assign(this, settings);
+		this.button.title = this.title;
+		this.button.type = "button";
+		this.button.dataset.active = "false";
+		if (this.name) {
+			this.button.className = `${STYLES.editor.toolbar.tool} data-[active=true]:bg-slate-300`;
+		} else {
+			this.button.className = `${STYLES.editor.toolbar.tool}`;
+		}
+		this._addButtonIcon(this.icon);
+		this.button.addEventListener("click", () => this.onClick());
+	}
+
+	onClick() {
+		const editor = this.toolbar.editor;
+		const chain = editor.chain().focus();
+		const shouldCollapseEmptySelection =
+			editor.isEmpty && (this._isInlineMarkToggle() || this._isListToggle());
+		if (shouldCollapseEmptySelection) chain.setTextSelection(1);
+		chain[this.command](this.args).run();
+		this.active ? this.disable() : this.enable();
+	}
+
+	enable() {
+		if (!this.name) return;
+		this.active = true;
+		this.button.dataset.active = "true";
+	}
+
+	disable() {
+		if (!this.name) return;
+		this.active = false;
+		this.button.dataset.active = "false";
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class ToggleFocusButton extends ToolbarButton {
+	onClick() {
+		this.active = !this.active;
+		const editorContainer = this.button.closest("[data-widget]");
+		if (this.active) {
+			editorContainer.dataset.fullscreen = "true";
+			this._addButtonIcon("minimize");
+		} else {
+			editorContainer.dataset.fullscreen = "false";
+			this._addButtonIcon("maximize");
+		}
+	}
+}
+
+export { ToolbarButton, ToolbarButton as redo, ToolbarButton as toggleBold, ToolbarButton as toggleBulletList, ToggleFocusButton as toggleFocus, ToolbarButton as toggleItalic, ToolbarButton as toggleOrderedList, ToolbarButton as toggleTaskList, ToolbarButton as undo };

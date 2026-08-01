@@ -1,2 +1,280 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="a3fca823-e0f7-41ab-93c7-15e3c7656a21",e._sentryDebugIdIdentifier="sentry-dbid-a3fca823-e0f7-41ab-93c7-15e3c7656a21");}catch(e){}}();import{c as m}from"./icons.js?v=b8490206";import"./styles.js?v=b8490206";function b(s){if(s=Math.max(Number(s)||0,0),s<10)return"just now";if(s<60)return`${Math.floor(s)} seconds`;const e=Math.floor(s/60);return e<60?`${e} min`:`${Math.floor(e/60)} hr ${e%60} min`}function f(s){return Array.from(document.querySelectorAll("[data-operation]")).filter(e=>e.dataset.operation===s)}class g{constructor(e){this.view=e,this.operations=new Map,this.destroyed=!1,this.ignored=new Set,this.unsubscribers=new Map}init(){return this.scan(),this}scan(e=document){const r=Array.from(e.querySelectorAll?.("[data-operation]")||[]);e.matches?.("[data-operation]")&&r.unshift(e);for(const t of r)this.track(t.dataset.operation,{revision:Number(t.dataset.operationRevision)||0,node:t})}track(e,{revision:r=0,node:t=null}={}){if(this.destroyed||!e||this.ignored.has(e))return!1;const o=t?.dataset?.deferredStatus==="false"?null:t,i=o?.dataset?.operation;i&&i!==e&&(this.operations.delete(i),this.unsubscribers.get(i)?.(),this.unsubscribers.delete(i),this._ignore(i)),o&&this.decorate(o,e);const d=this.operations.get(e);if(this.operations.set(e,{...d,revision:Math.max(Number(d?.revision)||0,Number(r)||0)}),!this.unsubscribers.has(e)){const a=this.view.PollingCoordinator?.subscribe({id:`operation:${e}`,type:"operation",key:e,revision:null,operation_revision:null},{onResult:async n=>{if(n.status==="changed"&&n.payload)return await this.receive(n.payload);n.status==="error"||n.status==="unavailable"?this._renderStatusDelay([e]):this._refreshCachedStatuses([e])}});a&&this.unsubscribers.set(e,a)}return!0}decorate(e,r){if(!e||!r)return;if(e.dataset.operation=r,e.dataset.deferredLock==="form"){e.setAttribute("aria-busy","true");for(const p of e.querySelectorAll("input, textarea, select, button"))p.disabled=!0}if(e.querySelector("[data-role='deferred-phase']"))return;const o=e.querySelector("[data-role='autofill']"),i=e.querySelector("[data-role='submit-group']"),d=e.querySelector("[data-role='autofill-submit-group']"),a=o&&i||d,n=document.createElement("p");n.dataset.role="deferred-progress",n.dataset.operation=r,n.className=a?"flex min-h-10 items-center justify-center gap-2 rounded-md bg-kind-default px-4 py-2 text-sm font-semibold text-white shadow-sm":"mt-2 text-sm text-base-medium",n.setAttribute("aria-live","polite");const h=m("spinner");h.setAttribute("aria-hidden","true");const l=document.createElement("span");l.dataset.role="deferred-phase",l.textContent=a?"Autofill queued":"Waiting to start";const c=document.createElement("span");c.setAttribute("aria-hidden","true"),c.textContent=" \xB7 ";const u=document.createElement("span");u.dataset.role="deferred-elapsed",u.textContent="just now",a?(n.append(h,l,c,u),a.replaceWith(n),o&&o!==a&&o.remove()):(n.append(l,c,u),e.append(n))}nudge(e,r=null){const t=e?this.operations.get(e):null;return t&&r!==null&&r!==void 0&&Number(r)<(Number(t.revision)||0)||e&&!this.track(e,{revision:r})?!1:(this.view.PollingCoordinator?.trigger(e?`operation:${e}`:null),!0)}async poll(){return this.view.PollingCoordinator?.trigger(Array.from(this.operations.keys(),e=>`operation:${e}`))}async receive(e){if(this.destroyed||!e?.key||!this.operations.has(e.key))return!1;const r=this.operations.get(e.key),t=Number(e.revision)||0,o=Number(r?.revision)||0;if(t<o)return!1;if(this.operations.set(e.key,{revision:t,status:{...e},receivedAt:Date.now()}),this._render(e),window.dispatchEvent(new CustomEvent("deferred-operation",{detail:{...e}})),e.terminal){let i=!0;try{this.view.EditWatcher?.expectDeferredCompletion?.(e.entity_key,e.key),await this.view.reconcileChange?.({type:"deferred-complete",key:e.entity_key,source_widget:e.source_widget,destination:e.destination,deferred_revision:`${e.key}:${t}`})}catch{i=!1}return i?(this.operations.delete(e.key),this.unsubscribers.get(e.key)?.(),this.unsubscribers.delete(e.key),this._ignore(e.key)):this._renderStatusDelay([e.key]),i}return!0}_render(e,r=e.elapsed_seconds){for(const t of f(e.key)){t.dataset.operationRevision=String(Number(e.revision)||0),t.dataset.operationStatus=e.status||"unknown",t.dataset.operationPhase=e.phase||"unknown",t.dataset.operationTerminal=e.terminal?"true":"false";const o=t.querySelector("[data-role='deferred-phase']");o&&(o.textContent=e.error?`${e.phase_label}: ${e.error}`:e.recovering?`${e.phase_label}. Automatic recovery is active.`:e.phase_label);const i=t.querySelector("[data-role='deferred-elapsed']");i&&(i.textContent=b(r))}}_refreshCachedStatuses(e=Array.from(this.operations.keys())){for(const r of e){const t=this.operations.get(r);if(!t?.status)continue;const o=(Number(t.status.elapsed_seconds)||0)+Math.max(Math.floor((Date.now()-t.receivedAt)/1e3),0);this._render(t.status,o)}}_renderStatusDelay(e=Array.from(this.operations.keys())){for(const r of e)for(const t of f(r)){const o=t.querySelector("[data-role='deferred-phase']");o&&(o.textContent="Status check delayed. Retrying.")}}_ignore(e){e&&(this.ignored.add(e),this.ignored.size>100&&this.ignored.delete(this.ignored.values().next().value))}destroy(){this.destroyed=!0;for(const e of this.unsubscribers.values())e();this.unsubscribers.clear(),this.operations.clear(),this.ignored.clear()}}export{g as DeferredOperationManager};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { c as createIcon } from './icons.js?v=b3f50eb1';
+import './styles.js?v=b3f50eb1';
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/deferredOperations.mjs::DeferredOperationManager
+ * @reason coordinator-owned bounded elapsed-time presentation
+ */
+function elapsedLabel(seconds) {
+	seconds = Math.max(Number(seconds) || 0, 0);
+	if (seconds < 10) return "just now";
+	if (seconds < 60) return `${Math.floor(seconds)} seconds`;
+	const minutes = Math.floor(seconds / 60);
+	if (minutes < 60) return `${minutes} min`;
+	const hours = Math.floor(minutes / 60);
+	return `${hours} hr ${minutes % 60} min`;
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/deferredOperations.mjs::DeferredOperationManager
+ * @reason coordinator-owned DOM lookup for operation decorations
+ */
+function operationNodes(key) {
+	return Array.from(document.querySelectorAll("[data-operation]")).filter(
+		(node) => node.dataset.operation === key,
+	);
+}
+
+/**
+ * Reconcile every visible deferred operation through the shared poll contract.
+ *
+ * @testable true
+ * @tests tests_js/test_023_deferred_operations.py::test_deferred_operation_manager_batches_orders_and_renders_status
+ * @features deferred-jobs
+ * @dimensions status revision polling progress timing backoff teardown decoration-opt-out
+ */
+class DeferredOperationManager {
+	constructor(view) {
+		this.view = view;
+		this.operations = new Map();
+		this.destroyed = false;
+		this.ignored = new Set();
+		this.unsubscribers = new Map();
+	}
+
+	init() {
+		this.scan();
+		return this;
+	}
+
+	scan(root = document) {
+		const nodes = Array.from(root.querySelectorAll?.("[data-operation]") || []);
+		if (root.matches?.("[data-operation]")) nodes.unshift(root);
+		for (const node of nodes) {
+			this.track(node.dataset.operation, {
+				revision: Number(node.dataset.operationRevision) || 0,
+				node,
+			});
+		}
+	}
+
+	track(key, { revision = 0, node = null } = {}) {
+		if (this.destroyed || !key || this.ignored.has(key)) return false;
+		const decorationNode =
+			node?.dataset?.deferredStatus === "false" ? null : node;
+		const previous = decorationNode?.dataset?.operation;
+		if (previous && previous !== key) {
+			this.operations.delete(previous);
+			this.unsubscribers.get(previous)?.();
+			this.unsubscribers.delete(previous);
+			this._ignore(previous);
+		}
+		if (decorationNode) this.decorate(decorationNode, key);
+		const current = this.operations.get(key);
+		this.operations.set(key, {
+			...current,
+			revision: Math.max(Number(current?.revision) || 0, Number(revision) || 0),
+		});
+		if (!this.unsubscribers.has(key)) {
+			const unsubscribe = this.view.PollingCoordinator?.subscribe(
+				{
+					id: `operation:${key}`,
+					type: "operation",
+					key,
+					revision: null,
+					operation_revision: null,
+				},
+				{
+					onResult: async (result) => {
+						if (result.status === "changed" && result.payload) {
+							return await this.receive(result.payload);
+						} else if (
+							result.status === "error" ||
+							result.status === "unavailable"
+						) {
+							this._renderStatusDelay([key]);
+						} else {
+							this._refreshCachedStatuses([key]);
+						}
+					},
+				},
+			);
+			if (unsubscribe) this.unsubscribers.set(key, unsubscribe);
+		}
+		return true;
+	}
+
+	decorate(node, key) {
+		if (!node || !key) return;
+		node.dataset.operation = key;
+		const formLocked = node.dataset.deferredLock === "form";
+		if (formLocked) {
+			node.setAttribute("aria-busy", "true");
+			for (const control of node.querySelectorAll(
+				"input, textarea, select, button",
+			)) {
+				control.disabled = true;
+			}
+		}
+		if (node.querySelector("[data-role='deferred-phase']")) return;
+		const autofill = node.querySelector("[data-role='autofill']");
+		const submitGroup = node.querySelector("[data-role='submit-group']");
+		const autofillSubmitGroup = node.querySelector(
+			"[data-role='autofill-submit-group']",
+		);
+		const autofillTarget = (autofill && submitGroup) || autofillSubmitGroup;
+		const progress = document.createElement("p");
+		progress.dataset.role = "deferred-progress";
+		progress.dataset.operation = key;
+		progress.className = autofillTarget
+			? "flex min-h-10 items-center justify-center gap-2 rounded-md bg-kind-default px-4 py-2 text-sm font-semibold text-white shadow-sm"
+			: "mt-2 text-sm text-base-medium";
+		progress.setAttribute("aria-live", "polite");
+		const icon = createIcon("spinner");
+		icon.setAttribute("aria-hidden", "true");
+		const phase = document.createElement("span");
+		phase.dataset.role = "deferred-phase";
+		phase.textContent = autofillTarget ? "Autofill queued" : "Waiting to start";
+		const separator = document.createElement("span");
+		separator.setAttribute("aria-hidden", "true");
+		separator.textContent = " · ";
+		const elapsed = document.createElement("span");
+		elapsed.dataset.role = "deferred-elapsed";
+		elapsed.textContent = "just now";
+		if (autofillTarget) {
+			progress.append(icon, phase, separator, elapsed);
+			autofillTarget.replaceWith(progress);
+			if (autofill && autofill !== autofillTarget) autofill.remove();
+		} else {
+			progress.append(phase, separator, elapsed);
+			node.append(progress);
+		}
+	}
+
+	nudge(key, revision = null) {
+		const current = key ? this.operations.get(key) : null;
+		if (
+			current &&
+			revision !== null &&
+			revision !== undefined &&
+			Number(revision) < (Number(current.revision) || 0)
+		)
+			return false;
+		if (key && !this.track(key, { revision })) return false;
+		this.view.PollingCoordinator?.trigger(key ? `operation:${key}` : null);
+		return true;
+	}
+
+	async poll() {
+		return this.view.PollingCoordinator?.trigger(
+			Array.from(this.operations.keys(), (key) => `operation:${key}`),
+		);
+	}
+
+	async receive(status) {
+		if (this.destroyed || !status?.key || !this.operations.has(status.key))
+			return false;
+		const current = this.operations.get(status.key);
+		const revision = Number(status.revision) || 0;
+		const previousRevision = Number(current?.revision) || 0;
+		if (revision < previousRevision) return false;
+		this.operations.set(status.key, {
+			revision,
+			status: { ...status },
+			receivedAt: Date.now(),
+		});
+		this._render(status);
+
+		window.dispatchEvent(
+			new CustomEvent("deferred-operation", { detail: { ...status } }),
+		);
+		if (status.terminal) {
+			let reconciled = true;
+			try {
+				this.view.EditWatcher?.expectDeferredCompletion?.(
+					status.entity_key,
+					status.key,
+				);
+				await this.view.reconcileChange?.({
+					type: "deferred-complete",
+					key: status.entity_key,
+					source_widget: status.source_widget,
+					destination: status.destination,
+					deferred_revision: `${status.key}:${revision}`,
+				});
+			} catch {
+				reconciled = false;
+			}
+			if (reconciled) {
+				this.operations.delete(status.key);
+				this.unsubscribers.get(status.key)?.();
+				this.unsubscribers.delete(status.key);
+				this._ignore(status.key);
+			} else {
+				this._renderStatusDelay([status.key]);
+			}
+			return reconciled;
+		}
+		return true;
+	}
+
+	_render(status, elapsedSeconds = status.elapsed_seconds) {
+		for (const node of operationNodes(status.key)) {
+			node.dataset.operationRevision = String(Number(status.revision) || 0);
+			node.dataset.operationStatus = status.status || "unknown";
+			node.dataset.operationPhase = status.phase || "unknown";
+			node.dataset.operationTerminal = status.terminal ? "true" : "false";
+			const phase = node.querySelector("[data-role='deferred-phase']");
+			if (phase) {
+				phase.textContent = status.error
+					? `${status.phase_label}: ${status.error}`
+					: status.recovering
+						? `${status.phase_label}. Automatic recovery is active.`
+						: status.phase_label;
+			}
+			const elapsed = node.querySelector("[data-role='deferred-elapsed']");
+			if (elapsed) elapsed.textContent = elapsedLabel(elapsedSeconds);
+		}
+	}
+
+	_refreshCachedStatuses(keys = Array.from(this.operations.keys())) {
+		for (const key of keys) {
+			const operation = this.operations.get(key);
+			if (!operation?.status) continue;
+			const elapsed =
+				(Number(operation.status.elapsed_seconds) || 0) +
+				Math.max(Math.floor((Date.now() - operation.receivedAt) / 1000), 0);
+			this._render(operation.status, elapsed);
+		}
+	}
+
+	_renderStatusDelay(keys = Array.from(this.operations.keys())) {
+		for (const key of keys) {
+			for (const node of operationNodes(key)) {
+				const phase = node.querySelector("[data-role='deferred-phase']");
+				if (phase) phase.textContent = "Status check delayed. Retrying.";
+			}
+		}
+	}
+
+	_ignore(key) {
+		if (!key) return;
+		this.ignored.add(key);
+		if (this.ignored.size > 100) {
+			this.ignored.delete(this.ignored.values().next().value);
+		}
+	}
+
+	destroy() {
+		this.destroyed = true;
+		for (const unsubscribe of this.unsubscribers.values()) unsubscribe();
+		this.unsubscribers.clear();
+		this.operations.clear();
+		this.ignored.clear();
+	}
+}
+
+export { DeferredOperationManager };

@@ -1,2 +1,288 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="13b392c8-d37f-4962-9ef4-cd7ddef65479",e._sentryDebugIdIdentifier="sentry-dbid-13b392c8-d37f-4962-9ef4-cd7ddef65479");}catch(e){}}();import{S as d}from"../styles.js?v=b8490206";import{withTransition as l}from"../utilities.js?v=b8490206";import{T as u}from"../tableVisibilityState.js?v=b8490206";import{C as p}from"../core.js?v=b8490206";import"../errors.js?v=b8490206";import"../connectivity.js?v=b8490206";import"../endpoints.js?v=b8490206";import"../request.js?v=b8490206";import"../shell.js?v=b8490206";class h extends p{constructor(t){super(t),this.dropdown=null,this.nav=null,this.toolsObserver=null}async init(){await super.init();const t=this.getComponent(this.elt.querySelector("#table")),e=this.elt.querySelector("#tools"),i=this.elt.querySelector("#mobile-controls");if(this.mobile&&e){await this._createDropdown();const o=document.querySelector("nav[data-nav='tools']");o&&(o.style.display="none")}if(this.TableVisibilityState=new u({component:t,view:this,selected:t.preload("selected")||[],columns:t.preload("columns")||[]}).init(),await l(async()=>{t.elt.hasAttribute("lp-prefetch")||await t.loadWidget("IndexTable"),await t.render(!0)}),this._indexMobileResize=async()=>{await l(async()=>{const o=document.querySelector("nav[data-nav='tools']");this.mobile?(e&&this.getComponent(e).deactivate(!1),await this._createDropdown(),o&&(o.style.display="none")):(i&&(i.dataset.visible="false"),this._setMobileControlsDropdownOpen(!1),o?.removeAttribute("style")),t.widgets.TableSorting?.reset()})},this.elt.addEventListener("mobile-resize",this._indexMobileResize),!e)return;const s=t.elt.querySelector("thead");this.toolsObserver=new MutationObserver(o=>{for(const r of o)if(r.attributeName==="data-visible"){const n=e?.dataset.visible==="true";s?.classList.toggle("sticky",!n)}}),this.toolsObserver.observe(e,{attributes:!0}),await this._renderDefaultTool(e)}_click(t){const e=t.target.closest("[data-role='tools-dropdown']");if(this.mobile&&e&&!this.dropdown){t.preventDefault(),t.stopPropagation(),this.runColdAction(e,()=>this._createDropdown(),s=>s?.showPanel?.(),e);return}const i=t.target.closest("button[lp-show='table:MobileTableControls']");if(this.mobile&&i){this.dropdown?.hidePanel(),this._setMobileControlsDropdownOpen(!1);const s=this.elt.querySelector("#tools");s?.dataset.visible==="true"&&this.getComponent(s)?.deactivate(!1)}super._click(t)}_defaultToolSlug(){return this.querySlug(this.queryParam("tool"))}_defaultToolTarget(t){const e=this._defaultToolSlug();if(!e)return null;const i=t.querySelectorAll("nav[data-nav='tools'] button[lp-show]");for(const o of i){const r=o.getAttribute("lp-show"),[n,a]=r.split(":");if([n,a,r.replace(":","-"),o.textContent].some(c=>this.querySlug(c)===e))return{componentId:n,widgetName:a}}const s=Array.from(t.querySelectorAll("[data-widget]")).find(o=>this.querySlug(o.dataset.widget)===e);return s?{componentId:s.closest("[lp-component]")?.id||t.id,widgetName:s.dataset.widget}:null}async _renderDefaultTool(t){const e=this._defaultToolTarget(t);if(!e)return;const i=this.getComponent(document.getElementById(e.componentId));if(!i)return;const s=await i.activate(e.widgetName||"default");await l(async()=>{await i.render(s)})}_setMobileControlsDropdownOpen(t){const e=this.elt.querySelector("#mobile-controls");e&&(e.classList.toggle("opacity-50",t),e.classList.toggle("pointer-events-none",t))}async _createDropdown(){if(this.dropdown)return;if(this._dropdownPromise)return this._dropdownPromise;const t=this.elt.querySelector("[data-role='tools-dropdown']");if(t)return this._dropdownPromise=import("../dropdown.js?v=b8490206").then(({Dropdown:e})=>{if(this._destroyed||!this.mobile)return null;const i=[],s=o=>{const r=o.cloneNode(!0);return r.setAttribute("role","option"),r.removeAttribute("data-selected"),r.className=d.index.tools.dropdown.toggle,r.outerHTML};return document.querySelectorAll("nav[data-nav='tools'] button").forEach(o=>{o.dataset.visible!=="false"&&i.push({html:s(o),onClick:()=>{const r=this.elt.querySelector("#mobile-controls"),n=this.getComponent(this.elt.querySelector("#table"));n?.active?.name==="MobileTableControls"?n.deactivate(!1):r&&(r.dataset.visible="false"),this._setMobileControlsDropdownOpen(!1),this.renderComponent(o)}})}),this.dropdown=new e(t),this.dropdown.init({items:i,placement:"bottom-end",styles:{panel:d.index.tools.dropdown.panel},onShow:()=>this._setMobileControlsDropdownOpen(!0),onHide:()=>this._setMobileControlsDropdownOpen(!1)}),this.dropdown}).catch(e=>(this.reportStartupError(e,t,"index-tools-dropdown"),null)).finally(()=>{this._dropdownPromise=null}),this._dropdownPromise}destroy(){this.elt.removeEventListener("mobile-resize",this._indexMobileResize),super.destroy(),this._setMobileControlsDropdownOpen(!1),this.dropdown?.destroy(),this.dropdown=null,this.toolsObserver?.disconnect(),this.toolsObserver=null,this.TableVisibilityState?.destroy(),this.TableVisibilityState=null}}export{h as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES } from '../styles.js?v=b3f50eb1';
+import { withTransition } from '../utilities.js?v=b3f50eb1';
+import { T as TableVisibilityState } from '../tableVisibilityState.js?v=b3f50eb1';
+import { C as Core } from '../core.js?v=b3f50eb1';
+import '../errors.js?v=b3f50eb1';
+import '../connectivity.js?v=b3f50eb1';
+import '../endpoints.js?v=b3f50eb1';
+import '../request.js?v=b3f50eb1';
+import '../shell.js?v=b3f50eb1';
+
+/**
+ * @testable true
+ * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_controls_open_with_page_columns
+ * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_controls_open_with_task_columns
+ * @tests tests_e2e/003_forms/test_003e_form_index_mobile_ui.py::test_form_index_mobile_tools_and_column_controls_are_exclusive
+ * @tests tests_e2e/008_users/test_008a_user_index.py::test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load
+ * @features table-controls
+ * @dimensions mobile-controls columns mobile-tools mutual-exclusion mobile-startup sorting
+ */
+class EntityIndex extends Core {
+	constructor(node) {
+		super(node);
+		this.dropdown = null;
+		this.nav = null;
+		this.toolsObserver = null;
+	}
+
+	async init() {
+		await super.init();
+
+		const table = this.getComponent(this.elt.querySelector("#table"));
+		const tools = this.elt.querySelector("#tools");
+		const mobileControls = this.elt.querySelector("#mobile-controls");
+
+		if (this.mobile && tools) {
+			await this._createDropdown();
+			const toolsNav = document.querySelector("nav[data-nav='tools']");
+			if (toolsNav) toolsNav.style.display = "none";
+		}
+
+		this.TableVisibilityState = new TableVisibilityState({
+			component: table,
+			view: this,
+			selected: table.preload("selected") || [],
+			columns: table.preload("columns") || [],
+		}).init();
+
+		await withTransition(async () => {
+			if (!table.elt.hasAttribute("lp-prefetch")) {
+				await table.loadWidget("IndexTable");
+			}
+			await table.render(true);
+		});
+
+		this._indexMobileResize = async () => {
+			await withTransition(async () => {
+				const toolsNav = document.querySelector("nav[data-nav='tools']");
+				if (!this.mobile) {
+					if (mobileControls) mobileControls.dataset.visible = "false";
+					this._setMobileControlsDropdownOpen(false);
+					toolsNav?.removeAttribute("style");
+				} else {
+					if (tools) this.getComponent(tools).deactivate(false);
+					await this._createDropdown();
+					if (toolsNav) toolsNav.style.display = "none";
+				}
+				table.widgets.TableSorting?.reset();
+			});
+		};
+		this.elt.addEventListener("mobile-resize", this._indexMobileResize);
+
+		if (!tools) {
+			return;
+		}
+
+		const thead = table.elt.querySelector("thead");
+		this.toolsObserver = new MutationObserver((mutations) => {
+			for (const mutation of mutations) {
+				if (mutation.attributeName === "data-visible") {
+					const visible = tools?.dataset.visible === "true";
+					thead?.classList.toggle("sticky", !visible);
+				}
+			}
+		});
+		this.toolsObserver.observe(tools, { attributes: true });
+		await this._renderDefaultTool(tools);
+	}
+
+	_click(e) {
+		const toolsTrigger = e.target.closest("[data-role='tools-dropdown']");
+		if (this.mobile && toolsTrigger && !this.dropdown) {
+			e.preventDefault();
+			e.stopPropagation();
+			void this.runColdAction(
+				toolsTrigger,
+				() => this._createDropdown(),
+				(dropdown) => dropdown?.showPanel?.(),
+				toolsTrigger,
+			);
+			return;
+		}
+
+		const tableControls = e.target.closest(
+			"button[lp-show='table:MobileTableControls']",
+		);
+		if (this.mobile && tableControls) {
+			this.dropdown?.hidePanel();
+			this._setMobileControlsDropdownOpen(false);
+
+			const tools = this.elt.querySelector("#tools");
+			if (tools?.dataset.visible === "true") {
+				this.getComponent(tools)?.deactivate(false);
+			}
+		}
+
+		super._click(e);
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/base/index.mjs::EntityIndex._defaultToolTarget
+	 * @reason query parsing is owned by the target resolver
+	 */
+	_defaultToolSlug() {
+		return this.querySlug(this.queryParam("tool"));
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_url_tool_opens_saved_filters
+	 * @features filters
+	 * @dimensions saved-filters query-tool
+	 */
+	_defaultToolTarget(tools) {
+		const tool = this._defaultToolSlug();
+		if (!tool) return null;
+
+		const buttons = tools.querySelectorAll(
+			"nav[data-nav='tools'] button[lp-show]",
+		);
+		for (const button of buttons) {
+			const attribute = button.getAttribute("lp-show");
+			const [componentId, widgetName] = attribute.split(":");
+			const candidates = [
+				componentId,
+				widgetName,
+				attribute.replace(":", "-"),
+				button.textContent,
+			];
+
+			if (candidates.some((candidate) => this.querySlug(candidate) === tool)) {
+				return { componentId, widgetName };
+			}
+		}
+
+		const widget = Array.from(tools.querySelectorAll("[data-widget]")).find(
+			(elt) => this.querySlug(elt.dataset.widget) === tool,
+		);
+		if (!widget) return null;
+
+		return {
+			componentId: widget.closest("[lp-component]")?.id || tools.id,
+			widgetName: widget.dataset.widget,
+		};
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/base/index.mjs::EntityIndex._defaultToolTarget
+	 * @reason render helper is driven by the resolved query target
+	 */
+	async _renderDefaultTool(tools) {
+		const target = this._defaultToolTarget(tools);
+		if (!target) return;
+
+		const component = this.getComponent(
+			document.getElementById(target.componentId),
+		);
+		if (!component) return;
+
+		const activated = await component.activate(target.widgetName || "default");
+		await withTransition(async () => {
+			await component.render(activated);
+		});
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003e_form_index_mobile_ui.py::test_form_index_mobile_tools_and_column_controls_are_exclusive
+	 * @features table-controls
+	 * @dimensions mobile-controls mobile-tools mutual-exclusion
+	 */
+	_setMobileControlsDropdownOpen(open) {
+		const mobileControls = this.elt.querySelector("#mobile-controls");
+		if (!mobileControls) return;
+
+		mobileControls.classList.toggle("opacity-50", open);
+		mobileControls.classList.toggle("pointer-events-none", open);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
+	 * @tests tests_e2e/003_forms/test_003e_form_index_mobile_ui.py::test_form_index_mobile_tools_and_column_controls_are_exclusive
+	 * @pairs pages:create pages:category-index pages:mobile-tools
+	 * @pairs table-controls:mobile-controls table-controls:mobile-tools table-controls:mutual-exclusion
+	 */
+	async _createDropdown() {
+		if (this.dropdown) return;
+		if (this._dropdownPromise) return this._dropdownPromise;
+
+		const trigger = this.elt.querySelector("[data-role='tools-dropdown']");
+		if (!trigger) return;
+		this._dropdownPromise = import('../dropdown.js?v=b3f50eb1')
+			.then(({ Dropdown }) => {
+				if (this._destroyed || !this.mobile) return null;
+
+				const items = [];
+
+				const createOption = (button) => {
+					const option = button.cloneNode(true);
+					option.setAttribute("role", "option");
+					option.removeAttribute("data-selected");
+					option.className = STYLES.index.tools.dropdown.toggle;
+					return option.outerHTML;
+				};
+
+				document
+					.querySelectorAll("nav[data-nav='tools'] button")
+					.forEach((button) => {
+						if (button.dataset.visible === "false") return;
+						items.push({
+							html: createOption(button),
+							onClick: () => {
+								const mobileControls =
+									this.elt.querySelector("#mobile-controls");
+								const table = this.getComponent(
+									this.elt.querySelector("#table"),
+								);
+								if (table?.active?.name === "MobileTableControls") {
+									table.deactivate(false);
+								} else if (mobileControls) {
+									mobileControls.dataset.visible = "false";
+								}
+								this._setMobileControlsDropdownOpen(false);
+								this.renderComponent(button);
+							},
+						});
+					});
+
+				this.dropdown = new Dropdown(trigger);
+
+				this.dropdown.init({
+					items,
+					placement: "bottom-end",
+					styles: {
+						panel: STYLES.index.tools.dropdown.panel,
+					},
+					onShow: () => this._setMobileControlsDropdownOpen(true),
+					onHide: () => this._setMobileControlsDropdownOpen(false),
+				});
+				return this.dropdown;
+			})
+			.catch((error) => {
+				this.reportStartupError(error, trigger, "index-tools-dropdown");
+				return null;
+			})
+			.finally(() => {
+				this._dropdownPromise = null;
+			});
+		return this._dropdownPromise;
+	}
+
+	destroy() {
+		this.elt.removeEventListener("mobile-resize", this._indexMobileResize);
+		super.destroy();
+		this._setMobileControlsDropdownOpen(false);
+		this.dropdown?.destroy();
+		this.dropdown = null;
+		this.toolsObserver?.disconnect();
+		this.toolsObserver = null;
+		this.TableVisibilityState?.destroy();
+		this.TableVisibilityState = null;
+	}
+}
+
+export { EntityIndex as default };

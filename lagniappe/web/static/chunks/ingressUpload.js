@@ -1,2 +1,71 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="ef1634f2-467e-4955-9296-4cebdc2acfb9",e._sentryDebugIdIdentifier="sentry-dbid-ef1634f2-467e-4955-9296-4cebdc2acfb9");}catch(e){}}();import{B as e,u as i,U as s}from"./baseUpload.js?v=b8490206";import"./styles.js?v=b8490206";import"./request.js?v=b8490206";import"./errors.js?v=b8490206";import"./connectivity.js?v=b8490206";import"./icons.js?v=b8490206";import"./utilities.js?v=b8490206";import"./buttons.js?v=b8490206";import"./formatting.js?v=b8490206";import"./dropdown.js?v=b8490206";import"./combobox.js?v=b8490206";import"./primitives.js?v=b8490206";import"./baseForm.js?v=b8490206";import"./loader.js?v=b8490206";const o="Drop a file here or click to upload. Only CSV files are supported.";class r extends e{constructor(t){super(t),this.messages={submit:"Upload File",submitting:"Uploading",submitted:"Uploaded"},this.uploadType="file",this.inputName="ingress-file",this.dropzone=i.dropzone({text:o}),this.submitButton=this.target.querySelector("button[type='submit']"),this.menuOptions=["paste"],this.uploadMenu=new s(this)}get html(){return[this.dropzone.element]}async init(){await super.init(),this.form.hideSubmitButton()}async created(){this.form.success(),this.createdFile=!0}async postreconcile(){this.createdFile&&(await super.reset(),this.visible=!1,this.target.dataset.visible="false",this.createdFile=!1)}}export{r as IngressFileUpload};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b3f50eb1';
+import './styles.js?v=b3f50eb1';
+import './request.js?v=b3f50eb1';
+import './errors.js?v=b3f50eb1';
+import './connectivity.js?v=b3f50eb1';
+import './icons.js?v=b3f50eb1';
+import './utilities.js?v=b3f50eb1';
+import './buttons.js?v=b3f50eb1';
+import './formatting.js?v=b3f50eb1';
+import './dropdown.js?v=b3f50eb1';
+import './combobox.js?v=b3f50eb1';
+import './primitives.js?v=b3f50eb1';
+import './baseForm.js?v=b3f50eb1';
+import './loader.js?v=b3f50eb1';
+
+const INGRESS_DROPZONE_TEXT =
+	"Drop a file here or click to upload. Only CSV files are supported.";
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002g_home_import.py::test_open_import_form
+ * @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_file_input
+ * @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_drag_drop
+ * @features ingress
+ * @dimensions upload-form file-input drag-drop
+ */
+class IngressFileUpload extends BaseUpload {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Upload File",
+			submitting: "Uploading",
+			submitted: "Uploaded",
+		};
+		this.uploadType = "file";
+		this.inputName = "ingress-file";
+
+		this.dropzone = uploadElement.dropzone({
+			text: INGRESS_DROPZONE_TEXT,
+		});
+		this.submitButton = this.target.querySelector("button[type='submit']");
+		this.menuOptions = ["paste"];
+		this.uploadMenu = new UploadMenu(this);
+	}
+
+	get html() {
+		return [this.dropzone.element];
+	}
+
+	async init() {
+		await super.init();
+		this.form.hideSubmitButton();
+	}
+
+	async created() {
+		this.form.success();
+		this.createdFile = true;
+	}
+
+	async postreconcile() {
+		if (this.createdFile) {
+			await super.reset();
+			this.visible = false;
+			this.target.dataset.visible = "false";
+			this.createdFile = false;
+		}
+	}
+}
+
+export { IngressFileUpload };

@@ -2,25 +2,79 @@
 
 
 # @features admin
-# @dimensions site-settings
-def test_site_settings_initializes_ai_selects_before_syncing_saved_values(run_node):
+# @dimensions site-settings composite-widgets sections persistence
+def test_site_settings_coordinates_section_widgets(run_node):
     run_node(
         r"""
 const fs = require("node:fs");
 const vm = require("node:vm");
 
+class FakeToggle {
+  constructor() {
+    this.dataset = {};
+    this.attributes = {};
+    this.title = "";
+  }
+  setAttribute(name, value) { this.attributes[name] = value; }
+}
+
+class FakeSection {
+  constructor(name) {
+    this.dataset = { section: name, open: "false" };
+    this.body = { dataset: { visible: "false" } };
+    this.toggle = new FakeToggle();
+  }
+  querySelector(selector) {
+    if (selector === "[data-role='section-body']") return this.body;
+    if (selector === "[data-role='expand']") return this.toggle;
+    return null;
+  }
+}
+
+const names = [
+  "maintenance",
+  "deployment",
+  "ai-models",
+  "service-providers",
+  "site-image",
+];
+const sections = names.map((name) => new FakeSection(name));
+const target = {
+  attributes: {},
+  listeners: {},
+  querySelectorAll: () => sections,
+  addEventListener(type, listener) { this.listeners[type] = listener; },
+  removeEventListener(type, listener) {
+    if (this.listeners[type] === listener) delete this.listeners[type];
+  },
+  setAttribute(name, value) { this.attributes[name] = value; },
+};
+
+const loaded = [];
+const widgets = new Map();
+const component = {
+  async loadWidget(name) {
+    loaded.push(name);
+    const widget = {
+      modified: false,
+      responses: [],
+      openedCount: 0,
+      updated(response) { this.responses.push(response); },
+      async opened() { this.openedCount += 1; },
+    };
+    widgets.set(name, widget);
+    return widget;
+  },
+};
+
+const storage = new Map([["lagniappe:site-settings-section", "missing"]]);
 const context = {
-  BaseUpload: class {},
-  ICONS: {},
-  STYLES: {},
-  Modal: class {},
-  SelectBox: class {},
-  UploadMenu: class {},
-  buttons: {},
-  clearRecentSearchResults() {},
   console,
-  request: {},
-  uploadElement: {},
+  localStorage: {
+    getItem: (key) => storage.get(key) || null,
+    setItem: (key, value) => storage.set(key, value),
+    removeItem: (key) => storage.delete(key),
+  },
   withTransition: async (callback) => await callback(),
 };
 
@@ -31,13 +85,89 @@ source = source.replace("export class SiteSettings", "class SiteSettings");
 source += "\nglobalThis.SiteSettings = SiteSettings;";
 vm.runInContext(source, context);
 
+(async () => {
+  const settings = new context.SiteSettings({ component, target });
+  await settings.init();
+
+  const expectedWidgets = [
+    "SiteMaintenance",
+    "SiteDeployment",
+    "SiteAiModels",
+    "SiteServiceProviders",
+    "SiteImage",
+  ];
+  if (JSON.stringify(loaded.sort()) !== JSON.stringify(expectedWidgets.sort())) {
+    throw new Error(`Unexpected child widgets: ${JSON.stringify(loaded)}`);
+  }
+  if (target.attributes.initialized !== "") {
+    throw new Error("Coordinator was published before initialization completed");
+  }
+  if (sections[0].dataset.open !== "true" || sections[0].body.dataset.visible !== "true") {
+    throw new Error("Invalid saved state did not fall back to Maintenance");
+  }
+
+  const response = { deployment: { DEPLOY_SCALING_TYPE: "basic" } };
+  settings.updated(response);
+  for (const widget of widgets.values()) {
+    if (widget.responses[0] !== response || widget.modified !== true) {
+      throw new Error("Aggregate response was not forwarded for reconciliation");
+    }
+  }
+
+  await settings._setOpenSection("site-image");
+  const image = widgets.get("SiteImage");
+  if (image.openedCount !== 1 || storage.get("lagniappe:site-settings-section") !== "site-image") {
+    throw new Error("Opening Site Image did not persist state or invoke its lifecycle hook");
+  }
+  if (sections.at(-1).dataset.open !== "true" || sections[0].dataset.open !== "false") {
+    throw new Error("Opening one section did not close the prior section");
+  }
+
+  await settings._setOpenSection(null);
+  if (storage.has("lagniappe:site-settings-section") || sections.some((section) => section.dataset.open === "true")) {
+    throw new Error("Collapsing the active section did not clear persisted state");
+  }
+
+  settings.destroy();
+  if (target.listeners.click) throw new Error("Coordinator click listener was not removed");
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
+"""
+    )
+
+
+# @features admin
+# @dimensions ai-settings model-options saved-values
+def test_site_settings_initializes_ai_selects_before_syncing_saved_values(run_node):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const context = {
+  SiteSetting: class {},
+  SelectBox: class {},
+  buttons: {},
+  console,
+  request: {},
+};
+
+vm.createContext(context);
+let source = fs.readFileSync("src/script/widgets/siteSettings/aiModels.mjs", "utf8");
+source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
+source = source.replace("export class SiteAiModels", "class SiteAiModels");
+source += "\nglobalThis.SiteAiModels = SiteAiModels;";
+vm.runInContext(source, context);
+
 const calls = [];
-const settings = Object.create(context.SiteSettings.prototype);
+const settings = Object.create(context.SiteAiModels.prototype);
 settings.aiForm = { querySelector: () => null };
 settings._initAiSelectBoxes = () => calls.push("init");
 settings._populateAiModelSelect = (name) => calls.push(`populate:${name}`);
 settings._setAiField = (name, value) => calls.push(`set:${name}:${value}`);
-settings._updateAiSummary = () => calls.push("summary");
+settings.updateSummary = () => calls.push("summary");
 
 settings._renderAiSettings(
   {
@@ -278,8 +408,7 @@ target.nodes = {
 };
 
 const context = {
-  BaseUpload: class {},
-  ICONS: {},
+  SiteSetting: class {},
   STYLES: {
     link: { emphasized: "link-emphasized" },
     siteSettings: {
@@ -292,25 +421,21 @@ const context = {
     },
   },
   Modal: class {},
-  SelectBox: class {},
-  UploadMenu: class {},
   buttons: {},
   clearRecentSearchResults() {},
   console,
   document: { createElement: () => new FakeNode() },
   request: {},
-  uploadElement() {},
-  withTransition: async (callback) => await callback(),
 };
 
 vm.createContext(context);
-let source = fs.readFileSync("src/script/widgets/siteSettings.mjs", "utf8");
+let source = fs.readFileSync("src/script/widgets/siteSettings/maintenance.mjs", "utf8");
 source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
-source = source.replace("export class SiteSettings", "class SiteSettings");
-source += "\nglobalThis.SiteSettings = SiteSettings;";
+source = source.replace("export class SiteMaintenance", "class SiteMaintenance");
+source += "\nglobalThis.SiteMaintenance = SiteMaintenance;";
 vm.runInContext(source, context);
 
-const settings = Object.create(context.SiteSettings.prototype);
+const settings = Object.create(context.SiteMaintenance.prototype);
 settings.target = target;
 
 const completed = {

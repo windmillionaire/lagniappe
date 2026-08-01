@@ -1,2 +1,167 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="b3b5c582-44ef-48df-9c43-d639be997b33",e._sentryDebugIdIdentifier="sentry-dbid-b3b5c582-44ef-48df-9c43-d639be997b33");}catch(e){}}();import{F as l}from"./form2.js?v=b8490206";import{s as o}from"./sections.js?v=b8490206";import{r as e}from"./request.js?v=b8490206";import"./connectivity.js?v=b8490206";import{captureError as s}from"./errors.js?v=b8490206";import"./utilities.js?v=b8490206";import"./baseForm.js?v=b8490206";import"./icons.js?v=b8490206";import"./styles.js?v=b8490206";import"./primitives.js?v=b8490206";import"./loader.js?v=b8490206";import"./baseUpload.js?v=b8490206";import"./buttons.js?v=b8490206";import"./formatting.js?v=b8490206";import"./dropdown.js?v=b8490206";import"./combobox.js?v=b8490206";class a extends l{constructor(t){super(t),this.messages={submit:"Update",submitting:"Updating",submitted:"Updated",queued:"Queued Sync"},this._historyFillRequest=null,this._historyFillSubmission=null,this._defaultFieldSave=Promise.resolve()}get autofillElement(){return this.readonly?null:o.autofill(this)}get historyFillRoute(){return this.endpoints?.latestHistorySubmission}get saveDefaultFieldRoute(){return this.endpoints?.saveDefaultField}get historyFillEnabled(){return!!(!this.readonly&&this.hasHistory&&this.historyFillRoute)}get hasHistory(){return!!this.component?.elt.querySelector("[data-widget='TaskHistory']")}get append(){return[this.autofillElement]}offline({data:t,method:i,route:r}){return{id:`update:task:${this.key}`,action:"update",kind:"task",method:i,route:r,target_key:this.key,data:t}}handleOfflineQueue({phase:t,record:i}){if(!(i?.kind!=="task"||i.target_key!==this.key)){if(t==="queued"&&this.form?.queued(),t==="conflict")return this._offlineConflict={record:i,response:i.conflictResponse},this.stageOfflineConflict();t==="replayed"&&this.form?.success()}}_resetHistoryFillCache(){this._historyFillRequest=null,this._historyFillSubmission=null}async init(){await super.init(),await this.loadHistoryFill()}async reset(){this._resetHistoryFillCache(),await super.reset(),await this.loadHistoryFill()}async latestHistorySubmission(){return this._historyFillSubmission?this._historyFillSubmission:(this._historyFillRequest||(this._historyFillRequest=e.get(this.historyFillRoute).then(t=>t.latest_submission||{}).catch(t=>(this._historyFillRequest=null,s(t,this.target,{route:this.historyFillRoute}),{}))),this._historyFillSubmission=await this._historyFillRequest,this._historyFillSubmission)}async saveDefaultField(t){if(!this.saveDefaultFieldRoute||!t)return;this._defaultFieldSave=this._defaultFieldSave.then(()=>e.patch(this.saveDefaultFieldRoute,{field_id:t}));const i=await this._defaultFieldSave;i?.ok||s(new Error(i?.error||"Failed to save repeating task value"),this.target,{fieldId:t,route:this.saveDefaultFieldRoute})}async loadHistoryFill(){if(!this.historyFillEnabled||!this.form?.renderer)return;const t=await this.latestHistorySubmission();this.form.renderer.addHistoryFillButtons(t,i=>this.saveDefaultField(i))}}export{a as TaskForm};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FormElement } from './form2.js?v=b3f50eb1';
+import { s as sections } from './sections.js?v=b3f50eb1';
+import { r as request } from './request.js?v=b3f50eb1';
+import './connectivity.js?v=b3f50eb1';
+import { captureError } from './errors.js?v=b3f50eb1';
+import './utilities.js?v=b3f50eb1';
+import './baseForm.js?v=b3f50eb1';
+import './icons.js?v=b3f50eb1';
+import './styles.js?v=b3f50eb1';
+import './primitives.js?v=b3f50eb1';
+import './loader.js?v=b3f50eb1';
+import './baseUpload.js?v=b3f50eb1';
+import './buttons.js?v=b3f50eb1';
+import './formatting.js?v=b3f50eb1';
+import './dropdown.js?v=b3f50eb1';
+import './combobox.js?v=b3f50eb1';
+
+/**
+ * @testable true
+ * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_submit_attached_task_form
+ * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state
+ * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_empty_form_is_readonly
+ * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_partial_submission_omits_empty_fields
+ * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_empty_form_structure_without_edit_controls
+ * @features tasks
+ * @dimensions attached-form submission autofill readonly complete empty-fields partial-submission permission-gates
+ */
+class TaskForm extends FormElement {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Update",
+			submitting: "Updating",
+			submitted: "Updated",
+			queued: "Queued Sync",
+		};
+		this._historyFillRequest = null;
+		this._historyFillSubmission = null;
+		this._defaultFieldSave = Promise.resolve();
+	}
+
+	get autofillElement() {
+		if (this.readonly) return null;
+		return sections.autofill(this);
+	}
+
+	get historyFillRoute() {
+		return this.endpoints?.latestHistorySubmission;
+	}
+
+	get saveDefaultFieldRoute() {
+		return this.endpoints?.saveDefaultField;
+	}
+
+	get historyFillEnabled() {
+		return Boolean(!this.readonly && this.hasHistory && this.historyFillRoute);
+	}
+
+	get hasHistory() {
+		return Boolean(
+			this.component?.elt.querySelector("[data-widget='TaskHistory']"),
+		);
+	}
+
+	get append() {
+		return [this.autofillElement];
+	}
+
+	offline({ data, method, route }) {
+		return {
+			id: `update:task:${this.key}`,
+			action: "update",
+			kind: "task",
+			method,
+			route,
+			target_key: this.key,
+			data,
+		};
+	}
+
+	handleOfflineQueue({ phase, record }) {
+		if (record?.kind !== "task" || record.target_key !== this.key) return;
+		if (phase === "queued") this.form?.queued();
+		if (phase === "conflict") {
+			this._offlineConflict = {
+				record,
+				response: record.conflictResponse,
+			};
+			return this.stageOfflineConflict();
+		}
+		if (phase === "replayed") this.form?.success();
+	}
+
+	_resetHistoryFillCache() {
+		this._historyFillRequest = null;
+		this._historyFillSubmission = null;
+	}
+
+	async init() {
+		await super.init();
+		await this.loadHistoryFill();
+	}
+
+	async reset() {
+		this._resetHistoryFillCache();
+		await super.reset();
+		await this.loadHistoryFill();
+	}
+
+	async latestHistorySubmission() {
+		if (this._historyFillSubmission) return this._historyFillSubmission;
+
+		if (!this._historyFillRequest) {
+			this._historyFillRequest = request
+				.get(this.historyFillRoute)
+				.then((response) => response.latest_submission || {})
+				.catch((error) => {
+					this._historyFillRequest = null;
+					captureError(error, this.target, { route: this.historyFillRoute });
+					return {};
+				});
+		}
+
+		this._historyFillSubmission = await this._historyFillRequest;
+		return this._historyFillSubmission;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
+	 * @features tasks
+	 * @dimensions history-fill repeating-default patch
+	 */
+	async saveDefaultField(fieldId) {
+		if (!this.saveDefaultFieldRoute || !fieldId) return;
+
+		this._defaultFieldSave = this._defaultFieldSave.then(() =>
+			request.patch(this.saveDefaultFieldRoute, { field_id: fieldId }),
+		);
+		const response = await this._defaultFieldSave;
+		if (!response?.ok) {
+			captureError(
+				new Error(response?.error || "Failed to save repeating task value"),
+				this.target,
+				{ fieldId, route: this.saveDefaultFieldRoute },
+			);
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
+	 * @features tasks
+	 * @dimensions history-fill latest-submission
+	 */
+	async loadHistoryFill() {
+		if (!this.historyFillEnabled || !this.form?.renderer) return;
+
+		const submission = await this.latestHistorySubmission();
+		this.form.renderer.addHistoryFillButtons(submission, (fieldId) =>
+			this.saveDefaultField(fieldId),
+		);
+	}
+}
+
+export { TaskForm };

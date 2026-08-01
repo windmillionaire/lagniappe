@@ -1,2 +1,24 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="1b72c086-a2b8-40b5-9ed3-f4d2eae30c93",e._sentryDebugIdIdentifier="sentry-dbid-1b72c086-a2b8-40b5-9ed3-f4d2eae30c93");}catch(e){}}();import{E as r}from"../entity.js?v=b8490206";import"../core.js?v=b8490206";import"../connectivity.js?v=b8490206";import"../endpoints.js?v=b8490206";import"../errors.js?v=b8490206";import"../request.js?v=b8490206";import"../utilities.js?v=b8490206";import"../shell.js?v=b8490206";class i extends r{constructor(t){super(t),this._defaultTabId=t.dataset.defaultTab||"settings"}}export{i as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { E as Entity } from '../entity.js?v=b3f50eb1';
+import '../core.js?v=b3f50eb1';
+import '../connectivity.js?v=b3f50eb1';
+import '../endpoints.js?v=b3f50eb1';
+import '../errors.js?v=b3f50eb1';
+import '../request.js?v=b3f50eb1';
+import '../utilities.js?v=b3f50eb1';
+import '../shell.js?v=b3f50eb1';
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002f_home_directory.py::test_admin_directory_link_opens_admin_settings
+ * @features admin
+ * @dimensions page-load site-settings
+ */
+class Admin extends Entity {
+	constructor(node) {
+		super(node);
+		this._defaultTabId = node.dataset.defaultTab || "settings";
+	}
+}
+
+export { Admin as default };

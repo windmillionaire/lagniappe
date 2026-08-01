@@ -1,2 +1,146 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="3d1361c9-2c45-4e2e-88bd-d602b078cc89",e._sentryDebugIdIdentifier="sentry-dbid-3d1361c9-2c45-4e2e-88bd-d602b078cc89");}catch(e){}}();import{S as s}from"./styles.js?v=b8490206";import{r as a}from"./request.js?v=b8490206";import"./connectivity.js?v=b8490206";import{s as d}from"./icons.js?v=b8490206";import{Modal as l}from"./modal.js?v=b8490206";import"./utilities.js?v=b8490206";import{Dropdown as c}from"./dropdown.js?v=b8490206";import"./errors.js?v=b8490206";import"./endpoints.js?v=b8490206";import"./combobox.js?v=b8490206";import"./primitives.js?v=b8490206";class p{constructor(e){this.toolbar=e,this.active=!1,this.button=document.createElement("button"),this._dropdown=null,this._restore=this._restore.bind(this),this._loadEntries=this._loadEntries.bind(this),this.refresh=this.refresh.bind(this)}init(e){Object.assign(this,e),this.button.title=this.title,this.button.className=`${s.editor.toolbar.tool}`;const n=document.createElement("span");d(n,this.icon,s.editor.toolbar.historyIcon),this.button.replaceChildren(n),this._dropdown=new c(this.button),this._dropdown.init({loadOptions:this._loadEntries,placement:"bottom-end",styles:{panel:`${s.dropdown.panel} ${s.editor.toolbar.portalIconContext}`}})}show(){this.button.hidden=!1}async _loadEntries(){const e=this.toolbar.endpoints.history;if(!e)return[];const n=await a.get(e,{refresh:Date.now()});if(!n?.ok)return[];const i=n.entries||[],o=[{name:"Pin Version",icon:"pin",onClick:()=>this.toolbar.openForm("pinVersion")}];return n.unpinned_count>0&&o.push({name:"Clear Unpinned Versions",icon:"delete",onClick:t=>this._confirmClear(t)}),o.push(...i.map(t=>{const r=t.created?new Date(t.created).toLocaleString():"";return{name:t.pinned?`${t.name} \u2014 ${r}`:r,icon:t.pinned?"pin":"history",onClick:()=>this._restore(t.key)}})),o}async refresh(){const e=await this._loadEntries();this._dropdown?.updateOptions(e)}async _confirmClear(e){const n=this.toolbar.endpoints.history;if(!n)return;const i=new l(this.toolbar.document.view,e);await i.load(`${n}/unpinned?refresh=${Date.now()}`);const o=i.modal?.querySelector("[data-role='delete']");o&&(o.addEventListener("click",async()=>{o.disabled=!0;const t=o.querySelector("#spinner");if(t&&(t.dataset.visible="true"),!(await a.delete(o.dataset.route))?.ok){o.disabled=!1,t&&(t.dataset.visible="false");return}await i.remove(),await this.refresh()}),o.focus())}async _restore(e){const n=this.toolbar.endpoints.history,i=await a.get(`${n}/${e}`);if(!i?.markup)return;this.toolbar.document.editor.commands.setContent(i.markup,{emitUpdate:!1})}destroy(){this._dropdown&&(this._dropdown.destroy(),this._dropdown=null)}}export{p as documentHistory};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES } from './styles.js?v=b3f50eb1';
+import { r as request } from './request.js?v=b3f50eb1';
+import './connectivity.js?v=b3f50eb1';
+import { s as setIcon } from './icons.js?v=b3f50eb1';
+import { Modal } from './modal.js?v=b3f50eb1';
+import './utilities.js?v=b3f50eb1';
+import { Dropdown } from './dropdown.js?v=b3f50eb1';
+import './errors.js?v=b3f50eb1';
+import './endpoints.js?v=b3f50eb1';
+import './combobox.js?v=b3f50eb1';
+import './primitives.js?v=b3f50eb1';
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_created_on_save
+ * @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
+ * @features editor
+ * @dimensions history-list history-restore
+ */
+class DocumentHistoryButton {
+	constructor(toolbar) {
+		this.toolbar = toolbar;
+		this.active = false;
+		this.button = document.createElement("button");
+		this._dropdown = null;
+		this._restore = this._restore.bind(this);
+		this._loadEntries = this._loadEntries.bind(this);
+		this.refresh = this.refresh.bind(this);
+	}
+
+	init(settings) {
+		Object.assign(this, settings);
+		this.button.title = this.title;
+		this.button.className = `${STYLES.editor.toolbar.tool}`;
+
+		const iconElement = document.createElement("span");
+		setIcon(iconElement, this.icon, STYLES.editor.toolbar.historyIcon);
+		this.button.replaceChildren(iconElement);
+
+		this._dropdown = new Dropdown(this.button);
+		this._dropdown.init({
+			loadOptions: this._loadEntries,
+			placement: "bottom-end",
+			styles: {
+				panel: `${STYLES.dropdown.panel} ${STYLES.editor.toolbar.portalIconContext}`,
+			},
+		});
+	}
+
+	show() {
+		this.button.hidden = false;
+	}
+
+	async _loadEntries() {
+		const endpoint = this.toolbar.endpoints.history;
+		if (!endpoint) return [];
+
+		const response = await request.get(endpoint, { refresh: Date.now() });
+		if (!response?.ok) return [];
+
+		const entries = response.entries || [];
+		const items = [
+			{
+				name: "Pin Version",
+				icon: "pin",
+				onClick: () => this.toolbar.openForm("pinVersion"),
+			},
+		];
+
+		if (response.unpinned_count > 0) {
+			items.push({
+				name: "Clear Unpinned Versions",
+				icon: "delete",
+				onClick: (option) => this._confirmClear(option),
+			});
+		}
+
+		items.push(
+			...entries.map((entry) => {
+				const date = entry.created
+					? new Date(entry.created).toLocaleString()
+					: "";
+				return {
+					name: entry.pinned ? `${entry.name} — ${date}` : date,
+					icon: entry.pinned ? "pin" : "history",
+					onClick: () => this._restore(entry.key),
+				};
+			}),
+		);
+
+		return items;
+	}
+
+	async refresh() {
+		const items = await this._loadEntries();
+		this._dropdown?.updateOptions(items);
+	}
+
+	async _confirmClear(trigger) {
+		const endpoint = this.toolbar.endpoints.history;
+		if (!endpoint) return;
+
+		const modal = new Modal(this.toolbar.document.view, trigger);
+		await modal.load(`${endpoint}/unpinned?refresh=${Date.now()}`);
+		const deleteButton = modal.modal?.querySelector("[data-role='delete']");
+		if (!deleteButton) return;
+
+		deleteButton.addEventListener("click", async () => {
+			deleteButton.disabled = true;
+			const spinner = deleteButton.querySelector("#spinner");
+			if (spinner) spinner.dataset.visible = "true";
+
+			const response = await request.delete(deleteButton.dataset.route);
+			if (!response?.ok) {
+				deleteButton.disabled = false;
+				if (spinner) spinner.dataset.visible = "false";
+				return;
+			}
+
+			await modal.remove();
+			await this.refresh();
+		});
+		deleteButton.focus();
+	}
+
+	async _restore(historyKey) {
+		const endpoint = this.toolbar.endpoints.history;
+		const response = await request.get(`${endpoint}/${historyKey}`);
+		if (!response?.markup) return;
+
+		const doc = this.toolbar.document;
+		doc.editor.commands.setContent(response.markup, {
+			emitUpdate: false,
+		});
+	}
+
+	destroy() {
+		if (this._dropdown) {
+			this._dropdown.destroy();
+			this._dropdown = null;
+		}
+	}
+}
+
+export { DocumentHistoryButton as documentHistory };

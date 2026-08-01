@@ -883,7 +883,7 @@ def test_site_settings_is_owner_only(get_user):
 
 
 # @features admin
-# @dimensions site-settings sections configuration-modal environment-variables
+# @dimensions site-settings sections configuration-modal environment-variables service-providers external-links
 # @template home/admin.html::main
 # @template home/site_settings.html::site_settings
 def test_site_settings_sections_expand_help_and_configuration(get_user):
@@ -892,11 +892,13 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
 
     maintenance = _site_settings_section(settings_panel, "maintenance")
     deployment = _site_settings_section(settings_panel, "deployment")
+    ai_models = _site_settings_section(settings_panel, "ai-models")
     providers = _site_settings_section(settings_panel, "service-providers")
     site_image = _site_settings_section(settings_panel, "site-image")
 
     expect(maintenance).to_have_attribute("data-open", "true")
     expect(deployment).to_have_attribute("data-open", "false")
+    expect(ai_models).to_have_attribute("data-open", "false")
     expect(providers).to_have_attribute("data-open", "false")
     expect(site_image).to_have_attribute("data-open", "false")
     _open_help_and_expect(
@@ -912,8 +914,21 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
         "Scaling",
     )
 
-    _open_site_settings_section(settings_panel, "service-providers")
+    _open_site_settings_section(settings_panel, "ai-models")
     expect(deployment).to_have_attribute("data-open", "false")
+    expect(ai_models).to_have_attribute("data-open", "true")
+    expect(ai_models.locator("input[role='combobox']")).to_have_count(3)
+    expect(ai_models.locator("[data-role='section-summary']")).to_contain_text(
+        "utility"
+    )
+    _open_help_and_expect(
+        owner,
+        ai_models.locator("button[lp-help='site_ai_models']"),
+        "Primary",
+    )
+
+    _open_site_settings_section(settings_panel, "service-providers")
+    expect(ai_models).to_have_attribute("data-open", "false")
     expect(providers).to_have_attribute("data-open", "true")
     expect(providers).to_contain_text("Google Cloud Console")
     _open_help_and_expect(
@@ -942,7 +957,7 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
 
 
 # @features admin
-# @dimensions deployment-settings metadata
+# @dimensions deployment-settings metadata scaling-controls
 # @template home/site_settings.html::site_settings
 def test_site_settings_deployment_form_saves_and_updates_summary(get_user):
     owner = get_user(Users.OWNER)
@@ -995,14 +1010,16 @@ def test_site_settings_deployment_form_saves_and_updates_summary(get_user):
 
 
 # @features admin
-# @dimensions site-image-upload generated-images public-preview metadata
+# @dimensions site-image-upload generated-images public-preview metadata lazy-initialization
 # @template home/site_settings.html::site_settings
 def test_site_settings_image_upload_generates_and_persists_site_images(get_user):
     owner = get_user(Users.OWNER)
     admin, settings_panel = _open_owner_site_settings(owner)
 
-    _open_site_settings_section(settings_panel, "site-image")
     upload_form = settings_panel.locator("[data-role='upload-site-image']")
+    expect(upload_form).not_to_have_attribute("rendered", "")
+
+    _open_site_settings_section(settings_panel, "site-image")
     expect(upload_form).to_have_attribute("rendered", "")
 
     image_path = Path("testing/files/site_image_test_image.jpeg").resolve()
