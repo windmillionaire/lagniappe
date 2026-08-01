@@ -189,7 +189,7 @@ def test_generate_ask_report_repairs_unusable_answers(monkeypatch):
 
 
 # @features ai-report
-# @dimensions ask generate validate repair needs-review references per-action-fallback fallback
+# @dimensions ask needs-review references per-action-fallback fallback
 @pytest.mark.unit
 def test_generate_ask_report_reviews_invalid_actions_after_failed_repair(
     monkeypatch,
@@ -273,7 +273,7 @@ def test_generate_ask_report_reviews_invalid_actions_after_failed_repair(
 
 
 # @features ai-report
-# @dimensions ask generate validate repair per-action-fallback malformed-data canonical-target
+# @dimensions ask per-action-fallback malformed-data canonical-target
 @pytest.mark.unit
 def test_generate_ask_report_preserves_valid_actions_after_malformed_repair(
     monkeypatch,

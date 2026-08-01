@@ -25,6 +25,9 @@ from lagniappe.core.tools.ai import (
     report_runner,
     summarize,
 )
+from lagniappe.core.tools.ai.reporting.actions import lifecycle as report_action_lifecycle
+from lagniappe.core.tools.ai.reporting import contracts as report_contracts
+from lagniappe.core.tools.ai.reporting import organize_completion
 from testing.utility.mock_restrictions import MockRestrictions
 from testing.utility.test_entities import TestEntities
 
@@ -1835,7 +1838,7 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
         file.summary = f"Summary for {file.filename}"
         return file.properties.summarize
 
-    monkeypatch.setattr(organize, "generate_summary", fake_generate_summary)
+    monkeypatch.setattr(organize_completion, "generate_summary", fake_generate_summary)
 
     summarized = organize.summarize_report_input_files(
         report,
@@ -1876,7 +1879,7 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
         file.summary = "Unindexed summary."
         return file.properties.summarize
 
-    monkeypatch.setattr(organize, "generate_summary", no_quota_summary)
+    monkeypatch.setattr(organize_completion, "generate_summary", no_quota_summary)
 
     summarized = organize.summarize_report_input_files(
         unindexed_report, search=False, raise_quota=False
@@ -1908,7 +1911,7 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
         file.summary = "Third summary."
         return file.properties.summarize
 
-    monkeypatch.setattr(organize, "generate_summary", quota_after_first)
+    monkeypatch.setattr(organize_completion, "generate_summary", quota_after_first)
 
     with pytest.raises(exceptions.AIQuotaError):
         organize.summarize_report_input_files(quota_report, save=quota_saved.append)
@@ -1950,7 +1953,7 @@ def test_summarize_report_input_files_falls_back_for_large_files(monkeypatch):
         file.properties.summarize.error = "Provider did not return a summary."
         return file.properties.summarize
 
-    monkeypatch.setattr(organize, "generate_summary", no_summary)
+    monkeypatch.setattr(organize_completion, "generate_summary", no_summary)
 
     summarized = organize.summarize_report_input_files(report, save=saved.append)
 
@@ -2002,7 +2005,7 @@ def test_unreadable_pdf_is_saved_skipped_and_reported(monkeypatch):
         target.properties.summarize.error = summarize.UNREADABLE_PDF_SUMMARY_ERROR
         return target.properties.summarize
 
-    monkeypatch.setattr(organize, "generate_summary", unreadable_summary)
+    monkeypatch.setattr(organize_completion, "generate_summary", unreadable_summary)
 
     summarized = organize.summarize_report_input_files(report, save=saved.append)
     retried = organize.summarize_report_input_files(report, save=saved.append)
@@ -2545,7 +2548,7 @@ def test_generate_organize_report_repairs_invalid_action_type_once(monkeypatch):
 
 
 # @features ai-report
-# @dimensions organize generate validate repair file-placement
+# @dimensions repair file-placement
 @pytest.mark.unit
 def test_generate_organize_report_repairs_missing_file_attachments(monkeypatch):
     invalid = {
@@ -2630,7 +2633,7 @@ def test_generate_organize_report_repairs_missing_file_attachments(monkeypatch):
 
 
 # @features ai-report
-# @dimensions organize generate validate repair file-placement fallback
+# @dimensions fallback file-placement
 @pytest.mark.unit
 def test_generate_organize_report_reviews_files_missing_after_repair(monkeypatch):
     incomplete = {
@@ -2684,7 +2687,7 @@ def test_generate_organize_report_reviews_files_missing_after_repair(monkeypatch
 
 
 # @features ai-report
-# @dimensions generate validate repair references
+# @dimensions repair references
 @pytest.mark.unit
 def test_generate_organize_report_repairs_invalid_action_references_once(monkeypatch):
     invalid = {
@@ -2754,7 +2757,7 @@ def test_generate_organize_report_repairs_invalid_action_references_once(monkeyp
 
 
 # @features ai-report
-# @dimensions generate validate repair references
+# @dimensions repair references
 @pytest.mark.unit
 def test_generate_organize_report_repairs_category_used_as_page_reference(monkeypatch):
     invalid = {
@@ -2844,7 +2847,7 @@ def test_generate_organize_report_repairs_category_used_as_page_reference(monkey
 
 
 # @features ai-report
-# @dimensions organize generate validate repair required-data
+# @dimensions repair required-data
 @pytest.mark.unit
 def test_generate_organize_report_repairs_invalid_action_data_shape(monkeypatch):
     invalid = {
@@ -2930,7 +2933,7 @@ def test_generate_organize_report_repairs_invalid_action_data_shape(monkeypatch)
 
 
 # @features ai-report
-# @dimensions organize generate validate repair add-category required-data
+# @dimensions repair add-category required-data
 @pytest.mark.unit
 def test_generate_organize_report_repairs_missing_add_category_target(monkeypatch):
     invalid = {
@@ -3005,7 +3008,7 @@ def test_generate_organize_report_repairs_missing_add_category_target(monkeypatc
 
 
 # @features ai-report
-# @dimensions organize generate validate repair submission required-data
+# @dimensions validate submission
 @pytest.mark.unit
 def test_generate_organize_plan_leaves_form_submission_for_completion(monkeypatch):
     invalid = {
@@ -3069,7 +3072,7 @@ def test_generate_organize_plan_leaves_form_submission_for_completion(monkeypatc
 
 
 # @features ai-report
-# @dimensions organize generate validate repair empty-form capture
+# @dimensions repair empty-form capture
 @pytest.mark.unit
 def test_generate_organize_report_repairs_empty_form_schema_without_capture(monkeypatch):
     invalid = {
@@ -3146,7 +3149,7 @@ def test_generate_organize_report_repairs_empty_form_schema_without_capture(monk
 
 
 # @features ai-report
-# @dimensions organize generate validate repair schema-field-id
+# @dimensions deterministic-repair schema-field-id
 @pytest.mark.unit
 def test_generate_organize_report_repairs_create_form_field_missing_id(monkeypatch):
     invalid = {
@@ -3205,9 +3208,6 @@ def test_generate_organize_report_repairs_create_form_field_missing_id(monkeypat
     assert len(calls) == 1
 
 
-# @pair ai-report:organize
-# @pair ai-report:generate
-# @pair ai-report:validate
 # @pair ai-report:deterministic-repair
 # @pair ai-report:schema-update
 # @pair form-schema:deterministic-repair
@@ -3268,9 +3268,6 @@ def test_generate_organize_report_completes_additive_schema_field(monkeypatch):
     assert len(calls) == 1
 
 
-# @pair ai-report:organize
-# @pair ai-report:generate
-# @pair ai-report:validate
 # @pair ai-report:deterministic-repair
 # @pair ai-report:form-type
 # @pair form-schema:form-type
@@ -3330,7 +3327,7 @@ def test_generate_organize_report_infers_create_form_type_from_usage(monkeypatch
 
 
 # @features ai-report
-# @dimensions organize generate validate deterministic-repair page-form references
+# @dimensions deterministic-repair page-form references
 @pytest.mark.unit
 def test_generate_organize_report_infers_unambiguous_add_form_reference(monkeypatch):
     proposal = {
@@ -3406,7 +3403,7 @@ def test_generate_organize_report_infers_unambiguous_add_form_reference(monkeypa
 
 
 # @features ai-report
-# @dimensions organize repair needs-review references page-form per-action-fallback fallback
+# @dimensions needs-review references page-form per-action-fallback fallback
 @pytest.mark.unit
 def test_generate_organize_report_reviews_ambiguous_missing_add_form_reference(
     monkeypatch,
@@ -3520,7 +3517,7 @@ def test_generate_organize_report_reviews_ambiguous_missing_add_form_reference(
 
 
 # @features ai-report
-# @dimensions organize generate validate repair needs-review references
+# @dimensions needs-review references per-action-fallback
 @pytest.mark.unit
 def test_generate_organize_report_reviews_unresolved_references_after_failed_repair(
     monkeypatch,
@@ -3581,7 +3578,7 @@ def test_generate_organize_report_reviews_unresolved_references_after_failed_rep
 
 
 # @features ai-report
-# @dimensions organize generate validate repair needs-review fallback
+# @dimensions needs-review per-action-fallback malformed-data
 @pytest.mark.unit
 def test_generate_organize_report_downgrades_malformed_action_after_failed_repair(
     monkeypatch,
@@ -3643,7 +3640,7 @@ def test_generate_organize_report_downgrades_malformed_action_after_failed_repai
 
 
 # @features ai-report
-# @dimensions organize generate validate repair needs-review fallback
+# @dimensions needs-review references per-action-fallback
 @pytest.mark.unit
 def test_generate_organize_report_downgrades_missing_category_without_sentry_capture(
     monkeypatch,
@@ -5088,6 +5085,18 @@ def test_toggle_proposal_action_indexes_can_skip_exact_indexes_without_dependenc
     assert skipped == {"changed": [1], "skipped": [1]}
     assert [action.get("skip") for action in proposal["actions"]] == [True, None]
 
+
+# @features ai-report
+# @dimensions action-registry contract
+@pytest.mark.unit
+def test_report_action_registry_matches_proposal_contracts():
+    adapters = report_runner.REPORT_ACTION_ADAPTERS
+
+    assert set(adapters) == set(report_contracts.REPORT_ACTION_DATA_CONTRACTS)
+    assert set(adapters) == set(report_contracts.ALLOWED_ACTIONS)
+    assert all(action_type == adapter.action_type for action_type, adapter in adapters.items())
+
+
 # @pair ai-report:cancellation
 # @pair ai-report:deterministic-run
 @pytest.mark.unit
@@ -5179,7 +5188,7 @@ def test_run_report_propagates_deferred_control_stop(monkeypatch):
 
 
 # @features ai-report
-# @dimensions deterministic-run create-order partial-result skip-action default-category result grouping attachments
+# @dimensions deterministic-run create-order partial-result skip-action default-category result grouping attachments file-summary
 @pytest.mark.unit
 def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -8461,7 +8470,7 @@ def test_run_report_retry_resumes_after_completed_create_without_duplicate(monke
         },
     )
     stored, _saves = _recovery_store(monkeypatch)
-    original_execute = report_runner._execute_action
+    original_execute = report_action_lifecycle._execute_action
     calls = []
     failed = {"value": False}
 
@@ -8472,7 +8481,7 @@ def test_run_report_retry_resumes_after_completed_create_without_duplicate(monke
             raise RuntimeError("injected interruption")
         return original_execute(action, *args, **kwargs)
 
-    monkeypatch.setattr(report_runner, "_execute_action", interrupted)
+    monkeypatch.setattr(report_action_lifecycle, "_execute_action", interrupted)
 
     first = report_runner.run_report(report, user)
 
@@ -8534,7 +8543,7 @@ def test_run_report_retry_stops_when_completed_prefix_permission_is_revoked(
         },
     )
     stored, _saves = _recovery_store(monkeypatch)
-    original_execute = report_runner._execute_action
+    original_execute = report_action_lifecycle._execute_action
     calls = []
 
     def interrupted(action, *args, **kwargs):
@@ -8543,7 +8552,7 @@ def test_run_report_retry_stops_when_completed_prefix_permission_is_revoked(
             raise RuntimeError("injected interruption")
         return original_execute(action, *args, **kwargs)
 
-    monkeypatch.setattr(report_runner, "_execute_action", interrupted)
+    monkeypatch.setattr(report_action_lifecycle, "_execute_action", interrupted)
     first = report_runner.run_report(report, user)
     project = stored[first["actions"][0]["entity"]["id"]]
     monkeypatch.setattr(
@@ -8623,9 +8632,9 @@ def test_run_report_reconciles_applying_create_when_output_already_exists(monkey
     assert list(stored) == [output_id]
 
 
-@pytest.mark.parametrize("first_action", ["move", "update"])
 # @features ai-report
 # @dimensions deterministic-run recovery moves batch-field-patch completed-prefix
+@pytest.mark.parametrize("first_action", ["move", "update"])
 @pytest.mark.unit
 def test_run_report_retry_validates_completed_move_and_update_prefix(
     monkeypatch,
@@ -8710,7 +8719,7 @@ def test_run_report_retry_validates_completed_move_and_update_prefix(
         page,
         form,
     )
-    original_execute = report_runner._execute_action
+    original_execute = report_action_lifecycle._execute_action
     calls = []
     failed = {"value": False}
 
@@ -8721,7 +8730,7 @@ def test_run_report_retry_validates_completed_move_and_update_prefix(
             raise RuntimeError("injected second-action failure")
         return original_execute(action, *args, **kwargs)
 
-    monkeypatch.setattr(report_runner, "_execute_action", interrupted)
+    monkeypatch.setattr(report_action_lifecycle, "_execute_action", interrupted)
 
     assert report_runner.run_report(report, user)["status"] == "failed"
     assert report_runner.run_report(report, user)["status"] == "complete"
@@ -8767,14 +8776,14 @@ def test_undo_report_compensates_completed_prefix_of_failed_report(monkeypatch):
         },
     )
     stored, _saves = _recovery_store(monkeypatch)
-    original_execute = report_runner._execute_action
+    original_execute = report_action_lifecycle._execute_action
 
     def interrupted(action, *args, **kwargs):
         if action["id"] == "failed_project":
             raise RuntimeError("stop after prefix")
         return original_execute(action, *args, **kwargs)
 
-    monkeypatch.setattr(report_runner, "_execute_action", interrupted)
+    monkeypatch.setattr(report_action_lifecycle, "_execute_action", interrupted)
     deleted = []
 
     def delete(*entities):
@@ -8855,7 +8864,7 @@ def test_completed_task_retry_and_undo_restore_reused_task(monkeypatch):
         },
     )
     stored, _saves = _recovery_store(monkeypatch, page, task)
-    original_execute = report_runner._execute_action
+    original_execute = report_action_lifecycle._execute_action
     calls = []
     failed = {"value": False}
 
@@ -8866,7 +8875,7 @@ def test_completed_task_retry_and_undo_restore_reused_task(monkeypatch):
             raise RuntimeError("stop after task mutation")
         return original_execute(action, *args, **kwargs)
 
-    monkeypatch.setattr(report_runner, "_execute_action", interrupted)
+    monkeypatch.setattr(report_action_lifecycle, "_execute_action", interrupted)
 
     first = report_runner.run_report(report, user)
 

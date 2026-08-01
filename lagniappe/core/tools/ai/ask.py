@@ -6,13 +6,15 @@ from .guidelines import (
     HTML_GENERATION_RULES,
     LAGNIAPPE_WORKSPACE_CONCEPTS,
 )
-from .organize import (
+from .reporting.contracts import (
     READ_ONLY_CONTEXT_TOOLS,
     allowed_report_actions,
     permission_filtered_output_contract,
     report_proposal_response_schema,
     report_action_permission_context,
     report_action_permission_instructions,
+)
+from .reporting.proposals import (
     generate_validated_proposal,
     validate_proposal,
 )

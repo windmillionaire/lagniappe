@@ -95,9 +95,10 @@ There are three different checkpoint systems and they should not be conflated:
 | Prompt composition | `ai/prompt.py` and workflow builders | System instruction, context/instructions ordering, output contract, attachments, tools, search, model/tier, and limits. |
 | Provider lifecycle | `ai/core.py` | Runtime model selection, Gemini configuration, SDK calls, tool loop, structured-final call, cleanup, and debug usage. |
 | Workspace retrieval | `ai/functions.py` and `function_definitions/` | Tool declaration, hash normalization, permission-filtered handler execution, exact-call cache, result/file parts, and failure trace. |
-| AI workflow | `ai/ask.py`, `create.py`, `organize.py`, `autofill.py` | Workflow-specific context, tool set, generation stages, validation, repair, and fallback. |
+| AI workflow | `ai/ask.py`, `create.py`, `organize.py`, `autofill.py` | Workflow-specific context, tool selection, generation stages, and fallback. |
+| Report proposal contract | `ai/reporting/contracts.py`, `proposals.py`, and `organize_completion.py` | Shared action schemas and ordering, proposal validation/repair, and Organize file-summary/submission completion. |
 | Durable generation | `deferred_jobs.py` and adapters | Job creation, claim/lease, retries, checkpoint, inspect/apply, cleanup, and durable notification state. |
-| Proposal application | `ai/report_runner.py` | Deterministic reviewed action execution, recovery ledger, retry, and undo. |
+| Proposal application | `ai/report_runner.py` and `ai/reporting/actions/` | Ledger coordination plus callback-registered deterministic action inspection, execution, retry, compensation, and undo. |
 | Browser completion | `/poll`, `PollingCoordinator`, `DeferredOperationManager`, `Core`, and `EditWatcher` | Operation acknowledgement, owner-safe status, revision validation, notification refresh, collection reconciliation, and watched-form refetch. |
 
 ## End-to-end workflow
@@ -216,10 +217,14 @@ added just because an attachment exists.
 ### 5. Validation, repair, and durable application
 
 Ask, Create, and Organize validate model output against application-owned
-contracts. Organize additionally performs narrow deterministic repairs, such as
-stable field IDs and unambiguous form links, before spending another model call
-on repair. Unsafe residual actions become review items; a structurally unusable
-plan becomes an accurately labeled review-only proposal.
+contracts in `ai/reporting/`. `contracts.py` owns the allowed action set, action
+ordering, and typed action-data schemas; `proposals.py` owns their shared
+validation, normalization, and repair. Organize adds its workflow-specific
+file-summary and form-submission completion in `organize_completion.py`,
+including narrow deterministic repairs such as stable field IDs and
+unambiguous form links, before spending another model call on repair. Unsafe
+residual actions become review items; a structurally unusable plan becomes an
+accurately labeled review-only proposal.
 
 Most deferred generation saves the final prepared proposal or submission in the
 job checkpoint before its final domain apply. Site Export is an exception: its
@@ -228,7 +233,11 @@ The adapter then inspects current state to distinguish already-applied from
 not-applied work and applies idempotently. AI report generation only saves a
 proposal. A later user-reviewed execution is queued as a distinct deferred job;
 its worker calls `run_report()` through the separate `report.result` recovery
-ledger.
+ledger. `report_runner.py` owns that version-1 ledger and ordered lifecycle;
+the action package owns one explicit callback adapter per contract action and
+groups domain handlers by entity, form, file, task, and shared-operation
+responsibility. The registry is checked against the proposal contract so a new
+action cannot silently exist on only the generation or execution side.
 
 ### 6. Terminal notification and browser refresh
 
