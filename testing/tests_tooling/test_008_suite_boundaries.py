@@ -16,6 +16,10 @@ LOWER_LEVEL_SUITES = (
     TESTING_ROOT / "tests_tooling",
     TESTING_ROOT / "tests_js",
 )
+E2E_CACHE_CONTRACT_ROOTS = (
+    TESTING_ROOT / "tests_e2e",
+    TESTING_ROOT / "resources",
+)
 
 
 def _python_files(*roots):
@@ -88,6 +92,14 @@ def _entities_call(node, method):
     )
 
 
+def _cache_invalidation_target(node):
+    return (isinstance(node, ast.Attribute) and node.attr == "invalidate_cache") or (
+        isinstance(node, ast.Subscript)
+        and isinstance(node.slice, ast.Constant)
+        and node.slice.value == "invalidate_cache"
+    )
+
+
 def _uses_injected_entity(node):
     for child in ast.walk(node):
         if not (
@@ -151,6 +163,58 @@ def test_tooling_suite_does_not_execute_node():
         for path in _python_files(TESTING_ROOT / "tests_tooling")
         if _runs_node(path)
     ]
+
+    assert violations == []
+
+
+def test_e2e_support_does_not_clear_user_cache_invalidation_out_of_band():
+    """Only the browser acknowledgement route may clear persisted invalidation."""
+    violations = []
+    for path in _python_files(*E2E_CACHE_CONTRACT_ROOTS):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        relative = path.relative_to(REPOSITORY_ROOT)
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                and node.name == "clear_cache_invalidation"
+            ):
+                violations.append(
+                    f"{relative}:{node.lineno} defines clear_cache_invalidation"
+                )
+                continue
+
+            if (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Name)
+                and node.func.id == "setattr"
+                and len(node.args) >= 3
+                and isinstance(node.args[1], ast.Constant)
+                and node.args[1].value == "invalidate_cache"
+                and isinstance(node.args[2], ast.Constant)
+                and node.args[2].value is False
+            ):
+                violations.append(
+                    f"{relative}:{node.lineno} clears invalidate_cache with setattr"
+                )
+                continue
+
+            if isinstance(node, ast.Assign):
+                targets = node.targets
+                value = node.value
+            elif isinstance(node, ast.AnnAssign):
+                targets = [node.target]
+                value = node.value
+            else:
+                continue
+
+            if (
+                isinstance(value, ast.Constant)
+                and value.value is False
+                and any(_cache_invalidation_target(target) for target in targets)
+            ):
+                violations.append(
+                    f"{relative}:{node.lineno} clears invalidate_cache directly"
+                )
 
     assert violations == []
 

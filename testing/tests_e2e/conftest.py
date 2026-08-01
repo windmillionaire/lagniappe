@@ -359,8 +359,8 @@ def get_user(browser, request):
     def _get_user(user_definition, creator=None):
         user = user_definition.get(creator)
 
-        user.clear_cache_invalidation()
-
+        # Persisted cache invalidation belongs to the browser acknowledgement
+        # protocol; permission-mutating tests must consume it explicitly.
         # Authenticate if user has email but no stored session
         if not user.storage_state and user.email:
             user.login(browser)
@@ -394,8 +394,6 @@ def get_user(browser, request):
             user.page.set_default_timeout(AI_TIMEOUT)
         else:
             user.page.set_default_timeout(DEFAULT_TIMEOUT)
-
-        user.clear_cache_invalidation()
 
         users.append(user)
         return user

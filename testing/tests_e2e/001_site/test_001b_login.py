@@ -363,27 +363,37 @@ def test_user_login_success(get_user):
 
 # @features auth
 # @dimensions session-user switch invalidation session-keys user-key page-key
+# @pair cache:invalidation-acknowledgement
 def test_switching_session_user_requests_client_cache_invalidation(get_user):
     owner = get_user(Users.OWNER)
-    other = get_user(Users.create_user, creator=owner)
-    owner.go(SitePages.HOME)
+    source = get_user(Users.session_switch_source, creator=owner)
+    target = get_user(Users.session_switch_target, creator=owner)
+    source.go(SitePages.HOME)
 
-    login_url = _site_url(f"/users/login?test_user={quote(other.email)}")
-    with owner.page.expect_response(
-        lambda response: response.url == login_url and response.status == 302
-    ) as login_response:
-        owner.page.goto(login_url)
+    login_url = _site_url(f"/users/login?test_user={quote(target.email)}")
+    with (
+        source.page.expect_response(
+            lambda response: response.url == login_url and response.status == 302
+        ) as login_response,
+        source.page.context.expect_event(
+            "response",
+            predicate=lambda response: (
+                response.url.endswith("/validate-user")
+                and response.request.method == "POST"
+            ),
+        ) as validation_info,
+    ):
+        source.page.goto(login_url)
 
-    assert (
-        login_response.value.headers.get("x-lagniappe-invalidate-cache") == "True"
-    )
-    expect(owner.page).to_have_title("Home")
+    assert login_response.value.headers.get("x-lagniappe-invalidate-cache") == "True"
+    validation = validation_info.value
+    assert validation.status == 200
+    assert validation.json()["cacheCleared"] is True
+    expect(source.page).to_have_title("Home")
 
-    payload = _session_serializer().loads(
-        _session_cookie(owner.page.context)["value"]
-    )
-    assert payload[CONFIG.LOGIN_USER_KEY] == other.entity.urlsafe_key
-    assert payload[CONFIG.LOGIN_USER_PAGE_KEY] == other.entity.page.urlsafe_key
+    payload = _session_serializer().loads(_session_cookie(source.page.context)["value"])
+    assert payload[CONFIG.LOGIN_USER_KEY] == target.entity.urlsafe_key
+    assert payload[CONFIG.LOGIN_USER_PAGE_KEY] == target.entity.page.urlsafe_key
 
 
 # @features auth
@@ -770,6 +780,7 @@ def test_csrf_failure_is_identified_for_targeted_retry(get_user):
 
 # @features login
 # @dimensions logout session redirect session-keys clear
+# @pair cache:invalidation-acknowledgement
 def test_logout_clears_session_and_returns_login(get_user):
     """
     Authenticated users visiting /users/login see logged-in shell; POST logout
@@ -780,7 +791,8 @@ def test_logout_clears_session_and_returns_login(get_user):
         - users.logout: POST clears Flask-Login session and redirects to login
         - lagniappe/web/start/errors.py: 401 → redirect to login
     """
-    user = get_user(Users.OWNER)
+    owner = get_user(Users.OWNER)
+    user = get_user(Users.logout_navigation, creator=owner)
     home = SitePages.HOME.get(user)
     login_page = user.go(SitePages.LOGIN_PAGE)
 
@@ -797,12 +809,30 @@ def test_logout_clears_session_and_returns_login(get_user):
     user.navigate(home.url)
     expect(user.page).to_have_title("Login")
 
+    login_url = _site_url(f"/users/login?test_user={quote(user.email)}")
+    with user.page.context.expect_event(
+        "response",
+        predicate=lambda response: (
+            response.url.endswith("/validate-user")
+            and response.request.method == "POST"
+        ),
+    ) as validation_info:
+        user.page.goto(login_url)
+
+    validation = validation_info.value
+    assert validation.status == 200
+    assert validation.json()["cacheCleared"] is True
+    assert Entities.USER.load(user.email).invalidate_cache is False
+    expect(user.page).to_have_title("Home")
+
 
 # @features login
 # @dimensions logout invalidation ajax
+# @pair cache:invalidation-acknowledgement
 def test_logout_flags_user_cache_invalidation(get_user):
     """AJAX logout should expose invalidation before the session is cleared."""
-    user = get_user(Users.OWNER)
+    owner = get_user(Users.OWNER)
+    user = get_user(Users.logout_ajax, creator=owner)
     user.go(SitePages.HOME)
 
     response = user.page.evaluate(
@@ -831,6 +861,23 @@ def test_logout_flags_user_cache_invalidation(get_user):
 
     saved_user = Entities.USER.load(user.email)
     assert saved_user.invalidate_cache is True
+
+    expect(user.page).to_have_title("Login")
+    login_url = _site_url(f"/users/login?test_user={quote(user.email)}")
+    with user.page.context.expect_event(
+        "response",
+        predicate=lambda response: (
+            response.url.endswith("/validate-user")
+            and response.request.method == "POST"
+        ),
+    ) as validation_info:
+        user.page.goto(login_url)
+
+    validation = validation_info.value
+    assert validation.status == 200
+    assert validation.json()["cacheCleared"] is True
+    assert Entities.USER.load(user.email).invalidate_cache is False
+    expect(user.page).to_have_title("Home")
 
 
 # @features login

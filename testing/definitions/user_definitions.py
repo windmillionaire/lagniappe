@@ -85,6 +85,50 @@ admin_ask = UserDefinition(
     ai_access=AI.ASK,
 )
 
+ai_access_tiers = UserDefinition(
+    name="AI Access Tiers",
+    email="ai_access_tiers@test.com",
+    ai_access=AI.NONE,
+)
+
+ai_access_report_reader = UserDefinition(
+    name="AI Access Report Reader",
+    email="ai_access_report_reader@test.com",
+    ai_access=AI.NONE,
+)
+
+user_settings_ai_access = UserDefinition(
+    name="User Settings AI Access",
+    email="user_settings_ai_access@test.com",
+    ai_access=AI.NONE,
+)
+
+user_settings_group_preload = UserDefinition(
+    name="User Settings Group Preload",
+    email="user_settings_group_preload@test.com",
+    groups=[Groups.general_users_view_only, Groups.test_user_one_category],
+)
+
+session_switch_source = UserDefinition(
+    name="Session Switch Source",
+    email="session_switch_source@test.com",
+)
+
+session_switch_target = UserDefinition(
+    name="Session Switch Target",
+    email="session_switch_target@test.com",
+)
+
+logout_navigation = UserDefinition(
+    name="Logout Navigation",
+    email="logout_navigation@test.com",
+)
+
+logout_ajax = UserDefinition(
+    name="Logout AJAX",
+    email="logout_ajax@test.com",
+)
+
 admin_cannot_create_users = UserDefinition(
     name="Admin Cannot Create",
     email="admin_cannot_create_users@test.com",

@@ -3,7 +3,6 @@ from urllib.parse import urlencode
 
 
 from config import SETTINGS
-from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 
 from .core import SiteResource
@@ -145,28 +144,6 @@ class User(SiteResource):
 
     def locate(self, selector):
         return self.page.locator(selector)
-
-    def clear_cache_invalidation(self):
-        if not self.email:
-            return
-
-        loaded = Entities.USER.load(self.email)
-        if loaded:
-            self.entity = loaded
-
-        if getattr(self.entity, "invalidate_cache", False):
-            self.entity = Entities.fetch_one(
-                self.entity,
-                request=Fetch.nested(because=FetchReason.USER_SAVE_REQUIREMENTS),
-            )
-            self.entity.invalidate_cache = False
-            self.entity.save()
-
-        loaded = Entities.USER.load(self.email)
-        if loaded:
-            self.entity = loaded
-        if self.page:
-            self.storage_state = self.page.context.storage_state()
 
     def login(self, browser):
         if self.storage_state:

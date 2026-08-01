@@ -622,10 +622,11 @@ def test_public_user_restricted_schedules_are_forbidden(limited_public_user):
 
 # @features user-settings
 # @dimensions owner-other-page editable-email group-selector edit-groups ai-access
+# @pair cache:invalidation-acknowledgement
 # @template pages/info.html::user_settings
 def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     owner = get_user(Users.OWNER)
-    created_user = get_user(Users.create_user, creator=owner)
+    created_user = get_user(Users.user_settings_ai_access, creator=owner)
     created_user_page_key = created_user.entity.page.urlsafe_key
 
     owner.go(SitePages.USER_INDEX)
@@ -676,11 +677,27 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     with owner.page.expect_response("**/pages/*/update"):
         SpinnerButtons.UPDATE.click(settings_panel)
     assert SpinnerButtons.UPDATE_SUCCESS.successful(settings_panel)
-    assert Entities.USER.load(created_user.email).ai_access == "ASK"
+    saved_user = Entities.USER.load(created_user.email)
+    assert saved_user.ai_access == "ASK"
+    assert saved_user.invalidate_cache is True
 
     restrictions_close.click()
     expect(settings_panel).not_to_be_visible()
     expect(info_tab.locator(created_user_page.INFO_FORM)).to_be_visible()
+
+    with created_user.page.context.expect_event(
+        "response",
+        predicate=lambda response: (
+            response.url.endswith("/validate-user")
+            and response.request.method == "POST"
+        ),
+    ) as validation_info:
+        created_user.go(SitePages.HOME)
+
+    validation = validation_info.value
+    assert validation.status == 200
+    assert validation.json()["cacheCleared"] is True
+    assert Entities.USER.load(created_user.email).invalidate_cache is False
 
 
 # @pair user-settings:group-selector
@@ -690,11 +707,9 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
 def test_user_settings_preloads_existing_groups(get_user):
     """The group selector shows every group already assigned to the user."""
     owner = get_user(Users.OWNER)
-    created_user = get_user(Users.create_user, creator=owner)
+    created_user = get_user(Users.user_settings_group_preload, creator=owner)
     first_group = Groups.general_users_view_only.get(owner)
     second_group = Groups.test_user_one_category.get(owner)
-    created_user.entity.groups = [first_group.entity, second_group.entity]
-    created_user.entity.save()
 
     user_page = Page(user=owner, definition=created_user.definition)
     user_page.entity = created_user.entity.page
@@ -785,6 +800,7 @@ def test_owner_can_reassign_and_remove_user_from_page(get_user):
 
 # @features user-settings
 # @dimensions submit-boundary attached-form categories restrictions
+# @pair cache:invalidation-acknowledgement
 def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     owner = get_user(Users.OWNER)
     category = Categories.test_basic_inputs_submission.get(owner)
@@ -849,9 +865,28 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     assert saved_user.name == updated_name
     assert saved_user.email == updated_email
     assert {g.key for g in saved_user.groups} == {membership_group.entity.key}
+    assert saved_user.invalidate_cache is True
     assert saved_page.form.key == form_key
     assert {c.key for c in saved_page.categories} == category_keys
     assert {g.key for g in saved_page.groups} == restriction_keys
+
+    affected_user = get_user(Users.ANONYMOUS)
+    login_page = affected_user.go(SitePages.LOGIN_PAGE)
+    login_url = login_page.login_url(updated_email)
+    with affected_user.page.context.expect_event(
+        "response",
+        predicate=lambda response: (
+            response.url.endswith("/validate-user")
+            and response.request.method == "POST"
+        ),
+    ) as validation_info:
+        affected_user.page.goto(login_url)
+
+    validation = validation_info.value
+    assert validation.status == 200
+    assert validation.json()["cacheCleared"] is True
+    assert Entities.USER.load(updated_email).invalidate_cache is False
+    expect(affected_user.page).to_have_title("Home")
 
     _tabs_controls(owner).locator(Buttons.LP_CLOSE).click()
     expect(settings_panel).not_to_be_visible()

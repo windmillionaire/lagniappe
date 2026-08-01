@@ -12,6 +12,7 @@ from testing.elements import (
     Dropdown,
     MobileTableControls,
     Modal,
+    PermissionsForm,
     Select,
     SpinnerButtons,
     Table,
@@ -34,14 +35,14 @@ Verified against:
 """
 
 
-def _set_public_users_allowed(enabled):
-    public_group = Entities.PUBLIC_GROUP.get()
-    public_group.active = enabled
-    public_group.permissions = {
-        Site.PUBLIC.value: Levels.TRUE.name if enabled else Levels.FALSE.name
-    }
-    public_group.save()
-    return public_group
+def _set_public_users_allowed(owner, enabled):
+    user_index = owner.go(SitePages.USER_INDEX)
+    permissions = PermissionsForm(
+        owner,
+        form=user_index.public_permissions_form,
+    )
+    permissions.set(Site.PUBLIC, Levels.TRUE if enabled else Levels.FALSE)
+    permissions.submit()
 
 
 def _create_public_user(email, name):
@@ -102,7 +103,7 @@ def _post_form_status(user, path, data):
 # @template users/index.html::public_users_toggle
 def test_users_index_public_toggle_hidden_when_public_users_disabled(get_user):
     owner = get_user(Users.OWNER)
-    _set_public_users_allowed(False)
+    _set_public_users_allowed(owner, False)
 
     user_index = owner.go(SitePages.USER_INDEX)
 
@@ -122,7 +123,7 @@ def test_users_index_public_toggle_shows_public_users(get_user):
     public_email = f"{uuid4().hex}@public-toggle.example"
 
     try:
-        _set_public_users_allowed(True)
+        _set_public_users_allowed(owner, True)
         _create_public_user(public_email, public_name)
 
         user_index = owner.go(SitePages.USER_INDEX)
@@ -167,7 +168,7 @@ def test_users_index_public_toggle_shows_public_users(get_user):
         expect(table.get_row(public_name)).to_have_count(0)
         expect(table.get_row(owner.name)).to_be_visible()
     finally:
-        _set_public_users_allowed(False)
+        _set_public_users_allowed(owner, False)
 
 
 def _create_user(user, create_form, definition):

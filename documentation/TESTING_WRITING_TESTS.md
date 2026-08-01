@@ -71,6 +71,25 @@ prefix are shared, so parallel E2E invocations can tear down each other's data
 and server state. When checking multiple focused files or nodeids, pass them to
 one pytest command.
 
+Permission and session changes that request client-cache invalidation need an
+explicit browser acknowledgement in the test that caused them:
+
+- use a dedicated user definition instead of mutating a shared suite identity;
+- prefer initial groups or access tiers in `testing/definitions/` when the
+  mutation itself is not under test;
+- when the mutation is under test, navigate as the affected user and observe
+  the service worker's `POST /validate-user` response with a browser-context
+  response event;
+- assert the response accepted the cache-clear confirmation and the persisted
+  `invalidate_cache` flag is false before the test ends.
+
+Do not clear `invalidate_cache` directly from an E2E fixture or support helper.
+That bypasses the session cookie and service-worker protocol, can leave a stale
+client invalidation request behind, and moves the resulting failure into an
+unrelated later test. Service-worker requests are not reliably visible through
+a page-level response listener, so use `user.page.context.expect_event(...)`
+for this acknowledgement.
+
 Use real pytest paths or nodeids for focused `run.py test` commands. The runner
 expands only suite aliases such as `unit`, `e2e`, `js`, `tooling`, and `setup`.
 

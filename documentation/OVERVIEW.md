@@ -55,6 +55,7 @@ Build, configuration, installation, and test workflows.
 | [TESTING.md](TESTING.md) | Test suites, commands, fixtures, managed test server, traceability tools. |
 | [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) | Practical guide for adding or reviewing tests. |
 | [TESTING_TEST_REVIEW.md](TESTING_TEST_REVIEW.md) | Agent workflow for reviewing annotated or bare tests. |
+| [TODO_E2E_HARDENING.md](TODO_E2E_HARDENING.md) | Prioritized backlog for isolating E2E state, replacing private test controls, and strengthening browser evidence. |
 | [TESTING_SOURCE_REVIEW.md](TESTING_SOURCE_REVIEW.md) | Agent workflow for reviewing source annotation quality. |
 | [TESTING_TRACEABILITY_TOOL.md](TESTING_TRACEABILITY_TOOL.md) | Source/test annotation contract, current-result evidence, and reporter behavior. |
 | [TESTING_TEMPLATE_CONTRACTS.md](TESTING_TEMPLATE_CONTRACTS.md) | Jinja macro, DOM contract, and selector-evidence tracking. |

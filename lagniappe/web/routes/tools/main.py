@@ -1,6 +1,5 @@
 """Routes for AI tool reports."""
 
-import json
 from types import SimpleNamespace
 
 from flask import abort, redirect, request, url_for
@@ -344,8 +343,10 @@ def _get_report(key):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_is_only_available_before_completion
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_access_can_read_create_report_without_create_actions
 # @features ai-report
 # @dimensions detail skip-action ask answer-html links no-actions create revision execute report-view needs-review no-execute deferred-refresh pending
+# @pair ai-access:report-read
 @tools.route("/reports/<key>", methods=["GET"])
 @ai_access(AI.ASK)
 def report(key):
