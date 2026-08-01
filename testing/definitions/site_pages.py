@@ -69,7 +69,7 @@ class SitePages(Enum):
     REPORTING_PRIVACY = SitePage(
         url="/reporting_privacy", title="Error-Reporting Privacy Notice"
     )
-    NONEXISTENT_PAGE = SitePage(url="/nonexistent")
+    NONEXISTENT_PAGE = SitePage(url="/nonexistent", expected_status=404)
 
     def get(self, user):
         """

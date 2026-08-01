@@ -115,7 +115,13 @@ class User(SiteResource):
         self.mobile = False
 
         response = self.navigate(url)
-        if response and response.status >= 400:
+        expected_status = resource.expected_status
+        if response and expected_status is not None and response.status != expected_status:
+            raise AssertionError(
+                f"Navigation returned HTTP {response.status}, expected "
+                f"{expected_status}: {response.url}"
+            )
+        if response and expected_status is None and response.status >= 400:
             raise AssertionError(
                 f"Navigation failed with HTTP {response.status}: {response.url}"
             )

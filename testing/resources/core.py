@@ -17,12 +17,14 @@ class SiteResource:
     _definition = None
     _initialize = False
     _sync = False
+    _expected_status = None
 
     def __init__(self, *args, **kwargs):
         self._url_suffix = kwargs.get("url")
         self.title = kwargs.get("title")
         self.definition = kwargs.get("definition")
         self.user = kwargs.get("user")
+        self.expected_status = kwargs.get("expected_status", self._expected_status)
 
     def initialize_view(self):
         if self._initialize:

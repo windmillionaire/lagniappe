@@ -1,2 +1,2342 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="6914a171-c8f1-4062-be53-5c1cf502d600",e._sentryDebugIdIdentifier="sentry-dbid-6914a171-c8f1-4062-be53-5c1cf502d600");}catch(e){}}();import{c as D}from"./connectivity.js?v=b1a2c353";import{E as _}from"./endpoints.js?v=b1a2c353";import{captureError as h}from"./errors.js?v=b1a2c353";import{r as p}from"./request.js?v=b1a2c353";import{withTransition as m,showBriefly as L,clearRecentSearchResults as N}from"./utilities.js?v=b1a2c353";import{w as I,m as W,S as j}from"./shell.js?v=b1a2c353";class C{constructor(t,e){this.component=t,this.active=!0,this.modified=!1,this._widget=null,this.element=e,this.name=e.dataset.nav,this.title=e.querySelector("[data-role='title']"),this.nav=document.querySelector(`nav[data-nav="${this.name}"]`)||this.component.elt.querySelector("nav"),this.standalone=this.nav.dataset.standalone==="true",this.persistent=this.nav.dataset.persistent==="true",this.componentToggles=this._initNavToggles(),this.nav.querySelector(".loader")&&this.nav.addEventListener("click",this._click.bind(this)),this._hideNavContainer=new Set,this._navContainer=this.element.querySelector("[data-flipped]")||this.nav,this.header=e.querySelector("[data-role='header']"),this.widgetToggles=this.header?this._initWidgetToggles(this.header):{},this.controls=e.querySelector("[data-role='controls']"),this.widgetControls=this.controls?this._initControls():{},this.navToggles=e.querySelector("[data-role='nav-toggles']")}_initNavToggles(){return Object.fromEntries(Array.from(this.nav.querySelectorAll("button[lp-show]:not([lp-control])")).map(t=>{const[e,s]=t.getAttribute("lp-show").split(":");return[["active","nav"].includes(s)?e:s,t]}))}_initWidgetToggles(){return Object.fromEntries(Array.from(this.header.querySelectorAll("button[lp-show]:not([lp-control])")).map(t=>{const[e,s]=t.getAttribute("lp-show").split(":");return this._hideNavContainer.add(s),[e,t]}))}_initControls(){return Object.fromEntries(Array.from(this.controls.querySelectorAll("button[lp-control]")).map(t=>[t.getAttribute("lp-control"),t]))}_click(t){t.target.closest("[lp-show]:not([lp-control])")&&Object.values(this.componentToggles).forEach(e=>{if(!e.classList.contains("loader"))return;e.contains(t.target)?e.disabled=!0:e.classList.add("opacity-50"),this.modified=!0})}_setSubToggleVisibility(t,e){const s=this.settings.controls==="true",n=this.settings.subtoggles==="true";t=t||s&&!n,Object.entries(this.widgetToggles).forEach(([r,a])=>{const o=t||r!==e;a.dataset.visible=o?"false":"true"})}_setComponentToggleVisibility(t,e,s){const n=this.component.view.mobile;return this._hideNavContainer.has(e)&&t?(this._navContainer.dataset.visible="false",!1):(this._navContainer&&(this._navContainer.dataset.visible="true"),Object.entries(this.componentToggles).forEach(([r,a])=>{t?a.dataset.visible="false":this.name===s?a.dataset.visible="true":(a.dataset.selected=r===s?"true":"false",a.dataset.visible=n?a.dataset.selected:"true")}),!0)}_setNavVisibility(t){const e=t?this.settings.nav!=="false":!0,s=this.persistent||this.component.active===this||e?"true":"false";this.nav.dataset.visible=s}_updateLoadingToggles(){this.modified&&(this.modified=!1,this.nav.querySelectorAll(".loader").forEach(t=>{t.disabled=!1,t.classList.remove("opacity-50")}))}_setControlOptions(t){const e=t?this.settings.controls==="true":!1;this.controls.dataset.visible=e?"true":"false",this.navToggles&&(this.navToggles.dataset.visible=e?"false":"true"),e&&("flipped"in this._navContainer.dataset&&(this._navContainer.dataset.flipped="false"),Object.entries(this.widgetControls).forEach(([s,n])=>{this._setControlOption(s,n)}))}_setTitle(){const t=this.settings.title||this.component.elt.dataset.title;this.title.textContent=t||""}enable(t){this.component=t,this.active=!0}disable(){this.active=!1}hide(){this.element.classList.add("[&>*:not([data-role='error'])]:opacity-50","pointer-events-none")}show(){this.element.classList.remove("[&>*:not([data-role='error'])]:opacity-50","pointer-events-none")}reconcile(t,e){const s=this.componentToggles[t]?t:e,n=this.settings.nav==="false";this._setComponentToggleVisibility(n,t,s),this.element.dataset.visible=this.active?"true":"false",this.active&&(this._setSubToggleVisibility(n,e),this._setNavVisibility(t),this._updateLoadingToggles(),this._setTitle(),this._setControlOptions(t))}get settings(){return this.component.active===this?this.nav.dataset:this.component.active?.target?.dataset||{}}_setControlOption(t,e=this.widgetControls[t]){if(!e)return;const s=this.settings,n=this.component.active?s[t]:this.component.elt.dataset?.[t];if(t==="delete"){e.dataset.visible=s.key?"true":"false";return}else if(!n&&e){e.dataset.visible="false";return}const r=e.dataset.controls;r&&e.setAttribute(`lp-${r}`,n),e.dataset.visible="true"}}const S={BaseList:()=>import("./baseList.js?v=b1a2c353"),CategoryInfo:()=>import("./category.js?v=b1a2c353"),CollaborativeDocument:()=>import("./collaborative.js?v=b1a2c353"),CreateCategory:()=>import("./category.js?v=b1a2c353"),CreateForm:()=>import("./form.js?v=b1a2c353"),CreateModelTask:()=>import("./modelTasks.js?v=b1a2c353"),CreateNote:()=>import("./note.js?v=b1a2c353"),CreatePage:()=>import("./pageInfo.js?v=b1a2c353"),CreateProject:()=>import("./projectInfo.js?v=b1a2c353"),CreateToolReport:()=>import("./tools.js?v=b1a2c353"),CreateUserTask:()=>import("./taskSettings.js?v=b1a2c353"),CreateTask:()=>import("./taskSettings.js?v=b1a2c353"),CreateUser:()=>import("./user2.js?v=b1a2c353"),CreateUserGroup:()=>import("./user2.js?v=b1a2c353"),DirectoryList:()=>import("./lists.js?v=b1a2c353"),DocumentSettings:()=>import("./documentSettings.js?v=b1a2c353"),FileInfo:()=>import("./fileInfo.js?v=b1a2c353"),PDFPreview:()=>import("./filePdfPreview.js?v=b1a2c353"),FileUpload:()=>import("./uploadFile.js?v=b1a2c353"),Filters:()=>import("./filters.js?v=b1a2c353"),FilterResults:()=>import("./tables.js?v=b1a2c353"),GeneratePages:()=>import("./category.js?v=b1a2c353"),GroupPermissions:()=>import("./user2.js?v=b1a2c353"),HomeActivityList:()=>import("./activity.js?v=b1a2c353"),HomePageList:()=>import("./lists.js?v=b1a2c353"),HomeTaskList:()=>import("./tasks.js?v=b1a2c353"),HomeProjectList:()=>import("./lists.js?v=b1a2c353"),HomeCategoryList:()=>import("./lists.js?v=b1a2c353"),ImportData:()=>import("./ingress.js?v=b1a2c353"),IndexTable:()=>import("./tables.js?v=b1a2c353"),IngressFileUpload:()=>import("./ingressUpload.js?v=b1a2c353"),IngressList:()=>import("./lists.js?v=b1a2c353"),MobileTableControls:()=>import("./mobileTableControls.js?v=b1a2c353"),ModelTaskInfo:()=>import("./modelTasks.js?v=b1a2c353"),ModelTaskList:()=>import("./modelTasks.js?v=b1a2c353"),PageInfo:()=>import("./pageInfo.js?v=b1a2c353"),PagePermissions:()=>import("./pagePermissions.js?v=b1a2c353"),PagePhoto:()=>import("./pagePhoto.js?v=b1a2c353"),PageTaskList:()=>import("./pageTaskList.js?v=b1a2c353"),ProjectInfo:()=>import("./projectInfo.js?v=b1a2c353"),PublicPermissions:()=>import("./user2.js?v=b1a2c353"),SavedFilters:()=>import("./filters.js?v=b1a2c353"),SiteExport:()=>import("./siteExport.js?v=b1a2c353"),SiteSettings:()=>import("./siteSettings.js?v=b1a2c353"),StarredList:()=>import("./lists.js?v=b1a2c353"),TableEditor:()=>import("./tableEditor.js?v=b1a2c353"),TableSorting:()=>import("./tableSorting.js?v=b1a2c353"),TableVisibility:()=>import("./tableVisibility.js?v=b1a2c353"),TaskForm:()=>import("./taskForm.js?v=b1a2c353"),TaskHistory:()=>import("./tables.js?v=b1a2c353"),TaskCombine:()=>import("./taskSettings.js?v=b1a2c353"),TaskMove:()=>import("./taskSettings.js?v=b1a2c353"),ToolReportList:()=>import("./lists.js?v=b1a2c353"),TaskSettings:()=>import("./taskSettings.js?v=b1a2c353"),UserSettings:()=>import("./pageInfo.js?v=b1a2c353")},x={document:{load:()=>import("./collaborative.js?v=b1a2c353"),name:"CollaborativeDocument"}},$=["attributes","submission","schema","conditions","columns","selected","preload","options"],B=(i,t)=>{const e={component:i,view:i.view,name:t,visible:!1,modified:!1},s=i.elt.querySelector(`[data-widget="${t}"]`);return s&&(e.target=s,e.key=s.dataset.key||i.key||e.view.key,e.kind=s.dataset.kind||i.kind||"default",e.persistent=s.dataset.persistent==="true",e.visible=s.dataset.visible==="true"),e.route=s?.dataset.route||i.elt.dataset.route,$.filter(n=>s?.dataset[n]).forEach(n=>{e[n]=JSON.parse(s.dataset[n])}),t in _&&(e.endpoints=_[t](e)),e},F=(i,t)=>{Object.defineProperty(i,"readonly",{configurable:!0,enumerable:!0,get(){return t.readonly||i.target?.dataset.readonly==="true"}})};class U{constructor(t){Object.assign(this,t),this.DEFAULT=!0}}async function w(i,t,e={}){let s;const n={...B(i,t),...e},r=t.split("/")[0];if(r in S){const a=await S[r]();s=new a[r](n)}else s=new U(n);return F(s,i),s.init&&await s.init(),s.enable=()=>{s.modified=s.modified||s.visible!==!0,s.visible=!0},s.disable=(a=!1)=>{s.modified=a||s.visible!==!1,s.visible=!1},s.reconcile=async(a=!1)=>{s.target&&!s.persistent&&(s.target.dataset.visible=s.visible?"true":"false"),s.modified&&(s.modified=!1,s.postreconcile&&!a&&await s.postreconcile())},s.target&&(s.target._lp_widget=s),s}async function H(i,t,{readonly:e=i.readonly}={}){const s=t.html?.querySelector(`[data-widget='${i.name}']`);if(!s)return null;const n=document.createElement("div");n.appendChild(s.cloneNode(!0));const r={key:i.key,kind:i.kind,readonly:e,online:!0,hidden:!1,showExtractReloadNotice(){}},a={elt:n,view:r,key:i.key,kind:i.kind,widgets:{},get readonly(){return e}},o=await w(a,i.name,{revisionPreview:!0,schema:t.schema??null,submission:t.submission??null}),l={...t,html:t.html?.cloneNode(!0)};return o.updated&&await o.updated(l),o.postreconcile&&await o.postreconcile(),o}function V(i){return i.endsWith(":document")?"document":null}async function Q({sync_id:i,remote:t,offline:e}){const s=V(i);if(!s)return null;const{load:n,name:r}=x[s],o=(await n())[r],l=document.createElement("div");l.setAttribute("lp-sync",i);const c=t?.fingerprint??e?.fingerprint;return c&&l.setAttribute("lp-fingerprint",c),new o({target:l,headless:!0,view:null,readonly:!0,key:t?.key??e?.key})}class k{constructor(t,e){this.view=e,this.elt=t,this.key=t.closest("[data-key]")?.dataset.key,this.name=t.id,this.kind=t.dataset.kind||e.kind,this.widgets={},this.widgetLoads=new Map,this.active=null,this.attributes={},this._nav=null,this._activeSubComponent=null,this._creating=!1,this._destroyed=!1,this.reconcile=null}get readonly(){return this.view.readonly||this.elt.dataset.readonly==="true"}get default(){return this.elt.dataset.default}get navElt(){return this.elt.querySelector(`[lp-nav][data-nav="${this.name}"]`)}get nav(){if(this._nav)return this._nav;const t=this.elt.dataset.parentNav,e=t?document.getElementById(t):null;return e&&!this.elt.contains(e)?this._nav=this.view.getComponent(e).nav:(this._nav=this.navElt?new C(this,this.navElt):null,this.navElt&&(this.navElt.dataset.visible="true")),this._nav}set nav(t){this._nav=t,this.navElt&&(this.navElt.dataset.visible=t?"false":"true")}get subComponents(){return Array.from(this.elt.querySelectorAll(":scope [lp-component]")).filter(e=>e.parentElement.closest("[lp-component]")===this.elt)}get parentComponent(){return this.elt.parentElement.closest("[lp-component]")}get persistent(){return this.elt.dataset.persistent==="true"}set persistent(t){this.elt.dataset.persistent=t?"true":"false"}get visible(){return this.elt.dataset.visible==="true"}set visible(t){this.elt.dataset.visible=t?"true":"false"}get error(){return this.elt.querySelector("[data-role='error']")}async activate(t){if(this._destroyed)return!1;if(this.active?.disable(),t){if(["default","active"].includes(t)){if(t=this.default,!t)return!1}else if(t==="nav"&&this.nav?.standalone)return this.active=this.nav,!0}else return this.active=null,this.nav?.reconcile(null,this.name),!1;if(this.active=await this.loadWidget(t),this._destroyed)return this.active?.destroy?.(),this.active=null,!1;const e=this.active?.ifEmpty;return e&&!this._creating&&Array.from(this.elt.querySelectorAll("[data-widget]")).some(n=>n.dataset.widget===e)?await this.activate(e):(this.active?.enable(),!0)}async prefetch(){const t=this.elt.querySelectorAll("[data-widget][lp-prefetch]");await Promise.all(Array.from(t).map(async e=>{await this.loadWidget(e.dataset.widget)}))}async refreshCollections(t=new Set){const e=Object.values(this.widgets);await Promise.all(e.map(async s=>{if(t.has(s)||s.refreshScope!=="collection"||!s.refresh||s.unsavedState===!0||s.form?._queued===!0||s.target?.querySelector?.("[lp-edited-marker][data-visible='true']"))return;const n=await this.view.load(this,s.route);!n||n.updated===!1||await s.refresh(n)}))}async loadWidget(t){if(!t||this._destroyed)return null;if(this.widgets[t])return this.widgets[t];if(this.widgetLoads.has(t))return this.widgetLoads.get(t);const e=(async()=>{const s=await w(this,t);return this._destroyed?(s?.destroy?.(),null):(this.widgets[t]=s,s.loading||s.loaded||(s.loading=!0,(s.target?.hasAttribute("lp-load")||s.target?.hasAttribute("lp-prefetch"))&&await this.load(s)),s)})();this.widgetLoads.set(t,e);try{return await e}finally{this.widgetLoads.get(t)===e&&this.widgetLoads.delete(t)}}async load(t=this.active,e=null){if(!t||t?.loaded)return null;e=e||t.route;const s=await this.view.load(this,e);if(t.modified=!0,!s)return null;const n=await t.updated(s);n&&this.load(t,n.dataset.route),t!==this.active&&await t.postreconcile()}async updated(t){const e={replace:[],append:[]};t.html?.querySelectorAll("[data-widget]").forEach(s=>{const n=s.dataset.widget,r=this.widgets[n],a=this.elt.querySelector(`[data-widget='${n}']`);r?.updated?(r.updated(t),r.modified=!0):a?e.replace.push({target:a,elt:s}):e.append.push(s)}),await m(async()=>{e.replace.forEach(({target:s,elt:n})=>{s.replaceWith(n)}),this.elt.append(...e.append),this.active?.success?.(),await this.render(!0)})}disable(){this.nav?.hide()}enable(){this.nav?.show()}async created(t){if(!this.active)return;const e=this.active;this._creating=!0,e.modified=!0;const[s,n]=e.target.dataset.destination.split(":");await e.created(t);let r;n?(s===this.name?(r=this,await this.activate(n)):(r=this.view.getComponent(document.getElementById(s)),await r.activate(n)),r.active&&(await r.active.created?.(t),r.active.modified=!0)):r=null,await m(async()=>{await this.render(!0),r&&this!==r&&await r.render(!0)}),this._creating=!1}preload(t){const e=this.elt.dataset.preload;return this.attributes=e?JSON.parse(e):{},this.attributes[t]??null}showError(t){if(this.enable(),this.active?.showError)this.active.showError(t);else{const e=this.error;if(!e)return;const s=document.createElement("span");s.textContent=t,L(e,s),this.active?.enable()}}get formData(){return this.active?.formData}get open(){return this.elt.dataset.open}get route(){return this.active?.route||this.active?.target.dataset.route||this.elt.dataset.route}deactivate(t=!0,e=null){this.active&&(this.active.disable(!0),this.active.reconcile(!0),this.nav?.reconcile(null,this.name)),t||(this.elt.dataset.visible=this.persistent?"true":"false",this.elt.dataset.open="false"),e&&(this.nav?.disable(),this.nav?.reconcile(e.active?.name,e.name))}_setParentComponent(){const t=this.parentComponent,e=t?this.view.getComponent(t):null;(e?e.subComponents:this.subComponents).forEach(n=>{const r=this.view.getComponent(n);r!==this&&r.deactivate(!1)}),e&&(!this.nav&&e.nav?this.nav=e.nav:this.nav!==e.nav&&this.nav?.standalone&&(e.deactivate(!0,this),e.elt.dataset.visible="true"),e._setSubComponent(this))}_setSubComponent(t){const e=this._activeSubComponent;if(e&&e!==t){const n=e.persistent?"true":"false";e.elt.dataset.visible=n}this._activeSubComponent=t;const s=new CustomEvent("set-subcomponent",{detail:{subcomponent:t},bubbles:!0});t.elt.dispatchEvent(s)}async render(t){const e=t?this.active?.name||"true":!1;this.elt.dataset.visible=this.persistent||t?"true":"false",this._setParentComponent(),await Promise.all(Object.values(this.widgets).map(s=>s.reconcile())),this.nav&&(this.nav.enable(this),this.nav.reconcile(this.active?.name,this.name)),this.elt.dataset.open=e||"false",this.view.schedulePollingReconciliation?.()}destroy(){this._destroyed=!0,Object.values(this.widgets).forEach(t=>{t.destroy?.()}),this.widgetLoads.clear(),delete this.view.components[this.key]}}const E=new Set(["delete","star","unstar"]),z=new Set([...E,"entity-poll"]),G=async(i,t)=>{if(!t)return null;const[e,s]=t.split(":");if(!e||!s)return null;const n=i.getComponent(document.getElementById(e));return n?await n.loadWidget(s):null},Y=async(i,t)=>{const e=new Set(t),s=new Set;for(const n of i.elt.querySelectorAll("[lp-entity][data-key]")){if(!e.has(n.dataset.key))continue;const r=n.parentElement?.closest?.("[data-widget]");r?.dataset.widget&&!r.matches?.("form")&&s.add(r)}await Promise.all(Array.from(s,async n=>{await i.getComponent(n)?.loadWidget(n.dataset.widget)}))},J=(i,t)=>{for(const e of i.elt.querySelectorAll("[data-key]"))e.dataset.key===t&&(e._lp_component?.destroy?.(),e.remove())},Z=(i,t={})=>(i._pendingChanges.push({...t}),i._reconcilePromise||(i._reconcilePromise=(async()=>{try{do{const e=i._pendingChanges.splice(0),s=i.elt.dataset.fingerprint||null,n=[];for(const o of e){o.type==="delete"&&N(),["star","unstar"].includes(o.type)&&i._applyStarState(o);const l=await G(i,o.destination);l?.key&&!E.has(o.type)&&n.push(l.key)}const r=[...new Set(e.map(({key:o})=>o).filter(Boolean))];r.length&&await Y(i,r);for(const{key:o,type:l}of e)l==="delete"&&o&&J(i,o);const a=[...new Set([...e.filter(({type:o})=>!z.has(o)).map(({key:o})=>o).filter(Boolean),...n])];if(a.length){const o=await i.ensureEditWatcher();i.PollingCoordinator?.activePoll?o?.enqueue(a):await o?.invalidate(a)}await i.refreshCollections(!1,{fingerprint:s}),await i.refreshSupplementalCollections(e);for(const o of e)await i.afterReconcileChange(o)}while(i._pendingChanges.length)}finally{i._reconcilePromise=null}})()),i._reconcilePromise),P=(i,t)=>{const e=new Map;for(const s of t)if(!(s.elt&&!s.elt.isConnected)){for(const n of Object.values(s.widgets))if(n.refreshScope==="collection"&&!(!n.refreshDescriptor||!n.refreshDelta))try{const r=n.refreshDescriptor();if(!r)continue;const a=s.name;if(!a||e.has(a))continue;e.set(a,{descriptor:{...r,id:a},widget:n})}catch(r){h(r)}}return e},X=async(i,t,{fingerprint:e=i.elt.dataset.fingerprint||null}={})=>{const s=P(i,t),n=new Set;let r=null;if(s.size){const a=await p.post("/refresh",{view:{key:i.key||null,hash:i.hash||null,index:i.elt.dataset.index||null,mode:i.elt.dataset.userMode||null,fingerprint:e},targets:Array.from(s.values(),({descriptor:o})=>o)});if(a?.reload){window.location.reload();return}if(a?.ok&&Array.isArray(a.targets)){if(r=a.fingerprint||null,!a.targets.length&&r)for(const{widget:l}of s.values())n.add(l);const o=new Map(a.targets.map(l=>[l.id,l]));for(const[l,{widget:c}]of s){const d=o.get(l);if(!(!d||d.fallback))try{await c.refreshDelta(d),n.add(c)}catch(y){h(y)}}}}await Promise.all(t.map(async a=>{a.elt&&!a.elt.isConnected||await a.refreshCollections(n)})),r&&(i.elt.dataset.fingerprint=r),await i.Notifications?.refresh?.()},u=(i,t,e,s)=>{if(i[e])return Promise.resolve(i[e]);if(i[t])return i[t];const n=Promise.resolve().then(s).then(r=>i._destroyed?(r?.destroy?.(),null):(r&&(i[e]=r),r||null)).catch(r=>{throw i[t]===n&&(i[t]=null),r});return i[t]=n,n},T=i=>u(i,"_offlineQueuePromise","offlineQueue",async()=>{const{OfflineQueue:t}=await import("./offlineQueue.js?v=b1a2c353");if(i._destroyed)return null;const e=new t(i);return await e.init(),e}),f=i=>u(i,"_pollingPromise","PollingCoordinator",async()=>{const{PollingCoordinator:t}=await import("./polling.js?v=b1a2c353");if(i._destroyed)return null;const e=new t(i).init();return i.PollingCoordinator=e,i._initPollingSubscription(),e}),b=i=>u(i,"_syncPromise","SyncManager",async()=>{await f(i);const{SyncManager:t}=await import("./sync.js?v=b1a2c353");if(i._destroyed)return null;const e=new t(i);return e.init(),e}),A=i=>u(i,"_editWatcherPromise","EditWatcher",async()=>{await f(i);const{EditWatcher:t}=await import("./editWatcher.js?v=b1a2c353");if(i._destroyed)return null;const e=new t(i);return e.init(),e}),R=i=>u(i,"_deferredOperationsPromise","DeferredOperations",async()=>{await f(i);const{DeferredOperationManager:t}=await import("./deferredOperations.js?v=b1a2c353");return i._destroyed?null:new t(i).init()}),M=i=>u(i,"_notificationsPromise","Notifications",async()=>{if(!document.querySelector("[data-role='notifications']"))return null;await f(i);const{Notifications:t}=await import("./notifications.js?v=b1a2c353");if(i._destroyed)return null;const e=new t(i);return e.init(),e}),K=i=>u(i,"_searchPromise","SearchBox",async()=>{const t=document.querySelector("[lp-search]");if(!t)return null;const{SearchBox:e}=await import("./search.js?v=b1a2c353");if(i._destroyed)return null;const s=new e(t);return await s.init(),s}),tt=i=>u(i,"_entityMenuPromise","EntityMenu",async()=>{const{EntityMenu:t}=await import("./entityMenu.js?v=b1a2c353");return i._destroyed?null:new t(i)}),et=i=>u(i,"_submissionPromise","SubmissionManager",async()=>{const{SubmissionManager:t}=await import("./submission.js?v=b1a2c353");return i._destroyed?null:new t(i)}),st=i=>u(i,"_offlineModalPromise","offlineModal",async()=>{if(!i.offlineIndicator)return null;const{OfflineModal:t}=await import("./modal.js?v=b1a2c353");if(i._destroyed)return null;const e=new t(i,i.offlineIndicator);return e.enable(),e}),it=i=>u(i,"_modalClassesPromise","ModalClasses",async()=>{const{DeleteModal:t,HelpModal:e,Modal:s}=await import("./modal.js?v=b1a2c353");return i._destroyed?null:{DeleteModal:t,HelpModal:e,Modal:s}}),nt=i=>!!i.elt.querySelector("[lp-sync]"),O=async(i,t,e)=>{const s=await Promise.allSettled(t);for(const n of s)n.status==="rejected"&&i.reportStartupError(n.reason,i.elt,e);return s},rt=i=>{if(i._servicesInitialized)return i.servicesReady;i._servicesInitialized=!0;const t=i._publishedReady.then(()=>i);i._serviceStart=t;const e=t.then(()=>I()),s=e.then(async()=>{const{inspectOfflineWork:a}=await import("./offlineWork.js?v=b1a2c353");return a(i)});i.offlineQueueReady=s.then(({mutations:a})=>a?T(i):null),i.syncReady=nt(i)?t.then(()=>b(i)):s.then(({sync:a})=>a?b(i):null),i.initialReplayReady=i.offlineQueueReady.then(async a=>{if(!a)return 0;const{replayOfflineQueue:o}=await import("./offlineReplay.js?v=b1a2c353");return o(i,a)});const n=t.then(async()=>i._destroyed?[]:(i._setOfflineIndicator(),await O(i,[f(i),i.prefetch()],"essential-service-startup"))),r=e.then(async()=>{if(i._destroyed)return[];const a=[];return document.querySelector("[data-role='notifications']")&&a.push(M(i)),i.elt.querySelector("[data-operation]")&&a.push(R(i)),i.elt.querySelector("[lp-edited-marker]")&&a.push(A(i)),await O(i,a,"optional-service-startup")});return i.servicesReady=Promise.all([n,r,i.offlineQueueReady,i.syncReady,i.initialReplayReady]).catch(a=>(i.reportStartupError(a,i.elt,"service-startup"),[])).then(async a=>(await i._publishedReady,i._destroyed||W("lagniappe:services-ready"),a)),i.servicesReady},q=new Set(["TaskMove","TaskCombine"]);class at extends k{async activate(t){const e=t==="TaskCombine"?this.widgets.TaskCombine:null;if(t==="TaskCombine"&&this.view.key){const n=this.elt.querySelector("[data-widget='TaskCombine']");if(n?.dataset.route){const r=new URL(n.dataset.route,window.location.origin);r.searchParams.set("page",this.view.key);const a=`${r.pathname}${r.search}`;n.dataset.route=a,e&&(e.route=a)}}const s=await super.activate(t);if(s&&e){const n=e.route.includes("?")?"&":"?";await this.load(e,`${e.route}${n}refresh=${Date.now()}`)}return s}closeOpenWidget(){return!this.open||this.open==="false"?!1:(this.deactivate(!1),!0)}get completed(){return this.elt.dataset.completed==="true"}get showEmptyFields(){return this.readonly&&!this.completed}get formData(){if(q.has(this.active?.name))return this.active.formData;const t=Object.values(this.widgets).filter(s=>!q.has(s.name)&&(s===this.active||s.unsavedState===!0)&&s.target?.dataset.widget===s.name&&this.elt.contains(s.target)),e=t.map(s=>s.formData instanceof FormData?s.formData:s.target instanceof HTMLFormElement?new FormData(s.target):null).filter(Boolean).reduce((s,n)=>{for(const[r,a]of n.entries())s.append(r,a);return s},new FormData);return t.forEach(s=>{e.append("active",s.name)}),e}async updated(t){if(t.task_delta){this.deactivate(!1),await this.view.getComponent(this.parentComponent)?.widgets?.PageTaskList?.refreshDelta(t.task_delta);return}const e=t.html?.querySelector(`[id='${this.name}']`);e&&(Object.assign(this.elt.dataset,e.dataset),this._replaceNav(e),this._removeMissingWidgets(e)),await super.updated(t)}_replaceNav(t){const e=t.querySelector("[lp-nav]"),s=this.nav?.element;!e||!s||(s.replaceWith(e),this._nav=null)}_removeMissingWidgets(t){this.elt.querySelectorAll("[data-widget]").forEach(e=>{const s=e.dataset.widget;t.querySelector(`[data-widget='${s}']`)||(e.remove(),this.active?.name===s&&(this.active=null),this.widgets[s]?.destroy?.(),delete this.widgets[s])})}}class ot extends j{constructor(t){super(t),this.hasDeferredServices=!0,this.offlineIndicator=document.querySelector('[data-role="offline"]'),this.offlineModal=null,this.Notifications=null,this.offlineQueue=null,this.PollingCoordinator=null,this.DeferredOperations=null,this.SyncManager=null,this.EditWatcher=null,this.SubmissionManager=null,this.SearchBox=null,this.EntityMenu=null,this.ModalClasses=null,this.offlineQueueReady=Promise.resolve(null),this.syncReady=Promise.resolve(null),this.initialReplayReady=Promise.resolve(0),this._pendingChanges=[],this._reconcilePromise=null,this._componentActions=new Map,this._pollingReconcileTask=null,this._pollingReconcileRequested=!1,this._offlineReplayTask=null}queryParam(t){return new URLSearchParams(window.location.search).get(t)?.trim()||null}querySlug(t){return t?.trim().replace(/([a-z0-9])([A-Z])/g,"$1-$2").replace(/[^a-zA-Z0-9]+/g,"-").replace(/^-|-$/g,"").toLowerCase()}operationId(){return globalThis.crypto?.randomUUID?.()||`operation-${Date.now()}-${Math.random().toString(16).slice(2)}`}async init(){return await super.init(),rt(this),this}reportStartupError(t,e=this.elt,s="lazy-control"){h(t,e,{context:s})}ensureOfflineQueue(){return T(this)}ensurePollingCoordinator(){return f(this)}ensureSyncManager(){return b(this)}ensureEditWatcher(){return A(this)}ensureDeferredOperations(){return R(this)}ensureNotifications(){return M(this)}ensureSearchBox(){return K(this)}ensureEntityMenu(){return tt(this)}ensureSubmissionManager(){return et(this)}ensureOfflineModal(){return st(this)}ensureModalClasses(){return it(this)}_initPollingSubscription(){if(!this.PollingCoordinator)return;if(this.key){const s=`view:entity:${this.key}`;this.PollingCoordinator.subscribe({id:s,type:"entity",key:this.key,revision:this.elt.dataset.fingerprint||null},{onResult:async n=>{if(await(this.elt.querySelector("[lp-edited-marker]")?await this.ensureEditWatcher():this.EditWatcher)?.receiveEntityResult?.(this.key,n),n.status==="unavailable"){await this.reconcileChange({type:"delete",key:this.key});return}n.status==="changed"&&await this.reconcileChange({type:"entity-poll",key:this.key})}});return}const t=this.elt.dataset.index||this.kind;new Set(["categories","projects","pages","tasks","forms","users","ingress","home"]).has(t)&&this.PollingCoordinator.subscribe({id:`view:channel:${t}`,type:"channel",channel:t,revision:this.elt.dataset.fingerprint||null},{onResult:async s=>{s.status==="changed"&&await this.refresh()}})}reconcileChange(t={}){return Z(this,t)}async refreshSupplementalCollections(){}async afterReconcileChange(){}_applyStarState({key:t,starred:e,type:s}={}){if(!t)return;const n=e??s==="star",r=new Set([...this.elt.querySelectorAll(`[data-key="${t}"] [lp-control="star"]`),...document.querySelectorAll(`[data-entity-key="${t}"][lp-control="star"]`)]);for(const a of r){a.dataset.active=n?"true":"false";const o=n?"Unstar":"Star";a.setAttribute("aria-label",o),a.title=o;const l=a.querySelector('[data-role="star-label"]');l&&(l.textContent=o)}}async _toggleStar(t){if(!this.online)return;const e=t.closest("[lp-entity]")||t.closest("[data-key]"),s=e?.id||e?.dataset.key;if(!s)return;const n=t.dataset.active==="true";t.disabled=!0,this._applyStarState({key:s,starred:!n});try{const r=await p.patch(_.toggleStar(s));if(!r?.ok)throw new Error("Unable to update star");await this.reconcileChange({type:r.starred?"star":"unstar",key:s,starred:r.starred})}catch(r){h(r,t),this._applyStarState({key:s,starred:n})}finally{t.disabled=!1}}_setOfflineIndicator(){this.offline=!this.online}get offline(){return!this.online}set offline(t){this.offlineIndicator&&(this.offlineIndicator.dataset.visible=t?"true":"false"),this.elt.dispatchEvent(new CustomEvent("offline-status",{detail:{offline:!!t}}))}async sync({hidden:t=document.hidden,force:e=!1}={}){const s=D.online,n=this.hidden||!this.online||e;if(e||t!==this.hidden||s!==this.online)if(this.hidden=t,this.online=s,this.offline=!s,!s||t)this.EditWatcher?.pause(),this.PollingCoordinator?.pause(),await this.SyncManager?.deregister();else{if(await Promise.all([this.ensurePollingCoordinator(),this.SyncManager||this.elt.querySelector("[lp-sync]")?this.ensureSyncManager():null,this.elt.querySelector("[lp-edited-marker]")?this.ensureEditWatcher():null]),n&&!t){const a=this.elt.dataset.fingerprint||null;this.scheduleOfflineReplay(),this.DeferredOperations?.nudge(),await this.EditWatcher?.resume(),await this.refresh(e,{fingerprint:a})}else await this.EditWatcher?.resume();await this.SyncManager?.register(),await this.reconcilePollingSubscriptions(),await this.PollingCoordinator?.resume()}}scheduleOfflineReplay(){return this._offlineReplayTask?this._offlineReplayTask:(this._offlineReplayTask=import("./offlineReplay.js?v=b1a2c353").then(({replayOfflineQueue:t})=>t(this)).finally(()=>{this._offlineReplayTask=null}),this._offlineReplayTask)}async reconcilePollingSubscriptions(){this._destroyed||this.hidden||!this.online||(await this.EditWatcher?.reconcileSubscriptions?.(),await this.SyncManager?.reconcileSubscriptions?.(),await Promise.all(Object.values(this.components).flatMap(t=>Object.values(t.widgets).map(e=>e.syncPollingSubscription?.()))))}schedulePollingReconciliation(){if(this._destroyed||this.hidden||!this.online)return Promise.resolve();if(this._pollingReconcileRequested=!0,this._pollingReconcileTask)return this._pollingReconcileTask;const t=Promise.resolve().then(async()=>{for(;this._pollingReconcileRequested&&!this._destroyed;)this._pollingReconcileRequested=!1,await this.reconcilePollingSubscriptions()}).catch(e=>{this.reportStartupError(e,this.elt,"polling-subscription-reconciliation")}).finally(()=>{this._pollingReconcileTask===t&&(this._pollingReconcileTask=null)});return this._pollingReconcileTask=t,t}async prefetch(){const t=this.elt.querySelectorAll("[lp-component][lp-prefetch]");await Promise.all(Array.from(t).map(async e=>{const s=this.getComponent(e);s&&await s.prefetch()}))}_collectRefreshTargets(t){return P(this,t)}async _refreshCollectionComponents(t,e={}){return X(this,t,e)}async refreshCollections(t=!1,e={}){const s=Object.values(this.components),n=async()=>await this._refreshCollectionComponents(s,e);t?await n():await m(n)}async refresh(t=!1,e={}){return this.refreshCollections(t,e)}async notify(t){await(await this.ensureNotifications())?.notify?.(t)}_installColdControlListeners(){this._coldControlEvent=this._coldControlEvent.bind(this);for(const t of["input","click"])document.addEventListener(t,this._coldControlEvent,!0)}_removeColdControlListeners(){if(this._coldControlEvent){for(const t of["input","click"])document.removeEventListener(t,this._coldControlEvent,!0);this._coldControlEvent=null}}_coldControlEvent(t){const e=t.target?.closest?.("[lp-search]");if(e&&!this.SearchBox){this.runColdAction(e,()=>this.ensureSearchBox(),r=>this._activateSearchBox(r),e);return}const s=t.target?.closest?.("[data-role='offline']");if(s&&!this.offlineModal&&t.type==="click"){t.preventDefault(),t.stopImmediatePropagation?.(),this.runColdAction(s,()=>this.ensureOfflineModal(),r=>r?.attach?.(),s);return}const n=t.target?.closest?.("[data-role='notifications']");!n||this.Notifications||(t.type==="click"&&(t.preventDefault(),t.stopImmediatePropagation?.()),this.runColdAction(n,()=>this.ensureNotifications(),r=>r?.dropdown?.showPanel?.(),n))}_click(t){const e=t.target.closest("[data-role='menu-trigger']"),s=e?.closest("[lp-menu]");if(s&&this.elt.contains(s)){t.preventDefault(),t.stopPropagation(),this.runColdAction(s,()=>this.ensureEntityMenu(),l=>l?.toggle(s),e);return}const n=t.target.closest("button"),r=n?.getAttribute("lp-control");if(n?.matches("[data-role='flipper']")){t.preventDefault();const l=n.closest("[data-flipped]"),c=l.dataset.flipped==="false";l.dataset.flipped=c?"true":"false";return}else if(r==="help"){t.preventDefault(),t.stopPropagation(),this._showHelpModal(n);return}else if(r==="star"){t.preventDefault(),this._toggleStar(n);return}else if(r==="delete"){t.preventDefault(),t.stopPropagation(),this._showDeleteModal(n);return}else if(["previous","next"].includes(r)){if(t.preventDefault(),!this.online)return;const l=t.target.closest("[data-widget]"),c=this.getComponent(l);p.get(n.dataset.route).then(d=>{c.widgets[l.dataset.widget]?.refresh(d)});return}else if(r||n?.hasAttribute("lp-show")){t.preventDefault(),this.renderComponent(n);return}if(t.target.closest("form")||t.target.closest("a")||t.target.closest("input")||t.target.closest("button"))return;const a=t.target.closest("[lp-show]");if(a){t.preventDefault(),this.renderComponent(a);return}const o=t.target.closest("[lp-link]");if(o){o.querySelector("[data-role='title']")?.click();return}}async _showDeleteModal(t){return this.runColdAction(t,()=>this.ensureModalClasses(),async({DeleteModal:e}={})=>{if(!e)return;await new e(this,t).init()})}async _showHelpModal(t){return this.runColdAction(t,()=>this.ensureModalClasses(),async({HelpModal:e}={})=>{if(!e)return;await new e(this,t).init()})}getComponent(t){const e=t?.closest("[lp-component]");if(e?._lp_component)return e._lp_component;const s=e?.id||e?.dataset?.key;if(s&&e?.hasAttribute("lp-component")){const n=e.matches("li[lp-component][data-kind='task']")?at:k,r=new n(e,this);return this.components[s]=r,e._lp_component=r,e.setAttribute("initialized",""),r}return null}successfulResponse(t,e){return t?t.reload?(window.location.reload(),!1):t.error?(e?.showError?.(t.error),!1):t.modal?(this.ensureModalClasses().then(({Modal:s}={})=>{this._destroyed||!s||new s(this).attach(t.modal,e)}),!1):!0:!1}async update(t,e,s=t.route){return(await this.ensureSubmissionManager())?.update(t,e,s)}async create(t,e,s=t.route){return(await this.ensureSubmissionManager())?.create(t,e,s)}async load(t,e){if(!e)return null;const s=await p.get(e);return this.successfulResponse(s,t)?s:null}_setLoadingTrigger(t,e,s){const n=e.elt.querySelector(`[data-widget="${s}"]`);if(!n||n.hasAttribute("loaded"))return null;const r=n?.hasAttribute("lp-load")||n?.hasAttribute("lp-prefetch");return t.setAttribute("aria-busy","true"),r&&(t.dataset.loading="true"),t}_clearLoadingTrigger(t){t&&(delete t.dataset.loading,t.removeAttribute("aria-busy"))}renderComponent(t){if(!t)return;if(this._componentActions.has(t))return this._componentActions.get(t);const e=t.getAttribute("lp-show")||t.getAttribute("lp-close")||"";let[s,n]=e.split(":");if(!s){h(new Error("No component ID found"),t);return}const r=document.getElementById(s),a=this.getComponent(r);if(!a){h(new Error("No component found"),t,{componentId:s});return}const o=a.active?.name;n=n==="active"&&o?o:n;const l=t.dataset.toggle==="true"&&o===n,c=a.visible&&n==="default",d=n==="active"&&a.active;l||c?n=a.active?.visible?null:o:d&&(n=o);const y=n?this._setLoadingTrigger(t,a,n):null,g=a.activate(n).then(v=>this._destroyed||t.isConnected===!1?null:m(async()=>{this._destroyed||await a.render(v)})).catch(v=>(this.reportStartupError(v,t,"component-activation"),null)).finally(()=>{this._clearLoadingTrigger(y),this._componentActions.get(t)===g&&this._componentActions.delete(t)});return this._componentActions.set(t,g),g}addFlash(t){!t||t.classList.contains("flash")||(t.classList.add("flash"),t.addEventListener("animationend",()=>{t.classList.remove("flash")},{once:!0}))}destroy(){super.destroy(),this._pollingReconcileRequested=!1,this.SubmissionManager?.destroy(),this.SyncManager?.destroy(),this.DeferredOperations?.destroy(),this.EntityMenu?.destroy(),this.EditWatcher?.destroy(),this.Notifications?.destroy?.(),this.PollingCoordinator?.destroy(),this.offlineModal?.destroy?.(),this._componentActions.clear(),Object.values(this.components).forEach(t=>{t.destroy&&t.destroy()}),this.components={}}}export{ot as C,C as N,H as a,Q as l};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { c as connectivity } from './connectivity.js?v=b32ad33a';
+import { E as ENDPOINTS } from './endpoints.js?v=b32ad33a';
+import { captureError } from './errors.js?v=b32ad33a';
+import { r as request } from './request.js?v=b32ad33a';
+import { withTransition, showBriefly, clearRecentSearchResults } from './utilities.js?v=b32ad33a';
+import { w as whenIdle, m as markPerformance, S as ShellView } from './shell.js?v=b32ad33a';
+
+/**
+ * @testable infrastructure
+ */
+class NavElement {
+	constructor(component, elt) {
+		this.component = component;
+		this.active = true;
+		this.modified = false;
+		this._widget = null;
+
+		this.element = elt;
+		this.name = elt.dataset.nav;
+
+		this.title = elt.querySelector("[data-role='title']");
+
+		this.nav =
+			document.querySelector(`nav[data-nav="${this.name}"]`) ||
+			this.component.elt.querySelector("nav");
+		this.standalone = this.nav.dataset.standalone === "true";
+		this.persistent = this.nav.dataset.persistent === "true";
+		this.componentToggles = this._initNavToggles();
+
+		if (this.nav.querySelector(".loader")) {
+			this.nav.addEventListener("click", this._click.bind(this));
+		}
+
+		this._hideNavContainer = new Set();
+		this._navContainer =
+			this.element.querySelector("[data-flipped]") || this.nav;
+		this.header = elt.querySelector("[data-role='header']");
+		this.widgetToggles = this.header
+			? this._initWidgetToggles(this.header)
+			: {};
+
+		this.controls = elt.querySelector("[data-role='controls']");
+		this.widgetControls = this.controls ? this._initControls() : {};
+		this.navToggles = elt.querySelector("[data-role='nav-toggles']");
+	}
+
+	_initNavToggles() {
+		return Object.fromEntries(
+			Array.from(
+				this.nav.querySelectorAll("button[lp-show]:not([lp-control])"),
+			).map((button) => {
+				const [component, widget] = button.getAttribute("lp-show").split(":");
+				return [
+					["active", "nav"].includes(widget) ? component : widget,
+					button,
+				];
+			}),
+		);
+	}
+
+	_initWidgetToggles() {
+		return Object.fromEntries(
+			Array.from(
+				this.header.querySelectorAll("button[lp-show]:not([lp-control])"),
+			).map((button) => {
+				const [component, widget] = button.getAttribute("lp-show").split(":");
+				this._hideNavContainer.add(widget);
+				return [component, button];
+			}),
+		);
+	}
+
+	_initControls() {
+		return Object.fromEntries(
+			Array.from(this.controls.querySelectorAll("button[lp-control]")).map(
+				(button) => [button.getAttribute("lp-control"), button],
+			),
+		);
+	}
+
+	_click(event) {
+		if (!event.target.closest("[lp-show]:not([lp-control])")) return;
+
+		Object.values(this.componentToggles).forEach((button) => {
+			if (!button.classList.contains("loader")) return;
+
+			const selected = button.contains(event.target);
+			if (selected) {
+				button.disabled = true;
+			} else {
+				button.classList.add("opacity-50");
+			}
+			this.modified = true;
+		});
+	}
+
+	_setSubToggleVisibility(hideToggles, component) {
+		const controlsVisible = this.settings.controls === "true";
+		const keepSubToggles = this.settings.subtoggles === "true";
+		hideToggles = hideToggles || (controlsVisible && !keepSubToggles);
+
+		Object.entries(this.widgetToggles).forEach(([name, toggle]) => {
+			const hidden = hideToggles || name !== component;
+			toggle.dataset.visible = hidden ? "false" : "true";
+		});
+	}
+
+	_setComponentToggleVisibility(hideToggles, widget, selected) {
+		const mobile = this.component.view.mobile;
+
+		if (this._hideNavContainer.has(widget) && hideToggles) {
+			this._navContainer.dataset.visible = "false";
+			return false;
+		}
+		if (this._navContainer) this._navContainer.dataset.visible = "true";
+
+		Object.entries(this.componentToggles).forEach(([show, toggle]) => {
+			if (hideToggles) {
+				toggle.dataset.visible = "false";
+			} else if (this.name === selected) {
+				toggle.dataset.visible = "true";
+			} else {
+				toggle.dataset.selected = show === selected ? "true" : "false";
+				toggle.dataset.visible = mobile ? toggle.dataset.selected : "true";
+			}
+		});
+
+		return true;
+	}
+
+	_setNavVisibility(widget) {
+		const togglesVisible = widget ? this.settings.nav !== "false" : true;
+		const visible =
+			this.persistent || this.component.active === this || togglesVisible
+				? "true"
+				: "false";
+
+		this.nav.dataset.visible = visible;
+	}
+
+	_updateLoadingToggles() {
+		if (!this.modified) return;
+		this.modified = false;
+
+		this.nav.querySelectorAll(".loader").forEach((toggle) => {
+			toggle.disabled = false;
+			toggle.classList.remove("opacity-50");
+		});
+	}
+
+	_setControlOptions(widget) {
+		const controlsVisible = widget ? this.settings.controls === "true" : false;
+		this.controls.dataset.visible = controlsVisible ? "true" : "false";
+		if (this.navToggles) {
+			this.navToggles.dataset.visible = controlsVisible ? "false" : "true";
+		}
+		if (!controlsVisible) return;
+
+		if ("flipped" in this._navContainer.dataset) {
+			this._navContainer.dataset.flipped = "false";
+		}
+
+		Object.entries(this.widgetControls).forEach(([option, element]) => {
+			this._setControlOption(option, element);
+		});
+	}
+
+	_setTitle() {
+		const title = this.settings.title || this.component.elt.dataset.title;
+		this.title.textContent = title || "";
+	}
+
+	enable(component) {
+		this.component = component;
+		this.active = true;
+	}
+
+	disable() {
+		this.active = false;
+	}
+
+	hide() {
+		this.element.classList.add(
+			"[&>*:not([data-role='error'])]:opacity-50",
+			"pointer-events-none",
+		);
+	}
+
+	show() {
+		this.element.classList.remove(
+			"[&>*:not([data-role='error'])]:opacity-50",
+			"pointer-events-none",
+		);
+	}
+
+	reconcile(widget, component) {
+		const selected = this.componentToggles[widget] ? widget : component;
+		const hideToggles = this.settings.nav === "false";
+		this._setComponentToggleVisibility(hideToggles, widget, selected);
+		this.element.dataset.visible = this.active ? "true" : "false";
+
+		if (!this.active) return;
+
+		this._setSubToggleVisibility(hideToggles, component);
+		this._setNavVisibility(widget);
+		this._updateLoadingToggles();
+		this._setTitle();
+		this._setControlOptions(widget);
+	}
+
+	get settings() {
+		if (this.component.active === this) {
+			return this.nav.dataset;
+		}
+		return this.component.active?.target?.dataset || {};
+	}
+
+	_setControlOption(option, element = this.widgetControls[option]) {
+		if (!element) return;
+
+		const settings = this.settings;
+		const value = this.component.active
+			? settings[option]
+			: this.component.elt.dataset?.[option];
+
+		if (option === "delete") {
+			element.dataset.visible = settings.key ? "true" : "false";
+			return;
+		} else if (!value && element) {
+			element.dataset.visible = "false";
+			return;
+		}
+
+		const controls = element.dataset.controls;
+		if (controls) {
+			element.setAttribute(`lp-${controls}`, value);
+		}
+
+		element.dataset.visible = "true";
+	}
+}
+
+/**
+ * Widget Contract:
+ * - target: Element - DOM element for this widget
+ * - enable(): Set this.active = true,
+ * - disable(): Set this.active = false, cleanup
+ * - reconcile(): Sync this.visible → target.dataset.visible (in transition)
+ * - updated(response): Handle server response
+ * - created(response): Post-create handling (reset forms)
+ * - data: FormData getter for submissions
+ * - destroy(): Cleanup listeners
+ */
+
+
+const WIDGETS = {
+	BaseList: () => import('./baseList.js?v=b32ad33a'),
+	CategoryInfo: () => import('./category.js?v=b32ad33a'),
+	CollaborativeDocument: () => import('./collaborative.js?v=b32ad33a'),
+	CreateCategory: () => import('./category.js?v=b32ad33a'),
+	CreateForm: () => import('./form.js?v=b32ad33a'),
+	CreateModelTask: () => import('./modelTasks.js?v=b32ad33a'),
+	CreateNote: () => import('./note.js?v=b32ad33a'),
+	CreatePage: () => import('./pageInfo.js?v=b32ad33a'),
+	CreateProject: () => import('./projectInfo.js?v=b32ad33a'),
+	CreateToolReport: () => import('./tools.js?v=b32ad33a'),
+	CreateUserTask: () => import('./taskSettings.js?v=b32ad33a'),
+	CreateTask: () => import('./taskSettings.js?v=b32ad33a'),
+	CreateUser: () => import('./user2.js?v=b32ad33a'),
+	CreateUserGroup: () => import('./user2.js?v=b32ad33a'),
+	DirectoryList: () => import('./lists.js?v=b32ad33a'),
+	DocumentSettings: () => import('./documentSettings.js?v=b32ad33a'),
+	FileInfo: () => import('./fileInfo.js?v=b32ad33a'),
+	PDFPreview: () => import('./filePdfPreview.js?v=b32ad33a'),
+	FileUpload: () => import('./uploadFile.js?v=b32ad33a'),
+	Filters: () => import('./filters.js?v=b32ad33a'),
+	FilterResults: () => import('./tables.js?v=b32ad33a'),
+	GeneratePages: () => import('./category.js?v=b32ad33a'),
+	GroupPermissions: () => import('./user2.js?v=b32ad33a'),
+	HomeActivityList: () => import('./activity.js?v=b32ad33a'),
+	HomePageList: () => import('./lists.js?v=b32ad33a'),
+	HomeTaskList: () => import('./tasks.js?v=b32ad33a'),
+	HomeProjectList: () => import('./lists.js?v=b32ad33a'),
+	HomeCategoryList: () => import('./lists.js?v=b32ad33a'),
+	ImportData: () => import('./ingress.js?v=b32ad33a'),
+	IndexTable: () => import('./tables.js?v=b32ad33a'),
+	IngressFileUpload: () => import('./ingressUpload.js?v=b32ad33a'),
+	IngressList: () => import('./lists.js?v=b32ad33a'),
+	MobileTableControls: () => import('./mobileTableControls.js?v=b32ad33a'),
+	ModelTaskInfo: () => import('./modelTasks.js?v=b32ad33a'),
+	ModelTaskList: () => import('./modelTasks.js?v=b32ad33a'),
+	PageInfo: () => import('./pageInfo.js?v=b32ad33a'),
+	PagePermissions: () => import('./pagePermissions.js?v=b32ad33a'),
+	PagePhoto: () => import('./pagePhoto.js?v=b32ad33a'),
+	PageTaskList: () => import('./pageTaskList.js?v=b32ad33a'),
+	ProjectInfo: () => import('./projectInfo.js?v=b32ad33a'),
+	PublicPermissions: () => import('./user2.js?v=b32ad33a'),
+	SavedFilters: () => import('./filters.js?v=b32ad33a'),
+	SiteExport: () => import('./siteExport.js?v=b32ad33a'),
+	SiteSettings: () => import('./siteSettings.js?v=b32ad33a'),
+	StarredList: () => import('./lists.js?v=b32ad33a'),
+	TableEditor: () => import('./tableEditor.js?v=b32ad33a'),
+	TableSorting: () => import('./tableSorting.js?v=b32ad33a'),
+	TableVisibility: () => import('./tableVisibility.js?v=b32ad33a'),
+	TaskForm: () => import('./taskForm.js?v=b32ad33a'),
+	TaskHistory: () => import('./tables.js?v=b32ad33a'),
+	TaskCombine: () => import('./taskSettings.js?v=b32ad33a'),
+	TaskMove: () => import('./taskSettings.js?v=b32ad33a'),
+	ToolReportList: () => import('./lists.js?v=b32ad33a'),
+	TaskSettings: () => import('./taskSettings.js?v=b32ad33a'),
+	UserSettings: () => import('./pageInfo.js?v=b32ad33a'),
+};
+
+/** Sync-capable widgets that can run without a mounted view (offline replay). */
+const HEADLESS_WIDGETS = {
+	document: {
+		load: () => import('./collaborative.js?v=b32ad33a'),
+		name: "CollaborativeDocument",
+	},
+};
+
+const JSON_ATTRIBUTES = [
+	"attributes",
+	"submission",
+	"schema",
+	"conditions",
+	"columns",
+	"selected",
+	"preload",
+	"options",
+];
+
+/**
+ * @testable infrastructure
+ */
+const _attributes = (component, show) => {
+	const settings = {
+		component: component,
+		view: component.view,
+		name: show,
+		visible: false,
+		modified: false,
+	};
+
+	// Components that cam be toggled visibly should have a target element
+	// either in the html or as a getter in the widget
+	const target = component.elt.querySelector(`[data-widget="${show}"]`);
+	if (target) {
+		settings.target = target;
+		settings.key = target.dataset.key || component.key || settings.view.key;
+		settings.kind = target.dataset.kind || component.kind || "default";
+		settings.persistent = target.dataset.persistent === "true";
+		settings.visible = target.dataset.visible === "true";
+	}
+
+	settings.route = target?.dataset.route || component.elt.dataset.route;
+
+	JSON_ATTRIBUTES.filter((attribute) => target?.dataset[attribute]).forEach(
+		(attribute) => {
+			settings[attribute] = JSON.parse(target.dataset[attribute]);
+		},
+	);
+
+	if (show in ENDPOINTS) {
+		settings.endpoints = ENDPOINTS[show](settings);
+	}
+
+	return settings;
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/widgets/loader.mjs::loadWidget
+ * @reason widget readonly is part of the widget construction contract
+ */
+const _defineReadonly = (widget, component) => {
+	Object.defineProperty(widget, "readonly", {
+		configurable: true,
+		enumerable: true,
+		get() {
+			return component.readonly || widget.target?.dataset.readonly === "true";
+		},
+	});
+};
+
+/**
+ * @testable infrastructure
+ */
+class DefaultWidget {
+	constructor(attributes) {
+		Object.assign(this, attributes);
+		this.DEFAULT = true;
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+async function loadWidget(component, show, extraAttributes = {}) {
+	let widget;
+	const attributes = { ..._attributes(component, show), ...extraAttributes };
+	const name = show.split("/")[0];
+
+	if (name in WIDGETS) {
+		const module = await WIDGETS[name]();
+		widget = new module[name](attributes);
+	} else {
+		widget = new DefaultWidget(attributes);
+	}
+
+	_defineReadonly(widget, component);
+
+	if (widget.init) await widget.init();
+
+	widget.enable = () => {
+		widget.modified = widget.modified || widget.visible !== true;
+		widget.visible = true;
+	};
+
+	widget.disable = (force = false) => {
+		widget.modified = force || widget.visible !== false;
+		widget.visible = false;
+	};
+
+	// All DOM manipulation should be done here, this is wrapped in a transition
+	// it is called for each changed widget in the component's render() method
+	widget.reconcile = async (silent = false) => {
+		if (widget.target && !widget.persistent) {
+			widget.target.dataset.visible = widget.visible ? "true" : "false";
+		}
+
+		if (!widget.modified) return;
+		widget.modified = false;
+
+		if (widget.postreconcile && !silent) await widget.postreconcile();
+	};
+
+	if (widget.target) widget.target._lp_widget = widget;
+	return widget;
+}
+
+/**
+ * Build a fully rendered, detached copy of a form widget for revision
+ * comparison. The response document is cloned so the original remains
+ * available if the user chooses to apply it.
+ *
+ * @testable infrastructure
+ */
+async function loadRevisionPreview(
+	liveWidget,
+	response,
+	{ readonly = liveWidget.readonly } = {},
+) {
+	const responseTarget = response.html?.querySelector(
+		`[data-widget='${liveWidget.name}']`,
+	);
+	if (!responseTarget) return null;
+
+	const container = document.createElement("div");
+	container.appendChild(responseTarget.cloneNode(true));
+	const view = {
+		key: liveWidget.key,
+		kind: liveWidget.kind,
+		readonly,
+		online: true,
+		hidden: false,
+		showExtractReloadNotice() {},
+	};
+	const component = {
+		elt: container,
+		view,
+		key: liveWidget.key,
+		kind: liveWidget.kind,
+		widgets: {},
+		get readonly() {
+			return readonly;
+		},
+	};
+	const preview = await loadWidget(component, liveWidget.name, {
+		revisionPreview: true,
+		schema: response.schema ?? null,
+		submission: response.submission ?? null,
+	});
+	const previewResponse = {
+		...response,
+		html: response.html?.cloneNode(true),
+	};
+
+	if (preview.updated) await preview.updated(previewResponse);
+	if (preview.postreconcile) await preview.postreconcile();
+	return preview;
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/widgets/loader.mjs::loadHeadlessWidget
+ * @reason helper owned by the headless sync widget loader
+ */
+function _headlessKind(sync_id) {
+	if (sync_id.endsWith(":document")) return "document";
+	return null;
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_replay_does_not_duplicate_after_reload
+ * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
+ * @features sync
+ * @dimensions headless-widget document offline-replay concurrency
+ *
+ * Construct a sync-capable widget with no view or DOM chrome.
+ * Caller runs init(), assigns remote/offlineRecord, then sync().
+ */
+async function loadHeadlessWidget({ sync_id, remote, offline }) {
+	const kind = _headlessKind(sync_id);
+	if (!kind) return null;
+
+	const { load, name } = HEADLESS_WIDGETS[kind];
+	const module = await load();
+	const Widget = module[name];
+
+	const target = document.createElement("div");
+	target.setAttribute("lp-sync", sync_id);
+	const fingerprint = remote?.fingerprint ?? offline?.fingerprint;
+	if (fingerprint) target.setAttribute("lp-fingerprint", fingerprint);
+	return new Widget({
+		target,
+		headless: true,
+		view: null,
+		readonly: true,
+		key: remote?.key ?? offline?.key,
+	});
+}
+
+/**
+ * @testable infrastructure
+ * @covered-by src/script/views/base/core.mjs::Core.getComponent
+ * @covered-by src/script/views/base/core.mjs::Core.renderComponent
+ * @covered-by src/script/views/base/core.mjs::Core.update
+ * @covered-by src/script/views/base/core.mjs::Core.create
+ */
+class ViewComponent {
+	constructor(node, view) {
+		this.view = view;
+		this.elt = node;
+		this.key = node.closest("[data-key]")?.dataset.key;
+		this.name = node.id;
+		this.kind = node.dataset.kind || view.kind;
+
+		this.widgets = {};
+		this.widgetLoads = new Map();
+		this.active = null;
+		this.attributes = {};
+		this._nav = null;
+		this._activeSubComponent = null;
+
+		this._creating = false;
+		this._destroyed = false;
+
+		this.reconcile = null;
+	}
+
+	get readonly() {
+		return this.view.readonly || this.elt.dataset.readonly === "true";
+	}
+
+	get default() {
+		return this.elt.dataset.default;
+	}
+
+	get navElt() {
+		return this.elt.querySelector(`[lp-nav][data-nav="${this.name}"]`);
+	}
+
+	get nav() {
+		if (this._nav) return this._nav;
+
+		const nav = this.elt.dataset.parentNav;
+		const navElt = nav ? document.getElementById(nav) : null;
+
+		if (navElt && !this.elt.contains(navElt)) {
+			this._nav = this.view.getComponent(navElt).nav;
+		} else {
+			this._nav = this.navElt ? new NavElement(this, this.navElt) : null;
+			if (this.navElt) this.navElt.dataset.visible = "true";
+		}
+
+		return this._nav;
+	}
+
+	set nav(newNav) {
+		this._nav = newNav;
+
+		if (this.navElt) this.navElt.dataset.visible = newNav ? "false" : "true";
+	}
+
+	get subComponents() {
+		const filtered = Array.from(
+			this.elt.querySelectorAll(":scope [lp-component]"),
+		).filter((component) => {
+			return component.parentElement.closest("[lp-component]") === this.elt;
+		});
+		return filtered;
+	}
+
+	get parentComponent() {
+		return this.elt.parentElement.closest("[lp-component]");
+	}
+
+	get persistent() {
+		return this.elt.dataset.persistent === "true";
+	}
+
+	set persistent(value) {
+		this.elt.dataset.persistent = value ? "true" : "false";
+	}
+
+	get visible() {
+		return this.elt.dataset.visible === "true";
+	}
+
+	set visible(value) {
+		this.elt.dataset.visible = value ? "true" : "false";
+	}
+
+	get error() {
+		return this.elt.querySelector("[data-role='error']");
+	}
+
+	/**
+	 * @testable false
+	 * @reason foundational view lifecycle plumbing
+	 */
+	async activate(show) {
+		if (this._destroyed) return false;
+		this.active?.disable();
+
+		if (!show) {
+			this.active = null;
+			this.nav?.reconcile(null, this.name);
+			return false;
+		} else if (["default", "active"].includes(show)) {
+			show = this.default;
+			if (!show) return false;
+		} else if (show === "nav" && this.nav?.standalone) {
+			this.active = this.nav;
+			return true;
+		}
+
+		this.active = await this.loadWidget(show);
+		if (this._destroyed) {
+			this.active?.destroy?.();
+			this.active = null;
+			return false;
+		}
+
+		const createForm = this.active?.ifEmpty;
+		if (createForm && !this._creating) {
+			const createTarget = Array.from(
+				this.elt.querySelectorAll("[data-widget]"),
+			).some((target) => target.dataset.widget === createForm);
+			if (createTarget) return await this.activate(createForm);
+		}
+
+		this.active?.enable();
+		return true;
+	}
+
+	/**
+	 * @testable false
+	 * @reason foundational view lifecycle plumbing
+	 */
+	async prefetch() {
+		const widgets = this.elt.querySelectorAll("[data-widget][lp-prefetch]");
+		await Promise.all(
+			Array.from(widgets).map(async (elt) => {
+				await this.loadWidget(elt.dataset.widget);
+			}),
+		);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_component_refresh_only_loads_collection_widgets
+	 * @features reconnect-refresh collections forms
+	 * @dimensions explicit-collection-scope form-exclusion
+	 */
+	async refreshCollections(skip = new Set()) {
+		const widgets = Object.values(this.widgets);
+		await Promise.all(
+			widgets.map(async (widget) => {
+				if (skip.has(widget)) return;
+				if (widget.refreshScope !== "collection") return;
+				if (!widget.refresh) return;
+				if (
+					widget.unsavedState === true ||
+					widget.form?._queued === true ||
+					widget.target?.querySelector?.(
+						"[lp-edited-marker][data-visible='true']",
+					)
+				)
+					return;
+				const response = await this.view.load(this, widget.route);
+				if (!response || response.updated === false) return;
+				await widget.refresh(response);
+			}),
+		);
+	}
+
+	/**
+	 * @testable false
+	 * @reason foundational view lifecycle plumbing
+	 */
+	async loadWidget(name) {
+		if (!name || this._destroyed) return null;
+		if (this.widgets[name]) return this.widgets[name];
+		if (this.widgetLoads.has(name)) return this.widgetLoads.get(name);
+
+		const pending = (async () => {
+			const widget = await loadWidget(this, name);
+			if (this._destroyed) {
+				widget?.destroy?.();
+				return null;
+			}
+			this.widgets[name] = widget;
+			if (widget.loading || widget.loaded) return widget;
+			widget.loading = true;
+			const shouldLoad =
+				widget.target?.hasAttribute("lp-load") ||
+				widget.target?.hasAttribute("lp-prefetch");
+			if (shouldLoad) await this.load(widget);
+			return widget;
+		})();
+		this.widgetLoads.set(name, pending);
+
+		try {
+			return await pending;
+		} finally {
+			if (this.widgetLoads.get(name) === pending) {
+				this.widgetLoads.delete(name);
+			}
+		}
+	}
+
+	// this is called when a widget needs to be loaded/reloaded in response to an event
+	/**
+	 * @testable false
+	 * @reason foundational view lifecycle plumbing
+	 */
+	async load(widget = this.active, route = null) {
+		if (!widget || widget?.loaded) return null;
+		route = route || widget.route;
+
+		const response = await this.view.load(this, route);
+		widget.modified = true;
+		if (!response) return null;
+
+		const append = await widget.updated(response);
+		if (append) this.load(widget, append.dataset.route);
+		if (widget !== this.active) {
+			await widget.postreconcile();
+		}
+	}
+
+	// triggered by a submit event, called by the core class's update() method
+	// any loaded widgets that have targets in the server response will be updated
+	// if the widget hasn't been loaded yet, its target will be replaced with the new html
+	// otherwise the widget's updated() method will be called with the response
+	async updated(response) {
+		const updates = { replace: [], append: [] };
+
+		response.html?.querySelectorAll("[data-widget]").forEach((elt) => {
+			const name = elt.dataset.widget;
+			const widget = this.widgets[name];
+			const target = this.elt.querySelector(`[data-widget='${name}']`);
+
+			if (widget?.updated) {
+				widget.updated(response);
+				widget.modified = true;
+			} else if (target) {
+				updates.replace.push({ target, elt });
+			} else {
+				updates.append.push(elt);
+			}
+		});
+
+		await withTransition(async () => {
+			updates.replace.forEach(({ target, elt }) => {
+				target.replaceWith(elt);
+			});
+			this.elt.append(...updates.append);
+			this.active?.success?.();
+			await this.render(true);
+		});
+	}
+
+	disable() {
+		this.nav?.hide();
+	}
+
+	enable() {
+		this.nav?.show();
+	}
+
+	// triggered by a submit event, called by the core class's create() method
+	// this.active is the form that triggered the event
+	// if it needs to be reset or modified, that should happen in its postreconcile() method
+	// receiver is the widget that will receive the new html, this will be activated
+	// it may be the same component or a different component, both components will be rendered
+	async created(response) {
+		if (!this.active) return;
+		const originator = this.active;
+		this._creating = true;
+
+		originator.modified = true;
+
+		const [componentId, widgetName] =
+			originator.target.dataset.destination.split(":");
+
+		await originator.created(response);
+
+		let component;
+		if (widgetName) {
+			if (componentId === this.name) {
+				component = this;
+				await this.activate(widgetName);
+			} else {
+				component = this.view.getComponent(
+					document.getElementById(componentId),
+				);
+				await component.activate(widgetName);
+			}
+
+			if (component.active) {
+				await component.active.created?.(response);
+				component.active.modified = true;
+			}
+		} else {
+			component = null;
+		}
+
+		await withTransition(async () => {
+			await this.render(true);
+			if (component && this !== component) await component.render(true);
+		});
+		this._creating = false;
+	}
+
+	preload(property) {
+		const data = this.elt.dataset.preload;
+		this.attributes = data ? JSON.parse(data) : {};
+		return this.attributes[property] ?? null;
+	}
+
+	showError(message) {
+		this.enable();
+
+		if (this.active?.showError) {
+			this.active.showError(message);
+		} else {
+			const errorElt = this.error;
+			if (!errorElt) return;
+
+			const error = document.createElement("span");
+			error.textContent = message;
+
+			showBriefly(errorElt, error);
+			this.active?.enable();
+		}
+	}
+
+	// if widgets return data, it must be a FormData object
+	// this FormData will have the data-role of the submitter added to it
+	get formData() {
+		return this.active?.formData;
+	}
+
+	get open() {
+		return this.elt.dataset.open;
+	}
+
+	get route() {
+		return (
+			this.active?.route ||
+			this.active?.target.dataset.route ||
+			this.elt.dataset.route
+		);
+	}
+
+	deactivate(visible = true, originator = null) {
+		if (this.active) {
+			this.active.disable(true);
+			this.active.reconcile(true);
+			this.nav?.reconcile(null, this.name);
+		}
+
+		if (!visible) {
+			this.elt.dataset.visible = this.persistent ? "true" : "false";
+			this.elt.dataset.open = "false";
+		}
+
+		if (originator) {
+			this.nav?.disable();
+			this.nav?.reconcile(originator.active?.name, originator.name);
+		}
+	}
+
+	_setParentComponent() {
+		const parentElt = this.parentComponent;
+		const parent = parentElt ? this.view.getComponent(parentElt) : null;
+		const subComponents = parent ? parent.subComponents : this.subComponents;
+
+		subComponents.forEach((elt) => {
+			const subComponent = this.view.getComponent(elt);
+			if (subComponent !== this) subComponent.deactivate(false);
+		});
+
+		if (!parent) return;
+
+		if (!this.nav && parent.nav) {
+			this.nav = parent.nav;
+		} else if (this.nav !== parent.nav && this.nav?.standalone) {
+			parent.deactivate(true, this);
+			parent.elt.dataset.visible = "true";
+		}
+
+		parent._setSubComponent(this);
+	}
+
+	_setSubComponent(subComponent) {
+		const activeSubComponent = this._activeSubComponent;
+		if (activeSubComponent && activeSubComponent !== subComponent) {
+			const visible = activeSubComponent.persistent ? "true" : "false";
+			activeSubComponent.elt.dataset.visible = visible;
+		}
+		this._activeSubComponent = subComponent;
+
+		const event = new CustomEvent("set-subcomponent", {
+			detail: {
+				subcomponent: subComponent,
+			},
+			bubbles: true,
+		});
+		subComponent.elt.dispatchEvent(event);
+	}
+
+	// User actions and initial entity enhancement call this within a transition.
+	// Any DOM manipulation in a widget should be done in postreconcile().
+	/**
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_component_render_does_not_wait_for_polling_reconciliation
+	 * @features startup polling
+	 * @dimensions component-render subscription-lifecycle nonblocking
+	 * @pairs startup:deferred-services startup:component-render startup:nonblocking
+	 * @pairs polling:subscription-lifecycle polling:component-render polling:nonblocking
+	 */
+	async render(visible) {
+		const open = visible ? this.active?.name || "true" : false;
+		this.elt.dataset.visible = this.persistent || visible ? "true" : "false";
+
+		this._setParentComponent();
+
+		await Promise.all(
+			Object.values(this.widgets).map((widget) => {
+				return widget.reconcile();
+			}),
+		);
+
+		if (this.nav) {
+			this.nav.enable(this);
+			this.nav.reconcile(this.active?.name, this.name);
+		}
+
+		this.elt.dataset.open = open || "false";
+		void this.view.schedulePollingReconciliation?.();
+	}
+
+	destroy() {
+		this._destroyed = true;
+		Object.values(this.widgets).forEach((widget) => {
+			widget.destroy?.();
+		});
+		this.widgetLoads.clear();
+		delete this.view.components[this.key];
+	}
+}
+
+const COLLECTION_ONLY_CHANGE_TYPES = new Set(["delete", "star", "unstar"]);
+const FORM_ALREADY_RECONCILED_CHANGE_TYPES = new Set([
+	...COLLECTION_ONLY_CHANGE_TYPES,
+	"entity-poll",
+]);
+
+const loadChangeDestination = async (view, destination) => {
+	if (!destination) return null;
+	const [componentId, widgetName] = destination.split(":");
+	if (!componentId || !widgetName) return null;
+	const component = view.getComponent(document.getElementById(componentId));
+	return component ? await component.loadWidget(widgetName) : null;
+};
+
+const loadMountedCollectionOwners = async (view, keys) => {
+	const requested = new Set(keys);
+	const targets = new Set();
+	for (const entity of view.elt.querySelectorAll("[lp-entity][data-key]")) {
+		if (!requested.has(entity.dataset.key)) continue;
+		const target = entity.parentElement?.closest?.("[data-widget]");
+		if (target?.dataset.widget && !target.matches?.("form"))
+			targets.add(target);
+	}
+	await Promise.all(
+		Array.from(targets, async (target) => {
+			await view.getComponent(target)?.loadWidget(target.dataset.widget);
+		}),
+	);
+};
+
+const removeDeletedEntity = (view, key) => {
+	for (const element of view.elt.querySelectorAll("[data-key]")) {
+		if (element.dataset.key !== key) continue;
+		element._lp_component?.destroy?.();
+		element.remove();
+	}
+};
+
+const reconcileChange = (view, change = {}) => {
+	view._pendingChanges.push({ ...change });
+	if (view._reconcilePromise) return view._reconcilePromise;
+
+	view._reconcilePromise = (async () => {
+		try {
+			do {
+				const changes = view._pendingChanges.splice(0);
+				const fingerprint = view.elt.dataset.fingerprint || null;
+				const destinationKeys = [];
+				for (const item of changes) {
+					if (item.type === "delete") clearRecentSearchResults();
+					if (["star", "unstar"].includes(item.type)) {
+						view._applyStarState(item);
+					}
+					const destination = await loadChangeDestination(
+						view,
+						item.destination,
+					);
+					if (
+						destination?.key &&
+						!COLLECTION_ONLY_CHANGE_TYPES.has(item.type)
+					) {
+						destinationKeys.push(destination.key);
+					}
+				}
+				const keys = [
+					...new Set(changes.map(({ key }) => key).filter(Boolean)),
+				];
+				if (keys.length) await loadMountedCollectionOwners(view, keys);
+				for (const { key, type } of changes) {
+					if (type === "delete" && key) removeDeletedEntity(view, key);
+				}
+				const formKeys = [
+					...new Set([
+						...changes
+							.filter(
+								({ type }) => !FORM_ALREADY_RECONCILED_CHANGE_TYPES.has(type),
+							)
+							.map(({ key }) => key)
+							.filter(Boolean),
+						...destinationKeys,
+					]),
+				];
+				if (formKeys.length) {
+					const watcher = await view.ensureEditWatcher();
+					if (view.PollingCoordinator?.activePoll) watcher?.enqueue(formKeys);
+					else await watcher?.invalidate(formKeys);
+				}
+				await view.refreshCollections(false, { fingerprint });
+				await view.refreshSupplementalCollections(changes);
+				for (const item of changes) await view.afterReconcileChange(item);
+			} while (view._pendingChanges.length);
+		} finally {
+			view._reconcilePromise = null;
+		}
+	})();
+	return view._reconcilePromise;
+};
+
+const collectRefreshTargets = (_view, components) => {
+	const targets = new Map();
+	for (const component of components) {
+		if (component.elt && !component.elt.isConnected) continue;
+		for (const widget of Object.values(component.widgets)) {
+			if (widget.refreshScope !== "collection") continue;
+			if (!widget.refreshDescriptor || !widget.refreshDelta) continue;
+			try {
+				const descriptor = widget.refreshDescriptor();
+				if (!descriptor) continue;
+				const id = component.name;
+				if (!id || targets.has(id)) continue;
+				targets.set(id, { descriptor: { ...descriptor, id }, widget });
+			} catch (error) {
+				captureError(error);
+			}
+		}
+	}
+	return targets;
+};
+
+const refreshCollectionComponents = async (
+	view,
+	components,
+	{ fingerprint = view.elt.dataset.fingerprint || null } = {},
+) => {
+	const targets = collectRefreshTargets(view, components);
+	const reconciled = new Set();
+	let refreshedFingerprint = null;
+	if (targets.size) {
+		const response = await request.post("/refresh", {
+			view: {
+				key: view.key || null,
+				hash: view.hash || null,
+				index: view.elt.dataset.index || null,
+				mode: view.elt.dataset.userMode || null,
+				fingerprint,
+			},
+			targets: Array.from(targets.values(), ({ descriptor }) => descriptor),
+		});
+		if (response?.reload) {
+			window.location.reload();
+			return;
+		}
+		if (response?.ok && Array.isArray(response.targets)) {
+			refreshedFingerprint = response.fingerprint || null;
+			if (!response.targets.length && refreshedFingerprint) {
+				for (const { widget } of targets.values()) reconciled.add(widget);
+			}
+			const results = new Map(
+				response.targets.map((target) => [target.id, target]),
+			);
+			for (const [id, { widget }] of targets) {
+				const result = results.get(id);
+				if (!result || result.fallback) continue;
+				try {
+					await widget.refreshDelta(result);
+					reconciled.add(widget);
+				} catch (error) {
+					captureError(error);
+				}
+			}
+		}
+	}
+	await Promise.all(
+		components.map(async (component) => {
+			if (component.elt && !component.elt.isConnected) return;
+			await component.refreshCollections(reconciled);
+		}),
+	);
+	if (refreshedFingerprint) view.elt.dataset.fingerprint = refreshedFingerprint;
+	await view.Notifications?.refresh?.();
+};
+
+const loadOnce = (view, promiseKey, handleKey, loader) => {
+	if (view[handleKey]) return Promise.resolve(view[handleKey]);
+	if (view[promiseKey]) return view[promiseKey];
+
+	const pending = Promise.resolve()
+		.then(loader)
+		.then((manager) => {
+			if (view._destroyed) {
+				manager?.destroy?.();
+				return null;
+			}
+			if (manager) view[handleKey] = manager;
+			return manager || null;
+		})
+		.catch((error) => {
+			if (view[promiseKey] === pending) view[promiseKey] = null;
+			throw error;
+		});
+	view[promiseKey] = pending;
+	return pending;
+};
+
+const ensureOfflineQueue = (view) =>
+	loadOnce(view, "_offlineQueuePromise", "offlineQueue", async () => {
+		const { OfflineQueue } = await import('./offlineQueue.js?v=b32ad33a');
+		if (view._destroyed) return null;
+		const queue = new OfflineQueue(view);
+		await queue.init();
+		return queue;
+	});
+
+const ensurePollingCoordinator = (view) =>
+	loadOnce(view, "_pollingPromise", "PollingCoordinator", async () => {
+		const { PollingCoordinator } = await import('./polling.js?v=b32ad33a');
+		if (view._destroyed) return null;
+		const coordinator = new PollingCoordinator(view).init();
+		view.PollingCoordinator = coordinator;
+		view._initPollingSubscription();
+		return coordinator;
+	});
+
+const ensureSyncManager = (view) =>
+	loadOnce(view, "_syncPromise", "SyncManager", async () => {
+		await ensurePollingCoordinator(view);
+		const { SyncManager } = await import('./sync.js?v=b32ad33a');
+		if (view._destroyed) return null;
+		const manager = new SyncManager(view);
+		manager.init();
+		return manager;
+	});
+
+const ensureEditWatcher = (view) =>
+	loadOnce(view, "_editWatcherPromise", "EditWatcher", async () => {
+		await ensurePollingCoordinator(view);
+		const { EditWatcher } = await import('./editWatcher.js?v=b32ad33a');
+		if (view._destroyed) return null;
+		const watcher = new EditWatcher(view);
+		watcher.init();
+		return watcher;
+	});
+
+const ensureDeferredOperations = (view) =>
+	loadOnce(
+		view,
+		"_deferredOperationsPromise",
+		"DeferredOperations",
+		async () => {
+			await ensurePollingCoordinator(view);
+			const { DeferredOperationManager } = await import(
+				'./deferredOperations.js?v=b32ad33a'
+			);
+			if (view._destroyed) return null;
+			return new DeferredOperationManager(view).init();
+		},
+	);
+
+const ensureNotifications = (view) =>
+	loadOnce(view, "_notificationsPromise", "Notifications", async () => {
+		if (!document.querySelector("[data-role='notifications']")) return null;
+		await ensurePollingCoordinator(view);
+		const { Notifications } = await import('./notifications.js?v=b32ad33a');
+		if (view._destroyed) return null;
+		const notifications = new Notifications(view);
+		notifications.init();
+		return notifications;
+	});
+
+const ensureSearchBox = (view) =>
+	loadOnce(view, "_searchPromise", "SearchBox", async () => {
+		const search = document.querySelector("[lp-search]");
+		if (!search) return null;
+		const { SearchBox } = await import('./search.js?v=b32ad33a');
+		if (view._destroyed) return null;
+		const box = new SearchBox(search);
+		await box.init();
+		return box;
+	});
+
+const ensureEntityMenu = (view) =>
+	loadOnce(view, "_entityMenuPromise", "EntityMenu", async () => {
+		const { EntityMenu } = await import('./entityMenu.js?v=b32ad33a');
+		if (view._destroyed) return null;
+		return new EntityMenu(view);
+	});
+
+const ensureSubmissionManager = (view) =>
+	loadOnce(view, "_submissionPromise", "SubmissionManager", async () => {
+		const { SubmissionManager } = await import('./submission.js?v=b32ad33a');
+		if (view._destroyed) return null;
+		return new SubmissionManager(view);
+	});
+
+const ensureOfflineModal = (view) =>
+	loadOnce(view, "_offlineModalPromise", "offlineModal", async () => {
+		if (!view.offlineIndicator) return null;
+		const { OfflineModal } = await import('./modal.js?v=b32ad33a');
+		if (view._destroyed) return null;
+		const modal = new OfflineModal(view, view.offlineIndicator);
+		modal.enable();
+		return modal;
+	});
+
+const ensureModalClasses = (view) =>
+	loadOnce(view, "_modalClassesPromise", "ModalClasses", async () => {
+		const { DeleteModal, HelpModal, Modal } = await import(
+			'./modal.js?v=b32ad33a'
+		);
+		if (view._destroyed) return null;
+		return { DeleteModal, HelpModal, Modal };
+	});
+
+/**
+ * @testable false
+ * @covered-by src/script/views/base/services.mjs::initializeCoreServices
+ */
+const hasSyncCapability = (view) =>
+	Boolean(view.elt.querySelector("[lp-sync]"));
+
+const settleServices = async (view, promises, context) => {
+	const results = await Promise.allSettled(promises);
+	for (const result of results) {
+		if (result.status === "rejected") {
+			view.reportStartupError(result.reason, view.elt, context);
+		}
+	}
+	return results;
+};
+
+/**
+ * Install stable readiness promises immediately, but do not start private
+ * storage/network services until concrete view publication. Explicit ensure
+ * methods use the same single-flight loaders and therefore bypass the
+ * background schedule.
+ *
+ * @testable infrastructure
+ * @tests tests_js/test_029_core_startup.py::test_initial_replay_is_scheduled_after_view_readiness
+ */
+const initializeCoreServices = (view) => {
+	if (view._servicesInitialized) return view.servicesReady;
+	view._servicesInitialized = true;
+	const start = view._publishedReady.then(() => view);
+	view._serviceStart = start;
+	const idle = start.then(() => whenIdle());
+	const offlineWork = idle.then(async () => {
+		const { inspectOfflineWork } = await import('./offlineWork.js?v=b32ad33a');
+		return inspectOfflineWork(view);
+	});
+	view.offlineQueueReady = offlineWork.then(({ mutations }) =>
+		mutations ? ensureOfflineQueue(view) : null,
+	);
+	view.syncReady = hasSyncCapability(view)
+		? start.then(() => ensureSyncManager(view))
+		: offlineWork.then(({ sync }) => (sync ? ensureSyncManager(view) : null));
+	view.initialReplayReady = view.offlineQueueReady.then(async (queue) => {
+		if (!queue) return 0;
+		const { replayOfflineQueue } = await import('./offlineReplay.js?v=b32ad33a');
+		return replayOfflineQueue(view, queue);
+	});
+
+	const essential = start.then(async () => {
+		if (view._destroyed) return [];
+		view._setOfflineIndicator();
+		return await settleServices(
+			view,
+			[
+				ensurePollingCoordinator(view),
+				// Server-backed widgets are the visible page. Start them directly;
+				// IndexedDB hydration and replay must never gate their first render.
+				view.prefetch(),
+			],
+			"essential-service-startup",
+		);
+	});
+
+	const optional = idle.then(async () => {
+		if (view._destroyed) return [];
+		const warmers = [];
+		if (document.querySelector("[data-role='notifications']")) {
+			warmers.push(ensureNotifications(view));
+		}
+		if (view.elt.querySelector("[data-operation]")) {
+			warmers.push(ensureDeferredOperations(view));
+		}
+		if (view.elt.querySelector("[lp-edited-marker]")) {
+			warmers.push(ensureEditWatcher(view));
+		}
+		return await settleServices(view, warmers, "optional-service-startup");
+	});
+
+	view.servicesReady = Promise.all([
+		essential,
+		optional,
+		view.offlineQueueReady,
+		view.syncReady,
+		view.initialReplayReady,
+	])
+		.catch((error) => {
+			view.reportStartupError(error, view.elt, "service-startup");
+			return [];
+		})
+		.then(async (result) => {
+			await view._publishedReady;
+			if (!view._destroyed) markPerformance("lagniappe:services-ready");
+			return result;
+		});
+	return view.servicesReady;
+};
+
+const ISOLATED_TASK_ACTIONS = new Set(["TaskMove", "TaskCombine"]);
+
+/**
+ * @testable true
+ * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state
+ * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_while_another_task_is_open_keeps_rows_clear
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
+ * @pairs tasks:update-state tasks:refresh tasks:readonly
+ * @pairs tasks:create tasks:while-open tasks:list-state
+ * @pairs task-combine:isolated-form task-combine:lazy-reload
+ * @pairs task-combine:view-page task-combine:linked-page
+ * @pairs task-combine:delta task-combine:no-reload
+ */
+class Task extends ViewComponent {
+	async activate(show) {
+		const existingCombine =
+			show === "TaskCombine" ? this.widgets.TaskCombine : null;
+		if (show === "TaskCombine" && this.view.key) {
+			const target = this.elt.querySelector("[data-widget='TaskCombine']");
+			if (target?.dataset.route) {
+				const route = new URL(target.dataset.route, window.location.origin);
+				route.searchParams.set("page", this.view.key);
+				const scopedRoute = `${route.pathname}${route.search}`;
+				target.dataset.route = scopedRoute;
+				if (existingCombine) existingCombine.route = scopedRoute;
+			}
+		}
+		const activated = await super.activate(show);
+		if (activated && existingCombine) {
+			const separator = existingCombine.route.includes("?") ? "&" : "?";
+			await this.load(
+				existingCombine,
+				`${existingCombine.route}${separator}refresh=${Date.now()}`,
+			);
+		}
+		return activated;
+	}
+
+	closeOpenWidget() {
+		if (!this.open || this.open === "false") return false;
+
+		this.deactivate(false);
+		return true;
+	}
+
+	get completed() {
+		return this.elt.dataset.completed === "true";
+	}
+
+	get showEmptyFields() {
+		return this.readonly && !this.completed;
+	}
+
+	get formData() {
+		if (ISOLATED_TASK_ACTIONS.has(this.active?.name)) {
+			return this.active.formData;
+		}
+
+		const taskWidgets = Object.values(this.widgets).filter(
+			(widget) =>
+				!ISOLATED_TASK_ACTIONS.has(widget.name) &&
+				(widget === this.active || widget.unsavedState === true) &&
+				widget.target?.dataset.widget === widget.name &&
+				this.elt.contains(widget.target),
+		);
+		const data = taskWidgets
+			.map((widget) => {
+				if (widget.formData instanceof FormData) return widget.formData;
+				if (widget.target instanceof HTMLFormElement) {
+					return new FormData(widget.target);
+				}
+				return null;
+			})
+			.filter(Boolean)
+			.reduce((merged, current) => {
+				for (const [key, value] of current.entries()) {
+					merged.append(key, value);
+				}
+				return merged;
+			}, new FormData());
+
+		taskWidgets.forEach((widget) => {
+			data.append("active", widget.name);
+		});
+
+		return data;
+	}
+
+	async updated(response) {
+		if (response.task_delta) {
+			this.deactivate(false);
+			const parent = this.view.getComponent(this.parentComponent);
+			await parent?.widgets?.PageTaskList?.refreshDelta(response.task_delta);
+			return;
+		}
+
+		const update = response.html?.querySelector(`[id='${this.name}']`);
+
+		if (update) {
+			Object.assign(this.elt.dataset, update.dataset);
+			this._replaceNav(update);
+			this._removeMissingWidgets(update);
+		}
+
+		await super.updated(response);
+	}
+
+	_replaceNav(update) {
+		const elt = update.querySelector("[lp-nav]");
+		const target = this.nav?.element;
+		if (!elt || !target) return;
+
+		target.replaceWith(elt);
+		this._nav = null;
+	}
+
+	_removeMissingWidgets(update) {
+		this.elt.querySelectorAll("[data-widget]").forEach((elt) => {
+			const name = elt.dataset.widget;
+			const target = update.querySelector(`[data-widget='${name}']`);
+			if (target) return;
+
+			elt.remove();
+			if (this.active?.name === name) this.active = null;
+			this.widgets[name]?.destroy?.();
+			delete this.widgets[name];
+		});
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class Core extends ShellView {
+	constructor(node) {
+		super(node);
+		this.hasDeferredServices = true;
+		this.offlineIndicator = document.querySelector('[data-role="offline"]');
+		this.offlineModal = null;
+
+		this.Notifications = null;
+		this.offlineQueue = null;
+		this.PollingCoordinator = null;
+		this.DeferredOperations = null;
+		this.SyncManager = null;
+		this.EditWatcher = null;
+		this.SubmissionManager = null;
+		this.SearchBox = null;
+		this.EntityMenu = null;
+		this.ModalClasses = null;
+		this.offlineQueueReady = Promise.resolve(null);
+		this.syncReady = Promise.resolve(null);
+		this.initialReplayReady = Promise.resolve(0);
+
+		this._pendingChanges = [];
+		this._reconcilePromise = null;
+		this._componentActions = new Map();
+		this._pollingReconcileTask = null;
+		this._pollingReconcileRequested = false;
+		this._offlineReplayTask = null;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/base/entity.mjs::Entity._initialTabId
+	 * @covered-by src/script/views/base/index.mjs::EntityIndex._defaultToolTarget
+	 * @reason URL query helpers are exercised through view-specific defaults
+	 */
+	queryParam(name) {
+		const value = new URLSearchParams(window.location.search).get(name);
+		return value?.trim() || null;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/base/entity.mjs::Entity._initialTabId
+	 * @covered-by src/script/views/base/index.mjs::EntityIndex._defaultToolTarget
+	 * @reason URL query helpers are exercised through view-specific defaults
+	 */
+	querySlug(value) {
+		return value
+			?.trim()
+			.replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+			.replace(/[^a-zA-Z0-9]+/g, "-")
+			.replace(/^-|-$/g, "")
+			.toLowerCase();
+	}
+
+	operationId() {
+		return (
+			globalThis.crypto?.randomUUID?.() ||
+			`operation-${Date.now()}-${Math.random().toString(16).slice(2)}`
+		);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_shell_intercepts_interactions_before_deferred_services
+	 * @pair startup:interaction-ready
+	 * @pair startup:deferred-services
+	 */
+	async init() {
+		await super.init();
+		initializeCoreServices(this);
+		return this;
+	}
+
+	reportStartupError(error, element = this.elt, context = "lazy-control") {
+		captureError(error, element, { context });
+	}
+
+	ensureOfflineQueue() {
+		return ensureOfflineQueue(this);
+	}
+
+	ensurePollingCoordinator() {
+		return ensurePollingCoordinator(this);
+	}
+
+	ensureSyncManager() {
+		return ensureSyncManager(this);
+	}
+
+	ensureEditWatcher() {
+		return ensureEditWatcher(this);
+	}
+
+	ensureDeferredOperations() {
+		return ensureDeferredOperations(this);
+	}
+
+	ensureNotifications() {
+		return ensureNotifications(this);
+	}
+
+	ensureSearchBox() {
+		return ensureSearchBox(this);
+	}
+
+	ensureEntityMenu() {
+		return ensureEntityMenu(this);
+	}
+
+	ensureSubmissionManager() {
+		return ensureSubmissionManager(this);
+	}
+
+	ensureOfflineModal() {
+		return ensureOfflineModal(this);
+	}
+
+	ensureModalClasses() {
+		return ensureModalClasses(this);
+	}
+
+	/**
+	 * Subscribe the root view to its durable entity or collection revision.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_core_polling_subscription_lifecycle
+	 * @covered-by src/script/views/base/services.mjs::ensurePollingCoordinator
+	 * @features polling
+	 * @dimensions entity channel refresh
+	 */
+	_initPollingSubscription() {
+		if (!this.PollingCoordinator) return;
+		if (this.key) {
+			const id = `view:entity:${this.key}`;
+			this.PollingCoordinator.subscribe(
+				{
+					id,
+					type: "entity",
+					key: this.key,
+					revision: this.elt.dataset.fingerprint || null,
+				},
+				{
+					onResult: async (result) => {
+						const watcher = this.elt.querySelector("[lp-edited-marker]")
+							? await this.ensureEditWatcher()
+							: this.EditWatcher;
+						await watcher?.receiveEntityResult?.(this.key, result);
+						if (result.status === "unavailable") {
+							await this.reconcileChange({ type: "delete", key: this.key });
+							return;
+						}
+						if (result.status !== "changed") return;
+						await this.reconcileChange({
+							type: "entity-poll",
+							key: this.key,
+						});
+					},
+				},
+			);
+			return;
+		}
+
+		const channel = this.elt.dataset.index || this.kind;
+		const supported = new Set([
+			"categories",
+			"projects",
+			"pages",
+			"tasks",
+			"forms",
+			"users",
+			"ingress",
+			"home",
+		]);
+		if (!supported.has(channel)) return;
+		this.PollingCoordinator.subscribe(
+			{
+				id: `view:channel:${channel}`,
+				type: "channel",
+				channel,
+				revision: this.elt.dataset.fingerprint || null,
+			},
+			{
+				onResult: async (result) => {
+					if (result.status === "changed") await this.refresh();
+				},
+			},
+		);
+	}
+
+	/**
+	 * Reconcile committed server invalidations without treating poll payloads as
+	 * authoritative replacement data. Concurrent invalidations share one pass
+	 * and any invalidations received mid-pass are
+	 * handled by the next iteration.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
+	 * @pairs reconnect-refresh:mounted-collection reconnect-refresh:committed-delete
+	 * @pair reconnect-refresh:destination-invalidation
+	 * @pair polling:reentrancy
+	 */
+	reconcileChange(change = {}) {
+		return reconcileChange(this, change);
+	}
+
+	async refreshSupplementalCollections() {}
+
+	async afterReconcileChange() {}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_category
+	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
+	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
+	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_file
+	 * @pairs starred:title-menu starred:accessible-state
+	 */
+	_applyStarState({ key, starred, type } = {}) {
+		if (!key) return;
+		const active = starred ?? type === "star";
+		const buttons = new Set([
+			...this.elt.querySelectorAll(`[data-key="${key}"] [lp-control="star"]`),
+			...document.querySelectorAll(
+				`[data-entity-key="${key}"][lp-control="star"]`,
+			),
+		]);
+		for (const button of buttons) {
+			button.dataset.active = active ? "true" : "false";
+			const label = active ? "Unstar" : "Star";
+			button.setAttribute("aria-label", label);
+			button.title = label;
+			const text = button.querySelector('[data-role="star-label"]');
+			if (text) text.textContent = label;
+		}
+	}
+
+	async _toggleStar(button) {
+		if (!this.online) return;
+		const entity =
+			button.closest("[lp-entity]") || button.closest("[data-key]");
+		const key = entity?.id || entity?.dataset.key;
+		if (!key) return;
+
+		const active = button.dataset.active === "true";
+		button.disabled = true;
+		this._applyStarState({ key, starred: !active });
+		try {
+			const response = await request.patch(ENDPOINTS.toggleStar(key));
+			if (!response?.ok) throw new Error("Unable to update star");
+			await this.reconcileChange({
+				type: response.starred ? "star" : "unstar",
+				key,
+				starred: response.starred,
+			});
+		} catch (error) {
+			captureError(error, button);
+			this._applyStarState({ key, starred: active });
+		} finally {
+			button.disabled = false;
+		}
+	}
+
+	_setOfflineIndicator() {
+		this.offline = !this.online;
+	}
+
+	get offline() {
+		return !this.online;
+	}
+
+	set offline(offline) {
+		if (this.offlineIndicator)
+			this.offlineIndicator.dataset.visible = offline ? "true" : "false";
+		this.elt.dispatchEvent(
+			new CustomEvent("offline-status", {
+				detail: { offline: Boolean(offline) },
+			}),
+		);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
+	 * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
+	 * @tests tests_e2e/001_site/test_001d_offline.py::test_rapid_offline_online_transitions
+	 * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
+	 * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
+	 * @features offline
+	 * @dimensions indicator browser-state server-health transitions view-reset dirty-form-preservation
+	 * @pair offline:dirty-form-preservation
+	 */
+	async sync({ hidden = document.hidden, force = false } = {}) {
+		const online = connectivity.online;
+
+		const wasInactive = this.hidden || !this.online || force;
+		const changed = force || hidden !== this.hidden || online !== this.online;
+		if (!changed) {
+			return;
+		}
+
+		this.hidden = hidden;
+		this.online = online;
+		this.offline = !online;
+
+		if (!online || hidden) {
+			this.EditWatcher?.pause();
+			this.PollingCoordinator?.pause();
+			await this.SyncManager?.deregister();
+		} else {
+			await Promise.all([
+				this.ensurePollingCoordinator(),
+				this.SyncManager || this.elt.querySelector("[lp-sync]")
+					? this.ensureSyncManager()
+					: null,
+				this.elt.querySelector("[lp-edited-marker]")
+					? this.ensureEditWatcher()
+					: null,
+			]);
+			if (wasInactive && !hidden) {
+				const refreshFingerprint = this.elt.dataset.fingerprint || null;
+				this.scheduleOfflineReplay();
+				this.DeferredOperations?.nudge();
+				await this.EditWatcher?.resume();
+				await this.refresh(force, { fingerprint: refreshFingerprint });
+			} else {
+				await this.EditWatcher?.resume();
+			}
+			await this.SyncManager?.register();
+			await this.reconcilePollingSubscriptions();
+			await this.PollingCoordinator?.resume();
+		}
+	}
+
+	/**
+	 * Replay is background reconciliation, never a prerequisite for restoring
+	 * polling, sync, EditWatcher, or the visible server render. OfflineQueue
+	 * itself polls mounted updated forms as each replay succeeds.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
+	 * @features offline polling
+	 * @dimensions background-replay nonblocking
+	 * @pair offline:background-replay
+	 * @pair polling:nonblocking
+	 */
+	scheduleOfflineReplay() {
+		if (this._offlineReplayTask) return this._offlineReplayTask;
+		this._offlineReplayTask = import('./offlineReplay.js?v=b32ad33a')
+			.then(({ replayOfflineQueue }) => replayOfflineQueue(this))
+			.finally(() => {
+				this._offlineReplayTask = null;
+			});
+		return this._offlineReplayTask;
+	}
+
+	/**
+	 * Reconcile widget-owned polling after a component activation or a return
+	 * to the foreground. Managers retain state for hidden widgets, but only the
+	 * active visible widget may own recurring form, document, or ingress work.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_core_polling_subscription_lifecycle
+	 * @features polling
+	 * @dimensions active-widget visibility subscription-lifecycle
+	 * @pairs polling:active-widget polling:visibility
+	 * @pair polling:subscription-lifecycle
+	 */
+	async reconcilePollingSubscriptions() {
+		if (this._destroyed || this.hidden || !this.online) return;
+		await this.EditWatcher?.reconcileSubscriptions?.();
+		await this.SyncManager?.reconcileSubscriptions?.();
+		await Promise.all(
+			Object.values(this.components).flatMap((component) =>
+				Object.values(component.widgets).map((widget) =>
+					widget.syncPollingSubscription?.(),
+				),
+			),
+		);
+	}
+
+	/**
+	 * Schedule subscription ownership reconciliation without making component
+	 * rendering wait for manager or network work. Repeated renders coalesce and
+	 * request at most one follow-up pass if ownership changes while a pass runs.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_core_polling_subscription_lifecycle
+	 * @features polling startup
+	 * @dimensions subscription-lifecycle nonblocking single-flight
+	 * @pairs polling:subscription-lifecycle polling:nonblocking
+	 * @pairs startup:single-flight startup:nonblocking
+	 */
+	schedulePollingReconciliation() {
+		if (this._destroyed || this.hidden || !this.online) {
+			return Promise.resolve();
+		}
+		this._pollingReconcileRequested = true;
+		if (this._pollingReconcileTask) return this._pollingReconcileTask;
+
+		const pending = Promise.resolve()
+			.then(async () => {
+				while (this._pollingReconcileRequested && !this._destroyed) {
+					this._pollingReconcileRequested = false;
+					await this.reconcilePollingSubscriptions();
+				}
+			})
+			.catch((error) => {
+				this.reportStartupError(
+					error,
+					this.elt,
+					"polling-subscription-reconciliation",
+				);
+			})
+			.finally(() => {
+				if (this._pollingReconcileTask === pending) {
+					this._pollingReconcileTask = null;
+				}
+			});
+		this._pollingReconcileTask = pending;
+		return pending;
+	}
+
+	async prefetch() {
+		const prefetch = this.elt.querySelectorAll("[lp-component][lp-prefetch]");
+		await Promise.all(
+			Array.from(prefetch).map(async (elt) => {
+				const component = this.getComponent(elt);
+				if (!component) return;
+				await component.prefetch();
+			}),
+		);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
+	 * @features reconnect-refresh
+	 * @dimensions manifest batching fallback
+	 */
+	_collectRefreshTargets(components) {
+		return collectRefreshTargets(this, components);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
+	 * @pair reconnect-refresh:delta-apply
+	 * @pair reconnect-refresh:legacy-fallback
+	 * @pair reconnect-refresh:cache-invalidation
+	 */
+	async _refreshCollectionComponents(components, options = {}) {
+		return refreshCollectionComponents(this, components, options);
+	}
+
+	async refreshCollections(navigation = false, options = {}) {
+		const components = Object.values(this.components);
+		const refreshed = async () =>
+			await this._refreshCollectionComponents(components, options);
+		if (navigation) {
+			await refreshed();
+		} else {
+			await withTransition(refreshed);
+		}
+	}
+
+	async refresh(navigation = false, options = {}) {
+		return this.refreshCollections(navigation, options);
+	}
+
+	async notify(message) {
+		const notifications = await this.ensureNotifications();
+		await notifications?.notify?.(message);
+	}
+
+	_installColdControlListeners() {
+		this._coldControlEvent = this._coldControlEvent.bind(this);
+		for (const type of ["input", "click"]) {
+			document.addEventListener(type, this._coldControlEvent, true);
+		}
+	}
+
+	_removeColdControlListeners() {
+		if (!this._coldControlEvent) return;
+		for (const type of ["input", "click"]) {
+			document.removeEventListener(type, this._coldControlEvent, true);
+		}
+		this._coldControlEvent = null;
+	}
+
+	_coldControlEvent(event) {
+		const search = event.target?.closest?.("[lp-search]");
+		if (search && !this.SearchBox) {
+			this.runColdAction(
+				search,
+				() => this.ensureSearchBox(),
+				(box) => this._activateSearchBox(box),
+				search,
+			);
+			return;
+		}
+
+		const offline = event.target?.closest?.("[data-role='offline']");
+		if (offline && !this.offlineModal && event.type === "click") {
+			event.preventDefault();
+			event.stopImmediatePropagation?.();
+			this.runColdAction(
+				offline,
+				() => this.ensureOfflineModal(),
+				(modal) => modal?.attach?.(),
+				offline,
+			);
+			return;
+		}
+
+		const notifications = event.target?.closest?.(
+			"[data-role='notifications']",
+		);
+		if (!notifications || this.Notifications) return;
+		if (event.type === "click") {
+			event.preventDefault();
+			event.stopImmediatePropagation?.();
+		}
+		this.runColdAction(
+			notifications,
+			() => this.ensureNotifications(),
+			(manager) => manager?.dropdown?.showPanel?.(),
+			notifications,
+		);
+	}
+
+	_click(e) {
+		const menuTrigger = e.target.closest("[data-role='menu-trigger']");
+		const menu = menuTrigger?.closest("[lp-menu]");
+		if (menu && this.elt.contains(menu)) {
+			e.preventDefault();
+			e.stopPropagation();
+			this.runColdAction(
+				menu,
+				() => this.ensureEntityMenu(),
+				(manager) => manager?.toggle(menu),
+				menuTrigger,
+			);
+			return;
+		}
+
+		const button = e.target.closest("button");
+		const control = button?.getAttribute("lp-control");
+
+		if (button?.matches("[data-role='flipper']")) {
+			e.preventDefault();
+			const flip = button.closest("[data-flipped]");
+			const flipped = flip.dataset.flipped === "false";
+			flip.dataset.flipped = flipped ? "true" : "false";
+			return;
+		} else if (control === "help") {
+			e.preventDefault();
+			e.stopPropagation();
+			void this._showHelpModal(button);
+			return;
+		} else if (control === "star") {
+			e.preventDefault();
+			void this._toggleStar(button);
+			return;
+		} else if (control === "delete") {
+			e.preventDefault();
+			e.stopPropagation();
+			void this._showDeleteModal(button);
+			return;
+		} else if (["previous", "next"].includes(control)) {
+			e.preventDefault();
+			if (!this.online) return;
+			const widget = e.target.closest("[data-widget]");
+			const component = this.getComponent(widget);
+			request.get(button.dataset.route).then((response) => {
+				component.widgets[widget.dataset.widget]?.refresh(response);
+			});
+			return;
+		} else if (control || button?.hasAttribute("lp-show")) {
+			e.preventDefault();
+			void this.renderComponent(button);
+			return;
+		}
+
+		if (
+			e.target.closest("form") ||
+			e.target.closest("a") ||
+			e.target.closest("input") ||
+			e.target.closest("button")
+		) {
+			return;
+		}
+
+		const toggle = e.target.closest("[lp-show]");
+		if (toggle) {
+			e.preventDefault();
+			void this.renderComponent(toggle);
+			return;
+		}
+
+		const link = e.target.closest("[lp-link]");
+		if (link) {
+			link.querySelector("[data-role='title']")?.click();
+			return;
+		}
+	}
+
+	async _showDeleteModal(button) {
+		return this.runColdAction(
+			button,
+			() => this.ensureModalClasses(),
+			async ({ DeleteModal } = {}) => {
+				if (!DeleteModal) return;
+				const modal = new DeleteModal(this, button);
+				await modal.init();
+			},
+		);
+	}
+
+	async _showHelpModal(button) {
+		return this.runColdAction(
+			button,
+			() => this.ensureModalClasses(),
+			async ({ HelpModal } = {}) => {
+				if (!HelpModal) return;
+				const modal = new HelpModal(this, button);
+				await modal.init();
+			},
+		);
+	}
+
+	getComponent(itemElt) {
+		const target = itemElt?.closest("[lp-component]");
+		if (target?._lp_component) return target._lp_component;
+
+		const id = target?.id || target?.dataset?.key;
+
+		if (id && target?.hasAttribute("lp-component")) {
+			const ComponentClass = target.matches(
+				"li[lp-component][data-kind='task']",
+			)
+				? Task
+				: ViewComponent;
+			const component = new ComponentClass(target, this);
+			this.components[id] = component;
+			target._lp_component = component;
+			target.setAttribute("initialized", "");
+			return component;
+		}
+
+		return null;
+	}
+
+	successfulResponse(response, component) {
+		if (!response) return false;
+		if (response.reload) {
+			window.location.reload();
+			return false;
+		}
+		if (response.error) {
+			component?.showError?.(response.error);
+			return false;
+		}
+		if (response.modal) {
+			void this.ensureModalClasses().then(({ Modal } = {}) => {
+				if (this._destroyed || !Modal) return;
+				new Modal(this).attach(response.modal, component);
+			});
+			return false;
+		}
+		return true;
+	}
+
+	async update(component, data, route = component.route) {
+		const manager = await this.ensureSubmissionManager();
+		return manager?.update(component, data, route);
+	}
+
+	async create(component, data, route = component.route) {
+		const manager = await this.ensureSubmissionManager();
+		return manager?.create(component, data, route);
+	}
+
+	async load(component, route) {
+		if (!route) return null;
+		const response = await request.get(route);
+
+		if (!this.successfulResponse(response, component)) return null;
+		// Ordinary rendering is authoritative and completely independent of
+		// OfflineQueue. Late replay is reconciled through polling/EditWatcher.
+		return response;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002a_home.py::test_model_lists_load_on_toggle
+	 * @features home
+	 * @dimensions lazy-load loading-indicator
+	 */
+	_setLoadingTrigger(trigger, component, widgetName) {
+		const target = component.elt.querySelector(`[data-widget="${widgetName}"]`);
+		if (!target || target.hasAttribute("loaded")) return null;
+
+		const loadsAsync =
+			target?.hasAttribute("lp-load") || target?.hasAttribute("lp-prefetch");
+		trigger.setAttribute("aria-busy", "true");
+		if (loadsAsync) trigger.dataset.loading = "true";
+		return trigger;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/base/core.mjs::Core._setLoadingTrigger
+	 * @reason paired cleanup for transient trigger loading state
+	 */
+	_clearLoadingTrigger(trigger) {
+		if (!trigger) return;
+		delete trigger.dataset.loading;
+		trigger.removeAttribute("aria-busy");
+	}
+
+	renderComponent(trigger) {
+		if (!trigger) return;
+		if (this._componentActions.has(trigger)) {
+			return this._componentActions.get(trigger);
+		}
+
+		const attribute =
+			trigger.getAttribute("lp-show") || trigger.getAttribute("lp-close") || "";
+
+		let [componentId, widgetName] = attribute.split(":");
+
+		if (!componentId) {
+			captureError(new Error("No component ID found"), trigger);
+			return;
+		}
+
+		const targetElt = document.getElementById(componentId);
+		const component = this.getComponent(targetElt);
+		if (!component) {
+			captureError(new Error("No component found"), trigger, { componentId });
+			return;
+		}
+
+		const activeWidget = component.active?.name;
+		widgetName =
+			widgetName === "active" && activeWidget ? activeWidget : widgetName;
+
+		const toggleWidget =
+			trigger.dataset.toggle === "true" && activeWidget === widgetName;
+		const toggleComponent = component.visible && widgetName === "default";
+		const showActiveWidget = widgetName === "active" && component.active;
+
+		if (toggleWidget || toggleComponent) {
+			widgetName = component.active?.visible ? null : activeWidget;
+		} else if (showActiveWidget) {
+			widgetName = activeWidget;
+		}
+
+		const loadingTrigger = widgetName
+			? this._setLoadingTrigger(trigger, component, widgetName)
+			: null;
+
+		const pending = component
+			.activate(widgetName)
+			.then((activated) => {
+				if (this._destroyed || trigger.isConnected === false) return null;
+				return withTransition(async () => {
+					if (this._destroyed) return;
+					await component.render(activated);
+				});
+			})
+			.catch((error) => {
+				this.reportStartupError(error, trigger, "component-activation");
+				return null;
+			})
+			.finally(() => {
+				this._clearLoadingTrigger(loadingTrigger);
+				if (this._componentActions.get(trigger) === pending) {
+					this._componentActions.delete(trigger);
+				}
+			});
+		this._componentActions.set(trigger, pending);
+		return pending;
+	}
+
+	addFlash(node) {
+		if (!node || node.classList.contains("flash")) return;
+
+		node.classList.add("flash");
+		node.addEventListener(
+			"animationend",
+			() => {
+				node.classList.remove("flash");
+			},
+			{ once: true },
+		);
+	}
+
+	destroy() {
+		super.destroy();
+		this._pollingReconcileRequested = false;
+		this.SubmissionManager?.destroy();
+		this.SyncManager?.destroy();
+		this.DeferredOperations?.destroy();
+		this.EntityMenu?.destroy();
+		this.EditWatcher?.destroy();
+		this.Notifications?.destroy?.();
+		this.PollingCoordinator?.destroy();
+		this.offlineModal?.destroy?.();
+		this._componentActions.clear();
+
+		Object.values(this.components).forEach((component) => {
+			if (component.destroy) component.destroy();
+		});
+		this.components = {};
+	}
+}
+
+export { Core as C, NavElement as N, loadRevisionPreview as a, loadHeadlessWidget as l };

@@ -1,2 +1,52 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="24833889-9b5a-41cb-a426-aafa98830e5b",e._sentryDebugIdIdentifier="sentry-dbid-24833889-9b5a-41cb-a426-aafa98830e5b");}catch(e){}}();async function w(e,a,n){let t;switch(a.type){case"checkbox":return t=await import("./checkbox.js?v=b1a2c353"),new t.CheckboxElement(e,a,n);case"radio":return t=await import("./radio.js?v=b1a2c353"),new t.RadioElement(e,a,n);case"textarea":return t=await import("./textarea.js?v=b1a2c353"),new t.TextareaElement(e,a,n);case"input":return t=await import("./input.js?v=b1a2c353"),new t.InputElement(e,a,n);case"select":return t=await import("./select.js?v=b1a2c353"),new t.SelectElement(e,a,n);case"html":return t=await import("./html2.js?v=b1a2c353"),new t.HtmlElement(e,a,n);case"signature":return t=await import("./signature.js?v=b1a2c353"),new t.SignatureElement(e,a,n);case"table":return t=await import("./table.js?v=b1a2c353"),new t.TableElement(e,a,n);case"link":return t=await import("./link.js?v=b1a2c353"),new t.LinkElement(e,a,n);case"bookmark":return t=await import("./bookmark.js?v=b1a2c353"),new t.BookmarkElement(e,a,n);case"location":return t=await import("./location.js?v=b1a2c353"),new t.LocationElement(e,a,n);case"status":return t=await import("./status2.js?v=b1a2c353"),new t.StatusElement(e,a,n);default:throw new Error(`Unknown form element type: ${a.type}`)}}export{w as g};
 /*! Third-party licenses: /third-party-licenses.txt */
+/**
+ * @testable true
+ * @tests tests_js/test_031_form_element_loader.py::test_unknown_form_element_reports_schema_type
+ * @features forms
+ * @dimensions invalid-schema
+ */
+async function getFormElement(renderer, schema, submission) {
+	let module;
+	switch (schema.type) {
+		case "checkbox":
+			module = await import('./checkbox.js?v=b32ad33a');
+			return new module.CheckboxElement(renderer, schema, submission);
+		case "radio":
+			module = await import('./radio.js?v=b32ad33a');
+			return new module.RadioElement(renderer, schema, submission);
+		case "textarea":
+			module = await import('./textarea.js?v=b32ad33a');
+			return new module.TextareaElement(renderer, schema, submission);
+		case "input":
+			module = await import('./input.js?v=b32ad33a');
+			return new module.InputElement(renderer, schema, submission);
+		case "select":
+			module = await import('./select.js?v=b32ad33a');
+			return new module.SelectElement(renderer, schema, submission);
+		case "html":
+			module = await import('./html2.js?v=b32ad33a');
+			return new module.HtmlElement(renderer, schema, submission);
+		case "signature":
+			module = await import('./signature.js?v=b32ad33a');
+			return new module.SignatureElement(renderer, schema, submission);
+		case "table":
+			module = await import('./table.js?v=b32ad33a');
+			return new module.TableElement(renderer, schema, submission);
+		case "link":
+			module = await import('./link.js?v=b32ad33a');
+			return new module.LinkElement(renderer, schema, submission);
+		case "bookmark":
+			module = await import('./bookmark.js?v=b32ad33a');
+			return new module.BookmarkElement(renderer, schema, submission);
+		case "location":
+			module = await import('./location.js?v=b32ad33a');
+			return new module.LocationElement(renderer, schema, submission);
+		case "status":
+			module = await import('./status2.js?v=b32ad33a');
+			return new module.StatusElement(renderer, schema, submission);
+		default:
+			throw new Error(`Unknown form element type: ${schema.type}`);
+	}
+}
+
+export { getFormElement as g };

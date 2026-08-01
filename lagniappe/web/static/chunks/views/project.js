@@ -1,2 +1,38 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="d368d05f-cc45-49ba-8563-e1f165e732af",e._sentryDebugIdIdentifier="sentry-dbid-d368d05f-cc45-49ba-8563-e1f165e732af");}catch(e){}}();import{E as e}from"../entity.js?v=b1a2c353";import"../core.js?v=b1a2c353";import"../connectivity.js?v=b1a2c353";import"../endpoints.js?v=b1a2c353";import"../errors.js?v=b1a2c353";import"../request.js?v=b1a2c353";import"../utilities.js?v=b1a2c353";import"../shell.js?v=b1a2c353";class r extends e{get secondaryCard(){const t=this.elt.querySelector("#model-tasks");return t?.dataset.hasAttribute==="false"?null:t}_prerender(t){return this._tabElement(t)?.dataset.hasAttribute==="false"&&(t=this._defaultTabId),super._prerender(t)}}export{r as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { E as Entity } from '../entity.js?v=b32ad33a';
+import '../core.js?v=b32ad33a';
+import '../connectivity.js?v=b32ad33a';
+import '../endpoints.js?v=b32ad33a';
+import '../errors.js?v=b32ad33a';
+import '../request.js?v=b32ad33a';
+import '../utilities.js?v=b32ad33a';
+import '../shell.js?v=b32ad33a';
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004b_info.py::test_toggle_tasks_attribute
+ * @features projects
+ * @dimensions attribute-model-tasks
+ */
+class Project extends Entity {
+	get secondaryCard() {
+		const modelTasks = this.elt.querySelector("#model-tasks");
+		if (modelTasks?.dataset.hasAttribute === "false") return null;
+		return modelTasks;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/base/entity.mjs::Entity._renderLayout
+	 * @reason project-specific inactive attribute guard feeds the shared layout renderer
+	 */
+	_prerender(tabId) {
+		const tab = this._tabElement(tabId);
+		if (tab?.dataset.hasAttribute === "false") {
+			tabId = this._defaultTabId;
+		}
+		return super._prerender(tabId);
+	}
+}
+
+export { Project as default };

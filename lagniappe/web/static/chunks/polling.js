@@ -1,2 +1,408 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="61e30de7-f609-4dd5-9a06-d606785b9120",e._sentryDebugIdIdentifier="sentry-dbid-61e30de7-f609-4dd5-9a06-d606785b9120");}catch(e){}}();import{E as f}from"./endpoints.js?v=b1a2c353";import{captureError as v}from"./errors.js?v=b1a2c353";import{r as w}from"./request.js?v=b1a2c353";const g=64,_="lagniappe-poll-client",y=[15e3,15e3,3e4,3e4,6e4],m=Object.freeze({document:2e3,ingress:2500,operation:4e3});function P(){let l=null;try{l=sessionStorage.getItem(_)}catch{}if(!l){l=globalThis.crypto?.randomUUID?.()||`poll-${Date.now()}-${Math.random().toString(16).slice(2)}`;try{sessionStorage.setItem(_,l)}catch{}}return l}function a(l,t=.9+Math.random()*.2){return Math.max(Math.round(l*t),250)}class I{constructor(t){this.view=t,this.clientId=P(),this.subscriptions=new Map,this.timer=null,this.activePoll=null,this.activeIds=new Set,this.inflight=null,this.followup=!1,this.queuedIds=new Set,this.destroyed=!1}init(){return this}subscribe(t,{onResult:e=null,beforePoll:i=null}={}){if(this.destroyed||!t?.id||!t?.type)return()=>{};const r=this.subscriptions.get(t.id),n=Date.now();return this.subscriptions.set(t.id,{...r,descriptor:{...r?.descriptor,...t},onResult:e??r?.onResult??null,beforePoll:i??r?.beforePoll??null,dueAt:Math.min(r?.dueAt??n,n),quiet:r?.quiet??0,errorCount:r?.errorCount??0}),this.pause(),this._schedule(0),()=>this.unsubscribe(t.id)}unsubscribe(t){this.subscriptions.delete(t),this.queuedIds.delete(t),this.subscriptions.size?this._schedule():this.pause()}get(t){return this.subscriptions.get(t)?.descriptor??null}update(t,e={}){const i=this.subscriptions.get(t);i&&Object.assign(i.descriptor,e)}acknowledge(t,e){const i=this.subscriptions.get(t);!i||e===void 0||e===null||(i.descriptor.revision=e,i.quiet=0)}enqueue(t=null){const e=t===null?new Set(this.subscriptions.keys()):new Set(Array.isArray(t)?t:[t]),i=Date.now();for(const[r,n]of this.subscriptions)e.has(r)&&(n.dueAt=i,this.activePoll&&this.queuedIds.add(r));if(this.activePoll){this.followup=!0;return}this._schedule(0)}trigger(t=null){const e=t===null?new Set(this.subscriptions.keys()):new Set(Array.isArray(t)?t:[t]);if(this.activePoll&&Array.from(e).every(i=>this.activeIds.has(i)))return this.activePoll;if(this.enqueue(t),this.activePoll){const i=this.activePoll,r=()=>Promise.resolve().then(()=>this.activePoll??this._poll());return i.then(r,r)}return this._poll()}pause(){this.timer&&window.clearTimeout(this.timer),this.timer=null}resume(){return this.destroyed?Promise.resolve([]):this.trigger()}async closeDocuments(t){const e=Array.from(new Set(t||[])).filter(Boolean);if(!(!e.length||!this.view.online))return this.activePoll&&await this.activePoll,w.post(f.poll,{version:1,client_id:this.clientId,subscriptions:[],closed_documents:e},{keepalive:!0})}_interval(t,e){if(e?.status==="error")return t.errorCount+=1,Math.min(2**t.errorCount*2e3,6e4);if(t.errorCount=0,e?.status==="changed"?t.quiet=0:t.quiet+=1,t.descriptor.type==="operation"){const i=[4e3,8e3,16e3,3e4];return i[Math.min(t.quiet,i.length-1)]}return m[t.descriptor.type]?Number(e?.poll_after_ms)||m[t.descriptor.type]:y[Math.min(t.quiet,y.length-1)]}_applyProtocolState(t,e){e.revision!==void 0&&(t.descriptor.revision=e.revision),e.operation_revision!==void 0&&(t.descriptor.operation_revision=e.operation_revision),t.descriptor.type==="document"&&e.payload&&(e.payload.generation&&(t.descriptor.generation=e.payload.generation),e.payload.presence_digest&&(t.descriptor.presence_digest=e.payload.presence_digest))}_due(){const t=Date.now();return Array.from(this.subscriptions.values()).filter(e=>e.dueAt<=t).slice(0,g)}_poll(){if(this.destroyed||this.view.hidden||!this.view.online)return Promise.resolve([]);if(this.activePoll)return this.followup=!0,this.activePoll;const t=this._runPoll();this.activePoll=t;const e=()=>{if(this.activePoll!==t)return;this.activePoll=null,this.activeIds.clear();const i=this.followup;this.followup=!1,i?queueMicrotask(()=>this._poll()):this._schedule()};return t.then(e,e),t}async _runPoll(){let t=[],e=[];try{if(t=this._due(),!t.length)return[];this.activeIds=new Set(t.map(({descriptor:s})=>s.id));for(const{descriptor:s}of t)this.queuedIds.delete(s.id);const i=new Set(t.map(({beforePoll:s})=>s).filter(Boolean));for(const s of i)await s();if(this.destroyed||this.view.hidden||!this.view.online)return[];if(t=t.filter(s=>this.subscriptions.get(s.descriptor.id)===s),!t.length)return[];this.pause();const r=new Map(t.map(s=>[s.descriptor.id,s]));this.inflight=w.post(f.poll,{version:1,client_id:this.clientId,subscriptions:t.map(({descriptor:s})=>({...s})),closed_documents:[]});const n=await this.inflight;if(!n?.ok||n.version!==1||!Array.isArray(n.results))throw new Error("Invalid polling response");if(this.destroyed||this.view.hidden||!this.view.online)return[];e=n.results;const c=new Set,h=.9+Math.random()*.2,d=Date.now();for(const s of e){const o=r.get(s?.id);if(!o||this.subscriptions.get(s.id)!==o)continue;c.add(s.id);const u={...o.descriptor};try{this._applyProtocolState(o,s),await o.onResult?.(s)===!1&&(o.descriptor=u),o.dueAt=d+a(this._interval(o,s),h)}catch(p){o.descriptor=u,v(p,this.view.elt,{context:"polling-subscription",subscription_id:s.id}),o.dueAt=d+a(this._interval(o,{status:"error"}),h)}}for(const[s,o]of r){if(c.has(s))continue;const u={id:s,status:"error",type:o.descriptor.type};o.dueAt=d+a(this._interval(o,u),h)}}catch(i){if(this.destroyed||this.view.hidden||!this.view.online)return[];v(i,this.view.elt,{context:"polling-coordinator"});const r=.9+Math.random()*.2,n=Date.now();for(const c of t)c.dueAt=n+a(this._interval(c,{status:"error"}),r),await c.onResult?.({id:c.descriptor.id,type:c.descriptor.type,status:"error"})}finally{this.inflight=null;const i=Date.now();for(const r of this.queuedIds){const n=this.subscriptions.get(r);n&&(n.dueAt=i)}}return e}_schedule(t=null){if(this.destroyed||this.timer||!this.subscriptions.size||this.view.hidden||!this.view.online)return;const e=Math.min(...Array.from(this.subscriptions.values(),({dueAt:r})=>r)),i=t??Math.max(e-Date.now(),0);this.timer=window.setTimeout(()=>{this.timer=null,this._poll()},i)}destroy(){this.destroyed=!0,this.pause(),this.subscriptions.clear(),this.activeIds.clear(),this.queuedIds.clear()}}export{I as PollingCoordinator};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { E as ENDPOINTS } from './endpoints.js?v=b32ad33a';
+import { captureError } from './errors.js?v=b32ad33a';
+import { r as request } from './request.js?v=b32ad33a';
+
+const MAX_SUBSCRIPTIONS_PER_REQUEST = 64;
+const CLIENT_ID_KEY = "lagniappe-poll-client";
+const ORDINARY_INTERVALS = [15_000, 15_000, 30_000, 30_000, 60_000];
+const TYPE_INTERVALS = Object.freeze({
+	document: 2_000,
+	ingress: 2_500,
+	operation: 4_000,
+});
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/polling.mjs::PollingCoordinator
+ * @reason page-scoped client identity creation is exercised through coordinator requests
+ */
+function clientId() {
+	let value = null;
+	try {
+		value = sessionStorage.getItem(CLIENT_ID_KEY);
+	} catch {
+		// Storage can be unavailable in hardened/private browser contexts.
+	}
+	if (!value) {
+		value =
+			globalThis.crypto?.randomUUID?.() ||
+			`poll-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+		try {
+			sessionStorage.setItem(CLIENT_ID_KEY, value);
+		} catch {
+			// The in-memory identity remains valid for this page lifetime.
+		}
+	}
+	return value;
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/polling.mjs::PollingCoordinator
+ * @reason bounded scheduling jitter is exercised through coordinator cadence
+ */
+function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
+	return Math.max(Math.round(delay * factor), 250);
+}
+
+/**
+ * One view-scoped scheduler for every server-state subscription.
+ *
+ * @testable true
+ * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_batches_due_subscriptions_and_applies_results
+ * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_enqueues_reentrant_followup_without_waiting
+ * @features polling
+ * @dimensions batching cadence lifecycle coalescing acknowledgement reentrancy requested-cycle
+ */
+class PollingCoordinator {
+	constructor(view) {
+		this.view = view;
+		this.clientId = clientId();
+		this.subscriptions = new Map();
+		this.timer = null;
+		this.activePoll = null;
+		this.activeIds = new Set();
+		this.inflight = null;
+		this.followup = false;
+		this.queuedIds = new Set();
+		this.destroyed = false;
+	}
+
+	init() {
+		return this;
+	}
+
+	subscribe(descriptor, { onResult = null, beforePoll = null } = {}) {
+		if (this.destroyed || !descriptor?.id || !descriptor?.type) return () => {};
+		const existing = this.subscriptions.get(descriptor.id);
+		const now = Date.now();
+		this.subscriptions.set(descriptor.id, {
+			...existing,
+			descriptor: { ...existing?.descriptor, ...descriptor },
+			onResult: onResult ?? existing?.onResult ?? null,
+			beforePoll: beforePoll ?? existing?.beforePoll ?? null,
+			dueAt: Math.min(existing?.dueAt ?? now, now),
+			quiet: existing?.quiet ?? 0,
+			errorCount: existing?.errorCount ?? 0,
+		});
+		this.pause();
+		this._schedule(0);
+		return () => this.unsubscribe(descriptor.id);
+	}
+
+	unsubscribe(id) {
+		this.subscriptions.delete(id);
+		this.queuedIds.delete(id);
+		if (!this.subscriptions.size) this.pause();
+		else this._schedule();
+	}
+
+	get(id) {
+		return this.subscriptions.get(id)?.descriptor ?? null;
+	}
+
+	update(id, patch = {}) {
+		const subscription = this.subscriptions.get(id);
+		if (!subscription) return;
+		Object.assign(subscription.descriptor, patch);
+	}
+
+	acknowledge(id, revision) {
+		const subscription = this.subscriptions.get(id);
+		if (!subscription || revision === undefined || revision === null) return;
+		subscription.descriptor.revision = revision;
+		subscription.quiet = 0;
+	}
+
+	/**
+	 * Mark subscriptions for an immediate cycle without exposing a promise that
+	 * a callback in the active cycle could accidentally await.
+	 */
+	enqueue(ids = null) {
+		const requested =
+			ids === null
+				? new Set(this.subscriptions.keys())
+				: new Set(Array.isArray(ids) ? ids : [ids]);
+		const now = Date.now();
+		for (const [id, subscription] of this.subscriptions) {
+			if (!requested.has(id)) continue;
+			subscription.dueAt = now;
+			if (this.activePoll) this.queuedIds.add(id);
+		}
+		if (this.activePoll) {
+			this.followup = true;
+			return;
+		}
+		this._schedule(0);
+	}
+
+	trigger(ids = null) {
+		const requested =
+			ids === null
+				? new Set(this.subscriptions.keys())
+				: new Set(Array.isArray(ids) ? ids : [ids]);
+		if (
+			this.activePoll &&
+			Array.from(requested).every((id) => this.activeIds.has(id))
+		) {
+			return this.activePoll;
+		}
+		this.enqueue(ids);
+		if (this.activePoll) {
+			const current = this.activePoll;
+			const followup = () =>
+				Promise.resolve().then(() => this.activePoll ?? this._poll());
+			return current.then(followup, followup);
+		}
+		return this._poll();
+	}
+
+	pause() {
+		if (this.timer) window.clearTimeout(this.timer);
+		this.timer = null;
+	}
+
+	resume() {
+		if (this.destroyed) return Promise.resolve([]);
+		return this.trigger();
+	}
+
+	async closeDocuments(syncIds) {
+		const closed = Array.from(new Set(syncIds || [])).filter(Boolean);
+		if (!closed.length || !this.view.online) return;
+		if (this.activePoll) await this.activePoll;
+		return request.post(
+			ENDPOINTS.poll,
+			{
+				version: 1,
+				client_id: this.clientId,
+				subscriptions: [],
+				closed_documents: closed,
+			},
+			{ keepalive: true },
+		);
+	}
+
+	_interval(subscription, result) {
+		if (result?.status === "error") {
+			subscription.errorCount += 1;
+			return Math.min(2 ** subscription.errorCount * 2_000, 60_000);
+		}
+		subscription.errorCount = 0;
+		if (result?.status === "changed") subscription.quiet = 0;
+		else subscription.quiet += 1;
+
+		if (subscription.descriptor.type === "operation") {
+			const steps = [4_000, 8_000, 16_000, 30_000];
+			return steps[Math.min(subscription.quiet, steps.length - 1)];
+		}
+		if (TYPE_INTERVALS[subscription.descriptor.type]) {
+			return (
+				Number(result?.poll_after_ms) ||
+				TYPE_INTERVALS[subscription.descriptor.type]
+			);
+		}
+		return ORDINARY_INTERVALS[
+			Math.min(subscription.quiet, ORDINARY_INTERVALS.length - 1)
+		];
+	}
+
+	_applyProtocolState(subscription, result) {
+		if (result.revision !== undefined) {
+			subscription.descriptor.revision = result.revision;
+		}
+		if (result.operation_revision !== undefined) {
+			subscription.descriptor.operation_revision = result.operation_revision;
+		}
+		if (subscription.descriptor.type === "document" && result.payload) {
+			if (result.payload.generation) {
+				subscription.descriptor.generation = result.payload.generation;
+			}
+			if (result.payload.presence_digest) {
+				subscription.descriptor.presence_digest =
+					result.payload.presence_digest;
+			}
+		}
+	}
+
+	_due() {
+		const now = Date.now();
+		return Array.from(this.subscriptions.values())
+			.filter((subscription) => subscription.dueAt <= now)
+			.slice(0, MAX_SUBSCRIPTIONS_PER_REQUEST);
+	}
+
+	_poll() {
+		if (this.destroyed || this.view.hidden || !this.view.online) {
+			return Promise.resolve([]);
+		}
+		if (this.activePoll) {
+			this.followup = true;
+			return this.activePoll;
+		}
+
+		const cycle = this._runPoll();
+		this.activePoll = cycle;
+		const complete = () => {
+			if (this.activePoll !== cycle) return;
+			this.activePoll = null;
+			this.activeIds.clear();
+			const followup = this.followup;
+			this.followup = false;
+			if (followup) {
+				queueMicrotask(() => this._poll());
+			} else {
+				this._schedule();
+			}
+		};
+		void cycle.then(complete, complete);
+		return cycle;
+	}
+
+	async _runPoll() {
+		let due = [];
+		let results = [];
+		try {
+			due = this._due();
+			if (!due.length) return [];
+			this.activeIds = new Set(due.map(({ descriptor }) => descriptor.id));
+			for (const { descriptor } of due) {
+				this.queuedIds.delete(descriptor.id);
+			}
+			const hooks = new Set(
+				due.map(({ beforePoll }) => beforePoll).filter(Boolean),
+			);
+			for (const hook of hooks) await hook();
+			if (this.destroyed || this.view.hidden || !this.view.online) return [];
+			due = due.filter(
+				(subscription) =>
+					this.subscriptions.get(subscription.descriptor.id) === subscription,
+			);
+			if (!due.length) return [];
+
+			this.pause();
+			const byId = new Map(
+				due.map((subscription) => [subscription.descriptor.id, subscription]),
+			);
+			this.inflight = request.post(ENDPOINTS.poll, {
+				version: 1,
+				client_id: this.clientId,
+				subscriptions: due.map(({ descriptor }) => ({ ...descriptor })),
+				closed_documents: [],
+			});
+			const response = await this.inflight;
+			if (
+				!response?.ok ||
+				response.version !== 1 ||
+				!Array.isArray(response.results)
+			) {
+				throw new Error("Invalid polling response");
+			}
+			if (this.destroyed || this.view.hidden || !this.view.online) return [];
+			results = response.results;
+			const received = new Set();
+			const cycleJitter = 0.9 + Math.random() * 0.2;
+			const scheduledAt = Date.now();
+			for (const result of results) {
+				const subscription = byId.get(result?.id);
+				if (!subscription || this.subscriptions.get(result.id) !== subscription)
+					continue;
+				received.add(result.id);
+				const previousDescriptor = { ...subscription.descriptor };
+				try {
+					this._applyProtocolState(subscription, result);
+					const accepted = await subscription.onResult?.(result);
+					if (accepted === false) {
+						subscription.descriptor = previousDescriptor;
+					}
+					subscription.dueAt =
+						scheduledAt +
+						jitter(this._interval(subscription, result), cycleJitter);
+				} catch (error) {
+					subscription.descriptor = previousDescriptor;
+					captureError(error, this.view.elt, {
+						context: "polling-subscription",
+						subscription_id: result.id,
+					});
+					subscription.dueAt =
+						scheduledAt +
+						jitter(
+							this._interval(subscription, {
+								status: "error",
+							}),
+							cycleJitter,
+						);
+				}
+			}
+			for (const [id, subscription] of byId) {
+				if (received.has(id)) continue;
+				const missing = {
+					id,
+					status: "error",
+					type: subscription.descriptor.type,
+				};
+				subscription.dueAt =
+					scheduledAt +
+					jitter(this._interval(subscription, missing), cycleJitter);
+			}
+		} catch (error) {
+			if (this.destroyed || this.view.hidden || !this.view.online) return [];
+			captureError(error, this.view.elt, { context: "polling-coordinator" });
+			const cycleJitter = 0.9 + Math.random() * 0.2;
+			const scheduledAt = Date.now();
+			for (const subscription of due) {
+				subscription.dueAt =
+					scheduledAt +
+					jitter(
+						this._interval(subscription, {
+							status: "error",
+						}),
+						cycleJitter,
+					);
+				await subscription.onResult?.({
+					id: subscription.descriptor.id,
+					type: subscription.descriptor.type,
+					status: "error",
+				});
+			}
+		} finally {
+			this.inflight = null;
+			const now = Date.now();
+			for (const id of this.queuedIds) {
+				const subscription = this.subscriptions.get(id);
+				if (subscription) subscription.dueAt = now;
+			}
+		}
+		return results;
+	}
+
+	_schedule(delay = null) {
+		if (
+			this.destroyed ||
+			this.timer ||
+			!this.subscriptions.size ||
+			this.view.hidden ||
+			!this.view.online
+		)
+			return;
+		const nextDue = Math.min(
+			...Array.from(this.subscriptions.values(), ({ dueAt }) => dueAt),
+		);
+		const wait = delay ?? Math.max(nextDue - Date.now(), 0);
+		this.timer = window.setTimeout(() => {
+			this.timer = null;
+			void this._poll();
+		}, wait);
+	}
+
+	destroy() {
+		this.destroyed = true;
+		this.pause();
+		this.subscriptions.clear();
+		this.activeIds.clear();
+		this.queuedIds.clear();
+	}
+}
+
+export { PollingCoordinator };

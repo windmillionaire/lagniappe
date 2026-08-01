@@ -1,2 +1,91 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="2ea578b4-376b-4808-a15e-9e133a178e29",e._sentryDebugIdIdentifier="sentry-dbid-2ea578b4-376b-4808-a15e-9e133a178e29");}catch(e){}}();import{S as n}from"./styles.js?v=b1a2c353";import{r}from"./request.js?v=b1a2c353";import"./connectivity.js?v=b1a2c353";import{E as o}from"./endpoints.js?v=b1a2c353";import{debounce as a}from"./utilities.js?v=b1a2c353";import{C as h}from"./combobox.js?v=b1a2c353";import{R as l}from"./results.js?v=b1a2c353";import"./errors.js?v=b1a2c353";import"./primitives.js?v=b1a2c353";import"./icons.js?v=b1a2c353";import"./formatting.js?v=b1a2c353";class p extends h{constructor(t){super(t),this.index="search",this.results=new l(this.index),this.input=this._input.bind(this),this.placement="bottom-end",this.endpoints=o.search}init(){this.styles.panel=`${n.dropdown.panel} right-0 w-64 sm:w-96 mt-2`,this.element.addEventListener("input",a(this.input,200)),super.init()}_input(t){const e=t.target.value.trim();e.length>1?this._search(e):e.length===0&&this.updatePanel(this.results.create())}elementClick(t){super.elementClick(t),this.showPanel()}async _search(t){const e=new URLSearchParams;e.set("q",t);const s=await r.get(this.endpoints.bar,e);if(s?.ok){const i=s?.results||null;this.updatePanel(i)}this.showPanel()}selectOption(t){this.results.save(t),this.hidePanel(),window.location.href=t.dataset.url}elementKeydown(t){if(super.elementKeydown(t),!t.defaultPrevented&&t.key==="Enter"){t.stopPropagation();const e=new URLSearchParams;e.set("q",this.element.value),this.element.value&&(window.location.href=`${this.endpoints.page}?${e.toString()}`)}}}export{p as SearchBox};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES } from './styles.js?v=b32ad33a';
+import { r as request } from './request.js?v=b32ad33a';
+import './connectivity.js?v=b32ad33a';
+import { E as ENDPOINTS } from './endpoints.js?v=b32ad33a';
+import { debounce } from './utilities.js?v=b32ad33a';
+import { C as Combobox } from './combobox.js?v=b32ad33a';
+import { R as Results } from './results.js?v=b32ad33a';
+import './errors.js?v=b32ad33a';
+import './primitives.js?v=b32ad33a';
+import './icons.js?v=b32ad33a';
+import './formatting.js?v=b32ad33a';
+
+/**
+ * @testable true
+ * @tests tests_e2e/009_search/test_009a_search_page.py::test_search_from_navbar
+ * @features search
+ * @dimensions navbar-submit page-navigation
+ */
+class SearchBox extends Combobox {
+	constructor(element) {
+		super(element);
+		this.index = "search";
+		this.results = new Results(this.index);
+		this.input = this._input.bind(this);
+		this.placement = "bottom-end";
+		this.endpoints = ENDPOINTS.search;
+	}
+
+	init() {
+		this.styles.panel = `${STYLES.dropdown.panel} right-0 w-64 sm:w-96 mt-2`;
+		this.element.addEventListener("input", debounce(this.input, 200));
+
+		super.init();
+	}
+
+	_input(event) {
+		const query = event.target.value.trim();
+		if (query.length > 1) {
+			this._search(query);
+		} else if (query.length === 0) {
+			this.updatePanel(this.results.create());
+		}
+	}
+
+	elementClick(event) {
+		super.elementClick(event);
+		this.showPanel();
+	}
+
+	async _search(query) {
+		const params = new URLSearchParams();
+		params.set("q", query);
+		const response = await request.get(this.endpoints.bar, params);
+		if (response?.ok) {
+			const html = response?.results || null;
+			this.updatePanel(html);
+		}
+		this.showPanel();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_click_result_navigates
+	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_result_links_correct
+	 * @features search
+	 * @dimensions result-navigation result-links
+	 * @template nav.html::search_results
+	 */
+	selectOption(option) {
+		this.results.save(option);
+		this.hidePanel();
+		window.location.href = option.dataset.url;
+	}
+
+	elementKeydown(event) {
+		super.elementKeydown(event);
+		if (event.defaultPrevented) return;
+
+		if (event.key === "Enter") {
+			event.stopPropagation();
+			const params = new URLSearchParams();
+			params.set("q", this.element.value);
+			if (this.element.value) {
+				window.location.href = `${this.endpoints.page}?${params.toString()}`;
+			}
+		}
+	}
+}
+
+export { SearchBox };

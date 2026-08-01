@@ -1,2 +1,108 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="7c203e0a-f3db-48b4-a773-8f9d0af7a263",e._sentryDebugIdIdentifier="sentry-dbid-7c203e0a-f3db-48b4-a773-8f9d0af7a263");}catch(e){}}();import{S as r}from"./styles.js?v=b1a2c353";import"./request.js?v=b1a2c353";import"./connectivity.js?v=b1a2c353";import{areEqual as a}from"./utilities.js?v=b1a2c353";import{p as l}from"./primitives.js?v=b1a2c353";import{S as h}from"./select2.js?v=b1a2c353";import{B as n}from"./baseElement.js?v=b1a2c353";import"./errors.js?v=b1a2c353";import"./icons.js?v=b1a2c353";import"./combobox.js?v=b1a2c353";import"./results.js?v=b1a2c353";import"./formatting.js?v=b1a2c353";import"./submitter.js?v=b1a2c353";class m extends n{get value(){if(this.combobox?.values.size>0){const e=Array.from(this.combobox.values);return this.schema.multiple?e:e[0]}return null}changed(e){return!a(this.value,e)}active(e){return this.combobox?.values.has(e)??this.values.includes(e)}get values(){return this.hasSubmission?typeof this.submission=="string"?[this.submission]:this.submission:[]}get read(){if(this._read)return this._read;if(!this.schema.options)return null;const e=this.schema.options;return this._read=document.createElement("div"),this._read.className="flex flex-row flex-wrap gap-2",this.values.forEach(t=>{const s=e.find(o=>o.value===t);if(!s)return;const i=this._read.appendChild(document.createElement("div"));i.className=r.form.submission.default,i.textContent=s.label}),this._read.classList.add("group-data-[mode=edit]/element:hidden"),this._read}get edit(){return this._edit?this._edit:this.schema.options?(this._edit=l.select({options:this.schema.options||[],label:this.label,name:this.schema.id||this.schema.name,kind:this.renderer.kind,data:{placeholder:this.schema.placeholder||"select an option...",multiple:this.schema.multiple,preload:this.values?JSON.stringify(this.values.map(t=>({id:t}))):"[]"}}),this.combobox=new h(this._edit),this.combobox.init(),this.destroyables.push(this.combobox),(this._edit.matches?.("[lp-select]")?this._edit:this._edit.querySelector("[lp-select]"))?.classList.add("group-data-[mode=read]/element:hidden"),this._edit):null}clear(){this.combobox&&this.combobox.clear(),this.submission=null,this.edit.querySelector("select").value=""}}export{m as SelectElement};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES } from './styles.js?v=b32ad33a';
+import './request.js?v=b32ad33a';
+import './connectivity.js?v=b32ad33a';
+import { areEqual } from './utilities.js?v=b32ad33a';
+import { p as primitives } from './primitives.js?v=b32ad33a';
+import { S as SelectBox } from './select2.js?v=b32ad33a';
+import { B as BaseElement } from './baseElement.js?v=b32ad33a';
+import './errors.js?v=b32ad33a';
+import './icons.js?v=b32ad33a';
+import './combobox.js?v=b32ad33a';
+import './results.js?v=b32ad33a';
+import './formatting.js?v=b32ad33a';
+import './submitter.js?v=b32ad33a';
+
+/**
+ * @testable true
+ * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_selection_submission
+ * @pairs pages:submission pages:selection-fields pages:read-mode
+ */
+class SelectElement extends BaseElement {
+	get value() {
+		if (this.combobox?.values.size > 0) {
+			const values = Array.from(this.combobox.values);
+			return this.schema.multiple ? values : values[0];
+		}
+		return null;
+	}
+
+	changed(value) {
+		if (areEqual(this.value, value)) return false;
+		return true;
+	}
+
+	active(value) {
+		return this.combobox?.values.has(value) ?? this.values.includes(value);
+	}
+
+	get values() {
+		if (!this.hasSubmission) return [];
+		return typeof this.submission === "string"
+			? [this.submission]
+			: this.submission;
+	}
+
+	get read() {
+		if (this._read) return this._read;
+		if (!this.schema.options) return null;
+
+		const options = this.schema.options;
+
+		this._read = document.createElement("div");
+		this._read.className = "flex flex-row flex-wrap gap-2";
+
+		this.values.forEach((item) => {
+			const option = options.find((opt) => opt.value === item);
+			if (!option) return;
+
+			const container = this._read.appendChild(document.createElement("div"));
+			container.className = STYLES.form.submission.default;
+			container.textContent = option.label;
+		});
+
+		this._read.classList.add("group-data-[mode=edit]/element:hidden");
+
+		return this._read;
+	}
+
+	get edit() {
+		if (this._edit) return this._edit;
+		if (!this.schema.options) return null;
+
+		this._edit = primitives.select({
+			options: this.schema.options || [],
+			label: this.label,
+			name: this.schema.id || this.schema.name,
+			kind: this.renderer.kind,
+			data: {
+				placeholder: this.schema.placeholder || "select an option...",
+				multiple: this.schema.multiple,
+				preload: this.values
+					? JSON.stringify(this.values.map((value) => ({ id: value })))
+					: "[]",
+			},
+		});
+
+		this.combobox = new SelectBox(this._edit);
+		this.combobox.init();
+		this.destroyables.push(this.combobox);
+
+		const select = this._edit.matches?.("[lp-select]")
+			? this._edit
+			: this._edit.querySelector("[lp-select]");
+		select?.classList.add("group-data-[mode=read]/element:hidden");
+
+		return this._edit;
+	}
+
+	clear() {
+		if (this.combobox) {
+			this.combobox.clear();
+		}
+		this.submission = null;
+		this.edit.querySelector("select").value = "";
+	}
+}
+
+export { SelectElement };

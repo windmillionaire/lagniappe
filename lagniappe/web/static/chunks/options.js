@@ -1,2 +1,92 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="525616de-ca31-42d7-89ec-1f2fa8d4f580",e._sentryDebugIdIdentifier="sentry-dbid-525616de-ca31-42d7-89ec-1f2fa8d4f580");}catch(e){}}();import{p as i}from"./primitives.js?v=b1a2c353";import"./request.js?v=b1a2c353";import"./connectivity.js?v=b1a2c353";import{simpleHash as s}from"./utilities.js?v=b1a2c353";import{C as o}from"./base.js?v=b1a2c353";import"./styles.js?v=b1a2c353";import"./icons.js?v=b1a2c353";import"./errors.js?v=b1a2c353";import"./baseForm.js?v=b1a2c353";import"./loader.js?v=b1a2c353";import"./select2.js?v=b1a2c353";import"./combobox.js?v=b1a2c353";import"./results.js?v=b1a2c353";import"./formatting.js?v=b1a2c353";import"./submitter.js?v=b1a2c353";class n extends o{constructor(t){super(t),this.key="options",this.messages={submit:"Add Option"}}init(){this.element.schema.options??=[],this.index!==-1?(this.setTitle("Edit Option"),this.messages.submit="Update Option",this.setting={...this.element.schema.options[this.index]}):(this.setTitle("Create Option"),this.messages.submit="Add Option",this.setting={}),super.init(),this.showProgress()}showProgress(){this.addOptionName(),this.setting.label&&(this.complete=!0),super.showProgress()}addOptionName(){if(this.options.has("name"))return;delete this.setting.value;const t=i.input({label:"Option Name",placeholder:"enter option name...",name:"option-name",type:"text",value:this.setting.label||null});this.options.set("name",t),this.focusTarget=t,t.addEventListener("input",e=>{this.setting.label=e.target.value,this.showProgress()})}validate(){return this.setting.label?(this.setting.value||(this.setting.value=`o${s(this.setting.label)}`),!0):(this.form.showError("Please enter an option name."),!1)}}export{n as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { p as primitives } from './primitives.js?v=b32ad33a';
+import './request.js?v=b32ad33a';
+import './connectivity.js?v=b32ad33a';
+import { simpleHash } from './utilities.js?v=b32ad33a';
+import { C as Condition } from './base.js?v=b32ad33a';
+import './styles.js?v=b32ad33a';
+import './icons.js?v=b32ad33a';
+import './errors.js?v=b32ad33a';
+import './baseForm.js?v=b32ad33a';
+import './loader.js?v=b32ad33a';
+import './select2.js?v=b32ad33a';
+import './combobox.js?v=b32ad33a';
+import './results.js?v=b32ad33a';
+import './formatting.js?v=b32ad33a';
+import './submitter.js?v=b32ad33a';
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
+ * @features forms
+ * @dimensions builder-select-options
+ */
+class Options extends Condition {
+	constructor(builder) {
+		super(builder);
+		this.key = "options";
+		this.messages = {
+			submit: "Add Option",
+		};
+	}
+
+	init() {
+		this.element.schema.options ??= [];
+
+		if (this.index !== -1) {
+			this.setTitle("Edit Option");
+			this.messages.submit = "Update Option";
+			this.setting = { ...this.element.schema.options[this.index] };
+		} else {
+			this.setTitle("Create Option");
+			this.messages.submit = "Add Option";
+			this.setting = {};
+		}
+
+		super.init();
+
+		this.showProgress();
+	}
+
+	showProgress() {
+		this.addOptionName();
+		if (this.setting.label) {
+			this.complete = true;
+		}
+		super.showProgress();
+	}
+
+	addOptionName() {
+		if (this.options.has("name")) return;
+		delete this.setting.value;
+
+		const optionName = primitives.input({
+			label: "Option Name",
+			placeholder: "enter option name...",
+			name: "option-name",
+			type: "text",
+			value: this.setting.label || null,
+		});
+
+		this.options.set("name", optionName);
+		this.focusTarget = optionName;
+
+		optionName.addEventListener("input", (e) => {
+			this.setting.label = e.target.value;
+			this.showProgress();
+		});
+	}
+
+	validate() {
+		if (!this.setting.label) {
+			this.form.showError("Please enter an option name.");
+			return false;
+		}
+		if (!this.setting.value) {
+			this.setting.value = `o${simpleHash(this.setting.label)}`;
+		}
+		return true;
+	}
+}
+
+export { Options as default };

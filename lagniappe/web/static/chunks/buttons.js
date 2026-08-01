@@ -1,2 +1,125 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="29c78a61-700e-49fd-8c0d-8b906edee9c3",e._sentryDebugIdIdentifier="sentry-dbid-29c78a61-700e-49fd-8c0d-8b906edee9c3");}catch(e){}}();import{S as f}from"./styles.js?v=b1a2c353";import{s as x}from"./icons.js?v=b1a2c353";import{f as C}from"./formatting.js?v=b1a2c353";const d=(t,e)=>{if(t&&e)return C.iconLabel({icon:t,content:e});if(t){const s=document.createElement("span");return x(s,t),s}const o=document.createElement("span");return o.textContent=e,o},b=t=>u({type:"submit",style:f.button.submit,...t}),u=t=>{const{text:e="",type:o="button",icon:s=null,style:i=f.button.submit,kind:r=null,role:c=null,data:a={},classes:l=[]}=t,n=document.createElement("button");n.type=o,n.className=i,(s||e)&&n.appendChild(d(s,e)),r&&(n.dataset.kind=r),c&&(n.dataset.role=c);for(const[m,p]of Object.entries(a))p!=null&&(n.dataset[m]=p);return l.length>0&&n.classList.add(...l),n},E=t=>{const e=t.existingButton||u(t),{defaultText:o=t.defaultText||t.text||e.textContent,processingText:s=t.processingText||!1,processingIcon:i=t.processingIcon||"spinner",completedText:r=t.completedText||t.text||e.textContent,completedIcon:c=t.completedIcon||t.icon}=t;return{element:e,activate:(a=null,l=null)=>{e.disabled=!0;const n=a||s||o;l&&(e.dataset.kind=l),i?e.replaceChildren(d(i,n)):e.replaceChildren(d(null,n))},deactivate:(a=null,l=null)=>{e.disabled=!1;const n=a||r||o;l&&(e.dataset.kind=l),c?e.replaceChildren(d(c,n)):e.replaceChildren(d(null,n))}}},g={default:u,submit:b,active:E};export{g as b};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as STYLES } from './styles.js?v=b32ad33a';
+import { s as setIcon } from './icons.js?v=b32ad33a';
+import { f as formatting } from './formatting.js?v=b32ad33a';
+
+/**
+ * @testable infrastructure
+ * @covered-by src/script/elements/buttons.mjs::button
+ */
+const buttonContents = (icon, text) => {
+	if (icon && text) {
+		return formatting.iconLabel({
+			icon,
+			content: text,
+		});
+	}
+	if (icon) {
+		const iconElt = document.createElement("span");
+		setIcon(iconElt, icon);
+		return iconElt;
+	}
+	const textElt = document.createElement("span");
+	textElt.textContent = text;
+	return textElt;
+};
+
+/**
+ * @testable infrastructure
+ */
+const submit = (attributes) => {
+	return button({
+		type: "submit",
+		style: STYLES.button.submit,
+		...attributes,
+	});
+};
+
+/**
+ * @testable infrastructure
+ */
+const button = (attributes) => {
+	const {
+		text = "",
+		type = "button",
+		icon = null,
+		style = STYLES.button.submit,
+		kind = null,
+		role = null,
+		data = {},
+		classes = [],
+	} = attributes;
+
+	const buttonElt = document.createElement("button");
+	buttonElt.type = type;
+	buttonElt.className = style;
+
+	if (icon || text) buttonElt.appendChild(buttonContents(icon, text));
+
+	if (kind) buttonElt.dataset.kind = kind;
+	if (role) buttonElt.dataset.role = role;
+
+	for (const [k, v] of Object.entries(data)) {
+		if (v != null) buttonElt.dataset[k] = v;
+	}
+
+	if (classes.length > 0) {
+		buttonElt.classList.add(...classes);
+	}
+
+	return buttonElt;
+};
+
+/**
+ * @testable infrastructure
+ */
+const active = (attributes) => {
+	const buttonElt = attributes.existingButton || button(attributes);
+	const {
+		defaultText = attributes.defaultText ||
+			attributes.text ||
+			buttonElt.textContent,
+		processingText = attributes.processingText || false,
+		processingIcon = attributes.processingIcon || "spinner",
+		completedText = attributes.completedText ||
+			attributes.text ||
+			buttonElt.textContent,
+		completedIcon = attributes.completedIcon || attributes.icon,
+	} = attributes;
+
+	return {
+		element: buttonElt,
+		activate: (activeText = null, kind = null) => {
+			buttonElt.disabled = true;
+			const text = activeText || processingText || defaultText;
+
+			if (kind) buttonElt.dataset.kind = kind;
+
+			if (processingIcon) {
+				buttonElt.replaceChildren(buttonContents(processingIcon, text));
+			} else {
+				buttonElt.replaceChildren(buttonContents(null, text));
+			}
+		},
+		deactivate: (inactiveText = null, kind = null) => {
+			buttonElt.disabled = false;
+			const text = inactiveText || completedText || defaultText;
+
+			if (kind) buttonElt.dataset.kind = kind;
+
+			if (completedIcon) {
+				buttonElt.replaceChildren(buttonContents(completedIcon, text));
+			} else {
+				buttonElt.replaceChildren(buttonContents(null, text));
+			}
+		},
+	};
+};
+
+const buttons = {
+	default: button,
+	submit,
+	active,
+};
+
+export { buttons as b };
