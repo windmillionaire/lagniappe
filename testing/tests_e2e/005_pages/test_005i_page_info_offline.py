@@ -82,7 +82,7 @@ def _fill_form_element(form, selector, value):
 # @template pages/info.html::info_form
 # @template pages/document.html::document_settings
 # @template notifications.html::list
-def test_page_info_lp_offline_submit_replays_and_notifies(get_user):
+def test_page_info_lp_offline_submit_replays_and_notifies(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = owner.go(Pages.test_offline_sync_form_page)
     updated_name = _unique("Offline page info")
@@ -95,25 +95,26 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_user):
     document_settings = owner.locate(Page.DOCUMENT_SETTINGS_FORM)
     expect(document_settings).to_be_visible()
 
-    owner.offline = True
-    expect(owner.locate(OFFLINE_INDICATOR)).to_be_visible()
+    with browser_failures.expect_offline(owner):
+        owner.offline = True
+        expect(owner.locate(OFFLINE_INDICATOR)).to_be_visible()
 
-    blocked_submit = _main_submit(document_settings)
-    expect(blocked_submit).to_be_disabled()
-    expect(blocked_submit).to_contain_text("Server Offline")
-    expect(blocked_submit.locator("[data-icon='offline']")).to_be_visible()
-    expect(blocked_submit).to_have_class(re.compile("opacity-75"))
+        blocked_submit = _main_submit(document_settings)
+        expect(blocked_submit).to_be_disabled()
+        expect(blocked_submit).to_contain_text("Server Offline")
+        expect(blocked_submit.locator("[data-icon='offline']")).to_be_visible()
+        expect(blocked_submit).to_have_class(re.compile("opacity-75"))
 
-    Tabs(owner).info
-    info_form = page.info_form
-    _fill_form_element(info_form, Page.INFO_NAME, updated_name)
-    owner.page.keyboard.press("Tab")
-    info_submit = _main_submit(info_form)
-    expect(info_submit.locator("[data-icon='builder.unsaved']")).to_be_visible()
-    info_submit.click()
-    expect(info_submit).to_contain_text("Queued Sync")
-    expect(info_submit.locator("[data-icon='offline']")).to_be_visible()
-    _wait_for_mutation_records(owner, exact=1)
+        Tabs(owner).info
+        info_form = page.info_form
+        _fill_form_element(info_form, Page.INFO_NAME, updated_name)
+        owner.page.keyboard.press("Tab")
+        info_submit = _main_submit(info_form)
+        expect(info_submit.locator("[data-icon='builder.unsaved']")).to_be_visible()
+        info_submit.click()
+        expect(info_submit).to_contain_text("Queued Sync")
+        expect(info_submit.locator("[data-icon='offline']")).to_be_visible()
+        _wait_for_mutation_records(owner, exact=1)
 
     with owner.page.expect_response("**/pages/*/update", timeout=15000):
         owner.offline = False
@@ -142,7 +143,7 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_user):
 # @pairs offline:queue-submit offline:reload offline:replay-reconciliation
 # @pairs pages:lp-offline edited-entity-notice:replayed-response
 # @template pages/info.html::info_form
-def test_page_info_replay_reconciles_after_reload(get_user):
+def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = owner.go(Pages.test_offline_sync_form_page)
     page = page.reload()
@@ -153,21 +154,22 @@ def test_page_info_replay_reconciles_after_reload(get_user):
     original_submission = submission.locator("input").input_value()
     _fill_form_element(info_form, "[id^='sync-text-renderer-']", updated_submission)
 
-    owner.offline = True
-    info_submit = _main_submit(info_form)
-    info_submit.click()
-    expect(info_submit).to_contain_text("Queued Sync")
-    _wait_for_mutation_records(owner, exact=1)
+    with browser_failures.expect_offline(owner):
+        owner.offline = True
+        info_submit = _main_submit(info_form)
+        info_submit.click()
+        expect(info_submit).to_contain_text("Queued Sync")
+        _wait_for_mutation_records(owner, exact=1)
 
-    page = page.reload()
-    expect(owner.locate(OFFLINE_INDICATOR)).to_be_visible()
+        page = page.reload()
+        expect(owner.locate(OFFLINE_INDICATOR)).to_be_visible()
 
-    current_form = page.info_form
-    current_submission = current_form.locator("[id^='sync-text-renderer-']")
-    expect(current_submission.locator("input")).to_have_value(original_submission)
-    current_submit = _main_submit(current_form)
-    expect(current_submit).to_contain_text("Update Page")
-    expect(current_submit.locator("[data-icon='offline']")).to_have_count(0)
+        current_form = page.info_form
+        current_submission = current_form.locator("[id^='sync-text-renderer-']")
+        expect(current_submission.locator("input")).to_have_value(original_submission)
+        current_submit = _main_submit(current_form)
+        expect(current_submit).to_contain_text("Update Page")
+        expect(current_submit.locator("[data-icon='offline']")).to_have_count(0)
 
     with owner.page.expect_response("**/pages/*/update", timeout=15000):
         owner.offline = False
@@ -202,7 +204,7 @@ def test_page_info_replay_reconciles_after_reload(get_user):
 # @pairs forms:submission-choice forms:queued-conflict
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
-def test_offline_submission_conflict_keeps_queue_until_choice(get_user):
+def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = owner.go(Pages.test_offline_sync_form_page)
     queued_value = _unique("Queued conflict value")
@@ -210,10 +212,11 @@ def test_offline_submission_conflict_keeps_queue_until_choice(get_user):
 
     info = page.info_form
     _fill_form_element(info, "[id^='sync-text-renderer-']", queued_value)
-    owner.offline = True
-    _main_submit(info).click()
-    expect(_main_submit(info)).to_contain_text("Queued Sync")
-    _wait_for_mutation_records(owner, exact=1)
+    with browser_failures.expect_offline(owner):
+        owner.offline = True
+        _main_submit(info).click()
+        expect(_main_submit(info)).to_contain_text("Queued Sync")
+        _wait_for_mutation_records(owner, exact=1)
 
     saved_page = Entities.fetch_one(page.key, request=Fetch.direct())
     saved_page.form_submission({"sync-text": saved_value})

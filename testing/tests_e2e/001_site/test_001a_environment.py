@@ -287,3 +287,29 @@ def test_error_handling(get_user):
     user.go(SitePages.NONEXISTENT_PAGE)
 
     expect(user.page).to_have_title("Error 404")
+
+
+# @features e2e browser-failures
+# @dimensions harness pageerror teardown
+def test_browser_failure_guard_detects_unhandled_page_errors(
+    get_user, browser_failures
+):
+    """The guard rejects a real page error unless a narrow scope accounts for it."""
+    user = get_user(Users.OWNER)
+    sentinel = "browser-failure-guard-sentinel"
+
+    with browser_failures.expect(
+        user,
+        kind="pageerror",
+        exception_type="Error",
+        message=sentinel,
+    ):
+        with user.page.expect_event("pageerror") as page_error:
+            user.page.evaluate(
+                "message => setTimeout(() => { throw new Error(message); }, 0)",
+                sentinel,
+            )
+
+        assert str(page_error.value) == sentinel
+        with pytest.raises(AssertionError, match="Unexpected browser failures"):
+            browser_failures.assert_clean()

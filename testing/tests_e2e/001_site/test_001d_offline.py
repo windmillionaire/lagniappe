@@ -126,7 +126,7 @@ def wait_for_offline_sync_records(user, *, minimum=None, exact=None):
 
 # @features offline
 # @dimensions indicator browser-state
-def test_offline_indicator_toggles(get_user):
+def test_offline_indicator_toggles(get_user, browser_failures):
     """
     Test that the offline indicator responds to offline state changes.
 
@@ -146,8 +146,9 @@ def test_offline_indicator_toggles(get_user):
     indicator = user.locate(OFFLINE_INDICATOR)
     expect(indicator).to_be_hidden()
 
-    user.offline = True
-    expect(indicator).to_be_visible()
+    with browser_failures.expect_offline(user):
+        user.offline = True
+        expect(indicator).to_be_visible()
 
     user.offline = False
     expect(indicator).to_be_hidden()
@@ -185,7 +186,7 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(get_user):
 
 # @features offline
 # @dimensions indicator browser-state server-health reconnect
-def test_offline_poll_recovers_without_online_event(get_user):
+def test_offline_poll_recovers_without_online_event(get_user, browser_failures):
     """
     Test that offline recovery does not depend solely on the online event.
 
@@ -206,8 +207,9 @@ def test_offline_poll_recovers_without_online_event(get_user):
     user.page.evaluate("window.__TESTING__ = false;")
 
     indicator = user.locate(OFFLINE_INDICATOR)
-    user.offline = True
-    expect(indicator).to_be_visible()
+    with browser_failures.expect_offline(user):
+        user.offline = True
+        expect(indicator).to_be_visible()
 
     user.offline = False
     expect(indicator).to_be_hidden(timeout=8000)
@@ -215,7 +217,7 @@ def test_offline_poll_recovers_without_online_event(get_user):
 
 # @features offline
 # @dimensions sync-queue reconnect
-def test_offline_prevents_sync_requests(get_user):
+def test_offline_prevents_sync_requests(get_user, browser_failures):
     """
     Test that going offline prevents sync network requests and that
     coming back online flushes the queue.
@@ -234,11 +236,11 @@ def test_offline_prevents_sync_requests(get_user):
     project = user.go(Projects.test_toolbar_loads)
     editor = project.editor
 
-    user.offline = True
-
-    editor.type_text("offline edit")
-    editor.text_entry.blur()
-    wait_for_offline_sync_records(user, minimum=1)
+    with browser_failures.expect_offline(user):
+        user.offline = True
+        editor.type_text("offline edit")
+        editor.text_entry.blur()
+        wait_for_offline_sync_records(user, minimum=1)
 
     with user.page.expect_response("**/sync") as response_info:
         user.offline = False
@@ -248,7 +250,7 @@ def test_offline_prevents_sync_requests(get_user):
 
 # @features offline
 # @dimensions indicator transitions
-def test_rapid_offline_online_transitions(get_user):
+def test_rapid_offline_online_transitions(get_user, browser_failures):
     """
     Test that rapid offline/online toggling settles to the correct state.
 
@@ -266,16 +268,17 @@ def test_rapid_offline_online_transitions(get_user):
 
     indicator = user.locate(OFFLINE_INDICATOR)
 
-    for _ in range(5):
-        user.offline = True
-        user.offline = False
+    with browser_failures.expect_offline(user):
+        for _ in range(5):
+            user.offline = True
+            user.offline = False
 
     expect(indicator).to_be_hidden()
 
 
 # @features offline
 # @dimensions indicator view-reset
-def test_testing_mode_navigation_resets_offline_state(get_user):
+def test_testing_mode_navigation_resets_offline_state(get_user, browser_failures):
     """
     Test that a new testing-mode view rechecks server state after navigation.
 
@@ -292,9 +295,10 @@ def test_testing_mode_navigation_resets_offline_state(get_user):
     user = get_user(Users.OWNER)
     user.go(SitePages.HOME)
 
-    user.offline = True
-    indicator = user.locate(OFFLINE_INDICATOR)
-    expect(indicator).to_be_visible()
+    with browser_failures.expect_offline(user):
+        user.offline = True
+        indicator = user.locate(OFFLINE_INDICATOR)
+        expect(indicator).to_be_visible()
 
     user.go(Projects.test_toolbar_loads)
     indicator = user.locate(OFFLINE_INDICATOR)

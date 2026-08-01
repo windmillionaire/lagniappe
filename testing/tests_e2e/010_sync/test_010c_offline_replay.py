@@ -124,18 +124,19 @@ def _wait_for_offline_document_record(user, *parts):
     )
 
 
-def _offline_document_edit(user, editor, *parts):
-    _go_offline(user)
-    editor.focus()
-    for index, part in enumerate(parts):
-        if index:
-            editor.enter()
-        editor.type_text(part)
-    editor.wait_for_render()
-    for part in parts:
-        expect(editor.text_entry).to_contain_text(part)
-    editor.text_entry.blur()
-    _wait_for_offline_document_record(user, *parts)
+def _offline_document_edit(user, browser_failures, editor, *parts):
+    with browser_failures.expect_offline(user):
+        _go_offline(user)
+        editor.focus()
+        for index, part in enumerate(parts):
+            if index:
+                editor.enter()
+            editor.type_text(part)
+        editor.wait_for_render()
+        for part in parts:
+            expect(editor.text_entry).to_contain_text(part)
+        editor.text_entry.blur()
+        _wait_for_offline_document_record(user, *parts)
 
 
 def _offline_form_edit(user, form, value):
@@ -158,14 +159,14 @@ def _reconnect_with_sync(user):
 
 # @features sync
 # @dimensions offline-replay replay-order queue-clear
-def test_offline_document_edits_replay_in_order(get_user):
+def test_offline_document_edits_replay_in_order(get_user, browser_failures):
     user = get_user(Users.OWNER)
     project = Projects.test_offline_document_replay.get(user)
     user.go(project)
     editor = project.editor
     first = _unique("first-offline-edit")
     second = _unique("second-offline-edit")
-    _offline_document_edit(user, editor, first, second)
+    _offline_document_edit(user, browser_failures, editor, first, second)
     _reconnect_with_sync(user)
     _wait_for_offline_sync_records(user, exact=0)
 
@@ -178,14 +179,14 @@ def test_offline_document_edits_replay_in_order(get_user):
 
 # @features sync
 # @dimensions offline-replay replay-error queue-preserved retry
-def test_failed_offline_replay_keeps_queue_and_retries(get_user):
+def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failures):
     user = get_user(Users.OWNER)
     project = Projects.test_offline_document_retry.get(user)
     user.go(project)
     editor = project.editor
     text = _unique("retry-after-failure")
 
-    _offline_document_edit(user, editor, text)
+    _offline_document_edit(user, browser_failures, editor, text)
 
     failed_sync_attempts = []
 
@@ -193,31 +194,46 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_user):
         failed_sync_attempts.append(route.request)
         route.abort()
 
-    user.page.context.route("**/sync", fail_sync)
-    with user.page.expect_request("**/sync"):
-        user.offline = False
-    assert len(failed_sync_attempts) == 1
-    _wait_for_offline_sync_records(user, minimum=1)
-    user.page.context.unroute("**/sync", fail_sync)
+    with browser_failures.expect(
+        user,
+        kind="console",
+        console_type="error",
+        text="Failed to load resource: the server responded with a status of 503 ()",
+        source_path="/sync",
+    ):
+        with browser_failures.expect(
+            user,
+            kind="console",
+            console_type="error",
+            text="Failed to load resource: the server responded with a status of 503 ()",
+            source_path="/poll",
+        ):
+            user.page.context.route("**/sync", fail_sync)
+            with user.page.expect_request("**/sync"):
+                user.offline = False
+            assert len(failed_sync_attempts) == 1
+            user.page.context.unroute("**/sync", fail_sync)
+            _wait_for_offline_sync_records(user, minimum=1)
 
-    _go_offline(user)
-    _reconnect_with_sync(user)
-    _wait_for_offline_sync_records(user, exact=0)
+            with browser_failures.expect_offline(user):
+                _go_offline(user)
+                _reconnect_with_sync(user)
+                _wait_for_offline_sync_records(user, exact=0)
 
-    user.go(project)
-    expect(project.editor.text_entry).to_contain_text(text)
+            user.go(project)
+            expect(project.editor.text_entry).to_contain_text(text)
 
 
 # @features sync
 # @dimensions offline-replay dedupe reload document headless-widget
-def test_offline_replay_does_not_duplicate_after_reload(get_user):
+def test_offline_replay_does_not_duplicate_after_reload(get_user, browser_failures):
     user = get_user(Users.OWNER)
     project = Projects.test_offline_document_reload.get(user)
     user.go(project)
     editor = project.editor
     text = _unique("reload-dedupe")
 
-    _offline_document_edit(user, editor, text)
+    _offline_document_edit(user, browser_failures, editor, text)
     _replace_page(user)
 
     with user.page.expect_response("**/sync"):
@@ -232,7 +248,9 @@ def test_offline_replay_does_not_duplicate_after_reload(get_user):
 # @pairs sync:offline-replay sync:headless sync:concurrency sync:merge
 # @pairs sync:revision sync:checkpoint sync:queue-clear
 # @pairs polling:document polling:current-state polling:cursor
-def test_headless_offline_replay_merges_concurrent_remote_edits(get_user):
+def test_headless_offline_replay_merges_concurrent_remote_edits(
+    get_user, browser_failures
+):
     owner = get_user(Users.OWNER)
     collaborator = get_user(Users.admin, creator=owner)
     project = Projects.test_offline_document_concurrent_replay.get(owner)
@@ -243,7 +261,7 @@ def test_headless_offline_replay_merges_concurrent_remote_edits(get_user):
     collaborator_editor = project.editor
 
     offline_text = _unique("offline-branch")
-    _offline_document_edit(owner, owner_editor, offline_text)
+    _offline_document_edit(owner, browser_failures, owner_editor, offline_text)
 
     remote_text = _unique("remote-branch")
     collaborator_editor.focus()

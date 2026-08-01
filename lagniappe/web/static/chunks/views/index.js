@@ -1,13 +1,13 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES } from '../styles.js?v=b01d709d';
-import { withTransition } from '../utilities.js?v=b01d709d';
-import { T as TableVisibilityState } from '../tableVisibilityState.js?v=b01d709d';
-import { C as Core } from '../core.js?v=b01d709d';
-import '../errors.js?v=b01d709d';
-import '../connectivity.js?v=b01d709d';
-import '../endpoints.js?v=b01d709d';
-import '../request.js?v=b01d709d';
-import '../shell.js?v=b01d709d';
+import { S as STYLES } from '../styles.js?v=b7488009';
+import { withTransition } from '../utilities.js?v=b7488009';
+import { T as TableVisibilityState } from '../tableVisibilityState.js?v=b7488009';
+import { C as Core } from '../core.js?v=b7488009';
+import '../errors.js?v=b7488009';
+import '../connectivity.js?v=b7488009';
+import '../endpoints.js?v=b7488009';
+import '../request.js?v=b7488009';
+import '../shell.js?v=b7488009';
 
 /**
  * @testable true
@@ -212,7 +212,7 @@ class EntityIndex extends Core {
 
 		const trigger = this.elt.querySelector("[data-role='tools-dropdown']");
 		if (!trigger) return;
-		this._dropdownPromise = import('../dropdown.js?v=b01d709d')
+		this._dropdownPromise = import('../dropdown.js?v=b7488009')
 			.then(({ Dropdown }) => {
 				if (this._destroyed || !this.mobile) return null;
 

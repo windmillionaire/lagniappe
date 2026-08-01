@@ -25,7 +25,6 @@ from lagniappe.core.tools.database.filter import Query
 from lagniappe.core.tools.filters.cache import FilterCache
 from lagniappe.core.tools.deferred_jobs import DeferredJobs
 from lagniappe.web import app as web_app
-from lagniappe.web.routes.process import main as process_main
 from testing.definitions import Pages, SitePages, Tasks, Users
 from testing.utility.structural_evidence import (
     COMPONENT_REFRESH_INSTRUMENTATION,
@@ -318,7 +317,7 @@ def _network_record(responses, failed_requests):
     }
 
 
-def _reconnect_evidence(get_user):
+def _reconnect_evidence(get_user, browser_failures):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
     home.task_list
@@ -331,8 +330,9 @@ def _reconnect_evidence(get_user):
 
     search = user.page.locator("[lp-search] input")
     search.focus()
-    user.offline = True
-    expect(user.locate("[data-role='offline']")).to_be_visible()
+    with browser_failures.expect_offline(user):
+        user.offline = True
+        expect(user.locate("[data-role='offline']")).to_be_visible()
 
     instrumentation = """
         () => {
@@ -435,12 +435,18 @@ def _reconnect_evidence(get_user):
     user.page.on("response", capture_response)
     user.page.on("requestfailed", capture_failure)
     try:
-        user.offline = False
-        user.page.wait_for_function(
-            "() => window.__structuralEvidence?.complete === true",
-            timeout=30000,
-        )
-        browser = user.page.evaluate("window.__structuralEvidence")
+        with browser_failures.expect(
+            user,
+            kind="requestfailed",
+            method="HEAD",
+            path="/ping",
+        ):
+            user.offline = False
+            user.page.wait_for_function(
+                "() => window.__structuralEvidence?.complete === true",
+                timeout=30000,
+            )
+            browser = user.page.evaluate("window.__structuralEvidence")
     finally:
         user.page.remove_listener("response", capture_response)
         user.page.remove_listener("requestfailed", capture_failure)
@@ -471,6 +477,7 @@ def _reconnect_evidence(get_user):
 
 def test_structural_evidence_after_full_e2e_suite(
     get_user,
+    browser_failures,
     monkeypatch,
     request,
 ):
@@ -664,7 +671,9 @@ def test_structural_evidence_after_full_e2e_suite(
         assert execution_result["status"] == "complete"
 
         record["workflows"].update(probe.records)
-        record["workflows"]["client_reconnect"] = _reconnect_evidence(get_user)
+        record["workflows"]["client_reconnect"] = _reconnect_evidence(
+            get_user, browser_failures
+        )
         record["collector_complete"] = True
     finally:
         record["workflows"].update(probe.records)

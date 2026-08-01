@@ -346,10 +346,6 @@ def test_task_history_expands_table_submission_cell(get_user):
     expect(embedded).to_be_visible()
     expect(embedded).to_contain_text("Note")
     expect(embedded).to_contain_text("History row")
-    assert not any(
-        "Cannot read properties of null (reading 'dataset')" in message
-        for message in user.console_messages
-    )
 
 
 # @pairs task-combine:compatible task-combine:same-page

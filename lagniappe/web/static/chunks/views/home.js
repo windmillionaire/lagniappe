@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { C as Core } from '../core.js?v=b01d709d';
-import '../connectivity.js?v=b01d709d';
-import '../endpoints.js?v=b01d709d';
-import '../errors.js?v=b01d709d';
-import '../request.js?v=b01d709d';
-import '../utilities.js?v=b01d709d';
-import '../shell.js?v=b01d709d';
+import { C as Core } from '../core.js?v=b7488009';
+import '../connectivity.js?v=b7488009';
+import '../endpoints.js?v=b7488009';
+import '../errors.js?v=b7488009';
+import '../request.js?v=b7488009';
+import '../utilities.js?v=b7488009';
+import '../shell.js?v=b7488009';
 
 /**
  * @testable true

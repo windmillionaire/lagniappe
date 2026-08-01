@@ -86,6 +86,52 @@ lock and cleans stale test data before starting the server, so overlapping
 pytest invocations should fail early with a clear message and interrupted runs
 should be less likely to poison the next run.
 
+### Browser failure guard
+
+E2E teardown fails on an unaccounted console error, uncaught `pageerror`, or
+failed browser request. The failure includes the user/context, page URL, and
+event details, and captures the usual browser artifact first.
+Playwright's exact `net::ERR_ABORTED` navigation cancellations are reported in
+diagnostic output but are not treated as failures; they are browser lifecycle
+cancellation, not a completed request failing in the application.
+
+When a test deliberately exercises one of those failures, scope its exact
+request or error instead of adding a global ignore:
+
+```python
+with browser_failures.expect(
+    user,
+    kind="requestfailed",
+    method="POST",
+    path="/sync",
+):
+    reconnect()
+```
+
+For a native offline transition, use the convenience scope. It requires the
+one failed `HEAD /ping` request and its browser console error, so an offline
+test cannot silently stop exercising the connection boundary:
+
+```python
+with browser_failures.expect_offline(user):
+    user.offline = True
+    expect(user.locate("[data-role='offline']")).to_be_visible()
+```
+
+The scope requires the expected event to occur exactly once; it fails when the
+event is missing or repeated. Use `message_contains` or `text_contains` only
+when a browser error includes variable stack-location text.
+
+To inventory browser events without making otherwise passing tests fail, run a
+sequential diagnostic session:
+
+```bash
+venv/bin/python run.py test e2e --browser-failure-diagnostics
+```
+
+It writes `reports/test_runs/browser_failure_diagnostics.json`. Diagnostic mode
+does not relax scoped-expectation checks.
+
 ## Manual Browser Test Server
 
 Use `test-server` when you want the same testing Flask server that E2E uses,

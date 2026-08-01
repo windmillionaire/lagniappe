@@ -1,13 +1,13 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES } from './styles.js?v=b01d709d';
-import { r as request } from './request.js?v=b01d709d';
-import './connectivity.js?v=b01d709d';
-import { c as createIcon } from './icons.js?v=b01d709d';
-import './utilities.js?v=b01d709d';
-import { b as buttons } from './buttons.js?v=b01d709d';
-import { Dropdown } from './dropdown.js?v=b01d709d';
-import { p as primitives } from './primitives.js?v=b01d709d';
-import { B as BaseForm } from './baseForm.js?v=b01d709d';
+import { S as STYLES } from './styles.js?v=b7488009';
+import { r as request } from './request.js?v=b7488009';
+import './connectivity.js?v=b7488009';
+import { c as createIcon } from './icons.js?v=b7488009';
+import './utilities.js?v=b7488009';
+import { b as buttons } from './buttons.js?v=b7488009';
+import { Dropdown } from './dropdown.js?v=b7488009';
+import { p as primitives } from './primitives.js?v=b7488009';
+import { B as BaseForm } from './baseForm.js?v=b7488009';
 
 const DEFAULT_DROPZONE_TEXT =
 	"Drop file here, click to upload, or tap to choose camera/files";

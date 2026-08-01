@@ -1,13 +1,13 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { a as loadRevisionPreview } from './core.js?v=b01d709d';
-import { S as STYLES } from './styles.js?v=b01d709d';
-import { Modal } from './modal.js?v=b01d709d';
-import { areEqual, withTransition } from './utilities.js?v=b01d709d';
-import { captureError } from './errors.js?v=b01d709d';
-import { r as request } from './request.js?v=b01d709d';
-import './connectivity.js?v=b01d709d';
-import './endpoints.js?v=b01d709d';
-import './shell.js?v=b01d709d';
+import { a as loadRevisionPreview } from './core.js?v=b7488009';
+import { S as STYLES } from './styles.js?v=b7488009';
+import { Modal } from './modal.js?v=b7488009';
+import { areEqual, withTransition } from './utilities.js?v=b7488009';
+import { captureError } from './errors.js?v=b7488009';
+import { r as request } from './request.js?v=b7488009';
+import './connectivity.js?v=b7488009';
+import './endpoints.js?v=b7488009';
+import './shell.js?v=b7488009';
 
 /**
  * @testable true

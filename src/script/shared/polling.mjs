@@ -291,8 +291,25 @@ export class PollingCoordinator {
 				closed_documents: [],
 			});
 			const response = await this.inflight;
+			if (!response?.ok) {
+				const cycleJitter = 0.9 + Math.random() * 0.2;
+				const scheduledAt = Date.now();
+				for (const subscription of due) {
+					subscription.dueAt =
+						scheduledAt +
+						jitter(
+							this._interval(subscription, { status: "error" }),
+							cycleJitter,
+						);
+					await subscription.onResult?.({
+						id: subscription.descriptor.id,
+						type: subscription.descriptor.type,
+						status: "error",
+					});
+				}
+				return [];
+			}
 			if (
-				!response?.ok ||
 				response.version !== 1 ||
 				!Array.isArray(response.results)
 			) {

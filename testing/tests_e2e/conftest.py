@@ -46,6 +46,7 @@ from runner.testing import (
 )
 
 from ..utility import TestResults, capture_on_failure
+from ..utility.browser_failures import BrowserFailureCollector, write_diagnostic_report
 from ..utility.structural_evidence import full_e2e_collection_state
 
 os.environ["FLASK_ENV"] = "testing"
@@ -56,6 +57,15 @@ AI_TIMEOUT = 30000  # 30 seconds - for @pytest.mark.ai tests
 
 logger = logging.getLogger(__name__)
 E2E_ROOT = Path(__file__).parent.resolve()
+
+
+def pytest_addoption(parser):
+    group = parser.getgroup("lagniappe-e2e")
+    group.addoption(
+        "--browser-failure-diagnostics",
+        action="store_true",
+        help="Record browser failures without making them teardown failures.",
+    )
 
 
 @pytest.hookimpl(trylast=True)
@@ -197,6 +207,16 @@ def setup_test_server():
 
 
 @pytest.fixture(scope="session", autouse=True)
+def browser_failure_diagnostics(request):
+    """Write one diagnostic report after all function collectors have finalized."""
+    if request.config.getoption("--browser-failure-diagnostics"):
+        request.config._browser_failure_diagnostics = []
+    yield
+    if request.config.getoption("--browser-failure-diagnostics"):
+        write_diagnostic_report(request.config._browser_failure_diagnostics)
+
+
+@pytest.fixture(scope="session", autouse=True)
 def browser():
     """
     Shared Playwright Chromium browser instance for all tests.
@@ -291,7 +311,20 @@ def ai_results(request):
 
 
 @pytest.fixture
-def get_user(browser, request):
+def browser_failures(request):
+    """Per-test browser failure collector exposed for narrow expected-error scopes."""
+    collector = BrowserFailureCollector()
+    yield collector
+    if request.config.getoption("--browser-failure-diagnostics"):
+        diagnostics = getattr(request.config, "_browser_failure_diagnostics", None)
+        if diagnostics is None:
+            diagnostics = []
+            request.config._browser_failure_diagnostics = diagnostics
+        diagnostics.append(collector.diagnostic_record(request.node.nodeid))
+
+
+@pytest.fixture
+def get_user(browser, request, browser_failures):
     """
     Factory fixture for getting authenticated User resources with isolated contexts.
 
@@ -366,11 +399,20 @@ def get_user(browser, request):
         else:
             user = user_definition.get(creator)
 
+        user.console_messages.clear()
+
         # Persisted cache invalidation belongs to the browser acknowledgement
         # protocol; permission-mutating tests must consume it explicitly.
-        # Authenticate if user has email but no stored session
+        # Authenticate if user has email but no stored session.
         if not user.storage_state and user.email:
-            user.login(browser)
+            user.login(
+                browser,
+                monitor_context=lambda context: browser_failures.monitor_context(
+                    context,
+                    label=user.name,
+                    console_messages=user.console_messages,
+                ),
+            )
 
         # Close any existing page/context from previous test or fixture reuse.
         if user.page:
@@ -384,17 +426,13 @@ def get_user(browser, request):
             viewport={"width": 1280, "height": 720},
         )
         contexts.append(context)
+        browser_failures.monitor_context(
+            context,
+            label=user.name,
+            console_messages=user.console_messages,
+        )
 
         user.page = context.new_page()
-        user.console_messages.clear()
-
-        # Capture console messages for debugging on failure
-        def handle_console(msg):
-            message = f"{msg.type}: {msg.text}"
-            user.console_messages.append(message)
-            logger.debug(f"Console [{user.name}]: {message}")
-
-        user.page.on("console", handle_console)
 
         # Apply appropriate timeout based on test markers
         if request.node.get_closest_marker("ai"):
@@ -408,9 +446,15 @@ def get_user(browser, request):
     yield _get_user
 
     try:
-        # Teardown: capture screenshots and console logs if test failed
+        # Teardown: capture screenshots and console logs for either assertion
+        # failures or browser failures discovered by the universal guard.
         rep_call = getattr(request.node, "rep_call", None)
-        if rep_call and rep_call.failed:
+        unexpected = [
+            event
+            for event in browser_failures.events
+            if event.expected_by is None and event.ignored_reason is None
+        ]
+        if (rep_call and rep_call.failed) or unexpected:
             for user in users:
                 if user.page and not user.page.is_closed():
                     for msg in user.console_messages:
@@ -418,6 +462,10 @@ def get_user(browser, request):
                     capture_on_failure(
                         user.page, f"{request.node.name} - {user.name}"
                     )
+        if unexpected and not request.config.getoption(
+            "--browser-failure-diagnostics"
+        ):
+            browser_failures.assert_clean()
     finally:
         for context in list(reversed(contexts)):
             _close_context(context)

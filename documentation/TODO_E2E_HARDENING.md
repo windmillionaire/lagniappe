@@ -149,17 +149,27 @@ verified through the browser's `/validate-user` acknowledgement.
 
 ### E2E-H02 — Make unexpected browser failures first-class test failures
 
-- [ ] Extend the E2E page instrumentation to collect console errors,
+- [x] Extend the E2E page instrumentation to collect console errors,
   uncaught `pageerror` events, and failed requests.
-- [ ] First run the collector in diagnostic mode to classify current noise.
-- [ ] Add narrowly scoped expectations for tests that deliberately cause
+- [x] First run the collector in diagnostic mode to classify representative
+  offline and replay noise.
+- [x] Add narrowly scoped expectations for tests that deliberately cause
   network failures, offline behavior, or browser errors.
-- [ ] Once classified, fail teardown on any unexpected event.
+- [x] Once classified, fail teardown on any unexpected event.
+- [ ] Run one sequential full-E2E baseline with the guard enabled and classify
+  any newly discovered event before declaring E2E-H02 complete.
 
-Current gap: `testing/tests_e2e/conftest.py` records console messages but
-generally prints them only after another assertion has already failed. Failed
-requests are not a universal failure, and `pageerror` is only asserted in an
-isolated page-tabs test.
+Current state: the E2E fixture monitors every created browser context and fails
+teardown for unexpected console errors, `pageerror` events, and failed
+requests. Native offline stories explicitly expect the single failed
+`HEAD /ping` request and its console error; injected replay failures have
+equally narrow per-test expectations. Exact `net::ERR_ABORTED` navigation
+cancellations remain visible in diagnostic output but are classified as browser
+lifecycle cancellation rather than application failures.
+
+Deferred validation: do not broaden the ignore set from focused results. The
+remaining full sequential E2E baseline is the evidence gate for any further
+classification, and this item stays open until that baseline is clean.
 
 Implementation notes:
 

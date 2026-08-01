@@ -298,3 +298,54 @@ coordinator.subscribe(
 });
 """
     )
+
+
+# @pair polling:transport-error
+def test_polling_coordinator_treats_failed_transport_as_retryable(run_node):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+let captured = 0;
+const results = [];
+const context = {
+  console,
+  crypto: { randomUUID: () => "client-1" },
+  Date,
+  ENDPOINTS: { poll: "/poll" },
+  Math,
+  queueMicrotask,
+  sessionStorage: { getItem() { return null; }, setItem() {} },
+  captureError() { captured += 1; },
+  request: { async post() { return { ok: false, error: "Failed to fetch" }; } },
+  window: { clearTimeout() {}, setTimeout() { return 1; } },
+};
+context.globalThis = context;
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/polling.mjs", "utf8");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replace("export class PollingCoordinator", "class PollingCoordinator");
+source += "\nglobalThis.PollingCoordinator = PollingCoordinator;";
+vm.runInContext(source, context);
+
+const coordinator = new context.PollingCoordinator({
+  elt: {}, hidden: false, online: true,
+}).init();
+coordinator.subscribe(
+  { id: "entity:one", type: "entity", key: "one", revision: "old" },
+  { onResult: (result) => results.push(result) },
+);
+
+(async () => {
+  await coordinator.trigger();
+  if (captured !== 0) throw new Error("Transport failure was captured as a defect");
+  if (results.length !== 1 || results[0].status !== "error") {
+    throw new Error(`Transport failure did not schedule an error result: ${JSON.stringify(results)}`);
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+"""
+    )

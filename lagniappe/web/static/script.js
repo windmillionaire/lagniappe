@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BROWSER_PROTOCOL, c as connectivity } from './chunks/connectivity.js?v=b01d709d';
+import { B as BROWSER_PROTOCOL, c as connectivity } from './chunks/connectivity.js?v=b7488009';
 
 const BROWSER_PROTOCOL_ID = BROWSER_PROTOCOL.id;
 const BROWSER_PROTOCOL_VERSION = BROWSER_PROTOCOL.version;
@@ -50,7 +50,7 @@ function connectivityMessage(state) {
 }
 
 const BUILD_ID =
-	"b01d709d";
+	"b7488009";
 
 /**
  * One registry owns both build inputs and runtime view selection. `entry` is a
@@ -102,7 +102,7 @@ async function onError(event) {
 		captureError,
 		isSkippedViewTransitionError,
 		isTransientNetworkError,
-	} = await import('./chunks/errors.js?v=b01d709d');
+	} = await import('./chunks/errors.js?v=b7488009');
 	const error = event.error || event.reason || event.message || "Unknown error";
 	if (isSkippedViewTransitionError(error) || isTransientNetworkError(error)) {
 		event.preventDefault();
@@ -138,7 +138,7 @@ const getView = async () => {
 	__activeView = (async () => {
 		const viewModule = await loadView(viewElt.dataset.kind);
 		if (!viewModule) {
-			const { captureError } = await import('./chunks/errors.js?v=b01d709d');
+			const { captureError } = await import('./chunks/errors.js?v=b7488009');
 			captureError(
 				new Error(`Unknown view kind: ${viewElt.dataset.kind || "missing"}`),
 				viewElt,
@@ -385,7 +385,7 @@ function pageMode() {
 }
 
 async function startAnalytics() {
-	const { analytics } = await import('./chunks/analytics.js?v=b01d709d');
+	const { analytics } = await import('./chunks/analytics.js?v=b7488009');
 	analytics.view();
 }
 
@@ -403,7 +403,7 @@ function startErrorHandling() {
 function startServiceWorker() {
 	if (!("serviceWorker" in navigator)) return;
 	navigator.serviceWorker.register("/sw.js").catch(async (error) => {
-		const { captureNetworkError } = await import('./chunks/errors.js?v=b01d709d');
+		const { captureNetworkError } = await import('./chunks/errors.js?v=b7488009');
 		captureNetworkError(error, "/sw.js", { context: "service_worker" });
 	});
 
@@ -413,7 +413,7 @@ function startServiceWorker() {
 				? "controlled"
 				: "uncontrolled",
 		});
-		const { clearRecentSearchResults } = await import('./chunks/utilities.js?v=b01d709d');
+		const { clearRecentSearchResults } = await import('./chunks/utilities.js?v=b7488009');
 		clearRecentSearchResults();
 		syncView();
 	});
@@ -430,8 +430,8 @@ async function startAuthenticatedLifecycle() {
 	startErrorHandling();
 
 	const [{ initializeLogoutForms }, { updateUserData }] = await Promise.all([
-		import('./chunks/logout.js?v=b01d709d'),
-		import('./chunks/user.js?v=b01d709d'),
+		import('./chunks/logout.js?v=b7488009'),
+		import('./chunks/user.js?v=b7488009'),
 	]);
 	initializeLogoutForms();
 	void startAnalytics();

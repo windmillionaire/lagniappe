@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { isSkippedViewTransitionError, captureError } from './errors.js?v=b01d709d';
+import { isSkippedViewTransitionError, captureError } from './errors.js?v=b7488009';
 
 /**
  * @testable false

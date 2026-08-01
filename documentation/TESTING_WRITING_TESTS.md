@@ -71,6 +71,40 @@ prefix are shared, so parallel E2E invocations can tear down each other's data
 and server state. When checking multiple focused files or nodeids, pass them to
 one pytest command.
 
+### Browser failure expectations
+
+Every E2E browser context is monitored for console errors, uncaught page errors,
+and failed requests. An ordinary test therefore needs no local listener just to
+assert that an operation did not throw: the fixture will fail teardown with the
+originating page and request details.
+
+Use the `browser_failures` fixture only when the story deliberately causes a
+failure, and keep the scope around the one action that causes it:
+
+```python
+def test_replay_retries_one_aborted_sync(get_user, browser_failures):
+    user = get_user(Users.OWNER)
+
+    with browser_failures.expect(
+        user,
+        kind="requestfailed",
+        method="POST",
+        path="/sync",
+    ):
+        reconnect_with_the_test_route_aborted()
+```
+
+An expectation is context-bound and requires its exact count (one by default).
+Match the narrowest stable fields: request method/path, exception type/message,
+or console type/text. Do not use a suite-wide substring allowlist. For errors
+whose browser text includes variable stack locations, use a scoped
+`message_contains` or `text_contains` predicate together with the other stable
+fields.
+
+For native connectivity transitions, prefer `browser_failures.expect_offline(user)`
+around the `user.offline = True` action and its offline assertions. It expects
+the exact `HEAD /ping` disconnect and console error produced by the browser.
+
 The accumulated E2E datastore intentionally resembles a living system. Reuse
 named users and entities when the story only needs them to exist, and establish
 the relevant precondition idempotently each time instead of assuming an earlier

@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as ENDPOINTS } from './endpoints.js?v=b01d709d';
-import { captureError } from './errors.js?v=b01d709d';
-import { r as request } from './request.js?v=b01d709d';
+import { E as ENDPOINTS } from './endpoints.js?v=b7488009';
+import { captureError } from './errors.js?v=b7488009';
+import { r as request } from './request.js?v=b7488009';
 
 const MAX_SUBSCRIPTIONS_PER_REQUEST = 64;
 const CLIENT_ID_KEY = "lagniappe-poll-client";
@@ -292,8 +292,25 @@ class PollingCoordinator {
 				closed_documents: [],
 			});
 			const response = await this.inflight;
+			if (!response?.ok) {
+				const cycleJitter = 0.9 + Math.random() * 0.2;
+				const scheduledAt = Date.now();
+				for (const subscription of due) {
+					subscription.dueAt =
+						scheduledAt +
+						jitter(
+							this._interval(subscription, { status: "error" }),
+							cycleJitter,
+						);
+					await subscription.onResult?.({
+						id: subscription.descriptor.id,
+						type: subscription.descriptor.type,
+						status: "error",
+					});
+				}
+				return [];
+			}
 			if (
-				!response?.ok ||
 				response.version !== 1 ||
 				!Array.isArray(response.results)
 			) {

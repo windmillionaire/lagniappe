@@ -129,18 +129,10 @@ def test_clear_page_info_form_selector_keeps_widget_stable(get_user):
     page = Pages.test_switch_page_form.get(user)
     user.go(page)
 
-    page_errors = []
-    user.page.on("pageerror", lambda error: page_errors.append(str(error)))
-
     info_form = page.info_form
     FormSelect(info_form).clear()
     user.page.evaluate("() => new Promise((resolve) => setTimeout(resolve, 0))")
-
-    assert page_errors == []
-    assert not any(
-        "Cannot read properties of undefined" in message
-        for message in user.console_messages
-    )
+    expect(info_form).to_be_visible()
 
 
 def _open_document_settings(user, page):
