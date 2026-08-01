@@ -128,7 +128,7 @@ def is_before_today(value):
 
 
 # @testable true
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_navbar_task_results_handle_legacy_completed_values
+# @tests tests_e2e/009_search/test_009a_search_page.py::test_navbar_task_results_render_current_completion_state
 # @features template-formatting
 # @dimensions tojson safe-json
 def initialize(app):

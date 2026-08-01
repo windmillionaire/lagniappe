@@ -14,7 +14,11 @@ from testing.definitions import DueDates, Pages, SitePages, Users
 from testing.definitions.task_definitions import TaskDefinition
 from testing.elements import Buttons, FormElements, List, Modal
 from testing.resources import Task
-from testing.utility import TestFile as _TestFile, trigger_poll
+from testing.utility import (
+    TestFile as _TestFile,
+    trigger_poll,
+    wait_for_offline_mutations,
+)
 from testing.utility.local_time import local_date_from_utc_datetime
 
 pytestmark = pytest.mark.e2e
@@ -556,20 +560,31 @@ def test_offline_home_create_mutations_persist_after_reload(get_user):
     task_item = _create_task_from_home(home, task_name, expect_network=False)
     expect(note_item).to_have_attribute("data-offline", "true")
     expect(task_item).to_have_attribute("data-offline", "true")
+    wait_for_offline_mutations(user, exact=2)
 
     home = home.reload()
 
+    _loaded_activity_list(home)
+    _loaded_task_list(home)
+    expect(_activity_item(home, note_body)).not_to_be_attached()
+    expect(_task_item(home, task_name)).not_to_be_attached()
+
+    with user.page.expect_response("**/activity/notes", timeout=15000):
+        with user.page.expect_response("**/personal", timeout=15000):
+            user.offline = False
+
+    wait_for_offline_mutations(user, exact=0)
     home.activity_list
-    home.task_list
     expect(_activity_item(home, note_body)).to_be_visible()
+    home.task_list
     expect(_task_item(home, task_name)).to_be_visible()
 
 
 # @features offline
-# @dimensions cached-overlay
+# @dimensions server-first reload replay
 # @template home/notes.html::list
 # @template home/tasks.html::list
-def test_offline_home_mutation_overlay_hides_deleted_items(get_user):
+def test_offline_home_reload_uses_server_state_until_replay(get_user):
     user = get_user(Users.OWNER)
     note_body = _unique("Offline cached note")
     task_name = _unique("Offline cached task")
@@ -588,16 +603,25 @@ def test_offline_home_mutation_overlay_hides_deleted_items(get_user):
         user, home, note_body, expect_network=False
     )
     expect(note_item).to_have_attribute("data-offline", "true")
+    wait_for_offline_mutations(user, exact=1)
     note_item.locator("[data-action='delete-activity']").click()
+    wait_for_offline_mutations(user, exact=0)
     task_item.locator("input[data-role='complete']").check()
     expect(note_item).not_to_be_attached()
     expect(task_item).not_to_be_attached()
+    wait_for_offline_mutations(user, exact=1)
 
     home = home.reload()
 
     _loaded_activity_list(home)
     _loaded_task_list(home)
     expect(_activity_item(home, note_body)).not_to_be_attached()
+    expect(_task_item(home, task_name)).to_be_attached()
+
+    with user.page.expect_response("**/complete", timeout=15000):
+        user.offline = False
+
+    wait_for_offline_mutations(user, exact=0)
     expect(_task_item(home, task_name)).not_to_be_attached()
 
 
@@ -633,7 +657,7 @@ def test_offline_home_mutations_replay_when_online(get_user):
 # @features tasks
 # @dimensions complete offline-queue
 # @template home/tasks.html::task
-def test_offline_task_complete_persists_after_reload(get_user):
+def test_offline_task_complete_replays_after_reload(get_user):
     user = get_user(Users.OWNER)
     task_name = _unique("Offline complete task")
     task = _save_personal_task(user, task_name)
@@ -650,7 +674,16 @@ def test_offline_task_complete_persists_after_reload(get_user):
     user.offline = True
     task_item.locator("input[data-role='complete']").check()
     expect(task_item).not_to_be_attached()
+    wait_for_offline_mutations(user, exact=1)
 
     home = home.reload()
     _loaded_task_list(home)
+    expect(_task_item(home, task_name)).to_have_attribute(
+        "data-due-date", expected_due_date
+    )
+
+    with user.page.expect_response("**/complete", timeout=15000):
+        user.offline = False
+
+    wait_for_offline_mutations(user, exact=0)
     expect(_task_item(home, task_name)).not_to_be_attached()

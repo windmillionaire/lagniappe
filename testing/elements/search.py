@@ -1,3 +1,5 @@
+import re
+
 from playwright.sync_api import expect
 
 from .combobox import Select
@@ -10,8 +12,10 @@ class HeaderSearch:
         self.page = user.page
 
     def search(self, query):
-        combobox = Select(self.page.locator(self.SEARCH_ELEMENT))
-        combobox.input.fill(query)
+        search = self.page.locator(self.SEARCH_ELEMENT)
+        search.locator("input[name='q']").fill(query)
+        expect(search).to_have_attribute("data-combobox-id", re.compile(r".+"))
+        combobox = Select(search)
         self.panel = combobox.panel
 
     def verify_entity_in_results(self, entity):

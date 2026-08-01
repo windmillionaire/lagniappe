@@ -22,7 +22,7 @@ from lagniappe.core.definitions import (
     SearchFacets,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, database
+from lagniappe.core.tools import database
 from lagniappe.core.tools.refresh import page_task_roots
 
 
@@ -777,7 +777,7 @@ def created_index_result(result):
 # @testable true
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_click_result_navigates
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_result_links_correct
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_navbar_task_results_handle_legacy_completed_values
+# @tests tests_e2e/009_search/test_009a_search_page.py::test_navbar_task_results_render_current_completion_state
 # @features search
 # @dimensions result-navigation result-links navbar-results task-model
 def search_results(query, results, total):

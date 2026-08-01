@@ -9,8 +9,6 @@ from playwright.sync_api import expect
 from config import SETTINGS
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools.cache.core import cache as search_cache
-from lagniappe.core.tools.cache.keys import Keys
 from testing.definitions import Projects, SitePages, Users
 from testing.resources import SitePage
 
@@ -81,16 +79,6 @@ def _create_project_task(user, project, model_task, name):
     )
     task.save()
     return task
-
-
-def _cache_legacy_incomplete_task(task):
-    details = dict(task.details)
-    details["completed"] = "False"
-    search_cache.redis.hset(
-        Keys.ENTITY_HASHES.value,
-        task.hash,
-        json.dumps(details),
-    )
 
 
 def _result_titles(user):
@@ -384,14 +372,6 @@ def test_task_facet_includes_task_and_model_results_with_links(get_user):
     )
     completed_task.completed = True
     completed_task.save()
-    legacy_active_task = _create_project_task(
-        user,
-        project,
-        model,
-        f"{token} legacy active task",
-    )
-    _cache_legacy_incomplete_task(legacy_active_task)
-
     _go_to_search_page(user, token)
     user.locate(f"{SEARCH_FACET}[data-kind='task']").click()
 
@@ -425,13 +405,6 @@ def test_task_facet_includes_task_and_model_results_with_links(get_user):
     expect(completed_row.locator("span[data-icon='selected']")).to_have_count(1)
     expect(completed_row.locator("span[data-icon='unselected']")).to_have_count(0)
 
-    legacy_link = _result_titles(user).filter(has_text=legacy_active_task.name)
-    expect(legacy_link).to_be_visible()
-    legacy_row = legacy_link.locator("xpath=ancestor::li")
-    expect(legacy_row.locator("span[data-icon='unselected']")).to_have_count(1)
-    expect(legacy_row.locator("span[data-icon='selected']")).to_have_count(0)
-
-
 # @pair search:navbar-results
 # @pair search:task-model
 # @pair search:result-links
@@ -439,7 +412,7 @@ def test_task_facet_includes_task_and_model_results_with_links(get_user):
 # @pair template-formatting:safe-json
 # @template nav.html::search_results
 # @template common.html::format_name
-def test_navbar_task_results_handle_legacy_completed_values(get_user):
+def test_navbar_task_results_render_current_completion_state(get_user):
     user = get_user(Users.OWNER)
     token = _unique("navbar-task").replace("-", "")
     project = _create_project(f"{token} project")
@@ -452,25 +425,23 @@ def test_navbar_task_results_handle_legacy_completed_values(get_user):
     )
     completed_task.completed = True
     completed_task.save()
-    legacy_active_task = _create_project_task(
+    active_task = _create_project_task(
         user,
         project,
         model,
-        f"{token} legacy active task",
+        f"{token} active task",
     )
-    _cache_legacy_incomplete_task(legacy_active_task)
 
     user.go(SitePages.HOME)
     navbar_search = user.locate("[lp-search] input[name='q']")
-    navbar_search.fill(legacy_active_task.name)
-    legacy_option = user.page.get_by_role("option").filter(
-        has_text=legacy_active_task.name
+    navbar_search.fill(active_task.name)
+    active_option = user.page.get_by_role("option").filter(
+        has_text=active_task.name
     )
-    expect(legacy_option).to_be_visible()
-    expect(legacy_option.locator("span[data-icon='unselected']")).to_have_count(1)
-    assert json.loads(legacy_option.get_attribute("data-result"))["details"][
-        "completed"
-    ] == "False"
+    expect(active_option).to_be_visible()
+    expect(active_option.locator("span[data-icon='unselected']")).to_have_count(1)
+    active_details = json.loads(active_option.get_attribute("data-result"))["details"]
+    assert active_details.get("completed", False) is False
 
     navbar_search.fill(completed_task.name)
     completed_option = user.page.get_by_role("option").filter(

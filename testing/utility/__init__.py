@@ -7,12 +7,14 @@ helpers, and other support code here rather than in test modules.
 """
 
 from .error_tracking import capture_on_failure
+from .offline import wait_for_offline_mutations
 from .polling import trigger_poll
 from .test_file import TestFile
 from .test_reporting import TestResults
 
 __all__ = [
     "capture_on_failure",
+    "wait_for_offline_mutations",
     "trigger_poll",
     "TestFile",
     "TestResults",

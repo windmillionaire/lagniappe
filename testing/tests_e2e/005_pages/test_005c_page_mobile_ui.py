@@ -114,7 +114,7 @@ def test_page_mobile_selection_persists_after_reload(get_user):
         "(key) => localStorage.getItem(key) === 'tasks'",
         arg=f"{page.entity.hash}-active",
     )
-    user.page.reload(wait_until="load")
+    page = page.reload()
 
     expect(user.locate(page.MOBILE_NAV)).to_be_visible()
     expect(user.locate(Tabs.TASKS_TAB)).to_be_visible()

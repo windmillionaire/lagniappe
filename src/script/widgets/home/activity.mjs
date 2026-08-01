@@ -23,10 +23,9 @@ export class HomeActivityList extends BaseList {
 		await this.deleteActivity(button);
 	}
 
-	handleOfflineQueue({ phase, queue, html, record, records }) {
+	handleOfflineQueue({ phase, queue, record }) {
 		if (phase === "queued") return this._offlineQueued(record, queue);
 		if (phase === "cancelled") this._offlineCancelled(record);
-		if (phase === "overlay") this._offlineOverlay({ queue, html, records });
 	}
 
 	_offlineQueued(record, queue) {
@@ -39,17 +38,6 @@ export class HomeActivityList extends BaseList {
 
 	_offlineCancelled(record) {
 		if (record.action === "create") this._removeByKey(record.client_key);
-	}
-
-	_offlineOverlay({ queue, html, records }) {
-		const list = html.querySelector("[data-widget='HomeActivityList']");
-		if (!list) return;
-
-		for (const record of records) {
-			if (record.kind !== "note" || record.action !== "create") continue;
-			if (this._itemByKey(list, record.client_key)) continue;
-			list.prepend(this._renderNote(record, queue));
-		}
 	}
 
 	/**
@@ -160,9 +148,9 @@ export class HomeActivityList extends BaseList {
 
 	/**
 	 * @testable true
-	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutation_overlay_hides_deleted_items
+	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_reload_uses_server_state_until_replay
 	 * @features offline
-	 * @dimensions cached-overlay
+	 * @dimensions optimistic-mutation
 	 */
 	_removeItem(item) {
 		const list = item.closest("ul");

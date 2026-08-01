@@ -208,7 +208,7 @@ def create_index(kind):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
-# @tests tests_e2e/009_search/test_009a_search_page.py::test_navbar_task_results_handle_legacy_completed_values
+# @tests tests_e2e/009_search/test_009a_search_page.py::test_navbar_task_results_render_current_completion_state
 # @pair projects:search
 # @pair search:navbar-results
 # @pair search:task-model

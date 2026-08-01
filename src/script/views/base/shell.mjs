@@ -197,11 +197,7 @@ export default class ShellView {
 				this.runColdAction(
 					search,
 					() => this.ensureSearchBox(),
-					(box) => {
-						if (!box) return;
-						if (search.value?.trim()) box._input({ target: search });
-						else box.showPanel?.();
-					},
+					(box) => this._activateSearchBox(box),
 					search,
 				);
 				return;
@@ -224,6 +220,20 @@ export default class ShellView {
 		for (const type of ["input", "click"]) {
 			document.addEventListener(type, this._shellColdControl, true);
 		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_lazy_search_replays_the_latest_live_input_after_loading
+	 * @features search startup
+	 * @dimensions navbar-results first-interaction single-flight
+	 * @pairs search:navbar-results startup:first-interaction startup:single-flight
+	 */
+	_activateSearchBox(box) {
+		if (!box) return;
+		const input = box.element;
+		if (input?.value?.trim()) box._input({ target: input });
+		else box.showPanel?.();
 	}
 
 	_removeColdControlListeners() {

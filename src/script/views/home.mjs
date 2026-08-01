@@ -50,9 +50,9 @@ export default class Home extends Core {
 
 	/**
 	 * @testable true
-	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutation_overlay_hides_deleted_items
+	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_reload_uses_server_state_until_replay
 	 * @features offline
-	 * @dimensions cached-overlay
+	 * @dimensions server-first reload
 	 */
 	_hideEmptyLists() {
 		for (const component of Object.values(this.components)) {

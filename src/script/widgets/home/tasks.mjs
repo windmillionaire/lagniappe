@@ -253,10 +253,9 @@ export class HomeTaskList extends BaseList {
 		this.target.addEventListener("change", this._change);
 	}
 
-	handleOfflineQueue({ phase, queue, html, record, records }) {
+	handleOfflineQueue({ phase, queue, record }) {
 		if (phase === "queued") return this._offlineQueued(record, queue);
 		if (phase === "cancelled") this._offlineCancelled(record);
-		if (phase === "overlay") this._offlineOverlay({ queue, html, records });
 		if (phase === "replayed" && record.kind === "task") this._syncList();
 	}
 
@@ -284,23 +283,11 @@ export class HomeTaskList extends BaseList {
 		this._updateUserTaskCountOffline(-1);
 	}
 
-	_offlineOverlay({ queue, html, records }) {
-		const list = html.querySelector("[data-widget='HomeTaskList']");
-		if (!list) return;
-
-		for (const record of records) {
-			if (record.kind !== "task" || record.action !== "create") continue;
-			if (!this._offlineTaskVisible(record, queue)) continue;
-			if (this._taskByKey(list, record.client_key)) continue;
-			_insertSorted(list, this._renderOfflineTask(record, queue));
-		}
-	}
-
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_task_from_home_page
 	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_recurring_task_from_home_page_reappears
-	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_task_complete_persists_after_reload
+	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_task_complete_replays_after_reload
 	 * @features tasks
 	 * @dimensions complete recurring offline-queue
 	 */

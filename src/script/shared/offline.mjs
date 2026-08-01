@@ -230,11 +230,11 @@ export function setOfflineMutation(record) {
 
 /**
  * @testable true
- * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutation_overlay_hides_deleted_items
+ * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_reload_uses_server_state_until_replay
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutations_replay_when_online
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
  * @features offline
- * @dimensions cached-overlay replay queue-submit
+ * @dimensions durable-queue server-first replay queue-submit
  */
 export function getOfflineMutations() {
 	return withTransaction(

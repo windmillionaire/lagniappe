@@ -11,14 +11,6 @@ from .core import SiteResource
 # Viewport dimensions
 MOBILE_VIEWPORT = {"width": 375, "height": 667}
 DESKTOP_VIEWPORT = {"width": 1280, "height": 720}
-
-
-def _poll_response_or_navigation_error(response):
-    return response.url.rstrip("/").endswith("/poll") or (
-        response.request.resource_type == "document" and response.status >= 400
-    )
-
-
 class User(SiteResource):
     _initialize = True
     _sync = True
@@ -105,9 +97,7 @@ class User(SiteResource):
         return f"/pages/{self.entity.page.urlsafe_key}"
 
     def navigate(self, url):
-        with self.page.expect_navigation():
-            self.page.goto(url, wait_until="load")
-        return self.page
+        return self.page.goto(url, wait_until="load")
 
     def go(self, site_resource, query_params=None):
         resource = (
@@ -124,18 +114,11 @@ class User(SiteResource):
         self.offline = False
         self.mobile = False
 
-        if resource.sync:
-            with self.page.expect_response(
-                _poll_response_or_navigation_error
-            ) as response_info:
-                self.navigate(url)
-            response = response_info.value
-            if response.status >= 400:
-                raise AssertionError(
-                    f"Navigation failed with HTTP {response.status}: {response.url}"
-                )
-        else:
-            self.navigate(url)
+        response = self.navigate(url)
+        if response and response.status >= 400:
+            raise AssertionError(
+                f"Navigation failed with HTTP {response.status}: {response.url}"
+            )
 
         if resource.initialize:
             resource.initialize_view()

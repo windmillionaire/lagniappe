@@ -525,11 +525,7 @@ export default class Core extends ShellView {
 			this.runColdAction(
 				search,
 				() => this.ensureSearchBox(),
-				(box) => {
-					if (!box) return;
-					if (search.value?.trim()) box._input({ target: search });
-					else box.showPanel?.();
-				},
+				(box) => this._activateSearchBox(box),
 				search,
 			);
 			return;

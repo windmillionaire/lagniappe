@@ -212,15 +212,6 @@ export class OfflineQueue {
 		);
 	}
 
-	async applyResponse(response, route = "") {
-		if (!response?.html) return response;
-
-		this._applyTombstones(response.html);
-		await this._applyOverlays(response.html, route);
-
-		return response;
-	}
-
 	/**
 	 * @testable true
 	 * @tests tests_js/test_028_form_state_split.py::test_offline_replay_polls_mounted_form_without_direct_acknowledgement
@@ -483,36 +474,5 @@ export class OfflineQueue {
 		if (["complete", "delete"].includes(record.action) && current) {
 			current.remove();
 		}
-	}
-
-	_applyTombstones(documentFragment) {
-		for (const key of this._hiddenKeys()) {
-			documentFragment
-				.querySelectorAll(`[data-key="${key}"]`)
-				.forEach((item) => {
-					item.remove();
-				});
-		}
-	}
-
-	_hiddenKeys() {
-		return this.records
-			.filter((record) => {
-				return ["delete", "complete"].includes(record.action);
-			})
-			.map((record) => record.target_key)
-			.filter(Boolean);
-	}
-
-	async _applyOverlays(documentFragment, route) {
-		const context = {
-			phase: "overlay",
-			queue: this,
-			html: documentFragment,
-			records: this._sortedRecords(),
-			route,
-		};
-
-		await this._dispatch(context);
 	}
 }

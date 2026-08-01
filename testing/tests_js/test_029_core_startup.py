@@ -225,6 +225,123 @@ const createSubmit = (form, submitter) => ({
     )
 
 
+# @pair startup:first-interaction
+# @pair startup:single-flight
+# @pair search:navbar-results
+def test_lazy_search_replays_the_latest_live_input_after_loading(run_node):
+    core_source = Path("src/script/views/base/core.mjs").read_text()
+    assert "(box) => this._activateSearchBox(box)" in core_source
+    assert "search.value" not in core_source
+
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const documentListeners = new Map();
+const context = {
+  console,
+  clearTimeout,
+  connectivity: { online: true, hidden: false },
+  CustomEvent: class {},
+  document: {
+    hidden: false,
+    addEventListener(type, listener) { documentListeners.set(type, listener); },
+    querySelector(selector) {
+      if (selector === "meta[name='mode']") {
+        return { getAttribute() { return "testing"; } };
+      }
+      return null;
+    },
+    removeEventListener(type) { documentListeners.delete(type); },
+  },
+  performance: { getEntriesByName() { return []; }, mark() {} },
+  queueMicrotask,
+  setTimeout,
+  window: {
+    addEventListener() {},
+    matchMedia() {
+      return {
+        addEventListener() {},
+        matches: false,
+        removeEventListener() {},
+      };
+    },
+    removeEventListener() {},
+  },
+};
+context.globalThis = context;
+vm.createContext(context);
+
+let source = fs.readFileSync("src/script/views/base/shell.mjs", "utf8");
+source = source.replace(
+  'import { connectivity } from "../../shared/connectivity";',
+  "",
+);
+source = source.replaceAll("export const ", "const ");
+source = source.replace("export default class ShellView", "class ShellView");
+source += "\nglobalThis.ShellView = ShellView;";
+vm.runInContext(source, context);
+
+const root = {
+  dataset: { kind: "manual" },
+  addEventListener() {},
+  dispatchEvent() {},
+  removeEventListener() {},
+  setAttribute() {},
+};
+const search = {
+  dataset: {},
+  removeAttribute(name) { delete this[name]; },
+  setAttribute(name, value) { this[name] = value; },
+};
+const input = {
+  value: "first query",
+  closest(selector) { return selector === "[lp-search]" ? search : null; },
+};
+
+(async () => {
+  const view = new context.ShellView(root);
+  view.hasDeferredServices = true;
+  let loadCount = 0;
+  let resolveSearch;
+  const loaded = new Promise((resolve) => { resolveSearch = resolve; });
+  view.ensureSearchBox = () => {
+    loadCount += 1;
+    return loaded;
+  };
+  await view.init();
+
+  documentListeners.get("input")({ target: input });
+  input.value = "latest query";
+  documentListeners.get("input")({ target: input });
+  await Promise.resolve();
+  if (loadCount !== 1) {
+    throw new Error(`Search loading was not single-flight: ${loadCount}`);
+  }
+
+  const queries = [];
+  resolveSearch({
+    element: input,
+    _input(event) { queries.push(event.target.value); },
+    showPanel() { throw new Error("A populated search opened without replaying"); },
+  });
+  await view._coldActions.get(search);
+
+  if (queries.length !== 1 || queries[0] !== "latest query") {
+    throw new Error(`Search replay did not use the live input: ${queries}`);
+  }
+  if (search["aria-busy"] || search.dataset.loading) {
+    throw new Error("Search replay left stale busy state");
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
+'''
+    )
+
+
 # @pair polling:channel
 # @pair polling:entity
 # @pair polling:refresh

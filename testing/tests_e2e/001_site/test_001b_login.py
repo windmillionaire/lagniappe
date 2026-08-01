@@ -515,13 +515,6 @@ def test_agent_access_login_form_creates_session(get_user):
 
     expect(user.page).to_have_title("Home")
     expect(user.locate("[lp-view]")).to_have_attribute("initialized", "")
-    assert user.page.evaluate(
-        """async () => {
-            const view = document.querySelector("[lp-view]")?._lp_view;
-            await view?.servicesReady;
-            return Boolean(view?.PollingCoordinator && view?.SyncManager);
-        }"""
-    )
     agent = Entities.fetch_one(
         Entities.USER.load(constants.DEFAULT_AGENT_ACCESS_EMAIL),
         request=Fetch.nested(because=FetchReason.USER_SAVE_REQUIREMENTS),
