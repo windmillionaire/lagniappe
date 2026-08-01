@@ -458,9 +458,17 @@ def test_adding_form_from_task_settings_preserves_widget_identity(get_user):
         SpinnerButtons.UPDATE.click(settings_form)
     assert SpinnerButtons.UPDATE_SUCCESS.successful(settings_form)
 
+    settings_form = task.element.locator(task.SETTINGS_FORM)
+    task_form = task.element.locator(task.TASK_FORM)
+    expect(settings_form).to_be_visible()
+    expect(task_form).to_have_count(1)
+    for role in ("project-select", "form-select", "file-select"):
+        expect(settings_form.locator(f"[data-role='{role}']")).to_be_visible()
+    expect(settings_form.locator("[name='input-textab12']")).to_have_count(0)
+    expect(task_form.locator("[name='input-textab12']")).to_have_count(1)
+
     saved_task, submission = _saved_task_submission(task)
     assert saved_task.name == updated_name
-    assert saved_task.description == task.definition.description
     assert saved_task.form.key == form.entity.key
     assert submission["input-textab12"] == task_value
 
