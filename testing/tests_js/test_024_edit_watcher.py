@@ -315,6 +315,14 @@ const context = {
   },
 };
 vm.createContext(context);
+let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
+reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
+reconcilerSource = reconcilerSource.replace(
+  "export class EditReconciler",
+  "class EditReconciler",
+);
+reconcilerSource += "\nglobalThis.EditReconciler = EditReconciler;";
+vm.runInContext(reconcilerSource, context);
 let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class EditWatcher", "class EditWatcher");
@@ -396,7 +404,7 @@ vm.runInContext(source, context);
     throw new Error("Marker-free view root did not accept its local revision");
   }
 
-  watcher._state(markerB).mode = "reset";
+  watcher._reconciler._state(markerB).mode = "reset";
   await watcher._click({ target: { closest() { return buttonB; } } });
 	if (!events.some((event) => event.type === "apply-b")) {
     throw new Error("Reset action did not apply the staged form response");
@@ -405,7 +413,7 @@ vm.runInContext(source, context);
     throw new Error("Form reset reloaded the page");
   }
 
-  watcher._state(markerB).mode = "reload";
+  watcher._reconciler._state(markerB).mode = "reload";
   await watcher._click({ target: { closest() { return buttonB; } } });
   if (events.filter((event) => event.type === "reload").length !== 1) {
     throw new Error("Explicit fallback action did not reload");
@@ -501,6 +509,14 @@ const context = {
   window: { addEventListener() {}, removeEventListener() {} },
 };
 vm.createContext(context);
+let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
+reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
+reconcilerSource = reconcilerSource.replace(
+  "export class EditReconciler",
+  "class EditReconciler",
+);
+reconcilerSource += "\nglobalThis.EditReconciler = EditReconciler;";
+vm.runInContext(reconcilerSource, context);
 let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class EditWatcher", "class EditWatcher");
@@ -514,17 +530,17 @@ vm.runInContext(source, context);
     elt: { addEventListener() {}, querySelectorAll() { return []; } },
   });
 
-  const first = watcher._probe(
+  const first = watcher._reconciler.probe(
     marker,
     "fingerprint-one",
     "2026-07-22T11:00:00+00:00",
   );
-  const duplicate = watcher._probe(
+  const duplicate = watcher._reconciler.probe(
     marker,
     "fingerprint-one",
     "2026-07-22T11:00:00+00:00",
   );
-  const followup = watcher._probe(
+  const followup = watcher._reconciler.probe(
     marker,
     "fingerprint-two",
     "2026-07-22T12:00:00+00:00",

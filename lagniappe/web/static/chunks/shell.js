@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as connectivity } from './connectivity.js?v=b3f50eb1';
+import { c as connectivity } from './connectivity.js?v=b211475b';
 
 const MOBILE_QUERY = "(max-width: 640px)";
 
@@ -115,7 +115,7 @@ class ShellView {
 			"_pollingPromise",
 			"PollingCoordinator",
 			async () => {
-				const { PollingCoordinator } = await import('./polling.js?v=b3f50eb1');
+				const { PollingCoordinator } = await import('./polling.js?v=b211475b');
 				return this._destroyed ? null : new PollingCoordinator(this).init();
 			},
 		);
@@ -125,7 +125,7 @@ class ShellView {
 		return this._loadShellManager("_searchPromise", "SearchBox", async () => {
 			const search = document.querySelector("[lp-search]");
 			if (!search) return null;
-			const { SearchBox } = await import('./search.js?v=b3f50eb1');
+			const { SearchBox } = await import('./search.js?v=b211475b');
 			if (this._destroyed) return null;
 			const box = new SearchBox(search);
 			await box.init();
@@ -140,7 +140,7 @@ class ShellView {
 			async () => {
 				if (!document.querySelector("[data-role='notifications']")) return null;
 				await this.ensurePollingCoordinator();
-				const { Notifications } = await import('./notifications.js?v=b3f50eb1');
+				const { Notifications } = await import('./notifications.js?v=b211475b');
 				if (this._destroyed) return null;
 				const notifications = new Notifications(this);
 				notifications.init();
@@ -184,7 +184,7 @@ class ShellView {
 	}
 
 	reportStartupError(error, element = this.elt, context = "lazy-control") {
-		void import('./errors.js?v=b3f50eb1')
+		void import('./errors.js?v=b211475b')
 			.then(({ captureError }) => {
 				captureError(error, element, { context });
 			})

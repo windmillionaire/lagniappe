@@ -1,13 +1,13 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES } from './styles.js?v=b3f50eb1';
-import { a as loadRevisionPreview } from './core.js?v=b3f50eb1';
-import { captureError } from './errors.js?v=b3f50eb1';
-import { Modal } from './modal.js?v=b3f50eb1';
-import { r as request } from './request.js?v=b3f50eb1';
-import { areEqual, withTransition } from './utilities.js?v=b3f50eb1';
-import './connectivity.js?v=b3f50eb1';
-import './endpoints.js?v=b3f50eb1';
-import './shell.js?v=b3f50eb1';
+import { a as loadRevisionPreview } from './core.js?v=b211475b';
+import { S as STYLES } from './styles.js?v=b211475b';
+import { Modal } from './modal.js?v=b211475b';
+import { areEqual, withTransition } from './utilities.js?v=b211475b';
+import { captureError } from './errors.js?v=b211475b';
+import { r as request } from './request.js?v=b211475b';
+import './connectivity.js?v=b211475b';
+import './endpoints.js?v=b211475b';
+import './shell.js?v=b211475b';
 
 /**
  * @testable true
@@ -17,9 +17,9 @@ import './shell.js?v=b3f50eb1';
  * @dimensions readonly-preview submission-choice latest-schema queued-conflict
  */
 class FormRevisionModal extends Modal {
-	constructor(watcher, marker, widget, state) {
-		super(watcher.view, marker.querySelector("[data-role='edited-reset']"));
-		this.watcher = watcher;
+	constructor(reconciler, marker, widget, state) {
+		super(reconciler.view, marker.querySelector("[data-role='edited-reset']"));
+		this.reconciler = reconciler;
 		this.marker = marker;
 		this.widget = widget;
 		this.state = state;
@@ -28,7 +28,7 @@ class FormRevisionModal extends Modal {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/editWatcher.mjs::FormRevisionModal
+	 * @covered-by src/script/shared/editRevisionModal.mjs::FormRevisionModal
 	 * @reason private schema-summary copy is part of the reconciliation modal
 	 */
 	_schemaSummary() {
@@ -52,7 +52,7 @@ class FormRevisionModal extends Modal {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/editWatcher.mjs::FormRevisionModal
+	 * @covered-by src/script/shared/editRevisionModal.mjs::FormRevisionModal
 	 * @reason private readonly value extraction is part of the reconciliation modal
 	 */
 	_value(element) {
@@ -86,7 +86,7 @@ class FormRevisionModal extends Modal {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/editWatcher.mjs::FormRevisionModal
+	 * @covered-by src/script/shared/editRevisionModal.mjs::FormRevisionModal
 	 * @reason private changed-field projection is part of the reconciliation modal
 	 */
 	async _differences(localResponse) {
@@ -135,7 +135,7 @@ class FormRevisionModal extends Modal {
 
 	/**
 	 * @testable false
-	 * @covered-by src/script/shared/editWatcher.mjs::FormRevisionModal
+	 * @covered-by src/script/shared/editRevisionModal.mjs::FormRevisionModal
 	 * @reason private per-field choice composition is part of the reconciliation modal
 	 */
 	_choice(field, source, value) {
@@ -183,7 +183,7 @@ class FormRevisionModal extends Modal {
 		modal.dataset.kind =
 			this.widget.kind ||
 			this.widget.component?.kind ||
-			this.watcher.view.kind ||
+			this.reconciler.view.kind ||
 			"default";
 		const content = modal.appendChild(document.createElement("div"));
 		content.id = "modal-content";
@@ -238,7 +238,7 @@ class FormRevisionModal extends Modal {
 		update.textContent = "Update values";
 
 		update.addEventListener("click", async () => {
-			await this.watcher.resolveRevision(this.marker, {
+			await this.reconciler.resolveRevision(this.marker, {
 				localResponse: local.response,
 				selections: Object.fromEntries(this.selections),
 			});
@@ -253,13 +253,13 @@ class FormRevisionModal extends Modal {
 
 /**
  * @testable false
- * @covered-by src/script/shared/editWatcher.mjs::EditWatcher
- * @reason private whole-form conflict UI is selected by capability-aware watcher state
+ * @covered-by src/script/shared/editReconciler.mjs::EditReconciler
+ * @reason private whole-form conflict UI is selected by capability-aware reconciliation state
  */
 class WholeFormRevisionModal extends Modal {
-	constructor(watcher, marker, widget) {
-		super(watcher.view, marker.querySelector("[data-role='edited-reset']"));
-		this.watcher = watcher;
+	constructor(reconciler, marker, widget) {
+		super(reconciler.view, marker.querySelector("[data-role='edited-reset']"));
+		this.reconciler = reconciler;
 		this.marker = marker;
 		this.widget = widget;
 	}
@@ -271,7 +271,7 @@ class WholeFormRevisionModal extends Modal {
 		modal.dataset.kind =
 			this.widget.kind ||
 			this.widget.component?.kind ||
-			this.watcher.view.kind ||
+			this.reconciler.view.kind ||
 			"default";
 		const content = modal.appendChild(document.createElement("div"));
 		content.id = "modal-content";
@@ -308,11 +308,11 @@ class WholeFormRevisionModal extends Modal {
 		saved.textContent = "Use saved version";
 
 		retry.addEventListener("click", async () => {
-			await this.watcher.resolveRevision(this.marker, "local");
+			await this.reconciler.resolveRevision(this.marker, "local");
 			await this.remove();
 		});
 		saved.addEventListener("click", async () => {
-			await this.watcher.resolveRevision(this.marker, "server");
+			await this.reconciler.resolveRevision(this.marker, "server");
 			await this.remove();
 		});
 
@@ -322,8 +322,8 @@ class WholeFormRevisionModal extends Modal {
 }
 
 /**
- * View-scoped detector for committed edits to forms represented by
- * lp-edited-marker descendants.
+ * Per-marker authoritative revision probing, comparison, and resolution for
+ * forms discovered by EditWatcher.
  *
  * @testable true
  * @tests tests_js/test_024_edit_watcher.py::test_edit_watcher_compares_and_resets_each_form_independently
@@ -331,127 +331,32 @@ class WholeFormRevisionModal extends Modal {
  * @tests tests_js/test_028_form_state_split.py::test_edit_watcher_separates_schema_and_renderer_value_changes
  * @tests tests_js/test_028_form_state_split.py::test_edit_watcher_reconciles_independent_field_selections
  * @tests tests_js/test_028_form_state_split.py::test_owned_deferred_completion_replaces_clean_active_form
- * @tests tests_e2e/004_projects/test_004b_info.py::test_project_revision_notice_only_resets_changed_form
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_form_submission_reconciliation_uses_latest_schema
- * @features edited-entity-notice
- * @dimensions entity-ancestor batching per-form comparison acknowledgement acknowledgement-no-probe targeted-reset reload-fallback timestamp-only formdata staged-reset no-reload dirty-state active-state focused-state replacement info-form side-effect-free overlap-follow-up coalescing renderer-capability latest-schema schema-only local-values submission-choice per-field-selection whole-form-selection clean-state transition owned-deferred-completion
- * @pairs edited-entity-notice:entity-ancestor edited-entity-notice:batching
- * @pairs edited-entity-notice:per-form edited-entity-notice:comparison
- * @pairs edited-entity-notice:acknowledgement edited-entity-notice:acknowledgement-no-probe
  * @pairs edited-entity-notice:targeted-reset edited-entity-notice:reload-fallback
- * @pairs edited-entity-notice:overlap-follow-up edited-entity-notice:clean-state
- * @pair edited-entity-notice:coalescing
- * @pair edited-entity-notice:dirty-state
- * @pairs edited-entity-notice:active-state
- * @pairs edited-entity-notice:owned-deferred-completion
- * @pair deferred-jobs:owned-deferred-completion
- * @pairs edited-entity-notice:focused-state edited-entity-notice:transition
+ * @pairs edited-entity-notice:dirty-state edited-entity-notice:active-state
+ * @pairs edited-entity-notice:focused-state edited-entity-notice:comparison
+ * @pairs edited-entity-notice:overlap-follow-up edited-entity-notice:coalescing
  * @pairs edited-entity-notice:renderer-capability edited-entity-notice:latest-schema
  * @pairs edited-entity-notice:schema-only edited-entity-notice:local-values
- * @pairs edited-entity-notice:whole-form-selection
- * @pairs edited-entity-notice:visibility edited-entity-notice:subscription-lifecycle
- * @pairs edited-entity-notice:submission-choice reconnect-refresh:dirty-form-preservation form-schema:notice
+ * @pairs edited-entity-notice:submission-choice edited-entity-notice:per-field-selection
+ * @pairs edited-entity-notice:whole-form-selection edited-entity-notice:clean-state
+ * @pairs edited-entity-notice:transition edited-entity-notice:owned-deferred-completion
+ * @pairs forms:latest-schema forms:submission-choice forms:per-field-selection
+ * @pairs reconnect-refresh:dirty-form-preservation form-schema:notice
  */
-class EditWatcher {
-	constructor(view) {
+class EditReconciler {
+	constructor(
+		view,
+		{
+			recordMarkerRevision = () => {},
+			ownedDeferredCompletion = () => null,
+			forgetDeferredCompletion = () => {},
+		} = {},
+	) {
 		this.view = view;
-		this._unsubscribers = new Map();
-		this._markerRevisions = new WeakMap();
-		this._latestRevisions = new Map();
-		this._deferredCompletions = new Map();
-		this._destroyed = false;
-
-		this._click = this._click.bind(this);
-		this._entityUpdated = this._entityUpdated.bind(this);
-		this.check = this.check.bind(this);
-	}
-
-	init() {
-		this.view.elt.addEventListener("click", this._click);
-		window.addEventListener("entity-updated", this._entityUpdated);
-		if (this.view.key && this.view.elt.dataset.fingerprint) {
-			this._latestRevisions.set(this.view.key, {
-				fingerprint: this.view.elt.dataset.fingerprint,
-				modified: this.view.elt.dataset.modified ?? null,
-			});
-		}
-		for (const component of Object.values(this.view.components ?? {})) {
-			for (const widget of Object.values(component.widgets ?? {})) {
-				if (widget._offlineConflict) {
-					this.stageConflict(widget, widget._offlineConflict);
-				}
-			}
-		}
-		this.resume();
-	}
-
-	get entities() {
-		return this._entities();
-	}
-
-	_componentVisible(component) {
-		if (component?.visible !== true) return false;
-		let ancestor = component.elt?.parentElement?.closest?.("[lp-component]");
-		while (ancestor) {
-			if (ancestor.dataset.visible === "false") return false;
-			ancestor = ancestor.parentElement?.closest?.("[lp-component]");
-		}
-		return true;
-	}
-
-	_markerActive(marker) {
-		const widget = marker.closest?.("form[data-widget]")?._lp_widget;
-		return Boolean(
-			widget &&
-				widget.component?.active === widget &&
-				this._componentVisible(widget.component) &&
-				widget.visible === true,
-		);
-	}
-
-	_markerRevision(marker, anchor) {
-		let revision = this._markerRevisions.get(marker);
-		if (!revision) {
-			revision = {
-				fingerprint: anchor.dataset.fingerprint ?? null,
-				modified: anchor.dataset.modified ?? null,
-			};
-			this._markerRevisions.set(marker, revision);
-		}
-		return revision;
-	}
-
-	_entities({ activeOnly = true } = {}) {
-		const entities = new Map();
-		const markers = this.view.elt.querySelectorAll("[lp-edited-marker]");
-
-		for (const marker of markers) {
-			const anchor = marker.closest("[lp-entity]");
-			const key = anchor?.dataset.key;
-			const revision = anchor ? this._markerRevision(marker, anchor) : null;
-			const fingerprint = revision?.fingerprint;
-			if (!anchor || !key || !fingerprint) {
-				captureError(
-					new Error("Edited marker has no fingerprinted entity anchor"),
-					marker,
-				);
-				continue;
-			}
-			if (activeOnly && !this._markerActive(marker)) continue;
-
-			const entity = entities.get(key) ?? {
-				key,
-				fingerprint,
-				modified: revision.modified,
-				anchors: new Set(),
-				markers: new Set(),
-			};
-			entity.anchors.add(anchor);
-			entity.markers.add(marker);
-			entities.set(key, entity);
-		}
-
-		return entities;
+		this.recordMarkerRevision = recordMarkerRevision;
+		this.ownedDeferredCompletion = ownedDeferredCompletion;
+		this.forgetDeferredCompletion = forgetDeferredCompletion;
 	}
 
 	_state(marker) {
@@ -471,42 +376,6 @@ class EditWatcher {
 			conflictPromise: null,
 		};
 		return marker._lp_edited_state;
-	}
-
-	expectDeferredCompletion(key, operation) {
-		if (!key || !operation) return false;
-		const operations = this._deferredCompletions.get(key) ?? new Set();
-		operations.add(operation);
-		this._deferredCompletions.set(key, operations);
-		return true;
-	}
-
-	/**
-	 * @testable true
-	 * @tests tests_js/test_028_form_state_split.py::test_owned_deferred_completion_replaces_clean_active_form
-	 * @pair deferred-jobs:owned-deferred-completion
-	 * @pair edited-entity-notice:owned-deferred-completion
-	 */
-	_ownedDeferredCompletion(marker, widget) {
-		const key = marker.closest?.("[lp-entity]")?.dataset?.key;
-		const operation = widget?._deferredOperation;
-		if (!key || !operation) return null;
-
-		if (this._deferredCompletions.get(key)?.has(operation)) {
-			return { key, operation };
-		}
-
-		for (const [ownerKey, operations] of this._deferredCompletions) {
-			if (operations.has(operation)) return { key: ownerKey, operation };
-		}
-		return null;
-	}
-
-	_forgetDeferredCompletion(completion) {
-		if (!completion) return;
-		const operations = this._deferredCompletions.get(completion.key);
-		operations?.delete(completion.operation);
-		if (!operations?.size) this._deferredCompletions.delete(completion.key);
 	}
 
 	_setAction(marker, mode, message = null) {
@@ -548,7 +417,7 @@ class EditWatcher {
 		if (!wasVisible) this.view.addFlash?.(marker);
 	}
 
-	_fallback(marker, error = null) {
+	fallback(marker, error = null) {
 		const state = this._state(marker);
 		state.response = null;
 		this._setAction(marker, "reload");
@@ -641,7 +510,7 @@ class EditWatcher {
 		}
 		if (!remotePreview || !widget.revisionCanReset(remotePreview)) {
 			remotePreview?.destroy?.();
-			this._fallback(marker);
+			this.fallback(marker);
 			return;
 		}
 		const remoteSnapshot = remotePreview.revisionSnapshot();
@@ -656,9 +525,7 @@ class EditWatcher {
 		const active =
 			widget.component?.active === widget && widget.visible === true;
 		const ownedDeferredCompletion =
-			!unsaved && !queued
-				? this._ownedDeferredCompletion(marker, widget)
-				: null;
+			!unsaved && !queued ? this.ownedDeferredCompletion(marker, widget) : null;
 		const protectedRevision =
 			unsaved || queued || (!ownedDeferredCompletion && (active || focused));
 		if (!protectedRevision) {
@@ -681,7 +548,7 @@ class EditWatcher {
 		}
 		if (!localPreview || !widget.revisionCanReset(localPreview)) {
 			localPreview?.destroy?.();
-			this._fallback(marker);
+			this.fallback(marker);
 			return;
 		}
 		const localSnapshot = localPreview.revisionSnapshot();
@@ -801,7 +668,7 @@ class EditWatcher {
 		);
 	}
 
-	_probe(marker, fingerprint, modified = null) {
+	probe(marker, fingerprint, modified = null) {
 		const state = this._state(marker);
 		const requested = { fingerprint, modified };
 		if (state.conflictPromise) {
@@ -810,7 +677,7 @@ class EditWatcher {
 				const pending = state.pendingProbe;
 				if (!pending) return;
 				state.pendingProbe = null;
-				return this._probe(marker, pending.fingerprint, pending.modified);
+				return this.probe(marker, pending.fingerprint, pending.modified);
 			});
 		}
 		if (
@@ -851,7 +718,7 @@ class EditWatcher {
 		state.token = token;
 		const route = marker.dataset.editedRoute;
 		if (!route) {
-			this._fallback(
+			this.fallback(
 				marker,
 				new Error("Edited marker has no replacement route"),
 			);
@@ -866,22 +733,22 @@ class EditWatcher {
 			if (state.token !== token) return;
 			const form = marker.closest("form[data-widget]");
 			const widget = form?._lp_widget;
-			const completion = this._ownedDeferredCompletion(marker, widget);
+			const completion = this.ownedDeferredCompletion(marker, widget);
 			if (response?.unchanged) {
 				this._hide(marker);
-				this._markerRevisions.set(marker, { fingerprint, modified });
-				this._forgetDeferredCompletion(completion);
+				this.recordMarkerRevision(marker, { fingerprint, modified });
+				this.forgetDeferredCompletion(completion);
 				return;
 			}
 			if (!response?.ok) {
-				this._fallback(marker);
-				this._forgetDeferredCompletion(completion);
+				this.fallback(marker);
+				this.forgetDeferredCompletion(completion);
 				return;
 			}
 
 			if (!widget) {
 				if (await this._installUninitialized(marker, response)) return;
-				this._fallback(marker, new Error("Replacement response has no form"));
+				this.fallback(marker, new Error("Replacement response has no form"));
 				return;
 			}
 
@@ -890,11 +757,314 @@ class EditWatcher {
 				fingerprint,
 				modified,
 			});
-			this._markerRevisions.set(marker, { fingerprint, modified });
-			this._forgetDeferredCompletion(completion);
+			this.recordMarkerRevision(marker, { fingerprint, modified });
+			this.forgetDeferredCompletion(completion);
 		} catch (error) {
-			if (state.token === token) this._fallback(marker, error);
+			if (state.token === token) this.fallback(marker, error);
 		}
+	}
+
+	async stageConflict(widget, { record, response } = {}) {
+		const marker = widget?.target?.querySelector?.("[lp-edited-marker]");
+		if (!marker || !record || !response) return false;
+		const revision = (response.entities || []).find(
+			(entity) => entity.key === record.target_key,
+		);
+		const state = this._state(marker);
+		const reconcile = (async () => {
+			if (state.probePromise) await state.probePromise;
+			state.token = {};
+			if (widget.revisionBaseline === null) widget.commitRevisionBaseline();
+			await this._stageRevision(marker, widget, response, {
+				fingerprint: revision?.fingerprint ?? null,
+				modified: revision?.modified ?? null,
+				record,
+			});
+			delete widget._offlineConflict;
+			return true;
+		})();
+		state.conflictPromise = reconcile;
+		try {
+			return await reconcile;
+		} finally {
+			if (state.conflictPromise === reconcile) {
+				state.conflictPromise = null;
+			}
+		}
+	}
+
+	async resolveRevision(marker, choice) {
+		const state = this._state(marker);
+		const widget = marker.closest("form[data-widget]")?._lp_widget;
+		if (!widget || !state.response) {
+			this.fallback(marker);
+			return false;
+		}
+
+		const fieldSelection =
+			choice && typeof choice === "object" ? (choice.selections ?? {}) : null;
+		const localSelected = fieldSelection
+			? Object.values(fieldSelection).some((source) => source === "local")
+			: choice === "local";
+
+		if (!localSelected) {
+			if (state.record) await this.view.offlineQueue?.cancel(state.record.id);
+			await withTransition(() => widget.applyRevision(state.response));
+		} else {
+			let selectedSubmission;
+			if (fieldSelection) {
+				selectedSubmission = structuredClone(state.response.submission ?? {});
+				const localSubmission = choice.localResponse?.submission ?? {};
+				for (const [id, source] of Object.entries(fieldSelection)) {
+					if (source !== "local") continue;
+					if (Object.hasOwn(localSubmission, id)) {
+						selectedSubmission[id] = structuredClone(localSubmission[id]);
+					} else {
+						delete selectedSubmission[id];
+					}
+				}
+			}
+			await withTransition(() =>
+				widget.applyLocalRevision(state.response, {
+					remoteSnapshot: state.remoteSnapshot,
+					markUnsaved: !state.record,
+					selectedSubmission,
+				}),
+			);
+			if (state.record) {
+				const rebased = await this.view.offlineQueue?.rebaseSubmit(
+					state.record,
+					widget,
+					{
+						fingerprint: state.fingerprint,
+						modified: state.modified,
+					},
+				);
+				if (rebased) await this.view.offlineQueue?.replay();
+			}
+		}
+
+		const currentMarker =
+			widget.target?.querySelector("[lp-edited-marker]") ?? marker;
+		this._hide(currentMarker);
+		return true;
+	}
+
+	async handleClick(event) {
+		const button = event.target.closest("[data-role='edited-reset']");
+		if (!button) return;
+		const marker = button.closest("[lp-edited-marker]");
+		const state = marker ? this._state(marker) : null;
+		if (!marker || !state) return;
+
+		if (state.mode === "reload") {
+			window.location.reload();
+			return;
+		}
+		if (state.mode === "dismiss") {
+			this._hide(marker);
+			return;
+		}
+		const widget = marker.closest("form[data-widget]")?._lp_widget;
+		if (!widget || !state.response) {
+			this.fallback(marker);
+			return;
+		}
+
+		button.disabled = true;
+		try {
+			if (state.mode === "review") {
+				const modal = new FormRevisionModal(this, marker, widget, state);
+				const shown = await modal.init();
+				if (!shown && state.record) {
+					await new WholeFormRevisionModal(this, marker, widget).init();
+				} else if (!shown) {
+					this._setAction(
+						marker,
+						"reset",
+						"This form changed elsewhere. Reset it to load the saved version.",
+					);
+				}
+			} else if (state.mode === "whole-review") {
+				await new WholeFormRevisionModal(this, marker, widget).init();
+			} else if (state.mode === "apply" && state.record) {
+				await this.resolveRevision(marker, "local");
+			} else {
+				await this.resolveRevision(marker, "server");
+			}
+		} catch (error) {
+			this.fallback(
+				widget.target?.querySelector("[lp-edited-marker]") ?? marker,
+				error,
+			);
+		} finally {
+			button.disabled = false;
+		}
+	}
+}
+
+/**
+ * View-scoped detector for committed edits to forms represented by
+ * lp-edited-marker descendants.
+ *
+ * @testable true
+ * @tests tests_js/test_024_edit_watcher.py::test_edit_watcher_compares_and_resets_each_form_independently
+ * @tests tests_js/test_028_form_state_split.py::test_owned_deferred_completion_replaces_clean_active_form
+ * @tests tests_e2e/004_projects/test_004b_info.py::test_project_revision_notice_only_resets_changed_form
+ * @features edited-entity-notice deferred-jobs
+ * @dimensions entity-ancestor batching per-form acknowledgement acknowledgement-no-probe active-state visibility subscription-lifecycle owned-deferred-completion
+ * @pairs edited-entity-notice:entity-ancestor edited-entity-notice:batching
+ * @pairs edited-entity-notice:per-form edited-entity-notice:acknowledgement
+ * @pairs edited-entity-notice:acknowledgement-no-probe
+ * @pairs edited-entity-notice:active-state
+ * @pairs edited-entity-notice:visibility edited-entity-notice:subscription-lifecycle
+ * @pairs edited-entity-notice:owned-deferred-completion deferred-jobs:owned-deferred-completion
+ */
+class EditWatcher {
+	constructor(view) {
+		this.view = view;
+		this._unsubscribers = new Map();
+		this._markerRevisions = new WeakMap();
+		this._latestRevisions = new Map();
+		this._deferredCompletions = new Map();
+		this._destroyed = false;
+		this._reconciler = new EditReconciler(view, {
+			recordMarkerRevision: (marker, revision) => {
+				this._markerRevisions.set(marker, revision);
+			},
+			ownedDeferredCompletion: (marker, widget) =>
+				this._ownedDeferredCompletion(marker, widget),
+			forgetDeferredCompletion: (completion) =>
+				this._forgetDeferredCompletion(completion),
+		});
+
+		this._click = (event) => this._reconciler.handleClick(event);
+		this._entityUpdated = this._entityUpdated.bind(this);
+		this.check = this.check.bind(this);
+	}
+
+	init() {
+		this.view.elt.addEventListener("click", this._click);
+		window.addEventListener("entity-updated", this._entityUpdated);
+		if (this.view.key && this.view.elt.dataset.fingerprint) {
+			this._latestRevisions.set(this.view.key, {
+				fingerprint: this.view.elt.dataset.fingerprint,
+				modified: this.view.elt.dataset.modified ?? null,
+			});
+		}
+		for (const component of Object.values(this.view.components ?? {})) {
+			for (const widget of Object.values(component.widgets ?? {})) {
+				if (widget._offlineConflict) {
+					this.stageConflict(widget, widget._offlineConflict);
+				}
+			}
+		}
+		this.resume();
+	}
+
+	get entities() {
+		return this._entities();
+	}
+
+	_componentVisible(component) {
+		if (component?.visible !== true) return false;
+		let ancestor = component.elt?.parentElement?.closest?.("[lp-component]");
+		while (ancestor) {
+			if (ancestor.dataset.visible === "false") return false;
+			ancestor = ancestor.parentElement?.closest?.("[lp-component]");
+		}
+		return true;
+	}
+
+	_markerActive(marker) {
+		const widget = marker.closest?.("form[data-widget]")?._lp_widget;
+		return Boolean(
+			widget &&
+				widget.component?.active === widget &&
+				this._componentVisible(widget.component) &&
+				widget.visible === true,
+		);
+	}
+
+	_markerRevision(marker, anchor) {
+		let revision = this._markerRevisions.get(marker);
+		if (!revision) {
+			revision = {
+				fingerprint: anchor.dataset.fingerprint ?? null,
+				modified: anchor.dataset.modified ?? null,
+			};
+			this._markerRevisions.set(marker, revision);
+		}
+		return revision;
+	}
+
+	_entities({ activeOnly = true } = {}) {
+		const entities = new Map();
+		const markers = this.view.elt.querySelectorAll("[lp-edited-marker]");
+
+		for (const marker of markers) {
+			const anchor = marker.closest("[lp-entity]");
+			const key = anchor?.dataset.key;
+			const revision = anchor ? this._markerRevision(marker, anchor) : null;
+			const fingerprint = revision?.fingerprint;
+			if (!anchor || !key || !fingerprint) {
+				captureError(
+					new Error("Edited marker has no fingerprinted entity anchor"),
+					marker,
+				);
+				continue;
+			}
+			if (activeOnly && !this._markerActive(marker)) continue;
+
+			const entity = entities.get(key) ?? {
+				key,
+				fingerprint,
+				modified: revision.modified,
+				anchors: new Set(),
+				markers: new Set(),
+			};
+			entity.anchors.add(anchor);
+			entity.markers.add(marker);
+			entities.set(key, entity);
+		}
+
+		return entities;
+	}
+
+	expectDeferredCompletion(key, operation) {
+		if (!key || !operation) return false;
+		const operations = this._deferredCompletions.get(key) ?? new Set();
+		operations.add(operation);
+		this._deferredCompletions.set(key, operations);
+		return true;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_owned_deferred_completion_replaces_clean_active_form
+	 * @pair deferred-jobs:owned-deferred-completion
+	 * @pair edited-entity-notice:owned-deferred-completion
+	 */
+	_ownedDeferredCompletion(marker, widget) {
+		const key = marker.closest?.("[lp-entity]")?.dataset?.key;
+		const operation = widget?._deferredOperation;
+		if (!key || !operation) return null;
+
+		if (this._deferredCompletions.get(key)?.has(operation)) {
+			return { key, operation };
+		}
+
+		for (const [ownerKey, operations] of this._deferredCompletions) {
+			if (operations.has(operation)) return { key: ownerKey, operation };
+		}
+		return null;
+	}
+
+	_forgetDeferredCompletion(completion) {
+		if (!completion) return;
+		const operations = this._deferredCompletions.get(completion.key);
+		operations?.delete(completion.operation);
+		if (!operations?.size) this._deferredCompletions.delete(completion.key);
 	}
 
 	async _probeEntity(key, fingerprint, modified = null) {
@@ -915,7 +1085,9 @@ class EditWatcher {
 			);
 		});
 		await Promise.all(
-			stale.map((marker) => this._probe(marker, fingerprint, modified)),
+			stale.map((marker) =>
+				this._reconciler.probe(marker, fingerprint, modified),
+			),
 		);
 		const latest = this._latestRevisions.get(key);
 		const anchorRevision = latest?.fingerprint ? latest : revision;
@@ -931,7 +1103,7 @@ class EditWatcher {
 		if (!key || !result) return;
 		if (result.status === "unavailable") {
 			for (const marker of this.entities.get(key)?.markers ?? []) {
-				this._fallback(marker);
+				this._reconciler.fallback(marker);
 			}
 			return;
 		}
@@ -1153,142 +1325,12 @@ class EditWatcher {
 		return this.reconcileSubscriptions();
 	}
 
-	async stageConflict(widget, { record, response } = {}) {
-		const marker = widget?.target?.querySelector?.("[lp-edited-marker]");
-		if (!marker || !record || !response) return false;
-		const revision = (response.entities || []).find(
-			(entity) => entity.key === record.target_key,
-		);
-		const state = this._state(marker);
-		const reconcile = (async () => {
-			if (state.probePromise) await state.probePromise;
-			state.token = {};
-			if (widget.revisionBaseline === null) widget.commitRevisionBaseline();
-			await this._stageRevision(marker, widget, response, {
-				fingerprint: revision?.fingerprint ?? null,
-				modified: revision?.modified ?? null,
-				record,
-			});
-			delete widget._offlineConflict;
-			return true;
-		})();
-		state.conflictPromise = reconcile;
-		try {
-			return await reconcile;
-		} finally {
-			if (state.conflictPromise === reconcile) {
-				state.conflictPromise = null;
-			}
-		}
+	stageConflict(widget, conflict = {}) {
+		return this._reconciler.stageConflict(widget, conflict);
 	}
 
-	async resolveRevision(marker, choice) {
-		const state = this._state(marker);
-		const widget = marker.closest("form[data-widget]")?._lp_widget;
-		if (!widget || !state.response) {
-			this._fallback(marker);
-			return false;
-		}
-
-		const fieldSelection =
-			choice && typeof choice === "object" ? (choice.selections ?? {}) : null;
-		const localSelected = fieldSelection
-			? Object.values(fieldSelection).some((source) => source === "local")
-			: choice === "local";
-
-		if (!localSelected) {
-			if (state.record) await this.view.offlineQueue?.cancel(state.record.id);
-			await withTransition(() => widget.applyRevision(state.response));
-		} else {
-			let selectedSubmission;
-			if (fieldSelection) {
-				selectedSubmission = structuredClone(state.response.submission ?? {});
-				const localSubmission = choice.localResponse?.submission ?? {};
-				for (const [id, source] of Object.entries(fieldSelection)) {
-					if (source !== "local") continue;
-					if (Object.hasOwn(localSubmission, id)) {
-						selectedSubmission[id] = structuredClone(localSubmission[id]);
-					} else {
-						delete selectedSubmission[id];
-					}
-				}
-			}
-			await withTransition(() =>
-				widget.applyLocalRevision(state.response, {
-					remoteSnapshot: state.remoteSnapshot,
-					markUnsaved: !state.record,
-					selectedSubmission,
-				}),
-			);
-			if (state.record) {
-				const rebased = await this.view.offlineQueue?.rebaseSubmit(
-					state.record,
-					widget,
-					{
-						fingerprint: state.fingerprint,
-						modified: state.modified,
-					},
-				);
-				if (rebased) await this.view.offlineQueue?.replay();
-			}
-		}
-
-		const currentMarker =
-			widget.target?.querySelector("[lp-edited-marker]") ?? marker;
-		this._hide(currentMarker);
-		return true;
-	}
-
-	async _click(event) {
-		const button = event.target.closest("[data-role='edited-reset']");
-		if (!button) return;
-		const marker = button.closest("[lp-edited-marker]");
-		const state = marker ? this._state(marker) : null;
-		if (!marker || !state) return;
-
-		if (state.mode === "reload") {
-			window.location.reload();
-			return;
-		}
-		if (state.mode === "dismiss") {
-			this._hide(marker);
-			return;
-		}
-		const widget = marker.closest("form[data-widget]")?._lp_widget;
-		if (!widget || !state.response) {
-			this._fallback(marker);
-			return;
-		}
-
-		button.disabled = true;
-		try {
-			if (state.mode === "review") {
-				const modal = new FormRevisionModal(this, marker, widget, state);
-				const shown = await modal.init();
-				if (!shown && state.record) {
-					await new WholeFormRevisionModal(this, marker, widget).init();
-				} else if (!shown) {
-					this._setAction(
-						marker,
-						"reset",
-						"This form changed elsewhere. Reset it to load the saved version.",
-					);
-				}
-			} else if (state.mode === "whole-review") {
-				await new WholeFormRevisionModal(this, marker, widget).init();
-			} else if (state.mode === "apply" && state.record) {
-				await this.resolveRevision(marker, "local");
-			} else {
-				await this.resolveRevision(marker, "server");
-			}
-		} catch (error) {
-			this._fallback(
-				widget.target?.querySelector("[lp-edited-marker]") ?? marker,
-				error,
-			);
-		} finally {
-			button.disabled = false;
-		}
+	resolveRevision(marker, choice) {
+		return this._reconciler.resolveRevision(marker, choice);
 	}
 
 	_entityUpdated(event) {

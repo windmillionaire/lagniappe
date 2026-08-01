@@ -877,6 +877,14 @@ const context = {
   window: { addEventListener() {}, removeEventListener() {} },
 };
 vm.createContext(context);
+let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
+reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
+reconcilerSource = reconcilerSource.replace(
+  "export class EditReconciler",
+  "class EditReconciler",
+);
+reconcilerSource += "\nglobalThis.EditReconciler = EditReconciler;";
+vm.runInContext(reconcilerSource, context);
 let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class EditWatcher", "class EditWatcher");
@@ -901,8 +909,8 @@ vm.runInContext(source, context);
     },
   );
   const schemaMarker = makeMarker(schemaWidget);
-  watcher._state(schemaMarker).token = {};
-  await watcher._stageRevision(
+  watcher._reconciler._state(schemaMarker).token = {};
+  await watcher._reconciler._stageRevision(
     schemaMarker,
     schemaWidget,
     {
@@ -921,7 +929,7 @@ vm.runInContext(source, context);
       modified: "2026-07-22T10:00:00+00:00",
     },
   );
-  const schemaState = watcher._state(schemaMarker);
+  const schemaState = watcher._reconciler._state(schemaMarker);
   const schemaApplication = events.find((event) => event.type === "apply-schema");
   if (
     events.filter((event) => event.type === "apply-schema").length !== 1 ||
@@ -942,8 +950,8 @@ vm.runInContext(source, context);
 
   const valueWidget = makeWidget([{ id: "same" }], { same: "local" });
   const valueMarker = makeMarker(valueWidget);
-  watcher._state(valueMarker).token = {};
-  await watcher._stageRevision(
+  watcher._reconciler._state(valueMarker).token = {};
+  await watcher._reconciler._stageRevision(
     valueMarker,
     valueWidget,
     {
@@ -956,7 +964,7 @@ vm.runInContext(source, context);
       modified: "2026-07-22T11:00:00+00:00",
     },
   );
-  const valueState = watcher._state(valueMarker);
+  const valueState = watcher._reconciler._state(valueMarker);
   if (!valueState.submissionChoice || valueState.mode !== "review") {
     throw new Error("A later saved submission did not request a value choice");
   }
@@ -969,8 +977,8 @@ vm.runInContext(source, context);
   activeWidget.visible = true;
   activeWidget.component = { active: activeWidget };
   const activeMarker = makeMarker(activeWidget);
-  watcher._state(activeMarker).token = {};
-  await watcher._stageRevision(
+  watcher._reconciler._state(activeMarker).token = {};
+  await watcher._reconciler._stageRevision(
     activeMarker,
     activeWidget,
     {
@@ -983,7 +991,7 @@ vm.runInContext(source, context);
       modified: "2026-07-22T11:15:00+00:00",
     },
   );
-  const activeState = watcher._state(activeMarker);
+  const activeState = watcher._reconciler._state(activeMarker);
   if (
     !activeState.submissionChoice ||
     activeState.mode !== "review" ||
@@ -997,8 +1005,8 @@ vm.runInContext(source, context);
 
   const matchingWidget = makeWidget([{ id: "same" }], { same: "saved" });
   const matchingMarker = makeMarker(matchingWidget);
-  watcher._state(matchingMarker).token = {};
-  await watcher._stageRevision(
+  watcher._reconciler._state(matchingMarker).token = {};
+  await watcher._reconciler._stageRevision(
     matchingMarker,
     matchingWidget,
     {
@@ -1011,7 +1019,7 @@ vm.runInContext(source, context);
       modified: "2026-07-22T11:30:00+00:00",
     },
   );
-  const matchingState = watcher._state(matchingMarker);
+  const matchingState = watcher._reconciler._state(matchingMarker);
   if (
     matchingState.submissionChoice ||
     matchingState.mode === "review" ||
@@ -1025,8 +1033,8 @@ vm.runInContext(source, context);
   const queuedWidget = makeWidget([{ id: "plain" }], { plain: "queued" });
   queuedWidget.form = { _queued: true };
   const queuedMarker = makeMarker(queuedWidget);
-  watcher._state(queuedMarker).token = {};
-  await watcher._stageRevision(
+  watcher._reconciler._state(queuedMarker).token = {};
+  await watcher._reconciler._stageRevision(
     queuedMarker,
     queuedWidget,
     {
@@ -1040,7 +1048,7 @@ vm.runInContext(source, context);
       record: { id: "queued-mutation" },
     },
   );
-  const queuedState = watcher._state(queuedMarker);
+  const queuedState = watcher._reconciler._state(queuedMarker);
   if (queuedState.mode !== "whole-review" || queuedState.submissionChoice !== true) {
     throw new Error("Queued non-renderer form did not use whole-form reconciliation");
   }
@@ -1099,6 +1107,14 @@ const context = {
   window: { addEventListener() {}, removeEventListener() {} },
 };
 vm.createContext(context);
+let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
+reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
+reconcilerSource = reconcilerSource.replace(
+  "export class EditReconciler",
+  "class EditReconciler",
+);
+reconcilerSource += "\nglobalThis.EditReconciler = EditReconciler;";
+vm.runInContext(reconcilerSource, context);
 let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class EditWatcher", "class EditWatcher");
@@ -1110,7 +1126,7 @@ vm.runInContext(source, context);
     components: {},
     elt: { addEventListener() {}, querySelectorAll() { return []; } },
   });
-  const state = watcher._state(marker);
+  const state = watcher._reconciler._state(marker);
   state.response = {
     submission: { first: "Saved first", second: "Saved second" },
   };
@@ -1181,6 +1197,14 @@ const view = {
 };
 const context = { console, Modal: class {} };
 vm.createContext(context);
+let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
+reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
+reconcilerSource = reconcilerSource.replace(
+  "export class EditReconciler",
+  "class EditReconciler",
+);
+reconcilerSource += "\nglobalThis.EditReconciler = EditReconciler;";
+vm.runInContext(reconcilerSource, context);
 let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class EditWatcher", "class EditWatcher");
@@ -1293,6 +1317,14 @@ const context = {
   window: { addEventListener() {}, removeEventListener() {} },
 };
 vm.createContext(context);
+let reconcilerSource = fs.readFileSync("src/script/shared/editReconciler.mjs", "utf8");
+reconcilerSource = reconcilerSource.replace(/^import .*$/gm, "");
+reconcilerSource = reconcilerSource.replace(
+  "export class EditReconciler",
+  "class EditReconciler",
+);
+reconcilerSource += "\nglobalThis.EditReconciler = EditReconciler;";
+vm.runInContext(reconcilerSource, context);
 let source = fs.readFileSync("src/script/shared/editWatcher.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
 source = source.replace("export class EditWatcher", "class EditWatcher");
@@ -1308,7 +1340,7 @@ vm.runInContext(source, context);
 
   const clean = formCase({ entityKey: "task-one" });
   watcher.expectDeferredCompletion("page-one", "operation-one");
-  await watcher._probe(
+  await watcher._reconciler.probe(
     clean.marker,
     "saved-fingerprint",
     "2026-07-22T11:00:00+00:00",
@@ -1323,7 +1355,7 @@ vm.runInContext(source, context);
 
   const dirty = formCase({ unsaved: true, entityKey: "task-one" });
   watcher.expectDeferredCompletion("page-one", "operation-one");
-  await watcher._probe(
+  await watcher._reconciler.probe(
     dirty.marker,
     "newer-fingerprint",
     "2026-07-22T12:00:00+00:00",
@@ -1331,7 +1363,7 @@ vm.runInContext(source, context);
   if (
     applications.length !== 1 ||
     dirty.marker.dataset.visible !== "true" ||
-    watcher._state(dirty.marker).mode !== "reset"
+    watcher._reconciler._state(dirty.marker).mode !== "reset"
   ) {
     throw new Error("An unsaved form bypassed revision protection for its deferred completion");
   }
