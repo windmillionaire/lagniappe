@@ -56,9 +56,11 @@ Use these rules before modifying a candidate:
    identify the intended request and verify success; a retrying browser
    assertion should then verify the visible result. Reload or use a fresh
    browser context when persistence or cache invalidation is part of the claim.
-5. **Use dedicated mutable state.** A test that mutates permissions, cache
-   invalidation, completion state, visibility, or filters should not reuse an
-   identity or entity whose later state matters to another test.
+5. **Make mutations order-independent in the living datastore.** Reuse named
+   identities and entities when a story only requires their existence, but
+   establish the relevant precondition every time. Use a dedicated entity when
+   the story asserts one exact lifecycle, and select newly created records by
+   their returned durable identity rather than text or list position.
 6. **Do not hide product defects in fixtures.** If the public workflow cannot
    produce or observe the expected state, record the product gap instead of
    clearing it with a server-side save, DOM fabrication, or a global error
@@ -92,7 +94,7 @@ These counts are search signals, not automatic defects:
 
 The recent cache-invalidation failure is the clearest example of why this work
 matters: a shared user retained invalidation state, and a fixture-side repair
-could conceal whether normal navigation actually invoked `/verify-user`.
+could conceal whether normal navigation actually invoked `/validate-user`.
 Cache-invalidation tests should use a dedicated user, cause invalidation through
 the behavior under test, then navigate through the UI and explicitly observe
 verification. Do not reintroduce a fixture helper that silently repairs the
@@ -103,15 +105,15 @@ user or cookie.
 These items have suite-wide blast radius and can turn unrelated tests into
 timing or ordering failures.
 
-### E2E-H01 — Isolate every test that mutates durable shared state
+### E2E-H01 — Make durable mutations independent in the living test system
 
-- [ ] Inventory tests that mutate user permissions, cache invalidation,
+- [x] Inventory tests that mutate user permissions, cache invalidation,
   completion state, visibility, shared filters, or shared definitions.
-- [ ] Give each mutating story a dedicated user/entity definition or an
-  idempotent fixture whose entire lifecycle belongs to that story.
-- [ ] Remove module-level "already seeded" flags where their truth can outlive
+- [x] Give exact-lifecycle stories a dedicated entity, and make reusable setup
+  idempotently establish the preconditions its current story needs.
+- [x] Remove module-level "already seeded" flags where their truth can outlive
   or disagree with datastore state.
-- [ ] For each repaired cluster, run the affected tests individually, in file
+- [x] For each repaired cluster, run the affected tests individually, in file
   order, and in reverse order where practical.
 
 Start with:
@@ -127,12 +129,23 @@ Start with:
 
 Acceptance criteria:
 
-- A test can be rerun immediately without inheriting its prior mutation.
+- A test can be rerun immediately without depending on its prior mutation.
 - Reversing two tests in a repaired cluster does not change their outcome.
 - No fixture changes an invalidation or permission flag merely to make the next
   test start clean.
 - Cache verification is observed through a real browser navigation and the
-  relevant `/verify-user` request, not inferred from a backend save.
+  relevant `/validate-user` request, not inferred from a backend save.
+
+Resolved 2026-08-01. The suite continues to accumulate realistic records; H01
+now isolates only the exact transitions under test. Reusable category, sorting,
+permission, visibility, and completion setup checks durable state on each use.
+Saved filters and UI-created groups are tracked by their returned keys, while
+rename/delete, quick-edit, completion, document-transition, AI-access, and user
+page-reassignment stories use dedicated entities where prior mutation would
+change the claim. A tooling check rejects process-local durable-setup booleans.
+User page reassignment also recalculates the affected user's permissions,
+invalidates client caches, refreshes stale canonical-page session keys, and is
+verified through the browser's `/validate-user` acknowledgement.
 
 ### E2E-H02 — Make unexpected browser failures first-class test failures
 

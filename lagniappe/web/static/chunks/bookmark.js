@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES } from './styles.js?v=b211475b';
-import { areEqual } from './utilities.js?v=b211475b';
-import { B as BaseElement } from './baseElement.js?v=b211475b';
-import { f as formatting } from './formatting.js?v=b211475b';
-import { p as primitives } from './primitives.js?v=b211475b';
-import './errors.js?v=b211475b';
-import './icons.js?v=b211475b';
+import { S as STYLES } from './styles.js?v=b01d709d';
+import { areEqual } from './utilities.js?v=b01d709d';
+import { B as BaseElement } from './baseElement.js?v=b01d709d';
+import { f as formatting } from './formatting.js?v=b01d709d';
+import { p as primitives } from './primitives.js?v=b01d709d';
+import './errors.js?v=b01d709d';
+import './icons.js?v=b01d709d';
 
 /**
  * @testable infrastructure

@@ -1,13 +1,23 @@
 import re
+from uuid import uuid4
 
 import pytest
 from playwright.sync_api import expect
 
 from lagniappe.core.definitions import General, Levels, Site
-from testing.definitions import Users, SitePages, Groups, Permissions
-from testing.elements import Buttons, Modal, SpinnerButtons, PermissionsForm, Table
+from testing.definitions import Groups, Permissions, SitePages, Users
+from testing.definitions.group_definitions import GroupDefinition
+from testing.elements import Buttons, Modal, PermissionsForm, SpinnerButtons
+from testing.resources import Group
 
 pytestmark = pytest.mark.e2e
+
+
+def _new_group(user, name):
+    return Group(
+        user=user,
+        definition=GroupDefinition(name=f"{name} {uuid4().hex}"),
+    )
 
 
 def _set_and_verify_permissions(user, group, permissions):
@@ -94,7 +104,7 @@ def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
 def test_set_general_permissions(get_user):
     user = get_user(Users.OWNER)
     user_index = user.go(SitePages.USER_INDEX)
-    group = Groups.test_set_general_permissions.get(user, create=False)
+    group = _new_group(user, "Model View Group")
 
     nav_title = _create_group(user, user_index, group)
 
@@ -112,7 +122,7 @@ def test_set_general_permissions(get_user):
 def test_set_entity_specific_permissions(get_user):
     user = get_user(Users.OWNER)
     user_index = user.go(SitePages.USER_INDEX)
-    group = Groups.test_set_entity_specific_permissions.get(user, create=False)
+    group = _new_group(user, "Entity Specific Group")
 
     nav_title = _create_group(user, user_index, group)
 
@@ -123,19 +133,18 @@ def test_set_entity_specific_permissions(get_user):
     _set_and_verify_permissions(user, group, permissions)
 
 
-# @features user-groups
-# @dimensions group-create rename permission-update nav reload
+# @pairs user-groups:rename user-groups:permission-update
 # @template users/tools.html::group_permissions
 # @template users/tools.html::group_selector
 def test_rename_group(get_user):
     """A group name can be changed from its permissions panel."""
     user = get_user(Users.OWNER)
     user_index = user.go(SitePages.USER_INDEX)
-    group = Groups.rename_group.get(user, create=False)
+    group = _new_group(user, "Rename Flow Group")
     _create_group(user, user_index, group)
 
     permissions = PermissionsForm(user, group)
-    renamed = "Renamed User Group"
+    renamed = f"Renamed User Group {uuid4().hex}"
     name_input = permissions.form.locator("input[name='name']")
     expect(name_input).to_have_value(group.definition.name)
     name_input.fill(renamed)
@@ -203,7 +212,7 @@ def test_set_public_permissions(get_user):
 def test_delete_group_refreshes_group_navigation(get_user):
     user = get_user(Users.OWNER)
     user_index = user.go(SitePages.USER_INDEX)
-    group = Groups.delete_group_refreshes_navigation.get(user, create=False)
+    group = _new_group(user, "Delete Flow Group")
 
     _create_group(user, user_index, group)
 

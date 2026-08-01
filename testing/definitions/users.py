@@ -81,8 +81,6 @@ class Users(ResourceEnumMixin, Enum):
     admin = User(definition=ud.admin_users)
     admin_ask = User(definition=ud.admin_ask)
     ai_access_tiers = User(definition=ud.ai_access_tiers)
-    ai_access_report_reader = User(definition=ud.ai_access_report_reader)
-    user_settings_ai_access = User(definition=ud.user_settings_ai_access)
     user_settings_group_preload = User(definition=ud.user_settings_group_preload)
     session_switch_source = User(definition=ud.session_switch_source)
     session_switch_target = User(definition=ud.session_switch_target)

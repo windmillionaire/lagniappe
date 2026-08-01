@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as ENDPOINTS } from './endpoints.js?v=b211475b';
-import { captureError } from './errors.js?v=b211475b';
-import { r as request } from './request.js?v=b211475b';
+import { E as ENDPOINTS } from './endpoints.js?v=b01d709d';
+import { captureError } from './errors.js?v=b01d709d';
+import { r as request } from './request.js?v=b01d709d';
 
 const MAX_SUBSCRIPTIONS_PER_REQUEST = 64;
 const CLIENT_ID_KEY = "lagniappe-poll-client";

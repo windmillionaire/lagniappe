@@ -259,6 +259,21 @@ category_filter_related_form_registration_page = PageDefinition(
     form=Forms.test_category_filter_page_form,
 )
 
+category_sort_zebra_page = PageDefinition(
+    name="Zebra Page",
+    category=Categories.test_create_page,
+)
+
+category_sort_alpha_page = PageDefinition(
+    name="Alpha Page",
+    category=Categories.test_create_page,
+)
+
+category_sort_mango_page = PageDefinition(
+    name="Mango Page",
+    category=Categories.test_create_page,
+)
+
 sync_form_page = PageDefinition(
     name="Sync Form Page",
     description="Page used for collaborative form sync tests.",

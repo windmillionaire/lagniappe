@@ -550,6 +550,11 @@ view_only_page_task = TaskDefinition(
     origin=Pages.acl_lab_visible,
 )
 
+completed_only_page_task = TaskDefinition(
+    name="Completed Only Page Task",
+    origin=Pages.acl_lab_visible,
+)
+
 view_only_page_task_with_empty_form = TaskDefinition(
     name="View Only Page Form Task",
     origin=Pages.acl_lab_visible,

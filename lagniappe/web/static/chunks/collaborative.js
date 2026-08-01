@@ -1,15 +1,15 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES } from './styles.js?v=b211475b';
-import { D as Doc, c as collaborativeEditor, T as Toolbar, m as mergeUpdates, e as encodeStateAsUpdate, a as applyUpdate } from './toolbar.js?v=b211475b';
-import './request.js?v=b211475b';
-import './connectivity.js?v=b211475b';
-import { waitForAttribute, uint8ArrayToBase64, base64ToUint8Array } from './utilities.js?v=b211475b';
-import { p as primitives } from './primitives.js?v=b211475b';
-import './combobox.js?v=b211475b';
-import './endpoints.js?v=b211475b';
-import './icons.js?v=b211475b';
-import './dropdown.js?v=b211475b';
-import './errors.js?v=b211475b';
+import { S as STYLES } from './styles.js?v=b01d709d';
+import { D as Doc, c as collaborativeEditor, T as Toolbar, m as mergeUpdates, e as encodeStateAsUpdate, a as applyUpdate } from './toolbar.js?v=b01d709d';
+import './request.js?v=b01d709d';
+import './connectivity.js?v=b01d709d';
+import { waitForAttribute, uint8ArrayToBase64, base64ToUint8Array } from './utilities.js?v=b01d709d';
+import { p as primitives } from './primitives.js?v=b01d709d';
+import './combobox.js?v=b01d709d';
+import './endpoints.js?v=b01d709d';
+import './icons.js?v=b01d709d';
+import './dropdown.js?v=b01d709d';
+import './errors.js?v=b01d709d';
 
 /**
  * @testable true

@@ -302,7 +302,8 @@ def get_user(browser, request):
     - Automatic screenshot capture on test failure
 
     Args:
-        user_definition: A Users enum member (e.g., Users.OWNER, Users.ANONYMOUS)
+        user_definition: A Users enum member or a fresh UserDefinition for an
+            exact-lifecycle story
         creator: User with admin permissions to create new users
 
     Returns:
@@ -357,7 +358,13 @@ def get_user(browser, request):
             contexts.remove(context)
 
     def _get_user(user_definition, creator=None):
-        user = user_definition.get(creator)
+        from testing.definitions.user_definitions import UserDefinition
+        from testing.resources import User
+
+        if isinstance(user_definition, UserDefinition):
+            user = User(user=creator, definition=user_definition).create()
+        else:
+            user = user_definition.get(creator)
 
         # Persisted cache invalidation belongs to the browser acknowledgement
         # protocol; permission-mutating tests must consume it explicitly.

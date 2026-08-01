@@ -1,20 +1,20 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { g as getMarkRange, n as normalizeLinkAttributes } from './toolbar.js?v=b211475b';
-import { S as STYLES } from './styles.js?v=b211475b';
-import { r as request } from './request.js?v=b211475b';
-import './connectivity.js?v=b211475b';
-import { E as ENDPOINTS } from './endpoints.js?v=b211475b';
-import { debounce } from './utilities.js?v=b211475b';
-import { B as BaseForm } from './baseForm.js?v=b211475b';
-import { b as buttons } from './buttons.js?v=b211475b';
-import { C as Combobox } from './combobox.js?v=b211475b';
-import { R as Results } from './results.js?v=b211475b';
-import { p as primitives } from './primitives.js?v=b211475b';
-import './icons.js?v=b211475b';
-import './dropdown.js?v=b211475b';
-import './errors.js?v=b211475b';
-import './loader.js?v=b211475b';
-import './formatting.js?v=b211475b';
+import { g as getMarkRange, n as normalizeLinkAttributes } from './toolbar.js?v=b01d709d';
+import { S as STYLES } from './styles.js?v=b01d709d';
+import { r as request } from './request.js?v=b01d709d';
+import './connectivity.js?v=b01d709d';
+import { E as ENDPOINTS } from './endpoints.js?v=b01d709d';
+import { debounce } from './utilities.js?v=b01d709d';
+import { B as BaseForm } from './baseForm.js?v=b01d709d';
+import { b as buttons } from './buttons.js?v=b01d709d';
+import { C as Combobox } from './combobox.js?v=b01d709d';
+import { R as Results } from './results.js?v=b01d709d';
+import { p as primitives } from './primitives.js?v=b01d709d';
+import './icons.js?v=b01d709d';
+import './dropdown.js?v=b01d709d';
+import './errors.js?v=b01d709d';
+import './loader.js?v=b01d709d';
+import './formatting.js?v=b01d709d';
 
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:/i;
 const BARE_DOMAIN_PATTERN = /^[^\s/]+\.[^\s]+(?:\/.*)?$/;

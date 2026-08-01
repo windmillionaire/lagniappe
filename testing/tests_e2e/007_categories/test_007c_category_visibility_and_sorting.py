@@ -21,8 +21,12 @@ from testing.resources.category import Category
 
 pytestmark = pytest.mark.e2e
 
-SORTABLE_PAGE_NAMES = ("Zebra Page", "Alpha Page", "Mango Page")
-_SORT_PAGES_SEEDED = False
+SORTABLE_PAGES = (
+    Pages.test_category_sort_zebra_page,
+    Pages.test_category_sort_alpha_page,
+    Pages.test_category_sort_mango_page,
+)
+SORTABLE_PAGE_NAMES = tuple(page.value.definition.name for page in SORTABLE_PAGES)
 
 
 def _view_hash(user):
@@ -40,16 +44,9 @@ def _clear_table_prefs(user, category_hash):
 
 
 def _seed_sortable_pages(owner):
-    global _SORT_PAGES_SEEDED
-    category_enum = Categories.test_create_page
-    category = category_enum.get(owner)
-    if not _SORT_PAGES_SEEDED:
-        for name in SORTABLE_PAGE_NAMES:
-            Page(
-                user=owner,
-                definition=PageDefinition(name=name, category=category_enum),
-            ).create()
-        _SORT_PAGES_SEEDED = True
+    category = Categories.test_create_page.get(owner)
+    for page in SORTABLE_PAGES:
+        page.get(owner)
     return category
 
 

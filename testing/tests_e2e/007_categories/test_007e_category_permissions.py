@@ -113,8 +113,9 @@ def test_category_viewer_opens_readonly_settings(get_user):
     category = Categories.test_category_readonly_settings.get(owner)
     form = category.definition.form.get(owner)
     description = "Readonly category settings description."
-    category.entity.description = description
-    category.entity.save()
+    if category.entity.description != description:
+        category.entity.description = description
+        category.entity.save()
 
     subject = get_user(Users.models_forms_view_only)
     subject.go(category)

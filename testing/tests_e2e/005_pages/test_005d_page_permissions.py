@@ -72,11 +72,10 @@ def test_page_viewer_sees_document_tab_only_when_content_exists(get_user):
     """Readonly viewers do not see empty document affordances, but can read saved docs."""
     owner = get_user(Users.OWNER)
     page = Pages.acl_lab_document.get(owner)
-    page.entity.properties.document.save(
-        html="<p>Readonly document content marker</p>",
-        ydoc=None,
-    )
-    page.entity.save()
+    marker = "Readonly document content marker"
+    if marker not in (page.entity.properties.document.html or ""):
+        page.entity.properties.document.save(html=f"<p>{marker}</p>", ydoc=None)
+        page.entity.save()
 
     viewer = get_user(Users.page_acl_one_visible)
     viewer.go(page)
@@ -84,7 +83,7 @@ def test_page_viewer_sees_document_tab_only_when_content_exists(get_user):
     expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).to_be_visible()
     document = Tabs(viewer).document
     expect(document).to_be_visible()
-    expect(document).to_contain_text("Readonly document content marker")
+    expect(document).to_contain_text(marker)
 
 
 # @features files

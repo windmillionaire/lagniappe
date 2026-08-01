@@ -8,40 +8,48 @@ Verified against:
 - src/script/components/filters.mjs
 """
 
+from dataclasses import replace
 import json
+from uuid import uuid4
 
 from playwright.sync_api import expect
 import pytest
 
 from testing.definitions import Categories, Forms, Pages, Users
+from testing.resources import Page
 from testing.elements import FormElements, FormSelect, SpinnerButtons, Table, Tools
 from testing.elements.filters import CategoryFilterConditions, Filters
 
 pytestmark = pytest.mark.e2e
 
-_CATEGORY_FILTER_CONTEXT_READY = False
-
-
 def _category_filter_context(user):
-    global _CATEGORY_FILTER_CONTEXT_READY
-
     category = Categories.test_category_filter_pages.get(user)
     matching_page = Pages.test_category_filter_match_page.get(user)
     excluded_page = Pages.test_category_filter_nonmatch_page.get(user)
     public_document_page = Pages.test_category_filter_public_document_page.get(user)
     extra_category = Categories.test_category_filter_extra.get(user)
 
-    if not _CATEGORY_FILTER_CONTEXT_READY:
+    if (
+        extra_category.entity.key
+        not in matching_page.entity.properties.categories.keys
+    ):
         matching_page.entity.properties.categories.add(extra_category.entity)
         matching_page.entity.save()
 
+    document_marker = "Category filter document marker."
+    public_document_changed = False
+    if not public_document_page.entity.is_public:
         public_document_page.entity.is_public = True
+        public_document_changed = True
+    if document_marker not in (
+        public_document_page.entity.properties.document.html or ""
+    ):
         public_document_page.entity.properties.document.save(
-            html="<p>Category filter document marker.</p>"
+            html=f"<p>{document_marker}</p>"
         )
+        public_document_changed = True
+    if public_document_changed:
         public_document_page.entity.save()
-
-        _CATEGORY_FILTER_CONTEXT_READY = True
 
     return category, matching_page, excluded_page, public_document_page, extra_category
 
@@ -86,8 +94,12 @@ def test_category_filter_select_includes_form_from_created_page(get_user):
     """Creating a page with a form registers that form for category filters."""
     user = get_user(Users.OWNER)
     category = Categories.test_category_filter_related_form_registration.get(user)
-    page = Pages.test_category_filter_related_form_registration_page.get(
-        user, create=False
+    page = Page(
+        user=user,
+        definition=replace(
+            Pages.test_category_filter_related_form_registration_page.value.definition,
+            name=f"Related Form Registration {uuid4().hex}",
+        ),
     )
     form = Forms.test_category_filter_page_form.get(user)
     user.go(category)
@@ -231,8 +243,9 @@ def test_category_filter_results_respect_page_permissions(get_user):
     category = Categories.test_category_filter_pages.get(owner)
     visible = Pages.test_category_filter_permission_visible.get(owner)
     hidden = Pages.test_category_filter_permission_hidden.get(owner)
-    hidden.entity.properties.restricted_to.add("owner")
-    hidden.entity.save()
+    if "owner" not in hidden.entity.properties.restricted_to.stored:
+        hidden.entity.properties.restricted_to.add("owner")
+        hidden.entity.save()
 
     subject = get_user(Users.general_models_view_only)
     category = subject.go(category)
@@ -411,10 +424,8 @@ def test_category_saved_filter_save_and_run(get_user):
     filters.set_condition(CategoryFilterConditions.NAME)
     filters.name_contains("Urgent").add_filter()
 
-    saved = filters.save_filter()
-    expect(saved.locator("[data-role='empty']")).not_to_be_attached()
-
-    saved_filter = saved.locator("li").filter(has_text="Urgent")
+    saved_filter = filters.save_filter()
+    filter_key = saved_filter.get_attribute("data-key")
     expect(saved_filter).to_be_visible()
     expect(saved_filter).to_contain_text(CategoryFilterConditions.NAME.value)
 
@@ -425,7 +436,7 @@ def test_category_saved_filter_save_and_run(get_user):
         tools.locate(category.SAVED_FILTERS_TOGGLE).click()
 
     reloaded_saved = tools.locate("[data-role='saved-filters']")
-    reloaded_filter = reloaded_saved.locator("li").filter(has_text="Urgent")
+    reloaded_filter = reloaded_saved.locator(f"li[data-key='{filter_key}']")
     expect(reloaded_filter).to_be_visible()
     expect(reloaded_filter).to_contain_text(CategoryFilterConditions.NAME.value)
 

@@ -91,18 +91,6 @@ ai_access_tiers = UserDefinition(
     ai_access=AI.NONE,
 )
 
-ai_access_report_reader = UserDefinition(
-    name="AI Access Report Reader",
-    email="ai_access_report_reader@test.com",
-    ai_access=AI.NONE,
-)
-
-user_settings_ai_access = UserDefinition(
-    name="User Settings AI Access",
-    email="user_settings_ai_access@test.com",
-    ai_access=AI.NONE,
-)
-
 user_settings_group_preload = UserDefinition(
     name="User Settings Group Preload",
     email="user_settings_group_preload@test.com",

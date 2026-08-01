@@ -27,9 +27,10 @@ Test Framework:
     - Resources: testing/resources/project.py (Project.filter_section)
 """
 
-import json
-import re
+from dataclasses import replace
 from datetime import datetime
+import json
+from uuid import uuid4
 
 import pytest
 from playwright.sync_api import expect
@@ -43,6 +44,7 @@ from testing.elements import (
     Modal,
     ProjectFilterConditions,
 )
+from testing.resources import Task
 
 pytestmark = pytest.mark.e2e
 
@@ -182,8 +184,9 @@ def test_project_filter_results_respect_task_permissions(get_user):
     owner = get_user(Users.OWNER)
     visible_task = Tasks.test_filter_permission_visible.get(owner)
     hidden_task = Tasks.test_filter_permission_hidden.get(owner)
-    hidden_task.entity.properties.restricted_to.add("owner")
-    hidden_task.entity.save()
+    if "owner" not in hidden_task.entity.properties.restricted_to.stored:
+        hidden_task.entity.properties.restricted_to.add("owner")
+        hidden_task.entity.save()
     project = visible_task.project
 
     viewer = get_user(Users.general_models_view_only)
@@ -328,7 +331,14 @@ def test_filter_by_attached_form_checkbox_condition(get_user):
 def test_saved_filter_quick_edit_persists_attached_form_checkbox(get_user):
     """A task form checkbox edited in a saved filter persists after reload."""
     user = get_user(Users.OWNER)
-    filters, _matching_task, task = _attached_form_filter_context(user)
+    task = Task(
+        user=user,
+        definition=replace(
+            Tasks.test_filter_by_attached_form_nonmatch.value.definition,
+            name=f"Attached Form Quick Edit {uuid4().hex}",
+        ),
+    ).create()
+    filters, _matching_task, _excluded_task = _attached_form_filter_context(user)
 
     badges = (
         filters.set_form_condition("Inspection Notes")
@@ -337,8 +347,7 @@ def test_saved_filter_quick_edit_persists_attached_form_checkbox(get_user):
     )
     expect(badges).to_contain_text("Inspection Notes")
 
-    saved = filters.save_filter()
-    saved_filter = saved.locator("li").filter(has_text="Inspection Notes")
+    saved_filter = filters.save_filter()
     expect(saved_filter).to_be_visible()
     saved_filter.locator("a[aria-label='Run saved filter']").click()
 
@@ -546,32 +555,29 @@ def test_filter_save(get_user):
     filters.set_condition(ProjectFilterConditions.NAME)
     filters.name_contains("Filter").add_filter()
 
-    saved = filters.save_filter()
-    expect(saved).to_be_visible()
-    saved_filter_pattern = re.compile(r"Task Name\s*contains\s*Filter")
-    saved_filter = saved.locator("li").filter(has_text=saved_filter_pattern)
-    expect(saved_filter).to_have_count(1, timeout=5000)
+    saved_filter = filters.save_filter()
+    filter_key = saved_filter.get_attribute("data-key")
+    expect(saved_filter).to_contain_text("Task Name")
+    expect(saved_filter).to_contain_text("Filter")
 
     user.reload(project)
     reloaded_filters = Filters(user, project)
     reloaded_saved = reloaded_filters.section.locator(Filters.SAVED_FILTERS)
     expect(reloaded_saved).to_be_visible()
-    expect(
-        reloaded_saved.locator("li").filter(has_text=saved_filter_pattern)
-    ).to_be_visible()
+    expect(reloaded_saved.locator(f"li[data-key='{filter_key}']")).to_be_visible()
 
     viewer = get_user(Users.general_models_view_only)
     viewer.go(project)
     viewer_filters = Filters(viewer, project)
     viewer_saved = viewer_filters.section.locator(Filters.SAVED_FILTERS)
-    viewer_filter = viewer_saved.locator("li").filter(has_text=saved_filter_pattern)
+    viewer_filter = viewer_saved.locator(f"li[data-key='{filter_key}']")
     expect(viewer_filter).to_be_visible()
     expect(viewer_filter.locator("[lp-delete]")).to_have_count(0)
 
     user.go(project)
     owner_filters = Filters(user, project)
     owner_saved = owner_filters.section.locator(Filters.SAVED_FILTERS)
-    owner_filter = owner_saved.locator("li").filter(has_text=saved_filter_pattern)
+    owner_filter = owner_saved.locator(f"li[data-key='{filter_key}']")
     expect(owner_filter).to_be_visible()
     owner_filter.locator(Buttons.LP_DELETE).click()
     Modal(user.page).delete()
@@ -580,9 +586,7 @@ def test_filter_save(get_user):
     user.reload(project)
     reloaded_filters = Filters(user, project)
     reloaded_saved = reloaded_filters.section.locator(Filters.SAVED_FILTERS)
-    expect(
-        reloaded_saved.locator("li").filter(has_text=saved_filter_pattern)
-    ).to_have_count(0)
+    expect(reloaded_saved.locator(f"li[data-key='{filter_key}']")).to_have_count(0)
 
 
 # @features filters
@@ -617,15 +621,20 @@ def test_saved_in_progress_filter_removes_completed_task_after_back_navigation(
 ):
     """Back navigation omits a completed task from its saved in-progress filter."""
     user = get_user(Users.OWNER)
-    task = Tasks.test_filter_by_completed.get(user)
+    task = Task(
+        user=user,
+        definition=replace(
+            Tasks.test_filter_by_completed.value.definition,
+            name=f"Saved In Progress Filter Task {uuid4().hex}",
+        ),
+    ).create()
     project = user.go(task.project)
 
     filters = Filters(user, project)
     filters.set_condition(ProjectFilterConditions.COMPLETED)
     filters.boolean("in progress").add_filter()
 
-    saved = filters.save_filter()
-    saved_filter = saved.locator("li").first
+    saved_filter = filters.save_filter()
     expect(saved_filter).to_be_visible()
 
     with user.page.expect_navigation():

@@ -338,8 +338,10 @@ def test_public_user_permissions_inherit_public_group_defaults_without_mutating_
     assert page.hash not in public_group.db["permissions"]
 
 
-# @features user-settings
-# @dimensions email-edit ai-access owner-own-page owner-other-page page-preservation
+# @pairs user-settings:email-edit user-settings:ai-access user-settings:owner-own-page
+# @pairs user-settings:owner-other-page user-settings:page-preservation
+# @pair user-settings:page-reassign
+# @pair permissions:permission-recalc
 @pytest.mark.unit
 def test_page_update_user_authorization_rules():
     group = TestEntities.get("USER_GROUP", {"name": "Editors", "hash": "grp009u"})
@@ -400,6 +402,37 @@ def test_page_update_user_authorization_rules():
     assert other_user.groups == [group]
     assert other_user.ai_access == "ASK"
     assert other_user.page is other_page
+
+    other_user.properties.permissions.create.reset_mock()
+    reassigned_page = Page(testing=True)
+    reassigned_page._key = "reassigned-page"
+    reassigned_page.model = users_model
+    uncategorized = TestEntities.get(
+        "CATEGORY",
+        {"name": "Uncategorized", "hash": "uncategorized-reassign"},
+    )
+    with (
+        patch(
+            "lagniappe.core.entities.page.Entities.USERS.get",
+            return_value=users_model,
+        ),
+        patch(
+            "lagniappe.core.entities.page.Entities.CATEGORY.get_uncategorized_pages",
+            return_value=uncategorized,
+        ),
+    ):
+        other_page.update_user(
+            {
+                "name": other_user.name,
+                "reassign-page": reassigned_page,
+            },
+            user=owner,
+        )
+
+    assert other_user.page is reassigned_page
+    assert reassigned_page.user is other_user
+    assert other_page.user is None
+    other_user.properties.permissions.create.assert_called_once_with()
 
     public_page = Page(testing=True)
     public_page._key = "public-page"

@@ -107,8 +107,9 @@ def test_page_task_viewer_sees_task_without_edit_controls(get_user):
 def test_completed_only_task_list_hides_empty_marker(get_user):
     """A completed task prevents the page-task empty marker from appearing."""
     owner = get_user(Users.OWNER)
-    task = Tasks.test_view_only_page_task.get(owner)
-    task.mark_completed()
+    task = Tasks.test_completed_only_page_task.get(owner)
+    if not task.entity.completed:
+        task.mark_completed()
 
     viewer = get_user(Users.page_acl_one_visible)
     viewer.go(task)

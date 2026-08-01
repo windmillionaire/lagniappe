@@ -66,8 +66,13 @@ document_history_pinned = ProjectDefinition(
 )
 
 readonly_document_visibility = ProjectDefinition(
-    name="Readonly Document Visibility Project",
-    description="Project used for testing readonly document tab visibility.",
+    name="Readonly Empty Document Project",
+    description="Project used for testing an empty readonly document tab.",
+)
+
+readonly_document_content = ProjectDefinition(
+    name="Readonly Document Content Project",
+    description="Project used for testing visible readonly document content.",
 )
 
 untouched_document = ProjectDefinition(

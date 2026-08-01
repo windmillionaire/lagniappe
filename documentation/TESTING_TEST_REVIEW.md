@@ -54,6 +54,11 @@ Before editing tags, read the test body and answer:
 4. Do the current test annotations, if any, describe that behavior precisely?
 5. Does a source symbol for each truthful `feature:dimension` pair reference the
    test and declare the same pair?
+6. Does the test establish the durable state relevant to its assertion, or
+   does it depend on one exact mutation from an earlier test?
+7. If the test creates or mutates a record in a living accumulated datastore,
+   does it keep and select that record by its durable key rather than text or
+   position among older records?
 
 Do not tag a test merely because it executes code. Test tags describe what a
 future reader should look for in the assertions, tooling checks, or E2E

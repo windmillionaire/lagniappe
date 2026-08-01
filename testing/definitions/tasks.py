@@ -132,6 +132,7 @@ class Tasks(ResourceEnumMixin, Enum):
     test_filter_by_has_status_active = Task(definition=td.filter_task_status_active)
     test_filter_by_has_status_inactive = Task(definition=td.filter_task_status_inactive)
     test_view_only_page_task = Task(definition=td.view_only_page_task)
+    test_completed_only_page_task = Task(definition=td.completed_only_page_task)
     test_view_only_page_task_with_empty_form = Task(
         definition=td.view_only_page_task_with_empty_form
     )

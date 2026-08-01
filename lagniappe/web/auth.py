@@ -222,8 +222,10 @@ def _session_protection_failed():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_stale_preloaded_session_keys_fall_back_to_flask_login_user
-# @features auth
-# @dimensions session-preload stale-session flask-login-skip batch-load session-keys clear user-key page-key
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_reassign_and_remove_user_from_page
+# @pairs auth:session-preload auth:stale-session auth:flask-login-skip auth:batch-load
+# @pairs auth:session-keys auth:clear auth:user-key auth:page-key auth:canonical-page
+# @pair cache:invalidation-acknowledgement
 def _load_session_user_context(entity_identifier=None):
     if not session.get("_user_id"):
         clear_login_session()
@@ -262,6 +264,11 @@ def _load_session_user_context(entity_identifier=None):
         None,
     )
     if not isinstance(user, Entities.USER) or user.get_id() != session.get("_user_id"):
+        clear_login_session()
+        return None, None
+
+    canonical_page_identifier = database.get.urlsafe_key(user.db.get("page"))
+    if canonical_page_identifier != user_page_identifier:
         clear_login_session()
         return None, None
 

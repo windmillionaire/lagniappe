@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { getOfflineMutations, deleteOfflineMutations, setOfflineMutation } from './offline.js?v=b211475b';
-import { r as request } from './request.js?v=b211475b';
-import './errors.js?v=b211475b';
+import { getOfflineMutations, deleteOfflineMutations, setOfflineMutation } from './offline.js?v=b01d709d';
+import { r as request } from './request.js?v=b01d709d';
+import './errors.js?v=b01d709d';
 
 /**
  * @testable false

@@ -278,8 +278,11 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_009a_user.py::test_page_update_user_authorization_rules
     # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
     # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_reassign_and_remove_user_from_page
-    # @features user-settings
-    # @dimensions email-edit ai-access owner-own-page owner-other-page page-preservation page-reassign page-remove
+    # @pairs user-settings:email-edit user-settings:ai-access user-settings:owner-own-page
+    # @pairs user-settings:owner-other-page user-settings:page-preservation
+    # @pairs user-settings:page-reassign user-settings:page-remove
+    # @pair cache:invalidation-acknowledgement
+    # @pair permissions:permission-recalc
     def update_user(self, data, user=None):
         user = current_context_user(user)
         target_user = self.user
@@ -331,6 +334,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
                 ),
             )
             self.properties.categories.remove(previous_users_category)
+            target_user.properties.permissions.create()
 
     # @testable true
     # @tests tests_unit/test_009a_user.py::test_user_page_default_form_submission_keeps_email_on_user

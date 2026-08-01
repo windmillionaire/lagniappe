@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as ENDPOINTS } from '../endpoints.js?v=b211475b';
-import { r as request } from '../request.js?v=b211475b';
-import { S as ShellView } from '../shell.js?v=b211475b';
-import '../errors.js?v=b211475b';
-import '../connectivity.js?v=b211475b';
+import { E as ENDPOINTS } from '../endpoints.js?v=b01d709d';
+import { r as request } from '../request.js?v=b01d709d';
+import { S as ShellView } from '../shell.js?v=b01d709d';
+import '../errors.js?v=b01d709d';
+import '../connectivity.js?v=b01d709d';
 
 /**
  * @testable true
@@ -71,7 +71,7 @@ class Manual extends ShellView {
 		const mobileNavButton = this.elt.querySelector("#manual-nav-button");
 		if (!mobileNavButton) return null;
 
-		this._mobileDropdownPromise = import('../dropdown.js?v=b211475b')
+		this._mobileDropdownPromise = import('../dropdown.js?v=b01d709d')
 			.then(({ Dropdown }) => {
 				if (this._destroyed || !this.mobile) return null;
 				const sections = JSON.parse(mobileNavButton.dataset.sections);

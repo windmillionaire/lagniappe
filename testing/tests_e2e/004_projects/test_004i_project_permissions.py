@@ -99,26 +99,29 @@ def test_project_viewer_reads_project_without_editing_controls(get_user):
 def test_project_viewer_sees_document_tab_only_when_content_exists(get_user):
     """Readonly viewers do not see empty document affordances, but can read saved docs."""
     owner = get_user(Users.OWNER)
-    project = Projects.test_readonly_document_visibility.get(owner)
+    empty_project = Projects.test_readonly_document_visibility.get(owner)
+    content_project = Projects.test_readonly_document_content.get(owner)
 
     viewer = get_user(Users.general_models_view_only)
-    viewer.go(project)
+    viewer.go(empty_project)
 
     expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).not_to_be_attached()
     expect(viewer.locate(Tabs.DOCUMENT_TAB)).not_to_be_attached()
 
-    project.entity.properties.document.save(
-        html="<p>Readonly project document content marker</p>",
-        ydoc=None,
-    )
-    project.entity.save()
+    marker = "Readonly project document content marker"
+    if marker not in (content_project.entity.properties.document.html or ""):
+        content_project.entity.properties.document.save(
+            html=f"<p>{marker}</p>",
+            ydoc=None,
+        )
+        content_project.entity.save()
 
-    viewer.go(project)
+    viewer.go(content_project)
 
     expect(viewer.locate(Tabs.DOCUMENT_TOGGLE_DESKTOP)).to_be_visible()
     document = Tabs(viewer).document
     expect(document).to_be_visible()
-    expect(document).to_contain_text("Readonly project document content marker")
+    expect(document).to_contain_text(marker)
 
 
 # @features model-tasks

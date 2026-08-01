@@ -242,7 +242,8 @@ def test_delete_model_task_form(get_user):
 def _status_filter_context(user):
     completed_task = Tasks.test_status_filter_completed.get(user)
     in_progress_task = Tasks.test_status_filter_in_progress.get(user)
-    completed_task.mark_completed()
+    if not completed_task.entity.completed:
+        completed_task.mark_completed()
 
     model_task = ModelTasks.test_status_filter_model_task.get(user)
     user.go(model_task.project)

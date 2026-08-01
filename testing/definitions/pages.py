@@ -79,6 +79,9 @@ class Pages(ResourceEnumMixin, Enum):
     test_category_filter_related_form_registration_page = Page(
         definition=pd.category_filter_related_form_registration_page
     )
+    test_category_sort_zebra_page = Page(definition=pd.category_sort_zebra_page)
+    test_category_sort_alpha_page = Page(definition=pd.category_sort_alpha_page)
+    test_category_sort_mango_page = Page(definition=pd.category_sort_mango_page)
     test_sync_form_page = Page(definition=pd.sync_form_page)
     test_sync_form_submit_page = Page(definition=pd.sync_form_submit_page)
     test_offline_sync_form_page = Page(definition=pd.offline_sync_form_page)

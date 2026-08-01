@@ -1,4 +1,5 @@
 from enum import Enum
+import re
 
 from playwright.sync_api import expect
 
@@ -136,11 +137,19 @@ class Filters:
         return self.section.locator(self.BADGES)
 
     def save_filter(self):
-        with self.user.page.expect_response("**/filters/*/save"):
+        with self.user.page.expect_response("**/filters/*/save") as response_info:
             self.save_button.click()
-        saved = self.user.page.locator(self.SAVED_FILTERS)
-        expect(saved).to_be_visible()
-        return saved
+        response = response_info.value
+        assert response.ok, f"Saving filter failed with HTTP {response.status}"
+
+        match = re.search(r"\bdata-key=['\"]([^'\"]+)['\"]", response.text())
+        assert match, "Saved-filter response did not identify the created filter"
+
+        saved_filter = self.user.page.locator(
+            f"{self.SAVED_FILTERS} li[data-key='{match.group(1)}']"
+        )
+        expect(saved_filter).to_be_visible()
+        return saved_filter
 
     def reset(self):
         self.reset_button.click()

@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as connectivity } from './connectivity.js?v=b211475b';
-import { E as ENDPOINTS } from './endpoints.js?v=b211475b';
-import { captureError } from './errors.js?v=b211475b';
-import { r as request } from './request.js?v=b211475b';
-import { withTransition, showBriefly, clearRecentSearchResults } from './utilities.js?v=b211475b';
-import { w as whenIdle, m as markPerformance, S as ShellView } from './shell.js?v=b211475b';
+import { c as connectivity } from './connectivity.js?v=b01d709d';
+import { E as ENDPOINTS } from './endpoints.js?v=b01d709d';
+import { captureError } from './errors.js?v=b01d709d';
+import { r as request } from './request.js?v=b01d709d';
+import { withTransition, showBriefly, clearRecentSearchResults } from './utilities.js?v=b01d709d';
+import { w as whenIdle, m as markPerformance, S as ShellView } from './shell.js?v=b01d709d';
 
 /**
  * @testable infrastructure
@@ -255,72 +255,72 @@ class NavElement {
 
 
 const WIDGETS = {
-	BaseList: () => import('./baseList.js?v=b211475b'),
-	CategoryInfo: () => import('./category.js?v=b211475b'),
-	CollaborativeDocument: () => import('./collaborative.js?v=b211475b'),
-	CreateCategory: () => import('./category.js?v=b211475b'),
-	CreateForm: () => import('./form.js?v=b211475b'),
-	CreateModelTask: () => import('./modelTasks.js?v=b211475b'),
-	CreateNote: () => import('./note.js?v=b211475b'),
-	CreatePage: () => import('./pageInfo.js?v=b211475b'),
-	CreateProject: () => import('./projectInfo.js?v=b211475b'),
-	CreateToolReport: () => import('./tools.js?v=b211475b'),
-	CreateUserTask: () => import('./taskSettings.js?v=b211475b'),
-	CreateTask: () => import('./taskSettings.js?v=b211475b'),
-	CreateUser: () => import('./user2.js?v=b211475b'),
-	CreateUserGroup: () => import('./user2.js?v=b211475b'),
-	DirectoryList: () => import('./lists.js?v=b211475b'),
-	DocumentSettings: () => import('./documentSettings.js?v=b211475b'),
-	FileInfo: () => import('./fileInfo.js?v=b211475b'),
-	PDFPreview: () => import('./filePdfPreview.js?v=b211475b'),
-	FileUpload: () => import('./uploadFile.js?v=b211475b'),
-	Filters: () => import('./filters.js?v=b211475b'),
-	FilterResults: () => import('./tables.js?v=b211475b'),
-	GeneratePages: () => import('./category.js?v=b211475b'),
-	GroupPermissions: () => import('./user2.js?v=b211475b'),
-	HomeActivityList: () => import('./activity.js?v=b211475b'),
-	HomePageList: () => import('./lists.js?v=b211475b'),
-	HomeTaskList: () => import('./tasks.js?v=b211475b'),
-	HomeProjectList: () => import('./lists.js?v=b211475b'),
-	HomeCategoryList: () => import('./lists.js?v=b211475b'),
-	ImportData: () => import('./ingress.js?v=b211475b'),
-	IndexTable: () => import('./tables.js?v=b211475b'),
-	IngressFileUpload: () => import('./ingressUpload.js?v=b211475b'),
-	IngressList: () => import('./lists.js?v=b211475b'),
-	MobileTableControls: () => import('./mobileTableControls.js?v=b211475b'),
-	ModelTaskInfo: () => import('./modelTasks.js?v=b211475b'),
-	ModelTaskList: () => import('./modelTasks.js?v=b211475b'),
-	PageInfo: () => import('./pageInfo.js?v=b211475b'),
-	PagePermissions: () => import('./pagePermissions.js?v=b211475b'),
-	PagePhoto: () => import('./pagePhoto.js?v=b211475b'),
-	PageTaskList: () => import('./pageTaskList.js?v=b211475b'),
-	ProjectInfo: () => import('./projectInfo.js?v=b211475b'),
-	PublicPermissions: () => import('./user2.js?v=b211475b'),
-	SavedFilters: () => import('./filters.js?v=b211475b'),
-	SiteExport: () => import('./siteExport.js?v=b211475b'),
-	SiteAiModels: () => import('./aiModels.js?v=b211475b'),
-	SiteDeployment: () => import('./deployment.js?v=b211475b'),
-	SiteImage: () => import('./image.js?v=b211475b'),
-	SiteMaintenance: () => import('./maintenance.js?v=b211475b'),
-	SiteServiceProviders: () => import('./providers.js?v=b211475b'),
-	SiteSettings: () => import('./siteSettings.js?v=b211475b'),
-	StarredList: () => import('./lists.js?v=b211475b'),
-	TableEditor: () => import('./tableEditor.js?v=b211475b'),
-	TableSorting: () => import('./tableSorting.js?v=b211475b'),
-	TableVisibility: () => import('./tableVisibility.js?v=b211475b'),
-	TaskForm: () => import('./taskForm.js?v=b211475b'),
-	TaskHistory: () => import('./tables.js?v=b211475b'),
-	TaskCombine: () => import('./taskSettings.js?v=b211475b'),
-	TaskMove: () => import('./taskSettings.js?v=b211475b'),
-	ToolReportList: () => import('./lists.js?v=b211475b'),
-	TaskSettings: () => import('./taskSettings.js?v=b211475b'),
-	UserSettings: () => import('./pageInfo.js?v=b211475b'),
+	BaseList: () => import('./baseList.js?v=b01d709d'),
+	CategoryInfo: () => import('./category.js?v=b01d709d'),
+	CollaborativeDocument: () => import('./collaborative.js?v=b01d709d'),
+	CreateCategory: () => import('./category.js?v=b01d709d'),
+	CreateForm: () => import('./form.js?v=b01d709d'),
+	CreateModelTask: () => import('./modelTasks.js?v=b01d709d'),
+	CreateNote: () => import('./note.js?v=b01d709d'),
+	CreatePage: () => import('./pageInfo.js?v=b01d709d'),
+	CreateProject: () => import('./projectInfo.js?v=b01d709d'),
+	CreateToolReport: () => import('./tools.js?v=b01d709d'),
+	CreateUserTask: () => import('./taskSettings.js?v=b01d709d'),
+	CreateTask: () => import('./taskSettings.js?v=b01d709d'),
+	CreateUser: () => import('./user2.js?v=b01d709d'),
+	CreateUserGroup: () => import('./user2.js?v=b01d709d'),
+	DirectoryList: () => import('./lists.js?v=b01d709d'),
+	DocumentSettings: () => import('./documentSettings.js?v=b01d709d'),
+	FileInfo: () => import('./fileInfo.js?v=b01d709d'),
+	PDFPreview: () => import('./filePdfPreview.js?v=b01d709d'),
+	FileUpload: () => import('./uploadFile.js?v=b01d709d'),
+	Filters: () => import('./filters.js?v=b01d709d'),
+	FilterResults: () => import('./tables.js?v=b01d709d'),
+	GeneratePages: () => import('./category.js?v=b01d709d'),
+	GroupPermissions: () => import('./user2.js?v=b01d709d'),
+	HomeActivityList: () => import('./activity.js?v=b01d709d'),
+	HomePageList: () => import('./lists.js?v=b01d709d'),
+	HomeTaskList: () => import('./tasks.js?v=b01d709d'),
+	HomeProjectList: () => import('./lists.js?v=b01d709d'),
+	HomeCategoryList: () => import('./lists.js?v=b01d709d'),
+	ImportData: () => import('./ingress.js?v=b01d709d'),
+	IndexTable: () => import('./tables.js?v=b01d709d'),
+	IngressFileUpload: () => import('./ingressUpload.js?v=b01d709d'),
+	IngressList: () => import('./lists.js?v=b01d709d'),
+	MobileTableControls: () => import('./mobileTableControls.js?v=b01d709d'),
+	ModelTaskInfo: () => import('./modelTasks.js?v=b01d709d'),
+	ModelTaskList: () => import('./modelTasks.js?v=b01d709d'),
+	PageInfo: () => import('./pageInfo.js?v=b01d709d'),
+	PagePermissions: () => import('./pagePermissions.js?v=b01d709d'),
+	PagePhoto: () => import('./pagePhoto.js?v=b01d709d'),
+	PageTaskList: () => import('./pageTaskList.js?v=b01d709d'),
+	ProjectInfo: () => import('./projectInfo.js?v=b01d709d'),
+	PublicPermissions: () => import('./user2.js?v=b01d709d'),
+	SavedFilters: () => import('./filters.js?v=b01d709d'),
+	SiteExport: () => import('./siteExport.js?v=b01d709d'),
+	SiteAiModels: () => import('./aiModels.js?v=b01d709d'),
+	SiteDeployment: () => import('./deployment.js?v=b01d709d'),
+	SiteImage: () => import('./image.js?v=b01d709d'),
+	SiteMaintenance: () => import('./maintenance.js?v=b01d709d'),
+	SiteServiceProviders: () => import('./providers.js?v=b01d709d'),
+	SiteSettings: () => import('./siteSettings.js?v=b01d709d'),
+	StarredList: () => import('./lists.js?v=b01d709d'),
+	TableEditor: () => import('./tableEditor.js?v=b01d709d'),
+	TableSorting: () => import('./tableSorting.js?v=b01d709d'),
+	TableVisibility: () => import('./tableVisibility.js?v=b01d709d'),
+	TaskForm: () => import('./taskForm.js?v=b01d709d'),
+	TaskHistory: () => import('./tables.js?v=b01d709d'),
+	TaskCombine: () => import('./taskSettings.js?v=b01d709d'),
+	TaskMove: () => import('./taskSettings.js?v=b01d709d'),
+	ToolReportList: () => import('./lists.js?v=b01d709d'),
+	TaskSettings: () => import('./taskSettings.js?v=b01d709d'),
+	UserSettings: () => import('./pageInfo.js?v=b01d709d'),
 };
 
 /** Sync-capable widgets that can run without a mounted view (offline replay). */
 const HEADLESS_WIDGETS = {
 	document: {
-		load: () => import('./collaborative.js?v=b211475b'),
+		load: () => import('./collaborative.js?v=b01d709d'),
 		name: "CollaborativeDocument",
 	},
 };
@@ -1187,7 +1187,7 @@ const loadOnce = (view, promiseKey, handleKey, loader) => {
 
 const ensureOfflineQueue = (view) =>
 	loadOnce(view, "_offlineQueuePromise", "offlineQueue", async () => {
-		const { OfflineQueue } = await import('./offlineQueue.js?v=b211475b');
+		const { OfflineQueue } = await import('./offlineQueue.js?v=b01d709d');
 		if (view._destroyed) return null;
 		const queue = new OfflineQueue(view);
 		await queue.init();
@@ -1196,7 +1196,7 @@ const ensureOfflineQueue = (view) =>
 
 const ensurePollingCoordinator = (view) =>
 	loadOnce(view, "_pollingPromise", "PollingCoordinator", async () => {
-		const { PollingCoordinator } = await import('./polling.js?v=b211475b');
+		const { PollingCoordinator } = await import('./polling.js?v=b01d709d');
 		if (view._destroyed) return null;
 		const coordinator = new PollingCoordinator(view).init();
 		view.PollingCoordinator = coordinator;
@@ -1207,7 +1207,7 @@ const ensurePollingCoordinator = (view) =>
 const ensureSyncManager = (view) =>
 	loadOnce(view, "_syncPromise", "SyncManager", async () => {
 		await ensurePollingCoordinator(view);
-		const { SyncManager } = await import('./sync.js?v=b211475b');
+		const { SyncManager } = await import('./sync.js?v=b01d709d');
 		if (view._destroyed) return null;
 		const manager = new SyncManager(view);
 		manager.init();
@@ -1217,7 +1217,7 @@ const ensureSyncManager = (view) =>
 const ensureEditWatcher = (view) =>
 	loadOnce(view, "_editWatcherPromise", "EditWatcher", async () => {
 		await ensurePollingCoordinator(view);
-		const { EditWatcher } = await import('./editWatcher.js?v=b211475b');
+		const { EditWatcher } = await import('./editWatcher.js?v=b01d709d');
 		if (view._destroyed) return null;
 		const watcher = new EditWatcher(view);
 		watcher.init();
@@ -1232,7 +1232,7 @@ const ensureDeferredOperations = (view) =>
 		async () => {
 			await ensurePollingCoordinator(view);
 			const { DeferredOperationManager } = await import(
-				'./deferredOperations.js?v=b211475b'
+				'./deferredOperations.js?v=b01d709d'
 			);
 			if (view._destroyed) return null;
 			return new DeferredOperationManager(view).init();
@@ -1243,7 +1243,7 @@ const ensureNotifications = (view) =>
 	loadOnce(view, "_notificationsPromise", "Notifications", async () => {
 		if (!document.querySelector("[data-role='notifications']")) return null;
 		await ensurePollingCoordinator(view);
-		const { Notifications } = await import('./notifications.js?v=b211475b');
+		const { Notifications } = await import('./notifications.js?v=b01d709d');
 		if (view._destroyed) return null;
 		const notifications = new Notifications(view);
 		notifications.init();
@@ -1254,7 +1254,7 @@ const ensureSearchBox = (view) =>
 	loadOnce(view, "_searchPromise", "SearchBox", async () => {
 		const search = document.querySelector("[lp-search]");
 		if (!search) return null;
-		const { SearchBox } = await import('./search.js?v=b211475b');
+		const { SearchBox } = await import('./search.js?v=b01d709d');
 		if (view._destroyed) return null;
 		const box = new SearchBox(search);
 		await box.init();
@@ -1263,14 +1263,14 @@ const ensureSearchBox = (view) =>
 
 const ensureEntityMenu = (view) =>
 	loadOnce(view, "_entityMenuPromise", "EntityMenu", async () => {
-		const { EntityMenu } = await import('./entityMenu.js?v=b211475b');
+		const { EntityMenu } = await import('./entityMenu.js?v=b01d709d');
 		if (view._destroyed) return null;
 		return new EntityMenu(view);
 	});
 
 const ensureSubmissionManager = (view) =>
 	loadOnce(view, "_submissionPromise", "SubmissionManager", async () => {
-		const { SubmissionManager } = await import('./submission.js?v=b211475b');
+		const { SubmissionManager } = await import('./submission.js?v=b01d709d');
 		if (view._destroyed) return null;
 		return new SubmissionManager(view);
 	});
@@ -1278,7 +1278,7 @@ const ensureSubmissionManager = (view) =>
 const ensureOfflineModal = (view) =>
 	loadOnce(view, "_offlineModalPromise", "offlineModal", async () => {
 		if (!view.offlineIndicator) return null;
-		const { OfflineModal } = await import('./modal.js?v=b211475b');
+		const { OfflineModal } = await import('./modal.js?v=b01d709d');
 		if (view._destroyed) return null;
 		const modal = new OfflineModal(view, view.offlineIndicator);
 		modal.enable();
@@ -1288,7 +1288,7 @@ const ensureOfflineModal = (view) =>
 const ensureModalClasses = (view) =>
 	loadOnce(view, "_modalClassesPromise", "ModalClasses", async () => {
 		const { DeleteModal, HelpModal, Modal } = await import(
-			'./modal.js?v=b211475b'
+			'./modal.js?v=b01d709d'
 		);
 		if (view._destroyed) return null;
 		return { DeleteModal, HelpModal, Modal };
@@ -1327,7 +1327,7 @@ const initializeCoreServices = (view) => {
 	view._serviceStart = start;
 	const idle = start.then(() => whenIdle());
 	const offlineWork = idle.then(async () => {
-		const { inspectOfflineWork } = await import('./offlineWork.js?v=b211475b');
+		const { inspectOfflineWork } = await import('./offlineWork.js?v=b01d709d');
 		return inspectOfflineWork(view);
 	});
 	view.offlineQueueReady = offlineWork.then(({ mutations }) =>
@@ -1338,7 +1338,7 @@ const initializeCoreServices = (view) => {
 		: offlineWork.then(({ sync }) => (sync ? ensureSyncManager(view) : null));
 	view.initialReplayReady = view.offlineQueueReady.then(async (queue) => {
 		if (!queue) return 0;
-		const { replayOfflineQueue } = await import('./offlineReplay.js?v=b211475b');
+		const { replayOfflineQueue } = await import('./offlineReplay.js?v=b01d709d');
 		return replayOfflineQueue(view, queue);
 	});
 
@@ -1873,7 +1873,7 @@ class Core extends ShellView {
 	 */
 	scheduleOfflineReplay() {
 		if (this._offlineReplayTask) return this._offlineReplayTask;
-		this._offlineReplayTask = import('./offlineReplay.js?v=b211475b')
+		this._offlineReplayTask = import('./offlineReplay.js?v=b01d709d')
 			.then(({ replayOfflineQueue }) => replayOfflineQueue(this))
 			.finally(() => {
 				this._offlineReplayTask = null;

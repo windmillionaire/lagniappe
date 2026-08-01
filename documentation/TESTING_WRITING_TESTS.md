@@ -71,6 +71,22 @@ prefix are shared, so parallel E2E invocations can tear down each other's data
 and server state. When checking multiple focused files or nodeids, pass them to
 one pytest command.
 
+The accumulated E2E datastore intentionally resembles a living system. Reuse
+named users and entities when the story only needs them to exist, and establish
+the relevant precondition idempotently each time instead of assuming an earlier
+test performed one exact mutation. Select anything created by a test using its
+returned durable key, not matching text or list position; older records with
+similar content are valid accumulated data. Use a unique entity when the test
+asserts an exact mutation lifecycle, such as empty-to-populated, active-to-
+completed, rename, reassignment, or deletion. Do not broadly clean shared data
+to make a test isolated: isolate its claimed transition while preserving the
+suite's realistic history.
+
+Process-local "already seeded" booleans are not valid E2E state. They can
+disagree with the datastore after a focused rerun, fixture reset, or failed
+setup. A setup helper should retrieve or create its durable entities on every
+call and conditionally establish only the properties the current story needs.
+
 Permission and session changes that request client-cache invalidation need an
 explicit browser acknowledgement in the test that caused them:
 

@@ -14,12 +14,16 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from flask import Flask
+from flask.sessions import SecureCookieSessionInterface
 from playwright.sync_api import expect
 
 from config import SETTINGS
-from lagniappe.core.definitions import Fetch, General, Levels, Site
+from lagniappe import CONFIG
+from lagniappe.core.definitions import AI, Fetch, General, Levels, Site
 from lagniappe.core.entities import Entities
 from testing.definitions import Categories, Groups, SitePages, Submissions, Users
+from testing.definitions.user_definitions import UserDefinition
 from testing.resources import HomePage, Page
 from testing.elements import (
     Buttons,
@@ -288,6 +292,18 @@ def _assert_site_image_links(site_image):
 
 def _submission_payload(submission):
     return {field.id: field.submission_value for field in submission}
+
+
+def _session_page_key(user):
+    app = Flask(__name__)
+    app.config.update(SECRET_KEY=CONFIG.SECRET_KEY)
+    serializer = SecureCookieSessionInterface().get_signing_serializer(app)
+    cookie = next(
+        cookie
+        for cookie in user.page.context.cookies()
+        if cookie["name"] == "session"
+    )
+    return serializer.loads(cookie["value"])[CONFIG.LOGIN_USER_PAGE_KEY]
 
 
 # @features user-settings
@@ -620,19 +636,33 @@ def test_public_user_restricted_schedules_are_forbidden(limited_public_user):
     )
 
 
-# @features user-settings
-# @dimensions owner-other-page editable-email group-selector edit-groups ai-access
+# @pair user-settings:owner-other-page
+# @pair user-settings:editable-email
+# @pair user-settings:group-selector
+# @pair user-settings:edit-groups
+# @pair user-settings:ai-access
 # @pair cache:invalidation-acknowledgement
 # @template pages/info.html::user_settings
 def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     owner = get_user(Users.OWNER)
-    created_user = get_user(Users.user_settings_ai_access, creator=owner)
+    suffix = uuid4().hex
+    created_user = get_user(
+        UserDefinition(
+            name=f"User Settings AI Access {suffix}",
+            email=f"user-settings-ai-access-{suffix}@example.test",
+            ai_access=AI.NONE,
+        ),
+        creator=owner,
+    )
     created_user_page_key = created_user.entity.page.urlsafe_key
 
     owner.go(SitePages.USER_INDEX)
     target_row = owner.locate(f"#table tr[data-key='{created_user.key}']")
     expect(target_row).to_be_visible()
-    target_row.click()
+    with owner.page.expect_navigation():
+        target_row.get_by_role(
+            "link", name=created_user.name, exact=True
+        ).click()
     expect(owner.page).to_have_title(re.compile(created_user.name))
     assert created_user_page_key in owner.page.url
 
@@ -692,12 +722,13 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
             and response.request.method == "POST"
         ),
     ) as validation_info:
-        created_user.go(SitePages.HOME)
+        created_user.navigate(SitePages.HOME.get(created_user).url)
 
     validation = validation_info.value
     assert validation.status == 200
     assert validation.json()["cacheCleared"] is True
     assert Entities.USER.load(created_user.email).invalidate_cache is False
+    expect(created_user.page).to_have_title("Home")
 
 
 # @pair user-settings:group-selector
@@ -739,14 +770,23 @@ def test_user_settings_preloads_existing_groups(get_user):
     assert second_group.definition.name in group_select.placeholder
 
 
-# @features user-settings
-# @dimensions owner-other-page page-reassign page-remove
+# @pair user-settings:owner-other-page
+# @pair user-settings:page-reassign
+# @pair user-settings:page-remove
+# @pair cache:invalidation-acknowledgement
+# @pair auth:canonical-page
 # @template pages/info.html::user_settings
 def test_owner_can_reassign_and_remove_user_from_page(get_user):
     owner = get_user(Users.OWNER)
-    created_user = get_user(Users.create_user, creator=owner)
-    source_page_key = created_user.entity.page.key
     suffix = uuid4().hex
+    created_user = get_user(
+        UserDefinition(
+            name=f"User Page Reassignment {suffix}",
+            email=f"user-page-reassignment-{suffix}@example.test",
+        ),
+        creator=owner,
+    )
+    source_page_key = created_user.entity.page.key
     target_page_entity = _create_user_page_reassign_target(
         owner,
         f"User Reassign Target {suffix}",
@@ -796,6 +836,23 @@ def test_owner_can_reassign_and_remove_user_from_page(get_user):
     assert saved_target_page.user is None
     assert replacement_page.key not in {source_page_key, target_page_key}
     assert replacement_page.user.email == created_user.email
+    assert saved_user.invalidate_cache is True
+
+    with created_user.page.context.expect_event(
+        "response",
+        predicate=lambda response: (
+            response.url.endswith("/validate-user")
+            and response.request.method == "POST"
+        ),
+    ) as validation_info:
+        created_user.navigate(SitePages.HOME.get(created_user).url)
+
+    validation = validation_info.value
+    assert validation.status == 200
+    assert validation.json()["cacheCleared"] is True
+    assert Entities.USER.load(created_user.email).invalidate_cache is False
+    expect(created_user.page).to_have_title("Home")
+    assert _session_page_key(created_user) == replacement_page.urlsafe_key
 
 
 # @features user-settings

@@ -14,6 +14,7 @@ from lagniappe.core.definitions import (
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import ai
 from testing.definitions import SitePages, Uploads, Users
+from testing.definitions.user_definitions import UserDefinition
 from testing.elements import Buttons, List, Modal
 from testing.resources import Report
 
@@ -534,7 +535,15 @@ def test_ai_access_tiers_gate_tool_routes(get_user):
 # @pair cache:invalidation-acknowledgement
 def test_ask_access_can_read_create_report_without_create_actions(get_user):
     owner = get_user(Users.OWNER)
-    user = get_user(Users.ai_access_report_reader, creator=owner)
+    suffix = uuid4().hex
+    user = get_user(
+        UserDefinition(
+            name=f"AI Access Report Reader {suffix}",
+            email=f"ai-access-report-reader-{suffix}@example.test",
+            ai_access=AI.NONE,
+        ),
+        creator=owner,
+    )
     report = _create_ready_report(user)
 
     entity = Entities.USER.load(user.email)

@@ -20,6 +20,7 @@ E2E_CACHE_CONTRACT_ROOTS = (
     TESTING_ROOT / "tests_e2e",
     TESTING_ROOT / "resources",
 )
+E2E_PROCESS_STATE_SUFFIXES = ("_READY", "_SEEDED", "_CREATED", "_INITIALIZED")
 
 
 def _python_files(*roots):
@@ -215,6 +216,37 @@ def test_e2e_support_does_not_clear_user_cache_invalidation_out_of_band():
                 violations.append(
                     f"{relative}:{node.lineno} clears invalidate_cache directly"
                 )
+
+    assert violations == []
+
+
+def test_e2e_modules_do_not_cache_durable_setup_in_process_booleans():
+    """Durable E2E preconditions must be checked against the living datastore."""
+    violations = []
+    for path in _python_files(TESTING_ROOT / "tests_e2e"):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        relative = path.relative_to(REPOSITORY_ROOT)
+        for node in tree.body:
+            if isinstance(node, ast.Assign):
+                targets = node.targets
+                value = node.value
+            elif isinstance(node, ast.AnnAssign):
+                targets = [node.target]
+                value = node.value
+            else:
+                continue
+
+            if not (
+                isinstance(value, ast.Constant)
+                and isinstance(value.value, bool)
+            ):
+                continue
+
+            for target in targets:
+                if isinstance(target, ast.Name) and target.id.endswith(
+                    E2E_PROCESS_STATE_SUFFIXES
+                ):
+                    violations.append(f"{relative}:{node.lineno} defines {target.id}")
 
     assert violations == []
 
