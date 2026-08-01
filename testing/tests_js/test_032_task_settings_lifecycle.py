@@ -160,3 +160,89 @@ vm.runInContext(source, context);
 });
 """
     )
+
+
+# @features forms
+# @dimensions schema-ownership sibling-widgets
+def test_form_response_metadata_stays_with_renderer_widget(run_node):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+class BaseForm {}
+
+function target({ renderer = false } = {}) {
+  return {
+    dataset: {},
+    cloneNode() { return target({ renderer }); },
+    hasAttribute(name) {
+      return renderer && ["data-schema", "data-submission"].includes(name);
+    },
+  };
+}
+
+const context = { BaseForm, console };
+vm.createContext(context);
+
+let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
+source = source.replace(/import .*?;\n/g, "");
+source = source.replace("export class FormElement", "class FormElement");
+source += "\nglobalThis.FormElement = FormElement;";
+vm.runInContext(source, context);
+
+const responseState = {
+  schema: [{ id: "task-form-field" }],
+  submission: { "task-form-field": "saved value" },
+};
+
+const settingsReplacement = target();
+const settings = new context.FormElement({
+  name: "TaskSettings",
+  target: target(),
+});
+settings.updated({
+  ...responseState,
+  html: {
+    querySelector(selector) {
+      if (selector !== "[data-widget='TaskSettings']") {
+        throw new Error(`Unexpected selector: ${selector}`);
+      }
+      return settingsReplacement;
+    },
+  },
+});
+
+if (settings.schema !== null || settings.submission !== null) {
+  throw new Error("TaskSettings adopted a sibling TaskForm schema/submission");
+}
+if (settings.initialTarget !== settingsReplacement || !settings._updated) {
+  throw new Error("TaskSettings did not retain its normal HTML reconciliation");
+}
+
+const renderer = new context.FormElement({
+  name: "TaskForm",
+  target: target({ renderer: true }),
+});
+renderer.updated({
+  ...responseState,
+  html: {
+    querySelector() { return target({ renderer: true }); },
+  },
+});
+if (renderer.schema !== responseState.schema ||
+    renderer.submission !== responseState.submission) {
+  throw new Error("TaskForm did not adopt its owned response state");
+}
+
+const revision = new context.FormElement({
+  name: "TaskForm",
+  target: target({ renderer: true }),
+});
+revision.updated(responseState);
+if (revision.schema !== responseState.schema ||
+    revision.submission !== responseState.submission) {
+  throw new Error("Metadata-only form revision stopped updating renderer state");
+}
+"""
+    )

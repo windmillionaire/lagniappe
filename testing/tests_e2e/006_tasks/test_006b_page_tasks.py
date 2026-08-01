@@ -393,6 +393,79 @@ def test_update_page_task_settings_from_row(get_user):
 
 
 # @features tasks
+# @dimensions attach-form widget-identity merged-submission
+# @template pages/tasks.html::task
+# @template pages/tasks.html::settings_form
+# @template pages/tasks.html::task_form
+def test_adding_form_from_task_settings_preserves_widget_identity(get_user):
+    user = get_user(Users.OWNER)
+    task = Tasks.test_update_page_task_settings.get(user)
+    form = Forms.test_task_history_form.get(user)
+    user.go(task)
+
+    settings_form = task.settings_form
+    FormSelect(settings_form).select(form)
+    task.save()
+
+    expect(task.element.locator(task.SETTINGS_FORM)).to_have_count(1)
+    expect(task.element.locator(task.TASK_FORM)).to_have_count(1)
+    settings_form = task.element.locator(task.SETTINGS_FORM)
+    expect(settings_form.locator("[name='name']")).to_have_count(1)
+    expect(settings_form.locator("[name='description']")).to_have_count(1)
+    expect(settings_form.locator("[name='input-textab12']")).to_have_count(0)
+    state = task.element.evaluate(
+        """row => {
+            const component = row._lp_component;
+            return {
+                active: component.active?.name,
+                activeTarget: component.active?.target?.dataset.widget,
+                settingsTarget: component.widgets.TaskSettings?.target?.dataset.widget,
+                formTarget: component.widgets.TaskForm?.target?.dataset.widget ?? null,
+                domWidgets: Array.from(row.querySelectorAll(':scope > [data-widget]'))
+                    .map(widget => widget.dataset.widget),
+            };
+        }"""
+    )
+    assert state == {
+        "active": "TaskSettings",
+        "activeTarget": "TaskSettings",
+        "settingsTarget": "TaskSettings",
+        "formTarget": None,
+        "domWidgets": [
+            "TaskSettings",
+            "TaskMove",
+            "TaskCombine",
+            "TaskForm",
+        ],
+    }
+
+    task_form = task.task_form
+    task_value = "Saved with a settings update"
+    task_form.locator("[name='input-textab12']").fill(task_value)
+    user.page.keyboard.press("Tab")
+
+    settings_toggle = task.element.locator(
+        f"{task.SETTINGS_FORM_TOGGLE}:visible"
+    )
+    expect(settings_toggle).to_be_visible()
+    settings_toggle.click()
+    settings_form = task.element.locator(task.SETTINGS_FORM)
+    expect(settings_form).to_be_visible()
+    expect(task_form).to_be_hidden()
+    updated_name = "Task Settings and Form After"
+    _fill_editable_field(settings_form, "name", FormElements.NAME, updated_name)
+    with user.page.expect_response("**/update"):
+        SpinnerButtons.UPDATE.click(settings_form)
+    assert SpinnerButtons.UPDATE_SUCCESS.successful(settings_form)
+
+    saved_task, submission = _saved_task_submission(task)
+    assert saved_task.name == updated_name
+    assert saved_task.description == task.definition.description
+    assert saved_task.form.key == form.entity.key
+    assert submission["input-textab12"] == task_value
+
+
+# @features tasks
 # @dimensions move completed title-menu
 # @template pages/tasks.html::task_title
 # @template pages/tasks.html::move_form

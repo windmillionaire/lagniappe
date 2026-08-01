@@ -437,18 +437,35 @@ export class FormElement {
 		this._success = true;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_form_response_metadata_stays_with_renderer_widget
+	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_adding_form_from_task_settings_preserves_widget_identity
+	 * @pairs forms:schema-ownership forms:sibling-widgets
+	 * @pairs tasks:attach-form tasks:widget-identity tasks:merged-submission
+	 */
 	updated(response) {
 		const updatedTarget = response.html?.querySelector(
 			`[data-widget='${this.name}']`,
 		);
+		const ownsRendererState =
+			!updatedTarget ||
+			[updatedTarget, this.target, this.initialTarget].some(
+				(target) =>
+					target?.hasAttribute?.("data-schema") ||
+					target?.hasAttribute?.("data-submission"),
+			);
 		if (updatedTarget) {
 			this.initialTarget = updatedTarget;
 			this._deferredOperation = updatedTarget.dataset.operation || null;
 			this._updated = true;
 		}
-		if (Object.hasOwn(response, "schema")) this.schema = response.schema;
-		if (Object.hasOwn(response, "submission"))
+		if (ownsRendererState && Object.hasOwn(response, "schema")) {
+			this.schema = response.schema;
+		}
+		if (ownsRendererState && Object.hasOwn(response, "submission")) {
 			this.submission = response.submission;
+		}
 	}
 
 	async postreconcile() {

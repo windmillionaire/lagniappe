@@ -1,21 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="1f8df347-82cb-4097-80f5-c1b6ed74a1dd",e._sentryDebugIdIdentifier="sentry-dbid-1f8df347-82cb-4097-80f5-c1b6ed74a1dd");}catch(e){}}();import"../search.js?v=b8490206";import"../entityMenu.js?v=b8490206";import"../request.js?v=b8490206";import"../connectivity.js?v=b8490206";import"../modal.js?v=b8490206";import"../utilities.js?v=b8490206";import{F as n}from"../builder.js?v=b8490206";import"../styles.js?v=b8490206";import"../endpoints.js?v=b8490206";import"../combobox.js?v=b8490206";import"../primitives.js?v=b8490206";import"../icons.js?v=b8490206";import"../results.js?v=b8490206";import"../formatting.js?v=b8490206";import"../errors.js?v=b8490206";import"../dropdown.js?v=b8490206";import"../baseForm.js?v=b8490206";import"../loader.js?v=b8490206";import"../facets.js?v=b8490206";import"../submitter.js?v=b8490206";export{n as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../search.js?v=b32ad33a';
-import '../entityMenu.js?v=b32ad33a';
-import '../request.js?v=b32ad33a';
-import '../connectivity.js?v=b32ad33a';
-import '../modal.js?v=b32ad33a';
-import '../utilities.js?v=b32ad33a';
-export { F as default } from '../builder.js?v=b32ad33a';
-import '../styles.js?v=b32ad33a';
-import '../endpoints.js?v=b32ad33a';
-import '../combobox.js?v=b32ad33a';
-import '../primitives.js?v=b32ad33a';
-import '../icons.js?v=b32ad33a';
-import '../results.js?v=b32ad33a';
-import '../formatting.js?v=b32ad33a';
-import '../errors.js?v=b32ad33a';
-import '../dropdown.js?v=b32ad33a';
-import '../baseForm.js?v=b32ad33a';
-import '../loader.js?v=b32ad33a';
-import '../facets.js?v=b32ad33a';
-import '../submitter.js?v=b32ad33a';

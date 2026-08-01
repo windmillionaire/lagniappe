@@ -806,11 +806,7 @@ export class EditWatcher {
 				const pending = state.pendingProbe;
 				if (!pending) return;
 				state.pendingProbe = null;
-				return this._probe(
-					marker,
-					pending.fingerprint,
-					pending.modified,
-				);
+				return this._probe(marker, pending.fingerprint, pending.modified);
 			});
 		}
 		if (
@@ -935,20 +931,13 @@ export class EditWatcher {
 			}
 			return;
 		}
-		if (
-			result.status === "unchanged" &&
-			this._deferredCompletions.has(key)
-		) {
+		if (result.status === "unchanged" && this._deferredCompletions.has(key)) {
 			const revision = this._latestRevisions.get(key) ?? {
 				fingerprint: result.revision ?? null,
 				modified: null,
 			};
 			if (revision.fingerprint) {
-				await this._probeEntity(
-					key,
-					revision.fingerprint,
-					revision.modified,
-				);
+				await this._probeEntity(key, revision.fingerprint, revision.modified);
 			}
 			return;
 		}

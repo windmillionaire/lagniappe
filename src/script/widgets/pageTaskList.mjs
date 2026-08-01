@@ -173,8 +173,7 @@ export class PageTaskList extends BaseList {
 		if (empty) empty.dataset.visible = showEmpty ? "true" : "false";
 		this.activeTasks.dataset.visible =
 			hasActive || showEmpty ? "true" : "false";
-		this.completedHeader.dataset.visible =
-			hasCompleted ? "true" : "false";
+		this.completedHeader.dataset.visible = hasCompleted ? "true" : "false";
 	}
 
 	get ifEmpty() {
