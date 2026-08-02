@@ -335,12 +335,12 @@ Acceptance criteria:
 
 ### E2E-H07 — Replace in-page `window.fetch` interception with browser routing
 
-- [ ] Convert fetch replacement/wrapping to Playwright routing and request
+- [x] Convert fetch replacement/wrapping to Playwright routing and request
   observation.
-- [ ] Use actual browser offline mode for connectivity stories when it matches
+- [x] Use actual browser offline mode for connectivity stories when it matches
   production behavior; use route abort/fulfill for a deliberately injected
   endpoint failure.
-- [ ] Assert the application-visible reaction as well as the intercepted
+- [x] Assert the application-visible reaction as well as the intercepted
   request.
 
 Candidates:
@@ -349,6 +349,14 @@ Candidates:
 - `005_pages/test_005f_page_image.py`
 - `011_files/test_011a_file_tabs.py`
 - `001_site/test_001d_offline.py`
+
+Resolved 2026-08-01. All E2E native-fetch replacements now use scoped
+Playwright context routes. Deterministic page-image and document-generation
+responses capture their real multipart requests, the server-health story aborts
+only `HEAD /ping`, and the PDF loading story delays then continues the real
+range request. Each route is removed after its visible outcome, deliberate
+browser failures are narrowly expected, and a tooling boundary check prevents
+E2E string literals from assigning `window.fetch` or `globalThis.fetch`.
 
 Acceptance criteria:
 

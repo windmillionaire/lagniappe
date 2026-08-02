@@ -6,7 +6,11 @@ from types import SimpleNamespace
 
 import pytest
 
-from testing.utility.network import expect_successful_response
+from testing.utility.network import (
+    expect_successful_response,
+    multipart_form_fields,
+    scoped_browser_route,
+)
 from testing.utility import polling, reconnect
 
 
@@ -34,6 +38,17 @@ class FakePage:
         predicate, response_info = self.pending
         if predicate(response):
             response_info.value = response
+
+
+class FakeRoutingTarget:
+    def __init__(self):
+        self.events = []
+
+    def route(self, pattern, handler):
+        self.events.append(("route", pattern, handler))
+
+    def unroute(self, pattern, handler):
+        self.events.append(("unroute", pattern, handler))
 
 
 class FakeResponse:
@@ -72,6 +87,62 @@ def _revisions(*keys):
             [{"key": key} for key in keys]
         )
     }
+
+
+# @features e2e
+# @dimensions request-routing cleanup
+def test_scoped_browser_route_always_removes_handler():
+    target = FakeRoutingTarget()
+    handler = object()
+
+    with scoped_browser_route(target, "**/ping", handler):
+        assert target.events == [("route", "**/ping", handler)]
+
+    assert target.events[-1] == ("unroute", "**/ping", handler)
+
+    with pytest.raises(RuntimeError, match="route body failed"):
+        with scoped_browser_route(target, "**/sync", handler):
+            raise RuntimeError("route body failed")
+
+    assert target.events[-1] == ("unroute", "**/sync", handler)
+
+
+# @features e2e
+# @dimensions request-routing multipart
+def test_multipart_form_fields_preserves_values_and_filenames():
+    boundary = "----lagniappe-test-boundary"
+    body = (
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="prompt"\r\n\r\n'
+        "Generate a bright image\r\n"
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="tag"\r\n\r\n'
+        "first\r\n"
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="tag"\r\n\r\n'
+        "second\r\n"
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="upload"; '
+        'filename="sample.png"\r\n'
+        "Content-Type: image/png\r\n\r\n"
+        "file bytes\r\n"
+        f"--{boundary}--\r\n"
+    ).encode()
+    request = SimpleNamespace(
+        header_value=lambda name: (
+            f"multipart/form-data; boundary={boundary}"
+            if name == "content-type"
+            else None
+        ),
+        post_data_buffer=body,
+    )
+
+    assert multipart_form_fields(request) == [
+        ("prompt", "Generate a bright image"),
+        ("tag", "first"),
+        ("tag", "second"),
+        ("upload", "sample.png"),
+    ]
 
 
 def test_wait_matches_exact_method_path_query_and_request_payload():

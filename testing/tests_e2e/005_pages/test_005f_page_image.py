@@ -1,5 +1,6 @@
 """Page photo upload, generation, replacement, and removal workflows."""
 
+from contextlib import contextmanager
 import re
 
 import pytest
@@ -8,6 +9,11 @@ from playwright.sync_api import expect
 from testing.definitions import Pages, Uploads, Users
 from testing.elements import Attributes, UploadDropdown
 from testing.resources import Page
+from testing.utility import (
+    expect_successful_response,
+    multipart_form_fields,
+    scoped_browser_route,
+)
 
 pytestmark = pytest.mark.e2e
 
@@ -49,50 +55,22 @@ def _ensure_photo_form(user, page):
     return form
 
 
-def _mock_generated_image(page, html):
-    page.evaluate(
-        """(html) => {
-            if (!window.__lagniappeOriginalFetch) {
-                window.__lagniappeOriginalFetch = window.fetch.bind(window);
-            }
+@contextmanager
+def _mock_generated_image(page, key, html):
+    path = f"/assets/{key}/generate-page-image"
+    requests = []
 
-            window.__pageImageGenerateRequests = [];
-            window.fetch = async (input, init = {}) => {
-                const url = typeof input === "string" ? input : input.url;
-                if (!url.includes("/generate-page-image")) {
-                    return window.__lagniappeOriginalFetch(input, init);
-                }
+    def fulfill_generated_image(route):
+        assert route.request.method == "POST"
+        requests.append(multipart_form_fields(route.request))
+        route.fulfill(status=200, content_type="text/html", body=html)
 
-                const fields = [];
-                if (init.body instanceof FormData) {
-                    for (const [name, value] of init.body.entries()) {
-                        fields.push([
-                            name,
-                            value instanceof File ? value.name : String(value),
-                        ]);
-                    }
-                }
-                window.__pageImageGenerateRequests.push(fields);
-
-                return new Response(html, {
-                    status: 200,
-                    headers: { "content-type": "text/html" },
-                });
-            };
-        }""",
-        html,
-    )
-
-
-def _generated_image_request_count(page):
-    return page.evaluate("window.__pageImageGenerateRequests?.length || 0")
-
-
-def _wait_for_generated_image_request(page, count):
-    page.wait_for_function(
-        "(count) => (window.__pageImageGenerateRequests || []).length > count",
-        arg=count,
-    )
+    with scoped_browser_route(
+        page.context,
+        f"**{path}",
+        fulfill_generated_image,
+    ):
+        yield path, requests
 
 
 def _expect_cache_busted_image(form):
@@ -168,21 +146,31 @@ def test_generate_image_on_page(get_user):
       </div>
     """
 
-    _mock_generated_image(user.page, generated_dropzone)
-
     prompt.locator(page.PHOTO_PROMPT_GENERATE).click()
     form = _photo_form(user)
     generate_form = form.locator("[data-role='generate-image']")
     expect(generate_form).to_be_visible()
-    generate_form.locator("textarea[name='prompt']").fill("Create a bright page image")
+    image_prompt = "Create a bright page image"
+    generate_form.locator("textarea[name='prompt']").fill(image_prompt)
 
-    request_count = _generated_image_request_count(user.page)
-    generate_form.locator("button[data-role='generate']").click()
-    _wait_for_generated_image_request(user.page, request_count)
+    with _mock_generated_image(
+        user.page,
+        page.key,
+        generated_dropzone,
+    ) as (path, requests):
+        with expect_successful_response(
+            user.page,
+            method="POST",
+            path=path,
+        ):
+            generate_form.locator("button[data-role='generate']").click()
 
-    expect(form.locator("img[alt='Generated test image']")).to_be_visible()
-    expect(prompt).not_to_be_attached()
-    expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-7xl.*"))
+        expect(form.locator("img[alt='Generated test image']")).to_be_visible()
+        expect(prompt).not_to_be_attached()
+        expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-7xl.*"))
+
+    assert len(requests) == 1
+    assert ("prompt", image_prompt) in requests[0]
 
 
 # @features pages

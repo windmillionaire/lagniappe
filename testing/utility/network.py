@@ -4,9 +4,69 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from email.parser import BytesParser
+from email.policy import default
 import json
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
+
+
+# @testable true
+# @tests tests_tooling/test_004_network_waits.py::test_scoped_browser_route_always_removes_handler
+# @features e2e
+# @dimensions request-routing cleanup
+@contextmanager
+def scoped_browser_route(
+    target: Any,
+    pattern: Any,
+    handler: Callable[[Any], None],
+) -> Iterator[None]:
+    """Install one Playwright route for a bounded scope and always remove it."""
+
+    target.route(pattern, handler)
+    try:
+        yield
+    finally:
+        target.unroute(pattern, handler)
+
+
+# @testable true
+# @tests tests_tooling/test_004_network_waits.py::test_multipart_form_fields_preserves_values_and_filenames
+# @features e2e
+# @dimensions request-routing multipart
+def multipart_form_fields(request: Any) -> list[tuple[str, str]]:
+    """Return ordered text values and filenames from a Playwright multipart request."""
+
+    content_type = request.header_value("content-type")
+    assert content_type and content_type.lower().startswith("multipart/form-data;"), (
+        "Expected a multipart/form-data browser request; received "
+        f"{content_type!r}"
+    )
+    body = request.post_data_buffer
+    assert body is not None, "Expected the multipart browser request to have a body"
+
+    message = BytesParser(policy=default).parsebytes(
+        b"Content-Type: "
+        + content_type.encode("latin-1")
+        + b"\r\nMIME-Version: 1.0\r\n\r\n"
+        + body
+    )
+    assert message.is_multipart(), "Browser request body was not valid multipart data"
+
+    fields = []
+    for part in message.iter_parts():
+        if part.get_content_disposition() != "form-data":
+            continue
+        name = part.get_param("name", header="content-disposition")
+        if not name:
+            continue
+        filename = part.get_filename()
+        if filename is not None:
+            fields.append((name, filename))
+            continue
+        payload = part.get_payload(decode=True) or b""
+        fields.append((name, payload.decode(part.get_content_charset() or "utf-8")))
+    return fields
 
 
 # @testable true

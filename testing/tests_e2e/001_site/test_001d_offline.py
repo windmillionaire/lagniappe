@@ -18,6 +18,7 @@ Related Files:
 import pytest
 
 from testing.definitions import Projects, SitePages, Users
+from testing.utility import expect_successful_response, scoped_browser_route
 from playwright.sync_api import expect
 
 pytestmark = pytest.mark.e2e
@@ -62,28 +63,6 @@ async ({ minimum, exact }) => {
 
 def trigger_focus_sync(user):
     user.page.evaluate("window.dispatchEvent(new Event('focus'));")
-
-
-def block_ping(user, blocked):
-    user.page.evaluate(
-        """
-        (blocked) => {
-            window.__LP_BLOCK_PING__ = blocked;
-            if (window.__LP_ORIGINAL_FETCH__) return;
-
-            window.__LP_ORIGINAL_FETCH__ = window.fetch.bind(window);
-            window.fetch = (input, init) => {
-                const url = typeof input === "string" ? input : input?.url;
-                const pathname = new URL(url, window.location.href).pathname;
-                if (window.__LP_BLOCK_PING__ && pathname === "/ping") {
-                    return Promise.reject(new TypeError("Failed to fetch"));
-                }
-                return window.__LP_ORIGINAL_FETCH__(input, init);
-            };
-        }
-        """,
-        blocked,
-    )
 
 
 def suppress_online_event_sync(user):
@@ -156,7 +135,10 @@ def test_offline_indicator_toggles(get_user, browser_failures):
 
 # @features offline
 # @dimensions indicator server-health
-def test_failed_ping_marks_view_offline_until_next_sync_event(get_user):
+def test_failed_ping_marks_view_offline_until_next_sync_event(
+    get_user,
+    browser_failures,
+):
     """
     Test that server health, not just client connectivity, drives offline UI.
 
@@ -174,13 +156,40 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(get_user):
     user = get_user(Users.OWNER)
     user.go(SitePages.HOME)
 
-    block_ping(user, True)
-    trigger_focus_sync(user)
     indicator = user.locate(OFFLINE_INDICATOR)
-    expect(indicator).to_be_visible()
+    failed_pings = []
 
-    block_ping(user, False)
-    trigger_focus_sync(user)
+    def fail_ping(route):
+        assert route.request.method == "HEAD"
+        failed_pings.append(route.request)
+        route.abort("connectionfailed")
+
+    with scoped_browser_route(user.page.context, "**/ping", fail_ping):
+        with browser_failures.expect(
+            user,
+            kind="requestfailed",
+            method="HEAD",
+            path="/ping",
+            failure="net::ERR_CONNECTION_FAILED",
+        ):
+            with browser_failures.expect(
+                user,
+                kind="console",
+                console_type="error",
+                text="Failed to load resource: net::ERR_CONNECTION_FAILED",
+                source_path="/ping",
+            ):
+                trigger_focus_sync(user)
+                expect(indicator).to_be_visible()
+
+    assert len(failed_pings) == 1
+
+    with expect_successful_response(
+        user.page,
+        method="HEAD",
+        path="/ping",
+    ):
+        trigger_focus_sync(user)
     expect(indicator).to_be_hidden()
 
 

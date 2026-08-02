@@ -105,6 +105,38 @@ For native connectivity transitions, prefer `browser_failures.expect_offline(use
 around the `user.offline = True` action and its offline assertions. It expects
 the exact `HEAD /ping` disconnect and console error produced by the browser.
 
+### Browser request interception
+
+Use `scoped_browser_route()` when an E2E story must observe, delay, abort, or
+fulfill a browser request. Install the route on `user.page.context` so requests
+forwarded through the service worker remain observable, use the narrowest
+stable endpoint pattern, and keep the application action plus its visible
+outcome inside the route scope:
+
+```python
+def fail_ping(route):
+    assert route.request.method == "HEAD"
+    route.abort("connectionfailed")
+
+
+with scoped_browser_route(user.page.context, "**/ping", fail_ping):
+    with browser_failures.expect(
+        user,
+        kind="requestfailed",
+        method="HEAD",
+        path="/ping",
+        failure="net::ERR_CONNECTION_FAILED",
+    ):
+        trigger_server_health_check()
+        expect(user.locate("[data-role='offline']")).to_be_visible()
+```
+
+Use `multipart_form_fields()` to inspect a routed `FormData` request without
+replacing `window.fetch`. Prefer native browser offline mode for connectivity
+stories. Use route abort/fulfill only when the story deliberately injects one
+endpoint failure or deterministic provider response, and narrowly expect any
+console or request failure that the route produces.
+
 ### Network response waits
 
 For a normal browser mutation, use `expect_successful_response()` instead of a

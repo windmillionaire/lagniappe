@@ -7,7 +7,11 @@ helpers, and other support code here rather than in test modules.
 """
 
 from .error_tracking import capture_on_failure
-from .network import expect_successful_response
+from .network import (
+    expect_successful_response,
+    multipart_form_fields,
+    scoped_browser_route,
+)
 from .offline import wait_for_offline_mutations
 from .polling import expect_poll_result
 from .reconnect import expect_reconnect_refresh
@@ -19,6 +23,8 @@ __all__ = [
     "expect_poll_result",
     "expect_successful_response",
     "expect_reconnect_refresh",
+    "multipart_form_fields",
+    "scoped_browser_route",
     "wait_for_offline_mutations",
     "TestFile",
     "TestResults",

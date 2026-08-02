@@ -1,3 +1,6 @@
+from contextlib import contextmanager
+from html import escape
+import json
 import re
 
 import pytest
@@ -6,124 +9,85 @@ from playwright.sync_api import expect
 from testing.definitions import Pages, Tasks, Uploads, Users
 from testing.elements import EditorGenerateText, EditorGenerateTextMode, Modal
 from testing.resources import File
+from testing.utility import (
+    expect_successful_response,
+    multipart_form_fields,
+    scoped_browser_route,
+)
 
 pytestmark = pytest.mark.e2e
 
 
-def _mock_generate_text(page, markers=None, error=None):
-    page.evaluate(
-        """({markers, error}) => {
-            const escapeHtml = (value) => String(value ?? "").replace(
-                /[&<>"']/g,
-                (character) => ({
-                    "&": "&amp;",
-                    "<": "&lt;",
-                    ">": "&gt;",
-                    '"': "&quot;",
-                    "'": "&#039;",
-                })[character],
-            );
+@contextmanager
+def _mock_generate_text(browser_page, key, markers=None, error=None):
+    path = f"/assets/{key}/document/generate"
+    requests = []
+    remaining_markers = list(markers or ["Generated text marker"])
 
-            if (!window.__lagniappeOriginalFetch) {
-                window.__lagniappeOriginalFetch = window.fetch.bind(window);
-            }
+    def field_value(fields, name):
+        return next((value for field, value in fields if field == name), "")
 
-            window.__generateTextRequests = [];
-            window.__generateTextMarkers = [...markers];
-            window.__generateTextError = error;
-            window.fetch = async (input, init = {}) => {
-                const url = typeof input === "string" ? input : input.url;
-                if (!url.includes("/document/generate")) {
-                    return window.__lagniappeOriginalFetch(input, init);
-                }
+    def fulfill_generate_text(route):
+        assert route.request.method == "POST"
+        fields = multipart_form_fields(route.request)
+        requests.append(fields)
 
-                const fields = [];
-                if (init.body instanceof FormData) {
-                    for (const [name, value] of init.body.entries()) {
-                        fields.push([
-                            name,
-                            value instanceof File ? value.name : String(value),
-                        ]);
-                    }
-                }
-                window.__generateTextRequests.push(fields);
+        if error:
+            route.fulfill(status=422, content_type="text/plain", body=error)
+            return
 
-                if (window.__generateTextError) {
-                    return new Response(window.__generateTextError, {
-                        status: 422,
-                        headers: { "content-type": "text/plain" },
-                    });
-                }
+        if field_value(fields, "role") == "explain":
+            prompt = escape(field_value(fields, "prompt"))
+            selected_text = escape(field_value(fields, "selected_text"))
+            modal = f"""
+                <div id="modal">
+                  <div id="modal-content">
+                    <button type="button" lp-control="close">Close</button>
+                    <section>
+                      <h2>Prompt</h2>
+                      <p>Prompt: {prompt}</p>
+                      <p>Selected text: {selected_text}</p>
+                    </section>
+                  </div>
+                </div>"""
+            body = {"modal": modal}
+        else:
+            marker = (
+                remaining_markers.pop(0)
+                if remaining_markers
+                else "Generated text marker"
+            )
+            body = {"markup": f"<p>{escape(marker)}</p>"}
 
-                const fieldValue = (name) => {
-                    const field = fields.find(([key]) => key === name);
-                    return field ? field[1] : "";
-                };
-                if (fieldValue("role") === "explain") {
-                    const selectedText = escapeHtml(fieldValue("selected_text"));
-                    const prompt = escapeHtml(fieldValue("prompt"));
-                    const modal = `
-                        <div id="modal">
-                          <div id="modal-content">
-                            <button type="button" lp-control="close">Close</button>
-                            <section>
-                              <h2>Prompt</h2>
-                              <p>Prompt: ${prompt}</p>
-                              <p>Selected text: ${selectedText}</p>
-                            </section>
-                          </div>
-                        </div>`;
-                    return new Response(JSON.stringify({ modal }), {
-                        status: 200,
-                        headers: { "content-type": "application/json" },
-                    });
-                }
+        route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps(body),
+        )
 
-                const marker =
-                    window.__generateTextMarkers.shift() || "Generated text marker";
-                return new Response(
-                    JSON.stringify({ markup: `<p>${escapeHtml(marker)}</p>` }),
-                    {
-                        status: 200,
-                        headers: { "content-type": "application/json" },
-                    },
-                );
-            };
-        }""",
-        {
-            "markers": markers or ["Generated text marker"],
-            "error": error,
-        },
-    )
-
-
-def _generate_text_request_count(page):
-    return page.evaluate("window.__generateTextRequests?.length || 0")
-
-
-def _generate_text_requests(page):
-    return page.evaluate("window.__generateTextRequests || []")
-
-
-def _wait_for_generate_text_request(page, count):
-    page.wait_for_function(
-        "(count) => (window.__generateTextRequests || []).length > count",
-        arg=count,
-    )
+    with scoped_browser_route(
+        browser_page.context,
+        f"**{path}",
+        fulfill_generate_text,
+    ):
+        yield path, requests
 
 
 def _field_values(request, field):
     return [value for name, value in request if name == field]
 
 
-def _submit_generated_text(editor, mode, prompt):
+def _submit_generated_text(editor, mode, prompt, path):
     page = editor.editor.page
-    request_count = _generate_text_request_count(page)
     form = EditorGenerateText(editor)
     form.set_mode(mode)
     form.fill_prompt(prompt)
-    form.submit()
-    _wait_for_generate_text_request(page, request_count)
+    with expect_successful_response(
+        page,
+        method="POST",
+        path=path,
+    ):
+        form.submit()
     editor.wait_for_render()
 
 
@@ -147,67 +111,80 @@ def test_generate_text_inserts_ai_markup_with_insert_modes(get_user):
         "Generated quote marker",
         "Generated cursor marker",
     ]
-    _mock_generate_text(user.page, markers)
+    with _mock_generate_text(
+        user.page,
+        page.key,
+        markers,
+    ) as (path, requests):
+        editor.clear_text()
+        editor.type_text("Original replace text")
+        _submit_generated_text(
+            editor,
+            EditorGenerateTextMode.REPLACE_DOCUMENT,
+            "Replace the document",
+            path,
+        )
+        expect(editor.text_entry).to_contain_text("Generated replace marker")
+        expect(editor.text_entry).not_to_contain_text("Original replace text")
 
-    editor.clear_text()
-    editor.type_text("Original replace text")
-    _submit_generated_text(
-        editor,
-        EditorGenerateTextMode.REPLACE_DOCUMENT,
-        "Replace the document",
-    )
-    expect(editor.text_entry).to_contain_text("Generated replace marker")
-    expect(editor.text_entry).not_to_contain_text("Original replace text")
+        editor.clear_text()
+        editor.type_text("Append base")
+        _submit_generated_text(
+            editor,
+            EditorGenerateTextMode.APPEND_TO_DOCUMENT,
+            "Append to the document",
+            path,
+        )
+        _assert_ordered(editor.get_text(), "Append base", "Generated append marker")
 
-    editor.clear_text()
-    editor.type_text("Append base")
-    _submit_generated_text(
-        editor,
-        EditorGenerateTextMode.APPEND_TO_DOCUMENT,
-        "Append to the document",
-    )
-    _assert_ordered(editor.get_text(), "Append base", "Generated append marker")
+        editor.clear_text()
+        editor.type_text("Prepend base")
+        _submit_generated_text(
+            editor,
+            EditorGenerateTextMode.PREPEND_TO_DOCUMENT,
+            "Prepend to the document",
+            path,
+        )
+        _assert_ordered(
+            editor.get_text(),
+            "Generated prepend marker",
+            "Prepend base",
+        )
 
-    editor.clear_text()
-    editor.type_text("Prepend base")
-    _submit_generated_text(
-        editor,
-        EditorGenerateTextMode.PREPEND_TO_DOCUMENT,
-        "Prepend to the document",
-    )
-    _assert_ordered(editor.get_text(), "Generated prepend marker", "Prepend base")
+        editor.clear_text()
+        editor.type_text("Quote base")
+        _submit_generated_text(
+            editor,
+            EditorGenerateTextMode.ADD_AS_QUOTE,
+            "Quote this at the top",
+            path,
+        )
+        expect(editor.get_element("blockquote")).to_contain_text(
+            "Generated quote marker"
+        )
 
-    editor.clear_text()
-    editor.type_text("Quote base")
-    _submit_generated_text(
-        editor,
-        EditorGenerateTextMode.ADD_AS_QUOTE,
-        "Quote this at the top",
-    )
-    expect(editor.get_element("blockquote")).to_contain_text("Generated quote marker")
+        editor.clear_text()
+        editor.type_text("Cursor base ")
+        _submit_generated_text(
+            editor,
+            EditorGenerateTextMode.ADD_AT_CURSOR,
+            "Insert at the cursor",
+            path,
+        )
+        _assert_ordered(editor.get_text(), "Cursor base", "Generated cursor marker")
 
-    editor.clear_text()
-    editor.type_text("Cursor base ")
-    _submit_generated_text(
-        editor,
-        EditorGenerateTextMode.ADD_AT_CURSOR,
-        "Insert at the cursor",
-    )
-    _assert_ordered(editor.get_text(), "Cursor base", "Generated cursor marker")
-
-    requests = _generate_text_requests(user.page)
-    assert len(requests) == len(markers)
-    for mode, post_data in zip(
-        [
-            "replace",
-            "append",
-            "prepend",
-            "quote-top",
-            "cursor",
-        ],
-        requests,
-    ):
-        assert mode in _field_values(post_data, "insert_mode")
+        assert len(requests) == len(markers)
+        for mode, post_data in zip(
+            [
+                "replace",
+                "append",
+                "prepend",
+                "quote-top",
+                "cursor",
+            ],
+            requests,
+        ):
+            assert mode in _field_values(post_data, "insert_mode")
 
     editor.blur()
     user.go(page)
@@ -222,7 +199,6 @@ def test_generate_text_replaces_selection_and_posts_selected_text(get_user):
     editor = page.editor
 
     selected_text = "Selected page document text"
-    _mock_generate_text(user.page, ["Generated selection marker"])
 
     editor.clear_text()
     editor.type_text(selected_text)
@@ -235,16 +211,24 @@ def test_generate_text_replaces_selection_and_posts_selected_text(get_user):
     expect(form.form.locator('input[value="replace-selection"]')).to_be_checked()
     form.fill_prompt("Rewrite the selected text")
 
-    request_count = _generate_text_request_count(user.page)
-    form.submit()
-    _wait_for_generate_text_request(user.page, request_count)
-    editor.wait_for_render()
+    with _mock_generate_text(
+        user.page,
+        page.key,
+        ["Generated selection marker"],
+    ) as (path, requests):
+        with expect_successful_response(
+            user.page,
+            method="POST",
+            path=path,
+        ):
+            form.submit()
+        editor.wait_for_render()
 
-    requests = _generate_text_requests(user.page)
-    assert selected_text in _field_values(requests[0], "selected_text")
-    assert "replace-selection" in _field_values(requests[0], "insert_mode")
-    expect(editor.text_entry).to_contain_text("Generated selection marker")
-    expect(editor.text_entry).not_to_contain_text(selected_text)
+        assert len(requests) == 1
+        assert selected_text in _field_values(requests[0], "selected_text")
+        assert "replace-selection" in _field_values(requests[0], "insert_mode")
+        expect(editor.text_entry).to_contain_text("Generated selection marker")
+        expect(editor.text_entry).not_to_contain_text(selected_text)
 
 
 # @features editor ai
@@ -255,7 +239,6 @@ def test_generate_text_explain_includes_selected_text_context(get_user):
     editor = page.editor
 
     selected_text = "Explain selected document text"
-    _mock_generate_text(user.page)
 
     editor.clear_text()
     editor.type_text(selected_text)
@@ -267,37 +250,72 @@ def test_generate_text_explain_includes_selected_text_context(get_user):
         "Initial Prompt"
     )
 
-    request_count = _generate_text_request_count(user.page)
-    form.explain()
-    _wait_for_generate_text_request(user.page, request_count)
+    with _mock_generate_text(user.page, page.key) as (path, requests):
+        with expect_successful_response(
+            user.page,
+            method="POST",
+            path=path,
+        ):
+            form.explain()
 
-    modal = Modal(user.page)
-    expect(modal.element).to_be_visible()
-    expect(modal.element).to_contain_text(re.compile("selected text", re.I))
-    expect(modal.element).to_contain_text(selected_text)
-    modal.close()
+        modal = Modal(user.page)
+        expect(modal.element).to_be_visible()
+        expect(modal.element).to_contain_text(re.compile("selected text", re.I))
+        expect(modal.element).to_contain_text(selected_text)
+        assert len(requests) == 1
+        assert selected_text in _field_values(requests[0], "selected_text")
+        assert "explain" in _field_values(requests[0], "role")
+        modal.close()
 
 
 # @features editor ai
 # @dimensions generate-text error
-def test_generate_text_provider_error_surfaces_in_form(get_user):
+def test_generate_text_provider_error_surfaces_in_form(
+    get_user,
+    browser_failures,
+):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_document_generation_page)
     editor = page.editor
     error = "Synthetic provider failure"
-    _mock_generate_text(user.page, error=error)
 
     editor.clear_text()
     form = EditorGenerateText(editor)
-    form.fill_prompt("Trigger an error")
+    prompt = "Trigger an error"
+    form.fill_prompt(prompt)
 
-    request_count = _generate_text_request_count(user.page)
-    form.submit()
-    _wait_for_generate_text_request(user.page, request_count)
+    with _mock_generate_text(
+        user.page,
+        page.key,
+        error=error,
+    ) as (path, requests):
+        with browser_failures.expect(
+            user,
+            kind="console",
+            console_type="error",
+            text_contains=(
+                "Failed to load resource: the server responded with a status of 422"
+            ),
+            source_path=path,
+        ):
+            with user.page.expect_response(
+                lambda response: (
+                    response.request.method == "POST"
+                    and response.url.endswith(path)
+                )
+            ) as response_info:
+                form.submit()
 
-    expect(form.form.locator("[data-role='error']")).to_contain_text(
-        re.compile(error)
-    )
+            response = response_info.value
+            assert response.status == 422
+            assert response.text() == error
+            expect(form.form.locator("[data-role='error']")).to_contain_text(
+                re.compile(error)
+            )
+
+        assert len(requests) == 1
+        assert ("prompt", prompt) in requests[0]
+        assert ("role", "generate") in requests[0]
 
 
 # @features ai

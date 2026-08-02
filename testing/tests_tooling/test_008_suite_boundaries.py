@@ -2,6 +2,7 @@
 
 import ast
 from pathlib import Path
+import re
 
 import pytest
 
@@ -21,6 +22,12 @@ E2E_CACHE_CONTRACT_ROOTS = (
     TESTING_ROOT / "resources",
 )
 E2E_PROCESS_STATE_SUFFIXES = ("_READY", "_SEEDED", "_CREATED", "_INITIALIZED")
+E2E_NATIVE_FETCH_ASSIGNMENT = re.compile(
+    r"""\b(?:window|globalThis)\s*
+        (?:\.\s*fetch|\[\s*['"]fetch['"]\s*\])\s*=
+    """,
+    re.VERBOSE,
+)
 
 
 def _python_files(*roots):
@@ -247,6 +254,27 @@ def test_e2e_modules_do_not_cache_durable_setup_in_process_booleans():
                     E2E_PROCESS_STATE_SUFFIXES
                 ):
                     violations.append(f"{relative}:{node.lineno} defines {target.id}")
+
+    assert violations == []
+
+
+def test_e2e_modules_do_not_replace_native_browser_fetch():
+    """Endpoint failures and stubs belong at Playwright's routing boundary."""
+    violations = []
+    for path in _python_files(TESTING_ROOT / "tests_e2e"):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        relative = path.relative_to(REPOSITORY_ROOT)
+        for node in ast.walk(tree):
+            if not (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+            ):
+                continue
+            for offset, line in enumerate(node.value.splitlines()):
+                if E2E_NATIVE_FETCH_ASSIGNMENT.search(line):
+                    violations.append(
+                        f"{relative}:{node.lineno + offset} assigns native fetch"
+                    )
 
     assert violations == []
 

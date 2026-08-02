@@ -11,6 +11,7 @@ Verified against:
 
 import re
 from pathlib import Path
+import time
 
 from playwright.sync_api import expect
 import pytest
@@ -22,6 +23,7 @@ from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Uploads, Users
 from testing.elements import MobileNav, Select, SpinnerButtons, Tabs
 from testing.resources import File
+from testing.utility import scoped_browser_route
 
 pytestmark = pytest.mark.e2e
 
@@ -280,35 +282,40 @@ def test_pdf_preview_loading_state_paints_before_document_render(get_user):
         Pages.test_file_upload_page,
         Uploads.pdf_file,
     )
-    user.page.add_init_script(
-        """
-        const originalFetch = window.fetch.bind(window);
-        window.fetch = async (...args) => {
-            const [resource, options = {}] = args;
-            const requestHeaders =
-                resource instanceof Request ? resource.headers : undefined;
-            const headers = new Headers(options.headers || requestHeaders);
-            if (headers.has("Range")) {
-                await new Promise((resolve) => setTimeout(resolve, 1500));
-            }
-            return originalFetch(...args);
-        };
-        """
+    range_requests = []
+
+    def delay_range_request(route):
+        range_header = route.request.header_value("range")
+        if range_header:
+            assert route.request.method == "GET"
+            range_requests.append(route.request)
+            time.sleep(1.5)
+        route.continue_()
+
+    with scoped_browser_route(
+        user.page.context,
+        f"**/assets/{uploaded_file.key}/file*",
+        delay_range_request,
+    ):
+        user.go(uploaded_file)
+
+        preview = user.locate(uploaded_file.PREVIEW_PDF)
+        status = user.locate(uploaded_file.PREVIEW_PDF_STATUS)
+        first_page = user.locate(uploaded_file.PREVIEW_PDF_CANVAS).first
+        expect(preview).to_have_attribute("aria-busy", "true")
+        expect(status).to_be_visible()
+        expect(user.locate(uploaded_file.PREVIEW_PDF_LOADING_BARS)).to_have_count(3)
+
+        expect(status).to_be_hidden()
+        expect(preview).not_to_have_attribute("aria-busy", "true")
+        expect(first_page).not_to_have_attribute("width", "0")
+        expect(first_page).not_to_have_attribute("height", "0")
+
+    assert range_requests
+    assert all(
+        request.header_value("range").startswith("bytes=")
+        for request in range_requests
     )
-
-    user.go(uploaded_file)
-
-    preview = user.locate(uploaded_file.PREVIEW_PDF)
-    status = user.locate(uploaded_file.PREVIEW_PDF_STATUS)
-    first_page = user.locate(uploaded_file.PREVIEW_PDF_CANVAS).first
-    expect(preview).to_have_attribute("aria-busy", "true")
-    expect(status).to_be_visible()
-    expect(user.locate(uploaded_file.PREVIEW_PDF_LOADING_BARS)).to_have_count(3)
-
-    expect(status).to_be_hidden()
-    expect(preview).not_to_have_attribute("aria-busy", "true")
-    expect(first_page).not_to_have_attribute("width", "0")
-    expect(first_page).not_to_have_attribute("height", "0")
 
 
 # @features file
