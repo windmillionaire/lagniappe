@@ -96,6 +96,17 @@ def _base_nodeid(nodeid: str) -> str:
     return "::".join(parts)
 
 
+def _test_module_exists(repo_root: Path, nodeid: str) -> bool:
+    """Return whether a recorded node ID still belongs to a test module."""
+    raw_path = nodeid.partition("::")[0]
+    path = Path(raw_path)
+    if path.is_absolute():
+        return path.is_file()
+    if path.parts and path.parts[0] == "testing":
+        return (repo_root / path).is_file()
+    return (repo_root / "testing" / path).is_file() or (repo_root / path).is_file()
+
+
 def _completed_parameter_sets(
     recorded_command: list[str],
     outcomes: dict[str, dict[str, object]],
@@ -151,6 +162,12 @@ def _write_manifest(
         if isinstance(previous_tests, dict):
             tests.update(previous_tests)
         snapshots.update(decode_test_run_snapshots(previous))
+
+    tests = {
+        nodeid: row
+        for nodeid, row in tests.items()
+        if nodeid in outcomes or _test_module_exists(repo_root, nodeid)
+    }
 
     snapshots[snapshot_id] = path_fingerprints
     recorded_outcomes = {

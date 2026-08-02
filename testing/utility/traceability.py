@@ -111,9 +111,6 @@ CONTEXT_TOKEN_STOPWORDS = {
 TESTABLE_INFRASTRUCTURE = "infrastructure"
 TESTABLE_ARCHITECTURE_ALIASES = {"architecture", "infra", "infrastructure"}
 SUPPRESSIVE_TESTABLE_VALUES = {True, False, TESTABLE_INFRASTRUCTURE}
-TEST_RESULT_VERIFICATION_EXEMPT = {
-    "tests_e2e/test_999_structural_evidence.py::test_structural_evidence_after_full_e2e_suite"
-}
 TEST_FUNCTION_SOURCE_CACHE: dict[str, str] = {}
 
 
@@ -5056,8 +5053,6 @@ def report_findings(report: Report) -> list[dict[str, str]]:
             {test.nodeid: test for test in report.template_contract_tests}
         )
         for test in required_tests.values():
-            if test.nodeid in TEST_RESULT_VERIFICATION_EXEMPT:
-                continue
             if not test.execution_current:
                 add(
                     "referenced-test-not-run",

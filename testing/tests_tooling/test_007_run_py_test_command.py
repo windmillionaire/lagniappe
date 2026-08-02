@@ -141,6 +141,10 @@ def test_behavior_snapshot_excludes_tracked_test_evidence(monkeypatch, tmp_path)
 def test_traceability_result_plugin_merges_focused_results_without_session_history(
     monkeypatch, tmp_path
 ):
+    tests_root = tmp_path / "testing/tests_unit"
+    tests_root.mkdir(parents=True)
+    (tests_root / "test_a.py").write_text("")
+    (tests_root / "test_b.py").write_text("")
     generated_at = "2026-01-01T00:00:00+00:00"
     monkeypatch.setattr(
         traceability_results,
@@ -278,6 +282,10 @@ def test_traceability_result_plugin_replaces_a_completed_parameter_set(
 def test_traceability_result_plugin_keeps_other_tests_across_tree_changes(
     monkeypatch, tmp_path
 ):
+    tests_root = tmp_path / "testing/tests_unit"
+    tests_root.mkdir(parents=True)
+    (tests_root / "test_a.py").write_text("")
+    (tests_root / "test_b.py").write_text("")
     generated_times = iter(
         [
             "2026-01-01T00:00:00+00:00",
@@ -319,9 +327,66 @@ def test_traceability_result_plugin_keeps_other_tests_across_tree_changes(
     }
 
 
+def test_traceability_result_plugin_prunes_deleted_test_modules(monkeypatch, tmp_path):
+    tests_root = tmp_path / "testing/tests_unit"
+    tests_root.mkdir(parents=True)
+    deleted_path = tests_root / "test_deleted.py"
+    retained_path = tests_root / "test_retained.py"
+    deleted_path.write_text("")
+    retained_path.write_text("")
+    snapshots = iter(
+        [
+            (
+                "snapshot-one",
+                {
+                    "testing/tests_unit/test_deleted.py": "deleted",
+                    "testing/tests_unit/test_retained.py": "retained-old",
+                },
+            ),
+            (
+                "snapshot-two",
+                {"testing/tests_unit/test_retained.py": "retained-current"},
+            ),
+        ]
+    )
+    monkeypatch.setattr(
+        traceability_results, "behavior_snapshot", lambda repo_root: next(snapshots)
+    )
+    deleted_nodeid = "tests_unit/test_deleted.py::test_deleted"
+    retained_nodeid = "tests_unit/test_retained.py::test_retained"
+    traceability_results._write_manifest(
+        tmp_path,
+        ["run.py", "test", "testing/tests_unit"],
+        {
+            deleted_nodeid: {"outcome": "passed", "duration": 0.1},
+            retained_nodeid: {"outcome": "passed", "duration": 0.1},
+        },
+        0,
+    )
+
+    deleted_path.unlink()
+    traceability_results._write_manifest(
+        tmp_path,
+        ["run.py", "test", retained_nodeid],
+        {retained_nodeid: {"outcome": "passed", "duration": 0.1}},
+        0,
+    )
+
+    payload = json.loads((tmp_path / "testing/evidence/latest.json").read_text())
+    assert set(payload["tests"]) == {retained_nodeid}
+    assert set(payload["snapshots"]) == {"snapshot-two"}
+    assert traceability_common.decode_test_run_snapshots(payload) == {
+        "snapshot-two": {"testing/tests_unit/test_retained.py": "retained-current"}
+    }
+
+
 def test_traceability_result_plugin_migrates_legacy_snapshot_maps(
     monkeypatch, tmp_path
 ):
+    tests_root = tmp_path / "testing/tests_unit"
+    tests_root.mkdir(parents=True)
+    (tests_root / "test_a.py").write_text("")
+    (tests_root / "test_b.py").write_text("")
     destination = tmp_path / "testing/evidence/latest.json"
     destination.parent.mkdir(parents=True)
     destination.write_text(

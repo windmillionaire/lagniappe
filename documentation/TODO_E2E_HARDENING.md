@@ -453,20 +453,28 @@ Acceptance criteria:
 - A direct adapter invocation is not presented as evidence that the browser
   workflow works.
 
-### E2E-H10 — Explicitly classify structural evidence tests
+### E2E-H10 — Retire the structural evidence collector
 
-- [ ] Document/mark `test_999_structural_evidence.py` as instrumentation and
-  structural-contract coverage rather than a user journey.
-- [ ] Keep its monkeypatching where it is necessary to observe structural
-  behavior, but do not use it to justify browser behavior that has no real E2E
-  story.
-- [ ] Check its source annotations under that classification.
+- [x] Remove the full-suite collector and its generated baseline format.
+- [x] Remove its instrumentation-only JavaScript/tooling coverage, pytest
+  marker and collection ordering, and traceability exception.
+- [x] Make tracked test evidence prune results owned by deleted modules.
+- [x] Keep independently useful tracing and user behavior coverage at their
+  existing unit, JavaScript, and E2E layers.
+
+Resolution: The collector recorded accumulated fixture shapes and
+implementation-level counts without thresholds, comparisons, or a downstream
+consumer. Its output was not an actionable regression guard, while its
+monkeypatching and full-suite-only lifecycle added maintenance cost. The
+collector stack was retired; underlying debug tracing and ordinary reconnect,
+cache, deferred-job, and AI behavior tests remain.
 
 Acceptance criteria:
 
-- Reports and reviewers can distinguish structural evidence from live user
-  behavior.
-- Instrumentation-specific JavaScript is not copied into ordinary E2E tests.
+- A full E2E run contains user and integration stories, not a synthetic final
+  measurement workflow.
+- Pytest and traceability need no special case for a full-suite-only collector.
+- The tracked evidence manifest contains no results for deleted test modules.
 
 ## Priority 3: localized durability improvements
 
@@ -671,5 +679,6 @@ the focused verification performed, and any intentional exception that remains.
 
 | Date | Item | Cluster | Result / remaining exception |
 |---|---|---|---|
+| 2026-08-02 | E2E-H10 | Structural evidence collector | Retired the non-actionable full-suite collector, generated baseline format, instrumentation-only tests, collection hook, marker, and traceability exception. The evidence reporter now prunes deleted test modules. The 105 focused tooling tests, 478-test E2E collection, Ruff check, and changed-scope traceability pass. Existing behavior-specific coverage remains; no exception remains. |
 | 2026-08-02 | E2E-H09 | AI report/deferred-job suite boundaries | Moved Ask/Organize adapter publication contracts to unit coverage, retired direct-provider/browserless E2E, and retained UI-started Ask jobs with durable checkpoints and natural polling reconciliation. The 184-test unit cluster, 11-test boundary suite, five focused E2E checks, one-run three-case live-provider evaluation, template contracts, and changed-source traceability pass. No exception remains. |
 | 2026-08-02 | E2E-H08 | Route/core suite boundaries | Replaced white-box route calls with core unit contracts and authenticated managed-server coverage. The 31-test focused unit/tooling cluster, 12 focused E2E contracts, and template contracts pass. Traceability has no metadata, link, or feature/dimension errors; refreshing current evidence for 71 adjacent historical tests was deferred to avoid an unrequested broad E2E run. |

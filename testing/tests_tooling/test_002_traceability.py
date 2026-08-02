@@ -2542,27 +2542,6 @@ def test_traceability_check_includes_template_contract_findings():
     ]
 
 
-def test_traceability_skips_current_result_gate_for_full_suite_structural_collector():
-    report = traceability.classify([], {})
-    report.summary["changed_scope"] = True
-    structural = make_test_case(
-        "tests_e2e/test_999_structural_evidence.py::"
-        "test_structural_evidence_after_full_e2e_suite",
-        runnable=True,
-        path="tests_e2e/test_999_structural_evidence.py",
-    )
-    structural.execution = "failed"
-    structural.execution_current = True
-    report.changed_tests = [structural]
-
-    findings = traceability.report_findings(report)
-
-    assert not {
-        "referenced-test-not-run",
-        "referenced-test-not-passed",
-    } & {finding["kind"] for finding in findings}
-
-
 def source_symbol(
     path,
     qualname,

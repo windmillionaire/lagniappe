@@ -55,9 +55,11 @@ reviewable evidence that the maintainer ran the relevant tests on configured
 infrastructure. It keeps only the most recent result
 for each exact test nodeid and only the newest pytest session's invocation
 metadata. Separate focused results are merged even when the working tree
-changes. Failed results also record `failed_phase` and a bounded pytest
-`traceback`; `traceback_truncated` identifies the rare result whose traceback
-exceeded the manifest limit. Each result records a semantic snapshot, and
+changes. A merge prunes results whose owning test module has been deleted while
+retaining unselected results for modules that still exist. Failed results also
+record `failed_phase` and a bounded pytest `traceback`; `traceback_truncated`
+identifies the rare result whose traceback exceeded the manifest limit. Each
+result records a semantic snapshot, and
 remains current only while its test file plus the source and template paths
 connected through traceability metadata are behaviorally unchanged. Python
 comments and docstrings, JavaScript comments, documentation, and report
@@ -100,12 +102,6 @@ venv/bin/python run.py traceability --changed --check
 The final traceability command fails when a changed or referenced test is not
 recorded as passing for the current fingerprint. This makes “tests passed” a
 checkable artifact rather than prose in an agent response.
-
-The full-suite structural-evidence collector is the narrow exception: it is
-only valid after a complete accumulated E2E collection, so traceability does
-not require a focused current pass for that one node ID. Its collection guard
-and evidence writer remain covered by tooling tests, and the collector still
-runs last during a complete E2E suite.
 
 Static AST discovery is the default and does not import the application.
 `--verify-collection` is an opt-in diagnostic that compares the inventory with

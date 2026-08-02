@@ -281,7 +281,6 @@ Keep the `testing/` root clean. Miscellaneous helpers belong in
 | `setup_drift` | Opt-in read-only provider/API drift probe |
 | `setup_provider` | Opt-in sequential live-provider setup/runtime contract |
 | `unfinished` | Backlog test skipped by default |
-| `structural_evidence` | Final accumulated-data evidence check; full E2E collection only |
 
 `testing/pytest.ini` excludes `unfinished`, `setup_drift`, and `setup_provider`
 by default.
@@ -354,8 +353,6 @@ Generated artifacts belong under `reports/`:
 - Managed browser test-server runtime/seed files: `reports/test-server.*`,
   `reports/test-server-load.json`
 - Traceability reports: `reports/traceability*.md`
-- Full-suite structural baseline: `reports/test_runs/structural_evidence_latest.json`
-  and `reports/test_runs/structural_evidence_latest.md`
 - Template contract reports: `reports/template-contracts*.md`
 - Rollup bundle visualizers: `reports/`
 
@@ -366,9 +363,11 @@ Failed tests also include their pytest traceback and failing phase in
 their beginning and end and are marked with `traceback_truncated: true`.
 Unlike generated reports, this manifest is tracked. It is current evidence
 rather than a run log: it keeps one latest result per exact test nodeid and
-invocation metadata for only the newest pytest session. Its semantic snapshots
-use an interned path/fingerprint table so snapshots from separate focused runs
-do not duplicate the full path strings and hashes. It excludes
+invocation metadata for only the newest pytest session. Each test run prunes
+results whose owning test module no longer exists while retaining unselected
+results from modules still in the tree. Its semantic snapshots use an interned
+path/fingerprint table so snapshots from separate focused runs do not duplicate
+the full path strings and hashes. It excludes
 `testing/evidence/` and `.github/` from those snapshots so writing evidence or
 changing contribution automation does not invalidate application behavior
 results. Review the file before committing it: failed results may contain
@@ -381,20 +380,6 @@ tests on configured infrastructure and commits the updated evidence manifest
 before opening the release pull request. Hosted CI runs Biome, Ruff,
 repository-wide traceability, changed-source traceability, and the release-tree
 check against the exact base commit.
-
-The structural baseline is regenerated as the last E2E test in either a full
-`run.py test e2e` or full `run.py test` invocation. It inventories the data
-accumulated by preceding E2E stories, then records project filter-cache build
-shape, separate AI autofill/generation/revision/execution request shapes, and a
-loaded-home reconnect's network and DOM fan-out. The JSON artifact is the
-machine-readable source; Markdown is a review companion. Both survive the
-managed server teardown that deletes test-prefixed datastore and cache data.
-
-Do not run the structural test as a focused baseline. The collection hook
-skips it when an E2E file is missing or `-k`/a non-default marker expression is
-active. The record deliberately contains no wall-clock, request-speed, or
-provider-speed fields; helper validation rejects those fields because local
-speed values are not comparable.
 
 ## Placement Rules
 

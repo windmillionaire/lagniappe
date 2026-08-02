@@ -47,7 +47,6 @@ from runner.testing import (
 
 from ..utility import TestResults, capture_on_failure
 from ..utility.browser_failures import BrowserFailureCollector, write_diagnostic_report
-from ..utility.structural_evidence import full_e2e_collection_state
 
 os.environ["FLASK_ENV"] = "testing"
 
@@ -56,7 +55,6 @@ DEFAULT_TIMEOUT = 15000  # 15 seconds - standard test operations
 AI_TIMEOUT = 30000  # 30 seconds - for @pytest.mark.ai tests
 
 logger = logging.getLogger(__name__)
-E2E_ROOT = Path(__file__).parent.resolve()
 
 
 def pytest_addoption(parser):
@@ -66,53 +64,6 @@ def pytest_addoption(parser):
         action="store_true",
         help="Record browser failures without making them teardown failures.",
     )
-
-
-@pytest.hookimpl(trylast=True)
-def pytest_collection_modifyitems(config, items):
-    """Run the accumulated-data evidence check only after a complete E2E collection."""
-    evidence_items = [
-        item for item in items if item.get_closest_marker("structural_evidence")
-    ]
-    if not evidence_items:
-        return
-
-    root = Path(str(config.rootpath)).resolve()
-    expected_files = {
-        str(path.resolve().relative_to(root))
-        for path in E2E_ROOT.rglob("test_*.py")
-    }
-    selected_files = {
-        str(Path(str(item.path)).resolve().relative_to(root))
-        for item in items
-        if Path(str(item.path)).resolve().is_relative_to(E2E_ROOT)
-    }
-    state = full_e2e_collection_state(
-        expected_files=expected_files,
-        selected_files=selected_files,
-        keyword=config.option.keyword,
-        mark_expression=config.option.markexpr,
-    )
-    config._structural_evidence_collection = state
-
-    for evidence_item in evidence_items:
-        if not state["full_e2e_run"]:
-            reason = "; ".join(state["reasons"])
-            evidence_item.add_marker(
-                pytest.mark.skip(
-                    reason="Structural evidence requires a complete E2E run: "
-                    + reason
-                )
-            )
-            continue
-
-        items.remove(evidence_item)
-        last_e2e_index = max(
-            index
-            for index, item in enumerate(items)
-            if Path(str(item.path)).resolve().is_relative_to(E2E_ROOT)
-        )
-        items.insert(last_e2e_index + 1, evidence_item)
 
 
 @contextmanager
