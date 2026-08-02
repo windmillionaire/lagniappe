@@ -451,19 +451,3 @@ def test_category_saved_filter_save_and_run(get_user):
     expect(
         table.locator("tr").filter(has_text=excluded_page.definition.name)
     ).not_to_be_visible()
-
-    filter_hash = user.locate("[lp-view]").get_attribute("data-hash")
-    filter_key = user.locate("[lp-view]").get_attribute("data-key")
-    with user.page.expect_response("**/refresh") as refresh_info:
-        user.page.evaluate(
-            "document.querySelector('[lp-view]')._lp_view.refresh(true)"
-        )
-
-    request_payload = json.loads(refresh_info.value.request.post_data or "{}")
-    assert request_payload["view"]["key"] == filter_key
-    assert request_payload["view"]["hash"] == filter_hash
-    assert {target["id"] for target in request_payload["targets"]} == {"table"}
-
-    response_payload = refresh_info.value.json()
-    assert response_payload["targets"] == []
-    assert response_payload["fingerprint"] == request_payload["view"]["fingerprint"]

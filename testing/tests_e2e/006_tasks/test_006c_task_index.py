@@ -120,17 +120,6 @@ def test_tasks_table_columns(get_user):
         if title:
             expect(header.locator("[data-role='title']")).to_have_text(title)
 
-    root = user.locate("[lp-view]")
-    fingerprint = root.get_attribute("data-fingerprint")
-    assert fingerprint
-    with user.page.expect_response("**/refresh") as refresh_info:
-        user.page.evaluate(
-            "document.querySelector('[lp-view]')._lp_view.refresh(true)"
-        )
-    refresh_payload = refresh_info.value.json()
-    assert refresh_payload == {"fingerprint": fingerprint, "targets": []}
-
-
 # @features table-controls
 # @dimensions sorting sort-asc name
 def test_task_index_name_sort_ascending_reorders_rows(get_user):

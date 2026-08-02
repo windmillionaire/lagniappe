@@ -152,9 +152,11 @@ def test(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_save
+# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_saved_in_progress_filter_removes_completed_task_after_back_navigation
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filter_save_and_run
 # @features filters
-# @dimensions save reload-persistence
+# @dimensions save saved-filter reload-persistence
+# @pair filters:saved-filter
 @filters.route("<key>/save", methods=["POST"])
 @permission(requested=Action.EDIT)
 def save(key, **kwargs):

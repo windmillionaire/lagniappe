@@ -38,6 +38,7 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
+from testing.utility import expect_successful_response
 from testing.utility.local_time import local_date_iso
 from ..elements import DateSelect, SpinnerButtons
 from .core import SiteResource
@@ -311,6 +312,11 @@ class Task(SiteResource):
         self.entity.save()
 
     def save(self):
-        with self.user.page.expect_response("**/update"):
+        with expect_successful_response(
+            self.user.page,
+            method="PUT",
+            path=f"/tasks/{self.key}/update",
+            entity_key=self.key,
+        ):
             SpinnerButtons.UPDATE.click(self.element)
         assert SpinnerButtons.UPDATE_SUCCESS.successful(self.element)

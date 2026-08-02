@@ -613,8 +613,6 @@ def test_filter_multiple_conditions(get_user):
 
 
 # @pair filters:saved-filter
-# @pair reconnect-refresh:filtered-index
-# @pair reconnect-refresh:back-navigation
 # @template table.html::row
 def test_saved_in_progress_filter_removes_completed_task_after_back_navigation(
     get_user,
@@ -654,22 +652,3 @@ def test_saved_in_progress_filter_removes_completed_task_after_back_navigation(
     user.page.wait_for_selector("[lp-view][initialized]")
     expect(filtered_row).not_to_be_attached(timeout=15000)
     expect(user.locate("#table tbody")).to_have_attribute("loaded", "")
-
-    with user.page.expect_response("**/refresh") as refresh_info:
-        user.page.evaluate(
-            "document.querySelector('[lp-view]')._lp_view.refresh(true)"
-        )
-
-    request_payload = json.loads(refresh_info.value.request.post_data or "{}")
-    assert request_payload["view"]["hash"]
-    assert request_payload["view"]["key"] == user.locate("[lp-view]").get_attribute(
-        "data-key"
-    )
-    assert {target["id"] for target in request_payload["targets"]} == {"table"}
-
-    response_payload = refresh_info.value.json()
-    table_refresh = next(
-        target for target in response_payload["targets"] if target["id"] == "table"
-    )
-    assert table_refresh["fallback"] is False
-    expect(filtered_row).not_to_be_attached()

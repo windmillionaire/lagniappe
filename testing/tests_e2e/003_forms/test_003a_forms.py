@@ -29,6 +29,7 @@ from testing.elements import Buttons, FormElements, Modal, SpinnerButtons, Table
 from testing.resources.form import Builder
 from testing.definitions.form_definitions import FormDefinition
 from testing.resources import Form
+from testing.utility import expect_reconnect_refresh
 
 
 # @pair forms:index
@@ -39,7 +40,7 @@ from testing.resources import Form
 # @pair indexes:rendering
 # @pair indexes:fingerprint-gate
 # @template forms/index.html::view
-def test_forms_index_page(get_user):
+def test_forms_index_page(get_user, browser_failures):
     user = get_user(Users.OWNER)
     user.go(SitePages.FORM_INDEX)
 
@@ -50,14 +51,6 @@ def test_forms_index_page(get_user):
     root = user.locate("[lp-view]")
     fingerprint = root.get_attribute("data-fingerprint")
     assert fingerprint
-    with user.page.expect_response("**/refresh") as refresh_info:
-        user.page.evaluate(
-            "document.querySelector('[lp-view]')._lp_view.refresh(true)"
-        )
-    refresh_request = json.loads(refresh_info.value.request.post_data or "{}")
-    refresh_payload = refresh_info.value.json()
-    assert refresh_request["view"]["fingerprint"] == fingerprint
-    assert refresh_payload == {"fingerprint": fingerprint, "targets": []}
 
     external_form = Entities.FORM.create(
         {
@@ -67,13 +60,16 @@ def test_forms_index_page(get_user):
     )
     external_form.save()
     try:
-        with user.page.expect_response("**/refresh") as changed_refresh_info:
-            with user.page.expect_response("**/forms/rows"):
-                user.page.evaluate(
-                    "document.querySelector('[lp-view]')._lp_view.refresh(true)"
-                )
+        with expect_reconnect_refresh(user, browser_failures) as changed_refresh_info:
+            user.offline = False
 
+        refresh_request = json.loads(
+            changed_refresh_info.value.request.post_data or "{}"
+        )
         changed_payload = changed_refresh_info.value.json()
+        assert refresh_request["view"]["index"] == "forms"
+        assert refresh_request["view"]["fingerprint"] == fingerprint
+        assert {target["id"] for target in refresh_request["targets"]} == {"table"}
         assert changed_payload["fingerprint"] != fingerprint
         assert changed_payload["targets"] == [{"fallback": True, "id": "table"}]
         expect(root).to_have_attribute(

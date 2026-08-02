@@ -192,11 +192,12 @@ Acceptance criteria:
 
 ### E2E-H03 — Establish a strong shared network-wait contract
 
-- [ ] Add or standardize a helper that matches the intended method and
+- [x] Add or standardize a helper that matches the intended method and
   endpoint, checks `response.ok`/status, and can optionally validate the entity
   key or request/response payload.
-- [ ] Convert the broadest `"**/update"` and `"**/create"` waits first.
-- [ ] Pair the response assertion with a retrying visible postcondition.
+- [x] Convert the broadest `"**/update"` and `"**/create"` waits first in the
+  task-page pilot.
+- [x] Pair the pilot response assertions with retrying visible postconditions.
 
 Good first clusters because they contain many response waits:
 
@@ -207,6 +208,12 @@ Good first clusters because they contain many response waits:
 
 Do not mechanically replace all 174 occurrences. Some endpoint patterns are
 already precise; inspect the action and payload before choosing a matcher.
+
+Pilot completed 2026-08-01: `testing/tests_e2e/006_tasks/test_006b_page_tasks.py`
+and its shared task-save resource now use exact method/path waits, validate the
+relevant entity revision, assert successful transport, and retain browser-visible
+postconditions. The category, page-tab, and home-tools clusters remain rollout
+work for this item.
 
 Acceptance criteria:
 
@@ -222,11 +229,11 @@ state through implementation-private controls.
 
 ### E2E-H04 — Replace private index refresh calls with real refresh triggers
 
-- [ ] Review every `_lp_view.refresh(true)` call and identify the real product
+- [x] Review every `_lp_view.refresh(true)` call and identify the real product
   event it is standing in for.
-- [ ] Use a second actor, real create/update, reconnect, focus/tab change, or
+- [x] Use a second actor, real create/update, reconnect, focus/tab change, or
   natural polling to cause refresh.
-- [ ] If the behavior is only the view's reconciliation algorithm, move the
+- [x] If the behavior is only the view's reconciliation algorithm, move the
   detailed cases to `testing/tests_js/` and retain one real E2E integration
   story.
 
@@ -238,6 +245,15 @@ Candidate files:
 - `007_categories/test_007a_category_index.py`
 - `007_categories/test_007b_category_filters.py`
 - `008_users/test_008a_user_index.py`
+
+Resolved 2026-08-01. The forms, category-index, and public-user-mode stories
+now use a real browser offline/online transition and require the resulting
+successful `POST /refresh`; they assert the visible external form/page/user
+update as well as the relevant request identity and refresh delta. The
+refresh-only probes in the task-index and saved-filter stories were removed:
+their manifest, fingerprint, filter-cache, and delta mechanics remain covered
+by the focused refresh unit and JavaScript suites. No E2E test calls
+`_lp_view.refresh` directly.
 
 Acceptance criteria:
 

@@ -48,6 +48,7 @@ def _ai_schedule_requested(form):
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_allows_own_page_only_users
 # @features task-index
 # @dimensions columns
+# @pair task-index:columns
 # @pair task-index:authenticated-access
 # @pair permissions:own-page-only
 @tasks.route("/index", methods=["GET"])

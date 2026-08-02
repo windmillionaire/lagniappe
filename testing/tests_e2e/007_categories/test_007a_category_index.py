@@ -10,9 +10,11 @@ Verified against:
 """
 
 import json
+from uuid import uuid4
 
 from playwright.sync_api import expect
 
+from lagniappe.core.entities import Entities
 from testing.definitions import Categories, Forms, Pages, Users
 from testing.elements import (
     Attributes,
@@ -23,6 +25,7 @@ from testing.elements import (
     SpinnerButtons,
     Table,
 )
+from testing.utility import expect_reconnect_refresh
 
 
 def _create_page(user, page, create_form):
@@ -99,34 +102,42 @@ def test_create_page_from_category_index(get_user):
 # @pair reconnect-refresh:category-index
 # @pair reconnect-refresh:component-identity
 # @template table.html::row
-def test_category_index_refresh_uses_table_component_manifest(get_user):
+def test_category_index_reconnect_refreshes_external_page(get_user, browser_failures):
     user = get_user(Users.OWNER)
-    page = Pages.test_basic_input_submission.get(user)
-    category = page.definition.category.get(user)
+    category = Categories.test_empty_category.get(user)
     user.go(category)
 
-    row = Table(user).get_row(page.definition.name)
-    expect(row).to_be_visible()
+    root = user.locate("[lp-view]")
+    fingerprint = root.get_attribute("data-fingerprint")
+    assert fingerprint
+    external_page = Entities.PAGE.create(
+        {
+            "name": f"Reconnect Refresh Page {uuid4().hex}",
+            "model": category.entity,
+        }
+    )
+    external_page.save()
+    try:
+        with expect_reconnect_refresh(user, browser_failures) as refresh_info:
+            user.offline = False
 
-    with user.page.expect_response("**/refresh") as refresh_info:
-        user.page.evaluate(
-            """async () => {
-                await document.querySelector("[lp-view]")._lp_view.refresh();
-            }"""
-        )
+        request_payload = json.loads(refresh_info.value.request.post_data or "{}")
+        assert request_payload["view"]["key"] == category.key
+        assert request_payload["view"]["fingerprint"] == fingerprint
+        assert {target["id"] for target in request_payload["targets"]} == {"table"}
+        assert set(request_payload["targets"][0]) == {"id", "rows"}
 
-    request_payload = json.loads(refresh_info.value.request.post_data or "{}")
-    assert request_payload["view"]["key"] == category.key
-    assert request_payload["view"]["fingerprint"] == user.locate(
-        "[lp-view]"
-    ).get_attribute("data-fingerprint")
-    assert {target["id"] for target in request_payload["targets"]} == {"table"}
-    assert set(request_payload["targets"][0]) == {"id", "rows"}
-
-    payload = refresh_info.value.json()
-    assert payload["targets"] == []
-    assert payload["fingerprint"] == request_payload["view"]["fingerprint"]
-    expect(row).to_be_visible()
+        payload = refresh_info.value.json()
+        assert payload["fingerprint"] != fingerprint
+        table_refresh = next(target for target in payload["targets"] if target["id"] == "table")
+        assert table_refresh["fallback"] is False
+        assert external_page.urlsafe_key in {
+            row["key"] for row in table_refresh["upsert"]
+        }
+        expect(root).to_have_attribute("data-fingerprint", payload["fingerprint"])
+        expect(Table(user).get_row(external_page.name)).to_be_visible()
+    finally:
+        Entities.delete(external_page)
 
 
 # @features pages

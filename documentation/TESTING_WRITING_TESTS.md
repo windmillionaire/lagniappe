@@ -105,6 +105,35 @@ For native connectivity transitions, prefer `browser_failures.expect_offline(use
 around the `user.offline = True` action and its offline assertions. It expects
 the exact `HEAD /ping` disconnect and console error produced by the browser.
 
+### Network response waits
+
+For a normal browser mutation, use `expect_successful_response()` instead of a
+broad `page.expect_response()` glob. It identifies the intended request before
+asserting its transport result, so a matching 4xx/5xx response reports the
+failure rather than making the test time out:
+
+```python
+with expect_successful_response(
+    user.page,
+    method="PUT",
+    path=f"/tasks/{task.key}/update",
+    entity_key=task.key,
+):
+    SpinnerButtons.UPDATE.click(task_form)
+
+expect(task_form).to_be_visible()
+```
+
+The method and path are always required. Use `query` when query parameters are
+part of the request identity, `request_payload_contains` when concurrent calls
+share a route, and `response_check` only for response-payload assertions. Use
+`entity_key` only when the route returns the `X-Lagniappe-Entity-Revisions`
+header. Keep the visible postcondition after the wait, and reload or use a
+fresh context when durable state is part of the story.
+
+Deliberate non-success responses are a different contract: retain a raw
+Playwright response wait and assert the expected status/body explicitly.
+
 The accumulated E2E datastore intentionally resembles a living system. Reuse
 named users and entities when the story only needs them to exist, and establish
 the relevant precondition idempotently each time instead of assuming an earlier

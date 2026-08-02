@@ -1,3 +1,4 @@
+import json
 import re
 from types import SimpleNamespace
 from uuid import uuid4
@@ -19,6 +20,7 @@ from testing.elements import (
     Tabs,
 )
 from testing.resources import Page
+from testing.utility import expect_reconnect_refresh
 
 pytestmark = pytest.mark.e2e
 
@@ -117,10 +119,12 @@ def test_users_index_public_toggle_hidden_when_public_users_disabled(get_user):
 # @pair reconnect-refresh:root-fingerprint
 # @pair permissions:authorization
 # @template users/index.html::public_users_toggle
-def test_users_index_public_toggle_shows_public_users(get_user):
+def test_users_index_public_toggle_shows_public_users(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     public_name = f"Public Toggle User {uuid4().hex}"
     public_email = f"{uuid4().hex}@public-toggle.example"
+    refreshed_public_name = f"Reconnect Public User {uuid4().hex}"
+    refreshed_public_email = f"{uuid4().hex}@public-toggle.example"
 
     try:
         _set_public_users_allowed(owner, True)
@@ -145,17 +149,33 @@ def test_users_index_public_toggle_shows_public_users(get_user):
         expect(table.get_row(public_name)).to_be_visible()
         expect(table.get_row(owner.name)).to_have_count(0)
 
-        with owner.page.expect_response("**/refresh") as refresh_info:
-            owner.page.evaluate(
-                "document.querySelector('[lp-view]')._lp_view.refresh(true)"
-            )
-
-        refresh_payload = refresh_info.value.json()
-        fingerprint = owner.locate("[lp-view]").get_attribute("data-fingerprint")
+        root = owner.locate("[lp-view]")
+        fingerprint = root.get_attribute("data-fingerprint")
         assert fingerprint
-        assert refresh_payload == {"fingerprint": fingerprint, "targets": []}
+        refreshed_public_user = _create_public_user(
+            refreshed_public_email,
+            refreshed_public_name,
+        )
+        with expect_reconnect_refresh(owner, browser_failures) as refresh_info:
+            owner.offline = False
+
+        refresh_request = json.loads(refresh_info.value.request.post_data or "{}")
+        assert refresh_request["view"]["index"] == "users"
+        assert refresh_request["view"]["mode"] == "public"
+        assert refresh_request["view"]["fingerprint"] == fingerprint
+        assert {target["id"] for target in refresh_request["targets"]} == {"table"}
+        refresh_payload = refresh_info.value.json()
+        assert refresh_payload["fingerprint"] != fingerprint
+        table_refresh = next(
+            target for target in refresh_payload["targets"] if target["id"] == "table"
+        )
+        assert table_refresh["fallback"] is False
+        assert refreshed_public_user.urlsafe_key in {
+            row["key"] for row in table_refresh["upsert"]
+        }
 
         expect(table.get_row(public_name)).to_be_visible()
+        expect(table.get_row(refreshed_public_name)).to_be_visible()
         expect(table.get_row(owner.name)).to_have_count(0)
 
         with owner.page.expect_response(_user_rows_response("regular")):

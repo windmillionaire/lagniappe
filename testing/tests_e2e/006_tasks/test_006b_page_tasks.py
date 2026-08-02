@@ -47,6 +47,7 @@ from testing.elements import (
     DateSelect,
     UserSelect,
 )
+from testing.utility import expect_successful_response
 
 
 SIGNATURE_FIELD_ID = "task-signature-field"
@@ -56,7 +57,13 @@ SIGNATURE_PNG = base64.b64decode(
 
 
 def _submit_create_task_form(user, page, task, create_form):
-    with user.page.expect_response("**/create"):
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path=f"/tasks/{page.key}/create",
+        entity_key=page.key,
+        request_payload_contains=task.definition.name,
+    ):
         SpinnerButtons.CREATE.click(create_form)
 
     expect(create_form).not_to_be_visible()
@@ -166,6 +173,9 @@ def test_create_basic_page_task(get_user):
     create_form.locator(FormElements.DESCRIPTION).fill(task.definition.description)
 
     task.key = _submit_create_task_form(user, page, task, create_form)
+    user.reload(page)
+    task.wait_for_load()
+    expect(task.element).to_contain_text(task.definition.name)
 
 
 # @pairs tasks:create-close tasks:empty-state
@@ -454,7 +464,12 @@ def test_adding_form_from_task_settings_preserves_widget_identity(get_user):
     expect(task_form).to_be_hidden()
     updated_name = "Task Settings and Form After"
     _fill_editable_field(settings_form, "name", FormElements.NAME, updated_name)
-    with user.page.expect_response("**/update"):
+    with expect_successful_response(
+        user.page,
+        method="PUT",
+        path=f"/tasks/{task.key}/update",
+        entity_key=task.key,
+    ):
         SpinnerButtons.UPDATE.click(settings_form)
     assert SpinnerButtons.UPDATE_SUCCESS.successful(settings_form)
 
@@ -471,6 +486,14 @@ def test_adding_form_from_task_settings_preserves_widget_identity(get_user):
     assert saved_task.name == updated_name
     assert saved_task.form.key == form.entity.key
     assert submission["input-textab12"] == task_value
+
+    user.reload()
+    task.wait_for_load()
+    expect(task.element.locator("[data-role='title']")).to_contain_text(updated_name)
+    reloaded_task_form = task.task_form
+    expect(reloaded_task_form.locator("[name='input-textab12']")).to_have_value(
+        task_value
+    )
 
 
 # @features tasks
@@ -554,7 +577,12 @@ def test_submit_attached_task_form(get_user):
     user.page.keyboard.press("Tab")
     expect(task_form.locator("[data-icon='builder.unsaved']")).to_be_visible()
 
-    with user.page.expect_response("**/update"):
+    with expect_successful_response(
+        user.page,
+        method="PUT",
+        path=f"/tasks/{task.key}/update",
+        entity_key=task.key,
+    ):
         task_form.locator("button[type='submit']:not([data-role])").click()
 
     expect(task_form).to_be_visible()
@@ -567,6 +595,12 @@ def test_submit_attached_task_form(get_user):
     expect(task_form.locator("[data-role='autofill']")).to_be_visible()
     task_form.locator("[data-role='cancel-autofill']").click()
     expect(task_form.locator("[data-role='autofill']")).to_be_hidden()
+
+    user.reload()
+    task.wait_for_load()
+    task_form = task.task_form
+    for submission in task.definition.submission:
+        assert submission.verify_submission_value(task_form)
 
 
 # @pair tasks:update-state
@@ -589,7 +623,12 @@ def test_task_update_preserves_open_widget_and_completed_readonly_state(get_user
     task_form = _open_page_task_form(page, task)
     expect(task_form).to_be_visible()
 
-    with user.page.expect_response("**/update"):
+    with expect_successful_response(
+        user.page,
+        method="PUT",
+        path=f"/tasks/{task.key}/update",
+        entity_key=task.key,
+    ):
         SpinnerButtons.UPDATE.click(task_form)
 
     task_form = task.element.locator(task.TASK_FORM)
@@ -855,7 +894,12 @@ def test_signature_submission_draw_save_reload_and_clear(get_user):
     assert saved_task.has_signature is False
 
     _upload_signature(task_form)
-    with user.page.expect_response("**/update"):
+    with expect_successful_response(
+        user.page,
+        method="PUT",
+        path=f"/tasks/{task.key}/update",
+        entity_key=task.key,
+    ):
         SpinnerButtons.UPDATE.click(task_form)
 
     assert SpinnerButtons.UPDATE_SUCCESS.successful(task_form)
@@ -872,7 +916,12 @@ def test_signature_submission_draw_save_reload_and_clear(get_user):
     _expect_signature_image(task_form)
 
     _clear_signature(task_form)
-    with user.page.expect_response("**/update"):
+    with expect_successful_response(
+        user.page,
+        method="PUT",
+        path=f"/tasks/{task.key}/update",
+        entity_key=task.key,
+    ):
         SpinnerButtons.UPDATE.click(task_form)
 
     assert SpinnerButtons.UPDATE_SUCCESS.successful(task_form)
@@ -885,7 +934,12 @@ def test_signature_submission_draw_save_reload_and_clear(get_user):
     assert saved_task.has_signature is False
 
     _upload_signature(task_form)
-    with user.page.expect_response("**/update"):
+    with expect_successful_response(
+        user.page,
+        method="PUT",
+        path=f"/tasks/{task.key}/update",
+        entity_key=task.key,
+    ):
         SpinnerButtons.UPDATE.click(task_form)
 
     assert SpinnerButtons.UPDATE_SUCCESS.successful(task_form)
