@@ -151,9 +151,8 @@ def summarize_report_input_files(
 # @tests tests_unit/test_020_ai_reports.py::test_complete_organize_submissions_uses_one_focused_prompt
 # @tests tests_unit/test_020_ai_reports.py::test_complete_organize_submissions_preserves_empty_form_records
 # @tests tests_unit/test_020_ai_reports.py::test_unreadable_pdf_is_saved_skipped_and_reported
-# @tests tests_e2e/002_home/test_002l_home_tools_ai.py::test_organize_completion_corpus_executes_usable_submissions*
 # @features ai-report
-# @dimensions submission-completion focused-prompt evidence-mapping persistence live-provider unreadable-pdf issue
+# @dimensions submission-completion focused-prompt evidence-mapping persistence unreadable-pdf issue
 def complete_organize_submissions(
     proposal,
     report,

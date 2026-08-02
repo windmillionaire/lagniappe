@@ -67,7 +67,8 @@ REPORT_LEDGER_VERSION = 1
 # @tests tests_unit/test_020_ai_reports.py::test_run_report_reconciles_applying_create_when_output_already_exists
 # @tests tests_unit/test_020_ai_reports.py::test_run_report_retry_validates_completed_move_and_update_prefix
 # @tests tests_unit/test_020_ai_reports.py::test_completed_task_retry_and_undo_restore_reused_task
-# @tests tests_e2e/002_home/test_002l_home_tools_ai.py::test_organize_completion_corpus_executes_usable_submissions*
+# @tests tests_unit/test_020_ai_reports.py::test_run_report_uses_category_form_from_stored_key_for_page_submission
+# @tests tests_unit/test_020_ai_reports.py::test_run_report_attach_file_to_task_targets_created_task
 # @features ai-report
 # @dimensions deterministic-run create-order partial-result validation recoverable continue skip-action execute persistence attachments recovery create idempotency completed-prefix post-commit-checkpoint reuse compensation permissions cancellation
 def run_report(report, user, ensure_active=None):

@@ -235,8 +235,10 @@ def _ask_prompt_base(report, user, intro, extra_contexts=()):
 
 # @testable true
 # @tests tests_unit/test_020b_ai_ask.py::test_ask_prompt_prioritizes_answers_and_exposes_read_tools
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
 # @features ai-report
-# @dimensions ask prompt search tool-context actions
+# @dimensions ask prompt search tool-context actions workspace-tools structured-filter
 def ask_prompt(report, user):
     """Build the AI prompt used to answer an Ask report."""
     prompt = _ask_prompt_base(
@@ -360,8 +362,10 @@ array.
 
 # @testable true
 # @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_repairs_unusable_answers
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
 # @features ai-report
-# @dimensions ask generate validate repair usable-answer
+# @dimensions ask generate validate repair usable-answer live-provider
 def generate_ask_report(prompt):
     """Generate and validate a usable Ask response."""
     return generate_validated_proposal(
@@ -411,25 +415,6 @@ def validate_ask_response(
             "Ask response answer_html must be a string when present."
         )
 
-    return response
-
-
-# @testable true
-# @tests tests_unit/test_020b_ai_ask.py::test_complete_ask_report_owns_prompt_generation_and_report_state
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
-# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @features ai-report
-# @dimensions ask pipeline create revision status live-provider corpus workspace-tools usable-answer structured-filter
-def complete_ask_report(report, user, feedback=None, generate=None):
-    """Build, generate, validate, and apply one Ask response to ``report``."""
-    prompt = (
-        revise_ask_prompt(report, user, feedback)
-        if feedback is not None
-        else ask_prompt(report, user)
-    )
-    response = (generate or generate_ask_report)(prompt)
-    status = "ready" if response.get("actions") else "complete"
-    report.properties.process.set_proposal(response, status=status)
     return response
 
 

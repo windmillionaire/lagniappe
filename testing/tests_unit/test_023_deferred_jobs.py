@@ -2230,9 +2230,156 @@ def test_report_replacement_supersedes_old_job_and_ignores_old_failure(monkeypat
     ]
 
 
+# @pair ai-report:ask
+# @pair ai-report:revision
+# @pair ai-report:status
+# @pair ai-report:proposal-publication
+# @pair deferred-jobs:checkpoint
+@pytest.mark.parametrize(
+    ("parameters", "response", "expected_prompt", "expected_status"),
+    [
+        (
+            {},
+            {
+                "summary": "No follow-up work is needed.",
+                "confidence": 0.9,
+                "actions": [],
+            },
+            "initial-prompt",
+            "complete",
+        ),
+        (
+            {"mode": "revise", "feedback": "Call out the ambiguity."},
+            {
+                "summary": "A human should confirm the ambiguous match.",
+                "confidence": 0.5,
+                "actions": [
+                    {
+                        "id": "review",
+                        "type": "needs_review",
+                        "data": {"note": "Confirm the matching record."},
+                    }
+                ],
+            },
+            "revision-prompt",
+            "ready",
+        ),
+    ],
+    ids=("answer", "revision-with-actions"),
+)
+def test_ask_report_adapter_prepares_and_applies_checkpointed_response(
+    monkeypatch,
+    parameters,
+    response,
+    expected_prompt,
+    expected_status,
+):
+    adapter = deferred_job_adapters.AskReportAdapter()
+    actor = SimpleNamespace()
+    saved = []
+    phases = []
+    prompt_calls = []
+
+    class Process:
+        def set_proposal(self, proposal, status="ready"):
+            report.proposal = proposal
+            report.summary = proposal.get("summary")
+            report.status = status
+            report.pending = None
+            report.error = None
+            report.result = None
+
+    report = SimpleNamespace(
+        urlsafe_key="ask-report",
+        deferred_job={"key": "ask-job"},
+        proposal={"summary": "Previous answer", "actions": []},
+        result={"stale": True},
+        properties=SimpleNamespace(process=Process()),
+    )
+    job = SimpleNamespace(
+        urlsafe_key="ask-job",
+        idempotency_key="ask-operation",
+    )
+
+    class Control:
+        def ensure_active(self):
+            return None
+
+        def set_phase(self, phase, **_details):
+            phases.append(str(getattr(phase, "value", phase)))
+
+    monkeypatch.setattr(
+        deferred_job_adapters.ai,
+        "ask_prompt",
+        lambda current_report, current_actor: prompt_calls.append(
+            ("initial", current_report, current_actor)
+        )
+        or "initial-prompt",
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.ai,
+        "revise_ask_prompt",
+        lambda current_report, current_actor, feedback: prompt_calls.append(
+            ("revision", current_report, current_actor, feedback)
+        )
+        or "revision-prompt",
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.ai,
+        "generate_ask_report",
+        lambda prompt: prompt_calls.append(("generate", prompt)) or response,
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.Entities,
+        "save",
+        lambda *entities: saved.append(entities),
+    )
+    context = deferred_jobs.DeferredJobContext(
+        job=job,
+        actor=actor,
+        notification=None,
+        inputs={"report": report},
+        parameters=parameters,
+        checkpoint={},
+        execution_control=Control(),
+    )
+
+    checkpoint = adapter.prepare(context)
+
+    assert checkpoint == {"proposal": response, "status": expected_status}
+    assert phases == ["generating", "validating"]
+    assert prompt_calls[-1] == ("generate", expected_prompt)
+    if parameters:
+        assert prompt_calls[0] == (
+            "revision",
+            report,
+            actor,
+            parameters["feedback"],
+        )
+    else:
+        assert prompt_calls[0] == ("initial", report, actor)
+    assert report.result == {"stale": True}
+
+    context.checkpoint = checkpoint
+    result = adapter.apply(context)
+
+    assert result == {
+        "report_key": "ask-report",
+        "status": expected_status,
+        "action_count": len(response["actions"]),
+    }
+    assert report.proposal == response
+    assert report.proposal is not response
+    assert report.status == expected_status
+    assert report.result is None
+    assert saved == [(report, actor)]
+
+
 # @pair deferred-jobs:checkpoint
 # @pair ai-report:plan-resume
 # @pair ai-report:submission-completion
+# @pair ai-report:status
+# @pair ai-report:proposal-publication
 def test_organize_resumes_plan_checkpoint_without_second_planning_call(monkeypatch):
     adapter = deferred_job_adapters.OrganizeReportAdapter()
     proposal = {"summary": "Planned", "actions": []}
@@ -2252,10 +2399,30 @@ def test_organize_resumes_plan_checkpoint_without_second_planning_call(monkeypat
         )
         or completed,
     )
-    report = SimpleNamespace()
+    saved = []
+
+    class Process:
+        def set_proposal(self, value, status="ready"):
+            report.proposal = value
+            report.status = status
+
+    report = SimpleNamespace(
+        urlsafe_key="organize-report",
+        deferred_job={"key": "organize-job"},
+        properties=SimpleNamespace(process=Process()),
+    )
     actor = SimpleNamespace()
+    monkeypatch.setattr(
+        deferred_job_adapters.Entities,
+        "save",
+        lambda *entities: saved.append(entities),
+    )
     context = deferred_jobs.DeferredJobContext(
-        job=SimpleNamespace(attempt=2),
+        job=SimpleNamespace(
+            attempt=2,
+            urlsafe_key="organize-job",
+            idempotency_key="organize-operation",
+        ),
         actor=actor,
         notification=None,
         inputs={"report": report},
@@ -2306,6 +2473,18 @@ def test_organize_resumes_plan_checkpoint_without_second_planning_call(monkeypat
             {"phase": "prepared"},
         )
     ]
+
+    result = adapter.apply(context)
+
+    assert result == {
+        "report_key": "organize-report",
+        "status": "ready",
+        "action_count": 0,
+    }
+    assert report.proposal == completed
+    assert report.proposal is not completed
+    assert report.status == "ready"
+    assert saved == [(report, actor)]
 
 
 # @features deferred-jobs

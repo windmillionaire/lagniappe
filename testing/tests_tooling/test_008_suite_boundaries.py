@@ -28,6 +28,10 @@ E2E_NATIVE_FETCH_ASSIGNMENT = re.compile(
     """,
     re.VERBOSE,
 )
+E2E_DIRECT_AI_HELPERS = {
+    "complete_ask_report",
+    "complete_organize_submissions",
+}
 
 
 def _python_files(*roots):
@@ -77,6 +81,52 @@ def _e2e_route_bypass_violations(path):
                 violations.append(f"{path}:{node.lineno} imports lagniappe.web.routes")
         elif isinstance(node, ast.Attribute) and node.attr == "__wrapped__":
             violations.append(f"{path}:{node.lineno} accesses __wrapped__")
+    return violations
+
+
+def _e2e_ai_worker_bypass_violations(path):
+    """Return direct provider/helper calls that bypass durable AI workers."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    violations = []
+    ai_model_names = {"ai_model"}
+    helper_names = {name: name for name in E2E_DIRECT_AI_HELPERS}
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        for alias in node.names:
+            local_name = alias.asname or alias.name
+            if alias.name == "ai_model":
+                ai_model_names.add(local_name)
+            elif alias.name in E2E_DIRECT_AI_HELPERS:
+                helper_names[local_name] = alias.name
+
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        target = node.func
+        if isinstance(target, ast.Name) and target.id in helper_names:
+            violations.append(
+                f"{path}:{node.lineno} calls {helper_names[target.id]}"
+            )
+            continue
+        if not isinstance(target, ast.Attribute):
+            continue
+        if target.attr in E2E_DIRECT_AI_HELPERS:
+            violations.append(f"{path}:{node.lineno} calls {target.attr}")
+        elif (
+            target.attr == "generate_content"
+            and (
+                (
+                    isinstance(target.value, ast.Name)
+                    and target.value.id in ai_model_names
+                )
+                or (
+                    isinstance(target.value, ast.Attribute)
+                    and target.value.attr == "ai_model"
+                )
+            )
+        ):
+            violations.append(f"{path}:{node.lineno} calls ai_model.generate_content")
     return violations
 
 
@@ -319,6 +369,33 @@ def test_e2e_route_bypass_guard_rejects_synthetic_white_box_test(tmp_path):
 
     assert any("imports lagniappe.web.routes.home" in item for item in violations)
     assert any("accesses __wrapped__" in item for item in violations)
+
+
+def test_e2e_modules_do_not_bypass_durable_ai_workers():
+    """Provider-backed E2E must enter through UI-created durable jobs."""
+    violations = []
+    for path in _python_files(TESTING_ROOT / "tests_e2e"):
+        violations.extend(_e2e_ai_worker_bypass_violations(path))
+
+    assert violations == []
+
+
+def test_e2e_ai_worker_guard_rejects_synthetic_white_box_test(tmp_path):
+    path = tmp_path / "test_ai_worker_bypass.py"
+    path.write_text(
+        "from lagniappe.core.tools.ai.core import ai_model as provider\n"
+        "from lagniappe.core.tools.ai.organize import "
+        "complete_organize_submissions as complete\n"
+        "provider.generate_content(prompt)\n"
+        "ask.complete_ask_report(report, owner)\n"
+        "complete(proposal, report, owner)\n"
+    )
+
+    violations = _e2e_ai_worker_bypass_violations(path)
+
+    assert any("calls ai_model.generate_content" in item for item in violations)
+    assert any("calls complete_ask_report" in item for item in violations)
+    assert any("calls complete_organize_submissions" in item for item in violations)
 
 
 def test_web_routes_use_explicit_entity_fetch_boundaries():

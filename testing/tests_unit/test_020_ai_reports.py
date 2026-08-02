@@ -5187,8 +5187,10 @@ def test_run_report_propagates_deferred_control_stop(monkeypatch):
     assert saved == [(report,)]
 
 
-# @features ai-report
-# @dimensions deterministic-run create-order partial-result skip-action default-category result grouping attachments file-summary
+# @pairs ai-report:deterministic-run ai-report:create-order ai-report:partial-result
+# @pairs ai-report:skip-action ai-report:default-category ai-report:result
+# @pairs ai-report:grouping ai-report:attachments ai-report:file-summary
+# @pairs ai-report:execute ai-report:persistence
 @pytest.mark.unit
 def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -5253,8 +5255,13 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
             {
                 "id": "uncategorized_page",
                 "type": "create_page",
-                "skip": True,
                 "data": {"name": "Loose scan"},
+            },
+            {
+                "id": "skipped_page",
+                "type": "create_page",
+                "skip": True,
+                "data": {"name": "Intentionally skipped"},
             },
             {
                 "id": "project",
@@ -5288,8 +5295,10 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
         ],
     }
     saved_batches = []
+    saved_entities = []
 
     def save_entities(*entities):
+        saved_entities.extend(entities)
         saved_batches.append([getattr(entity, "kind", None) for entity in entities])
 
     monkeypatch.setattr(report_runner.Entities, "save", save_entities)
@@ -5320,11 +5329,21 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
         "page",
         "file",
         "file",
+        "page",
         "project",
         "form",
         "model",
     ]
-    assert result["actions"][8]["entity"]["parent"]["name"] == "House Admin"
+    assert result["actions"][5]["entity"]["name"] == "Loose scan"
+    loose_page = next(
+        entity
+        for entity in saved_entities
+        if getattr(entity, "entity_kind", None) == "page"
+        and entity.name == "Loose scan"
+    )
+    assert loose_page.model.name == "Uncategorized Pages"
+    assert result["actions"][6]["status"] == "skipped"
+    assert result["actions"][9]["entity"]["parent"]["name"] == "House Admin"
     assert result["actions"][3]["target"]["kind"] == "page"
     assert result["actions"][3]["target"]["name"] == "July Receipt"
     assert result["actions"][4]["type"] == "summarize_file"
@@ -5337,11 +5356,11 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
     }
     assert file.summary == "Receipt for July house supplies."
     assert file.properties.summarize.search is True
-    assert result["actions"][5]["status"] == "skipped"
     grouped = report.properties.result.grouped_actions
     assert [action["type"] for action in grouped] == [
         "create_form",
         "create_category",
+        "create_page",
         "create_page",
         "create_page",
         "create_project",
@@ -5394,8 +5413,8 @@ def test_run_report_rejects_saved_pending_submissions_before_execution():
         report_runner.run_report(report, user)
 
 
-# @features ai-report form-schema submission
-# @dimensions deterministic-run page category-form lazy-load submission
+# @pair ai-report:deterministic-run
+# @pairs ai-report:submission-completion ai-report:persistence
 @pytest.mark.unit
 def test_run_report_uses_category_form_from_stored_key_for_page_submission(
     monkeypatch,
@@ -5477,8 +5496,8 @@ def test_run_report_uses_category_form_from_stored_key_for_page_submission(
     assert result["actions"][0]["submission"] == {"created": True, "field_count": 1}
 
 
-# @features ai-report tasks files
-# @dimensions deterministic-run task-attachment created-task
+# @pairs ai-report:deterministic-run ai-report:task-attachment ai-report:created-task
+# @pairs ai-report:submission-completion ai-report:persistence
 @pytest.mark.unit
 def test_run_report_attach_file_to_task_targets_created_task(monkeypatch, get_schema):
     _patch_fake_keys(monkeypatch)

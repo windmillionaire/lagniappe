@@ -4,97 +4,13 @@ from uuid import uuid4
 
 import pytest
 
-from lagniappe.core.definitions import (
-    DeferredJobSpec,
-    DeferredJobType,
-    Fetch,
-)
+from lagniappe.core.definitions import DeferredJobSpec, DeferredJobType
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import deferred_job_adapters
 from lagniappe.core.tools.deferred_jobs import DeferredJobs
-from lagniappe.web import app as web_app
 from testing.definitions import SitePages, Users
 
 
 pytestmark = pytest.mark.e2e
-
-
-def test_report_generation_runs_through_durable_job_checkpoint(get_user, monkeypatch):
-    """The report adapter checkpoints provider output before applying it."""
-    user = get_user(Users.OWNER)
-    owner = Entities.USER.load(user.email)
-    report = Entities.REPORT.create(
-        {
-            "parent": owner,
-            "user": owner,
-            "name": "Durable report generation",
-            "tool": "organize",
-            "instructions": "Review the workspace without changing it.",
-            "status": "pending",
-            "pending": True,
-        }
-    )
-    Entities.save(report, owner)
-    proposal = {
-        "summary": "No changes are needed.",
-        "confidence": 1,
-        "issues": [],
-        "actions": [],
-    }
-    monkeypatch.setattr(
-        deferred_job_adapters.ai,
-        "finalize_report_upload_manifest",
-        lambda *_args, **_kwargs: None,
-    )
-    monkeypatch.setattr(
-        deferred_job_adapters.ai,
-        "summarize_report_input_files",
-        lambda *_args, **_kwargs: [],
-    )
-    monkeypatch.setattr(
-        deferred_job_adapters.ai,
-        "prepare_organize_retrieval_context",
-        lambda *_args, **_kwargs: {},
-    )
-    monkeypatch.setattr(
-        deferred_job_adapters.ai,
-        "organize_prompt",
-        lambda *_args, **_kwargs: object(),
-    )
-    monkeypatch.setattr(
-        deferred_job_adapters.ai,
-        "generate_organize_plan",
-        lambda _prompt: proposal,
-    )
-    monkeypatch.setattr(
-        deferred_job_adapters.ai,
-        "complete_organize_submissions",
-        lambda value, *_args, **_kwargs: value,
-    )
-    job, _notification = DeferredJobs.start(
-        DeferredJobSpec(
-            job_type=DeferredJobType.REPORT_ORGANIZE,
-            actor=owner,
-            inputs={"report": report},
-            notification_target=report,
-        )
-    )
-
-    with web_app.test_request_context("/"):
-        result = DeferredJobs.run(job.urlsafe_key)
-
-    saved_job = Entities.fetch_one(job.urlsafe_key, request=Fetch.direct())
-    saved_report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
-    assert result.success is True
-    assert saved_job.checkpoint == {
-        "schema_version": 1,
-        "stage": "ready_to_apply",
-        "proposal": proposal,
-        "status": "ready",
-    }
-    assert saved_job.status == "succeeded"
-    assert saved_report.proposal == proposal
-    assert saved_report.status == "ready"
 
 
 # @pairs polling:protocol polling:operation polling:owner polling:batching

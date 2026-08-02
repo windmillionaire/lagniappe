@@ -277,8 +277,10 @@ def create_organize_report():
 
 # @testable true
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
 # @features ai-report
-# @dimensions ask explain-button tool-switcher
+# @dimensions ask explain-button tool-switcher async persistence
 @tools.route("/ask", methods=["POST"])
 @ai_access(AI.ASK)
 def create_ask_report():

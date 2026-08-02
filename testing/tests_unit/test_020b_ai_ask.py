@@ -342,57 +342,6 @@ def test_generate_ask_report_preserves_valid_actions_after_malformed_repair(
 
 
 # @features ai-report
-# @dimensions ask pipeline create revision status
-@pytest.mark.unit
-def test_complete_ask_report_owns_prompt_generation_and_report_state():
-    user = _user("ask-pipeline-owner")
-    report = _report(user, hash="ask-pipeline-report", result={"old": True})
-    prompts = []
-
-    def answer(prompt):
-        prompts.append(prompt)
-        return {
-            "summary": "No follow-up work is needed.",
-            "confidence": 0.9,
-            "actions": [],
-        }
-
-    response = ask.complete_ask_report(report, user, generate=answer)
-
-    assert response is report.proposal
-    assert report.status == "complete"
-    assert report.result is None
-    assert _context(prompts[0], "User Question").strip()
-
-    def revise(prompt):
-        prompts.append(prompt)
-        return {
-            "summary": "A human should confirm the ambiguous match.",
-            "confidence": 0.5,
-            "actions": [
-                {
-                    "id": "review",
-                    "type": "needs_review",
-                    "data": {"note": "Confirm the matching record."},
-                }
-            ],
-        }
-
-    ask.complete_ask_report(
-        report,
-        user,
-        feedback="Call out the ambiguity.",
-        generate=revise,
-    )
-
-    assert report.status == "ready"
-    assert _context(prompts[1], "User Feedback") == (
-        "```\nCall out the ambiguity.\n```"
-    )
-    assert _json_context(prompts[1], "Current Response Json")["actions"] == []
-
-
-# @features ai-report
 # @dimensions ask title-truncation
 @pytest.mark.unit
 def test_ask_report_name_is_compact_and_marks_truncation():

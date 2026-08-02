@@ -423,18 +423,27 @@ Acceptance criteria:
 
 ### E2E-H09 — Split AI adapter evaluation from full browser stories
 
-- [ ] Review direct adapter calls and test request contexts in the home AI
+- [x] Review direct adapter calls and test request contexts in the home AI
   report/deferred-job tests.
-- [ ] Move deterministic proposal/application and adapter contracts to unit
+- [x] Move deterministic proposal/application and adapter contracts to unit
   coverage where possible.
-- [ ] Retain focused E2E stories that start through the UI, observe the durable
+- [x] Retain focused E2E stories that start through the UI, observe the durable
   job lifecycle, and verify the visible applied result.
 
 Candidate cluster:
 
-- `002_home/test_002l_home_tools_ai.py`
+- `002_home/test_002l_home_tools_ai.py` (retired; live-provider quality remains
+  in the standalone evaluation utility)
 - `002_home/test_002m_home_ask_ai.py`
 - `002_home/test_002o_deferred_jobs.py`
+
+Resolution: Ask adapter preparation and shared proposal publication are covered
+as isolated deferred-adapter unit contracts. The redundant browserless deferred
+job test and the direct-provider Organize E2E were retired. The remaining live
+Ask stories create reports through `/tools/ask`, assert the queued durable job,
+run that job through the production worker entrypoint, and wait for the browser's
+normal polling reconciliation before checking the rendered answer. A tooling
+guard rejects direct provider and report-completion helper calls from E2E files.
 
 Acceptance criteria:
 
@@ -662,4 +671,5 @@ the focused verification performed, and any intentional exception that remains.
 
 | Date | Item | Cluster | Result / remaining exception |
 |---|---|---|---|
+| 2026-08-02 | E2E-H09 | AI report/deferred-job suite boundaries | Moved Ask/Organize adapter publication contracts to unit coverage, retired direct-provider/browserless E2E, and retained UI-started Ask jobs with durable checkpoints and natural polling reconciliation. The 184-test unit cluster, 11-test boundary suite, five focused E2E checks, one-run three-case live-provider evaluation, template contracts, and changed-source traceability pass. No exception remains. |
 | 2026-08-02 | E2E-H08 | Route/core suite boundaries | Replaced white-box route calls with core unit contracts and authenticated managed-server coverage. The 31-test focused unit/tooling cluster, 12 focused E2E contracts, and template contracts pass. Traceability has no metadata, link, or feature/dimension errors; refreshing current evidence for 71 adjacent historical tests was deferred to avoid an unrequested broad E2E run. |

@@ -143,7 +143,7 @@ def _task_state_fingerprint(task):
 # @testable true
 # @tests tests_unit/test_020_ai_reports.py::test_run_report_warns_but_continues_when_task_form_submission_missing
 # @tests tests_unit/test_020_ai_reports.py::test_run_report_skips_task_that_references_page_form_and_continues
-# @tests tests_e2e/002_home/test_002l_home_tools_ai.py::test_organize_completion_corpus_executes_usable_submissions*
+# @tests tests_unit/test_020_ai_reports.py::test_run_report_attach_file_to_task_targets_created_task
 # @pair ai-report:task-form
 # @pair tasks:task-form
 # @pair task-completion:task-form

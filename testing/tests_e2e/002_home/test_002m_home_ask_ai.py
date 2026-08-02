@@ -7,14 +7,16 @@ from uuid import uuid4
 import pytest
 from playwright.sync_api import expect
 
-from lagniappe.core.definitions import Fetch, FetchReason
+from lagniappe.core.definitions import DeferredJobStatus, Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools.ai import ask
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai.core import ai_model
+from lagniappe.core.tools.deferred_jobs import DeferredJobs
 from lagniappe.web import app as web_app
-from testing.definitions import Users
+from testing.definitions import SitePages, Users
+from testing.elements import List
 from testing.resources import Report
+from testing.utility import expect_successful_response
 from testing.utility.organize_submission_eval import load_cases
 
 
@@ -33,29 +35,70 @@ def _slug(label):
     return f"test-ask-{label}-{uuid4().hex[:8]}"
 
 
-def _report(owner, question):
-    report = Entities.REPORT.create(
-        {
-            "parent": owner,
-            "user": owner,
-            "name": ask.ask_report_name(question),
-            "tool": "ask",
-            "instructions": question,
-            "status": "pending",
-            "pending": True,
-        }
+def _start_ask_report(user, question):
+    home = user.go(SitePages.HOME)
+    user.locate(home.CREATE_TOOL_REPORT_TOGGLE).click()
+    form = user.locate(home.CREATE_TOOL_REPORT_FORM)
+    form.locator("[data-role='tool-switcher']").get_by_role(
+        "button", name="Ask"
+    ).click()
+    form.locator("textarea[name='instructions']").fill(question)
+
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/tools/ask",
+    ) as response_info:
+        form.get_by_role("button", name="Start").click()
+
+    payload = response_info.value.json()
+    operation = payload["operation"]
+    match = re.search(r'data-key="([^"]+)"', payload["html"])
+    assert match, "Ask response did not include a report data-key"
+    report_key = match.group(1)
+    report_list = List(user.locate(home.TOOL_REPORT_LIST))
+    assert report_list.is_loaded
+    item = report_list.list.locator(f"li[data-key='{report_key}']")
+    expect(item).to_be_visible()
+    expect(item.locator("[data-role='report-stage']")).to_have_text(
+        "Answer pending"
     )
-    Entities.save(report, owner)
-    return report
+    expect(item).to_have_attribute("data-operation", operation)
+
+    report = Entities.fetch_one(report_key, request=Fetch.direct())
+    job = Entities.fetch_one(operation, request=Fetch.direct())
+    assert report.tool == "ask"
+    assert report.instructions == question
+    assert report.status == "pending"
+    assert report.pending is True
+    assert job.status == DeferredJobStatus.QUEUED.value
+    assert job.inputs == {
+        "report": {
+            "kind": "report",
+            "id": report.urlsafe_key,
+        }
+    }
+    return item, report, job
 
 
-def _complete(report, owner, ai_results):
+def _run_ask_job(report, job, ai_results):
     ai_model.initialize()
     with web_app.test_request_context("/"):
-        response = ask.complete_ask_report(report, owner)
+        result = DeferredJobs.run(job.urlsafe_key)
+    saved_job = Entities.fetch_one(job.urlsafe_key, request=Fetch.direct())
+    saved_report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
+    response = saved_report.proposal
     ai_results.record("validated_ask_response", response)
-    Entities.save(report, owner)
-    return response
+    ai_results.record("deferred_job_checkpoint", saved_job.checkpoint)
+    assert result.success is True
+    assert saved_job.status == DeferredJobStatus.SUCCEEDED.value
+    assert saved_job.checkpoint == {
+        "proposal": response,
+        "status": saved_report.status,
+    }
+    assert saved_report.status in {"ready", "complete"}
+    assert not saved_report.pending
+    return response, saved_report
 
 
 def _answer_text(response):
@@ -180,7 +223,7 @@ def _medical_project(owner, case, slug):
 
 
 # @features ai-report
-# @dimensions ask live-provider corpus workspace-tools usable-answer report-view
+# @dimensions ask live-provider workspace-tools usable-answer async persistence
 def test_ask_answers_from_attached_corpus_receipt(get_user, request, monkeypatch):
     user = get_user(Users.OWNER)
     owner = _owner(user)
@@ -206,9 +249,13 @@ def test_ask_answers_from_attached_corpus_receipt(get_user, request, monkeypatch
         "attached receipt. What merchant, purchase date, and total does the "
         "receipt show? Return those exact values and no suggested actions."
     )
-    report = _report(owner, question)
+    item, report, job = _start_ask_report(user, question)
 
-    response = _complete(report, owner, request.node.ai_results)
+    response, report = _run_ask_job(
+        report,
+        job,
+        request.node.ai_results,
+    )
     failures = _answer_usability_failures(
         response,
         required_terms=("Acme Hardware", "2026-07-10", "42"),
@@ -224,6 +271,11 @@ def test_ask_answers_from_attached_corpus_receipt(get_user, request, monkeypatch
     assert workspace_tool_calls, "Ask did not inspect the workspace"
     assert not failures, "\n".join(failures)
     assert report.status == "complete"
+    expect(item.locator("[data-role='report-stage']")).to_have_text(
+        "Answer ready",
+        timeout=30_000,
+    )
+    expect(item).not_to_have_attribute("data-operation", re.compile(".+"))
 
     report_page = user.go(Report.for_entity(user, report))
     expect(report_page.answer).to_be_visible()
@@ -234,7 +286,7 @@ def test_ask_answers_from_attached_corpus_receipt(get_user, request, monkeypatch
 
 
 # @features ai-report
-# @dimensions ask live-provider workspace-tools structured-filter usable-answer report-view
+# @dimensions ask live-provider workspace-tools structured-filter usable-answer async persistence
 def test_ask_uses_structured_filter_for_form_submission_query(
     get_user,
     request,
@@ -263,9 +315,13 @@ def test_ask_uses_structured_filter_for_form_submission_query(
         "exactly Dr. Maria Rivera. Return the exact matching task names and no "
         "suggested actions."
     )
-    report = _report(owner, question)
+    item, report, job = _start_ask_report(user, question)
 
-    response = _complete(report, owner, request.node.ai_results)
+    response, report = _run_ask_job(
+        report,
+        job,
+        request.node.ai_results,
+    )
     failures = _answer_usability_failures(
         response,
         required_terms=(matching.name,),
@@ -277,6 +333,11 @@ def test_ask_uses_structured_filter_for_form_submission_query(
     assert calls, "Ask did not call query_workspace_filter"
     assert not failures, "\n".join(failures)
     assert report.status == "complete"
+    expect(item.locator("[data-role='report-stage']")).to_have_text(
+        "Answer ready",
+        timeout=30_000,
+    )
+    expect(item).not_to_have_attribute("data-operation", re.compile(".+"))
 
     report_page = user.go(Report.for_entity(user, report))
     expect(report_page.answer).to_be_visible()

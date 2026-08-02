@@ -138,7 +138,6 @@ def _create_model_task(action, _report, user, created):
 # @testable true
 # @tests tests_unit/test_020_ai_reports.py::test_run_report_creates_form_category_page_and_project_chain
 # @tests tests_unit/test_020_ai_reports.py::test_run_report_uses_category_form_from_stored_key_for_page_submission
-# @tests tests_e2e/002_home/test_002l_home_tools_ai.py::test_organize_completion_corpus_executes_usable_submissions*
 # @pair ai-report:create-order
 # @pair ai-report:default-category
 # @pair ai-report:submission-completion

@@ -100,7 +100,11 @@ class ReportAdapter(DeferredJobAdapter):
             return DeferredJobInspection.NOT_APPLIED
         return DeferredJobInspection.DRIFTED
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_023_deferred_jobs.py::test_ask_report_adapter_prepares_and_applies_checkpointed_response
+    # @tests tests_unit/test_023_deferred_jobs.py::test_organize_resumes_plan_checkpoint_without_second_planning_call
+    # @pair ai-report:status
+    # @pair ai-report:proposal-publication
     def apply(self, context):
         context.ensure_active()
         self.validate_apply(context)
@@ -294,7 +298,15 @@ class OrganizeReportAdapter(ReportAdapter):
         return None
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_023_deferred_jobs.py::test_ask_report_adapter_prepares_and_applies_checkpointed_response
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
+# @pair ai-report:ask
+# @pair ai-report:revision
+# @pair ai-report:status
+# @pairs ai-report:async ai-report:persistence ai-report:live-provider
+# @pair deferred-jobs:checkpoint
 class AskReportAdapter(ReportAdapter):
     job_type = DeferredJobType.REPORT_ASK
     required_ai_access = AI.ASK

@@ -319,16 +319,18 @@ parent cache, compile only validated definitions, recheck each result with the
 Ask user's view permission, and return a bounded array of `entity.to_ai(user)`
 records. The cache remains permission-neutral; user scoping happens on results.
 
-Ask report generation is owned by `ask.complete_ask_report()`: it selects the
-initial or revision prompt, generates and validates a complete response, clears
-stale execution results, and sets the report to `complete` for answers without
-actions or `ready` for reviewed follow-up actions. Ask validation requires a
-non-empty summary, confidence from 0 to 1, optional string HTML, and the same
-deterministic action validation used by Organize/Create. Invalid model output is
-given one schema-aware repair pass. If an Ask repair still has unresolved
-workspace references or malformed action data, only the unsafe actions become
-review items while valid actions and the usable answer are preserved. The
-retained answer is prefaced
+Ask report generation is owned by the durable `AskReportAdapter`. The UI creates
+a pending report and deferred job; the adapter selects the initial or revision
+prompt, generates and validates the response, and checkpoints the proposal
+before `ReportAdapter.apply()` publishes it. Publication clears stale execution
+results and sets the report to `complete` for answers without actions or `ready`
+for reviewed follow-up actions. Ask validation requires a non-empty summary,
+confidence from 0 to 1, optional string HTML, and the same deterministic action
+validation used by Organize/Create. Invalid model output is given one
+schema-aware repair pass. If an Ask repair still has unresolved workspace
+references or malformed action data, only the unsafe actions become review
+items while valid actions and the usable answer are preserved. The retained
+answer is prefaced
 with an explicit notice that its workspace changes are suggestions and have
 not been applied. Ask prompts keep internal entity hash tokens out of summaries
 and HTML answers, using readable names and links instead. Organize likewise
@@ -577,15 +579,20 @@ Run the synthetic medical/receipt role-separation corpus against the configured
 live model with:
 
 ```bash
-venv/bin/python testing/utility/organize_submission_eval.py --runs 3
+venv/bin/python -m testing.utility.organize_submission_eval --runs 3
 ```
 
-The same corpus also runs through live form entities, report execution,
-`ai_submission()` normalization, and attachment persistence in E2E:
+This command is the live-provider quality evaluation. Deterministic Organize
+checkpoint publication and proposal application belong to the deferred-adapter
+unit suite:
 
 ```bash
-venv/bin/python run.py test testing/tests_e2e/002_home/test_002l_home_tools_ai.py
+venv/bin/python run.py test testing/tests_unit/test_023_deferred_jobs.py::test_organize_resumes_plan_checkpoint_without_second_planning_call
 ```
+
+Browser coverage instead starts reports through the public tools UI, observes
+the durable job lifecycle, and verifies the rendered terminal result. It does
+not call the provider or proposal-completion helper directly.
 
 ### Guidelines (`guidelines/`)
 
