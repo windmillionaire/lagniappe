@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request } from '../request.js?v=b7488009';
-import { S as ShellView } from '../shell.js?v=b7488009';
-import '../errors.js?v=b7488009';
-import '../connectivity.js?v=b7488009';
+import { r as request } from '../request.js?v=be0d9638';
+import { S as ShellView } from '../shell.js?v=be0d9638';
+import '../errors.js?v=be0d9638';
+import '../connectivity.js?v=be0d9638';
 
 /**
  * @testable infrastructure

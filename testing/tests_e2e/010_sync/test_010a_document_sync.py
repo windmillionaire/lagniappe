@@ -15,7 +15,7 @@ from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Projects, Users
 from testing.elements import Tabs
-from testing.utility import trigger_poll
+from testing.utility import expect_poll_result, expect_successful_response
 
 pytestmark = pytest.mark.e2e
 
@@ -48,7 +48,10 @@ def document_parent_touch_response(response):
 # @pairs sync:document sync:collaboration sync:persistence
 # @pairs sync:revision sync:delta sync:checkpoint
 # @pairs sync:author-color editor:remote-highlight
-def test_two_users_see_document_edits_without_reload(get_user):
+def test_two_users_see_document_edits_without_reload(
+    get_user,
+    browser_failures,
+):
     owner = get_user(Users.OWNER)
     collaborator = get_user(Users.admin, creator=owner)
     project = Projects.test_sync_document_collaboration.get(owner)
@@ -58,6 +61,7 @@ def test_two_users_see_document_edits_without_reload(get_user):
 
     collaborator.go(project)
     collaborator_editor = project.editor
+    document_sync_id = project.entity.sync_ids["document"]["id"]
 
     users_button = collaborator_editor.toolbar.locator("button[title='Users']")
     expect(users_button).to_be_visible(timeout=15000)
@@ -102,6 +106,12 @@ def test_two_users_see_document_edits_without_reload(get_user):
             });
         }"""
     )
+    collaborator.page.wait_for_function(
+        "() => !document.fonts || document.fonts.status === 'loaded'"
+    )
+    with browser_failures.expect_offline(collaborator):
+        collaborator.offline = True
+        expect(collaborator.locate("[data-role='offline']")).to_be_visible()
     owner_editor.clear_text()
     owner_editor.type_text(text)
     owner_editor.wait_for_render()
@@ -112,18 +122,13 @@ def test_two_users_see_document_edits_without_reload(get_user):
     save_result = save_info.value.json()
     assert save_result["updates"][0]["checkpoint_accepted"] is True
 
-    owner.page.evaluate(
-        """async () => {
-            const view = document.querySelector("[lp-view]")._lp_view;
-            await view.SyncManager.deregister();
-        }"""
-    )
-    trigger_poll(collaborator)
+    with expect_poll_result(
+        collaborator.page,
+        subscription_id=f"document:{document_sync_id}",
+    ):
+        collaborator.offline = False
 
     expect(collaborator_editor.text_entry).to_contain_text(text)
-    expect(collaborator_editor.toolbar.locator("button[title='Users']")).to_have_count(
-        0
-    )
     observed = collaborator.page.evaluate(
         "() => window.__remoteRevisionFlashes"
     )
@@ -147,7 +152,7 @@ def test_two_users_see_document_edits_without_reload(get_user):
 
 # @pairs sync:document sync:presence sync:lifecycle
 # @pairs polling:document polling:presence polling:lifecycle
-def test_document_presence_appears_and_clears(get_user):
+def test_document_presence_appears_and_clears(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     collaborator = get_user(Users.admin, creator=owner)
     project = Projects.test_sync_document_presence.get(owner)
@@ -155,6 +160,7 @@ def test_document_presence_appears_and_clears(get_user):
     owner.go(project)
     # Presence is document-scoped; the owner must mount the document to join it.
     expect(project.editor.text_entry).to_be_visible()
+    document_sync_id = project.entity.sync_ids["document"]["id"]
 
     collaborator.go(project)
     collaborator_editor = project.editor
@@ -166,23 +172,27 @@ def test_document_presence_appears_and_clears(get_user):
     users_panel = collaborator.page.locator("[role='listbox'][data-visible='true']")
     expect(users_panel).to_contain_text(owner.entity.name)
 
-    deregistered = owner.page.evaluate(
-        """async () => {
-            const view = document.querySelector("[lp-view]")._lp_view;
-            return await Promise.race([
-                view.SyncManager.deregister().then(() => ({ done: true })),
-                new Promise((resolve) => setTimeout(() => resolve({
-                    done: false,
-                    active_poll: Boolean(view.PollingCoordinator.activePoll),
-                    inflight: Boolean(view.PollingCoordinator.inflight),
-                    send_pending: Boolean(view.SyncManager._sendPromise),
-                    subscriptions: [...view.SyncManager._subscriptions.keys()],
-                }), 10000)),
-            ]);
-        }"""
+    collaborator.page.wait_for_function(
+        "() => !document.fonts || document.fonts.status === 'loaded'"
     )
-    assert deregistered["done"], deregistered
-    trigger_poll(collaborator)
+    with browser_failures.expect_offline(collaborator):
+        collaborator.offline = True
+        expect(collaborator.locate("[data-role='offline']")).to_be_visible()
+    with expect_successful_response(
+        owner.page,
+        method="POST",
+        path="/poll",
+        request_payload_contains=(
+            f'"closed_documents":["{document_sync_id}"]'
+        ),
+    ):
+        Tabs(owner).info
+
+    with expect_poll_result(
+        collaborator.page,
+        subscription_id=f"document:{document_sync_id}",
+    ):
+        collaborator.offline = False
 
     expect(collaborator_editor.toolbar.locator("button[title='Users']")).to_have_count(0)
 

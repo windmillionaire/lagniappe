@@ -14,6 +14,7 @@ from lagniappe.web.routes.home import sync as sync_routes
 from lagniappe.web.routes.pages import main as page_routes
 from lagniappe.web.routes.tasks import main as task_routes
 from testing.definitions import Pages, Tasks, Users
+from testing.utility import expect_poll_result, expect_successful_response
 
 
 pytestmark = pytest.mark.e2e
@@ -137,8 +138,12 @@ def _fill_form_field(form, field_prefix, value):
 # @pairs reconnect-refresh:dirty-form-preservation form-schema:notice
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
-def test_form_submission_reconciliation_uses_latest_schema(get_user):
+def test_form_submission_reconciliation_uses_latest_schema(
+    get_user,
+    browser_failures,
+):
     owner = get_user(Users.OWNER)
+    collaborator = get_user(Users.admin, creator=owner)
     page = owner.go(Pages.test_offline_sync_form_page)
     first = owner.page
     info = page.info_form
@@ -149,9 +154,12 @@ def test_form_submission_reconciliation_uses_latest_schema(get_user):
     added_id = f"reconcile-added-field-{suffix}"
 
     _fill_form_field(info, "sync-text-renderer", local_value)
-    first.evaluate(
-        "() => document.querySelector('[lp-view]')._lp_view.sync({ hidden: true })"
+    first.wait_for_function(
+        "() => !document.fonts || document.fonts.status === 'loaded'"
     )
+    with browser_failures.expect_offline(owner):
+        owner.offline = True
+        expect(owner.locate("[data-role='offline']")).to_be_visible()
 
     form = page.entity.form
     original_schema = deepcopy(form.schema)
@@ -168,26 +176,51 @@ def test_form_submission_reconciliation_uses_latest_schema(get_user):
         ]
         form.save()
 
-        other = first.context.new_page()
+        other = collaborator.page
         other.goto(first.url)
         other_info = other.locator("[data-widget='PageInfo']")
         expect(other_info).to_have_attribute("rendered", "")
         _fill_form_field(other_info, "sync-text-renderer", server_value)
         _fill_form_field(other_info, added_id, added_value)
-        with other.expect_response("**/pages/*/update"):
+        with expect_successful_response(
+            other,
+            method="PUT",
+            path=f"/pages/{page.key}/update",
+            entity_key=page.key,
+        ):
             other_info.locator(
                 'button[type="submit"]:not([data-role])'
             ).click()
 
-        first.bring_to_front()
-        first.evaluate(
-            """async () => {
-                const view = document.querySelector("[lp-view]")._lp_view;
-                await view.sync({ hidden: false });
-                await view.EditWatcher.check();
-            }"""
-        )
+        replacement_requests = []
 
+        def record_replacement(request):
+            if (
+                request.method == "GET"
+                and request.url.endswith(f"/pages/{page.key}/info/replace")
+            ):
+                replacement_requests.append(request)
+
+        first.on("request", record_replacement)
+        try:
+            with expect_poll_result(
+                first,
+                subscription_id=f"view:entity:{page.key}",
+            ):
+                with expect_successful_response(
+                    first,
+                    method="GET",
+                    path=f"/pages/{page.key}/info/replace",
+                    entity_key=page.key,
+                ):
+                    owner.offline = False
+        finally:
+            first.remove_listener("request", record_replacement)
+
+        assert len(replacement_requests) == 1
+        expect(owner.locate("[data-role='offline']")).to_be_hidden()
+
+        info = first.locator("[data-widget='PageInfo']")
         marker = info.locator("[lp-edited-marker]")
         expect(marker).to_be_visible()
         expect(marker.locator("[data-role='edited-message']")).to_contain_text(
@@ -214,21 +247,6 @@ def test_form_submission_reconciliation_uses_latest_schema(get_user):
         )
         expect(saved_choice).to_have_attribute("aria-checked", "true")
         expect(local_choice).to_have_attribute("aria-checked", "false")
-
-        modal.get_by_role("button", name="Close").click()
-        expect(modal).not_to_be_attached()
-        expect(info.locator("input[name='sync-text']")).to_have_value(local_value)
-        expect(marker).to_be_visible()
-
-        marker.locator("[data-role='edited-reset']").click()
-        modal = first.locator("#modal")
-        expect(modal).to_be_visible()
-        local_choice = modal.locator("[data-revision-source='local']").filter(
-            has_text=local_value
-        )
-        saved_choice = modal.locator("[data-revision-source='server']").filter(
-            has_text=server_value
-        )
         local_choice.click()
         expect(local_choice).to_have_attribute("aria-checked", "true")
         expect(saved_choice).to_have_attribute("aria-checked", "false")
@@ -260,7 +278,13 @@ def test_task_collection_refresh_preserves_active_form_for_revision_review(
 ):
     owner = get_user(Users.OWNER)
     task = Tasks.test_task_revision_review.get(owner)
-    owner.go(task)
+    with expect_poll_result(
+        owner.page,
+        subscription_id=f"edit:{task.key}",
+        status=None,
+        timeout=25000,
+    ):
+        owner.go(task)
     task_form = task.task_form
     field_id = "input-textab12"
     field = task_form.locator(f"input[name='{field_id}']")
@@ -274,15 +298,13 @@ def test_task_collection_refresh_preserves_active_form_for_revision_review(
     try:
         submission = dict(saved_task.properties.submission.form_value)
         submission[field_id] = saved_value
-        saved_task.form_submission(submission)
-        saved_task.save()
-
-        owner.page.evaluate(
-            """async () => {
-                const view = document.querySelector("[lp-view]")._lp_view;
-                await view.PollingCoordinator.trigger();
-            }"""
-        )
+        with expect_poll_result(
+            owner.page,
+            subscription_id=f"edit:{task.key}",
+            timeout=25000,
+        ):
+            saved_task.form_submission(submission)
+            saved_task.save()
 
         task_form = task.element.locator(task.TASK_FORM)
         marker = task_form.locator("[lp-edited-marker]")

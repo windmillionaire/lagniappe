@@ -9,14 +9,17 @@ Verified against:
 """
 
 import re
+from urllib.parse import urljoin
 from uuid import uuid4
 
+import requests
 from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Projects, SubmissionFields, Users
 from testing.elements import SpinnerButtons, Attributes, Tabs
+from testing.utility import expect_poll_result, expect_successful_response
 
 
 # @features projects
@@ -67,10 +70,50 @@ def test_project_info_form(get_user):
     expect(description).to_contain_text(new_description)
 
 
-# @features edited-entity-notice projects
-# @dimensions timestamp-only formdata staged-reset no-reload dirty-state replacement info-form side-effect-free
+# @pairs edited-entity-notice:timestamp-only edited-entity-notice:replacement
+# @pairs edited-entity-notice:info-form edited-entity-notice:side-effect-free
+# @pairs projects:timestamp-only projects:replacement projects:info-form
+# @pair projects:side-effect-free
 # @template projects/info.html::info_form
-def test_project_revision_notice_only_resets_changed_form(get_user):
+def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revision(
+    get_user,
+):
+    owner = get_user(Users.OWNER)
+    project = Projects.test_project_info_form.get(owner)
+    owner.go(project)
+
+    timestamp_only = Entities.fetch_one(project.key, request=Fetch.direct())
+    timestamp_only.properties.modified.update()
+    timestamp_only.save()
+    modified_before_probe = timestamp_only.modified
+    cookies = {
+        cookie["name"]: cookie["value"]
+        for cookie in owner.page.context.cookies()
+    }
+    replacement = requests.get(
+        urljoin(owner.page.url, f"/projects/{project.key}/info/replace"),
+        cookies=cookies,
+        timeout=10,
+    )
+
+    assert replacement.ok
+    replacement_headers = replacement.headers
+    assert "x-lagniappe-entity-revisions" in replacement_headers
+    assert "x-lagniappe-entity-key" not in replacement_headers
+    assert "x-lagniappe-entity-fingerprint" not in replacement_headers
+    after_probe = Entities.fetch_one(project.key, request=Fetch.direct())
+    assert after_probe.modified == modified_before_probe
+
+
+# @pairs edited-entity-notice:staged-reset edited-entity-notice:no-reload
+# @pairs edited-entity-notice:dirty-state edited-entity-notice:replacement
+# @pairs projects:staged-reset projects:no-reload projects:dirty-state
+# @pairs projects:replacement projects:info-form
+# @template projects/info.html::info_form
+def test_project_revision_notice_only_resets_changed_form(
+    get_user,
+    browser_failures,
+):
     owner = get_user(Users.OWNER)
     collaborator = get_user(Users.admin, creator=owner)
     project = Projects.test_project_info_form.get(owner)
@@ -82,84 +125,77 @@ def test_project_revision_notice_only_resets_changed_form(get_user):
     owner_description = owner_form.locator("textarea[name='description']")
     initial_name = owner_name.input_value()
     initial_description = owner_description.input_value()
-    marker = owner_form.locator("[lp-edited-marker]")
-
-    collaborator.go(project)
-    project.user = collaborator
-    collaborator_form = project.info_form
-
-    timestamp_only = Entities.fetch_one(project.key, request=Fetch.direct())
-    timestamp_only.properties.modified.update()
-    timestamp_only.save()
-    modified_before_probe = timestamp_only.modified
-    with owner.page.expect_response("**/projects/*/info/replace") as replacement:
-        owner.page.evaluate(
-            "document.querySelector('[lp-view]')._lp_view.EditWatcher.check()"
-        )
-    replacement_headers = replacement.value.headers
-    assert "x-lagniappe-entity-revisions" in replacement_headers
-    assert "x-lagniappe-entity-key" not in replacement_headers
-    assert "x-lagniappe-entity-fingerprint" not in replacement_headers
-    after_probe = Entities.fetch_one(project.key, request=Fetch.direct())
-    assert after_probe.modified == modified_before_probe
-    expect(marker).to_be_hidden()
-
-    remote_name = f"Remote revision {uuid4().hex[:8]}"
-    remote_name_field = SubmissionFields.INPUT.get(
-        "name", submission_value=remote_name
-    )
-    remote_name_field.set_submission_value(collaborator_form)
-    owner_submit = owner_form.locator(
-        "button[type='submit']:not([data-role])"
-    )
-    owner_submit.focus()
-    expect(owner_submit).to_be_focused()
-    with collaborator.page.expect_response("**/projects/*/update"):
-        collaborator_form.locator(
-            "button[type='submit']:not([data-role])"
-        ).click()
-
-    owner.page.evaluate(
-        "document.querySelector('[lp-view]')._lp_view.EditWatcher.check()"
-    )
-
-    expect(marker).to_be_visible()
-    expect(marker.get_by_role("button", name="Reset form")).to_be_visible()
-    expect(owner_name).to_have_value(initial_name)
-    marker.get_by_role("button", name="Reset form").click()
-    expect(owner_form.locator("input[name='name']")).to_have_value(remote_name)
-    expect(owner_form.locator("[lp-edited-marker]")).to_be_hidden()
-
-    second_remote_name = f"Second remote revision {uuid4().hex[:8]}"
-    second_remote_name_field = SubmissionFields.INPUT.get(
-        "name", submission_value=second_remote_name
-    )
-    collaborator_form = project.info_form
-    second_remote_name_field.set_submission_value(collaborator_form)
-    with collaborator.page.expect_response("**/projects/*/update"):
-        collaborator_form.locator(
-            "button[type='submit']:not([data-role])"
-        ).click()
-
     local_description = f"Local draft {uuid4().hex[:8]}"
     local_description_field = SubmissionFields.TEXTAREA.get(
         "description", submission_value=local_description
     )
     local_description_field.set_submission_value(owner_form)
     owner.page.evaluate("window.__revisionResetSentinel = 'mounted'")
-    owner.page.evaluate(
-        "document.querySelector('[lp-view]')._lp_view.EditWatcher.check()"
+    owner.page.wait_for_function(
+        "() => !document.fonts || document.fonts.status === 'loaded'"
     )
+    with browser_failures.expect_offline(owner):
+        owner.offline = True
+        expect(owner.locate("[data-role='offline']")).to_be_visible()
 
+    remote_name = f"Remote revision {uuid4().hex[:8]}"
+    collaborator.go(project)
+    project.user = collaborator
+    collaborator_form = project.info_form
+    remote_name_field = SubmissionFields.INPUT.get(
+        "name", submission_value=remote_name
+    )
+    remote_name_field.set_submission_value(collaborator_form)
+    with expect_successful_response(
+        collaborator.page,
+        method="PUT",
+        path=f"/projects/{project.key}/update",
+        entity_key=project.key,
+    ):
+        collaborator_form.locator(
+            "button[type='submit']:not([data-role])"
+        ).click()
+
+    replacement_requests = []
+
+    def record_replacement(request):
+        if (
+            request.method == "GET"
+            and request.url.endswith(f"/projects/{project.key}/info/replace")
+        ):
+            replacement_requests.append(request)
+
+    owner.page.on("request", record_replacement)
+    try:
+        with expect_poll_result(
+            owner.page,
+            subscription_id=f"view:entity:{project.key}",
+        ):
+            with expect_successful_response(
+                owner.page,
+                method="GET",
+                path=f"/projects/{project.key}/info/replace",
+                entity_key=project.key,
+            ):
+                owner.offline = False
+    finally:
+        owner.page.remove_listener("request", record_replacement)
+
+    assert len(replacement_requests) == 1
+    expect(owner.locate("[data-role='offline']")).to_be_hidden()
+
+    project.user = owner
+    owner_form = project.info_form
+    owner_name = owner_form.locator("input[name='name']")
+    owner_description = owner_form.locator("textarea[name='description']")
+    marker = owner_form.locator("[lp-edited-marker]")
     expect(marker).to_be_visible()
     expect(marker.get_by_role("button", name="Reset form")).to_be_visible()
-    expect(owner_name).to_have_value(remote_name)
+    expect(owner_name).to_have_value(initial_name)
     expect(owner_description).to_have_value(local_description)
 
     marker.get_by_role("button", name="Reset form").click()
-    expect(owner_form.locator("input[name='name']")).to_have_value(
-        second_remote_name
-    )
+    expect(owner_form.locator("input[name='name']")).to_have_value(remote_name)
     expect(owner_form.locator("textarea[name='description']")).to_have_value(
         initial_description
     )

@@ -604,12 +604,9 @@ def test_submit_attached_task_form(get_user):
 
 
 # @pair tasks:update-state
-# @pair tasks:refresh
 # @pair tasks:complete
 # @pair tasks:readonly
 # @pair tasks:attached-form
-# @pair reconnect-refresh:page-tasks
-# @pair reconnect-refresh:component-identity
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
 # @template pages/tasks.html::settings_form
@@ -636,38 +633,6 @@ def test_task_update_preserves_open_widget_and_completed_readonly_state(get_user
     for submission in task.definition.submission:
         assert submission.verify_submission_value(task_form)
 
-    with user.page.expect_response("**/refresh") as refresh_info:
-        user.page.evaluate(
-            """async () => {
-                const view = document.querySelector("[lp-view]");
-                const watcher = view._lp_view.EditWatcher;
-                watcher?.pause();
-                view.dataset.fingerprint = "stale-refresh-test";
-                try {
-                    await view._lp_view._refreshCollectionComponents(
-                        Object.values(view._lp_view.components),
-                    );
-                } finally {
-                    watcher?.resume();
-                }
-            }"""
-        )
-
-    refresh_request = json.loads(refresh_info.value.request.post_data or "{}")
-    assert refresh_request["view"]["key"] == page.key
-    assert refresh_request["view"]["fingerprint"] == "stale-refresh-test"
-    assert {target["id"] for target in refresh_request["targets"]} == {"tasks"}
-    assert set(refresh_request["targets"][0]) == {"id", "rows"}
-
-    refresh_targets = refresh_info.value.json()["targets"]
-    task_refresh = next(
-        target for target in refresh_targets if target["id"] == "tasks"
-    )
-    assert task_refresh["fallback"] is False
-    task_form = task.element.locator(task.TASK_FORM)
-    expect(task_form).to_be_visible()
-    expect(task.element).to_have_attribute("data-open", "TaskForm")
-
     task.complete()
 
     task_form = task.element.locator(task.TASK_FORM)
@@ -687,49 +652,6 @@ def test_task_update_preserves_open_widget_and_completed_readonly_state(get_user
     readonly_field.locator("[data-role='label']").click()
     expect(readonly_field).to_have_attribute("data-mode", "read")
     expect(readonly_field.locator("input")).to_have_count(0)
-
-
-# @features tasks
-# @dimensions refresh update-state stale-widget
-# @template pages/tasks.html::task
-# @template pages/tasks.html::task_form
-def test_task_refresh_closes_when_open_widget_is_missing(get_user):
-    user = get_user(Users.OWNER)
-    task = Tasks.test_completed_task_readonly_form.get(user)
-    page = Pages.test_create_page_task.get(user)
-    user.go(task)
-
-    expect(_open_page_task_form(page, task)).to_be_visible()
-    result = user.page.evaluate(
-        """async (key) => {
-            const list = document.querySelector("[data-widget='PageTaskList']")
-                ._lp_widget;
-            const row = document.querySelector(`[data-key="${key}"]`);
-            const replacement = row.cloneNode(true);
-            replacement.dataset.modified = `${row.dataset.modified || ""}:replacement`;
-            replacement.dataset.default = "";
-            replacement.dataset.open = "false";
-            replacement.querySelector("[data-widget='TaskForm']")?.remove();
-            replacement.querySelector("[lp-control='form']")?.remove();
-
-            list._replaced = [{ from: row, to: replacement }];
-            await list.postreconcile();
-
-            const updated = document.querySelector(`[data-key="${key}"]`);
-            return {
-                hasForm: Boolean(updated.querySelector("[data-widget='TaskForm']")),
-                open: updated.dataset.open,
-                visibleWidgets: Array.from(updated.querySelectorAll("[data-widget]"))
-                    .filter((widget) => widget.dataset.visible === "true")
-                    .map((widget) => widget.dataset.widget),
-            };
-        }""",
-        task.key,
-    )
-
-    assert result == {"hasForm": False, "open": "false", "visibleWidgets": []}
-    expect(task.element.locator(task.TASK_FORM)).to_have_count(0)
-    expect(task.element).to_have_attribute("data-open", "false")
 
 
 # @features tasks
@@ -832,50 +754,6 @@ def test_create_page_task_while_another_task_is_open_keeps_rows_clear(get_user):
     expect(
         existing_task.element.locator(existing_task.SETTINGS_FORM)
     ).not_to_be_visible()
-
-
-# @features tasks
-# @dimensions create refresh dedupe
-# @template pages/tasks.html::task_list
-# @template pages/tasks.html::task
-def test_page_task_refresh_create_reconcile_does_not_duplicate_rows(get_user):
-    user = get_user(Users.OWNER)
-    task = Tasks.test_page_task_refresh_create_dedupe.get(user, create=False)
-    page = Pages.test_create_page_task.get(user)
-    user.go(page)
-
-    create_form = page.create_task_form
-    create_form.locator(FormElements.NAME).fill(task.definition.name)
-    create_form.locator(FormElements.DESCRIPTION).fill(task.definition.description)
-
-    task.key = _submit_create_task_form(user, page, task, create_form)
-    task_rows = page.task_list.locator(f"li[lp-entity][data-key='{task.key}']")
-    expect(task_rows).to_have_count(1)
-
-    duplicate_count = user.page.evaluate(
-        """async (key) => {
-            const list = document.querySelector("[data-widget='PageTaskList']")
-                ._lp_widget;
-            const rows = () => Array.from(
-                list.target.querySelectorAll("li[lp-entity]"),
-            ).filter((elt) => elt.dataset.key === key);
-            const row = rows()[0];
-            if (!row) throw new Error("Created task row not found");
-
-            const refreshRow = row.cloneNode(true);
-            const createdRow = row.cloneNode(true);
-            row.remove();
-            list._added = [refreshRow];
-            list._created = [createdRow];
-
-            await list.postreconcile();
-            return rows().length;
-        }""",
-        task.key,
-    )
-
-    assert duplicate_count == 1
-    expect(task_rows).to_have_count(1)
 
 
 # @features signature

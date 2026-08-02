@@ -5,13 +5,12 @@ import { BaseList } from "../elements/base/baseList";
  * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_task_without_edit_controls
  * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_assigned_user_can_work_their_assigned_task
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_refresh_closes_when_open_widget_is_missing
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_while_another_task_is_open_keeps_rows_clear
- * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_page_task_refresh_create_reconcile_does_not_duplicate_rows
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_update_page_task_settings_from_row
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_empty_page_task_list_shows_marker_only_after_create_closes
  * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_completed_only_task_list_hides_empty_marker
  * @tests tests_js/test_028_form_state_split.py::test_task_list_refresh_preserves_rows_with_local_form_state
+ * @tests tests_js/test_028_form_state_split.py::test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_task_collection_refresh_preserves_active_form_for_revision_review
  * @tests tests_js/test_028_form_state_split.py::test_task_list_empty_marker_requires_closed_create_form_and_no_tasks
  * @features tasks
@@ -19,6 +18,7 @@ import { BaseList } from "../elements/base/baseList";
  * @pair tasks:active-form-preservation
  * @pair tasks:dirty-form-preservation
  * @pairs tasks:completed-only tasks:empty-state tasks:create-close
+ * @pairs tasks:create tasks:refresh tasks:dedupe
  */
 export class PageTaskList extends BaseList {
 	constructor(attributes) {
@@ -378,7 +378,6 @@ export class PageTaskList extends BaseList {
 
 	/**
 	 * @testable true
-	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_refresh_closes_when_open_widget_is_missing
 	 * @tests tests_js/test_028_form_state_split.py::test_task_list_refresh_preserves_rows_with_local_form_state
 	 * @pairs tasks:active-form-preservation tasks:dirty-form-preservation
 	 * @pair tasks:stale-widget

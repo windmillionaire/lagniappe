@@ -15,6 +15,7 @@ from playwright.sync_api import expect
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Projects, SitePages, Users
+from testing.utility import expect_successful_response
 
 pytestmark = pytest.mark.e2e
 
@@ -150,10 +151,25 @@ def _offline_form_edit(user, form, value):
 
 
 def _reconnect_with_sync(user):
-    with user.page.expect_response("**/sync") as response_info:
-        user.offline = False
-        user.page.evaluate("window.dispatchEvent(new Event('online'))")
-    assert response_info.value.ok
+    sync_requests = []
+
+    def record_sync(request):
+        if request.method == "POST" and request.url.endswith("/sync"):
+            sync_requests.append(request)
+
+    user.page.on("request", record_sync)
+    try:
+        with expect_successful_response(
+            user.page,
+            method="POST",
+            path="/sync",
+        ) as response_info:
+            user.offline = False
+        _wait_for_offline_sync_records(user, exact=0)
+    finally:
+        user.page.remove_listener("request", record_sync)
+
+    assert len(sync_requests) == 1
     return response_info.value
 
 
@@ -168,7 +184,6 @@ def test_offline_document_edits_replay_in_order(get_user, browser_failures):
     second = _unique("second-offline-edit")
     _offline_document_edit(user, browser_failures, editor, first, second)
     _reconnect_with_sync(user)
-    _wait_for_offline_sync_records(user, exact=0)
 
     user.go(project)
     replayed = project.editor.get_text()
@@ -177,8 +192,7 @@ def test_offline_document_edits_replay_in_order(get_user, browser_failures):
     assert replayed.index(first) < replayed.index(second)
 
 
-# @features sync
-# @dimensions offline-replay replay-error queue-preserved retry
+# @pairs sync:offline-replay sync:queue-preserved
 def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failures):
     user = get_user(Users.OWNER)
     project = Projects.test_offline_document_retry.get(user)
@@ -218,7 +232,6 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failure
             with browser_failures.expect_offline(user):
                 _go_offline(user)
                 _reconnect_with_sync(user)
-                _wait_for_offline_sync_records(user, exact=0)
 
             user.go(project)
             expect(project.editor.text_entry).to_contain_text(text)

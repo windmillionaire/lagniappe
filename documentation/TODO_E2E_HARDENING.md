@@ -264,11 +264,11 @@ Acceptance criteria:
 
 ### E2E-H05 — Remove direct `EditWatcher`, sync, polling, and reconciliation control
 
-- [ ] Replace direct `EditWatcher.check()`, `_lp_view.sync`,
+- [x] Replace direct `EditWatcher.check()`, `_lp_view.sync`,
   `PollingCoordinator.trigger`, and `_pollingReconcileTask` calls with the
   corresponding browser lifecycle event where possible.
-- [ ] Move direct state-machine and DOM reconciliation cases into the JS suite.
-- [ ] Keep one E2E story per important integration path: reconnect sync,
+- [x] Move direct state-machine and DOM reconciliation cases into the JS suite.
+- [x] Keep one E2E story per important integration path: reconnect sync,
   collaborator edit, poll reconciliation, and offline replay.
 
 High-value candidates:
@@ -287,6 +287,16 @@ Possible real triggers include switching between two pages/actors,
 `bring_to_front`, browser offline/online transitions, a collaborator save, and
 waiting for the application's normal poll. Confirm actual production behavior
 in the frontend and sync documentation before choosing one.
+
+Resolved 2026-08-01. Reconciliation E2E stories now use public tab changes,
+collaborator saves, and the browser's native offline/online transition.
+`expect_poll_result()` observes an exact subscription without invoking the
+coordinator; the active-task revision story is the one deliberate
+ordinary-cadence poll, while native reconnect catch-up drives the other poll
+cases.
+Fabricated task-list and file-extraction reconciliation permutations moved to
+focused JavaScript tests. Reconnect coverage also records exactly one
+successful `POST /sync` and no longer dispatches a duplicate `online` event.
 
 Acceptance criteria:
 

@@ -1,13 +1,13 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as createIcon, s as setIcon } from '../icons.js?v=b7488009';
-import { r as request } from '../request.js?v=b7488009';
-import { C as Core } from '../core.js?v=b7488009';
-import '../styles.js?v=b7488009';
-import '../errors.js?v=b7488009';
-import '../connectivity.js?v=b7488009';
-import '../endpoints.js?v=b7488009';
-import '../utilities.js?v=b7488009';
-import '../shell.js?v=b7488009';
+import { c as createIcon, s as setIcon } from '../icons.js?v=be0d9638';
+import { r as request } from '../request.js?v=be0d9638';
+import { C as Core } from '../core.js?v=be0d9638';
+import '../styles.js?v=be0d9638';
+import '../errors.js?v=be0d9638';
+import '../connectivity.js?v=be0d9638';
+import '../endpoints.js?v=be0d9638';
+import '../utilities.js?v=be0d9638';
+import '../shell.js?v=be0d9638';
 
 const REPORT_FORM_SELECTOR =
 	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='undo-report-form'], [data-role='revise-report-form']";
@@ -47,7 +47,7 @@ class Report extends Core {
 		if (this._reportFormsReady) return Promise.resolve(this);
 		if (this._reportFormsPromise) return this._reportFormsPromise;
 
-		const pending = import('../baseForm.js?v=b7488009').then(function (n) { return n.b; })
+		const pending = import('../baseForm.js?v=be0d9638').then(function (n) { return n.b; })
 			.then(async ({ BaseForm }) => {
 				if (this._destroyed) return null;
 				await Promise.all([

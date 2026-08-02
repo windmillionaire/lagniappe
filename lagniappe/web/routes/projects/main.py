@@ -33,9 +33,15 @@ def view(key, **kwargs):
 
 
 # @testable true
+# @tests tests_e2e/004_projects/test_004b_info.py::test_project_info_replacement_is_side_effect_free_for_timestamp_only_revision
 # @tests tests_e2e/004_projects/test_004b_info.py::test_project_revision_notice_only_resets_changed_form
-# @features edited-entity-notice projects
-# @dimensions replacement info-form side-effect-free timestamp-only formdata staged-reset no-reload dirty-state
+# @pairs edited-entity-notice:replacement edited-entity-notice:info-form
+# @pairs edited-entity-notice:side-effect-free edited-entity-notice:timestamp-only
+# @pairs edited-entity-notice:staged-reset edited-entity-notice:no-reload
+# @pair edited-entity-notice:dirty-state
+# @pairs projects:replacement projects:info-form projects:side-effect-free
+# @pairs projects:timestamp-only projects:staged-reset projects:no-reload
+# @pair projects:dirty-state
 @projects.route("/<key>/info/replace", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
 def info(key, **kwargs):

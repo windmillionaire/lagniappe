@@ -26,6 +26,7 @@ from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Projects, Users
 from testing.elements import EditorMenuOptions, EditorToggleOptions, Tabs
+from testing.utility import expect_successful_response
 
 
 MARKDOWN_TABLE_PASTE_FIXTURE = "\n".join(
@@ -61,14 +62,16 @@ def test_untouched_document_does_not_save_or_touch_project(get_user):
     editor = project.editor
     assert editor.get_text() == ""
 
-    Tabs(user).info
-    user.page.evaluate(
-        """async () => {
-            const view = document.querySelector('[lp-view]')._lp_view;
-            await Promise.resolve();
-            await view._pollingReconcileTask;
-        }"""
-    )
+    document_sync_id = project.entity.sync_ids["document"]["id"]
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/poll",
+        request_payload_contains=(
+            f'"closed_documents":["{document_sync_id}"]'
+        ),
+    ):
+        Tabs(user).info
 
     after = Entities.fetch_one(project.key, request=Fetch.direct()).modified
     assert after == before

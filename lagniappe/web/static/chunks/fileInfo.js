@@ -1,32 +1,32 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES } from './styles.js?v=b7488009';
-import { F as FormElement } from './form2.js?v=b7488009';
-import { InputElement } from './input.js?v=b7488009';
-import { p as primitives } from './primitives.js?v=b7488009';
-import { S as SectionToggle } from './sectionToggle.js?v=b7488009';
-import { TextareaElement } from './textarea.js?v=b7488009';
-import { s as setIcon } from './icons.js?v=b7488009';
-import './baseForm.js?v=b7488009';
-import './request.js?v=b7488009';
-import './errors.js?v=b7488009';
-import './connectivity.js?v=b7488009';
-import './utilities.js?v=b7488009';
-import './loader.js?v=b7488009';
-import './baseElement.js?v=b7488009';
-import './formatting.js?v=b7488009';
-import './facets.js?v=b7488009';
-import './endpoints.js?v=b7488009';
-import './combobox.js?v=b7488009';
-import './results.js?v=b7488009';
-import './submitter.js?v=b7488009';
-import './buttons.js?v=b7488009';
-import './baseUpload.js?v=b7488009';
-import './dropdown.js?v=b7488009';
+import { S as STYLES } from './styles.js?v=be0d9638';
+import { F as FormElement } from './form2.js?v=be0d9638';
+import { InputElement } from './input.js?v=be0d9638';
+import { p as primitives } from './primitives.js?v=be0d9638';
+import { S as SectionToggle } from './sectionToggle.js?v=be0d9638';
+import { TextareaElement } from './textarea.js?v=be0d9638';
+import { s as setIcon } from './icons.js?v=be0d9638';
+import './baseForm.js?v=be0d9638';
+import './request.js?v=be0d9638';
+import './errors.js?v=be0d9638';
+import './connectivity.js?v=be0d9638';
+import './utilities.js?v=be0d9638';
+import './loader.js?v=be0d9638';
+import './baseElement.js?v=be0d9638';
+import './formatting.js?v=be0d9638';
+import './facets.js?v=be0d9638';
+import './endpoints.js?v=be0d9638';
+import './combobox.js?v=be0d9638';
+import './results.js?v=be0d9638';
+import './submitter.js?v=be0d9638';
+import './buttons.js?v=be0d9638';
+import './baseUpload.js?v=be0d9638';
+import './dropdown.js?v=be0d9638';
 
 /**
  * @testable true
  * @tests tests_e2e/011_files/test_011c_file_processing_reconciliation.py::test_file_summary_completion_stages_authoritative_info_until_reset
- * @tests tests_e2e/011_files/test_011c_file_processing_reconciliation.py::test_file_extract_completion_prompts_reload_for_text_tab_after_reset
+ * @tests tests_js/test_039_file_processing_reconciliation.py::test_file_info_extract_completion_requests_one_reload_notice
  * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_page_links_can_be_added_and_removed
  * @features file
  * @dimensions extract summarize polling status summary reload text-tab active-reset linked-pages

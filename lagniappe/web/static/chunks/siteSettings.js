@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import './request.js?v=b7488009';
-import './connectivity.js?v=b7488009';
-import { withTransition } from './utilities.js?v=b7488009';
-import './errors.js?v=b7488009';
+import './request.js?v=be0d9638';
+import './connectivity.js?v=be0d9638';
+import { withTransition } from './utilities.js?v=be0d9638';
+import './errors.js?v=be0d9638';
 
 const SECTION_STORAGE_KEY = "lagniappe:site-settings-section";
 const DEFAULT_SECTION = "maintenance";

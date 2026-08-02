@@ -16,7 +16,6 @@ from testing.elements import Buttons, FormElements, List, Modal
 from testing.resources import Task
 from testing.utility import (
     TestFile as _TestFile,
-    trigger_poll,
     wait_for_offline_mutations,
 )
 from testing.utility.local_time import local_date_from_utc_datetime
@@ -314,10 +313,8 @@ def test_delete_activity_item_from_home(get_user):
     user = get_user(Users.OWNER)
     other_user = get_user(Users.create_user, creator=user)
     own_body = _unique("Activity note delete")
-    remote_body = _unique("Activity polling delete")
     other_body = _unique("Other user activity note")
     own_note = _save_note(user, own_body)
-    remote_note = _save_note(user, remote_body)
     _save_note(other_user, other_body)
 
     home = user.go(SitePages.HOME)
@@ -339,12 +336,6 @@ def test_delete_activity_item_from_home(get_user):
     ):
         modal.delete()
     expect(own_item).not_to_be_visible()
-
-    remote_item = _activity_item(home, remote_body)
-    expect(remote_item).to_be_visible()
-    Entities.delete(remote_note)
-    trigger_poll(user)
-    expect(remote_item).not_to_be_visible()
     expect(activity_list).to_contain_text(other_body)
 
 

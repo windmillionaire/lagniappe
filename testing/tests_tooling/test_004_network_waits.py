@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from testing.utility.network import expect_successful_response
-from testing.utility import reconnect
+from testing.utility import polling, reconnect
 
 
 pytestmark = pytest.mark.tooling
@@ -186,6 +186,77 @@ def test_wait_validates_entity_revisions_and_response_payload():
 
 def assert_deferred(response):
     assert response.json()["deferred"] is True
+
+
+def test_poll_wait_matches_subscription_and_validates_result():
+    page = FakePage()
+    subscription_id = "edit:task-key"
+
+    with polling.expect_poll_result(
+        page,
+        subscription_id=subscription_id,
+    ) as response_info:
+        page.respond(
+            FakeResponse(
+                url="http://test.local/poll",
+                post_data='{"subscriptions":[{"id":"edit:other-task"}]}',
+                payload={
+                    "version": 1,
+                    "results": [{"id": "edit:other-task", "status": "changed"}],
+                },
+            )
+        )
+        expected = FakeResponse(
+            url="http://test.local/poll",
+            post_data=(
+                '{"subscriptions":[{"id":"edit:task-key",'
+                '"type":"entity"}]}'
+            ),
+            payload={
+                "version": 1,
+                "results": [{"id": subscription_id, "status": "changed"}],
+            },
+        )
+        page.respond(expected)
+
+    assert response_info.value is expected
+
+
+@pytest.mark.parametrize(
+    ("payload", "message"),
+    [
+        (
+            {"version": 1, "results": []},
+            "did not return subscription 'view:entity:file-key'",
+        ),
+        (
+            {
+                "version": 1,
+                "results": [
+                    {"id": "view:entity:file-key", "status": "unchanged"}
+                ],
+            },
+            "expected 'changed'",
+        ),
+    ],
+)
+def test_poll_wait_reports_missing_or_unexpected_result(payload, message):
+    page = FakePage()
+
+    with pytest.raises(AssertionError, match=message):
+        with polling.expect_poll_result(
+            page,
+            subscription_id="view:entity:file-key",
+        ):
+            page.respond(
+                FakeResponse(
+                    url="http://test.local/poll",
+                    post_data=(
+                        '{"subscriptions":[{"id":"view:entity:file-key"}]}'
+                    ),
+                    payload=payload,
+                )
+            )
 
 
 class FakeBrowserFailures:

@@ -1624,11 +1624,13 @@ const activeReplacement = {
 };
 let incompatibleReplaced = false;
 const incompatible = {
-  replaceWith() { incompatibleReplaced = true; },
+  replaceWith(node) { incompatibleReplaced = node; },
 };
 const incompatibleReplacement = {
+  dataset: { open: "false" },
   querySelector() { return null; },
 };
+let incompatibleDestroyed = false;
 let hiddenReplaced = false;
 const hidden = {
   replaceWith() { hiddenReplaced = true; },
@@ -1655,8 +1657,9 @@ const components = new Map([
     incompatible,
     {
       active: incompatibleWidget,
+      open: "TaskForm",
       widgets: { TaskForm: incompatibleWidget },
-      destroy() {},
+      destroy() { incompatibleDestroyed = true; },
     },
   ],
   [
@@ -1695,8 +1698,90 @@ Object.defineProperty(list, "completedCount", { value: 0 });
   if (!hiddenReplaced) {
     throw new Error("A hidden clean form row was not silently refreshed");
   }
-  if (!incompatibleReplaced) {
+  if (
+    incompatibleReplaced !== incompatibleReplacement ||
+    !incompatibleDestroyed ||
+    incompatibleReplacement.dataset.open !== "false"
+  ) {
     throw new Error("An active row survived after its form disappeared");
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
+# @pairs tasks:create tasks:refresh tasks:dedupe
+def test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh(
+    run_node,
+):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const context = { BaseList: class {}, console };
+vm.createContext(context);
+let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class PageTaskList", "class PageTaskList");
+source += "\nglobalThis.PageTaskList = PageTaskList;";
+vm.runInContext(source, context);
+
+const rows = [];
+const flashes = [];
+const refreshRow = { dataset: { key: "task-key", completed: "false" } };
+const createdRow = { dataset: { key: "task-key", completed: "false" } };
+const activeTasks = {
+  contains(row) { return rows.includes(row); },
+  prepend(row) { rows.unshift(row); },
+};
+const completedTasks = {
+  contains() { return false; },
+  prepend() { throw new Error("Active task was inserted into completed tasks"); },
+};
+const list = Object.create(context.PageTaskList.prototype);
+list.component = { active: null };
+list.view = {
+  addFlash(row) { flashes.push(row); },
+  getComponent() { throw new Error("Duplicate created row was initialized"); },
+};
+list.target = {
+  querySelectorAll() { return rows; },
+  setAttribute() {},
+};
+Object.defineProperties(list, {
+  activeTasks: { value: activeTasks },
+  completedTasks: { value: completedTasks },
+  activeCount: { value: 0 },
+  completedCount: { value: 0 },
+});
+list._updated = [];
+list._removed = [];
+list._replaced = [];
+list._added = [refreshRow];
+list._created = [createdRow];
+list._setListVisibility = () => {};
+
+(async () => {
+  await list.postreconcile();
+  if (
+    rows.length !== 1 ||
+    rows[0] !== refreshRow ||
+    flashes.length !== 1 ||
+    flashes[0] !== refreshRow
+  ) {
+    throw new Error(
+      `Refresh/create reconciliation duplicated a task: ${JSON.stringify({
+        rows: rows.length,
+        flashes: flashes.length,
+      })}`,
+    );
+  }
+  if (list._added.length || list._created.length) {
+    throw new Error("Refresh/create reconciliation did not clear its queues");
   }
 })().catch((error) => {
   console.error(error);

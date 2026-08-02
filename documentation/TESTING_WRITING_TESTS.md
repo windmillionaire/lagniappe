@@ -134,6 +134,34 @@ fresh context when durable state is part of the story.
 Deliberate non-success responses are a different contract: retain a raw
 Playwright response wait and assert the expected status/body explicitly.
 
+### Polling and reconciliation waits
+
+Use `expect_poll_result()` when an E2E story needs to observe the polling
+protocol. Give it the exact subscription ID (for example,
+`view:entity:<key>`, `edit:<key>`, or `document:<sync-id>`) and put the public
+lifecycle action inside the context:
+
+```python
+with browser_failures.expect_offline(user):
+    user.offline = True
+
+# Arrange the external committed change while this browser is offline.
+with expect_poll_result(
+    user.page,
+    subscription_id=f"view:entity:{project.key}",
+):
+    user.offline = False
+```
+
+The helper only observes and validates a successful natural `POST /poll`; it
+does not invoke the polling coordinator. Prefer a visible tab change, a
+collaborator save, or a native offline/online transition for E2E stories. Keep
+ordinary-cadence waits deliberate and rare because they add real wall-clock
+time. Never call a view's polling/sync manager, watcher check, private refresh
+method, reconciliation method, or private task promise from an E2E test. Put
+low-level state-machine and DOM reconciliation permutations in the JavaScript
+suite.
+
 The accumulated E2E datastore intentionally resembles a living system. Reuse
 named users and entities when the story only needs them to exist, and establish
 the relevant precondition idempotently each time instead of assuming an earlier

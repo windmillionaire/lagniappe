@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as Entity } from '../entity.js?v=b7488009';
-import '../core.js?v=b7488009';
-import '../connectivity.js?v=b7488009';
-import '../endpoints.js?v=b7488009';
-import '../errors.js?v=b7488009';
-import '../request.js?v=b7488009';
-import '../utilities.js?v=b7488009';
-import '../shell.js?v=b7488009';
+import { E as Entity } from '../entity.js?v=be0d9638';
+import '../core.js?v=be0d9638';
+import '../connectivity.js?v=be0d9638';
+import '../endpoints.js?v=be0d9638';
+import '../errors.js?v=be0d9638';
+import '../request.js?v=be0d9638';
+import '../utilities.js?v=be0d9638';
+import '../shell.js?v=be0d9638';
 
 /**
  * @testable true
@@ -18,7 +18,7 @@ import '../shell.js?v=b7488009';
  * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_mobile_preview_uses_preview_tab
  * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_mobile_pdf_preview_renders_canvas
  * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_page_shows_linked_page_and_task_badges
- * @tests tests_e2e/011_files/test_011c_file_processing_reconciliation.py::test_file_extract_completion_prompts_reload_for_text_tab
+ * @tests tests_js/test_039_file_processing_reconciliation.py::test_file_view_shows_extract_reload_only_for_matching_unmounted_text
  * @features file
  * @dimensions load tabs text-tab file-mobile preview pdf-preview pdf-toolbar file-upload page-upload extract polling reload authoritative-remount linked-entities reverse-links badges
  */

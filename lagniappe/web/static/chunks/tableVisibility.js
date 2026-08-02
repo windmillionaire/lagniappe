@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { p as primitives } from './primitives.js?v=b7488009';
-import { T as TableVisibilityState } from './tableVisibilityState.js?v=b7488009';
-import './styles.js?v=b7488009';
-import './icons.js?v=b7488009';
+import { p as primitives } from './primitives.js?v=be0d9638';
+import { T as TableVisibilityState } from './tableVisibilityState.js?v=be0d9638';
+import './styles.js?v=be0d9638';
+import './icons.js?v=be0d9638';
 
 /**
  * @testable infrastructure
