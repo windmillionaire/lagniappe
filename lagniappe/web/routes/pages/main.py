@@ -60,11 +60,11 @@ def _preserve_public_user_page_attributes(page, page_data):
 
     preserved = {"photo", "files"}
     submitted = set(page_data.get("attributes") or [])
+    existing = {attribute.name for attribute in page.attributes if attribute.active}
     if _is_public_users_own_page(page):
-        page_data["attributes"] = sorted(submitted - preserved)
+        page_data["attributes"] = sorted(existing)
         return
 
-    existing = {attribute.name for attribute in page.attributes if attribute.active}
     page_data["attributes"] = sorted(submitted | (existing & preserved))
 
 
@@ -678,6 +678,8 @@ def _apply_owner_access_restriction(page, owner):
 # @dimensions access-restrictions group-restricted
 def _apply_group_access_restriction(page, group_action, group_key):
     group = Entities.fetch_one(group_key, request=Fetch.direct())
+    if not group:
+        abort(404)
     if group_action == "add":
         page.properties.groups.add(group)
     elif group_action == "remove":

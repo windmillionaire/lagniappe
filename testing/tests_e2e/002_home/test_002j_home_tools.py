@@ -479,7 +479,7 @@ def test_tools_create_form_has_expected_controls(get_user):
 # @pair cache:invalidation-acknowledgement
 # @template home/home.html::main
 # @template home/tools.html::create_report
-def test_ai_access_tiers_gate_tool_routes(get_user):
+def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     user = get_user(Users.ai_access_tiers, creator=owner)
 
@@ -524,10 +524,22 @@ def test_ai_access_tiers_gate_tool_routes(get_user):
                 button = switcher.get_by_role("button", name=tool, exact=True)
                 expect(button).to_have_count(1 if tool in visible_tools else 0)
 
-        statuses = tuple(
-            _tool_route_status(user, path)
-            for path in ("/tools/organize", "/tools/ask", "/tools/create")
-        )
+        statuses = []
+        for path, expected_status in zip(
+            ("/tools/organize", "/tools/ask", "/tools/create"),
+            expected_statuses,
+            strict=True,
+        ):
+            if expected_status == 403:
+                with browser_failures.expect_http_error(
+                    user,
+                    status=403,
+                    path=path,
+                ):
+                    statuses.append(_tool_route_status(user, path))
+            else:
+                statuses.append(_tool_route_status(user, path))
+        statuses = tuple(statuses)
         assert statuses == expected_statuses
 
 
@@ -949,7 +961,9 @@ def test_ask_report_detail_shows_answer_without_duplicate_proposal(get_user):
 
 # @features ai-report
 # @dimensions revision ready-state completed-state route-guard
-def test_report_revision_is_only_available_before_completion(get_user):
+def test_report_revision_is_only_available_before_completion(
+    get_user, browser_failures
+):
     user = get_user(Users.OWNER)
     owner = _owner(user)
 
@@ -987,22 +1001,28 @@ def test_report_revision_is_only_available_before_completion(get_user):
         user.page.reload()
         expect(user.page.get_by_role("button", name=button_name)).not_to_be_attached()
 
-        response = user.page.evaluate(
-            """async (url) => {
-                const response = await fetch(url, {
-                    method: "POST",
-                    credentials: "include",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "X-CSRFToken": document.querySelector("#token").value,
-                        "X-Lagniappe-Request": "true",
-                    },
-                    body: new URLSearchParams({feedback: "Change the response."}),
-                });
-                return {status: response.status, text: await response.text()};
-            }""",
-            f"/tools/reports/{report.urlsafe_key}/revise",
-        )
+        revise_path = f"/tools/reports/{report.urlsafe_key}/revise"
+        with browser_failures.expect_http_error(
+            user,
+            status=422,
+            path=revise_path,
+        ):
+            response = user.page.evaluate(
+                """async (url) => {
+                    const response = await fetch(url, {
+                        method: "POST",
+                        credentials: "include",
+                        headers: {
+                            "Content-Type": "application/x-www-form-urlencoded",
+                            "X-CSRFToken": document.querySelector("#token").value,
+                            "X-Lagniappe-Request": "true",
+                        },
+                        body: new URLSearchParams({feedback: "Change the response."}),
+                    });
+                    return {status: response.status, text: await response.text()};
+                }""",
+                revise_path,
+            )
         assert response["status"] == 422
         assert "Only reports with saved responses can be revised" in response["text"]
 

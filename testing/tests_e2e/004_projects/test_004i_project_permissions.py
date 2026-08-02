@@ -26,15 +26,15 @@ pytestmark = pytest.mark.e2e
 
 # @features projects
 # @dimensions permission-gates
-def test_project_is_forbidden_without_model_permission(get_user):
+def test_project_is_forbidden_without_model_permission(get_user, browser_failures):
     """A signed-in user with no model access cannot open an existing project."""
     owner = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(owner)
 
     blocked = get_user(Users.user_no_access)
-    blocked.navigate(project.url)
-
-    expect(blocked.page).to_have_title("Error 403")
+    with browser_failures.expect_http_error(blocked, status=403, path=project.url):
+        blocked.navigate(project.url)
+        expect(blocked.page).to_have_title("Error 403")
 
 
 # @features projects

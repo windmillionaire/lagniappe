@@ -79,8 +79,12 @@ class Select(Combobox):
         else:
             self.input.press("Escape")
 
-    def select_by_key(self, key):
+    def select_by_key(self, key, *, query=None):
         panel = self.open()
+
+        if query is not None and self.input.get_attribute("inputmode") != "none":
+            expect(self.input).to_be_focused()
+            self.input.fill(query)
         expect(panel).to_be_visible()
 
         option = panel.locator(f"[role='option'][data-id='{key}']")

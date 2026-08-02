@@ -156,10 +156,11 @@ def seed_login_session(user, invalidate_cache=False):
 
 
 # @testable true
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_ai_actions_are_forbidden
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_file_and_photo_actions_are_forbidden
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_restricted_schedules_are_forbidden
 # @features public-users
-# @dimensions restriction-gate
+# @dimensions metered-actions restriction-gate
 def abort_public_user_action():
     """Reject actions that public users may not invoke despite edit access."""
     if getattr(current_user, "is_public", False):
@@ -263,7 +264,8 @@ def _load_session_user_context(entity_identifier=None):
         ),
         None,
     )
-    if not isinstance(user, Entities.USER) or user.get_id() != session.get("_user_id"):
+    user_email = user.db.get("email") if isinstance(user, Entities.USER) else None
+    if not user_email or str(user_email) != session.get("_user_id"):
         clear_login_session()
         return None, None
 

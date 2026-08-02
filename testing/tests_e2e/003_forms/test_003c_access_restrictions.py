@@ -21,7 +21,7 @@ pytestmark = pytest.mark.e2e
 # @features forms
 # @dimensions access-restrictions owner-restricted
 # @template forms/restrictions.html::restrict_access
-def test_owner_can_restrict_form_to_site_owner(get_user):
+def test_owner_can_restrict_form_to_site_owner(get_user, browser_failures):
     """The owner locks a form down to owner-only access from the builder."""
     owner = get_user(Users.OWNER)
     form = Forms.test_owner_restricted_form.get(owner)
@@ -29,14 +29,17 @@ def test_owner_can_restrict_form_to_site_owner(get_user):
     form.builder.restrict_to_owner()
 
     viewer = get_user(Users.general_forms_view_only)
-    viewer.navigate(form.url)
-    expect(viewer.page).to_have_title("Error 403")
+    with browser_failures.expect_http_error(viewer, status=403, path=form.url):
+        viewer.navigate(form.url)
+        expect(viewer.page).to_have_title("Error 403")
 
 
 # @features forms
 # @dimensions access-restrictions group-restricted
 # @template forms/restrictions.html::restrict_access
-def test_group_restricted_form_opens_for_group_member_only(get_user):
+def test_group_restricted_form_opens_for_group_member_only(
+    get_user, browser_failures
+):
     """A form restricted to a group remains usable for members and closed to others."""
     owner = get_user(Users.OWNER)
     form = Forms.test_group_restricted_form.get(owner)
@@ -50,8 +53,9 @@ def test_group_restricted_form_opens_for_group_member_only(get_user):
     expect(member.locate(Builder.FORM_NAME)).to_have_text(form.definition.name)
 
     outsider = get_user(Users.admin)
-    outsider.navigate(form.url)
-    expect(outsider.page).to_have_title("Error 403")
+    with browser_failures.expect_http_error(outsider, status=403, path=form.url):
+        outsider.navigate(form.url)
+        expect(outsider.page).to_have_title("Error 403")
 
 
 # @features forms

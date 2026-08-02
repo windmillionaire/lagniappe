@@ -249,7 +249,9 @@ def test_create_user_from_index(get_user):
 # @features users
 # @dimensions owner-only
 # @template users/tools.html::create_user
-def test_non_owner_cannot_set_ai_access_when_creating_user(get_user):
+def test_non_owner_cannot_set_ai_access_when_creating_user(
+    get_user, browser_failures
+):
     owner = get_user(Users.OWNER)
     admin = get_user(Users.admin, creator=owner)
     suffix = uuid4().hex
@@ -260,15 +262,20 @@ def test_non_owner_cannot_set_ai_access_when_creating_user(get_user):
     expect(create_form).to_have_attribute("data-can-edit-ai", "false")
     expect(create_form.locator("input[name='ai_access']")).to_have_count(0)
 
-    status = _post_form_status(
+    with browser_failures.expect_http_error(
         admin,
-        "/users/create",
-        {
-            "name": f"Forged AI Access {suffix}",
-            "email": email,
-            "ai_access": "CREATE",
-        },
-    )
+        status=403,
+        path="/users/create",
+    ):
+        status = _post_form_status(
+            admin,
+            "/users/create",
+            {
+                "name": f"Forged AI Access {suffix}",
+                "email": email,
+                "ai_access": "CREATE",
+            },
+        )
     assert status == 403
     assert Entities.USER.load(email) is None
 

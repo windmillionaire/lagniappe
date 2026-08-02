@@ -136,7 +136,7 @@ export class FormSettings {
 				list?.insertAdjacentHTML("beforeend", response.html);
 			}
 		}
-		this.selectGroup?.clear();
+		this.selectGroup?.clear({ notify: false });
 	}
 
 	async _removeRestriction(button) {

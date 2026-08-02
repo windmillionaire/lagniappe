@@ -208,19 +208,23 @@ def test_import_wizard_importing_stage_streams_results_and_completes(get_user):
 
 # @features ingress
 # @dimensions non-csv validation
-def test_import_wizard_rejects_non_csv_upload(get_user):
+def test_import_wizard_rejects_non_csv_upload(get_user, browser_failures):
     user = get_user(Users.OWNER)
     form = _open_import_upload_form(user)
 
     Uploads.plain_text_file.set(form)
-    with user.page.expect_response("**/ingress") as response_info:
-        SpinnerButtons.UPLOAD.click(form)
-
-    assert response_info.value.status == 422
-    expect(form).to_be_visible()
-    expect(form.locator("[data-role='error']")).to_contain_text(
-        "File must be a CSV file."
-    )
+    with browser_failures.expect_http_error(
+        user,
+        status=422,
+        path="/files/ingress",
+    ):
+        with user.page.expect_response("**/ingress") as response_info:
+            SpinnerButtons.UPLOAD.click(form)
+        assert response_info.value.status == 422
+        expect(form).to_be_visible()
+        expect(form.locator("[data-role='error']")).to_contain_text(
+            "File must be a CSV file."
+        )
 
 
 # @features ingress

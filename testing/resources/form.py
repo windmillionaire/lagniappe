@@ -123,7 +123,10 @@ class Builder:
         expect(group_input).to_be_visible()
         expect(group_input).to_have_attribute("data-combobox-id", re.compile(".+"))
         with self.page.expect_response("**/restrictions"):
-            Select(group_input).select_by_name(group.definition.name)
+            Select(group_input).select_by_key(
+                group.key,
+                query=group.definition.name,
+            )
 
         expect(group_list.filter(has_text=group.definition.name)).to_be_visible()
         return restrictions

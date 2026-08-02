@@ -48,7 +48,7 @@ from playwright.sync_api import expect
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from testing.definitions import DueDates, SitePages, Tasks, Users
-from testing.resources import Task, Page
+from testing.resources import Page
 from testing.elements import (
     PostponeDropdown,
     Buttons,
@@ -223,11 +223,10 @@ def test_complete_task_from_home_page(get_user):
 
     user_page.uncomplete_task(task)
 
-    user_task = Task(user=user)
-    user_task.element = user_page.active_task_list.get_item(task)
+    task.element = user_page.active_task_list.get_item(task)
 
-    user_task.set_due_date(DueDates.personal_task_due_today)
-    user_task.save()
+    task.set_due_date(DueDates.personal_task_due_today)
+    task.save()
 
     home = user.go(SitePages.HOME)
     task_item = home.task_list.get_item(task)

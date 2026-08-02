@@ -70,7 +70,7 @@ def _open_note_composer(user):
 # @template pages/notes.html::notes_section
 # @template pages/notes.html::note_list
 # @template notes.html::note_item
-def test_page_notes_visibility_and_title_menu(get_user):
+def test_page_notes_visibility_and_title_menu(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = Pages.acl_lab_visible.get(owner)
     shared_body = _unique("Shared Page note")
@@ -107,8 +107,10 @@ def test_page_notes_visibility_and_title_menu(get_user):
     assert composer_box["y"] >= header_box["y"] + header_box["height"]
 
     page_without_notes = Pages.test_create_page_task.get(owner)
-    owner.navigate(f"{page_without_notes.url}/notes")
-    expect(owner.page).to_have_title("Error 404")
+    notes_url = f"{page_without_notes.url}/notes"
+    with browser_failures.expect_http_error(owner, status=404, path=notes_url):
+        owner.navigate(notes_url)
+        expect(owner.page).to_have_title("Error 404")
 
 
 # @pair notes:create
@@ -127,18 +129,20 @@ def test_page_notes_visibility_and_title_menu(get_user):
 # @template pages/notes.html::notes_section
 # @template notes.html::composer
 # @template notes.html::note_item
-def test_page_note_text_photo_and_delete_modal(get_user):
+def test_page_note_text_photo_and_delete_modal(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = owner.go(Pages.test_create_page)
     body = _unique("Page text and photo note")
     composer = _open_note_composer(owner)
 
-    with owner.page.expect_response("**/pages/*/notes") as invalid_response:
-        composer.locator("button[type='submit']").click()
-    assert invalid_response.value.status == 422
-    expect(composer.locator("[data-role='error']")).to_contain_text(
-        "Add a note before saving."
-    )
+    notes_path = f"/pages/{page.key}/notes"
+    with browser_failures.expect_http_error(owner, status=422, path=notes_path):
+        with owner.page.expect_response("**/pages/*/notes") as invalid_response:
+            composer.locator("button[type='submit']").click()
+        assert invalid_response.value.status == 422
+        expect(composer.locator("[data-role='error']")).to_contain_text(
+            "Add a note before saving."
+        )
 
     composer.locator("textarea[name='body']").fill(body)
     composer.locator("input[name='visibility'][value='everyone']").check()

@@ -1,5 +1,8 @@
 /**
- * @testable infrastructure
+ * @testable true
+ * @tests tests_js/test_016_combobox_frontend.py::test_submitter_clear_can_suppress_change_notification
+ * @features combobox
+ * @dimensions clear-notification
  */
 export const Submitter = (Combobox) =>
 	/**
@@ -186,13 +189,13 @@ export const Submitter = (Combobox) =>
 			this.addValue(option.id, preloading);
 		}
 
-		clear() {
+		clear({ notify = true } = {}) {
 			if (this.values.size === 0) return;
 
 			this.values.clear();
 			this.focusedIndex = -1;
 			this.element.value = "";
 			this.hidePanel();
-			this.updateSelect();
+			this.updateSelect(!notify);
 		}
 	};

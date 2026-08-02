@@ -24,8 +24,9 @@ from . import files
 # @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_drag_drop
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_opens_with_processed_csv_status
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_error_state_persists_after_reopen
+# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_rejects_non_csv_upload
 # @features ingress
-# @dimensions file-input drag-drop upload-counts process-csv stage-wizard reopen
+# @dimensions file-input drag-drop upload-counts process-csv stage-wizard reopen non-csv validation
 @files.route("/ingress", methods=["GET", "POST"])
 @permission(Resource.SITE)
 def ingress(**kwargs):

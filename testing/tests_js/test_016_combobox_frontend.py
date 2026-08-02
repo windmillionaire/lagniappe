@@ -295,6 +295,17 @@ comboboxSource = comboboxSource.replace("export class Combobox", "class Combobox
 comboboxSource += "\nglobalThis.Combobox = Combobox;";
 vm.runInContext(comboboxSource, context);
 
+let submitterSource = fs.readFileSync(
+  "src/script/elements/combobox/submitter.mjs",
+  "utf8",
+);
+submitterSource = submitterSource.replace(
+  "export const Submitter",
+  "const Submitter",
+);
+submitterSource += "\nglobalThis.Submitter = Submitter;";
+vm.runInContext(submitterSource, context);
+
 let dropdownSource = fs.readFileSync(
   "src/script/elements/combobox/dropdown.mjs",
   "utf8",
@@ -306,6 +317,7 @@ vm.runInContext(dropdownSource, context);
 
 const Combobox = context.Combobox;
 const Dropdown = context.Dropdown;
+const Submitter = context.Submitter;
 
 (async () => {
 __ASSERTION__
@@ -756,6 +768,34 @@ const single = makeComboboxElements();
 single.initial.dataset.multiple = "false";
 if (new Combobox(single.parent).multiple !== false) {
   throw new Error('data-multiple="false" was retained as a truthy string');
+}
+""",
+    )
+
+
+# @features combobox
+# @dimensions clear-notification
+def test_submitter_clear_can_suppress_change_notification(run_node):
+    run_combobox_check(
+        run_node,
+        r"""
+const { parent } = makeComboboxElements();
+const SubmitterCombobox = Submitter(Combobox);
+const combobox = new SubmitterCombobox(parent);
+const updateModes = [];
+combobox.hidePanel = () => {};
+combobox.updateSelect = (preloading) => updateModes.push(preloading);
+
+combobox.values.add("group-key");
+combobox.clear({ notify: false });
+if (combobox.values.size !== 0 || updateModes[0] !== true) {
+  throw new Error("Silent clear did not suppress the updated/change events");
+}
+
+combobox.values.add("second-group-key");
+combobox.clear();
+if (combobox.values.size !== 0 || updateModes[1] !== false) {
+  throw new Error("Normal clear stopped notifying listeners");
 }
 """,
     )

@@ -218,9 +218,11 @@ class Config:
                 f"'{configured_project}'."
             )
 
-        if getattr(self, "ENV", None) in {
-            Environment.DEVELOPMENT,
-            Environment.TESTING,
+        environment = getattr(self, "ENV", None)
+        environment_value = getattr(environment, "value", environment)
+        if environment_value in {
+            Environment.DEVELOPMENT.value,
+            Environment.TESTING.value,
         }:
             source_principal = str(
                 getattr(credentials, "service_account_email", None)

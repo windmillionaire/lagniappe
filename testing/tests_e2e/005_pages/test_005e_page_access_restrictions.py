@@ -54,7 +54,10 @@ def _restrict_page_to_group(user, page, group):
         expect(group_input).to_be_visible()
         expect(group_input).to_have_attribute("data-combobox-id", re.compile(".+"))
         with user.page.expect_response("**/view-access"):
-            Select(group_input).select_by_name(group.definition.name)
+            Select(group_input).select_by_key(
+                group.key,
+                query=group.definition.name,
+            )
 
     expect(group_list.filter(has_text=group.definition.name)).to_be_visible()
     return permissions
@@ -62,7 +65,9 @@ def _restrict_page_to_group(user, page, group):
 
 # @features pages
 # @dimensions access-restrictions owner-restricted
-def test_owner_restricted_page_is_hidden_from_model_viewer(get_user):
+def test_owner_restricted_page_is_hidden_from_model_viewer(
+    get_user, browser_failures
+):
     """The owner marks a page owner-only; a normal model viewer can no longer open it."""
     owner = get_user(Users.OWNER)
     page = Pages.test_owner_restricted_page.get(owner)
@@ -70,13 +75,14 @@ def test_owner_restricted_page_is_hidden_from_model_viewer(get_user):
     _restrict_page_to_owner(owner, page)
 
     viewer = get_user(Users.general_models_view_only)
-    viewer.navigate(page.url)
-    expect(viewer.page).to_have_title("Error 403")
+    with browser_failures.expect_http_error(viewer, status=403, path=page.url):
+        viewer.navigate(page.url)
+        expect(viewer.page).to_have_title("Error 403")
 
 
 # @features pages
 # @dimensions access-restrictions group-restricted
-def test_group_restricted_page_opens_for_member_only(get_user):
+def test_group_restricted_page_opens_for_member_only(get_user, browser_failures):
     """The owner restricts a page to a group; members keep access and others lose it."""
     owner = get_user(Users.OWNER)
     page = Pages.test_group_restricted_page.get(owner)
@@ -89,8 +95,9 @@ def test_group_restricted_page_opens_for_member_only(get_user):
     expect(member.locate(Page.PAGE_TITLE)).to_contain_text(page.definition.name)
 
     outsider = get_user(Users.admin)
-    outsider.navigate(page.url)
-    expect(outsider.page).to_have_title("Error 403")
+    with browser_failures.expect_http_error(outsider, status=403, path=page.url):
+        outsider.navigate(page.url)
+        expect(outsider.page).to_have_title("Error 403")
 
 
 # @features pages

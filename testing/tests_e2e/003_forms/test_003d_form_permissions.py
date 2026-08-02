@@ -21,12 +21,13 @@ pytestmark = pytest.mark.e2e
 # @features forms
 # @dimensions permission-gates index-view
 # @template forms/index.html::view
-def test_form_index_forbidden_without_forms_view(get_user):
+def test_form_index_forbidden_without_forms_view(get_user, browser_failures):
     user = get_user(Users.user_one_category)
     Categories.test_create_category_manual_mode.get(user)
     url = SitePages.FORM_INDEX.get(user).url
-    user.navigate(url)
-    expect(user.page).to_have_title("Error 403")
+    with browser_failures.expect_http_error(user, status=403, path=url):
+        user.navigate(url)
+        expect(user.page).to_have_title("Error 403")
 
 
 # @features forms

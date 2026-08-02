@@ -127,12 +127,32 @@ class BrowserFailureCollector:
             },
         )
 
+    def expect_http_error(
+        self,
+        user: Any,
+        *,
+        status: int,
+        path: str,
+        count: int = 1,
+    ) -> "ExpectedBrowserFailure":
+        """Account for one exact intentional HTTP error reported by Chromium."""
+        source_path = urlsplit(path).path
+        return self.expect(
+            user,
+            kind="console",
+            count=count,
+            console_type="error",
+            text_contains=f"status of {status} ",
+            source_path=source_path,
+        )
+
     @contextmanager
-    def expect_offline(self, user: Any):
+    def expect_offline(self, user: Any, *, ping_count: int = 1):
         """Account for the health check deliberately rejected by browser offline mode."""
         with self.expect(
             user,
             kind="requestfailed",
+            count=ping_count,
             method="HEAD",
             path="/ping",
             failure="net::ERR_INTERNET_DISCONNECTED",
@@ -140,8 +160,10 @@ class BrowserFailureCollector:
             with self.expect(
                 user,
                 kind="console",
+                count=ping_count,
                 console_type="error",
                 text="Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+                source_path="/ping",
             ):
                 yield
 

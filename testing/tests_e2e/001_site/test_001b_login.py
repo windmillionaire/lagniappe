@@ -506,7 +506,7 @@ def test_login_accepts_google_state_redirect_target(get_user):
 # @features login
 # @dimensions agent-access session user-page
 # @template users/agent_login.html::agent_login_form
-def test_agent_access_login_form_creates_session(get_user):
+def test_agent_access_login_form_creates_session(get_user, browser_failures):
     user = get_user(Users.ANONYMOUS)
     user.page.goto(_site_url("/users/agent-login"))
 
@@ -517,8 +517,15 @@ def test_agent_access_login_form_creates_session(get_user):
     expect(agent_button.locator(":scope > [data-role='text']")).to_have_count(1)
 
     user.locate("input[name='code']").fill("wrong-code")
-    agent_button.click()
-    expect(user.locate("[data-role='error']")).to_have_text("Invalid access code")
+    with browser_failures.expect_http_error(
+        user,
+        status=401,
+        path="/users/agent-login",
+    ):
+        agent_button.click()
+        expect(user.locate("[data-role='error']")).to_have_text(
+            "Invalid access code"
+        )
 
     user.locate("input[name='code']").fill(constants.DEFAULT_AGENT_ACCESS_TEST_CODE)
     agent_button.click()
@@ -748,30 +755,35 @@ def test_login_responsive_design(get_user):
 
 
 # @pair error-handling:csrf
-def test_csrf_failure_is_identified_for_targeted_retry(get_user):
+def test_csrf_failure_is_identified_for_targeted_retry(get_user, browser_failures):
     """Only Flask-WTF CSRF failures should trigger the frontend retry path."""
     user = get_user(Users.OWNER)
     user.go(SitePages.HOME)
 
-    response = user.page.evaluate(
-        """async () => {
-            const response = await fetch("/users/logout", {
-                method: "POST",
-                credentials: "include",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": "stale-token",
-                    "X-Lagniappe-Request": "true",
-                },
-                body: JSON.stringify({}),
-            });
-            return {
-                status: response.status,
-                csrf: response.headers.get("X-Lagniappe-CSRF"),
-                body: await response.text(),
-            };
-        }"""
-    )
+    with browser_failures.expect_http_error(
+        user,
+        status=400,
+        path="/users/logout",
+    ):
+        response = user.page.evaluate(
+            """async () => {
+                const response = await fetch("/users/logout", {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": "stale-token",
+                        "X-Lagniappe-Request": "true",
+                    },
+                    body: JSON.stringify({}),
+                });
+                return {
+                    status: response.status,
+                    csrf: response.headers.get("X-Lagniappe-CSRF"),
+                    body: await response.text(),
+                };
+            }"""
+        )
 
     assert response["status"] == 400
     assert response["csrf"] == "invalid"
@@ -947,39 +959,50 @@ def test_forgot_password_form_opens_from_sign_in(get_user):
 
 # @features login
 # @dimensions identity-platform rate-limit
-def test_login_identity_returns_rate_limit_response(get_user):
+def test_login_identity_returns_rate_limit_response(get_user, browser_failures):
     """The live Identity Platform login route should propagate limiter 429 responses."""
     user = get_user(Users.ANONYMOUS)
     user.go(SitePages.LOGIN_PAGE)
     csrf_token = user.locate("#token").input_value()
 
     limited = None
-    for _ in range(25):
-        response = user.page.evaluate(
-            """async ({ csrfToken, authResult }) => {
-                const response = await fetch("/users/login-identity", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": csrfToken,
+    with browser_failures.expect_http_error(
+        user,
+        status=429,
+        path="/users/login-identity",
+    ):
+        with browser_failures.expect_http_error(
+            user,
+            status=401,
+            path="/users/login-identity",
+            count=20,
+        ):
+            for _ in range(25):
+                response = user.page.evaluate(
+                    """async ({ csrfToken, authResult }) => {
+                        const response = await fetch("/users/login-identity", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "X-CSRFToken": csrfToken,
+                            },
+                            body: JSON.stringify({ authResult }),
+                        });
+                        return {
+                            status: response.status,
+                            retryAfter: response.headers.get("Retry-After"),
+                            json: await response.json(),
+                        };
+                    }""",
+                    {
+                        "csrfToken": csrf_token,
+                        "authResult": f"invalid-token-{uuid4().hex}",
                     },
-                    body: JSON.stringify({ authResult }),
-                });
-                return {
-                    status: response.status,
-                    retryAfter: response.headers.get("Retry-After"),
-                    json: await response.json(),
-                };
-            }""",
-            {
-                "csrfToken": csrf_token,
-                "authResult": f"invalid-token-{uuid4().hex}",
-            },
-        )
-        if response["status"] == 429:
-            limited = response
-            break
-        assert response["status"] == 401
+                )
+                if response["status"] == 429:
+                    limited = response
+                    break
+                assert response["status"] == 401
 
     assert limited is not None
     assert limited["retryAfter"] is not None
@@ -1098,6 +1121,7 @@ def test_first_time_setup_form_creates_password_and_can_return_to_email_check(
 # @dimensions identity-platform redirect verify-email remember-preference
 def test_login_identity_client_handoff_redirects_or_requires_verification(
     get_user,
+    browser_failures,
 ):
     """Identity Platform sign-in posts the handoff payload and handles both outcomes."""
     user = get_user(Users.ANONYMOUS)
@@ -1144,13 +1168,18 @@ def test_login_identity_client_handoff_redirects_or_requires_verification(
     login_page = user.go(SitePages.LOGIN_PAGE)
     sign_in_form = _open_sign_in_form(user, login_page, email)
     sign_in_form.locator(PASSWORD).fill("valid-password")
-    sign_in_form.locator(Buttons.SIGNIN).click()
+    with browser_failures.expect_http_error(
+        user,
+        status=403,
+        path="/users/login-identity",
+    ):
+        sign_in_form.locator(Buttons.SIGNIN).click()
 
-    success = sign_in_form.locator("[data-role='success']")
-    expect(success).to_be_visible()
-    expect(success).to_contain_text(
-        f"An email verification link has been sent to {email}."
-    )
+        success = sign_in_form.locator("[data-role='success']")
+        expect(success).to_be_visible()
+        expect(success).to_contain_text(
+            f"An email verification link has been sent to {email}."
+        )
 
     assert login_identity_calls[0]["email"] == email
     assert login_identity_calls[0]["remember"] is True
@@ -1173,11 +1202,16 @@ def test_login_identity_client_handoff_redirects_or_requires_verification(
     login_page = user.go(SitePages.LOGIN_PAGE)
     sign_in_form = _open_sign_in_form(user, login_page, email)
     sign_in_form.locator(PASSWORD).fill("valid-password")
-    sign_in_form.locator(Buttons.SIGNIN).click()
+    with browser_failures.expect_http_error(
+        user,
+        status=401,
+        path="/users/login-identity",
+    ):
+        sign_in_form.locator(Buttons.SIGNIN).click()
 
-    error = sign_in_form.locator(Roles.ERROR)
-    expect(error).to_be_visible()
-    expect(error).to_contain_text("User not registered")
+        error = sign_in_form.locator(Roles.ERROR)
+        expect(error).to_be_visible()
+        expect(error).to_contain_text("User not registered")
 
     assert login_identity_calls[0]["email"] == email
     assert identity_calls["sign_in"][0]["email"] == email
@@ -1186,7 +1220,7 @@ def test_login_identity_client_handoff_redirects_or_requires_verification(
 
 # @features login
 # @dimensions auth-errors
-def test_login_auth_error_messages_are_user_safe(get_user):
+def test_login_auth_error_messages_are_user_safe(get_user, browser_failures):
     """Identity Platform error codes should render safe messages, not provider internals."""
     user = get_user(Users.ANONYMOUS)
     identity_calls = _mock_identity_platform(
@@ -1204,17 +1238,27 @@ def test_login_auth_error_messages_are_user_safe(get_user):
     error = sign_in_form.locator(Roles.ERROR)
 
     password.fill("bad-password")
-    sign_in_form.locator(Buttons.SIGNIN).click()
-    expect(error).to_be_visible()
-    expect(error).to_contain_text("Incorrect email or password.")
-    expect(error).not_to_contain_text("EMAIL_NOT_FOUND")
-    expect(error).not_to_contain_text("auth/")
+    with browser_failures.expect_http_error(
+        user,
+        status=400,
+        path="/v1/accounts:signInWithPassword",
+    ):
+        sign_in_form.locator(Buttons.SIGNIN).click()
+        expect(error).to_be_visible()
+        expect(error).to_contain_text("Incorrect email or password.")
+        expect(error).not_to_contain_text("EMAIL_NOT_FOUND")
+        expect(error).not_to_contain_text("auth/")
 
     password.fill("bad-password-again")
-    sign_in_form.locator(Buttons.SIGNIN).click()
-    expect(error).to_contain_text("If you previously signed in with Google")
-    expect(error).not_to_contain_text("INVALID_LOGIN_CREDENTIALS")
-    expect(error).not_to_contain_text("auth/")
+    with browser_failures.expect_http_error(
+        user,
+        status=400,
+        path="/v1/accounts:signInWithPassword",
+    ):
+        sign_in_form.locator(Buttons.SIGNIN).click()
+        expect(error).to_contain_text("If you previously signed in with Google")
+        expect(error).not_to_contain_text("INVALID_LOGIN_CREDENTIALS")
+        expect(error).not_to_contain_text("auth/")
     assert not identity_calls["unexpected"]
 
     user = get_user(Users.ANONYMOUS)
@@ -1232,12 +1276,17 @@ def test_login_auth_error_messages_are_user_safe(get_user):
     first_time_error = first_time_form.locator(Roles.ERROR)
 
     first_time_form.locator(PASSWORD).fill("valid-password")
-    first_time_form.locator(Buttons.SIGNIN).click()
+    with browser_failures.expect_http_error(
+        user,
+        status=400,
+        path="/v1/accounts:signUp",
+    ):
+        first_time_form.locator(Buttons.SIGNIN).click()
 
-    expect(first_time_error).to_be_visible()
-    expect(first_time_error).to_contain_text(
-        "An account with this email already exists."
-    )
-    expect(first_time_error).not_to_contain_text("EMAIL_EXISTS")
-    expect(first_time_error).not_to_contain_text("auth/")
+        expect(first_time_error).to_be_visible()
+        expect(first_time_error).to_contain_text(
+            "An account with this email already exists."
+        )
+        expect(first_time_error).not_to_contain_text("EMAIL_EXISTS")
+        expect(first_time_error).not_to_contain_text("auth/")
     assert not identity_calls["unexpected"]

@@ -156,20 +156,32 @@ verified through the browser's `/validate-user` acknowledgement.
 - [x] Add narrowly scoped expectations for tests that deliberately cause
   network failures, offline behavior, or browser errors.
 - [x] Once classified, fail teardown on any unexpected event.
-- [ ] Run one sequential full-E2E baseline with the guard enabled and classify
+- [x] Run one sequential full-E2E baseline with the guard enabled and classify
   any newly discovered event before declaring E2E-H02 complete.
 
 Current state: the E2E fixture monitors every created browser context and fails
 teardown for unexpected console errors, `pageerror` events, and failed
-requests. Native offline stories explicitly expect the single failed
-`HEAD /ping` request and its console error; injected replay failures have
-equally narrow per-test expectations. Exact `net::ERR_ABORTED` navigation
-cancellations remain visible in diagnostic output but are classified as browser
-lifecycle cancellation rather than application failures.
+requests. Native offline stories explicitly expect the exact failed
+`HEAD /ping` request and its console error; reload stories that perform a
+second new-page health check require exactly two. Intentional browser-visible
+4xx/5xx responses are scoped by status, source path, context, and count.
+Injected replay failures have equally narrow per-test expectations. Exact
+`net::ERR_ABORTED` navigation cancellations remain visible in diagnostic
+output but are classified as browser lifecycle cancellation rather than
+application failures.
 
-Deferred validation: do not broaden the ignore set from focused results. The
-remaining full sequential E2E baseline is the evidence gate for any further
-classification, and this item stays open until that baseline is clean.
+Resolved 2026-08-01. The guard-enabled sequential baseline first exposed all
+deliberate authorization, validation, offline analytics, and offline asset
+responses; each now has a local exact expectation rather than a global ignore.
+It also brought real defects to light: restriction combobox clearing sent a
+duplicate mutation, a public user's metadata update could remove unrelated
+page attributes, stale group search results could select the wrong durable
+entity, malformed cached session data could raise during request startup, and
+configuration behavior depended on enum object identity after module reloads.
+Those paths were hardened, and a keyless task test helper that caused a false
+completion timeout was repaired. The final full repository run completed with
+1,976 passed, 2 skipped, and 6 deselected tests in one sequential E2E session,
+with no unclassified browser failure.
 
 Implementation notes:
 

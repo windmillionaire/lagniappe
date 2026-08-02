@@ -474,7 +474,7 @@ def undo_report(key):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_is_only_available_before_completion
 # @features ai-report
-# @dimensions revision feedback async completed-state
+# @dimensions revision feedback async completed-state ready-state route-guard
 @tools.route("/reports/<key>/revise", methods=["POST"])
 @ai_access(AI.ASK)
 def revise_report(key):

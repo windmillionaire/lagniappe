@@ -266,7 +266,7 @@ def test_reporting_privacy_notice_is_public(get_user):
 
 # @features error-handling
 # @dimensions http-404 error-page
-def test_error_handling(get_user):
+def test_error_handling(get_user, browser_failures):
     """
     Verify 404 error page renders correctly.
 
@@ -284,7 +284,12 @@ def test_error_handling(get_user):
         - Server returning wrong status code for 404
     """
     user = get_user(Users.ANONYMOUS)
-    user.go(SitePages.NONEXISTENT_PAGE)
+    with browser_failures.expect_http_error(
+        user,
+        status=404,
+        path=SitePages.NONEXISTENT_PAGE.get(user).url,
+    ):
+        user.go(SitePages.NONEXISTENT_PAGE)
 
     expect(user.page).to_have_title("Error 404")
 

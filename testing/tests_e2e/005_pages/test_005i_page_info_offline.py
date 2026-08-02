@@ -154,22 +154,29 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
     original_submission = submission.locator("input").input_value()
     _fill_form_element(info_form, "[id^='sync-text-renderer-']", updated_submission)
 
-    with browser_failures.expect_offline(owner):
-        owner.offline = True
-        info_submit = _main_submit(info_form)
-        info_submit.click()
-        expect(info_submit).to_contain_text("Queued Sync")
-        _wait_for_mutation_records(owner, exact=1)
+    with browser_failures.expect_http_error(
+        owner,
+        status=503,
+        path="/analytics/track",
+    ):
+        with browser_failures.expect_offline(owner, ping_count=2):
+            owner.offline = True
+            info_submit = _main_submit(info_form)
+            info_submit.click()
+            expect(info_submit).to_contain_text("Queued Sync")
+            _wait_for_mutation_records(owner, exact=1)
 
-        page = page.reload()
-        expect(owner.locate(OFFLINE_INDICATOR)).to_be_visible()
+            page = page.reload()
+            expect(owner.locate(OFFLINE_INDICATOR)).to_be_visible()
 
-        current_form = page.info_form
-        current_submission = current_form.locator("[id^='sync-text-renderer-']")
-        expect(current_submission.locator("input")).to_have_value(original_submission)
-        current_submit = _main_submit(current_form)
-        expect(current_submit).to_contain_text("Update Page")
-        expect(current_submit.locator("[data-icon='offline']")).to_have_count(0)
+            current_form = page.info_form
+            current_submission = current_form.locator("[id^='sync-text-renderer-']")
+            expect(current_submission.locator("input")).to_have_value(
+                original_submission
+            )
+            current_submit = _main_submit(current_form)
+            expect(current_submit).to_contain_text("Update Page")
+            expect(current_submit.locator("[data-icon='offline']")).to_have_count(0)
 
     with owner.page.expect_response("**/pages/*/update", timeout=15000):
         owner.offline = False

@@ -102,7 +102,7 @@ def poll(user, subscriptions):
 # @pairs polling:identifiers polling:fingerprint polling:revision
 # @pairs polling:unavailable polling:authorization polling:validation
 # @pair polling:permissions
-def test_poll_endpoint_batches_entity_changes(get_user):
+def test_poll_endpoint_batches_entity_changes(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = Pages.test_sync_form_page.get(owner)
     owner.go(page)
@@ -170,36 +170,44 @@ def test_poll_endpoint_batches_entity_changes(get_user):
     inaccessible = poll(blocked, [descriptor])
     assert inaccessible["data"]["results"][0]["status"] == "unavailable"
 
-    duplicate = poll(owner, [descriptor, descriptor])
-    assert duplicate["status"] == 422
-
-    malformed_document = poll(
+    with browser_failures.expect_http_error(
         owner,
-        [
-            {
-                "id": "invalid-document",
-                "type": "document",
-                "key": page.entity.urlsafe_key,
-                "sync_id": page.entity.sync_ids["document"]["id"],
-                "revision": "not-an-integer",
-            }
-        ],
-    )
-    assert malformed_document["status"] == 422
+        status=422,
+        path="/poll",
+        count=4,
+    ):
+        duplicate = poll(owner, [descriptor, descriptor])
+        assert duplicate["status"] == 422
 
-    malformed_revision = poll(owner, [{**descriptor, "revision": {"nested": True}}])
-    assert malformed_revision["status"] == 422
+        malformed_document = poll(
+            owner,
+            [
+                {
+                    "id": "invalid-document",
+                    "type": "document",
+                    "key": page.entity.urlsafe_key,
+                    "sync_id": page.entity.sync_ids["document"]["id"],
+                    "revision": "not-an-integer",
+                }
+            ],
+        )
+        assert malformed_document["status"] == 422
 
-    oversized = poll(
-        owner,
-        [
-            {
-                "id": f"entity-{index}",
-                "type": "entity",
-                "key": f"entity-{index}",
-                "revision": "same",
-            }
-            for index in range(65)
-        ],
-    )
-    assert oversized["status"] == 422
+        malformed_revision = poll(
+            owner, [{**descriptor, "revision": {"nested": True}}]
+        )
+        assert malformed_revision["status"] == 422
+
+        oversized = poll(
+            owner,
+            [
+                {
+                    "id": f"entity-{index}",
+                    "type": "entity",
+                    "key": f"entity-{index}",
+                    "revision": "same",
+                }
+                for index in range(65)
+            ],
+        )
+        assert oversized["status"] == 422

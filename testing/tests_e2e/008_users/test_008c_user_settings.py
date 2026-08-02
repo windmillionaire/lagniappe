@@ -309,7 +309,7 @@ def _session_page_key(user):
 # @features user-settings
 # @dimensions personal-page readonly-email sign-out group-selector-hidden
 # @template pages/info.html::user_settings
-def test_user_settings_panel_opens_from_my_page(get_user):
+def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
     """A signed-in user can open settings from their personal page."""
     owner = get_user(Users.OWNER)
     user = get_user(Users.create_user, creator=owner)
@@ -332,16 +332,18 @@ def test_user_settings_panel_opens_from_my_page(get_user):
     expect(settings_panel.locator("[data-role='user-groups']")).to_have_count(0)
     expect(settings_panel.locator("input[name='ai_access']")).to_have_count(0)
 
-    forged = _fetch_status(
-        user,
-        f"/pages/{user.entity.page.urlsafe_key}/update",
-        method="PUT",
-        data={
-            "role": "user-settings",
-            "name": user.name,
-            "ai_access": "CREATE",
-        },
-    )
+    update_path = f"/pages/{user.entity.page.urlsafe_key}/update"
+    with browser_failures.expect_http_error(user, status=403, path=update_path):
+        forged = _fetch_status(
+            user,
+            update_path,
+            method="PUT",
+            data={
+                "role": "user-settings",
+                "name": user.name,
+                "ai_access": "CREATE",
+            },
+        )
     assert forged["status"] == 403
     assert Entities.USER.load(user.email).ai_access == "NONE"
 
@@ -497,15 +499,18 @@ def test_public_user_creates_task_with_reduced_schedule_options(limited_public_u
     page.active_task_list.new_item(task_name)
 
 
-def _assert_routes_forbidden(user, routes):
+def _assert_routes_forbidden(user, routes, browser_failures):
     for method, path, data in routes:
-        result = _fetch_status(user, path, method=method, data=data)
+        with browser_failures.expect_http_error(user, status=403, path=path):
+            result = _fetch_status(user, path, method=method, data=data)
         assert result["status"] == 403, f"{method} {path}: {result}"
 
 
 # @features public-users
 # @dimensions metered-actions restriction-gate
-def test_public_user_ai_actions_are_forbidden(limited_public_user):
+def test_public_user_ai_actions_are_forbidden(
+    limited_public_user, browser_failures
+):
     scenario = limited_public_user
     page_key = scenario.entity.page.urlsafe_key
     task_key = scenario.task.urlsafe_key
@@ -550,12 +555,15 @@ def test_public_user_ai_actions_are_forbidden(limited_public_user):
                 {"explain": "autofill", "name": scenario.task.name},
             ),
         ],
+        browser_failures,
     )
 
 
 # @features public-users
 # @dimensions file-photo-gates restriction-gate
-def test_public_user_file_and_photo_actions_are_forbidden(limited_public_user):
+def test_public_user_file_and_photo_actions_are_forbidden(
+    limited_public_user, browser_failures
+):
     scenario = limited_public_user
     page_key = scenario.entity.page.urlsafe_key
     task_key = scenario.task.urlsafe_key
@@ -573,15 +581,23 @@ def test_public_user_file_and_photo_actions_are_forbidden(limited_public_user):
             ("POST", f"/files/{page_key}/upload", {}),
             ("POST", f"/tasks/{task_key}/upload-file", {}),
         ],
+        browser_failures,
     )
 
 
 # @features public-users
 # @dimensions attribute-preservation ai-schedule-guard restriction-gate
-def test_public_user_restricted_schedules_are_forbidden(limited_public_user):
+def test_public_user_restricted_schedules_are_forbidden(
+    limited_public_user, browser_failures
+):
     scenario = limited_public_user
     page_key = scenario.entity.page.urlsafe_key
     task_key = scenario.task.urlsafe_key
+    initial_attributes = {
+        attribute.name
+        for attribute in scenario.entity.page.attributes
+        if attribute.active
+    }
     metadata_update = _fetch_status(
         scenario.user,
         f"/pages/{page_key}/update",
@@ -598,6 +614,9 @@ def test_public_user_restricted_schedules_are_forbidden(limited_public_user):
     )
     assert not saved_page.has("photo")
     assert not saved_page.has("files")
+    assert {
+        attribute.name for attribute in saved_page.attributes if attribute.active
+    } == initial_attributes
 
     _assert_routes_forbidden(
         scenario.user,
@@ -633,6 +652,7 @@ def test_public_user_restricted_schedules_are_forbidden(limited_public_user):
                 },
             ),
         ],
+        browser_failures,
     )
 
 
@@ -958,7 +978,7 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
 # @features admin
 # @dimensions site-settings owner-only route page-load
 # @template home/admin.html::main
-def test_site_settings_is_owner_only(get_user):
+def test_site_settings_is_owner_only(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     user = get_user(Users.create_user, creator=owner)
 
@@ -967,10 +987,12 @@ def test_site_settings_is_owner_only(get_user):
     expect(owner.locate(admin.SITE_SETTINGS_FORM)).to_be_visible()
 
     # Non-owner: direct route is forbidden.
-    response = user.page.goto(
-        f"{SETTINGS.test_config['BASE_URL'].rstrip('/')}/admin",
-        wait_until="domcontentloaded",
-    )
+    admin_url = f"{SETTINGS.test_config['BASE_URL'].rstrip('/')}/admin"
+    with browser_failures.expect_http_error(user, status=403, path=admin_url):
+        response = user.page.goto(
+            admin_url,
+            wait_until="domcontentloaded",
+        )
     assert response.status == 403
 
 

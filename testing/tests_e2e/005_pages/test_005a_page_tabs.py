@@ -156,7 +156,7 @@ def _document_save_response(text):
 
 # @features pages
 # @dimensions document-visibility public private public-document
-def test_document_visibility_can_toggle_public_private(get_user):
+def test_document_visibility_can_toggle_public_private(get_user, browser_failures):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_document_visibility_page)
 
@@ -196,7 +196,12 @@ def test_document_visibility_can_toggle_public_private(get_user):
     expect(settings).to_contain_text("This document is currently private")
     expect(settings.locator("input[value='private']")).to_be_checked()
     expect(settings.locator("a")).to_have_count(0)
-    private_response = user.page.goto(public_url)
+    with browser_failures.expect_http_error(
+        user,
+        status=404,
+        path=public_url,
+    ):
+        private_response = user.page.goto(public_url)
     assert private_response.status == 404
 
 

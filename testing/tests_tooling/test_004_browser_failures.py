@@ -155,6 +155,62 @@ def test_offline_scope_requires_the_native_ping_failure_and_console_error():
     collector.assert_clean()
 
 
+def test_offline_scope_accepts_an_exact_reload_ping_count():
+    collector = BrowserFailureCollector()
+    context = FakeContext()
+    collector.monitor_context(context, label="Owner")
+    page = context.new_page()
+
+    with collector.expect_offline(_user(page), ping_count=2):
+        for _ in range(2):
+            page.emit(
+                "requestfailed",
+                SimpleNamespace(
+                    method="HEAD",
+                    url="http://test.local/ping",
+                    failure="net::ERR_INTERNET_DISCONNECTED",
+                ),
+            )
+            page.emit(
+                "console",
+                SimpleNamespace(
+                    type="error",
+                    text="Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+                    location={"url": "http://test.local/ping", "lineNumber": 0},
+                ),
+            )
+
+    collector.assert_clean()
+
+
+def test_http_error_scope_matches_status_path_and_count():
+    collector = BrowserFailureCollector()
+    context = FakeContext()
+    collector.monitor_context(context, label="Owner")
+    page = context.new_page()
+
+    with collector.expect_http_error(
+        _user(page),
+        status=422,
+        path="http://test.local/poll?source=test",
+        count=2,
+    ):
+        for reason in ("UNPROCESSABLE ENTITY", "Unprocessable Content"):
+            page.emit(
+                "console",
+                SimpleNamespace(
+                    type="error",
+                    text=(
+                        "Failed to load resource: the server responded with a "
+                        f"status of 422 ({reason})"
+                    ),
+                    location={"url": "http://test.local/poll", "lineNumber": 0},
+                ),
+            )
+
+    collector.assert_clean()
+
+
 @pytest.mark.parametrize("count", [0, 2])
 def test_expected_scope_fails_when_failure_count_is_not_exact(count):
     collector = BrowserFailureCollector()

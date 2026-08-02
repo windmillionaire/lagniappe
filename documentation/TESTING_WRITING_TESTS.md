@@ -101,9 +101,27 @@ whose browser text includes variable stack locations, use a scoped
 `message_contains` or `text_contains` predicate together with the other stable
 fields.
 
+When the deliberate failure is an HTTP response that Chromium reports to the
+console, use the status-and-path helper and keep the response assertion inside
+the same scope:
+
+```python
+with browser_failures.expect_http_error(user, status=403, path="/admin"):
+    response = user.page.goto(f"{base_url}/admin")
+    assert response.status == 403
+```
+
+The helper accounts only for that exact console source path and status. It does
+not replace an assertion about the returned status, response body, or visible
+error state.
+
 For native connectivity transitions, prefer `browser_failures.expect_offline(user)`
 around the `user.offline = True` action and its offline assertions. It expects
 the exact `HEAD /ping` disconnect and console error produced by the browser.
+An offline reload that deliberately performs both the connectivity transition
+and a new-page health check may use `ping_count=2`. Scope any expected 503 for
+an offline analytics or asset request separately by its exact path; do not fold
+those responses into the ping allowance.
 
 ### Browser request interception
 

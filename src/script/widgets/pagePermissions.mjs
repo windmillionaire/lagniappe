@@ -95,7 +95,7 @@ export class PagePermissions extends FormElement {
 			data.append("group-key", key);
 		});
 		this._addRestriction(data);
-		this.restrictAccessSelect.clear();
+		this.restrictAccessSelect.clear({ notify: false });
 	}
 
 	async _addRestriction(data) {

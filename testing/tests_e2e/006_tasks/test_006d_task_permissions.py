@@ -23,15 +23,17 @@ pytestmark = pytest.mark.e2e
 
 # @pairs permissions:etag permissions:authorization-before-cache
 # @pairs permissions:resource-gates cache:permissions
-def test_task_route_is_forbidden_without_model_or_page_permission(get_user):
+def test_task_route_is_forbidden_without_model_or_page_permission(
+    get_user, browser_failures
+):
     """A signed-in user with no model/page access cannot follow a task URL."""
     owner = get_user(Users.OWNER)
     task = Tasks.test_create_page_task.get(owner)
 
     blocked = get_user(Users.user_no_access)
-    blocked.navigate(task.url)
-
-    expect(blocked.page).to_have_title("Error 403")
+    with browser_failures.expect_http_error(blocked, status=403, path=task.url):
+        blocked.navigate(task.url)
+        expect(blocked.page).to_have_title("Error 403")
 
     blocked_fingerprint = hashlib.md5(
         (

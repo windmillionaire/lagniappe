@@ -1,23 +1,23 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { SearchBox } from './search.js?v=b549327e';
-import { EntityMenu } from './entityMenu.js?v=b549327e';
-import { r as request } from './request.js?v=b549327e';
-import { c as connectivity } from './connectivity.js?v=b549327e';
-import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b549327e';
-import { withTransition, generateElementId } from './utilities.js?v=b549327e';
-import { S as STYLES } from './styles.js?v=b549327e';
-import { s as setIcon } from './icons.js?v=b549327e';
-import { p as primitives } from './primitives.js?v=b549327e';
-import { B as BaseForm, R as Renderer } from './baseForm.js?v=b549327e';
-import { E as ENDPOINTS } from './endpoints.js?v=b549327e';
-import { F as FacetsBox } from './facets.js?v=b549327e';
+import { SearchBox } from './search.js?v=be1b1fb2';
+import { EntityMenu } from './entityMenu.js?v=be1b1fb2';
+import { r as request } from './request.js?v=be1b1fb2';
+import { c as connectivity } from './connectivity.js?v=be1b1fb2';
+import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=be1b1fb2';
+import { withTransition, generateElementId } from './utilities.js?v=be1b1fb2';
+import { S as STYLES } from './styles.js?v=be1b1fb2';
+import { s as setIcon } from './icons.js?v=be1b1fb2';
+import { p as primitives } from './primitives.js?v=be1b1fb2';
+import { B as BaseForm, R as Renderer } from './baseForm.js?v=be1b1fb2';
+import { E as ENDPOINTS } from './endpoints.js?v=be1b1fb2';
+import { F as FacetsBox } from './facets.js?v=be1b1fb2';
 
 const CONDITION_REGISTRY = {
-	html: () => import('./html.js?v=b549327e'),
-	status: () => import('./status.js?v=b549327e'),
-	visibility: () => import('./visibility.js?v=b549327e'),
-	columns: () => import('./columns.js?v=b549327e'),
-	options: () => import('./options.js?v=b549327e'),
+	html: () => import('./html.js?v=be1b1fb2'),
+	status: () => import('./status.js?v=be1b1fb2'),
+	visibility: () => import('./visibility.js?v=be1b1fb2'),
+	columns: () => import('./columns.js?v=be1b1fb2'),
+	options: () => import('./options.js?v=be1b1fb2'),
 };
 
 /**
@@ -3689,7 +3689,7 @@ class FormSettings {
 				list?.insertAdjacentHTML("beforeend", response.html);
 			}
 		}
-		this.selectGroup?.clear();
+		this.selectGroup?.clear({ notify: false });
 	}
 
 	async _removeRestriction(button) {

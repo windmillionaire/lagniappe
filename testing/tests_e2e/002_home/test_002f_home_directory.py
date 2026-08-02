@@ -118,7 +118,9 @@ def test_admin_directory_link_opens_admin_settings(get_user):
 # @features analytics
 # @dimensions dashboard page-load accordion period-controls owner-filter retention-clear
 @pytest.mark.e2e
-def test_analytics_dashboard_owner_filter_and_retention_clear(get_user):
+def test_analytics_dashboard_owner_filter_and_retention_clear(
+    get_user, browser_failures
+):
     owner = get_user(Users.OWNER)
     visitor = get_user(Users.admin, creator=owner)
     old_key = _save_analytics_event(
@@ -130,7 +132,13 @@ def test_analytics_dashboard_owner_filter_and_retention_clear(get_user):
 
     with visitor.page.expect_response("**/analytics/track"):
         visitor.go(SitePages.HOME)
-    denied = visitor.page.goto(f"{SETTINGS.test_config['BASE_URL']}/analytics/")
+    analytics_url = f"{SETTINGS.test_config['BASE_URL']}/analytics/"
+    with browser_failures.expect_http_error(
+        visitor,
+        status=403,
+        path=analytics_url,
+    ):
+        denied = visitor.page.goto(analytics_url)
     assert denied.status == 403
 
     with owner.page.expect_response("**/analytics/track"):

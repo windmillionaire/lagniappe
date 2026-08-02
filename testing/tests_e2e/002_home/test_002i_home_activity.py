@@ -544,24 +544,36 @@ def test_offline_home_create_mutations_persist_after_reload(get_user, browser_fa
 
     _warm_offline_create_widgets(home)
 
-    with browser_failures.expect_offline(user):
-        user.offline = True
-        expect(user.locate("[data-role='offline']")).to_be_visible()
+    with browser_failures.expect_http_error(
+        user,
+        status=503,
+        path="/fonts/source-sans-italic-latin.woff2",
+    ):
+        with browser_failures.expect_http_error(
+            user,
+            status=503,
+            path="/analytics/track",
+        ):
+            with browser_failures.expect_offline(user, ping_count=2):
+                user.offline = True
+                expect(user.locate("[data-role='offline']")).to_be_visible()
 
-        note_item = _create_text_note_from_home(
-            user, home, note_body, expect_network=False
-        )
-        task_item = _create_task_from_home(home, task_name, expect_network=False)
-        expect(note_item).to_have_attribute("data-offline", "true")
-        expect(task_item).to_have_attribute("data-offline", "true")
-        wait_for_offline_mutations(user, exact=2)
+                note_item = _create_text_note_from_home(
+                    user, home, note_body, expect_network=False
+                )
+                task_item = _create_task_from_home(
+                    home, task_name, expect_network=False
+                )
+                expect(note_item).to_have_attribute("data-offline", "true")
+                expect(task_item).to_have_attribute("data-offline", "true")
+                wait_for_offline_mutations(user, exact=2)
 
-        home = home.reload()
+                home = home.reload()
 
-        _loaded_activity_list(home)
-        _loaded_task_list(home)
-        expect(_activity_item(home, note_body)).not_to_be_attached()
-        expect(_task_item(home, task_name)).not_to_be_attached()
+                _loaded_activity_list(home)
+                _loaded_task_list(home)
+                expect(_activity_item(home, note_body)).not_to_be_attached()
+                expect(_task_item(home, task_name)).not_to_be_attached()
 
     with user.page.expect_response("**/activity/notes", timeout=15000):
         with user.page.expect_response("**/personal", timeout=15000):
@@ -592,26 +604,31 @@ def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_fa
 
     _warm_offline_create_widgets(home, task=False)
 
-    with browser_failures.expect_offline(user):
-        user.offline = True
-        note_item = _create_text_note_from_home(
-            user, home, note_body, expect_network=False
-        )
-        expect(note_item).to_have_attribute("data-offline", "true")
-        wait_for_offline_mutations(user, exact=1)
-        note_item.locator("[data-action='delete-activity']").click()
-        wait_for_offline_mutations(user, exact=0)
-        task_item.locator("input[data-role='complete']").check()
-        expect(note_item).not_to_be_attached()
-        expect(task_item).not_to_be_attached()
-        wait_for_offline_mutations(user, exact=1)
+    with browser_failures.expect_http_error(
+        user,
+        status=503,
+        path="/analytics/track",
+    ):
+        with browser_failures.expect_offline(user, ping_count=2):
+            user.offline = True
+            note_item = _create_text_note_from_home(
+                user, home, note_body, expect_network=False
+            )
+            expect(note_item).to_have_attribute("data-offline", "true")
+            wait_for_offline_mutations(user, exact=1)
+            note_item.locator("[data-action='delete-activity']").click()
+            wait_for_offline_mutations(user, exact=0)
+            task_item.locator("input[data-role='complete']").check()
+            expect(note_item).not_to_be_attached()
+            expect(task_item).not_to_be_attached()
+            wait_for_offline_mutations(user, exact=1)
 
-        home = home.reload()
+            home = home.reload()
 
-        _loaded_activity_list(home)
-        _loaded_task_list(home)
-        expect(_activity_item(home, note_body)).not_to_be_attached()
-        expect(_task_item(home, task_name)).to_be_attached()
+            _loaded_activity_list(home)
+            _loaded_task_list(home)
+            expect(_activity_item(home, note_body)).not_to_be_attached()
+            expect(_task_item(home, task_name)).to_be_attached()
 
     with user.page.expect_response("**/complete", timeout=15000):
         user.offline = False
@@ -667,17 +684,22 @@ def test_offline_task_complete_replays_after_reload(get_user, browser_failures):
     task_item = _task_item(home, task_name)
     expect(task_item).to_have_attribute("data-due-date", expected_due_date)
 
-    with browser_failures.expect_offline(user):
-        user.offline = True
-        task_item.locator("input[data-role='complete']").check()
-        expect(task_item).not_to_be_attached()
-        wait_for_offline_mutations(user, exact=1)
+    with browser_failures.expect_http_error(
+        user,
+        status=503,
+        path="/analytics/track",
+    ):
+        with browser_failures.expect_offline(user, ping_count=2):
+            user.offline = True
+            task_item.locator("input[data-role='complete']").check()
+            expect(task_item).not_to_be_attached()
+            wait_for_offline_mutations(user, exact=1)
 
-        home = home.reload()
-        _loaded_task_list(home)
-        expect(_task_item(home, task_name)).to_have_attribute(
-            "data-due-date", expected_due_date
-        )
+            home = home.reload()
+            _loaded_task_list(home)
+            expect(_task_item(home, task_name)).to_have_attribute(
+                "data-due-date", expected_due_date
+            )
 
     with user.page.expect_response("**/complete", timeout=15000):
         user.offline = False
