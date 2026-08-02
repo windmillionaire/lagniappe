@@ -2300,9 +2300,6 @@
     --tw-outline-style: none;
     outline-style: none;
   }
-  .active\:table:active {
-    display: table;
-  }
   .disabled\:pointer-events-none:disabled {
     pointer-events: none;
   }

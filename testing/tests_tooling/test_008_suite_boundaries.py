@@ -21,6 +21,12 @@ E2E_CACHE_CONTRACT_ROOTS = (
     TESTING_ROOT / "tests_e2e",
     TESTING_ROOT / "resources",
 )
+E2E_BROWSER_INTERACTION_ROOTS = (
+    TESTING_ROOT / "tests_e2e",
+    TESTING_ROOT / "resources",
+    TESTING_ROOT / "elements",
+    TESTING_ROOT / "utility",
+)
 E2E_PROCESS_STATE_SUFFIXES = ("_READY", "_SEEDED", "_CREATED", "_INITIALIZED")
 E2E_NATIVE_FETCH_ASSIGNMENT = re.compile(
     r"""\b(?:window|globalThis)\s*
@@ -28,6 +34,30 @@ E2E_NATIVE_FETCH_ASSIGNMENT = re.compile(
     """,
     re.VERBOSE,
 )
+E2E_SYNTHETIC_POINTER_DISPATCH = re.compile(
+    r"""dispatchEvent\s*\(\s*new\s+(?:Event|PointerEvent|TouchEvent)\s*\(
+        \s*['"](?:pointer(?:down|move|up|cancel)|touch(?:start|move|end|cancel))['"]
+    """,
+    re.VERBOSE,
+)
+E2E_INLINE_LAYOUT_ASSIGNMENT = re.compile(
+    r"""\.style\s*(?:
+        (?:\.\s*(?:width|minWidth|maxWidth)|
+           \[\s*['"](?:width|minWidth|maxWidth)['"]\s*\])\s*=|
+        \.\s*setProperty\s*\(\s*['"](?:width|min-width|max-width)['"]
+    )""",
+    re.VERBOSE,
+)
+E2E_SYNTHETIC_INPUT_EVENTS = {
+    "pointercancel",
+    "pointerdown",
+    "pointermove",
+    "pointerup",
+    "touchcancel",
+    "touchend",
+    "touchmove",
+    "touchstart",
+}
 E2E_DIRECT_AI_HELPERS = {
     "complete_ask_report",
     "complete_organize_submissions",
@@ -127,6 +157,37 @@ def _e2e_ai_worker_bypass_violations(path):
             )
         ):
             violations.append(f"{path}:{node.lineno} calls ai_model.generate_content")
+    return violations
+
+
+def _e2e_interaction_shortcut_violations(path):
+    """Return fabricated pointer/touch input and inline layout overrides."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    violations = []
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "dispatch_event"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+            and node.args[0].value.lower() in E2E_SYNTHETIC_INPUT_EVENTS
+        ):
+            violations.append(
+                f"{path}:{node.lineno} dispatches {node.args[0].value.lower()}"
+            )
+
+        if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+            continue
+        for pattern, description in (
+            (E2E_SYNTHETIC_POINTER_DISPATCH, "dispatches synthetic pointer/touch input"),
+            (E2E_INLINE_LAYOUT_ASSIGNMENT, "assigns inline layout width"),
+        ):
+            for match in pattern.finditer(node.value):
+                line = node.lineno + node.value[: match.start()].count("\n")
+                violations.append(f"{path}:{line} {description}")
+
     return violations
 
 
@@ -348,6 +409,33 @@ def test_e2e_modules_do_not_replace_native_browser_fetch():
                     )
 
     assert violations == []
+
+
+def test_e2e_support_does_not_fabricate_pointer_input_or_layout_widths():
+    """Touch gestures and responsive layout must use browser capabilities."""
+    violations = []
+    for path in _python_files(*E2E_BROWSER_INTERACTION_ROOTS):
+        violations.extend(_e2e_interaction_shortcut_violations(path))
+
+    assert violations == []
+
+
+def test_e2e_interaction_guard_rejects_synthetic_shortcuts(tmp_path):
+    path = tmp_path / "test_interaction_shortcuts.py"
+    path.write_text(
+        'row.dispatch_event("pointerdown", {"pointerType": "touch"})\n'
+        'page.evaluate("node => { node.style.maxWidth = \'8rem\'; }")\n'
+        'page.evaluate("node => node.dispatchEvent('
+        'new TouchEvent(\'touchstart\'))")\n'
+    )
+
+    violations = _e2e_interaction_shortcut_violations(path)
+
+    assert any("dispatches pointerdown" in item for item in violations)
+    assert any("assigns inline layout width" in item for item in violations)
+    assert any(
+        "dispatches synthetic pointer/touch input" in item for item in violations
+    )
 
 
 def test_e2e_modules_do_not_import_or_bypass_route_functions():

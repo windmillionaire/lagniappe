@@ -289,6 +289,9 @@ def get_user(browser, request, browser_failures):
         user_definition: A Users enum member or a fresh UserDefinition for an
             exact-lifecycle story
         creator: User with admin permissions to create new users
+        has_touch: Whether the isolated browser context supports touch input.
+            Required for Playwright tap gestures; viewport resizing alone does
+            not enable touch events.
 
     Returns:
         User: Resource with .page, .go(), .locate() methods
@@ -297,6 +300,7 @@ def get_user(browser, request, browser_failures):
         - storage_state: Persisted auth from user.login()
         - permissions: clipboard-read, clipboard-write enabled
         - viewport: 1280x720 desktop size
+        - has_touch: disabled unless explicitly requested by the test
 
     Timeout Behavior:
         - Standard tests: 15 seconds (DEFAULT_TIMEOUT)
@@ -341,7 +345,7 @@ def get_user(browser, request, browser_failures):
         if context in contexts:
             contexts.remove(context)
 
-    def _get_user(user_definition, creator=None):
+    def _get_user(user_definition, creator=None, *, has_touch=False):
         from testing.definitions.user_definitions import UserDefinition
         from testing.resources import User
 
@@ -375,6 +379,7 @@ def get_user(browser, request, browser_failures):
             storage_state=user.storage_state,
             permissions=["clipboard-read", "clipboard-write"],
             viewport={"width": 1280, "height": 720},
+            has_touch=has_touch,
         )
         contexts.append(context)
         browser_failures.monitor_context(

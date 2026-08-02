@@ -113,7 +113,7 @@ filter_project = ProjectDefinition(
 
 
 attach_project_to_task = ProjectDefinition(
-    name="Attach Project to Task",
+    name="Regional Launch Readiness and Compliance Migration Project",
     description="Project used for testing task creation with a project.",
 )
 

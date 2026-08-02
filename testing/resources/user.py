@@ -53,6 +53,8 @@ class User(SiteResource):
 
         When set to True, viewport changes to mobile dimensions (375x667).
         When set to False, viewport changes to desktop dimensions (1280x720).
+        Browser input capabilities are fixed when the context is created; use
+        ``get_user(..., has_touch=True)`` when a test needs a real tap gesture.
         """
         if value == self._is_mobile:
             return

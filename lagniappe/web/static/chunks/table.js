@@ -1,22 +1,22 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES } from './styles.js?v=b19dd33c';
-import { r as request } from './request.js?v=b19dd33c';
-import './connectivity.js?v=b19dd33c';
-import { s as setIcon } from './icons.js?v=b19dd33c';
-import { E as ENDPOINTS } from './endpoints.js?v=b19dd33c';
-import { captureError } from './errors.js?v=b19dd33c';
-import { areEqual, withTransition } from './utilities.js?v=b19dd33c';
-import { B as BaseElement } from './baseElement.js?v=b19dd33c';
-import { CheckboxElement } from './checkbox.js?v=b19dd33c';
-import { InputElement } from './input.js?v=b19dd33c';
-import { LinkElement } from './link.js?v=b19dd33c';
-import { g as getFormElement } from './loader.js?v=b19dd33c';
-import { p as primitives } from './primitives.js?v=b19dd33c';
-import './formatting.js?v=b19dd33c';
-import './facets.js?v=b19dd33c';
-import './combobox.js?v=b19dd33c';
-import './results.js?v=b19dd33c';
-import './submitter.js?v=b19dd33c';
+import { S as STYLES } from './styles.js?v=b729950f';
+import { r as request } from './request.js?v=b729950f';
+import './connectivity.js?v=b729950f';
+import { s as setIcon } from './icons.js?v=b729950f';
+import { E as ENDPOINTS } from './endpoints.js?v=b729950f';
+import { captureError } from './errors.js?v=b729950f';
+import { areEqual, withTransition } from './utilities.js?v=b729950f';
+import { B as BaseElement } from './baseElement.js?v=b729950f';
+import { CheckboxElement } from './checkbox.js?v=b729950f';
+import { InputElement } from './input.js?v=b729950f';
+import { LinkElement } from './link.js?v=b729950f';
+import { g as getFormElement } from './loader.js?v=b729950f';
+import { p as primitives } from './primitives.js?v=b729950f';
+import './formatting.js?v=b729950f';
+import './facets.js?v=b729950f';
+import './combobox.js?v=b729950f';
+import './results.js?v=b729950f';
+import './submitter.js?v=b729950f';
 
 const COMPACT_COLUMN_TYPES = new Set(["checkbox"]);
 const TABLE_CELL_ELEMENTS = {
@@ -41,6 +41,7 @@ const ACTIONS = [
  * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_table_submission_row_actions
  * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_table_submission_mobile_row_action_gestures
  * @tests tests_js/test_027_table_element_frontend.py::test_table_validation_uses_form_key_for_detached_preview
+ * @tests tests_js/test_027_table_element_frontend.py::test_table_touch_movement_threshold_distinguishes_tap_from_swipe
  * @features form-table
  * @dimensions row-actions reorder edit delete reload mobile touch-gesture detached-revision-preview validation-route
  */

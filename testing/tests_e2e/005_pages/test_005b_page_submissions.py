@@ -186,8 +186,8 @@ def test_table_submission_row_actions(get_user):
 # @features form-table
 # @dimensions row-actions mobile touch-gesture
 def test_table_submission_mobile_row_action_gestures(get_user):
-    """Mobile taps open row actions while a swipe does not."""
-    user = get_user(Users.OWNER)
+    """Real mobile touchscreen taps toggle row actions."""
+    user = get_user(Users.OWNER, has_touch=True)
     page = Pages.test_table_submission.get(user)
     user.go(page)
     user.mobile = True
@@ -200,59 +200,8 @@ def test_table_submission_mobile_row_action_gestures(get_user):
     expect(rows.first).to_be_in_viewport()
     expect(actions).not_to_be_visible()
 
-    rows.first.dispatch_event(
-        "pointerdown",
-        {
-            "pointerType": "touch",
-            "pointerId": 1,
-            "clientX": 240,
-            "clientY": 120,
-            "bubbles": True,
-        },
-    )
-    rows.first.dispatch_event(
-        "pointermove",
-        {
-            "pointerType": "touch",
-            "pointerId": 1,
-            "clientX": 160,
-            "clientY": 122,
-            "bubbles": True,
-        },
-    )
-    rows.first.dispatch_event(
-        "pointerup",
-        {
-            "pointerType": "touch",
-            "pointerId": 1,
-            "clientX": 160,
-            "clientY": 122,
-            "bubbles": True,
-        },
-    )
-    expect(actions).not_to_be_visible()
-
-    rows.first.dispatch_event(
-        "pointerdown",
-        {
-            "pointerType": "touch",
-            "pointerId": 2,
-            "clientX": 240,
-            "clientY": 120,
-            "bubbles": True,
-        },
-    )
-    rows.first.dispatch_event(
-        "pointerup",
-        {
-            "pointerType": "touch",
-            "pointerId": 2,
-            "clientX": 240,
-            "clientY": 120,
-            "bubbles": True,
-        },
-    )
+    rows.first.tap(position={"x": 12, "y": 12})
     expect(actions).to_be_visible()
 
-    user.page.keyboard.press("Escape")
+    rows.first.tap(position={"x": 12, "y": 12})
     expect(actions).not_to_be_visible()

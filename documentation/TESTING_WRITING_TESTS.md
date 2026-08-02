@@ -71,6 +71,31 @@ prefix are shared, so parallel E2E invocations can tear down each other's data
 and server state. When checking multiple focused files or nodeids, pass them to
 one pytest command.
 
+### Touch and responsive interaction
+
+Viewport size and input capability are separate browser-context contracts.
+`user.mobile = True` changes the current page to the standard mobile viewport,
+but it cannot add touch support to an existing context. Request touch support
+when the user is created, then use Playwright's tap action so Chromium produces
+the real event sequence:
+
+```python
+user = get_user(Users.OWNER, has_touch=True)
+page = user.go(Pages.test_table_submission)
+user.mobile = True
+
+row = page.info_form.locator("tbody tr").first
+row.tap(position={"x": 12, "y": 12})
+expect(row.locator("[data-role='row-actions']")).to_be_visible()
+```
+
+Do not dispatch pointer or touch events manually from an E2E test. Playwright
+does not expose a general swipe primitive; movement thresholds and detailed
+event-order permutations belong in the JavaScript suite, with E2E retaining a
+real tap integration story. Drive layout assertions with a supported viewport,
+real content, or a naturally narrow component state rather than assigning
+inline width styles from JavaScript.
+
 ### Browser failure expectations
 
 Every E2E browser context is monitored for console errors, uncaught page errors,

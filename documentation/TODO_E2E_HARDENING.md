@@ -483,18 +483,27 @@ opportunistically by file cluster.
 
 ### E2E-H11 — Replace synthetic interaction and layout shortcuts
 
-- [ ] Use a touch-capable browser context and Playwright touchscreen/coordinates
+- [x] Use a touch-capable browser context and Playwright touchscreen/coordinates
   for touch behavior instead of manually dispatching pointer events.
-- [ ] Use a real viewport or naturally narrow container instead of assigning
+- [x] Use a real viewport or naturally narrow container instead of assigning
   inline widths from JavaScript.
-- [ ] Move low-level event-sequence contracts to JS tests when Playwright cannot
+- [x] Move low-level event-sequence contracts to JS tests when Playwright cannot
   express the relevant primitive accurately.
 
 Candidates:
 
 - `005_pages/test_005b_page_submissions.py` — hand-built touch/pointer sequence
-- `006_tasks/test_006b_page_tasks.py` — inline `maxWidth` and fabricated DOM
-  reconciliation state
+- `006_tasks/test_006b_page_tasks.py` — inline `maxWidth`; its fabricated DOM
+  reconciliation cases were already moved under E2E-H05
+
+Resolved 2026-08-02. The E2E user factory now creates a touch-capable context
+only when requested. Mobile table coverage uses Playwright's real tap gesture
+to open and close row actions, while the exact tap-versus-swipe movement
+threshold and listener cleanup live in the JavaScript suite. The task project
+selector now wraps a realistic long label at the standard mobile viewport and
+returns to its normal desktop/input height without changing inline styles. A
+tooling guard rejects synthetic pointer/touch dispatch and inline layout-width
+assignments from E2E tests and support helpers.
 
 Acceptance criteria:
 
@@ -679,6 +688,7 @@ the focused verification performed, and any intentional exception that remains.
 
 | Date | Item | Cluster | Result / remaining exception |
 |---|---|---|---|
+| 2026-08-02 | E2E-H11 | Table touch gestures and task select layout | Replaced synthetic pointer events with a touch-capable Playwright tap, moved the tap/swipe threshold to JS coverage, and replaced inline width mutation with real mobile/desktop layout. The 2-test JS file, 13-test boundary file, two focused E2E stories, 24-test E2E file cluster, template contract, and Ruff check pass. Changed-scope traceability has no template or style errors, but changing the shared `get_user` fixture made 37 unrelated recorded E2E results stale; refreshing those broad historical stories was deferred for this localized item. No behavior exception remains. |
 | 2026-08-02 | E2E-H10 | Structural evidence collector | Retired the non-actionable full-suite collector, generated baseline format, instrumentation-only tests, collection hook, marker, and traceability exception. The evidence reporter now prunes deleted test modules. The 105 focused tooling tests, 478-test E2E collection, Ruff check, and changed-scope traceability pass. Existing behavior-specific coverage remains; no exception remains. |
 | 2026-08-02 | E2E-H09 | AI report/deferred-job suite boundaries | Moved Ask/Organize adapter publication contracts to unit coverage, retired direct-provider/browserless E2E, and retained UI-started Ask jobs with durable checkpoints and natural polling reconciliation. The 184-test unit cluster, 11-test boundary suite, five focused E2E checks, one-run three-case live-provider evaluation, template contracts, and changed-source traceability pass. No exception remains. |
 | 2026-08-02 | E2E-H08 | Route/core suite boundaries | Replaced white-box route calls with core unit contracts and authenticated managed-server coverage. The 31-test focused unit/tooling cluster, 12 focused E2E contracts, and template contracts pass. Traceability has no metadata, link, or feature/dimension errors; refreshing current evidence for 71 adjacent historical tests was deferred to avoid an unrequested broad E2E run. |

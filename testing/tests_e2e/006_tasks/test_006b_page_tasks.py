@@ -266,26 +266,25 @@ def test_create_page_task_with_project(get_user):
         ":scope > [data-role='clear'] > [data-icon]"
     )
     expect(clear_icon).to_be_visible()
+    expect(leading_icon).to_have_css("font-size", "16px")
+    expect(clear_icon).to_have_css("font-size", "14px")
 
-    leading_size = float(
-        leading_icon.evaluate("node => getComputedStyle(node).fontSize")[:-2]
+    user.mobile = True
+    mobile_button = project_button.element_handle()
+    assert mobile_button is not None
+    user.page.wait_for_function(
+        "button => button.getBoundingClientRect().height > 40",
+        arg=mobile_button,
     )
-    clear_size = float(
-        clear_icon.evaluate("node => getComputedStyle(node).fontSize")[:-2]
-    )
-    assert clear_size <= leading_size
 
-    project_button.evaluate("node => { node.style.maxWidth = '8rem'; }")
-    assert project_button.bounding_box()["height"] > 40
-    project_button.evaluate("node => { node.style.maxWidth = ''; }")
-
-    button_height = project_button.bounding_box()["height"]
+    user.mobile = False
+    expect(project_button).to_have_css("height", "40px")
     leading_icon.click()
     project_input = settings_form.locator(
         "[data-role='project-select'] + input[role='combobox']"
     )
     expect(project_input).to_be_visible()
-    assert abs(project_input.bounding_box()["height"] - button_height) < 1
+    expect(project_input).to_have_css("height", "40px")
 
 
 # @features tasks
