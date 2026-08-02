@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as createIcon } from './icons.js?v=be0d9638';
-import './styles.js?v=be0d9638';
+import { c as createIcon } from './icons.js?v=b549327e';
+import './styles.js?v=b549327e';
 
 /**
  * @testable false

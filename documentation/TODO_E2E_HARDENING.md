@@ -308,15 +308,22 @@ Acceptance criteria:
 
 ### E2E-H06 — Remove fabricated authorization and readonly DOM state
 
-- [ ] Replace DOM attributes that manufacture permission state with a real user
+- [x] Replace DOM attributes that manufacture permission state with a real user
   whose server-rendered permissions produce that state.
-- [ ] Where a visual state has no public setup route, use isolated backend setup
+- [x] Where a visual state has no public setup route, use isolated backend setup
   before navigation, not DOM mutation after rendering.
 
 Start with
 `testing/tests_e2e/007_categories/test_007a_category_index.py`, which sets
 `#tools.dataset.readonly` and then treats the result as evidence for readonly
 fields.
+
+Resolved 2026-08-01. Category readonly coverage now uses a persisted
+MODELS/FORMS VIEW-only user and the server-rendered Category Settings form.
+The permission story asserts labels and values, unavailable editing and create
+controls, and a CSRF-authenticated forbidden `PUT` that leaves the category
+unchanged. A targeted E2E audit found no remaining readonly or permission
+claims manufactured through DOM attributes, properties, or classes.
 
 Acceptance criteria:
 

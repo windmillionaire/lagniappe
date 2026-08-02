@@ -81,7 +81,9 @@ def _category_data(form):
 
 
 # @testable true
-# @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_column_visibility_persists_after_reload
+# @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
+# @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_viewer_opens_readonly_settings
+# @pairs categories:update categories:permission-gates
 @categories.route("<key>/update", methods=["PUT"])
 @permission(Resource.CATEGORY, Action.EDIT)
 def update(key, **kwargs):

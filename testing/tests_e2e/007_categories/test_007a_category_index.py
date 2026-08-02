@@ -252,33 +252,6 @@ def test_create_page_related_form_badge_selects_form(get_user):
     Table(user).new_row(created_name)
 
 
-# @features categories
-# @dimensions info-form readonly labels
-def test_category_info_readonly_fields_keep_labels(get_user):
-    user = get_user(Users.OWNER)
-    category = Categories.test_category_info_update.get(user)
-    readonly_description = "Readonly category settings description."
-    category.entity.description = readonly_description
-    category.entity.save()
-    user.go(category)
-    user.page.evaluate(
-        """() => {
-            document.querySelector("#tools").dataset.readonly = "true";
-        }""",
-    )
-
-    info_form = category.category_info_form()
-    name_field = info_form.locator("#name")
-    description_field = info_form.locator("#description")
-
-    expect(name_field).to_contain_text("Category Name")
-    expect(name_field).to_contain_text(category.entity.name)
-    expect(description_field).to_contain_text("Category Description")
-    expect(description_field).to_contain_text(readonly_description)
-    expect(info_form.locator(FormElements.NAME)).not_to_be_attached()
-    expect(info_form.locator(FormElements.DESCRIPTION)).not_to_be_attached()
-
-
 # @features category-index
 # @dimensions quick-edit editable-cell
 def test_category_index_quick_edit_updates_text_cell(get_user):

@@ -16,10 +16,13 @@ with the team (see category-permissions plan risks).
 import re
 
 import pytest
+import requests
 from playwright.sync_api import expect
 
+from lagniappe.core.definitions import Fetch
+from lagniappe.core.entities import Entities
 from testing.definitions import Categories, Pages, SitePages, Users
-from testing.elements import HeaderSearch, Table, Tools
+from testing.elements import FormElements, HeaderSearch, Table, Tools
 from testing.resources.category import Category
 
 pytestmark = pytest.mark.e2e
@@ -104,7 +107,7 @@ def test_category_create_scoped_to_one_category(get_user):
 
 
 # @features categories
-# @dimensions readonly default-form
+# @dimensions readonly default-form info-form labels permission-gates
 # @template categories/index.html::tools_section
 # @template categories/tools.html::category_info
 def test_category_viewer_opens_readonly_settings(get_user):
@@ -116,6 +119,7 @@ def test_category_viewer_opens_readonly_settings(get_user):
     if category.entity.description != description:
         category.entity.description = description
         category.entity.save()
+    original_fingerprint = category.entity.fingerprint
 
     subject = get_user(Users.models_forms_view_only)
     subject.go(category)
@@ -126,8 +130,14 @@ def test_category_viewer_opens_readonly_settings(get_user):
     settings = tools.locate(Category.CATEGORY_INFO_WIDGET)
     expect(settings).to_be_visible()
     expect(settings).to_have_attribute("data-readonly", "true")
-    expect(settings.locator("#name")).to_contain_text(category.definition.name)
-    expect(settings.locator("#description")).to_contain_text(description)
+    name_field = settings.locator("#name")
+    description_field = settings.locator("#description")
+    expect(name_field).to_contain_text("Category Name")
+    expect(name_field).to_contain_text(category.definition.name)
+    expect(description_field).to_contain_text("Category Description")
+    expect(description_field).to_contain_text(description)
+    expect(settings.locator(FormElements.NAME)).not_to_be_attached()
+    expect(settings.locator(FormElements.DESCRIPTION)).not_to_be_attached()
     form_select = settings.locator("[data-role='form-select']")
     expect(form_select).to_be_visible()
     form_link = form_select.get_by_role("link", name=form.definition.name)
@@ -143,3 +153,29 @@ def test_category_viewer_opens_readonly_settings(get_user):
     expect(tools.locate(Category.GENERATE_PAGES_TOGGLE)).not_to_be_attached()
     expect(tools.locate(Category.CATEGORY_INFO_TOGGLE)).to_be_visible()
     expect(tools.locate(Category.CATEGORY_FILTERS_TOGGLE)).to_be_visible()
+
+    cookies = {
+        cookie["name"]: cookie["value"]
+        for cookie in subject.page.context.cookies()
+    }
+    response = requests.put(
+        f"{category.url}/update",
+        data={
+            "name": category.entity.name,
+            "description": "Forbidden category settings description.",
+            "form": form.key,
+            **{attribute.name: "true" for attribute in category.entity.attributes},
+        },
+        cookies=cookies,
+        headers={
+            "X-CSRFToken": subject.locate("#token").input_value(),
+            "X-Lagniappe-Request": "true",
+        },
+        allow_redirects=False,
+        timeout=10,
+    )
+
+    assert response.status_code == 403
+    persisted = Entities.fetch_one(category.key, request=Fetch.direct())
+    assert persisted.description == description
+    assert persisted.fingerprint == original_fingerprint

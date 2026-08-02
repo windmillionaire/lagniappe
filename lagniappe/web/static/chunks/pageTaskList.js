@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { BaseList } from './baseList.js?v=be0d9638';
+import { BaseList } from './baseList.js?v=b549327e';
 
 /**
  * @testable true
@@ -19,6 +19,7 @@ import { BaseList } from './baseList.js?v=be0d9638';
  * @pair tasks:active-form-preservation
  * @pair tasks:dirty-form-preservation
  * @pairs tasks:completed-only tasks:empty-state tasks:create-close
+ * @pairs tasks:create tasks:refresh tasks:dedupe
  */
 class PageTaskList extends BaseList {
 	constructor(attributes) {

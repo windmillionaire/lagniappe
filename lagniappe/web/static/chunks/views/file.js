@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as Entity } from '../entity.js?v=be0d9638';
-import '../core.js?v=be0d9638';
-import '../connectivity.js?v=be0d9638';
-import '../endpoints.js?v=be0d9638';
-import '../errors.js?v=be0d9638';
-import '../request.js?v=be0d9638';
-import '../utilities.js?v=be0d9638';
-import '../shell.js?v=be0d9638';
+import { E as Entity } from '../entity.js?v=b549327e';
+import '../core.js?v=b549327e';
+import '../connectivity.js?v=b549327e';
+import '../endpoints.js?v=b549327e';
+import '../errors.js?v=b549327e';
+import '../request.js?v=b549327e';
+import '../utilities.js?v=b549327e';
+import '../shell.js?v=b549327e';
 
 /**
  * @testable true
@@ -21,6 +21,7 @@ import '../shell.js?v=be0d9638';
  * @tests tests_js/test_039_file_processing_reconciliation.py::test_file_view_shows_extract_reload_only_for_matching_unmounted_text
  * @features file
  * @dimensions load tabs text-tab file-mobile preview pdf-preview pdf-toolbar file-upload page-upload extract polling reload authoritative-remount linked-entities reverse-links badges
+ * @pairs file:extract file:reload file:text-tab file:authoritative-remount
  */
 class File extends Entity {
 	constructor(node) {

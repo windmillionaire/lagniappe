@@ -1,27 +1,27 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as STYLES } from './styles.js?v=be0d9638';
-import { F as FormElement } from './form2.js?v=be0d9638';
-import { InputElement } from './input.js?v=be0d9638';
-import { p as primitives } from './primitives.js?v=be0d9638';
-import { S as SectionToggle } from './sectionToggle.js?v=be0d9638';
-import { TextareaElement } from './textarea.js?v=be0d9638';
-import { s as setIcon } from './icons.js?v=be0d9638';
-import './baseForm.js?v=be0d9638';
-import './request.js?v=be0d9638';
-import './errors.js?v=be0d9638';
-import './connectivity.js?v=be0d9638';
-import './utilities.js?v=be0d9638';
-import './loader.js?v=be0d9638';
-import './baseElement.js?v=be0d9638';
-import './formatting.js?v=be0d9638';
-import './facets.js?v=be0d9638';
-import './endpoints.js?v=be0d9638';
-import './combobox.js?v=be0d9638';
-import './results.js?v=be0d9638';
-import './submitter.js?v=be0d9638';
-import './buttons.js?v=be0d9638';
-import './baseUpload.js?v=be0d9638';
-import './dropdown.js?v=be0d9638';
+import { S as STYLES } from './styles.js?v=b549327e';
+import { F as FormElement } from './form2.js?v=b549327e';
+import { InputElement } from './input.js?v=b549327e';
+import { p as primitives } from './primitives.js?v=b549327e';
+import { S as SectionToggle } from './sectionToggle.js?v=b549327e';
+import { TextareaElement } from './textarea.js?v=b549327e';
+import { s as setIcon } from './icons.js?v=b549327e';
+import './baseForm.js?v=b549327e';
+import './request.js?v=b549327e';
+import './errors.js?v=b549327e';
+import './connectivity.js?v=b549327e';
+import './utilities.js?v=b549327e';
+import './loader.js?v=b549327e';
+import './baseElement.js?v=b549327e';
+import './formatting.js?v=b549327e';
+import './facets.js?v=b549327e';
+import './endpoints.js?v=b549327e';
+import './combobox.js?v=b549327e';
+import './results.js?v=b549327e';
+import './submitter.js?v=b549327e';
+import './buttons.js?v=b549327e';
+import './baseUpload.js?v=b549327e';
+import './dropdown.js?v=b549327e';
 
 /**
  * @testable true
@@ -30,6 +30,9 @@ import './dropdown.js?v=be0d9638';
  * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_page_links_can_be_added_and_removed
  * @features file
  * @dimensions extract summarize polling status summary reload text-tab active-reset linked-pages
+ * @pairs file:extract file:summarize file:polling file:status file:summary
+ * @pairs file:reload file:text-tab file:active-reset file:linked-pages
+ * @pair file:authoritative-remount
  */
 class FileInfo extends FormElement {
 	constructor(attributes) {
