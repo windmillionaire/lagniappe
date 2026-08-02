@@ -441,9 +441,9 @@ def test_tools_create_form_has_expected_controls(get_user):
     instructions = form.locator("textarea[name='instructions']")
     expect(instructions).to_be_visible()
     explain_button = form.locator(Buttons.EXPLAIN)
-    expect(
-        explain_button.locator(":scope > span:not([data-icon])")
-    ).to_have_text("Initial Prompt")
+    expect(explain_button.locator(":scope > span:not([data-icon])")).to_have_text(
+        "Initial Prompt"
+    )
     expect(explain_button).not_to_be_visible()
     instructions.fill("Sort this into the right place.")
     expect(explain_button).to_be_visible()
@@ -709,6 +709,38 @@ def test_text_only_organize_uses_ask(get_user):
     assert report.input_files == []
 
 
+# @features ai-report
+# @dimensions upload validation http-boundary
+def test_organize_rejects_zero_byte_folder_placeholder(get_user, browser_failures):
+    user = get_user(Users.OWNER)
+    user.go(SitePages.HOME)
+
+    with browser_failures.expect_http_error(
+        user,
+        status=422,
+        path="/tools/organize",
+    ):
+        result = user.page.evaluate(
+            """async () => {
+                const body = new FormData();
+                body.append("tool-files", new File([], "documents"));
+                const response = await fetch("/tools/organize", {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "X-CSRFToken": document.getElementById("token")?.value,
+                        "X-Lagniappe-Request": "true",
+                    },
+                    body,
+                });
+                return {status: response.status, text: await response.text()};
+            }"""
+        )
+
+    assert result["status"] == 422
+    assert "Only individual files are supported" in result["text"]
+
+
 def _create_uploaded_report_item(user):
     home = user.go(SitePages.HOME)
     user.locate(home.CREATE_TOOL_REPORT_TOGGLE).click()
@@ -895,9 +927,7 @@ def test_report_detail_runs_ready_report(get_user):
 
     user.page.get_by_role("button", name=f"Delete {page_name}").click()
     modal = Modal(user.page)
-    expect(modal.element.get_by_role("heading")).to_have_accessible_name(
-        "Delete Page"
-    )
+    expect(modal.element.get_by_role("heading")).to_have_accessible_name("Delete Page")
     delete_button = modal.element.get_by_role("button", name=f"Delete {page_name}")
     expect(delete_button).to_have_attribute(
         "data-route",

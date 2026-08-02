@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request } from './request.js?v=be1b1fb2';
-import './errors.js?v=be1b1fb2';
+import { r as request } from './request.js?v=b19dd33c';
+import './errors.js?v=b19dd33c';
 
 const LOGOUT_BUTTON_SELECTOR = "[data-action='logout'][data-route]";
 

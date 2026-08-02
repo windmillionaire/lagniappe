@@ -384,8 +384,7 @@ def verify_generation_manifest():
         ) from error
     if manifest.get("schema") != GENERATION_SCHEMA_VERSION:
         raise RuntimeError(
-            "Generated configuration manifest is missing or unsupported. "
-            "Rerun setup."
+            "Generated configuration manifest is missing or unsupported. Rerun setup."
         )
     _require_generation_files()
     source_path = GENERATION_SOURCE_FILE.relative_to(APP_DIR).as_posix()
@@ -432,7 +431,9 @@ class Settings:
         self._DEV_SETTINGS = None
         self._TEST_SETTINGS = None
         selected = tuple(file_refs) or GENERATION_FILES
-        invalid = [file_ref for file_ref in selected if file_ref not in GENERATION_FILES]
+        invalid = [
+            file_ref for file_ref in selected if file_ref not in GENERATION_FILES
+        ]
         if invalid:
             raise ValueError(f"Unsupported generated file selection: {invalid}")
 
@@ -450,9 +451,7 @@ class Settings:
             File.MANIFEST_JSON: self.MANIFEST,
         }
         changed = [
-            file_ref.name
-            for file_ref in selected
-            if file_ref.save(documents[file_ref])
+            file_ref.name for file_ref in selected if file_ref.save(documents[file_ref])
         ]
         if all(file_ref.exists() for file_ref in GENERATION_FILES):
             write_generation_manifest()
@@ -500,6 +499,8 @@ class Settings:
                 "AGENT_ACCESS_EMAIL": constants.DEFAULT_AGENT_ACCESS_EMAIL,
                 "AGENT_ACCESS_NAME": constants.DEFAULT_AGENT_ACCESS_NAME,
                 "AGENT_ACCESS_CODE": constants.DEFAULT_AGENT_ACCESS_TEST_CODE,
+                "ANALYTICS": True,
+                "AI_OBSERVABILITY": True,
             }
         )
         app_settings.update(self.TEST_CONFIG)

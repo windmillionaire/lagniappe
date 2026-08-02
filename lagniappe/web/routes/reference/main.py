@@ -1,13 +1,11 @@
-from flask import abort
+from flask import abort, g
 
 from config import SETTINGS
-from config.recovery import (
-    RecoveryConfigurationError,
-    build_recovery_snapshot,
-    read_recovery_redis_ca,
-)
 from lagniappe.core.definitions import Resource
-from lagniappe.core.tools import database
+from lagniappe.core.tools.recovery import (
+    RecoverySnapshotUnavailable,
+    load_recovery_snapshot,
+)
 from lagniappe.web.auth import logged_in, permission
 from lagniappe.web import responses
 
@@ -38,27 +36,16 @@ def environment_variables():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_is_owner_only
-# @tests tests_e2e/008_users/test_008f_recovery_settings.py::test_owner_download_is_complete_canonical_and_not_cacheable
-# @tests tests_e2e/008_users/test_008f_recovery_settings.py::test_owner_download_fails_closed_when_live_settings_are_unavailable
-# @features admin
-# @dimensions recovery-export failure-isolation
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+# @pairs admin:recovery-export
 @reference.route("/download-settings")
 @permission(Resource.SITE)
 def download_settings():
     """Download the complete canonical recovery snapshot."""
+    g.NO_CACHE = True
     try:
-        persisted = SETTINGS.app_settings
-        env_vars = build_recovery_snapshot(
-            persisted,
-            deployment_settings=database.get.site_deployment(),
-            ai_settings=database.get.site_ai(),
-            redis_ca_pem=read_recovery_redis_ca(persisted),
-        )
-    except Exception as error:
-        if isinstance(error, RecoveryConfigurationError):
-            message = "The recovery snapshot is incomplete."
-        else:
-            message = "The recovery snapshot could not be read."
-        abort(503, f"{message} No settings were downloaded.")
+        env_vars = load_recovery_snapshot(SETTINGS.app_settings)
+    except RecoverySnapshotUnavailable as error:
+        abort(503, error.public_message)
 
     return responses.reference_environment_variables(env_vars, download=True)

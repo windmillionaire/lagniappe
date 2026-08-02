@@ -1,14 +1,14 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request } from '../request.js?v=be1b1fb2';
-import { withTransition } from '../utilities.js?v=be1b1fb2';
-import { S as ShellView } from '../shell.js?v=be1b1fb2';
-import '../errors.js?v=be1b1fb2';
-import '../connectivity.js?v=be1b1fb2';
+import { r as request } from '../request.js?v=b19dd33c';
+import { withTransition } from '../utilities.js?v=b19dd33c';
+import { S as ShellView } from '../shell.js?v=b19dd33c';
+import '../errors.js?v=b19dd33c';
+import '../connectivity.js?v=b19dd33c';
 
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
- * @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_observability_dashboard_flags_and_clears_are_independent
+ * @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
  * @features analytics
  * @dimensions dashboard accordion retention-clear
  */

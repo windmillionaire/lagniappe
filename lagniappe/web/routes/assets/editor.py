@@ -18,9 +18,8 @@ from . import assets
 
 # @testable true
 # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
-# @tests tests_e2e/011_files/test_011d_asset_route_loading.py::test_html_field_expands_permission_entity_directly
 # @features html-field
-# @dimensions render-fetch submitter-key form-asset decorator-entity direct-expand
+# @dimensions render-fetch submitter-key form-asset
 @assets.route("<key>/html/<field_id>", methods=["GET"])
 @permission(requested=Action.VIEW)
 def html_field(key, field_id, **kwargs):

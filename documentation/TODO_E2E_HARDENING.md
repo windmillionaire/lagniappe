@@ -384,13 +384,13 @@ suite-wide isolation work unless a file is already being touched.
 
 ### E2E-H08 — Reclassify route functions invoked through `__wrapped__`
 
-- [ ] Inventory E2E tests that call decorated Flask routes through
+- [x] Inventory E2E tests that call decorated Flask routes through
   `__wrapped__`, create bare request contexts, or monkeypatch route imports.
-- [ ] For pure decision/transformation logic, extract a runtime-safe helper to
+- [x] For pure decision/transformation logic, extract a runtime-safe helper to
   `lagniappe/core/` and cover it in `testing/tests_unit/`.
-- [ ] For an HTTP/route contract, exercise the actual managed server through
+- [x] For an HTTP/route contract, exercise the actual managed server through
   browser navigation or an authenticated HTTP request.
-- [ ] Keep full-browser coverage only when rendering or frontend behavior is
+- [x] Keep full-browser coverage only when rendering or frontend behavior is
   part of the contract.
 
 Initial candidates:
@@ -406,6 +406,13 @@ Initial candidates:
 Important boundary constraint: unit tests may not solve this by importing
 `lagniappe.web`. Extract pure logic when unit coverage is appropriate. Tooling
 tests may import neither `lagniappe.web` nor `lagniappe.core`.
+
+Resolution: deterministic polling, sync, form-state, autofill, administration,
+recovery, notification, error-filtering, and diagnostic projections now live in
+runtime-safe core services with unit coverage. Route contracts use authenticated
+managed-server requests, and a tooling guard rejects route-module imports and
+`__wrapped__` access from E2E modules. The remaining request-context work is
+owned by E2E-H09.
 
 Acceptance criteria:
 
@@ -655,4 +662,4 @@ the focused verification performed, and any intentional exception that remains.
 
 | Date | Item | Cluster | Result / remaining exception |
 |---|---|---|---|
-| | | | |
+| 2026-08-02 | E2E-H08 | Route/core suite boundaries | Replaced white-box route calls with core unit contracts and authenticated managed-server coverage. The 31-test focused unit/tooling cluster, 12 focused E2E contracts, and template contracts pass. Traceability has no metadata, link, or feature/dimension errors; refreshing current evidence for 71 adjacent historical tests was deferred to avoid an unrequested broad E2E run. |

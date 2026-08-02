@@ -13,8 +13,8 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.tools.database.core import DATA, KINDS
 from lagniappe.core.tools.ai.observability import (
-    GenerationSummaryV1,
     aggregate_records,
+    operation_diagnostic_payload,
 )
 from lagniappe.core.tools.deferred_jobs import DeferredJobs
 from lagniappe.web import responses
@@ -294,9 +294,7 @@ def _events(period, prefix=None, limit=QUERY_LIMIT):
     q = DATA.datastore.query(kind=KINDS.analytics.value)
     start = _period_start(period)
     if start:
-        q.add_filter(
-            filter=datastore_query.PropertyFilter("created", ">=", start)
-        )
+        q.add_filter(filter=datastore_query.PropertyFilter("created", ">=", start))
     q.order = ["-created"]
 
     events = list(q.fetch(limit=limit))
@@ -312,9 +310,7 @@ def _ai_records(period, limit=QUERY_LIMIT):
     q = DATA.datastore.query(kind=KINDS.ai_observability.value)
     start = _period_start(period)
     if start:
-        q.add_filter(
-            filter=datastore_query.PropertyFilter("created", ">=", start)
-        )
+        q.add_filter(filter=datastore_query.PropertyFilter("created", ">=", start))
     q.order = ["-created"]
     return list(q.fetch(limit=limit))
 
@@ -359,42 +355,6 @@ def _inflight_ai_records(records, job_keys_by_telemetry=None):
 
 # @testable false
 # @covered-by lagniappe/web/routes/analytics/main.py::operation_diagnostic
-# @reason typed observability allowlist owns the transferable JSON shape
-def _diagnostic_ai_record(record):
-    result = {}
-    for name in GenerationSummaryV1.__dataclass_fields__:
-        value = record.get(name)
-        if value is None:
-            continue
-        if isinstance(value, datetime):
-            value = value.isoformat()
-        result[name] = value
-    return result
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::operation_diagnostic
-# @reason route test verifies correlation and privacy-bounded serialization
-def _operation_diagnostic_payload(operation, records):
-    telemetry_id = operation.get("telemetry_id")
-    matching = [
-        _diagnostic_ai_record(record)
-        for record in records
-        if telemetry_id and record.get("telemetry_id") == telemetry_id
-    ]
-    return {
-        "schema_version": 1,
-        "job_id": operation.get("key"),
-        "telemetry_id": telemetry_id,
-        "operation": operation,
-        "ai_generations": matching,
-        "ai_record_query_limit": QUERY_LIMIT,
-        "ai_records_may_be_truncated": len(records) >= QUERY_LIMIT,
-    }
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/analytics/main.py::operation_diagnostic
 # @reason displayed operation lookup is bounded by the dashboard cohort
 def _recent_operation(key):
     for operation in DeferredJobs.recent(limit=250):
@@ -428,9 +388,7 @@ def _delete_events(retention, batch_size=DELETE_BATCH_SIZE):
     while True:
         q = DATA.datastore.query(kind=KINDS.analytics.value)
         if cutoff is not None:
-            q.add_filter(
-                filter=datastore_query.PropertyFilter("created", "<", cutoff)
-            )
+            q.add_filter(filter=datastore_query.PropertyFilter("created", "<", cutoff))
             q.order = ["created"]
         q.keys_only()
 
@@ -454,9 +412,7 @@ def _delete_ai_records(retention, batch_size=DELETE_BATCH_SIZE):
     while True:
         q = DATA.datastore.query(kind=KINDS.ai_observability.value)
         if cutoff is not None:
-            q.add_filter(
-                filter=datastore_query.PropertyFilter("created", "<", cutoff)
-            )
+            q.add_filter(filter=datastore_query.PropertyFilter("created", "<", cutoff))
             q.order = ["created"]
         q.keys_only()
 
@@ -520,8 +476,7 @@ def _dashboard(events):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_observability_dashboard_flags_and_clears_are_independent
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_operation_ids_and_json_diagnostics_are_correlated
+# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
 # @pair analytics:dashboard
 # @pair analytics:period-controls
 # @pair ai-observability:ai-only
@@ -581,7 +536,7 @@ def index():
 
 
 # @testable true
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_operation_ids_and_json_diagnostics_are_correlated
+# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
 # @pair ai-observability:job-correlation
 # @pair deferred-jobs:diagnostics
 @analytics.route("/ai/operations/<job_id>.json", methods=["GET"])
@@ -594,7 +549,7 @@ def operation_diagnostic(job_id):
     operation = _recent_operation(job_id)
     records = _ai_records("all")
     return responses.json_response(
-        _operation_diagnostic_payload(operation, records)
+        operation_diagnostic_payload(operation, records, query_limit=QUERY_LIMIT)
     )
 
 
@@ -639,7 +594,7 @@ def clear_records(retention):
 
 
 # @testable true
-# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_observability_dashboard_flags_and_clears_are_independent
+# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
 # @pair ai-observability:independent-clear
 @analytics.route("/ai/clear/<retention>", methods=["DELETE"])
 @permission(Resource.SITE, Action.EDIT)

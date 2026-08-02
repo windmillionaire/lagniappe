@@ -146,9 +146,9 @@ def test_generation_manifest_tracks_constants_and_required_outputs(
 
 
 def test_gcloudignore_uploads_only_canonical_runtime_config():
-    ignore = (
-        Path(__file__).resolve().parents[2] / ".gcloudignore"
-    ).read_text(encoding="utf-8")
+    ignore = (Path(__file__).resolve().parents[2] / ".gcloudignore").read_text(
+        encoding="utf-8"
+    )
 
     assert "/config/files/*" in ignore
     assert "!/config/files/lagniappe_settings.yaml" in ignore
@@ -332,9 +332,7 @@ def test_test_frontend_bundle_skips_current_build(monkeypatch, tmp_path):
     state_path.write_text(json.dumps(state))
 
     monkeypatch.setattr(testing, "_TEST_FRONTEND_BUNDLE_STATE", state_path)
-    monkeypatch.setattr(
-        testing, "_test_frontend_input_fingerprint", lambda: "inputs-1"
-    )
+    monkeypatch.setattr(testing, "_test_frontend_input_fingerprint", lambda: "inputs-1")
     monkeypatch.setattr(
         testing, "_test_frontend_output_fingerprint", lambda: "outputs-1"
     )
@@ -475,6 +473,8 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
 
         assert SETTINGS.test_config["BASE_URL"].startswith("http://")
         assert SETTINGS.test_config["AGENT_ACCESS_ENABLED"] is True
+        assert SETTINGS.test_config["ANALYTICS"] is True
+        assert SETTINGS.test_config["AI_OBSERVABILITY"] is True
         assert "BUILD_ID" not in SETTINGS.app_config
         assert "BUILD_ID" not in SETTINGS.app_settings
         assert (
@@ -497,12 +497,14 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
             {
                 "AGENT_ACCESS_ENABLED": False,
                 "AGENT_ACCESS_CODE": "custom-test-code",
+                "AI_OBSERVABILITY": False,
             }
         )
         SETTINGS._TEST_SETTINGS = None
 
         assert SETTINGS.test_config["AGENT_ACCESS_ENABLED"] is False
         assert SETTINGS.test_config["AGENT_ACCESS_CODE"] == "custom-test-code"
+        assert SETTINGS.test_config["AI_OBSERVABILITY"] is False
 
         SETTINGS.APP["BUILD_ID"] = "stale-local-build"
         File.APP_SETTINGS_YAML.save(SETTINGS.APP)
@@ -788,8 +790,7 @@ def _valid_recovery_document():
         "OCR_LOCATION": "us",
         "APP_URL": "https://recovered-project-1.us-central1.r.appspot.com",
         "GOOGLE_LOGIN_URI": (
-            "https://recovered-project-1.us-central1.r.appspot.com/"
-            "users/google-signin"
+            "https://recovered-project-1.us-central1.r.appspot.com/users/google-signin"
         ),
         "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
             "runtime@recovered-project-1.iam.gserviceaccount.com"
@@ -961,9 +962,7 @@ def test_recovery_rejects_current_configuration_identity_mismatch():
             "IDENTITY_PLATFORM_CONFIG.projectId",
         ),
         (
-            lambda value: value.update(
-                APP_URL="https://wrong-project-1.appspot.com"
-            ),
+            lambda value: value.update(APP_URL="https://wrong-project-1.appspot.com"),
             "APP_URL",
         ),
         (
@@ -1017,9 +1016,7 @@ def test_recovery_redis_ca_round_trips_through_one_file(monkeypatch, tmp_path):
         "CONFIG_SCHEMA_VERSION": recovery.CONFIG_SCHEMA_VERSION,
         "REDIS_TLS": True,
         "REDIS_CA_CERT": "config/files/redis_ca.pem",
-        "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
-            "runtime@project-1.iam.gserviceaccount.com"
-        ),
+        "RUNTIME_SERVICE_ACCOUNT_EMAIL": ("runtime@project-1.iam.gserviceaccount.com"),
         "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": (
             "runtime@project-1.iam.gserviceaccount.com"
         ),

@@ -39,7 +39,7 @@ def get(kind):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_notes_exclude_notifications
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_process_notification_uses_menu_not_home_notes
+# @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes
 # @features activity notes
 # @dimensions load cached-response notes-only
 # @pair activity:notes-exclusion

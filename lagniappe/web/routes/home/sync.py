@@ -6,72 +6,11 @@ from flask_login import current_user
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
+from lagniappe.core.tools.form_state import validate_sync_payload
 from lagniappe.web import responses
 from lagniappe.web.auth import logged_in
 
 from . import home
-
-
-def _is_document(sync_id):
-    return isinstance(sync_id, str) and sync_id.endswith(":document")
-
-
-# @testable true
-# @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_sync_response_contract_is_browser_visible
-# @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_live_sync_rejects_form_widget_payloads
-# @pair sync:validation
-# @pair sync:document-only
-# @pair sync:client-identity
-# @pair forms:no-live-sync
-def _validate_sync_payload(payload):
-    if not isinstance(payload, dict):
-        return "Invalid sync payload."
-    if (
-        not isinstance(payload.get("client_id"), str)
-        or not payload["client_id"]
-        or len(payload["client_id"]) > 128
-    ):
-        return "Sync payload missing client_id."
-    updates = payload.get("updates")
-    if not isinstance(updates, list) or len(updates) > 64:
-        return "Sync payload updates must be a bounded list."
-    for update in updates:
-        if not isinstance(update, dict):
-            return "Sync update must be an object."
-        if (
-            not isinstance(update.get("key"), str)
-            or not update["key"]
-            or len(update["key"]) > 512
-            or not _is_document(update.get("sync_id"))
-            or len(update["sync_id"]) > 512
-        ):
-            return "Only identified document widgets may use live sync."
-        revision = update.get("revision")
-        if (
-            revision is not None
-            and (
-                not isinstance(revision, int)
-                or isinstance(revision, bool)
-                or revision < 0
-            )
-        ):
-            return "Document revision must be a non-negative integer."
-        generation = update.get("generation")
-        if generation is not None and (
-            not isinstance(generation, str) or len(generation) > 128
-        ):
-            return "Document generation is invalid."
-        if not isinstance(update.get("save"), bool):
-            return "Document save mode is invalid."
-        touch_parent = update.get("touch_parent", False)
-        if not isinstance(touch_parent, bool) or (
-            touch_parent and not update["save"]
-        ):
-            return "Document parent touch is invalid."
-        for name in ("update", "ydoc", "html"):
-            if update.get(name) is not None and not isinstance(update[name], str):
-                return f"Document {name} must be encoded text."
-    return None
 
 
 # @testable false
@@ -100,7 +39,7 @@ def _document_seed(entity):
 def sync():
     """Append Yjs deltas and persist only current-generation checkpoints."""
     payload = request.get_json(silent=True) or {}
-    error = _validate_sync_payload(payload)
+    error = validate_sync_payload(payload)
     if error:
         return responses.error(error)
 
@@ -125,8 +64,7 @@ def sync():
         entity = entities[update["key"]]
         seed = _document_seed(entity)
         has_document_payload = any(
-            update.get(name) is not None
-            for name in ("update", "ydoc", "html")
+            update.get(name) is not None for name in ("update", "ydoc", "html")
         )
         if has_document_payload:
             acknowledgement = cache.apply_document_update(

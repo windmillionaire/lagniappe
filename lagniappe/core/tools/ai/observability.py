@@ -213,6 +213,44 @@ class GenerationSummaryV1:
 
 
 # @testable false
+# @covered-by lagniappe/core/tools/ai/observability.py::operation_diagnostic_payload
+# @reason the public correlation helper owns the typed serialization allowlist
+def diagnostic_record(record):
+    """Serialize only fields declared by the persisted summary contract."""
+    result = {}
+    for name in GenerationSummaryV1.__dataclass_fields__:
+        value = record.get(name)
+        if value is None:
+            continue
+        if isinstance(value, datetime):
+            value = value.isoformat()
+        result[name] = value
+    return result
+
+
+# @testable true
+# @tests tests_unit/test_015c_ai_observability.py::test_operation_diagnostic_payload_is_correlated_and_privacy_bounded
+# @pairs ai-observability:job-correlation ai-observability:privacy
+def operation_diagnostic_payload(operation, records, *, query_limit=QUERY_LIMIT):
+    """Build a transferable, privacy-bounded job/provider snapshot."""
+    telemetry_id = operation.get("telemetry_id")
+    matching = [
+        diagnostic_record(record)
+        for record in records
+        if telemetry_id and record.get("telemetry_id") == telemetry_id
+    ]
+    return {
+        "schema_version": 1,
+        "job_id": operation.get("key"),
+        "telemetry_id": telemetry_id,
+        "operation": operation,
+        "ai_generations": matching,
+        "ai_record_query_limit": query_limit,
+        "ai_records_may_be_truncated": len(records) >= query_limit,
+    }
+
+
+# @testable false
 # @covered-by lagniappe/core/tools/ai/observability.py::GenerationObserver
 # @reason enablement is exercised through observer construction and disabled-mode tests
 def enabled(config=CONFIG):
@@ -226,7 +264,9 @@ def _bounded_contract(value, fallback="unknown"):
     value = str(value or "").strip().lower().replace("_", "-")
     if not value or len(value) > 80:
         return fallback
-    if any(character not in "abcdefghijklmnopqrstuvwxyz0123456789-." for character in value):
+    if any(
+        character not in "abcdefghijklmnopqrstuvwxyz0123456789-." for character in value
+    ):
         return fallback
     return value
 
@@ -248,7 +288,9 @@ def _size(value):
 # @reason ephemeral validation comparison is exercised through local-repair outcomes
 def _fingerprint(value):
     try:
-        serialized = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+        serialized = json.dumps(
+            value, sort_keys=True, separators=(",", ":"), default=str
+        )
     except Exception:
         serialized = f"<{type(value).__name__}>"
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
@@ -352,7 +394,8 @@ class GenerationObserver:
             ),
             service_tier=(
                 getattr(prompt, "service_tier", None)
-                if getattr(prompt, "service_tier", None) in {"standard", "priority", "flex"}
+                if getattr(prompt, "service_tier", None)
+                in {"standard", "priority", "flex"}
                 else "standard"
             ),
             original_file_count=(
@@ -417,7 +460,9 @@ class GenerationObserver:
             ("total_tokens", "total_token_count"),
         ):
             value = getattr(usage, provider_name, 0) or 0
-            setattr(self.summary, field_name, getattr(self.summary, field_name) + int(value))
+            setattr(
+                self.summary, field_name, getattr(self.summary, field_name) + int(value)
+            )
         traffic = str(getattr(usage, "traffic_type", "") or "")
         traffic = traffic.rsplit(".", 1)[-1].upper()
         normalized = KNOWN_TRAFFIC_TYPES.get(traffic, "other")
@@ -460,8 +505,12 @@ class GenerationObserver:
         for call in calls:
             if isinstance(call, dict):
                 self.summary.exact_call_cache_hits += int(bool(call.get("cached")))
-                self.summary.tool_result_chars += max(int(call.get("result_chars") or 0), 0)
-                self.summary.original_file_count += max(int(call.get("file_parts") or 0), 0)
+                self.summary.tool_result_chars += max(
+                    int(call.get("result_chars") or 0), 0
+                )
+                self.summary.original_file_count += max(
+                    int(call.get("file_parts") or 0), 0
+                )
         self.summary.tool_names.sort()
         self._persist_live()
 
@@ -545,7 +594,9 @@ class GenerationObserver:
             try:
                 prune_old_records()
             except Exception:
-                LOGGER.warning("Unable to prune AI observability summaries.", exc_info=True)
+                LOGGER.warning(
+                    "Unable to prune AI observability summaries.", exc_info=True
+                )
 
 
 # @testable false
@@ -619,7 +670,9 @@ def aggregate_records(records, *, query_limit=QUERY_LIMIT):
         return round((100 * numerator / denominator), 1) if denominator else 0.0
 
     successes = sum(bool(record.get("success")) for record in records)
-    tool_generations = sum(int(record.get("tool_rounds") or 0) > 0 for record in records)
+    tool_generations = sum(
+        int(record.get("tool_rounds") or 0) > 0 for record in records
+    )
     sequential = sum(int(record.get("tool_rounds") or 0) > 1 for record in records)
     tool_rounds = total("tool_rounds")
     tool_calls = total("tool_calls")
@@ -661,7 +714,9 @@ def aggregate_records(records, *, query_limit=QUERY_LIMIT):
             row["requests"] += max(int(record.get("provider_requests") or 0), 0)
             row["tokens"] += max(int(record.get("total_tokens") or 0), 0)
             outcome = record.get("outcome") or "not_validated"
-            row["outcomes"][outcome if outcome in KNOWN_OUTCOMES else "not_validated"] += 1
+            row["outcomes"][
+                outcome if outcome in KNOWN_OUTCOMES else "not_validated"
+            ] += 1
         rows = []
         for row in grouped.values():
             row["success_rate"] = percent(row.pop("successes"), row["count"])
@@ -697,8 +752,7 @@ def aggregate_records(records, *, query_limit=QUERY_LIMIT):
         "original_file_count": total("original_file_count"),
         "groups": grouped_tables,
         "tools": [
-            {"name": name, "count": value}
-            for name, value in tool_names.most_common()
+            {"name": name, "count": value} for name, value in tool_names.most_common()
         ],
         "limited": count >= query_limit,
     }

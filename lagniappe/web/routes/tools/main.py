@@ -42,7 +42,7 @@ def _tool_label(tool):
 
 
 # @testable true
-# @tests tests_e2e/002_home/test_002n_file_consumer_routes.py::test_organize_report_rejects_zero_byte_folder_placeholder
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder
 # @features ai-report
 # @dimensions upload
 def _uploaded_report_files():
@@ -233,9 +233,10 @@ def _start_tool_report(
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_text_only_organize_uses_ask
-# @tests tests_e2e/002_home/test_002n_file_consumer_routes.py::test_organize_report_accepts_oversized_input
+# @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_rejects_zero_byte_folder_placeholder
 # @features ai-report
 # @dimensions create upload async explain-button text-only ask-fallback
+# @pairs ai-report:validation ai-report:http-boundary
 @tools.route("/organize", methods=["POST"])
 @ai_access(AI.CREATE)
 def create_organize_report():
@@ -449,8 +450,7 @@ def undo_report(key):
         return responses.not_found("Report not found")
     result = report.result if isinstance(report.result, dict) else {}
     has_completed_actions = any(
-        action.get("status") == "complete"
-        for action in result.get("actions") or []
+        action.get("status") == "complete" for action in result.get("actions") or []
     )
     if (
         report.status not in {"complete", "failed", "undo_failed"}
@@ -573,9 +573,7 @@ def delete_report(key):
     if not report:
         return responses.not_found("Report not found")
 
-    files_to_delete = [
-        file for file in report.input_files if not file.has_references
-    ]
+    files_to_delete = [file for file in report.input_files if not file.has_references]
     DeferredJobs.cancel(report.deferred_job)
     ai.cleanup_report_upload_manifest(report)
     Entities.delete(report, *files_to_delete)

@@ -1,7 +1,6 @@
 """Server contracts for document-only sync and marker-owned form operations."""
 
 from copy import deepcopy
-from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -9,10 +8,6 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from lagniappe.web.routes.home import poll as poll_routes
-from lagniappe.web.routes.home import sync as sync_routes
-from lagniappe.web.routes.pages import main as page_routes
-from lagniappe.web.routes.tasks import main as task_routes
 from testing.definitions import Pages, Tasks, Users
 from testing.utility import expect_poll_result, expect_successful_response
 
@@ -21,110 +16,80 @@ pytestmark = pytest.mark.e2e
 
 
 # @pairs sync:document-only forms:no-live-sync
-def test_live_sync_rejects_form_widget_payloads():
-    error = sync_routes._validate_sync_payload(
-        {
-            "client_id": "form-contract-test",
-            "updates": [
-                {
-                    "key": "page-key",
-                    "sync_id": "page-hash:form-hash:form",
-                    "update": {"field": "draft"},
-                }
-            ]
-        }
-    )
-    assert error == "Only identified document widgets may use live sync."
-    assert (
-        sync_routes._validate_sync_payload(
-            {
-                "client_id": "document-contract-test",
-                "updates": [
-                    {
-                        "key": "page-key",
-                        "sync_id": "page-hash:document",
-                        "ydoc": "encoded-state",
-                        "save": False,
-                    }
-                ]
-            }
+def test_live_sync_rejects_form_widget_payloads(get_user, browser_failures):
+    owner = get_user(Users.OWNER)
+    owner.go(Pages.test_sync_form_page)
+
+    with browser_failures.expect_http_error(owner, status=422, path="/sync"):
+        result = owner.page.evaluate(
+            """async () => {
+                const response = await fetch("/sync", {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": document.getElementById("token")?.value,
+                        "X-Lagniappe-Request": "true",
+                    },
+                    body: JSON.stringify({
+                        client_id: "form-contract-test",
+                        updates: [{
+                            key: "page-key",
+                            sync_id: "page-hash:form-hash:form",
+                            update: "encoded-state",
+                            save: false,
+                        }],
+                    }),
+                });
+                return {status: response.status, text: await response.text()};
+            }"""
         )
-        is None
+
+    assert result["status"] == 422
+    assert "Only identified document widgets may use live sync" in result["text"]
+
+
+# @pairs offline:replay-precondition forms:conflict-review tasks:no-mutation
+def test_task_offline_replay_rejects_a_stale_origin_fingerprint(get_user):
+    owner = get_user(Users.OWNER)
+    task = Tasks.test_task_revision_review.get(owner)
+    owner.go(task)
+    current = Entities.fetch_one(
+        task.key,
+        request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
+    )
+    original_name = current.name
+    original_fingerprint = current.fingerprint
+    path = f"/tasks/{task.key}/update"
+
+    result = owner.page.evaluate(
+        """async ({path, name}) => {
+            const body = new FormData();
+            body.set("offline", "True");
+            body.set("offline-fingerprint", "stale-origin-fingerprint");
+            body.set("name", name);
+            const response = await fetch(path, {
+                method: "PUT",
+                credentials: "include",
+                headers: {
+                    "X-CSRFToken": document.getElementById("token")?.value,
+                    "X-Lagniappe-Request": "true",
+                },
+                body,
+            });
+            return {status: response.status, data: await response.json()};
+        }""",
+        {"path": path, "name": "This stale replay must not be saved"},
     )
 
-
-# @pairs deferred-jobs:form-lock polling:revision
-def test_poll_form_lock_revision_is_independent_of_entity_fingerprint(monkeypatch):
-    class Page:
-        urlsafe_key = "page-key"
-        fingerprint = "entity-fingerprint"
-
-        def allowed(self, action, user=None):
-            return user == "editor"
-
-    monkeypatch.setattr(poll_routes, "current_user", "editor")
-    entity = Page()
-    active_locks = {
-        entity.urlsafe_key: (
-            SimpleNamespace(scope="form-autofill"),
-            SimpleNamespace(urlsafe_key="operation-key", status_revision=6),
-        )
-    }
-    descriptor = {
-        "id": "form-lock:page-key",
-        "type": "form-lock",
-        "key": entity.urlsafe_key,
-        "revision": "operation-key:5",
-    }
-
-    assert poll_routes._lock_result(descriptor, entity, active_locks) == {
-        "id": "form-lock:page-key",
-        "type": "form-lock",
-        "status": "changed",
-        "revision": "operation-key:6",
-        "poll_after_ms": 15000,
-        "payload": {
-            "key": "page-key",
-            "locked": True,
-            "scope": "form-autofill",
-            "operation": "operation-key",
-            "revision": 6,
-        },
-    }
-
-    entity.fingerprint = "changed-entity-fingerprint"
-    assert poll_routes._lock_result(
-        {**descriptor, "revision": "operation-key:6"},
-        entity,
-        active_locks,
-    ) == {
-        "id": "form-lock:page-key",
-        "type": "form-lock",
-        "status": "unchanged",
-        "revision": "operation-key:6",
-        "poll_after_ms": 15000,
-    }
-
-
-# @pairs offline:replay-precondition forms:conflict-review
-def test_offline_form_replay_uses_originating_entity_fingerprint():
-    entity = SimpleNamespace(fingerprint="current")
-    stale = {
-        "offline": "True",
-        "offline-fingerprint": "originating",
-    }
-    current = {
-        "offline": "True",
-        "offline-fingerprint": "current",
-    }
-
-    for conflicts in (
-        page_routes._offline_replay_conflicts,
-        task_routes._offline_replay_conflicts,
-    ):
-        assert conflicts(entity, stale) is True
-        assert conflicts(entity, current) is False
-        assert conflicts(entity, {"offline-fingerprint": "originating"}) is False
+    assert result["status"] == 200
+    assert result["data"]["conflict"] is True
+    saved = Entities.fetch_one(
+        task.key,
+        request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
+    )
+    assert saved.name == original_name
+    assert saved.fingerprint == original_fingerprint
 
 
 def _fill_form_field(form, field_prefix, value):
@@ -188,16 +153,13 @@ def test_form_submission_reconciliation_uses_latest_schema(
             path=f"/pages/{page.key}/update",
             entity_key=page.key,
         ):
-            other_info.locator(
-                'button[type="submit"]:not([data-role])'
-            ).click()
+            other_info.locator('button[type="submit"]:not([data-role])').click()
 
         replacement_requests = []
 
         def record_replacement(request):
-            if (
-                request.method == "GET"
-                and request.url.endswith(f"/pages/{page.key}/info/replace")
+            if request.method == "GET" and request.url.endswith(
+                f"/pages/{page.key}/info/replace"
             ):
                 replacement_requests.append(request)
 
@@ -259,8 +221,7 @@ def test_form_submission_reconciliation_uses_latest_schema(
         expect(info.locator(f"input[name='{added_id}']")).to_have_value(added_value)
         expect(
             info.locator(
-                "button[type='submit']:not([data-role]) "
-                "[data-icon='builder.unsaved']"
+                "button[type='submit']:not([data-role]) [data-icon='builder.unsaved']"
             )
         ).to_be_visible()
     finally:

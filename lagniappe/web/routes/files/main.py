@@ -234,7 +234,7 @@ def get_html(key, **kwargs):
 # @testable true
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_file_to_page
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_multiple_files_to_page_hides_existing_file_select
-# @tests tests_e2e/002_home/test_002n_file_consumer_routes.py::test_batch_page_upload_rejects_actor_without_ai_create_before_summary
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_page_editor_without_ai_create_is_rejected_before_batch_summary
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_text_file_renders_original_content_in_text_tab
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_image_shows_desktop_preview
 # @pair file:file-upload

@@ -262,14 +262,10 @@ def test_deferred_generation_overwrites_correlated_live_snapshots(monkeypatch):
 
     assert len(persisted) >= 4
     assert len({record["correlation_id"] for record in persisted}) == 1
-    assert all(
-        record["telemetry_id"] == "opaque-telemetry-id"
-        for record in persisted
-    )
+    assert all(record["telemetry_id"] == "opaque-telemetry-id" for record in persisted)
     assert persisted[0]["state"] == "running"
     assert any(
-        record["active_provider_stage"] == "initial"
-        for record in persisted[:-1]
+        record["active_provider_stage"] == "initial" for record in persisted[:-1]
     )
     assert persisted[-1]["state"] == "complete"
     assert persisted[-1]["active_provider_stage"] == "complete"
@@ -554,7 +550,9 @@ def test_ai_observability_dashboard_aggregation():
         {"name": "get_file", "count": 2},
         {"name": "search_entities", "count": 1},
     ]
-    workflow = next(group for group in dashboard["groups"] if group["field"] == "workflow")
+    workflow = next(
+        group for group in dashboard["groups"] if group["field"] == "workflow"
+    )
     assert {group["field"] for group in dashboard["groups"]} == {
         "workflow",
         "stage",
@@ -569,3 +567,52 @@ def test_ai_observability_dashboard_aggregation():
         {"name": "Model Repair", "count": 1},
         {"name": "Validation Failed", "count": 1},
     ]
+
+
+# @pairs ai-observability:job-correlation ai-observability:privacy
+def test_operation_diagnostic_payload_is_correlated_and_privacy_bounded():
+    created = datetime(2026, 1, 2, 3, 4, tzinfo=timezone.utc)
+    operation = {
+        "key": "job-key",
+        "telemetry_id": "telemetry-match",
+        "state": "complete",
+    }
+    records = [
+        {
+            "telemetry_id": "telemetry-match",
+            "correlation_id": "correlation",
+            "created": created,
+            "workflow": "ask",
+            "stage": "answer",
+            "prompt_contract_id": "ask-report",
+            "prompt_contract_version": 1,
+            "private_prompt": "must not leave core",
+        },
+        {
+            "telemetry_id": "telemetry-other",
+            "workflow": "organize",
+            "private_prompt": "unrelated",
+        },
+    ]
+
+    payload = observability.operation_diagnostic_payload(
+        operation,
+        records,
+        query_limit=2,
+    )
+
+    assert payload["job_id"] == "job-key"
+    assert payload["telemetry_id"] == "telemetry-match"
+    assert payload["ai_records_may_be_truncated"] is True
+    assert payload["ai_generations"] == [
+        {
+            "correlation_id": "correlation",
+            "created": created.isoformat(),
+            "workflow": "ask",
+            "stage": "answer",
+            "prompt_contract_id": "ask-report",
+            "prompt_contract_version": 1,
+            "telemetry_id": "telemetry-match",
+        }
+    ]
+    assert "private_prompt" not in str(payload)

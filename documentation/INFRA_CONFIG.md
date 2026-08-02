@@ -152,6 +152,11 @@ reconcile drift.
 | `dev_config` | `APP` + `DEV_CONFIG` | Merged development runtime settings. |
 | `test_config` | `APP` + `TEST_CONFIG` | Merged test runtime settings, including `BASE_URL`. |
 
+The managed testing profile enables activity analytics and AI observability so
+their owner-only HTTP contracts are deterministic in E2E runs. Explicit
+`TEST_CONFIG` values are applied afterward and can still disable either feature
+for focused configuration tests.
+
 `SOURCE_URL` is an optional application setting used by the Manual's Open
 Source card. Setup defaults it to the canonical Lagniappe repository and
 preserves an operator-authored repository, fork, tag, or commit URL on later

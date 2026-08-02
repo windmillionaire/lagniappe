@@ -17,11 +17,13 @@ import pytest
 from flask import Flask
 from flask.sessions import SecureCookieSessionInterface
 from playwright.sync_api import expect
+import yaml
 
-from config import SETTINGS
+from config import SETTINGS, recovery
 from lagniappe import CONFIG
-from lagniappe.core.definitions import AI, Fetch, General, Levels, Site
+from lagniappe.core.definitions import AI, Action, Fetch, General, Levels, Site
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools import database
 from testing.definitions import Categories, Groups, SitePages, Submissions, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.resources import HomePage, Page
@@ -61,7 +63,9 @@ def _assert_sign_out_button_in_user_header(settings_panel):
     user_actions = user_header.locator("[data-role='user-actions']")
     sign_out_button = user_actions.locator("button[data-action='logout']")
     expect(sign_out_button).to_be_visible()
-    expect(sign_out_button).to_have_attribute("data-route", re.compile(r"/users/logout$"))
+    expect(sign_out_button).to_have_attribute(
+        "data-route", re.compile(r"/users/logout$")
+    )
     expect(sign_out_button).to_contain_text("Sign out")
     user_fields_actions = settings_panel.locator(
         "[data-role='user-fields'] [data-role='user-actions']"
@@ -207,10 +211,10 @@ def _fetch_status(user, path, method="POST", data=None):
                 response = await send();
             }
 
-            return {
-                status: response.status,
-                text: (await response.text()).slice(0, 240),
-            };
+            const text = await response.text();
+            let parsed = text;
+            try { parsed = JSON.parse(text); } catch {}
+            return {status: response.status, text: text.slice(0, 240), data: parsed};
         }""",
         {"path": path, "method": method, "data": data or {}},
     )
@@ -299,9 +303,7 @@ def _session_page_key(user):
     app.config.update(SECRET_KEY=CONFIG.SECRET_KEY)
     serializer = SecureCookieSessionInterface().get_signing_serializer(app)
     cookie = next(
-        cookie
-        for cookie in user.page.context.cookies()
-        if cookie["name"] == "session"
+        cookie for cookie in user.page.context.cookies() if cookie["name"] == "session"
     )
     return serializer.loads(cookie["value"])[CONFIG.LOGIN_USER_PAGE_KEY]
 
@@ -434,9 +436,7 @@ def test_public_user_edits_document_without_ai_or_image_tools(limited_public_use
     post_data = response_info.value.request.post_data or ""
     assert json.loads(post_data)["client_id"]
     assert '"token"' not in post_data
-    saved_page = Entities.fetch_one(
-        scenario.entity.page.key, request=Fetch.direct()
-    )
+    saved_page = Entities.fetch_one(scenario.entity.page.key, request=Fetch.direct())
     assert text in (saved_page.properties.document.html or "")
     page.reload()
     editor = page.editor
@@ -444,9 +444,7 @@ def test_public_user_edits_document_without_ai_or_image_tools(limited_public_use
 
     insert_menu = Dropdown(editor.toolbar.locator("[title='Insert']")).open()
     expect(insert_menu.get_by_role("option", name="Link", exact=True)).to_be_visible()
-    expect(
-        insert_menu.get_by_role("option", name="Image", exact=True)
-    ).to_have_count(0)
+    expect(insert_menu.get_by_role("option", name="Image", exact=True)).to_have_count(0)
     expect(
         insert_menu.get_by_role("option", name="Generate Text", exact=True)
     ).to_have_count(0)
@@ -508,9 +506,7 @@ def _assert_routes_forbidden(user, routes, browser_failures):
 
 # @features public-users
 # @dimensions metered-actions restriction-gate
-def test_public_user_ai_actions_are_forbidden(
-    limited_public_user, browser_failures
-):
+def test_public_user_ai_actions_are_forbidden(limited_public_user, browser_failures):
     scenario = limited_public_user
     page_key = scenario.entity.page.urlsafe_key
     task_key = scenario.task.urlsafe_key
@@ -557,6 +553,43 @@ def test_public_user_ai_actions_are_forbidden(
         ],
         browser_failures,
     )
+
+
+# @pairs ai:batch-summary ai:access-gate ai:provider-boundary
+def test_page_editor_without_ai_create_is_rejected_before_batch_summary(
+    get_user,
+    browser_failures,
+):
+    owner = get_user(Users.OWNER)
+    user = get_user(Users.create_user, creator=owner)
+    page = user.entity.page
+    assert page.allowed(Action.EDIT, user=user.entity)
+    assert not user.entity.access(AI.CREATE)
+    user.go(SitePages.HOME)
+    path = f"/files/{page.urlsafe_key}/upload"
+
+    with browser_failures.expect_http_error(user, status=403, path=path):
+        result = user.page.evaluate(
+            """async (path) => {
+                const body = new FormData();
+                body.append("summarize", "on");
+                body.append("file-upload", new File(["one"], "one.txt"));
+                body.append("file-upload", new File(["two"], "two.txt"));
+                const response = await fetch(path, {
+                    method: "POST",
+                    credentials: "include",
+                    headers: {
+                        "X-CSRFToken": document.getElementById("token")?.value,
+                        "X-Lagniappe-Request": "true",
+                    },
+                    body,
+                });
+                return response.status;
+            }""",
+            path,
+        )
+
+    assert result == 403
 
 
 # @features public-users
@@ -609,9 +642,7 @@ def test_public_user_restricted_schedules_are_forbidden(
         },
     )
     assert metadata_update["status"] == 200
-    saved_page = Entities.fetch_one(
-        scenario.entity.page.key, request=Fetch.direct()
-    )
+    saved_page = Entities.fetch_one(scenario.entity.page.key, request=Fetch.direct())
     assert not saved_page.has("photo")
     assert not saved_page.has("files")
     assert {
@@ -680,9 +711,7 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     target_row = owner.locate(f"#table tr[data-key='{created_user.key}']")
     expect(target_row).to_be_visible()
     with owner.page.expect_navigation():
-        target_row.get_by_role(
-            "link", name=created_user.name, exact=True
-        ).click()
+        target_row.get_by_role("link", name=created_user.name, exact=True).click()
     expect(owner.page).to_have_title(re.compile(created_user.name))
     assert created_user_page_key in owner.page.url
 
@@ -827,12 +856,8 @@ def test_owner_can_reassign_and_remove_user_from_page(get_user):
     _submit_user_settings_and_wait_for_reload(owner, settings_panel)
 
     saved_user = Entities.USER.load(created_user.email)
-    saved_source_page = Entities.fetch_one(
-        source_page_key, request=Fetch.direct()
-    )
-    saved_target_page = Entities.fetch_one(
-        target_page_key, request=Fetch.direct()
-    )
+    saved_source_page = Entities.fetch_one(source_page_key, request=Fetch.direct())
+    saved_target_page = Entities.fetch_one(target_page_key, request=Fetch.direct())
     assert saved_source_page.user is None
     assert saved_user.page.key == target_page_key
     assert saved_target_page.user.email == created_user.email
@@ -850,9 +875,7 @@ def test_owner_can_reassign_and_remove_user_from_page(get_user):
 
     saved_user = Entities.USER.load(created_user.email)
     replacement_page = saved_user.page
-    saved_target_page = Entities.fetch_one(
-        target_page_key, request=Fetch.direct()
-    )
+    saved_target_page = Entities.fetch_one(target_page_key, request=Fetch.direct())
     assert saved_target_page.user is None
     assert replacement_page.key not in {source_page_key, target_page_key}
     assert replacement_page.user.email == created_user.email
@@ -998,6 +1021,7 @@ def test_site_settings_is_owner_only(get_user, browser_failures):
 
 # @features admin
 # @dimensions site-settings sections configuration-modal environment-variables service-providers external-links
+# @pairs admin:configuration-display admin:recovery-export admin:secrets admin:web-headers
 # @template home/admin.html::main
 # @template home/site_settings.html::site_settings
 def test_site_settings_sections_expand_help_and_configuration(get_user):
@@ -1067,13 +1091,39 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     expect(
         modal.element.get_by_role("link", name="Download Settings File")
     ).to_be_visible()
+    expect(modal.element).to_contain_text(recovery.REDACTED_VALUE)
+    download_link = modal.element.get_by_role("link", name="Download Settings File")
+    with owner.page.expect_response("**/reference/download-settings") as response_info:
+        with owner.page.expect_download() as download_info:
+            download_link.click()
+    response = response_info.value
+    download = download_info.value
+    downloaded = yaml.safe_load(Path(download.path()).read_text())
+    assert response.status == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.headers["pragma"] == "no-cache"
+    assert response.headers["content-type"].startswith("application/yaml")
+    assert downloaded["CONFIG_KIND"] == recovery.CONFIG_KIND
+    assert downloaded["CONFIG_SCHEMA_VERSION"] == recovery.CONFIG_SCHEMA_VERSION
+    live_deployment = database.get.site_deployment()
+    if live_deployment:
+        assert (
+            downloaded["DEPLOY_MAX_INSTANCES"]
+            == dict(live_deployment)["DEPLOY_MAX_INSTANCES"]
+        )
+    live_ai = database.get.site_ai()
+    if live_ai:
+        assert downloaded["AI_MODEL"] == dict(live_ai)["AI_MODEL"]
     modal.close()
 
 
 # @features admin
-# @dimensions deployment-settings metadata scaling-controls
+# @dimensions deployment-settings metadata scaling-controls validation
 # @template home/site_settings.html::site_settings
-def test_site_settings_deployment_form_saves_and_updates_summary(get_user):
+def test_site_settings_deployment_form_saves_and_updates_summary(
+    get_user,
+    browser_failures,
+):
     owner = get_user(Users.OWNER)
     _, settings_panel = _open_owner_site_settings(owner)
 
@@ -1121,6 +1171,85 @@ def test_site_settings_deployment_form_saves_and_updates_summary(get_user):
     expect(deployment.locator("[data-role='section-summary']")).to_contain_text(
         "2 max instances"
     )
+
+    with browser_failures.expect_http_error(
+        owner,
+        status=422,
+        path="/set-deployment-settings",
+    ):
+        rejected = _fetch_status(
+            owner,
+            "/set-deployment-settings",
+            data={**deployment_data, "DEPLOY_WORKER_COUNT": "0"},
+        )
+    assert rejected["status"] == 422
+    assert "Worker count" in rejected["text"]
+
+
+# @features admin
+# @dimensions ai-settings metadata validation
+# @template home/site_settings.html::site_settings
+def test_site_settings_ai_form_saves_current_models_through_route(
+    get_user,
+    browser_failures,
+):
+    owner = get_user(Users.OWNER)
+    _, settings_panel = _open_owner_site_settings(owner)
+    ai_models = _open_site_settings_section(settings_panel, "ai-models")
+    form = ai_models.locator("[data-role='ai-settings']")
+    expected = {
+        name: form.locator(f"[name='{name}']").input_value()
+        for name in (
+            "AI_MODEL",
+            "AI_UTILITY_MODEL",
+            "AI_IMAGE_MODEL",
+            "AI_LOCATION",
+        )
+    }
+
+    with owner.page.expect_response("**/set-ai-settings") as response_info:
+        form.locator("button[type='submit']").click()
+
+    response = response_info.value
+    assert response.status == 200
+    assert response.json()["ai_settings"] == expected
+    expect(form.locator("button[type='submit']")).to_contain_text(
+        "AI Model Settings Saved"
+    )
+    saved = dict(database.get.site_ai())
+    assert {name: saved[name] for name in expected} == expected
+
+    with browser_failures.expect_http_error(
+        owner,
+        status=422,
+        path="/set-ai-settings",
+    ):
+        rejected = _fetch_status(
+            owner,
+            "/set-ai-settings",
+            data={**expected, "AI_LOCATION": "not-global"},
+        )
+    assert rejected["status"] == 422
+    assert "global" in rejected["text"]
+
+
+# @pairs admin:site-update admin:success cache:current
+# @template home/site_settings.html::site_settings
+def test_site_maintenance_update_and_cache_refresh_use_real_routes(get_user):
+    owner = get_user(Users.OWNER)
+    _, settings_panel = _open_owner_site_settings(owner)
+    maintenance = _open_site_settings_section(settings_panel, "maintenance")
+
+    update = _fetch_status(owner, "/site-update", method="POST")
+    assert update["status"] == 200
+    assert update["data"]["migration_status"]["status"] == "current"
+
+    cache_button = maintenance.locator("[data-role='rebuild-cache']")
+    expect(cache_button).to_be_enabled()
+    with owner.page.expect_response("**/rebuild-cache") as response_info:
+        cache_button.click()
+    assert response_info.value.status == 200
+    expect(cache_button).to_contain_text("Cache Refreshed")
 
 
 # @features admin

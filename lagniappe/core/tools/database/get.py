@@ -283,7 +283,7 @@ def site_deployment():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008e_site_settings_routes.py::test_site_settings_loads_ai_settings_and_options
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
 # @features admin
 # @dimensions ai-settings metadata
 def site_ai():

@@ -4,7 +4,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from lagniappe.core.tools import deferred_job_adapters
+from lagniappe.core.definitions import FileConsumer, FileConsumerLimitError
+from lagniappe.core.tools import (
+    autofill_jobs,
+    deferred_job_adapters,
+    form_state,
+    notifications,
+    polling,
+)
 
 
 pytestmark = pytest.mark.unit
@@ -46,3 +53,298 @@ def test_lockless_create_page_autofill_keeps_revision_drift_guard(monkeypatch):
     target.autofill_revision = "revision-two"
     with pytest.raises(deferred_job_adapters.DeferredJobDriftError):
         deferred_job_adapters.AutofillAdapter().validate_apply(context)
+
+
+# @pairs sync:validation sync:document-only sync:client-identity forms:no-live-sync
+def test_sync_payload_validation_is_document_only_and_bounded():
+    invalid = {
+        "client_id": "form-contract-test",
+        "updates": [
+            {
+                "key": "page-key",
+                "sync_id": "page-hash:form-hash:form",
+                "update": "encoded-state",
+                "save": False,
+            }
+        ],
+    }
+    valid = {
+        "client_id": "document-contract-test",
+        "updates": [
+            {
+                "key": "page-key",
+                "sync_id": "page-hash:document",
+                "ydoc": "encoded-state",
+                "save": False,
+            }
+        ],
+    }
+
+    assert (
+        form_state.validate_sync_payload(invalid)
+        == "Only identified document widgets may use live sync."
+    )
+    assert form_state.validate_sync_payload(valid) is None
+    assert (
+        form_state.validate_sync_payload({"updates": []})
+        == "Sync payload missing client_id."
+    )
+    assert (
+        form_state.validate_sync_payload({"client_id": "x", "updates": [valid] * 65})
+        == "Sync payload updates must be a bounded list."
+    )
+    assert (
+        form_state.validate_sync_payload({"client_id": "x", "updates": [{}]})
+        == "Only identified document widgets may use live sync."
+    )
+
+
+# @pairs offline:replay-precondition forms:conflict-review
+def test_offline_replay_conflict_requires_stale_origin_fingerprint():
+    entity = SimpleNamespace(fingerprint="current")
+
+    assert form_state.offline_replay_conflicts(
+        entity,
+        {"offline": "True", "offline-fingerprint": "originating"},
+    )
+    assert not form_state.offline_replay_conflicts(
+        entity,
+        {"offline": "True", "offline-fingerprint": "current"},
+    )
+    assert not form_state.offline_replay_conflicts(
+        entity,
+        {"offline-fingerprint": "originating"},
+    )
+
+
+# @pairs deferred-jobs:form-lock deferred-jobs:quick-edit
+def test_form_field_membership_uses_the_attached_schema():
+    entity = SimpleNamespace(form=SimpleNamespace(schema=[{"id": "form-field"}]))
+
+    assert form_state.is_form_field(entity, "form-field")
+    assert not form_state.is_form_field(entity, "task-setting")
+
+
+# @pairs polling:channel polling:revision polling:permissions
+# @pairs notifications:personal-activity notifications:revision notifications:datastore-read-isolation
+def test_notification_channel_revision_uses_loaded_user_only():
+    user = SimpleNamespace(
+        fingerprint="unchanged-user-fingerprint",
+        permissions_fingerprint="unchanged-permissions",
+        notification_revision=4,
+    )
+
+    before = polling.channel_revision(
+        "notifications",
+        user,
+        site_fingerprint=lambda _path: (_ for _ in ()).throw(
+            AssertionError("notification revision read a site fingerprint")
+        ),
+    )
+    user.notification_revision += 1
+    after = polling.channel_revision("notifications", user)
+
+    assert before != after
+
+    fingerprints = []
+    home_before = polling.channel_revision(
+        "home",
+        user,
+        site_fingerprint=lambda path: fingerprints.append(path) or f"site:{path}",
+    )
+    user.permissions_fingerprint = "changed-permissions"
+    home_after = polling.channel_revision(
+        "home",
+        user,
+        site_fingerprint=lambda path: f"site:{path}",
+    )
+    assert home_before != home_after
+    assert fingerprints == [
+        "/",
+        "/categories/index",
+        "/projects/index",
+        "/pages/index",
+        "/tasks/index",
+    ]
+
+
+# @pairs polling:revision polling:batching deferred-jobs:datastore-read-isolation
+def test_operation_statuses_skip_current_jobs_and_batch_stale_jobs():
+    user = SimpleNamespace(operation_revision=9)
+    loaded = []
+
+    def statuses(keys, actor):
+        loaded.append((list(keys), actor))
+        return [{"key": key, "revision": 3} for key in keys]
+
+    stale = [
+        {
+            "id": f"operation:{index}",
+            "type": "operation",
+            "key": str(index),
+            "operation_revision": None,
+        }
+        for index in range(51)
+    ]
+    revision, projected = polling.operation_statuses(
+        stale,
+        user,
+        status_loader=statuses,
+    )
+    assert revision == 9
+    assert projected == {
+        str(index): {"key": str(index), "revision": 3} for index in range(51)
+    }
+    assert loaded == [([str(index) for index in range(50)], user), (["50"], user)]
+
+    loaded.clear()
+    revision, projected = polling.operation_statuses(
+        [{**stale[0], "operation_revision": 9}],
+        user,
+        status_loader=statuses,
+    )
+    assert revision == 9
+    assert projected == {}
+    assert loaded == []
+
+
+# @pairs deferred-jobs:form-lock polling:revision
+def test_form_lock_revision_is_independent_of_entity_fingerprint():
+    entity = SimpleNamespace(
+        urlsafe_key="page-key",
+        fingerprint="entity-fingerprint",
+        allowed=lambda _action, user=None: user == "editor",
+    )
+    descriptor = {
+        "id": "form-lock:page-key",
+        "type": "form-lock",
+        "key": entity.urlsafe_key,
+        "revision": "operation-key:5",
+    }
+    active_locks = {
+        entity.urlsafe_key: (
+            SimpleNamespace(scope="form-autofill"),
+            SimpleNamespace(urlsafe_key="operation-key", status_revision=6),
+        )
+    }
+
+    changed = polling.lock_result(
+        descriptor,
+        entity,
+        active_locks,
+        user="editor",
+    )
+    assert changed["status"] == "changed"
+    assert changed["revision"] == "operation-key:6"
+    assert changed["payload"]["locked"] is True
+
+    entity.fingerprint = "changed-entity-fingerprint"
+    current = polling.lock_result(
+        {**descriptor, "revision": "operation-key:6"},
+        entity,
+        active_locks,
+        user="editor",
+    )
+    assert current == {
+        "id": "form-lock:page-key",
+        "type": "form-lock",
+        "status": "unchanged",
+        "revision": "operation-key:6",
+        "poll_after_ms": 15000,
+    }
+
+
+# @pairs ai:autofill ai:deferred pages:autofill tasks:autofill
+def test_autofill_job_spec_contains_only_durable_inputs(monkeypatch):
+    class Task:
+        pass
+
+    monkeypatch.setattr(autofill_jobs.Entities, "TASK", Task)
+    entity = SimpleNamespace(urlsafe_key="page-key")
+    user = SimpleNamespace(urlsafe_key="user-key")
+    record = {"token": "signed", "filename": "context.pdf"}
+
+    spec = autofill_jobs.autofill_job_spec(
+        entity,
+        user,
+        {
+            "operation-id": "operation-id",
+            "autofill-description": "Use the attachment",
+            "mimetype": "application/pdf",
+        },
+        upload_record=record,
+    )
+
+    assert spec.actor is user
+    assert spec.inputs == {"target": entity}
+    assert spec.parameters["upload_record"] == record
+    assert spec.parameters["lock_target"] is True
+    assert spec.client["destination"] == "info:PageInfo"
+
+    task = Task()
+    task.hash = "task-hash"
+    task.page = SimpleNamespace(urlsafe_key="parent-page-key")
+    task_spec = autofill_jobs.autofill_job_spec(task, user, {})
+    assert task_spec.client == {
+        "key": "parent-page-key",
+        "source_widget": "TaskForm",
+        "destination": "task-hash:TaskForm",
+    }
+
+
+# @pairs ai:autofill ai:deferred notifications:autofill
+def test_autofill_upload_is_validated_before_job_start(monkeypatch):
+    started = []
+    error = FileConsumerLimitError(
+        "oversized.pdf is too large for AI autofill attachment.",
+        consumer=FileConsumer.AI_INLINE,
+        size=31,
+        max_bytes=30,
+    )
+    monkeypatch.setattr(
+        autofill_jobs.storage_assets,
+        "direct_upload_file",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(error),
+    )
+    monkeypatch.setattr(
+        autofill_jobs.DeferredJobs,
+        "start",
+        lambda spec: started.append(spec),
+    )
+
+    with pytest.raises(FileConsumerLimitError):
+        autofill_jobs.start_autofill_job(
+            SimpleNamespace(urlsafe_key="page-key"),
+            SimpleNamespace(urlsafe_key="user-key"),
+            {},
+            upload_record={"token": "signed", "filename": "oversized.pdf"},
+        )
+    assert started == []
+
+
+# @pairs notifications:task-queue notifications:create notifications:body
+def test_process_notification_requires_a_valid_user(monkeypatch):
+    user = SimpleNamespace(kind="user")
+    saved = []
+    monkeypatch.setattr(
+        notifications.Entities,
+        "fetch_one",
+        lambda key, request: user if key == "user-key" else None,
+    )
+    monkeypatch.setattr(
+        notifications.Entities.NOTIFICATION,
+        "create",
+        lambda data: SimpleNamespace(**data),
+    )
+    monkeypatch.setattr(
+        notifications.Entities, "save", lambda value: saved.append(value)
+    )
+
+    assert notifications.create_process_notification({}, "Ignored") is None
+    created = notifications.create_process_notification(
+        {"user_key": "user-key"},
+        "Completed",
+    )
+    assert created.parent is user
+    assert created.body == "Completed"
+    assert saved == [created]

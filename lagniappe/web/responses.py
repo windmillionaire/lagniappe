@@ -383,9 +383,7 @@ def page_permissions(page):
 def page_document_settings(entity):
     return entity_response(
         (
-            get_template_attribute("pages/document.html", "document_settings")(
-                entity
-            ),
+            get_template_attribute("pages/document.html", "document_settings")(entity),
             200,
         ),
         entity,
@@ -818,11 +816,7 @@ def delete_entity(entity=None, key=None):
     if not entity:
         return render_template("delete/dne.html", key=key), 200
 
-    kind = (
-        "user"
-        if entity.kind == "page" and entity.db.get("user")
-        else entity.kind
-    )
+    kind = "user" if entity.kind == "page" and entity.db.get("user") else entity.kind
 
     if kind == "form":
         instances = [
@@ -876,10 +870,8 @@ def reference_topic(section):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008f_recovery_settings.py::test_owner_download_is_complete_canonical_and_not_cacheable
-# @tests tests_e2e/008_users/test_008f_recovery_settings.py::test_inline_configuration_redacts_secrets
-# @features admin
-# @dimensions recovery-export configuration-display secrets web-headers
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+# @pairs admin:recovery-export admin:configuration-display admin:secrets admin:web-headers
 def reference_environment_variables(variables, download=False):
     if download:
         display_variables = variables
@@ -910,9 +902,8 @@ def reference_environment_variables(variables, download=False):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008f_recovery_settings.py::test_inline_configuration_redacts_secrets
-# @features admin
-# @dimensions configuration-display secrets
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+# @pairs admin:configuration-display admin:secrets
 def site_configuration(variables):
     from config.recovery import redact_settings_for_display
 

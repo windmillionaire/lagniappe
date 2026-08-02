@@ -15,37 +15,9 @@ from flask import Flask, g, session
 from flask_wtf.csrf import CSRFProtect
 
 from lagniappe import CONFIG
-from lagniappe.core.exceptions.request import sanitize_sentry_event
+from lagniappe.core.exceptions.request import filter_sentry_event, sanitize_sentry_event
 
 from .start import initialize_app
-
-
-# @testable false
-# @covered-by lagniappe/web/__init__.py::_filter_expected_sentry_errors
-# @reason exact exception matching is asserted through the public before-send filter
-def _is_expected_ai_document_limit(event):
-    exception = event.get("exception") if isinstance(event, dict) else None
-    values = exception.get("values") if isinstance(exception, dict) else None
-    if not isinstance(values, list):
-        return False
-    return any(
-        isinstance(value, dict)
-        and value.get("type") == "ClientError"
-        and "exceeds the supported page limit"
-        in str(value.get("value") or "").casefold()
-        for value in values
-    )
-
-
-# @testable true
-# @tests tests_e2e/001_site/test_001c_error_reporting.py::test_sentry_filter_drops_only_expected_ai_document_page_limit
-# @features error-reporting ai files
-# @dimensions expected-provider-failure pdf-page-limit privacy
-def _filter_expected_sentry_errors(event, hint):
-    """Drop known user-input limits, then sanitize every reported error."""
-    if _is_expected_ai_document_limit(event):
-        return None
-    return sanitize_sentry_event(event, hint)
 
 
 SENTRY_LOADED = False
@@ -60,7 +32,7 @@ if CONFIG.capture_errors:
         traces_sample_rate=1.0,
         profile_session_sample_rate=1.0,
         profile_lifecycle="trace",
-        before_send=_filter_expected_sentry_errors,
+        before_send=filter_sentry_event,
         before_send_transaction=sanitize_sentry_event,
         integrations=[GoogleGenAIIntegration()],
     )

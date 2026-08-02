@@ -9,6 +9,7 @@ from lagniappe.core.definitions import (
     enforce_file_consumer,
 )
 from lagniappe.core.tools import ai, database
+from lagniappe.core.tools.form_state import is_form_field, offline_replay_conflicts
 from lagniappe.core.definitions import PageAttributes, Action, Fetch, Resource
 from lagniappe.web.auth import (
     abort_public_user_action,
@@ -42,9 +43,7 @@ def _is_public_users_own_page(page):
 # @pair user-settings:relation-loading
 def _load_user_settings_groups(page):
     """Attach group relations needed by another user's settings selector."""
-    is_own_page = (
-        getattr(getattr(current_user, "page", None), "key", None) == page.key
-    )
+    is_own_page = getattr(getattr(current_user, "page", None), "key", None) == page.key
     if page.user and current_user.is_owner and not is_own_page:
         Entities.fetch_one(page.user, request=Fetch.direct())
     return page
@@ -98,12 +97,8 @@ def info(key, **kwargs):
 @permission(Resource.PAGE, Action.VIEW)
 def user_settings(key, **kwargs):
     page = _load_user_settings_groups(kwargs["entity"])
-    is_own_page = (
-        getattr(getattr(current_user, "page", None), "key", None) == page.key
-    )
-    if not page.user or not (
-        is_own_page or Resource.USER.allowed(Action.PERMISSIONS)
-    ):
+    is_own_page = getattr(getattr(current_user, "page", None), "key", None) == page.key
+    if not page.user or not (is_own_page or Resource.USER.allowed(Action.PERMISSIONS)):
         abort(403)
     return responses.user_settings(page)
 
@@ -280,18 +275,6 @@ def _is_offline_replay(form):
     return str(form.get("offline", "")).lower() == "true"
 
 
-# @testable true
-# @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_offline_form_replay_uses_originating_entity_fingerprint
-# @pairs offline:replay-precondition forms:conflict-review
-def _offline_replay_conflicts(entity, form):
-    expected = form.get("offline-fingerprint")
-    return bool(
-        _is_offline_replay(form)
-        and expected
-        and expected != entity.fingerprint
-    )
-
-
 # @testable false
 # @covered-by lagniappe/web/routes/pages/main.py::_page_form_submission_response
 # @covered-by lagniappe/web/routes/pages/main.py::_apply_page_submission
@@ -311,7 +294,7 @@ def update(key, **kwargs):
     elif not page.allowed(Action.EDIT):
         abort(403)
 
-    if _offline_replay_conflicts(page, request.form):
+    if offline_replay_conflicts(page, request.form):
         return responses.page_info(page, conflict=True)
 
     role = request.form.get("role")
@@ -453,7 +436,7 @@ def patch(key, **kwargs):
     value = patch_data["value"]
     column = patch_data.get("column")
 
-    if deferred_autofill.is_form_field(page, schema_id):
+    if is_form_field(page, schema_id):
         locked = deferred_autofill.locked_response(page)
         if locked:
             return locked

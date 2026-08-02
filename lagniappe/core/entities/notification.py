@@ -40,7 +40,7 @@ class Notification(Entity):
         return database.get.activity(parent, types=(cls.entity_kind,))
 
     # @testable true
-    # @tests tests_e2e/002_home/test_002i_home_activity.py::test_process_notification_uses_menu_not_home_notes
+    # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes
     # @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_notes_exclude_notifications
     # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_renders_target_and_preserves_pending_state
     # @pairs activity:create activity:body activity:parent

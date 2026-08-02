@@ -81,8 +81,7 @@ def test_error_context_sanitizer_redacts_nested_secrets_and_bounds_payloads():
             }
         ],
         "private_material": (
-            "-----BEGIN PRIVATE KEY-----\nprivate-key-secret\n"
-            "-----END PRIVATE KEY-----"
+            "-----BEGIN PRIVATE KEY-----\nprivate-key-secret\n-----END PRIVATE KEY-----"
         ),
         "body": {"safe-looking": "body-secret"},
         "long_text": "x" * 700,
@@ -171,9 +170,7 @@ def test_request_info_uses_bounded_structural_allowlist():
     assert info["query_parameters"]["field_count"] == 33
     assert len(info["query_parameters"]["fields"]) == 25
     assert info["query_parameters"]["truncated"] is True
-    assert {"Accept", "User-Agent", "X-Lagniappe-Request"} <= info[
-        "headers"
-    ].keys()
+    assert {"Accept", "User-Agent", "X-Lagniappe-Request"} <= info["headers"].keys()
     assert "url" not in info
     assert "view_args" not in info
     assert "form" not in info
@@ -394,7 +391,8 @@ def test_entities_delete_accepts_batch_and_dedupes(monkeypatch):
     )
     monkeypatch.setattr(
         mutation_executor.cache,
-        "delete", lambda to_delete: (
+        "delete",
+        lambda to_delete: (
             events.append("cache-delete"),
             captured.setdefault("cache_delete", to_delete),
         ),
@@ -564,13 +562,11 @@ def test_collect_user_delete_can_preserve_page(monkeypatch):
     assert categorized_page.model is None
     assert categorized_page.categories == [category]
     assert any(
-        effect.effect is MutationEffectType.DELETE
-        and effect.entity is categorized_user
+        effect.effect is MutationEffectType.DELETE and effect.entity is categorized_user
         for effect in plan.effects
     )
     assert any(
-        effect.effect is MutationEffectType.UNLINK
-        and effect.entity is categorized_page
+        effect.effect is MutationEffectType.UNLINK and effect.entity is categorized_page
         for effect in plan.effects
     )
     assert any(
@@ -624,8 +620,7 @@ def test_collect_task_delete_updates_task_list_owners(monkeypatch):
         linked_page,
     ]
     assert all(
-        survivor.property_updates == {"modified"}
-        for survivor in collector.survivors
+        survivor.property_updates == {"modified"} for survivor in collector.survivors
     )
 
 
@@ -711,7 +706,9 @@ def test_property_defaults_to_config_test_user():
 def test_agent_access_config_and_user_helpers(monkeypatch):
     monkeypatch.setattr(CONFIG, "AGENT_ACCESS_ENABLED", False, raising=False)
     monkeypatch.setattr(CONFIG, "AGENT_ACCESS_CODE", "secret-code", raising=False)
-    monkeypatch.setattr(CONFIG, "AGENT_ACCESS_EMAIL", "Agent@Example.COM", raising=False)
+    monkeypatch.setattr(
+        CONFIG, "AGENT_ACCESS_EMAIL", "Agent@Example.COM", raising=False
+    )
     monkeypatch.setattr(CONFIG, "AGENT_ACCESS_NAME", "Review Agent", raising=False)
 
     assert not agent_access.enabled()
@@ -734,7 +731,9 @@ def test_agent_access_config_and_user_helpers(monkeypatch):
 # @features login
 # @dimensions agent-access user groups user-page
 def test_agent_access_user_helper_creates_or_loads_user_with_groups(monkeypatch):
-    monkeypatch.setattr(CONFIG, "AGENT_ACCESS_EMAIL", "Agent@Example.COM", raising=False)
+    monkeypatch.setattr(
+        CONFIG, "AGENT_ACCESS_EMAIL", "Agent@Example.COM", raising=False
+    )
     monkeypatch.setattr(CONFIG, "AGENT_ACCESS_NAME", "Review Agent", raising=False)
 
     events = []
@@ -785,7 +784,9 @@ def test_agent_access_user_helper_creates_or_loads_user_with_groups(monkeypatch)
 
         @staticmethod
         def fetch_one(db, *, request):
-            events.append(("load-user", db["email"], request.depth is FetchDepth.NESTED))
+            events.append(
+                ("load-user", db["email"], request.depth is FetchDepth.NESTED)
+            )
             return FakeUser(db, [SimpleNamespace(name="Assigned Group")])
 
     def fake_get_user(email):
@@ -1326,10 +1327,7 @@ def test_record_entity_load_trace_includes_fetch_scope(monkeypatch):
         )
 
         assert g.entity_loads[0]["fetch_depth"] == "NESTED"
-        assert (
-            g.entity_loads[0]["fetch_reason"]
-            == "report-route-projection"
-        )
+        assert g.entity_loads[0]["fetch_reason"] == "report-route-projection"
         assert g.entity_loads[0]["fetch_stage"] == "roots"
 
 
@@ -1440,8 +1438,9 @@ def test_related_list_value_reports_unloaded_relation_without_loading(monkeypatc
     assert context["entity"]["kind"] == "page"
     assert context["property"]["id"] == "items"
     assert context["keys"] == ["task:Follow-up"]
-    assert "test_related_list_value_reports_unloaded_relation_without_loading" in (
-        context["caller"]
+    assert (
+        "test_related_list_value_reports_unloaded_relation_without_loading"
+        in (context["caller"])
     )
 
 
@@ -1847,3 +1846,39 @@ def test_database_filter_requires_rejects_invalid_hashes_type():
         match="hashes must be Restriction.UNRESTRICTED or a list",
     ):
         Filter().requires(None)
+
+
+# @features error-reporting ai files
+# @dimensions expected-provider-failure pdf-page-limit privacy
+def test_sentry_filter_drops_only_expected_ai_document_page_limit():
+    from lagniappe.core.exceptions.request import filter_sentry_event
+
+    expected = {
+        "exception": {
+            "values": [
+                {
+                    "type": "ClientError",
+                    "value": (
+                        "The document contains 1203 pages which exceeds the "
+                        "supported page limit of 1000."
+                    ),
+                }
+            ]
+        }
+    }
+    unrelated = {
+        "exception": {
+            "values": [
+                {
+                    "type": "ClientError",
+                    "value": "A different provider request was invalid.",
+                }
+            ]
+        },
+        "user": {"email": "private@example.test"},
+    }
+
+    assert filter_sentry_event(expected, {}) is None
+    filtered = filter_sentry_event(unrelated, {})
+    assert filtered is not None
+    assert "user" not in filtered

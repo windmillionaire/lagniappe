@@ -9,7 +9,6 @@ from playwright.sync_api import expect
 from config import SETTINGS
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.web.routes.process.main import _create_notification
 from testing.definitions import DueDates, Pages, SitePages, Users
 from testing.definitions.task_definitions import TaskDefinition
 from testing.elements import Buttons, FormElements, List, Modal
@@ -86,10 +85,6 @@ def _save_personal_task(user, name):
     return task.create()
 
 
-def _user_key(user):
-    return user.entity.urlsafe_key
-
-
 def _create_text_note_from_home(
     user, home, body, expect_network=True, visible_text=None, visibility=None
 ):
@@ -98,9 +93,7 @@ def _create_text_note_from_home(
     expect(form).to_be_visible()
     form.locator("textarea[name='body']").fill(body)
     if visibility:
-        form.locator(
-            f"input[name='visibility'][value='{visibility}']"
-        ).check()
+        form.locator(f"input[name='visibility'][value='{visibility}']").check()
     else:
         expect(
             form.locator("input[name='visibility'][value='private']")
@@ -122,9 +115,7 @@ def _create_photo_note_from_home(user, home, body, visibility="private"):
     form = home.user.locate(home.CREATE_NOTE_FORM)
     expect(form).to_be_visible()
     form.locator("textarea[name='body']").fill(body)
-    form.locator(
-        f"input[name='visibility'][value='{visibility}']"
-    ).check()
+    form.locator(f"input[name='visibility'][value='{visibility}']").check()
 
     with user.page.expect_file_chooser() as chooser_info:
         form.locator("[data-action='add-photo']").click()
@@ -272,9 +263,7 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
     expect(
         form.locator("input[name='visibility'][value='everyone']")
     ).not_to_be_attached()
-    expect(
-        form.locator("input[name='visibility'][value='private']")
-    ).to_be_checked()
+    expect(form.locator("input[name='visibility'][value='private']")).to_be_checked()
 
     private_body = _unique("Private Home note")
     form.locator("textarea[name='body']").fill(private_body)
@@ -331,8 +320,10 @@ def test_delete_activity_item_from_home(get_user):
 
     own_item.locator(Buttons.LP_DELETE).click()
     with user.page.expect_response(
-        lambda response: response.request.method == "DELETE"
-        and response.url.endswith(f"/activity/{own_note.urlsafe_key}")
+        lambda response: (
+            response.request.method == "DELETE"
+            and response.url.endswith(f"/activity/{own_note.urlsafe_key}")
+        )
     ):
         modal.delete()
     expect(own_item).not_to_be_visible()
@@ -376,24 +367,19 @@ def test_home_note_visibility_across_users(get_user):
     expect(_activity_item(owner_home, private_body)).to_be_visible()
 
 
-# @pairs activity:create activity:body activity:parent activity:task-queue
-# @pairs activity:html-stripping activity:notes-exclusion activity:load
-# @pairs activity:cached-response activity:notes-only
-# @pairs notes:load notes:cached-response notes:notes-only
+# @pairs activity:create activity:body activity:parent
+# @pairs activity:html-stripping activity:notes-exclusion
 # @pairs notifications:create notifications:body notifications:parent
-# @pairs notifications:task-queue notifications:html-stripping
+# @pairs notifications:html-stripping
 # @template notifications.html::item
-def test_process_notification_uses_menu_not_home_notes(get_user):
+def test_notification_channel_uses_menu_not_home_notes(get_user):
     user = get_user(Users.OWNER)
     note_body = _unique("Process notification control note")
     raw_body = f"<em>{_unique('Process notification complete')}</em>"
     visible_body = raw_body.replace("<em>", "").replace("</em>", "")
 
     _save_note(user, note_body)
-    _create_notification(
-        {"user_key": _user_key(user)},
-        raw_body,
-    )
+    _save_notification(user, raw_body)
 
     home = user.go(SitePages.HOME)
     home.activity_list
@@ -472,9 +458,9 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
     expect(report_option.locator("[data-role='report-summary']")).to_have_text(
         report_summary
     )
-    expect(
-        report_option.locator("[data-action='delete-notification']")
-    ).to_have_css("float", "right")
+    expect(report_option.locator("[data-action='delete-notification']")).to_have_css(
+        "float", "right"
+    )
 
 
 # @features notifications
@@ -518,8 +504,10 @@ def test_notification_menu_deletes_and_clears(get_user):
     )
 
     with user.page.expect_response(
-        lambda response: response.request.method == "DELETE"
-        and response.url.endswith("/notifications")
+        lambda response: (
+            response.request.method == "DELETE"
+            and response.url.endswith("/notifications")
+        )
     ):
         clear_all.click()
 
@@ -674,9 +662,9 @@ def test_offline_task_complete_replays_after_reload(get_user, browser_failures):
     user = get_user(Users.OWNER)
     task_name = _unique("Offline complete task")
     task = _save_personal_task(user, task_name)
-    expected_due_date = local_date_from_utc_datetime(
-        task.entity.due_date
-    ).date().isoformat()
+    expected_due_date = (
+        local_date_from_utc_datetime(task.entity.due_date).date().isoformat()
+    )
 
     home = user.go(SitePages.HOME)
     home = home.reload()

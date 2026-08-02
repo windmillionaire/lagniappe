@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as Entity } from '../entity.js?v=be1b1fb2';
-import '../core.js?v=be1b1fb2';
-import '../connectivity.js?v=be1b1fb2';
-import '../endpoints.js?v=be1b1fb2';
-import '../errors.js?v=be1b1fb2';
-import '../request.js?v=be1b1fb2';
-import '../utilities.js?v=be1b1fb2';
-import '../shell.js?v=be1b1fb2';
+import { E as Entity } from '../entity.js?v=b19dd33c';
+import '../core.js?v=b19dd33c';
+import '../connectivity.js?v=b19dd33c';
+import '../endpoints.js?v=b19dd33c';
+import '../errors.js?v=b19dd33c';
+import '../request.js?v=b19dd33c';
+import '../utilities.js?v=b19dd33c';
+import '../shell.js?v=b19dd33c';
 
 /**
  * @testable true

@@ -54,6 +54,32 @@ def _package_imports(path, package):
     return imports
 
 
+def _e2e_route_bypass_violations(path):
+    """Return route imports and decorator bypasses in one E2E module."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    violations = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "lagniappe.web.routes" or alias.name.startswith(
+                    "lagniappe.web.routes."
+                ):
+                    violations.append(f"{path}:{node.lineno} imports {alias.name}")
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            if module == "lagniappe.web.routes" or module.startswith(
+                "lagniappe.web.routes."
+            ):
+                violations.append(f"{path}:{node.lineno} imports {module}")
+            elif module == "lagniappe.web" and any(
+                alias.name == "routes" for alias in node.names
+            ):
+                violations.append(f"{path}:{node.lineno} imports lagniappe.web.routes")
+        elif isinstance(node, ast.Attribute) and node.attr == "__wrapped__":
+            violations.append(f"{path}:{node.lineno} accesses __wrapped__")
+    return violations
+
+
 def _runs_node(path):
     for node in ast.walk(ast.parse(path.read_text(), filename=str(path))):
         if not isinstance(node, ast.Call):
@@ -72,7 +98,8 @@ def _runs_node(path):
             isinstance(node.func, ast.Attribute)
             and isinstance(node.func.value, ast.Name)
             and node.func.value.id == "subprocess"
-            and node.func.attr in {
+            and node.func.attr
+            in {
                 "call",
                 "check_call",
                 "check_output",
@@ -243,10 +270,7 @@ def test_e2e_modules_do_not_cache_durable_setup_in_process_booleans():
             else:
                 continue
 
-            if not (
-                isinstance(value, ast.Constant)
-                and isinstance(value.value, bool)
-            ):
+            if not (isinstance(value, ast.Constant) and isinstance(value.value, bool)):
                 continue
 
             for target in targets:
@@ -265,10 +289,7 @@ def test_e2e_modules_do_not_replace_native_browser_fetch():
         tree = ast.parse(path.read_text(), filename=str(path))
         relative = path.relative_to(REPOSITORY_ROOT)
         for node in ast.walk(tree):
-            if not (
-                isinstance(node, ast.Constant)
-                and isinstance(node.value, str)
-            ):
+            if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
                 continue
             for offset, line in enumerate(node.value.splitlines()):
                 if E2E_NATIVE_FETCH_ASSIGNMENT.search(line):
@@ -277,6 +298,27 @@ def test_e2e_modules_do_not_replace_native_browser_fetch():
                     )
 
     assert violations == []
+
+
+def test_e2e_modules_do_not_import_or_bypass_route_functions():
+    """E2E route claims must traverse the managed server and decorator stack."""
+    violations = []
+    for path in _python_files(TESTING_ROOT / "tests_e2e"):
+        violations.extend(_e2e_route_bypass_violations(path))
+
+    assert violations == []
+
+
+def test_e2e_route_bypass_guard_rejects_synthetic_white_box_test(tmp_path):
+    path = tmp_path / "test_route_bypass.py"
+    path.write_text(
+        "from lagniappe.web.routes.home import site\nsite.site_update.__wrapped__()\n"
+    )
+
+    violations = _e2e_route_bypass_violations(path)
+
+    assert any("imports lagniappe.web.routes.home" in item for item in violations)
+    assert any("accesses __wrapped__" in item for item in violations)
 
 
 def test_web_routes_use_explicit_entity_fetch_boundaries():
@@ -288,6 +330,12 @@ def test_web_routes_use_explicit_entity_fetch_boundaries():
         for node in ast.walk(tree):
             if _entities_call(node, "load"):
                 violations.append(f"{relative}:{node.lineno} uses Entities.load")
+            elif (
+                _entities_call(node, "fetch") or _entities_call(node, "fetch_one")
+            ) and not any(keyword.arg == "request" for keyword in node.keywords):
+                violations.append(
+                    f"{relative}:{node.lineno} uses {node.func.attr} without request=Fetch..."
+                )
             elif _entities_call(node, "get") and any(
                 keyword.arg == "load"
                 and isinstance(keyword.value, ast.Constant)

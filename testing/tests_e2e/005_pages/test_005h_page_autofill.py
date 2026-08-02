@@ -52,12 +52,12 @@ def _run_notification_job(notification):
 # @pairs ai:autofill ai:deferred ai:attached-files ai:completion-refresh
 # @pairs pages:autofill pages:deferred
 # @pairs notifications:autofill notifications:deferred
-# @pairs deferred-jobs:form-lock deferred-jobs:reload
+# @pairs deferred-jobs:form-lock deferred-jobs:conflict deferred-jobs:reload
 # @pairs deferred-jobs:refresh deferred-jobs:form-schema
 # @pairs pages:refresh pages:form-schema
 # @template pages/info.html::info_form
 def test_page_autofill_runs_deferred_with_attached_file_context(
-    get_user, monkeypatch
+    get_user, monkeypatch, browser_failures
 ):
     user = get_user(Users.OWNER)
     page = Pages.test_page_autofill.get(user)
@@ -85,9 +85,7 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     expect(form.locator("[data-role='submit-group']")).not_to_be_attached()
     expect(form.locator("[data-role='autofill']")).not_to_be_attached()
     expect(form.locator("[data-role='autofill-submit-group']")).not_to_be_attached()
-    expect(
-        form.locator("textarea[name='autofill-description']")
-    ).not_to_be_attached()
+    expect(form.locator("textarea[name='autofill-description']")).not_to_be_attached()
     expect(form).to_have_attribute("data-autofill-probe", "mounted")
     expect(form.locator(f"[name='{FIELD_ID}']")).to_be_disabled()
 
@@ -96,8 +94,7 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
             return False
         payload = response.request.post_data_json or {}
         return any(
-            descriptor.get("type") == "form-lock"
-            and descriptor.get("key") == page.key
+            descriptor.get("type") == "form-lock" and descriptor.get("key") == page.key
             for descriptor in payload.get("subscriptions", [])
         )
 
@@ -118,6 +115,33 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     expect(form.locator("[data-role='submit-group']")).not_to_be_attached()
     expect(form.locator("[data-role='autofill']")).not_to_be_attached()
     expect(form.locator(f"[name='{FIELD_ID}']")).to_be_disabled()
+
+    update_path = f"/pages/{page.entity.urlsafe_key}/update"
+    original_name = page.entity.name
+    with browser_failures.expect_http_error(user, status=409, path=update_path):
+        locked_update = user.page.evaluate(
+            """async ({path, name}) => {
+                const body = new FormData();
+                body.set("name", name);
+                const response = await fetch(path, {
+                    method: "PUT",
+                    credentials: "include",
+                    headers: {
+                        "X-CSRFToken": document.getElementById("token")?.value,
+                        "X-Lagniappe-Request": "true",
+                    },
+                    body,
+                });
+                return {status: response.status, data: await response.json()};
+            }""",
+            {"path": update_path, "name": "Blocked while autofill owns the form"},
+        )
+    assert locked_update["status"] == 409
+    assert locked_update["data"]["locked"] is True
+    assert locked_update["data"]["scope"] == "form-autofill"
+    assert "changes were not saved" in locked_update["data"]["message"]
+    unchanged = Entities.fetch_one(page.entity.urlsafe_key, request=Fetch.direct())
+    assert unchanged.name == original_name
 
     from lagniappe.web import app as web_app
     from lagniappe.core.tools import deferred_job_adapters

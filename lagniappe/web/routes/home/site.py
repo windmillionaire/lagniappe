@@ -1,4 +1,3 @@
-from itertools import chain, islice
 import json
 
 from flask import abort, request, session, g
@@ -6,17 +5,21 @@ from flask_login import current_user
 from flask_wtf.csrf import generate_csrf
 
 from config import SETTINGS
-from config.ai_models import discover_model_options
 from config.ai_settings import normalize_ai_settings
-from config.constants import DEFAULT_DEPLOYMENT_SETTINGS
 from config.deployment import normalize_deployment_settings
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, database, site_image
+from lagniappe.core.tools import database, site_image
 from lagniappe.core.tools.ai_settings import runtime_ai_settings
 from lagniappe.core.tools.database import migrations as database_migrations
+from lagniappe.core.tools.site_admin import (
+    load_ai_settings_payload,
+    load_deployment_settings,
+    rebuild_application_cache,
+    run_site_updates,
+)
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
 from lagniappe.web.auth import clear_client_cache_invalidation, logged_in, permission
@@ -37,58 +40,6 @@ def _site_image_response(paths):
         for k, v in paths.items()
         if k != "version"
     }
-
-
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
-# @tests tests_e2e/008_users/test_008e_site_settings_routes.py::test_site_settings_loads_deployment_defaults_from_config
-# @features admin
-# @dimensions deployment-settings metadata config route
-def _deployment_settings():
-    defaults = {
-        key: getattr(CONFIG, key, value)
-        for key, value in DEFAULT_DEPLOYMENT_SETTINGS.items()
-    }
-    entity = database.get.site_deployment()
-    if entity:
-        defaults.update(
-            {
-                key: value
-                for key, value in dict(entity).items()
-                if key in DEFAULT_DEPLOYMENT_SETTINGS
-            }
-        )
-    return normalize_deployment_settings(defaults)
-
-
-# @testable true
-# @tests tests_e2e/008_users/test_008e_site_settings_routes.py::test_site_settings_loads_ai_settings_and_options
-# @features admin
-# @dimensions ai-settings metadata config route
-def _ai_settings():
-    return runtime_ai_settings(config=CONFIG)
-
-
-# @testable false
-# @covered-by lagniappe/web/routes/home/site.py::site_settings
-# @covered-by lagniappe/web/routes/home/site.py::set_ai_settings
-# @reason small response-shaping helper covered through route payload tests
-def _ai_settings_payload(settings=None):
-    settings = settings or _ai_settings()
-    model_options = discover_model_options(
-        project=CONFIG.GOOGLE_CLOUD_PROJECT,
-        location=settings["AI_LOCATION"],
-        credentials=CONFIG.google_credentials,
-        current_settings=settings,
-    )
-    return (
-        normalize_ai_settings(
-            settings,
-            current_settings=settings,
-            model_options=model_options,
-        ),
-        model_options,
-    )
 
 
 # @testable true
@@ -118,44 +69,27 @@ def offline():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
-# @tests tests_e2e/008_users/test_008e_site_settings_routes.py::test_rebuild_cache_requires_current_migrations
-# @features cache
-# @dimensions redis-connection migration-gate current pending
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_maintenance_update_and_cache_refresh_use_real_routes
+# @pairs cache:redis-connection cache:current
 @home.route("/rebuild-cache", methods=["POST"])
 @permission(Resource.SITE)
 def rebuild_cache():
-    migration_status = database_migrations.get_migration_status()
-    if not migration_status["cache_refresh_allowed"]:
+    result = rebuild_application_cache()
+    if not result.rebuilt:
         return responses.json_response(
-            {"migration_status": migration_status},
+            {"migration_status": result.migration_status},
             status=409,
         )
-
-    cache.delete_cache()
-
-    CHUNK_SIZE = 100
-    all_raw = chain(
-        database.get.all_models(),
-        database.get.all_instances(),
-        database.get.all_files(),
-        database.get.all_users(),
-    )
-
-    while chunk := list(islice(all_raw, CHUNK_SIZE)):
-        loaded = Entities.fetch(*chunk, request=Fetch.direct())
-        cache.update(*loaded, update=False)
-
     return responses.ok()
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008e_site_settings_routes.py::test_site_update_returns_migration_report_and_failure_status
-# @features admin
-# @dimensions site-update audit success failure pending running
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_maintenance_update_and_cache_refresh_use_real_routes
+# @pairs admin:site-update admin:success
 @home.route("/site-update", methods=["POST"])
 @permission(Resource.SITE)
 def site_update():
-    migration_status = database_migrations.run_data_migrations()
+    migration_status = run_site_updates()
     status = 200 if migration_status["status"] == "current" else 409
     return responses.json_response(
         {"migration_status": migration_status},
@@ -265,13 +199,13 @@ def site_settings():
     else:
         site_image_response = None
 
-    ai_settings, ai_model_options = _ai_settings_payload()
+    ai_settings, ai_model_options = load_ai_settings_payload(config=CONFIG)
 
     return responses.json_response(
         {
             "ai_settings": ai_settings,
             "ai_model_options": ai_model_options,
-            "deployment": _deployment_settings(),
+            "deployment": load_deployment_settings(config=CONFIG),
             "site_image": site_image_response,
             "service_providers": links,
             "migration_status": database_migrations.get_migration_status(),
@@ -281,11 +215,8 @@ def site_settings():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
-# @tests tests_e2e/008_users/test_008e_site_settings_routes.py::test_set_deployment_settings_rejects_invalid_payloads[invalid-scaling]
-# @tests tests_e2e/008_users/test_008e_site_settings_routes.py::test_set_deployment_settings_rejects_invalid_payloads[invalid-workers]
-# @tests tests_e2e/008_users/test_008e_site_settings_routes.py::test_set_deployment_settings_rejects_invalid_payloads[invalid-instances]
 # @features admin
-# @dimensions deployment-settings metadata validation route
+# @dimensions deployment-settings metadata validation
 @home.route("/set-deployment-settings", methods=["POST"])
 @permission(Resource.SITE)
 def set_deployment_settings():
@@ -301,17 +232,15 @@ def set_deployment_settings():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008e_site_settings_routes.py::test_set_ai_settings_saves_valid_payload
-# @tests tests_e2e/008_users/test_008e_site_settings_routes.py::test_set_ai_settings_rejects_invalid_payloads[invalid-model]
-# @tests tests_e2e/008_users/test_008e_site_settings_routes.py::test_set_ai_settings_rejects_invalid_payloads[invalid-location]
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
 # @features admin
-# @dimensions ai-settings validation route
+# @dimensions ai-settings validation
 @home.route("/set-ai-settings", methods=["POST"])
 @permission(Resource.SITE)
 def set_ai_settings():
     data = request.form if request.form else request.get_json(silent=True) or {}
-    current = _ai_settings()
-    _, model_options = _ai_settings_payload(current)
+    current = runtime_ai_settings(config=CONFIG)
+    _, model_options = load_ai_settings_payload(current, config=CONFIG)
 
     try:
         ai_settings = normalize_ai_settings(
@@ -344,9 +273,8 @@ def site_configuration():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @tests tests_e2e/008_users/test_008e_site_settings_routes.py::test_set_site_image_returns_static_image_paths
 # @features admin
-# @dimensions site-image-upload generated-images public-preview metadata route
+# @dimensions site-image-upload generated-images public-preview metadata
 @home.route("/set-site-image", methods=["POST"])
 @permission(Resource.SITE)
 def set_site_image():
@@ -419,9 +347,7 @@ def refresh_token():
 @home.route("/identity-config")
 def identity_config():
     g.NO_CACHE = True
-    return responses.json_response(
-        getattr(CONFIG, "IDENTITY_PLATFORM_CONFIG", {})
-    )
+    return responses.json_response(getattr(CONFIG, "IDENTITY_PLATFORM_CONFIG", {}))
 
 
 # @testable true
@@ -458,8 +384,7 @@ def update_session():
 def validate_user():
     data = request.get_json(silent=True) or {}
     cache_cleared = (
-        data.get("cacheCleared") is True
-        and data.get("responseCacheCleared") is True
+        data.get("cacheCleared") is True and data.get("responseCacheCleared") is True
     )
 
     if cache_cleared:

@@ -16,6 +16,7 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.tools import ai, database, dates, task_combine
+from lagniappe.core.tools.form_state import is_form_field, offline_replay_conflicts
 from lagniappe.web.auth import (
     abort_public_user_action,
     logged_in,
@@ -183,9 +184,7 @@ def move(key, **kwargs):
 def combine(key, **kwargs):
     task = kwargs["entity"]
     page_key = request.args.get("page")
-    page = (
-        Entities.fetch_one(page_key, request=Fetch.direct()) if page_key else None
-    )
+    page = Entities.fetch_one(page_key, request=Fetch.direct()) if page_key else None
     if not isinstance(page, Entities.PAGE) or not page.allowed(Action.VIEW):
         abort(404)
 
@@ -456,26 +455,16 @@ def _should_submit_task_form(active, role, task):
 
 
 # @testable true
-# @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_offline_form_replay_uses_originating_entity_fingerprint
-# @pairs offline:replay-precondition forms:conflict-review
-def _offline_replay_conflicts(entity, form):
-    expected = form.get("offline-fingerprint")
-    return bool(
-        str(form.get("offline", "")).lower() == "true"
-        and expected
-        and expected != entity.fingerprint
-    )
-
-
-# @testable true
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_task_from_home_page
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_complete_page_task
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_empty_form_is_readonly
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_partial_submission_omits_empty_fields
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_task_without_edit_controls
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_assigned_user_can_work_their_assigned_task
+# @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_task_offline_replay_rejects_a_stale_origin_fingerprint
 # @features tasks
 # @dimensions complete due-date readonly assignee permission-gates attached-form empty-fields partial-submission
+# @pairs tasks:no-mutation offline:replay-precondition forms:conflict-review
 @tasks.route("<key>/update", methods=["PUT", "GET"])
 @permission(Resource.TASK, Action.EDIT)
 def update(key, **kwargs):
@@ -484,7 +473,7 @@ def update(key, **kwargs):
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
 
-    if _offline_replay_conflicts(task, request.form):
+    if offline_replay_conflicts(task, request.form):
         return responses.page_task(task, conflict=True)
 
     active = request.form.getlist("active")
@@ -783,9 +772,7 @@ def patch(key, **kwargs):
     column = task_data.get("column")
     field = None
 
-    if deferred_autofill.is_form_field(task, schema_id) or (
-        schema_id == "completed" and task.form
-    ):
+    if is_form_field(task, schema_id) or (schema_id == "completed" and task.form):
         locked = deferred_autofill.locked_response(task)
         if locked:
             return locked

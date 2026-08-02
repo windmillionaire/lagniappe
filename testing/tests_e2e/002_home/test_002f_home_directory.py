@@ -14,17 +14,14 @@ Related Files:
 from datetime import datetime, timedelta, timezone
 import re
 from urllib.parse import urlparse
+from uuid import uuid4
 
 import pytest
-from flask import Flask
 from playwright.sync_api import expect
-from werkzeug.exceptions import NotFound
 
 from config import SETTINGS, constants
+from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database.core import DATA, KINDS
-from lagniappe.web import app as lagniappe_app
-from lagniappe.web import auth as web_auth
-from lagniappe.web.routes.analytics import main as analytics_main
 from testing.definitions import SitePages, Users
 
 
@@ -55,6 +52,53 @@ def _save_analytics_event(label, created):
     )
     DATA.datastore.put(event)
     return key
+
+
+def _save_ai_record(telemetry_id, created):
+    key = DATA.datastore.allocate_ids(
+        DATA.datastore.key(KINDS.ai_observability.value), 1
+    )[0]
+    record = DATA.datastore.entity(key=key)
+    record.update(
+        {
+            "correlation_id": f"correlation-{telemetry_id}",
+            "telemetry_id": telemetry_id,
+            "created": created,
+            "updated": created,
+            "workflow": "organize",
+            "stage": "planning",
+            "prompt_contract_id": "organize-report",
+            "prompt_contract_version": 1,
+            "state": "complete",
+            "active_provider_stage": "structured_final",
+            "resolved_model": "managed-test-model",
+            "success": True,
+            "provider_requests": 1,
+            "private_payload": "must not be exported",
+        }
+    )
+    DATA.datastore.put(record)
+    return key
+
+
+def _analytics_request(user, path, method="GET"):
+    return user.page.evaluate(
+        """async ({path, method}) => {
+            const response = await fetch(path, {
+                method,
+                credentials: "include",
+                headers: {
+                    "X-CSRFToken": document.getElementById("token")?.value || "",
+                    "X-Lagniappe-Request": "true",
+                },
+            });
+            const text = await response.text();
+            let data = text;
+            try { data = JSON.parse(text); } catch {}
+            return {status: response.status, data};
+        }""",
+        {"path": path, "method": method},
+    )
 
 
 # @features home
@@ -218,214 +262,67 @@ def test_analytics_dashboard_owner_filter_and_retention_clear(
     assert DATA.datastore.get(recent_key) is None
 
 
-# @pair ai-observability:independent-flags
-# @pair ai-observability:ai-only
 # @pair ai-observability:independent-clear
+# @pair ai-observability:ai-only
+# @pair ai-observability:independent-flags
 # @pair analytics:page-tracking
-@pytest.mark.e2e
-def test_ai_observability_dashboard_flags_and_clears_are_independent(monkeypatch):
-    app = Flask(__name__)
-    captured = []
-    real_render_template = analytics_main.render_template
-    ai_records = [
-        {
-            "workflow": "ask",
-            "stage": "answer",
-            "prompt_contract_id": "ask-report",
-            "prompt_contract_version": 1,
-            "success": True,
-        }
-    ]
-    monkeypatch.setattr(
-        analytics_main,
-        "render_template",
-        lambda template, **context: captured.append((template, context)) or context,
-    )
-    monkeypatch.setattr(
-        analytics_main,
-        "CONFIG",
-        type("AIOnlyConfig", (), {"ANALYTICS": False, "AI_OBSERVABILITY": True})(),
-    )
-    monkeypatch.setattr(
-        analytics_main,
-        "_events",
-        lambda *args, **kwargs: pytest.fail("AI-only page queried activity records"),
-    )
-    monkeypatch.setattr(analytics_main, "_ai_records", lambda period: ai_records)
-
-    with app.test_request_context("/analytics/?period=30d"):
-        body, status = analytics_main.index.__wrapped__()
-    assert status == 200
-    assert captured[-1][0] == "analytics/index.html"
-    assert body["analytics_enabled"] is False
-    assert body["dashboard"] is None
-    assert body["ai_observability_enabled"] is True
-    assert body["ai_dashboard"]["generation_count"] == 1
-    with lagniappe_app.test_request_context("/analytics/?period=30d"):
-        rendered = real_render_template("analytics/index.html", **body)
-    assert 'data-role="ai-observability"' in rendered
-    assert 'data-role="analytics-summary"' not in rendered
-    assert "Delete AI Generation Records" in rendered
-    assert "Delete Activity Records" not in rendered
-
-    with app.test_request_context("/analytics/track", method="POST"):
-        with pytest.raises(NotFound):
-            analytics_main.track()
-
-    deleted = []
-    monkeypatch.setattr(
-        analytics_main,
-        "CONFIG",
-        type("BothConfig", (), {"ANALYTICS": True, "AI_OBSERVABILITY": True})(),
-    )
-    monkeypatch.setattr(
-        analytics_main,
-        "_delete_events",
-        lambda retention: deleted.append(("activity", retention)) or 2,
-    )
-    monkeypatch.setattr(
-        analytics_main,
-        "_delete_ai_records",
-        lambda retention: deleted.append(("ai", retention)) or 3,
-    )
-    monkeypatch.setattr(
-        analytics_main.DeferredJobs,
-        "delete_terminal",
-        lambda *, before: deleted.append(("jobs", before)) or 4,
-    )
-
-    with app.test_request_context("/analytics/clear/all", method="DELETE"):
-        analytics_main.clear_records.__wrapped__("all")
-    assert deleted == [("activity", "all")]
-
-    with app.test_request_context("/analytics/ai/clear/all", method="DELETE"):
-        response, status = analytics_main.clear_ai_records.__wrapped__("all")
-    assert status == 200
-    assert response.get_json() == {
-        "dataset": "ai",
-        "deleted": 3,
-        "jobs_deleted": 4,
-        "retention": "all",
-        "label": "Delete All Records",
-    }
-    assert deleted == [("activity", "all"), ("ai", "all"), ("jobs", None)]
-
-
 # @pair ai-observability:job-correlation
 # @pair deferred-jobs:diagnostics
 # @template analytics/index.html::ai_observability
 @pytest.mark.e2e
-def test_ai_operation_ids_and_json_diagnostics_are_correlated(monkeypatch):
-    job_id = "opaque-report-organize-job"
-    telemetry_id = "opaque-job-telemetry"
-    operation = {
-        "key": job_id,
-        "type": "report-organize",
-        "actor": "Analytics Owner",
-        "status": "running",
-        "phase_label": "Checking context",
-        "attempt": 1,
-        "elapsed_seconds": 6788,
-        "recovering": True,
-        "telemetry_id": telemetry_id,
-        "input_refs": {"report": {"kind": "report", "id": "opaque-report-key"}},
-    }
-    matching_generation = {
-        "correlation_id": "matching-generation",
-        "telemetry_id": telemetry_id,
-        "workflow": "organize",
-        "stage": "planning",
-        "state": "running",
-        "active_provider_stage": "tool",
-        "resolved_model": "gemini-test",
-        "provider_requests": 5,
-        "created": datetime(2026, 7, 19, 10, tzinfo=timezone.utc),
-        "private_payload": "must not be exported",
-    }
-    unrelated_generation = {
-        **matching_generation,
-        "correlation_id": "unrelated-generation",
-        "telemetry_id": "different-telemetry",
-    }
-    records = [matching_generation, unrelated_generation]
-
-    monkeypatch.setattr(
-        analytics_main,
-        "CONFIG",
-        type(
-            "AIOnlyConfig",
-            (),
-            {"ANALYTICS": False, "AI_OBSERVABILITY": True},
-        )(),
+def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
+    get_user,
+    browser_failures,
+):
+    owner = get_user(Users.OWNER)
+    telemetry_id = f"analytics-{uuid4().hex}"
+    activity_key = _save_analytics_event("AI Clear Control", datetime.now(timezone.utc))
+    ai_key = _save_ai_record(telemetry_id, datetime.now(timezone.utc))
+    job = Entities.DEFERRED_JOB.create(
+        {
+            "actor": owner.entity,
+            "job_type": "report-organize",
+            "status": "succeeded",
+            "idempotency_key": telemetry_id,
+            "dispatch_state": "complete",
+            "telemetry_id": telemetry_id,
+            "inputs": {"report": {"kind": "report", "id": "opaque-report-key"}},
+            "progress": {"phase": "finalizing"},
+        }
     )
-    monkeypatch.setattr(
-        analytics_main.DeferredJobs,
-        "recent",
-        lambda **_kwargs: [operation],
+    Entities.save(job)
+
+    owner.go(SitePages.HOME)
+    response = owner.page.goto(f"{SETTINGS.test_config['BASE_URL']}/analytics/")
+    assert response.ok
+    expect(owner.locate("[data-role='ai-observability']")).to_be_visible()
+    expect(owner.locate("[data-role='analytics-summary']")).to_be_visible()
+    expect(owner.page.locator("body")).to_contain_text(job.urlsafe_key)
+    expect(owner.page.locator("body")).to_contain_text("Delete AI Generation Records")
+
+    diagnostic_path = f"/analytics/ai/operations/{job.urlsafe_key}.json"
+    diagnostic = _analytics_request(owner, diagnostic_path)
+    assert diagnostic["status"] == 200
+    assert diagnostic["data"]["job_id"] == job.urlsafe_key
+    assert diagnostic["data"]["operation"]["input_refs"]["report"]["id"] == (
+        "opaque-report-key"
     )
-    monkeypatch.setattr(analytics_main, "_ai_records", lambda _period: records)
+    assert len(diagnostic["data"]["ai_generations"]) == 1
+    assert "must not be exported" not in str(diagnostic["data"])
 
-    with lagniappe_app.test_request_context("/analytics/?period=30d"):
-        rendered, status = analytics_main.index.__wrapped__()
+    missing_path = "/analytics/ai/operations/missing-job.json"
+    with browser_failures.expect_http_error(owner, status=404, path=missing_path):
+        missing = _analytics_request(owner, missing_path)
+    assert missing["status"] == 404
 
-    assert status == 200
-    assert rendered.count(job_id) >= 2
-    assert 'data-role="deferred-operation-id"' in rendered
-    assert 'data-role="deferred-operation-json"' in rendered
-    assert 'data-role="ai-generation-job-id"' in rendered
-    assert "…organize-job" in rendered
-    assert f"/analytics/ai/operations/{job_id}.json" in rendered
-    assert "Delete AI Generation Records" in rendered
-    assert "Delete Records Older Than 7 Days" in rendered
-
-    with lagniappe_app.test_request_context(f"/analytics/ai/operations/{job_id}.json"):
-        response, status = analytics_main.operation_diagnostic.__wrapped__(job_id)
-
-    payload = response.get_json()
-    assert status == 200
-    assert payload["job_id"] == job_id
-    assert payload["operation"]["input_refs"]["report"]["id"] == ("opaque-report-key")
-    assert [record["correlation_id"] for record in payload["ai_generations"]] == [
-        "matching-generation"
-    ]
-    serialized = response.get_data(as_text=True)
-    assert "must not be exported" not in serialized
-    assert "unrelated-generation" not in serialized
-
-    class Owner:
-        is_authenticated = True
-        permissions_fingerprint = "analytics-owner"
-
-        @staticmethod
-        def has_permission(_resource, _requested):
-            return True
-
-    loaded_entity_ids = []
-
-    def load_owner(entity_id=None):
-        loaded_entity_ids.append(entity_id)
-        return Owner(), None
-
-    monkeypatch.setattr(web_auth, "_load_request_context", load_owner)
-    monkeypatch.setattr(
-        web_auth.database,
-        "site_fingerprint",
-        lambda _path: "analytics-diagnostics",
-    )
-    with lagniappe_app.test_request_context(f"/analytics/ai/operations/{job_id}.json"):
-        wrapped_response, wrapped_status = analytics_main.operation_diagnostic(
-            job_id=job_id
-        )
-
-    assert wrapped_status == 200
-    assert wrapped_response.get_json()["job_id"] == job_id
-    assert loaded_entity_ids == [None]
-
-    with lagniappe_app.test_request_context(
-        "/analytics/ai/operations/missing-job.json"
-    ):
-        with pytest.raises(NotFound):
-            analytics_main.operation_diagnostic.__wrapped__("missing-job")
+    cleared = _analytics_request(owner, "/analytics/ai/clear/all", method="DELETE")
+    assert cleared["status"] == 200
+    assert cleared["data"]["dataset"] == "ai"
+    assert cleared["data"]["deleted"] >= 1
+    assert cleared["data"]["jobs_deleted"] >= 1
+    assert DATA.datastore.get(ai_key) is None
+    assert DATA.datastore.get(activity_key) is not None
+    assert DATA.datastore.get(job.key) is None
 
 
 # @features manual
@@ -496,8 +393,7 @@ def test_manual_security_section_loads(get_user):
 # @style manual.codeShell
 # @style manual.codeToolbar
 # @style manual.copyButton
-# @features manual
-# @dimensions command-copy mobile-overflow
+# @pair manual:command-copy
 @pytest.mark.e2e
 def test_manual_installation_commands_are_copyable_and_scroll_on_mobile(
     get_user,
@@ -537,9 +433,10 @@ def test_manual_installation_commands_are_copyable_and_scroll_on_mobile(
     ).locator("[data-role='manual-command-copy']")
     copy_button.click()
     expect(copy_button).to_have_text("Copied!")
-    assert anonymous.page.evaluate(
-        "() => navigator.clipboard.readText()"
-    ) == "gcloud auth login"
+    assert (
+        anonymous.page.evaluate("() => navigator.clipboard.readText()")
+        == "gcloud auth login"
+    )
 
     command = clone_commands.first
     expect(command).to_have_css("overflow-x", "auto")

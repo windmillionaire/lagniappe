@@ -92,9 +92,7 @@ _AUTH_VALUE_PATTERN = re.compile(
     r"\b(?:Bearer|Basic)\s+[A-Za-z0-9._~+/=-]+",
     re.IGNORECASE,
 )
-_JWT_PATTERN = re.compile(
-    r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b"
-)
+_JWT_PATTERN = re.compile(r"\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b")
 _SECRET_ASSIGNMENT_PATTERN = re.compile(
     r"""(?ix)
     (
@@ -268,9 +266,7 @@ def extract_request_info():
         "route": _sanitize_text(rule.rule, limit=MAX_CONTEXT_STRING_LENGTH)
         if rule
         else None,
-        "route_parameters": sorted(rule.arguments)[:MAX_CONTEXT_ITEMS]
-        if rule
-        else [],
+        "route_parameters": sorted(rule.arguments)[:MAX_CONTEXT_ITEMS] if rule else [],
         "query_parameters": _summarize_parameters(request.args),
         "body_metadata": {
             "content_type": _sanitize_text(
@@ -342,3 +338,31 @@ def sanitize_sentry_event(event, _hint=None):
             sanitized[key] = sanitize_error_context(sanitized[key])
 
     return sanitized
+
+
+# @testable false
+# @covered-by lagniappe/core/exceptions/request.py::filter_sentry_event
+# @reason exact exception matching is asserted through the public before-send filter
+def _is_expected_ai_document_limit(event):
+    exception = event.get("exception") if isinstance(event, Mapping) else None
+    values = exception.get("values") if isinstance(exception, Mapping) else None
+    if not isinstance(values, list):
+        return False
+    return any(
+        isinstance(value, Mapping)
+        and value.get("type") == "ClientError"
+        and "exceeds the supported page limit"
+        in str(value.get("value") or "").casefold()
+        for value in values
+    )
+
+
+# @testable true
+# @tests tests_unit/test_001_test_general_and_utilities.py::test_sentry_filter_drops_only_expected_ai_document_page_limit
+# @features error-reporting ai files
+# @dimensions expected-provider-failure pdf-page-limit privacy
+def filter_sentry_event(event, hint=None):
+    """Drop known user-input limits, then sanitize every reported error."""
+    if _is_expected_ai_document_limit(event):
+        return None
+    return sanitize_sentry_event(event, hint)

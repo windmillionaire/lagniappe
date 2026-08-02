@@ -1,75 +1,11 @@
 """E2E coverage for the unified polling contract."""
 
-from types import SimpleNamespace
-
 import pytest
 
 from testing.definitions import Pages, SitePages, Users
 
 
 pytestmark = pytest.mark.e2e
-
-
-# @pairs notifications:personal-activity notifications:revision notifications:datastore-read-isolation
-# @source lagniappe/web/routes/home/poll.py::_channel_revision
-def test_notification_channel_revision_comes_from_loaded_user(monkeypatch):
-    from lagniappe.web.routes.home import poll as poll_routes
-
-    monkeypatch.setattr(
-        poll_routes.database,
-        "site_fingerprint",
-        lambda _path: (_ for _ in ()).throw(
-            AssertionError("notification revision read a site fingerprint")
-        ),
-    )
-    user = SimpleNamespace(
-        fingerprint="unchanged-user-fingerprint",
-        permissions_fingerprint="unchanged-permissions",
-        notification_revision=4,
-    )
-
-    before = poll_routes._channel_revision("notifications", user)
-    user.notification_revision += 1
-    after = poll_routes._channel_revision("notifications", user)
-
-    assert before != after
-
-
-# @features polling deferred-jobs
-# @dimensions personal-activity revision datastore-read-isolation batching
-# @source lagniappe/web/routes/home/poll.py::_operation_statuses
-def test_operation_revision_skips_quiet_job_reads(monkeypatch):
-    from lagniappe.web.routes.home import poll as poll_routes
-
-    user = SimpleNamespace(operation_revision=9)
-    loaded = []
-
-    def statuses(keys, actor):
-        loaded.append((list(keys), actor))
-        return [{"key": key, "revision": 3} for key in keys]
-
-    monkeypatch.setattr(poll_routes.DeferredJobs, "statuses", statuses)
-    stale = [
-        {
-            "id": "operation:one",
-            "type": "operation",
-            "key": "one",
-            "operation_revision": None,
-        }
-    ]
-    revision, projected = poll_routes._operation_statuses(stale, user)
-
-    assert revision == 9
-    assert projected == {"one": {"key": "one", "revision": 3}}
-    assert loaded == [(["one"], user)]
-
-    loaded.clear()
-    current = [{**stale[0], "operation_revision": 9}]
-    revision, projected = poll_routes._operation_statuses(current, user)
-
-    assert revision == 9
-    assert projected == {}
-    assert loaded == []
 
 
 def poll(user, subscriptions):
@@ -193,9 +129,7 @@ def test_poll_endpoint_batches_entity_changes(get_user, browser_failures):
         )
         assert malformed_document["status"] == 422
 
-        malformed_revision = poll(
-            owner, [{**descriptor, "revision": {"nested": True}}]
-        )
+        malformed_revision = poll(owner, [{**descriptor, "revision": {"nested": True}}])
         assert malformed_revision["status"] == 422
 
         oversized = poll(

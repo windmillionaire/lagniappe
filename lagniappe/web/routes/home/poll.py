@@ -1,18 +1,17 @@
 """Versioned adaptive polling for mounted browser state."""
 
-import hashlib
-import json
-
 from flask import request
 from flask_login import current_user
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, database
-from lagniappe.core.tools.deferred_jobs import (
-    DeferredJobs,
-    deferred_job_lock_descriptors,
+from lagniappe.core.tools import cache
+from lagniappe.core.tools.deferred_jobs import deferred_job_lock_descriptors
+from lagniappe.core.tools.polling import (
+    channel_revision as _channel_revision,
+    lock_result as _project_lock_result,
+    operation_statuses as _operation_statuses,
 )
 from lagniappe.web import responses
 from lagniappe.web.auth import logged_in
@@ -42,17 +41,6 @@ CHANNELS = frozenset(
         "tool-reports",
     }
 )
-PERSONAL_CHANNELS = frozenset({"notifications", "starred", "tool-reports"})
-CHANNEL_REVISION_PATHS = {
-    "home": (
-        "/",
-        "/categories/index",
-        "/projects/index",
-        "/pages/index",
-        "/tasks/index",
-    ),
-    "tool-reports": ("/reports/index",),
-}
 POLL_AFTER_MS = {
     "entity": 15_000,
     "channel": 15_000,
@@ -137,10 +125,7 @@ def _descriptors(payload):
                 )
                 or (
                     generation is not None
-                    and (
-                        not isinstance(generation, str)
-                        or len(generation) > 128
-                    )
+                    and (not isinstance(generation, str) or len(generation) > 128)
                 )
                 or (
                     presence_digest is not None
@@ -169,13 +154,10 @@ def _descriptors(payload):
             item["key"] = descriptor["key"]
             if subscription_type == "operation":
                 operation_revision = descriptor.get("operation_revision")
-                if (
-                    operation_revision is not None
-                    and (
-                        isinstance(operation_revision, bool)
-                        or not isinstance(operation_revision, int)
-                        or operation_revision < 0
-                    )
+                if operation_revision is not None and (
+                    isinstance(operation_revision, bool)
+                    or not isinstance(operation_revision, int)
+                    or operation_revision < 0
                 ):
                     return None
                 item["operation_revision"] = operation_revision
@@ -194,48 +176,6 @@ def _descriptors(payload):
     ):
         return None
     return client_id, normalized, list(dict.fromkeys(closed))
-
-
-# @testable true
-# @tests tests_e2e/001_site/test_001f_edited_entities.py::test_poll_endpoint_batches_entity_changes
-# @tests tests_e2e/001_site/test_001f_edited_entities.py::test_notification_channel_revision_comes_from_loaded_user
-# @pairs polling:channel polling:revision polling:permissions
-# @pairs notifications:personal-activity notifications:revision notifications:datastore-read-isolation
-def _channel_revision(channel, user):
-    """Return an opaque durable revision scoped to the current viewer."""
-    entity_revision = getattr(user, "fingerprint", None)
-    if not entity_revision:
-        modified = getattr(user, "modified", None)
-        entity_revision = modified.isoformat() if modified else "unknown"
-    paths = (
-        ()
-        if channel == "notifications"
-        else CHANNEL_REVISION_PATHS.get(
-            channel,
-            ("/" if channel == "home" else f"/{channel}/index",),
-        )
-    )
-    durable_revisions = [database.site_fingerprint(path) for path in paths]
-    permissions = getattr(
-        user,
-        "authorization_fingerprint",
-        getattr(user, "permissions_fingerprint", entity_revision),
-    )
-    source = json.dumps(
-        {
-            "channel": channel,
-            "durable": durable_revisions,
-            "personal": (
-                int(getattr(user, "notification_revision", 0) or 0)
-                if channel == "notifications"
-                else entity_revision if channel in PERSONAL_CHANNELS else None
-            ),
-            "permissions": permissions,
-        },
-        separators=(",", ":"),
-        sort_keys=True,
-    )
-    return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
 # @testable false
@@ -295,37 +235,11 @@ def _entity_result(descriptor, entity, *, ingress=False):
     return _revision_result(descriptor, entity.fingerprint, payload)
 
 
-# @testable true
-# @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_poll_form_lock_revision_is_independent_of_entity_fingerprint
-# @pairs deferred-jobs:form-lock polling:revision
-def _lock_result(descriptor, entity, active_locks):
-    if not entity or not entity.allowed(Action.VIEW, user=current_user):
-        return _result(descriptor, "unavailable")
-    active = active_locks.get(descriptor["key"])
-    if not active:
-        return _revision_result(descriptor, "unlocked", {"locked": False})
-    lock, job = active
-    revision = f"{job.urlsafe_key}:{int(job.status_revision or 0)}"
-    return _revision_result(
-        descriptor,
-        revision,
-        {
-            "key": descriptor["key"],
-            "locked": True,
-            "scope": lock.scope,
-            "operation": job.urlsafe_key,
-            "revision": int(job.status_revision or 0),
-        },
-    )
-
-
 # @testable false
 # @covered-by lagniappe/web/routes/home/poll.py::poll
 # @reason document permission and Redis projection are exercised through route coverage
 def _document_result(descriptor, entity, client_id):
-    document_id = (getattr(entity, "sync_ids", {}) or {}).get("document", {}).get(
-        "id"
-    )
+    document_id = (getattr(entity, "sync_ids", {}) or {}).get("document", {}).get("id")
     if (
         not entity
         or not entity.allowed(Action.VIEW, user=current_user)
@@ -355,34 +269,6 @@ def _document_result(descriptor, entity, client_id):
 
 
 # @testable true
-# @tests tests_e2e/001_site/test_001f_edited_entities.py::test_operation_revision_skips_quiet_job_reads
-# @features polling deferred-jobs
-# @dimensions personal-activity revision datastore-read-isolation batching
-def _operation_statuses(descriptors, user):
-    """Load only operations invalidated by the request user's durable cursor."""
-    operation_revision = int(getattr(user, "operation_revision", 0) or 0)
-    changed = [
-        descriptor
-        for descriptor in descriptors
-        if descriptor["type"] == "operation"
-        and descriptor.get("operation_revision") != operation_revision
-    ]
-    statuses = {}
-    operation_keys = [descriptor["key"] for descriptor in changed]
-    for offset in range(0, len(operation_keys), 50):
-        statuses.update(
-            {
-                status["key"]: status
-                for status in DeferredJobs.statuses(
-                    operation_keys[offset : offset + 50],
-                    user,
-                )
-            }
-        )
-    return operation_revision, statuses
-
-
-# @testable true
 # @tests tests_e2e/001_site/test_001f_edited_entities.py::test_poll_endpoint_batches_entity_changes
 # @tests tests_e2e/002_home/test_002o_deferred_jobs.py::test_poll_operation_is_owner_safe
 # @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_presence_appears_and_clears
@@ -406,7 +292,9 @@ def poll():
     ]
     entities = {
         entity.urlsafe_key: entity
-        for entity in Entities.fetch(*dict.fromkeys(entity_keys), request=Fetch.direct())
+        for entity in Entities.fetch(
+            *dict.fromkeys(entity_keys), request=Fetch.direct()
+        )
     }
     lock_entities = [
         entities.get(descriptor["key"])
@@ -443,10 +331,11 @@ def poll():
                     ingress=True,
                 )
             elif subscription_type == "form-lock":
-                result = _lock_result(
+                result = _project_lock_result(
                     descriptor,
                     entities.get(descriptor["key"]),
                     active_locks,
+                    user=current_user,
                 )
             elif subscription_type == "channel":
                 revision = _channel_revision(descriptor["channel"], current_user)

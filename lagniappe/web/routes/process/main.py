@@ -7,33 +7,13 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import dates, filters, task_queue
+from lagniappe.core.tools.notifications import create_process_notification
 from lagniappe.core.tools.deferred_jobs import (
     DeferredJobInfrastructureError,
     DeferredJobs,
 )
 from lagniappe.core.tools.ingress import IngressService
 from . import process
-
-
-# @testable true
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_process_notification_uses_menu_not_home_notes
-# @features activity notifications
-# @dimensions create body task-queue
-def _create_notification(payload, body):
-    """Create a notification entity for the user's polled notification channel."""
-    user_key = payload.get("user_key")
-    if not user_key:
-        return
-
-    user = Entities.fetch_one(
-        user_key,
-        request=Fetch.direct(),
-    )
-    if not user or user.kind != "user":
-        return
-
-    notification = Entities.NOTIFICATION.create({"parent": user, "body": body})
-    Entities.save(notification)
 
 
 # Validate OIDC token from Cloud Tasks
@@ -149,10 +129,7 @@ def uncomplete_task():
     payload = authenticate_task(request)
     if payload is None:
         return make_response("Unauthorized", 401)
-    if (
-        not payload.get("key")
-        or not set(payload).issubset({"key", "next_due_date"})
-    ):
+    if not payload.get("key") or not set(payload).issubset({"key", "next_due_date"}):
         return jsonify({"success": False, "error": "Invalid task payload."}), 400
 
     task = None
@@ -228,9 +205,8 @@ def ingress():
     payload = authenticate_task(request)
     if payload is None:
         return make_response("Unauthorized", 401)
-    if (
-        not set(payload).issubset({"key", "timezone", "user_key"})
-        or not all(payload.get(key) for key in ("key", "user_key"))
+    if not set(payload).issubset({"key", "timezone", "user_key"}) or not all(
+        payload.get(key) for key in ("key", "user_key")
     ):
         return jsonify({"success": False, "error": "Invalid ingress payload."}), 400
 
@@ -251,7 +227,7 @@ def ingress():
             return jsonify({"success": True}), 200
 
         if outcome.state == "completed":
-            _create_notification(
+            create_process_notification(
                 payload,
                 f"Data import complete for {service.entity.name}",
             )

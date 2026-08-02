@@ -120,7 +120,7 @@ class Pending(DBProperty):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
-# @tests tests_e2e/002_home/test_002i_home_activity.py::test_process_notification_uses_menu_not_home_notes
+# @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes
 # @features activity notes notifications
 # @dimensions body html-stripping
 class Body(DBProperty):
