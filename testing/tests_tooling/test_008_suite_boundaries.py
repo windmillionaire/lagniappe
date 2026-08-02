@@ -49,6 +49,12 @@ E2E_INLINE_LAYOUT_ASSIGNMENT = re.compile(
     re.VERBOSE,
 )
 E2E_BROWSER_STORAGE_ACCESS = re.compile(r"\b(?:localStorage|sessionStorage)\b")
+E2E_SYNTHETIC_LIFECYCLE_DISPATCH = re.compile(
+    r"""dispatchEvent\s*\(\s*new\s+(?:Event|CustomEvent)\s*\(
+        \s*['"](?:focus|online|offline)['"]
+    """,
+    re.VERBOSE,
+)
 E2E_SYNTHETIC_INPUT_EVENTS = {
     "pointercancel",
     "pointerdown",
@@ -59,6 +65,7 @@ E2E_SYNTHETIC_INPUT_EVENTS = {
     "touchmove",
     "touchstart",
 }
+E2E_SYNTHETIC_LIFECYCLE_EVENTS = {"focus", "offline", "online"}
 E2E_DIRECT_AI_HELPERS = {
     "complete_ask_report",
     "complete_organize_submissions",
@@ -203,6 +210,54 @@ def _e2e_browser_storage_violations(path):
             line = node.lineno + node.value[: match.start()].count("\n")
             violations.append(
                 f"{path}:{line} references {match.group(0)} directly"
+            )
+
+    return violations
+
+
+def _e2e_wait_shortcut_violations(path):
+    """Return fixed Python polling and fabricated lifecycle events."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    violations = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.While):
+            for child in ast.walk(node):
+                if not isinstance(child, ast.Call):
+                    continue
+                target = child.func
+                name = (
+                    target.id
+                    if isinstance(target, ast.Name)
+                    else target.attr
+                    if isinstance(target, ast.Attribute)
+                    else None
+                )
+                if name in {"sleep", "wait_for_timeout"}:
+                    violations.append(
+                        f"{path}:{child.lineno} polls in Python with {name}"
+                    )
+
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "dispatch_event"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+            and node.args[0].value.lower() in E2E_SYNTHETIC_LIFECYCLE_EVENTS
+        ):
+            violations.append(
+                f"{path}:{node.lineno} dispatches synthetic "
+                f"{node.args[0].value.lower()} lifecycle event"
+            )
+
+        if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+            continue
+        for match in E2E_SYNTHETIC_LIFECYCLE_DISPATCH.finditer(node.value):
+            line = node.lineno + node.value[: match.start()].count("\n")
+            violations.append(
+                f"{path}:{line} dispatches synthetic browser lifecycle event"
             )
 
     return violations
@@ -446,6 +501,15 @@ def test_e2e_support_does_not_access_browser_storage_directly():
     assert violations == []
 
 
+def test_e2e_support_does_not_poll_in_python_or_dispatch_lifecycle_events():
+    """Automated waits use browser conditions and native lifecycle triggers."""
+    violations = []
+    for path in _python_files(*E2E_BROWSER_INTERACTION_ROOTS):
+        violations.extend(_e2e_wait_shortcut_violations(path))
+
+    assert violations == []
+
+
 def test_e2e_browser_storage_guard_rejects_white_box_access(tmp_path):
     path = tmp_path / "test_browser_storage.py"
     path.write_text(
@@ -475,6 +539,24 @@ def test_e2e_interaction_guard_rejects_synthetic_shortcuts(tmp_path):
     assert any(
         "dispatches synthetic pointer/touch input" in item for item in violations
     )
+
+
+def test_e2e_wait_guard_rejects_python_polling_and_lifecycle_dispatch(tmp_path):
+    path = tmp_path / "test_wait_shortcuts.py"
+    path.write_text(
+        "while not ready():\n"
+        "    page.wait_for_timeout(100)\n"
+        "    sleep(0.1)\n"
+        'page.dispatch_event("focus")\n'
+        'page.evaluate("window.dispatchEvent(new Event(\'online\'))")\n'
+    )
+
+    violations = _e2e_wait_shortcut_violations(path)
+
+    assert any("polls in Python with wait_for_timeout" in item for item in violations)
+    assert any("polls in Python with sleep" in item for item in violations)
+    assert any("dispatches synthetic focus" in item for item in violations)
+    assert any("synthetic browser lifecycle event" in item for item in violations)
 
 
 def test_e2e_modules_do_not_import_or_bypass_route_functions():

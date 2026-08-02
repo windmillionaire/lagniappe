@@ -539,12 +539,12 @@ Acceptance criteria:
 
 ### E2E-H13 — Replace fixed waits and Python polling where event waits exist
 
-- [ ] Consolidate offline replay polling on a retrying browser condition rather
+- [x] Consolidate offline replay polling on a retrying browser condition rather
   than a Python loop plus `wait_for_timeout(100)`.
-- [ ] Prefer a visible history/network event over repeatedly querying Datastore.
-- [ ] Test expiration with an already-expired artifact or controlled clock
+- [x] Prefer a visible history/network event over repeatedly querying Datastore.
+- [x] Test expiration with an already-expired artifact or controlled clock
   rather than sleeping for two seconds.
-- [ ] Use real focus/online events where Playwright can produce them, and avoid
+- [x] Use real focus/online events where Playwright can produce them, and avoid
   manually dispatching a second copy.
 
 Candidates:
@@ -558,6 +558,15 @@ Direct `/poll` requests in `001_site/test_001f_edited_entities.py` and
 `002_home/test_002o_deferred_jobs.py` may be correct when the poll protocol is
 the explicit subject. A visible reconciliation story should normally let the
 application perform its own poll.
+
+Resolved 2026-08-02. Offline sync queue checks now share one retrying browser
+condition with failure diagnostics instead of Python deadline loops. Task
+history waits on its committed update and visible history request, while the
+live signed-URL contract uses a controlled past issuance timestamp. Offline
+health coverage uses reload and Playwright's native connectivity transition;
+exact headless focus plumbing remains in the JavaScript suite. A tooling guard
+rejects Python polling loops and synthetic focus/online/offline dispatch from
+automated E2E and support code.
 
 Acceptance criteria:
 

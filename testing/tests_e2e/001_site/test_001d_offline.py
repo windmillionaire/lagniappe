@@ -18,91 +18,16 @@ Related Files:
 import pytest
 
 from testing.definitions import Projects, SitePages, Users
-from testing.utility import expect_successful_response, scoped_browser_route
+from testing.utility import (
+    expect_successful_response,
+    scoped_browser_route,
+    wait_for_offline_sync_records,
+)
 from playwright.sync_api import expect
 
 pytestmark = pytest.mark.e2e
 
 OFFLINE_INDICATOR = "[data-role='offline']"
-OFFLINE_SYNC_RECORD_WAIT = """
-async ({ minimum, exact }) => {
-    const count = await new Promise((resolve) => {
-        const request = indexedDB.open("offline-db", 5);
-        request.onerror = () => resolve(0);
-        request.onupgradeneeded = () => {
-            const db = request.result;
-            if (!db.objectStoreNames.contains("sync")) {
-                db.createObjectStore("sync", { keyPath: "sync_id" });
-            }
-            if (!db.objectStoreNames.contains("mutations")) {
-                db.createObjectStore("mutations", { keyPath: "id" });
-            }
-        };
-        request.onsuccess = () => {
-            const db = request.result;
-            if (!db.objectStoreNames.contains("sync")) {
-                db.close();
-                resolve(0);
-                return;
-            }
-            const tx = db.transaction("sync", "readonly");
-            const countRequest = tx.objectStore("sync").count();
-            countRequest.onsuccess = () => resolve(countRequest.result);
-            countRequest.onerror = () => resolve(0);
-            tx.oncomplete = () => db.close();
-            tx.onerror = () => {
-                db.close();
-                resolve(0);
-            };
-        };
-    });
-    return exact === null ? count >= minimum : count === exact;
-}
-"""
-
-
-def trigger_focus_sync(user):
-    user.page.evaluate("window.dispatchEvent(new Event('focus'));")
-
-
-def suppress_online_event_sync(user):
-    user.page.add_init_script(
-        """
-        (() => {
-            if (window.__LP_ONLINE_LISTENER_WRAPPED__) return;
-            window.__LP_ONLINE_LISTENER_WRAPPED__ = true;
-            window.__LP_SUPPRESS_ONLINE_EVENT__ = true;
-
-            const addEventListener = window.addEventListener.bind(window);
-            window.addEventListener = (type, listener, options) => {
-                if (type !== "online") {
-                    return addEventListener(type, listener, options);
-                }
-
-                return addEventListener(
-                    type,
-                    function wrappedOnlineListener(event) {
-                        if (window.__LP_SUPPRESS_ONLINE_EVENT__) return;
-                        if (typeof listener === "function") {
-                            return listener.call(this, event);
-                        }
-                        return listener?.handleEvent?.(event);
-                    },
-                    options,
-                );
-            };
-        })();
-        """
-    )
-
-
-def wait_for_offline_sync_records(user, *, minimum=None, exact=None):
-    user.page.wait_for_function(
-        OFFLINE_SYNC_RECORD_WAIT,
-        arg={"minimum": minimum, "exact": exact},
-    )
-
-
 # @features offline
 # @dimensions indicator browser-state
 def test_offline_indicator_toggles(get_user, browser_failures):
@@ -145,13 +70,13 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
     Flow:
         1. Navigate home while online
         2. Fail /ping while leaving the browser online
-        3. Trigger a focus sync event and verify the indicator becomes visible
-        4. Restore /ping and trigger another focus sync event
+        3. Reload and verify the failed health check makes the indicator visible
+        4. Restore /ping and reload again
         5. Verify the indicator hides again
 
     Verifies:
         - Failed server health checks mark the view offline
-        - A later sync event can restore online state without a test-only hook
+        - A later browser lifecycle sync restores online state
     """
     user = get_user(Users.OWNER)
     user.go(SitePages.HOME)
@@ -179,7 +104,7 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
                 text="Failed to load resource: net::ERR_CONNECTION_FAILED",
                 source_path="/ping",
             ):
-                trigger_focus_sync(user)
+                user.reload()
                 expect(indicator).to_be_visible()
 
     assert len(failed_pings) == 1
@@ -189,7 +114,7 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
         method="HEAD",
         path="/ping",
     ):
-        trigger_focus_sync(user)
+        user.reload()
     expect(indicator).to_be_hidden()
 
 
@@ -197,21 +122,20 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
 # @dimensions indicator browser-state server-health reconnect
 def test_offline_poll_recovers_without_online_event(get_user, browser_failures):
     """
-    Test that offline recovery does not depend solely on the online event.
+    Test that retry polling recovers after the native online event fails.
 
     Flow:
-        1. Navigate home with the app's online listener suppressed
-        2. Allow production polling, then set the browser context offline
+        1. Navigate home and allow production polling
+        2. Set the browser context offline
         3. Verify the offline indicator becomes visible
-        4. Restore the browser context without delivering online to the app
-        5. Verify the retry loop pings the server and hides the indicator
+        4. Restore the browser context and fail that native reconnect ping
+        5. Verify the retry loop succeeds without a second online event
 
     Verifies:
         - Offline state schedules a server health retry
-        - A later successful ping restores online UI without an online event
+        - A later successful ping restores online UI without another event
     """
     user = get_user(Users.OWNER)
-    suppress_online_event_sync(user)
     user.go(SitePages.HOME)
     user.page.evaluate("window.__TESTING__ = false;")
 
@@ -220,8 +144,45 @@ def test_offline_poll_recovers_without_online_event(get_user, browser_failures):
         user.offline = True
         expect(indicator).to_be_visible()
 
-    user.offline = False
-    expect(indicator).to_be_hidden(timeout=8000)
+    failed_pings = []
+
+    def fail_ping(route):
+        assert route.request.method == "HEAD"
+        failed_pings.append(route.request)
+        route.abort("connectionfailed")
+
+    with expect_successful_response(
+        user.page,
+        method="HEAD",
+        path="/ping",
+        timeout=8000,
+    ):
+        with scoped_browser_route(user.page.context, "**/ping", fail_ping):
+            with browser_failures.expect(
+                user,
+                kind="requestfailed",
+                method="HEAD",
+                path="/ping",
+                failure="net::ERR_CONNECTION_FAILED",
+            ):
+                with browser_failures.expect(
+                    user,
+                    kind="console",
+                    console_type="error",
+                    text="Failed to load resource: net::ERR_CONNECTION_FAILED",
+                    source_path="/ping",
+                ):
+                    with user.page.expect_event(
+                        "requestfailed",
+                        predicate=lambda request: request.method == "HEAD"
+                        and request.url.endswith("/ping"),
+                    ):
+                        user.offline = False
+                    expect(indicator).to_be_visible()
+                    assert user.page.evaluate("navigator.onLine") is True
+
+    assert len(failed_pings) == 1
+    expect(indicator).to_be_hidden()
 
 
 # @features offline

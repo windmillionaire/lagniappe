@@ -12,7 +12,7 @@ from .network import (
     multipart_form_fields,
     scoped_browser_route,
 )
-from .offline import wait_for_offline_mutations
+from .offline import wait_for_offline_mutations, wait_for_offline_sync_records
 from .polling import expect_poll_result
 from .reconnect import expect_reconnect_refresh
 from .test_file import TestFile
@@ -26,6 +26,7 @@ __all__ = [
     "multipart_form_fields",
     "scoped_browser_route",
     "wait_for_offline_mutations",
+    "wait_for_offline_sync_records",
     "TestFile",
     "TestResults",
 ]

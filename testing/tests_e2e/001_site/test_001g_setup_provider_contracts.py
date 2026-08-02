@@ -5,8 +5,9 @@ uniquely named, test-prefixed resources, clean them in ``finally`` blocks, and
 must remain sequential with every other E2E or managed-server session.
 """
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-import time
+from urllib.parse import parse_qs, urlparse
 from uuid import uuid4
 from xml.etree import ElementTree
 
@@ -22,6 +23,7 @@ from google.cloud import (
     resourcemanager_v3,
     storage,
 )
+from google.cloud.storage import _signing as storage_signing
 from google.cloud.datastore.query import PropertyFilter
 
 from config import constants
@@ -186,7 +188,7 @@ def test_runtime_iam_policy_and_effective_forbidden_permissions():
     }
 
 
-def test_runtime_datastore_and_all_storage_bucket_operations():
+def test_runtime_datastore_and_all_storage_bucket_operations(monkeypatch):
     """Exercise the exact Datastore and four-bucket object operations used at runtime."""
     probe_id = _probe_id()
     datastore_client = DATA.datastore
@@ -234,8 +236,19 @@ def test_runtime_datastore_and_all_storage_bucket_operations():
                 tampered_suffix = "0" if signed_url[-1] != "0" else "1"
                 tampered_url = f"{signed_url[:-1]}{tampered_suffix}"
                 assert requests.get(tampered_url, timeout=30).status_code == 403
-                expired_url = assets.get_signed_url(blob.name, expires_in=1)
-                time.sleep(2)
+                issued_at = datetime.now(timezone.utc) - timedelta(minutes=1)
+                request_timestamp = issued_at.strftime("%Y%m%dT%H%M%SZ")
+                datestamp = issued_at.strftime("%Y%m%d")
+                with monkeypatch.context() as controlled_clock:
+                    controlled_clock.setattr(
+                        storage_signing,
+                        "get_v4_now_dtstamps",
+                        lambda: (request_timestamp, datestamp),
+                    )
+                    expired_url = assets.get_signed_url(blob.name, expires_in=1)
+                expired_query = parse_qs(urlparse(expired_url).query)
+                assert expired_query["X-Goog-Date"] == [request_timestamp]
+                assert expired_query["X-Goog-Expires"] == ["1"]
                 expired_response = requests.get(expired_url, timeout=30)
                 assert expired_response.status_code == 400
                 expired_error = ElementTree.fromstring(expired_response.content)

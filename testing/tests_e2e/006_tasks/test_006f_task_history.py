@@ -10,7 +10,6 @@ Verified against:
 
 import re
 from datetime import datetime, timezone
-from time import monotonic, sleep
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -20,6 +19,7 @@ from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from testing.definitions import ModelTasks, Pages, Tasks, Users
 from testing.resources import Task
+from testing.utility import expect_successful_response
 
 pytestmark = pytest.mark.e2e
 
@@ -45,26 +45,14 @@ def _complete_then_uncomplete(task):
     assert task.completed
     task.uncomplete()
     assert not task.completed
-    _wait_for_history(task)
     history_toggles = task.element.locator("button[lp-control='history']")
     expect(history_toggles).to_have_count(2)
     expect(
         task.element.locator("button[lp-control='history']:visible")
     ).to_have_count(1)
     expect(task.element.locator(Task.TASK_HISTORY)).to_have_count(1)
-
-
-def _wait_for_history(task, timeout=10):
-    deadline = monotonic() + timeout
-    while monotonic() < deadline:
-        entity = Entities.fetch_one(task.key, request=Fetch.direct())
-        if entity and entity.has_history and entity.history:
-            task.entity = entity
-            return entity
-        sleep(0.2)
-
-    entity = Entities.fetch_one(task.key, request=Fetch.direct())
-    raise AssertionError(f"Task history was not persisted for {task.key}: {entity.db}")
+    task.user.reload()
+    task.wait_for_load()
 
 
 def _open_history(task):
@@ -72,7 +60,12 @@ def _open_history(task):
     task._close_task()
     history_toggle = task.element.locator(Task.TASK_HISTORY_TOGGLE)
     expect(history_toggle).to_be_visible()
-    history_toggle.click()
+    with expect_successful_response(
+        task.user.page,
+        method="GET",
+        path=f"/tasks/{task.key}/history",
+    ):
+        history_toggle.click()
 
     history = task.element.locator(Task.TASK_HISTORY)
     expect(history).to_be_visible()
@@ -178,7 +171,6 @@ def test_task_history_appears_after_completion_cycle(get_user):
     task.entity = completed
     user.reload()
     task.wait_for_load()
-    _wait_for_history(task)
     expect(task.element.locator("[data-role='saved-files']")).to_have_count(0)
     history = _open_history(task)
 
@@ -246,6 +238,8 @@ def test_task_form_field_fills_from_latest_history(get_user):
     task = Tasks.test_history_fill_task.get(user)
     user.go(task)
 
+    _complete_then_uncomplete(task)
+
     history_fill_requests = []
     user.page.on(
         "request",
@@ -253,8 +247,6 @@ def test_task_form_field_fills_from_latest_history(get_user):
         if "/history/latest-submission" in request.url
         else None,
     )
-
-    _complete_then_uncomplete(task)
 
     task_form = task.task_form
 

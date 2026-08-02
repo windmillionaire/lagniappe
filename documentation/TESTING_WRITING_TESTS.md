@@ -237,6 +237,27 @@ method, reconciliation method, or private task promise from an E2E test. Put
 low-level state-machine and DOM reconciliation permutations in the JavaScript
 suite.
 
+### Browser conditions and deterministic time
+
+Wait on the boundary that owns asynchronous completion. Use a precise network
+response plus a retrying visible assertion for browser workflows. When the
+condition lives only in browser state, such as an IndexedDB offline queue, use
+a shared `page.wait_for_function()` helper that reports the expected condition
+and the final observed state. Do not build Python `monotonic()`/`sleep()` loops
+or call `wait_for_timeout()` to let the application settle.
+
+Use native Playwright lifecycle changes for offline/online behavior. Headless
+Chromium does not reliably emit a real window focus transition when pages are
+brought to the front, so exact focus/blur listener plumbing belongs in the
+JavaScript suite; E2E should use another public lifecycle action such as reload,
+navigation, or reconnect. Never pair a native connectivity change with a
+manually dispatched copy of the same event.
+
+For expiration behavior, create an already-expired artifact or control the
+clock used to issue it. A fixed sleep is appropriate only when elapsed latency
+is itself the visible contract, such as proving a loading state paints while a
+request is deliberately held.
+
 The accumulated E2E datastore intentionally resembles a living system. Reuse
 named users and entities when the story only needs them to exist, and establish
 the relevant precondition idempotently each time instead of assuming an earlier

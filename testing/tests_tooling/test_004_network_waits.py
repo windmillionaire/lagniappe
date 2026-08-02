@@ -5,13 +5,14 @@ import json
 from types import SimpleNamespace
 
 import pytest
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from testing.utility.network import (
     expect_successful_response,
     multipart_form_fields,
     scoped_browser_route,
 )
-from testing.utility import polling, reconnect
+from testing.utility import offline, polling, reconnect
 
 
 pytestmark = pytest.mark.tooling
@@ -328,6 +329,86 @@ def test_poll_wait_reports_missing_or_unexpected_result(payload, message):
                     payload=payload,
                 )
             )
+
+
+class FakeJavaScriptHandle:
+    def __init__(self, value):
+        self.value = value
+        self.disposed = False
+
+    def json_value(self):
+        return self.value
+
+    def dispose(self):
+        self.disposed = True
+
+
+class FakeOfflinePage:
+    def __init__(self, rows, *, timeout=False):
+        self.rows = rows
+        self.timeout = timeout
+        self.wait = None
+        self.evaluation = None
+        self.handle = None
+
+    def wait_for_function(self, expression, *, arg):
+        self.wait = (expression, arg)
+        if self.timeout:
+            raise PlaywrightTimeoutError("Offline record wait timed out")
+        self.handle = FakeJavaScriptHandle(self.rows)
+        return self.handle
+
+    def evaluate(self, expression, *, arg):
+        self.evaluation = (expression, arg)
+        return self.rows
+
+
+def test_offline_sync_wait_uses_browser_condition_and_returns_records():
+    rows = [{"save": True, "html": "First offline edit\nSecond offline edit"}]
+    page = FakeOfflinePage(rows)
+    user = SimpleNamespace(page=page)
+
+    result = offline.wait_for_offline_sync_records(
+        user,
+        minimum=1,
+        saved_html_contains=("First offline edit", "Second offline edit"),
+    )
+
+    assert result == rows
+    assert page.wait[1] == {
+        "storeName": "sync",
+        "minimum": 1,
+        "exact": None,
+        "savedHtmlContains": ["First offline edit", "Second offline edit"],
+    }
+    assert page.handle.disposed is True
+
+
+def test_offline_record_wait_validates_conditions_and_reports_current_rows():
+    user = SimpleNamespace(page=FakeOfflinePage([]))
+
+    with pytest.raises(ValueError, match="require a count or saved HTML"):
+        offline.wait_for_offline_sync_records(user)
+    with pytest.raises(ValueError, match="either minimum or exact"):
+        offline.wait_for_offline_sync_records(user, minimum=1, exact=1)
+    with pytest.raises(ValueError, match="must be non-negative"):
+        offline.wait_for_offline_mutations(user, exact=-1)
+
+    rows = [{"save": True, "html": "Different edit"}]
+    page = FakeOfflinePage(rows, timeout=True)
+    with pytest.raises(AssertionError) as error:
+        offline.wait_for_offline_sync_records(
+            SimpleNamespace(page=page),
+            exact=0,
+            saved_html_contains=("Expected edit",),
+        )
+
+    message = str(error.value)
+    assert "offline sync store" in message
+    assert "exactly 0 record(s)" in message
+    assert "saved HTML containing ('Expected edit',)" in message
+    assert "Different edit" in message
+    assert page.evaluation[1] == "sync"
 
 
 class FakeBrowserFailures:

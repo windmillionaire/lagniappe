@@ -11,6 +11,7 @@ Maps to:
 from playwright.sync_api import expect
 
 from lagniappe.core.entities import Entities
+from testing.utility import expect_successful_response
 
 from ..elements import Editor, List, SpinnerButtons, Tabs
 from .core import SiteResource
@@ -221,19 +222,32 @@ class Page(SiteResource):
     def complete_task(self, task):
         task_item = self.active_task_list.get_item(task)
 
-        with self.user.page.expect_response("**/update"):
+        with expect_successful_response(
+            self.user.page,
+            method="PUT",
+            path=f"/tasks/{task.key}/update",
+            entity_key=task.key,
+        ):
             task_item.locator(self.COMPLETE_TASK_CHECKBOX).click()
 
         completed_task = self.completed_task_list.get_item(task)
+        expect(completed_task).to_be_visible()
         task.element = completed_task
 
     def uncomplete_task(self, task):
         task_item = self.completed_task_list.get_item(task)
 
-        with self.user.page.expect_response("**/update"):
+        with expect_successful_response(
+            self.user.page,
+            method="PUT",
+            path=f"/tasks/{task.key}/update",
+            entity_key=task.key,
+        ):
             task_item.locator(self.COMPLETE_TASK_CHECKBOX).click()
 
-        task.element = self.active_task_list.get_item(task)
+        active_task = self.active_task_list.get_item(task)
+        expect(active_task).to_be_visible()
+        task.element = active_task
 
     def set_submission(self, submission):
         info_form = self.info_form
