@@ -1,13 +1,13 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as createIcon, s as setIcon } from '../icons.js?v=b729950f';
-import { r as request } from '../request.js?v=b729950f';
-import { C as Core } from '../core.js?v=b729950f';
-import '../styles.js?v=b729950f';
-import '../errors.js?v=b729950f';
-import '../connectivity.js?v=b729950f';
-import '../endpoints.js?v=b729950f';
-import '../utilities.js?v=b729950f';
-import '../shell.js?v=b729950f';
+import { c as createIcon, s as setIcon } from '../icons.js?v=b55964c3';
+import { r as request } from '../request.js?v=b55964c3';
+import { C as Core } from '../core.js?v=b55964c3';
+import '../styles.js?v=b55964c3';
+import '../errors.js?v=b55964c3';
+import '../connectivity.js?v=b55964c3';
+import '../endpoints.js?v=b55964c3';
+import '../utilities.js?v=b55964c3';
+import '../shell.js?v=b55964c3';
 
 const REPORT_FORM_SELECTOR =
 	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='undo-report-form'], [data-role='revise-report-form']";
@@ -47,7 +47,7 @@ class Report extends Core {
 		if (this._reportFormsReady) return Promise.resolve(this);
 		if (this._reportFormsPromise) return this._reportFormsPromise;
 
-		const pending = import('../baseForm.js?v=b729950f').then(function (n) { return n.b; })
+		const pending = import('../baseForm.js?v=b55964c3').then(function (n) { return n.b; })
 			.then(async ({ BaseForm }) => {
 				if (this._destroyed) return null;
 				await Promise.all([

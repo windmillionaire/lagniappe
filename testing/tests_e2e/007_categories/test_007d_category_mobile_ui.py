@@ -20,28 +20,13 @@ from testing.resources.category import Category
 pytestmark = pytest.mark.e2e
 
 
-def _clear_category_column_prefs(user):
-    category_hash = user.locate("[lp-view][data-kind='category']").get_attribute(
-        "data-hash"
-    )
-    user.page.evaluate(
-        """([columnsKey, sortsKey]) => {
-            localStorage.removeItem(columnsKey);
-            sessionStorage.removeItem(sortsKey);
-        }""",
-        [f"columns-{category_hash}", f"sorts-{category_hash}"],
-    )
-
-
 # @features table-controls
 # @dimensions mobile-controls columns
 def test_category_mobile_controls_open_with_page_columns(get_user):
     """A phone user opens category table controls and sees page-oriented columns."""
     user = get_user(Users.OWNER)
     Pages.test_create_page.get(user)
-    category = user.go(Categories.test_create_page)
-    _clear_category_column_prefs(user)
-    user.reload(category)
+    user.go(Categories.test_create_page)
 
     controls = MobileTableControls(user)
     expect(controls.panel).to_be_hidden()
@@ -82,9 +67,7 @@ def test_category_mobile_visibility_toggle_hides_column(get_user):
     """Mobile controls hide a category column without leaving cells behind."""
     user = get_user(Users.OWNER)
     Pages.test_create_page.get(user)
-    category = user.go(Categories.test_create_page)
-    _clear_category_column_prefs(user)
-    user.reload(category)
+    user.go(Categories.test_create_page)
     user.mobile = True
 
     controls = MobileTableControls(user)
@@ -104,9 +87,7 @@ def test_category_mobile_filter_button_opens_sorting_panel(get_user):
     """The mobile filter button opens sorting controls for the selected column."""
     user = get_user(Users.OWNER)
     Pages.test_create_page.get(user)
-    category = user.go(Categories.test_create_page)
-    _clear_category_column_prefs(user)
-    user.reload(category)
+    user.go(Categories.test_create_page)
     user.mobile = True
 
     controls = MobileTableControls(user)
@@ -126,9 +107,7 @@ def test_category_mobile_controls_handle_form_columns(get_user):
     """Mobile table controls include category form columns and open their sorts."""
     user = get_user(Users.OWNER)
     Pages.test_category_filter_match_page.get(user)
-    category = user.go(Categories.test_category_filter_pages)
-    _clear_category_column_prefs(user)
-    user.reload(category)
+    user.go(Categories.test_category_filter_pages)
     user.mobile = True
 
     controls = MobileTableControls(user)

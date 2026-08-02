@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { g as getFormElement } from './loader.js?v=b729950f';
-import { s as setIcon } from './icons.js?v=b729950f';
-import { r as request } from './request.js?v=b729950f';
-import { withTransition } from './utilities.js?v=b729950f';
-import './styles.js?v=b729950f';
-import './errors.js?v=b729950f';
+import { g as getFormElement } from './loader.js?v=b55964c3';
+import { s as setIcon } from './icons.js?v=b55964c3';
+import { r as request } from './request.js?v=b55964c3';
+import { withTransition } from './utilities.js?v=b55964c3';
+import './styles.js?v=b55964c3';
+import './errors.js?v=b55964c3';
 
 const SAVED_STATE_MS = 1200;
 
@@ -20,6 +20,7 @@ const ROUTES = {
  * @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_quick_edit_renders_checkbox_cells
  * @pairs task-index:quick-edit
  * @pairs task-index:link-affordance
+ * @pairs task-index:editable-cell
  * @pairs task-index:quick-edit task-index:column-visibility task-index:checkbox-cell
  * @pairs category-index:quick-edit category-index:checkbox-cell
  */

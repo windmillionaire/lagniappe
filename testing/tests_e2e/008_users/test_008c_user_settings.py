@@ -91,7 +91,6 @@ def _go_to_my_page(user):
 
 def _open_owner_site_settings(owner):
     owner.go(SitePages.HOME)
-    owner.page.evaluate("localStorage.removeItem('lagniappe:site-settings-section')")
     admin = owner.go(SitePages.ADMIN)
     settings_panel = owner.locate(admin.SITE_SETTINGS_FORM)
     expect(settings_panel).to_have_attribute("initialized", "")

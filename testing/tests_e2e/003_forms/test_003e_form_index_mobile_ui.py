@@ -20,15 +20,6 @@ from testing.resources.site import FormIndex
 pytestmark = pytest.mark.e2e
 
 
-def _clear_form_column_prefs(user):
-    user.page.evaluate(
-        """() => {
-            localStorage.removeItem('columns-forms');
-            sessionStorage.removeItem('sorts-forms');
-        }"""
-    )
-
-
 # @features table-controls
 # @dimensions mobile-controls mobile-tools mutual-exclusion
 # @template forms/index.html::view_header
@@ -37,9 +28,7 @@ def test_form_index_mobile_tools_and_column_controls_are_exclusive(get_user):
     """Mobile Tools and column controls close one another when opened."""
     user = get_user(Users.OWNER)
     Forms.test_create_page_form.get(user)
-    form_index = user.go(SitePages.FORM_INDEX)
-    _clear_form_column_prefs(user)
-    user.reload(form_index)
+    user.go(SitePages.FORM_INDEX)
 
     user.mobile = True
     controls = MobileTableControls(user)

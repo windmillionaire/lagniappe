@@ -80,16 +80,6 @@ def _open_history(task):
     return history
 
 
-def _history_columns_key(task):
-    return f"columns-{task.entity.hash}-history"
-
-
-def _clear_history_column_preferences(user, task):
-    user.page.evaluate(
-        "(key) => localStorage.removeItem(key)", _history_columns_key(task)
-    )
-
-
 def _open_history_visibility(history):
     toggle = history.locator("[data-role='embedded-table-visibility']")
     expect(toggle).to_be_visible()
@@ -177,7 +167,6 @@ def test_task_history_appears_after_completion_cycle(get_user):
     task.entity.properties.files.add(attachment)
     task.entity.save()
     user.go(task)
-    _clear_history_column_preferences(user, task)
 
     task.complete()
     completed = Entities.fetch_one(
@@ -220,7 +209,6 @@ def test_task_history_visibility_persists_after_reload(get_user):
     task = Tasks.test_history_form_task.get(user)
     _add_task_row_pressure(task)
     user.go(task)
-    _clear_history_column_preferences(user, task)
 
     _complete_then_uncomplete(task)
 
@@ -235,9 +223,6 @@ def test_task_history_visibility_persists_after_reload(get_user):
     expect(form_column_toggle).not_to_be_checked()
     form_column_toggle.set_checked(True)
     expect(form_column).to_be_visible()
-    assert "input-textab12" in user.page.evaluate(
-        "(key) => JSON.parse(localStorage.getItem(key))", _history_columns_key(task)
-    )
 
     user.reload()
     task.wait_for_load()
@@ -322,7 +307,6 @@ def test_task_history_expands_table_submission_cell(get_user):
     user = get_user(Users.OWNER)
     task = Tasks.test_history_table_task.get(user)
     user.go(task)
-    _clear_history_column_preferences(user, task)
 
     _complete_then_uncomplete(task)
     history = _open_history(task)

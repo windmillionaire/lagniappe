@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { I as ICONS } from './styles.js?v=b729950f';
+import { I as ICONS } from './styles.js?v=b55964c3';
 
 /**
  * @testable true

@@ -29,15 +29,6 @@ SORTING_PANEL = "[data-widget='TableSorting']"
 COLUMN_FILTER_BUTTON = "th[data-column='{column}'] button[data-toggle='filter']"
 
 
-def _clear_task_column_prefs(user):
-    user.page.evaluate(
-        """() => {
-            localStorage.removeItem('columns-tasks');
-            sessionStorage.removeItem('sorts-tasks');
-        }"""
-    )
-
-
 def _row_for(user, task):
     return user.locate(TASK_ROW).filter(has_text=task.definition.name)
 
@@ -128,9 +119,7 @@ def test_task_index_name_sort_ascending_reorders_rows(get_user):
     personal = Tasks.test_task_index_personal_today.get(user)
     page_active = Tasks.test_task_index_page_active.get(user)
     future = Tasks.test_task_index_due_future.get(user)
-    task_index = user.go(SitePages.TASK_INDEX)
-    _clear_task_column_prefs(user)
-    user.reload(task_index)
+    user.go(SitePages.TASK_INDEX)
 
     _select_sort(user, "name", "asc")
 
@@ -145,9 +134,7 @@ def test_task_index_due_date_sort_filters_to_dated_rows(get_user):
     today = Tasks.test_task_index_personal_today.get(user)
     undated = Tasks.test_task_index_page_active.get(user)
     future = Tasks.test_task_index_due_future.get(user)
-    task_index = user.go(SitePages.TASK_INDEX)
-    _clear_task_column_prefs(user)
-    user.reload(task_index)
+    user.go(SitePages.TASK_INDEX)
 
     _select_sort(user, "due_date", "asc")
 
@@ -202,9 +189,7 @@ def test_task_route_rewrites_to_page_url_after_focus(get_user):
 def test_task_index_delete_task_from_row(get_user):
     user = get_user(Users.OWNER)
     task = Tasks.test_task_index_delete_from_index.get(user)
-    task_index = user.go(SitePages.TASK_INDEX)
-    _clear_task_column_prefs(user)
-    user.reload(task_index)
+    user.go(SitePages.TASK_INDEX)
 
     row = user.locate(f"{TASK_ROW}[data-key='{task.key}']")
     expect(row).to_be_visible()
@@ -231,9 +216,7 @@ def test_task_index_quick_edit_updates_editable_cell(get_user):
     """Quick edit can update and persist an editable task-index text cell."""
     user = get_user(Users.OWNER)
     task = Tasks.test_task_index_page_active.get(user)
-    task_index = user.go(SitePages.TASK_INDEX)
-    _clear_task_column_prefs(user)
-    user.reload(task_index)
+    user.go(SitePages.TASK_INDEX)
 
     row = user.locate(f"{TASK_ROW}[data-key='{task.key}']")
     expect(row).to_be_visible()
@@ -269,9 +252,7 @@ def test_task_index_quick_edit_keeps_revealed_completed_column_editable(get_user
     """A checkbox column revealed during quick edit remains an editor control."""
     user = get_user(Users.OWNER)
     task = Tasks.test_task_index_page_active.get(user)
-    task_index = user.go(SitePages.TASK_INDEX)
-    _clear_task_column_prefs(user)
-    user.reload(task_index)
+    user.go(SitePages.TASK_INDEX)
 
     row = user.locate(f"{TASK_ROW}[data-key='{task.key}']")
     completed = row.locator("td[data-column='completed']")

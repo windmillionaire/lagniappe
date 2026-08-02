@@ -55,20 +55,6 @@ def _fill_editable_field(form, field_id, selector, value):
     control.fill(value)
 
 
-def _view_hash(user):
-    return user.locate("[lp-view][data-kind='category']").get_attribute("data-hash")
-
-
-def _clear_column_prefs(user, category_hash):
-    user.page.evaluate(
-        """([columnsKey, sortsKey]) => {
-            localStorage.removeItem(columnsKey);
-            sessionStorage.removeItem(sortsKey);
-        }""",
-        [f"columns-{category_hash}", f"sorts-{category_hash}"],
-    )
-
-
 def _open_visibility_panel(user, category):
     toggle = user.locate(category.TABLE_VISIBILITY_TOGGLE)
     expect(toggle).to_be_visible()
@@ -298,8 +284,6 @@ def test_category_index_quick_edit_renders_checkbox_cells(get_user):
     page = Pages.test_category_filter_match_page.get(user)
     category = page.definition.category.get(user)
     user.go(category)
-    _clear_column_prefs(user, _view_hash(user))
-    user.reload(category)
 
     field = "category-filter-flagged"
     panel = _open_visibility_panel(user, category)
@@ -345,8 +329,6 @@ def test_category_index_expands_table_submission_cell(get_user):
     page = Pages.test_category_table_expansion.get(user)
     category = page.definition.category.get(user)
     user.go(category)
-    _clear_column_prefs(user, _view_hash(user))
-    user.reload(category)
 
     panel = _open_visibility_panel(user, category)
     items = panel.locator("input[type='checkbox'][name='items']")

@@ -513,14 +513,22 @@ Acceptance criteria:
 
 ### E2E-H12 — Replace storage surgery with user-visible reset or clean contexts
 
-- [ ] Decide whether each local/session storage access is testing the storage
+- [x] Decide whether each local/session storage access is testing the storage
   contract or merely forcing setup.
-- [ ] For setup, prefer a fresh context or the product's reset/clear UI.
-- [ ] Keep direct storage access only when the key/value lifecycle is the
+- [x] For setup, prefer a fresh context or the product's reset/clear UI.
+- [x] Keep direct storage access only when the key/value lifecycle is the
   explicit contract, and assert the corresponding visible behavior.
 
 Candidate clusters include user settings, category mobile/index tests, task
 index/history tests, form-index mobile tests, and page-tabs tests.
+
+Resolved 2026-08-02. E2E tests and support helpers no longer read, write, or
+clear browser storage directly. Ordinary setup now relies on the isolated
+context supplied by `get_user`, while preference stories establish state
+through visible controls and verify the resulting UI after navigation or
+reload. Exact storage key/value contracts remain in the JavaScript suite. A
+tooling guard rejects future direct Web Storage references in E2E and support
+code. No behavior exception remains.
 
 Acceptance criteria:
 
@@ -688,6 +696,7 @@ the focused verification performed, and any intentional exception that remains.
 
 | Date | Item | Cluster | Result / remaining exception |
 |---|---|---|---|
+| 2026-08-02 | E2E-H12 | Browser preference setup and persistence | Removed all 20 direct-storage audit hits from E2E tests and support helpers, moved ordinary setup to clean contexts, and retained UI-level persistence assertions across navigation and reload. The 15-test boundary file, nine JavaScript contracts, 58 focused E2E stories, eight template-contract reports, and Ruff check pass. Source ownership gaps are resolved; 23 unrelated changed-scope evidence results remain stale and are deferred to the upcoming full-suite run. No behavior exception remains. |
 | 2026-08-02 | E2E-H11 | Table touch gestures and task select layout | Replaced synthetic pointer events with a touch-capable Playwright tap, moved the tap/swipe threshold to JS coverage, and replaced inline width mutation with real mobile/desktop layout. The 2-test JS file, 13-test boundary file, two focused E2E stories, 24-test E2E file cluster, template contract, and Ruff check pass. Changed-scope traceability has no template or style errors, but changing the shared `get_user` fixture made 37 unrelated recorded E2E results stale; refreshing those broad historical stories was deferred for this localized item. No behavior exception remains. |
 | 2026-08-02 | E2E-H10 | Structural evidence collector | Retired the non-actionable full-suite collector, generated baseline format, instrumentation-only tests, collection hook, marker, and traceability exception. The evidence reporter now prunes deleted test modules. The 105 focused tooling tests, 478-test E2E collection, Ruff check, and changed-scope traceability pass. Existing behavior-specific coverage remains; no exception remains. |
 | 2026-08-02 | E2E-H09 | AI report/deferred-job suite boundaries | Moved Ask/Organize adapter publication contracts to unit coverage, retired direct-provider/browserless E2E, and retained UI-started Ask jobs with durable checkpoints and natural polling reconciliation. The 184-test unit cluster, 11-test boundary suite, five focused E2E checks, one-run three-case live-provider evaluation, template contracts, and changed-source traceability pass. No exception remains. |

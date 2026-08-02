@@ -253,6 +253,26 @@ disagree with the datastore after a focused rerun, fixture reset, or failed
 setup. A setup helper should retrieve or create its durable entities on every
 call and conditionally establish only the properties the current story needs.
 
+### Browser storage and persistence
+
+`get_user` creates an isolated browser context for each test; preference state
+written by an earlier test context is not reused. Treat that fresh context as
+the baseline for ordinary table, settings, and navigation stories. Do not use
+`page.evaluate()` or `page.wait_for_function()` to inject, remove, or wait on a
+`localStorage` or `sessionStorage` key merely to force setup.
+
+When a workflow needs a non-default preference, establish it through the
+visible control that owns it. Assert the immediate UI result, then navigate or
+reload and assert the restored UI when persistence is the claim. Use a product
+reset/clear control when the same story must return to defaults. Remove reloads
+whose only purpose was to apply a private storage deletion, but retain reloads
+that are the public persistence boundary under test.
+
+Exact key/value lifecycle belongs in the JavaScript suite when it is a durable
+frontend contract. Such a test should name the key, cover save/load/clear as
+applicable, and prove the resulting component state. Keep E2E coverage focused
+on what the user sees rather than the storage mechanism that produced it.
+
 Permission and session changes that request client-cache invalidation need an
 explicit browser acknowledgement in the test that caused them:
 

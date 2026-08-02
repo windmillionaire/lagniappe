@@ -162,16 +162,15 @@ def test_resize_from_mobile_filters_to_desktop_preserves_selected_tab(get_user):
 # @features entity-layout
 # @dimensions project-mobile reload persistence
 def test_mobile_selected_section_persists_after_reload(get_user):
-    """The last selected mobile section is restored on reload via localStorage."""
+    """The last selected mobile section is restored after a full reload."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(project)
 
     project.mobile_nav.select_section("model-tasks", "ModelTaskList")
-    user.page.wait_for_function(
-        "(key) => localStorage.getItem(key) === 'model-tasks'",
-        arg=f"{project.entity.hash}-active",
-    )
+    expect(project.model_tasks_card).to_be_visible()
+    assert project.mobile_nav.get_section_title() == "Model Tasks"
+
     user.page.reload(wait_until="load")
 
     expect(user.locate(project.MOBILE_NAV)).to_be_visible()

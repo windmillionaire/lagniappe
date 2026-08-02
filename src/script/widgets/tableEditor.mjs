@@ -17,6 +17,7 @@ const ROUTES = {
  * @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_quick_edit_renders_checkbox_cells
  * @pairs task-index:quick-edit
  * @pairs task-index:link-affordance
+ * @pairs task-index:editable-cell
  * @pairs task-index:quick-edit task-index:column-visibility task-index:checkbox-cell
  * @pairs category-index:quick-edit category-index:checkbox-cell
  */

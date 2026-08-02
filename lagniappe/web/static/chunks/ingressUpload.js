@@ -1,18 +1,18 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b729950f';
-import './styles.js?v=b729950f';
-import './request.js?v=b729950f';
-import './errors.js?v=b729950f';
-import './connectivity.js?v=b729950f';
-import './icons.js?v=b729950f';
-import './utilities.js?v=b729950f';
-import './buttons.js?v=b729950f';
-import './formatting.js?v=b729950f';
-import './dropdown.js?v=b729950f';
-import './combobox.js?v=b729950f';
-import './primitives.js?v=b729950f';
-import './baseForm.js?v=b729950f';
-import './loader.js?v=b729950f';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b55964c3';
+import './styles.js?v=b55964c3';
+import './request.js?v=b55964c3';
+import './errors.js?v=b55964c3';
+import './connectivity.js?v=b55964c3';
+import './icons.js?v=b55964c3';
+import './utilities.js?v=b55964c3';
+import './buttons.js?v=b55964c3';
+import './formatting.js?v=b55964c3';
+import './dropdown.js?v=b55964c3';
+import './combobox.js?v=b55964c3';
+import './primitives.js?v=b55964c3';
+import './baseForm.js?v=b55964c3';
+import './loader.js?v=b55964c3';
 
 const INGRESS_DROPZONE_TEXT =
 	"Drop a file here or click to upload. Only CSV files are supported.";

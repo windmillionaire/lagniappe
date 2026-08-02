@@ -110,10 +110,9 @@ def test_page_mobile_selection_persists_after_reload(get_user):
     user.go(page)
 
     page.mobile_nav.select_section("tasks:active")
-    user.page.wait_for_function(
-        "(key) => localStorage.getItem(key) === 'tasks'",
-        arg=f"{page.entity.hash}-active",
-    )
+    expect(user.locate(Tabs.TASKS_TAB)).to_be_visible()
+    assert page.mobile_nav.get_section_title() in {"Tasks", "New Task"}
+
     page = page.reload()
 
     expect(user.locate(page.MOBILE_NAV)).to_be_visible()

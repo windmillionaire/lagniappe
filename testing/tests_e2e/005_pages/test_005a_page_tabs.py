@@ -41,10 +41,7 @@ def test_page_url_tab_overrides_saved_tab(get_user):
     page = Pages.test_page_loads.get(user)
     user.go(page)
 
-    user.page.evaluate(
-        "(key) => localStorage.setItem(key, 'document')",
-        f"{page.entity.hash}-active",
-    )
+    Tabs(user).document
 
     user.go(page, query_params={"tab": "tasks"})
 
@@ -53,9 +50,13 @@ def test_page_url_tab_overrides_saved_tab(get_user):
     expect(user.locate(Tabs.TASKS_TOGGLE_DESKTOP)).to_have_attribute(
         "data-selected", "true"
     )
-    user.page.wait_for_function(
-        "(key) => localStorage.getItem(key) === 'tasks'",
-        arg=f"{page.entity.hash}-active",
+
+    user.go(page)
+
+    expect(user.locate(Tabs.TASKS_TAB)).to_be_visible()
+    expect(user.locate(Tabs.DOCUMENT_TAB)).to_be_hidden()
+    expect(user.locate(Tabs.TASKS_TOGGLE_DESKTOP)).to_have_attribute(
+        "data-selected", "true"
     )
 
 

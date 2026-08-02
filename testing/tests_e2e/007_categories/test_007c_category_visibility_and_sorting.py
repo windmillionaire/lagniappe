@@ -29,20 +29,6 @@ SORTABLE_PAGES = (
 SORTABLE_PAGE_NAMES = tuple(page.value.definition.name for page in SORTABLE_PAGES)
 
 
-def _view_hash(user):
-    return user.locate("[lp-view][data-kind='category']").get_attribute("data-hash")
-
-
-def _clear_table_prefs(user, category_hash):
-    user.page.evaluate(
-        """([columnsKey, sortsKey]) => {
-            localStorage.removeItem(columnsKey);
-            sessionStorage.removeItem(sortsKey);
-        }""",
-        [f"columns-{category_hash}", f"sorts-{category_hash}"],
-    )
-
-
 def _seed_sortable_pages(owner):
     category = Categories.test_create_page.get(owner)
     for page in SORTABLE_PAGES:
@@ -127,9 +113,7 @@ def _select_name_sort(user, direction):
 def test_column_visibility_panel_opens(get_user):
     """Desktop column picker opens from the table header control."""
     user = get_user(Users.OWNER)
-    category = user.go(Categories.test_create_page)
-    _clear_table_prefs(user, _view_hash(user))
-    user.reload(category)
+    user.go(Categories.test_create_page)
 
     panel = _open_visibility_panel(user)
     expect(panel.locator("input[type='checkbox'][name='image']")).to_be_visible()
@@ -144,9 +128,7 @@ def test_hiding_column_updates_visible_headers_and_cells(get_user):
     """Unchecking a visible column hides its header and body cells."""
     user = get_user(Users.OWNER)
     _seed_sortable_pages(user)
-    category = user.go(Categories.test_create_page)
-    _clear_table_prefs(user, _view_hash(user))
-    user.reload(category)
+    user.go(Categories.test_create_page)
 
     panel = _open_visibility_panel(user)
     modified = panel.locator("input[type='checkbox'][name='modified']")
@@ -168,9 +150,6 @@ def test_column_visibility_persists_after_reload(get_user):
     user = get_user(Users.OWNER)
     _seed_sortable_pages(user)
     category = user.go(Categories.test_create_page)
-    category_hash = _view_hash(user)
-    _clear_table_prefs(user, category_hash)
-    user.reload(category)
 
     panel = _open_visibility_panel(user)
     description = panel.locator("input[type='checkbox'][name='description']")
@@ -198,9 +177,7 @@ def test_visibility_panel_includes_category_form_columns(get_user):
     user = get_user(Users.OWNER)
     matching_page = Pages.test_category_filter_match_page.get(user)
     public_document_page = Pages.test_category_filter_public_document_page.get(user)
-    category = user.go(Categories.test_category_filter_pages)
-    _clear_table_prefs(user, _view_hash(user))
-    user.reload(category)
+    user.go(Categories.test_category_filter_pages)
 
     panel = _open_visibility_panel(user)
     expect(
@@ -251,9 +228,7 @@ def test_image_column_sort_panel_offers_presence_options(get_user):
     """The image column opens existence-style sort/filter controls."""
     user = get_user(Users.OWNER)
     Pages.test_category_filter_match_page.get(user)
-    category = user.go(Categories.test_category_filter_pages)
-    _clear_table_prefs(user, _view_hash(user))
-    user.reload(category)
+    user.go(Categories.test_category_filter_pages)
 
     visibility = _open_visibility_panel(user)
     image = visibility.locator("input[type='checkbox'][name='image']")
@@ -282,9 +257,7 @@ def test_boolean_column_filter_clear_restores_rows(get_user):
     user = get_user(Users.OWNER)
     matching_page = Pages.test_category_filter_match_page.get(user)
     nonmatching_page = Pages.test_category_filter_nonmatch_page.get(user)
-    category = user.go(Categories.test_category_filter_pages)
-    _clear_table_prefs(user, _view_hash(user))
-    user.reload(category)
+    user.go(Categories.test_category_filter_pages)
 
     visibility = _open_visibility_panel(user)
     flagged = visibility.locator(
@@ -359,9 +332,7 @@ def test_exists_column_filter_treats_phone_values_as_present(get_user):
             category=Categories.test_basic_inputs_submission,
         ),
     ).create()
-    category = user.go(Categories.test_basic_inputs_submission)
-    _clear_table_prefs(user, _view_hash(user))
-    user.reload(category)
+    user.go(Categories.test_basic_inputs_submission)
 
     visibility = _open_visibility_panel(user)
     phone = visibility.locator("input[type='checkbox'][name='input-telkl12']")
@@ -406,9 +377,7 @@ def test_name_column_sort_ascending_reorders_rows(get_user):
     """Name column A→Z sort reorders visible category page rows."""
     user = get_user(Users.OWNER)
     _seed_sortable_pages(user)
-    category = user.go(Categories.test_create_page)
-    _clear_table_prefs(user, _view_hash(user))
-    user.reload(category)
+    user.go(Categories.test_create_page)
 
     _select_name_sort(user, "asc")
     _assert_visible_sortable_order(
@@ -423,8 +392,6 @@ def test_name_column_sort_persists_after_back_navigation(get_user):
     user = get_user(Users.OWNER)
     _seed_sortable_pages(user)
     category = user.go(Categories.test_create_page)
-    _clear_table_prefs(user, _view_hash(user))
-    user.reload(category)
 
     _select_name_sort(user, "asc")
 
@@ -453,9 +420,7 @@ def test_name_column_sort_descending_reorders_rows(get_user):
     """Name column Z→A sort reverses visible row order."""
     user = get_user(Users.OWNER)
     _seed_sortable_pages(user)
-    category = user.go(Categories.test_create_page)
-    _clear_table_prefs(user, _view_hash(user))
-    user.reload(category)
+    user.go(Categories.test_create_page)
 
     _select_name_sort(user, "desc")
     _assert_visible_sortable_order(
@@ -469,9 +434,7 @@ def test_clearing_sort_restores_default_order(get_user):
     """Toggling the name filter again restores the initial visible row order."""
     user = get_user(Users.OWNER)
     _seed_sortable_pages(user)
-    category = user.go(Categories.test_create_page)
-    _clear_table_prefs(user, _view_hash(user))
-    user.reload(category)
+    user.go(Categories.test_create_page)
 
     initial_order = _visible_sortable_names_in_order(user)
     assert len(initial_order) == len(SORTABLE_PAGE_NAMES)

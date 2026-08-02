@@ -48,6 +48,7 @@ E2E_INLINE_LAYOUT_ASSIGNMENT = re.compile(
     )""",
     re.VERBOSE,
 )
+E2E_BROWSER_STORAGE_ACCESS = re.compile(r"\b(?:localStorage|sessionStorage)\b")
 E2E_SYNTHETIC_INPUT_EVENTS = {
     "pointercancel",
     "pointerdown",
@@ -187,6 +188,22 @@ def _e2e_interaction_shortcut_violations(path):
             for match in pattern.finditer(node.value):
                 line = node.lineno + node.value[: match.start()].count("\n")
                 violations.append(f"{path}:{line} {description}")
+
+    return violations
+
+
+def _e2e_browser_storage_violations(path):
+    """Return direct Web Storage references from E2E browser scripts."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    violations = []
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Constant) and isinstance(node.value, str)):
+            continue
+        for match in E2E_BROWSER_STORAGE_ACCESS.finditer(node.value):
+            line = node.lineno + node.value[: match.start()].count("\n")
+            violations.append(
+                f"{path}:{line} references {match.group(0)} directly"
+            )
 
     return violations
 
@@ -418,6 +435,28 @@ def test_e2e_support_does_not_fabricate_pointer_input_or_layout_widths():
         violations.extend(_e2e_interaction_shortcut_violations(path))
 
     assert violations == []
+
+
+def test_e2e_support_does_not_access_browser_storage_directly():
+    """Preference setup and persistence checks must use visible product behavior."""
+    violations = []
+    for path in _python_files(*E2E_BROWSER_INTERACTION_ROOTS):
+        violations.extend(_e2e_browser_storage_violations(path))
+
+    assert violations == []
+
+
+def test_e2e_browser_storage_guard_rejects_white_box_access(tmp_path):
+    path = tmp_path / "test_browser_storage.py"
+    path.write_text(
+        'page.evaluate("localStorage.removeItem(\'columns-tasks\')")\n'
+        'page.wait_for_function("sessionStorage.getItem(\'sorts-tasks\')")\n'
+    )
+
+    violations = _e2e_browser_storage_violations(path)
+
+    assert any("references localStorage directly" in item for item in violations)
+    assert any("references sessionStorage directly" in item for item in violations)
 
 
 def test_e2e_interaction_guard_rejects_synthetic_shortcuts(tmp_path):
