@@ -8,6 +8,7 @@ Verified against:
 - lagniappe/web/routes/projects/main.py
 """
 
+from dataclasses import replace
 import re
 from urllib.parse import urljoin
 from uuid import uuid4
@@ -19,6 +20,7 @@ from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Projects, SubmissionFields, Users
 from testing.elements import SpinnerButtons, Attributes, Tabs
+from testing.resources import Project
 from testing.utility import expect_poll_result, expect_successful_response
 
 
@@ -79,7 +81,13 @@ def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revisio
     get_user,
 ):
     owner = get_user(Users.OWNER)
-    project = Projects.test_project_info_form.get(owner)
+    project = Project(
+        user=owner,
+        definition=replace(
+            Projects.test_project_info_form.value.definition,
+            name=f"Timestamp-only Project {uuid4().hex}",
+        ),
+    ).create()
     owner.go(project)
 
     timestamp_only = Entities.fetch_one(project.key, request=Fetch.direct())

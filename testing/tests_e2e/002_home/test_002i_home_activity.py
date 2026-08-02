@@ -1,5 +1,6 @@
 """E2E coverage for homepage activity, notifications, and offline replay."""
 
+import re
 from uuid import uuid4
 
 import pytest
@@ -641,8 +642,9 @@ def test_offline_home_mutations_replay_when_online(get_user, browser_failures):
         optimistic_item = _create_text_note_from_home(
             user, home, note_body, expect_network=False
         )
-        optimistic_key = optimistic_item.get_attribute("data-key")
-        assert optimistic_key.startswith("offline:")
+        expect(optimistic_item).to_have_attribute(
+            "data-key", re.compile(r"^offline:")
+        )
 
     with user.page.expect_response("**/activity/notes", timeout=15000):
         user.offline = False
@@ -650,8 +652,11 @@ def test_offline_home_mutations_replay_when_online(get_user, browser_failures):
     replayed_item = _activity_item(home, note_body)
     expect(replayed_item).to_be_visible()
     expect(replayed_item).not_to_have_attribute("data-offline", "true")
+    expect(replayed_item).to_have_attribute("data-key", re.compile(r"\S+"))
+    expect(replayed_item).not_to_have_attribute(
+        "data-key", re.compile(r"^offline:")
+    )
     replayed_key = replayed_item.get_attribute("data-key")
-    assert not replayed_key.startswith("offline:")
     assert Entities.fetch_one(replayed_key, request=Fetch.direct()).body == note_body
 
 

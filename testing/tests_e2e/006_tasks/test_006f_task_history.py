@@ -8,9 +8,11 @@ Verified against:
 - lagniappe/core/entities/task.py
 """
 
+from dataclasses import replace
 import re
 from datetime import datetime, timezone
 from urllib.parse import parse_qs, urlparse
+from uuid import uuid4
 
 import pytest
 from playwright.sync_api import expect
@@ -150,8 +152,17 @@ def _open_combine_form(user, task):
 def test_task_history_appears_after_completion_cycle(get_user):
     """Completing and reopening a task leaves a visible history record."""
     user = get_user(Users.OWNER)
-    task = Tasks.test_history_task.get(user)
-    attachment_name = "History Attachment"
+    task_name = f"History Task {uuid4().hex}"
+    task = _create_combine_task(
+        user,
+        Pages.test_create_page_task.get(user).entity,
+        task_name,
+    )
+    task.definition = replace(
+        Tasks.test_history_task.value.definition,
+        name=task_name,
+    )
+    attachment_name = f"History Attachment {uuid4().hex}"
     attachment = Entities.FILE.create(
         data={"name": attachment_name, "filename": "history-attachment.txt"}
     )
@@ -161,16 +172,7 @@ def test_task_history_appears_after_completion_cycle(get_user):
     task.entity.save()
     user.go(task)
 
-    task.complete()
-    completed = Entities.fetch_one(
-        task.key,
-        request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
-    )
-    completed.uncomplete()
-    completed.save()
-    task.entity = completed
-    user.reload()
-    task.wait_for_load()
+    _complete_then_uncomplete(task)
     expect(task.element.locator("[data-role='saved-files']")).to_have_count(0)
     history = _open_history(task)
 
@@ -180,7 +182,7 @@ def test_task_history_appears_after_completion_cycle(get_user):
     expect(history.locator("th[data-column='completed_by']")).to_be_hidden()
     expect(history.locator("th[data-column='files']")).to_be_hidden()
     expect(history.locator("tbody tr")).not_to_have_count(0)
-    expect(history.locator("tbody")).to_contain_text("History Task")
+    expect(history.locator("tbody")).to_contain_text(task_name)
     expect(history.locator("tbody")).to_contain_text(
         "History task completion description"
     )

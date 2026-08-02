@@ -890,13 +890,18 @@ def test_report_detail_runs_ready_report(get_user):
     expect(user.page.get_by_text("Work done.")).to_be_visible()
     expect(report_page.execute_button).not_to_be_visible()
     expect(user.page.get_by_role("link", name=category_name)).to_be_visible()
-    page_link = user.page.get_by_role("link", name=page_name).first
-    expect(page_link).to_be_visible()
-    assert "/pages/" in page_link.get_attribute("href")
-    json_panel = report_page.expand_json("Result JSON")
-    expect(json_panel).to_contain_text('"status": "complete"')
     saved_report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
     assert saved_report.status == "complete"
+    created = {
+        action["entity"]["kind"]: action["entity"]["id"]
+        for action in saved_report.result["actions"]
+        if "entity" in action
+    }
+    page_link = user.page.get_by_role("link", name=page_name).first
+    expect(page_link).to_be_visible()
+    expect(page_link).to_have_attribute("href", f"/pages/{created['page']}")
+    json_panel = report_page.expand_json("Result JSON")
+    expect(json_panel).to_contain_text('"status": "complete"')
     repeat_run = user.page.evaluate(
         """async (url) => {
             const response = await fetch(url, {
@@ -915,11 +920,6 @@ def test_report_detail_runs_ready_report(get_user):
     assert (
         "Only ready or recoverable failed reports can be run" not in repeat_run["text"]
     )
-    created = {
-        action["entity"]["kind"]: action["entity"]["id"]
-        for action in saved_report.result["actions"]
-        if "entity" in action
-    }
     category = Entities.fetch_one(created["category"], request=Fetch.direct())
     page = Entities.fetch_one(created["page"], request=Fetch.direct())
     assert category.name == category_name
@@ -1114,12 +1114,20 @@ def test_organize_report_detail_refreshes_when_submitted_revision_completes(
     ).to_be_visible()
 
     user.page.locator("#report-feedback").fill("Use a review step instead.")
-    with user.page.expect_response(f"**/tools/reports/{report.urlsafe_key}/revise"):
+    with user.page.expect_response(
+        f"**/tools/reports/{report.urlsafe_key}/revise"
+    ) as revision_info:
         user.page.get_by_role("button", name="Revise Plan").click()
 
-    expect(user.locate(Report.VIEW)).to_have_attribute("data-pending", "true")
-    operation = user.locate(Report.VIEW).get_attribute("data-operation")
-    assert operation
+    revision_response = revision_info.value
+    assert revision_response.ok
+    revision_payload = revision_response.json()
+    assert revision_payload["deferred"] is True
+    operation = revision_payload["operation"]
+    assert isinstance(operation, str) and operation
+    report_view = user.locate(Report.VIEW)
+    expect(report_view).to_have_attribute("data-pending", "true")
+    expect(report_view).to_have_attribute("data-operation", operation)
 
     report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
     job = Entities.fetch_one(operation, request=Fetch.direct())

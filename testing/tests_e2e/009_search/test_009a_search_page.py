@@ -206,9 +206,8 @@ def test_primary_name_matches_rank_above_file_name_and_description_matches(get_u
 
     titles = _result_titles(user)
     expect(titles).to_have_count(4)
-    assert {
-        titles.nth(index).get_attribute("data-kind") for index in range(3)
-    } == {"category", "project", "page"}
+    for kind in ("category", "project", "page"):
+        expect(user.locate(f"{SEARCH_TITLE}[data-kind='{kind}']")).to_have_count(1)
     expect(titles.nth(3)).to_have_attribute("data-kind", "file")
 
 
@@ -440,6 +439,7 @@ def test_navbar_task_results_render_current_completion_state(get_user):
     )
     expect(active_option).to_be_visible()
     expect(active_option.locator("span[data-icon='unselected']")).to_have_count(1)
+    expect(active_option).to_have_attribute("data-result", re.compile(r"\S+"))
     active_details = json.loads(active_option.get_attribute("data-result"))["details"]
     assert active_details.get("completed", False) is False
 

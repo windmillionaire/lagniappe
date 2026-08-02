@@ -49,22 +49,15 @@ def _select_sort(user, column, direction):
     radio.check()
 
 
-def _visible_task_names(user):
-    rows = user.locate(VISIBLE_TASK_ROW)
-    expect(rows.first).to_be_visible()
-    names = []
-    for index in range(rows.count()):
-        cell = rows.nth(index).locator(TASK_NAME_CELL)
-        expect(cell).to_be_visible()
-        names.append(cell.locator("a[data-role='title']").inner_text().strip())
-    return names
-
-
 def _assert_visible_task_order(user, tasks):
-    names = _visible_task_names(user)
     expected = [task.definition.name for task in tasks]
-    positions = [names.index(name) for name in expected]
-    assert positions == sorted(positions)
+    name_pattern = re.compile(
+        rf"^(?:{'|'.join(re.escape(name) for name in expected)})$"
+    )
+    titles = user.locate(
+        f"{VISIBLE_TASK_ROW} {TASK_NAME_CELL} a[data-role='title']"
+    ).filter(has_text=name_pattern)
+    expect(titles).to_have_text(expected)
 
 
 # @pairs task-index:authenticated-access permissions:own-page-only

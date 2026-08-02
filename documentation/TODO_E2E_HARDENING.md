@@ -576,9 +576,9 @@ Acceptance criteria:
 
 ### E2E-H14 — Tighten non-retrying browser assertions
 
-- [ ] Replace raw `count()`, `all()`, `inner_text()`, and `get_attribute()`
+- [x] Replace raw `count()`, `all()`, `inner_text()`, and `get_attribute()`
   checks with Playwright `expect(...)` when the value may settle asynchronously.
-- [ ] Prefer exact cardinality/text/attribute assertions over broad truthiness.
+- [x] Prefer exact cardinality/text/attribute assertions over broad truthiness.
 
 Initial examples:
 
@@ -586,6 +586,16 @@ Initial examples:
 - `003_forms/test_003a_forms.py` — `links.all()` followed by immediate text reads
 - raw attribute assertions in `008_users/test_008c_user_settings.py` and
   `002_home/test_002j_home_tools.py`
+
+Resolved 2026-08-02. Ordered form links, search results, category/task sorting,
+document history, reconnect fingerprints, generated image links, report
+operations, file keys, group preload state, and offline key replacement now use
+retrying locator expectations. Exact text, kind, URL, key, and operation values
+are asserted where the workflow exposes them; the document-history lower bound
+waits on the fourth option without claiming a fixed total. A tooling guard
+rejects raw locator snapshots used as assertions, `locator.all()` iteration,
+and `range(locator.count())` enumeration while allowing identifier extraction
+after readiness and idempotent setup branches with retrying postconditions.
 
 Acceptance criteria:
 
@@ -595,19 +605,30 @@ Acceptance criteria:
 
 ### E2E-H15 — Audit direct backend setup without banning it
 
-- [ ] Review direct creates/saves when touching a file and label each use as
+- [x] Review direct creates/saves when touching a file and identify each use as
   isolated precondition, backend verification, or shortcut around the claimed
   behavior.
-- [ ] Replace only the shortcut category with UI action or a separate actor.
-- [ ] Ensure direct setup uses dedicated entities rather than shared mutable
+- [x] Replace only the shortcut category with UI action or a separate actor.
+- [x] Ensure direct setup uses dedicated entities rather than shared mutable
   definitions.
-- [ ] Keep browser-visible assertions as the primary evidence; backend reads
+- [x] Keep browser-visible assertions as the primary evidence; backend reads
   may supplement them.
 
 Reasonable direct setup includes otherwise unreachable failure records,
 histories, pagination volumes, and content needed for a permission test when
 content creation is not the subject. It is weak when a test claims that the UI
 created or updated the same state that setup wrote directly.
+
+Resolved 2026-08-02. Direct persistence remains a review guideline rather than
+an enforced annotation contract. UI claims no longer depend on injected
+agent-page content, injected file summaries, backend task uncompletion, or
+backend-written collaborator changes. Exact recurring, timestamp, history,
+autofill, offline-conflict, reconciliation, and revision stories use dedicated
+entities; recurring ingress targets are established idempotently. User
+creation, settings preservation, deletion, page/form reconciliation, and task
+revision stories retain browser-visible evidence across navigation, reload,
+reconnect, or a separate browser actor, with backend reads used only as
+supplementary persistence checks.
 
 Acceptance criteria:
 

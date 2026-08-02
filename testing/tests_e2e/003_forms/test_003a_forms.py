@@ -49,8 +49,8 @@ def test_forms_index_page(get_user, browser_failures):
     expect(user.locate("button[lp-show='table:TableEditor']")).not_to_be_attached()
 
     root = user.locate("[lp-view]")
+    expect(root).to_have_attribute("data-fingerprint", re.compile(r"\S+"))
     fingerprint = root.get_attribute("data-fingerprint")
-    assert fingerprint
 
     external_form = Entities.FORM.create(
         {
@@ -143,10 +143,15 @@ def test_form_delete_modal_lists_page_and_task_users(get_user):
         expect(
             modal.element.locator("a[data-role='title'][data-kind='task']")
         ).to_have_count(2)
-        for link in links.all():
-            assert suffix in link.inner_text()
-            href = link.get_attribute("href")
-            assert href and (href.startswith("/pages/") or href.startswith("/tasks/"))
+        expected_links = [*pages, *tasks[:2]]
+        expect(links).to_have_text([entity.name for entity in expected_links])
+        for index, entity in enumerate(expected_links):
+            link = links.nth(index)
+            expect(link).to_have_attribute("data-kind", entity.kind)
+            route = "pages" if entity.kind == "page" else "tasks"
+            expect(link).to_have_attribute(
+                "href", f"/{route}/{entity.urlsafe_key}"
+            )
 
         modal.click("Cancel")
     finally:

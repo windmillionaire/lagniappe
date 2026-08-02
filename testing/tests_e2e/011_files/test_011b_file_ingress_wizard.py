@@ -14,7 +14,9 @@ import re
 from playwright.sync_api import expect
 import pytest
 
+from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools import database
 from testing.definitions import Categories, Forms, SitePages, Uploads, Users
 from testing.elements import IngressWizard, SpinnerButtons
 from testing.resources import File
@@ -75,8 +77,17 @@ def _advance_page_import_to_verify(user, upload):
 
 def _create_task_target_pages(user):
     category = Categories.test_empty_category.get(user)
+    existing_names = {
+        page.name
+        for page in Entities.fetch(
+            *database.get.pages(category.key, limit=None).results,
+            request=Fetch.direct(),
+        )
+    }
 
     for name in TARGET_PAGE_NAMES:
+        if name in existing_names:
+            continue
         page = Entities.PAGE.create(
             {
                 "name": name,

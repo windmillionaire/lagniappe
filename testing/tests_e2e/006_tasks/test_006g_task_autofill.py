@@ -1,18 +1,21 @@
 """Deferred task autofill stories grounded in task-specific files."""
 
+from dataclasses import replace
 import json
 import re
+from uuid import uuid4
 
 import pytest
 from playwright.sync_api import expect
 
-from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
 from lagniappe.core.tools.database.core import KINDS
 from lagniappe.core.tools.database.filter import Filter, Query
 from lagniappe.core.tools.deferred_jobs import DeferredJobs
 from testing.definitions import Pages, Tasks, Users
+from testing.resources import Page, Task
 
 
 pytestmark = pytest.mark.e2e
@@ -30,6 +33,37 @@ def _attach_task_evidence(task):
     task.entity.properties.files.add(file)
     task.entity.save()
     return file
+
+
+def _create_autofill_fixture(user):
+    page = Page(
+        user=user,
+        definition=replace(
+            Pages.test_page_autofill.value.definition,
+            name=f"Task Autofill Page {uuid4().hex}",
+        ),
+    ).create()
+    definition = replace(
+        Tasks.test_task_autofill.value.definition,
+        name=f"Autofill Evidence Task {uuid4().hex}",
+    )
+    form = definition.form.get(user).entity
+    entity = Entities.TASK.create(
+        {
+            "name": definition.name,
+            "description": definition.description,
+            "page": page.entity,
+            "form": form,
+        }
+    )
+    entity = Entities.fetch_one(
+        entity,
+        request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
+    )
+    entity.save()
+    task = Task(user=user, definition=definition)
+    task.entity = entity
+    return page, task
 
 
 def _notification_from_response(response):
@@ -56,8 +90,7 @@ def _run_notification_job(notification):
 # @template pages/tasks.html::task_form
 def test_task_autofill_runs_deferred_with_page_file_context(get_user, monkeypatch):
     user = get_user(Users.OWNER)
-    page = Pages.test_page_autofill.get(user)
-    task = Tasks.test_task_autofill.get(user)
+    page, task = _create_autofill_fixture(user)
     _attach_task_evidence(task)
     user.go(page, query_params={"tab": "tasks"})
 

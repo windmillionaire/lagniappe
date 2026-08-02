@@ -9,6 +9,7 @@ Verified against:
 - src/script/widgets/tableSorting.mjs
 """
 
+import re
 from uuid import uuid4
 
 import pytest
@@ -27,6 +28,9 @@ SORTABLE_PAGES = (
     Pages.test_category_sort_mango_page,
 )
 SORTABLE_PAGE_NAMES = tuple(page.value.definition.name for page in SORTABLE_PAGES)
+SORTABLE_PAGE_NAME_PATTERN = re.compile(
+    rf"^(?:{'|'.join(re.escape(name) for name in SORTABLE_PAGE_NAMES)})$"
+)
 
 
 def _seed_sortable_pages(owner):
@@ -36,41 +40,18 @@ def _seed_sortable_pages(owner):
     return category
 
 
-def _visible_data_rows(user):
-    rows = user.page.locator(Category.VISIBLE_DATA_ROW)
-    expect(rows.first).to_be_visible()
-    return rows
-
-
-def _visible_sortable_names_in_order(user):
-    """Names of seeded pages in the order they appear in visible table rows."""
-    rows = _visible_data_rows(user)
-    names = []
-    for index in range(rows.count()):
-        row = rows.nth(index)
-        expect(row).to_be_visible()
-        cell = row.locator(Category.VISIBLE_NAME_CELL)
-        expect(cell).to_be_visible()
-        text = cell.inner_text().strip()
-        if text in SORTABLE_PAGE_NAMES:
-            names.append(text)
-    return names
+def _visible_sortable_titles(user):
+    """Seeded page-title locators in their current visible table order."""
+    titles = user.page.locator(
+        f"{Category.VISIBLE_DATA_ROW} {Category.VISIBLE_NAME_CELL} "
+        "a[data-role='title']"
+    ).filter(has_text=SORTABLE_PAGE_NAME_PATTERN)
+    expect(titles).to_have_count(len(SORTABLE_PAGE_NAMES))
+    return titles
 
 
 def _assert_visible_sortable_order(user, expected):
-    rows = _visible_data_rows(user)
-    position = 0
-    for index in range(rows.count()):
-        row = rows.nth(index)
-        expect(row).to_be_visible()
-        cell = row.locator(Category.VISIBLE_NAME_CELL)
-        expect(cell).to_be_visible()
-        text = cell.inner_text().strip()
-        if text not in SORTABLE_PAGE_NAMES:
-            continue
-        expect(cell).to_contain_text(expected[position])
-        position += 1
-    assert position == len(expected)
+    expect(_visible_sortable_titles(user)).to_have_text(expected)
 
 
 def _open_visibility_panel(user):
@@ -436,8 +417,7 @@ def test_clearing_sort_restores_default_order(get_user):
     _seed_sortable_pages(user)
     user.go(Categories.test_create_page)
 
-    initial_order = _visible_sortable_names_in_order(user)
-    assert len(initial_order) == len(SORTABLE_PAGE_NAMES)
+    initial_order = _visible_sortable_titles(user).all_inner_texts()
 
     _select_name_sort(user, "asc")
     _assert_visible_sortable_order(
@@ -450,4 +430,4 @@ def test_clearing_sort_restores_default_order(get_user):
     expect(filter_button).to_be_visible()
     filter_button.click()
 
-    assert _visible_sortable_names_in_order(user) == initial_order
+    expect(_visible_sortable_titles(user)).to_have_text(initial_order)

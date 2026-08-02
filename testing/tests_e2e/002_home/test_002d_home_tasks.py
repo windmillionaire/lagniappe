@@ -41,6 +41,7 @@ Date assertions:
 """
 
 import re
+from uuid import uuid4
 
 import pytest
 from playwright.sync_api import expect
@@ -48,7 +49,8 @@ from playwright.sync_api import expect
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from testing.definitions import DueDates, SitePages, Tasks, Users
-from testing.resources import Page
+from testing.definitions.task_definitions import TaskDefinition
+from testing.resources import Page, Task
 from testing.elements import (
     PostponeDropdown,
     Buttons,
@@ -239,7 +241,14 @@ def test_complete_task_from_home_page(get_user):
 def test_complete_recurring_task_from_home_page_reappears(get_user):
     """Completing a near-term recurring home task replaces it with the next occurrence."""
     user = get_user(Users.OWNER)
-    task = Tasks.test_complete_recurring_task_from_home_page.get(user)
+    task = Task(
+        user=user,
+        definition=TaskDefinition(
+            name=f"Recurring Home Task {uuid4().hex}",
+            origin=SitePages.HOME,
+            due_date=DueDates.personal_task_due_today,
+        ),
+    ).create()
     _make_recurring_daily(task)
     home = user.go(SitePages.HOME)
 

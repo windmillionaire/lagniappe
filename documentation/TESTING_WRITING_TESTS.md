@@ -258,6 +258,52 @@ clock used to issue it. A fixed sleep is appropriate only when elapsed latency
 is itself the visible contract, such as proving a loading state paints while a
 request is deliberately held.
 
+### Retrying browser assertions
+
+Playwright locator getters such as `count()`, `all()`, `inner_text()`, and
+`get_attribute()` return an immediate DOM snapshot. Do not use those snapshots
+as the final evidence for browser state that may still reconcile. Express the
+condition with `expect(locator)` so a failure reports the named unmet state:
+
+```python
+expect(results).to_have_text(["First", "Second", "Third"])
+expect(item).to_have_attribute("data-key", re.compile(r"\S+"))
+key = item.get_attribute("data-key")
+```
+
+List-valued text expectations assert order and exact cardinality together.
+When the product contract is only a lower bound, retry on the last required
+item, such as `expect(options.nth(3)).to_be_visible()` for at least four
+options, rather than snapshotting `count()`. For a JSON-valued attribute, first
+expect the attribute to be present or match its stable content, then read and
+parse it for supplementary structural assertions.
+
+Raw reads remain appropriate for transporting a durable identifier after its
+attribute expectation, capturing an already-settled baseline for a later
+retrying comparison, or choosing an idempotent setup branch that ends in an
+exact retrying postcondition. They are not a substitute for the browser-visible
+assertion.
+
+### Direct backend writes in E2E
+
+Direct creates and saves are allowed only when they are either an isolated
+precondition or supplementary backend verification. When reviewing a test,
+ask whether each direct write is setup, supporting persistence evidence, or a
+shortcut around the behavior the test claims. No special annotation is
+required; add an ordinary explanatory comment only when the purpose is not
+clear from the test.
+
+Give exact lifecycle stories a dedicated entity, and establish shared
+prerequisites idempotently against the current datastore. Backend reads may
+supplement the claim, but a browser workflow still needs primary visible
+evidence and a reload, navigation, reconnect, or fresh browser context when it
+claims persistence.
+
+Replace convenience mutations with the visible action or a separate browser
+actor. In particular, do not complete/uncomplete a task, edit another user's
+visible state, or inject page/form content directly when that mutation is part
+of the story.
+
 The accumulated E2E datastore intentionally resembles a living system. Reuse
 named users and entities when the story only needs them to exist, and establish
 the relevant precondition idempotently each time instead of assuming an earlier

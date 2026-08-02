@@ -9,7 +9,10 @@ Each resource provides:
 
 Entity creation typically uses `Entities.TYPE.create(...)` followed by
 `entity.save()`, which mirrors the route-layer persistence path while avoiding
-browser overhead for tests that only need setup data to exist.
+browser overhead for tests that only need setup data to exist. Resource
+`create()` methods are setup helpers: do not use them to skip a visible
+create/edit/delete action when that action is the E2E behavior under test.
+Prefer a unique definition when the test claims an exact lifecycle.
 
 Architecture:
     Definition Enums -> Resource Classes -> Definition Dataclasses

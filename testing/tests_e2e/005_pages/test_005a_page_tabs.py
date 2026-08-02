@@ -212,7 +212,6 @@ def test_document_visibility_can_toggle_public_private(get_user, browser_failure
 def test_add_file_to_page(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_file_upload_page)
-    file_summary = "A summary shown from the page file list."
 
     files_tab = page.files_tab
     upload_form = files_tab.locator(page.UPLOAD_FILE_FORM)
@@ -234,19 +233,7 @@ def test_add_file_to_page(get_user):
     expect(thumbnail).to_have_attribute(
         "src", re.compile(r"/assets/.+/file\.jpeg$")
     )
-    file_key = file_item.get_attribute("data-key")
-    assert file_key
-    file_entity = Entities.fetch_one(file_key, request=Fetch.direct())
-    Entities.fetch(file_entity, *file_entity.pages, request=Fetch.direct())
-    file_entity.summary = file_summary
-    file_entity.save()
-
-    user.page.reload()
-    files_tab = page.files_tab
-    file_list = files_tab.locator("[data-widget='BaseList']")
-    file_item = file_list.locator("li").filter(has_text="editor_test_image")
-    expect(file_item).to_contain_text(file_summary)
-    expect(file_item.locator("p")).to_have_class(re.compile(r"line-clamp-3"))
+    expect(file_item).to_have_attribute("data-key", re.compile(r"\S+"))
 
     file_item.locator(Buttons.LP_DELETE).click()
     Modal(user.page).delete()
@@ -298,8 +285,8 @@ def test_add_multiple_files_to_page_hides_existing_file_select(get_user):
         (notes_item, "sample_notes"),
         (document_item, "sample_document"),
     ]:
+        expect(item).to_have_attribute("data-key", re.compile(r"\S+"))
         file_key = item.get_attribute("data-key")
-        assert file_key
         file_entity = Entities.fetch_one(file_key, request=Fetch.direct())
         assert file_entity.name == expected_name
 

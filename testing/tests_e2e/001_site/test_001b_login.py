@@ -49,10 +49,9 @@ from playwright.sync_api import expect
 
 from config import SETTINGS, constants
 from lagniappe import CONFIG
-from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 
-from testing.definitions import Forms, SitePages, Users
+from testing.definitions import SitePages, Users
 from testing.elements import Buttons, FormElements, Roles
 
 pytestmark = pytest.mark.e2e
@@ -532,13 +531,6 @@ def test_agent_access_login_form_creates_session(get_user, browser_failures):
 
     expect(user.page).to_have_title("Home")
     expect(user.locate("[lp-view]")).to_have_attribute("initialized", "")
-    agent = Entities.fetch_one(
-        Entities.USER.load(constants.DEFAULT_AGENT_ACCESS_EMAIL),
-        request=Fetch.nested(because=FetchReason.USER_SAVE_REQUIREMENTS),
-    )
-    agent.page.form = Forms.test_sync_page_form.get().entity
-    agent.page.submission = {"sync-text": "Initial form sync"}
-    agent.page.save()
 
     my_page = user.page.get_by_role("link", name="My Page")
     expect(my_page).to_be_visible()

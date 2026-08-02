@@ -107,7 +107,7 @@ def test_document_history_created_on_save(get_user):
     panel = user.page.locator("[role='listbox'][data-visible='true']")
     expect(panel).to_be_visible()
     expect(panel.get_by_role("option", name="Clear Unpinned Versions")).to_be_visible()
-    assert panel.locator("[role='option']").count() >= 4
+    expect(panel.locator("[role='option']").nth(3)).to_be_visible()
 
 
 # @features editor

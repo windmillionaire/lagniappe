@@ -10,6 +10,7 @@ Verified against:
 """
 
 import json
+import re
 from uuid import uuid4
 
 from playwright.sync_api import expect
@@ -94,8 +95,8 @@ def test_category_index_reconnect_refreshes_external_page(get_user, browser_fail
     user.go(category)
 
     root = user.locate("[lp-view]")
+    expect(root).to_have_attribute("data-fingerprint", re.compile(r"\S+"))
     fingerprint = root.get_attribute("data-fingerprint")
-    assert fingerprint
     external_page = Entities.PAGE.create(
         {
             "name": f"Reconnect Refresh Page {uuid4().hex}",

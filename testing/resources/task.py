@@ -306,7 +306,11 @@ class Task(SiteResource):
         page.uncomplete_task(self)
 
     def mark_completed(self):
-        """Complete the task programmatically (no UI navigation required)."""
+        """Establish an already-completed setup task without UI navigation.
+
+        Do not use this helper when completion or its persistence is the E2E
+        behavior under test; use the visible completion control in that story.
+        """
         self.entity.completed = True
         self.entity.completed_on = datetime.now()
         self.entity.save()

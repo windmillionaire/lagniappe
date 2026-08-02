@@ -272,25 +272,32 @@ def _submit_user_settings_and_wait_for_reload(user, settings_panel):
     expect(user.locate("[lp-view]")).to_have_attribute("initialized", "")
 
 
-def _assert_site_image_links(site_image):
-    expected_filenames = [
+def _assert_site_image_links(site_image, image_data):
+    required_filenames = {
         "favicon-16x16.png",
         "favicon-32x32.png",
         "favicon.ico",
         "apple-touch-icon.png",
         "logo-192x192.png",
         "logo-512x512.png",
-    ]
+    }
+    assert required_filenames.issubset(image_data)
+    displayed_images = {
+        filename: url
+        for filename, url in image_data.items()
+        if not filename.startswith("splash-")
+    }
 
     preview = site_image.locator("img[alt='Site image']")
     expect(preview).to_be_visible()
     expect(preview).to_have_attribute("src", re.compile(r"/images/"))
     expect(preview).to_have_js_property("complete", True)
     assert preview.evaluate("(image) => image.naturalWidth") > 0
-    for filename in expected_filenames:
+    expect(site_image.locator("a")).to_have_count(len(displayed_images))
+    for filename, url in displayed_images.items():
         link = site_image.locator("a", has_text=filename)
         expect(link).to_be_visible()
-        assert filename in link.get_attribute("href")
+        expect(link).to_have_attribute("href", url)
 
 
 def _submission_payload(submission):
@@ -802,20 +809,26 @@ def test_user_settings_preloads_existing_groups(get_user):
         second_group.entity.urlsafe_key,
     }
 
-    preload_attribute = groups.locator("[lp-select]").get_attribute("data-preload")
+    preload_element = groups.locator("[lp-select]")
+    expect(preload_element).to_have_attribute("data-preload", re.compile(r"\S+"))
+    preload_attribute = preload_element.get_attribute("data-preload")
     preload = json.loads(preload_attribute)
     assert {group["id"] for group in preload} == expected_group_ids
-    selected_group_ids = set(
-        groups.evaluate(
-            """root => Array.from(
-                root.querySelector("select[name='group']").selectedOptions,
-                option => option.value,
-            )"""
+    selected_options = groups.locator("select[name='group'] option:checked")
+    expect(selected_options).to_have_count(len(expected_group_ids))
+    for group_id in expected_group_ids:
+        expect(
+            groups.locator(
+                f"select[name='group'] option[value='{group_id}']:checked"
+            )
+        ).to_have_count(1)
+    for group_name in (
+        first_group.definition.name,
+        second_group.definition.name,
+    ):
+        expect(group_select.input).to_have_attribute(
+            "placeholder", re.compile(re.escape(group_name))
         )
-    )
-    assert selected_group_ids == expected_group_ids
-    assert first_group.definition.name in group_select.placeholder
-    assert second_group.definition.name in group_select.placeholder
 
 
 # @pair user-settings:owner-other-page
@@ -986,6 +999,38 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     assert validation.json()["cacheCleared"] is True
     assert Entities.USER.load(updated_email).invalidate_cache is False
     expect(affected_user.page).to_have_title("Home")
+
+    user_page.reload()
+    info_form = user_page.info_form
+    expect(info_form).to_be_visible()
+    assert user_page.verify_submission(initial_submission)
+    categories = info_form.locator("[data-role='categories']")
+    expect(categories).to_be_visible()
+    expect(Select(categories).input).to_have_attribute(
+        "placeholder", re.compile(re.escape(category.definition.name))
+    )
+    expect(info_form.locator("[data-role='form-select']")).to_contain_text(
+        form.definition.name
+    )
+
+    settings_panel = _open_user_settings(owner, user_page)
+    expect(settings_panel.locator("input[name='name']")).to_have_value(updated_name)
+    expect(settings_panel.locator("input[name='email']")).to_have_value(updated_email)
+    settings_groups = settings_panel.locator("[data-role='user-groups']")
+    expect(
+        settings_groups.locator(
+            "select[name='group'] "
+            f"option[value='{membership_group.entity.urlsafe_key}']:checked"
+        )
+    ).to_have_count(1)
+    expect(Select(settings_groups).input).to_have_attribute(
+        "placeholder", re.compile(re.escape(membership_group.definition.name))
+    )
+    expect(
+        settings_panel.locator(Page.PAGE_RESTRICTED_GROUP_LIST).filter(
+            has_text=restriction_group.definition.name
+        )
+    ).to_be_visible()
 
     _tabs_controls(owner).locator(Buttons.LP_CLOSE).click()
     expect(settings_panel).not_to_be_visible()
@@ -1281,7 +1326,7 @@ def test_site_settings_image_upload_generates_and_persists_site_images(get_user)
     assert "logo-192x192.png" in image_data
 
     site_image = settings_panel.locator("[data-role='site-image']")
-    _assert_site_image_links(site_image)
+    _assert_site_image_links(site_image, image_data)
 
     owner.reload(admin)
     settings_panel = owner.locate(admin.SITE_SETTINGS_FORM)
@@ -1289,4 +1334,4 @@ def test_site_settings_image_upload_generates_and_persists_site_images(get_user)
     _open_site_settings_section(settings_panel, "site-image")
 
     persisted_site_image = settings_panel.locator("[data-role='site-image']")
-    _assert_site_image_links(persisted_site_image)
+    _assert_site_image_links(persisted_site_image, image_data)

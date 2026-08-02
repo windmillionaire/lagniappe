@@ -1,7 +1,9 @@
 """Deferred page autofill stories grounded in attached-file summaries."""
 
+from dataclasses import replace
 import json
 import re
+from uuid import uuid4
 
 import pytest
 from playwright.sync_api import expect
@@ -13,6 +15,7 @@ from lagniappe.core.tools.database.core import KINDS
 from lagniappe.core.tools.database.filter import Filter, Query
 from lagniappe.core.tools.deferred_jobs import DeferredJobs
 from testing.definitions import Pages, Users
+from testing.resources import Page
 
 
 pytestmark = pytest.mark.e2e
@@ -60,7 +63,13 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     get_user, monkeypatch, browser_failures
 ):
     user = get_user(Users.OWNER)
-    page = Pages.test_page_autofill.get(user)
+    page = Page(
+        user=user,
+        definition=replace(
+            Pages.test_page_autofill.value.definition,
+            name=f"Autofill Evidence Page {uuid4().hex}",
+        ),
+    ).create()
     _attach_evidence(page)
     user.go(page)
 

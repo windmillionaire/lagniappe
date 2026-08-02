@@ -1,5 +1,6 @@
 """E2E coverage for offline PageInfo submissions and replay."""
 
+from dataclasses import replace
 import re
 from uuid import uuid4
 
@@ -11,6 +12,7 @@ from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Users
 from testing.elements import Tabs
 from testing.resources import Page
+from testing.utility import expect_successful_response
 
 
 pytestmark = pytest.mark.e2e
@@ -213,7 +215,15 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
 # @template pages/info.html::info_form
 def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_failures):
     owner = get_user(Users.OWNER)
-    page = owner.go(Pages.test_offline_sync_form_page)
+    collaborator = get_user(Users.admin, creator=owner)
+    page = Page(
+        user=owner,
+        definition=replace(
+            Pages.test_offline_sync_form_page.value.definition,
+            name=_unique("Offline conflict page"),
+        ),
+    ).create()
+    page = owner.go(page)
     queued_value = _unique("Queued conflict value")
     saved_value = _unique("Intervening saved value")
 
@@ -225,9 +235,25 @@ def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_
         expect(_main_submit(info)).to_contain_text("Queued Sync")
         _wait_for_mutation_records(owner, exact=1)
 
-    saved_page = Entities.fetch_one(page.key, request=Fetch.direct())
-    saved_page.form_submission({"sync-text": saved_value})
-    saved_page.save()
+    collaborator.page.goto(page.url)
+    expect(collaborator.locate("[lp-view]")).to_have_attribute("initialized", "")
+    collaborator_info = collaborator.locate(Page.INFO_FORM)
+    expect(collaborator_info).to_have_attribute("rendered", "")
+    _fill_form_element(
+        collaborator_info,
+        "[id^='sync-text-renderer-']",
+        saved_value,
+    )
+    with expect_successful_response(
+        collaborator.page,
+        method="PUT",
+        path=f"/pages/{page.key}/update",
+        entity_key=page.key,
+    ):
+        _main_submit(collaborator_info).click()
+    expect(collaborator_info.locator("input[name='sync-text']")).to_have_value(
+        saved_value
+    )
 
     with owner.page.expect_response("**/pages/*/update", timeout=15000):
         owner.offline = False

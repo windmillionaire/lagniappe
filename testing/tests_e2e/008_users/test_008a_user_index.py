@@ -150,8 +150,8 @@ def test_users_index_public_toggle_shows_public_users(get_user, browser_failures
         expect(table.get_row(owner.name)).to_have_count(0)
 
         root = owner.locate("[lp-view]")
+        expect(root).to_have_attribute("data-fingerprint", re.compile(r"\S+"))
         fingerprint = root.get_attribute("data-fingerprint")
-        assert fingerprint
         refreshed_public_user = _create_public_user(
             refreshed_public_email,
             refreshed_public_name,
@@ -244,6 +244,14 @@ def test_create_user_from_index(get_user):
 
     new_row.locator(Table.ENTITY_URL).click()
     expect(owner.page).to_have_title(re.compile(created_user.name))
+    settings_toggle = owner.locate(Page.USER_SETTINGS_TOGGLE).first
+    expect(settings_toggle).to_be_visible()
+    settings_toggle.click()
+    settings_panel = owner.locate(Page.USER_SETTINGS_FORM)
+    expect(settings_panel).to_be_visible()
+    expect(
+        settings_panel.locator("input[name='ai_access'][value='ASK']")
+    ).to_be_checked()
 
 
 # @features users
@@ -313,12 +321,33 @@ def test_create_user_group_selector_accepts_multiple_groups(get_user):
         second_group.entity.urlsafe_key,
     }
 
-    _create_user(owner, create_form, created_user)
+    new_row = _create_user(owner, create_form, created_user)
     saved_user = Entities.USER.load(created_user.email)
     assert {group.key for group in saved_user.groups} == {
         first_group.entity.key,
         second_group.entity.key,
     }
+
+    new_row.locator(Table.ENTITY_URL).click()
+    expect(owner.page).to_have_title(re.compile(created_user.name))
+    settings_toggle = owner.locate(Page.USER_SETTINGS_TOGGLE).first
+    expect(settings_toggle).to_be_visible()
+    settings_toggle.click()
+    groups = owner.locate(Page.USER_SETTINGS_FORM).locator(
+        "[data-role='user-groups']"
+    )
+    expect(groups.locator("select[name='group'] option:checked")).to_have_count(2)
+    group_input = Select(groups).input
+    for group in (first_group, second_group):
+        expect(
+            groups.locator(
+                "select[name='group'] "
+                f"option[value='{group.entity.urlsafe_key}']:checked"
+            )
+        ).to_have_count(1)
+        expect(group_input).to_have_attribute(
+            "placeholder", re.compile(re.escape(group.definition.name))
+        )
 
 
 # @pair table-controls:mobile-startup
@@ -460,6 +489,7 @@ def test_delete_user_can_preserve_page(get_user):
         with owner.page.expect_response("**/users/*/delete") as response_info:
             cascade_modal.delete()
 
+        expect(cascade_row).not_to_be_attached()
         assert response_info.value.request.post_data_json == {"delete-page": True}
         assert Entities.fetch_one(cascade_user_key, request=Fetch.root()) is None
         assert Entities.fetch_one(cascade_page_key, request=Fetch.root()) is None
@@ -477,6 +507,7 @@ def test_delete_user_can_preserve_page(get_user):
         with owner.page.expect_response("**/users/*/delete") as response_info:
             modal.delete()
 
+        expect(row).not_to_be_attached()
         assert response_info.value.request.post_data_json == {"delete-page": False}
         assert Entities.fetch_one(user_key, request=Fetch.root()) is None
 
@@ -484,6 +515,21 @@ def test_delete_user_can_preserve_page(get_user):
         assert preserved_page is not None
         assert preserved_page.user is None
         assert preserved_page.model.name == "Uncategorized Pages"
+
+        owner.page.reload()
+        expect(owner.locate("[lp-view]")).to_have_attribute("initialized", "")
+        expect(Table(owner).get_row(cascade_user.name)).to_have_count(0)
+        expect(Table(owner).get_row(created_user.name)).to_have_count(0)
+
+        preserved_resource = Page(
+            user=owner,
+            definition=SimpleNamespace(name=preserved_page.name),
+        )
+        preserved_resource.entity = preserved_page
+        owner.go(preserved_resource)
+        expect(owner.page).to_have_title(re.compile(preserved_page.name))
+        expect(owner.locate(Page.PAGE_TITLE)).to_contain_text(preserved_page.name)
+        expect(owner.locate(Page.USER_SETTINGS_TOGGLE)).to_have_count(0)
     finally:
         cascade_page = Entities.fetch_one(cascade_page_key, request=Fetch.direct())
         if cascade_page:

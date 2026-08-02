@@ -66,12 +66,11 @@ E2E_SYNTHETIC_INPUT_EVENTS = {
     "touchstart",
 }
 E2E_SYNTHETIC_LIFECYCLE_EVENTS = {"focus", "offline", "online"}
+E2E_NONRETRYING_BROWSER_GETTERS = {"get_attribute", "inner_text"}
 E2E_DIRECT_AI_HELPERS = {
     "complete_ask_report",
     "complete_organize_submissions",
 }
-
-
 def _python_files(*roots):
     for root in roots:
         yield from root.rglob("*.py")
@@ -259,6 +258,114 @@ def _e2e_wait_shortcut_violations(path):
             violations.append(
                 f"{path}:{line} dispatches synthetic browser lifecycle event"
             )
+
+    return violations
+
+
+def _browser_snapshot_method(node):
+    """Return the raw locator getter name represented by one call, if any."""
+    if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+        return None
+    if node.func.attr in E2E_NONRETRYING_BROWSER_GETTERS:
+        return node.func.attr
+    if node.func.attr == "count" and not node.args and not node.keywords:
+        return node.func.attr
+    return None
+
+
+def _asserts_snapshot_name(node, names):
+    """Whether an assertion directly checks a value read from a locator."""
+    if isinstance(node, ast.Name):
+        return node.id in names
+    if isinstance(node, ast.BoolOp):
+        return any(_asserts_snapshot_name(value, names) for value in node.values)
+    if isinstance(node, ast.Compare):
+        # A raw attribute on the left is the assertion subject. A raw value on
+        # the right is commonly a settled identifier expected in a response.
+        return _asserts_snapshot_name(node.left, names)
+    if isinstance(node, ast.UnaryOp):
+        return _asserts_snapshot_name(node.operand, names)
+    if isinstance(node, (ast.Attribute, ast.Subscript)):
+        return _asserts_snapshot_name(node.value, names)
+    if isinstance(node, ast.Call):
+        if isinstance(node.func, ast.Attribute):
+            return _asserts_snapshot_name(node.func.value, names)
+        if isinstance(node.func, ast.Name) and node.func.id in {"bool", "len"}:
+            return any(_asserts_snapshot_name(arg, names) for arg in node.args)
+    return False
+
+
+def _e2e_nonretrying_assertion_violations(path):
+    """Return assertion-shaped locator snapshots that should use expect()."""
+    tree = ast.parse(path.read_text(), filename=str(path))
+    violations = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assert):
+            for child in ast.walk(node.test):
+                if method := _browser_snapshot_method(child):
+                    violations.append(
+                        f"{path}:{child.lineno} asserts raw {method}() snapshot"
+                    )
+
+        if (
+            isinstance(node, (ast.For, ast.AsyncFor))
+            and isinstance(node.iter, ast.Call)
+            and isinstance(node.iter.func, ast.Attribute)
+            and node.iter.func.attr == "all"
+        ):
+            violations.append(f"{path}:{node.iter.lineno} iterates locator.all()")
+
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "range"
+        ):
+            continue
+        for child in ast.walk(node):
+            if _browser_snapshot_method(child) == "count":
+                violations.append(
+                    f"{path}:{child.lineno} enumerates range(locator.count())"
+                )
+
+    for scope in (
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ):
+        snapshot_assignments = {}
+        for node in ast.walk(scope):
+            if isinstance(node, ast.Assign):
+                targets = node.targets
+                value = node.value
+            elif isinstance(node, ast.AnnAssign):
+                targets = [node.target]
+                value = node.value
+            else:
+                continue
+            method = _browser_snapshot_method(value)
+            if method is None:
+                continue
+            for target in targets:
+                if isinstance(target, ast.Name):
+                    snapshot_assignments[target.id] = (method, value.lineno)
+
+        if not snapshot_assignments:
+            continue
+        for assertion in (
+            node for node in ast.walk(scope) if isinstance(node, ast.Assert)
+        ):
+            checked_names = {
+                name
+                for name in snapshot_assignments
+                if _asserts_snapshot_name(assertion.test, {name})
+            }
+            for name in sorted(checked_names):
+                method, assignment_line = snapshot_assignments[name]
+                violations.append(
+                    f"{path}:{assertion.lineno} asserts {name} from raw "
+                    f"{method}() on line {assignment_line}"
+                )
 
     return violations
 
@@ -510,6 +617,15 @@ def test_e2e_support_does_not_poll_in_python_or_dispatch_lifecycle_events():
     assert violations == []
 
 
+def test_e2e_support_does_not_use_nonretrying_browser_assertions():
+    """Browser outcomes use retrying locator expectations, not DOM snapshots."""
+    violations = []
+    for path in _python_files(*E2E_BROWSER_INTERACTION_ROOTS):
+        violations.extend(_e2e_nonretrying_assertion_violations(path))
+
+    assert violations == []
+
+
 def test_e2e_browser_storage_guard_rejects_white_box_access(tmp_path):
     path = tmp_path / "test_browser_storage.py"
     path.write_text(
@@ -557,6 +673,40 @@ def test_e2e_wait_guard_rejects_python_polling_and_lifecycle_dispatch(tmp_path):
     assert any("polls in Python with sleep" in item for item in violations)
     assert any("dispatches synthetic focus" in item for item in violations)
     assert any("synthetic browser lifecycle event" in item for item in violations)
+
+
+def test_e2e_assertion_guard_rejects_locator_snapshots(tmp_path):
+    path = tmp_path / "test_nonretrying_assertions.py"
+    path.write_text(
+        "def test_example():\n"
+        "    links = modal.locator('a')\n"
+        "    assert links.count() >= 4\n"
+        "    for link in links.all():\n"
+        "        assert link.inner_text()\n"
+        "    href = links.first.get_attribute('href')\n"
+        "    assert href and href.startswith('/pages/')\n"
+        "    for index in range(links.count()):\n"
+        "        visit(links.nth(index))\n"
+    )
+
+    violations = _e2e_nonretrying_assertion_violations(path)
+
+    assert any("asserts raw count() snapshot" in item for item in violations)
+    assert any("iterates locator.all()" in item for item in violations)
+    assert any("asserts raw inner_text() snapshot" in item for item in violations)
+    assert any("asserts href from raw get_attribute()" in item for item in violations)
+    assert any("enumerates range(locator.count())" in item for item in violations)
+
+    allowed = tmp_path / "test_identifier_extraction.py"
+    allowed.write_text(
+        "def test_example():\n"
+        "    expect(item).to_have_attribute('data-key', NONEMPTY)\n"
+        "    key = item.get_attribute('data-key')\n"
+        "    entity = fetch(key)\n"
+        "    assert entity is not None\n"
+    )
+
+    assert _e2e_nonretrying_assertion_violations(allowed) == []
 
 
 def test_e2e_modules_do_not_import_or_bypass_route_functions():
