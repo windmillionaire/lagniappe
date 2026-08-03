@@ -120,8 +120,8 @@
       script work in your Google Cloud account. Install both before continuing;
       you do not need to know Git beyond the commands in this guide.
     </p>
-    <div class="grid lg:grid-cols-2 gap-6">
-      <div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="min-w-0">
         <h4 class="font-semibold text-base-dark mb-2">Windows</h4>
         <ol class="text-base-medium text-sm space-y-3 list-decimal ml-5">
           <li>
@@ -143,31 +143,50 @@
         </ol>
         {{ code("git --version\ngcloud.cmd --version") }}
       </div>
-      <div>
+      <div class="min-w-0">
         <h4 class="font-semibold text-base-dark mb-2">macOS</h4>
         <ol class="text-base-medium text-sm space-y-3 list-decimal ml-5">
           <li>
-            Open Terminal and run the command below to install Apple's Command
-            Line Tools, which include Git. Choose <strong>Install</strong> in
-            the macOS dialog. If macOS says the tools are already installed,
-            continue.
+            Open Terminal and check whether Git is installed:
           </li>
         </ol>
-        {{ code("xcode-select --install") }}
-        <p class="text-base-medium text-sm mt-2">
-          After the installation finishes, verify Git:
-        </p>
         {{ code("git --version") }}
+        <p class="text-base-medium text-sm mt-2">
+          On a new Mac, this opens Apple's
+          <strong>Install Command Line Developer Tools</strong> app, which
+          includes Git. If its window does not appear, click its icon in the
+          Dock. Choose <strong>Install</strong>, accept the license, and wait
+          for the installation to finish. Then run the same command again. If
+          it displays a Git version immediately, Git is already installed.
+        </p>
         <ol start="2"
+            class="text-base-medium text-sm space-y-3 list-decimal ml-5 mt-3">
+          <li>
+            Check whether the installed Python version is ready for Lagniappe:
+          </li>
+        </ol>
+        {{ code("python3") }}
+        <p class="text-base-medium text-sm mt-2">
+          Python displays its version and then a <code>&gt;&gt;&gt;</code> prompt.
+          Type <code>exit()</code> and press Enter to return to the normal
+          Terminal prompt. If the displayed version is 3.12 or newer,
+          continue. If it is 3.11 or older, or the command is not found,
+          download and run
+          {{ link("https://www.python.org/downloads/macos/", "Python.org's current macOS installer") }},
+          then close and reopen Terminal and run the check again.
+        </p>
+        <ol start="3"
             class="text-base-medium text-sm space-y-3 list-decimal ml-5 mt-3">
           <li>
             Run Google's interactive Cloud CLI installer. Accept the default
             install folder and answer <strong>Y</strong> when it asks to add
             <code>gcloud</code> to your PATH. Restart the shell and verify the
-            command:
+            command. This works from macOS's standard zsh Terminal;
+            <code>/bin/bash</code> runs only Google's installer and does not
+            change your shell:
           </li>
         </ol>
-        {{ code("curl https://sdk.cloud.google.com | bash") }}
+        {{ code("curl https://sdk.cloud.google.com | /bin/bash") }}
         {{ code("exec -l $SHELL") }}
         {{ code("gcloud --version") }}
       </div>
@@ -186,10 +205,10 @@
       Google Cloud CLI remain normal system tools.
     {% endcall %}
     {% call callout("note", False) %}
-      Lagniappe needs Python 3.12 or newer. On macOS, the current Google Cloud
-      CLI's bundled Python can usually supply it. On Windows, setup can offer
-      to install a supported standalone Python with WinGet if one is not
-      already available.
+      Lagniappe needs Python 3.12 or newer. The macOS steps above check Python
+      before installing Google Cloud CLI. On Windows, setup can offer to
+      install a supported standalone Python with WinGet if one is not already
+      available.
     {% endcall %}
   {% endcall %}
   {{ heading("Running the Commands") }}

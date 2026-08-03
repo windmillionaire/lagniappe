@@ -472,7 +472,8 @@ catalog and preserves any saved custom current model names.
 2. Switches to the correct GCloud configuration
 3. Starts Flask with `FLASK_ENV=testing` on the test port
 4. Filters server output to hide static file requests (fonts, chunks, icons, etc.)
-5. Waits for the server to respond to `/ping` before returning
+5. Allows a cold Flask import up to roughly 17 seconds to make `/ping` healthy
+   before treating startup as failed
 
 The repository test runner performs the same preflight before launching pytest
 when an E2E target—or the unscoped full suite—is requested. Unit, JavaScript,

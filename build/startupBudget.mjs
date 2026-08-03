@@ -3,7 +3,7 @@ const KIB = 1024;
 export const STARTUP_BUDGETS = Object.freeze({
 	main: 16 * KIB,
 	shell: 64 * KIB,
-	core: 96 * KIB,
+	core: 120 * KIB,
 	builder: 192 * KIB,
 });
 

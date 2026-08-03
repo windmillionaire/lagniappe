@@ -192,8 +192,7 @@ def test_offline_poll_recovers_without_online_event(get_user, browser_failures):
     expect(indicator).to_be_hidden()
 
 
-# @features offline
-# @dimensions sync-queue reconnect
+# @pairs sync:offline-replay sync:queue-clear
 def test_offline_prevents_sync_requests(get_user, browser_failures):
     """
     Test that going offline prevents sync network requests and that
@@ -212,17 +211,30 @@ def test_offline_prevents_sync_requests(get_user, browser_failures):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_toolbar_loads)
     editor = project.editor
+    document_sync_id = project.entity.sync_ids["document"]["id"]
 
     with browser_failures.expect_offline(user):
         user.offline = True
         editor.type_text("offline edit")
         editor.text_entry.blur()
-        wait_for_offline_sync_records(user, minimum=1)
+        wait_for_offline_sync_records(
+            user,
+            sync_id=document_sync_id,
+            minimum=1,
+        )
 
-    with user.page.expect_response("**/sync") as response_info:
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/sync",
+        request_payload_contains=document_sync_id,
+    ):
         user.offline = False
-    assert response_info.value.ok
-    wait_for_offline_sync_records(user, exact=0)
+    wait_for_offline_sync_records(
+        user,
+        sync_id=document_sync_id,
+        exact=0,
+    )
 
 
 # @features offline

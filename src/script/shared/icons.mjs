@@ -1,4 +1,4 @@
-import { ICONS } from "styles";
+import { ICONS } from "icons";
 
 /**
  * @testable true

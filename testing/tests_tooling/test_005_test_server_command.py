@@ -2,6 +2,7 @@
 
 from pathlib import Path
 import importlib
+import json
 import sys
 import types
 
@@ -91,6 +92,135 @@ def make_demo_app(tmp_path: Path) -> Path:
     return app_dir
 
 
+# @pairs test-server:freshness frontend-build:freshness frontend-build:no-op
+def test_test_frontend_bundle_skips_current_build(
+    import_config_testing,
+    monkeypatch,
+    tmp_path,
+):
+    testing = import_config_testing(make_demo_app(tmp_path))
+    state_path = tmp_path / "test-frontend-bundle.json"
+    state = {"schema": 1, "inputs": "inputs-1", "outputs": "outputs-1"}
+    state_path.write_text(json.dumps(state))
+
+    monkeypatch.setattr(testing, "_TEST_FRONTEND_BUNDLE_STATE", state_path)
+    monkeypatch.setattr(testing, "_test_frontend_input_fingerprint", lambda: "inputs-1")
+    monkeypatch.setattr(
+        testing, "_test_frontend_output_fingerprint", lambda: "outputs-1"
+    )
+    monkeypatch.setattr(
+        testing.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail("fresh bundle must not invoke npm"),
+    )
+
+    assert testing.ensure_test_frontend_bundle() is False
+
+
+# @pairs test-server:freshness frontend-build:freshness frontend-build:rebuild
+# @pair frontend-build:output-validation
+def test_test_frontend_bundle_rebuilds_stale_build(
+    import_config_testing,
+    monkeypatch,
+    tmp_path,
+):
+    testing = import_config_testing(make_demo_app(tmp_path))
+    state_path = tmp_path / "test-frontend-bundle.json"
+    calls = []
+    output_fingerprints = iter(["outputs-old", "outputs-new"])
+
+    monkeypatch.setattr(testing, "_TEST_FRONTEND_BUNDLE_STATE", state_path)
+    monkeypatch.setattr(
+        testing, "_test_frontend_input_fingerprint", lambda: "inputs-new"
+    )
+    monkeypatch.setattr(
+        testing,
+        "_test_frontend_output_fingerprint",
+        lambda: next(output_fingerprints),
+    )
+
+    def fake_run(command, **kwargs):
+        calls.append((command, kwargs))
+        return types.SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(testing.subprocess, "run", fake_run)
+
+    assert testing.ensure_test_frontend_bundle() is True
+    assert calls == [
+        ([testing.NPM_CLI, "run", "dev"], {"cwd": testing.APP_DIR, "check": False})
+    ]
+    assert json.loads(state_path.read_text()) == {
+        "schema": 1,
+        "inputs": "inputs-new",
+        "outputs": "outputs-new",
+    }
+
+
+# @pairs test-server:freshness frontend-build:freshness frontend-build:no-op
+# @pair frontend-build:e2e-session-isolation
+def test_test_frontend_bundle_defers_build_during_active_e2e_session(
+    import_config_testing,
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    testing = import_config_testing(make_demo_app(tmp_path))
+    lock_path = tmp_path / "lagniappe-e2e.lock"
+    monkeypatch.setattr(testing, "_e2e_session_lock_path", lambda: lock_path)
+
+    with lock_path.open("a+") as active_lock:
+        active_lock.write("pid=2468")
+        active_lock.flush()
+        testing.fcntl.flock(
+            active_lock,
+            testing.fcntl.LOCK_EX | testing.fcntl.LOCK_NB,
+        )
+        monkeypatch.setattr(
+            testing,
+            "_test_frontend_input_fingerprint",
+            lambda: pytest.fail("active E2E session must defer fingerprinting"),
+        )
+        monkeypatch.setattr(
+            testing.subprocess,
+            "run",
+            lambda *args, **kwargs: pytest.fail(
+                "active E2E session must not invoke npm"
+            ),
+        )
+
+        assert testing.ensure_test_frontend_bundle() is False
+        assert "preflight deferred" in capsys.readouterr().out
+
+
+# @pairs test-server:freshness frontend-build:freshness frontend-build:no-op
+# @pair frontend-build:production-preservation
+def test_test_frontend_bundle_preserves_production_build(
+    import_config_testing,
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    testing = import_config_testing(make_demo_app(tmp_path))
+    metadata_path = tmp_path / "build.json"
+    metadata_path.write_text(json.dumps({"mode": "production"}))
+    monkeypatch.setattr(testing, "_TEST_FRONTEND_BUILD_METADATA", metadata_path)
+    monkeypatch.setattr(
+        testing,
+        "_test_frontend_input_fingerprint",
+        lambda: pytest.fail("production bundle must bypass dev fingerprinting"),
+    )
+    monkeypatch.setattr(
+        testing.subprocess,
+        "run",
+        lambda *args, **kwargs: pytest.fail(
+            "production bundle must not invoke npm run dev"
+        ),
+    )
+
+    assert testing.ensure_test_frontend_bundle() is False
+    assert "Production frontend bundle detected" in capsys.readouterr().out
+
+
 def test_run_py_test_server_command_dispatches_start(monkeypatch, capsys):
     import run
 
@@ -140,6 +270,29 @@ def test_run_py_test_server_adc_mismatch_points_to_auth(monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "Test server command stopped:" in output
     assert "run.py auth" in output
+
+
+# @features test-server
+# @dimensions readiness slow-start
+def test_wait_for_server_allows_slow_local_startup(
+    import_config_testing, monkeypatch, tmp_path
+):
+    testing = import_config_testing(make_demo_app(tmp_path))
+    attempts = []
+    sleeps = []
+
+    def delayed_ping(url):
+        attempts.append(url)
+        if len(attempts) <= 10:
+            raise ConnectionError("server still starting")
+        return types.SimpleNamespace(status_code=200)
+
+    monkeypatch.setattr("requests.get", delayed_ping)
+    monkeypatch.setattr("time.sleep", sleeps.append)
+
+    assert testing.wait_for_server("http://127.0.0.1:5000") is True
+    assert len(attempts) == 11
+    assert sleeps == [2, *([0.5] * 10)]
 
 
 def test_run_test_server_prepares_frontend_before_flask_launch(

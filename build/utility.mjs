@@ -28,6 +28,55 @@ const rawStylesYaml = yaml.load(
 const constantsPath = "./config/constants.py";
 const browserProtocolPath = "./config/browser_protocol.json";
 const buildMetadataPath = "./lagniappe/web/static/build.json";
+const BOOT_CONNECTIVITY_MODULE = "shared/connectivity.mjs";
+const INTERACTION_FOUNDATION_MODULES = new Set([
+	"shared/endpoints.mjs",
+	"shared/errors.mjs",
+	"shared/request.mjs",
+	"shared/utilities.mjs",
+	"views/base/shell.mjs",
+]);
+const CORE_FOUNDATION_MODULES = new Set([
+	"elements/nav.mjs",
+	"views/base/component.mjs",
+	"views/base/core.mjs",
+	"views/base/reconciliation.mjs",
+	"views/base/services.mjs",
+	"views/base/task.mjs",
+	"widgets/loader.mjs",
+]);
+const INDEX_FOUNDATION_MODULES = new Set([
+	"views/base/index.mjs",
+	"widgets/tableVisibilityState.mjs",
+]);
+
+/**
+ * Keep the interaction-critical view graph in stable chunks so templates can
+ * preload it without depending on Rollup's incidental shared-chunk split.
+ * Connectivity stays separate because the main boot entry imports it too.
+ *
+ * @testable true
+ * @tests tests_js/test_032_build_configuration.py::test_interaction_preloads_have_stable_manual_chunks
+ * @tests tests_js/test_032_build_configuration.py::test_templates_preload_registered_view_and_interaction_foundations
+ * @pairs frontend-build:chunking frontend-build:modulepreload frontend-build:interaction-foundation
+ */
+const interactionFoundationChunk = (id) => {
+	const normalized = id.replaceAll("\\", "/");
+	if (normalized.endsWith("/config/browser_protocol.json")) {
+		return "connectivity";
+	}
+	const marker = "/src/script/";
+	const sourceIndex = normalized.lastIndexOf(marker);
+	if (sourceIndex === -1) return undefined;
+	const relative = normalized.slice(sourceIndex + marker.length);
+	if (relative === BOOT_CONNECTIVITY_MODULE) return "connectivity";
+	if (relative === "views/base/entity.mjs") return "entity-foundation";
+	if (INDEX_FOUNDATION_MODULES.has(relative)) return "index-foundation";
+	if (CORE_FOUNDATION_MODULES.has(relative)) return "core-foundation";
+	return INTERACTION_FOUNDATION_MODULES.has(relative)
+		? "foundation"
+		: undefined;
+};
 
 /**
  * @testable false
@@ -303,10 +352,17 @@ const stylesYaml = normalizeStyleRegistry(rawStylesYaml);
  * @tests tests_js/test_018_style_pipeline.py::test_virtual_and_python_style_payloads_share_one_runtime_value
  * @pair style-build:runtime-parity
  */
-const virtualStyleModuleSource = (icons, styles) => {
-	const iconSource = `const ICONS = ${stringify(icons)};`;
-	const styleSource = `const STYLES = ${stringify(styles)};`;
-	return `${iconSource}\n${styleSource}\nexport { ICONS, STYLES };`;
+const virtualStyleModuleSource = (styles) => {
+	return `const STYLES = ${stringify(styles)};\nexport { STYLES };`;
+};
+
+/**
+ * @testable true
+ * @tests tests_js/test_018_style_pipeline.py::test_virtual_and_python_style_payloads_share_one_runtime_value
+ * @pair style-build:runtime-parity
+ */
+const virtualIconModuleSource = (icons) => {
+	return `const ICONS = ${stringify(icons)};\nexport { ICONS };`;
 };
 
 /**
@@ -354,19 +410,23 @@ const pythonStyleModuleSource = (name, registry) => {
  * @pair style-build:pipeline-contract
  */
 const buildStyles = () => {
+	const virtualModules = new Map([
+		[
+			STYLE_PIPELINE.registry.virtual_module,
+			virtualStyleModuleSource(stylesYaml),
+		],
+		[
+			STYLE_PIPELINE.registry.icons_virtual_module,
+			virtualIconModuleSource(iconsYaml),
+		],
+	]);
 	return {
 		name: "build-styles",
 		resolveId(source) {
-			if (source === STYLE_PIPELINE.registry.virtual_module) {
-				return source;
-			}
-			return null;
+			return virtualModules.has(source) ? source : null;
 		},
 		load(id) {
-			if (id === STYLE_PIPELINE.registry.virtual_module) {
-				return virtualStyleModuleSource(iconsYaml, stylesYaml);
-			}
-			return null;
+			return virtualModules.get(id) ?? null;
 		},
 		generateBundle() {
 			writeFileSync(
@@ -691,6 +751,7 @@ export {
 	emitPdfWorker,
 	emitThirdPartyLicenses,
 	generateBuildId,
+	interactionFoundationChunk,
 	normalizeIconRegistry,
 	normalizeStyleRegistry,
 	precacheUrls,
@@ -700,5 +761,6 @@ export {
 	updateConstantsBuildId,
 	updateServiceWorker,
 	versionChunkImports,
+	virtualIconModuleSource,
 	virtualStyleModuleSource,
 };

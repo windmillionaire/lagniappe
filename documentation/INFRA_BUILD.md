@@ -69,12 +69,17 @@ the backend `SENTRY_DSN` without hardcoded browser loader keys.
 
 The private application and public Manual share a small main boot entry.
 `src/script/viewRegistry.mjs` is the single source for runtime view selection
-and Rollup's stable named view entries under `chunks/views/`. A template emits
-one versioned `modulepreload` for its current view. Rollup automatically creates
-feature-level shared chunks from static and dynamic module boundaries; there is
-no blanket `shared` `manualChunks` group. Editor, PDF, modal, combobox, offline,
-sync, notification, and other feature chunks remain lazy until their owning
-surface requests them. The vendored Material Symbols Rounded subset is declared by
+and Rollup's stable named view entries under `chunks/views/`. Focused stable
+manual chunks separate connectivity, the shared shell/request foundation,
+Core, Entity, and EntityIndex tiers. Templates preload only the
+tiers required by their current view: shell-only, Core, Entity, or Index.
+EntityIndex's dropdown styling remains lazy with the dropdown. This prevents a
+cold page from discovering interaction-critical dependencies only after DOM
+readiness without making shell or Builder closures inherit Core. Rollup
+automatically creates the remaining feature-level chunks from static and
+dynamic module boundaries.
+Editor, PDF, modal, combobox, offline, sync, notification, and other feature
+chunks remain lazy until their owning surface requests them. The vendored Material Symbols Rounded subset is declared by
 `src/style/fonts.css`, bundled into `style.css`, and emitted with the other
 self-hosted fonts under `lagniappe/web/static/fonts/`.
 
@@ -106,7 +111,7 @@ Run via `npm run build`.
   `chunks/views/` entries and their feature chunks
 - **Startup budget**: `build/startupBudget.mjs` measures deduplicated minified
   static-import closures and fails above 16 KiB for main, 64 KiB for main plus
-  a shell view, 96 KiB for main plus a Core view, or 192 KiB for Builder. It
+  a shell view, 120 KiB for main plus a Core view, or 192 KiB for Builder. It
   also rejects OfflineQueue, SyncManager, EditWatcher,
   DeferredOperationManager, modal, notification, entity-menu, and combobox
   modules from every Core view's static closure.
@@ -135,23 +140,30 @@ Run via `npm run dev`.
 - **Test-server freshness**: E2E and managed test-server startup hashes the
   authored build inputs plus generated outputs and runs this build only when
   that state is stale or incomplete; the local state record lives at
-  `reports/test-frontend-bundle.json`
+  `reports/test-frontend-bundle.json`. A completed production build is
+  preserved instead of being replaced with development assets. Development
+  preflight holds the same interprocess lock as the E2E session, so another
+  attempted test run cannot remove chunks while a live browser run uses them.
 
 ## Custom Plugins (`utility.mjs`)
 
 ### `buildStyles()`
 
-A virtual module plugin that creates the `"styles"` import used throughout the frontend. Serves two purposes:
+This plugin creates separate `"styles"` and `"icons"` virtual imports. It
+serves two purposes:
 
-**JavaScript side**: When any module imports `from "styles"`, Rollup resolves it
-to a virtual module containing `ICONS` and `STYLES` as JSON objects parsed from
-`src/style/icons.yaml` and `src/style/styles.yaml`.
+**JavaScript side**: Rollup resolves `from "styles"` to the `STYLES` runtime
+tree parsed from `src/style/styles.yaml`, and `from "icons"` to the independent
+`ICONS` registry parsed from `src/style/icons.yaml`. Keeping the registries in
+separate modules lets interaction-critical icon helpers load without promoting
+the much larger style-class registry into the same static closure.
 
 **Python side**: During `generateBundle()`, writes the same data as Python
 dictionaries to `lagniappe/web/start/styles/icons.py` and `styles.py`. These
 auto-generated files are used by Jinja templates server-side.
 
-This ensures a single YAML source of truth for all style constants across both JavaScript and Python.
+This ensures a single YAML source of truth for all style constants across both
+JavaScript and Python.
 
 Icon IDs use lower camel case. Each leaf is a structured Material Symbols
 record with a snake-case `glyph`, explicit `fill` value, and optional validated
@@ -173,9 +185,9 @@ size, line height, or optical offsets. Icon-only controls consequently
 shrink-wrap the icon box and add only interaction styling.
 
 `src/style/pipeline.json` is the machine-readable contract for this path. It
-names the registry and virtual module, generated Python targets, CSS entry and
-output, explicit Tailwind sources, and the transforms used by each Rollup mode.
-Both Rollup configurations consume the CSS output from this contract.
+names both registries and virtual modules, generated Python targets, CSS entry
+and output, explicit Tailwind sources, and the transforms used by each Rollup
+mode. Both Rollup configurations consume the CSS output from this contract.
 
 Leaves in `styles.yaml` are typed records rather than bare strings:
 
@@ -191,7 +203,7 @@ button:
 An `alias` may replace `classes` when two semantic roles intentionally share a
 runtime value. The build rejects untyped leaves, unknown fields, invalid
 metadata, missing alias targets, and alias cycles. Normalization happens once;
-the virtual JavaScript module and generated Python map receive that same
+the virtual JavaScript style module and generated Python map receive that same
 string-valued runtime tree.
 
 ### Style Traceability

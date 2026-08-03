@@ -79,8 +79,9 @@ saveable. An accepted checkpoint clears that dirty state unless another local ed
 arrived while the save request was in flight.
 Offline forms become interactive from server HTML without reading queue state.
 Initial replay waits for view readiness. A successful write with a mounted form
-triggers an immediate poll instead of directly acknowledging the response, so
-normal EditWatcher reconciliation owns the update. Replay also remains
+triggers a fresh poll cycle instead of directly acknowledging the response; an
+already-in-flight poll is not accepted as evidence of the later write. Normal
+EditWatcher reconciliation therefore owns the update. Replay also remains
 fire-and-forget during reconnect: polling, sync, EditWatcher, and visible refresh
 resume without waiting on IndexedDB or queued requests. Public pages do not
 create any of these private managers.

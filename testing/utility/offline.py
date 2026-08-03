@@ -4,7 +4,7 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 OFFLINE_RECORDS = """
 async (storeName) => await new Promise((resolve) => {
         const request = indexedDB.open("offline-db", 5);
-        request.onerror = () => resolve([]);
+        request.onerror = () => resolve(null);
         request.onupgradeneeded = () => {
             const db = request.result;
             if (!db.objectStoreNames.contains("sync")) {
@@ -24,29 +24,33 @@ async (storeName) => await new Promise((resolve) => {
             const transaction = db.transaction(storeName, "readonly");
             const recordsRequest = transaction.objectStore(storeName).getAll();
             recordsRequest.onsuccess = () => resolve(recordsRequest.result || []);
-            recordsRequest.onerror = () => resolve([]);
+            recordsRequest.onerror = () => resolve(null);
             transaction.oncomplete = () => db.close();
             transaction.onerror = () => {
                 db.close();
-                resolve([]);
+                resolve(null);
             };
         };
 })
 """
 
 OFFLINE_RECORD_WAIT = f"""
-async ({{ storeName, minimum, exact, savedHtmlContains }}) => {{
+async ({{ storeName, minimum, exact, savedHtmlContains, recordKey, recordValue }}) => {{
     const readRecords = {OFFLINE_RECORDS};
     const rows = await readRecords(storeName);
+    if (!Array.isArray(rows)) return false;
+    const scopedRows = recordValue === null
+        ? rows
+        : rows.filter((row) => row?.[recordKey] === recordValue);
     const countMatches = exact === null
-        ? minimum === null || rows.length >= minimum
-        : rows.length === exact;
-    const contentMatches = savedHtmlContains.length === 0 || rows.some((row) =>
+        ? minimum === null || scopedRows.length >= minimum
+        : scopedRows.length === exact;
+    const contentMatches = savedHtmlContains.length === 0 || scopedRows.some((row) =>
         row?.save === true &&
         typeof row?.html === "string" &&
         savedHtmlContains.every((part) => row.html.includes(part))
     );
-    return countMatches && contentMatches ? rows : false;
+    return countMatches && contentMatches ? scopedRows : false;
 }}
 """
 
@@ -63,8 +67,12 @@ def _validate_record_wait(*, minimum, exact, saved_html_contains):
             raise ValueError(f"Offline record {label} must be non-negative.")
 
 
-def _record_wait_description(*, minimum, exact, saved_html_contains):
+def _record_wait_description(
+    *, minimum, exact, saved_html_contains, record_key, record_value
+):
     conditions = []
+    if record_value is not None:
+        conditions.append(f"{record_key}={record_value!r}")
     if exact is not None:
         conditions.append(f"exactly {exact} record(s)")
     elif minimum is not None:
@@ -81,6 +89,9 @@ def _wait_for_offline_records(
     minimum=None,
     exact=None,
     saved_html_contains=(),
+    record_key=None,
+    record_value=None,
+    timeout=None,
 ):
     saved_html_contains = tuple(saved_html_contains)
     _validate_record_wait(
@@ -93,19 +104,43 @@ def _wait_for_offline_records(
         "minimum": minimum,
         "exact": exact,
         "savedHtmlContains": list(saved_html_contains),
+        "recordKey": record_key,
+        "recordValue": record_value,
     }
     try:
-        result = user.page.wait_for_function(OFFLINE_RECORD_WAIT, arg=args)
+        options = {"arg": args}
+        if timeout is not None:
+            options["timeout"] = timeout
+        result = user.page.wait_for_function(OFFLINE_RECORD_WAIT, **options)
     except PlaywrightTimeoutError as error:
-        rows = user.page.evaluate(OFFLINE_RECORDS, arg=store_name)
+        all_rows = user.page.evaluate(OFFLINE_RECORDS, arg=store_name)
+        read_failed = not isinstance(all_rows, list)
+        all_rows = all_rows if isinstance(all_rows, list) else []
+        rows = (
+            all_rows
+            if record_value is None
+            else [
+                row
+                for row in all_rows
+                if isinstance(row, dict) and row.get(record_key) == record_value
+            ]
+        )
         expected = _record_wait_description(
             minimum=minimum,
             exact=exact,
             saved_html_contains=saved_html_contains,
+            record_key=record_key,
+            record_value=record_value,
+        )
+        observed = (
+            "the IndexedDB read failed"
+            if read_failed
+            else f"found {len(rows)} matching record(s) out of "
+            f"{len(all_rows)} total: {rows!r}"
         )
         raise AssertionError(
             f"Expected offline {store_name} store to contain {expected}; "
-            f"found {len(rows)} record(s): {rows!r}."
+            f"{observed}."
         ) from error
 
     try:
@@ -114,13 +149,18 @@ def _wait_for_offline_records(
         result.dispose()
 
 
-def wait_for_offline_mutations(user, *, minimum=None, exact=None):
+def wait_for_offline_mutations(
+    user, *, minimum=None, exact=None, record_id=None, timeout=None
+):
     """Wait for the durable mutation queue, not a timing or network proxy."""
     return _wait_for_offline_records(
         user,
         "mutations",
         minimum=minimum,
         exact=exact,
+        record_key="id",
+        record_value=record_id,
+        timeout=timeout,
     )
 
 
@@ -130,6 +170,8 @@ def wait_for_offline_sync_records(
     minimum=None,
     exact=None,
     saved_html_contains=(),
+    sync_id=None,
+    timeout=None,
 ):
     """Wait for queued collaborative sync records in the browser."""
     return _wait_for_offline_records(
@@ -138,4 +180,7 @@ def wait_for_offline_sync_records(
         minimum=minimum,
         exact=exact,
         saved_html_contains=saved_html_contains,
+        record_key="sync_id",
+        record_value=sync_id,
+        timeout=timeout,
     )

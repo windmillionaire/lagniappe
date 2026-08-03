@@ -944,7 +944,7 @@ manual:
     intent: button presentation within manual
     surfaces: [server]
   codeShell:
-    classes: bg-base-dark rounded-lg my-2 max-w-full overflow-hidden
+    classes: bg-base-dark rounded-lg my-2 w-full min-w-0 max-w-full overflow-hidden
     intent: command block shell with a copy control
     surfaces: [server]
   codeToolbar:
@@ -956,7 +956,7 @@ manual:
     intent: copy a manual command to the clipboard
     surfaces: [server]
   code:
-    classes: text-project-light px-4 pb-4 pt-2 font-mono text-sm max-w-full overflow-x-auto whitespace-pre
+    classes: text-project-light px-4 pb-4 pt-2 font-mono text-sm block w-full min-w-0 max-w-full overflow-x-auto whitespace-pre
     intent: line-preserving, horizontally scrollable command block within manual content
     surfaces: [server]
   content:

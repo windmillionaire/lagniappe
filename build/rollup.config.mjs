@@ -18,6 +18,7 @@ import {
 	emitPdfWorker,
 	emitThirdPartyLicenses,
 	generateBuildId,
+	interactionFoundationChunk,
 	resolveMaterialSymbolsFont,
 	STYLE_PIPELINE,
 	updateConstantsBuildId,
@@ -138,6 +139,8 @@ export default [
 			entryFileNames: ({ name }) =>
 				name === "main" ? "script.js" : "chunks/views/[name].js",
 			chunkFileNames: "chunks/[name].js",
+			manualChunks: interactionFoundationChunk,
+			onlyExplicitManualChunks: true,
 			format: "esm",
 			sourcemap: sentry.sourcemap,
 			name: "lagniappe",

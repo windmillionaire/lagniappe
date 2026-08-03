@@ -349,8 +349,14 @@ def test_page_uploaded_pdf_toolbar_navigates_pages(get_user):
     expect(first_page).not_to_have_attribute("height", "0")
     assert _canvas_has_ink(first_page)
     expect(toolbar).to_be_visible()
-    expect(page_input).to_have_value("1")
     expect(page_count).to_have_text("/ 2")
+
+    # The active-page observer may already report page 2 when rendering or
+    # viewport restoration centers it. Establish the toolbar story's starting
+    # page through the same visible page control a user would use.
+    page_input.fill("1")
+    page_input.press("Enter")
+    expect(page_input).to_have_value("1")
     expect(previous_page).to_be_disabled()
     expect(next_page).to_be_enabled()
 
@@ -359,9 +365,10 @@ def test_page_uploaded_pdf_toolbar_navigates_pages(get_user):
     expect(previous_page).to_be_enabled()
     expect(next_page).to_be_disabled()
 
-    page_input.fill("1")
-    page_input.press("Enter")
+    previous_page.click()
     expect(page_input).to_have_value("1")
+    expect(previous_page).to_be_disabled()
+    expect(next_page).to_be_enabled()
 
     focus.click()
     expect(preview).to_have_attribute("data-fullscreen", "true")

@@ -1,4 +1,6 @@
 import copy
+from contextlib import contextmanager
+import fcntl
 import hashlib
 import json
 import os
@@ -45,6 +47,7 @@ FILTERED_PATTERNS = re.compile(
 
 _TEST_FRONTEND_BUNDLE_SCHEMA = 1
 _TEST_FRONTEND_BUNDLE_STATE = Directory.REPORTS.value / "test-frontend-bundle.json"
+_TEST_FRONTEND_BUILD_METADATA = APP_DIR / "lagniappe/web/static/build.json"
 _TEST_FRONTEND_INPUT_ROOTS = (
     Path("build"),
     Path("src/script"),
@@ -64,6 +67,52 @@ _TEST_FRONTEND_OUTPUT_FILES = (
     Path("lagniappe/web/static/style.css"),
     Path("lagniappe/web/static/sw.js"),
 )
+
+
+# @testable false
+# @covered-by runner/testing.py::ensure_test_frontend_bundle
+# @reason shared path contract with the E2E session fixture
+def _e2e_session_lock_path():
+    port = SETTINGS.test_config["SERVER_PORT"]
+    return Path("/tmp") / f"lagniappe-e2e-{port}.lock"
+
+
+# @testable false
+# @covered-by runner/testing.py::ensure_test_frontend_bundle
+# @reason prevents a preflight build from deleting chunks used by a live browser session
+@contextmanager
+def _test_frontend_bundle_session_guard():
+    lock_path = _e2e_session_lock_path()
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with lock_path.open("a+", encoding="utf-8") as lock_file:
+        acquired = False
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquired = True
+        except BlockingIOError:
+            lock_file.seek(0)
+            owner = lock_file.read().strip()
+            if owner != f"pid={os.getpid()}":
+                print(
+                    "Frontend test bundle preflight deferred while the E2E "
+                    f"session lock is held ({owner or 'unknown owner'}).",
+                    flush=True,
+                )
+                yield False
+                return
+
+        if acquired:
+            lock_file.seek(0)
+            lock_file.truncate()
+            lock_file.write(f"pid={os.getpid()}")
+            lock_file.flush()
+
+        try:
+            yield True
+        finally:
+            if acquired:
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
 
 
 # @testable false
@@ -128,59 +177,89 @@ def _read_test_frontend_bundle_state():
     return state if isinstance(state, dict) else None
 
 
+# @testable false
+# @covered-by runner/testing.py::ensure_test_frontend_bundle
+# @reason tolerant metadata read preserves intentional production builds without trusting malformed output
+def _test_frontend_bundle_mode():
+    try:
+        metadata = json.loads(
+            _TEST_FRONTEND_BUILD_METADATA.read_text(encoding="utf-8")
+        )
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return None
+    if not isinstance(metadata, dict):
+        return None
+    mode = metadata.get("mode")
+    return mode if isinstance(mode, str) else None
+
+
 # @testable true
-# @tests tests_tooling/test_003_config.py::test_test_frontend_bundle_skips_current_build
-# @tests tests_tooling/test_003_config.py::test_test_frontend_bundle_rebuilds_stale_build
+# @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_skips_current_build
+# @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_rebuilds_stale_build
+# @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_defers_build_during_active_e2e_session
+# @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_preserves_production_build
 # @pair test-server:freshness
 # @pair frontend-build:freshness
 # @pair frontend-build:no-op
 # @pair frontend-build:rebuild
 # @pair frontend-build:output-validation
+# @pair frontend-build:e2e-session-isolation
+# @pair frontend-build:production-preservation
 def ensure_test_frontend_bundle():
     """Build development assets when test-server inputs or outputs changed."""
-    input_fingerprint = _test_frontend_input_fingerprint()
-    output_fingerprint = _test_frontend_output_fingerprint()
-    state = _read_test_frontend_bundle_state()
-    if output_fingerprint is not None and state == {
-        "schema": _TEST_FRONTEND_BUNDLE_SCHEMA,
-        "inputs": input_fingerprint,
-        "outputs": output_fingerprint,
-    }:
+    if _test_frontend_bundle_mode() == "production":
+        print("Production frontend bundle detected; preserving it.", flush=True)
         return False
 
-    print("Frontend test bundle is stale; running npm run dev.", flush=True)
-    try:
-        result = subprocess.run(
-            [NPM_CLI, "run", "dev"],
-            cwd=APP_DIR,
-            check=False,
-        )
-    except FileNotFoundError as error:
-        raise RuntimeError("npm is required to build the frontend test bundle.") from error
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"Frontend test bundle build failed with exit code {result.returncode}."
-        )
+    with _test_frontend_bundle_session_guard() as may_build:
+        if not may_build:
+            return False
 
-    output_fingerprint = _test_frontend_output_fingerprint()
-    if output_fingerprint is None:
-        raise RuntimeError(
-            "Frontend test bundle build completed without required outputs."
-        )
+        input_fingerprint = _test_frontend_input_fingerprint()
+        output_fingerprint = _test_frontend_output_fingerprint()
+        state = _read_test_frontend_bundle_state()
+        if output_fingerprint is not None and state == {
+            "schema": _TEST_FRONTEND_BUNDLE_SCHEMA,
+            "inputs": input_fingerprint,
+            "outputs": output_fingerprint,
+        }:
+            return False
 
-    Directory.REPORTS.create()
-    state = {
-        "schema": _TEST_FRONTEND_BUNDLE_SCHEMA,
-        "inputs": input_fingerprint,
-        "outputs": output_fingerprint,
-    }
-    temporary = _TEST_FRONTEND_BUNDLE_STATE.with_suffix(".tmp")
-    temporary.write_text(
-        f"{json.dumps(state, indent=2)}\n",
-        encoding="utf-8",
-    )
-    temporary.replace(_TEST_FRONTEND_BUNDLE_STATE)
-    return True
+        print("Frontend test bundle is stale; running npm run dev.", flush=True)
+        try:
+            result = subprocess.run(
+                [NPM_CLI, "run", "dev"],
+                cwd=APP_DIR,
+                check=False,
+            )
+        except FileNotFoundError as error:
+            raise RuntimeError(
+                "npm is required to build the frontend test bundle."
+            ) from error
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"Frontend test bundle build failed with exit code {result.returncode}."
+            )
+
+        output_fingerprint = _test_frontend_output_fingerprint()
+        if output_fingerprint is None:
+            raise RuntimeError(
+                "Frontend test bundle build completed without required outputs."
+            )
+
+        Directory.REPORTS.create()
+        state = {
+            "schema": _TEST_FRONTEND_BUNDLE_SCHEMA,
+            "inputs": input_fingerprint,
+            "outputs": output_fingerprint,
+        }
+        temporary = _TEST_FRONTEND_BUNDLE_STATE.with_suffix(".tmp")
+        temporary.write_text(
+            f"{json.dumps(state, indent=2)}\n",
+            encoding="utf-8",
+        )
+        temporary.replace(_TEST_FRONTEND_BUNDLE_STATE)
+        return True
 
 
 def prepare_test_artifacts():
@@ -217,19 +296,24 @@ def update_test_indexes():
         File.INDEX_YAML.save(index_data)
 
 
-def wait_for_server(BASE_URL, max_retries=10):
+# @testable true
+# @tests tests_tooling/test_005_test_server_command.py::test_wait_for_server_allows_slow_local_startup
+# @features test-server
+# @dimensions readiness slow-start
+def wait_for_server(BASE_URL, max_retries=30):
     import requests
     from time import sleep
 
     sleep(2)
 
-    for i in range(max_retries):
+    for attempt in range(max_retries):
         try:
             response = requests.get(f"{BASE_URL}/ping")
             if response.status_code == 200:
                 return True
         except Exception as e:
             print(f"Error waiting for server: {e}")
+        if attempt < max_retries - 1:
             sleep(0.5)
 
     return False

@@ -323,64 +323,6 @@ def test_dependency_upgrade_updates_node_version_pin(monkeypatch, tmp_path):
     )
 
 
-# @pairs test-server:freshness frontend-build:freshness frontend-build:no-op
-def test_test_frontend_bundle_skips_current_build(monkeypatch, tmp_path):
-    from runner import testing
-
-    state_path = tmp_path / "test-frontend-bundle.json"
-    state = {"schema": 1, "inputs": "inputs-1", "outputs": "outputs-1"}
-    state_path.write_text(json.dumps(state))
-
-    monkeypatch.setattr(testing, "_TEST_FRONTEND_BUNDLE_STATE", state_path)
-    monkeypatch.setattr(testing, "_test_frontend_input_fingerprint", lambda: "inputs-1")
-    monkeypatch.setattr(
-        testing, "_test_frontend_output_fingerprint", lambda: "outputs-1"
-    )
-    monkeypatch.setattr(
-        testing.subprocess,
-        "run",
-        lambda *args, **kwargs: pytest.fail("fresh bundle must not invoke npm"),
-    )
-
-    assert testing.ensure_test_frontend_bundle() is False
-
-
-# @pairs test-server:freshness frontend-build:freshness frontend-build:rebuild
-# @pair frontend-build:output-validation
-def test_test_frontend_bundle_rebuilds_stale_build(monkeypatch, tmp_path):
-    from runner import testing
-
-    state_path = tmp_path / "test-frontend-bundle.json"
-    calls = []
-    output_fingerprints = iter(["outputs-old", "outputs-new"])
-
-    monkeypatch.setattr(testing, "_TEST_FRONTEND_BUNDLE_STATE", state_path)
-    monkeypatch.setattr(
-        testing, "_test_frontend_input_fingerprint", lambda: "inputs-new"
-    )
-    monkeypatch.setattr(
-        testing,
-        "_test_frontend_output_fingerprint",
-        lambda: next(output_fingerprints),
-    )
-
-    def fake_run(command, **kwargs):
-        calls.append((command, kwargs))
-        return types.SimpleNamespace(returncode=0)
-
-    monkeypatch.setattr(testing.subprocess, "run", fake_run)
-
-    assert testing.ensure_test_frontend_bundle() is True
-    assert calls == [
-        ([testing.NPM_CLI, "run", "dev"], {"cwd": testing.APP_DIR, "check": False})
-    ]
-    assert json.loads(state_path.read_text()) == {
-        "schema": 1,
-        "inputs": "inputs-new",
-        "outputs": "outputs-new",
-    }
-
-
 # @features config
 # @dimensions config-files parsing
 def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_path):

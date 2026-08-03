@@ -407,9 +407,10 @@ export class SyncManager {
 
 	/**
 	 * @testable true
+	 * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_prevents_sync_requests
 	 * @tests tests_js/test_010_sync_manager_frontend.py::test_sync_manager_uses_polling_subscriptions
 	 * @features sync
-	 * @dimensions checkpoint persistence dirty-state
+	 * @dimensions checkpoint persistence dirty-state offline-replay queue-clear
 	 */
 	async _sendUpdatesNow(
 		save = false,

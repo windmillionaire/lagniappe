@@ -7,6 +7,7 @@
 		"icons": "src/style/icons.yaml",
 		"icons_schema": "src/style/icons.schema.json",
 		"virtual_module": "styles",
+		"icons_virtual_module": "icons",
 		"python_styles": "lagniappe/web/start/styles/styles.py",
 		"python_icons": "lagniappe/web/start/styles/icons.py"
 	},

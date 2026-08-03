@@ -27,9 +27,6 @@ import("./build/sentry.mjs").then(({ resolveSentryBuild }) => {
 
 
 # @pair frontend-build:view-registry
-# @pair frontend-build:automatic-splitting
-# @pair frontend-build:startup-budgets
-# @pair frontend-build:module-boundaries
 def test_frontend_entries_and_startup_budget_contract(run_node):
     run_node(
         r'''
@@ -54,6 +51,7 @@ assert.deepEqual(Object.keys(VIEW_ENTRIES).sort(), [
   "page", "project", "report", "results", "user",
 ]);
 assert.equal(VIEW_REGISTRY.category.entry, VIEW_REGISTRY.form.entry);
+assert.equal(STARTUP_BUDGETS.core, 120 * 1024);
 
 for (const configPath of [
   "build/rollup.config.mjs",
@@ -62,7 +60,9 @@ for (const configPath of [
   const source = readFileSync(configPath, "utf8");
   assert.match(source, /VIEW_ENTRIES/);
   assert.match(source, /chunks\/views\/\[name\]\.js/);
-  assert.doesNotMatch(source, /manualChunks\s*[:(]/);
+  assert.match(source, /manualChunks: interactionFoundationChunk/);
+  assert.match(source, /onlyExplicitManualChunks: true/);
+  assert.equal((source.match(/manualChunks:/g) || []).length, 1);
 }
 
 const chunk = ({ name, code = "x", imports = [], modules = {} }) => ({
@@ -110,7 +110,7 @@ assert.throws(
 
 # @pair frontend-build:modulepreload
 # @pair frontend-build:view-registry
-def test_templates_preload_only_the_registered_current_view(run_node):
+def test_templates_preload_registered_view_and_interaction_foundations(run_node):
     run_node(
         r'''
 import assert from "node:assert/strict";
@@ -122,6 +122,24 @@ assert.match(base, /rel="modulepreload"/);
 assert.match(
   base,
   /\/chunks\/views\/\{\{ view_entry \}\}\.js\?v=\{\{ CONFIG\.BUILD_ID \}\}/,
+);
+assert.match(base, /\/chunks\/connectivity\.js\?v=\{\{ CONFIG\.BUILD_ID \}\}/);
+assert.match(base, /\/chunks\/foundation\.js\?v=\{\{ CONFIG\.BUILD_ID \}\}/);
+assert.match(
+  base,
+  /view_entry in \['project',[\s\S]*\/chunks\/core-foundation\.js\?v=\{\{ CONFIG\.BUILD_ID \}\}/,
+);
+assert.match(
+  base,
+  /view_entry in \['project', 'page', 'file', 'admin'\][\s\S]*\/chunks\/entity-foundation\.js\?v=\{\{ CONFIG\.BUILD_ID \}\}/,
+);
+assert.match(
+  base,
+  /view_entry == 'index'[\s\S]*\/chunks\/index-foundation\.js\?v=\{\{ CONFIG\.BUILD_ID \}\}/,
+);
+assert.doesNotMatch(
+  base,
+  /\/chunks\/(?:core|endpoints|errors|request|shell|utilities)\.js/,
 );
 
 const templates = [
@@ -141,6 +159,66 @@ for (const template of templates) {
     1,
     `${template} declares multiple view preloads`,
   );
+}
+''',
+        module=True,
+    )
+
+
+# @pair frontend-build:modulepreload
+# @pair frontend-build:interaction-foundation
+# @pair frontend-build:chunking
+def test_interaction_preloads_have_stable_manual_chunks(run_node):
+    run_node(
+        r'''
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { interactionFoundationChunk } from "./build/utility.mjs";
+
+const root = "/checkout/src/script/";
+for (const module of [
+  "shared/endpoints.mjs", "shared/errors.mjs", "shared/request.mjs",
+  "shared/utilities.mjs", "views/base/shell.mjs",
+]) {
+  assert.equal(interactionFoundationChunk(`${root}${module}`), "foundation");
+}
+assert.equal(
+  interactionFoundationChunk(`${root}shared/connectivity.mjs`),
+  "connectivity",
+);
+assert.equal(
+  interactionFoundationChunk("/checkout/config/browser_protocol.json"),
+  "connectivity",
+);
+for (const module of [
+  "elements/nav.mjs", "views/base/component.mjs", "views/base/core.mjs",
+  "views/base/reconciliation.mjs", "views/base/services.mjs",
+  "views/base/task.mjs", "widgets/loader.mjs",
+]) {
+  assert.equal(
+    interactionFoundationChunk(`${root}${module}`),
+    "core-foundation",
+  );
+}
+assert.equal(
+  interactionFoundationChunk(`${root}views/base/entity.mjs`),
+  "entity-foundation",
+);
+for (const module of [
+  "views/base/index.mjs", "widgets/tableVisibilityState.mjs",
+]) {
+  assert.equal(
+    interactionFoundationChunk(`${root}${module}`),
+    "index-foundation",
+  );
+}
+assert.equal(interactionFoundationChunk(`${root}views/home.mjs`), undefined);
+assert.equal(interactionFoundationChunk("\0virtual:styles"), undefined);
+
+for (const config of ["build/rollup.config.mjs", "build/rollup.dev.config.mjs"]) {
+  const source = readFileSync(config, "utf8");
+  assert.match(source, /manualChunks: interactionFoundationChunk/);
+  assert.match(source, /onlyExplicitManualChunks: true/);
 }
 ''',
         module=True,

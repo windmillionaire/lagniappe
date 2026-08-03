@@ -52,7 +52,8 @@ function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_batches_due_subscriptions_and_applies_results
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_enqueues_reentrant_followup_without_waiting
  * @features polling
- * @dimensions batching cadence lifecycle coalescing acknowledgement reentrancy requested-cycle
+ * @dimensions batching cadence lifecycle coalescing acknowledgement reentrancy requested-cycle freshness
+ * @pairs polling:reentrancy polling:requested-cycle polling:freshness
  */
 export class PollingCoordinator {
 	constructor(view) {
@@ -136,13 +137,14 @@ export class PollingCoordinator {
 		this._schedule(0);
 	}
 
-	trigger(ids = null) {
+	trigger(ids = null, { fresh = false } = {}) {
 		const requested =
 			ids === null
 				? new Set(this.subscriptions.keys())
 				: new Set(Array.isArray(ids) ? ids : [ids]);
 		if (
 			this.activePoll &&
+			!fresh &&
 			Array.from(requested).every((id) => this.activeIds.has(id))
 		) {
 			return this.activePoll;
@@ -309,10 +311,7 @@ export class PollingCoordinator {
 				}
 				return [];
 			}
-			if (
-				response.version !== 1 ||
-				!Array.isArray(response.results)
-			) {
+			if (response.version !== 1 || !Array.isArray(response.results)) {
 				throw new Error("Invalid polling response");
 			}
 			if (this.destroyed || this.view.hidden || !this.view.online) return [];

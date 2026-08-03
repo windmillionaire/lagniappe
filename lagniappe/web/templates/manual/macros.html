@@ -12,7 +12,8 @@
 {% endmacro %}
 
 {% macro card() %}
-  <div class="rounded-lg border border-base-light/50 bg-white p-5 mb-5">{{ caller() }}</div>
+  <div data-role="manual-card"
+       class="rounded-lg border border-base-light/50 bg-white p-5 mb-5">{{ caller() }}</div>
 {% endmacro %}
 
 {% macro callout(kind="info", margin_bottom=True) %}

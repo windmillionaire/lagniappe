@@ -389,6 +389,7 @@ def test_manual_security_section_loads(get_user):
 
 
 # @template manual/macros.html::code
+# @template manual/macros.html::card
 # @style manual.code
 # @style manual.codeShell
 # @style manual.codeToolbar
@@ -446,6 +447,27 @@ def test_manual_installation_commands_are_copyable_and_scroll_on_mobile(
         "scrollWidth: element.scrollWidth})"
     )
     assert dimensions["scrollWidth"] > dimensions["clientWidth"]
+
+    command_shells = anonymous.locate("[data-role='manual-command-shell']")
+    shell_bounds = command_shells.evaluate_all(
+        """elements => elements.map((element) => {
+                const shell = element.getBoundingClientRect();
+                const card = element.closest("[data-role='manual-card']");
+                const cardBounds = card.getBoundingClientRect();
+                const cardStyle = getComputedStyle(card);
+                return {
+                    shellLeft: shell.left,
+                    shellRight: shell.right,
+                    contentLeft:
+                        cardBounds.left + parseFloat(cardStyle.paddingLeft),
+                    contentRight:
+                        cardBounds.right - parseFloat(cardStyle.paddingRight),
+                };
+            })"""
+    )
+    for bounds in shell_bounds:
+        assert bounds["shellLeft"] >= bounds["contentLeft"] - 0.5
+        assert bounds["shellRight"] <= bounds["contentRight"] + 0.5
 
 
 # @features manual

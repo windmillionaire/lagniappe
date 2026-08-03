@@ -128,6 +128,7 @@ class EditorAddLink:
         if self.input.get_attribute("aria-expanded") == "true":
             self.input.press("Escape")
         self.form.locator(self.SUBMIT).evaluate("(button) => button.click()")
+        self.editor.wait_for_render()
 
     def select_search_result(self, query, text):
         self.input.fill(query)

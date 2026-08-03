@@ -12,58 +12,16 @@ from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Users
 from testing.elements import Tabs
 from testing.resources import Page
-from testing.utility import expect_successful_response
+from testing.utility import expect_successful_response, wait_for_offline_mutations
 
 
 pytestmark = pytest.mark.e2e
 
 OFFLINE_INDICATOR = "[data-role='offline']"
-MUTATION_DB_WAIT = """
-async ({ minimum, exact }) => {
-    const count = await new Promise((resolve) => {
-        const request = indexedDB.open("offline-db", 5);
-        request.onerror = () => resolve(0);
-        request.onupgradeneeded = () => {
-            const db = request.result;
-            if (!db.objectStoreNames.contains("sync")) {
-                db.createObjectStore("sync", { keyPath: "sync_id" });
-            }
-            if (!db.objectStoreNames.contains("mutations")) {
-                db.createObjectStore("mutations", { keyPath: "id" });
-            }
-        };
-        request.onsuccess = () => {
-            const db = request.result;
-            if (!db.objectStoreNames.contains("mutations")) {
-                db.close();
-                resolve(0);
-                return;
-            }
-            const tx = db.transaction("mutations", "readonly");
-            const countRequest = tx.objectStore("mutations").count();
-            countRequest.onsuccess = () => resolve(countRequest.result);
-            countRequest.onerror = () => resolve(0);
-            tx.oncomplete = () => db.close();
-            tx.onerror = () => {
-                db.close();
-                resolve(0);
-            };
-        };
-    });
-    return exact === null ? count >= minimum : count === exact;
-}
-"""
 
 
 def _unique(label):
     return f"{label} {uuid4().hex[:8]}"
-
-
-def _wait_for_mutation_records(user, *, minimum=None, exact=None):
-    user.page.wait_for_function(
-        MUTATION_DB_WAIT,
-        arg={"minimum": minimum, "exact": exact},
-    )
 
 
 def _main_submit(form):
@@ -87,6 +45,7 @@ def _fill_form_element(form, selector, value):
 def test_page_info_lp_offline_submit_replays_and_notifies(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = owner.go(Pages.test_offline_sync_form_page)
+    mutation_id = f"update:page:{page.key}"
     updated_name = _unique("Offline page info")
 
     info_form = page.info_form
@@ -116,11 +75,11 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_user, browser_fail
         info_submit.click()
         expect(info_submit).to_contain_text("Queued Sync")
         expect(info_submit.locator("[data-icon='offline']")).to_be_visible()
-        _wait_for_mutation_records(owner, exact=1)
+        wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
 
     with owner.page.expect_response("**/pages/*/update", timeout=15000):
         owner.offline = False
-    _wait_for_mutation_records(owner, exact=0)
+    wait_for_offline_mutations(owner, record_id=mutation_id, exact=0)
     expect(info_submit.locator("[data-icon='offline']")).to_have_count(0)
     expect(info_submit).to_contain_text("Update Page")
 
@@ -144,11 +103,13 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_user, browser_fail
 
 # @pairs offline:queue-submit offline:reload offline:replay-reconciliation
 # @pairs pages:lp-offline edited-entity-notice:replayed-response
+# @pairs polling:freshness
 # @template pages/info.html::info_form
 def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = owner.go(Pages.test_offline_sync_form_page)
     page = page.reload()
+    mutation_id = f"update:page:{page.key}"
     updated_submission = _unique("Reloaded offline submission")
 
     info_form = page.info_form
@@ -161,12 +122,16 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
         status=503,
         path="/analytics/track",
     ):
-        with browser_failures.expect_offline(owner, ping_count=2):
+        with browser_failures.expect_offline(
+            owner,
+            ping_count=2,
+            max_ping_count=3,
+        ):
             owner.offline = True
             info_submit = _main_submit(info_form)
             info_submit.click()
             expect(info_submit).to_contain_text("Queued Sync")
-            _wait_for_mutation_records(owner, exact=1)
+            wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
 
             page = page.reload()
             expect(owner.locate(OFFLINE_INDICATOR)).to_be_visible()
@@ -180,9 +145,9 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
             expect(current_submit).to_contain_text("Update Page")
             expect(current_submit.locator("[data-icon='offline']")).to_have_count(0)
 
-    with owner.page.expect_response("**/pages/*/update", timeout=15000):
-        owner.offline = False
-    _wait_for_mutation_records(owner, exact=0)
+            with owner.page.expect_response("**/pages/*/update", timeout=15000):
+                owner.offline = False
+            wait_for_offline_mutations(owner, record_id=mutation_id, exact=0)
 
     marker = current_form.locator("[lp-edited-marker]")
     expect(marker).to_be_visible()
@@ -209,7 +174,6 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
     )
 
 
-# @pairs offline:replay-precondition offline:conflict-review
 # @pairs forms:submission-choice forms:queued-conflict
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
@@ -224,6 +188,7 @@ def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_
         ),
     ).create()
     page = owner.go(page)
+    mutation_id = f"update:page:{page.key}"
     queued_value = _unique("Queued conflict value")
     saved_value = _unique("Intervening saved value")
 
@@ -233,7 +198,7 @@ def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_
         owner.offline = True
         _main_submit(info).click()
         expect(_main_submit(info)).to_contain_text("Queued Sync")
-        _wait_for_mutation_records(owner, exact=1)
+        wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
 
     collaborator.page.goto(page.url)
     expect(collaborator.locate("[lp-view]")).to_have_attribute("initialized", "")
@@ -263,7 +228,7 @@ def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_
     expect(marker.locator("[data-role='edited-message']")).to_contain_text(
         "Saved values changed elsewhere"
     )
-    _wait_for_mutation_records(owner, exact=1)
+    wait_for_offline_mutations(owner, record_id=mutation_id, exact=1)
 
     marker.locator("[data-role='edited-reset']").click()
     modal = owner.page.locator("#modal")
@@ -277,5 +242,5 @@ def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_
     modal.get_by_role("button", name="Update values").click()
 
     expect(modal).not_to_be_attached()
-    _wait_for_mutation_records(owner, exact=0)
+    wait_for_offline_mutations(owner, record_id=mutation_id, exact=0)
     expect(info.locator("input[name='sync-text']")).to_have_value(saved_value)

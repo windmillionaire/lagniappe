@@ -579,7 +579,22 @@ def test_offline_home_create_mutations_persist_after_reload(get_user, browser_fa
                 )
                 expect(note_item).to_have_attribute("data-offline", "true")
                 expect(task_item).to_have_attribute("data-offline", "true")
-                wait_for_offline_mutations(user, exact=2)
+                expect(note_item).to_have_attribute(
+                    "data-key", re.compile(r"^offline:")
+                )
+                expect(task_item).to_have_attribute(
+                    "data-key", re.compile(r"^offline:")
+                )
+                note_key = note_item.get_attribute("data-key")
+                task_key = task_item.get_attribute("data-key")
+                note_mutation_id = note_key.removeprefix("offline:")
+                task_mutation_id = task_key.removeprefix("offline:")
+                wait_for_offline_mutations(
+                    user, record_id=note_mutation_id, exact=1
+                )
+                wait_for_offline_mutations(
+                    user, record_id=task_mutation_id, exact=1
+                )
 
                 home = home.reload()
 
@@ -588,11 +603,18 @@ def test_offline_home_create_mutations_persist_after_reload(get_user, browser_fa
                 expect(_activity_item(home, note_body)).not_to_be_attached()
                 expect(_task_item(home, task_name)).not_to_be_attached()
 
-    with user.page.expect_response("**/activity/notes", timeout=15000):
-        with user.page.expect_response("**/personal", timeout=15000):
-            user.offline = False
+                with user.page.expect_response(
+                    "**/activity/notes", timeout=15000
+                ):
+                    with user.page.expect_response("**/personal", timeout=15000):
+                        user.offline = False
 
-    wait_for_offline_mutations(user, exact=0)
+                wait_for_offline_mutations(
+                    user, record_id=note_mutation_id, exact=0
+                )
+                wait_for_offline_mutations(
+                    user, record_id=task_mutation_id, exact=0
+                )
     home.activity_list
     expect(_activity_item(home, note_body)).to_be_visible()
     home.task_list
@@ -607,7 +629,8 @@ def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_fa
     user = get_user(Users.OWNER)
     note_body = _unique("Offline cached note")
     task_name = _unique("Offline cached task")
-    _save_personal_task(user, task_name)
+    task = _save_personal_task(user, task_name)
+    task_mutation_id = f"complete:{task.key}"
 
     home = user.go(SitePages.HOME)
     home = home.reload()
@@ -632,13 +655,24 @@ def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_fa
                 user, home, note_body, expect_network=False
             )
             expect(note_item).to_have_attribute("data-offline", "true")
-            wait_for_offline_mutations(user, exact=1)
+            expect(note_item).to_have_attribute(
+                "data-key", re.compile(r"^offline:")
+            )
+            note_key = note_item.get_attribute("data-key")
+            note_mutation_id = note_key.removeprefix("offline:")
+            wait_for_offline_mutations(
+                user, record_id=note_mutation_id, exact=1
+            )
             note_item.locator("[data-action='delete-activity']").click()
-            wait_for_offline_mutations(user, exact=0)
+            wait_for_offline_mutations(
+                user, record_id=note_mutation_id, exact=0
+            )
             task_item.locator("input[data-role='complete']").check()
             expect(note_item).not_to_be_attached()
             expect(task_item).not_to_be_attached()
-            wait_for_offline_mutations(user, exact=1)
+            wait_for_offline_mutations(
+                user, record_id=task_mutation_id, exact=1
+            )
 
             home = home.reload()
 
@@ -647,10 +681,12 @@ def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_fa
             expect(_activity_item(home, note_body)).not_to_be_attached()
             expect(_task_item(home, task_name)).to_be_attached()
 
-    with user.page.expect_response("**/complete", timeout=15000):
-        user.offline = False
+            with user.page.expect_response("**/complete", timeout=15000):
+                user.offline = False
 
-    wait_for_offline_mutations(user, exact=0)
+            wait_for_offline_mutations(
+                user, record_id=task_mutation_id, exact=0
+            )
     expect(_task_item(home, task_name)).not_to_be_attached()
 
 
@@ -695,6 +731,7 @@ def test_offline_task_complete_replays_after_reload(get_user, browser_failures):
     user = get_user(Users.OWNER)
     task_name = _unique("Offline complete task")
     task = _save_personal_task(user, task_name)
+    mutation_id = f"complete:{task.key}"
     expected_due_date = (
         local_date_from_utc_datetime(task.entity.due_date).date().isoformat()
     )
@@ -710,11 +747,15 @@ def test_offline_task_complete_replays_after_reload(get_user, browser_failures):
         status=503,
         path="/analytics/track",
     ):
-        with browser_failures.expect_offline(user, ping_count=2):
+        with browser_failures.expect_offline(
+            user,
+            ping_count=2,
+            max_ping_count=3,
+        ):
             user.offline = True
             task_item.locator("input[data-role='complete']").check()
             expect(task_item).not_to_be_attached()
-            wait_for_offline_mutations(user, exact=1)
+            wait_for_offline_mutations(user, record_id=mutation_id, exact=1)
 
             home = home.reload()
             _loaded_task_list(home)
@@ -722,8 +763,8 @@ def test_offline_task_complete_replays_after_reload(get_user, browser_failures):
                 "data-due-date", expected_due_date
             )
 
-    with user.page.expect_response("**/complete", timeout=15000):
-        user.offline = False
+            with user.page.expect_response("**/complete", timeout=15000):
+                user.offline = False
 
-    wait_for_offline_mutations(user, exact=0)
+            wait_for_offline_mutations(user, record_id=mutation_id, exact=0)
     expect(_task_item(home, task_name)).not_to_be_attached()

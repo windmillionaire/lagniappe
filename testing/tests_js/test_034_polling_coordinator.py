@@ -179,6 +179,7 @@ if (timerId !== 3 || clearedTimers.join(",") !== "1,2") {
 
 # @pair polling:reentrancy
 # @pair polling:requested-cycle
+# @pair polling:freshness
 def test_polling_coordinator_enqueues_reentrant_followup_without_waiting(run_node):
     run_node(
         r"""
@@ -269,6 +270,29 @@ coordinator.subscribe(
   await Promise.resolve();
 
   blockResponse = true;
+  const staleCycle = coordinator.trigger("entity:one");
+  for (let attempt = 0; attempt < 20 && !releaseResponse; attempt += 1) {
+    await Promise.resolve();
+  }
+  const freshCycle = coordinator.trigger("entity:one", { fresh: true });
+  if (freshCycle === staleCycle) {
+    throw new Error("Fresh trigger reused a poll that began before invalidation");
+  }
+  if (!releaseResponse) {
+    throw new Error("Stale cycle did not reach the response boundary");
+  }
+  blockResponse = false;
+  releaseResponse();
+  await staleCycle;
+  await freshCycle;
+  if (calls.length !== 4 ||
+      !calls.slice(-2).every((call) =>
+        call.subscriptions.some((item) => item.id === "entity:one"))) {
+    throw new Error("Fresh invalidation did not run one post-write poll cycle");
+  }
+
+  blockResponse = true;
+  releaseResponse = null;
   const active = coordinator.trigger("entity:one");
   for (let attempt = 0; attempt < 20 && !releaseResponse; attempt += 1) {
     await Promise.resolve();

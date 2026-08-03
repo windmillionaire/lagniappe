@@ -1,4 +1,3 @@
-import { STYLES } from "styles";
 import { withTransition } from "../../shared/utilities";
 import { TableVisibilityState } from "../../widgets/tableVisibilityState";
 import Core from "./core";
@@ -206,8 +205,11 @@ export default class EntityIndex extends Core {
 
 		const trigger = this.elt.querySelector("[data-role='tools-dropdown']");
 		if (!trigger) return;
-		this._dropdownPromise = import("../../elements/combobox/dropdown")
-			.then(({ Dropdown }) => {
+		this._dropdownPromise = Promise.all([
+			import("../../elements/combobox/dropdown"),
+			import("styles"),
+		])
+			.then(([{ Dropdown }, { STYLES }]) => {
 				if (this._destroyed || !this.mobile) return null;
 
 				const items = [];

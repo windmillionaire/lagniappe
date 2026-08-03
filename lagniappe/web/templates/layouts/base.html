@@ -20,6 +20,22 @@
     {% if view_entry %}
       <link rel="modulepreload"
             href="/chunks/views/{{ view_entry }}.js?v={{ CONFIG.BUILD_ID }}">
+      <link rel="modulepreload"
+            href="/chunks/connectivity.js?v={{ CONFIG.BUILD_ID }}">
+      <link rel="modulepreload"
+            href="/chunks/foundation.js?v={{ CONFIG.BUILD_ID }}">
+      {% if view_entry in ['project', 'page', 'home', 'user', 'index', 'file', 'report', 'admin'] %}
+        <link rel="modulepreload"
+              href="/chunks/core-foundation.js?v={{ CONFIG.BUILD_ID }}">
+      {% endif %}
+      {% if view_entry in ['project', 'page', 'file', 'admin'] %}
+        <link rel="modulepreload"
+              href="/chunks/entity-foundation.js?v={{ CONFIG.BUILD_ID }}">
+      {% endif %}
+      {% if view_entry == 'index' %}
+        <link rel="modulepreload"
+              href="/chunks/index-foundation.js?v={{ CONFIG.BUILD_ID }}">
+      {% endif %}
     {% endif %}
     {% if CONFIG.capture_errors %}
       <meta name="sentry-dsn" content="{{ CONFIG.SENTRY_JS_DSN }}">

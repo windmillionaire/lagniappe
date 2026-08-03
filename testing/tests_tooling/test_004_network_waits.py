@@ -406,8 +406,8 @@ class FakeOfflinePage:
         self.evaluation = None
         self.handle = None
 
-    def wait_for_function(self, expression, *, arg):
-        self.wait = (expression, arg)
+    def wait_for_function(self, expression, *, arg, timeout=None):
+        self.wait = (expression, arg, timeout)
         if self.timeout:
             raise PlaywrightTimeoutError("Offline record wait timed out")
         self.handle = FakeJavaScriptHandle(self.rows)
@@ -435,8 +435,28 @@ def test_offline_sync_wait_uses_browser_condition_and_returns_records():
         "minimum": 1,
         "exact": None,
         "savedHtmlContains": ["First offline edit", "Second offline edit"],
+        "recordKey": "sync_id",
+        "recordValue": None,
     }
+    assert page.wait[2] is None
     assert page.handle.disposed is True
+
+
+def test_offline_sync_wait_scopes_records_and_accepts_a_longer_bound():
+    rows = []
+    page = FakeOfflinePage(rows)
+
+    result = offline.wait_for_offline_sync_records(
+        SimpleNamespace(page=page),
+        sync_id="project:document",
+        exact=0,
+        timeout=30000,
+    )
+
+    assert result == rows
+    assert page.wait[1]["recordKey"] == "sync_id"
+    assert page.wait[1]["recordValue"] == "project:document"
+    assert page.wait[2] == 30000
 
 
 def test_offline_record_wait_validates_conditions_and_reports_current_rows():
@@ -456,14 +476,23 @@ def test_offline_record_wait_validates_conditions_and_reports_current_rows():
             SimpleNamespace(page=page),
             exact=0,
             saved_html_contains=("Expected edit",),
+            sync_id="expected:document",
         )
 
     message = str(error.value)
     assert "offline sync store" in message
     assert "exactly 0 record(s)" in message
     assert "saved HTML containing ('Expected edit',)" in message
-    assert "Different edit" in message
+    assert "sync_id='expected:document'" in message
+    assert "0 matching record(s) out of 1 total" in message
     assert page.evaluation[1] == "sync"
+
+    unreadable = FakeOfflinePage(None, timeout=True)
+    with pytest.raises(AssertionError, match="IndexedDB read failed"):
+        offline.wait_for_offline_sync_records(
+            SimpleNamespace(page=unreadable),
+            exact=0,
+        )
 
 
 class FakeBrowserFailures:

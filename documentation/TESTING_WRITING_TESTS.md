@@ -69,7 +69,10 @@ local to one assertion and would make a helper worse.
 Keep E2E pytest runs sequential. The managed browser test server and test data
 prefix are shared, so parallel E2E invocations can tear down each other's data
 and server state. When checking multiple focused files or nodeids, pass them to
-one pytest command.
+one pytest command. Frontend bundle preflight uses that same session lock and
+defers any development rebuild while an E2E session is live. It also preserves
+a completed production bundle; run `npm run dev` explicitly when replacing
+production assets with a development build is intentional.
 
 ### Touch and responsive interaction
 
@@ -277,8 +280,13 @@ Wait on the boundary that owns asynchronous completion. Use a precise network
 response plus a retrying visible assertion for browser workflows. When the
 condition lives only in browser state, such as an IndexedDB offline queue, use
 a shared `page.wait_for_function()` helper that reports the expected condition
-and the final observed state. Do not build Python `monotonic()`/`sleep()` loops
-or call `wait_for_timeout()` to let the application settle.
+and the final observed state. Scope queue waits to the mutation record ID or
+document sync ID created by the story; an all-store `exact=0` assertion can be
+invalid when a reused browser context contains unrelated durable work. Headless
+replay may use an explicit longer bound when it must load and reconcile an
+editor before sending. A storage read failure must remain a failed condition,
+not masquerade as an empty queue. Do not build Python `monotonic()`/`sleep()`
+loops or call `wait_for_timeout()` to let the application settle.
 
 Use native Playwright lifecycle changes for offline/online behavior. Headless
 Chromium does not reliably emit a real window focus transition when pages are
