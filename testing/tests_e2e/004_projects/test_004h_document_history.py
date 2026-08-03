@@ -17,6 +17,7 @@ Related Files:
 """
 
 import re
+from urllib.parse import urlsplit
 
 import pytest
 import requests
@@ -27,6 +28,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
 from lagniappe.core.tools.database.core import DATA
 from testing.definitions import Projects, Users
+from testing.utility import assert_lagniappe_error_response
 
 
 pytestmark = pytest.mark.e2e
@@ -41,21 +43,6 @@ def _blob_exists(definition):
     visibility = definition.get("visibility", "private")
     return DATA.bucket(visibility).blob(definition["path"]).exists()
 
-
-def _post_json(page, url, payload):
-    url = f"{page.url.split('/projects/', 1)[0]}{url}"
-    cookies = {cookie["name"]: cookie["value"] for cookie in page.context.cookies()}
-    response = requests.post(
-        url,
-        json=payload,
-        cookies=cookies,
-        headers={
-            "X-CSRFToken": page.locator("#token").input_value(),
-            "X-Lagniappe-Request": "true",
-        },
-        timeout=10,
-    )
-    return {"status": response.status_code, "body": response.text}
 
 # @features editor
 # @dimensions history-list
@@ -159,7 +146,7 @@ def test_document_history_restore(get_user):
 # @features editor
 # @dimensions history-pin history-clear current-content validation ordering cleanup parent-scope confirmation batch
 # @template delete/document_history.html::confirmation
-def test_pin_and_clear_document_history(get_user):
+def test_pin_and_clear_document_history(get_user, browser_failures):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_document_history_pinned)
     other_project = Projects.test_formatting_persists.get(user)
@@ -184,8 +171,65 @@ def test_pin_and_clear_document_history(get_user):
     history.get_by_role("option", name="Pin Version").click()
     pin_form = editor.toolbar.locator("[data-option='pinVersion']")
     expect(pin_form).to_be_visible()
+    pin_url = f"/assets/{project.key}/document/history/pin"
+    history_before_invalid = tuple(
+        sorted(entry.urlsafe_key for entry in _history_entries(project.entity))
+    )
+    assets_before_invalid = [
+        entry.assets["document"]
+        for entry in _history_entries(project.entity)
+        if "document" in entry.assets
+    ]
+
+    def is_pin_response(response):
+        return (
+            response.request.method == "POST"
+            and urlsplit(response.url).path == pin_url
+        )
+
+    def assert_invalid_pin(response, message):
+        assert response.status == 422
+        assert response.headers["content-type"].startswith("text/html")
+        assert response.text() == message
+        expect(pin_form.locator("[data-role='error']")).to_have_text(message)
+        assert tuple(
+            sorted(entry.urlsafe_key for entry in _history_entries(project.entity))
+        ) == history_before_invalid
+        assert all(_blob_exists(definition) for definition in assets_before_invalid)
+
+    pin_form.locator("input[name='name']").fill("<b> </b>")
+    with browser_failures.expect_http_error(
+        user,
+        status=422,
+        path=pin_url,
+    ):
+        with user.page.expect_response(is_pin_response) as invalid_name_info:
+            pin_form.locator("button[type='submit']").click()
+        assert_invalid_pin(invalid_name_info.value, "Version name is required")
+
+    editor.clear_text()
+    history = editor.history
+    history.get_by_role("option", name="Pin Version").click()
+    expect(pin_form).to_be_visible()
+    pin_form.locator("input[name='name']").fill("Empty document")
+    with browser_failures.expect_http_error(
+        user,
+        status=422,
+        path=pin_url,
+    ):
+        with user.page.expect_response(is_pin_response) as invalid_content_info:
+            pin_form.locator("button[type='submit']").click()
+        assert_invalid_pin(
+            invalid_content_info.value,
+            "Document content is required",
+        )
+
+    editor.type_text("Pinned but not saved checkpoint")
+    history = editor.history
+    history.get_by_role("option", name="Pin Version").click()
+    expect(pin_form).to_be_visible()
     pin_form.locator("input[name='name']").fill("Release checkpoint")
-    with user.page.expect_response("**/document/history/pin") as pin_response:
+    with user.page.expect_response(is_pin_response) as pin_response:
         pin_form.locator("button[type='submit']").click()
 
     assert pin_response.value.ok
@@ -219,20 +263,9 @@ def test_pin_and_clear_document_history(get_user):
     unpinned_assets = [entry.assets["document"] for entry in unpinned]
     assert all(_blob_exists(definition) for definition in unpinned_assets)
 
-    pin_url = f"/assets/{project.key}/document/history/pin"
-    invalid_name = _post_json(
-        user.page,
-        pin_url,
-        {"name": "<b> </b>", "html": "<p>Content</p>"},
+    history_before_cross_document = tuple(
+        entry.urlsafe_key for entry in _history_entries(project.entity)
     )
-    invalid_content = _post_json(
-        user.page,
-        pin_url,
-        {"name": "Empty document", "html": "<p><br></p>"},
-    )
-    assert invalid_name["status"] == 422
-    assert invalid_content["status"] == 422
-
     cross_document = requests.get(
         f"{user.page.url.split('/projects/', 1)[0]}/assets/{other_project.key}"
         f"/document/history/{pinned_payload['key']}",
@@ -241,9 +274,16 @@ def test_pin_and_clear_document_history(get_user):
             for cookie in user.page.context.cookies()
         },
         headers={"X-Lagniappe-Request": "true"},
+        allow_redirects=False,
         timeout=10,
     )
-    assert cross_document.status_code == 404
+    assert_lagniappe_error_response(cross_document, status=404)
+    assert pinned_payload["key"] not in cross_document.text
+    assert "Pinned but not saved checkpoint" not in cross_document.text
+    assert tuple(
+        entry.urlsafe_key for entry in _history_entries(project.entity)
+    ) == history_before_cross_document
+    assert _blob_exists(entries[0].assets["document"])
 
     history = editor.history
     history.get_by_role("option", name="Clear Unpinned Versions").click()

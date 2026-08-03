@@ -1,4 +1,8 @@
+from urllib.parse import urlsplit
+
 from playwright.sync_api import expect
+
+from testing.utility import expect_successful_response
 
 from .combobox import Select
 from .forms_common import SpinnerButtons
@@ -83,6 +87,12 @@ class PermissionsForm:
 
     def submit(self):
         route = self.form.get_attribute("data-route") or "/group-permissions/"
-        with self.user.page.expect_response(f"**{route}"):
+        with expect_successful_response(
+            self.user.page,
+            method="PUT",
+            path=urlsplit(route).path,
+            entity_key=self.group.key if self.group is not None else None,
+        ) as response_info:
             SpinnerButtons.UPDATE.click(self.form)
-            assert SpinnerButtons.UPDATE_SUCCESS.successful(self.form)
+        assert SpinnerButtons.UPDATE_SUCCESS.successful(self.form)
+        return response_info.value

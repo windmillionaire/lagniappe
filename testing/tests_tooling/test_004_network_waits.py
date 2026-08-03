@@ -8,6 +8,7 @@ import pytest
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from testing.utility.network import (
+    assert_lagniappe_error_response,
     expect_successful_response,
     multipart_form_fields,
     scoped_browser_route,
@@ -90,8 +91,64 @@ def _revisions(*keys):
     }
 
 
-# @features e2e
-# @dimensions request-routing cleanup
+def test_lagniappe_error_response_contract():
+    response = SimpleNamespace(
+        status_code=403,
+        headers={
+            "content-type": "text/html; charset=utf-8",
+            "x-lagniappe-error": "Error 403",
+        },
+        text="<h1>Error 403</h1>",
+    )
+
+    assert_lagniappe_error_response(response, status=403)
+
+    invalid_responses = [
+        SimpleNamespace(**{**response.__dict__, "status_code": 404}),
+        SimpleNamespace(
+            **{
+                **response.__dict__,
+                "headers": {
+                    **response.headers,
+                    "content-type": "application/json",
+                },
+            }
+        ),
+        SimpleNamespace(
+            **{
+                **response.__dict__,
+                "headers": {
+                    **response.headers,
+                    "x-lagniappe-error": "Error 404",
+                },
+            }
+        ),
+        SimpleNamespace(**{**response.__dict__, "text": "Access denied"}),
+        SimpleNamespace(
+            **{
+                **response.__dict__,
+                "headers": {
+                    **response.headers,
+                    "x-lagniappe-entity-revisions": "[]",
+                },
+            }
+        ),
+    ]
+    for invalid in invalid_responses:
+        with pytest.raises(AssertionError):
+            assert_lagniappe_error_response(invalid, status=403)
+
+    playwright_response = SimpleNamespace(
+        status=400,
+        headers={
+            "content-type": "text/html; charset=utf-8",
+            "x-lagniappe-error": "Error 400",
+        },
+        text=lambda: "<h1>Error 400</h1>",
+    )
+    assert_lagniappe_error_response(playwright_response, status=400)
+
+
 def test_scoped_browser_route_always_removes_handler():
     target = FakeRoutingTarget()
     handler = object()
@@ -108,8 +165,6 @@ def test_scoped_browser_route_always_removes_handler():
     assert target.events[-1] == ("unroute", "**/sync", handler)
 
 
-# @features e2e
-# @dimensions request-routing multipart
 def test_multipart_form_fields_preserves_values_and_filenames():
     boundary = "----lagniappe-test-boundary"
     body = (

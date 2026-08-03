@@ -1589,6 +1589,180 @@ component.view = {
     )
 
 
+# @features user-groups
+# @dimensions single-reconciliation
+def test_permissions_form_does_not_rebuild_for_visibility_only_reconciliation(
+    run_node,
+):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const context = {
+  BaseForm: class {},
+  FacetsBox: class {},
+  FormElement: class {},
+  STYLES: {},
+  console,
+  primitives: {},
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class PermissionsForm", "class PermissionsForm");
+source += "\nglobalThis.PermissionsForm = PermissionsForm;";
+vm.runInContext(source, context);
+
+const events = [];
+const widget = Object.create(context.PermissionsForm.prototype);
+widget._rebuildSections = false;
+widget._success = false;
+widget.destroy = () => events.push("destroy");
+widget.init = async () => events.push("init");
+
+(async () => {
+  await widget.postreconcile();
+  if (events.length !== 0) {
+    throw new Error(`Visibility-only reconciliation rebuilt the form: ${events}`);
+  }
+
+  widget._rebuildSections = true;
+  await widget.postreconcile();
+  await widget.postreconcile();
+  const expected = ["destroy", "init"];
+  if (JSON.stringify(events) !== JSON.stringify(expected)) {
+    throw new Error(`Server sections were not rebuilt exactly once: ${JSON.stringify(events)}`);
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
+# @features user-groups
+# @dimensions rebuild-serialization single-reconciliation
+def test_permissions_form_serializes_overlapping_section_rebuilds(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const context = {
+  BaseForm: class {},
+  FacetsBox: class {},
+  FormElement: class {},
+  STYLES: {},
+  console,
+  primitives: {},
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class PermissionsForm", "class PermissionsForm");
+source += "\nglobalThis.PermissionsForm = PermissionsForm;";
+vm.runInContext(source, context);
+
+const events = [];
+let releaseFirstInit;
+const firstInit = new Promise((resolve) => { releaseFirstInit = resolve; });
+const widget = Object.create(context.PermissionsForm.prototype);
+widget.unsavedState = false;
+widget.sections = new Map();
+widget._rebuildSections = false;
+widget._sectionReconcile = null;
+widget._success = false;
+widget.target = { inert: false };
+widget.form = null;
+widget.setSections = () => events.push("sections");
+widget.destroy = () => events.push("destroy");
+widget.init = async () => {
+  events.push("init");
+  if (events.filter((event) => event === "init").length === 1) await firstInit;
+};
+
+(async () => {
+  await widget.updated({ sections: {} });
+  const first = widget.postreconcile();
+  if (!widget.target.inert) {
+    throw new Error("Permission controls became interactive during rebuild");
+  }
+
+  await widget.updated({ sections: {} });
+  const second = widget.postreconcile();
+  releaseFirstInit();
+  await Promise.all([first, second]);
+
+  const expected = ["sections", "destroy", "init", "sections", "destroy", "init"];
+  if (JSON.stringify(events) !== JSON.stringify(expected)) {
+    throw new Error(`Overlapping permission rebuilds were not serialized: ${events}`);
+  }
+  if (widget.target.inert || widget._sectionReconcile !== null) {
+    throw new Error("Permission controls did not leave the rebuild state");
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
+# @features user-groups
+# @dimensions unsaved-preservation background-update
+def test_permissions_form_preserves_unsaved_values_during_background_update(
+    run_node,
+):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const context = {
+  BaseForm: class {},
+  FacetsBox: class {},
+  FormElement: class {},
+  STYLES: {},
+  console,
+  primitives: {},
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class PermissionsForm", "class PermissionsForm");
+source += "\nglobalThis.PermissionsForm = PermissionsForm;";
+vm.runInContext(source, context);
+
+const events = [];
+const local = { config: { permission: { level: "VIEW" } } };
+const widget = Object.create(context.PermissionsForm.prototype);
+widget.unsavedState = true;
+widget.sections = new Map([["models", local]]);
+widget._rebuildSections = false;
+widget.setSections = () => events.push("setSections");
+
+(async () => {
+  await widget.updated({
+    sections: {
+      models: { permission: { level: "NONE" } },
+    },
+  });
+  if (widget.sections.get("models") !== local) {
+    throw new Error("Background response replaced unsaved permission values");
+  }
+  if (widget._rebuildSections || events.length) {
+    throw new Error(`Background response scheduled a rebuild: ${events}`);
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
 # @features tasks reconnect-refresh forms offline
 # @dimensions active-row dirty-row queued-row staged-review replacement removal preservation
 # @pair tasks:active-form-preservation

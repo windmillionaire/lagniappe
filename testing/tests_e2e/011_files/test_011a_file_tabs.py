@@ -531,8 +531,20 @@ def test_file_download_uses_original_filename_and_mimetype(get_user):
         cookie["name"]: cookie["value"]
         for cookie in user.page.context.cookies()
     }
-    full_response = requests.get(asset_url, cookies=cookies, timeout=10)
+    full_response = requests.get(
+        asset_url,
+        cookies=cookies,
+        allow_redirects=False,
+        timeout=10,
+    )
     assert full_response.status_code == 200
+    assert full_response.headers["content-type"].startswith("text/plain")
+    assert full_response.headers["accept-ranges"] == "bytes"
+    assert full_response.headers["cache-control"] == "no-store"
+    assert int(full_response.headers["content-length"]) == len(
+        upload.definition.file.content
+    )
+    assert full_response.content == upload.definition.file.content
     etag = full_response.headers["etag"]
 
     range_response = requests.get(
@@ -542,8 +554,16 @@ def test_file_download_uses_original_filename_and_mimetype(get_user):
             "Range": "bytes=0-3",
         },
         cookies=cookies,
+        allow_redirects=False,
         timeout=10,
     )
     assert range_response.status_code == 206
-    assert range_response.headers["content-range"].startswith("bytes 0-3/")
+    assert range_response.headers["content-type"].startswith("text/plain")
+    assert range_response.headers["accept-ranges"] == "bytes"
+    assert range_response.headers["cache-control"] == "no-store"
+    assert range_response.headers["etag"] == etag
+    assert range_response.headers["content-range"] == (
+        f"bytes 0-3/{len(upload.definition.file.content)}"
+    )
+    assert range_response.headers["content-length"] == "4"
     assert range_response.content == upload.definition.file.content[:4]

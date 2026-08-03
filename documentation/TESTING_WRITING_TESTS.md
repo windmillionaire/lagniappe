@@ -144,9 +144,18 @@ For native connectivity transitions, prefer `browser_failures.expect_offline(use
 around the `user.offline = True` action and its offline assertions. It expects
 the exact `HEAD /ping` disconnect and console error produced by the browser.
 An offline reload that deliberately performs both the connectivity transition
-and a new-page health check may use `ping_count=2`. Scope any expected 503 for
-an offline analytics or asset request separately by its exact path; do not fold
-those responses into the ping allowance.
+and a new-page health check may use `ping_count=2`. If the same story also has a
+document lifecycle that can legitimately schedule one additional health check,
+use the bounded `ping_count=2, max_ping_count=3` form. Keep the upper bound so a
+retry loop still fails. Scope any expected 503 for an offline analytics or asset
+request separately by its exact path; do not fold those responses into the ping
+allowance.
+
+If an unrelated request is already in flight when a deliberate offline
+transition begins, it may fail zero or a small bounded number of times. Express
+that as `count=0, max_count=N` only with an exact method/status/path signature.
+The zero minimum makes the failure optional; the upper bound still detects a
+loop or an unexpectedly broad outage.
 
 ### Browser request interception
 
@@ -208,6 +217,31 @@ fresh context when durable state is part of the story.
 
 Deliberate non-success responses are a different contract: retain a raw
 Playwright response wait and assert the expected status/body explicitly.
+
+### Manual HTTP contracts
+
+Use a direct `requests` or Playwright request-context call only when HTTP is
+the behavior under test: forged authorization, validators such as ETag/304,
+byte ranges, signed/provider URLs, or cross-entity not-found boundaries. When
+the application can perform the request, trigger it through the visible UI or
+a real browser lifecycle and inspect the resulting browser response instead.
+A direct forged request may supplement that story when the browser correctly
+hides the forbidden action.
+
+A retained direct request must assert more than its status. Check the relevant
+content type and response schema or body, plus protocol headers such as ETag,
+`Content-Range`, `Content-Length`, cache policy, redirects, or error metadata.
+Use `assert_lagniappe_error_response()` for direct Lagniappe 403/404 responses;
+it verifies the common HTML error envelope and absence of an entity-revision
+acknowledgement. Provider errors should validate their provider-specific JSON
+or XML shape.
+
+For a forged mutation, use a unique attempted value and compare the relevant
+entity, revision/history, notification, and asset state before and after the
+request. Reload or navigate again when the unchanged state is visible in the
+product. Authenticate manual requests from the real browser context, include
+the current CSRF token for mutations, set a finite timeout, and disable
+redirect following when a redirect would hide the contract being asserted.
 
 ### Polling and reconciliation waits
 

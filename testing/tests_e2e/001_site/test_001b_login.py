@@ -53,6 +53,7 @@ from lagniappe.core.entities import Entities
 
 from testing.definitions import SitePages, Users
 from testing.elements import Buttons, FormElements, Roles
+from testing.utility import assert_lagniappe_error_response, expect_successful_response
 
 pytestmark = pytest.mark.e2e
 
@@ -62,9 +63,12 @@ def _site_url(path):
 
 
 def _set_cookie_headers(response):
+    headers_array = response.headers_array
+    if callable(headers_array):
+        headers_array = headers_array()
     return [
         header["value"]
-        for header in response.headers_array
+        for header in headers_array
         if header["name"].lower() == "set-cookie"
     ]
 
@@ -468,7 +472,7 @@ def test_google_signin_enforces_double_submit_csrf_before_provider_auth(get_user
     api = user.page.context.request
 
     missing_cookie = api.post(url, form={"g_csrf_token": "body-token"})
-    assert missing_cookie.status == 400
+    assert_lagniappe_error_response(missing_cookie, status=400)
     assert "No CSRF token in Cookie" in missing_cookie.text()
 
     user.page.context.add_cookies(
@@ -476,16 +480,19 @@ def test_google_signin_enforces_double_submit_csrf_before_provider_auth(get_user
     )
 
     missing_body = api.post(url, form={})
-    assert missing_body.status == 400
+    assert_lagniappe_error_response(missing_body, status=400)
     assert "No CSRF token in post body" in missing_body.text()
 
     mismatch = api.post(url, form={"g_csrf_token": "different-token"})
-    assert mismatch.status == 400
+    assert_lagniappe_error_response(mismatch, status=400)
     assert "Failed to verify double submit cookie" in mismatch.text()
 
     matched = api.post(url, form={"g_csrf_token": "cookie-token"})
-    assert matched.status == 400
+    assert_lagniappe_error_response(matched, status=400)
     assert "No credential provided" in matched.text()
+    cookie_names = {cookie["name"] for cookie in user.page.context.cookies()}
+    assert "session" not in cookie_names
+    assert "remember_token" not in cookie_names
 
 
 # @features login
@@ -588,12 +595,22 @@ def test_check_user_status_endpoint_does_not_enumerate_accounts(get_user):
     """Unknown accounts should receive the generic sign-in next step."""
     user = get_user(Users.ANONYMOUS)
     email = f"unknown-{uuid4().hex}@example.test"
-    response = user.page.context.request.get(
-        _site_url(f"/users/check-user-status?email={quote(email)}")
-    )
+    login_page = user.go(SitePages.LOGIN_PAGE)
+    email_form = user.locate(login_page.EMAIL_CHECK_FORM)
+    email_form.locator(FormElements.EMAIL).fill(email)
 
-    assert response.status == 200
+    with expect_successful_response(
+        user.page,
+        method="GET",
+        path="/users/check-user-status",
+        query={"email": email},
+    ) as response_info:
+        email_form.locator(Buttons.SIGNIN).click()
+
+    response = response_info.value
+    assert response.headers["content-type"].startswith("application/json")
     assert response.json() == {"success": True, "next": "signin"}
+    expect(user.locate(login_page.SIGN_IN_FORM)).to_be_visible()
 
 
 # @features login
@@ -614,12 +631,22 @@ def test_check_user_status_endpoint_returns_first_time_setup(get_user):
     )
     provisioned_user.save()
 
-    response = user.page.context.request.get(
-        _site_url(f"/users/check-user-status?email={quote(email)}")
-    )
+    login_page = user.go(SitePages.LOGIN_PAGE)
+    email_form = user.locate(login_page.EMAIL_CHECK_FORM)
+    email_form.locator(FormElements.EMAIL).fill(email)
 
-    assert response.status == 200
+    with expect_successful_response(
+        user.page,
+        method="GET",
+        path="/users/check-user-status",
+        query={"email": email},
+    ) as response_info:
+        email_form.locator(Buttons.SIGNIN).click()
+
+    response = response_info.value
+    assert response.headers["content-type"].startswith("application/json")
     assert response.json() == {"success": True, "next": "first_time_setup"}
+    expect(user.locate(login_page.FIRST_TIME_SETUP_FORM)).to_be_visible()
 
 
 # @features login
@@ -891,13 +918,16 @@ def test_login_sets_hardened_auth_cookies(get_user):
     owner = get_user(Users.OWNER)
     user = get_user(Users.ANONYMOUS)
     login_page = SitePages.LOGIN_PAGE.get(user)
+    login_url = login_page.login_url(owner.email)
 
-    response = user.page.context.request.get(
-        login_page.login_url(owner.email),
-        max_redirects=0,
-    )
+    with user.page.expect_response(
+        lambda response: response.url == login_url and response.status == 302
+    ) as response_info:
+        user.page.goto(login_url)
 
-    assert response.status == 302
+    response = response_info.value
+    assert response.headers["content-type"].startswith("text/html")
+    assert response.headers["location"] == "/"
     set_cookies = _set_cookie_headers(response)
     session_cookie = next(
         cookie for cookie in set_cookies if cookie.startswith("session=")
@@ -910,6 +940,16 @@ def test_login_sets_hardened_auth_cookies(get_user):
         assert "Secure" in cookie
         assert "HttpOnly" in cookie
         assert "SameSite=Lax" in cookie
+
+    stored_cookies = {
+        cookie["name"]: cookie for cookie in user.page.context.cookies()
+    }
+    for name in ("session", "remember_token"):
+        assert stored_cookies[name]["secure"] is True
+        assert stored_cookies[name]["httpOnly"] is True
+        assert stored_cookies[name]["sameSite"] == "Lax"
+
+    expect(user.page).to_have_title("Home")
 
 
 # @features login

@@ -28,6 +28,7 @@ class FetchReason(Enum):
     )
     USER_SAVE_REQUIREMENTS = "user-save-requirements"
     DERIVED_PAGE_SAVE_REQUIREMENTS = "derived-page-save-requirements"
+    CACHE_REBUILD_MATERIALIZATION = "cache-rebuild-materialization"
 
 
 # @testable true

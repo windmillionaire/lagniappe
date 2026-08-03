@@ -638,17 +638,27 @@ Acceptance criteria:
 
 ### E2E-H16 — Strengthen legitimate manual HTTP contract tests
 
-- [ ] Keep direct HTTP for forged authorization attempts, ETag/304 behavior,
+- [x] Keep direct HTTP for forged authorization attempts, ETag/304 behavior,
   Range requests, signed/provider URLs, and cross-entity 404 contracts.
-- [ ] Assert status, response schema/content type/headers, and absence of
+- [x] Assert status, response schema/content type/headers, and absence of
   forbidden side effects.
-- [ ] Use the UI for actions that are available there; use the direct request as
+- [x] Use the UI for actions that are available there; use the direct request as
   an additional adversarial assertion where appropriate.
 
 Examples worth preserving as HTTP-level tests include authorization probes in
 `006_tasks/test_006d_task_permissions.py`, ETag behavior in
-`002_home/test_002i_home_activity.py`, and document history/range contracts in
-`004_projects/test_004h_document_history.py`.
+`001_site/test_001a_environment.py`, document history isolation in
+`004_projects/test_004h_document_history.py`, and Range behavior in
+`011_files/test_011a_file_tabs.py`.
+
+Resolved 2026-08-02. Browser-capable login, note/history validation, and
+timestamp-replacement probes now use visible forms, navigation, or reconnect.
+The remaining direct calls are limited to CSRF/authorization forgery, ETag/304,
+signed/provider URLs, cross-entity 404, and byte-range contracts. They assert
+the relevant MIME type, schema/body, protocol headers, and entity, revision,
+notification, or asset non-effects. A shared helper enforces the common
+Lagniappe 400/403/404 error envelope; the documented policy remains guidance
+rather than a static allowlist.
 
 Acceptance criteria:
 
@@ -726,6 +736,8 @@ the focused verification performed, and any intentional exception that remains.
 
 | Date | Item | Cluster | Result / remaining exception |
 |---|---|---|---|
+| 2026-08-03 | E2E-H16 follow-up | Full-order stabilization | A second full-order run reached 459 passed and exposed that the first attempted permission fix in shared `ViewComponent` lifecycle code hid task/form widgets. That shared change was removed; all 17 affected task/form nodeids shown in the run now pass in focused reruns. Retained request, response, persistence, DOM, and widget-state instrumentation showed the permission mismatch occurred before submission: a later authoritative section response replaced the first checked radio while the new form was still reconciling. Permission section rebuilds are now serialized while controls are inert, and background section responses cannot overwrite unsaved values. The six-test offline and user-group files, preceding-user-file plus permission pair, 23-test JavaScript file, 14-test failure-helper file, template contract, and changed-scope traceability pass. One final broad full-order confirmation remains. |
+| 2026-08-02 | E2E-H16 | Manual HTTP and browser-boundary contracts | Audited every direct E2E HTTP call, moved UI-capable actions to browser flows, and hardened the retained CSRF/authorization, ETag, signed/provider, cross-entity 404, and Range contracts with response and side-effect assertions. The initial full E2E run reached 475 passed with three follow-up failures and one resulting teardown error. Cache rebuilds now materialize nested relations across batch boundaries, and offline failure scopes use explicit bounded lifecycle allowances. The obsolete Firebase Cloud Messaging Admin binding was removed from the active runtime service account, and the focused live IAM contract passes. No H16 contract exception remains. |
 | 2026-08-02 | E2E-H12 | Browser preference setup and persistence | Removed all 20 direct-storage audit hits from E2E tests and support helpers, moved ordinary setup to clean contexts, and retained UI-level persistence assertions across navigation and reload. The 15-test boundary file, nine JavaScript contracts, 58 focused E2E stories, eight template-contract reports, and Ruff check pass. Source ownership gaps are resolved; 23 unrelated changed-scope evidence results remain stale and are deferred to the upcoming full-suite run. No behavior exception remains. |
 | 2026-08-02 | E2E-H11 | Table touch gestures and task select layout | Replaced synthetic pointer events with a touch-capable Playwright tap, moved the tap/swipe threshold to JS coverage, and replaced inline width mutation with real mobile/desktop layout. The 2-test JS file, 13-test boundary file, two focused E2E stories, 24-test E2E file cluster, template contract, and Ruff check pass. Changed-scope traceability has no template or style errors, but changing the shared `get_user` fixture made 37 unrelated recorded E2E results stale; refreshing those broad historical stories was deferred for this localized item. No behavior exception remains. |
 | 2026-08-02 | E2E-H10 | Structural evidence collector | Retired the non-actionable full-suite collector, generated baseline format, instrumentation-only tests, collection hook, marker, and traceability exception. The evidence reporter now prunes deleted test modules. The 105 focused tooling tests, 478-test E2E collection, Ruff check, and changed-scope traceability pass. Existing behavior-specific coverage remains; no exception remains. |

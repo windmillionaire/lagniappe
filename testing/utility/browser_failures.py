@@ -94,6 +94,7 @@ class BrowserFailureCollector:
         *,
         kind: str,
         count: int = 1,
+        max_count: int | None = None,
         method: str | None = None,
         path: str | None = None,
         exception_type: str | None = None,
@@ -105,14 +106,19 @@ class BrowserFailureCollector:
         failure: str | None = None,
         source_path: str | None = None,
     ) -> "ExpectedBrowserFailure":
-        """Return a scope that consumes one exact intentional failure pattern."""
-        if count < 1:
-            raise ValueError("Expected browser failure count must be at least one.")
+        """Return a scope that consumes an intentional failure pattern."""
+        if count < 0:
+            raise ValueError("Expected browser failure count cannot be negative.")
+        if max_count is not None and max_count < count:
+            raise ValueError(
+                "Maximum browser failure count must be at least the minimum count."
+            )
         return ExpectedBrowserFailure(
             self,
             context_id=id(user.page.context),
             kind=kind,
             count=count,
+            max_count=max_count,
             criteria={
                 "method": method,
                 "path": path,
@@ -147,12 +153,19 @@ class BrowserFailureCollector:
         )
 
     @contextmanager
-    def expect_offline(self, user: Any, *, ping_count: int = 1):
+    def expect_offline(
+        self,
+        user: Any,
+        *,
+        ping_count: int = 1,
+        max_ping_count: int | None = None,
+    ):
         """Account for the health check deliberately rejected by browser offline mode."""
         with self.expect(
             user,
             kind="requestfailed",
             count=ping_count,
+            max_count=max_ping_count,
             method="HEAD",
             path="/ping",
             failure="net::ERR_INTERNET_DISCONNECTED",
@@ -161,6 +174,7 @@ class BrowserFailureCollector:
                 user,
                 kind="console",
                 count=ping_count,
+                max_count=max_ping_count,
                 console_type="error",
                 text="Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
                 source_path="/ping",
@@ -284,12 +298,14 @@ class ExpectedBrowserFailure(AbstractContextManager[None]):
         context_id: int,
         kind: str,
         count: int,
+        max_count: int | None,
         criteria: dict[str, str | None],
     ):
         self.collector = collector
         self.context_id = context_id
         self.kind = kind
-        self.count = count
+        self.min_count = count
+        self.max_count = count if max_count is None else max_count
         self.criteria = criteria
         self.start_index = 0
 
@@ -309,9 +325,14 @@ class ExpectedBrowserFailure(AbstractContextManager[None]):
         description = self._description()
         for event in matches:
             event.expected_by = description
-        if len(matches) != self.count:
+        if not self.min_count <= len(matches) <= self.max_count:
+            expected_count = (
+                str(self.min_count)
+                if self.min_count == self.max_count
+                else f"between {self.min_count} and {self.max_count}"
+            )
             raise AssertionError(
-                f"Expected {self.count} browser failure(s) matching {description}; "
+                f"Expected {expected_count} browser failure(s) matching {description}; "
                 f"observed {len(matches)}.\n"
                 + self.collector.format_events(matches)
             )

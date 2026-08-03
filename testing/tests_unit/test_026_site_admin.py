@@ -1,9 +1,15 @@
 """Unit contracts for runtime-safe site administration services."""
 
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
+from google.cloud.datastore import Key
 import pytest
 
+from lagniappe.core.definitions import FetchDepth, FetchReason
+from lagniappe.core.entities.group import UserGroup
+from lagniappe.core.entities.page import Page
+from lagniappe.core.entities.user import User
 from lagniappe.core.tools import recovery, site_admin
 
 
@@ -120,7 +126,8 @@ def test_cache_rebuild_rehydrates_entities_in_bounded_chunks(monkeypatch):
         site_admin.Entities,
         "fetch",
         lambda *keys, request: (
-            fetches.append(list(keys)) or [f"loaded:{key}" for key in keys]
+            fetches.append((list(keys), request))
+            or [f"loaded:{key}" for key in keys]
         ),
     )
     monkeypatch.setattr(
@@ -133,8 +140,97 @@ def test_cache_rebuild_rehydrates_entities_in_bounded_chunks(monkeypatch):
 
     assert result.rebuilt is True
     assert deleted == [True]
-    assert fetches == [["one", "two"], ["three"]]
+    assert [keys for keys, _request in fetches] == [["one", "two"], ["three"]]
+    assert all(request.depth is FetchDepth.NESTED for _keys, request in fetches)
+    assert all(
+        request.reason is FetchReason.CACHE_REBUILD_MATERIALIZATION
+        for _keys, request in fetches
+    )
     assert updates == [(["loaded:one", "loaded:two"], False), (["loaded:three"], False)]
+
+
+def _stored_entity(entity_class, key, **values):
+    now = datetime.now(timezone.utc)
+    entity = entity_class(testing=True)
+    entity._key = key
+    entity._db = {
+        "active": True,
+        "created": now,
+        "hash": values.pop("hash"),
+        "kind": entity.entity_kind,
+        "modified": now,
+        "name": values.pop("name"),
+        "requires": values.pop("requires", [entity.entity_kind]),
+        "type": entity.entity_kind,
+        **values,
+    }
+    return entity
+
+
+# @features cache
+# @dimensions current batching nested-relations
+def test_cache_rebuild_materializes_nested_relations_across_batch_boundaries(
+    monkeypatch,
+):
+    project = "cache-rebuild-unit-test"
+    group_key = Key("group", "grouped-viewers", project=project)
+    user_key = Key("user", "grouped-user", project=project)
+    page_key = Key("page", "grouped-user-page", project=project)
+    group = _stored_entity(
+        UserGroup,
+        group_key,
+        name="Grouped Viewers",
+        hash="grouped-viewers",
+        permissions="{}",
+    )
+    user = _stored_entity(
+        User,
+        user_key,
+        name="Grouped User",
+        hash="grouped-user",
+        groups=[group_key],
+        page=page_key,
+        permissions="{}",
+    )
+    page = _stored_entity(
+        Page,
+        page_key,
+        name="Grouped User Page",
+        hash="grouped-user-page",
+        user=user_key,
+    )
+    stored = {entity.key: entity for entity in (group, user, page)}
+    projections = {}
+
+    monkeypatch.setattr(
+        site_admin.database_migrations,
+        "get_migration_status",
+        lambda: {"status": "current", "cache_refresh_allowed": True},
+    )
+    monkeypatch.setattr(site_admin.cache, "delete_cache", lambda: None)
+    monkeypatch.setattr(site_admin.database.get, "all_models", lambda: iter([group]))
+    monkeypatch.setattr(site_admin.database.get, "all_instances", lambda: iter([page]))
+    monkeypatch.setattr(site_admin.database.get, "all_files", lambda: iter(()))
+    monkeypatch.setattr(site_admin.database.get, "all_users", lambda: iter([user]))
+    monkeypatch.setattr(
+        site_admin.database.get,
+        "entities",
+        lambda keys: [stored[key] for key in keys if key in stored],
+    )
+
+    def materialize(*entities, update):
+        assert update is False
+        for entity in entities:
+            projections[entity.key] = dict(entity.to_cache)
+
+    monkeypatch.setattr(site_admin.cache, "update", materialize)
+
+    result = site_admin.rebuild_application_cache(chunk_size=1)
+
+    assert result.rebuilt is True
+    assert page.user is user
+    assert user.groups == [group]
+    assert projections[page_key]["requires"] == "users,grouped-viewers"
 
 
 # @features admin

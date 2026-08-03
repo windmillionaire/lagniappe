@@ -10,12 +10,14 @@ from playwright.sync_api import expect
 from config import SETTINGS
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools import database
 from testing.definitions import DueDates, Pages, SitePages, Users
 from testing.definitions.task_definitions import TaskDefinition
 from testing.elements import Buttons, FormElements, List, Modal
 from testing.resources import Task
 from testing.utility import (
     TestFile as _TestFile,
+    assert_lagniappe_error_response,
     wait_for_offline_mutations,
 )
 from testing.utility.local_time import local_date_from_utc_datetime
@@ -274,12 +276,16 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
     expect(private_item).to_be_visible()
     expect(private_item).to_contain_text("Private")
 
+    activity_before = tuple(
+        item.key for item in database.get.activity(user.entity)
+    )
+    forbidden_body = _unique("Forbidden Home note")
     cookies = {
         cookie["name"]: cookie["value"] for cookie in user.page.context.cookies()
     }
     response = requests.post(
         f"{SETTINGS.test_config['BASE_URL']}/activity/notes",
-        data={"body": _unique("Forbidden Home note"), "visibility": "everyone"},
+        data={"body": forbidden_body, "visibility": "everyone"},
         cookies=cookies,
         headers={
             "X-CSRFToken": user.locate("#token").input_value(),
@@ -289,7 +295,21 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
         timeout=10,
     )
 
-    assert response.status_code == 403
+    assert_lagniappe_error_response(response, status=403)
+    assert forbidden_body not in response.text
+    assert tuple(item.key for item in database.get.activity(user.entity)) == (
+        activity_before
+    )
+
+    reloaded_home = user.go(SitePages.HOME)
+    user.locate(reloaded_home.NOTE_LIST_TOGGLE).click()
+    expect(user.locate(reloaded_home.NOTE_LIST)).to_be_visible()
+    expect(_activity_item(reloaded_home, private_body)).to_be_visible()
+    expect(
+        user.locate(reloaded_home.NOTE_LIST).locator("li").filter(
+            has_text=forbidden_body
+        )
+    ).to_have_count(0)
 
 
 # @pair activity:delete
@@ -543,7 +563,11 @@ def test_offline_home_create_mutations_persist_after_reload(get_user, browser_fa
             status=503,
             path="/analytics/track",
         ):
-            with browser_failures.expect_offline(user, ping_count=2):
+            with browser_failures.expect_offline(
+                user,
+                ping_count=2,
+                max_ping_count=3,
+            ):
                 user.offline = True
                 expect(user.locate("[data-role='offline']")).to_be_visible()
 
@@ -598,7 +622,11 @@ def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_fa
         status=503,
         path="/analytics/track",
     ):
-        with browser_failures.expect_offline(user, ping_count=2):
+        with browser_failures.expect_offline(
+            user,
+            ping_count=2,
+            max_ping_count=3,
+        ):
             user.offline = True
             note_item = _create_text_note_from_home(
                 user, home, note_body, expect_network=False

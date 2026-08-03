@@ -194,9 +194,16 @@ def test_authenticated_home_response_headers_include_etag(get_user):
     headers = direct.headers
 
     assert direct.status_code == 200
+    assert headers["content-type"].startswith("text/html")
     assert headers.get("etag")
     assert headers["cache-control"] == "private, no-cache"
+    assert headers["strict-transport-security"] == (
+        "max-age=31536000; includeSubDomains; preload"
+    )
     assert headers["x-frame-options"] == "SAMEORIGIN"
+    assert headers["x-content-type-options"] == "nosniff"
+    assert headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    assert '<div lp-view data-kind="home"' in direct.text
     csp = headers["content-security-policy"]
     assert "script-src 'self' https://accounts.google.com" in csp
     assert "connect-src 'self' https://*.googleapis.com" in csp
@@ -220,6 +227,9 @@ def test_authenticated_home_response_headers_include_etag(get_user):
         timeout=10,
     )
     assert conditional.status_code == 304
+    assert conditional.headers["etag"] == headers["etag"]
+    assert conditional.headers["cache-control"] == "private, no-cache"
+    assert conditional.content == b""
 
     uncached = requests.get(
         f"{SETTINGS.test_config['BASE_URL']}/",
@@ -229,6 +239,9 @@ def test_authenticated_home_response_headers_include_etag(get_user):
         timeout=10,
     )
     assert uncached.status_code == 200
+    assert uncached.headers["etag"] == headers["etag"]
+    assert uncached.headers["content-type"].startswith("text/html")
+    assert '<div lp-view data-kind="home"' in uncached.text
 
 
 # @features privacy public-pages

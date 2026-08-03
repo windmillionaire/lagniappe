@@ -40,6 +40,14 @@ def _probe_id():
     return f"setup-runtime-{uuid4().hex}"
 
 
+def _assert_xml_error_response(response, *, status, code):
+    assert response.status_code == status
+    assert response.headers["content-type"].startswith("application/xml")
+    error = ElementTree.fromstring(response.content)
+    assert error.findtext("Code") == code
+    assert error.findtext("Message")
+
+
 def _unconditional_members(policy, role):
     members = set()
     for binding in policy.bindings:
@@ -231,11 +239,18 @@ def test_runtime_datastore_and_all_storage_bucket_operations(monkeypatch):
                 signed_url = assets.get_signed_url(blob.name, expires_in=60)
                 response = requests.get(signed_url, timeout=30)
                 assert response.status_code == 200
+                assert response.headers["content-type"].startswith("text/plain")
+                assert int(response.headers["content-length"]) == len(response.content)
                 assert response.text == f"{bucket_role}:{probe_id}"
 
                 tampered_suffix = "0" if signed_url[-1] != "0" else "1"
                 tampered_url = f"{signed_url[:-1]}{tampered_suffix}"
-                assert requests.get(tampered_url, timeout=30).status_code == 403
+                tampered_response = requests.get(tampered_url, timeout=30)
+                _assert_xml_error_response(
+                    tampered_response,
+                    status=403,
+                    code="SignatureDoesNotMatch",
+                )
                 issued_at = datetime.now(timezone.utc) - timedelta(minutes=1)
                 request_timestamp = issued_at.strftime("%Y%m%dT%H%M%SZ")
                 datestamp = issued_at.strftime("%Y%m%d")
@@ -250,9 +265,12 @@ def test_runtime_datastore_and_all_storage_bucket_operations(monkeypatch):
                 assert expired_query["X-Goog-Date"] == [request_timestamp]
                 assert expired_query["X-Goog-Expires"] == ["1"]
                 expired_response = requests.get(expired_url, timeout=30)
-                assert expired_response.status_code == 400
-                expired_error = ElementTree.fromstring(expired_response.content)
-                assert expired_error.findtext("Code") == "ExpiredToken"
+                _assert_xml_error_response(
+                    expired_response,
+                    status=400,
+                    code="ExpiredToken",
+                )
+                assert blob.download_as_text() == f"{bucket_role}:{probe_id}"
         finally:
             if blob.exists():
                 blob.delete()
@@ -291,6 +309,7 @@ def test_runtime_task_create_delete_and_scheduler_oidc_delivery(monkeypatch):
     )
 
     assert response.status_code == 400
+    assert response.headers["content-type"].startswith("application/json")
     assert response.json() == {
         "success": False,
         "error": "Invalid reconcile payload.",

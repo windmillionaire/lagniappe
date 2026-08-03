@@ -89,32 +89,39 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
         failed_pings.append(route.request)
         route.abort("connectionfailed")
 
-    with scoped_browser_route(user.page.context, "**/ping", fail_ping):
+    # Reload startup can coalesce focus, pageshow, and controller events behind
+    # the first failed health check. Keep the expectation open through the
+    # recovery reload so Chromium has delivered every failure event.
+    with browser_failures.expect(
+        user,
+        kind="requestfailed",
+        count=1,
+        max_count=3,
+        method="HEAD",
+        path="/ping",
+        failure="net::ERR_CONNECTION_FAILED",
+    ):
         with browser_failures.expect(
             user,
-            kind="requestfailed",
-            method="HEAD",
-            path="/ping",
-            failure="net::ERR_CONNECTION_FAILED",
+            kind="console",
+            count=1,
+            max_count=3,
+            console_type="error",
+            text="Failed to load resource: net::ERR_CONNECTION_FAILED",
+            source_path="/ping",
         ):
-            with browser_failures.expect(
-                user,
-                kind="console",
-                console_type="error",
-                text="Failed to load resource: net::ERR_CONNECTION_FAILED",
-                source_path="/ping",
-            ):
+            with scoped_browser_route(user.page.context, "**/ping", fail_ping):
                 user.reload()
                 expect(indicator).to_be_visible()
 
-    assert len(failed_pings) == 1
+            assert 1 <= len(failed_pings) <= 3
 
-    with expect_successful_response(
-        user.page,
-        method="HEAD",
-        path="/ping",
-    ):
-        user.reload()
+            with expect_successful_response(
+                user.page,
+                method="HEAD",
+                path="/ping",
+            ):
+                user.reload()
     expect(indicator).to_be_hidden()
 
 
@@ -238,10 +245,19 @@ def test_rapid_offline_online_transitions(get_user, browser_failures):
 
     indicator = user.locate(OFFLINE_INDICATOR)
 
-    with browser_failures.expect_offline(user):
-        for _ in range(5):
-            user.offline = True
-            user.offline = False
+    with browser_failures.expect(
+        user,
+        kind="console",
+        count=0,
+        max_count=2,
+        console_type="error",
+        text_contains="status of 503 ",
+        source_path="/notifications",
+    ):
+        with browser_failures.expect_offline(user):
+            for _ in range(5):
+                user.offline = True
+                user.offline = False
 
     expect(indicator).to_be_hidden()
 

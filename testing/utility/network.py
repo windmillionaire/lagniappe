@@ -12,6 +12,29 @@ from urllib.parse import parse_qs, urlsplit
 
 
 # @testable true
+# @tests tests_tooling/test_004_network_waits.py::test_lagniappe_error_response_contract
+# @features e2e
+# @dimensions manual-http error-contract side-effect-free
+def assert_lagniappe_error_response(response: Any, *, status: int) -> None:
+    """Assert the common response envelope for a direct Lagniappe HTTP error."""
+
+    response_status = getattr(response, "status_code", None)
+    if response_status is None:
+        response_status = response.status
+    assert response_status == status
+    content_type = response.headers.get("content-type", "")
+    assert content_type.lower().startswith("text/html"), (
+        f"Expected an HTML error response; received {content_type!r}"
+    )
+    assert response.headers.get("x-lagniappe-error") == f"Error {status}"
+    response_text = response.text
+    if callable(response_text):
+        response_text = response_text()
+    assert f"Error {status}" in response_text
+    assert "x-lagniappe-entity-revisions" not in response.headers
+
+
+# @testable true
 # @tests tests_tooling/test_004_network_waits.py::test_scoped_browser_route_always_removes_handler
 # @features e2e
 # @dimensions request-routing cleanup

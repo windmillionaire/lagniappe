@@ -9,11 +9,10 @@ Verified against:
 """
 
 from dataclasses import replace
+import json
 import re
-from urllib.parse import urljoin
 from uuid import uuid4
 
-import requests
 from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch
@@ -79,6 +78,7 @@ def test_project_info_form(get_user):
 # @template projects/info.html::info_form
 def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revision(
     get_user,
+    browser_failures,
 ):
     owner = get_user(Users.OWNER)
     project = Project(
@@ -89,26 +89,60 @@ def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revisio
         ),
     ).create()
     owner.go(project)
+    info_form = project.info_form
+    expect(info_form.locator("input[name='name']")).to_have_value(
+        project.definition.name
+    )
+    expect(info_form.locator("textarea[name='description']")).to_have_value(
+        project.definition.description
+    )
+
+    with browser_failures.expect_offline(owner):
+        owner.offline = True
+        expect(owner.locate("[data-role='offline']")).to_be_visible()
 
     timestamp_only = Entities.fetch_one(project.key, request=Fetch.direct())
     timestamp_only.properties.modified.update()
     timestamp_only.save()
     modified_before_probe = timestamp_only.modified
-    cookies = {
-        cookie["name"]: cookie["value"]
-        for cookie in owner.page.context.cookies()
-    }
-    replacement = requests.get(
-        urljoin(owner.page.url, f"/projects/{project.key}/info/replace"),
-        cookies=cookies,
-        timeout=10,
-    )
 
-    assert replacement.ok
-    replacement_headers = replacement.headers
-    assert "x-lagniappe-entity-revisions" in replacement_headers
-    assert "x-lagniappe-entity-key" not in replacement_headers
-    assert "x-lagniappe-entity-fingerprint" not in replacement_headers
+    def assert_replacement_contract(response):
+        assert response.headers["content-type"].startswith("text/html")
+        assert "x-lagniappe-entity-key" not in response.headers
+        assert "x-lagniappe-entity-fingerprint" not in response.headers
+        assert json.loads(response.headers["x-lagniappe-entity-revisions"]) == [
+            {
+                "key": project.key,
+                "fingerprint": timestamp_only.fingerprint,
+                "modified": modified_before_probe.isoformat(),
+            }
+        ]
+        body = response.text()
+        assert 'data-widget="ProjectInfo"' in body
+        assert project.definition.name in body
+        assert project.definition.description in body
+
+    with expect_poll_result(
+        owner.page,
+        subscription_id=f"view:entity:{project.key}",
+    ):
+        with expect_successful_response(
+            owner.page,
+            method="GET",
+            path=f"/projects/{project.key}/info/replace",
+            entity_key=project.key,
+            response_check=assert_replacement_contract,
+        ):
+            owner.offline = False
+
+    expect(owner.locate("[data-role='offline']")).to_be_hidden()
+    refreshed_form = project.info_form
+    expect(refreshed_form.locator("input[name='name']")).to_have_value(
+        project.definition.name
+    )
+    expect(refreshed_form.locator("textarea[name='description']")).to_have_value(
+        project.definition.description
+    )
     after_probe = Entities.fetch_one(project.key, request=Fetch.direct())
     assert after_probe.modified == modified_before_probe
 

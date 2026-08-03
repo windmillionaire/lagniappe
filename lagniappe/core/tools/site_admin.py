@@ -8,7 +8,7 @@ from config.ai_settings import normalize_ai_settings
 from config.constants import DEFAULT_DEPLOYMENT_SETTINGS
 from config.deployment import normalize_deployment_settings
 from lagniappe import CONFIG
-from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache, database
 from lagniappe.core.tools.ai_settings import runtime_ai_settings
@@ -82,8 +82,9 @@ def run_site_updates():
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_is_blocked_until_migrations_are_current
 # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_rehydrates_entities_in_bounded_chunks
+# @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_materializes_nested_relations_across_batch_boundaries
 # @features cache
-# @dimensions migration-gate current pending batching
+# @dimensions migration-gate current pending batching nested-relations
 def rebuild_application_cache(*, chunk_size=100):
     """Rebuild cached entities only when migration state allows it."""
     migration_status = database_migrations.get_migration_status()
@@ -98,7 +99,12 @@ def rebuild_application_cache(*, chunk_size=100):
         database.get.all_users(),
     )
     while chunk := list(islice(all_raw, chunk_size)):
-        loaded = Entities.fetch(*chunk, request=Fetch.direct())
+        loaded = Entities.fetch(
+            *chunk,
+            request=Fetch.nested(
+                because=FetchReason.CACHE_REBUILD_MATERIALIZATION
+            ),
+        )
         cache.update(*loaded, update=False)
 
     return CacheRebuildResult(True, migration_status)

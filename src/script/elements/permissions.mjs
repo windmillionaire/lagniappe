@@ -83,13 +83,18 @@ const addSpecificPermission = (config, entry = {}) => {
  * @testable true
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
+ * @tests tests_js/test_028_form_state_split.py::test_permissions_form_does_not_rebuild_for_visibility_only_reconciliation
+ * @tests tests_js/test_028_form_state_split.py::test_permissions_form_serializes_overlapping_section_rebuilds
+ * @tests tests_js/test_028_form_state_split.py::test_permissions_form_preserves_unsaved_values_during_background_update
  * @features user-groups
- * @dimensions permission-update general-permissions entity-permissions selection-render responsive-layout
+ * @dimensions permission-update general-permissions entity-permissions selection-render responsive-layout single-reconciliation unsaved-preservation background-update rebuild-serialization
  */
 export class PermissionsForm extends FormElement {
 	constructor(attributes) {
 		super(attributes);
 		this.sections = new Map();
+		this._rebuildSections = false;
+		this._sectionReconcile = null;
 		this._update = this._update.bind(this);
 		this._change = this._change.bind(this);
 		this.target.addEventListener("updated", this._update);
@@ -111,6 +116,12 @@ export class PermissionsForm extends FormElement {
 	}
 
 	async updated(response) {
+		// A polling/revision response may finish after the user has started
+		// editing. The edit watcher owns presenting that conflict; rebuilding here
+		// would silently replace the live controls before they can be submitted.
+		if (this.unsavedState) return;
+		if (this.target) this.target.inert = true;
+
 		SECTION_ORDER.forEach((name) => {
 			if (response.sections[name]) {
 				this.sections.set(name, { config: response.sections[name] });
@@ -118,15 +129,34 @@ export class PermissionsForm extends FormElement {
 		});
 
 		this.setSections();
+		this._rebuildSections = true;
 
 		if (this.form) this._success = true;
 	}
 
 	async postreconcile() {
-		this.destroy();
-		await this.init();
-		if (this._success) this.form.success();
-		this._success = false;
+		if (this._sectionReconcile) return this._sectionReconcile;
+		if (!this._rebuildSections) return;
+
+		this._sectionReconcile = (async () => {
+			// Drain updates which arrive during init before making the controls
+			// interactive. This keeps a late authoritative response from replacing
+			// the first user input on a newly activated form.
+			while (this._rebuildSections) {
+				this._rebuildSections = false;
+				this.destroy();
+				await this.init();
+			}
+			if (this._success) this.form.success();
+			this._success = false;
+		})();
+
+		try {
+			await this._sectionReconcile;
+		} finally {
+			this._sectionReconcile = null;
+			if (this.target) this.target.inert = false;
+		}
 	}
 
 	_update(event) {

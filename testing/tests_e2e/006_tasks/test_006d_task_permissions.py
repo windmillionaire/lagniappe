@@ -15,10 +15,40 @@ from playwright.sync_api import expect
 
 from config import SETTINGS
 from lagniappe import CONFIG
+from lagniappe.core.definitions import Fetch
+from lagniappe.core.entities import Entities
+from lagniappe.core.tools import database
 from testing.definitions import Tasks, Users
 from testing.resources import Task
+from testing.utility import assert_lagniappe_error_response
 
 pytestmark = pytest.mark.e2e
+
+
+def _task_side_effect_state(task, *users):
+    persisted = Entities.fetch_one(task.key, request=Fetch.direct())
+    history_keys = tuple(
+        row.key for row in database.get.task_history(persisted)
+    )
+    notification_keys = tuple(
+        (
+            user.entity.key,
+            tuple(
+                row.key
+                for row in database.get.activity(
+                    user.entity,
+                    types="notification",
+                )
+            ),
+        )
+        for user in users
+    )
+    return (
+        persisted.fingerprint,
+        persisted.modified,
+        history_keys,
+        notification_keys,
+    )
 
 
 # @pairs permissions:etag permissions:authorization-before-cache
@@ -31,6 +61,7 @@ def test_task_route_is_forbidden_without_model_or_page_permission(
     task = Tasks.test_create_page_task.get(owner)
 
     blocked = get_user(Users.user_no_access)
+    state_before = _task_side_effect_state(task, owner, blocked)
     with browser_failures.expect_http_error(blocked, status=403, path=task.url):
         blocked.navigate(task.url)
         expect(blocked.page).to_have_title("Error 403")
@@ -57,7 +88,10 @@ def test_task_route_is_forbidden_without_model_or_page_permission(
         allow_redirects=False,
         timeout=10,
     )
-    assert response.status_code == 403
+    assert_lagniappe_error_response(response, status=403)
+    assert response.headers["etag"] == f'"{blocked_fingerprint}"'
+    assert task.entity.name not in response.text
+    assert _task_side_effect_state(task, owner, blocked) == state_before
 
 
 # @pairs tasks:history task-combine:authorization
@@ -67,6 +101,7 @@ def test_task_history_routes_are_forbidden_without_permission(get_user):
     task = Tasks.test_create_page_task.get(owner)
 
     blocked = get_user(Users.user_no_access)
+    state_before = _task_side_effect_state(task, owner, blocked)
     cookies = {
         cookie["name"]: cookie["value"]
         for cookie in blocked.page.context.cookies()
@@ -80,7 +115,10 @@ def test_task_history_routes_are_forbidden_without_permission(get_user):
             allow_redirects=False,
             timeout=10,
         )
-        assert response.status_code == 403
+        assert_lagniappe_error_response(response, status=403)
+        assert task.entity.name not in response.text
+
+    assert _task_side_effect_state(task, owner, blocked) == state_before
 
 
 # @pairs tasks:readonly tasks:permission-gates

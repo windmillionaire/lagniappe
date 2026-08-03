@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { l as loadHeadlessWidget } from './core.js?v=b55964c3';
-import { E as ENDPOINTS } from './endpoints.js?v=b55964c3';
-import { getSyncRecord, getAllOfflineRecords, deleteSyncRecords, deleteSyncRecord, updateSyncRecord } from './offline.js?v=b55964c3';
-import { r as request } from './request.js?v=b55964c3';
-import { waitForAttribute } from './utilities.js?v=b55964c3';
-import './connectivity.js?v=b55964c3';
-import './errors.js?v=b55964c3';
-import './shell.js?v=b55964c3';
+import { l as loadHeadlessWidget } from './core.js?v=b26991f5';
+import { E as ENDPOINTS } from './endpoints.js?v=b26991f5';
+import { getSyncRecord, getAllOfflineRecords, deleteSyncRecords, deleteSyncRecord, updateSyncRecord } from './offline.js?v=b26991f5';
+import { r as request } from './request.js?v=b26991f5';
+import { waitForAttribute } from './utilities.js?v=b26991f5';
+import './connectivity.js?v=b26991f5';
+import './errors.js?v=b26991f5';
+import './shell.js?v=b26991f5';
 
 /**
  * Coordinate Yjs document updates through the shared polling protocol.

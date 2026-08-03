@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { captureNetworkError } from './errors.js?v=b55964c3';
+import { captureNetworkError } from './errors.js?v=b26991f5';
 
 const PARSER = new DOMParser();
 const TOKEN_REQUEST = {

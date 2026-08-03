@@ -21,11 +21,39 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools import database
 from testing.definitions import Categories, Pages, SitePages, Users
 from testing.elements import FormElements, HeaderSearch, Table, Tools
 from testing.resources.category import Category
+from testing.utility import assert_lagniappe_error_response
 
 pytestmark = pytest.mark.e2e
+
+
+def _category_side_effect_state(category, *users):
+    persisted = Entities.fetch_one(category.key, request=Fetch.direct())
+    notification_keys = tuple(
+        (
+            user.entity.key,
+            tuple(
+                row.key
+                for row in database.get.activity(
+                    user.entity,
+                    types="notification",
+                )
+            ),
+        )
+        for user in users
+    )
+    return (
+        persisted.name,
+        persisted.description,
+        persisted.form.key if persisted.form else None,
+        tuple(attribute.name for attribute in persisted.attributes),
+        persisted.fingerprint,
+        persisted.modified,
+        notification_keys,
+    )
 
 
 # @features categories
@@ -123,6 +151,7 @@ def test_category_viewer_opens_readonly_settings(get_user):
 
     subject = get_user(Users.models_forms_view_only)
     subject.go(category)
+    state_before_forgery = _category_side_effect_state(category, owner, subject)
 
     tools = Tools(subject)
     tools.open()
@@ -158,11 +187,12 @@ def test_category_viewer_opens_readonly_settings(get_user):
         cookie["name"]: cookie["value"]
         for cookie in subject.page.context.cookies()
     }
+    forbidden_description = "Forbidden category settings description."
     response = requests.put(
         f"{category.url}/update",
         data={
             "name": category.entity.name,
-            "description": "Forbidden category settings description.",
+            "description": forbidden_description,
             "form": form.key,
             **{attribute.name: "true" for attribute in category.entity.attributes},
         },
@@ -175,7 +205,20 @@ def test_category_viewer_opens_readonly_settings(get_user):
         timeout=10,
     )
 
-    assert response.status_code == 403
+    assert_lagniappe_error_response(response, status=403)
+    assert forbidden_description not in response.text
+    assert _category_side_effect_state(category, owner, subject) == (
+        state_before_forgery
+    )
     persisted = Entities.fetch_one(category.key, request=Fetch.direct())
     assert persisted.description == description
     assert persisted.fingerprint == original_fingerprint
+
+    subject.go(category)
+    refreshed_tools = Tools(subject)
+    refreshed_tools.open()
+    expect(
+        refreshed_tools.locate(Category.CATEGORY_INFO_WIDGET).locator(
+            "#description"
+        )
+    ).to_contain_text(description)

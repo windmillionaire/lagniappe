@@ -8,6 +8,7 @@ helpers, and other support code here rather than in test modules.
 
 from .error_tracking import capture_on_failure
 from .network import (
+    assert_lagniappe_error_response,
     expect_successful_response,
     multipart_form_fields,
     scoped_browser_route,
@@ -19,6 +20,7 @@ from .test_file import TestFile
 from .test_reporting import TestResults
 
 __all__ = [
+    "assert_lagniappe_error_response",
     "capture_on_failure",
     "expect_poll_result",
     "expect_successful_response",

@@ -183,6 +183,107 @@ def test_offline_scope_accepts_an_exact_reload_ping_count():
     collector.assert_clean()
 
 
+def test_offline_scope_accepts_a_bounded_reload_ping_count():
+    collector = BrowserFailureCollector()
+    context = FakeContext()
+    collector.monitor_context(context, label="Owner")
+    page = context.new_page()
+
+    with collector.expect_offline(
+        _user(page),
+        ping_count=2,
+        max_ping_count=3,
+    ):
+        for _ in range(3):
+            page.emit(
+                "requestfailed",
+                SimpleNamespace(
+                    method="HEAD",
+                    url="http://test.local/ping",
+                    failure="net::ERR_INTERNET_DISCONNECTED",
+                ),
+            )
+            page.emit(
+                "console",
+                SimpleNamespace(
+                    type="error",
+                    text="Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+                    location={"url": "http://test.local/ping", "lineNumber": 0},
+                ),
+            )
+
+    collector.assert_clean()
+
+
+def test_offline_scope_rejects_ping_counts_above_the_bound():
+    collector = BrowserFailureCollector()
+    context = FakeContext()
+    collector.monitor_context(context, label="Owner")
+    page = context.new_page()
+
+    with pytest.raises(AssertionError, match="between 2 and 3 browser failure"):
+        with collector.expect_offline(
+            _user(page),
+            ping_count=2,
+            max_ping_count=3,
+        ):
+            for _ in range(4):
+                page.emit(
+                    "requestfailed",
+                    SimpleNamespace(
+                        method="HEAD",
+                        url="http://test.local/ping",
+                        failure="net::ERR_INTERNET_DISCONNECTED",
+                    ),
+                )
+                page.emit(
+                    "console",
+                    SimpleNamespace(
+                        type="error",
+                        text=(
+                            "Failed to load resource: "
+                            "net::ERR_INTERNET_DISCONNECTED"
+                        ),
+                        location={
+                            "url": "http://test.local/ping",
+                            "lineNumber": 0,
+                        },
+                    ),
+                )
+
+
+@pytest.mark.parametrize("count", [0, 2])
+def test_bounded_scope_can_allow_an_optional_exact_failure(count):
+    collector = BrowserFailureCollector()
+    context = FakeContext()
+    collector.monitor_context(context, label="Owner")
+    page = context.new_page()
+
+    with collector.expect(
+        _user(page),
+        kind="console",
+        count=0,
+        max_count=2,
+        console_type="error",
+        text_contains="status of 503",
+        source_path="/notifications",
+    ):
+        for _ in range(count):
+            page.emit(
+                "console",
+                SimpleNamespace(
+                    type="error",
+                    text="Failed to load resource: status of 503",
+                    location={
+                        "url": "http://test.local/notifications",
+                        "lineNumber": 0,
+                    },
+                ),
+            )
+
+    collector.assert_clean()
+
+
 def test_http_error_scope_matches_status_path_and_count():
     collector = BrowserFailureCollector()
     context = FakeContext()
