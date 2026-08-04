@@ -16,8 +16,9 @@ import { primitives } from "../primitives";
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_pointer_and_dismissal_events_preserve_trigger_focus
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_hides_empty_recent_panel_but_keeps_server_empty_result_row
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_copies_only_supported_dataset_configuration
+ * @tests tests_js/test_016_combobox_frontend.py::test_combobox_positioning_stops_after_destroy
  * @features combobox
- * @dimensions positioning aria keyboard pointer dismissal empty-results dataset-configuration
+ * @dimensions positioning aria keyboard pointer dismissal empty-results dataset-configuration teardown
  */
 export class Combobox {
 	constructor(element) {
@@ -184,8 +185,12 @@ export class Combobox {
 	_startAutoUpdate() {
 		this._cleanupAutoUpdate();
 		const reference = this.positionReference || this.element;
+		const panel = this.panel;
+		if (!panel) return;
+		let active = true;
 
-		this.cleanup = autoUpdate(reference, this.panel, () => {
+		const cleanup = autoUpdate(reference, panel, () => {
+			if (!active || this.panel !== panel) return;
 			const middleware = [
 				offset(4),
 				shift({ padding: 5 }),
@@ -194,23 +199,28 @@ export class Combobox {
 
 			if (this.matchReferenceWidth) {
 				const { width } = reference.getBoundingClientRect();
-				this.panel.style.minWidth = `${Math.ceil(width)}px`;
+				panel.style.minWidth = `${Math.ceil(width)}px`;
 			} else if (this.element.classList.contains("w-full")) {
 				const { width } = this.element.getBoundingClientRect();
-				this.panel.style.width = `${Math.round(width)}px`;
+				panel.style.width = `${Math.round(width)}px`;
 			}
 
-			computePosition(reference, this.panel, {
+			computePosition(reference, panel, {
 				placement: this.placement,
 				middleware: middleware,
 			}).then(({ x, y, placement }) => {
-				Object.assign(this.panel.style, {
+				if (!active || this.panel !== panel) return;
+				Object.assign(panel.style, {
 					left: `${x}px`,
 					top: `${y}px`,
 				});
 				this.placement = placement;
 			});
 		});
+		this.cleanup = () => {
+			active = false;
+			cleanup();
+		};
 	}
 
 	_cleanupAutoUpdate() {

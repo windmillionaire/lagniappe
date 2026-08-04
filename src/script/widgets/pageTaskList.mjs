@@ -13,12 +13,14 @@ import { BaseList } from "../elements/base/baseList";
  * @tests tests_js/test_028_form_state_split.py::test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_task_collection_refresh_preserves_active_form_for_revision_review
  * @tests tests_js/test_028_form_state_split.py::test_task_list_empty_marker_requires_closed_create_form_and_no_tasks
+ * @tests tests_js/test_028_form_state_split.py::test_task_list_reconciliation_rejects_incomplete_structure
  * @features tasks
  * @dimensions readonly assignee permission-gates refresh update-state stale-widget create while-open list-state dedupe unsaved-marker active-form-preservation dirty-form-preservation
  * @pair tasks:active-form-preservation
  * @pair tasks:dirty-form-preservation
  * @pairs tasks:completed-only tasks:empty-state tasks:create-close
  * @pairs tasks:create tasks:refresh tasks:dedupe
+ * @pair tasks:detached-structure
  */
 export class PageTaskList extends BaseList {
 	constructor(attributes) {
@@ -160,10 +162,14 @@ export class PageTaskList extends BaseList {
 
 	_setListVisibility() {
 		if (!this.target.hasAttribute("loaded")) return;
+		const activeTasks = this.activeTasks;
+		const completedTasks = this.completedTasks;
+		const completedHeader = this.completedHeader;
+		if (!activeTasks || !completedTasks || !completedHeader) return;
 
 		const hasActive = this.activeCount > 0;
 		const hasCompleted = this.completedCount > 0;
-		const empty = this.activeTasks.querySelector("[data-role='empty']");
+		const empty = activeTasks.querySelector("[data-role='empty']");
 		const showEmpty =
 			Boolean(empty) &&
 			!hasActive &&
@@ -171,9 +177,8 @@ export class PageTaskList extends BaseList {
 			this.component.active === this;
 
 		if (empty) empty.dataset.visible = showEmpty ? "true" : "false";
-		this.activeTasks.dataset.visible =
-			hasActive || showEmpty ? "true" : "false";
-		this.completedHeader.dataset.visible = hasCompleted ? "true" : "false";
+		activeTasks.dataset.visible = hasActive || showEmpty ? "true" : "false";
+		completedHeader.dataset.visible = hasCompleted ? "true" : "false";
 	}
 
 	get ifEmpty() {
@@ -310,13 +315,18 @@ export class PageTaskList extends BaseList {
 	updated(response) {
 		if (!response.html) return;
 
-		this._isEmpty = !response.html.querySelector("[data-key]");
-
-		this._updated = [
+		const updated = [
 			response.html.querySelector("[data-role='active-tasks']"),
 			response.html.querySelector("[data-role='completed-header']"),
 			response.html.querySelector("[data-role='completed-tasks']"),
-		].filter(Boolean);
+		];
+		if (updated.some((element) => !element)) {
+			this._updated = [];
+			return;
+		}
+
+		this._isEmpty = !response.html.querySelector("[data-key]");
+		this._updated = updated;
 	}
 	/**
 	 * @testable true

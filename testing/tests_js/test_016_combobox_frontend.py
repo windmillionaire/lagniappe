@@ -219,7 +219,7 @@ const computePositionCalls = [];
 const observers = [];
 
 const autoUpdate = (reference, panel, callback) => {
-  const call = { cleaned: false, panel, reference };
+  const call = { callback, cleaned: false, panel, reference };
   autoUpdateCalls.push(call);
   callback();
   return () => {
@@ -491,6 +491,39 @@ if (
   middleware[2].name !== "flip" || middleware[2].options.padding !== 5
 ) {
   throw new Error(`Position safeguards changed: ${JSON.stringify(middleware)}`);
+}
+""",
+    )
+
+
+# @pair combobox:teardown
+# @style dropdown.panel
+def test_combobox_positioning_stops_after_destroy(run_node):
+    run_combobox_check(
+        run_node,
+        r"""
+const { parent } = makeComboboxElements();
+const combobox = new Combobox(parent);
+const input = new FakeElement("input", { rect: { width: 123.6 } });
+input.classList.add("w-full");
+combobox.element = input;
+combobox.panel = new FakeElement("div");
+
+combobox._startAutoUpdate();
+await Promise.resolve();
+const call = autoUpdateCalls[0];
+const panel = call.panel;
+const positioned = { ...panel.style };
+
+combobox.destroy();
+call.callback();
+await Promise.resolve();
+
+if (!call.cleaned || combobox.panel !== null) {
+  throw new Error("Destroy did not cancel and release combobox positioning");
+}
+if (JSON.stringify(panel.style) !== JSON.stringify(positioned)) {
+  throw new Error(`Canceled positioning mutated the detached panel: ${JSON.stringify(panel.style)}`);
 }
 """,
     )

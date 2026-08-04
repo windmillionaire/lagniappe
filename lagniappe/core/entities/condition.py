@@ -15,8 +15,9 @@ from ..tools import cache
 
 # @testable true
 # @tests tests_unit/test_011_filters.py::test_filter_conditions_multiple_types
+# @tests tests_unit/test_011_filters.py::test_condition_create_skips_missing_entity_reference
 # @features filter
-# @dimensions conditions mixed-types
+# @dimensions conditions mixed-types missing-entity
 class Condition:
     """A single filter condition: entity + field + comparator + value.
 
@@ -54,7 +55,10 @@ class Condition:
 
         if not condition.entity:
             entity_hash = definition.entity_hash
-            condition.entity = entity_map[entity_hash]
+            entity = entity_map.get(entity_hash)
+            if not entity:
+                return None
+            condition.entity = entity
 
         if definition.field in condition.entity.filters.fields:
             condition.field = definition.field

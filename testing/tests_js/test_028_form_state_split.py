@@ -2054,6 +2054,7 @@ const activeTasks = {
   },
 };
 const completedHeader = { dataset: {} };
+const completedTasks = { dataset: {} };
 const list = Object.create(context.PageTaskList.prototype);
 let activeCount = 0;
 let completedCount = 0;
@@ -2067,6 +2068,7 @@ list._created = [];
 list.component = { active: { name: "CreateTask" }, widgets: {} };
 Object.defineProperties(list, {
   activeTasks: { value: activeTasks },
+  completedTasks: { value: completedTasks },
   completedHeader: { value: completedHeader },
   activeCount: { get() { return activeCount; } },
   completedCount: { get() { return completedCount; } },
@@ -2110,6 +2112,48 @@ list._setListVisibility();
 if (marker.dataset.visible !== "false" || activeTasks.dataset.visible !== "true") {
   throw new Error("Active task visibility was affected by the empty marker");
 }
+'''
+    )
+
+
+# @pair tasks:detached-structure
+def test_task_list_reconciliation_rejects_incomplete_structure(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const context = { BaseList: class {}, console };
+vm.createContext(context);
+let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class PageTaskList", "class PageTaskList");
+source += "\nglobalThis.PageTaskList = PageTaskList;";
+vm.runInContext(source, context);
+
+const list = Object.create(context.PageTaskList.prototype);
+list._isEmpty = false;
+list._updated = [{ stale: true }];
+list.target = {
+  hasAttribute(name) { return name === "loaded"; },
+  querySelector() { return null; },
+};
+
+list.updated({
+  html: {
+    querySelector(selector) {
+      if (selector === "[data-role='active-tasks']") return { role: "active" };
+      if (selector === "[data-role='completed-header']") return { role: "header" };
+      return null;
+    },
+  },
+});
+
+if (list._updated.length !== 0 || list._isEmpty !== false) {
+  throw new Error("An incomplete task-list response replaced the retained structure");
+}
+
+list._setListVisibility();
 '''
     )
 

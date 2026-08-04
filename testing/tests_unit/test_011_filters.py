@@ -60,6 +60,21 @@ def test_condition_requires_field_for_type_and_definition():
         condition._create_definition()
 
 
+# @pair filter:missing-entity
+@pytest.mark.unit
+def test_condition_create_skips_missing_entity_reference():
+    definition = FilterDefinition(
+        "missing-entity",
+        "name",
+        FieldType.STRING,
+        Comparator.EQUALS,
+        "Example",
+        False,
+    )
+
+    assert Condition.create(definition, {}) is None
+
+
 # @features filter
 # @dimensions conditions string
 @pytest.mark.unit
