@@ -20,6 +20,8 @@ class Keys(Enum):
     AI_RESOURCE_INVENTORY = f"{CONFIG.PREFIX}AI:RESOURCES:{{}}"
     FILTER = f"{CONFIG.PREFIX}JSON:{{}}:{{}}"
     RATE_LIMIT = f"{CONFIG.PREFIX}RATE_LIMIT:{{}}:{{}}"
+    NOTIFICATIONS = f"{CONFIG.PREFIX}NOTIFICATIONS:{{}}"
+    NOTIFICATION_EPOCH = f"{CONFIG.PREFIX}NOTIFICATIONS:EPOCH:{{}}"
 
     # @testable infrastructure
     def key(self, entity):

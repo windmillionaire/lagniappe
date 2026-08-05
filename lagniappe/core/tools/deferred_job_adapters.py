@@ -57,6 +57,7 @@ class ReportAdapter(DeferredJobAdapter):
         report.deferred_job = {
             "key": context.job.urlsafe_key,
             "idempotency_key": context.job.idempotency_key,
+            "revision": int(getattr(context.job, "status_revision", 0) or 0),
         }
         Entities.save(report, context.actor)
 
@@ -398,6 +399,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             "key": context.job.urlsafe_key,
             "idempotency_key": context.job.idempotency_key,
             "previous_status": previous_status,
+            "revision": int(getattr(context.job, "status_revision", 0) or 0),
         }
         report.status = "running"
         report.pending = True

@@ -224,6 +224,15 @@ export default class ViewComponent {
 		const response = await this.view.load(this, route);
 		widget.modified = true;
 		if (!response) return null;
+		const responseTarget = response.html?.querySelector?.(
+			`[data-widget='${widget.name}']`,
+		);
+		if (responseTarget && response.pollChannel) {
+			responseTarget.dataset.pollChannel = response.pollChannel;
+		}
+		if (responseTarget && response.pollRevision) {
+			responseTarget.dataset.pollRevision = response.pollRevision;
+		}
 
 		const append = await widget.updated(response);
 		if (append) this.load(widget, append.dataset.route);

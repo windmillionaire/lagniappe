@@ -309,8 +309,11 @@ view.Notifications = { async refresh() { events.push({ type: "notifications" });
     throw new Error("Component IDs did not identify refresh targets");
   }
   const types = events.map((event) => event.type);
-  for (const expected of ["delta", "legacy-fallback", "notifications"]) {
+  for (const expected of ["delta", "legacy-fallback"]) {
     if (!types.includes(expected)) throw new Error(`Missing ${expected}: ${types}`);
+  }
+  if (types.includes("notifications")) {
+    throw new Error("Collection reconciliation fetched the notification list");
   }
   if (types.includes("legacy-delta") || types.includes("unexpected-delta")) {
     throw new Error(`Incorrect per-target fallback: ${types}`);

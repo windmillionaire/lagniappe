@@ -1,2 +1,78 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="f9068bb9-104e-41ed-9003-dc0793cb55cf",e._sentryDebugIdIdentifier="sentry-dbid-f9068bb9-104e-41ed-9003-dc0793cb55cf");}catch(e){}}();import{a as t}from"./base2.js?v=b83a2173";import"./styles.js?v=b83a2173";import"./baseForm.js?v=b83a2173";import"./foundation.js?v=b83a2173";import"./connectivity.js?v=b83a2173";import"./icons.js?v=b83a2173";import"./primitives.js?v=b83a2173";import"./loader.js?v=b83a2173";import"./select2.js?v=b83a2173";import"./combobox.js?v=b83a2173";import"./results.js?v=b83a2173";import"./formatting.js?v=b83a2173";import"./submitter.js?v=b83a2173";class e extends t{constructor(i){super(i),this.key="visibility",this.targetSelectTitle="Show this element when",this.messages={submit:"Add Visibility Condition"}}init(){this.element.schema.visibility??=[],this.index!==-1?(this.setTitle("Edit Visibility Condition"),this.messages.submit="Update Visibility Condition",this.setting={...this.element.schema.visibility[this.index]}):(this.setTitle("Create Visibility Condition"),this.setting={}),super.init(),this.builder.getEligibleConditionTargets().length===0?this.form.showError("Visibility cannot be set using available components. Please add a radio button, checkbox, or select menu to the form before setting the visibility of this element."):super.addTargetSelect(),this.showProgress()}showProgress(){const i=this.builder.elements.get(this.setting.id);i&&(i.schema.type==="checkbox"?(this.addCheckboxTarget(),this.complete=!0):(this.addChooseValue(),this.setting.value&&(this.complete=!0)),super.showProgress())}}export{e as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { a as ConditionTarget } from './base2.js?v=bed962f9';
+import './styles.js?v=bed962f9';
+import './baseForm.js?v=bed962f9';
+import './foundation.js?v=bed962f9';
+import './notificationState.js?v=bed962f9';
+import './connectivity.js?v=bed962f9';
+import './icons.js?v=bed962f9';
+import './primitives.js?v=bed962f9';
+import './loader.js?v=bed962f9';
+import './select2.js?v=bed962f9';
+import './combobox.js?v=bed962f9';
+import './results.js?v=bed962f9';
+import './formatting.js?v=bed962f9';
+import './submitter.js?v=bed962f9';
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility_select_multiple_values
+ * @features forms
+ * @dimensions builder-field-visibility select-or-values
+ */
+class Visibility extends ConditionTarget {
+	constructor(builder) {
+		super(builder);
+		this.key = "visibility";
+		this.targetSelectTitle = "Show this element when";
+		this.messages = {
+			submit: "Add Visibility Condition",
+		};
+	}
+
+	init() {
+		this.element.schema.visibility ??= [];
+
+		if (this.index !== -1) {
+			this.setTitle("Edit Visibility Condition");
+			this.messages.submit = "Update Visibility Condition";
+			this.setting = { ...this.element.schema.visibility[this.index] };
+		} else {
+			this.setTitle("Create Visibility Condition");
+			this.setting = {};
+		}
+
+		super.init();
+
+		const targets = this.builder.getEligibleConditionTargets();
+		if (targets.length === 0) {
+			this.form.showError(
+				"Visibility cannot be set using available components. " +
+					"Please add a radio button, checkbox, or select menu to the form before " +
+					"setting the visibility of this element.",
+			);
+		} else {
+			super.addTargetSelect();
+		}
+
+		this.showProgress();
+	}
+
+	showProgress() {
+		const target = this.builder.elements.get(this.setting.id);
+		if (!target) return;
+
+		if (target.schema.type === "checkbox") {
+			this.addCheckboxTarget();
+			this.complete = true;
+		} else {
+			this.addChooseValue();
+			if (this.setting.value) this.complete = true;
+		}
+
+		super.showProgress();
+	}
+}
+
+export { Visibility as default };

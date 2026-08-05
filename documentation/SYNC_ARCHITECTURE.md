@@ -9,15 +9,18 @@ features no longer own timers or push registrations.
 | Entity and focused forms | Datastore entity `fingerprint` and `modified` | `entity`, `form-lock` |
 | Collection/list membership | Existing Datastore `site` fingerprints | `channel` |
 | Deferred work | User `operation_revision`, then `DeferredJob.status_revision` and status projection | `operation` |
+| Notification badge/list invalidation | Expiring Redis generation, revision, and membership projection | piggybacked `notification_state` |
 | File ingress | Ingress entity fingerprint | `ingress` |
 | Collaborative documents | Entity document asset plus revisioned Redis working state | `document` |
 | Explicit offline submits | IndexedDB mutation records | replayed on reconnect |
 
 This division is intentional. Entity and collection revisions must survive
-Redis loss, so they remain in Datastore. Redis is used only for high-churn
-collaborative document deltas and expiring presence. A second Redis copy of
-every entity fingerprint would introduce invalidation and recovery work without
-improving correctness.
+Redis loss, so they remain in Datastore. Redis is used for high-churn
+collaborative document state and for reconstructable notification membership.
+Notification bodies remain durable in Datastore; the Redis projection is only
+an expiring badge/list cursor and may be rebuilt with one keys-only ancestor
+query. A second Redis copy of every entity fingerprint would introduce
+invalidation and recovery work without improving correctness.
 
 ## Browser scheduler
 
@@ -38,21 +41,27 @@ subscription has a stable client ID, type-specific fields, and an opaque
 - adds ten-percent jitter to avoid synchronized clients, using one jitter factor
   and one scheduling timestamp per response so subscriptions with the same
   cadence remain in the same request instead of gradually fanning out;
-- backs ordinary entity/channel checks from 15 seconds to 30 and then 60
-  seconds while quiet;
-- polls the active visible document every 2 seconds, active visible ingress
-  every 2.5 seconds, and deferred operations at 4, 8, 16, then 30 seconds while
-  quiet;
+- gives every subscription an explicit `periodic` or `foreground` mode and an
+  `immediate` or `scheduled` initial check;
+- starts entity and form-lock conflict checks after 15 seconds, then backs them
+  off while quiet;
+- keeps collection channels foreground-only: they install no idle timer and
+  run only in a catch-up cycle;
+- polls active documents immediately and every 2 seconds, active ingress
+  immediately and every 2.5 seconds, and server-rendered operations first at
+  four seconds before their 8, 16, and 30 second quiet backoff. A locally
+  started operation still nudges its own descriptor immediately;
 - backs transport errors off exponentially to 60 seconds;
 - stops when the tab is hidden, the browser window is unfocused, or the view is
   offline;
-- immediately polls after visibility, focus, browser-online, or server-online
-  recovery.
+- performs one batched `catchUp()` after visibility, focus, browser-online, or
+  server-online recovery. `resume()` only restores scheduled timers.
 
-The existing connectivity health check remains separate: it determines whether
-the server is reachable and drives the offline UI. It does not fetch feature
-state. It also stops on window blur; focus performs the explicit catch-up before
-the normal long health-check interval resumes.
+The existing connectivity health check remains the server-health authority and
+drives the offline UI. Its optional `X-Lagniappe-Notification-State` header is
+a Redis-only projection read; a miss or Redis failure never changes the health
+result. It also stops on window blur; focus performs one health check and one
+poll catch-up before the normal long interval resumes.
 
 ### Startup and readiness
 
@@ -97,8 +106,10 @@ selection beneath a closed parent does not subscribe.
 
 | Subscription | Lifetime | Notes |
 |---|---|---|
-| Root `entity` or collection `channel` | Mounted view while focused/visible | The page or index itself remains the durable invalidation authority. |
-| `notifications` channel | Mounted authenticated view while focused/visible | Global chrome must learn about a newly created notification even when the menu is closed. |
+| Root `entity` | Mounted view while focused/visible | Periodic conflict check, first due after 15 seconds. |
+| Index collection `channel` | Mounted view while focused/visible | Foreground-only; the rendered opaque poll revision is separate from the raw `/refresh` fingerprint. |
+| Home collection `channel` | While its owning widget has loaded | `home-notes`, `tasks`, `starred`, `pages`, `projects`, `categories`, `ingress`, and `tool-reports` catch up independently and refresh only their owner. The legacy composite `home` channel remains server-compatible. |
+| Notification state | Authenticated ping and any already-needed poll | No subscription or timer. A cold ping miss causes one personal-state seed poll. |
 | Watched-form `entity` and `form-lock` | Active visible form widget only | A root form shares the root entity subscription, avoiding a duplicate entity descriptor and Datastore read. |
 | `document` | Active visible collaborative document only | Deactivation checkpoints local state, unsubscribes, and explicitly closes presence. |
 | `ingress` | Active visible import wizard while its import is running | Hidden running imports retain local running state and catch up when reopened. |
@@ -127,7 +138,12 @@ The version 1 request envelope is:
       "revision": "known-fingerprint"
     }
   ],
-  "closed_documents": []
+  "closed_documents": [],
+  "notification_state": {
+    "generation": "known-generation",
+    "revision": 12,
+    "seed": false
+  }
 }
 ```
 
@@ -173,23 +189,23 @@ from becoming a second rendering API.
 
 ### Channel revisions
 
-Collection revisions normally reuse `database.site_fingerprint()`. Entity
+Collection revisions reuse batched `database.site_fingerprints()` reads. Entity
 saves already update these durable records in the same persistence workflow.
-The `home` channel combines the fingerprints for notes, categories, projects,
-pages, and tasks because the dashboard renders several collections. Personal
+Only paths for mounted channels are loaded. Home uses one channel per loaded
+widget so a changed Tasks fingerprint cannot reload Notes, Pages, or Projects;
+the composite `home` channel remains only for older cached clients. Personal
 channels use state already present on the directly loaded request user where
 that is the narrower authority:
 
-- `notifications` uses the user's monotonic `notification_revision`, avoiding a
-  separate collection-fingerprint read;
 - `starred` uses the user revision;
 - `tool-reports` uses report and user revisions.
 
 Permission fingerprints are part of each channel revision, so a permission
 change invalidates the viewer's collection even when membership did not change.
-Notification-only and operation-only user revision patches do not change the
-user's `modified` fingerprint, refresh its Redis search cache, or invalidate the
-global users collection.
+Operation-only user revision patches do not change the user's `modified`
+fingerprint, refresh its Redis search cache, or invalidate the global users
+collection. Notification mutations do not write the User or any site
+fingerprint at all.
 
 ## Collaborative documents
 
@@ -327,20 +343,42 @@ reconciles the configured entity/widget route when terminal and then removes
 the subscription. Pending report lists do not run a second refresh timer; their
 operation marker is the sole automatic completion authority.
 
-Notifications are durable entities. The `notifications` channel refreshes the
-dropdown; entity, operation, and ingress subscriptions independently reconcile
-their owned active surfaces. There is no completion-event payload or provider
-retry path.
+Notifications remain durable entities, but badge/list invalidation is an
+expiring Redis projection. Each user has a versioned hash containing a
+generation UUID, revision, and one membership field per notification key, plus
+a separately watched epoch key. The count is derived from membership; bodies
+are never cached there. Both keys use a sliding 30-minute expiration.
 
-The request user has separate monotonic `notification_revision` and
-`operation_revision` fields. Notification mutations advance the first; every
-client-visible deferred status revision advances the second in the same
-user-ancestor transaction as the job. An operation descriptor echoes the last
-seen `operation_revision`. When it still matches the already loaded request
-user, `/poll` returns `unchanged` without loading that job. A mismatch causes
-one bounded owner-safe batch load and advances the descriptor gate. Separate
-counters prevent job progress from refetching the notification list and prevent
-a new notification from reloading every active operation.
+A cold seed watches the projection and epoch, records the epoch, performs one
+keys-only notification ancestor query, and publishes only if neither watched
+key changed. Concurrent creates, content updates, and deletes increment the
+epoch and force a retry. After a durable notification mutation, one post-commit
+effect upserts or removes membership and advances the revision once. If the
+projection is absent, it advances only the epoch and leaves the next poll to
+seed; Redis failure is reported but never rolls back the durable write. Opening
+`/notifications` performs the keys query inside the same watched repair and
+uses those keys to load the list, avoiding a second notification query.
+
+`/ping` reads the signed session user key without activating Flask-Login and
+peeks only at Redis. A warm state slides expiration and is returned in
+`X-Lagniappe-Notification-State`; a miss is reported with null fields. The
+browser folds that miss into the next `/poll`, or sends one personal-state-only
+poll when no channel is otherwise due. Document, ingress, operation, and
+foreground catch-up requests carry the last notification cursor, so warm checks
+add no notification Datastore read. A changed state updates the badge and marks
+an already-loaded menu stale; the list refreshes immediately only while open
+and otherwise waits for its next opening.
+
+`User.operation_revision` remains the durable aggregate gate. Every
+client-visible deferred status revision advances it in the same user-ancestor
+transaction as the job. Server-rendered operation descriptors start with both
+the aggregate and job revision plus the bounded current status, hydrate that
+status into the browser cache, and wait four seconds for their first check;
+locally started operations nudge immediately. Matching aggregate revisions
+return `unchanged` without loading jobs. A mismatch loads only operation keys
+tracked by that browser in existing batches of 50. The historical
+`User.notification_revision` property is left untouched for compatibility and
+is no longer read or advanced.
 
 ## Offline submissions
 
@@ -380,5 +418,7 @@ payload:
    test;
 6. document its authority and inactive-tab behavior here.
 
-Do not add feature-owned intervals, service-worker event relays, or a Redis copy
-of durable entity metadata.
+Do not add feature-owned intervals, service-worker event relays, or Redis
+copies of durable entity metadata. Reconstructable projections such as the
+notification membership hash must define their authoritative seed and
+mutation-race contract explicitly.

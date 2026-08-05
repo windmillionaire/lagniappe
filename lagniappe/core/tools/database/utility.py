@@ -648,7 +648,7 @@ class Fingerprint(Enum, metaclass=DefaultEnum):
     group = "users"
     public_group = "users"
     note = "home"
-    notification = "notifications"
+    notification = None
     report = "reports"
 
     # url segment
@@ -683,6 +683,8 @@ def save(*entities):
 # @reason neutral-mask selection is asserted through the public mutation writer
 def _advances_site_fingerprint(entity, mask):
     fields = set(mask or ())
+    if entity.db.get("type") == "notification":
+        return False
     if not fields:
         return True
     if entity.db.get("type") == "user" and fields.issubset(
@@ -698,8 +700,10 @@ def _advances_site_fingerprint(entity, mask):
 
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_save_mutations_applies_property_masks_and_fingerprints
+# @tests tests_unit/test_018_database_utility.py::test_notification_save_and_delete_skip_site_fingerprints
 # @features mutations database
 # @dimensions property-mask update full-upsert site-fingerprint document-checkpoint
+# @pairs notifications:mutation notifications:site-fingerprint-isolation
 def save_mutations(writes):
     """Persist full and property-masked entity writes in one Datastore batch.
 
@@ -771,7 +775,13 @@ def delete_entities(entities):
     to_delete = {e.key: e.db for e in entities if getattr(e, "key", None)}
     if not to_delete:
         return
-    to_update = update_site_fingerprints(*to_delete.values())
+    to_update = update_site_fingerprints(
+        *(
+            entity
+            for entity in to_delete.values()
+            if entity.get("type") != "notification"
+        )
+    )
 
     with DATA.datastore.batch() as batch:
         for entity in to_update:
@@ -825,26 +835,43 @@ def update_site_fingerprints(*entities):
 # @reason site fingerprint creation is persistence-owned and covered by route/E2E workflows
 def site_fingerprint(path):
     """Return the current fingerprint UUID for a URL path, creating one if needed."""
-    parts = [p for p in path.split("/") if p]
-    if not parts:
-        index = "home"
-    else:
-        index = next((p for p in parts if Fingerprint[p].value), None)
+    return site_fingerprints((path,)).get(path)
 
-    if not index:
-        return None
 
-    path_key = DATA.datastore.key("site", index)
-    record = DATA.datastore.get(path_key)
+# @testable true
+# @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
+# @tests tests_unit/test_018_database_utility.py::test_site_fingerprints_batch_reads_only_resolved_paths
+# @pairs polling:channel polling:batching polling:mounted-scope
+def site_fingerprints(paths):
+    """Return fingerprints for ``paths`` through one bounded multi-read."""
+    paths = tuple(dict.fromkeys(path for path in paths if isinstance(path, str)))
+    indexes = {}
+    for path in paths:
+        parts = [part for part in path.split("/") if part]
+        index = (
+            "home"
+            if not parts
+            else next((part for part in parts if Fingerprint[part].value), None)
+        )
+        if index:
+            indexes[path] = index
 
-    if record:
-        return record.get("fingerprint")
-    else:
-        record = DATA.datastore.entity(key=path_key)
-        fingerprint = str(uuid.uuid4())
-        record["fingerprint"] = fingerprint
-        DATA.datastore.put(record)
-        return fingerprint
+    keys_by_index = {
+        index: DATA.datastore.key("site", index)
+        for index in dict.fromkeys(indexes.values())
+    }
+    missing = []
+    records = DATA.datastore.get_multi(list(keys_by_index.values()), missing=missing)
+    for record in missing:
+        record["fingerprint"] = str(uuid.uuid4())
+    if missing:
+        DATA.datastore.put_multi(missing)
+    by_key = {record.key: record for record in [*records, *missing] if record}
+
+    return {
+        path: by_key[keys_by_index[index]].get("fingerprint")
+        for path, index in indexes.items()
+    }
 
 
 # @testable infrastructure

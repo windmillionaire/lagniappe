@@ -162,6 +162,25 @@ export default class Core extends ShellView {
 	 */
 	_initPollingSubscription() {
 		if (!this.PollingCoordinator) return;
+		const pollChannel = this.elt.dataset.pollChannel;
+		if (pollChannel) {
+			this.PollingCoordinator.subscribe(
+				{
+					id: `view:channel:${pollChannel}`,
+					type: "channel",
+					channel: pollChannel,
+					revision: this.elt.dataset.pollRevision || null,
+				},
+				{
+					mode: "foreground",
+					initial: "scheduled",
+					onResult: async (result) => {
+						if (result.status === "changed") await this.refresh();
+					},
+				},
+			);
+			return;
+		}
 		if (this.key) {
 			const id = `view:entity:${this.key}`;
 			this.PollingCoordinator.subscribe(
@@ -172,6 +191,8 @@ export default class Core extends ShellView {
 					revision: this.elt.dataset.fingerprint || null,
 				},
 				{
+					mode: "periodic",
+					initial: "scheduled",
 					onResult: async (result) => {
 						const watcher = this.elt.querySelector("[lp-edited-marker]")
 							? await this.ensureEditWatcher()
@@ -212,6 +233,8 @@ export default class Core extends ShellView {
 				revision: this.elt.dataset.fingerprint || null,
 			},
 			{
+				mode: "foreground",
+				initial: "scheduled",
 				onResult: async (result) => {
 					if (result.status === "changed") await this.refresh();
 				},
@@ -314,12 +337,13 @@ export default class Core extends ShellView {
 	 * @testable true
 	 * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
 	 * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
-	 * @tests tests_e2e/001_site/test_001d_offline.py::test_rapid_offline_online_transitions
 	 * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
 	 * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
 	 * @features offline
 	 * @dimensions indicator browser-state server-health transitions view-reset dirty-form-preservation
 	 * @pair offline:dirty-form-preservation
+	 * @pair offline:background-replay
+	 * @pairs polling:nonblocking polling:catch-up
 	 */
 	async sync({ hidden = document.hidden, force = false } = {}) {
 		const online = connectivity.online;
@@ -349,17 +373,18 @@ export default class Core extends ShellView {
 					: null,
 			]);
 			if (wasInactive && !hidden) {
-				const refreshFingerprint = this.elt.dataset.fingerprint || null;
 				this.scheduleOfflineReplay();
-				this.DeferredOperations?.nudge();
 				await this.EditWatcher?.resume();
-				await this.refresh(force, { fingerprint: refreshFingerprint });
 			} else {
 				await this.EditWatcher?.resume();
 			}
 			await this.SyncManager?.register();
 			await this.reconcilePollingSubscriptions();
-			await this.PollingCoordinator?.resume();
+			if (wasInactive && !hidden) {
+				await this.PollingCoordinator?.catchUp();
+			} else {
+				await this.PollingCoordinator?.resume();
+			}
 		}
 	}
 

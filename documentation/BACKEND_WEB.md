@@ -242,11 +242,23 @@ def tasks(key, **kwargs):
 ### Unified Polling
 
 `POST /poll` accepts a bounded versioned batch of typed subscriptions. It
-deduplicates entity loads, checks viewer permissions, and returns a common
-changed/unchanged/unavailable/error envelope. Entity and collection cursors are
-durable fingerprints; document cursors are Redis generations/revisions;
-deferred operations use `status_revision`. Large HTML or data remains on
-focused replacement routes. See
+groups descriptors before invoking type-specific loaders, batches target
+entities once, resolves locks only when lock descriptors exist, and reads only
+the site fingerprints required by mounted channels in one multi-read. Matching
+operation aggregate revisions skip job loads; stale aggregates load only the
+operation keys tracked by that browser in batches of 50. Viewer permissions are
+checked before returning the common changed/unchanged/unavailable/error
+envelope. Entity and collection cursors are durable fingerprints; document
+cursors are Redis generations/revisions; deferred operations use
+`status_revision`. Large HTML or data remains on focused replacement routes.
+
+The optional request-level `notification_state` cursor is checked through Redis
+and returned in `X-Lagniappe-Notification-State`. A `seed: true` miss performs
+the single authoritative keys-only notification query; warm document, ingress,
+operation, and foreground catch-up polls do no notification Datastore work.
+`HEAD /ping` reads only the signed session user key and performs the same warm
+Redis peek without activating Flask-Login. Redis misses/errors do not change
+the health-check status. See
 [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md).
 
 ### Deferred Admin Export

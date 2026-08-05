@@ -194,7 +194,7 @@
                 class="{{ styles.home.create }}">{{ render_icon("plus", styles.icon.default) }}</button>
       </div>
       {{ notes.add_note_form() }}
-      {{ notes.list(home.notes) }}
+      {{ notes.list(home.notes, poll_revisions['home-notes']) }}
     </div>
     <div id="tasks"
          lp-component
@@ -230,6 +230,8 @@
           data-widget="HomeTaskList"
           data-route='{{ url_for("home.get", kind="tasks") }}'
           data-if-empty="CreateUserTask"
+          data-poll-channel="tasks"
+          data-poll-revision="{{ poll_revisions['tasks'] }}"
           data-visible="false">
       </ul>
     </div>

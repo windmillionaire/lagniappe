@@ -1,4 +1,5 @@
 import { captureNetworkError } from "./errors.mjs";
+import { applyNotificationStateHeader } from "./notificationState.mjs";
 
 const PARSER = new DOMParser();
 const TOKEN_REQUEST = {
@@ -9,6 +10,8 @@ const UPDATED_HEADER = "X-Lagniappe-Updated";
 const INVALIDATE_CACHE_HEADER = "X-Lagniappe-Invalidate-Cache";
 const ENTITY_REVISIONS_HEADER = "X-Lagniappe-Entity-Revisions";
 const CSRF_FAILURE_HEADER = "X-Lagniappe-CSRF";
+const POLL_CHANNEL_HEADER = "X-Lagniappe-Poll-Channel";
+const POLL_REVISION_HEADER = "X-Lagniappe-Poll-Revision";
 const CSRF_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const UPSTREAM_UPLOAD_OVERLOAD_ERROR = "Upload fewer files?";
 const UPSTREAM_RESET_PATTERN =
@@ -61,6 +64,7 @@ const _formatResponse = async (
 	response,
 	{ acknowledgeEntities = true } = {},
 ) => {
+	applyNotificationStateHeader(response.headers);
 	if (response.status === 304) {
 		return {
 			ok: true,
@@ -84,6 +88,8 @@ const _formatResponse = async (
 	}
 	result.updated = response.headers.get(UPDATED_HEADER) !== "false";
 	result.etag = response.headers.get("ETag");
+	result.pollChannel = response.headers.get(POLL_CHANNEL_HEADER);
+	result.pollRevision = response.headers.get(POLL_REVISION_HEADER);
 	result.reload =
 		Boolean(result.reload) || response.headers.has(INVALIDATE_CACHE_HEADER);
 	const revisions = new Map();

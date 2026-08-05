@@ -138,8 +138,9 @@ The archive root is `html/YYYY-MM-DD/YYYYMMDDTHHMMSSZ-<short-id>/` and includes 
 
 ## Cache (`tools/cache/`)
 
-Redis-backed caching layer for search indexing, ETag fingerprinting, sync state,
-rate limiting, and filter results.
+Redis-backed caching layer for search indexing, notification projection, sync
+state, rate limiting, and filter results. Page/component ETag fingerprints
+remain durable Datastore records rather than Redis values.
 
 ### Initialization (`core.py`)
 
@@ -167,6 +168,11 @@ Three key enums:
 - **`Search`**: Per-entity-type hash keys (`{prefix}{kind}:{urlsafe_key}`)
 - **`Sync`**: Per-widget/entity sync registrations and cached state
 
+`Keys.NOTIFICATIONS` and `Keys.NOTIFICATION_EPOCH` are per-user and expire
+after 30 minutes of inactivity. The first is a versioned membership hash; the
+second is the independently watched mutation epoch used to prevent a cold seed
+from publishing stale membership.
+
 ### Writing (`add.py`)
 
 `update(*entities)` writes entity data to the hash cache and parent JSON filter
@@ -184,6 +190,27 @@ indexes used by saved filters.
 Redis stores parent references as `parent_key`; this helper hydrates those
 pointers back into `parent` detail blocks for callers. Search-result hydration
 also lives here so query code does not need to know the detail storage format.
+
+### Notification projection (`notifications.py`)
+
+The notification projection stores only schema version, generation UUID,
+revision, and notification-key membership. Count is derived from membership;
+notification bodies stay in Datastore. Warm peeks are Redis-only and slide the
+30-minute expiration of both the state and epoch keys.
+
+Cold population watches both keys, records the epoch, performs one keys-only
+ancestor query, and writes a new generation. Any concurrent committed
+notification mutation increments the watched epoch, so optimistic transaction
+retry reruns the query instead of publishing stale membership. Post-commit
+notification effects upsert/remove keys and advance the revision once per
+logical mutation. When state is absent they advance only the epoch; they never
+query Datastore. `/notifications` runs its list keys query inside the same
+watched repair and reuses those keys to fetch bodies.
+
+Redis errors are rebuildable provider failures: they are captured after the
+durable mutation and cannot roll it back. `/ping` similarly omits the optional
+notification-state header on Redis error while preserving its server-health
+response.
 
 ### Querying (`query.py`)
 

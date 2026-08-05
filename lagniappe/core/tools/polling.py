@@ -8,7 +8,7 @@ from lagniappe.core.tools import database
 from lagniappe.core.tools.deferred_jobs import DeferredJobs
 
 
-PERSONAL_CHANNELS = frozenset({"notifications", "starred", "tool-reports"})
+PERSONAL_CHANNELS = frozenset({"starred", "tool-reports"})
 CHANNEL_REVISION_PATHS = {
     "home": (
         "/",
@@ -17,29 +17,50 @@ CHANNEL_REVISION_PATHS = {
         "/pages/index",
         "/tasks/index",
     ),
+    "home-notes": ("/",),
+    "categories": ("/categories/index",),
+    "projects": ("/projects/index",),
+    "pages": ("/pages/index",),
+    "tasks": ("/tasks/index",),
+    "forms": ("/forms/index",),
+    "users": ("/users/index",),
+    "ingress": ("/ingress/index",),
+    "starred": (),
     "tool-reports": ("/reports/index",),
 }
 
 
 # @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_notification_channel_revision_uses_loaded_user_only
-# @pairs polling:channel polling:revision polling:permissions
-# @pairs notifications:personal-activity notifications:revision notifications:datastore-read-isolation
-def channel_revision(channel, user, *, site_fingerprint=None):
+# @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
+# @pairs polling:channel polling:revision polling:permissions polling:mounted-scope
+def channel_paths(channel):
+    """Return the durable fingerprint paths owned by one polling channel."""
+    return CHANNEL_REVISION_PATHS.get(channel, (f"/{channel}/index",))
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/polling.py::channel_revisions
+# @reason single-channel hashing is exercised through the batched public projection
+def channel_revision(
+    channel,
+    user,
+    *,
+    site_fingerprint=None,
+    site_fingerprints=None,
+):
     """Return an opaque durable revision scoped to the supplied viewer."""
     site_fingerprint = site_fingerprint or database.site_fingerprint
     entity_revision = getattr(user, "fingerprint", None)
     if not entity_revision:
         modified = getattr(user, "modified", None)
         entity_revision = modified.isoformat() if modified else "unknown"
-    paths = (
-        ()
-        if channel == "notifications"
-        else CHANNEL_REVISION_PATHS.get(
-            channel, ("/" if channel == "home" else f"/{channel}/index",)
-        )
-    )
-    durable_revisions = [site_fingerprint(path) for path in paths]
+    paths = channel_paths(channel)
+    durable_revisions = [
+        site_fingerprints.get(path)
+        if site_fingerprints is not None
+        else site_fingerprint(path)
+        for path in paths
+    ]
     permissions = getattr(
         user,
         "authorization_fingerprint",
@@ -49,19 +70,34 @@ def channel_revision(channel, user, *, site_fingerprint=None):
         {
             "channel": channel,
             "durable": durable_revisions,
-            "personal": (
-                int(getattr(user, "notification_revision", 0) or 0)
-                if channel == "notifications"
-                else entity_revision
-                if channel in PERSONAL_CHANNELS
-                else None
-            ),
+            "personal": (entity_revision if channel in PERSONAL_CHANNELS else None),
             "permissions": permissions,
         },
         separators=(",", ":"),
         sort_keys=True,
     )
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
+
+
+# @testable true
+# @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
+# @pairs polling:channel polling:batching polling:mounted-scope
+def channel_revisions(channels, user, *, fingerprint_loader=None):
+    """Resolve requested channel cursors through one site-fingerprint batch."""
+    channels = tuple(dict.fromkeys(channels))
+    paths = tuple(
+        dict.fromkeys(path for channel in channels for path in channel_paths(channel))
+    )
+    fingerprint_loader = fingerprint_loader or database.site_fingerprints
+    fingerprints = fingerprint_loader(paths) if paths else {}
+    return {
+        channel: channel_revision(
+            channel,
+            user,
+            site_fingerprints=fingerprints,
+        )
+        for channel in channels
+    }
 
 
 # @testable true
@@ -87,6 +123,37 @@ def operation_statuses(descriptors, user, *, status_loader=None):
             }
         )
     return operation_revision, statuses
+
+
+# @testable true
+# @tests tests_unit/test_024_autofill_form_state.py::test_render_operation_statuses_batches_and_attaches_known_jobs
+# @pairs deferred-jobs:server-render deferred-jobs:status polling:batching
+def render_operation_statuses(entities, user, *, status_loader=None):
+    """Attach current status projections to server-rendered operation owners."""
+    status_loader = status_loader or DeferredJobs.statuses
+    entities = list(entities or ())
+    keys = []
+    owners = {}
+    for entity in entities:
+        operation = dict(getattr(entity, "deferred_job", None) or {})
+        key = operation.get("key")
+        if not key:
+            continue
+        keys.append(key)
+        owners.setdefault(key, []).append(entity)
+
+    statuses = {}
+    for offset in range(0, len(keys), 50):
+        statuses.update(
+            {
+                status["key"]: status
+                for status in status_loader(keys[offset : offset + 50], user)
+            }
+        )
+    for key, records in owners.items():
+        for record in records:
+            record._operation_status = statuses.get(key)
+    return statuses
 
 
 # @testable false

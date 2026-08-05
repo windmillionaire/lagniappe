@@ -115,6 +115,7 @@ const _attributes = (component, show) => {
 		settings.kind = target.dataset.kind || component.kind || "default";
 		settings.persistent = target.dataset.persistent === "true";
 		settings.visible = target.dataset.visible === "true";
+		settings.loaded = target.hasAttribute("loaded");
 	}
 
 	settings.route = target?.dataset.route || component.elt.dataset.route;

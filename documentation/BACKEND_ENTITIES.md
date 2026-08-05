@@ -468,15 +468,21 @@ optional related `target`, and a `pending` flag for deferred work. Offline
 mutation replay can set `offline=True` on a route request; routes that want a
 durable user-visible completion message create a `Notification` with
 `parent=current_user` and the affected target. Deferred routes create the
-notification as pending, update the same entity when the process finishes, and
-advance the personal notification channel revision.
+notification as pending and update the same entity when the process finishes.
+Committed notification creates/content updates/deletes emit a post-commit Redis
+projection effect. They do not write the User or a notification/site
+fingerprint, and cache failure never rolls back the durable entity mutation.
 
-`User.notification_revision` and `User.operation_revision` are unindexed,
-monotonic polling cursors. They are deliberately separate from `modified` and
-the authorization fingerprint: notification/job activity must not invalidate
-the user entity, global users list, or authorization-derived response caches.
-The request authentication path loads the user directly on every request, so
-`/poll` can compare these cursors without another Datastore read.
+`User.operation_revision` is the unindexed monotonic deferred-job polling gate.
+It is deliberately separate from `modified` and the authorization fingerprint,
+so job activity does not invalidate the user entity, global users list, or
+authorization-derived response caches. The request authentication path already
+loads the user for `/poll`, allowing operation descriptors to compare the gate
+without another User read. The historical `User.notification_revision`
+property remains readable for stored-record compatibility but is no longer
+read, updated, or used as an invalidation authority. Notification count and
+revision instead live in the reconstructable expiring Redis projection
+documented in [BACKEND_TOOLS.md](BACKEND_TOOLS.md).
 
 Notes are activity entities with an author `user`, owning `parent`, optional
 plain-text `body` and photo asset, a server-assigned `scope` (`home` or `page`),

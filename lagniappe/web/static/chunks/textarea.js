@@ -1,2 +1,66 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="fa5d475c-5307-4a69-bf15-19d2f5bd5f90",e._sentryDebugIdIdentifier="sentry-dbid-fa5d475c-5307-4a69-bf15-19d2f5bd5f90");}catch(e){}}();import{STYLES as t}from"./styles.js?v=b83a2173";import{B as i}from"./baseElement.js?v=b83a2173";import{p as s}from"./primitives.js?v=b83a2173";import"./icons.js?v=b83a2173";class r extends i{get value(){const e=this.elt?.matches?.("textarea")?this.elt:this.elt?.querySelector("textarea");return e?e.value:this.submission===null||this.submission===void 0?null:String(this.submission)}changed(e){return this.value!==String(e??"")}clear(){this.submission=null;const e=this._edit?.matches?.("textarea")?this._edit:this._edit?.querySelector("textarea");e&&(e.value="")}get read(){return this._read?this._read:(this._read=document.createElement("p"),this._read.textContent=this.hasSubmission?String(this.submission):"",this._read.className=t.form.submission.grows,this._read.classList.add("group-data-[mode=edit]/element:hidden"),this._read)}get edit(){return this._edit?this._edit:(this._edit=s.textarea({label:this.label,name:this.schema.id,placeholder:this.schema.placeholder,rows:3,value:this.submission,disabled:this.renderer.readonly}),(this._edit.matches?.("textarea")?this._edit:this._edit.querySelector("textarea"))?.classList.add("group-data-[mode=read]/element:hidden"),this._edit)}}export{r as TextareaElement};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { STYLES } from './styles.js?v=bed962f9';
+import { B as BaseElement } from './baseElement.js?v=bed962f9';
+import { p as primitives } from './primitives.js?v=bed962f9';
+import './icons.js?v=bed962f9';
+
+/**
+ * @testable infrastructure
+ * @tests tests_js/test_028_form_state_split.py::test_direct_form_controls_clear_inputs_and_textareas
+ */
+class TextareaElement extends BaseElement {
+	get value() {
+		const textarea = this.elt?.matches?.("textarea")
+			? this.elt
+			: this.elt?.querySelector("textarea");
+		if (textarea) return textarea.value;
+		if (this.submission === null || this.submission === undefined) return null;
+		return String(this.submission);
+	}
+
+	changed(value) {
+		if (this.value === String(value ?? "")) return false;
+		return true;
+	}
+
+	clear() {
+		this.submission = null;
+		const textarea = this._edit?.matches?.("textarea")
+			? this._edit
+			: this._edit?.querySelector("textarea");
+		if (textarea) textarea.value = "";
+	}
+
+	get read() {
+		if (this._read) return this._read;
+
+		this._read = document.createElement("p");
+		this._read.textContent = this.hasSubmission ? String(this.submission) : "";
+		this._read.className = STYLES.form.submission.grows;
+		this._read.classList.add("group-data-[mode=edit]/element:hidden");
+
+		return this._read;
+	}
+
+	get edit() {
+		if (this._edit) return this._edit;
+
+		this._edit = primitives.textarea({
+			label: this.label,
+			name: this.schema.id,
+			placeholder: this.schema.placeholder,
+			rows: 3,
+			value: this.submission,
+			disabled: this.renderer.readonly,
+		});
+
+		const textarea = this._edit.matches?.("textarea")
+			? this._edit
+			: this._edit.querySelector("textarea");
+		textarea?.classList.add("group-data-[mode=read]/element:hidden");
+
+		return this._edit;
+	}
+}
+
+export { TextareaElement };

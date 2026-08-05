@@ -11,6 +11,15 @@ from .documents import (
     poll_document,
     update_document_asset,
 )
+from .notifications import (
+    clear_recorded_notification_states,
+    peek_notification_state,
+    public_notification_state,
+    repair_notification_state,
+    seed_notification_state,
+    take_recorded_notification_state,
+    update_notification_projection,
+)
 from .query import entity_search, kind_search, search
 from .utility import (
     check_hash,
@@ -38,4 +47,11 @@ __all__ = [
     "close_presence",
     "poll_document",
     "update_document_asset",
+    "clear_recorded_notification_states",
+    "peek_notification_state",
+    "public_notification_state",
+    "repair_notification_state",
+    "seed_notification_state",
+    "take_recorded_notification_state",
+    "update_notification_projection",
 ]

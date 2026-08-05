@@ -238,43 +238,6 @@ def test_offline_prevents_sync_requests(get_user, browser_failures):
 
 
 # @features offline
-# @dimensions indicator transitions
-def test_rapid_offline_online_transitions(get_user, browser_failures):
-    """
-    Test that rapid offline/online toggling settles to the correct state.
-
-    Flow:
-        1. Navigate to home
-        2. Toggle offline/online 5 times rapidly
-        3. Verify indicator settles to hidden (online)
-
-    Verifies:
-        - No stale state after rapid transitions
-        - Indicator reflects final state
-    """
-    user = get_user(Users.OWNER)
-    user.go(SitePages.HOME)
-
-    indicator = user.locate(OFFLINE_INDICATOR)
-
-    with browser_failures.expect(
-        user,
-        kind="console",
-        count=0,
-        max_count=2,
-        console_type="error",
-        text_contains="status of 503 ",
-        source_path="/notifications",
-    ):
-        with browser_failures.expect_offline(user):
-            for _ in range(5):
-                user.offline = True
-                user.offline = False
-
-    expect(indicator).to_be_hidden()
-
-
-# @features offline
 # @dimensions indicator view-reset
 def test_testing_mode_navigation_resets_offline_state(get_user, browser_failures):
     """

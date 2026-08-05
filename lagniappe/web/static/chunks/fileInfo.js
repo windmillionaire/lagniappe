@@ -1,2 +1,230 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="88ef8bc8-78e1-4b94-aa7d-0d8ba034d758",e._sentryDebugIdIdentifier="sentry-dbid-88ef8bc8-78e1-4b94-aa7d-0d8ba034d758");}catch(e){}}();import{STYLES as i}from"./styles.js?v=b83a2173";import{F as o}from"./form2.js?v=b83a2173";import{InputElement as m}from"./input.js?v=b83a2173";import{p as c}from"./primitives.js?v=b83a2173";import{S as p}from"./sectionToggle.js?v=b83a2173";import{TextareaElement as d}from"./textarea.js?v=b83a2173";import{s as u}from"./icons.js?v=b83a2173";import"./baseForm.js?v=b83a2173";import"./foundation.js?v=b83a2173";import"./connectivity.js?v=b83a2173";import"./loader.js?v=b83a2173";import"./baseElement.js?v=b83a2173";import"./formatting.js?v=b83a2173";import"./facets.js?v=b83a2173";import"./combobox.js?v=b83a2173";import"./results.js?v=b83a2173";import"./submitter.js?v=b83a2173";import"./buttons.js?v=b83a2173";import"./baseUpload.js?v=b83a2173";import"./dropdown.js?v=b83a2173";class h extends o{constructor(e){super(e),this.aiCreate=this.target.dataset.aiCreate==="true",this.messages={submit:"Update File",submitting:"Updating File",submitted:"File Updated"},this._taskSettings={extract:{role:"extract",action:"Extract Text",title:"Text Extraction"},summarize:{role:"summarize",action:"Summarize File Content",title:"Content Summarization"}},this._refreshExtractOnReconcile=!1}get html(){const e=document.createElement("div");return e.className="flex flex-col gap-2",e.append(...[this._taskStatus(this._taskSettings.extract),this._taskStatus(this._taskSettings.summarize)].filter(Boolean)),[this.filenameElement,this.nameElement,this.mimetypeElement,e,this.descriptionElement,this.pagesElement]}async init(){await super.init()}get nameElement(){return new m({kind:"file",readonly:this.readonly},{input:"text",id:"name",title:"Display Name",placeholder:"name this file..."},this.target.dataset.name||"").elt}get descriptionElement(){return new d({kind:"file",readonly:this.readonly},{input:"textarea",id:"description",title:"Description",placeholder:"describe this file..."},this.target.dataset.description||"").elt}get filenameElement(){const e=document.createElement("div");e.className="flex flex-col gap-1";const t=e.appendChild(document.createElement("h3"));t.className=i.label.default,t.textContent="File Name";const a=e.appendChild(document.createElement("p"));return a.className="sm:text-sm text-kind-default",a.textContent=this.target.dataset.filename,e}get mimetypeElement(){const e=this.target.dataset.mimetype;if(!e)return null;const t=document.createElement("div");t.className="flex flex-col gap-1";const a=t.appendChild(document.createElement("h3"));a.className=i.label.default,a.textContent="File Type";const s=t.appendChild(document.createElement("p"));s.className="sm:text-sm text-kind-default";const n=this.target.dataset.encoding;return s.textContent=n?`${e} (${n})`:e,t}get pagesElement(){return this._facetElement('[data-role="pages"]')}_facetElement(e){const t=this.target.querySelector(e);if(!t)return null;const a=p.facet(this,t);return a.init(),this.destroyables.push(a),a.elt}_taskStatus(e){const t=this.options?.[e.role];if(e.role==="summarize"&&!this.aiCreate&&!t?.enabled)return null;const a=document.createElement("div");if(a.dataset.role=e.role,!t?.enabled)a.appendChild(c.checkbox({name:`enable-${e.role}`,label:e.action,checked:t?.enabled||!1}));else{const s=a.appendChild(document.createElement("h3"));s.className=i.label.default,s.textContent=e.title;const n=a.appendChild(document.createElement("p"));if(n.className="sm:text-sm text-base-dark italic",!t.complete&&t.status){const r=n.appendChild(document.createElement("span"));u(r,"spinner","mr-2");const l=n.appendChild(document.createElement("span"));l.textContent=t.status}else!t.complete&&t.error?(n.className="sm:text-sm text-delete-default italic",n.textContent=t.error):t.complete&&t.status&&(n.textContent=t.status)}return a}updated(e){super.updated(e);const a=e.html?.querySelector("[data-widget='FileInfo']")?.dataset.options;if(!a){this._refreshExtractOnReconcile=!1;return}this.options=JSON.parse(a);const s=!!document.getElementById("text");this._refreshExtractOnReconcile=this.options.extract?.complete===!0&&!s}async postreconcile(){await super.postreconcile(),this.setEntityMetadata(),this._refreshExtractOnReconcile&&(this._refreshExtractOnReconcile=!1,this.view.showExtractReloadNotice?.())}destroy(){super.destroy()}}export{h as FileInfo};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { STYLES } from './styles.js?v=bed962f9';
+import { F as FormElement } from './form2.js?v=bed962f9';
+import { InputElement } from './input.js?v=bed962f9';
+import { p as primitives } from './primitives.js?v=bed962f9';
+import { S as SectionToggle } from './sectionToggle.js?v=bed962f9';
+import { TextareaElement } from './textarea.js?v=bed962f9';
+import { s as setIcon } from './icons.js?v=bed962f9';
+import './baseForm.js?v=bed962f9';
+import './foundation.js?v=bed962f9';
+import './notificationState.js?v=bed962f9';
+import './connectivity.js?v=bed962f9';
+import './loader.js?v=bed962f9';
+import './baseElement.js?v=bed962f9';
+import './formatting.js?v=bed962f9';
+import './facets.js?v=bed962f9';
+import './combobox.js?v=bed962f9';
+import './results.js?v=bed962f9';
+import './submitter.js?v=bed962f9';
+import './buttons.js?v=bed962f9';
+import './baseUpload.js?v=bed962f9';
+import './dropdown.js?v=bed962f9';
+
+/**
+ * @testable true
+ * @tests tests_e2e/011_files/test_011c_file_processing_reconciliation.py::test_file_summary_completion_stages_authoritative_info_until_reset
+ * @tests tests_js/test_039_file_processing_reconciliation.py::test_file_info_extract_completion_requests_one_reload_notice
+ * @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_page_links_can_be_added_and_removed
+ * @features file
+ * @dimensions extract summarize polling status summary reload text-tab active-reset linked-pages
+ * @pairs file:extract file:summarize file:polling file:status file:summary
+ * @pairs file:reload file:text-tab file:active-reset file:linked-pages
+ * @pair file:authoritative-remount
+ */
+class FileInfo extends FormElement {
+	constructor(attributes) {
+		super(attributes);
+		this.aiCreate = this.target.dataset.aiCreate === "true";
+		this.messages = {
+			submit: "Update File",
+			submitting: "Updating File",
+			submitted: "File Updated",
+		};
+		this._taskSettings = {
+			extract: {
+				role: "extract",
+				action: "Extract Text",
+				title: "Text Extraction",
+			},
+			summarize: {
+				role: "summarize",
+				action: "Summarize File Content",
+				title: "Content Summarization",
+			},
+		};
+		this._refreshExtractOnReconcile = false;
+	}
+
+	get html() {
+		const status = document.createElement("div");
+		status.className = "flex flex-col gap-2";
+		status.append(
+			...[
+				this._taskStatus(this._taskSettings.extract),
+				this._taskStatus(this._taskSettings.summarize),
+			].filter(Boolean),
+		);
+		return [
+			this.filenameElement,
+			this.nameElement,
+			this.mimetypeElement,
+			status,
+			this.descriptionElement,
+			this.pagesElement,
+		];
+	}
+
+	async init() {
+		await super.init();
+	}
+
+	get nameElement() {
+		return new InputElement(
+			{ kind: "file", readonly: this.readonly },
+			{
+				input: "text",
+				id: "name",
+				title: "Display Name",
+				placeholder: "name this file...",
+			},
+			this.target.dataset.name || "",
+		).elt;
+	}
+
+	get descriptionElement() {
+		return new TextareaElement(
+			{ kind: "file", readonly: this.readonly },
+			{
+				input: "textarea",
+				id: "description",
+				title: "Description",
+				placeholder: "describe this file...",
+			},
+			this.target.dataset.description || "",
+		).elt;
+	}
+
+	get filenameElement() {
+		const wrapper = document.createElement("div");
+		wrapper.className = "flex flex-col gap-1";
+
+		const label = wrapper.appendChild(document.createElement("h3"));
+		label.className = STYLES.label.default;
+		label.textContent = "File Name";
+
+		const value = wrapper.appendChild(document.createElement("p"));
+		value.className = "sm:text-sm text-kind-default";
+		value.textContent = this.target.dataset.filename;
+
+		return wrapper;
+	}
+
+	get mimetypeElement() {
+		const mimetype = this.target.dataset.mimetype;
+		if (!mimetype) return null;
+
+		const wrapper = document.createElement("div");
+		wrapper.className = "flex flex-col gap-1";
+
+		const label = wrapper.appendChild(document.createElement("h3"));
+		label.className = STYLES.label.default;
+		label.textContent = "File Type";
+
+		const value = wrapper.appendChild(document.createElement("p"));
+		value.className = "sm:text-sm text-kind-default";
+		const encoding = this.target.dataset.encoding;
+		value.textContent = encoding ? `${mimetype} (${encoding})` : mimetype;
+
+		return wrapper;
+	}
+
+	get pagesElement() {
+		return this._facetElement('[data-role="pages"]');
+	}
+
+	_facetElement(selector) {
+		const target = this.target.querySelector(selector);
+		if (!target) return null;
+
+		const control = SectionToggle.facet(this, target);
+		control.init();
+		this.destroyables.push(control);
+		return control.elt;
+	}
+
+	_taskStatus(taskSettings) {
+		const taskOptions = this.options?.[taskSettings.role];
+		if (
+			taskSettings.role === "summarize" &&
+			!this.aiCreate &&
+			!taskOptions?.enabled
+		) {
+			return null;
+		}
+
+		const status = document.createElement("div");
+		status.dataset.role = taskSettings.role;
+
+		if (!taskOptions?.enabled) {
+			status.appendChild(
+				primitives.checkbox({
+					name: `enable-${taskSettings.role}`,
+					label: taskSettings.action,
+					checked: taskOptions?.enabled || false,
+				}),
+			);
+		} else {
+			const header = status.appendChild(document.createElement("h3"));
+			header.className = STYLES.label.default;
+			header.textContent = taskSettings.title;
+			const statusText = status.appendChild(document.createElement("p"));
+			statusText.className = "sm:text-sm text-base-dark italic";
+
+			if (!taskOptions.complete && taskOptions.status) {
+				const spinner = statusText.appendChild(document.createElement("span"));
+				setIcon(spinner, "spinner", "mr-2");
+				const text = statusText.appendChild(document.createElement("span"));
+				text.textContent = taskOptions.status;
+			} else if (!taskOptions.complete && taskOptions.error) {
+				statusText.className = "sm:text-sm text-delete-default italic";
+				statusText.textContent = taskOptions.error;
+			} else if (taskOptions.complete && taskOptions.status) {
+				statusText.textContent = taskOptions.status;
+			}
+		}
+
+		return status;
+	}
+
+	updated(response) {
+		super.updated(response);
+
+		const target = response.html?.querySelector("[data-widget='FileInfo']");
+		const options = target?.dataset.options;
+		if (!options) {
+			this._refreshExtractOnReconcile = false;
+			return;
+		}
+
+		this.options = JSON.parse(options);
+		const hasTextTab = Boolean(document.getElementById("text"));
+		this._refreshExtractOnReconcile =
+			this.options.extract?.complete === true && !hasTextTab;
+	}
+
+	async postreconcile() {
+		await super.postreconcile();
+		this.setEntityMetadata();
+		if (this._refreshExtractOnReconcile) {
+			this._refreshExtractOnReconcile = false;
+			this.view.showExtractReloadNotice?.();
+		}
+	}
+
+	destroy() {
+		super.destroy();
+	}
+}
+
+export { FileInfo };

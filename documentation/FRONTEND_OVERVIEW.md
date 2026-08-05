@@ -13,7 +13,7 @@ shared infrastructure such as analytics. On DOM ready it:
 2. Sends a fire-and-forget analytics view event when analytics metadata enables it.
 3. Runs `syncView()` to initialize the current view and server-health state.
 4. Registers global `error` and `unhandledrejection` listeners that route to Sentry via `captureError`.
-5. Registers `visibilitychange`, `focus`, `pagehide`/`pageshow`, and `online`/`offline` listeners for server health, view sync, and sync deregistration/registration. `ConnectivityState` retains separate browser, server, visibility, and service-worker-controller signals. Hiding a view suspends it directly without an unnecessary `/ping`; foreground transitions perform the health check.
+5. Registers `visibilitychange`, `focus`, `pagehide`/`pageshow`, and `online`/`offline` listeners for server health, view sync, and sync deregistration/registration. `ConnectivityState` retains separate browser, server, visibility, and service-worker-controller signals. Hiding a view suspends it directly without an unnecessary `/ping`; foreground transitions perform one health check and one polling catch-up.
 6. Registers the service worker (`sw.js`) and publishes versioned connectivity state to its cache policy. The worker does not carry application update events.
 7. Calls `updateUserData()` to sync the user's timezone and location to the server, except when `<meta name="mode" content="public">` marks a public page.
 
@@ -23,9 +23,9 @@ instantiates it, and calls `init()`. Search initialization happens during
 `Core.init()`.
 
 Re-initialization is handled on `pageshow` (bfcache) events, which re-check server
-health and force view sync. `Core.sync()` replays offline mutations, runs the
-immediate watched-form check, refreshes explicit collection widgets, and then
-re-registers document sync widgets.
+health and force view sync. `Core.sync()` schedules offline replay, re-registers
+document/widget polling ownership, and runs one shared catch-up. Only changed
+entity/collection results invoke their focused probe or refresh route.
 
 ### `login.mjs` (unauthenticated)
 
@@ -88,7 +88,8 @@ point; internal implementation modules are noted below. Modules:
 | `analytics.mjs` | `analytics.tag()` and `analytics.view()` -- fire-and-forget page-load, login, and public-view tracking using metadata from the current page. |
 | `connectivity.mjs` | `ConnectivityState` and the shared `connectivity` instance -- explicit browser-link, server-reachability, visibility, and service-worker-controller state. |
 | `endpoints.mjs` | API route definitions, organized by widget name. Widget-specific endpoints are functions keyed by widget name (e.g. `ENDPOINTS.Filters(settings)`); global endpoints are static properties. |
-| `polling.mjs` | `PollingCoordinator` -- one adaptive, visibility-aware scheduler for entity, channel, document, operation, form-lock, and ingress subscriptions. |
+| `polling.mjs` | `PollingCoordinator` -- one adaptive, visibility-aware scheduler with periodic/foreground and immediate/scheduled subscription modes for entity, channel, document, operation, form-lock, and ingress state. Notification state piggybacks on any poll and uses one personal-state-only request after a cold `/ping` miss. |
+| `notificationState.mjs` | Parses `X-Lagniappe-Notification-State`, stores the latest generation/revision/count before the lazy menu loads, updates the badge, and publishes state changes to menu/coordinator consumers. |
 | `editWatcher.mjs` | `EditWatcher` -- fingerprint-based entity discovery, polling subscriptions, form-lock restoration, and the stable watched-form service facade. |
 | `editReconciler.mjs` | `EditReconciler` -- per-form authoritative replacement probes, draft and queued-mutation comparison, and revision resolution. Internal to `EditWatcher`. |
 | `editRevisionModal.mjs` | Field-by-field and whole-form revision review modals. Internal to `EditReconciler`. |

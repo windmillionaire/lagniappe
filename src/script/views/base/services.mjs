@@ -76,10 +76,12 @@ export const ensureDeferredOperations = (view) =>
 		},
 	);
 
+/**
+ * @testable infrastructure
+ */
 export const ensureNotifications = (view) =>
 	loadOnce(view, "_notificationsPromise", "Notifications", async () => {
 		if (!document.querySelector("[data-role='notifications']")) return null;
-		await ensurePollingCoordinator(view);
 		const { Notifications } = await import("../../elements/notifications");
 		if (view._destroyed) return null;
 		const notifications = new Notifications(view);

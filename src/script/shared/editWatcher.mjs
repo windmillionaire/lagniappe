@@ -301,6 +301,8 @@ export class EditWatcher {
 							revision: entity.fingerprint,
 						},
 						{
+							mode: "periodic",
+							initial: "scheduled",
 							onResult: (result) =>
 								this.receiveEntityResult(entity.key, result),
 						},
@@ -318,6 +320,8 @@ export class EditWatcher {
 							revision: "unlocked",
 						},
 						{
+							mode: "periodic",
+							initial: "scheduled",
 							onResult: async (result) => {
 								if (result.status !== "changed") return;
 								if (result.payload?.locked) {

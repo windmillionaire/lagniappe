@@ -130,7 +130,9 @@ if (timerId !== 3 || clearedTimers.join(",") !== "1,2") {
   if (calls.length !== 2) throw new Error("Hidden view continued polling");
   view.hidden = false;
   await coordinator.resume();
-  if (calls.length !== 3) throw new Error("Visible view did not resume polling");
+  if (calls.length !== 2) throw new Error("Resume performed an eager catch-up");
+  await coordinator.catchUp();
+  if (calls.length !== 3) throw new Error("Visible view did not catch up polling");
 
   blockPollResponse = true;
   const activePoll = coordinator.trigger();
@@ -169,6 +171,110 @@ if (timerId !== 3 || clearedTimers.join(",") !== "1,2") {
   if (coordinator.subscriptions.size) {
     throw new Error("Destroy did not clear subscriptions");
   }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+"""
+    )
+
+
+# @pair polling:foreground
+# @pair polling:scheduled-initial
+# @pair notifications:cold-seed
+def test_polling_coordinator_schedules_modes_and_notification_seed(run_node):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const calls = [];
+const timers = [];
+let timerId = 0;
+const context = {
+  console,
+  crypto: { randomUUID: () => "client-1" },
+  Date,
+  ENDPOINTS: { poll: "/poll" },
+  Math,
+  queueMicrotask,
+  sessionStorage: { getItem() { return null; }, setItem() {} },
+  captureError(error) { throw error; },
+  request: {
+    async post(_url, body) {
+      calls.push(body);
+      return {
+        ok: true,
+        version: 1,
+        results: body.subscriptions.map((item) => ({
+          id: item.id,
+          type: item.type,
+          status: "unchanged",
+          revision: item.revision,
+        })),
+      };
+    },
+  },
+  window: {
+    __NOTIFICATION_STATE__: null,
+    addEventListener() {},
+    removeEventListener() {},
+    clearTimeout() {},
+    setTimeout(callback, delay) {
+      timerId += 1;
+      timers.push({ callback, delay });
+      return timerId;
+    },
+  },
+};
+context.globalThis = context;
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/polling.mjs", "utf8");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replace("export class PollingCoordinator", "class PollingCoordinator");
+source += "\nglobalThis.PollingCoordinator = PollingCoordinator;";
+vm.runInContext(source, context);
+
+const view = { elt: {}, hidden: false, online: true };
+const coordinator = new context.PollingCoordinator(view).init();
+coordinator.subscribe(
+  { id: "channel:tasks", type: "channel", channel: "tasks", revision: "same" },
+  { mode: "foreground", initial: "scheduled" },
+);
+if (timers.length !== 0) {
+  throw new Error("Foreground-only subscription installed an idle timer");
+}
+coordinator.subscribe(
+  { id: "entity:one", type: "entity", key: "one", revision: "same" },
+  { mode: "periodic", initial: "scheduled" },
+);
+if (timers.length !== 1 || timers[0].delay < 14_900) {
+  throw new Error(`Scheduled entity did not wait for its interval: ${JSON.stringify(timers)}`);
+}
+
+(async () => {
+  await coordinator.catchUp();
+  if (calls.length !== 1 || calls[0].subscriptions.length !== 2) {
+    throw new Error("Foreground catch-up did not batch mounted subscriptions");
+  }
+  if (coordinator.subscriptions.get("channel:tasks").dueAt !== Infinity) {
+    throw new Error("Foreground subscription acquired a periodic due time");
+  }
+  coordinator.destroy();
+
+  context.window.__NOTIFICATION_STATE__ = {
+    generation: null,
+    revision: null,
+    count: null,
+    miss: true,
+  };
+  const cold = new context.PollingCoordinator(view).init();
+  await cold.trigger();
+  const seeded = calls.at(-1);
+  if (seeded.subscriptions.length !== 0 || !seeded.notification_state?.seed) {
+    throw new Error(`Cold state did not send one personal seed poll: ${JSON.stringify(seeded)}`);
+  }
+  cold.destroy();
 })().catch((error) => {
   console.error(error);
   process.exit(1);

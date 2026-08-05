@@ -123,6 +123,88 @@ def test_update_site_fingerprints_upserts_missing_users_fingerprint(monkeypatch)
     assert records == [{"key": ("site", "users"), "fingerprint": "users-fingerprint"}]
 
 
+# @pairs polling:channel polling:batching polling:mounted-scope
+# @source lagniappe/core/tools/database/utility.py::site_fingerprints
+@pytest.mark.unit
+def test_site_fingerprints_batch_reads_only_resolved_paths(monkeypatch):
+    class Record(dict):
+        def __init__(self, key, **values):
+            super().__init__(values)
+            self.key = key
+
+    loaded = []
+    saved = []
+    existing = Record(("site", "home"), fingerprint="home-current")
+
+    class Datastore:
+        def key(self, *parts):
+            return parts
+
+        def get_multi(self, keys, missing=None):
+            loaded.append(keys)
+            missing.append(Record(("site", "tasks")))
+            return [existing]
+
+        def put_multi(self, entities):
+            saved.extend(entities)
+
+    monkeypatch.setattr(utility, "DATA", SimpleNamespace(datastore=Datastore()))
+    monkeypatch.setattr(utility.uuid, "uuid4", lambda: "tasks-created")
+
+    fingerprints = utility.site_fingerprints(
+        ("/", "/tasks/index", "/unmapped/index", "/tasks/index")
+    )
+
+    assert loaded == [[("site", "home"), ("site", "tasks")]]
+    assert fingerprints == {
+        "/": "home-current",
+        "/tasks/index": "tasks-created",
+    }
+    assert [record.key for record in saved] == [("site", "tasks")]
+
+
+# @pairs notifications:mutation notifications:site-fingerprint-isolation
+# @source lagniappe/core/tools/database/utility.py::save_mutations
+@pytest.mark.unit
+def test_notification_save_and_delete_skip_site_fingerprints(monkeypatch):
+    fingerprinted = []
+    saved = []
+
+    class Batch:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def put(self, entity):
+            saved.append(("put", entity))
+
+        def delete(self, key):
+            saved.append(("delete", key))
+
+    datastore = SimpleNamespace(batch=Batch)
+    monkeypatch.setattr(utility, "DATA", SimpleNamespace(datastore=datastore))
+    monkeypatch.setattr(
+        utility,
+        "update_site_fingerprints",
+        lambda *entities: fingerprinted.extend(entities) or [],
+    )
+    notification = SimpleNamespace(
+        key=("activity", "notification"),
+        db={"type": "notification"},
+    )
+
+    utility.save_mutations(((notification, None),))
+    utility.delete_entities((notification,))
+
+    assert fingerprinted == []
+    assert saved == [
+        ("put", notification.db),
+        ("delete", notification.key),
+    ]
+
+
 # @features mutations database
 # @dimensions property-mask update full-upsert site-fingerprint document-checkpoint
 # @source lagniappe/core/tools/database/utility.py::save_mutations

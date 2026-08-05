@@ -107,6 +107,26 @@ def execute_post_commit(plan):
             cache.delete_entity_from_search(effect.cache_kind, effect.entity)
             complete(MutationEffectType.CACHE_SEARCH_DELETE)
 
+    notification_upserts = [
+        effect.entity
+        for effect in post_commit
+        if effect.effect is MutationEffectType.NOTIFICATION_UPSERT
+    ]
+    notification_deletes = [
+        effect.entity
+        for effect in post_commit
+        if effect.effect is MutationEffectType.NOTIFICATION_DELETE
+    ]
+    if notification_upserts or notification_deletes:
+        cache.update_notification_projection(
+            upserts=notification_upserts,
+            deletes=notification_deletes,
+        )
+        if notification_upserts:
+            complete(MutationEffectType.NOTIFICATION_UPSERT)
+        if notification_deletes:
+            complete(MutationEffectType.NOTIFICATION_DELETE)
+
     blob_effects = [
         effect
         for effect in post_commit

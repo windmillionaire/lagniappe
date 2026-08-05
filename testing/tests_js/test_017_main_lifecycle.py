@@ -64,6 +64,7 @@ let viewLoader = async () => null;
 const context = {{
   AbortController,
   analytics: {{ view() {{ analyticsCalls.push("analytics"); }} }},
+  applyNotificationStateHeader() {{}},
   captureError(error) {{ capturedErrors.push(error); }},
   captureNetworkError() {{}},
   clearRecentSearchResults() {{}},

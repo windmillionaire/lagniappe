@@ -16,6 +16,7 @@ from lagniappe.core.tools.database.filter import Filter, Query
 from lagniappe.core.tools.deferred_jobs import DeferredJobs
 from testing.definitions import Pages, Users
 from testing.resources import Page
+from testing.utility import expect_poll_result
 
 
 pytestmark = pytest.mark.e2e
@@ -98,18 +99,12 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     expect(form).to_have_attribute("data-autofill-probe", "mounted")
     expect(form.locator(f"[name='{FIELD_ID}']")).to_be_disabled()
 
-    def form_lock_poll(response):
-        if not response.url.endswith("/poll"):
-            return False
-        payload = response.request.post_data_json or {}
-        return any(
-            descriptor.get("type") == "form-lock" and descriptor.get("key") == page.key
-            for descriptor in payload.get("subscriptions", [])
-        )
-
-    with user.page.expect_response(form_lock_poll) as poll_response:
+    with expect_poll_result(
+        user.page,
+        subscription_id=f"lock:{page.key}",
+        timeout=25_000,
+    ) as poll_response:
         user.page.reload()
-    assert poll_response.value.ok
     operation = next(
         result["payload"]
         for result in poll_response.value.json()["results"]

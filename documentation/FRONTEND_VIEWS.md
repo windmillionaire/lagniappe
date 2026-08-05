@@ -67,13 +67,16 @@ manager must await its readiness promise or call the corresponding idempotent
   DOM capabilities exist. SearchBox, EntityMenu, and modal UI load on first
   interaction through the same single-flight `ensure…()` loaders.
 - Registers the root entity or collection subscription when the polling
-  coordinator becomes ready. Documents await `syncReady`. Offline forms render
-  authoritative server state without touching queue readiness. Initial replay
-  waits for view readiness; successful writes trigger an immediate poll when
-  their form is mounted, using normal EditWatcher reconciliation.
+  coordinator becomes ready. Entity/form-lock checks are periodic with their
+  first request after 15 seconds; index collections are foreground-only and do
+  not install a timer. Documents await `syncReady` and poll immediately while
+  active. Offline forms render authoritative server state without touching
+  queue readiness. Initial replay waits for view readiness; successful writes
+  trigger an immediate poll when their form is mounted, using normal
+  EditWatcher reconciliation.
 - Keeps offline replay, reconnect reconciliation, polling batching, edit
-  notices, deferred operations, and notification semantics unchanged behind
-  the lazy service facades in `views/base/services.mjs`.
+  notices, deferred operations, and notification delivery behind the lazy
+  service facades in `views/base/services.mjs`.
 
 Cold controls synchronously prevent native navigation/submission when needed,
 set `aria-busy`, and coalesce repeated activation. The intended operation is
@@ -169,9 +172,14 @@ Each descriptor also retains the user's last-seen operation revision; when it
 matches the user already loaded for the request, the server acknowledges the
 quiet operation without reading its job row.
 Polling pauses while the tab is hidden, the window is unfocused, or the view is
-offline, resumes promptly on focus/visibility/connectivity, keeps elapsed time
-moving between responses, and displays a delayed status/retry message instead
-of an indefinite silent spinner when a status check fails.
+offline. A server-rendered operation seeds both revisions and schedules its
+first request four seconds later. Its bounded current status is rendered into
+the operation element and hydrated into the manager cache, so a matching quiet
+check can skip the job row without leaving a stale phase label. An operation
+started by this browser nudges its own descriptor immediately. Focus/visibility/connectivity runs one batched
+catch-up, keeps elapsed time moving between responses, and displays a delayed
+status/retry message instead of an indefinite silent spinner when a status
+check fails.
 
 The operation subscription is the authoritative completion mechanism. The
 coordinator rejects stale revisions before refreshing the form's
@@ -262,7 +270,12 @@ owned by the surrounding page.
 Collection widgets explicitly opt into generic refresh with
 `refreshScope = "collection"`. `Core.refreshCollections()` batches supported
 table/list manifests and falls back to their normal GET routes; forms are never
-generic refresh targets. Active visible, dirty, queued, and staged-review task
+generic refresh targets. It does not refresh the notification list. Index roots
+carry a raw `data-fingerprint` for `/refresh` and separate
+`data-poll-channel`/`data-poll-revision` attributes for the opaque collection
+cursor, preventing raw-versus-opaque false changes. Index collection channels
+have no idle timer and invoke `/refresh` only after a changed foreground
+catch-up result. Active visible, dirty, queued, and staged-review task
 rows are also protected from collection replacement, so the parent Page refresh
 cannot replace a TaskForm before its entity revision is reviewed. Hidden clean
 task forms still refresh silently. When a changed entity is already rendered
@@ -286,6 +299,22 @@ both the direct entity and owners whose fingerprints advanced. Notices remain
 separate from the notification menu and from document collaboration. PageInfo,
 TaskForm, TaskSettings, and CategoryInfo use focused edit markers; TaskMove and
 TaskCombine remain action forms and are deliberately excluded.
+
+The notification badge is driven by `X-Lagniappe-Notification-State`, parsed by
+the initial/focus/ten-minute `/ping` and by the shared request wrapper. The
+header contains only Redis generation, revision, and count. The menu module can
+therefore initialize lazily without fetching `/notifications`: its first open
+loads the list, a changed cursor marks an already-loaded list stale, and a stale
+list refreshes immediately only when the menu is open. Create/delete/clear
+responses carry the resulting state so the originating tab updates its badge
+without waiting for another poll.
+
+Home does not use the composite collection subscription for current clients.
+Server-rendered Notes is marked loaded and owns `home-notes`; Tasks retains its
+single prefetch and owns `tasks`. Starred and the lazy Pages, Projects,
+Categories, Ingress, and Tool Reports widgets acquire their own foreground
+channel only after loading. A changed result fetches and refreshes only that
+channel's widget.
 
 ### `renderComponent(trigger)`
 

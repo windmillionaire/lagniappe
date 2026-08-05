@@ -469,6 +469,8 @@ export class ImportData {
 				revision: this.target.dataset.fingerprint ?? null,
 			},
 			{
+				mode: "periodic",
+				initial: "immediate",
 				onResult: (result) => {
 					if (!this._pollingVisible()) return false;
 					if (result.status === "changed") return this._refreshProgress();

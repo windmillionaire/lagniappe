@@ -16,6 +16,7 @@ from flask_wtf.csrf import CSRFProtect
 
 from lagniappe import CONFIG
 from lagniappe.core.exceptions.request import filter_sentry_event, sanitize_sentry_event
+from lagniappe.core.tools import cache
 
 from .start import initialize_app
 
@@ -105,6 +106,13 @@ def _client_cache_invalidation_requested():
     return invalidate
 
 
+# @testable infrastructure
+@app.before_request
+def clear_request_notification_state():
+    """Start every request without a stale post-commit projection result."""
+    cache.clear_recorded_notification_states()
+
+
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
 # @tests tests_e2e/001_site/test_001b_login.py::test_logout_flags_user_cache_invalidation
@@ -130,6 +138,17 @@ def add_lagniappe_headers(response):
     if entity_revisions:
         headers["X-Lagniappe-Entity-Revisions"] = json.dumps(
             entity_revisions, separators=(",", ":")
+        )
+
+    notification_state = getattr(g, "NOTIFICATION_STATE", None)
+    if notification_state is None:
+        user_key = session.get(CONFIG.LOGIN_USER_KEY)
+        if user_key:
+            notification_state = cache.take_recorded_notification_state(user_key)
+    if notification_state is not None:
+        headers["X-Lagniappe-Notification-State"] = json.dumps(
+            notification_state,
+            separators=(",", ":"),
         )
 
     if _client_cache_invalidation_requested():

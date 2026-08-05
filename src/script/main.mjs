@@ -1,6 +1,7 @@
 import "../style/main.css";
 
 import { connectivity } from "./shared/connectivity";
+import { applyNotificationStateHeader } from "./shared/notificationState";
 import { connectivityMessage } from "./shared/protocol";
 import { loadView } from "./viewRegistry";
 
@@ -93,6 +94,7 @@ async function pingServer() {
 				method: "HEAD",
 				signal: controller.signal,
 			});
+			applyNotificationStateHeader(response.headers);
 			return response.ok;
 		} catch {
 			return false;
@@ -101,6 +103,10 @@ async function pingServer() {
 			_ping = null;
 		}
 	})();
+	window.__PING_PENDING__ = _ping;
+	void _ping.finally(() => {
+		if (window.__PING_PENDING__ === _ping) window.__PING_PENDING__ = null;
+	});
 
 	return _ping;
 }
@@ -194,7 +200,6 @@ function queueSync({ hidden, force = false } = {}) {
  * @testable true
  * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
  * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
- * @tests tests_e2e/001_site/test_001d_offline.py::test_rapid_offline_online_transitions
  * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
  * @tests tests_js/test_017_main_lifecycle.py::test_rapid_sync_requests_coalesce_and_retain_forced_transition
  * @features offline
@@ -236,7 +241,7 @@ async function syncViewOnce({
 /**
  * @testable true
  * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
- * @tests tests_e2e/001_site/test_001d_offline.py::test_rapid_offline_online_transitions
+ * @tests tests_js/test_017_main_lifecycle.py::test_rapid_sync_requests_coalesce_and_retain_forced_transition
  * @features offline
  * @dimensions server-health transitions
  */
@@ -378,8 +383,8 @@ function initialize() {
 	// foundational infrastructure. Establish it before view startup instead of
 	// introducing it later during live interaction.
 	startServiceWorker();
-	void getView();
 	if (mode === "public") {
+		void getView();
 		startErrorHandling();
 		void startAnalytics();
 		return;

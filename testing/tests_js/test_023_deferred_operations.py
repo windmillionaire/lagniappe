@@ -27,11 +27,18 @@ function operationNode(key) {
 
 const nodes = [operationNode("operation-a"), operationNode("operation-b")];
 const subscriptions = new Map();
+const descriptors = new Map();
+const schedules = new Map();
 const triggers = [];
 const reconciled = [];
 const expectedCompletions = [];
 const coordinator = {
   subscribe(descriptor, hooks) {
+    descriptors.set(descriptor.id, descriptor);
+    schedules.set(descriptor.id, {
+      mode: hooks.mode,
+      initial: hooks.initial,
+    });
     subscriptions.set(descriptor.id, hooks);
     return () => subscriptions.delete(descriptor.id);
   },
@@ -44,6 +51,12 @@ const context = {
   },
   createIcon() { return {}; },
   document: {
+    querySelector(selector) {
+      if (selector === "meta[name='operation-revision']") {
+        return { getAttribute() { return "9"; } };
+      }
+      return null;
+    },
     querySelectorAll(selector) {
       return selector === "[data-operation]" ? nodes : [];
     },
@@ -75,8 +88,18 @@ const manager = new context.DeferredOperationManager(view).init();
   if (subscriptions.size !== 2) {
     throw new Error("Visible operations did not create polling subscriptions");
   }
+  if (triggers.length !== 0 ||
+      descriptors.get("operation:operation-a")?.operation_revision !== 9 ||
+      descriptors.get("operation:operation-a")?.revision !== 0 ||
+      schedules.get("operation:operation-a")?.initial !== "scheduled") {
+    throw new Error("Server-rendered operation did not seed a delayed revision cursor");
+  }
+  manager.track("operation-local", { revision: 2 });
+  if (triggers.length !== 1 || triggers[0] !== "operation:operation-local") {
+    throw new Error("Locally started operation did not request an immediate poll");
+  }
   await manager.poll();
-  if (triggers.length !== 1 || triggers[0].length !== 2) {
+  if (triggers.length !== 2 || triggers[1].length !== 3) {
     throw new Error("Operation poll did not delegate a batch to the coordinator");
   }
 

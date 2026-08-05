@@ -1,2 +1,162 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="f01e4313-28f5-4d72-b67f-a34131dd51b3",e._sentryDebugIdIdentifier="sentry-dbid-f01e4313-28f5-4d72-b67f-a34131dd51b3");}catch(e){}}();import{S as l,r as i,w as d}from"../foundation.js?v=b83a2173";import"../connectivity.js?v=b83a2173";class c extends l{_click(t){const s=t.target.closest("[data-role='analytics-retention-toggle']");if(s&&this.elt.contains(s)){t.preventDefault(),t.stopPropagation(),this._toggleRetention(s);return}const e=t.target.closest("[data-role='analytics-clear']");if(e&&this.elt.contains(e)){t.preventDefault(),t.stopPropagation(),this._clearRecords(e);return}const a=t.target.closest("[data-role='expand']"),r=a?.closest("[data-role='analytics-prefix']");if(r&&this.elt.contains(r)){t.preventDefault(),t.stopPropagation(),this._toggleGroup(r,a);return}super._click(t)}_toggleRetention(t){const s=t.closest("[data-role='analytics-retention']"),e=s?.querySelector("[data-role='analytics-retention-panel']");if(!e)return;const a=e.dataset.visible!=="true";e.dataset.visible=a?"true":"false",t.dataset.open=e.dataset.visible,t.setAttribute("aria-expanded",a?"true":"false"),s&&(s.dataset.open=e.dataset.visible)}_toggleGroup(t,s){const e=t.dataset.open!=="true";t.dataset.open=e?"true":"false",s.dataset.open=t.dataset.open,s.setAttribute("aria-expanded",e?"true":"false");const a=t.querySelector("[data-role='analytics-events']");a&&(a.dataset.visible=t.dataset.open),e&&this._loadGroup(t)}async _loadGroup(t){if(t.dataset.loaded==="true")return;const s=t.querySelector("[data-role='analytics-events']"),e=t.dataset.route;if(!s||!e)return;t.dataset.loaded="true";const a=await i.get(e);a?.ok&&a.html?s.innerHTML=a.html.body.innerHTML:s.innerHTML='<div class="p-2 text-sm text-base-medium sm:px-6">Unable to load events.</div>'}async _clearRecords(t){if(t.disabled)return;const s=t.closest("[data-role='analytics-retention-panel']"),e=s?.dataset.dataset||"activity",a=t.innerHTML;t.disabled=!0,t.setAttribute("aria-busy","true"),this._setRetentionStatus(s,"Clearing records...");const r=await i.delete(t.dataset.route);if(!r?.ok){t.disabled=!1,t.removeAttribute("aria-busy"),t.innerHTML=a,this._setRetentionStatus(s,r?.error||"Unable to clear analytics records.","delete");return}const n=await this._refreshDashboard(e),o=e==="ai"?"AI generation":"analytics";this._setRetentionStatus(n,`Deleted ${r.deleted} ${o} ${r.deleted===1?"record":"records"}.`,"success")}_setRetentionStatus(t,s,e="page"){const a=t?.querySelector("[data-role='analytics-clear-status']");a&&(a.dataset.kind=e,a.dataset.visible="true",a.textContent=s)}async _refreshDashboard(t){const s=await i.get(`${window.location.pathname}${window.location.search}`),e=s?.html?.querySelector("[lp-view][data-kind='analytics']");if(!s?.ok||!e)return null;await d(()=>{this.elt.innerHTML=e.innerHTML});const a=this.elt.querySelector(`[data-role='analytics-retention'][data-dataset='${t}']`),r=a?.querySelector("[data-role='analytics-retention-panel']"),n=a?.querySelector("[data-role='analytics-retention-toggle']");return r&&(r.dataset.visible="true"),a&&(a.dataset.open="true"),n&&(n.dataset.open="true",n.setAttribute("aria-expanded","true")),r||null}}export{c as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { S as ShellView, r as request, w as withTransition } from '../foundation.js?v=bed962f9';
+import '../notificationState.js?v=bed962f9';
+import '../connectivity.js?v=bed962f9';
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
+ * @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
+ * @features analytics
+ * @dimensions dashboard accordion retention-clear
+ */
+class Analytics extends ShellView {
+	_click(event) {
+		const retentionToggle = event.target.closest(
+			"[data-role='analytics-retention-toggle']",
+		);
+		if (retentionToggle && this.elt.contains(retentionToggle)) {
+			event.preventDefault();
+			event.stopPropagation();
+			this._toggleRetention(retentionToggle);
+			return;
+		}
+
+		const clearButton = event.target.closest("[data-role='analytics-clear']");
+		if (clearButton && this.elt.contains(clearButton)) {
+			event.preventDefault();
+			event.stopPropagation();
+			this._clearRecords(clearButton);
+			return;
+		}
+
+		const toggle = event.target.closest("[data-role='expand']");
+		const group = toggle?.closest("[data-role='analytics-prefix']");
+		if (group && this.elt.contains(group)) {
+			event.preventDefault();
+			event.stopPropagation();
+			this._toggleGroup(group, toggle);
+			return;
+		}
+
+		super._click(event);
+	}
+
+	_toggleRetention(toggle) {
+		const retention = toggle.closest("[data-role='analytics-retention']");
+		const panel = retention?.querySelector(
+			"[data-role='analytics-retention-panel']",
+		);
+		if (!panel) return;
+
+		const open = panel.dataset.visible !== "true";
+		panel.dataset.visible = open ? "true" : "false";
+		toggle.dataset.open = panel.dataset.visible;
+		toggle.setAttribute("aria-expanded", open ? "true" : "false");
+		if (retention) retention.dataset.open = panel.dataset.visible;
+	}
+
+	_toggleGroup(group, toggle) {
+		const open = group.dataset.open !== "true";
+		group.dataset.open = open ? "true" : "false";
+		toggle.dataset.open = group.dataset.open;
+		toggle.setAttribute("aria-expanded", open ? "true" : "false");
+
+		const target = group.querySelector("[data-role='analytics-events']");
+		if (target) target.dataset.visible = group.dataset.open;
+
+		if (open) this._loadGroup(group);
+	}
+
+	async _loadGroup(group) {
+		if (group.dataset.loaded === "true") return;
+
+		const target = group.querySelector("[data-role='analytics-events']");
+		const route = group.dataset.route;
+		if (!target || !route) return;
+
+		group.dataset.loaded = "true";
+		const response = await request.get(route);
+		if (response?.ok && response.html) {
+			target.innerHTML = response.html.body.innerHTML;
+		} else {
+			target.innerHTML =
+				'<div class="p-2 text-sm text-base-medium sm:px-6">Unable to load events.</div>';
+		}
+	}
+
+	async _clearRecords(button) {
+		if (button.disabled) return;
+
+		const panel = button.closest("[data-role='analytics-retention-panel']");
+		const dataset = panel?.dataset.dataset || "activity";
+		const originalContent = button.innerHTML;
+		button.disabled = true;
+		button.setAttribute("aria-busy", "true");
+		this._setRetentionStatus(panel, "Clearing records...");
+
+		const response = await request.delete(button.dataset.route);
+		if (!response?.ok) {
+			button.disabled = false;
+			button.removeAttribute("aria-busy");
+			button.innerHTML = originalContent;
+			this._setRetentionStatus(
+				panel,
+				response?.error || "Unable to clear analytics records.",
+				"delete",
+			);
+			return;
+		}
+
+		const refreshedPanel = await this._refreshDashboard(dataset);
+		const datasetLabel = dataset === "ai" ? "AI generation" : "analytics";
+		this._setRetentionStatus(
+			refreshedPanel,
+			`Deleted ${response.deleted} ${datasetLabel} ${
+				response.deleted === 1 ? "record" : "records"
+			}.`,
+			"success",
+		);
+	}
+
+	_setRetentionStatus(panel, message, kind = "page") {
+		const status = panel?.querySelector("[data-role='analytics-clear-status']");
+		if (!status) return;
+
+		status.dataset.kind = kind;
+		status.dataset.visible = "true";
+		status.textContent = message;
+	}
+
+	async _refreshDashboard(dataset) {
+		const response = await request.get(
+			`${window.location.pathname}${window.location.search}`,
+		);
+		const view = response?.html?.querySelector(
+			"[lp-view][data-kind='analytics']",
+		);
+		if (!response?.ok || !view) return null;
+
+		await withTransition(() => {
+			this.elt.innerHTML = view.innerHTML;
+		});
+		const retention = this.elt.querySelector(
+			`[data-role='analytics-retention'][data-dataset='${dataset}']`,
+		);
+		const panel = retention?.querySelector(
+			"[data-role='analytics-retention-panel']",
+		);
+		const toggle = retention?.querySelector(
+			"[data-role='analytics-retention-toggle']",
+		);
+		if (panel) panel.dataset.visible = "true";
+		if (retention) retention.dataset.open = "true";
+		if (toggle) {
+			toggle.dataset.open = "true";
+			toggle.setAttribute("aria-expanded", "true");
+		}
+		return panel || null;
+	}
+}
+
+export { Analytics as default };

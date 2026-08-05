@@ -149,6 +149,7 @@ class _ActivityQuery:
         self.rows = rows
         self.ancestor_key = None
         self.ordering = None
+        self.keys_only_requested = False
 
     def ancestor(self, key):
         self.ancestor_key = key
@@ -159,6 +160,10 @@ class _ActivityQuery:
 
     def order(self, field):
         self.ordering = field
+        return self
+
+    def keys_only(self):
+        self.keys_only_requested = True
         return self
 
     def fetch_all(self):
@@ -197,6 +202,28 @@ def test_activity_query_filters_requested_types(monkeypatch):
     assert [item.key for item in results] == ["notification"]
     assert query.ancestor_key == "parent-key"
     assert query.ordering == "-created"
+    assert activity_filter.calls == [("eq", "type", "notification")]
+
+
+# @pairs notifications:cold-seed notifications:keys-only
+# @source lagniappe/core/tools/database/get.py::notification_keys
+def test_notification_keys_query_returns_only_ancestor_keys(monkeypatch):
+    query = _ActivityQuery(
+        [
+            _RawActivity("notification-one"),
+            _RawActivity("notification-two"),
+        ]
+    )
+    activity_filter = _ActivityFilter()
+    monkeypatch.setattr(database_get, "datastore_key", lambda _parent: "parent-key")
+    monkeypatch.setattr(database_get, "Filter", lambda: activity_filter)
+    monkeypatch.setattr(database_get, "Query", lambda _kind: query)
+
+    results = database_get.notification_keys(object())
+
+    assert results == ["notification-one", "notification-two"]
+    assert query.ancestor_key == "parent-key"
+    assert query.keys_only_requested is True
     assert activity_filter.calls == [("eq", "type", "notification")]
 
 

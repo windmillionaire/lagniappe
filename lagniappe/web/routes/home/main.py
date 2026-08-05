@@ -1,8 +1,11 @@
-from flask import abort, request, g
+from flask import abort, request, g, make_response
 
 from flask_login import current_user
 from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core.entities import Entities
+from lagniappe.core import exceptions
+from lagniappe.core.tools import cache
+from lagniappe.core.tools.polling import channel_revisions, render_operation_statuses
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
 from lagniappe.web.auth import home_permission, logged_in, require_ai_access
 from lagniappe.web import responses
@@ -33,8 +36,18 @@ def get(kind):
         require_ai_access(AI.ASK)
     home = Entities.HOME()
     section = home.section(kind, **request.args)
+    if kind == "tools":
+        render_operation_statuses(section.list, current_user)
 
-    return responses.home_section(section)
+    response = make_response(responses.home_section(section))
+    channel = {
+        "notes": "home-notes",
+        "tools": "tool-reports",
+    }.get(kind, kind)
+    revision = channel_revisions((channel,), current_user)[channel]
+    response.headers["X-Lagniappe-Poll-Channel"] = channel
+    response.headers["X-Lagniappe-Poll-Revision"] = revision
+    return response
 
 
 # @testable true
@@ -60,7 +73,24 @@ def activity():
 @home.route("/notifications")
 @logged_in
 def notifications():
-    notification_keys = Entities.NOTIFICATION.keys_for_parent(current_user)
+    notification_keys = []
+
+    # @testable infrastructure
+    def load_notification_keys(user):
+        notification_keys[:] = Entities.NOTIFICATION.keys_for_parent(user)
+        return notification_keys
+
+    try:
+        state = cache.seed_notification_state(
+            current_user,
+            keys_loader=load_notification_keys,
+            repair=True,
+        )
+        responses.publish_notification_state(state)
+    except Exception as error:
+        exceptions.capture(error, context={"operation": "notification-state-repair"})
+        if not notification_keys:
+            load_notification_keys(current_user)
     notifications = Entities.fetch(*notification_keys, request=Fetch.direct())
     g.NO_CACHE = True
     return responses.notifications(notifications)
@@ -76,7 +106,6 @@ def clear_notifications():
     notification_keys = Entities.NOTIFICATION.keys_for_parent(current_user)
     notifications = Entities.fetch(*notification_keys, request=Fetch.root())
     Entities.delete(*notifications)
-    Entities.advance_notifications(current_user)
 
     return responses.ok()
 
@@ -154,8 +183,6 @@ def delete_activity(key):
         abort(403)
 
     Entities.delete(activity)
-    if activity.kind == "notification":
-        Entities.advance_notifications(current_user)
 
     return responses.ok()
 

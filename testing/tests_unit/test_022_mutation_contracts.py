@@ -290,46 +290,10 @@ def test_document_parent_touch_only_advances_parent_and_list_fingerprints(
     assert outcome.complete is True
 
 
-# @pairs notifications:personal-activity notifications:revision notifications:cache-isolation
-# @pairs polling:personal-activity polling:revision
-# @source lagniappe/core/entities/__init__.py::EntityRegistry.advance_notifications
-def test_advance_notifications_only_updates_personal_revision(monkeypatch):
-    user = User(testing=True)
-    user._key = "activity-user"
-    user._db = SaveDB(
-        {
-            "type": "user",
-            "modified": datetime(2026, 7, 30, tzinfo=timezone.utc),
-        }
-    )
-    original_fingerprint = user.fingerprint
-    saved = []
-
-    monkeypatch.setattr(
-        mutation_executor.database,
-        "save_mutations",
-        lambda writes: saved.extend(writes),
-    )
-    cache_updates = []
-    monkeypatch.setattr(
-        mutation_executor.cache,
-        "update",
-        lambda *entities: cache_updates.extend(entities),
-    )
-
-    outcome = Entities.advance_notifications(user)
-
-    assert user.notification_revision == 1
-    assert user.operation_revision == 0
-    assert user.fingerprint == original_fingerprint
-    assert saved == [(user, ("notification_revision",))]
-    assert cache_updates == []
-    assert outcome.complete is True
-
-
 # @pairs notifications:personal-activity notifications:mutation notifications:cache-isolation
+# @pair notifications:cache-failure-isolation
 # @source lagniappe/core/mutations/save.py::NotificationMutation.plan_save
-def test_notification_save_advances_owner_revision_without_touching_user(monkeypatch):
+def test_notification_save_updates_projection_without_touching_user(monkeypatch):
     modified = datetime(2026, 7, 30, tzinfo=timezone.utc)
     user = User(testing=True)
     user._key = "notification-user"
@@ -361,15 +325,41 @@ def test_notification_save_advances_owner_revision_without_touching_user(monkeyp
         "update",
         lambda *entities: cache_updates.extend(entities),
     )
+    projection_updates = []
+    monkeypatch.setattr(
+        mutation_executor.cache,
+        "update_notification_projection",
+        lambda **changes: projection_updates.append(changes),
+    )
 
     outcome = Entities.save(notification)
 
-    assert user.notification_revision == 1
+    assert user.notification_revision == 0
     assert user.operation_revision == 0
     assert user.modified == modified
-    assert (user, ("notification_revision",)) in saved
+    assert saved == [(notification, None)]
     assert user not in cache_updates
+    assert projection_updates == [{"upserts": [notification], "deletes": []}]
     assert outcome.complete is True
+
+    failed_notification = Notification(testing=True)
+    failed_notification._key = "failed-notification"
+    failed_notification.kind = "notification"
+    failed_notification.db["hash"] = "failed-notification-hash"
+    failed_notification.parent = user
+    failed_notification.body = "Durable despite Redis"
+    monkeypatch.setattr(
+        mutation_executor.cache,
+        "update_notification_projection",
+        lambda **_changes: (_ for _ in ()).throw(RuntimeError("redis unavailable")),
+    )
+
+    failed_outcome = Entities.save(failed_notification)
+
+    assert saved[-1] == (failed_notification, None)
+    assert failed_outcome.durable_committed is True
+    assert failed_outcome.post_commit_complete is False
+    assert failed_outcome.errors == ["redis unavailable"]
 
 
 # @features mutations

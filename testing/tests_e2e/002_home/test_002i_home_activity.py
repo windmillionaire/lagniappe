@@ -10,7 +10,7 @@ from playwright.sync_api import expect
 from config import SETTINGS
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools import cache, database
 from testing.definitions import DueDates, Pages, SitePages, Users
 from testing.definitions.task_definitions import TaskDefinition
 from testing.elements import Buttons, FormElements, List, Modal
@@ -493,8 +493,21 @@ def test_notification_menu_deletes_and_clears(get_user):
     starting_count = len(Entities.NOTIFICATION.keys_for_parent(user.entity))
     first = _save_notification(user, first_body)
     second = _save_notification(user, second_body)
+    assert len(Entities.NOTIFICATION.keys_for_parent(user.entity)) == starting_count + 2
+    projected = cache.peek_notification_state(user.entity)
+    if projected is not None:
+        assert projected["count"] == starting_count + 2
 
     user.go(SitePages.HOME)
+    user.page.wait_for_function(
+        "window.__NOTIFICATION_STATE__?.miss === false",
+        timeout=15000,
+    )
+    browser_state = user.page.evaluate("window.__NOTIFICATION_STATE__")
+    assert isinstance(browser_state["generation"], str)
+    assert isinstance(browser_state["revision"], int)
+    assert browser_state["count"] == starting_count + 2
+    assert browser_state["miss"] is False
     notifications = user.locate("[data-role='notifications']")
     expect(notifications).to_be_visible(timeout=15000)
     expect(notifications).to_have_attribute(

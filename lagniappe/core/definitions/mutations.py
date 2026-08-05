@@ -29,6 +29,8 @@ class MutationEffectType(Enum):
     CACHE_DELETE = "cache-delete"
     CACHE_STATE_DELETE = "cache-state-delete"
     CACHE_SEARCH_DELETE = "cache-search-delete"
+    NOTIFICATION_UPSERT = "notification-upsert"
+    NOTIFICATION_DELETE = "notification-delete"
     BLOB_DELETE = "blob-delete"
 
 

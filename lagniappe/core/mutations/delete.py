@@ -501,6 +501,11 @@ def plan_delete(*entities, registry, preserve_user_pages=False):
         )
     for entity in deleted:
         builder.delete(entity, reason="delete-cascade")
+        if getattr(entity, "entity_kind", None) == "notification":
+            builder.notification_delete(
+                entity,
+                reason="notification-delete",
+            )
         for asset in getattr(entity, "assets", {}).values():
             builder.delete_blob(
                 asset.get("path"),

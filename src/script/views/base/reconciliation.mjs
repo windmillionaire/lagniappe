@@ -121,6 +121,10 @@ export const collectRefreshTargets = (_view, components) => {
 	return targets;
 };
 
+/**
+ * @testable infrastructure
+ * @covered-by src/script/views/base/core.mjs::Core._refreshCollectionComponents
+ */
 export const refreshCollectionComponents = async (
 	view,
 	components,
@@ -171,5 +175,4 @@ export const refreshCollectionComponents = async (
 		}),
 	);
 	if (refreshedFingerprint) view.elt.dataset.fingerprint = refreshedFingerprint;
-	await view.Notifications?.refresh?.();
 };

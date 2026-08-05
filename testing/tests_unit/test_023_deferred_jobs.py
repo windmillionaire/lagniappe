@@ -2095,6 +2095,7 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
         "key": "execution-job",
         "idempotency_key": "execution-operation",
         "previous_status": "ready",
+        "revision": 0,
     }
 
     adapter.cleanup(context, terminal=True)
@@ -2210,6 +2211,7 @@ def test_report_replacement_supersedes_old_job_and_ignores_old_failure(monkeypat
     assert report.deferred_job == {
         "key": "new-operation",
         "idempotency_key": "new-idempotency-key",
+        "revision": 0,
     }
 
     monkeypatch.setattr(deferred_job_adapters.Entities, "REPORT", FakeReport)

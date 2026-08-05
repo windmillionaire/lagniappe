@@ -76,7 +76,7 @@ Browser form
   -> job/result/notification terminal state saved
   -> operation status revision becomes visible through POST /poll
   -> shared polling coordinator refetches the authoritative destination
-  -> notification/entity channel revisions refresh other mounted surfaces
+  -> notification Redis state and entity revisions refresh other mounted surfaces
 ```
 
 There are three different checkpoint systems and they should not be conflated:
@@ -252,8 +252,8 @@ status includes only bounded source/destination/entity identifiers and a
 monotonic revision. The browser rejects older revisions, locates the mounted
 destination, and fetches its authoritative replacement route. It pauses while
 hidden, unfocused, or offline and backs off with jitter while quiet. File
-completion converges through the durable notification channel plus
-`EditWatcher`'s entity fingerprint refetch.
+completion converges through the durable Notification entity's Redis projection
+plus `EditWatcher`'s entity fingerprint refetch.
 
 ## Workflow comparison
 
@@ -556,12 +556,13 @@ proposal/checkpoint data. Automatic compaction is not implemented.
 - `operation` subscriptions return that bounded projection through `/poll`.
 - The already loaded request user's `operation_revision` gates those job
   projections, so a quiet poll does not read durable-job rows. Notification
-  mutations use a separate `notification_revision` and cannot invalidate the
-  operation gate.
+  mutations use the separate expiring Redis notification projection and cannot
+  invalidate the operation gate.
 - A terminal result fetches authoritative destination HTML/data; it never
   carries AI context or output in the polling payload.
-- Notification entities are saved durably and the personal notification
-  channel refreshes all active tabs.
+- Notification entities are saved durably; their post-commit Redis generation,
+  revision, and count reach active tabs through `/ping`, existing poll traffic,
+  or one cold-cache seed poll.
 - `lp-deferred` remains online-only and does not replay later against
   potentially changed permissions or target state.
 
@@ -580,9 +581,9 @@ state. It:
 - stops cleanly when the view/widget is destroyed;
 - rejects stale/superseded operation revisions before reconciliation.
 
-Standalone file OCR/summary converge through the durable notification channel
-and watched entity fingerprint. Collaborative documents use their separate
-revisioned Redis contract.
+Standalone file OCR/summary converge through durable Notification entities,
+their expiring Redis badge/list projection, and the watched entity fingerprint.
+Collaborative documents use their separate revisioned Redis contract.
 
 ### Prompt preview
 

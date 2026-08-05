@@ -1,2 +1,35 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="68fb2a16-c52f-452e-a47c-bf88031b2658",e._sentryDebugIdIdentifier="sentry-dbid-68fb2a16-c52f-452e-a47c-bf88031b2658");}catch(e){}}();import{E as e}from"../entity-foundation.js?v=b83a2173";import"../core-foundation.js?v=b83a2173";import"../connectivity.js?v=b83a2173";import"../foundation.js?v=b83a2173";class r extends e{get secondaryCard(){const t=this.elt.querySelector("#model-tasks");return t?.dataset.hasAttribute==="false"?null:t}_prerender(t){return this._tabElement(t)?.dataset.hasAttribute==="false"&&(t=this._defaultTabId),super._prerender(t)}}export{r as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { E as Entity } from '../entity-foundation.js?v=bed962f9';
+import '../core-foundation.js?v=bed962f9';
+import '../connectivity.js?v=bed962f9';
+import '../foundation.js?v=bed962f9';
+import '../notificationState.js?v=bed962f9';
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004b_info.py::test_toggle_tasks_attribute
+ * @features projects
+ * @dimensions attribute-model-tasks
+ */
+class Project extends Entity {
+	get secondaryCard() {
+		const modelTasks = this.elt.querySelector("#model-tasks");
+		if (modelTasks?.dataset.hasAttribute === "false") return null;
+		return modelTasks;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/base/entity.mjs::Entity._renderLayout
+	 * @reason project-specific inactive attribute guard feeds the shared layout renderer
+	 */
+	_prerender(tabId) {
+		const tab = this._tabElement(tabId);
+		if (tab?.dataset.hasAttribute === "false") {
+			tabId = this._defaultTabId;
+		}
+		return super._prerender(tabId);
+	}
+}
+
+export { Project as default };

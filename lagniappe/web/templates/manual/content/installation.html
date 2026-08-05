@@ -180,14 +180,14 @@
           <li>
             Run Google's interactive Cloud CLI installer. Accept the default
             install folder and answer <strong>Y</strong> when it asks to add
-            <code>gcloud</code> to your PATH. Restart the shell and verify the
-            command. This works from macOS's standard zsh Terminal;
+            <code>gcloud</code> to your PATH. When installation finishes, close
+            and reopen Terminal, then verify the command. This works from
+            macOS's standard zsh Terminal;
             <code>/bin/bash</code> runs only Google's installer and does not
             change your shell:
           </li>
         </ol>
         {{ code("curl https://sdk.cloud.google.com | /bin/bash") }}
-        {{ code("exec -l $SHELL") }}
         {{ code("gcloud --version") }}
       </div>
     </div>

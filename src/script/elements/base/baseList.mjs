@@ -77,6 +77,7 @@ export class BaseList {
 			this.itemCount > 0 && visible ? "true" : "false";
 
 		this._itemCount = 0;
+		this.loaded = true;
 		this.target.setAttribute("loaded", "");
 	}
 }

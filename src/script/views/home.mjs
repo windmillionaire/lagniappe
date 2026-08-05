@@ -1,15 +1,92 @@
 import Core from "./base/core";
 
+const HOME_CHANNELS = Object.freeze({
+	HomeActivityList: "home-notes",
+	HomeTaskList: "tasks",
+	StarredList: "starred",
+	HomePageList: "pages",
+	HomeProjectList: "projects",
+	HomeCategoryList: "categories",
+	IngressList: "ingress",
+	ToolReportList: "tool-reports",
+});
+
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002a_home.py::test_home_mobile_dashboard_smoke
+ * @tests tests_js/test_040_home_polling.py::test_home_polling_subscribes_loaded_widgets_and_refreshes_only_owner
  * @features home
  * @dimensions load layout mobile
+ * @pairs home:foreground home:mounted-scope home:targeted-refresh home:lazy-widget
+ * @pairs polling:foreground polling:mounted-scope polling:targeted-refresh polling:lazy-widget
  */
 export default class Home extends Core {
 	constructor(elt) {
 		super(elt);
 		this.hash = "home";
+		this._homePollUnsubscribers = new Map();
+	}
+
+	_initPollingSubscription() {}
+
+	async prefetch() {
+		await super.prefetch();
+		this._syncHomePollingSubscriptions();
+	}
+
+	async reconcilePollingSubscriptions() {
+		await super.reconcilePollingSubscriptions();
+		this._syncHomePollingSubscriptions();
+	}
+
+	_syncHomePollingSubscriptions() {
+		if (!this.PollingCoordinator) return;
+		const loaded = new Set();
+		for (const component of Object.values(this.components)) {
+			for (const widget of Object.values(component.widgets)) {
+				const channel = HOME_CHANNELS[widget.name];
+				if (!channel || !widget.loaded) continue;
+				const id = `home:channel:${channel}`;
+				loaded.add(id);
+				if (this._homePollUnsubscribers.has(id)) continue;
+				const unsubscribe = this.PollingCoordinator.subscribe(
+					{
+						id,
+						type: "channel",
+						channel,
+						revision: widget.target?.dataset.pollRevision || null,
+					},
+					{
+						mode: "foreground",
+						initial: "scheduled",
+						onResult: async (result) => {
+							if (result.status !== "changed") return;
+							return await this._refreshHomeWidget(component, widget);
+						},
+					},
+				);
+				this._homePollUnsubscribers.set(id, unsubscribe);
+			}
+		}
+		for (const [id, unsubscribe] of this._homePollUnsubscribers) {
+			if (loaded.has(id)) continue;
+			unsubscribe?.();
+			this._homePollUnsubscribers.delete(id);
+		}
+	}
+
+	async _refreshHomeWidget(component, widget) {
+		if (!widget?.loaded || !widget.route) return false;
+		const response = await this.load(component, widget.route);
+		if (!response || response.updated === false) return false;
+		await widget.refresh?.(response);
+		if (response.pollChannel) {
+			widget.target.dataset.pollChannel = response.pollChannel;
+		}
+		if (response.pollRevision) {
+			widget.target.dataset.pollRevision = response.pollRevision;
+		}
+		return true;
 	}
 
 	/**
@@ -44,8 +121,9 @@ export default class Home extends Core {
 			existingWidget || (await starredComponent.loadWidget("StarredList"));
 		if (!widget) return;
 
-		if (existingWidget) await starredComponent.load(widget);
+		if (existingWidget) await this._refreshHomeWidget(starredComponent, widget);
 		if (starredComponent.active === widget) await starredComponent.render(true);
+		this._syncHomePollingSubscriptions();
 	}
 
 	/**
@@ -63,5 +141,13 @@ export default class Home extends Core {
 				}
 			}
 		}
+	}
+
+	destroy() {
+		for (const unsubscribe of this._homePollUnsubscribers.values()) {
+			unsubscribe?.();
+		}
+		this._homePollUnsubscribers.clear();
+		super.destroy();
 	}
 }

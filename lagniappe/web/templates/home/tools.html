@@ -131,6 +131,7 @@
 {% macro report_item(report) %}
   {% set stage_label = report_stage_label(report)|trim %}
   {% set operation_key = report.deferred_job.key if report.deferred_job else none %}
+  {% set operation_status = report._operation_status|default(none) %}
   <li lp-entity
       lp-link
       data-key="{{ report.urlsafe_key }}"
@@ -139,7 +140,19 @@
       data-kind="report"
       data-status="{{ report.status }}"
       data-pending="{{ report.pending|yesno }}"
-      {% if operation_key %}data-operation="{{ operation_key }}"{% endif %}
+      {% if operation_key %}
+        data-operation="{{ operation_key }}"
+        data-operation-revision="{{ operation_status.revision if operation_status else report.deferred_job.revision|default(0, true) }}"
+        {% if operation_status %}
+          data-operation-status="{{ operation_status.status }}"
+          data-operation-phase="{{ operation_status.phase }}"
+          data-operation-phase-label="{{ operation_status.phase_label }}"
+          data-operation-elapsed="{{ operation_status.elapsed_seconds }}"
+          data-operation-recovering="{{ operation_status.recovering|yesno }}"
+          data-operation-terminal="{{ operation_status.terminal|yesno }}"
+          {% if operation_status.error %}data-operation-error="{{ operation_status.error }}"{% endif %}
+        {% endif %}
+      {% endif %}
       class="{{ styles.home.ingress.item }}">
     <div class="{{ styles.home.card.item }}">
       <div class="flex min-w-0 flex-col gap-0.5">
@@ -153,7 +166,19 @@
         {% endif %}
         {% if report.pending and operation_key %}
           <p class="text-xs text-base-medium" aria-live="polite">
-            <span data-role="deferred-phase">Waiting to start</span>
+            <span data-role="deferred-phase">
+              {%- if operation_status -%}
+                {%- if operation_status.error -%}
+                  {{ operation_status.phase_label }}: {{ operation_status.error }}
+                {%- elif operation_status.recovering -%}
+                  {{ operation_status.phase_label }}. Automatic recovery is active.
+                {%- else -%}
+                  {{ operation_status.phase_label }}
+                {%- endif -%}
+              {%- else -%}
+                Waiting to start
+              {%- endif -%}
+            </span>
             <span aria-hidden="true">·</span>
             <span data-role="deferred-elapsed">just now</span>
           </p>

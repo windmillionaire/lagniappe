@@ -225,6 +225,7 @@
   {% set revise_button_label = "Revise Response" if is_ask else "Revise Plan" %}
   {% set revise_heading = "Revise Response" if is_ask else "Revise Proposal" %}
   {% set operation_key = report.deferred_job.key if report.deferred_job else none %}
+  {% set operation_status = report._operation_status|default(none) %}
   <main lp-view
         lp-entity
         data-key="{{ report.urlsafe_key }}"
@@ -232,7 +233,19 @@
         data-kind="report"
         data-pending="{{ 'true' if report.pending else 'false' }}"
         data-status="{{ report.status }}"
-        {% if operation_key %}data-operation="{{ operation_key }}"{% endif %}
+        {% if operation_key %}
+          data-operation="{{ operation_key }}"
+          data-operation-revision="{{ operation_status.revision if operation_status else report.deferred_job.revision|default(0, true) }}"
+          {% if operation_status %}
+            data-operation-status="{{ operation_status.status }}"
+            data-operation-phase="{{ operation_status.phase }}"
+            data-operation-phase-label="{{ operation_status.phase_label }}"
+            data-operation-elapsed="{{ operation_status.elapsed_seconds }}"
+            data-operation-recovering="{{ operation_status.recovering|yesno }}"
+            data-operation-terminal="{{ operation_status.terminal|yesno }}"
+            {% if operation_status.error %}data-operation-error="{{ operation_status.error }}"{% endif %}
+          {% endif %}
+        {% endif %}
         class="group/view max-w-5xl mx-auto">
     <div class="{{ styles.layout.view.header }}" data-flipped="false">
       <nav class="{{ styles.layout.view.title }}" data-nav="view">
@@ -263,7 +276,19 @@
               </p>
               {% if report.pending and operation_key %}
                 <p class="text-sm text-base-medium" aria-live="polite">
-                  <span data-role="deferred-phase">Waiting to start</span>
+                  <span data-role="deferred-phase">
+                    {%- if operation_status -%}
+                      {%- if operation_status.error -%}
+                        {{ operation_status.phase_label }}: {{ operation_status.error }}
+                      {%- elif operation_status.recovering -%}
+                        {{ operation_status.phase_label }}. Automatic recovery is active.
+                      {%- else -%}
+                        {{ operation_status.phase_label }}
+                      {%- endif -%}
+                    {%- else -%}
+                      Waiting to start
+                    {%- endif -%}
+                  </span>
                   <span aria-hidden="true"> · </span>
                   <span data-role="deferred-elapsed">just now</span>
                 </p>

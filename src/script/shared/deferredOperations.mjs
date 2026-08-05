@@ -41,6 +41,12 @@ export class DeferredOperationManager {
 		this.destroyed = false;
 		this.ignored = new Set();
 		this.unsubscribers = new Map();
+		this.operationRevision =
+			Number(
+				document
+					.querySelector?.("meta[name='operation-revision']")
+					?.getAttribute?.("content"),
+			) || 0;
 	}
 
 	init() {
@@ -52,14 +58,34 @@ export class DeferredOperationManager {
 		const nodes = Array.from(root.querySelectorAll?.("[data-operation]") || []);
 		if (root.matches?.("[data-operation]")) nodes.unshift(root);
 		for (const node of nodes) {
+			const status = node.dataset.operationStatus
+				? {
+						key: node.dataset.operation,
+						revision: Number(node.dataset.operationRevision) || 0,
+						status: node.dataset.operationStatus,
+						phase: node.dataset.operationPhase || "unknown",
+						phase_label: node.dataset.operationPhaseLabel || "Working",
+						elapsed_seconds: Number(node.dataset.operationElapsed) || 0,
+						recovering: node.dataset.operationRecovering === "true",
+						terminal: node.dataset.operationTerminal === "true",
+						...(node.dataset.operationError
+							? { error: node.dataset.operationError }
+							: {}),
+					}
+				: null;
 			this.track(node.dataset.operation, {
 				revision: Number(node.dataset.operationRevision) || 0,
 				node,
+				immediate: false,
+				status,
 			});
 		}
 	}
 
-	track(key, { revision = 0, node = null } = {}) {
+	track(
+		key,
+		{ revision = 0, node = null, immediate = true, status = null } = {},
+	) {
 		if (this.destroyed || !key || this.ignored.has(key)) return false;
 		const decorationNode =
 			node?.dataset?.deferredStatus === "false" ? null : node;
@@ -75,18 +101,25 @@ export class DeferredOperationManager {
 		this.operations.set(key, {
 			...current,
 			revision: Math.max(Number(current?.revision) || 0, Number(revision) || 0),
+			...(status ? { status: { ...status }, receivedAt: Date.now() } : {}),
 		});
+		let subscribed = false;
 		if (!this.unsubscribers.has(key)) {
 			const unsubscribe = this.view.PollingCoordinator?.subscribe(
 				{
 					id: `operation:${key}`,
 					type: "operation",
 					key,
-					revision: null,
-					operation_revision: null,
+					revision: Number(this.operations.get(key)?.revision) || 0,
+					operation_revision: this.operationRevision,
 				},
 				{
+					mode: "periodic",
+					initial: "scheduled",
 					onResult: async (result) => {
+						if (result.operation_revision !== undefined) {
+							this.operationRevision = Number(result.operation_revision) || 0;
+						}
 						if (result.status === "changed" && result.payload) {
 							return await this.receive(result.payload);
 						} else if (
@@ -100,7 +133,13 @@ export class DeferredOperationManager {
 					},
 				},
 			);
-			if (unsubscribe) this.unsubscribers.set(key, unsubscribe);
+			if (unsubscribe) {
+				this.unsubscribers.set(key, unsubscribe);
+				subscribed = true;
+			}
+		}
+		if (immediate && subscribed) {
+			this.view.PollingCoordinator?.trigger(`operation:${key}`);
 		}
 		return true;
 	}

@@ -10,6 +10,8 @@ const TYPE_INTERVALS = Object.freeze({
 	ingress: 2_500,
 	operation: 4_000,
 });
+const SUBSCRIPTION_MODES = new Set(["periodic", "foreground"]);
+const INITIAL_MODES = new Set(["immediate", "scheduled"]);
 
 /**
  * @testable false
@@ -51,9 +53,12 @@ function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
  * @testable true
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_batches_due_subscriptions_and_applies_results
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_enqueues_reentrant_followup_without_waiting
+ * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_schedules_modes_and_notification_seed
  * @features polling
  * @dimensions batching cadence lifecycle coalescing acknowledgement reentrancy requested-cycle freshness
- * @pairs polling:reentrancy polling:requested-cycle polling:freshness
+ * @pairs polling:batching polling:cadence polling:lifecycle polling:coalescing polling:acknowledgement
+ * @pairs polling:reentrancy polling:requested-cycle polling:freshness polling:foreground polling:scheduled-initial
+ * @pair notifications:cold-seed
  */
 export class PollingCoordinator {
 	constructor(view) {
@@ -67,34 +72,62 @@ export class PollingCoordinator {
 		this.followup = false;
 		this.queuedIds = new Set();
 		this.destroyed = false;
+		this.notificationSeedPending = Boolean(window.__NOTIFICATION_STATE__?.miss);
+		this._notificationState = (event) => {
+			if (!event?.detail?.miss) return;
+			this.notificationSeedPending = true;
+			if (this.activePoll) this.followup = true;
+			else this._schedule(0);
+		};
 	}
 
 	init() {
+		window.addEventListener?.("notification-state", this._notificationState);
+		if (this.notificationSeedPending) this._schedule(0);
 		return this;
 	}
 
-	subscribe(descriptor, { onResult = null, beforePoll = null } = {}) {
+	subscribe(
+		descriptor,
+		{
+			onResult = null,
+			beforePoll = null,
+			mode = "periodic",
+			initial = "immediate",
+		} = {},
+	) {
 		if (this.destroyed || !descriptor?.id || !descriptor?.type) return () => {};
+		if (!SUBSCRIPTION_MODES.has(mode) || !INITIAL_MODES.has(initial)) {
+			throw new TypeError("Invalid polling subscription schedule.");
+		}
 		const existing = this.subscriptions.get(descriptor.id);
 		const now = Date.now();
+		const schedule = existing
+			? existing.dueAt
+			: mode === "foreground"
+				? Number.POSITIVE_INFINITY
+				: initial === "immediate"
+					? now
+					: now + this._baseInterval(descriptor.type);
 		this.subscriptions.set(descriptor.id, {
 			...existing,
 			descriptor: { ...existing?.descriptor, ...descriptor },
 			onResult: onResult ?? existing?.onResult ?? null,
 			beforePoll: beforePoll ?? existing?.beforePoll ?? null,
-			dueAt: Math.min(existing?.dueAt ?? now, now),
+			mode,
+			dueAt: schedule,
 			quiet: existing?.quiet ?? 0,
 			errorCount: existing?.errorCount ?? 0,
 		});
 		this.pause();
-		this._schedule(0);
+		this._schedule(initial === "immediate" && mode === "periodic" ? 0 : null);
 		return () => this.unsubscribe(descriptor.id);
 	}
 
 	unsubscribe(id) {
 		this.subscriptions.delete(id);
 		this.queuedIds.delete(id);
-		if (!this.subscriptions.size) this.pause();
+		if (!this.subscriptions.size && !this.notificationSeedPending) this.pause();
 		else this._schedule();
 	}
 
@@ -166,6 +199,12 @@ export class PollingCoordinator {
 
 	resume() {
 		if (this.destroyed) return Promise.resolve([]);
+		this._schedule();
+		return Promise.resolve([]);
+	}
+
+	catchUp() {
+		if (this.destroyed) return Promise.resolve([]);
 		return this.trigger();
 	}
 
@@ -207,6 +246,20 @@ export class PollingCoordinator {
 		return ORDINARY_INTERVALS[
 			Math.min(subscription.quiet, ORDINARY_INTERVALS.length - 1)
 		];
+	}
+
+	_baseInterval(type) {
+		return TYPE_INTERVALS[type] || ORDINARY_INTERVALS[0];
+	}
+
+	_notificationRequest() {
+		const state = window.__NOTIFICATION_STATE__;
+		if (!state) return null;
+		return {
+			generation: state.generation ?? null,
+			revision: Number.isInteger(state.revision) ? state.revision : null,
+			seed: Boolean(state.miss),
+		};
 	}
 
 	_applyProtocolState(subscription, result) {
@@ -266,7 +319,7 @@ export class PollingCoordinator {
 		let results = [];
 		try {
 			due = this._due();
-			if (!due.length) return [];
+			if (!due.length && !this.notificationSeedPending) return [];
 			this.activeIds = new Set(due.map(({ descriptor }) => descriptor.id));
 			for (const { descriptor } of due) {
 				this.queuedIds.delete(descriptor.id);
@@ -275,34 +328,41 @@ export class PollingCoordinator {
 				due.map(({ beforePoll }) => beforePoll).filter(Boolean),
 			);
 			for (const hook of hooks) await hook();
+			await window.__PING_PENDING__;
 			if (this.destroyed || this.view.hidden || !this.view.online) return [];
+			const notificationState = this._notificationRequest();
 			due = due.filter(
 				(subscription) =>
 					this.subscriptions.get(subscription.descriptor.id) === subscription,
 			);
-			if (!due.length) return [];
+			if (!due.length && !this.notificationSeedPending) return [];
 
 			this.pause();
 			const byId = new Map(
 				due.map((subscription) => [subscription.descriptor.id, subscription]),
 			);
-			this.inflight = request.post(ENDPOINTS.poll, {
+			const body = {
 				version: 1,
 				client_id: this.clientId,
 				subscriptions: due.map(({ descriptor }) => ({ ...descriptor })),
 				closed_documents: [],
-			});
+			};
+			if (notificationState) body.notification_state = notificationState;
+			if (notificationState?.seed) this.notificationSeedPending = false;
+			this.inflight = request.post(ENDPOINTS.poll, body);
 			const response = await this.inflight;
 			if (!response?.ok) {
 				const cycleJitter = 0.9 + Math.random() * 0.2;
 				const scheduledAt = Date.now();
 				for (const subscription of due) {
 					subscription.dueAt =
-						scheduledAt +
-						jitter(
-							this._interval(subscription, { status: "error" }),
-							cycleJitter,
-						);
+						subscription.mode === "foreground"
+							? Number.POSITIVE_INFINITY
+							: scheduledAt +
+								jitter(
+									this._interval(subscription, { status: "error" }),
+									cycleJitter,
+								);
 					await subscription.onResult?.({
 						id: subscription.descriptor.id,
 						type: subscription.descriptor.type,
@@ -332,8 +392,10 @@ export class PollingCoordinator {
 						subscription.descriptor = previousDescriptor;
 					}
 					subscription.dueAt =
-						scheduledAt +
-						jitter(this._interval(subscription, result), cycleJitter);
+						subscription.mode === "foreground"
+							? Number.POSITIVE_INFINITY
+							: scheduledAt +
+								jitter(this._interval(subscription, result), cycleJitter);
 				} catch (error) {
 					subscription.descriptor = previousDescriptor;
 					captureError(error, this.view.elt, {
@@ -341,13 +403,15 @@ export class PollingCoordinator {
 						subscription_id: result.id,
 					});
 					subscription.dueAt =
-						scheduledAt +
-						jitter(
-							this._interval(subscription, {
-								status: "error",
-							}),
-							cycleJitter,
-						);
+						subscription.mode === "foreground"
+							? Number.POSITIVE_INFINITY
+							: scheduledAt +
+								jitter(
+									this._interval(subscription, {
+										status: "error",
+									}),
+									cycleJitter,
+								);
 				}
 			}
 			for (const [id, subscription] of byId) {
@@ -358,8 +422,10 @@ export class PollingCoordinator {
 					type: subscription.descriptor.type,
 				};
 				subscription.dueAt =
-					scheduledAt +
-					jitter(this._interval(subscription, missing), cycleJitter);
+					subscription.mode === "foreground"
+						? Number.POSITIVE_INFINITY
+						: scheduledAt +
+							jitter(this._interval(subscription, missing), cycleJitter);
 			}
 		} catch (error) {
 			if (this.destroyed || this.view.hidden || !this.view.online) return [];
@@ -368,13 +434,15 @@ export class PollingCoordinator {
 			const scheduledAt = Date.now();
 			for (const subscription of due) {
 				subscription.dueAt =
-					scheduledAt +
-					jitter(
-						this._interval(subscription, {
-							status: "error",
-						}),
-						cycleJitter,
-					);
+					subscription.mode === "foreground"
+						? Number.POSITIVE_INFINITY
+						: scheduledAt +
+							jitter(
+								this._interval(subscription, {
+									status: "error",
+								}),
+								cycleJitter,
+							);
 				await subscription.onResult?.({
 					id: subscription.descriptor.id,
 					type: subscription.descriptor.type,
@@ -396,14 +464,18 @@ export class PollingCoordinator {
 		if (
 			this.destroyed ||
 			this.timer ||
-			!this.subscriptions.size ||
+			(!this.subscriptions.size && !this.notificationSeedPending) ||
 			this.view.hidden ||
 			!this.view.online
 		)
 			return;
-		const nextDue = Math.min(
-			...Array.from(this.subscriptions.values(), ({ dueAt }) => dueAt),
-		);
+		const periodicDue = Array.from(this.subscriptions.values())
+			.filter(({ mode }) => mode === "periodic")
+			.map(({ dueAt }) => dueAt);
+		if (!this.notificationSeedPending && !periodicDue.length) return;
+		const nextDue = this.notificationSeedPending
+			? Date.now()
+			: Math.min(...periodicDue);
 		const wait = delay ?? Math.max(nextDue - Date.now(), 0);
 		this.timer = window.setTimeout(() => {
 			this.timer = null;
@@ -417,5 +489,6 @@ export class PollingCoordinator {
 		this.subscriptions.clear();
 		this.activeIds.clear();
 		this.queuedIds.clear();
+		window.removeEventListener?.("notification-state", this._notificationState);
 	}
 }

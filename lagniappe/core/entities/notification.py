@@ -37,7 +37,7 @@ class Notification(Entity):
     # @reason notification ownership and deletion are exercised through the route
     @classmethod
     def keys_for_parent(cls, parent):
-        return database.get.activity(parent, types=(cls.entity_kind,))
+        return database.get.notification_keys(parent)
 
     # @testable true
     # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes

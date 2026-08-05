@@ -103,6 +103,8 @@ export class SyncManager {
 			...this._descriptor(widget),
 		};
 		const unsubscribe = this.view.PollingCoordinator?.subscribe(descriptor, {
+			mode: "periodic",
+			initial: "immediate",
 			beforePoll: () => {
 				const current = this.widgets[widget.syncId] ?? widget;
 				if (
@@ -260,15 +262,18 @@ export class SyncManager {
 	 */
 	async _pollOfflineState(offline) {
 		const id = `replay:${offline.sync_id}`;
-		const unsubscribe = this.view.PollingCoordinator?.subscribe({
-			id,
-			type: "document",
-			key: offline.key,
-			sync_id: offline.sync_id,
-			fingerprint: offline.fingerprint,
-			generation: offline.generation ?? null,
-			revision: Number(offline.revision) || 0,
-		});
+		const unsubscribe = this.view.PollingCoordinator?.subscribe(
+			{
+				id,
+				type: "document",
+				key: offline.key,
+				sync_id: offline.sync_id,
+				fingerprint: offline.fingerprint,
+				generation: offline.generation ?? null,
+				revision: Number(offline.revision) || 0,
+			},
+			{ mode: "periodic", initial: "immediate" },
+		);
 		if (!unsubscribe) return null;
 
 		try {

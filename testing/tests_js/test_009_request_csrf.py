@@ -185,6 +185,10 @@ source = source.replace(
   'import {{ captureNetworkError }} from "./errors.mjs";',
   "const captureNetworkError = (...args) => networkErrors.push(args);",
 );
+source = source.replace(
+  'import {{ applyNotificationStateHeader }} from "./notificationState.mjs";',
+  "const applyNotificationStateHeader = () => null;",
+);
 source = source.replace("export const request = {{", "const request = {{");
 source += "\\nglobalThis.request = request;";
 vm.runInContext(source, context);

@@ -1,2 +1,453 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="ec5a089a-7a41-459d-a819-c3bca74538f2",e._sentryDebugIdIdentifier="sentry-dbid-ec5a089a-7a41-459d-a819-c3bca74538f2");}catch(e){}}();import{g as c}from"./loader.js?v=b83a2173";import{s as l}from"./icons.js?v=b83a2173";import{w as u,r as d}from"./foundation.js?v=b83a2173";import"./connectivity.js?v=b83a2173";const h=1200,f={page:a=>`/pages/${a}/patch`,task:a=>`/tasks/${a}/patch`};class m{constructor(t){Object.assign(this,t),this.rows=null,this.kind=this.kind||this.component.kind,this.columns=new Map((this.component.preload("columns")||[]).map(e=>[e.field,e])),this.activeEdit=null,this.checkboxEdits=new Map}async init(){this.rows=await this.component.loadWidget("IndexTable"),this.rows.target.addEventListener("click",t=>this._click(t)),this.rows.target.addEventListener("change",t=>this._change(t)),this.rows.target.addEventListener("keydown",t=>this._keydown(t))}_parseValue(t){try{return JSON.parse(t.dataset.editValue??"null")}catch{return null}}_column(t){return this.columns.get(t.dataset.column)}_schema(t){const e=this._column(t);return e?.schema?{id:e.field,title:e.title,...e.schema}:null}_route(t){const e=f[this.kind],i=t.closest("tr[data-key]")?.dataset.key;return e&&i?e(i):null}_editRenderer(){return{readonly:!1,kind:this.kind,id:"quick-edit",mode:"edit",cellEditing:!0,form:{target:this.rows.target}}}_control(t){for(const e of["input:not([type='hidden']):not([disabled])","textarea:not([disabled])","select:not([disabled])"]){if(t.matches?.(e))return t;const i=t.querySelector(e);if(i)return i}return null}_editableCells(){return Array.from(this.rows.target.querySelectorAll('td[data-editable="true"]')).filter(t=>this._schema(t)&&this._route(t))}_isCheckboxCell(t){return this._schema(t)?.type==="checkbox"}_changed(t){return typeof t.element.changed=="function"?t.element.changed(t.value):t.element.value!==t.value}_renderValue(t,e,{saved:i=!1}={}){const s=document.createElement("div");s.dataset.editing="false",s.dataset.role="quick-edit-result";const r=s.appendChild(document.createElement("div"));if(r.dataset.role="quick-edit-value",i){const o=r.appendChild(document.createElement("span"));l(o,"check","text-saved-default"),o.dataset.role="quick-edit-saved"}const n=r.appendChild(document.createElement("div"));n.dataset.role="quick-edit-content",n.innerHTML=e,t.replaceChildren(s)}_clearError(t){t.querySelector("[data-role='quick-edit-error']")?.remove()}_showError(t,e){t.dataset.editState="error";let i=t.querySelector("[data-role='quick-edit-error']");i||(i=document.createElement("p"),i.dataset.role="quick-edit-error",t.appendChild(i)),i.textContent=e||"Could not save this value.",this._control(t)?.focus()}_editableCell(t){const e=t.closest("td");return!this.visible||e?.dataset.editable!=="true"||!this._schema(e)||!this._route(e)?null:e}async _openCheckboxes(){this._cleanupCheckboxEdits(),await Promise.all(this._editableCells().filter(t=>this._isCheckboxCell(t)).map(t=>this._openCheckbox(t)))}async refreshCheckboxes(){this.visible&&await this._openCheckboxes()}async _openCheckbox(t){if(this.checkboxEdits.has(t))return;const e=this._schema(t),i=this._parseValue(t),s=await c(this._editRenderer(),e,i),r=s.cell;if(!r){s.destroy();return}this.checkboxEdits.set(t,{before:t.innerHTML,cell:t,column:this._column(t),element:s,value:i}),t.dataset.editState="editing",t.replaceChildren(r)}_cleanupCheckboxEdits(){this.checkboxEdits.forEach((t,e)=>{e.isConnected||(t.element.destroy(),this.checkboxEdits.delete(e))})}_cancelCheckbox(t){const e=this.checkboxEdits.get(t);e&&(t.isConnected&&(t.innerHTML=e.before,delete t.dataset.editState),e.element.destroy(),this.checkboxEdits.delete(t))}_cancelCheckboxes(){Array.from(this.checkboxEdits.keys()).forEach(t=>{this._cancelCheckbox(t)})}async _click(t){if(!this.visible)return;t.stopPropagation();const e=this._editableCell(t.target);e&&(this._isCheckboxCell(e)||this.activeEdit?.cell!==e&&(t.preventDefault(),await this._open(e)))}async _change(t){if(!this.visible)return;const e=this._editableCell(t.target);if(!(!e||!this._isCheckboxCell(e))&&(t.stopPropagation(),!!this.checkboxEdits.has(e))){if(this.activeEdit&&this.activeEdit.cell!==e&&!await this._commit(this.activeEdit.cell)){const i=this._control(e),s=this.checkboxEdits.get(e);i&&(i.checked=s.value===!0);return}await this._commitCheckbox(e)}}async _open(t){if(this.activeEdit?.cell===t||this._isCheckboxCell(t)||this.activeEdit&&!await this._commit(this.activeEdit.cell))return;const e=this._schema(t),i=this._parseValue(t),s=await c(this._editRenderer(),e,i),r=s.cell;if(!r){s.destroy();return}await u(async()=>{t.dataset.editState="editing",this.activeEdit={before:t.innerHTML,cell:t,column:this._column(t),element:s,value:i},t.replaceChildren(r)}),this._control(r)?.focus({preventScroll:!0})}async _keydown(t){if(!this.activeEdit||!["Enter","Escape","Tab"].includes(t.key))return;const{cell:e}=this.activeEdit;if(!e.contains(t.target))return;if(t.preventDefault(),t.stopPropagation(),t.key==="Escape"){this._cancel(e);return}await this._commit(e)&&t.key==="Tab"&&await this._focusNext(e,t.shiftKey)}_nextEditableCell(t,e=!1){const i=this._editableCells(),s=i.indexOf(t);return s<0?null:i[s+(e?-1:1)]||null}async _focusNext(t,e=!1){const i=this._nextEditableCell(t,e);if(i?.focus?.(),!!i){if(this._isCheckboxCell(i)){this._control(i)?.focus({preventScroll:!0});return}await this._open(i)}}_cancel(t){!this.activeEdit||this.activeEdit.cell!==t||(t.innerHTML=this.activeEdit.before,delete t.dataset.editState,this.activeEdit.element.destroy(),this.activeEdit=null)}async _commit(t){if(!this.activeEdit||this.activeEdit.cell!==t)return!1;const e=this.activeEdit,i=e.element.value;if(!this._changed(e))return this._cancel(t),!0;t.dataset.editState="saving",this._clearError(t);const s=await d.patch(this._route(t),{schema_id:e.element.schema.id,value:i,column:e.column});return s?.ok?(this._renderValue(t,s.html?.body?.innerHTML??"",{saved:!0}),t.dataset.editValue=JSON.stringify(i),t.dataset.editState="saved",e.element.destroy(),this.activeEdit=null,setTimeout(()=>{t.dataset.editState==="saved"&&(delete t.dataset.editState,t.querySelector("[data-role='quick-edit-saved']")?.remove())},h),!0):(this._showError(t,s?.error),!1)}async _commitCheckbox(t){const e=this.checkboxEdits.get(t);if(!e)return!0;const i=e.element.value;if(!this._changed(e))return t.dataset.editState="editing",this._clearError(t),!0;t.dataset.editState="saving",this._clearError(t);const s=await d.patch(this._route(t),{schema_id:e.element.schema.id,value:i,column:e.column});return s?.ok?(e.before=s.html?.body?.innerHTML??e.before,e.value=i,t.dataset.editValue=JSON.stringify(i),t.dataset.editState="saved",setTimeout(()=>{t.dataset.editState==="saved"&&(t.dataset.editState="editing")},h),!0):(this._showError(t,s?.error),!1)}async postreconcile(){const t=this.component.active;!this.visible&&this.rows.target.dataset.editing==="true"&&t?.name==="TableVisibility"&&(this.visible=!0,t.preserveEditor?.(this)),!this.visible&&this.activeEdit&&this._cancel(this.activeEdit.cell),this.visible||this._cancelCheckboxes(),this.rows.target.dataset.editing=this.visible?"true":"false",this.view.elt.querySelectorAll('button[lp-show="table:TableEditor"]').forEach(i=>{i.dataset.editing=this.visible?"true":"false",i.setAttribute("aria-pressed",this.visible?"true":"false")}),this.visible&&await this._openCheckboxes()}}export{m as TableEditor};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { g as getFormElement } from './loader.js?v=bed962f9';
+import { s as setIcon } from './icons.js?v=bed962f9';
+import { w as withTransition, r as request } from './foundation.js?v=bed962f9';
+import './notificationState.js?v=bed962f9';
+import './connectivity.js?v=bed962f9';
+
+const SAVED_STATE_MS = 1200;
+
+const ROUTES = {
+	page: (key) => `/pages/${key}/patch`,
+	task: (key) => `/tasks/${key}/patch`,
+};
+
+/**
+ * @testable true
+ * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_quick_edit_updates_editable_cell
+ * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_quick_edit_keeps_revealed_completed_column_editable
+ * @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_quick_edit_renders_checkbox_cells
+ * @pairs task-index:quick-edit
+ * @pairs task-index:link-affordance
+ * @pairs task-index:editable-cell
+ * @pairs task-index:quick-edit task-index:column-visibility task-index:checkbox-cell
+ * @pairs category-index:quick-edit category-index:checkbox-cell
+ */
+class TableEditor {
+	constructor(attributes) {
+		Object.assign(this, attributes);
+
+		this.rows = null;
+		this.kind = this.kind || this.component.kind;
+		this.columns = new Map(
+			(this.component.preload("columns") || []).map((column) => [
+				column.field,
+				column,
+			]),
+		);
+		this.activeEdit = null;
+		this.checkboxEdits = new Map();
+	}
+
+	async init() {
+		this.rows = await this.component.loadWidget("IndexTable");
+
+		this.rows.target.addEventListener("click", (e) => this._click(e));
+		this.rows.target.addEventListener("change", (e) => this._change(e));
+		this.rows.target.addEventListener("keydown", (e) => this._keydown(e));
+	}
+
+	_parseValue(cell) {
+		try {
+			return JSON.parse(cell.dataset.editValue ?? "null");
+		} catch {
+			return null;
+		}
+	}
+
+	_column(cell) {
+		return this.columns.get(cell.dataset.column);
+	}
+
+	_schema(cell) {
+		const column = this._column(cell);
+		if (!column?.schema) return null;
+
+		return {
+			id: column.field,
+			title: column.title,
+			...column.schema,
+		};
+	}
+
+	_route(cell) {
+		const route = ROUTES[this.kind];
+		const key = cell.closest("tr[data-key]")?.dataset.key;
+		return route && key ? route(key) : null;
+	}
+
+	_editRenderer() {
+		return {
+			readonly: false,
+			kind: this.kind,
+			id: "quick-edit",
+			mode: "edit",
+			cellEditing: true,
+			form: { target: this.rows.target },
+		};
+	}
+
+	_control(root) {
+		for (const selector of [
+			"input:not([type='hidden']):not([disabled])",
+			"textarea:not([disabled])",
+			"select:not([disabled])",
+		]) {
+			if (root.matches?.(selector)) return root;
+			const control = root.querySelector(selector);
+			if (control) return control;
+		}
+		return null;
+	}
+
+	_editableCells() {
+		return Array.from(
+			this.rows.target.querySelectorAll('td[data-editable="true"]'),
+		).filter((candidate) => this._schema(candidate) && this._route(candidate));
+	}
+
+	_isCheckboxCell(cell) {
+		return this._schema(cell)?.type === "checkbox";
+	}
+
+	_changed(edit) {
+		if (typeof edit.element.changed === "function") {
+			return edit.element.changed(edit.value);
+		}
+		return edit.element.value !== edit.value;
+	}
+
+	_renderValue(cell, html, { saved = false } = {}) {
+		const wrapper = document.createElement("div");
+		wrapper.dataset.editing = "false";
+		wrapper.dataset.role = "quick-edit-result";
+
+		const row = wrapper.appendChild(document.createElement("div"));
+		row.dataset.role = "quick-edit-value";
+
+		if (saved) {
+			const icon = row.appendChild(document.createElement("span"));
+			setIcon(icon, "check", "text-saved-default");
+			icon.dataset.role = "quick-edit-saved";
+		}
+
+		const content = row.appendChild(document.createElement("div"));
+		content.dataset.role = "quick-edit-content";
+		content.innerHTML = html;
+
+		cell.replaceChildren(wrapper);
+	}
+
+	_clearError(cell) {
+		cell.querySelector("[data-role='quick-edit-error']")?.remove();
+	}
+
+	_showError(cell, message) {
+		cell.dataset.editState = "error";
+
+		let error = cell.querySelector("[data-role='quick-edit-error']");
+		if (!error) {
+			error = document.createElement("p");
+			error.dataset.role = "quick-edit-error";
+			cell.appendChild(error);
+		}
+		error.textContent = message || "Could not save this value.";
+		this._control(cell)?.focus();
+	}
+
+	_editableCell(target) {
+		const cell = target.closest("td");
+		if (!this.visible || cell?.dataset.editable !== "true") return null;
+		if (!this._schema(cell) || !this._route(cell)) return null;
+		return cell;
+	}
+
+	async _openCheckboxes() {
+		this._cleanupCheckboxEdits();
+
+		await Promise.all(
+			this._editableCells()
+				.filter((cell) => this._isCheckboxCell(cell))
+				.map((cell) => this._openCheckbox(cell)),
+		);
+	}
+
+	async refreshCheckboxes() {
+		if (this.visible) await this._openCheckboxes();
+	}
+
+	async _openCheckbox(cell) {
+		if (this.checkboxEdits.has(cell)) return;
+
+		const schema = this._schema(cell);
+		const value = this._parseValue(cell);
+		const element = await getFormElement(this._editRenderer(), schema, value);
+		const editor = element.cell;
+		if (!editor) {
+			element.destroy();
+			return;
+		}
+
+		this.checkboxEdits.set(cell, {
+			before: cell.innerHTML,
+			cell,
+			column: this._column(cell),
+			element,
+			value,
+		});
+		cell.dataset.editState = "editing";
+		cell.replaceChildren(editor);
+	}
+
+	_cleanupCheckboxEdits() {
+		this.checkboxEdits.forEach((edit, cell) => {
+			if (cell.isConnected) return;
+			edit.element.destroy();
+			this.checkboxEdits.delete(cell);
+		});
+	}
+
+	_cancelCheckbox(cell) {
+		const edit = this.checkboxEdits.get(cell);
+		if (!edit) return;
+
+		if (cell.isConnected) {
+			cell.innerHTML = edit.before;
+			delete cell.dataset.editState;
+		}
+		edit.element.destroy();
+		this.checkboxEdits.delete(cell);
+	}
+
+	_cancelCheckboxes() {
+		Array.from(this.checkboxEdits.keys()).forEach((cell) => {
+			this._cancelCheckbox(cell);
+		});
+	}
+
+	async _click(e) {
+		if (!this.visible) return;
+
+		e.stopPropagation();
+
+		const cell = this._editableCell(e.target);
+		if (!cell) return;
+
+		if (this._isCheckboxCell(cell)) return;
+		if (this.activeEdit?.cell === cell) return;
+
+		e.preventDefault();
+		await this._open(cell);
+	}
+
+	async _change(e) {
+		if (!this.visible) return;
+
+		const cell = this._editableCell(e.target);
+		if (!cell || !this._isCheckboxCell(cell)) return;
+
+		e.stopPropagation();
+		if (!this.checkboxEdits.has(cell)) return;
+
+		if (
+			this.activeEdit &&
+			this.activeEdit.cell !== cell &&
+			!(await this._commit(this.activeEdit.cell))
+		) {
+			const control = this._control(cell);
+			const edit = this.checkboxEdits.get(cell);
+			if (control) control.checked = edit.value === true;
+			return;
+		}
+
+		await this._commitCheckbox(cell);
+	}
+
+	async _open(cell) {
+		if (this.activeEdit?.cell === cell) return;
+		if (this._isCheckboxCell(cell)) return;
+
+		if (this.activeEdit && !(await this._commit(this.activeEdit.cell))) {
+			return;
+		}
+
+		const schema = this._schema(cell);
+		const value = this._parseValue(cell);
+		const element = await getFormElement(this._editRenderer(), schema, value);
+		const editor = element.cell;
+		if (!editor) {
+			element.destroy();
+			return;
+		}
+
+		await withTransition(async () => {
+			cell.dataset.editState = "editing";
+			this.activeEdit = {
+				before: cell.innerHTML,
+				cell,
+				column: this._column(cell),
+				element,
+				value,
+			};
+			cell.replaceChildren(editor);
+		});
+
+		const control = this._control(editor);
+		control?.focus({ preventScroll: true });
+	}
+
+	async _keydown(e) {
+		if (!this.activeEdit) return;
+		if (!["Enter", "Escape", "Tab"].includes(e.key)) return;
+
+		const { cell } = this.activeEdit;
+		if (!cell.contains(e.target)) return;
+
+		e.preventDefault();
+		e.stopPropagation();
+
+		if (e.key === "Escape") {
+			this._cancel(cell);
+			return;
+		}
+
+		const committed = await this._commit(cell);
+		if (committed && e.key === "Tab") await this._focusNext(cell, e.shiftKey);
+	}
+
+	_nextEditableCell(cell, reverse = false) {
+		const cells = this._editableCells();
+		const index = cells.indexOf(cell);
+		if (index < 0) return null;
+
+		const offset = reverse ? -1 : 1;
+		return cells[index + offset] || null;
+	}
+
+	async _focusNext(cell, reverse = false) {
+		const next = this._nextEditableCell(cell, reverse);
+		next?.focus?.();
+		if (!next) return;
+		if (this._isCheckboxCell(next)) {
+			this._control(next)?.focus({ preventScroll: true });
+			return;
+		}
+		await this._open(next);
+	}
+
+	_cancel(cell) {
+		if (!this.activeEdit || this.activeEdit.cell !== cell) return;
+
+		cell.innerHTML = this.activeEdit.before;
+		delete cell.dataset.editState;
+		this.activeEdit.element.destroy();
+		this.activeEdit = null;
+	}
+
+	async _commit(cell) {
+		if (!this.activeEdit || this.activeEdit.cell !== cell) return false;
+
+		const edit = this.activeEdit;
+		const value = edit.element.value;
+		if (!this._changed(edit)) {
+			this._cancel(cell);
+			return true;
+		}
+
+		cell.dataset.editState = "saving";
+		this._clearError(cell);
+		const response = await request.patch(this._route(cell), {
+			schema_id: edit.element.schema.id,
+			value,
+			column: edit.column,
+		});
+
+		if (!response?.ok) {
+			this._showError(cell, response?.error);
+			return false;
+		}
+
+		this._renderValue(cell, response.html?.body?.innerHTML ?? "", {
+			saved: true,
+		});
+		cell.dataset.editValue = JSON.stringify(value);
+		cell.dataset.editState = "saved";
+		edit.element.destroy();
+		this.activeEdit = null;
+
+		setTimeout(() => {
+			if (cell.dataset.editState !== "saved") return;
+			delete cell.dataset.editState;
+			cell.querySelector("[data-role='quick-edit-saved']")?.remove();
+		}, SAVED_STATE_MS);
+
+		return true;
+	}
+
+	async _commitCheckbox(cell) {
+		const edit = this.checkboxEdits.get(cell);
+		if (!edit) return true;
+
+		const value = edit.element.value;
+		if (!this._changed(edit)) {
+			cell.dataset.editState = "editing";
+			this._clearError(cell);
+			return true;
+		}
+
+		cell.dataset.editState = "saving";
+		this._clearError(cell);
+		const response = await request.patch(this._route(cell), {
+			schema_id: edit.element.schema.id,
+			value,
+			column: edit.column,
+		});
+
+		if (!response?.ok) {
+			this._showError(cell, response?.error);
+			return false;
+		}
+
+		edit.before = response.html?.body?.innerHTML ?? edit.before;
+		edit.value = value;
+		cell.dataset.editValue = JSON.stringify(value);
+		cell.dataset.editState = "saved";
+
+		setTimeout(() => {
+			if (cell.dataset.editState === "saved") {
+				cell.dataset.editState = "editing";
+			}
+		}, SAVED_STATE_MS);
+
+		return true;
+	}
+
+	async postreconcile() {
+		const visibility = this.component.active;
+		const preserveForVisibility =
+			!this.visible &&
+			this.rows.target.dataset.editing === "true" &&
+			visibility?.name === "TableVisibility";
+		if (preserveForVisibility) {
+			this.visible = true;
+			visibility.preserveEditor?.(this);
+		}
+
+		if (!this.visible && this.activeEdit) this._cancel(this.activeEdit.cell);
+		if (!this.visible) {
+			this._cancelCheckboxes();
+		}
+
+		this.rows.target.dataset.editing = this.visible ? "true" : "false";
+		this.view.elt
+			.querySelectorAll('button[lp-show="table:TableEditor"]')
+			.forEach((button) => {
+				button.dataset.editing = this.visible ? "true" : "false";
+				button.setAttribute("aria-pressed", this.visible ? "true" : "false");
+			});
+
+		if (this.visible) await this._openCheckboxes();
+	}
+}
+
+export { TableEditor };

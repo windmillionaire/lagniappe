@@ -113,6 +113,8 @@
        data-index="category"
        data-key="{{ filtered.urlsafe_key if filtered and not filtered.temporary else category.urlsafe_key }}"
        data-fingerprint="{{ filtered.fingerprint if filtered and not filtered.temporary else category.fingerprint }}"
+       data-poll-channel="{{ poll_channel }}"
+       data-poll-revision="{{ poll_revision }}"
        data-hash="{{ filtered.hash if filtered else category.hash }}"
        class="group/view">
     <div class="{{ styles.layout.view.header }}">

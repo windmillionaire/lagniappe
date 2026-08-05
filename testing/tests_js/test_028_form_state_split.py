@@ -1377,10 +1377,10 @@ vm.runInContext(source, context);
 
 
 # @features reconnect-refresh edited-entity-notice forms
-# @dimensions visibility ordering stale-fingerprint dirty-form-preservation
+# @dimensions visibility ordering catch-up dirty-form-preservation
 # @pair offline:dirty-form-preservation
 # @pair offline:background-replay
-# @pair polling:nonblocking
+# @pairs polling:nonblocking polling:catch-up
 def test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay(
     run_node,
 ):
@@ -1482,6 +1482,9 @@ view.offlineQueue = {
   },
 };
 view.DeferredOperations = { nudge() { events.push("nudge"); } };
+view.PollingCoordinator = {
+  async catchUp() { events.push("catch-up"); },
+};
 view.EditWatcher = {
   async resume() {
     events.push("watcher");
@@ -1501,13 +1504,7 @@ view.refresh = async (navigation, options) => {
   if (outcome !== "synced") {
     throw new Error("Visibility sync waited for OfflineQueue replay");
   }
-  const expected = [
-    "nudge",
-    "watcher",
-    "replay",
-    "refresh:false:stale-root",
-    "register",
-  ];
+  const expected = ["watcher", "replay", "register", "catch-up"];
   if (JSON.stringify(events) !== JSON.stringify(expected)) {
     throw new Error(`Unexpected visibility order: ${JSON.stringify(events)}`);
   }

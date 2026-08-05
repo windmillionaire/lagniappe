@@ -763,6 +763,25 @@ def activity(parent, types=("note", "notification")):
 
 
 # @testable true
+# @tests tests_unit/test_025_notification_state.py::test_cold_seed_runs_one_keys_only_query_and_is_race_safe
+# @tests tests_unit/test_002j_notes.py::test_notification_keys_query_returns_only_ancestor_keys
+# @pairs notifications:cold-seed notifications:keys-only
+def notification_keys(parent):
+    """Fetch only notification keys in one ancestor query."""
+    parent_key = datastore_key(parent)
+    if not parent_key:
+        return []
+    records = (
+        Query(KINDS.activity)
+        .ancestor(parent_key)
+        .filter(Filter().eq("type", "notification"))
+        .keys_only()
+        .fetch_all()
+    )
+    return [record.key for record in records]
+
+
+# @testable true
 # @tests tests_unit/test_002j_notes.py::test_home_notes_return_only_visible_notes
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_note_visibility_across_users
 # @features notes permissions

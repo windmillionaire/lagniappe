@@ -31,6 +31,7 @@ Test Isolation Strategy:
     without data collision. Cleanup happens in conftest.py teardown.
 """
 
+import json
 from urllib.parse import urlsplit
 
 import pytest
@@ -39,6 +40,7 @@ from playwright.sync_api import expect
 
 from config import SETTINGS
 from lagniappe import CONFIG
+from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache, database
 
 from testing.definitions import SitePages, Users
@@ -168,6 +170,48 @@ def test_server_running(get_user):
     user.go(SitePages.PING)
 
     expect(user.locate("body")).to_contain_text("pong")
+
+
+# @pairs notifications:ping notifications:redis-projection
+# @pair web-headers:notification-state
+def test_ping_notification_state_is_redis_only_and_optional(get_user):
+    """A real notification reaches a reloaded page through the ping header."""
+    user = get_user(Users.OWNER)
+    user.go(SitePages.HOME)
+    notification = Entities.NOTIFICATION.create(
+        {
+            "parent": user.entity,
+            "body": "Ping projection notification",
+        }
+    )
+    Entities.save(notification)
+
+    notification_requests = []
+
+    def record_request(request):
+        if urlsplit(request.url).path == "/notifications":
+            notification_requests.append(request.url)
+
+    user.page.on("request", record_request)
+    with user.page.expect_response(
+        lambda response: (
+            urlsplit(response.url).path == "/ping"
+            and response.request.method == "HEAD"
+        )
+    ) as ping_info:
+        user.page.reload()
+
+    state = json.loads(
+        ping_info.value.headers["x-lagniappe-notification-state"]
+    )
+    assert isinstance(state["generation"], str)
+    assert state["revision"] >= 1
+    assert state["count"] == 1
+    expect(user.page.locator("[data-role='notification-count']")).to_have_text("1")
+    expect(user.page.locator("[data-role='notifications']")).to_have_attribute(
+        "data-visible", "true"
+    )
+    assert notification_requests == []
 
 
 # @pairs web-headers:etag web-headers:security web-headers:conditional-request

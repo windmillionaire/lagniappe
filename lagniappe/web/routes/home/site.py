@@ -11,7 +11,7 @@ from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database, site_image
+from lagniappe.core.tools import cache, database, site_image
 from lagniappe.core.tools.ai_settings import runtime_ai_settings
 from lagniappe.core.tools.database import migrations as database_migrations
 from lagniappe.core.tools.site_admin import (
@@ -306,11 +306,22 @@ def set_site_image_direct():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_server_running
+# @tests tests_e2e/001_site/test_001a_environment.py::test_ping_notification_state_is_redis_only_and_optional
 # @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
 # @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
+# @pairs notifications:ping notifications:redis-projection
+# @pair web-headers:notification-state
 @home.route("/ping")
 def ping():
     g.NO_CACHE = True
+    user_key = session.get(CONFIG.LOGIN_USER_KEY) if session.get("_user_id") else None
+    if user_key:
+        try:
+            responses.publish_notification_state(
+                cache.peek_notification_state(user_key)
+            )
+        except Exception as error:
+            exceptions.capture(error, context={"operation": "notification-state-peek"})
     return "pong", 200
 
 

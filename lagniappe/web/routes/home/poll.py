@@ -9,7 +9,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
 from lagniappe.core.tools.deferred_jobs import deferred_job_lock_descriptors
 from lagniappe.core.tools.polling import (
-    channel_revision as _channel_revision,
+    channel_revisions as _channel_revisions,
     lock_result as _project_lock_result,
     operation_statuses as _operation_statuses,
 )
@@ -36,6 +36,7 @@ CHANNELS = frozenset(
         "users",
         "ingress",
         "home",
+        "home-notes",
         "notifications",
         "starred",
         "tool-reports",
@@ -53,6 +54,7 @@ POLL_AFTER_MS = {
 
 # @testable true
 # @tests tests_e2e/001_site/test_001f_edited_entities.py::test_poll_endpoint_batches_entity_changes
+# @tests tests_e2e/001_site/test_001f_edited_entities.py::test_cold_notification_state_seeds_through_one_poll
 # @features polling
 # @dimensions protocol validation batching identifiers
 def _descriptors(payload):
@@ -175,7 +177,35 @@ def _descriptors(payload):
         )
     ):
         return None
-    return client_id, normalized, list(dict.fromkeys(closed))
+    notification_state = payload.get("notification_state")
+    if notification_state is not None:
+        if not isinstance(notification_state, dict):
+            return None
+        generation = notification_state.get("generation")
+        revision = notification_state.get("revision")
+        seed = notification_state.get("seed", False)
+        if (
+            (
+                generation is not None
+                and (not isinstance(generation, str) or len(generation) > 128)
+            )
+            or (
+                revision is not None
+                and (
+                    isinstance(revision, bool)
+                    or not isinstance(revision, int)
+                    or revision < 0
+                )
+            )
+            or not isinstance(seed, bool)
+        ):
+            return None
+        notification_state = {
+            "generation": generation,
+            "revision": revision,
+            "seed": seed,
+        }
+    return client_id, normalized, list(dict.fromkeys(closed)), notification_state
 
 
 # @testable false
@@ -270,10 +300,13 @@ def _document_result(descriptor, entity, client_id):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001f_edited_entities.py::test_poll_endpoint_batches_entity_changes
+# @tests tests_e2e/001_site/test_001f_edited_entities.py::test_cold_notification_state_seeds_through_one_poll
 # @tests tests_e2e/002_home/test_002o_deferred_jobs.py::test_poll_operation_is_owner_safe
 # @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_presence_appears_and_clears
 # @features polling
 # @dimensions protocol entity channel operation document presence permissions authorization fingerprint unavailable owner batching progress revision timing lifecycle
+# @pairs notifications:cold-seed notifications:ping notifications:redis-projection
+# @pairs polling:personal-state polling:piggyback web-headers:notification-state
 @home.route("/poll", methods=["POST"])
 @logged_in
 def poll():
@@ -281,14 +314,23 @@ def poll():
     parsed = _descriptors(request.get_json(silent=True) or {})
     if parsed is None:
         return responses.error("Invalid polling request.")
-    client_id, descriptors, closed_documents = parsed
+    client_id, descriptors, closed_documents, notification_request = parsed
     if closed_documents:
         cache.close_presence(client_id, closed_documents)
 
+    grouped = {
+        subscription_type: [
+            descriptor
+            for descriptor in descriptors
+            if descriptor["type"] == subscription_type
+        ]
+        for subscription_type in POLL_TYPES
+    }
+
     entity_keys = [
         descriptor["key"]
-        for descriptor in descriptors
-        if descriptor["type"] in {"entity", "form-lock", "document", "ingress"}
+        for subscription_type in ("entity", "form-lock", "document", "ingress")
+        for descriptor in grouped[subscription_type]
     ]
     entities = {
         entity.urlsafe_key: entity
@@ -297,9 +339,7 @@ def poll():
         )
     }
     lock_entities = [
-        entities.get(descriptor["key"])
-        for descriptor in descriptors
-        if descriptor["type"] == "form-lock"
+        entities.get(descriptor["key"]) for descriptor in grouped["form-lock"]
     ]
     lock_entities = [
         entity
@@ -308,12 +348,38 @@ def poll():
         and entity.allowed(Action.EDIT, user=current_user)
         and isinstance(entity, (Entities.PAGE, Entities.TASK))
     ]
-    active_locks = deferred_job_lock_descriptors(lock_entities)
+    active_locks = deferred_job_lock_descriptors(lock_entities) if lock_entities else {}
 
-    operation_revision, operation_statuses = _operation_statuses(
-        descriptors,
-        current_user,
+    operation_revision, operation_statuses = (
+        _operation_statuses(grouped["operation"], current_user)
+        if grouped["operation"]
+        else (int(getattr(current_user, "operation_revision", 0) or 0), {})
     )
+
+    channels = [
+        descriptor["channel"]
+        for descriptor in grouped["channel"]
+        if descriptor["channel"] != "notifications"
+    ]
+    channel_revisions = _channel_revisions(channels, current_user)
+
+    notification_state = None
+    notification_requested = notification_request is not None
+    legacy_notifications = any(
+        descriptor["channel"] == "notifications" for descriptor in grouped["channel"]
+    )
+    if notification_requested or legacy_notifications:
+        try:
+            notification_state = cache.peek_notification_state(current_user)
+            should_seed = legacy_notifications or notification_request.get("seed")
+            if notification_state is None and should_seed:
+                notification_state = cache.seed_notification_state(current_user)
+            responses.publish_notification_state(notification_state)
+        except Exception as error:
+            exceptions.capture(
+                error,
+                context={"operation": "poll_notification_state"},
+            )
 
     results = []
     for descriptor in descriptors:
@@ -338,7 +404,14 @@ def poll():
                     user=current_user,
                 )
             elif subscription_type == "channel":
-                revision = _channel_revision(descriptor["channel"], current_user)
+                if descriptor["channel"] == "notifications":
+                    revision = (
+                        f"{notification_state['generation']}:{notification_state['revision']}"
+                        if notification_state
+                        else "missing"
+                    )
+                else:
+                    revision = channel_revisions[descriptor["channel"]]
                 result = _revision_result(
                     descriptor,
                     revision,

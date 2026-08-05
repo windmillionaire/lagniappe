@@ -23,6 +23,12 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
+from lagniappe.core.tools import cache
+from lagniappe.core.tools.polling import (
+    channel_revision,
+    channel_revisions,
+    render_operation_statuses,
+)
 from lagniappe.core.tools.refresh import page_task_roots
 
 
@@ -105,6 +111,12 @@ def json_response(data, status=200):
     return jsonify(data), status
 
 
+# @testable infrastructure
+def publish_notification_state(state):
+    """Attach compact notification state to the current response lifecycle."""
+    g.NOTIFICATION_STATE = cache.public_notification_state(state)
+
+
 # @testable true
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
 # @pair web-headers:local-save
@@ -150,11 +162,23 @@ def index(name, index):
         if name in {"forms", "tasks", "users"}
         else None
     )
+    poll_channel = "categories" if name == "categories" else name
+    poll_revision = (
+        channel_revision(
+            poll_channel,
+            current_user,
+            site_fingerprints={f"/{name}/index": fingerprint},
+        )
+        if fingerprint
+        else channel_revisions((poll_channel,), current_user)[poll_channel]
+    )
     return (
         render_template(
             f"{name}/index.html",
             index=index,
             fingerprint=fingerprint,
+            poll_channel=poll_channel,
+            poll_revision=poll_revision,
         ),
         200,
     )
@@ -585,14 +609,26 @@ def deferred_tool_report(report, notification, job=None):
     )
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/tools/main.py::report
+# @reason report route coverage owns status hydration and full-page rendering
 def tool_report(report):
+    render_operation_statuses((report,), current_user)
     return render_template("tools/report.html", report=report), 200
 
 
 # @testable false
 # @covered-by lagniappe/web/routes/home/main.py::home_page
 def home_page(home):
-    return render_template("home/home.html", home=home), 200
+    poll_revisions = channel_revisions(("home-notes", "tasks"), current_user)
+    return (
+        render_template(
+            "home/home.html",
+            home=home,
+            poll_revisions=poll_revisions,
+        ),
+        200,
+    )
 
 
 # @testable true

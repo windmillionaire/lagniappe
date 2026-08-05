@@ -125,47 +125,66 @@ def test_form_field_membership_uses_the_attached_schema():
     assert not form_state.is_form_field(entity, "task-setting")
 
 
-# @pairs polling:channel polling:revision polling:permissions
-# @pairs notifications:personal-activity notifications:revision notifications:datastore-read-isolation
-def test_notification_channel_revision_uses_loaded_user_only():
+# @pairs polling:channel polling:revision polling:permissions polling:mounted-scope polling:batching
+def test_channel_revisions_batch_only_requested_site_fingerprints():
     user = SimpleNamespace(
         fingerprint="unchanged-user-fingerprint",
         permissions_fingerprint="unchanged-permissions",
-        notification_revision=4,
+    )
+    loads = []
+
+    def load(paths):
+        loads.append(tuple(paths))
+        return {path: f"site:{path}" for path in paths}
+
+    revisions = polling.channel_revisions(
+        ("home-notes", "tasks", "starred", "tasks"),
+        user,
+        fingerprint_loader=load,
     )
 
-    before = polling.channel_revision(
-        "notifications",
-        user,
-        site_fingerprint=lambda _path: (_ for _ in ()).throw(
-            AssertionError("notification revision read a site fingerprint")
-        ),
-    )
-    user.notification_revision += 1
-    after = polling.channel_revision("notifications", user)
+    assert set(revisions) == {"home-notes", "tasks", "starred"}
+    assert loads == [("/", "/tasks/index")]
 
-    assert before != after
+    starred_before = revisions["starred"]
+    home_before = revisions["home-notes"]
+    user.fingerprint = "changed-user-fingerprint"
+    changed = polling.channel_revisions(
+        ("home-notes", "starred"),
+        user,
+        fingerprint_loader=load,
+    )
+    assert changed["starred"] != starred_before
+    assert changed["home-notes"] == home_before
 
-    fingerprints = []
-    home_before = polling.channel_revision(
-        "home",
-        user,
-        site_fingerprint=lambda path: fingerprints.append(path) or f"site:{path}",
-    )
-    user.permissions_fingerprint = "changed-permissions"
-    home_after = polling.channel_revision(
-        "home",
-        user,
-        site_fingerprint=lambda path: f"site:{path}",
-    )
-    assert home_before != home_after
-    assert fingerprints == [
-        "/",
-        "/categories/index",
-        "/projects/index",
-        "/pages/index",
-        "/tasks/index",
+
+# @pairs deferred-jobs:server-render deferred-jobs:status polling:batching
+# @source lagniappe/core/tools/polling.py::render_operation_statuses
+def test_render_operation_statuses_batches_and_attaches_known_jobs():
+    reports = [
+        SimpleNamespace(deferred_job={"key": f"job-{index}"})
+        for index in range(51)
     ]
+    loads = []
+
+    def load(keys, user):
+        loads.append((list(keys), user))
+        return [{"key": key, "revision": 3, "status": "running"} for key in keys]
+
+    statuses = polling.render_operation_statuses(
+        reports,
+        "viewer",
+        status_loader=load,
+    )
+
+    assert [len(keys) for keys, _user in loads] == [50, 1]
+    assert all(user == "viewer" for _keys, user in loads)
+    assert len(statuses) == 51
+    assert reports[0]._operation_status == {
+        "key": "job-0",
+        "revision": 3,
+        "status": "running",
+    }
 
 
 # @pairs polling:revision polling:batching deferred-jobs:datastore-read-isolation

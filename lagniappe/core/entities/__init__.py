@@ -240,22 +240,6 @@ class EntityRegistry:
             plan_document_parent_touch(entity, registry=self)
         )
 
-    # @testable true
-    # @tests tests_unit/test_022_mutation_contracts.py::test_advance_notifications_only_updates_personal_revision
-    # @pairs notifications:personal-activity notifications:revision notifications:cache-isolation
-    # @pairs polling:personal-activity polling:revision
-    def advance_notifications(self, *users):
-        """Advance notification polling state without changing user fingerprints."""
-        users = tuple(user for user in users if hasattr(user, "db"))
-        return execute_mutation(
-            plan_root(
-                *users,
-                property_mask=("notification_revision",),
-                property_updates=("notification_revision",),
-            )
-        )
-
-
 Entities = EntityRegistry()
 
 

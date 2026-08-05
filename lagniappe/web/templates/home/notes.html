@@ -4,11 +4,16 @@
   {{ note_ui.composer(url_for('home.create_note'), 'notes:HomeActivityList', 'notes', 'home', true) }}
 {% endmacro %}
 
-{% macro list(notes) %}
+{% macro list(notes, poll_revision=none) %}
   <ul lp-prefetch
+      loaded
       data-widget="HomeActivityList"
       data-route='{{ url_for("home.activity") }}'
       data-if-empty="CreateNote"
+      {% if poll_revision %}
+        data-poll-channel="home-notes"
+        data-poll-revision="{{ poll_revision }}"
+      {% endif %}
       data-visible="false"
       class="{{ styles.note.list.home }}">
     {% for n in notes.list %}{{ note_item(n) }}{% endfor %}

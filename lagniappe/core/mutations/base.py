@@ -201,6 +201,22 @@ class MutationPlanBuilder:
         self._add_entity_cache_effect(MutationEffectType.CACHE_DELETE, entity, reason)
 
     # @testable infrastructure
+    def notification_upsert(self, entity, *, reason):
+        self._add_entity_cache_effect(
+            MutationEffectType.NOTIFICATION_UPSERT,
+            entity,
+            reason,
+        )
+
+    # @testable infrastructure
+    def notification_delete(self, entity, *, reason):
+        self._add_entity_cache_effect(
+            MutationEffectType.NOTIFICATION_DELETE,
+            entity,
+            reason,
+        )
+
+    # @testable infrastructure
     def clear_cache_state(self, cache_key, *, reason):
         if not cache_key:
             return
@@ -354,6 +370,7 @@ class MutationPlanBuilder:
                     MutationEffectType.UNLINK,
                     MutationEffectType.CACHE_REFRESH,
                     MutationEffectType.CACHE_SEARCH_DELETE,
+                    MutationEffectType.NOTIFICATION_UPSERT,
                 }
             )
         ]

@@ -858,37 +858,27 @@ def test_logout_clears_session_and_returns_login(get_user):
 
 
 # @features login
-# @dimensions logout invalidation ajax
+# @dimensions logout invalidation control redirect
 # @pair cache:invalidation-acknowledgement
 def test_logout_flags_user_cache_invalidation(get_user):
-    """AJAX logout should expose invalidation before the session is cleared."""
+    """The logout control should expose invalidation and navigate to login."""
     owner = get_user(Users.OWNER)
     user = get_user(Users.logout_ajax, creator=owner)
-    user.go(SitePages.HOME)
+    user.go(SitePages.LOGIN_PAGE)
+    logout = user.page.get_by_role("button", name="Logout")
+    expect(logout).to_be_visible()
 
-    response = user.page.evaluate(
-        """async () => {
-            const response = await fetch("/users/logout", {
-                method: "POST",
-                credentials: "include",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": document.getElementById("token")?.value,
-                    "X-Lagniappe-Request": "true",
-                },
-                body: JSON.stringify({}),
-            });
-            return {
-                status: response.status,
-                invalidate: response.headers.get("X-Lagniappe-Invalidate-Cache"),
-                json: await response.json(),
-            };
-        }"""
-    )
+    with user.page.expect_response(
+        lambda response: (
+            response.url.endswith("/users/logout")
+            and response.request.method == "POST"
+        )
+    ) as logout_info, user.page.expect_navigation():
+        logout.click()
 
-    assert response["status"] == 200
-    assert response["json"]["redirect"] == "/users/login"
-    assert response["invalidate"] == "True"
+    response = logout_info.value
+    assert response.status == 200
+    assert response.headers["x-lagniappe-invalidate-cache"] == "True"
 
     saved_user = Entities.USER.load(user.email)
     assert saved_user.invalidate_cache is True

@@ -19,10 +19,16 @@ export class Notifications {
 		this.button = document.querySelector("[data-role='notifications']");
 		this.count = document.querySelector("[data-role='notification-count']");
 		this.notifications = [];
+		this.loaded = false;
+		this.stale = false;
+		this.menuOpen = false;
+		this.state = null;
+		this.localMutation = false;
 
 		this._selectNotification = this._selectNotification.bind(this);
 		this._clearNotifications = this._clearNotifications.bind(this);
 		this._closeOnNotificationClick = this._closeOnNotificationClick.bind(this);
+		this._notificationState = this._notificationState.bind(this);
 	}
 
 	get visible() {
@@ -38,40 +44,61 @@ export class Notifications {
 		if (!this.button) return;
 
 		this.notifications = this.notifications.concat(notifications);
+		this.loaded = notifications.length > 0;
+		this.state = window.__NOTIFICATION_STATE__ || null;
 		this.dropdown = new Dropdown(this.button).init({
-			items: this._dropdownItems(),
+			items: [],
+			loadOptions: async () => {
+				await this._ensureLoaded();
+				return this._dropdownItems();
+			},
+			onShow: () => {
+				this.menuOpen = true;
+			},
+			onHide: () => {
+				this.menuOpen = false;
+			},
 			placement: "bottom-end",
 			styles: {
 				panel: `${STYLES.dropdown.panel} mt-2 w-80 max-w-[calc(100vw-1rem)] sm:w-96`,
 			},
 		});
 		this._updateCount();
-		this._unsubscribe = this.view.PollingCoordinator?.subscribe(
-			{
-				id: "personal:notifications",
-				type: "channel",
-				channel: "notifications",
-				revision: null,
-			},
-			{
-				onResult: async (result) => {
-					if (result.status !== "changed") return;
-					if (!(await this.refresh())) return false;
-					return true;
-				},
-			},
+		window.addEventListener("notification-state", this._notificationState);
+	}
+
+	async _notificationState(event) {
+		const next = event?.detail;
+		if (!next || next.miss) return;
+		const changed = Boolean(
+			this.state &&
+				(this.state.generation !== next.generation ||
+					this.state.revision !== next.revision),
 		);
+		this.state = { ...next };
+		if (changed && this.loaded && !this.localMutation) this.stale = true;
+		this._updateCount();
+		if (this.stale && this.menuOpen) await this.refresh();
+	}
+
+	async _ensureLoaded() {
+		if (this.loaded && !this.stale) return true;
+		return await this.refresh();
 	}
 
 	/**
 	 * @testable false
-	 * @manual true
+	 * @covered-by src/script/elements/notifications.mjs::Notifications
 	 * @reason pending/completed replacement is covered through dropdown refresh
 	 * @features notifications
 	 * @dimensions upsert pending-complete
 	 */
 	upsertNotification(html) {
 		if (!this.dropdown || !html) return;
+		if (!this.loaded) {
+			this.stale = true;
+			return;
+		}
 
 		const option = this._notificationOption(html);
 		const index = option.key
@@ -93,6 +120,8 @@ export class Notifications {
 		if (!response?.ok || !response.html) return false;
 
 		this.notifications = this._optionsFromHtml(response.html);
+		this.loaded = true;
+		this.stale = false;
 		this._updateDropdown();
 		return true;
 	}
@@ -171,20 +200,32 @@ export class Notifications {
 	async _clearNotifications() {
 		if (!this.notifications.length) return;
 
-		const response = await request.delete(ENDPOINTS.notifications);
+		this.localMutation = true;
+		const response = await request
+			.delete(ENDPOINTS.notifications)
+			.finally(() => {
+				this.localMutation = false;
+			});
 		if (!response?.ok) return;
 
 		this.notifications = [];
+		this.stale = false;
 		this._updateDropdown();
 	}
 
 	async _deleteNotification(key) {
 		if (!key) return;
 
-		const response = await request.delete(ENDPOINTS.activity(key));
+		this.localMutation = true;
+		const response = await request
+			.delete(ENDPOINTS.activity(key))
+			.finally(() => {
+				this.localMutation = false;
+			});
 		if (!response?.ok) return;
 
 		this.notifications = this.notifications.filter((item) => item.key !== key);
+		this.stale = false;
 		this._updateDropdown();
 	}
 
@@ -196,7 +237,15 @@ export class Notifications {
 	}
 
 	_updateCount() {
-		const count = this.notifications.length;
+		const projected = Number(this.state?.count);
+		const count =
+			this.stale && Number.isInteger(projected)
+				? projected
+				: this.loaded
+					? this.notifications.length
+					: Number.isInteger(projected)
+						? projected
+						: 0;
 		if (this.count) this.count.textContent = count;
 		if (this.button) {
 			this.button.setAttribute("aria-label", `Notifications: ${count}`);
@@ -205,8 +254,7 @@ export class Notifications {
 	}
 
 	destroy() {
-		this._unsubscribe?.();
-		this._unsubscribe = null;
+		window.removeEventListener("notification-state", this._notificationState);
 		this.dropdown?.destroy?.();
 		this.dropdown = null;
 	}
