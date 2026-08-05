@@ -96,7 +96,7 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_user, browser_fail
     expect(option).to_be_visible()
     expect(option.locator("[data-role='target']")).to_contain_text(updated_name)
 
-    with owner.page.expect_response("**/activity/*"):
+    with owner.page.expect_response("**/l/activity/*"):
         option.locator("[data-action='delete-notification']").click()
     expect(option).not_to_be_attached()
 

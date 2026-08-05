@@ -103,13 +103,13 @@ with browser_failures.expect(
     user,
     kind="requestfailed",
     method="POST",
-    path="/sync",
+    path="/l/sync",
 ):
     reconnect()
 ```
 
 For a native offline transition, use the convenience scope. It requires the
-one failed `HEAD /ping` request and its browser console error, so an offline
+one failed `HEAD /l/ping` request and its browser console error, so an offline
 test cannot silently stop exercising the connection boundary:
 
 ```python

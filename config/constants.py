@@ -1,5 +1,5 @@
 SENTRY_DSN = "https://6ad2f168c5abc9f35de261d98b588633@o4511027028033536.ingest.us.sentry.io/4511218693242880"
-BUILD_ID = "bed962f9"
+BUILD_ID = "bfd37afb"
 RUNTIME = "python314"
 DEFAULT_EXPIRATION = "31536000s"
 DEFAULT_APP_ENGINE_LOCATION = "us-central"
@@ -433,6 +433,7 @@ DEPLOYER_PROJECT_ROLES = [
 ]
 
 RUNTIME_PROJECT_ROLES = [
+    "roles/cloudscheduler.admin",
     "roles/datastore.user",
     "roles/firebaseauth.editor",
     "roles/cloudtasks.enqueuer",
@@ -533,6 +534,39 @@ SCREENSHOTS = [
     },
 ]
 
+
+# Keep these path families aligned with the registered Flask blueprints, the
+# unprefixed home routes, and App Engine's lifecycle routes. Requests outside
+# this allowlist fall through to the final static 404 handler without starting
+# the application runtime.
+APP_BLUEPRINT_ROUTE_PREFIXES = (
+    "analytics",
+    "assets",
+    "categories",
+    "files",
+    "filters",
+    "forms",
+    "l",
+    "manual",
+    "pages",
+    "process",
+    "projects",
+    "reference",
+    "tasks",
+    "testing",
+    "tools",
+    "users",
+)
+
+APP_ROOT_ROUTE_PREFIXES = (
+    "_ah",
+    "admin",
+    "offline",
+    "privacy-policy",
+    "reporting_privacy",
+)
+
+
 APP_HANDLERS = [
     {
         "url": "/(.*\\.css)$",
@@ -624,10 +658,37 @@ APP_HANDLERS = [
         "upload": "lagniappe/web/static/manifest.json",
         "mime_type": "application/manifest+json",
     },
+]
+
+APP_HANDLERS.extend(
     {
-        "url": "/.*",
+        "url": f"/{prefix}(/.*)?$",
         "script": "auto",
         "secure": "always",
         "redirect_http_response_code": 301,
-    },
-]
+    }
+    for prefix in (*APP_BLUEPRINT_ROUTE_PREFIXES, *APP_ROOT_ROUTE_PREFIXES)
+)
+
+APP_HANDLERS.extend(
+    [
+        {
+            "url": "/$",
+            "script": "auto",
+            "secure": "always",
+            "redirect_http_response_code": 301,
+        },
+        {
+            "url": "/(.*)$",
+            "mime_type": "text/html; charset=utf-8",
+            "secure": "always",
+            "static_files": "lagniappe/web/static/404.html",
+            "upload": "lagniappe/web/static/404.html",
+            "expiration": "0s",
+            "http_headers": {
+                "Cache-Control": "no-store",
+                "X-Robots-Tag": "noindex, nofollow",
+            },
+        },
+    ]
+)

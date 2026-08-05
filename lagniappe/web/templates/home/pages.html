@@ -34,7 +34,7 @@
 {% macro list(pages) %}
   {% set can_create_pages = current_user.properties.restrictions.category_edit_restrictions %}
   <ul data-widget="HomePageList"
-      data-route='{{ url_for("home.get", kind="pages") }}'
+      data-route='{{ url_for("internal.get", kind="pages") }}'
       data-visible="false"
       data-if-empty="{{ 'CreatePage' if can_create_pages else '' }}"
       class="{{ styles.home.card.list }}">
@@ -44,14 +44,14 @@
         {% if pages.back %}
           <button class="{{ styles.home.pagination.button }} bg-page-bg/50"
                   lp-control="previous"
-                  data-route='{{ url_for("home.get", kind="pages", cursor=None) }}'>
+                  data-route='{{ url_for("internal.get", kind="pages", cursor=None) }}'>
             {{ render_icon("start") }}
           </button>
         {% endif %}
         {% if pages.cursor %}
           <button class="{{ styles.home.pagination.button }} bg-page-bg/50"
                   lp-control="next"
-                  data-route='{{ url_for("home.get", kind="pages", cursor=pages.cursor) }}'>
+                  data-route='{{ url_for("internal.get", kind="pages", cursor=pages.cursor) }}'>
             {{ render_icon("next") }}
           </button>
         {% endif %}

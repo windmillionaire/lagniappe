@@ -3445,7 +3445,7 @@ def test_installer_bucket_permission_preflight_uses_bucket_resource(monkeypatch)
     assert "active installer account" in message
 
 
-def test_runtime_role_plan_excludes_provisioning_and_administration():
+def test_runtime_role_plan_limits_administration_to_owned_scheduler_lifecycle():
     constants = _load_config_constants()
 
     assert "iam.serviceAccountKeys.create" not in (
@@ -3457,6 +3457,7 @@ def test_runtime_role_plan_excludes_provisioning_and_administration():
     runtime_roles = set(constants.RUNTIME_PROJECT_ROLES)
     assert runtime_roles.isdisjoint(constants.REMOVED_RUNTIME_PROJECT_ROLES)
     assert {
+        "roles/cloudscheduler.admin",
         "roles/cloudtasks.enqueuer",
         "roles/cloudtasks.taskDeleter",
         "roles/firebaseauth.editor",

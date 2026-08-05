@@ -28,7 +28,7 @@
 
 {% macro list(tasks) %}
   <ul data-widget="HomeTaskList"
-      data-route='{{ url_for("home.get", kind="tasks") }}'
+      data-route='{{ url_for("internal.get", kind="tasks") }}'
       data-visible="false"
       data-if-empty="CreateUserTask"
       class="{{ styles.home.card.list }}">

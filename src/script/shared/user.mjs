@@ -13,7 +13,7 @@ export async function updateUserData() {
 
 	sessionStorage.setItem("timezone_sent", currentTimezone);
 	const response = await request.post(
-		"/update-session",
+		"/l/update-session",
 		{ timezone: currentTimezone },
 		{ keepalive: true },
 	);
@@ -52,7 +52,7 @@ function _getCurrentPosition(options) {
 async function _updateUserLocation(newLocation) {
 	localStorage.setItem("location", JSON.stringify(newLocation));
 	await request.post(
-		"/update-session",
+		"/l/update-session",
 		{ location: newLocation },
 		{ keepalive: true },
 	);

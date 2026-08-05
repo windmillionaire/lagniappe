@@ -480,7 +480,7 @@ def test_public_manual_loads_without_login_or_auth_bootstrap(get_user):
 
     def track_auth_bootstrap(request):
         path = urlparse(request.url).path
-        if path in {"/update-session", "/poll", "/sync"}:
+        if path in {"/l/update-session", "/l/poll", "/l/sync"}:
             auth_bootstrap_paths.append(path)
 
     anonymous.page.on("request", track_auth_bootstrap)

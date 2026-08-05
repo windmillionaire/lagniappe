@@ -166,7 +166,7 @@ create form declares `data-deferred-status="false"`, so the coordinator tracks
 its operation without ever decorating that source form. Status is presented by
 the destination report-list item and the pending/completed notification. The
 shared polling coordinator includes operation descriptors in its bounded
-`POST /poll` batch. The owner-authorized result carries the current durable
+`POST /l/poll` batch. The owner-authorized result carries the current durable
 status revision and applies jittered backoff from roughly four to 30 seconds.
 Each descriptor also retains the user's last-seen operation revision; when it
 matches the user already loaded for the request, the server acknowledges the
@@ -271,10 +271,10 @@ Collection widgets explicitly opt into generic refresh with
 `refreshScope = "collection"`. `Core.refreshCollections()` batches supported
 table/list manifests and falls back to their normal GET routes; forms are never
 generic refresh targets. It does not refresh the notification list. Index roots
-carry a raw `data-fingerprint` for `/refresh` and separate
+carry a raw `data-fingerprint` for `/l/refresh` and separate
 `data-poll-channel`/`data-poll-revision` attributes for the opaque collection
 cursor, preventing raw-versus-opaque false changes. Index collection channels
-have no idle timer and invoke `/refresh` only after a changed foreground
+have no idle timer and invoke `/l/refresh` only after a changed foreground
 catch-up result. Active visible, dirty, queued, and staged-review task
 rows are also protected from collection replacement, so the parent Page refresh
 cannot replace a TaskForm before its entity revision is reviewed. Hidden clean
@@ -286,7 +286,7 @@ delete removes elements with that exact entity key before collection and
 supplemental-navigation refresh, allowing non-collection selectors to reconcile
 without restoring widget-specific message handlers.
 
-The same `/poll` batch independently carries active durable `form-lock`
+The same `/l/poll` batch independently carries active durable `form-lock`
 results. PageInfo and TaskForm reconstruct their lock/progress state from those
 results on reload or in another tab even when their committed fingerprint is
 unchanged. This recovery does not register the form with `SyncManager`.
@@ -301,9 +301,9 @@ TaskForm, TaskSettings, and CategoryInfo use focused edit markers; TaskMove and
 TaskCombine remain action forms and are deliberately excluded.
 
 The notification badge is driven by `X-Lagniappe-Notification-State`, parsed by
-the initial/focus/ten-minute `/ping` and by the shared request wrapper. The
+the initial/focus/ten-minute `/l/ping` and by the shared request wrapper. The
 header contains only Redis generation, revision, and count. The menu module can
-therefore initialize lazily without fetching `/notifications`: its first open
+therefore initialize lazily without fetching `/l/notifications`: its first open
 loads the list, a changed cursor marks an already-loaded list stale, and a stale
 list refreshes immediately only when the menu is open. Create/delete/clear
 responses carry the resulting state so the originating tab updates its badge
@@ -430,7 +430,7 @@ Delegates to `view.load(this)` to fetch data. Passes the response to `active.upd
 ### `refreshCollections()`
 
 Refreshes loaded widgets only when they declare `refreshScope = "collection"`.
-Widgets already reconciled by the batched `/refresh` manifest are skipped;
+Widgets already reconciled by the batched `/l/refresh` manifest are skipped;
 remaining collection widgets use their normal GET/`refresh()` path. Form widgets
 are outside this contract and are reconciled by `EditWatcher`.
 

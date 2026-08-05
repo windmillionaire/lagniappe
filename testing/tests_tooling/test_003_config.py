@@ -1,5 +1,6 @@
 """Tooling smoke tests for load-bearing config surfaces."""
 
+import ast
 import importlib
 import importlib.util
 import json
@@ -523,6 +524,121 @@ def test_app_engine_pdfjs_wasm_handlers_precede_general_js():
 
     assert wasm_handler["mime_type"] == "application/wasm"
     assert pdfjs_index < general_js_index
+
+
+def test_app_engine_dynamic_handler_allowlist_covers_registered_routes():
+    repository_root = Path(__file__).resolve().parents[2]
+    constants_path = repository_root / "config" / "constants.py"
+    spec = importlib.util.spec_from_file_location(
+        "lagniappe_constants_under_test",
+        constants_path,
+    )
+    constants = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(constants)
+
+    blueprint_tree = ast.parse(
+        (repository_root / "lagniappe/web/start/blueprints.py").read_text()
+    )
+    blueprint_prefixes = {
+        keyword.value.value.removeprefix("/")
+        for node in ast.walk(blueprint_tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "register_blueprint"
+        for keyword in node.keywords
+        if keyword.arg == "url_prefix"
+        and isinstance(keyword.value, ast.Constant)
+        and isinstance(keyword.value.value, str)
+    }
+    assert blueprint_prefixes == set(constants.APP_BLUEPRINT_ROUTE_PREFIXES)
+    unprefixed_blueprints = {
+        node.args[0].id
+        for node in ast.walk(blueprint_tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "register_blueprint"
+        and node.args
+        and isinstance(node.args[0], ast.Name)
+        and not any(keyword.arg == "url_prefix" for keyword in node.keywords)
+    }
+    assert unprefixed_blueprints == {"home"}
+
+    root_prefixes = set()
+    has_root_route = False
+    for route_path in sorted(
+        (repository_root / "lagniappe/web/routes/home").glob("*.py")
+    ):
+        route_tree = ast.parse(route_path.read_text())
+        for node in ast.walk(route_tree):
+            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for decorator in node.decorator_list:
+                if not (
+                    isinstance(decorator, ast.Call)
+                    and isinstance(decorator.func, ast.Attribute)
+                    and isinstance(decorator.func.value, ast.Name)
+                    and decorator.func.value.id == "home"
+                    and decorator.func.attr == "route"
+                    and decorator.args
+                    and isinstance(decorator.args[0], ast.Constant)
+                    and isinstance(decorator.args[0].value, str)
+                ):
+                    continue
+                route = decorator.args[0].value
+                if route == "/":
+                    has_root_route = True
+                else:
+                    root_prefixes.add(route.removeprefix("/").split("/", 1)[0])
+
+    main_tree = ast.parse((repository_root / "main.py").read_text())
+    root_prefixes.update(
+        node.args[0].value.removeprefix("/").split("/", 1)[0]
+        for node in ast.walk(main_tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "app"
+        and node.func.attr == "route"
+        and node.args
+        and isinstance(node.args[0], ast.Constant)
+        and isinstance(node.args[0].value, str)
+    )
+    assert has_root_route
+    assert root_prefixes == set(constants.APP_ROOT_ROUTE_PREFIXES)
+
+    script_urls = [
+        handler["url"]
+        for handler in constants.APP_HANDLERS
+        if handler.get("script") == "auto"
+    ]
+    assert script_urls == [
+        *(
+            f"/{prefix}(/.*)?$"
+            for prefix in (
+                *constants.APP_BLUEPRINT_ROUTE_PREFIXES,
+                *constants.APP_ROOT_ROUTE_PREFIXES,
+            )
+        ),
+        "/$",
+    ]
+    assert constants.APP_HANDLERS[-1] == {
+        "url": "/(.*)$",
+        "mime_type": "text/html; charset=utf-8",
+        "secure": "always",
+        "static_files": "lagniappe/web/static/404.html",
+        "upload": "lagniappe/web/static/404.html",
+        "expiration": "0s",
+        "http_headers": {
+            "Cache-Control": "no-store",
+            "X-Robots-Tag": "noindex, nofollow",
+        },
+    }
+    assert not (
+        repository_root / "app_engine_404" / "handler-anchor.txt"
+    ).exists()
+    static_404_page = repository_root / "lagniappe/web/static/404.html"
+    assert static_404_page.is_file()
+    assert "That page was not found on this server." in static_404_page.read_text()
 
 
 # @features deploy

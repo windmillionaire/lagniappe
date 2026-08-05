@@ -196,7 +196,7 @@ new catalog entries as pending.
 
 ## Failure recovery and operations
 
-`POST /site-update` returns HTTP 200 only when the final catalog status is
+`POST /l/site-update` returns HTTP 200 only when the final catalog status is
 `current`; pending, running, failed, interrupted, or audit-error results return
 HTTP 409. A second click during a live run observes the lease and does not start
 a concurrent runner.

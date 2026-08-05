@@ -132,7 +132,7 @@ class InvalidateCache(DBProperty):
 
     Set to True when permissions change. The service worker reads this
     from the response header, clears its cache and ETag store, then calls
-    /validate-user with a clear confirmation to reset the flag.
+    /l/validate-user with a clear confirmation to reset the flag.
 
     Set:
         value (bool): True to invalidate, False to clear the flag.

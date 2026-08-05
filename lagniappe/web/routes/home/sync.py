@@ -10,7 +10,7 @@ from lagniappe.core.tools.form_state import validate_sync_payload
 from lagniappe.web import responses
 from lagniappe.web.auth import logged_in
 
-from . import home
+from . import internal
 
 
 # @testable false
@@ -34,7 +34,7 @@ def _document_seed(entity):
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_edits_document_without_ai_or_image_tools
 # @features sync
 # @dimensions document revision delta checkpoint persistence offline-replay
-@home.route("/sync", methods=["POST"])
+@internal.route("/sync", methods=["POST"])
 @logged_in
 def sync():
     """Append Yjs deltas and persist only current-generation checkpoints."""

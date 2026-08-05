@@ -741,6 +741,8 @@ members.
 
 The runtime project role set is:
 
+- `roles/cloudscheduler.admin`, used only to read, pause, and resume the
+  setup-owned deferred-job reconciler;
 - `roles/datastore.user`;
 - `roles/firebaseauth.editor`, the narrower named role containing the Identity
   Platform account lookup/delete and OOB email-code permissions;
@@ -790,6 +792,18 @@ boundary used by Cloud Tasks. Enabling Cloud Scheduler provisions its managed
 service agent, so setup does not invoke the optional `gcloud beta` component;
 it verifies the managed agent's project role before creating the job.
 
+Setup also grants the runtime account `roles/cloudscheduler.admin`. Cloud
+Scheduler has no narrower predefined role containing both
+`cloudscheduler.jobs.pause` and `cloudscheduler.jobs.enable`; runtime code
+nevertheless addresses only the exact setup-owned reconciler resource. The
+application records recovery-required deferred jobs in the stable
+`site/deferred-jobs-control` Datastore entry and resumes the schedule before
+accepting the first tracked job. Completing the last tracked job pauses future
+runs. Revision-checked bootstrap scans let existing installations initialize
+that record, and two clean empty runs are required before the reconciler pauses
+itself for the first time. Rerunning setup applies the runtime role idempotently
+to an existing installation.
+
 The identities deliberately have different responsibilities:
 
 - Google's managed Cloud Scheduler service agent,
@@ -797,8 +811,9 @@ The identities deliberately have different responsibilities:
   ensured `roles/cloudscheduler.serviceAgent` on the project.
 - The runtime application service account from
   `RUNTIME_SERVICE_ACCOUNT_EMAIL`
-  is only attached as the Scheduler job's OIDC caller. It is not granted
-  Scheduler Admin and the running application never calls the Scheduler API.
+  is attached as the Scheduler job's OIDC caller and owns its operational
+  pause/resume lifecycle through `roles/cloudscheduler.admin`. It does not use
+  that role to provision, delete, update, or force-run jobs.
 - `INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL` records that exact expected caller.
   Task creation, Scheduler configuration, and server-side token verification
   all read the same setting; recovery requires it to match the attached

@@ -386,7 +386,7 @@ class Editor:
         self.wait_for_render()
 
     def blur(self):
-        with self.editor.page.expect_response("**/sync"):
+        with self.editor.page.expect_response("**/l/sync"):
             self.text_entry.blur()
 
     def select_text(self):

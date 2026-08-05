@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bed962f9';
-import { g as generateElementId } from './foundation.js?v=bed962f9';
-import './connectivity.js?v=bed962f9';
-import { p as primitives } from './primitives.js?v=bed962f9';
+import { STYLES } from './styles.js?v=bfd37afb';
+import { g as generateElementId } from './foundation.js?v=bfd37afb';
+import './connectivity.js?v=bfd37afb';
+import { p as primitives } from './primitives.js?v=bfd37afb';
 
 /**
  * Custom positioning reference element.

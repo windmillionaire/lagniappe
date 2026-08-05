@@ -1,14 +1,14 @@
 {% import 'notes.html' as note_ui %}
 
 {% macro add_note_form() %}
-  {{ note_ui.composer(url_for('home.create_note'), 'notes:HomeActivityList', 'notes', 'home', true) }}
+  {{ note_ui.composer(url_for('internal.create_note'), 'notes:HomeActivityList', 'notes', 'home', true) }}
 {% endmacro %}
 
 {% macro list(notes, poll_revision=none) %}
   <ul lp-prefetch
       loaded
       data-widget="HomeActivityList"
-      data-route='{{ url_for("home.activity") }}'
+      data-route='{{ url_for("internal.activity") }}'
       data-if-empty="CreateNote"
       {% if poll_revision %}
         data-poll-channel="home-notes"

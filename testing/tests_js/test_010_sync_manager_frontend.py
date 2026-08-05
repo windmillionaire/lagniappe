@@ -68,7 +68,7 @@ const offline = {
 };
 const context = {
   console,
-  ENDPOINTS: { sync: "/sync" },
+  ENDPOINTS: { sync: "/l/sync" },
   loadHeadlessWidget: async (settings) => headlessFactory(settings),
   offline,
   request: {

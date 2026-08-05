@@ -98,7 +98,7 @@
     {{ ingress.upload_ingress_file() }}
     <ul lp-load
         data-widget="IngressList"
-        data-route='{{ url_for("home.get", kind="ingress") }}'
+        data-route='{{ url_for("internal.get", kind="ingress") }}'
         data-if-empty="IngressFileUpload"
         data-persistent="true"
         data-visible="true"

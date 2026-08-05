@@ -14,7 +14,7 @@ from lagniappe.core.tools.refresh import (
 from lagniappe.web import responses
 from lagniappe.web.auth import logged_in
 
-from . import home
+from . import internal
 
 
 MAX_REFRESH_TARGETS = 32
@@ -99,7 +99,7 @@ def _refresh_target(view, target, refresh_view):
 # @pair category-index:refresh
 # @pair reconnect-refresh:root-fingerprint
 # @pair permissions:authorization
-@home.route("/refresh", methods=["POST"])
+@internal.route("/refresh", methods=["POST"])
 @logged_in
 def refresh():
     """Return permission-checked row deltas for supported mounted collections."""

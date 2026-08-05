@@ -17,7 +17,7 @@ pytestmark = pytest.mark.e2e
 def poll(user, subscriptions):
     return user.page.evaluate(
         """async (subscriptions) => {
-            const response = await fetch("/poll", {
+            const response = await fetch("/l/poll", {
                 method: "POST",
                 credentials: "include",
                 headers: {
@@ -115,7 +115,7 @@ def test_poll_endpoint_batches_entity_changes(get_user, browser_failures):
     with browser_failures.expect_http_error(
         owner,
         status=422,
-        path="/poll",
+        path="/l/poll",
         count=4,
     ):
         duplicate = poll(owner, [descriptor, descriptor])
@@ -167,18 +167,18 @@ def test_cold_notification_state_seeds_through_one_poll(get_user):
     poll_requests = []
 
     def record_poll(request):
-        if urlsplit(request.url).path == "/poll":
+        if urlsplit(request.url).path == "/l/poll":
             poll_requests.append(request)
 
     owner.page.on("request", record_poll)
     with owner.page.expect_response(
         lambda response: (
-            urlsplit(response.url).path == "/ping"
+            urlsplit(response.url).path == "/l/ping"
             and response.request.method == "HEAD"
         )
     ) as cold_ping_info, owner.page.expect_response(
         lambda response: (
-            urlsplit(response.url).path == "/poll"
+            urlsplit(response.url).path == "/l/poll"
             and response.request.method == "POST"
         )
     ) as seed_poll_info:
@@ -211,7 +211,7 @@ def test_cold_notification_state_seeds_through_one_poll(get_user):
     poll_requests.clear()
     with owner.page.expect_response(
         lambda response: (
-            urlsplit(response.url).path == "/ping"
+            urlsplit(response.url).path == "/l/ping"
             and response.request.method == "HEAD"
         )
     ) as warm_ping_info:

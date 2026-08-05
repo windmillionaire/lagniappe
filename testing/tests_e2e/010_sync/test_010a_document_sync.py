@@ -28,7 +28,7 @@ def document_save_response(text):
     def predicate(response):
         post_data = response.request.post_data or ""
         return (
-            response.url.endswith("/sync")
+            response.url.endswith("/l/sync")
             and '"save":true' in post_data
             and text in post_data
         )
@@ -39,7 +39,7 @@ def document_save_response(text):
 def document_parent_touch_response(response):
     post_data = response.request.post_data or ""
     return (
-        response.url.endswith("/sync")
+        response.url.endswith("/l/sync")
         and '"touch_parent":true' in post_data
         and '"ydoc"' not in post_data
     )
@@ -181,7 +181,7 @@ def test_document_presence_appears_and_clears(get_user, browser_failures):
     with expect_successful_response(
         owner.page,
         method="POST",
-        path="/poll",
+        path="/l/poll",
         request_payload_contains=(
             f'"closed_documents":["{document_sync_id}"]'
         ),

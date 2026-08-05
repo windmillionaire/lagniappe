@@ -54,8 +54,8 @@ preserving ETag storage and offline reuse.
 `shared/request.mjs` exposes the worker marker as `response.updated`; refresh
 consumers skip DOM reconciliation when it is `false`.
 
-`/token` is classified as network-only because returning a cached token would be
-functionally incorrect. `/ping` bypasses the worker entirely. Neither caller
+`/l/token` is classified as network-only because returning a cached token would be
+functionally incorrect. `/l/ping` bypasses the worker entirely. Neither caller
 adds request-side `no-store` or `Cache-Control` directives: cacheability is
 server-owned through `g.NO_CACHE` and the application `after_request` hook.
 
@@ -148,7 +148,7 @@ authenticated service-worker lifecycle.
 independent fields: browser link state, application-server reachability,
 document visibility, and controller availability. The worker validates the
 protocol/version and all four field values before using browser/server state to
-choose network or cached behavior. `/ping` remains the authority for server
+choose network or cached behavior. `/l/ping` remains the authority for server
 reachability; `navigator.onLine` remains a scheduling hint.
 
 ### Fetch

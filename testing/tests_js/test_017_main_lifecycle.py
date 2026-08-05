@@ -305,7 +305,7 @@ if (!online || fetchCalls.length !== 1) {
   throw new Error("Ping did not complete successfully");
 }
 const call = fetchCalls[0];
-if (call.url !== "/ping" || call.options.method !== "HEAD") {
+if (call.url !== "/l/ping" || call.options.method !== "HEAD") {
   throw new Error(`Unexpected ping request: ${JSON.stringify(call)}`);
 }
 if ("cache" in call.options || new Headers(call.options.headers).has("Cache-Control")) {

@@ -23,10 +23,10 @@ def test_live_sync_rejects_form_widget_payloads(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     owner.go(Pages.test_sync_form_page)
 
-    with browser_failures.expect_http_error(owner, status=422, path="/sync"):
+    with browser_failures.expect_http_error(owner, status=422, path="/l/sync"):
         result = owner.page.evaluate(
             """async () => {
-                const response = await fetch("/sync", {
+                const response = await fetch("/l/sync", {
                     method: "POST",
                     credentials: "include",
                     headers: {

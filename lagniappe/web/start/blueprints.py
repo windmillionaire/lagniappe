@@ -5,7 +5,7 @@
 # @reason Flask blueprint registration is exercised through E2E app boot; unit coverage would require route import scaffolding
 def initialize(app, csrf):
     from lagniappe import CONFIG
-    from lagniappe.web.routes import home
+    from lagniappe.web.routes import home, internal
     from lagniappe.web.routes import projects
     from lagniappe.web.routes import files
     from lagniappe.web.routes import categories
@@ -22,6 +22,7 @@ def initialize(app, csrf):
     from lagniappe.web.routes import testing
 
     app.register_blueprint(home)
+    app.register_blueprint(internal, url_prefix="/l")
     app.register_blueprint(projects, url_prefix="/projects")
     app.register_blueprint(files, url_prefix="/files")
     app.register_blueprint(categories, url_prefix="/categories")

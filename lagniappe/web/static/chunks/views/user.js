@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition, r as request } from '../foundation.js?v=bed962f9';
-import { E as EntityIndex } from '../index-foundation.js?v=bed962f9';
-import '../notificationState.js?v=bed962f9';
-import '../connectivity.js?v=bed962f9';
-import '../core-foundation.js?v=bed962f9';
+import { w as withTransition, r as request } from '../foundation.js?v=bfd37afb';
+import { E as EntityIndex } from '../index-foundation.js?v=bfd37afb';
+import '../notificationState.js?v=bfd37afb';
+import '../connectivity.js?v=bfd37afb';
+import '../core-foundation.js?v=bfd37afb';
 
 /**
  * @testable true

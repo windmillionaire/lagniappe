@@ -132,7 +132,7 @@ Used by the `SelectElement` form element for dropdown selects. Replaces the nati
 
 Used by the `LinkElement` for internal entity links. Searches the server index on input.
 
-**`_search(query)`** sends a GET to `/search-index/{index}` with the query,
+**`_search(query)`** sends a GET to `/l/search-index/{index}` with the query,
 form type, and currently selected hashes (to keep them visible in results).
 Displays server-returned HTML in the panel.
 
@@ -143,7 +143,7 @@ wrapper/button or its nested input.
 Opt-in quick-create is enabled with `data-creatable="true"` on the FacetsBox
 trigger. When a non-empty search has zero real matches and the current user has
 create permission for the facet kind, the server returns an `Add New ...`
-command row. Selecting that row posts to `/search-index/{index}/create`, then
+command row. Selecting that row posts to `/l/search-index/{index}/create`, then
 selects the server-rendered created option through the normal `Submitter`
 selection path. Supported quick-create kinds are `project`, `category`, `form`,
 and `page`; users and model tasks are intentionally excluded.
@@ -154,7 +154,7 @@ and `page`; users and model tasks are intentionally excluded.
 
 Used by the `LocationElement` for Google Places autocomplete. On init, requests the user's geolocation via `updateUserLocation()`.
 
-**`_input(event)`** shows recent locations when empty, searches the server (`/search-location`) when typing.
+**`_input(event)`** shows recent locations when empty, searches the server (`/l/search-location`) when typing.
 
 ### SearchBox (`search.mjs`)
 
@@ -162,16 +162,16 @@ The global search bar, mounted by the observer on `[lp-search]` elements. Does *
 
 **`init()`** sets up a debounced input listener (200ms) and creates an initial panel with recent searches.
 
-**`_search(query)`** sends a GET to `/search-bar` with the query. Panel shows server-returned results.
+**`_search(query)`** sends a GET to `/l/search-bar` with the query. Panel shows server-returned results.
 
 **`selectOption(option)`** saves the selection to recent results and navigates to `option.dataset.url`.
 
-**Enter key** navigates to the full search page (`/search-page?q=...`).
+**Enter key** navigates to the full search page (`/l/search-page?q=...`).
 
 ### Editor Link Search
 
 The editor `addLink` form owns a small editor-specific `Combobox` subclass. It
-queries the same `/search-bar` endpoint and renders the same `"search"`
+queries the same `/l/search-bar` endpoint and renders the same `"search"`
 results as `SearchBox`, but selecting an option applies `option.dataset.url` to
 the current editor link instead of navigating.
 

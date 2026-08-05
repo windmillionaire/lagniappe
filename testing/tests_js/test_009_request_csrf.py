@@ -157,7 +157,7 @@ context.fetch = async (url, config = {{}}) => {{
     }});
   }}
 
-  if (requestUrl === "/token") {{
+  if (requestUrl === "/l/token") {{
     await new Promise((resolve) => setTimeout(resolve, 5));
     return new Response("fresh-token", {{ status: 200 }});
   }}
@@ -225,7 +225,7 @@ def test_concurrent_stale_writes_share_server_controlled_token_refresh(run_node)
         run_node,
         """
 const [post, put] = await Promise.all([
-  request.post("/sync", { value: 1 }, { keepalive: true }),
+  request.post("/l/sync", { value: 1 }, { keepalive: true }),
   request.put("/pages/page-1/update", { value: 2 }),
 ]);
 
@@ -233,7 +233,7 @@ if (!post.ok || !put.ok) {
   throw new Error("stale writes did not retry successfully");
 }
 
-const tokenCalls = fetchCalls.filter((call) => call.url === "/token");
+const tokenCalls = fetchCalls.filter((call) => call.url === "/l/token");
 if (tokenCalls.length !== 1) {
   throw new Error(`Expected one shared token refresh, got ${tokenCalls.length}`);
 }
@@ -247,7 +247,7 @@ if (tokenElt.value !== "fresh-token") {
   throw new Error(`Hidden token was not updated: ${tokenElt.value}`);
 }
 
-const writeCalls = fetchCalls.filter((call) => call.url !== "/token");
+const writeCalls = fetchCalls.filter((call) => call.url !== "/l/token");
 const staleWrites = writeCalls.filter(
   (call) => call.headers["X-CSRFToken"] === "stale-token",
 );
@@ -282,7 +282,7 @@ const calls = fetchCalls.filter((call) => call.url === "/bad-request");
 if (calls.length !== 1) {
   throw new Error(`Non-CSRF 400 was retried ${calls.length} times`);
 }
-if (fetchCalls.some((call) => call.url === "/token")) {
+if (fetchCalls.some((call) => call.url === "/l/token")) {
   throw new Error("Non-CSRF 400 triggered a token refresh");
 }
 """,
@@ -473,7 +473,7 @@ if (button.dataset.submitting !== "true") {
   throw new Error("logout button did not track its submitting state");
 }
 
-const tokenCalls = fetchCalls.filter((call) => call.url === "/token");
+const tokenCalls = fetchCalls.filter((call) => call.url === "/l/token");
 if (tokenCalls.length !== 1) {
   throw new Error(`Expected one token refresh, got ${tokenCalls.length}`);
 }

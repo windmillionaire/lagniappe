@@ -27,7 +27,7 @@ def expect_reconnect_refresh(user, browser_failures, *, timeout=None):
     with expect_successful_response(
         user.page,
         method="POST",
-        path="/refresh",
+        path="/l/refresh",
         timeout=timeout,
     ) as response_info:
         yield response_info

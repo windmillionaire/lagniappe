@@ -49,7 +49,7 @@ Used for entity documents (project documents, page documents). Manages real-time
   do not re-queue.
 - **Saving**: On blur, the editor dispatches `sync-save`. `saveData` includes
   the merged delta, full `ydoc`, and rendered `html`; document HTML persistence
-  happens through the `/sync` route when `html` is present.
+  happens through the `/l/sync` route when `html` is present.
 - **Offline/headless replay**: `loadHeadlessWidget(...)` can instantiate a
   headless collaborative document so an offline record can merge and replay
   even when the widget is not mounted on the current route.

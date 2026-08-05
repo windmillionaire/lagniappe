@@ -150,7 +150,7 @@ context.fetch = async (request) => {
     headers: { "Cache-Control": "NO-STORE" },
   });
 };
-const request = new Request("https://example.test/token", {
+const request = new Request("https://example.test/l/token", {
   credentials: "include",
 });
 responseCache.entries.set(request.url, new Response("cached", {
@@ -161,7 +161,7 @@ const waitUntil = [];
 const response = await context.handleCacheable({
   request,
   waitUntil: (promise) => waitUntil.push(Promise.resolve(promise)),
-}, "/token");
+}, "/l/token");
 await Promise.all(waitUntil);
 
 const body = await response.text();
@@ -206,7 +206,7 @@ context.fetch = async (request) => {
     headers: { "Cache-Control": "no-store" },
   });
 };
-const request = new Request("https://example.test/token", {
+const request = new Request("https://example.test/l/token", {
   credentials: "include",
   headers: { "X-Lagniappe-Request": "true" },
 });
@@ -568,7 +568,7 @@ def test_cache_invalidation_confirmation_posts_after_local_clear(run_node):
         """
 const validateCalls = [];
 context.fetch = async (url, options = {}) => {
-  if (url === "/token") {
+  if (url === "/l/token") {
     if (options.credentials !== "include") {
       throw new Error(`Expected token credentials include, got ${options.credentials}`);
     }
@@ -577,7 +577,7 @@ context.fetch = async (url, options = {}) => {
     }
     return new Response("csrf-token");
   }
-  if (url === "/validate-user") {
+  if (url === "/l/validate-user") {
     validateCalls.push(options);
     return new Response("", { status: 200 });
   }
@@ -815,7 +815,7 @@ def test_changed_validators_clear_only_same_path_query_siblings_for_configured_r
         """
 const qualifyingPaths = [
   "/",
-  "/get-pages",
+  "/l/get/pages",
   "/categories/example",
   "/pages/index",
   "/pages/rows",

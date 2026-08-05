@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request } from './foundation.js?v=bed962f9';
-import './notificationState.js?v=bed962f9';
-import './connectivity.js?v=bed962f9';
+import { r as request } from './foundation.js?v=bfd37afb';
+import './notificationState.js?v=bfd37afb';
+import './connectivity.js?v=bfd37afb';
 
 /**
  * @testable false
@@ -16,7 +16,7 @@ async function updateUserData() {
 
 	sessionStorage.setItem("timezone_sent", currentTimezone);
 	const response = await request.post(
-		"/update-session",
+		"/l/update-session",
 		{ timezone: currentTimezone },
 		{ keepalive: true },
 	);
@@ -55,7 +55,7 @@ function _getCurrentPosition(options) {
 async function _updateUserLocation(newLocation) {
 	localStorage.setItem("location", JSON.stringify(newLocation));
 	await request.post(
-		"/update-session",
+		"/l/update-session",
 		{ location: newLocation },
 		{ keepalive: true },
 	);

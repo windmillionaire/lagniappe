@@ -7,7 +7,7 @@ Star/Unstar commands in their title menus.
 
 Related Files:
     Application:
-        - lagniappe/web/routes/home/main.py: toggle_star() route (PATCH /toggle-star/<key>)
+        - lagniappe/web/routes/home/main.py: toggle_star() route (PATCH /l/toggle-star/<key>)
         - lagniappe/web/templates/home/starred.html: Starred list component
         - lagniappe/web/templates/controls.html: icon-only home star() macro
         - lagniappe/web/templates/menus.html: labeled title-menu star() macro
@@ -24,7 +24,7 @@ Related Files:
         - testing/resources/home.py: HomePage selectors
 
 Star controls use data-active="true/false" to track state. Clicking toggles via
-PATCH to /toggle-star/<key>. The client updates both the hidden title-menu
+PATCH to /l/toggle-star/<key>. The client updates both the hidden title-menu
 source and its portal clone so an already-created menu stays current.
 """
 
@@ -62,7 +62,7 @@ def _title_star_action(user, menu_name, action_name):
 
 def _toggle_title_star(user, menu_name, action_name):
     action = _title_star_action(user, menu_name, action_name)
-    with user.page.expect_response("**/toggle-star/*"):
+    with user.page.expect_response("**/l/toggle-star/*"):
         action.click()
     expect(user.page.get_by_role("menu", name=menu_name)).to_be_hidden()
 

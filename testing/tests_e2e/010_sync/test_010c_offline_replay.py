@@ -14,7 +14,11 @@ from playwright.sync_api import expect
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Projects, SitePages, Users
-from testing.utility import expect_successful_response, wait_for_offline_sync_records
+from testing.utility import (
+    expect_offline_sync_replay,
+    expect_successful_response,
+    wait_for_offline_sync_records,
+)
 
 pytestmark = pytest.mark.e2e
 
@@ -28,7 +32,7 @@ def _document_save_response(*parts):
     def predicate(response):
         post_data = response.request.post_data or ""
         return (
-            response.url.endswith("/sync")
+            response.url.endswith("/l/sync")
             and '"save":true' in post_data
             and all(part in post_data for part in parts)
         )
@@ -90,7 +94,7 @@ def _reconnect_with_sync(user, sync_id):
         request_body = request.post_data or ""
         if (
             request.method == "POST"
-            and request.url.endswith("/sync")
+            and request.url.endswith("/l/sync")
             and sync_id in request_body
         ):
             sync_requests.append(request)
@@ -100,7 +104,7 @@ def _reconnect_with_sync(user, sync_id):
         with expect_successful_response(
             user.page,
             method="POST",
-            path="/sync",
+            path="/l/sync",
             request_payload_contains=sync_id,
         ) as response_info:
             user.offline = False
@@ -170,24 +174,24 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failure
         kind="console",
         console_type="error",
         text="Failed to load resource: the server responded with a status of 503 ()",
-        source_path="/sync",
+        source_path="/l/sync",
     ):
         with browser_failures.expect(
             user,
             kind="console",
             console_type="error",
             text="Failed to load resource: the server responded with a status of 503 ()",
-            source_path="/poll",
+            source_path="/l/poll",
         ):
-            user.page.context.route("**/sync", fail_sync)
+            user.page.context.route("**/l/sync", fail_sync)
             with user.page.expect_request(
                 lambda request: request.method == "POST"
-                and request.url.endswith("/sync")
+                and request.url.endswith("/l/sync")
                 and document_sync_id in (request.post_data or "")
             ):
                 user.offline = False
             assert len(failed_sync_attempts) == 1
-            user.page.context.unroute("**/sync", fail_sync)
+            user.page.context.unroute("**/l/sync", fail_sync)
             wait_for_offline_sync_records(
                 user,
                 sync_id=document_sync_id,
@@ -221,12 +225,9 @@ def test_offline_replay_does_not_duplicate_after_reload(get_user, browser_failur
     )
     _replace_page(user)
 
-    with expect_successful_response(
-        user.page,
-        method="POST",
-        path="/sync",
+    with expect_offline_sync_replay(
+        user,
         request_payload_contains=text,
-        timeout=30000,
     ):
         user.go(SitePages.HOME)
     wait_for_offline_sync_records(
@@ -277,13 +278,13 @@ def test_headless_offline_replay_merges_concurrent_remote_edits(
     assert remote_response.value.ok
 
     _replace_page(owner)
-    with owner.page.expect_response(
-        _document_save_response(offline_text, remote_text)
-    ) as replay_response:
+    with expect_offline_sync_replay(
+        owner,
+        request_payload_contains=(offline_text, remote_text),
+    ) as replay_responses:
         owner.go(SitePages.HOME)
 
-    assert replay_response.value.ok
-    acknowledgement = replay_response.value.json()["updates"][0]
+    acknowledgement = replay_responses[0].json()["updates"][0]
     assert acknowledgement["checkpoint_accepted"] is True
     wait_for_offline_sync_records(
         owner,

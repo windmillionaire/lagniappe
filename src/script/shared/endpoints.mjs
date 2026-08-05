@@ -46,34 +46,34 @@ export const ENDPOINTS = {
 	},
 	SiteAiModels: () => {
 		return {
-			setAiSettings: "/set-ai-settings",
+			setAiSettings: "/l/set-ai-settings",
 		};
 	},
 	SiteDeployment: () => {
 		return {
-			setDeploymentSettings: "/set-deployment-settings",
+			setDeploymentSettings: "/l/set-deployment-settings",
 		};
 	},
 	SiteImage: () => {
 		return {
-			setSiteImage: "/set-site-image",
+			setSiteImage: "/l/set-site-image",
 		};
 	},
 	SiteMaintenance: () => {
 		return {
-			siteConfiguration: "/site-configuration",
-			siteUpdate: "/site-update",
-			rebuildCache: "/rebuild-cache",
+			siteConfiguration: "/l/site-configuration",
+			siteUpdate: "/l/site-update",
+			rebuildCache: "/l/rebuild-cache",
 		};
 	},
 	SiteSettings: () => {
 		return {
-			siteSettings: "/site-settings",
+			siteSettings: "/l/site-settings",
 		};
 	},
 	SiteExport: () => {
 		return {
-			start: "/site-export",
+			start: "/l/site-export",
 		};
 	},
 	HomeTaskList: () => {
@@ -111,13 +111,13 @@ export const ENDPOINTS = {
 		};
 	},
 	search: {
-		bar: "/search-bar",
-		page: "/search-page",
+		bar: "/l/search-bar",
+		page: "/l/search-page",
 	},
-	linkPreview: "/preview",
-	location: "/search-location",
+	linkPreview: "/l/preview",
+	location: "/l/search-location",
 	facet: (index) => {
-		return `/search-index/${index}`;
+		return `/l/search-index/${index}`;
 	},
 	html: (key, field) => {
 		return {
@@ -142,13 +142,13 @@ export const ENDPOINTS = {
 		start: `/collaboration/start`,
 		stop: `/collaboration/stop`,
 	},
-	delete: (key) => `/delete/${key}`,
+	delete: (key) => `/l/delete/${key}`,
 	toggleStar: (key) => {
-		return `/toggle-star/${key}`;
+		return `/l/toggle-star/${key}`;
 	},
-	activity: (key) => `/activity/${key}`,
-	poll: "/poll",
-	notifications: "/notifications",
+	activity: (key) => `/l/activity/${key}`,
+	poll: "/l/poll",
+	notifications: "/l/notifications",
 	help: (key) => {
 		return `/reference/section/${key}`;
 	},
@@ -163,5 +163,5 @@ export const ENDPOINTS = {
 	UserSettings: (settings) => {
 		return ENDPOINTS.PagePermissions(settings);
 	},
-	sync: "/sync",
+	sync: "/l/sync",
 };

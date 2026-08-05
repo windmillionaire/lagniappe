@@ -91,7 +91,7 @@ class SitePage(SiteResource):
     Generic site page with no specific selectors.
 
     Used for simple pages that only need URL navigation:
-    - /ping (health check)
+    - /l/ping (health check)
     - /nonexistent (404 testing)
     """
 

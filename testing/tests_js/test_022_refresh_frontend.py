@@ -290,7 +290,7 @@ view.Notifications = { async refresh() { events.push({ type: "notifications" });
 (async () => {
   await view.refresh();
   const requests = events.filter((event) => event.type === "request");
-  if (requests.length !== 1 || requests[0].url !== "/refresh") {
+  if (requests.length !== 1 || requests[0].url !== "/l/refresh") {
     throw new Error(`Expected one refresh request: ${JSON.stringify(events)}`);
   }
   if (requests[0].payload.targets.length !== 2) {

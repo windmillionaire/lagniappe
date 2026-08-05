@@ -9,5 +9,5 @@
 {%- endblock description %}
 
 {% block button -%}
-  {{ delete_action(url_for('home.delete_activity', key=entity.urlsafe_key), "Delete Note") }}
+  {{ delete_action(url_for('internal.delete_activity', key=entity.urlsafe_key), "Delete Note") }}
 {%- endblock button %}

@@ -167,7 +167,7 @@ class BrowserFailureCollector:
             count=ping_count,
             max_count=max_ping_count,
             method="HEAD",
-            path="/ping",
+            path="/l/ping",
             failure="net::ERR_INTERNET_DISCONNECTED",
         ):
             with self.expect(
@@ -177,7 +177,7 @@ class BrowserFailureCollector:
                 max_count=max_ping_count,
                 console_type="error",
                 text="Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
-                source_path="/ping",
+                source_path="/l/ping",
             ):
                 yield
 

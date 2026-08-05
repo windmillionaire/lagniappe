@@ -50,7 +50,7 @@
 
 {% macro list(categories) %}
   <ul data-widget="HomeCategoryList"
-      data-route='{{ url_for("home.get", kind="categories") }}'
+      data-route='{{ url_for("internal.get", kind="categories") }}'
       data-visible="false"
       data-if-empty="{{ 'CreateCategory' if Resource.CATEGORY.allowed(Action.CREATE) else '' }}"
       class="{{ styles.home.card.list }}">
@@ -60,14 +60,14 @@
         {% if categories.back %}
           <button class="{{ styles.home.pagination.button }} bg-category-bg/50"
                   lp-control="previous"
-                  data-route='{{ url_for("home.get", kind="categories", cursor=None) }}'>
+                  data-route='{{ url_for("internal.get", kind="categories", cursor=None) }}'>
             {{ render_icon("start") }}
           </button>
         {% endif %}
         {% if categories.cursor %}
           <button class="{{ styles.home.pagination.button }} bg-category-bg/50"
                   lp-control="next"
-                  data-route='{{ url_for("home.get", kind="categories", cursor=categories.cursor) }}'>
+                  data-route='{{ url_for("internal.get", kind="categories", cursor=categories.cursor) }}'>
             {{ render_icon("next") }}
           </button>
         {% endif %}

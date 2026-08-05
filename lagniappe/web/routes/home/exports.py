@@ -15,7 +15,7 @@ from lagniappe.core.tools.deferred_jobs import DeferredJobs
 from lagniappe.web import responses
 from lagniappe.web.auth import permission
 
-from . import home
+from . import internal
 
 
 # @testable false
@@ -29,7 +29,7 @@ def _site_export_html():
 # @testable true
 # @tests tests_e2e/001_site/test_001f_site_export.py::test_owner_can_start_html_export
 # @pairs export:owner-only export:start-export
-@home.route("/site-export", methods=["GET"])
+@internal.route("/site-export", methods=["GET"])
 @permission(Resource.SITE)
 def site_export_widget():
     return _site_export_html(), 200
@@ -38,7 +38,7 @@ def site_export_widget():
 # @testable true
 # @tests tests_e2e/001_site/test_001f_site_export.py::test_owner_can_start_html_export
 # @pairs export:owner-only export:start-export export:notification
-@home.route("/site-export", methods=["POST"])
+@internal.route("/site-export", methods=["POST"])
 @permission(Resource.SITE)
 def create_site_export():
     body = request.get_json(silent=True) or request.form

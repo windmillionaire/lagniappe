@@ -101,6 +101,23 @@ def _run_ask_job(report, job, ai_results):
     return response, saved_report
 
 
+def _poll_ask_job_completion(user, job):
+    user.page.evaluate(
+        """async (key) => {
+            const view = document.querySelector("[lp-view]")?._lp_view;
+            if (!view) throw new Error("Ask view is not initialized");
+            const operations = await view.ensureDeferredOperations();
+            if (!operations?.operations?.has(key)) {
+                throw new Error("Ask operation is not tracked");
+            }
+            await view.PollingCoordinator.trigger(`operation:${key}`, {
+                fresh: true,
+            });
+        }""",
+        job.urlsafe_key,
+    )
+
+
 def _answer_text(response):
     text = f"{response.get('summary') or ''} {response.get('answer_html') or ''}"
     return " ".join(unescape(re.sub(r"<[^>]+>", " ", text)).split())
@@ -271,6 +288,7 @@ def test_ask_answers_from_attached_corpus_receipt(get_user, request, monkeypatch
     assert workspace_tool_calls, "Ask did not inspect the workspace"
     assert not failures, "\n".join(failures)
     assert report.status == "complete"
+    _poll_ask_job_completion(user, job)
     expect(item.locator("[data-role='report-stage']")).to_have_text(
         "Answer ready",
         timeout=30_000,
@@ -333,6 +351,7 @@ def test_ask_uses_structured_filter_for_form_submission_query(
     assert calls, "Ask did not call query_workspace_filter"
     assert not failures, "\n".join(failures)
     assert report.status == "complete"
+    _poll_ask_job_completion(user, job)
     expect(item.locator("[data-role='report-stage']")).to_have_text(
         "Answer ready",
         timeout=30_000,

@@ -27,12 +27,12 @@ def expect_poll_result(
     def check(response: Any) -> None:
         payload = response.json()
         assert payload.get("version") == 1, (
-            f"POST /poll returned an invalid protocol version for "
+            f"POST /l/poll returned an invalid protocol version for "
             f"{subscription_id!r}: {payload!r}"
         )
         results = payload.get("results")
         assert isinstance(results, list), (
-            f"POST /poll returned no result list for {subscription_id!r}: "
+            f"POST /l/poll returned no result list for {subscription_id!r}: "
             f"{payload!r}"
         )
         result = next(
@@ -45,19 +45,19 @@ def expect_poll_result(
             None,
         )
         assert result is not None, (
-            f"POST /poll did not return subscription {subscription_id!r}: "
+            f"POST /l/poll did not return subscription {subscription_id!r}: "
             f"{results!r}"
         )
         if status is not None:
             assert result.get("status") == status, (
-                f"POST /poll returned {result.get('status')!r} for "
+                f"POST /l/poll returned {result.get('status')!r} for "
                 f"{subscription_id!r}; expected {status!r}. Result: {result!r}"
             )
 
     with expect_successful_response(
         page,
         method="POST",
-        path="/poll",
+        path="/l/poll",
         request_payload_contains=f'"id":"{subscription_id}"',
         response_check=check,
         timeout=timeout,

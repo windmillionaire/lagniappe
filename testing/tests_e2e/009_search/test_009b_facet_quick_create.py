@@ -54,7 +54,7 @@ def _fetch_json(user, path, method="GET", data=None):
 
             let response = await send();
             if (response.status === 400 && csrfMethods.has(method)) {
-                const tokenResponse = await fetch("/token");
+                const tokenResponse = await fetch("/l/token");
                 const token = await tokenResponse.text();
                 const tokenElt = document.getElementById("token");
                 if (tokenElt) tokenElt.value = token;
@@ -106,12 +106,12 @@ def test_quick_create_command_requires_opt_in_and_create_permission(get_user):
 
     opted_in = _fetch_json(
         owner,
-        f"/search-index/project?q={quote(query)}&creatable=true",
+        f"/l/search-index/project?q={quote(query)}&creatable=true",
     )
     assert opted_in["status"] == 200
     assert f"Add New Project: {query}" in opted_in["json"]["results"]
 
-    lookup_only = _fetch_json(owner, f"/search-index/project?q={quote(query)}")
+    lookup_only = _fetch_json(owner, f"/l/search-index/project?q={quote(query)}")
     assert lookup_only["status"] == 200
     assert "Add New Project" not in lookup_only["json"]["results"]
     assert "No Results" in lookup_only["json"]["results"]
@@ -120,7 +120,7 @@ def test_quick_create_command_requires_opt_in_and_create_permission(get_user):
     viewer.go(SitePages.HOME)
     denied = _fetch_json(
         viewer,
-        f"/search-index/project?q={quote(query)}&creatable=true",
+        f"/l/search-index/project?q={quote(query)}&creatable=true",
     )
     assert denied["status"] == 200
     assert "Add New Project" not in denied["json"]["results"]
@@ -139,7 +139,7 @@ def test_category_search_permission_filter_returns_editable_categories(get_user)
 
     response = _fetch_json(
         user,
-        f"/search-index/category?q={quote('acl')}&permission=edit",
+        f"/l/search-index/category?q={quote('acl')}&permission=edit",
     )
 
     assert response["status"] == 200
@@ -164,7 +164,7 @@ def test_user_assign_search_permission_filter_returns_assignable_users(get_user)
 
     response = _fetch_json(
         assigner,
-        f"/search-index/user?q={quote('User')}&permission=assign",
+        f"/l/search-index/user?q={quote('User')}&permission=assign",
     )
 
     assert response["status"] == 200
@@ -179,7 +179,7 @@ def test_user_assign_search_permission_filter_returns_assignable_users(get_user)
     user_page = Page(user=assigner, definition=assigner.definition)
     user_select = UserSelect(user_page.create_task_form)
     with assigner.page.expect_response(
-        lambda response: "/search-index/user" in response.url
+        lambda response: "/l/search-index/user" in response.url
         and "permission=assign" in response.url
     ):
         panel = user_select.panel(fill="User")
@@ -201,13 +201,13 @@ def test_page_quick_create_uses_visible_uncategorized_pages_category(get_user):
 
     first = _fetch_json(
         user,
-        "/search-index/page/create",
+        "/l/search-index/page/create",
         method="POST",
         data={"name": _unique("page-one")},
     )
     second = _fetch_json(
         user,
-        "/search-index/page/create",
+        "/l/search-index/page/create",
         method="POST",
         data={"name": _unique("page-two")},
     )
@@ -243,7 +243,7 @@ def test_project_combobox_quick_create_selects_new_project(get_user):
         project_select,
         "Project",
         project_name,
-        "**/search-index/project/create",
+        "**/l/search-index/project/create",
     )
 
     expect(project_select.button).to_contain_text(project_name)
@@ -267,7 +267,7 @@ def test_model_task_form_selector_quick_creates_form(get_user):
         FormSelect(create_form),
         "Form",
         form_name,
-        "**/search-index/form/create",
+        "**/l/search-index/form/create",
     )
 
     with user.page.expect_response("**/create-model"):
@@ -295,7 +295,7 @@ def test_home_create_category_form_selector_quick_creates_form(get_user):
         FormSelect(create_form),
         "Form",
         form_name,
-        "**/search-index/form/create",
+        "**/l/search-index/form/create",
     )
 
     with user.page.expect_response("**/categories/create") as response_info:
@@ -326,7 +326,7 @@ def test_page_info_category_multiselect_quick_creates_category(get_user):
         category_select,
         "Category",
         category_name,
-        "**/search-index/category/create",
+        "**/l/search-index/category/create",
     )
     placeholder = category_select.placeholder
     assert category_name in placeholder

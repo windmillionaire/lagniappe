@@ -177,7 +177,7 @@ def test_page_note_text_photo_and_delete_modal(get_user, browser_failures):
     item.locator(Buttons.LP_DELETE).click()
     with owner.page.expect_response(
         lambda response: response.request.method == "DELETE"
-        and response.url.endswith(f"/activity/{key}")
+        and response.url.endswith(f"/l/activity/{key}")
     ):
         modal.delete()
     expect(item).not_to_be_attached()

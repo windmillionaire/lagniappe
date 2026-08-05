@@ -6,6 +6,7 @@ The build system (`build/`) uses Rollup to bundle the frontend JavaScript and CS
 
 ```
 lagniappe/web/static/
+  ├── 404.html               # Authored runtime-free catch-all page
   ├── script.js              # Main app bundle (ESM)
   ├── login.js               # Login bundle (ESM)
   ├── sentry.js              # Conditional browser monitoring bundle (ESM)
@@ -26,6 +27,11 @@ update.
 tracked. Do not edit static bundles directly. After source changes that need to
 ship generated assets, run `npm run dev` or `npm run build` in an intentional
 build-output pass.
+
+The authored `lagniappe/web/static/404.html` page is an intentional exception to
+the generated-bundle rule. App Engine's final static handler serves it for paths
+outside the dynamic route allowlist, so those requests do not start the
+application runtime.
 
 ### Release output
 

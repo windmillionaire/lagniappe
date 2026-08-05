@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request, E as ENDPOINTS, a as captureError } from './foundation.js?v=bed962f9';
-import './notificationState.js?v=bed962f9';
-import './connectivity.js?v=bed962f9';
+import { r as request, E as ENDPOINTS, a as captureError } from './foundation.js?v=bfd37afb';
+import './notificationState.js?v=bfd37afb';
+import './connectivity.js?v=bfd37afb';
 
 const MAX_SUBSCRIPTIONS_PER_REQUEST = 64;
 const CLIENT_ID_KEY = "lagniappe-poll-client";

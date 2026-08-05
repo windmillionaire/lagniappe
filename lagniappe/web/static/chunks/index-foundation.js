@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from './foundation.js?v=bed962f9';
-import { C as Core } from './core-foundation.js?v=bed962f9';
+import { w as withTransition } from './foundation.js?v=bfd37afb';
+import { C as Core } from './core-foundation.js?v=bfd37afb';
 
 /**
  * Lightweight persisted column-state owner. It applies visibility CSS before
@@ -315,8 +315,8 @@ class EntityIndex extends Core {
 		const trigger = this.elt.querySelector("[data-role='tools-dropdown']");
 		if (!trigger) return;
 		this._dropdownPromise = Promise.all([
-			import('./dropdown.js?v=bed962f9'),
-			import('./styles.js?v=bed962f9'),
+			import('./dropdown.js?v=bfd37afb'),
+			import('./styles.js?v=bfd37afb'),
 		])
 			.then(([{ Dropdown }, { STYLES }]) => {
 				if (this._destroyed || !this.mobile) return null;

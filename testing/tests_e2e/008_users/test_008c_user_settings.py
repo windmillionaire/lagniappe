@@ -166,7 +166,7 @@ def _document_save_response(text):
     def predicate(response):
         post_data = response.request.post_data or ""
         return (
-            response.url.endswith("/sync")
+            response.url.endswith("/l/sync")
             and '"save":true' in post_data
             and text in post_data
         )
@@ -203,7 +203,7 @@ def _fetch_status(user, path, method="POST", data=None):
 
             let response = await send();
             if (response.status === 400 && csrfMethods.has(method)) {
-                const tokenResponse = await fetch("/token");
+                const tokenResponse = await fetch("/l/token");
                 const token = await tokenResponse.text();
                 const tokenElt = document.getElementById("token");
                 if (tokenElt) tokenElt.value = token;
@@ -773,7 +773,7 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     with created_user.page.context.expect_event(
         "response",
         predicate=lambda response: (
-            response.url.endswith("/validate-user")
+            response.url.endswith("/l/validate-user")
             and response.request.method == "POST"
         ),
     ) as validation_info:
@@ -896,7 +896,7 @@ def test_owner_can_reassign_and_remove_user_from_page(get_user):
     with created_user.page.context.expect_event(
         "response",
         predicate=lambda response: (
-            response.url.endswith("/validate-user")
+            response.url.endswith("/l/validate-user")
             and response.request.method == "POST"
         ),
     ) as validation_info:
@@ -988,7 +988,7 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     with affected_user.page.context.expect_event(
         "response",
         predicate=lambda response: (
-            response.url.endswith("/validate-user")
+            response.url.endswith("/l/validate-user")
             and response.request.method == "POST"
         ),
     ) as validation_info:
@@ -1187,7 +1187,7 @@ def test_site_settings_deployment_form_saves_and_updates_summary(
         "[data-role='automatic-instance-counts'] input[name='DEPLOY_MAX_INSTANCES']"
     ).fill("2")
 
-    with owner.page.expect_response("**/set-deployment-settings") as response_info:
+    with owner.page.expect_response("**/l/set-deployment-settings") as response_info:
         form.locator("button[type='submit']").click()
 
     response = response_info.value
@@ -1219,11 +1219,11 @@ def test_site_settings_deployment_form_saves_and_updates_summary(
     with browser_failures.expect_http_error(
         owner,
         status=422,
-        path="/set-deployment-settings",
+        path="/l/set-deployment-settings",
     ):
         rejected = _fetch_status(
             owner,
-            "/set-deployment-settings",
+            "/l/set-deployment-settings",
             data={**deployment_data, "DEPLOY_WORKER_COUNT": "0"},
         )
     assert rejected["status"] == 422
@@ -1251,7 +1251,7 @@ def test_site_settings_ai_form_saves_current_models_through_route(
         )
     }
 
-    with owner.page.expect_response("**/set-ai-settings") as response_info:
+    with owner.page.expect_response("**/l/set-ai-settings") as response_info:
         form.locator("button[type='submit']").click()
 
     response = response_info.value
@@ -1266,11 +1266,11 @@ def test_site_settings_ai_form_saves_current_models_through_route(
     with browser_failures.expect_http_error(
         owner,
         status=422,
-        path="/set-ai-settings",
+        path="/l/set-ai-settings",
     ):
         rejected = _fetch_status(
             owner,
-            "/set-ai-settings",
+            "/l/set-ai-settings",
             data={**expected, "AI_LOCATION": "not-global"},
         )
     assert rejected["status"] == 422
@@ -1284,13 +1284,13 @@ def test_site_maintenance_update_and_cache_refresh_use_real_routes(get_user):
     _, settings_panel = _open_owner_site_settings(owner)
     maintenance = _open_site_settings_section(settings_panel, "maintenance")
 
-    update = _fetch_status(owner, "/site-update", method="POST")
+    update = _fetch_status(owner, "/l/site-update", method="POST")
     assert update["status"] == 200
     assert update["data"]["migration_status"]["status"] == "current"
 
     cache_button = maintenance.locator("[data-role='rebuild-cache']")
     expect(cache_button).to_be_enabled()
-    with owner.page.expect_response("**/rebuild-cache") as response_info:
+    with owner.page.expect_response("**/l/rebuild-cache") as response_info:
         cache_button.click()
     assert response_info.value.status == 200
     expect(cache_button).to_contain_text("Cache Refreshed")
@@ -1315,7 +1315,7 @@ def test_site_settings_image_upload_generates_and_persists_site_images(get_user)
         "site_image_test_image"
     )
 
-    with owner.page.expect_response("**/set-site-image") as response_info:
+    with owner.page.expect_response("**/l/set-site-image") as response_info:
         upload_form.locator("button[type='submit']").click()
 
     response = response_info.value

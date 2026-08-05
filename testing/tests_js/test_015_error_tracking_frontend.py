@@ -180,8 +180,8 @@ if (sentryProcessorsRef.length !== 1) {
 const result = sentryProcessorsRef[0]({
   type: "generic",
   level: "warning",
-  transaction: "home.notifications",
-  culprit: "home.notifications",
+  transaction: "internal.notifications",
+  culprit: "internal.notifications",
   metadata: { title: "Blocking Operation" },
   contexts: {
     trace: {
@@ -243,11 +243,11 @@ configureSentry();
 
 const event = {
   type: "transaction",
-  transaction: "home.notifications",
+  transaction: "internal.notifications",
   spans: [
     { op: "ui.long-task", description: "Main UI thread blocked" },
     { op: "ui.long-animation-frame", description: "Main UI thread blocked" },
-    { op: "http.client", description: "GET /notifications" },
+    { op: "http.client", description: "GET /l/notifications" },
   ],
 };
 

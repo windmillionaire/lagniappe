@@ -272,7 +272,7 @@ class StarButton:
     def toggle(self):
         """Toggle the star button."""
         starred = self.button.get_attribute("data-active") == "true"
-        with self.button.page.expect_response("**/toggle-star/*"):
+        with self.button.page.expect_response("**/l/toggle-star/*"):
             self.button.click()
 
         expected = "false" if starred else "true"

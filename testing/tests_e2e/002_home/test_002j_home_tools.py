@@ -50,7 +50,7 @@ def _tool_route_status(user, path):
 
             let response = await send();
             if (response.status === 400) {
-                const token = await (await fetch("/token")).text();
+                const token = await (await fetch("/l/token")).text();
                 const tokenElt = document.getElementById("token");
                 if (tokenElt) tokenElt.value = token;
                 response = await send();
@@ -498,7 +498,7 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
             with user.page.context.expect_event(
                 "response",
                 predicate=lambda response: (
-                    response.url.endswith("/validate-user")
+                    response.url.endswith("/l/validate-user")
                     and response.request.method == "POST"
                 ),
             ) as validation_info:
@@ -567,7 +567,7 @@ def test_ask_access_can_read_create_report_without_create_actions(get_user):
     with user.page.context.expect_event(
         "response",
         predicate=lambda response: (
-            response.url.endswith("/validate-user")
+            response.url.endswith("/l/validate-user")
             and response.request.method == "POST"
         ),
     ) as validation_info:

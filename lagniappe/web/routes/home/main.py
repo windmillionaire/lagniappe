@@ -10,7 +10,7 @@ from lagniappe.core.properties.activity import NOTE_VISIBILITIES
 from lagniappe.web.auth import home_permission, logged_in, require_ai_access
 from lagniappe.web import responses
 
-from . import home
+from . import home, internal
 
 
 # @testable true
@@ -29,7 +29,7 @@ def home_page():
 # @tests tests_e2e/002_home/test_002a_home.py::test_model_lists_load_on_toggle
 # @features home
 # @dimensions prefetch lazy-load task-list task-count project-list category-list
-@home.route("/get/<kind>")
+@internal.route("/get/<kind>")
 @home_permission()
 def get(kind):
     if kind == "tools":
@@ -56,7 +56,7 @@ def get(kind):
 # @features activity notes
 # @dimensions load cached-response notes-only
 # @pair activity:notes-exclusion
-@home.route("/activity")
+@internal.route("/activity")
 @home_permission()
 def activity():
     home = Entities.HOME()
@@ -70,7 +70,7 @@ def activity():
 # @pair notifications:target-link
 # @pair offline:dropdown-refresh
 # @pair offline:target-link
-@home.route("/notifications")
+@internal.route("/notifications")
 @logged_in
 def notifications():
     notification_keys = []
@@ -100,7 +100,7 @@ def notifications():
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_deletes_and_clears
 # @features notifications
 # @dimensions clear-all ownership
-@home.route("/notifications", methods=["DELETE"])
+@internal.route("/notifications", methods=["DELETE"])
 @logged_in
 def clear_notifications():
     notification_keys = Entities.NOTIFICATION.keys_for_parent(current_user)
@@ -131,7 +131,7 @@ def clear_notifications():
 # @pair notes:owner-only-shared
 # @pair notes:private-default
 # @pair permissions:owner-only-shared
-@home.route("/activity/notes", methods=["POST"])
+@internal.route("/activity/notes", methods=["POST"])
 @logged_in
 def create_note():
     body = (request.form.get("body") or "").strip()
@@ -165,7 +165,7 @@ def create_note():
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_delete_activity_item_from_home
 # @features activity notes notifications
 # @dimensions delete ownership
-@home.route("/activity/<key>", methods=["DELETE"])
+@internal.route("/activity/<key>", methods=["DELETE"])
 @logged_in
 def delete_activity(key):
     activity = Entities.fetch_one(key, request=Fetch.direct())
@@ -194,7 +194,7 @@ def delete_activity(key):
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_file
 # @features starred
 # @dimensions category project page file
-@home.route("/toggle-star/<key>", methods=["PATCH"])
+@internal.route("/toggle-star/<key>", methods=["PATCH"])
 @logged_in
 def toggle_star(key):
     """Toggle starred status for an entity.

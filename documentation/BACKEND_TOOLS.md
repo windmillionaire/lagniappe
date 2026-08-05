@@ -204,11 +204,11 @@ notification mutation increments the watched epoch, so optimistic transaction
 retry reruns the query instead of publishing stale membership. Post-commit
 notification effects upsert/remove keys and advance the revision once per
 logical mutation. When state is absent they advance only the epoch; they never
-query Datastore. `/notifications` runs its list keys query inside the same
+query Datastore. `/l/notifications` runs its list keys query inside the same
 watched repair and reuses those keys to fetch bodies.
 
 Redis errors are rebuildable provider failures: they are captured after the
-durable mutation and cannot roll it back. `/ping` similarly omits the optional
+durable mutation and cannot roll it back. `/l/ping` similarly omits the optional
 notification-state header on Redis error while preserving its server-health
 response.
 
@@ -417,7 +417,7 @@ or failure.
 
 Existing page/task targets also acquire a durable `form-autofill` lock in the
 same transaction as the job. While it is active, form submit/quick-edit/default
-routes reject conflicting mutations. The unified `/poll` contract returns an
+routes reject conflicting mutations. The unified `/l/poll` contract returns an
 active `form-lock` independently of fingerprint drift, allowing the browser to
 disable the form and replace the complete submit/autofill-context action area
 with progress on reload or in another tab. Forms do not register with document
@@ -724,7 +724,7 @@ request.
 | Task uncompletion | `process.uncomplete_task` | Task schedule creates new task |
 | Shared deferred jobs | `process.deferred_job_process` (`/process/jobs`) | Report generation/revision, page/task autofill, page generation, site export, file OCR, and file summary |
 | Long-running feedback | `process.deferred_job_feedback` (`/process/jobs/feedback`) | Production deferred jobs that start with a pending notification |
-| Deferred-job recovery | `process.deferred_job_reconcile` (`/process/jobs/reconcile`) | Five-minute Cloud Scheduler OIDC request; redelivers missing/expired work and incomplete terminal delivery |
+| Deferred-job recovery | `process.deferred_job_reconcile` (`/process/jobs/reconcile`) | Five-minute Cloud Scheduler OIDC request while recovery-required jobs exist; redelivers missing/expired work, completes terminal delivery, and self-pauses when empty |
 
 See [BACKEND_ENTITIES.md](BACKEND_ENTITIES.md) for the durable job record and
 [AI_PIPELINE.md](AI_PIPELINE.md) for the lease, retry, checkpoint, context, and

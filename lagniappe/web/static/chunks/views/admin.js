@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as Entity } from '../entity-foundation.js?v=bed962f9';
-import '../core-foundation.js?v=bed962f9';
-import '../connectivity.js?v=bed962f9';
-import '../foundation.js?v=bed962f9';
-import '../notificationState.js?v=bed962f9';
+import { E as Entity } from '../entity-foundation.js?v=bfd37afb';
+import '../core-foundation.js?v=bfd37afb';
+import '../connectivity.js?v=bfd37afb';
+import '../foundation.js?v=bfd37afb';
+import '../notificationState.js?v=bfd37afb';
 
 /**
  * @testable true

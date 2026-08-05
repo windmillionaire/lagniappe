@@ -74,7 +74,7 @@ Browser form
   -> most adapters save final prepared output in DeferredJob.checkpoint
   -> adapter inspects current durable state and applies idempotently
   -> job/result/notification terminal state saved
-  -> operation status revision becomes visible through POST /poll
+  -> operation status revision becomes visible through POST /l/poll
   -> shared polling coordinator refetches the authoritative destination
   -> notification Redis state and entity revisions refresh other mounted surfaces
 ```
@@ -99,7 +99,7 @@ There are three different checkpoint systems and they should not be conflated:
 | Report proposal contract | `ai/reporting/contracts.py`, `proposals.py`, and `organize_completion.py` | Shared action schemas and ordering, proposal validation/repair, and Organize file-summary/submission completion. |
 | Durable generation | `deferred_jobs.py` and adapters | Job creation, claim/lease, retries, checkpoint, inspect/apply, cleanup, and durable notification state. |
 | Proposal application | `ai/report_runner.py` and `ai/reporting/actions/` | Ledger coordination plus callback-registered deterministic action inspection, execution, retry, compensation, and undo. |
-| Browser completion | `/poll`, `PollingCoordinator`, `DeferredOperationManager`, `Core`, and `EditWatcher` | Operation acknowledgement, owner-safe status, revision validation, notification refresh, collection reconciliation, and watched-form refetch. |
+| Browser completion | `/l/poll`, `PollingCoordinator`, `DeferredOperationManager`, `Core`, and `EditWatcher` | Operation acknowledgement, owner-safe status, revision validation, notification refresh, collection reconciliation, and watched-form refetch. |
 
 ## End-to-end workflow
 
@@ -553,7 +553,7 @@ proposal/checkpoint data. Automatic compaction is not implemented.
 
 - The job's `status_revision`, terminal status, and destination metadata are
   durable.
-- `operation` subscriptions return that bounded projection through `/poll`.
+- `operation` subscriptions return that bounded projection through `/l/poll`.
 - The already loaded request user's `operation_revision` gates those job
   projections, so a quiet poll does not read durable-job rows. Notification
   mutations use the separate expiring Redis notification projection and cannot
@@ -561,7 +561,7 @@ proposal/checkpoint data. Automatic compaction is not implemented.
 - A terminal result fetches authoritative destination HTML/data; it never
   carries AI context or output in the polling payload.
 - Notification entities are saved durably; their post-commit Redis generation,
-  revision, and count reach active tabs through `/ping`, existing poll traffic,
+  revision, and count reach active tabs through `/l/ping`, existing poll traffic,
   or one cold-cache seed poll.
 - `lp-deferred` remains online-only and does not replay later against
   potentially changed permissions or target state.

@@ -9,7 +9,7 @@ from lagniappe.core.tools import cache, location
 from lagniappe.web.auth import logged_in
 from lagniappe.web import responses
 
-from . import home
+from . import internal
 
 
 CREATABLES = {
@@ -138,7 +138,7 @@ def _quick_create_entity(kind, form):
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_page_info_category_multiselect_quick_creates_category
 # @features search facets quick-create
 # @dimensions search-results command-row
-@home.route("/search-index/<kind>")
+@internal.route("/search-index/<kind>")
 @logged_in
 def index(kind):
     g.NO_CACHE = True
@@ -192,7 +192,7 @@ def index(kind):
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_home_create_category_form_selector_quick_creates_form
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_page_info_category_multiselect_quick_creates_category
 # @pairs quick-create:create-route quick-create:created-option
-@home.route("/search-index/<kind>/create", methods=["POST"])
+@internal.route("/search-index/<kind>/create", methods=["POST"])
 @logged_in
 def create_index(kind):
     if not _can_quick_create(kind):
@@ -212,7 +212,7 @@ def create_index(kind):
 # @pair projects:search
 # @pair search:navbar-results
 # @pair search:task-model
-@home.route("/search-bar")
+@internal.route("/search-bar")
 @logged_in
 def search_bar():
     g.NO_CACHE = True
@@ -235,7 +235,7 @@ def search_bar():
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_result_titles
 # @features search
 # @dimensions query-display no-results result-title
-@home.route("/search-page")
+@internal.route("/search-page")
 @logged_in
 def search_page():
     g.NO_CACHE = True
@@ -289,7 +289,7 @@ def _search_page_pagination(page, results, total, per_page=10):
 # @testable true
 # @tests tests_unit/test_003d_submission_location.py::test_resolve_location_query_first_hit_wins
 # @tests tests_unit/test_003d_submission_location.py::test_resolve_location_query_retries_after_simplify
-@home.route("/search-location")
+@internal.route("/search-location")
 @logged_in
 def location_search():
     g.NO_CACHE = True

@@ -65,9 +65,9 @@ async function precacheStaticAssets() {
  */
 const _validateUser = async (cacheConfirmation = {}) => {
 	try {
-		const response = await fetch("/token", TOKEN_REQUEST);
+		const response = await fetch("/l/token", TOKEN_REQUEST);
 		const newToken = await response.text();
-		await fetch("/validate-user", {
+		await fetch("/l/validate-user", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -169,7 +169,7 @@ async function clearSiblingCacheEntries(newETag, storedETag, url, pathname) {
 	if (storedETag && newETag && storedETag === newETag) return;
 	const shouldClear =
 		pathname === "/" ||
-		pathname.startsWith("/get") ||
+		pathname.startsWith("/l/get") ||
 		pathname.startsWith("/categories") ||
 		pathname.includes("/index") ||
 		pathname.includes("/rows");
@@ -349,8 +349,8 @@ self.addEventListener("fetch", (event) => {
 
 	if (requestUrl.includes("extension://")) return;
 	if (url.origin !== self.location.origin) return;
-	if (pathname === "/ping") return;
-	if (pathname === "/token" && event.request.method === "GET") {
+	if (pathname === "/l/ping") return;
+	if (pathname === "/l/token" && event.request.method === "GET") {
 		event.respondWith(handleNetworkOnlyGet(event));
 		return;
 	}
@@ -624,7 +624,7 @@ async function handleRequest(event, pathname) {
 	try {
 		const response = await fetch(request);
 
-		if (pathname !== "/validate-user" && responseInvalidatesCache(response)) {
+		if (pathname !== "/l/validate-user" && responseInvalidatesCache(response)) {
 			event.waitUntil(checkForCacheInvalidation(response));
 		}
 

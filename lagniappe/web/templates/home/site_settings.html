@@ -31,7 +31,7 @@
        data-visible="false"
        data-controls="{{ controls|yesno }}"
        lp-load
-       data-route="{{ url_for('home.site_settings') }}">
+       data-route="{{ url_for('internal.site_settings') }}">
     <div class="{{ styles.form.default }}">
       {% call site_settings_section('maintenance', 'SiteMaintenance', 'Maintenance', 'site_maintenance', 'Cache, updates, and configuration', true) %}
         <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">

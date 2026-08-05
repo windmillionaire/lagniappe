@@ -64,7 +64,7 @@ places where a real user would wonder what happens next.
    - `search-review` is useful for the full search results page. It loads
      category, page, project, task, form, and user data with a shared `filter`
      query token so facets, snippets, result links, and pagination can be
-     reviewed from `/search-page?q=filter`.
+     reviewed from `/l/search-page?q=filter`.
    - `task-index-review` is useful for the global active-task index. It loads
      personal and page-backed active tasks with due dates, assignment,
      project/model links, and attached-form data, plus one completed contrast

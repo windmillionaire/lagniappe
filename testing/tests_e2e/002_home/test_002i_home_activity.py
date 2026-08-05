@@ -103,7 +103,7 @@ def _create_text_note_from_home(
         ).to_be_checked()
 
     if expect_network:
-        with user.page.expect_response("**/activity/notes"):
+        with user.page.expect_response("**/l/activity/notes"):
             form.locator("button[type='submit']").click()
     else:
         form.locator("button[type='submit']").click()
@@ -127,7 +127,7 @@ def _create_photo_note_from_home(user, home, body, visibility="private"):
     expect(form.locator("textarea[name='body']")).to_have_value(body)
     expect(form.locator("[data-role='photo-preview']")).to_be_visible()
 
-    with user.page.expect_response("**/activity/notes"):
+    with user.page.expect_response("**/l/activity/notes"):
         form.locator("button[type='submit']").click()
 
     item = _activity_item(home, body)
@@ -270,7 +270,7 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
 
     private_body = _unique("Private Home note")
     form.locator("textarea[name='body']").fill(private_body)
-    with user.page.expect_response("**/activity/notes"):
+    with user.page.expect_response("**/l/activity/notes"):
         form.locator("button[type='submit']").click()
     private_item = _activity_item(home, private_body)
     expect(private_item).to_be_visible()
@@ -284,7 +284,7 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
         cookie["name"]: cookie["value"] for cookie in user.page.context.cookies()
     }
     response = requests.post(
-        f"{SETTINGS.test_config['BASE_URL']}/activity/notes",
+        f"{SETTINGS.test_config['BASE_URL']}/l/activity/notes",
         data={"body": forbidden_body, "visibility": "everyone"},
         cookies=cookies,
         headers={
@@ -343,7 +343,7 @@ def test_delete_activity_item_from_home(get_user):
     with user.page.expect_response(
         lambda response: (
             response.request.method == "DELETE"
-            and response.url.endswith(f"/activity/{own_note.urlsafe_key}")
+            and response.url.endswith(f"/l/activity/{own_note.urlsafe_key}")
         )
     ):
         modal.delete()
@@ -527,7 +527,7 @@ def test_notification_menu_deletes_and_clears(get_user):
 
     first_option = panel.locator("[role='option']").filter(has_text=first_body)
     expect(first_option).to_be_visible()
-    with user.page.expect_response(f"**/activity/{first.urlsafe_key}"):
+    with user.page.expect_response(f"**/l/activity/{first.urlsafe_key}"):
         first_option.locator("[data-action='delete-notification']").click()
 
     expect(panel).to_be_visible()
@@ -540,7 +540,7 @@ def test_notification_menu_deletes_and_clears(get_user):
     with user.page.expect_response(
         lambda response: (
             response.request.method == "DELETE"
-            and response.url.endswith("/notifications")
+            and response.url.endswith("/l/notifications")
         )
     ):
         clear_all.click()
@@ -617,7 +617,7 @@ def test_offline_home_create_mutations_persist_after_reload(get_user, browser_fa
                 expect(_task_item(home, task_name)).not_to_be_attached()
 
                 with user.page.expect_response(
-                    "**/activity/notes", timeout=15000
+                    "**/l/activity/notes", timeout=15000
                 ):
                     with user.page.expect_response("**/personal", timeout=15000):
                         user.offline = False
@@ -723,7 +723,7 @@ def test_offline_home_mutations_replay_when_online(get_user, browser_failures):
             "data-key", re.compile(r"^offline:")
         )
 
-    with user.page.expect_response("**/activity/notes", timeout=15000):
+    with user.page.expect_response("**/l/activity/notes", timeout=15000):
         user.offline = False
 
     replayed_item = _activity_item(home, note_body)

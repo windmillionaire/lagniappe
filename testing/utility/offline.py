@@ -1,3 +1,6 @@
+from contextlib import contextmanager
+from urllib.parse import urlsplit
+
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 
@@ -53,6 +56,64 @@ async ({{ storeName, minimum, exact, savedHtmlContains, recordKey, recordValue }
     return countMatches && contentMatches ? scopedRows : false;
 }}
 """
+
+SYNC_MANAGER_READY = """
+async () => {
+    const view = document.querySelector("[lp-view]")?._lp_view;
+    const manager = await view?.syncReady;
+    if (!manager) return false;
+    await manager.ready;
+    return true;
+}
+"""
+
+
+@contextmanager
+def expect_offline_sync_replay(
+    user,
+    *,
+    request_payload_contains,
+    expected_count=1,
+):
+    """Observe startup-owned document replay and await its SyncManager."""
+    markers = (
+        (request_payload_contains,)
+        if isinstance(request_payload_contains, str)
+        else tuple(request_payload_contains)
+    )
+    if not markers:
+        raise ValueError("Offline sync replay waits require request payload markers.")
+    if expected_count < 1:
+        raise ValueError("Offline sync replay waits require a positive response count.")
+
+    page = user.page
+    responses = []
+
+    def record_replay(response):
+        request = response.request
+        body = request.post_data or ""
+        if (
+            request.method == "POST"
+            and urlsplit(response.url).path == "/l/sync"
+            and all(marker in body for marker in markers)
+        ):
+            responses.append(response)
+
+    page.on("response", record_replay)
+    try:
+        yield responses
+        manager_ready = page.evaluate(SYNC_MANAGER_READY)
+    finally:
+        page.remove_listener("response", record_replay)
+
+    assert manager_ready, "Persisted document replay did not start SyncManager"
+    assert len(responses) == expected_count, (
+        f"Expected {expected_count} matching offline sync replay response(s), "
+        f"received {len(responses)}."
+    )
+    assert all(response.ok for response in responses), (
+        "Offline sync replay returned a non-success response."
+    )
 
 
 def _validate_record_wait(*, minimum, exact, saved_html_contains):

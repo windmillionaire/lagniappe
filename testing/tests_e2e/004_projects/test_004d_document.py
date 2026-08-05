@@ -53,7 +53,7 @@ def test_untouched_document_does_not_save_or_touch_project(get_user):
     sync_updates = []
 
     def record_sync_updates(request):
-        if request.method != "POST" or not request.url.endswith("/sync"):
+        if request.method != "POST" or not request.url.endswith("/l/sync"):
             return
         sync_updates.extend((request.post_data_json or {}).get("updates", []))
 
@@ -66,7 +66,7 @@ def test_untouched_document_does_not_save_or_touch_project(get_user):
     with expect_successful_response(
         user.page,
         method="POST",
-        path="/poll",
+        path="/l/poll",
         request_payload_contains=(
             f'"closed_documents":["{document_sync_id}"]'
         ),

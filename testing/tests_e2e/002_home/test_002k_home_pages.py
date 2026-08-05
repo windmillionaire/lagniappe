@@ -79,7 +79,7 @@ def test_home_page_create_visible_for_category_editor(get_user):
     create_form = home.create_page_form()
     category_select = Select(create_form.locator("[data-role='categories']"))
     with user.page.expect_response(
-        lambda response: "/search-index/category" in response.url
+        lambda response: "/l/search-index/category" in response.url
         and "permission=edit" in response.url
     ):
         category_select.fill("ACL Create")

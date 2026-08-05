@@ -1328,7 +1328,7 @@ const _formatError = async (
  */
 const _refreshToken = async () => {
 	try {
-		const response = await fetch("/token", TOKEN_REQUEST);
+		const response = await fetch("/l/token", TOKEN_REQUEST);
 		if (!response.ok) {
 			throw new Error(`Failed to refresh token: ${response.statusText}`);
 		}
@@ -1342,7 +1342,8 @@ const _refreshToken = async () => {
 		}
 		return newToken;
 	} catch (error) {
-		captureNetworkError(error, "/token", { });
+		captureNetworkError(error, "/l/token", {
+			});
 		return null;
 	}
 };
@@ -2616,7 +2617,7 @@ initializeAgentLoginForms();
  */
 async function initializeIdentityPlatform() {
 	try {
-		const response = await fetch("/identity-config");
+		const response = await fetch("/l/identity-config");
 		const config = await response.json();
 		return new IdentityPlatformClient(config);
 	} catch (error) {

@@ -477,7 +477,7 @@ fingerprint, and cache failure never rolls back the durable entity mutation.
 It is deliberately separate from `modified` and the authorization fingerprint,
 so job activity does not invalidate the user entity, global users list, or
 authorization-derived response caches. The request authentication path already
-loads the user for `/poll`, allowing operation descriptors to compare the gate
+loads the user for `/l/poll`, allowing operation descriptors to compare the gate
 without another User read. The historical `User.notification_revision`
 property remains readable for stored-record compatibility but is no longer
 read, updated, or used as an invalidation authority. Notification count and
@@ -556,6 +556,26 @@ provider preparation or domain apply. The legacy field names remain in the
 durable job schema for upgrade compatibility; they no longer represent
 provider sends.
 
+The stable `site/deferred-jobs-control` record tracks the URL-safe keys of jobs
+that still require recovery. Membership includes `queued`, `running`, and
+`retry_wait` jobs plus terminal jobs whose delivery remains pending. Creation
+adds membership in the job transaction; cancellation, failed pre-claim setup,
+and the final `delivery_pending` to `complete` transition remove it in their
+job transactions. The set makes duplicate lifecycle calls harmless and its
+derived count is diagnostic rather than a separate authority.
+
+That site record also stores initialization state, desired/applied Scheduler
+state, a monotonic generation, and a short synchronization lease. The first
+job requires the exact Cloud Scheduler reconciler to be enabled before its
+start request succeeds; the last completion requests a pause, whose failure is
+safe because it only permits extra recovery calls. One lease holder serializes
+provider mutations and rereads the latest generation after each API response,
+so a concurrent first-job resume wins over a stale last-job pause. Existing
+installations bootstrap membership from the durable recovery query with an
+optimistic generation check. Status-class changes advance that generation so
+the scan cannot publish a mixed view of its separate status queries. Two clean
+empty bootstrap runs are required before an existing installation may pause.
+
 Cloud Tasks sends only `{ "job_key": "..." }` to `/process/jobs`. Deterministic
 task IDs make duplicate scheduling harmless, and a delivery may run for up to
 30 minutes. A configured production queue must return a task identity. A
@@ -565,12 +585,13 @@ still fails fast. A second deterministic task checks the job after two minutes
 and, if it is still queued or running, replaces the pending notification with a
 clear "still working" message.
 
-The Cloud Scheduler reconciler calls `/process/jobs/reconcile` every five
-minutes. After a two-minute grace period it compare-and-set claims missing
-dispatches, expired-running leases, overdue retry waits, and incomplete
-terminal delivery. It redispatches with a revision-qualified deterministic task
-ID. Work older than three hours transitions atomically to failed before normal
-failure cleanup and notification persistence run. Terminal records are retained
+While recovery-required work exists, the Cloud Scheduler reconciler calls
+`/process/jobs/reconcile` every five minutes. After a two-minute grace period it
+compare-and-set claims missing dispatches, expired-running leases, overdue retry
+waits, and incomplete terminal delivery. It redispatches with a
+revision-qualified deterministic task ID. Work older than three hours
+transitions atomically to failed before normal failure cleanup and notification
+persistence run. Terminal records are retained
 for operational review until an owner applies the AI Analytics retention
 controls. That manual cleanup deletes terminal jobs in the selected age window
 but preserves active work and terminal jobs whose delivery is still pending;

@@ -4,7 +4,7 @@
 {% macro list(starred) %}
   <ul data-widget="StarredList"
       data-visible="false"
-      data-route='{{ url_for("home.get", kind="starred") }}'
+      data-route='{{ url_for("internal.get", kind="starred") }}'
       class="{{ styles.home.card.list }}">
     {% for s in starred.list %}{{ starred_entity(s) }}{% endfor %}
     {% if starred.cursor or starred.back %}
@@ -12,14 +12,14 @@
         {% if starred.back %}
           <button class="{{ styles.home.pagination.button }}"
                   lp-control="previous"
-                  data-route='{{ url_for("home.get", kind="starred", cursor=None) }}'>
+                  data-route='{{ url_for("internal.get", kind="starred", cursor=None) }}'>
             {{ render_icon("start") }}
           </button>
         {% endif %}
         {% if starred.cursor %}
           <button class="{{ styles.home.pagination.button }}"
                   lp-control="next"
-                  data-route='{{ url_for("home.get", kind="starred", cursor=starred.cursor) }}'>
+                  data-route='{{ url_for("internal.get", kind="starred", cursor=starred.cursor) }}'>
             {{ render_icon("next") }}
           </button>
         {% endif %}

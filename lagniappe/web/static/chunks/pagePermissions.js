@@ -1,18 +1,18 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request } from './foundation.js?v=bed962f9';
-import './connectivity.js?v=bed962f9';
-import { p as primitives } from './primitives.js?v=bed962f9';
-import { F as FacetsBox } from './facets.js?v=bed962f9';
-import { F as FormElement } from './form2.js?v=bed962f9';
-import './notificationState.js?v=bed962f9';
-import './styles.js?v=bed962f9';
-import './icons.js?v=bed962f9';
-import './combobox.js?v=bed962f9';
-import './results.js?v=bed962f9';
-import './formatting.js?v=bed962f9';
-import './submitter.js?v=bed962f9';
-import './baseForm.js?v=bed962f9';
-import './loader.js?v=bed962f9';
+import { r as request } from './foundation.js?v=bfd37afb';
+import './connectivity.js?v=bfd37afb';
+import { p as primitives } from './primitives.js?v=bfd37afb';
+import { F as FacetsBox } from './facets.js?v=bfd37afb';
+import { F as FormElement } from './form2.js?v=bfd37afb';
+import './notificationState.js?v=bfd37afb';
+import './styles.js?v=bfd37afb';
+import './icons.js?v=bfd37afb';
+import './combobox.js?v=bfd37afb';
+import './results.js?v=bfd37afb';
+import './formatting.js?v=bfd37afb';
+import './submitter.js?v=bfd37afb';
+import './baseForm.js?v=bfd37afb';
+import './loader.js?v=bfd37afb';
 
 /**
  * @testable true

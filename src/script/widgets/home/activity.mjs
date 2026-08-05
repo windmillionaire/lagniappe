@@ -62,7 +62,7 @@ export class HomeActivityList extends BaseList {
 		}
 		if (item.dataset.kind === "note") return;
 
-		const route = `/activity/${key}`;
+		const route = `/l/activity/${key}`;
 		if (!this.view.online) {
 			const queue =
 				this.view.offlineQueue || (await this.view.ensureOfflineQueue?.());

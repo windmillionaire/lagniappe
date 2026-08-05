@@ -16,7 +16,7 @@ from lagniappe.core.tools.polling import (
 from lagniappe.web import responses
 from lagniappe.web.auth import logged_in
 
-from . import home
+from . import internal
 
 
 POLL_PROTOCOL_VERSION = 1
@@ -307,7 +307,7 @@ def _document_result(descriptor, entity, client_id):
 # @dimensions protocol entity channel operation document presence permissions authorization fingerprint unavailable owner batching progress revision timing lifecycle
 # @pairs notifications:cold-seed notifications:ping notifications:redis-projection
 # @pairs polling:personal-state polling:piggyback web-headers:notification-state
-@home.route("/poll", methods=["POST"])
+@internal.route("/poll", methods=["POST"])
 @logged_in
 def poll():
     """Resolve every due browser subscription through one typed contract."""

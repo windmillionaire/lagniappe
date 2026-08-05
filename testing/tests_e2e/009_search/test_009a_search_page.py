@@ -86,7 +86,7 @@ def _result_titles(user):
 
 
 def _go_to_search_page(user, query):
-    search_page = SitePage(url="/search-page")
+    search_page = SitePage(url="/l/search-page")
     user.go(search_page, query_params={"q": query})
     results_view = user.locate("[lp-view][data-kind='results']")
     expect(results_view).to_be_visible()
@@ -99,7 +99,7 @@ def test_search_page_requires_login(get_user):
     """Anonymous search requests redirect to login with the target preserved."""
     anonymous = get_user(Users.ANONYMOUS)
     base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
-    anonymous.navigate(f"{base_url}/search-page?q=private-search")
+    anonymous.navigate(f"{base_url}/l/search-page?q=private-search")
 
     expect(anonymous.page).to_have_url(
         re.compile(r"/users/login\?next=.*search-page.*private-search")
@@ -116,7 +116,7 @@ def test_search_from_navbar(get_user):
 
     search_input = user.locate(SEARCH_INPUT)
     search_input.fill(project.definition.name)
-    with user.page.expect_navigation(url="**/search-page**"):
+    with user.page.expect_navigation(url="**/l/search-page**"):
         search_input.press("Enter")
 
     expect(user.page).to_have_url(re.compile(r".*/search-page\?q=.*"))

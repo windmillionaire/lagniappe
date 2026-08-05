@@ -13,7 +13,11 @@ from .network import (
     multipart_form_fields,
     scoped_browser_route,
 )
-from .offline import wait_for_offline_mutations, wait_for_offline_sync_records
+from .offline import (
+    expect_offline_sync_replay,
+    wait_for_offline_mutations,
+    wait_for_offline_sync_records,
+)
 from .polling import expect_poll_result
 from .reconnect import expect_reconnect_refresh
 from .test_file import TestFile
@@ -22,6 +26,7 @@ from .test_reporting import TestResults
 __all__ = [
     "assert_lagniappe_error_response",
     "capture_on_failure",
+    "expect_offline_sync_replay",
     "expect_poll_result",
     "expect_successful_response",
     "expect_reconnect_refresh",

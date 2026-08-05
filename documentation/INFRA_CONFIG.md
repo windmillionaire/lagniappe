@@ -279,7 +279,12 @@ seconds, including while a provider call blocks, and control checks run between
 provider rounds and tool handlers. Normal retry delays are 60, 180, and 600
 seconds; quota retries are 60 and 300 seconds plus up to 30 seconds of positive
 jitter. The reconciler uses a two-minute grace period, runs every five minutes,
-and fails work that remains active for three hours. Independently, a two-minute
+and fails work that remains active for three hours. Its setup-owned Cloud
+Scheduler job is enabled only while the transactionally maintained
+`site/deferred-jobs-control` record contains recovery-required jobs; an empty
+reconciliation initializes or repairs that record, and a second clean empty
+bootstrap run pauses future runs.
+Independently, a two-minute
 feedback task keeps long-running state visible while a provider request remains
 active. Terminal deferred-job failures wait briefly for Sentry delivery before
 the Cloud Tasks request returns so App Engine suspension cannot strand a queued
@@ -448,6 +453,20 @@ PDF previews also serve PDF.js auxiliary decoder assets from `/pdfjs/wasm/`;
 keep those handlers before the general `*.js` handler when changing static
 asset routing.
 
+Dynamic App Engine handlers are an allowlist of the registered blueprint URL
+prefixes, a few unprefixed navigable pages, the root page, and App Engine's
+`/_ah/` lifecycle routes. Browser protocol routes such as sync, polling, search
+fragments, session maintenance, and site settings live under the `/l`
+blueprint, so adding one does not expand the root allowlist. The final handler
+serves the generated `lagniappe/web/static/404.html` page for every other path.
+Obvious probes therefore receive a familiar not-found page without starting
+Gunicorn. App Engine static handlers cannot assign a 404 response status, so
+this is intentionally a no-index, no-store soft 404. The authored page lives at
+`lagniappe/web/static/404.html`; it does not require a frontend build step. Keep
+`APP_BLUEPRINT_ROUTE_PREFIXES` synchronized with
+`lagniappe/web/start/blueprints.py` and `APP_ROOT_ROUTE_PREFIXES` synchronized
+with Home and `main.py` routes; the tooling contract checks both.
+
 ### Deployment Settings (`deployment.py`)
 
 Normalizes deployment settings used by setup-generated `lagniappe.yaml`,
@@ -472,7 +491,7 @@ catalog and preserves any saved custom current model names.
 2. Switches to the correct GCloud configuration
 3. Starts Flask with `FLASK_ENV=testing` on the test port
 4. Filters server output to hide static file requests (fonts, chunks, icons, etc.)
-5. Allows a cold Flask import up to roughly 17 seconds to make `/ping` healthy
+5. Allows a cold Flask import up to roughly 17 seconds to make `/l/ping` healthy
    before treating startup as failed
 
 The repository test runner performs the same preflight before launching pytest

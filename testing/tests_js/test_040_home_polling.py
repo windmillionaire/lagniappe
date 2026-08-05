@@ -46,21 +46,21 @@ vm.runInContext(source, context);
 const notes = {
   name: "HomeActivityList",
   loaded: true,
-  route: "/get/notes",
+  route: "/l/get/notes",
   target: { dataset: { pollRevision: "notes-1" } },
   async refresh() { refreshed.push("notes"); },
 };
 const tasks = {
   name: "HomeTaskList",
   loaded: true,
-  route: "/get/tasks",
+  route: "/l/get/tasks",
   target: { dataset: { pollRevision: "tasks-1" } },
   async refresh() { refreshed.push("tasks"); },
 };
 const pages = {
   name: "HomePageList",
   loaded: false,
-  route: "/get/pages",
+  route: "/l/get/pages",
   target: { dataset: { pollRevision: "pages-1" } },
   async refresh() { refreshed.push("pages"); },
 };

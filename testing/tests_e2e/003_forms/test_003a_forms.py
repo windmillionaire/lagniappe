@@ -131,7 +131,7 @@ def test_form_delete_modal_lists_page_and_task_users(get_user):
         trigger = Table(user).get_row(form.name).locator(
             f"td[data-column='delete'] {Buttons.LP_DELETE}"
         )
-        with user.page.expect_response(f"**/delete/{form.urlsafe_key}"):
+        with user.page.expect_response(f"**/l/delete/{form.urlsafe_key}"):
             modal = Modal(user.page).open(trigger)
 
         links = modal.element.locator("a[data-role='title']")

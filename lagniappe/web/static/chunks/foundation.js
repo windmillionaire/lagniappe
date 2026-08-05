@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { a as applyNotificationStateHeader } from './notificationState.js?v=bed962f9';
-import { c as connectivity } from './connectivity.js?v=bed962f9';
+import { a as applyNotificationStateHeader } from './notificationState.js?v=bfd37afb';
+import { c as connectivity } from './connectivity.js?v=bfd37afb';
 
 /**
  * @testable false
@@ -515,34 +515,34 @@ const ENDPOINTS = {
 	},
 	SiteAiModels: () => {
 		return {
-			setAiSettings: "/set-ai-settings",
+			setAiSettings: "/l/set-ai-settings",
 		};
 	},
 	SiteDeployment: () => {
 		return {
-			setDeploymentSettings: "/set-deployment-settings",
+			setDeploymentSettings: "/l/set-deployment-settings",
 		};
 	},
 	SiteImage: () => {
 		return {
-			setSiteImage: "/set-site-image",
+			setSiteImage: "/l/set-site-image",
 		};
 	},
 	SiteMaintenance: () => {
 		return {
-			siteConfiguration: "/site-configuration",
-			siteUpdate: "/site-update",
-			rebuildCache: "/rebuild-cache",
+			siteConfiguration: "/l/site-configuration",
+			siteUpdate: "/l/site-update",
+			rebuildCache: "/l/rebuild-cache",
 		};
 	},
 	SiteSettings: () => {
 		return {
-			siteSettings: "/site-settings",
+			siteSettings: "/l/site-settings",
 		};
 	},
 	SiteExport: () => {
 		return {
-			start: "/site-export",
+			start: "/l/site-export",
 		};
 	},
 	HomeTaskList: () => {
@@ -580,13 +580,13 @@ const ENDPOINTS = {
 		};
 	},
 	search: {
-		bar: "/search-bar",
-		page: "/search-page",
+		bar: "/l/search-bar",
+		page: "/l/search-page",
 	},
-	linkPreview: "/preview",
-	location: "/search-location",
+	linkPreview: "/l/preview",
+	location: "/l/search-location",
 	facet: (index) => {
-		return `/search-index/${index}`;
+		return `/l/search-index/${index}`;
 	},
 	html: (key, field) => {
 		return {
@@ -611,13 +611,13 @@ const ENDPOINTS = {
 		start: `/collaboration/start`,
 		stop: `/collaboration/stop`,
 	},
-	delete: (key) => `/delete/${key}`,
+	delete: (key) => `/l/delete/${key}`,
 	toggleStar: (key) => {
-		return `/toggle-star/${key}`;
+		return `/l/toggle-star/${key}`;
 	},
-	activity: (key) => `/activity/${key}`,
-	poll: "/poll",
-	notifications: "/notifications",
+	activity: (key) => `/l/activity/${key}`,
+	poll: "/l/poll",
+	notifications: "/l/notifications",
 	help: (key) => {
 		return `/reference/section/${key}`;
 	},
@@ -632,7 +632,7 @@ const ENDPOINTS = {
 	UserSettings: (settings) => {
 		return ENDPOINTS.PagePermissions(settings);
 	},
-	sync: "/sync",
+	sync: "/l/sync",
 };
 
 const PARSER = new DOMParser();
@@ -859,7 +859,7 @@ const _formatError = async (
  */
 const _refreshToken = async () => {
 	try {
-		const response = await fetch("/token", TOKEN_REQUEST);
+		const response = await fetch("/l/token", TOKEN_REQUEST);
 		if (!response.ok) {
 			throw new Error(`Failed to refresh token: ${response.statusText}`);
 		}
@@ -873,7 +873,8 @@ const _refreshToken = async () => {
 		}
 		return newToken;
 	} catch (error) {
-		captureNetworkError(error, "/token", { });
+		captureNetworkError(error, "/l/token", {
+			});
 		return null;
 	}
 };
@@ -1157,7 +1158,7 @@ class ShellView {
 			"_pollingPromise",
 			"PollingCoordinator",
 			async () => {
-				const { PollingCoordinator } = await import('./polling.js?v=bed962f9');
+				const { PollingCoordinator } = await import('./polling.js?v=bfd37afb');
 				return this._destroyed ? null : new PollingCoordinator(this).init();
 			},
 		);
@@ -1167,7 +1168,7 @@ class ShellView {
 		return this._loadShellManager("_searchPromise", "SearchBox", async () => {
 			const search = document.querySelector("[lp-search]");
 			if (!search) return null;
-			const { SearchBox } = await import('./search.js?v=bed962f9');
+			const { SearchBox } = await import('./search.js?v=bfd37afb');
 			if (this._destroyed) return null;
 			const box = new SearchBox(search);
 			await box.init();
@@ -1182,7 +1183,7 @@ class ShellView {
 			async () => {
 				if (!document.querySelector("[data-role='notifications']")) return null;
 				await this.ensurePollingCoordinator();
-				const { Notifications } = await import('./notifications.js?v=bed962f9');
+				const { Notifications } = await import('./notifications.js?v=bfd37afb');
 				if (this._destroyed) return null;
 				const notifications = new Notifications(this);
 				notifications.init();

@@ -172,7 +172,7 @@ def test_tasks_prefetch(get_user):
     Verifies:
         - src/script/views/home.mjs: Prefetch initialization
         - lagniappe/web/templates/home/tasks.html: lp-prefetch attribute
-        - Task list shell is replaced after prefetch GET /get/tasks
+        - Task list shell is replaced after prefetch GET /l/get/tasks
         - Task count element is rendered
 
     Framework note:
@@ -194,7 +194,7 @@ def test_tasks_prefetch(get_user):
 # @features home
 # @dimensions lazy-load project-list category-list loading-indicator
 def test_model_lists_load_on_toggle(get_user):
-    """Verify project and category home lists load through their /get branches on demand."""
+    """Verify project and category home lists load through their /l/get branches on demand."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
     category = Categories.test_create_category_manual_mode.get(user)

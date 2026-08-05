@@ -325,7 +325,7 @@ def test_poll_wait_matches_subscription_and_validates_result():
     ) as response_info:
         page.respond(
             FakeResponse(
-                url="http://test.local/poll",
+                url="http://test.local/l/poll",
                 post_data='{"subscriptions":[{"id":"edit:other-task"}]}',
                 payload={
                     "version": 1,
@@ -334,7 +334,7 @@ def test_poll_wait_matches_subscription_and_validates_result():
             )
         )
         expected = FakeResponse(
-            url="http://test.local/poll",
+            url="http://test.local/l/poll",
             post_data=(
                 '{"subscriptions":[{"id":"edit:task-key",'
                 '"type":"entity"}]}'
@@ -377,7 +377,7 @@ def test_poll_wait_reports_missing_or_unexpected_result(payload, message):
         ):
             page.respond(
                 FakeResponse(
-                    url="http://test.local/poll",
+                    url="http://test.local/l/poll",
                     post_data=(
                         '{"subscriptions":[{"id":"view:entity:file-key"}]}'
                     ),
@@ -459,6 +459,54 @@ def test_offline_sync_wait_scopes_records_and_accepts_a_longer_bound():
     assert page.wait[2] == 30000
 
 
+class FakeOfflineReplayPage:
+    def __init__(self):
+        self.listener = None
+        self.evaluation = None
+
+    def on(self, event, listener):
+        assert event == "response"
+        self.listener = listener
+
+    def remove_listener(self, event, listener):
+        assert event == "response"
+        assert listener is self.listener
+        self.listener = None
+
+    def evaluate(self, expression):
+        self.evaluation = expression
+        return True
+
+    def respond(self, response):
+        self.listener(response)
+
+
+def test_offline_sync_replay_waits_for_manager_and_exact_matching_response():
+    page = FakeOfflineReplayPage()
+    user = SimpleNamespace(page=page)
+    expected = FakeResponse(
+        url="http://test.local/l/sync",
+        post_data='{"updates":["offline edit","remote edit"]}',
+    )
+
+    with offline.expect_offline_sync_replay(
+        user,
+        request_payload_contains=("offline edit", "remote edit"),
+    ) as responses:
+        page.respond(
+            FakeResponse(
+                url="http://test.local/l/sync",
+                post_data='{"updates":["unrelated"]}',
+            )
+        )
+        page.respond(expected)
+
+    assert responses == [expected]
+    assert "await view?.syncReady" in page.evaluation
+    assert "await manager.ready" in page.evaluation
+    assert page.listener is None
+
+
 def test_offline_record_wait_validates_conditions_and_reports_current_rows():
     user = SimpleNamespace(page=FakeOfflinePage([]))
 
@@ -523,7 +571,7 @@ class FakeUser:
         self._offline = value
         self.events.append(f"offline={value}")
         if not value:
-            self.page.respond(FakeResponse(url="http://test.local/refresh"))
+            self.page.respond(FakeResponse(url="http://test.local/l/refresh"))
 
 
 def test_reconnect_wait_uses_native_offline_state_and_requires_refresh(monkeypatch):
@@ -549,7 +597,7 @@ def test_reconnect_wait_uses_native_offline_state_and_requires_refresh(monkeypat
     ) as response_info:
         user.offline = False
 
-    assert response_info.value.url == "http://test.local/refresh"
+    assert response_info.value.url == "http://test.local/l/refresh"
     assert events == [
         "expect-offline",
         "offline=True",

@@ -98,7 +98,7 @@
   {%- if total > 10 -%}
     <div role="option"
          class="{{ styles.dropdown.search.more }} cursor-pointer"
-         data-url="{{ url_for('home.search_page', q=query) }}">
+         data-url="{{ url_for('internal.search_page', q=query) }}">
       {{ render_icon("next", styles.dropdown.icon) -}}
       All Results
     </div>

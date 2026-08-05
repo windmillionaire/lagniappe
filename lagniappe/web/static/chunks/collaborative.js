@@ -1,13 +1,13 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bed962f9';
-import { D as Doc, c as collaborativeEditor, T as Toolbar, m as mergeUpdates, e as encodeStateAsUpdate, a as applyUpdate } from './toolbar.js?v=bed962f9';
-import { e as waitForAttribute, u as uint8ArrayToBase64, f as base64ToUint8Array } from './foundation.js?v=bed962f9';
-import './connectivity.js?v=bed962f9';
-import { p as primitives } from './primitives.js?v=bed962f9';
-import './combobox.js?v=bed962f9';
-import './icons.js?v=bed962f9';
-import './dropdown.js?v=bed962f9';
-import './notificationState.js?v=bed962f9';
+import { STYLES } from './styles.js?v=bfd37afb';
+import { D as Doc, c as collaborativeEditor, T as Toolbar, m as mergeUpdates, e as encodeStateAsUpdate, a as applyUpdate } from './toolbar.js?v=bfd37afb';
+import { e as waitForAttribute, u as uint8ArrayToBase64, f as base64ToUint8Array } from './foundation.js?v=bfd37afb';
+import './connectivity.js?v=bfd37afb';
+import { p as primitives } from './primitives.js?v=bfd37afb';
+import './combobox.js?v=bfd37afb';
+import './icons.js?v=bfd37afb';
+import './dropdown.js?v=bfd37afb';
+import './notificationState.js?v=bfd37afb';
 
 /**
  * @testable true

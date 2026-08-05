@@ -381,7 +381,7 @@ def test_switching_session_user_requests_client_cache_invalidation(get_user):
         source.page.context.expect_event(
             "response",
             predicate=lambda response: (
-                response.url.endswith("/validate-user")
+                response.url.endswith("/l/validate-user")
                 and response.request.method == "POST"
             ),
         ) as validation_info,
@@ -844,7 +844,7 @@ def test_logout_clears_session_and_returns_login(get_user):
     with user.page.context.expect_event(
         "response",
         predicate=lambda response: (
-            response.url.endswith("/validate-user")
+            response.url.endswith("/l/validate-user")
             and response.request.method == "POST"
         ),
     ) as validation_info:
@@ -888,7 +888,7 @@ def test_logout_flags_user_cache_invalidation(get_user):
     with user.page.context.expect_event(
         "response",
         predicate=lambda response: (
-            response.url.endswith("/validate-user")
+            response.url.endswith("/l/validate-user")
             and response.request.method == "POST"
         ),
     ) as validation_info:

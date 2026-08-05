@@ -10,7 +10,7 @@ Related Files:
         - lagniappe/__init__.py: CONFIG object with environment settings
         - lagniappe/core/tools/database/core.py: KINDS enum, DataServices (buckets)
         - lagniappe/core/tools/cache/core.py: Cache class (Redis connection, INDEX)
-        - lagniappe/web/routes/home/main.py: /ping endpoint
+        - lagniappe/web/routes/home/site.py: /l/ping endpoint
 
     Configuration:
         - config/__init__.py: SETTINGS.test_config for PREFIX, BASE_URL, etc.
@@ -153,18 +153,18 @@ def test_server_running(get_user):
     """
     Verify Flask test server is running and responding.
 
-    Navigates to /ping endpoint which returns "pong" to confirm the server
-    is running. Uses Users.ANONYMOUS since /ping doesn't require auth.
+    Navigates to /l/ping endpoint which returns "pong" to confirm the server
+    is running. Uses Users.ANONYMOUS since /l/ping doesn't require auth.
 
     Verifies:
-        - lagniappe/web/routes/home/main.py: /ping route returns "pong"
+        - lagniappe/web/routes/home/site.py: /l/ping route returns "pong"
         - runner/testing.py: run_test_server() started successfully
         - Server listening on SETTINGS.test_config["BASE_URL"]
 
     Failure indicates:
         - Test server failed to start (check conftest.setup_test_server)
         - Server not listening on expected port
-        - /ping route not defined or returning wrong content
+        - /l/ping route not defined or returning wrong content
     """
     user = get_user(Users.ANONYMOUS)
     user.go(SitePages.PING)
@@ -189,13 +189,13 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
     notification_requests = []
 
     def record_request(request):
-        if urlsplit(request.url).path == "/notifications":
+        if urlsplit(request.url).path == "/l/notifications":
             notification_requests.append(request.url)
 
     user.page.on("request", record_request)
     with user.page.expect_response(
         lambda response: (
-            urlsplit(response.url).path == "/ping"
+            urlsplit(response.url).path == "/l/ping"
             and response.request.method == "HEAD"
         )
     ) as ping_info:
@@ -220,7 +220,7 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
 def test_authenticated_home_response_headers_include_etag(get_user):
     """Authenticated app responses should carry the common header envelope."""
     user = get_user(Users.OWNER)
-    with user.page.expect_response("**/update-session") as session_info:
+    with user.page.expect_response("**/l/update-session") as session_info:
         user.page.goto(f"{SETTINGS.test_config['BASE_URL']}/")
     assert session_info.value.ok
     expect(user.page).to_have_title("Home")

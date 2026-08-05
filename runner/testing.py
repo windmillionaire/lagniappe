@@ -308,7 +308,7 @@ def wait_for_server(BASE_URL, max_retries=30):
 
     for attempt in range(max_retries):
         try:
-            response = requests.get(f"{BASE_URL}/ping")
+            response = requests.get(f"{BASE_URL}/l/ping")
             if response.status_code == 200:
                 return True
         except Exception as e:

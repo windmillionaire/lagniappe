@@ -117,7 +117,7 @@ def test_replay_retries_one_aborted_sync(get_user, browser_failures):
         user,
         kind="requestfailed",
         method="POST",
-        path="/sync",
+        path="/l/sync",
     ):
         reconnect_with_the_test_route_aborted()
 ```
@@ -145,7 +145,7 @@ error state.
 
 For native connectivity transitions, prefer `browser_failures.expect_offline(user)`
 around the `user.offline = True` action and its offline assertions. It expects
-the exact `HEAD /ping` disconnect and console error produced by the browser.
+the exact `HEAD /l/ping` disconnect and console error produced by the browser.
 An offline reload that deliberately performs both the connectivity transition
 and a new-page health check may use `ping_count=2`. If the same story also has a
 document lifecycle that can legitimately schedule one additional health check,
@@ -174,12 +174,12 @@ def fail_ping(route):
     route.abort("connectionfailed")
 
 
-with scoped_browser_route(user.page.context, "**/ping", fail_ping):
+with scoped_browser_route(user.page.context, "**/l/ping", fail_ping):
     with browser_failures.expect(
         user,
         kind="requestfailed",
         method="HEAD",
-        path="/ping",
+        path="/l/ping",
         failure="net::ERR_CONNECTION_FAILED",
     ):
         trigger_server_health_check()
@@ -217,6 +217,13 @@ share a route, and `response_check` only for response-payload assertions. Use
 `entity_key` only when the route returns the `X-Lagniappe-Entity-Revisions`
 header. Keep the visible postcondition after the wait, and reload or use a
 fresh context when durable state is part of the story.
+
+For persisted document replay after replacing or reloading the page, use
+`expect_offline_sync_replay()`. It installs the `/l/sync` response listener
+before navigation, awaits the new view's `syncReady` manager and the manager's
+own `ready` replay, and verifies the expected number of successful matching
+responses. Do not make ordinary `User.go()` or view initialization await this
+background work; normal application startup intentionally remains non-blocking.
 
 Deliberate non-success responses are a different contract: retain a raw
 Playwright response wait and assert the expected status/body explicitly.
@@ -265,7 +272,7 @@ with expect_poll_result(
     user.offline = False
 ```
 
-The helper only observes and validates a successful natural `POST /poll`; it
+The helper only observes and validates a successful natural `POST /l/poll`; it
 does not invoke the polling coordinator. Prefer a visible tab change, a
 collaborator save, or a native offline/online transition for E2E stories. Keep
 ordinary-cadence waits deliberate and rare because they add real wall-clock
@@ -389,7 +396,7 @@ explicit browser acknowledgement in the test that caused them:
 - prefer initial groups or access tiers in `testing/definitions/` when the
   mutation itself is not under test;
 - when the mutation is under test, navigate as the affected user and observe
-  the service worker's `POST /validate-user` response with a browser-context
+  the service worker's `POST /l/validate-user` response with a browser-context
   response event;
 - assert the response accepted the cache-clear confirmation and the persisted
   `invalidate_cache` flag is false before the test ends.

@@ -13,7 +13,7 @@ shared infrastructure such as analytics. On DOM ready it:
 2. Sends a fire-and-forget analytics view event when analytics metadata enables it.
 3. Runs `syncView()` to initialize the current view and server-health state.
 4. Registers global `error` and `unhandledrejection` listeners that route to Sentry via `captureError`.
-5. Registers `visibilitychange`, `focus`, `pagehide`/`pageshow`, and `online`/`offline` listeners for server health, view sync, and sync deregistration/registration. `ConnectivityState` retains separate browser, server, visibility, and service-worker-controller signals. Hiding a view suspends it directly without an unnecessary `/ping`; foreground transitions perform one health check and one polling catch-up.
+5. Registers `visibilitychange`, `focus`, `pagehide`/`pageshow`, and `online`/`offline` listeners for server health, view sync, and sync deregistration/registration. `ConnectivityState` retains separate browser, server, visibility, and service-worker-controller signals. Hiding a view suspends it directly without an unnecessary `/l/ping`; foreground transitions perform one health check and one polling catch-up.
 6. Registers the service worker (`sw.js`) and publishes versioned connectivity state to its cache policy. The worker does not carry application update events.
 7. Calls `updateUserData()` to sync the user's timezone and location to the server, except when `<meta name="mode" content="public">` marks a public page.
 
@@ -30,7 +30,7 @@ entity/collection results invoke their focused probe or refresh route.
 ### `login.mjs` (unauthenticated)
 
 A separate bundle for the login page. It initializes a small Identity Platform
-REST client from `/identity-config`, reads `data-mode` / `data-code` from
+REST client from `/l/identity-config`, reads `data-mode` / `data-code` from
 `<body>`, and shows the appropriate form (`EmailCheck`, `SignIn`,
 `ResetPassword`, `VerifyEmail`, `FirstTimeSetup`, `ForgotPassword`). Navigation
 between forms happens via custom `login:show-*` events. Email/password sign-in
@@ -88,7 +88,7 @@ point; internal implementation modules are noted below. Modules:
 | `analytics.mjs` | `analytics.tag()` and `analytics.view()` -- fire-and-forget page-load, login, and public-view tracking using metadata from the current page. |
 | `connectivity.mjs` | `ConnectivityState` and the shared `connectivity` instance -- explicit browser-link, server-reachability, visibility, and service-worker-controller state. |
 | `endpoints.mjs` | API route definitions, organized by widget name. Widget-specific endpoints are functions keyed by widget name (e.g. `ENDPOINTS.Filters(settings)`); global endpoints are static properties. |
-| `polling.mjs` | `PollingCoordinator` -- one adaptive, visibility-aware scheduler with periodic/foreground and immediate/scheduled subscription modes for entity, channel, document, operation, form-lock, and ingress state. Notification state piggybacks on any poll and uses one personal-state-only request after a cold `/ping` miss. |
+| `polling.mjs` | `PollingCoordinator` -- one adaptive, visibility-aware scheduler with periodic/foreground and immediate/scheduled subscription modes for entity, channel, document, operation, form-lock, and ingress state. Notification state piggybacks on any poll and uses one personal-state-only request after a cold `/l/ping` miss. |
 | `notificationState.mjs` | Parses `X-Lagniappe-Notification-State`, stores the latest generation/revision/count before the lazy menu loads, updates the badge, and publishes state changes to menu/coordinator consumers. |
 | `editWatcher.mjs` | `EditWatcher` -- fingerprint-based entity discovery, polling subscriptions, form-lock restoration, and the stable watched-form service facade. |
 | `editReconciler.mjs` | `EditReconciler` -- per-form authoritative replacement probes, draft and queued-mutation comparison, and revision resolution. Internal to `EditWatcher`. |
@@ -96,7 +96,7 @@ point; internal implementation modules are noted below. Modules:
 | `deferredOperations.mjs` | `DeferredOperationManager` -- owner-authorized operation subscriptions and revision-aware terminal destination reconciliation. |
 | `errors.mjs` | `captureError()`, `captureNetworkError()`, and `configureSentry()` -- collect DOM context from the nearest widget/component/view elements and forward to the configured local Sentry bundle + console. The client initializes only when an installation DSN is rendered. Its event processor removes SDK request payloads and identity context, applies the exact diagnostic-header allowlist, recursively redacts recognized credentials/payloads, and bounds nested context. |
 | `request.mjs` | `request.get/post/put/patch/delete` -- wraps `fetch` with CSRF token injection, targeted retry for responses explicitly identified as CSRF failures, 422 validation error handling, redirect following, and JSON/HTML content-type detection. A service-worker `X-Lagniappe-Updated: false` marker is exposed as `response.updated === false` so refresh consumers can skip unchanged DOM work. |
-| `sync.mjs` | `SyncManager` -- revisioned collaborative-document synchronization through `/sync` and shared document polling, including offline document-delta replay. See [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md). |
+| `sync.mjs` | `SyncManager` -- revisioned collaborative-document synchronization through `/l/sync` and shared document polling, including offline document-delta replay. See [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md). |
 | `modal.mjs` | Modal system: `Modal` (base), `DeleteModal`, `HelpModal`, and `OfflineModal`. Handles Escape/click-outside dismissal, load-from-server, and nested view transitions. |
 | `offline.mjs` | IndexedDB primitives for document sync records and explicit offline mutation records. |
 | `offlineQueue.mjs` | `OfflineQueue` -- serializes explicit `lp-offline` mutation commands, restores optimistic overlays, replays commands, and hands conflicts to `EditWatcher`. |

@@ -89,7 +89,7 @@ def _post_form_status(user, path, data):
 
             let response = await send();
             if (response.status === 400) {
-                const token = await (await fetch("/token")).text();
+                const token = await (await fetch("/l/token")).text();
                 const tokenElt = document.getElementById("token");
                 if (tokenElt) tokenElt.value = token;
                 response = await send();

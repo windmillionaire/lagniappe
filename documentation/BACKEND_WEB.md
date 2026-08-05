@@ -21,7 +21,7 @@ the stack. Initialization:
 6. **Security headers**: Applied via `after_request` -- HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy
 7. **ETag support**: If `g.fingerprint` is set by a route, it's included as an `ETag` header (combined with build ID)
 8. **Cache invalidation**: If Flask-Login already loaded an authenticated user and that user has `invalidate_cache` set, adds `X-Lagniappe-Invalidate-Cache` (triggers service worker cache wipe without forcing user loads for static/health-check requests)
-9. **Polling routes**: Registers the versioned, permission-checked `/poll`
+9. **Polling routes**: Registers the versioned, permission-checked `/l/poll`
    contract used by mounted browser state
 
 ## Startup (`web/start/`)
@@ -56,8 +56,8 @@ requests for private file assets, returning `206 Partial Content` with
 the entire object through the app server.
 
 Page notes use `GET` and `POST /pages/<page-key>/notes`. Home notes use
-`POST /activity/notes`; both return the shared note-card fragment and delete
-through the standard confirmation flow at `DELETE /activity/<note-key>`.
+`POST /l/activity/notes`; both return the shared note-card fragment and delete
+through the standard confirmation flow at `DELETE /l/activity/<note-key>`.
 Home note creation requires login, but only `SITE:EDIT` may create a Home note
 with `everyone` visibility. Page note creation and visibility choices continue
 to use the Page edit permission. The server assigns the note scope, validates
@@ -125,7 +125,7 @@ error pages).
 
 ## Authentication (`web/auth/`)
 
-The login page refreshes its Flask-WTF token from `GET /token` immediately
+The login page refreshes its Flask-WTF token from `GET /l/token` immediately
 before handing an Identity Platform credential to
 `POST /users/login-identity`. If that write still receives a CSRF-specific
 `400` response, identified by `X-Lagniappe-CSRF: invalid`, the client refreshes
@@ -241,7 +241,7 @@ def tasks(key, **kwargs):
 
 ### Unified Polling
 
-`POST /poll` accepts a bounded versioned batch of typed subscriptions. It
+`POST /l/poll` accepts a bounded versioned batch of typed subscriptions. It
 groups descriptors before invoking type-specific loaders, batches target
 entities once, resolves locks only when lock descriptors exist, and reads only
 the site fingerprints required by mounted channels in one multi-read. Matching
@@ -256,7 +256,7 @@ The optional request-level `notification_state` cursor is checked through Redis
 and returned in `X-Lagniappe-Notification-State`. A `seed: true` miss performs
 the single authoritative keys-only notification query; warm document, ingress,
 operation, and foreground catch-up polls do no notification Datastore work.
-`HEAD /ping` reads only the signed session user key and performs the same warm
+`HEAD /l/ping` reads only the signed session user key and performs the same warm
 Redis peek without activating Flask-Login. Redis misses/errors do not change
 the health-check status. See
 [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md).
@@ -264,8 +264,8 @@ the health-check status. See
 ### Deferred Admin Export
 
 The `/admin` view includes an owner-only Export tab next to Site Settings. Its
-`SiteExport` widget loads from `GET /site-export` and starts work with
-`POST /site-export`. The POST creates the queued `site_export` metadata record
+`SiteExport` widget loads from `GET /l/site-export` and starts work with
+`POST /l/site-export`. The POST creates the queued `site_export` metadata record
 and starts a durable shared job with a pending notification. Production
 dispatches that job to `/process/jobs`, development runs it in a local daemon
 thread, and testing runs the `SiteExportAdapter` inline.

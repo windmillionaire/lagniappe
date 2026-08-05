@@ -47,7 +47,7 @@
       <ul lp-load
           data-widget="StarredList"
           data-visible="false"
-          data-route='{{ url_for("home.get", kind="starred") }}'>
+          data-route='{{ url_for("internal.get", kind="starred") }}'>
       </ul>
     </div>
     <div id="directory"
@@ -110,7 +110,7 @@
         {{ tools.create_report() }}
         <ul lp-load
             data-widget="ToolReportList"
-            data-route='{{ url_for("home.get", kind="tools") }}'
+            data-route='{{ url_for("internal.get", kind="tools") }}'
             data-if-empty="CreateToolReport"
             data-visible="false">
         </ul>
@@ -157,7 +157,7 @@
       {% if can_create_pages %}{{ pages.create() }}{% endif %}
       <ul lp-load
           data-widget="HomePageList"
-          data-route='{{ url_for("home.get", kind="pages") }}'
+          data-route='{{ url_for("internal.get", kind="pages") }}'
           data-if-empty="{{ 'CreatePage' if can_create_pages else '' }}"
           data-visible="false">
       </ul>
@@ -228,7 +228,7 @@
       {{ tasks.create() }}
       <ul lp-prefetch
           data-widget="HomeTaskList"
-          data-route='{{ url_for("home.get", kind="tasks") }}'
+          data-route='{{ url_for("internal.get", kind="tasks") }}'
           data-if-empty="CreateUserTask"
           data-poll-channel="tasks"
           data-poll-revision="{{ poll_revisions['tasks'] }}"
@@ -270,7 +270,7 @@
       {% if Resource.PROJECT.allowed(Action.CREATE) %}{{ project.create(home.projects.attributes) }}{% endif %}
       <ul lp-load
           data-widget="HomeProjectList"
-          data-route='{{ url_for("home.get", kind="projects") }}'
+          data-route='{{ url_for("internal.get", kind="projects") }}'
           data-if-empty="{{ 'CreateProject' if Resource.PROJECT.allowed(Action.CREATE) else '' }}"
           data-visible="false">
       </ul>
@@ -310,7 +310,7 @@
       {% if Resource.CATEGORY.allowed(Action.CREATE) %}{{ category.create(home.categories.attributes) }}{% endif %}
       <ul lp-load
           data-widget="HomeCategoryList"
-          data-route='{{ url_for("home.get", kind="categories") }}'
+          data-route='{{ url_for("internal.get", kind="categories") }}'
           data-if-empty="{{ 'CreateCategory' if Resource.CATEGORY.allowed(Action.CREATE) else '' }}"
           data-visible="false">
       </ul>

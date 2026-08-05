@@ -139,7 +139,7 @@ def test_offline_scope_requires_the_native_ping_failure_and_console_error():
             "requestfailed",
             SimpleNamespace(
                 method="HEAD",
-                url="http://test.local/ping",
+                url="http://test.local/l/ping",
                 failure="net::ERR_INTERNET_DISCONNECTED",
             ),
         )
@@ -148,7 +148,7 @@ def test_offline_scope_requires_the_native_ping_failure_and_console_error():
             SimpleNamespace(
                 type="error",
                 text="Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
-                location={"url": "http://test.local/ping", "lineNumber": 0},
+                location={"url": "http://test.local/l/ping", "lineNumber": 0},
             ),
         )
 
@@ -167,7 +167,7 @@ def test_offline_scope_accepts_an_exact_reload_ping_count():
                 "requestfailed",
                 SimpleNamespace(
                     method="HEAD",
-                    url="http://test.local/ping",
+                    url="http://test.local/l/ping",
                     failure="net::ERR_INTERNET_DISCONNECTED",
                 ),
             )
@@ -176,7 +176,7 @@ def test_offline_scope_accepts_an_exact_reload_ping_count():
                 SimpleNamespace(
                     type="error",
                     text="Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
-                    location={"url": "http://test.local/ping", "lineNumber": 0},
+                    location={"url": "http://test.local/l/ping", "lineNumber": 0},
                 ),
             )
 
@@ -199,7 +199,7 @@ def test_offline_scope_accepts_a_bounded_reload_ping_count():
                 "requestfailed",
                 SimpleNamespace(
                     method="HEAD",
-                    url="http://test.local/ping",
+                    url="http://test.local/l/ping",
                     failure="net::ERR_INTERNET_DISCONNECTED",
                 ),
             )
@@ -208,7 +208,7 @@ def test_offline_scope_accepts_a_bounded_reload_ping_count():
                 SimpleNamespace(
                     type="error",
                     text="Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
-                    location={"url": "http://test.local/ping", "lineNumber": 0},
+                    location={"url": "http://test.local/l/ping", "lineNumber": 0},
                 ),
             )
 
@@ -232,7 +232,7 @@ def test_offline_scope_rejects_ping_counts_above_the_bound():
                     "requestfailed",
                     SimpleNamespace(
                         method="HEAD",
-                        url="http://test.local/ping",
+                        url="http://test.local/l/ping",
                         failure="net::ERR_INTERNET_DISCONNECTED",
                     ),
                 )
@@ -245,7 +245,7 @@ def test_offline_scope_rejects_ping_counts_above_the_bound():
                             "net::ERR_INTERNET_DISCONNECTED"
                         ),
                         location={
-                            "url": "http://test.local/ping",
+                            "url": "http://test.local/l/ping",
                             "lineNumber": 0,
                         },
                     ),

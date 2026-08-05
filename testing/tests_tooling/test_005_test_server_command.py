@@ -292,6 +292,7 @@ def test_wait_for_server_allows_slow_local_startup(
 
     assert testing.wait_for_server("http://127.0.0.1:5000") is True
     assert len(attempts) == 11
+    assert set(attempts) == {"http://127.0.0.1:5000/l/ping"}
     assert sleeps == [2, *([0.5] * 10)]
 
 

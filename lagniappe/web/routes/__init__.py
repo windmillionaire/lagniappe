@@ -1,6 +1,6 @@
 from .categories import categories
 from .files import files
-from .home import home
+from .home import home, internal
 from .projects import projects
 from .forms import forms
 from .tasks import tasks
@@ -19,6 +19,7 @@ __all__ = [
     "categories",
     "files",
     "home",
+    "internal",
     "projects",
     "forms",
     "tasks",

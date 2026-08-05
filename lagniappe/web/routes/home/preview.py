@@ -5,13 +5,13 @@ from lagniappe.core.tools import link_preview
 from lagniappe.web import responses
 from lagniappe.web.auth import logged_in
 
-from . import home
+from . import internal
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/link_preview.py::preview_for_url
 # @reason route wrapper delegates preview resolution and safety checks to core helper
-@home.route("/preview")
+@internal.route("/preview")
 @logged_in
 def preview():
     g.NO_CACHE = True

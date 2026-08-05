@@ -147,7 +147,7 @@ def _open_document_settings(user, page):
 
 def _document_save_response(text):
     def predicate(response):
-        if not response.url.endswith("/sync"):
+        if not response.url.endswith("/l/sync"):
             return False
         post_data = response.request.post_data or ""
         return '"save":true' in post_data and text in post_data

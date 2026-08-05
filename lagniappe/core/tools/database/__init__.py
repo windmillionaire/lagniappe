@@ -16,6 +16,7 @@ from .assets import (
     upload_site_image,
 )
 from .utility import (
+    acquire_deferred_job_scheduler_sync,
     create_entity,
     create_key,
     create_named_key,
@@ -30,6 +31,10 @@ from .utility import (
     claim_deferred_job_recovery,
     commit_ingress_row,
     create_deferred_job_if_absent,
+    get_deferred_job_scheduler_control,
+    record_deferred_job_scheduler_sync,
+    release_deferred_job_scheduler_sync,
+    repair_deferred_job_scheduler_control,
     release_deferred_job_lock,
     site_fingerprint,
     site_fingerprints,
@@ -41,6 +46,7 @@ from .utility import (
 
 __all__ = [
     "get",
+    "acquire_deferred_job_scheduler_sync",
     "delete_blobs",
     "delete_entities",
     "save",
@@ -70,6 +76,10 @@ __all__ = [
     "claim_deferred_job_recovery",
     "commit_ingress_row",
     "create_deferred_job_if_absent",
+    "get_deferred_job_scheduler_control",
+    "record_deferred_job_scheduler_sync",
+    "release_deferred_job_scheduler_sync",
+    "repair_deferred_job_scheduler_control",
     "release_deferred_job_lock",
     "update_claimed_deferred_job",
     "update_deferred_job_recovery_dispatch",

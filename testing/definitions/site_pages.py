@@ -6,7 +6,7 @@ application routes that don't require creation - they always exist.
 
 Related Files:
     Application Routes:
-        - lagniappe/web/routes/home/main.py: / (HOME), /ping (PING)
+        - lagniappe/web/routes/home/main.py: / (HOME), /l/ping (PING)
         - lagniappe/web/routes/forms/main.py: /forms/index (FORM_INDEX)
         - lagniappe/web/routes/tasks/main.py: /tasks/index (TASK_INDEX)
         - lagniappe/web/routes/users/main.py: /users/index, /users/login
@@ -46,9 +46,9 @@ class SitePages(Enum):
     Members:
         HOME: Main dashboard at / (HomePage resource with project/category lists)
         ADMIN: Owner-only admin settings page at /admin
-        PING: Health check endpoint at /ping (returns "pong")
+        PING: Health check endpoint at /l/ping (returns "pong")
         FORM_INDEX: Form builder index at /forms/index
-        SEARCH_PAGE: Full search results page at /search-page
+        SEARCH_PAGE: Full search results page at /l/search-page
         TASK_INDEX: Global task list at /tasks/index
         USER_INDEX: User management at /users/index
         LOGIN_PAGE: Authentication page at /users/login
@@ -59,9 +59,9 @@ class SitePages(Enum):
 
     HOME = HomePage(url="/", title="Home")
     ADMIN = AdminPage(url="/admin", title="Admin")
-    PING = SitePage(url="/ping")
+    PING = SitePage(url="/l/ping")
     FORM_INDEX = FormIndex(url="/forms/index")
-    SEARCH_PAGE = SitePage(url="/search-page", title="Search")
+    SEARCH_PAGE = SitePage(url="/l/search-page", title="Search")
     TASK_INDEX = TaskIndex(url="/tasks/index")
     USER_INDEX = UserIndex(url="/users/index")
     LOGIN_PAGE = LoginPage(url="/users/login")

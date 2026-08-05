@@ -90,7 +90,7 @@ async function pingServer() {
 		const controller = new AbortController();
 		const timeoutId = setTimeout(() => controller.abort(), 500);
 		try {
-			const response = await fetch("/ping", {
+			const response = await fetch("/l/ping", {
 				method: "HEAD",
 				signal: controller.signal,
 			});

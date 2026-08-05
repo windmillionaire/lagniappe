@@ -225,7 +225,7 @@ const _formatError = async (
  */
 const _refreshToken = async () => {
 	try {
-		const response = await fetch("/token", TOKEN_REQUEST);
+		const response = await fetch("/l/token", TOKEN_REQUEST);
 		if (!response.ok) {
 			throw new Error(`Failed to refresh token: ${response.statusText}`);
 		}
@@ -239,7 +239,9 @@ const _refreshToken = async () => {
 		}
 		return newToken;
 	} catch (error) {
-		captureNetworkError(error, "/token", { context: "token_refresh_utility" });
+		captureNetworkError(error, "/l/token", {
+			context: "token_refresh_utility",
+		});
 		return null;
 	}
 };

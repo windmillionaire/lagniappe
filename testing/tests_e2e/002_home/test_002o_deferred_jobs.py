@@ -50,7 +50,7 @@ def test_poll_operation_is_owner_safe(get_user):
                 "X-CSRFToken": document.getElementById("token")?.value || "",
                 "X-Lagniappe-Request": "true",
             };
-            const response = await fetch("/poll", {
+            const response = await fetch("/l/poll", {
                 method: "POST",
                 headers,
                 body: JSON.stringify({
@@ -66,7 +66,7 @@ def test_poll_operation_is_owner_safe(get_user):
             });
             const body = await response.json();
             const current = body.results[0];
-            const unchangedResponse = await fetch("/poll", {
+            const unchangedResponse = await fetch("/l/poll", {
                 method: "POST",
                 headers,
                 body: JSON.stringify({

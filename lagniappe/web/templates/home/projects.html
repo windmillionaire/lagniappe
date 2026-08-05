@@ -33,7 +33,7 @@
 
 {% macro list(projects) %}
   <ul data-widget="HomeProjectList"
-      data-route='{{ url_for("home.get", kind="projects") }}'
+      data-route='{{ url_for("internal.get", kind="projects") }}'
       data-visible="false"
       data-if-empty="{{ 'CreateProject' if Resource.PROJECT.allowed(Action.CREATE) else '' }}"
       class="{{ styles.home.card.list }}">
@@ -43,14 +43,14 @@
         {% if projects.back %}
           <button class="{{ styles.home.pagination.button }} bg-project-bg/50"
                   lp-control="previous"
-                  data-route='{{ url_for("home.get", kind="projects", cursor=None) }}'>
+                  data-route='{{ url_for("internal.get", kind="projects", cursor=None) }}'>
             {{ render_icon("start") }}
           </button>
         {% endif %}
         {% if projects.cursor %}
           <button class="{{ styles.home.pagination.button }} bg-project-bg/50"
                   lp-control="next"
-                  data-route='{{ url_for("home.get", kind="projects", cursor=projects.cursor) }}'>
+                  data-route='{{ url_for("internal.get", kind="projects", cursor=projects.cursor) }}'>
             {{ render_icon("next") }}
           </button>
         {% endif %}

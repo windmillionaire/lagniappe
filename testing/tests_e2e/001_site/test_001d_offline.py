@@ -69,9 +69,9 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
 
     Flow:
         1. Navigate home while online
-        2. Fail /ping while leaving the browser online
+        2. Fail /l/ping while leaving the browser online
         3. Reload and verify the failed health check makes the indicator visible
-        4. Restore /ping and reload again
+        4. Restore /l/ping and reload again
         5. Verify the indicator hides again
 
     Verifies:
@@ -98,7 +98,7 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
         count=1,
         max_count=3,
         method="HEAD",
-        path="/ping",
+        path="/l/ping",
         failure="net::ERR_CONNECTION_FAILED",
     ):
         with browser_failures.expect(
@@ -108,9 +108,9 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
             max_count=3,
             console_type="error",
             text="Failed to load resource: net::ERR_CONNECTION_FAILED",
-            source_path="/ping",
+            source_path="/l/ping",
         ):
-            with scoped_browser_route(user.page.context, "**/ping", fail_ping):
+            with scoped_browser_route(user.page.context, "**/l/ping", fail_ping):
                 user.reload()
                 expect(indicator).to_be_visible()
 
@@ -119,7 +119,7 @@ def test_failed_ping_marks_view_offline_until_next_sync_event(
             with expect_successful_response(
                 user.page,
                 method="HEAD",
-                path="/ping",
+                path="/l/ping",
             ):
                 user.reload()
     expect(indicator).to_be_hidden()
@@ -161,15 +161,15 @@ def test_offline_poll_recovers_without_online_event(get_user, browser_failures):
     with expect_successful_response(
         user.page,
         method="HEAD",
-        path="/ping",
+        path="/l/ping",
         timeout=8000,
     ):
-        with scoped_browser_route(user.page.context, "**/ping", fail_ping):
+        with scoped_browser_route(user.page.context, "**/l/ping", fail_ping):
             with browser_failures.expect(
                 user,
                 kind="requestfailed",
                 method="HEAD",
-                path="/ping",
+                path="/l/ping",
                 failure="net::ERR_CONNECTION_FAILED",
             ):
                 with browser_failures.expect(
@@ -177,12 +177,12 @@ def test_offline_poll_recovers_without_online_event(get_user, browser_failures):
                     kind="console",
                     console_type="error",
                     text="Failed to load resource: net::ERR_CONNECTION_FAILED",
-                    source_path="/ping",
+                    source_path="/l/ping",
                 ):
                     with user.page.expect_event(
                         "requestfailed",
                         predicate=lambda request: request.method == "HEAD"
-                        and request.url.endswith("/ping"),
+                        and request.url.endswith("/l/ping"),
                     ):
                         user.offline = False
                     expect(indicator).to_be_visible()
@@ -226,7 +226,7 @@ def test_offline_prevents_sync_requests(get_user, browser_failures):
     with expect_successful_response(
         user.page,
         method="POST",
-        path="/sync",
+        path="/l/sync",
         request_payload_contains=document_sync_id,
     ):
         user.offline = False

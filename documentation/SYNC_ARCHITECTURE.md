@@ -1,7 +1,7 @@
 # Sync and Polling Architecture
 
 Lagniappe uses one browser polling coordinator for server-state invalidation.
-The coordinator batches every due subscription into `POST /poll`; individual
+The coordinator batches every due subscription into `POST /l/poll`; individual
 features no longer own timers or push registrations.
 
 | Surface | Durable authority | Poll contract |
@@ -107,7 +107,7 @@ selection beneath a closed parent does not subscribe.
 | Subscription | Lifetime | Notes |
 |---|---|---|
 | Root `entity` | Mounted view while focused/visible | Periodic conflict check, first due after 15 seconds. |
-| Index collection `channel` | Mounted view while focused/visible | Foreground-only; the rendered opaque poll revision is separate from the raw `/refresh` fingerprint. |
+| Index collection `channel` | Mounted view while focused/visible | Foreground-only; the rendered opaque poll revision is separate from the raw `/l/refresh` fingerprint. |
 | Home collection `channel` | While its owning widget has loaded | `home-notes`, `tasks`, `starred`, `pages`, `projects`, `categories`, `ingress`, and `tool-reports` catch up independently and refresh only their owner. The legacy composite `home` channel remains server-compatible. |
 | Notification state | Authenticated ping and any already-needed poll | No subscription or timer. A cold ping miss causes one personal-state seed poll. |
 | Watched-form `entity` and `form-lock` | Active visible form widget only | A root form shares the root entity subscription, avoiding a duplicate entity descriptor and Datastore read. |
@@ -122,7 +122,7 @@ When a form becomes active, those values are compared and only a stale form
 uses its focused replacement route. Advancing the root DOM fingerprint while a
 form is hidden therefore cannot make that form miss an update.
 
-## `POST /poll`
+## `POST /l/poll`
 
 The version 1 request envelope is:
 
@@ -184,7 +184,7 @@ Typed payloads are deliberately narrow:
 
 Payload routes still exist for focused HTML or large content. Polling tells a
 mounted consumer that its contract changed; the consumer then uses its normal
-authoritative replacement route. This keeps `/poll` bounded and prevents it
+authoritative replacement route. This keeps `/l/poll` bounded and prevents it
 from becoming a second rendering API.
 
 ### Channel revisions
@@ -240,7 +240,7 @@ generation seeded from the durable entity document asset.
 
 ### Revisions, deltas, and checkpoints
 
-`POST /sync` appends Yjs deltas under a Redis optimistic transaction. Each delta
+`POST /l/sync` appends Yjs deltas under a Redis optimistic transaction. Each delta
 gets a monotonically increasing revision. A client receives:
 
 - a full snapshot when its generation differs or its cursor predates the
@@ -356,13 +356,13 @@ epoch and force a retry. After a durable notification mutation, one post-commit
 effect upserts or removes membership and advances the revision once. If the
 projection is absent, it advances only the epoch and leaves the next poll to
 seed; Redis failure is reported but never rolls back the durable write. Opening
-`/notifications` performs the keys query inside the same watched repair and
+`/l/notifications` performs the keys query inside the same watched repair and
 uses those keys to load the list, avoiding a second notification query.
 
-`/ping` reads the signed session user key without activating Flask-Login and
+`/l/ping` reads the signed session user key without activating Flask-Login and
 peeks only at Redis. A warm state slides expiration and is returned in
 `X-Lagniappe-Notification-State`; a miss is reported with null fields. The
-browser folds that miss into the next `/poll`, or sends one personal-state-only
+browser folds that miss into the next `/l/poll`, or sends one personal-state-only
 poll when no channel is otherwise due. Document, ingress, operation, and
 foreground catch-up requests carry the last notification cursor, so warm checks
 add no notification Datastore read. A changed state updates the badge and marks

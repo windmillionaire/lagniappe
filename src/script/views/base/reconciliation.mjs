@@ -134,7 +134,7 @@ export const refreshCollectionComponents = async (
 	const reconciled = new Set();
 	let refreshedFingerprint = null;
 	if (targets.size) {
-		const response = await request.post("/refresh", {
+		const response = await request.post("/l/refresh", {
 			view: {
 				key: view.key || null,
 				hash: view.hash || null,

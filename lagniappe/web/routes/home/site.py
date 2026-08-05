@@ -25,7 +25,7 @@ from lagniappe.web import direct_uploads
 from lagniappe.web.auth import clear_client_cache_invalidation, logged_in, permission
 from lagniappe.core.exceptions import AISettingsError, DeploymentSettingsError
 
-from . import home
+from . import home, internal
 
 
 # @testable false
@@ -44,7 +44,7 @@ def _site_image_response(paths):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
-@home.route("/delete/<key>", methods=["GET"])
+@internal.route("/delete/<key>", methods=["GET"])
 @permission(requested=Action.DELETE)
 def delete(key, **kwargs):
     entity = Entities.fetch_one(
@@ -71,7 +71,7 @@ def offline():
 # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_maintenance_update_and_cache_refresh_use_real_routes
 # @pairs cache:redis-connection cache:current
-@home.route("/rebuild-cache", methods=["POST"])
+@internal.route("/rebuild-cache", methods=["POST"])
 @permission(Resource.SITE)
 def rebuild_cache():
     result = rebuild_application_cache()
@@ -86,7 +86,7 @@ def rebuild_cache():
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_maintenance_update_and_cache_refresh_use_real_routes
 # @pairs admin:site-update admin:success
-@home.route("/site-update", methods=["POST"])
+@internal.route("/site-update", methods=["POST"])
 @permission(Resource.SITE)
 def site_update():
     migration_status = run_site_updates()
@@ -102,7 +102,7 @@ def site_update():
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @features admin
 # @dimensions site-settings owner-only public-preview metadata
-@home.route("/site-settings", methods=["GET"])
+@internal.route("/site-settings", methods=["GET"])
 @permission(Resource.SITE)
 def site_settings():
     project_id = CONFIG.GOOGLE_CLOUD_PROJECT
@@ -217,7 +217,7 @@ def site_settings():
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
 # @features admin
 # @dimensions deployment-settings metadata validation
-@home.route("/set-deployment-settings", methods=["POST"])
+@internal.route("/set-deployment-settings", methods=["POST"])
 @permission(Resource.SITE)
 def set_deployment_settings():
     data = request.form if request.form else request.get_json(silent=True) or {}
@@ -235,7 +235,7 @@ def set_deployment_settings():
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
 # @features admin
 # @dimensions ai-settings validation
-@home.route("/set-ai-settings", methods=["POST"])
+@internal.route("/set-ai-settings", methods=["POST"])
 @permission(Resource.SITE)
 def set_ai_settings():
     data = request.form if request.form else request.get_json(silent=True) or {}
@@ -264,7 +264,7 @@ def set_ai_settings():
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
 # @features admin
 # @dimensions configuration-modal environment-variables
-@home.route("/site-configuration", methods=["GET"])
+@internal.route("/site-configuration", methods=["GET"])
 @permission(Resource.SITE)
 def site_configuration():
     g.NO_CACHE = True
@@ -275,7 +275,7 @@ def site_configuration():
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @features admin
 # @dimensions site-image-upload generated-images public-preview metadata
-@home.route("/set-site-image", methods=["POST"])
+@internal.route("/set-site-image", methods=["POST"])
 @permission(Resource.SITE)
 def set_site_image():
     uploaded_file = (
@@ -298,7 +298,7 @@ def set_site_image():
 # @testable false
 # @covered-by lagniappe/web/routes/home/site.py::set_site_image
 # @reason route permission mirrors the final site image upload endpoint
-@home.route("/set-site-image/direct-upload", methods=["POST"])
+@internal.route("/set-site-image/direct-upload", methods=["POST"])
 @permission(Resource.SITE)
 def set_site_image_direct():
     return direct_uploads.direct_upload_response()
@@ -311,7 +311,7 @@ def set_site_image_direct():
 # @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
 # @pairs notifications:ping notifications:redis-projection
 # @pair web-headers:notification-state
-@home.route("/ping")
+@internal.route("/ping")
 def ping():
     g.NO_CACHE = True
     user_key = session.get(CONFIG.LOGIN_USER_KEY) if session.get("_user_id") else None
@@ -345,7 +345,7 @@ def reporting_privacy():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
-@home.route("/token")
+@internal.route("/token")
 def refresh_token():
     g.NO_CACHE = True
     return generate_csrf()
@@ -355,7 +355,7 @@ def refresh_token():
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_page_loads
 # @features login
 # @dimensions page-load form-state
-@home.route("/identity-config")
+@internal.route("/identity-config")
 def identity_config():
     g.NO_CACHE = True
     return responses.json_response(getattr(CONFIG, "IDENTITY_PLATFORM_CONFIG", {}))
@@ -363,7 +363,7 @@ def identity_config():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
-@home.route("/update-session", methods=["POST"])
+@internal.route("/update-session", methods=["POST"])
 @logged_in
 def update_session():
     if request.json.get("timezone"):
@@ -390,7 +390,7 @@ def update_session():
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_access_can_read_create_report_without_create_actions
 # @features cache
 # @dimensions invalidation-acknowledgement
-@home.route("/validate-user", methods=["POST"])
+@internal.route("/validate-user", methods=["POST"])
 @logged_in
 def validate_user():
     data = request.get_json(silent=True) or {}

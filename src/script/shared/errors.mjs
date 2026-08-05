@@ -138,7 +138,7 @@ const SENTRY_BLOCKING_SPAN_OPS = new Set([
 	"ui.long-animation-frame",
 ]);
 const SENTRY_NOTIFICATION_TRANSACTION_PATTERNS = [
-	/^home\.notifications$/,
+	/^internal\.notifications$/,
 	/(^|\s|\/)notifications(\?|$|\s)/,
 ];
 const SENTRY_REDACTED = "[REDACTED]";

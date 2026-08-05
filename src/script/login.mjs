@@ -72,7 +72,7 @@ initializeAgentLoginForms();
  */
 async function initializeIdentityPlatform() {
 	try {
-		const response = await fetch("/identity-config");
+		const response = await fetch("/l/identity-config");
 		const config = await response.json();
 		return new IdentityPlatformClient(config);
 	} catch (error) {

@@ -20,6 +20,9 @@ from lagniappe.core.definitions.default import DefaultEnum
 PREFIX = CONFIG.PREFIX
 DEFERRED_JOB_TRANSACTION_RETRY_DELAYS = (0.05, 0.1, 0.2)
 ACTIVE_DEFERRED_JOB_STATUSES = {"queued", "running", "retry_wait"}
+DEFERRED_JOB_SCHEDULER_CONTROL_ID = "deferred-jobs-control"
+DEFERRED_JOB_SCHEDULER_CONTROL_SCHEMA_VERSION = 1
+DEFERRED_JOB_SCHEDULER_STATES = {"enabled", "paused"}
 
 
 # @testable true
@@ -96,6 +99,304 @@ def _deferred_job_key(identifier):
 
 
 # @testable true
+# @tests tests_unit/test_023_deferred_jobs.py::test_deferred_job_transactions_retry_aborted_contention
+# @features deferred-jobs
+# @dimensions transaction-contention retry
+def _retry_deferred_job_transaction(operation):
+    """Retry a complete deferred-job transaction after Datastore contention."""
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/database/utility.py::_retry_deferred_job_transaction
+    # @reason wrapper behavior is asserted through decorated transaction functions
+    @wraps(operation)
+    def retried(*args, **kwargs):
+        for attempt in range(len(DEFERRED_JOB_TRANSACTION_RETRY_DELAYS) + 1):
+            try:
+                return operation(*args, **kwargs)
+            except google_exceptions.Aborted:
+                if attempt >= len(DEFERRED_JOB_TRANSACTION_RETRY_DELAYS):
+                    raise
+                time.sleep(DEFERRED_JOB_TRANSACTION_RETRY_DELAYS[attempt])
+
+    return retried
+
+
+# @testable true
+# @tests tests_unit/test_023b_deferred_job_scheduler.py::test_tracking_membership_follows_recovery_required_state
+# @features deferred-jobs cloud-scheduler
+# @dimensions durable-membership terminal-delivery idempotency
+def _deferred_job_requires_recovery(entity):
+    """Return whether a durable job still needs scheduled recovery coverage."""
+    return bool(
+        entity
+        and (
+            entity.get("status") in ACTIVE_DEFERRED_JOB_STATUSES
+            or entity.get("dispatch_state") == "delivery_pending"
+        )
+    )
+
+
+# @testable infrastructure
+# @covered-by lagniappe/core/tools/database/utility.py::_update_deferred_job_scheduler_tracking
+def _deferred_job_recovery_query_state(entity):
+    if not entity:
+        return (None, False)
+    status = entity.get("status")
+    return (
+        status if status in ACTIVE_DEFERRED_JOB_STATUSES else None,
+        entity.get("dispatch_state") == "delivery_pending",
+    )
+
+
+# @testable infrastructure
+# @covered-by lagniappe/core/tools/database/utility.py::_update_deferred_job_scheduler_tracking
+def _deferred_job_scheduler_control_key():
+    return DATA.datastore.key(KINDS.site.value, DEFERRED_JOB_SCHEDULER_CONTROL_ID)
+
+
+# @testable infrastructure
+# @covered-by lagniappe/core/tools/database/utility.py::_update_deferred_job_scheduler_tracking
+def _deferred_job_tracking_id(identifier):
+    key = _deferred_job_key(identifier)
+    if key is None:
+        return str(identifier)
+    if not hasattr(key, "to_legacy_urlsafe"):
+        return str(key)
+    encoded = key.to_legacy_urlsafe()
+    return encoded.decode() if isinstance(encoded, bytes) else str(encoded)
+
+
+# @testable infrastructure
+# @covered-by lagniappe/core/tools/database/utility.py::_update_deferred_job_scheduler_tracking
+def _deferred_job_scheduler_control(transaction):
+    key = _deferred_job_scheduler_control_key()
+    control = DATA.datastore.get(key, transaction=transaction)
+    if control is None:
+        control = Entity(key=key, exclude_from_indexes=("tracked_jobs",))
+    else:
+        try:
+            control.exclude_from_indexes = frozenset(
+                {*control.exclude_from_indexes, "tracked_jobs"}
+            )
+        except AttributeError:
+            pass
+    return control
+
+
+# @testable infrastructure
+# @covered-by lagniappe/core/tools/database/utility.py::get_deferred_job_scheduler_control
+def _deferred_job_scheduler_snapshot(control=None):
+    control = control or {}
+    tracked_jobs = sorted(set(control.get("tracked_jobs") or ()))
+    initialized = bool(control.get("initialized"))
+    desired_state = control.get("desired_state")
+    if desired_state not in DEFERRED_JOB_SCHEDULER_STATES:
+        desired_state = "enabled" if tracked_jobs or not initialized else "paused"
+    return {
+        "schema_version": int(control.get("schema_version") or 0),
+        "initialized": initialized,
+        "tracked_jobs": tracked_jobs,
+        "active_jobs": len(tracked_jobs),
+        "desired_state": desired_state,
+        "generation": int(control.get("generation") or 0),
+        "applied_generation": int(control.get("applied_generation") or 0),
+        "applied_state": control.get("applied_state"),
+        "sync_lease_token": control.get("sync_lease_token"),
+        "sync_lease_expires": control.get("sync_lease_expires"),
+    }
+
+
+# @testable true
+# @tests tests_unit/test_023b_deferred_job_scheduler.py::test_tracking_membership_follows_recovery_required_state
+# @features deferred-jobs cloud-scheduler
+# @dimensions durable-membership transaction desired-state
+def _update_deferred_job_scheduler_tracking(
+    transaction,
+    job_key,
+    before,
+    after,
+    now,
+):
+    """Update recovery membership in the same transaction as a job boundary."""
+    was_required = _deferred_job_requires_recovery(before)
+    is_required = _deferred_job_requires_recovery(after)
+    query_state_changed = _deferred_job_recovery_query_state(
+        before
+    ) != _deferred_job_recovery_query_state(after)
+    if was_required == is_required and not query_state_changed:
+        return None
+
+    control = _deferred_job_scheduler_control(transaction)
+    snapshot = _deferred_job_scheduler_snapshot(control)
+    tracked_jobs = set(snapshot["tracked_jobs"])
+    tracking_id = _deferred_job_tracking_id(job_key)
+    if is_required:
+        tracked_jobs.add(tracking_id)
+    elif was_required:
+        tracked_jobs.discard(tracking_id)
+
+    initialized = snapshot["initialized"]
+    control.update(
+        {
+            "schema_version": DEFERRED_JOB_SCHEDULER_CONTROL_SCHEMA_VERSION,
+            "initialized": initialized,
+            "tracked_jobs": sorted(tracked_jobs),
+            "active_jobs": len(tracked_jobs),
+            "desired_state": (
+                "enabled" if tracked_jobs or not initialized else "paused"
+            ),
+            "generation": snapshot["generation"] + 1,
+            "modified": now,
+        }
+    )
+    transaction.put(control)
+    return _deferred_job_scheduler_snapshot(control)
+
+
+# @testable true
+# @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_control_repair_is_revision_checked
+# @features deferred-jobs cloud-scheduler
+# @dimensions bootstrap drift-repair optimistic-concurrency
+@_retry_deferred_job_transaction
+def repair_deferred_job_scheduler_control(job_keys, expected_generation, now):
+    """Initialize or repair tracked recovery jobs if no boundary raced the scan."""
+    tracked_jobs = sorted({_deferred_job_tracking_id(key) for key in job_keys})
+    with DATA.datastore.transaction() as transaction:
+        control = _deferred_job_scheduler_control(transaction)
+        snapshot = _deferred_job_scheduler_snapshot(control)
+        if snapshot["generation"] != int(expected_generation or 0):
+            return {
+                "repaired": False,
+                "reason": "generation",
+                "control": snapshot,
+            }
+
+        desired_state = (
+            "enabled" if tracked_jobs or not snapshot["initialized"] else "paused"
+        )
+        changed = (
+            not snapshot["initialized"]
+            or snapshot["tracked_jobs"] != tracked_jobs
+            or snapshot["desired_state"] != desired_state
+            or snapshot["schema_version"]
+            != DEFERRED_JOB_SCHEDULER_CONTROL_SCHEMA_VERSION
+        )
+        control.update(
+            {
+                "schema_version": DEFERRED_JOB_SCHEDULER_CONTROL_SCHEMA_VERSION,
+                "initialized": True,
+                "tracked_jobs": tracked_jobs,
+                "active_jobs": len(tracked_jobs),
+                "desired_state": desired_state,
+                "generation": snapshot["generation"] + int(changed),
+                "modified": now,
+            }
+        )
+        transaction.put(control)
+        return {
+            "repaired": True,
+            "reason": "updated" if changed else "current",
+            "control": _deferred_job_scheduler_snapshot(control),
+        }
+
+
+# @testable true
+# @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
+# @features deferred-jobs cloud-scheduler
+# @dimensions distributed-lease generation race
+@_retry_deferred_job_transaction
+def acquire_deferred_job_scheduler_sync(lease_token, now, *, lease_seconds):
+    """Acquire the short Datastore lease serializing Scheduler API mutations."""
+    with DATA.datastore.transaction() as transaction:
+        control = _deferred_job_scheduler_control(transaction)
+        snapshot = _deferred_job_scheduler_snapshot(control)
+        current_token = snapshot["sync_lease_token"]
+        lease_expires = _deferred_datetime(snapshot["sync_lease_expires"])
+        if (
+            current_token
+            and current_token != lease_token
+            and lease_expires
+            and lease_expires > now
+        ):
+            return {"acquired": False, "control": snapshot}
+
+        control["sync_lease_token"] = lease_token
+        control["sync_lease_expires"] = now + timedelta(seconds=lease_seconds)
+        transaction.put(control)
+        return {
+            "acquired": True,
+            "control": _deferred_job_scheduler_snapshot(control),
+        }
+
+
+# @testable true
+# @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
+# @features deferred-jobs cloud-scheduler
+# @dimensions distributed-lease generation provider-state
+@_retry_deferred_job_transaction
+def record_deferred_job_scheduler_sync(
+    lease_token,
+    actual_state,
+    now,
+    *,
+    lease_seconds,
+):
+    """Record provider state and release only when the latest intent converged."""
+    if actual_state not in DEFERRED_JOB_SCHEDULER_STATES:
+        raise ValueError(f"Unsupported Scheduler state: {actual_state!r}")
+    with DATA.datastore.transaction() as transaction:
+        control = _deferred_job_scheduler_control(transaction)
+        snapshot = _deferred_job_scheduler_snapshot(control)
+        if snapshot["sync_lease_token"] != lease_token:
+            return {"recorded": False, "reason": "lease", "control": snapshot}
+
+        control["applied_state"] = actual_state
+        converged = actual_state == snapshot["desired_state"]
+        if converged:
+            control["applied_generation"] = snapshot["generation"]
+            control.pop("sync_lease_token", None)
+            control.pop("sync_lease_expires", None)
+        else:
+            control["sync_lease_expires"] = now + timedelta(seconds=lease_seconds)
+        control["modified"] = now
+        transaction.put(control)
+        return {
+            "recorded": True,
+            "reason": "converged" if converged else "changed",
+            "control": _deferred_job_scheduler_snapshot(control),
+        }
+
+
+# @testable true
+# @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_sync_releases_lease_after_provider_failure
+# @features deferred-jobs cloud-scheduler
+# @dimensions distributed-lease provider-failure
+@_retry_deferred_job_transaction
+def release_deferred_job_scheduler_sync(lease_token, now):
+    """Release a Scheduler synchronization lease still owned by the caller."""
+    with DATA.datastore.transaction() as transaction:
+        control = _deferred_job_scheduler_control(transaction)
+        snapshot = _deferred_job_scheduler_snapshot(control)
+        if snapshot["sync_lease_token"] != lease_token:
+            return False
+        control.pop("sync_lease_token", None)
+        control.pop("sync_lease_expires", None)
+        control["modified"] = now
+        transaction.put(control)
+        return True
+
+
+# @testable true
+# @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_control_repair_is_revision_checked
+# @features deferred-jobs cloud-scheduler
+# @dimensions state-read defaults
+def get_deferred_job_scheduler_control():
+    """Read normalized recovery/Scheduler control state without creating it."""
+    control = DATA.datastore.get(_deferred_job_scheduler_control_key())
+    return _deferred_job_scheduler_snapshot(control)
+
+
+# @testable true
 # @tests tests_unit/test_023_deferred_jobs.py::test_deferred_job_operation_revision_tracks_client_visible_status
 # @features deferred-jobs polling
 # @dimensions personal-activity revision transaction
@@ -119,29 +420,6 @@ def _advance_deferred_job_revision(transaction, job_key):
     except AttributeError:
         pass
     transaction.put(actor)
-
-
-# @testable true
-# @tests tests_unit/test_023_deferred_jobs.py::test_deferred_job_transactions_retry_aborted_contention
-# @features deferred-jobs
-# @dimensions transaction-contention retry
-def _retry_deferred_job_transaction(operation):
-    """Retry a complete deferred-job transaction after Datastore contention."""
-
-    # @testable false
-    # @covered-by lagniappe/core/tools/database/utility.py::_retry_deferred_job_transaction
-    # @reason wrapper behavior is asserted through decorated transaction functions
-    @wraps(operation)
-    def retried(*args, **kwargs):
-        for attempt in range(len(DEFERRED_JOB_TRANSACTION_RETRY_DELAYS) + 1):
-            try:
-                return operation(*args, **kwargs)
-            except google_exceptions.Aborted:
-                if attempt >= len(DEFERRED_JOB_TRANSACTION_RETRY_DELAYS):
-                    raise
-                time.sleep(DEFERRED_JOB_TRANSACTION_RETRY_DELAYS[attempt])
-
-    return retried
 
 
 # @testable true
@@ -207,6 +485,13 @@ def create_deferred_job_if_absent(job, notification=None, lock=None):
             if lock is not None:
                 result["lock"] = lock.db
             return result
+        scheduler_control = _update_deferred_job_scheduler_tracking(
+            transaction,
+            key,
+            None,
+            job.db,
+            datetime.now(timezone.utc),
+        )
         for entity in entities:
             transaction.put(entity.db)
         result = {
@@ -216,6 +501,8 @@ def create_deferred_job_if_absent(job, notification=None, lock=None):
         }
         if lock is not None:
             result["lock"] = lock.db
+        if scheduler_control is not None:
+            result["scheduler_control"] = scheduler_control
         return result
 
 
@@ -265,6 +552,7 @@ def claim_deferred_job(identifier, lease_token, lease_expires, now):
         if status == "retry_wait" and next_attempt and next_attempt > now:
             return {"claimed": False, "reason": "retry-wait", "entity": entity}
 
+        before = dict(entity)
         entity["status"] = "running"
         entity["attempt"] = int(entity.get("attempt") or 0) + 1
         entity["lease_token"] = lease_token
@@ -274,6 +562,13 @@ def claim_deferred_job(identifier, lease_token, lease_expires, now):
         entity.pop("next_attempt_at", None)
         entity["modified"] = now
         transaction.put(entity)
+        _update_deferred_job_scheduler_tracking(
+            transaction,
+            key,
+            before,
+            entity,
+            now,
+        )
         _advance_deferred_job_revision(transaction, key)
         return {"claimed": True, "reason": "claimed", "entity": entity}
 
@@ -293,6 +588,7 @@ def update_claimed_deferred_job(identifier, lease_token, updates, now):
         entity = DATA.datastore.get(key, transaction=transaction)
         if entity is None or entity.get("lease_token") != lease_token:
             return False
+        before = dict(entity)
         for name, value in updates.items():
             if value is None:
                 entity.pop(name, None)
@@ -300,6 +596,13 @@ def update_claimed_deferred_job(identifier, lease_token, updates, now):
                 entity[name] = value
         entity["modified"] = now
         transaction.put(entity)
+        _update_deferred_job_scheduler_tracking(
+            transaction,
+            key,
+            before,
+            entity,
+            now,
+        )
         if "status_revision" in updates:
             _advance_deferred_job_revision(transaction, key)
         return True
@@ -378,6 +681,7 @@ def claim_deferred_job_recovery(
         if int(entity.get("status_revision") or 0) != int(expected_revision or 0):
             return {"claimed": False, "reason": "revision", "entity": entity}
 
+        before = dict(entity)
         created = _deferred_datetime(entity.get("created"))
         if created and (now - created).total_seconds() >= max_age_seconds:
             for name, value in stale_updates.items():
@@ -388,6 +692,13 @@ def claim_deferred_job_recovery(
             entity["status_revision"] = int(entity.get("status_revision") or 0) + 1
             entity["modified"] = now
             transaction.put(entity)
+            _update_deferred_job_scheduler_tracking(
+                transaction,
+                key,
+                before,
+                entity,
+                now,
+            )
             _advance_deferred_job_revision(transaction, key)
             return {
                 "claimed": True,
@@ -406,6 +717,13 @@ def claim_deferred_job_recovery(
             entity["next_attempt_at"] = now
         entity["modified"] = now
         transaction.put(entity)
+        _update_deferred_job_scheduler_tracking(
+            transaction,
+            key,
+            before,
+            entity,
+            now,
+        )
         _advance_deferred_job_revision(transaction, key)
         return {
             "claimed": True,
@@ -465,6 +783,7 @@ def transition_active_deferred_job(identifier, updates, now):
             return {"transitioned": False, "reason": "missing", "entity": None}
         if entity.get("status") in {"succeeded", "failed", "cancelled", "superseded"}:
             return {"transitioned": False, "reason": "terminal", "entity": entity}
+        before = dict(entity)
         for name, value in updates.items():
             if value is None:
                 entity.pop(name, None)
@@ -473,8 +792,22 @@ def transition_active_deferred_job(identifier, updates, now):
         entity["status_revision"] = int(entity.get("status_revision") or 0) + 1
         entity["modified"] = now
         transaction.put(entity)
+        scheduler_control = _update_deferred_job_scheduler_tracking(
+            transaction,
+            key,
+            before,
+            entity,
+            now,
+        )
         _advance_deferred_job_revision(transaction, key)
-        return {"transitioned": True, "reason": "transitioned", "entity": entity}
+        result = {
+            "transitioned": True,
+            "reason": "transitioned",
+            "entity": entity,
+        }
+        if scheduler_control is not None:
+            result["scheduler_control"] = scheduler_control
+        return result
 
 
 # @testable false

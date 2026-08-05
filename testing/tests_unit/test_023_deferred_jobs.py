@@ -62,8 +62,13 @@ class FakeDatastore:
     def transaction(self):
         return self.transaction_instance
 
+    def key(self, *parts):
+        return tuple(parts)
+
     def get(self, _key, transaction=None):
         assert transaction is self.transaction_instance
+        if isinstance(_key, tuple) and _key[-1] == "deferred-jobs-control":
+            return None
         return self.transaction_instance.entity
 
 
@@ -98,6 +103,9 @@ class KeyedDatastore:
 
     def transaction(self):
         return KeyedTransaction(self)
+
+    def key(self, *parts):
+        return tuple(parts)
 
     def get(self, key, transaction=None):
         assert isinstance(transaction, KeyedTransaction)
@@ -255,6 +263,11 @@ def test_deferred_job_transactions_retry_aborted_contention(monkeypatch):
     sleeps = []
     monkeypatch.setattr(database_utility.time, "sleep", sleeps.append)
     monkeypatch.setattr(database_utility, "_deferred_job_key", lambda _value: "job")
+    monkeypatch.setattr(
+        database_utility,
+        "_update_deferred_job_scheduler_tracking",
+        lambda *_args, **_kwargs: None,
+    )
 
     claim_datastore = ContendedDatastore(
         {"status": "queued", "attempt": 0},
@@ -348,10 +361,21 @@ def test_deferred_job_create_is_transactionally_idempotent(monkeypatch):
     created = database_utility.create_deferred_job_if_absent(job, notification)
 
     assert created["created"] is True
-    assert datastore.transaction_instance.saved == [
+    assert datastore.transaction_instance.saved[1:] == [
         {"status": "queued"},
         {"pending": True},
     ]
+    control = dict(datastore.transaction_instance.saved[0])
+    assert control.pop("modified").tzinfo is not None
+    assert control == {
+        "schema_version": 1,
+        "initialized": False,
+        "tracked_jobs": ["job"],
+        "active_jobs": 1,
+        "desired_state": "enabled",
+        "generation": 1,
+    }
+    assert created["scheduler_control"]["tracked_jobs"] == ["job"]
 
     datastore.transaction_instance.entity = {"status": "running"}
     duplicate = database_utility.create_deferred_job_if_absent(job, notification)
@@ -360,7 +384,7 @@ def test_deferred_job_create_is_transactionally_idempotent(monkeypatch):
         "reason": "existing",
         "entity": {"status": "running"},
     }
-    assert len(datastore.transaction_instance.saved) == 2
+    assert len(datastore.transaction_instance.saved) == 3
 
 
 # @features deferred-jobs
