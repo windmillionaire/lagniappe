@@ -116,7 +116,7 @@ def test_poll_endpoint_batches_entity_changes(get_user, browser_failures):
         owner,
         status=422,
         path="/l/poll",
-        count=4,
+        count=5,
     ):
         duplicate = poll(owner, [descriptor, descriptor])
         assert duplicate["status"] == 422
@@ -137,6 +137,19 @@ def test_poll_endpoint_batches_entity_changes(get_user, browser_failures):
 
         malformed_revision = poll(owner, [{**descriptor, "revision": {"nested": True}}])
         assert malformed_revision["status"] == 422
+
+        retired_notification_channel = poll(
+            owner,
+            [
+                {
+                    "id": "notifications",
+                    "type": "channel",
+                    "channel": "notifications",
+                    "revision": None,
+                }
+            ],
+        )
+        assert retired_notification_channel["status"] == 422
 
         oversized = poll(
             owner,

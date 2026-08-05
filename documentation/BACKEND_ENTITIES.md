@@ -473,16 +473,12 @@ Committed notification creates/content updates/deletes emit a post-commit Redis
 projection effect. They do not write the User or a notification/site
 fingerprint, and cache failure never rolls back the durable entity mutation.
 
-`User.operation_revision` is the unindexed monotonic deferred-job polling gate.
-It is deliberately separate from `modified` and the authorization fingerprint,
-so job activity does not invalidate the user entity, global users list, or
-authorization-derived response caches. The request authentication path already
-loads the user for `/l/poll`, allowing operation descriptors to compare the gate
-without another User read. The historical `User.notification_revision`
-property remains readable for stored-record compatibility but is no longer
-read, updated, or used as an invalidation authority. Notification count and
-revision instead live in the reconstructable expiring Redis projection
-documented in [BACKEND_TOOLS.md](BACKEND_TOOLS.md).
+Deferred-job status transactions write only the durable job and
+scheduler-control records they actually change; job activity does not
+invalidate the User, global users list, or authorization-derived response
+caches. Reconstructable operation and notification revisions live in separate
+expiring Redis projections documented in
+[BACKEND_TOOLS.md](BACKEND_TOOLS.md).
 
 Notes are activity entities with an author `user`, owning `parent`, optional
 plain-text `body` and photo asset, a server-assigned `scope` (`home` or `page`),
@@ -504,11 +500,16 @@ deadline, bounded progress phases, and opaque telemetry correlation. Unknown
 versions fail rather than guessing at compatibility. The combined inline
 contract is limited to 750 KiB.
 
-Client-visible job revision transactions also advance the ancestor user's
-`operation_revision`; lease-only heartbeats do not. Because jobs are children
-of their actor user, this stays inside the transaction's existing entity group.
-Quiet operation polls compare the loaded-user cursor first and avoid loading
-job rows until some operation has actually advanced.
+Every committed client-visible status revision is published post-commit to a
+small per-job Redis projection containing only revision, terminal state, and a
+durable-verification timestamp. Lease-only heartbeats do not publish because
+they do not change status. Owner polls skip a job-row load while their supplied
+revision matches a projection verified during the last minute; misses,
+mismatches, and older projections reload the durable job in batches and repair
+Redis. Non-owner descriptors always use the durable permission-checked path,
+so the cache cannot grant access. Redis failures never roll back a job
+transition, and the bounded verification interval prevents an indefinitely
+stale cache value from hiding a missed or delayed invalidation.
 
 `DeferredJobLock` is a separate, small Datastore record keyed by a hash of the
 target and mutation scope. Page/task autofill creates its job, notification,
@@ -552,9 +553,7 @@ preventing expected worker/heartbeat races from stranding active work.
 A job remains `delivery_pending` until cleanup, notification persistence, and
 terminal visibility markers have completed. A later Cloud Task or the
 scheduled reconciler resumes at the incomplete marker without repeating
-provider preparation or domain apply. The legacy field names remain in the
-durable job schema for upgrade compatibility; they no longer represent
-provider sends.
+provider preparation or domain apply.
 
 The stable `site/deferred-jobs-control` record tracks the URL-safe keys of jobs
 that still require recovery. Membership includes `queued`, `running`, and
@@ -570,11 +569,11 @@ job requires the exact Cloud Scheduler reconciler to be enabled before its
 start request succeeds; the last completion requests a pause, whose failure is
 safe because it only permits extra recovery calls. One lease holder serializes
 provider mutations and rereads the latest generation after each API response,
-so a concurrent first-job resume wins over a stale last-job pause. Existing
-installations bootstrap membership from the durable recovery query with an
+so a concurrent first-job resume wins over a stale last-job pause. Each
+reconciliation repairs membership from the durable recovery query with an
 optimistic generation check. Status-class changes advance that generation so
-the scan cannot publish a mixed view of its separate status queries. Two clean
-empty bootstrap runs are required before an existing installation may pause.
+the scan cannot publish a mixed view of its separate status queries. A clean
+empty scan requests a pause immediately.
 
 Cloud Tasks sends only `{ "job_key": "..." }` to `/process/jobs`. Deterministic
 task IDs make duplicate scheduling harmless, and a delivery may run for up to
@@ -605,8 +604,8 @@ The owner-only AI analytics view shows each retained job's opaque ID and links
 to a transferable JSON diagnostic. That projection includes bounded timing,
 dispatch/recovery state, safe input entity references, checkpoint stage, and
 AI-generation summaries correlated through the opaque telemetry ID. It excludes
-legacy client tokens, parameters/feedback, checkpoint payloads, generated content,
-authorization data, lease tokens, and provider/tool payloads.
+parameters/feedback, checkpoint payloads, generated content, authorization data,
+lease tokens, and provider/tool payloads.
 
 Deferred provider requests use at most two SDK attempts before durable job
 backoff owns recovery. AI quota failures use application-owned base backoff at

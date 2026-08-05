@@ -115,7 +115,6 @@ def test_tracking_membership_follows_recovery_required_state(scheduler_database)
 
     assert added["active_jobs"] == 1
     assert added["desired_state"] == "enabled"
-    assert added["initialized"] is False
 
     repaired = database_utility.repair_deferred_job_scheduler_control(
         [job_key],
@@ -123,7 +122,6 @@ def test_tracking_membership_follows_recovery_required_state(scheduler_database)
         now,
     )
     assert repaired["repaired"] is True
-    assert repaired["control"]["initialized"] is True
 
     with scheduler_database.transaction() as transaction:
         status_changed = database_utility._update_deferred_job_scheduler_tracking(
@@ -151,16 +149,15 @@ def test_tracking_membership_follows_recovery_required_state(scheduler_database)
 
 
 # @features deferred-jobs cloud-scheduler
-# @dimensions bootstrap drift-repair optimistic-concurrency state-read defaults
+# @dimensions drift-repair optimistic-concurrency state-read defaults
 def test_scheduler_control_repair_is_revision_checked(scheduler_database):
     now = datetime(2026, 8, 5, tzinfo=timezone.utc)
     job_key = _job_key()
     assert _control() == {
         "schema_version": 0,
-        "initialized": False,
         "tracked_jobs": [],
         "active_jobs": 0,
-        "desired_state": "enabled",
+        "desired_state": "paused",
         "generation": 0,
         "applied_generation": 0,
         "applied_state": None,
@@ -192,7 +189,6 @@ def test_scheduler_control_repair_is_revision_checked(scheduler_database):
         now,
     )
     assert repaired["repaired"] is True
-    assert repaired["control"]["initialized"] is True
     assert repaired["control"]["tracked_jobs"] == _control()["tracked_jobs"]
 
 
@@ -237,10 +233,6 @@ def test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
 ):
     now = datetime(2026, 8, 5, tzinfo=timezone.utc)
     empty = database_utility.repair_deferred_job_scheduler_control([], 0, now)
-    assert empty["control"]["desired_state"] == "enabled"
-    empty = database_utility.repair_deferred_job_scheduler_control(
-        [], empty["control"]["generation"], now
-    )
     assert empty["control"]["desired_state"] == "paused"
     job_key = _job_key()
 
@@ -314,6 +306,33 @@ def test_scheduler_sync_releases_lease_after_provider_failure(scheduler_database
     assert control["sync_lease_expires"] is None
 
 
+# @pairs deferred-jobs:datastore-read-isolation cloud-scheduler:datastore-read-isolation
+# @source lagniappe/core/tools/deferred_job_scheduler.py::synchronize_deferred_job_reconciler
+def test_scheduler_sync_uses_committed_control_hint_when_current(monkeypatch):
+    control = {
+        "desired_state": "enabled",
+        "applied_state": "enabled",
+        "generation": 8,
+        "applied_generation": 8,
+    }
+    monkeypatch.setattr(
+        deferred_job_scheduler.database,
+        "get_deferred_job_scheduler_control",
+        lambda: pytest.fail("committed scheduler control was read again"),
+    )
+
+    result = deferred_job_scheduler.synchronize_deferred_job_reconciler(
+        initial_control=control,
+        config=SimpleNamespace(production=True),
+    )
+
+    assert result == {
+        "synchronized": True,
+        "reason": "current",
+        "control": control,
+    }
+
+
 # @features deferred-jobs cloud-scheduler
 # @dimensions resume-failure pause-failure recovery-guarantee
 def test_registry_requires_resume_but_tolerates_pause_failure(monkeypatch):
@@ -344,7 +363,7 @@ def test_registry_requires_resume_but_tolerates_pause_failure(monkeypatch):
 
 
 # @features deferred-jobs cloud-scheduler
-# @dimensions bootstrap drift-repair optimistic-concurrency self-pause
+# @dimensions drift-repair optimistic-concurrency self-pause
 def test_reconciler_repairs_control_before_self_pausing(monkeypatch):
     registry = deferred_jobs.DeferredJobRegistry()
     repaired = []

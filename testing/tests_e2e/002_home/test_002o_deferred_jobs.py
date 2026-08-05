@@ -64,7 +64,13 @@ def test_poll_operation_is_owner_safe(get_user):
                     })),
                 }),
             });
-            const body = await response.json();
+            const responseText = await response.text();
+            let body;
+            try {
+                body = JSON.parse(responseText);
+            } catch (_error) {
+                return { status: response.status, responseText };
+            }
             const current = body.results[0];
             const unchangedResponse = await fetch("/l/poll", {
                 method: "POST",
@@ -77,7 +83,6 @@ def test_poll_operation_is_owner_safe(get_user):
                         type: "operation",
                         key: operations[0],
                         revision: current.revision,
-                        operation_revision: current.operation_revision,
                     }],
                 }),
             });
@@ -91,7 +96,7 @@ def test_poll_operation_is_owner_safe(get_user):
         [owner_job.urlsafe_key, other_job.urlsafe_key, "missing-operation"],
     )
 
-    assert result["status"] == 200
+    assert result["status"] == 200, result
     statuses = result["body"]["results"]
     assert statuses[0]["id"] == f"operation:{owner_job.urlsafe_key}"
     assert len(statuses[0]["id"]) > 128
@@ -101,11 +106,9 @@ def test_poll_operation_is_owner_safe(get_user):
     assert statuses[0]["payload"]["elapsed_seconds"] >= 0
     assert statuses[0]["payload"]["phase_elapsed_seconds"] >= 0
     assert statuses[0]["revision"] == statuses[0]["payload"]["revision"]
-    assert isinstance(statuses[0]["operation_revision"], int)
     assert statuses[1]["status"] == "unavailable"
     assert statuses[2]["status"] == "unavailable"
     assert result["unchangedStatus"] == 200
     unchanged = result["unchangedBody"]["results"][0]
     assert unchanged["status"] == "unchanged"
     assert unchanged["revision"] == statuses[0]["revision"]
-    assert unchanged["operation_revision"] == statuses[0]["operation_revision"]

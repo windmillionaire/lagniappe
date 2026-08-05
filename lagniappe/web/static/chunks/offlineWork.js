@@ -21,7 +21,7 @@ const inspectOfflineWork = async (view) => {
 		if (!databases.some(({ name }) => name === "offline-db")) {
 			return { mutations: false, sync: false };
 		}
-		const { getAllOfflineRecords } = await import('./offline.js?v=bfd37afb');
+		const { getAllOfflineRecords } = await import('./offline.js?v=bb7cd952');
 		const records = await getAllOfflineRecords();
 		return {
 			mutations: Boolean(records.mutations?.length),

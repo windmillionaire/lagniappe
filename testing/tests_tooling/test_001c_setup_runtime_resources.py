@@ -483,7 +483,8 @@ def test_error_monitoring_supports_maintainer_or_operator_sentry(
     from installer import optional
 
     constants = types.SimpleNamespace(
-        SENTRY_DSN="https://maintainer@errors.example.test/1"
+        SENTRY_DSN="https://maintainer@errors.example.test/1",
+        SENTRY_JS_DSN="https://maintainer-js@errors.example.test/2",
     )
     settings = _fake_settings()
 
@@ -497,7 +498,17 @@ def test_error_monitoring_supports_maintainer_or_operator_sentry(
 
     assert settings.APP["CAPTURE_ERRORS"] == "True"
     assert settings.APP["SENTRY_DSN"] == constants.SENTRY_DSN
+    assert settings.APP["SENTRY_JS_DSN"] == constants.SENTRY_JS_DSN
     assert "https://lagniappe.site/reporting_privacy" in capsys.readouterr().out
+
+    settings.APP.pop("SENTRY_JS_DSN")
+    saves_before = len(settings._saves)
+    monkeypatch.setattr("builtins.input", lambda prompt: "")
+
+    optional.setup_error_monitoring()
+
+    assert settings.APP["SENTRY_JS_DSN"] == constants.SENTRY_JS_DSN
+    assert len(settings._saves) == saves_before + 1
 
     settings.APP.clear()
     operator_dsn = "https://operator@errors.example.test/42"
@@ -508,12 +519,14 @@ def test_error_monitoring_supports_maintainer_or_operator_sentry(
 
     assert settings.APP["CAPTURE_ERRORS"] == "True"
     assert settings.APP["SENTRY_DSN"] == operator_dsn
+    assert settings.APP["SENTRY_JS_DSN"] == operator_dsn
 
     saves_before = len(settings._saves)
     monkeypatch.setattr("builtins.input", lambda prompt: "")
     optional.setup_error_monitoring()
     assert settings.APP["CAPTURE_ERRORS"] == "True"
     assert settings.APP["SENTRY_DSN"] == operator_dsn
+    assert settings.APP["SENTRY_JS_DSN"] == operator_dsn
     assert len(settings._saves) == saves_before
 
 
@@ -524,7 +537,8 @@ def test_disabled_error_monitoring_offers_to_enable(monkeypatch, capsys):
     from installer import optional
 
     constants = types.SimpleNamespace(
-        SENTRY_DSN="https://maintainer@errors.example.test/1"
+        SENTRY_DSN="https://maintainer@errors.example.test/1",
+        SENTRY_JS_DSN="https://maintainer-js@errors.example.test/2",
     )
     settings = _fake_settings(app={"CAPTURE_ERRORS": "False"})
     monkeypatch.setattr(config, "SETTINGS", settings)
@@ -543,6 +557,7 @@ def test_disabled_error_monitoring_offers_to_enable(monkeypatch, capsys):
     assert settings.APP == {
         "CAPTURE_ERRORS": "True",
         "SENTRY_DSN": constants.SENTRY_DSN,
+        "SENTRY_JS_DSN": constants.SENTRY_JS_DSN,
     }
     assert "Error Monitoring & Crash Reporting" in capsys.readouterr().out
 
@@ -727,7 +742,8 @@ def test_development_monitoring_rejects_maintainer_sentry(monkeypatch, capsys):
     from installer import optional
 
     constants = types.SimpleNamespace(
-        SENTRY_DSN="https://maintainer@errors.example.test/1"
+        SENTRY_DSN="https://maintainer@errors.example.test/1",
+        SENTRY_JS_DSN="https://maintainer-js@errors.example.test/2",
     )
     settings = _fake_settings(
         app={"CAPTURE_ERRORS": "True", "SENTRY_DSN": constants.SENTRY_DSN}
@@ -742,6 +758,7 @@ def test_development_monitoring_rejects_maintainer_sentry(monkeypatch, capsys):
     assert settings.APP == {
         "CAPTURE_ERRORS": "True",
         "SENTRY_DSN": operator_dsn,
+        "SENTRY_JS_DSN": operator_dsn,
     }
     assert "That is the maintainer DSN" in capsys.readouterr().out
 
@@ -3104,6 +3121,7 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     settings.APP.update(
         {
             "SENTRY_DSN": "old",
+            "SENTRY_JS_DSN": "old-js",
             "AI_MODEL": "gemini-old",
             "AI_UTILITY_MODEL": "gemini-utility-old",
             "AI_IMAGE_MODEL": "imagen-old",
@@ -3131,6 +3149,7 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
 
     assert settings.APP["CAPTURE_ERRORS"] == "False"
     assert "SENTRY_DSN" not in settings.APP
+    assert "SENTRY_JS_DSN" not in settings.APP
     assert "Form and JSON values, request/response bodies" in setup_output
     assert "Recognized password, token, API-key, and private-key values" in setup_output
     assert "Reports are privacy-reduced, not guaranteed to be anonymous" in setup_output

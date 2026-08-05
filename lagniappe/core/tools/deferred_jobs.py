@@ -38,7 +38,7 @@ from lagniappe.core.definitions import (
     Fetch,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database, deferred_job_scheduler, task_queue
+from lagniappe.core.tools import cache, database, deferred_job_scheduler, task_queue
 from lagniappe.core.tools.database.core import DATA, KINDS
 
 
@@ -83,6 +83,27 @@ DEPENDENCY_RETRY_DELAY_SECONDS = 60
 MISSING_INPUT_MESSAGE = (
     "This operation stopped because the item it was working on was deleted."
 )
+
+
+# @testable true
+# @tests tests_unit/test_023_deferred_jobs.py::test_cancel_deletes_tasks_and_persists_a_tombstone
+# @tests tests_unit/test_023_deferred_jobs.py::test_operation_projection_failure_is_nonfatal
+# @pairs deferred-jobs:redis-projection deferred-jobs:cache-failure-isolation
+def _publish_operation_projection(job, *, operation):
+    """Publish disposable polling state without changing a durable outcome."""
+    try:
+        cache.update_operation_projection(job)
+    except Exception as error:
+        exceptions.capture(
+            error,
+            context={
+                "deferred_job": {
+                    "id": getattr(job, "urlsafe_key", None),
+                    "operation": operation,
+                }
+            },
+            level="warning",
+        )
 
 
 class DeferredJobInfrastructureError(RuntimeError):
@@ -526,12 +547,13 @@ class DeferredJobRegistry:
     # @tests tests_unit/test_023b_deferred_job_scheduler.py::test_registry_requires_resume_but_tolerates_pause_failure
     # @features deferred-jobs cloud-scheduler
     # @dimensions resume-failure pause-failure recovery-guarantee
-    def _sync_reconciler(self, *, required=False, force=False):
+    def _sync_reconciler(self, *, required=False, force=False, control=None):
         """Converge recovery scheduling, optionally requiring success to start."""
         try:
-            return deferred_job_scheduler.synchronize_deferred_job_reconciler(
-                force=force
-            )
+            options = {"force": force}
+            if control is not None:
+                options["initial_control"] = control
+            return deferred_job_scheduler.synchronize_deferred_job_reconciler(**options)
         except Exception as error:
             exceptions.capture(
                 error,
@@ -565,9 +587,6 @@ class DeferredJobRegistry:
         adapter.failure(context, error)
         adapter.cleanup(context, terminal=True)
         now = _utc()
-        public_client = {
-            key: value for key, value in (job.client or {}).items() if key != "token"
-        }
         transition = database.transition_active_deferred_job(
             job.key,
             {
@@ -577,7 +596,7 @@ class DeferredJobRegistry:
                 "lease_expires": None,
                 "next_attempt_at": None,
                 "deadline_at": None,
-                "client": json.dumps(public_client),
+                "client": json.dumps(job.client or {}),
                 "error": json.dumps(_error_record(error, retryable=False, attempt=0)),
                 "progress": json.dumps(
                     {
@@ -592,6 +611,10 @@ class DeferredJobRegistry:
             raise DeferredJobInfrastructureError(
                 "Deferred operation failure could not be persisted."
             )
+        _publish_operation_projection(
+            Entities.DEFERRED_JOB(transition["entity"]),
+            operation="failed_start_projection",
+        )
         if notification is not None:
             notification.body = adapter.terminal_message(
                 context,
@@ -600,7 +623,7 @@ class DeferredJobRegistry:
             )
             notification.pending = False
             Entities.save(notification)
-        self._sync_reconciler()
+        self._sync_reconciler(control=transition.get("scheduler_control"))
 
     # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_deferred_job_create_is_transactionally_idempotent
@@ -623,11 +646,7 @@ class DeferredJobRegistry:
         adapter = self.adapter(spec.job_type)
         inputs = _serialize_inputs(spec.inputs)
         parameters = _json_copy(spec.parameters)
-        client = {
-            key: value
-            for key, value in _json_copy(spec.client).items()
-            if key != "token"
-        }
+        client = _json_copy(spec.client)
         if bool(client.get("source_widget")) != bool(client.get("destination")):
             raise exceptions.ValidationError(
                 "Deferred completion routing requires both a source and destination."
@@ -737,7 +756,10 @@ class DeferredJobRegistry:
             ):
                 self._sync_reconciler(required=True)
             return existing, existing.notification
-        self._sync_reconciler(required=True)
+        self._sync_reconciler(
+            required=True,
+            control=creation.get("scheduler_control"),
+        )
         Entities.save(*[entity for entity in (job, notification) if entity])
 
         context = DeferredJobContext(
@@ -906,9 +928,6 @@ class DeferredJobRegistry:
         }:
             raise ValueError("Active work can only be cancelled or superseded.")
         now = _utc()
-        public_client = {
-            key: value for key, value in (job.client or {}).items() if key != "token"
-        }
         task_identity = getattr(job, "task_identity", None)
         if not task_identity and job.status in {
             DeferredJobStatus.QUEUED.value,
@@ -929,7 +948,7 @@ class DeferredJobRegistry:
                 "lease_expires": None,
                 "next_attempt_at": None,
                 "deadline_at": None,
-                "client": json.dumps(public_client),
+                "client": json.dumps(job.client or {}),
                 "progress": json.dumps(
                     {
                         "phase": status.value,
@@ -943,7 +962,8 @@ class DeferredJobRegistry:
             return transition.get("reason") == "terminal"
         job = Entities.DEFERRED_JOB(transition["entity"])
         job = Entities.fetch_one(job, request=Fetch.direct()) or job
-        self._sync_reconciler()
+        _publish_operation_projection(job, operation="cancel_projection")
+        self._sync_reconciler(control=transition.get("scheduler_control"))
         if task_identity:
             task_queue.delete_task(task_identity)
         task_queue.delete_task(task_queue.task_name(_feedback_task_id(job)))
@@ -1138,7 +1158,10 @@ class DeferredJobRegistry:
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_scheduler.py::test_reconciler_repairs_control_before_self_pausing
     # @features deferred-jobs cloud-scheduler
-    # @dimensions bootstrap drift-repair optimistic-concurrency
+    # @dimensions drift-repair optimistic-concurrency self-pause
+    # @pairs deferred-jobs:self-pause cloud-scheduler:self-pause
+    # @pairs deferred-jobs:drift-repair cloud-scheduler:drift-repair
+    # @pairs deferred-jobs:optimistic-concurrency cloud-scheduler:optimistic-concurrency
     def _repair_reconciler_control(self, now, *, attempts=4):
         """Scan durable recovery work and publish it without losing raced changes."""
         if not CONFIG.production:
@@ -1249,6 +1272,7 @@ class DeferredJobRegistry:
                     continue
                 job = Entities.DEFERRED_JOB(claim["entity"])
                 job = Entities.fetch_one(job, request=Fetch.direct()) or job
+                _publish_operation_projection(job, operation="recovery_projection")
                 if claim.get("action") == "failed":
                     self._finish_stale_delivery(job, error=error)
                     result["failed"] += 1
@@ -1400,6 +1424,8 @@ class DeferredJobRegistry:
                 )
                 return DeferredJobResult(state, job=job)
             return DeferredJobResult(DeferredJobRunState.ACTIVE, job=job)
+
+        _publish_operation_projection(job, operation="claim_projection")
 
         deadline_at = now + timedelta(seconds=DEFERRED_JOB_ATTEMPT_DEADLINE_SECONDS)
         self._persist_claimed(
@@ -1704,15 +1730,26 @@ class DeferredJobRegistry:
         for name, value in values.items():
             setattr(job, name, value)
         updates = {name: job.db.get(job.properties[name].db_key) for name in values}
-        if not database.update_claimed_deferred_job(
+        persisted = database.update_claimed_deferred_job(
             job.key,
             claim_token,
             updates,
             _utc(),
-        ):
+            include_scheduler_control=True,
+        )
+        if not persisted:
             raise DeferredJobClaimLostError("Deferred job was cancelled or superseded.")
+        if "status_revision" in values:
+            _publish_operation_projection(job, operation="status_projection")
+        return (
+            persisted.get("scheduler_control")
+            if isinstance(persisted, dict)
+            else None
+        )
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_023_deferred_jobs.py::test_terminal_release_reuses_committed_scheduler_control
+    # @pairs deferred-jobs:terminal-delivery cloud-scheduler:datastore-read-isolation
     def _release(self, job, lease_token):
         values = {
             "lease_token": None,
@@ -1722,9 +1759,9 @@ class DeferredJobRegistry:
         terminal = job.status in TERMINAL_STATUSES
         if terminal:
             values.update({"dispatch_state": "complete", "deadline_at": None})
-        self._persist_claimed(job, lease_token, **values)
+        scheduler_control = self._persist_claimed(job, lease_token, **values)
         if terminal:
-            self._sync_reconciler()
+            self._sync_reconciler(control=scheduler_control)
 
     # @testable infrastructure
     def _expire_claim(self, job, lease_token, now):
@@ -2020,11 +2057,6 @@ class DeferredJobRegistry:
             delivery["notification"] = True
             self._save_terminal_fields(job, delivery=delivery)
 
-        client = dict(job.client or {})
-        if "token" in client:
-            client.pop("token", None)
-            self._save_terminal_fields(job, client=client)
-
     # @testable infrastructure
     def _save_terminal_fields(self, job, **values):
         token = job.lease_token
@@ -2105,9 +2137,9 @@ def _new_idempotency_key(spec):
 
 
 # @testable true
-# @tests tests_unit/test_023_deferred_jobs.py::test_request_fingerprint_ignores_legacy_browser_token
+# @tests tests_unit/test_023_deferred_jobs.py::test_request_fingerprint_tracks_the_complete_client_contract
 # @features deferred-jobs
-# @dimensions operation-fingerprint legacy-token-exclusion routing-identity
+# @dimensions operation-fingerprint client-contract routing-identity
 def _request_fingerprint(
     *,
     job_type,
@@ -2117,10 +2149,7 @@ def _request_fingerprint(
     parameters,
     client,
 ):
-    """Hash immutable operation data while ignoring retired legacy client tokens."""
-    public_client = {
-        key: value for key, value in (client or {}).items() if key != "token"
-    }
+    """Hash the complete immutable deferred-operation request contract."""
     payload = json.dumps(
         {
             "job_type": job_type,
@@ -2128,7 +2157,7 @@ def _request_fingerprint(
             "authorization": authorization,
             "inputs": inputs,
             "parameters": parameters,
-            "client": public_client,
+            "client": client or {},
         },
         sort_keys=True,
         separators=(",", ":"),

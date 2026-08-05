@@ -212,6 +212,25 @@ durable mutation and cannot roll it back. `/l/ping` similarly omits the optional
 notification-state header on Redis error while preserving its server-health
 response.
 
+### Deferred-operation projection (`operations.py`)
+
+Deferred jobs remain authoritative Datastore records. Redis stores only a
+schema version, monotonic status revision, terminal flag, and durable-
+verification timestamp under a hashed per-job key. Committed job saves and
+compare-and-set lifecycle transitions publish the projection after commit;
+deletes remove it. A compare-and-set Redis update prevents a delayed older
+publisher from replacing a newer revision.
+
+Owner operation polls treat a matching projection as a read-elision hint for
+60 seconds. A miss, revision mismatch, or verification-due entry loads the
+requested durable jobs in batches of 50 and repairs Redis. Collaborator
+descriptors always take the durable status/authorization path. Redis failures
+are captured and fall back to Datastore, never roll back job state, and cannot
+make the cache an authorization or delivery authority. Projection keys have a
+sliding 30-minute expiration. Polls that also request notification state read
+the two projection families through one Redis pipeline while retaining their
+separate schemas and lifecycles.
+
 ### Querying (`query.py`)
 
 `search(query, user)` runs a full-text search against the Redis index with permission filtering. Results are filtered by the user's `requires` tags so users only see entities they have access to. Name relevance outweighs all secondary fields combined, and an optional weighted query clause boosts categories, projects, and pages when every normalized query term occurs in the entity name. Per-kind document scores remain a broader relevance multiplier. Search results are hydrated through `get_details_by_hash()` before being returned, so parent display data comes from the current entity hash details rather than a duplicated search-row blob.

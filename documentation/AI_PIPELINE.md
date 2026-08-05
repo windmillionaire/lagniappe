@@ -554,10 +554,12 @@ proposal/checkpoint data. Automatic compaction is not implemented.
 - The job's `status_revision`, terminal status, and destination metadata are
   durable.
 - `operation` subscriptions return that bounded projection through `/l/poll`.
-- The already loaded request user's `operation_revision` gates those job
-  projections, so a quiet poll does not read durable-job rows. Notification
-  mutations use the separate expiring Redis notification projection and cannot
-  invalidate the operation gate.
+- A matching per-job Redis status revision verified during the last minute
+  lets an owner quiet poll skip that durable-job row. Cache misses, mismatches,
+  and verification-due entries reload and repair only the requested jobs;
+  collaborator checks always load durably for authorization. Notification
+  mutations use a separate expiring Redis projection and cannot invalidate an
+  operation hint.
 - A terminal result fetches authoritative destination HTML/data; it never
   carries AI context or output in the polling payload.
 - Notification entities are saved durably; their post-commit Redis generation,
@@ -573,8 +575,8 @@ with the shared coordinator and refresh the declared destination at terminal
 state. It:
 
 - batches all active operations in one request;
-- echoes the loaded-user operation revision and only loads owner-safe job rows
-  after that gate changes;
+- echoes each job's durable status revision and skips only fresh matching owner
+  projections, with bounded durable verification;
 - exposes only type, state, coarse phase, retry time, destination, and terminal
   outcome/revision—not checkpoint, prompt, inputs, or token;
 - uses adaptive backoff, jitter, and visibility/connectivity checks;

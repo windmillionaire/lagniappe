@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as createIcon, s as setIcon } from '../icons.js?v=bfd37afb';
-import { r as request } from '../foundation.js?v=bfd37afb';
-import { C as Core } from '../core-foundation.js?v=bfd37afb';
-import '../notificationState.js?v=bfd37afb';
-import '../connectivity.js?v=bfd37afb';
+import { c as createIcon, s as setIcon } from '../icons.js?v=bb7cd952';
+import { r as request } from '../foundation.js?v=bb7cd952';
+import { C as Core } from '../core-foundation.js?v=bb7cd952';
+import '../notificationState.js?v=bb7cd952';
+import '../connectivity.js?v=bb7cd952';
 
 const REPORT_FORM_SELECTOR =
 	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='undo-report-form'], [data-role='revise-report-form']";
@@ -43,7 +43,7 @@ class Report extends Core {
 		if (this._reportFormsReady) return Promise.resolve(this);
 		if (this._reportFormsPromise) return this._reportFormsPromise;
 
-		const pending = import('../baseForm.js?v=bfd37afb').then(function (n) { return n.b; })
+		const pending = import('../baseForm.js?v=bb7cd952').then(function (n) { return n.b; })
 			.then(async ({ BaseForm }) => {
 				if (this._destroyed) return null;
 				await Promise.all([

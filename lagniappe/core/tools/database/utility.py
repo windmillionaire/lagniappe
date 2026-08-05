@@ -21,7 +21,7 @@ PREFIX = CONFIG.PREFIX
 DEFERRED_JOB_TRANSACTION_RETRY_DELAYS = (0.05, 0.1, 0.2)
 ACTIVE_DEFERRED_JOB_STATUSES = {"queued", "running", "retry_wait"}
 DEFERRED_JOB_SCHEDULER_CONTROL_ID = "deferred-jobs-control"
-DEFERRED_JOB_SCHEDULER_CONTROL_SCHEMA_VERSION = 1
+DEFERRED_JOB_SCHEDULER_CONTROL_SCHEMA_VERSION = 2
 DEFERRED_JOB_SCHEDULER_STATES = {"enabled", "paused"}
 
 
@@ -188,13 +188,11 @@ def _deferred_job_scheduler_control(transaction):
 def _deferred_job_scheduler_snapshot(control=None):
     control = control or {}
     tracked_jobs = sorted(set(control.get("tracked_jobs") or ()))
-    initialized = bool(control.get("initialized"))
     desired_state = control.get("desired_state")
     if desired_state not in DEFERRED_JOB_SCHEDULER_STATES:
-        desired_state = "enabled" if tracked_jobs or not initialized else "paused"
+        desired_state = "enabled" if tracked_jobs else "paused"
     return {
         "schema_version": int(control.get("schema_version") or 0),
-        "initialized": initialized,
         "tracked_jobs": tracked_jobs,
         "active_jobs": len(tracked_jobs),
         "desired_state": desired_state,
@@ -235,16 +233,12 @@ def _update_deferred_job_scheduler_tracking(
     elif was_required:
         tracked_jobs.discard(tracking_id)
 
-    initialized = snapshot["initialized"]
     control.update(
         {
             "schema_version": DEFERRED_JOB_SCHEDULER_CONTROL_SCHEMA_VERSION,
-            "initialized": initialized,
             "tracked_jobs": sorted(tracked_jobs),
             "active_jobs": len(tracked_jobs),
-            "desired_state": (
-                "enabled" if tracked_jobs or not initialized else "paused"
-            ),
+            "desired_state": "enabled" if tracked_jobs else "paused",
             "generation": snapshot["generation"] + 1,
             "modified": now,
         }
@@ -256,10 +250,10 @@ def _update_deferred_job_scheduler_tracking(
 # @testable true
 # @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_control_repair_is_revision_checked
 # @features deferred-jobs cloud-scheduler
-# @dimensions bootstrap drift-repair optimistic-concurrency
+# @dimensions drift-repair optimistic-concurrency
 @_retry_deferred_job_transaction
 def repair_deferred_job_scheduler_control(job_keys, expected_generation, now):
-    """Initialize or repair tracked recovery jobs if no boundary raced the scan."""
+    """Repair tracked recovery jobs if no lifecycle boundary raced the scan."""
     tracked_jobs = sorted({_deferred_job_tracking_id(key) for key in job_keys})
     with DATA.datastore.transaction() as transaction:
         control = _deferred_job_scheduler_control(transaction)
@@ -271,12 +265,9 @@ def repair_deferred_job_scheduler_control(job_keys, expected_generation, now):
                 "control": snapshot,
             }
 
-        desired_state = (
-            "enabled" if tracked_jobs or not snapshot["initialized"] else "paused"
-        )
+        desired_state = "enabled" if tracked_jobs else "paused"
         changed = (
-            not snapshot["initialized"]
-            or snapshot["tracked_jobs"] != tracked_jobs
+            snapshot["tracked_jobs"] != tracked_jobs
             or snapshot["desired_state"] != desired_state
             or snapshot["schema_version"]
             != DEFERRED_JOB_SCHEDULER_CONTROL_SCHEMA_VERSION
@@ -284,7 +275,6 @@ def repair_deferred_job_scheduler_control(job_keys, expected_generation, now):
         control.update(
             {
                 "schema_version": DEFERRED_JOB_SCHEDULER_CONTROL_SCHEMA_VERSION,
-                "initialized": True,
                 "tracked_jobs": tracked_jobs,
                 "active_jobs": len(tracked_jobs),
                 "desired_state": desired_state,
@@ -397,32 +387,6 @@ def get_deferred_job_scheduler_control():
 
 
 # @testable true
-# @tests tests_unit/test_023_deferred_jobs.py::test_deferred_job_operation_revision_tracks_client_visible_status
-# @features deferred-jobs polling
-# @dimensions personal-activity revision transaction
-def _advance_deferred_job_revision(transaction, job_key):
-    """Advance the owning user's activity cursor in the job transaction."""
-    actor_key = getattr(job_key, "parent", None)
-    if actor_key is None:
-        return
-    actor = DATA.datastore.get(actor_key, transaction=transaction)
-    if actor is None or actor.get("type") != "user":
-        return
-    actor["operation_revision"] = int(actor.get("operation_revision") or 0) + 1
-    try:
-        actor.exclude_from_indexes = frozenset(
-            {
-                *actor.exclude_from_indexes,
-                "notification_revision",
-                "operation_revision",
-            }
-        )
-    except AttributeError:
-        pass
-    transaction.put(actor)
-
-
-# @testable true
 # @tests tests_unit/test_023_deferred_jobs.py::test_deferred_job_create_is_transactionally_idempotent
 # @features deferred-jobs
 # @dimensions start get-or-create notification idempotency
@@ -526,8 +490,10 @@ def release_deferred_job_lock(identifier, operation):
 
 # @testable true
 # @tests tests_unit/test_023_deferred_jobs.py::test_deferred_job_claim_and_checkpoint_are_compare_and_set
+# @tests tests_unit/test_023_deferred_jobs.py::test_deferred_job_status_transactions_do_not_write_actor
 # @features deferred-jobs
 # @dimensions lease claim duplicate-delivery
+# @pairs deferred-jobs:user-write-isolation deferred-jobs:revision deferred-jobs:transaction
 @_retry_deferred_job_transaction
 def claim_deferred_job(identifier, lease_token, lease_expires, now):
     """Atomically claim a due job unless it is terminal or actively leased."""
@@ -569,16 +535,24 @@ def claim_deferred_job(identifier, lease_token, lease_expires, now):
             entity,
             now,
         )
-        _advance_deferred_job_revision(transaction, key)
         return {"claimed": True, "reason": "claimed", "entity": entity}
 
 
 # @testable true
 # @tests tests_unit/test_023_deferred_jobs.py::test_deferred_job_claim_and_checkpoint_are_compare_and_set
+# @tests tests_unit/test_023_deferred_jobs.py::test_deferred_job_status_transactions_do_not_write_actor
 # @features deferred-jobs
 # @dimensions lease checkpoint compare-and-set
+# @pairs deferred-jobs:user-write-isolation deferred-jobs:revision deferred-jobs:transaction
 @_retry_deferred_job_transaction
-def update_claimed_deferred_job(identifier, lease_token, updates, now):
+def update_claimed_deferred_job(
+    identifier,
+    lease_token,
+    updates,
+    now,
+    *,
+    include_scheduler_control=False,
+):
     """Atomically update a job only while the caller owns its lease."""
     key = _deferred_job_key(identifier)
     if key is None:
@@ -596,15 +570,18 @@ def update_claimed_deferred_job(identifier, lease_token, updates, now):
                 entity[name] = value
         entity["modified"] = now
         transaction.put(entity)
-        _update_deferred_job_scheduler_tracking(
+        scheduler_control = _update_deferred_job_scheduler_tracking(
             transaction,
             key,
             before,
             entity,
             now,
         )
-        if "status_revision" in updates:
-            _advance_deferred_job_revision(transaction, key)
+        if include_scheduler_control:
+            return {
+                "updated": True,
+                "scheduler_control": scheduler_control,
+            }
         return True
 
 
@@ -699,7 +676,6 @@ def claim_deferred_job_recovery(
                 entity,
                 now,
             )
-            _advance_deferred_job_revision(transaction, key)
             return {
                 "claimed": True,
                 "reason": "maximum-age",
@@ -724,7 +700,6 @@ def claim_deferred_job_recovery(
             entity,
             now,
         )
-        _advance_deferred_job_revision(transaction, key)
         return {
             "claimed": True,
             "reason": "stale",
@@ -799,7 +774,6 @@ def transition_active_deferred_job(identifier, updates, now):
             entity,
             now,
         )
-        _advance_deferred_job_revision(transaction, key)
         result = {
             "transitioned": True,
             "reason": "transitioned",
@@ -1020,10 +994,6 @@ def _advances_site_fingerprint(entity, mask):
         return False
     if not fields:
         return True
-    if entity.db.get("type") == "user" and fields.issubset(
-        {"notification_revision", "operation_revision"}
-    ):
-        return False
     return not (
         entity.db.get("type") in {"page", "project"}
         and "document_history" in fields
@@ -1036,6 +1006,10 @@ def _advances_site_fingerprint(entity, mask):
 # @tests tests_unit/test_018_database_utility.py::test_notification_save_and_delete_skip_site_fingerprints
 # @features mutations database
 # @dimensions property-mask update full-upsert site-fingerprint document-checkpoint
+# @pairs database:property-mask database:update database:full-upsert
+# @pairs database:site-fingerprint database:document-checkpoint
+# @pairs mutations:property-mask mutations:update mutations:full-upsert
+# @pairs mutations:site-fingerprint mutations:document-checkpoint
 # @pairs notifications:mutation notifications:site-fingerprint-isolation
 def save_mutations(writes):
     """Persist full and property-masked entity writes in one Datastore batch.

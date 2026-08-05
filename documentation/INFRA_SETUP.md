@@ -799,10 +799,14 @@ nevertheless addresses only the exact setup-owned reconciler resource. The
 application records recovery-required deferred jobs in the stable
 `site/deferred-jobs-control` Datastore entry and resumes the schedule before
 accepting the first tracked job. Completing the last tracked job pauses future
-runs. Revision-checked bootstrap scans let existing installations initialize
-that record, and two clean empty runs are required before the reconciler pauses
-itself for the first time. Rerunning setup applies the runtime role idempotently
-to an existing installation.
+runs. Each reconciliation revision-checks the durable recovery query against
+that record, and a clean empty scan requests a pause immediately. Job lifecycle
+transactions pass their committed control snapshot into synchronization,
+avoiding an immediate duplicate read when it is already converged; any actual
+pause/resume still acquires the durable generation-checked lease and rereads
+current intent transactionally. Scheduler membership is not moved to Redis
+because it is recovery authority rather than a polling hint. Rerunning setup
+applies the runtime role idempotently to an existing installation.
 
 The identities deliberately have different responsibilities:
 

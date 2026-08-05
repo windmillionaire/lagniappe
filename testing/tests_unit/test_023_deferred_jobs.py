@@ -37,6 +37,18 @@ from lagniappe.core.tools.files import extract as file_extract
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def operation_projection(monkeypatch):
+    """Keep deferred-job unit tests isolated from the Redis provider."""
+    published = []
+    monkeypatch.setattr(
+        deferred_jobs.cache,
+        "update_operation_projection",
+        lambda *jobs: published.extend(jobs),
+    )
+    return published
+
+
 class FakeTransaction:
     def __init__(self, entity):
         self.entity = entity
@@ -89,6 +101,7 @@ class KeyedTransaction:
         return False
 
     def put(self, entity):
+        self.datastore.saved.append(entity)
         self.datastore.entities[entity.key] = entity
 
     def delete(self, key):
@@ -100,6 +113,7 @@ class KeyedDatastore:
     def __init__(self, *entities):
         self.entities = {entity.key: entity for entity in entities}
         self.deleted = []
+        self.saved = []
 
     def transaction(self):
         return KeyedTransaction(self)
@@ -146,10 +160,10 @@ class ContendedDatastore:
         return transaction.entity
 
 
-# @features deferred-jobs polling
-# @dimensions personal-activity revision transaction
-# @source lagniappe/core/tools/database/utility.py::_advance_deferred_job_revision
-def test_deferred_job_operation_revision_tracks_client_visible_status(monkeypatch):
+# @pairs deferred-jobs:user-write-isolation deferred-jobs:revision deferred-jobs:transaction
+# @source lagniappe/core/tools/database/utility.py::claim_deferred_job
+# @source lagniappe/core/tools/database/utility.py::update_claimed_deferred_job
+def test_deferred_job_status_transactions_do_not_write_actor(monkeypatch):
     class JobKey:
         def __init__(self, parent):
             self.parent = parent
@@ -160,7 +174,7 @@ def test_deferred_job_operation_revision_tracks_client_visible_status(monkeypatc
     actor = KeyedEntity(
         actor_key,
         type="user",
-        operation_revision=4,
+        marker="unchanged",
     )
     job = KeyedEntity(
         job_key,
@@ -184,7 +198,6 @@ def test_deferred_job_operation_revision_tracks_client_visible_status(monkeypatc
         now,
     )
     assert claimed["claimed"] is True
-    assert actor["operation_revision"] == 5
 
     assert database_utility.update_claimed_deferred_job(
         job_key,
@@ -192,7 +205,6 @@ def test_deferred_job_operation_revision_tracks_client_visible_status(monkeypatc
         {"status_revision": 3, "progress": {"phase": "generating"}},
         now,
     )
-    assert actor["operation_revision"] == 6
 
     assert database_utility.update_claimed_deferred_job(
         job_key,
@@ -200,7 +212,18 @@ def test_deferred_job_operation_revision_tracks_client_visible_status(monkeypatc
         {"lease_expires": now + timedelta(minutes=15)},
         now,
     )
-    assert actor["operation_revision"] == 6
+
+    terminal = database_utility.update_claimed_deferred_job(
+        job_key,
+        "lease-one",
+        {"status": "succeeded", "dispatch_state": "complete"},
+        now,
+        include_scheduler_control=True,
+    )
+    assert terminal["updated"] is True
+    assert terminal["scheduler_control"]["active_jobs"] == 0
+    assert actor["marker"] == "unchanged"
+    assert all(entity is not actor for entity in datastore.saved)
 
 
 # @features deferred-jobs
@@ -368,8 +391,7 @@ def test_deferred_job_create_is_transactionally_idempotent(monkeypatch):
     control = dict(datastore.transaction_instance.saved[0])
     assert control.pop("modified").tzinfo is not None
     assert control == {
-        "schema_version": 1,
-        "initialized": False,
+        "schema_version": 2,
         "tracked_jobs": ["job"],
         "active_jobs": 1,
         "desired_state": "enabled",
@@ -1311,17 +1333,6 @@ def _terminal_delivery_runner(monkeypatch, job, adapter, persist=None):
     monkeypatch.setattr(registry, "_heartbeat", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(registry, "_claim_active", lambda *_args: True)
     return registry
-
-
-def _terminal_delivery_job():
-    job = RunnerJob()
-    job.notification = SimpleNamespace(body="Working...", pending=True)
-    job.client = {
-        "token": "browser-token",
-        "source_widget": "DeferredWidget",
-        "destination": "test:Destination",
-    }
-    return job
 
 
 # @pair deferred-jobs:preparation-context
@@ -2515,7 +2526,10 @@ def test_organize_resumes_plan_checkpoint_without_second_planning_call(monkeypat
 
 # @features deferred-jobs
 # @dimensions cancellation deterministic-task-id
-def test_cancel_deletes_tasks_and_persists_a_tombstone(monkeypatch):
+def test_cancel_deletes_tasks_and_persists_a_tombstone(
+    monkeypatch,
+    operation_projection,
+):
     registry = deferred_jobs.DeferredJobRegistry()
     job = RunnerJob(attempt=2)
     job.status = DeferredJobStatus.RETRY_WAIT.value
@@ -2568,6 +2582,80 @@ def test_cancel_deletes_tasks_and_persists_a_tombstone(monkeypatch):
     assert job.progress["phase"] == "cancelled"
     assert job.notification.pending is False
     assert saved == [job, job.notification]
+    assert operation_projection == [job]
+
+
+# @pairs deferred-jobs:redis-projection deferred-jobs:cache-failure-isolation
+# @source lagniappe/core/tools/deferred_jobs.py::_publish_operation_projection
+def test_operation_projection_failure_is_nonfatal(monkeypatch):
+    job = SimpleNamespace(urlsafe_key="durable-job")
+    captured = []
+    monkeypatch.setattr(
+        deferred_jobs.cache,
+        "update_operation_projection",
+        lambda *_jobs: (_ for _ in ()).throw(RuntimeError("redis unavailable")),
+    )
+    monkeypatch.setattr(
+        deferred_jobs.exceptions,
+        "capture",
+        lambda error, **kwargs: captured.append((error, kwargs)),
+    )
+
+    assert (
+        deferred_jobs._publish_operation_projection(
+            job,
+            operation="status_projection",
+        )
+        is None
+    )
+    assert str(captured[0][0]) == "redis unavailable"
+    assert captured[0][1]["level"] == "warning"
+    assert captured[0][1]["context"] == {
+        "deferred_job": {
+            "id": "durable-job",
+            "operation": "status_projection",
+        }
+    }
+
+
+# @pairs deferred-jobs:terminal-delivery cloud-scheduler:datastore-read-isolation
+# @source lagniappe/core/tools/deferred_jobs.py::DeferredJobRegistry._release
+def test_terminal_release_reuses_committed_scheduler_control(monkeypatch):
+    registry = deferred_jobs.DeferredJobRegistry()
+    job = RunnerJob()
+    job.status = DeferredJobStatus.SUCCEEDED.value
+    control = {"generation": 9, "desired_state": "paused"}
+    persisted = []
+    synchronized = []
+    monkeypatch.setattr(
+        registry,
+        "_persist_claimed",
+        lambda current, lease, **values: (
+            persisted.append((current, lease, values)) or control
+        ),
+    )
+    monkeypatch.setattr(
+        registry,
+        "_sync_reconciler",
+        lambda **options: synchronized.append(options),
+    )
+
+    registry._release(job, "lease-one")
+
+    assert persisted == [
+        (
+            job,
+            "lease-one",
+            {
+                "lease_token": None,
+                "lease_expires": None,
+                "next_attempt_at": None,
+                "dispatch_state": "complete",
+                "deadline_at": None,
+            },
+        )
+    ]
+    assert synchronized == [{"control": control}]
 
 
 # @features deferred-jobs notifications
@@ -2879,8 +2967,8 @@ def test_start_rejects_operation_id_reuse_for_different_request(monkeypatch):
 
 
 # @features deferred-jobs
-# @dimensions operation-fingerprint legacy-token-exclusion routing-identity
-def test_request_fingerprint_ignores_legacy_browser_token():
+# @dimensions operation-fingerprint client-contract routing-identity
+def test_request_fingerprint_tracks_the_complete_client_contract():
     values = {
         "job_type": "autofill",
         "actor": "actor-key",
@@ -2890,18 +2978,18 @@ def test_request_fingerprint_ignores_legacy_browser_token():
     }
     first = deferred_jobs._request_fingerprint(
         **values,
-        client={"token": "token-one", "destination": "page:Form"},
+        client={"destination": "page:Form"},
     )
-    refreshed = deferred_jobs._request_fingerprint(
+    extended = deferred_jobs._request_fingerprint(
         **values,
-        client={"token": "token-two", "destination": "page:Form"},
+        client={"destination": "page:Form", "key": "page-key"},
     )
     rerouted = deferred_jobs._request_fingerprint(
         **values,
-        client={"token": "token-two", "destination": "page:Other"},
+        client={"destination": "page:Other"},
     )
 
-    assert first == refreshed
+    assert first != extended
     assert first != rerouted
 
 
@@ -2924,7 +3012,6 @@ def test_status_projection_is_bounded_and_marks_stale_work():
         status_revision=7,
         dispatch_state="claimed",
         client={
-            "token": "secret-browser-token",
             "source_widget": "AskToolReport",
             "destination": "tools:ToolReportList",
         },
@@ -2938,9 +3025,7 @@ def test_status_projection_is_bounded_and_marks_stale_work():
     assert status["recovering"] is True
     assert status["elapsed_seconds"] == 600
     assert status["phase_elapsed_seconds"] == 180
-    assert "token" not in status
     assert "checkpoint" not in status
-    assert "secret-browser-token" not in json.dumps(status)
     assert "private authored content" not in json.dumps(status)
 
 
@@ -2992,7 +3077,6 @@ def test_admin_projection_exposes_diagnostics_without_payload_content():
         start_completed=True,
         telemetry_id="telemetry-id",
         client={
-            "token": "private-browser-token",
             "source_widget": "CreateToolReport",
             "destination": "tools:ToolReportList",
         },
@@ -3023,7 +3107,6 @@ def test_admin_projection_exposes_diagnostics_without_payload_content():
         "input_missing": True,
     }
     serialized = json.dumps(projection)
-    assert "private-browser-token" not in serialized
     assert "private feedback content" not in serialized
     assert "private proposal content" not in serialized
     assert "private progress content" not in serialized
@@ -3225,7 +3308,6 @@ def test_reconciler_completes_terminal_delivery_when_input_was_deleted(
     }
     job.notification = SimpleNamespace(body="Creating report...", pending=True)
     job.client = {
-        "token": "obsolete-browser-token",
         "source_widget": "CreateToolReport",
         "destination": "tools:ToolReportList",
     }
@@ -3271,7 +3353,10 @@ def test_reconciler_completes_terminal_delivery_when_input_was_deleted(
     }
     assert job.notification.pending is False
     assert job.notification.body == deferred_jobs.MISSING_INPUT_MESSAGE
-    assert "token" not in job.client
+    assert job.client == {
+        "source_widget": "CreateToolReport",
+        "destination": "tools:ToolReportList",
+    }
     assert captured == []
 
     assert registry.reconcile(now=now + timedelta(minutes=5)) == {

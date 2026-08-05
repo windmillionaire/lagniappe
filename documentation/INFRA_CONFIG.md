@@ -282,8 +282,7 @@ jitter. The reconciler uses a two-minute grace period, runs every five minutes,
 and fails work that remains active for three hours. Its setup-owned Cloud
 Scheduler job is enabled only while the transactionally maintained
 `site/deferred-jobs-control` record contains recovery-required jobs; an empty
-reconciliation initializes or repairs that record, and a second clean empty
-bootstrap run pauses future runs.
+reconciliation repairs that record and pauses future runs immediately.
 Independently, a two-minute
 feedback task keeps long-running state visible while a provider request remains
 active. Terminal deferred-job failures wait briefly for Sentry delivery before

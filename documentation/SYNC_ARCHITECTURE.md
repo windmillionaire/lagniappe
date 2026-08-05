@@ -8,7 +8,7 @@ features no longer own timers or push registrations.
 |---|---|---|
 | Entity and focused forms | Datastore entity `fingerprint` and `modified` | `entity`, `form-lock` |
 | Collection/list membership | Existing Datastore `site` fingerprints | `channel` |
-| Deferred work | User `operation_revision`, then `DeferredJob.status_revision` and status projection | `operation` |
+| Deferred work | `DeferredJob.status_revision`; expiring Redis revision projection is a bounded fast path | `operation` |
 | Notification badge/list invalidation | Expiring Redis generation, revision, and membership projection | piggybacked `notification_state` |
 | File ingress | Ingress entity fingerprint | `ingress` |
 | Collaborative documents | Entity document asset plus revisioned Redis working state | `document` |
@@ -16,11 +16,13 @@ features no longer own timers or push registrations.
 
 This division is intentional. Entity and collection revisions must survive
 Redis loss, so they remain in Datastore. Redis is used for high-churn
-collaborative document state and for reconstructable notification membership.
-Notification bodies remain durable in Datastore; the Redis projection is only
-an expiring badge/list cursor and may be rebuilt with one keys-only ancestor
-query. A second Redis copy of every entity fingerprint would introduce
-invalidation and recovery work without improving correctness.
+collaborative document state and for reconstructable notification membership
+and deferred-operation revision hints. Notification bodies and complete job
+status remain durable in Datastore. Notification membership may be rebuilt
+with one keys-only ancestor query; operation hints are repaired from only the
+jobs already tracked by a browser and are periodically reverified. A second
+Redis copy of every entity fingerprint would introduce invalidation and
+recovery work without improving correctness.
 
 ## Browser scheduler
 
@@ -369,16 +371,20 @@ add no notification Datastore read. A changed state updates the badge and marks
 an already-loaded menu stale; the list refreshes immediately only while open
 and otherwise waits for its next opening.
 
-`User.operation_revision` remains the durable aggregate gate. Every
-client-visible deferred status revision advances it in the same user-ancestor
-transaction as the job. Server-rendered operation descriptors start with both
-the aggregate and job revision plus the bounded current status, hydrate that
-status into the browser cache, and wait four seconds for their first check;
-locally started operations nudge immediately. Matching aggregate revisions
-return `unchanged` without loading jobs. A mismatch loads only operation keys
-tracked by that browser in existing batches of 50. The historical
-`User.notification_revision` property is left untouched for compatibility and
-is no longer read or advanced.
+Each client-visible deferred status revision publishes a separate per-job
+Redis hash after its durable transaction commits. The hash contains schema,
+status revision, terminal state, and the time that revision was last verified
+against Datastore; it slides for 30 minutes but the verification timestamp does
+not slide on a read. Server-rendered descriptors start with the job revision
+and bounded current status, hydrate that status into the browser cache, and
+wait four seconds for their first check; locally started operations nudge
+immediately. A matching owner projection younger than 60 seconds returns
+`unchanged` without loading the job. Misses, mismatches, and verification-due
+entries load only operation keys tracked by that browser in batches of 50 and
+repair the projection. Collaborator checks always load the durable job to
+enforce current authorization. When a poll also checks notifications, their
+separate physical keys share the same Redis pipeline. User entities carry no
+polling cursors.
 
 ## Offline submissions
 

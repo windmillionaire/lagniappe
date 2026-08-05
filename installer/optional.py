@@ -49,6 +49,13 @@ def setup_error_monitoring():
                 "Keep the existing monitoring choice and destination? [Y/n]: "
             )
             if preserve.casefold() != "n":
+                if not str(SETTINGS.APP.get("SENTRY_JS_DSN") or "").strip():
+                    SETTINGS.APP["SENTRY_JS_DSN"] = (
+                        constants.SENTRY_JS_DSN
+                        if destination == constants.SENTRY_DSN
+                        else destination
+                    )
+                    SETTINGS.save()
                 print("Existing error-monitoring settings preserved.")
                 return True
         else:
@@ -201,6 +208,11 @@ def setup_error_monitoring():
 
     if dsn:
         SETTINGS.APP["SENTRY_DSN"] = dsn
+        SETTINGS.APP["SENTRY_JS_DSN"] = (
+            constants.SENTRY_JS_DSN
+            if dsn == constants.SENTRY_DSN
+            else dsn
+        )
         SETTINGS.APP["CAPTURE_ERRORS"] = "True"
         destination = (
             "the maintainer Sentry project"
@@ -211,6 +223,7 @@ def setup_error_monitoring():
     else:
         SETTINGS.APP["CAPTURE_ERRORS"] = "False"
         SETTINGS.APP.pop("SENTRY_DSN", None)
+        SETTINGS.APP.pop("SENTRY_JS_DSN", None)
         print(f.success("Error monitoring disabled."))
 
     SETTINGS.save()
@@ -226,7 +239,12 @@ def configure_development_error_monitoring():
     from config import SETTINGS
 
     current_dsn = str(SETTINGS.APP.get("SENTRY_DSN") or "").strip()
-    if current_dsn != constants.SENTRY_DSN:
+    current_js_dsn = str(SETTINGS.APP.get("SENTRY_JS_DSN") or "").strip()
+    maintainer_dsns = {constants.SENTRY_DSN, constants.SENTRY_JS_DSN}
+    if (
+        current_dsn not in maintainer_dsns
+        and current_js_dsn not in maintainer_dsns
+    ):
         return True
 
     print(
@@ -239,7 +257,7 @@ def configure_development_error_monitoring():
         dsn = _operator_sentry_dsn(
             "Enter your Sentry DSN, or leave blank to disable monitoring: "
         )
-        if dsn != constants.SENTRY_DSN:
+        if dsn not in maintainer_dsns:
             break
         print(
             wrap_text(
@@ -249,10 +267,12 @@ def configure_development_error_monitoring():
         )
     if dsn:
         SETTINGS.APP["SENTRY_DSN"] = dsn
+        SETTINGS.APP["SENTRY_JS_DSN"] = dsn
         SETTINGS.APP["CAPTURE_ERRORS"] = "True"
         print("Development error monitoring will use your Sentry project.")
     else:
         SETTINGS.APP.pop("SENTRY_DSN", None)
+        SETTINGS.APP.pop("SENTRY_JS_DSN", None)
         SETTINGS.APP["CAPTURE_ERRORS"] = "False"
         print("Development error monitoring disabled.")
     SETTINGS.save()

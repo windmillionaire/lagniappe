@@ -20,6 +20,14 @@ from .notifications import (
     take_recorded_notification_state,
     update_notification_projection,
 )
+from .operations import (
+    OPERATION_VERIFY_SECONDS,
+    delete_operation_projection,
+    operation_state_current,
+    peek_operation_states,
+    peek_poll_states,
+    update_operation_projection,
+)
 from .query import entity_search, kind_search, search
 from .utility import (
     check_hash,
@@ -54,4 +62,10 @@ __all__ = [
     "seed_notification_state",
     "take_recorded_notification_state",
     "update_notification_projection",
+    "OPERATION_VERIFY_SECONDS",
+    "delete_operation_projection",
+    "operation_state_current",
+    "peek_operation_states",
+    "peek_poll_states",
+    "update_operation_projection",
 ]

@@ -3,8 +3,9 @@
 import hashlib
 import json
 
+from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action
-from lagniappe.core.tools import database
+from lagniappe.core.tools import cache, database
 from lagniappe.core.tools.deferred_jobs import DeferredJobs
 
 
@@ -101,17 +102,52 @@ def channel_revisions(channels, user, *, fingerprint_loader=None):
 
 
 # @testable true
-# @tests tests_unit/test_024_autofill_form_state.py::test_operation_statuses_skip_current_jobs_and_batch_stale_jobs
-# @pairs polling:revision polling:batching deferred-jobs:datastore-read-isolation
-def operation_statuses(descriptors, user, *, status_loader=None):
-    """Load only operations invalidated by the viewer's durable cursor."""
+# @tests tests_unit/test_024_autofill_form_state.py::test_operation_statuses_skip_fresh_cached_jobs_and_batch_stale_jobs
+# @pairs polling:revision polling:batching polling:permissions
+# @pairs deferred-jobs:redis-projection deferred-jobs:owner deferred-jobs:cache-failure-isolation
+def operation_statuses(
+    descriptors,
+    user,
+    *,
+    status_loader=None,
+    state_loader=None,
+    state_writer=None,
+    now=None,
+):
+    """Load only operations missing a fresh owner-safe Redis revision."""
     status_loader = status_loader or DeferredJobs.statuses
-    operation_revision = int(getattr(user, "operation_revision", 0) or 0)
+    state_loader = state_loader or cache.peek_operation_states
+    state_writer = state_writer or cache.update_operation_projection
+    user_key = getattr(user, "urlsafe_key", None)
+    owned = []
+    for descriptor in descriptors:
+        key = database.get.datastore_key(descriptor.get("key"))
+        parent = getattr(key, "parent", None)
+        owner_key = database.get.urlsafe_key(parent) if parent is not None else None
+        if user_key and owner_key == user_key:
+            owned.append(descriptor)
+
+    states = {}
+    if owned:
+        try:
+            states = state_loader([descriptor["key"] for descriptor in owned])
+        except Exception as error:
+            exceptions.capture(error, context={"operation": "poll_operation_state"})
+
+    unchanged = {
+        descriptor["key"]
+        for descriptor in owned
+        if cache.operation_state_current(
+            states.get(descriptor["key"]),
+            descriptor.get("revision"),
+            now=now,
+        )
+    }
     changed = [
         descriptor
         for descriptor in descriptors
         if descriptor["type"] == "operation"
-        and descriptor.get("operation_revision") != operation_revision
+        and descriptor["key"] not in unchanged
     ]
     statuses = {}
     operation_keys = [descriptor["key"] for descriptor in changed]
@@ -122,7 +158,12 @@ def operation_statuses(descriptors, user, *, status_loader=None):
                 for status in status_loader(operation_keys[offset : offset + 50], user)
             }
         )
-    return operation_revision, statuses
+    if statuses:
+        try:
+            state_writer(*statuses.values())
+        except Exception as error:
+            exceptions.capture(error, context={"operation": "poll_operation_repair"})
+    return statuses, unchanged
 
 
 # @testable true

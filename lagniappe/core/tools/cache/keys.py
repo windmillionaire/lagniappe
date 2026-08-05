@@ -22,6 +22,7 @@ class Keys(Enum):
     RATE_LIMIT = f"{CONFIG.PREFIX}RATE_LIMIT:{{}}:{{}}"
     NOTIFICATIONS = f"{CONFIG.PREFIX}NOTIFICATIONS:{{}}"
     NOTIFICATION_EPOCH = f"{CONFIG.PREFIX}NOTIFICATIONS:EPOCH:{{}}"
+    OPERATION = f"{CONFIG.PREFIX}OPERATIONS:{{}}"
 
     # @testable infrastructure
     def key(self, entity):

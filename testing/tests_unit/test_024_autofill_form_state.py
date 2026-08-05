@@ -187,9 +187,15 @@ def test_render_operation_statuses_batches_and_attaches_known_jobs():
     }
 
 
-# @pairs polling:revision polling:batching deferred-jobs:datastore-read-isolation
-def test_operation_statuses_skip_current_jobs_and_batch_stale_jobs():
-    user = SimpleNamespace(operation_revision=9)
+# @pairs polling:revision polling:batching polling:permissions
+# @pairs deferred-jobs:redis-projection deferred-jobs:owner deferred-jobs:cache-failure-isolation
+def test_operation_statuses_skip_fresh_cached_jobs_and_batch_stale_jobs(monkeypatch):
+    from google.cloud.datastore import Key
+
+    actor_key = Key("users", "owner", project="poll-test")
+    user = SimpleNamespace(
+        urlsafe_key=actor_key.to_legacy_urlsafe().decode("utf-8")
+    )
     loaded = []
 
     def statuses(keys, actor):
@@ -200,31 +206,95 @@ def test_operation_statuses_skip_current_jobs_and_batch_stale_jobs():
         {
             "id": f"operation:{index}",
             "type": "operation",
-            "key": str(index),
-            "operation_revision": None,
+            "key": Key(
+                "jobs", str(index), parent=actor_key
+            ).to_legacy_urlsafe().decode("utf-8"),
+            "revision": 1,
         }
         for index in range(51)
     ]
-    revision, projected = polling.operation_statuses(
+    projected, unchanged = polling.operation_statuses(
         stale,
         user,
         status_loader=statuses,
+        state_loader=lambda _keys: {},
+        state_writer=lambda *_statuses: None,
+        now=100,
     )
-    assert revision == 9
     assert projected == {
-        str(index): {"key": str(index), "revision": 3} for index in range(51)
+        descriptor["key"]: {"key": descriptor["key"], "revision": 3}
+        for descriptor in stale
     }
-    assert loaded == [([str(index) for index in range(50)], user), (["50"], user)]
+    assert unchanged == set()
+    assert loaded == [
+        ([descriptor["key"] for descriptor in stale[:50]], user),
+        ([stale[50]["key"]], user),
+    ]
 
     loaded.clear()
-    revision, projected = polling.operation_statuses(
-        [{**stale[0], "operation_revision": 9}],
+    current = {stale[0]["key"]: {"revision": 3, "verified_at": 99}}
+    projected, unchanged = polling.operation_statuses(
+        [{**stale[0], "revision": 3}],
         user,
         status_loader=statuses,
+        state_loader=lambda _keys: current,
+        state_writer=lambda *_statuses: None,
+        now=100,
     )
-    assert revision == 9
     assert projected == {}
+    assert unchanged == {stale[0]["key"]}
     assert loaded == []
+
+    captured = []
+    monkeypatch.setattr(
+        polling.exceptions,
+        "capture",
+        lambda error, **kwargs: captured.append((error, kwargs)),
+    )
+    projected, unchanged = polling.operation_statuses(
+        [{**stale[0], "revision": 3}],
+        user,
+        status_loader=statuses,
+        state_loader=lambda _keys: (_ for _ in ()).throw(
+            RuntimeError("redis unavailable")
+        ),
+        state_writer=lambda *_statuses: None,
+        now=100,
+    )
+    assert projected == {
+        stale[0]["key"]: {"key": stale[0]["key"], "revision": 3}
+    }
+    assert unchanged == set()
+    assert loaded == [([stale[0]["key"]], user)]
+    assert str(captured[0][0]) == "redis unavailable"
+
+    collaborator_key = Key("users", "collaborator", project="poll-test")
+    collaborator_job = Key(
+        "jobs", "shared", parent=collaborator_key
+    ).to_legacy_urlsafe().decode("utf-8")
+    loaded.clear()
+    projected, unchanged = polling.operation_statuses(
+        [
+            {
+                "id": "operation:shared",
+                "type": "operation",
+                "key": collaborator_job,
+                "revision": 3,
+            }
+        ],
+        user,
+        status_loader=statuses,
+        state_loader=lambda _keys: {
+            collaborator_job: {"revision": 3, "verified_at": 99}
+        },
+        state_writer=lambda *_statuses: None,
+        now=100,
+    )
+    assert projected == {
+        collaborator_job: {"key": collaborator_job, "revision": 3}
+    }
+    assert unchanged == set()
+    assert loaded == [([collaborator_job], user)]
 
 
 # @pairs deferred-jobs:form-lock polling:revision

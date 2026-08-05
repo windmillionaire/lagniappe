@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request, E as ENDPOINTS, a as captureError } from './foundation.js?v=bfd37afb';
-import './notificationState.js?v=bfd37afb';
-import './connectivity.js?v=bfd37afb';
+import { r as request, E as ENDPOINTS, a as captureError } from './foundation.js?v=bb7cd952';
+import './notificationState.js?v=bb7cd952';
+import './connectivity.js?v=bb7cd952';
 
 const MAX_SUBSCRIPTIONS_PER_REQUEST = 64;
 const CLIENT_ID_KEY = "lagniappe-poll-client";
@@ -266,9 +266,6 @@ class PollingCoordinator {
 	_applyProtocolState(subscription, result) {
 		if (result.revision !== undefined) {
 			subscription.descriptor.revision = result.revision;
-		}
-		if (result.operation_revision !== undefined) {
-			subscription.descriptor.operation_revision = result.operation_revision;
 		}
 		if (subscription.descriptor.type === "document" && result.payload) {
 			if (result.payload.generation) {

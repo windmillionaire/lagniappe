@@ -30,8 +30,6 @@ class User(AssetMixin, UserMixin, Entity):
     def exclude_from_index(self):
         return frozenset(
             {
-                "notification_revision",
-                "operation_revision",
                 "ai_access",
                 "permissions",
                 "photo",
@@ -85,8 +83,6 @@ class User(AssetMixin, UserMixin, Entity):
                 "permissions": user_permissions.UserPermissions,
                 "photo": user_entity.ProfilePhoto,
                 "starred": user_related.Starred,
-                "notification_revision": user_entity.NotificationRevision,
-                "operation_revision": user_entity.OperationRevision,
                 "invalidate_cache": user_entity.InvalidateCache,
                 "ai_access": user_entity.AIAccess,
                 "restrictions": user_restrictions.Restrictions,

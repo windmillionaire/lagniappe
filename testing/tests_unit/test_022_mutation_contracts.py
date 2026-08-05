@@ -14,6 +14,7 @@ from lagniappe.core.definitions.mutation_contracts import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.entities.notification import Notification
+from lagniappe.core.entities.deferred_job import DeferredJob
 from lagniappe.core.entities.user import User
 from lagniappe.core.mutations import (
     execute_mutation,
@@ -334,8 +335,6 @@ def test_notification_save_updates_projection_without_touching_user(monkeypatch)
 
     outcome = Entities.save(notification)
 
-    assert user.notification_revision == 0
-    assert user.operation_revision == 0
     assert user.modified == modified
     assert saved == [(notification, None)]
     assert user not in cache_updates
@@ -360,6 +359,91 @@ def test_notification_save_updates_projection_without_touching_user(monkeypatch)
     assert failed_outcome.durable_committed is True
     assert failed_outcome.post_commit_complete is False
     assert failed_outcome.errors == ["redis unavailable"]
+
+
+# @pairs deferred-jobs:redis-projection deferred-jobs:mutation deferred-jobs:cache-isolation
+# @source lagniappe/core/mutations/save.py::JobMutation.plan_save
+def test_job_save_updates_operation_projection_without_touching_relations(monkeypatch):
+    modified = datetime(2026, 8, 5, tzinfo=timezone.utc)
+    user = User(testing=True)
+    user._key = "operation-user"
+    user._db = SaveDB(
+        {
+            "type": "user",
+            "name": "Operation User",
+            "email": "operation@example.test",
+            "hash": "operation-user-hash",
+            "modified": modified,
+        }
+    )
+    notification = Notification(testing=True)
+    notification._key = "operation-notification"
+    notification.kind = "notification"
+    notification.db["hash"] = "operation-notification-hash"
+    notification.parent = user
+    notification.body = "Working"
+    notification_modified = notification.modified
+
+    job = DeferredJob(testing=True)
+    job._key = "operation-job"
+    job.kind = "job"
+    job.db["hash"] = "operation-job-hash"
+    job.actor = user
+    job.notification = notification
+    job.status = "running"
+    job.status_revision = 3
+
+    saved = []
+    monkeypatch.setattr(
+        mutation_executor.database,
+        "save_mutations",
+        lambda writes: saved.extend(writes),
+    )
+    monkeypatch.setattr(mutation_executor.cache, "update", lambda *_entities: None)
+    projected = []
+    monkeypatch.setattr(
+        mutation_executor.cache,
+        "update_operation_projection",
+        lambda *jobs: projected.extend(jobs),
+    )
+
+    outcome = Entities.save(job)
+
+    assert saved == [(job, None)]
+    assert user.modified == modified
+    assert notification.modified == notification_modified
+    assert projected == [job]
+    assert outcome.complete is True
+
+
+# @pairs mutations:delete deferred-jobs:redis-projection
+# @source lagniappe/core/mutations/delete.py::plan_delete
+def test_job_delete_removes_operation_projection_after_commit(monkeypatch):
+    job = DeferredJob(testing=True)
+    job._key = "deleted-operation-job"
+    job.kind = "job"
+    job.db["hash"] = "deleted-operation-job-hash"
+    job.status = "succeeded"
+    job.status_revision = 5
+    deleted = []
+    projected = []
+    monkeypatch.setattr(
+        mutation_executor.database,
+        "delete_entities",
+        lambda entities: deleted.extend(entities),
+    )
+    monkeypatch.setattr(mutation_executor.cache, "delete", lambda _entities: None)
+    monkeypatch.setattr(
+        mutation_executor.cache,
+        "delete_operation_projection",
+        lambda *jobs: projected.extend(jobs),
+    )
+
+    outcome = Entities.delete(job)
+
+    assert deleted == [job]
+    assert projected == [job]
+    assert outcome.complete is True
 
 
 # @features mutations

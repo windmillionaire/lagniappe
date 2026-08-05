@@ -461,8 +461,10 @@ def _merge_survivors(survivors):
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_delete_accepts_batch_and_dedupes
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_user_delete_can_preserve_page
+# @tests tests_unit/test_022_mutation_contracts.py::test_job_delete_removes_operation_projection_after_commit
 # @pairs mutations:delete mutations:batch mutations:dedupe
 # @pair mutations:preserve-user-pages
+# @pair deferred-jobs:redis-projection
 def plan_delete(*entities, registry, preserve_user_pages=False):
     entities = tuple(entity for entity in entities if entity)
     builder = MutationPlanBuilder(
@@ -505,6 +507,11 @@ def plan_delete(*entities, registry, preserve_user_pages=False):
             builder.notification_delete(
                 entity,
                 reason="notification-delete",
+            )
+        if getattr(entity, "entity_kind", None) == "job":
+            builder.operation_delete(
+                entity,
+                reason="operation-delete",
             )
         for asset in getattr(entity, "assets", {}).values():
             builder.delete_blob(

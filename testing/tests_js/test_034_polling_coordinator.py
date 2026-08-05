@@ -47,7 +47,6 @@ const context = {
           status: item.id === "retry:three" || index === 0 ? "changed" : "unchanged",
           revision: index + 10,
           poll_after_ms: 15000,
-          ...(item.type === "operation" ? { operation_revision: 7 } : {}),
           ...(index === 0 ? { payload: { refresh: true } } : {}),
         })),
       };
@@ -101,7 +100,6 @@ if (timerId !== 3 || clearedTimers.join(",") !== "1,2") {
   if (handled.length !== 2 ||
       coordinator.get("entity:one").revision !== 10 ||
       coordinator.get("operation:two").revision !== 11 ||
-      coordinator.get("operation:two").operation_revision !== 7 ||
       coordinator.get("retry:three").revision !== "retry-old") {
     throw new Error("Polling results did not advance subscription cursors");
   }

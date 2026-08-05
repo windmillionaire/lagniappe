@@ -192,7 +192,9 @@ class NotificationMutation(StandardMutation):
 
 # @testable infrastructure
 class JobMutation(StandardMutation):
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_022_mutation_contracts.py::test_job_save_updates_operation_projection_without_touching_relations
+    # @pairs deferred-jobs:redis-projection deferred-jobs:mutation deferred-jobs:cache-isolation
     def plan_save(self, entity, builder, *, reason, depends_on=()):
         super().plan_save(
             entity,
@@ -200,12 +202,4 @@ class JobMutation(StandardMutation):
             reason=reason,
             depends_on=depends_on,
         )
-        if entity.actor:
-            builder.patch(
-                entity.actor,
-                property_updates=("operation_revision",),
-                refresh_cache=False,
-                reason="job-actor-owner",
-            )
-        if entity.notification:
-            builder.touch(entity.notification, reason="job-notification-owner")
+        builder.operation_upsert(entity, reason="job-operation-state")

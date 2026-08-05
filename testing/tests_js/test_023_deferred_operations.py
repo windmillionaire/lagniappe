@@ -51,12 +51,6 @@ const context = {
   },
   createIcon() { return {}; },
   document: {
-    querySelector(selector) {
-      if (selector === "meta[name='operation-revision']") {
-        return { getAttribute() { return "9"; } };
-      }
-      return null;
-    },
     querySelectorAll(selector) {
       return selector === "[data-operation]" ? nodes : [];
     },
@@ -89,7 +83,6 @@ const manager = new context.DeferredOperationManager(view).init();
     throw new Error("Visible operations did not create polling subscriptions");
   }
   if (triggers.length !== 0 ||
-      descriptors.get("operation:operation-a")?.operation_revision !== 9 ||
       descriptors.get("operation:operation-a")?.revision !== 0 ||
       schedules.get("operation:operation-a")?.initial !== "scheduled") {
     throw new Error("Server-rendered operation did not seed a delayed revision cursor");

@@ -37,7 +37,6 @@ CHANNELS = frozenset(
         "ingress",
         "home",
         "home-notes",
-        "notifications",
         "starred",
         "tool-reports",
     }
@@ -154,15 +153,6 @@ def _descriptors(payload):
             ):
                 return None
             item["key"] = descriptor["key"]
-            if subscription_type == "operation":
-                operation_revision = descriptor.get("operation_revision")
-                if operation_revision is not None and (
-                    isinstance(operation_revision, bool)
-                    or not isinstance(operation_revision, int)
-                    or operation_revision < 0
-                ):
-                    return None
-                item["operation_revision"] = operation_revision
         normalized.append(item)
 
     closed = payload.get("closed_documents") or []
@@ -218,7 +208,6 @@ def _result(
     revision=None,
     payload=None,
     poll_after_ms=None,
-    operation_revision=None,
 ):
     result = {
         "id": descriptor["id"],
@@ -230,8 +219,6 @@ def _result(
         result["revision"] = revision
     if payload is not None:
         result["payload"] = payload
-    if operation_revision is not None:
-        result["operation_revision"] = operation_revision
     return result
 
 
@@ -307,6 +294,11 @@ def _document_result(descriptor, entity, client_id):
 # @dimensions protocol entity channel operation document presence permissions authorization fingerprint unavailable owner batching progress revision timing lifecycle
 # @pairs notifications:cold-seed notifications:ping notifications:redis-projection
 # @pairs polling:personal-state polling:piggyback web-headers:notification-state
+# @pairs polling:protocol polling:operation polling:owner polling:permissions
+# @pairs polling:batching polling:progress polling:timing polling:revision
+# @pairs polling:entity polling:channel polling:fingerprint polling:authorization
+# @pair polling:validation
+# @pair polling:unavailable
 @internal.route("/poll", methods=["POST"])
 @logged_in
 def poll():
@@ -350,29 +342,45 @@ def poll():
     ]
     active_locks = deferred_job_lock_descriptors(lock_entities) if lock_entities else {}
 
-    operation_revision, operation_statuses = (
-        _operation_statuses(grouped["operation"], current_user)
+    notification_polled = notification_request is not None
+    notification_state = None
+    prefetched_operation_states = None
+    if grouped["operation"] and notification_polled:
+        try:
+            notification_state, prefetched_operation_states = cache.peek_poll_states(
+                current_user,
+                [descriptor["key"] for descriptor in grouped["operation"]],
+            )
+        except Exception as error:
+            prefetched_operation_states = {}
+            exceptions.capture(error, context={"operation": "poll_redis_state"})
+
+    operation_statuses, unchanged_operations = (
+        _operation_statuses(
+            grouped["operation"],
+            current_user,
+            state_loader=(
+                (
+                    lambda keys: {
+                        key: prefetched_operation_states.get(key) for key in keys
+                    }
+                )
+                if prefetched_operation_states is not None
+                else cache.peek_operation_states
+            ),
+        )
         if grouped["operation"]
-        else (int(getattr(current_user, "operation_revision", 0) or 0), {})
+        else ({}, set())
     )
 
-    channels = [
-        descriptor["channel"]
-        for descriptor in grouped["channel"]
-        if descriptor["channel"] != "notifications"
-    ]
+    channels = [descriptor["channel"] for descriptor in grouped["channel"]]
     channel_revisions = _channel_revisions(channels, current_user)
 
-    notification_state = None
-    notification_requested = notification_request is not None
-    legacy_notifications = any(
-        descriptor["channel"] == "notifications" for descriptor in grouped["channel"]
-    )
-    if notification_requested or legacy_notifications:
+    if notification_polled:
         try:
-            notification_state = cache.peek_notification_state(current_user)
-            should_seed = legacy_notifications or notification_request.get("seed")
-            if notification_state is None and should_seed:
+            if prefetched_operation_states is None:
+                notification_state = cache.peek_notification_state(current_user)
+            if notification_state is None and notification_request.get("seed"):
                 notification_state = cache.seed_notification_state(current_user)
             responses.publish_notification_state(notification_state)
         except Exception as error:
@@ -404,26 +412,18 @@ def poll():
                     user=current_user,
                 )
             elif subscription_type == "channel":
-                if descriptor["channel"] == "notifications":
-                    revision = (
-                        f"{notification_state['generation']}:{notification_state['revision']}"
-                        if notification_state
-                        else "missing"
-                    )
-                else:
-                    revision = channel_revisions[descriptor["channel"]]
+                revision = channel_revisions[descriptor["channel"]]
                 result = _revision_result(
                     descriptor,
                     revision,
                     {"refresh": True},
                 )
             elif subscription_type == "operation":
-                if descriptor.get("operation_revision") == operation_revision:
+                if descriptor["key"] in unchanged_operations:
                     result = _result(
                         descriptor,
                         "unchanged",
                         revision=descriptor.get("revision"),
-                        operation_revision=operation_revision,
                     )
                 else:
                     status = operation_statuses.get(descriptor["key"])
@@ -436,7 +436,6 @@ def poll():
                         if status
                         else _result(descriptor, "unavailable")
                     )
-                    result["operation_revision"] = operation_revision
             else:
                 result = _document_result(
                     descriptor,

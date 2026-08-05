@@ -19,38 +19,6 @@ from lagniappe.core.properties.user_related import Starred
 from testing.utility.test_entities import TestEntities
 
 
-# @pairs user:personal-activity user:revision
-# @pairs polling:personal-activity polling:revision
-# @pairs notifications:personal-activity notifications:revision
-# @pairs deferred-jobs:personal-activity deferred-jobs:revision
-# @source lagniappe/core/properties/user_entity.py::NotificationRevision
-# @source lagniappe/core/properties/user_entity.py::OperationRevision
-@pytest.mark.unit
-def test_user_personal_revisions_default_and_advance_independently():
-    user = User(testing=True)
-    user.modified = datetime(2026, 7, 30, tzinfo=timezone.utc)
-    fingerprint = user.fingerprint
-    permissions_fingerprint = user.permissions_fingerprint
-
-    assert user.notification_revision == 0
-    assert user.operation_revision == 0
-
-    user.properties.notification_revision.update()
-    user.properties.notification_revision.update()
-    user.properties.operation_revision.update()
-
-    assert user.notification_revision == 2
-    assert user.operation_revision == 1
-    assert user.fingerprint == fingerprint
-    assert user.permissions_fingerprint == permissions_fingerprint
-    assert user.db["notification_revision"] == 2
-    assert user.db["operation_revision"] == 1
-    assert {
-        "notification_revision",
-        "operation_revision",
-    }.issubset(user.exclude_from_index)
-
-
 # @features user
 # @dimensions email column sort
 @pytest.mark.unit

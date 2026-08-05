@@ -41,12 +41,6 @@ export class DeferredOperationManager {
 		this.destroyed = false;
 		this.ignored = new Set();
 		this.unsubscribers = new Map();
-		this.operationRevision =
-			Number(
-				document
-					.querySelector?.("meta[name='operation-revision']")
-					?.getAttribute?.("content"),
-			) || 0;
 	}
 
 	init() {
@@ -111,15 +105,11 @@ export class DeferredOperationManager {
 					type: "operation",
 					key,
 					revision: Number(this.operations.get(key)?.revision) || 0,
-					operation_revision: this.operationRevision,
 				},
 				{
 					mode: "periodic",
 					initial: "scheduled",
 					onResult: async (result) => {
-						if (result.operation_revision !== undefined) {
-							this.operationRevision = Number(result.operation_revision) || 0;
-						}
 						if (result.status === "changed" && result.payload) {
 							return await this.receive(result.payload);
 						} else if (

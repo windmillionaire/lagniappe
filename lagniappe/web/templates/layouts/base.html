@@ -11,10 +11,6 @@
     <meta name="keywords" content="private, internal, non-indexed">
     <meta name="mode" content="{{ page_mode|default(default_page_mode) }}">
     <meta name="analytics" content="{{ CONFIG.ANALYTICS|yesno }}">
-    {% if current_user.is_authenticated %}
-      <meta name="operation-revision"
-            content="{{ current_user.operation_revision|default(0, true) }}">
-    {% endif %}
     <link rel="icon"
           type="image/png"
           sizes="32x32"

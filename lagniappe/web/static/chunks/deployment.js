@@ -1,17 +1,17 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { b as buttons } from './buttons.js?v=bfd37afb';
-import { r as request } from './foundation.js?v=bfd37afb';
-import './connectivity.js?v=bfd37afb';
-import { S as SelectBox } from './select2.js?v=bfd37afb';
-import { S as SiteSetting } from './base.js?v=bfd37afb';
-import './styles.js?v=bfd37afb';
-import './icons.js?v=bfd37afb';
-import './formatting.js?v=bfd37afb';
-import './notificationState.js?v=bfd37afb';
-import './combobox.js?v=bfd37afb';
-import './primitives.js?v=bfd37afb';
-import './results.js?v=bfd37afb';
-import './submitter.js?v=bfd37afb';
+import { b as buttons } from './buttons.js?v=bb7cd952';
+import { r as request } from './foundation.js?v=bb7cd952';
+import './connectivity.js?v=bb7cd952';
+import { S as SelectBox } from './select2.js?v=bb7cd952';
+import { S as SiteSetting } from './base.js?v=bb7cd952';
+import './styles.js?v=bb7cd952';
+import './icons.js?v=bb7cd952';
+import './formatting.js?v=bb7cd952';
+import './notificationState.js?v=bb7cd952';
+import './combobox.js?v=bb7cd952';
+import './primitives.js?v=bb7cd952';
+import './results.js?v=bb7cd952';
+import './submitter.js?v=bb7cd952';
 
 const INSTANCE_CLASSES = {
 	automatic: ["F1", "F2", "F4", "F4_1G"],

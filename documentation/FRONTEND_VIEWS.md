@@ -168,11 +168,14 @@ the destination report-list item and the pending/completed notification. The
 shared polling coordinator includes operation descriptors in its bounded
 `POST /l/poll` batch. The owner-authorized result carries the current durable
 status revision and applies jittered backoff from roughly four to 30 seconds.
-Each descriptor also retains the user's last-seen operation revision; when it
-matches the user already loaded for the request, the server acknowledges the
-quiet operation without reading its job row.
+Each descriptor retains only that operation's last-seen status revision. A
+matching, recently durable-verified Redis projection lets the server
+acknowledge a quiet owner operation without reading its job row; at least once
+per minute, or after a miss/mismatch, it reloads the durable job and repairs the
+projection. Redis operation and notification state use separate keys but are
+read in one pipeline when the same poll needs both.
 Polling pauses while the tab is hidden, the window is unfocused, or the view is
-offline. A server-rendered operation seeds both revisions and schedules its
+offline. A server-rendered operation seeds its revision and schedules its
 first request four seconds later. Its bounded current status is rendered into
 the operation element and hydrated into the manager cache, so a matching quiet
 check can skip the job row without leaving a stale phase label. An operation

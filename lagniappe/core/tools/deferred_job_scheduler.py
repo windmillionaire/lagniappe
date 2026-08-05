@@ -130,11 +130,15 @@ def _control_converged(control):
 # @testable true
 # @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
 # @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_sync_releases_lease_after_provider_failure
+# @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_sync_uses_committed_control_hint_when_current
 # @features deferred-jobs cloud-scheduler
 # @dimensions distributed-lease generation convergence provider-failure
+# @pairs deferred-jobs:datastore-read-isolation cloud-scheduler:datastore-read-isolation
+# @pairs deferred-jobs:convergence cloud-scheduler:convergence
 def synchronize_deferred_job_reconciler(
     *,
     force=False,
+    initial_control=None,
     config=CONFIG,
     session=None,
     now_fn=_utc,
@@ -148,7 +152,11 @@ def synchronize_deferred_job_reconciler(
             "control": None,
         }
 
-    initial = database.get_deferred_job_scheduler_control()
+    initial = (
+        initial_control
+        if initial_control is not None
+        else database.get_deferred_job_scheduler_control()
+    )
     if not force and _control_converged(initial):
         return {"synchronized": True, "reason": "current", "control": initial}
 

@@ -266,9 +266,6 @@ export class PollingCoordinator {
 		if (result.revision !== undefined) {
 			subscription.descriptor.revision = result.revision;
 		}
-		if (result.operation_revision !== undefined) {
-			subscription.descriptor.operation_revision = result.operation_revision;
-		}
 		if (subscription.descriptor.type === "document" && result.payload) {
 			if (result.payload.generation) {
 				subscription.descriptor.generation = result.payload.generation;

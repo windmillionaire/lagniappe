@@ -127,6 +127,23 @@ def execute_post_commit(plan):
         if notification_deletes:
             complete(MutationEffectType.NOTIFICATION_DELETE)
 
+    operation_upserts = [
+        effect.entity
+        for effect in post_commit
+        if effect.effect is MutationEffectType.OPERATION_UPSERT
+    ]
+    operation_deletes = [
+        effect.entity
+        for effect in post_commit
+        if effect.effect is MutationEffectType.OPERATION_DELETE
+    ]
+    if operation_upserts:
+        cache.update_operation_projection(*operation_upserts)
+        complete(MutationEffectType.OPERATION_UPSERT)
+    if operation_deletes:
+        cache.delete_operation_projection(*operation_deletes)
+        complete(MutationEffectType.OPERATION_DELETE)
+
     blob_effects = [
         effect
         for effect in post_commit
