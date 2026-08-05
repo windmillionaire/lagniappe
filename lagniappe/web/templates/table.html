@@ -23,7 +23,7 @@
 
 {% macro table(entities, parent) %}
   <table lp-component
-         {% if not entities and not parent.is_filter %}lp-prefetch{% endif %}
+         {% if entities is undefined and not parent.is_filter %}lp-prefetch{% endif %}
          id="{{ 'table' if not parent.table.embedded else 'embedded-table' }}"
          data-kind="{{ parent.table.kind }}"
          data-preload='{{ parent.table.preload|tojson }}'
@@ -78,7 +78,7 @@
 {% macro rows(entities, parent) %}
   {% set entities = entities if entities is iterable else [] %}
   <tbody class="{{ styles.table.body }}"
-         {% if not entities and not parent.is_filter %}lp-prefetch{% endif %}
+         {% if entities is undefined and not parent.is_filter %}lp-prefetch{% endif %}
          {% if parent.route %}data-route="{{ parent.route }}"{% endif %}
          data-persistent="true"
          data-widget="{{ 'IndexTable' if not parent.table.embedded else 'EmbeddedTable' }}">

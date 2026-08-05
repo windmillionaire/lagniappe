@@ -182,7 +182,7 @@ STYLES = {
 		},
 		"section": "border border-base-light/50 shadow-sm flex flex-col gap-4 p-4 bg-base-bg rounded-md",
 		"toggle": "flex w-full flex-row items-center gap-2 rounded-md bg-white hover:bg-kind-bg px-2.5 py-1.5 font-semibold text-base-dark shadow-sm outline focus-visible:outline-kind-default hover:outline-kind-default outline-base-light/50 hover:outline-2 focus-visible:outline-2",
-		"toggleLabel": "flow-root min-w-0 flex-1 text-left",
+		"toggleLabel": "flex min-w-0 flex-1 items-center gap-2 text-left",
 		"listToggle": "flex w-full flex-row items-center gap-2 rounded-md bg-white hover:bg-kind-bg px-2.5 py-1.5 font-semibold text-base-dark shadow-sm outline focus-visible:outline-kind-default hover:outline-kind-default outline-base-light/50 hover:outline-2 focus-visible:outline-2 group/list-toggle",
 		"view": "grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 w-full p-4 sm:pb-0 sm:pt-6 lg:pt-8 sm:px-6 lg:px-8 mx-auto max-w-7xl"
 	},
@@ -340,6 +340,14 @@ STYLES = {
 		"label": "flex items-center gap-2 font-semibold sm:text-sm text-base-dark"
 	},
 	"section": "outline outline-base-light rounded-md px-4 pb-4 bg-white w-full",
+	"search": {
+		"pagination": {
+			"footer": "flex flex-row items-center gap-3 border-t border-base-light/50 py-3",
+			"summary": "text-xs text-base-medium sm:text-base",
+			"navigation": "ml-auto flex flex-row items-center justify-end gap-2 sm:gap-4",
+			"button": "inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md bg-kind-default px-3 py-1.5 text-sm font-semibold text-white shadow-sm"
+		}
+	},
 	"select": {
 		"container": "flex flex-col",
 		"wrapper": "grid grid-cols-1 h-10",

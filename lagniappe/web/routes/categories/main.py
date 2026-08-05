@@ -25,8 +25,14 @@ from . import categories
 # @testable true
 # @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_page_acl_user_sees_one_page_on_category_index_home_and_search
 # @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_create_scoped_to_one_category
+# @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
 # @features categories
-# @dimensions permission-gates index-filter create-control
+# @dimensions permission-gates index-filter create-control server-render first-batch
+# @pair categories:permission-gates
+# @pair categories:index-filter
+# @pair categories:create-control
+# @pair categories:server-render
+# @pair categories:first-batch
 @categories.route("/<key>", methods=["GET"])
 @timed(profile=True)
 @permission(Resource.CATEGORY, Action.RESTRICTED)
@@ -36,8 +42,9 @@ def index(key, **kwargs):
     filters.FilterCache(category).update()
 
     category_index = category.index(**request.values)
+    pages = category_index.pages
 
-    return responses.index("categories", category_index)
+    return responses.index("categories", category_index, pages=pages)
 
 
 # @testable true

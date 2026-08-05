@@ -14,6 +14,32 @@ from playwright.sync_api import expect
 from testing.definitions import ModelTasks, Projects, Users
 from testing.elements import FormElements, MobileNav, Tabs
 from testing.resources import Project
+from testing.utility import scoped_browser_route
+
+
+def _empty_main_script(route):
+    route.fulfill(status=200, content_type="text/javascript", body="")
+
+
+# @template projects/project.html::main
+# @style entity.tabIcon
+def test_project_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_user):
+    """Desktop tab icons never paint while a phone layout is unresolved."""
+    user = get_user(Users.OWNER)
+    project = Projects.test_create_project_manual_mode.get(user)
+    project.user = user
+    user.page.set_viewport_size({"width": 375, "height": 667})
+
+    with scoped_browser_route(user.page, "**/script.js?*", _empty_main_script):
+        response = user.page.goto(project.url, wait_until="load")
+
+    assert response.ok
+    assert user.locate("[lp-view]").get_attribute("initialized") is None
+    tabs_card = user.locate(project.TABS_CARD)
+    expect(tabs_card).to_have_attribute("data-visible", "false")
+    expect(tabs_card).to_be_hidden()
+    expect(user.locate(project.DESKTOP_TAB_NAV)).to_be_hidden()
+    expect(user.locate(project.MOBILE_NAV)).to_be_hidden()
 
 
 # @features entity-layout
@@ -25,6 +51,7 @@ def test_mobile_nav_visibility_changes_with_viewport(get_user):
     project = user.go(Projects.test_create_project_manual_mode)
 
     expect(user.locate(project.MOBILE_NAV)).to_be_hidden()
+    expect(user.locate(project.TABS_CARD)).to_be_visible()
     expect(user.locate(project.DESKTOP_TAB_NAV)).to_be_visible()
 
     user.mobile = True

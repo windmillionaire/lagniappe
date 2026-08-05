@@ -131,8 +131,13 @@
     {{ mobile_nav() }}
     <div id="layout" class="{{ styles.entity.cards }} sm:mt-4">
       {% if render_tasks %}{{ model_tasks(project, has_tasks) }}{% endif %}
-      <div id="tabs" lp-component class="{{ styles.card.primary }}">
-        <div lp-nav class="{{ styles.layout.nav.title }}" data-nav="tabs">
+      <div id="tabs"
+           lp-component
+           data-visible="false"
+           class="{{ styles.card.primary }}">
+        <div lp-nav
+             class="{{ styles.layout.nav.title }}"
+             data-nav="tabs">
           <span class="text-default-dark" data-role="title">Info</span>
           {{ controls.page_controls() }}
           {{ toggles('tabs') }}

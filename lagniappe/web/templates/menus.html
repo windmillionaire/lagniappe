@@ -35,7 +35,6 @@
           data-active="{{ starred|yesno }}"
           lp-control="star"
           aria-label="{{ 'Unstar' if starred else 'Star' }}"
-          title="{{ 'Unstar' if starred else 'Star' }}"
           class="{{ styles.dropdown.option.action }} group/toggle">
     <span class="grid shrink-0 {{ styles.dropdown.icon }} text-kind-default">
       {{ render_icon("star.active", (styles.toggle.icon.active ~ " [grid-area:1/1]")) }}

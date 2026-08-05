@@ -226,8 +226,12 @@ class PageIndex(Index):
 
     # @testable true
     # @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_restricted_page_is_not_listed_for_outsider_on_category_index
+    # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
     # @features pages
-    # @dimensions access-restrictions index-filter
+    # @dimensions access-restrictions index-filter cursor-pagination
+    # @pair pages:access-restrictions
+    # @pair pages:index-filter
+    # @pair pages:cursor-pagination
     @property
     def pages(self):
         if self._pages is not None:

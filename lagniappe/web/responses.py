@@ -154,9 +154,10 @@ def notification_item(notification):
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_tasks_table_columns
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
+# @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
 # @pair reconnect-refresh:root-fingerprint
 # @pair indexes:rendering
-def index(name, index):
+def index(name, index, **context):
     fingerprint = (
         database.site_fingerprint(f"/{name}/index")
         if name in {"forms", "tasks", "users"}
@@ -179,6 +180,7 @@ def index(name, index):
             fingerprint=fingerprint,
             poll_channel=poll_channel,
             poll_revision=poll_revision,
+            **context,
         ),
         200,
     )

@@ -38,11 +38,6 @@
 	justify-content: flex-start;
 }
 
-/* @style dropdown.option.action */
-.dropdown-option-action > span:not(.icon) {
-	line-height: 1.25;
-}
-
 /* @style dropdown.option.multiple */
 .dropdown-option-multiple {
 	padding-inline-end: 2.25rem;

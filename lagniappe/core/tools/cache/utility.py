@@ -16,11 +16,15 @@ MISSING_INDEX_MESSAGES = (
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
 # @tests tests_unit/test_017_cache_query.py::test_delete_cache_flushes_db_and_recreates_indexes
+# @tests tests_unit/test_017_cache_query.py::test_delete_cache_clears_only_prefixed_keys_and_recreates_indexes
 # @features cache
-# @dimensions redis-connection rebuild flush-db
+# @dimensions redis-connection rebuild flush-db prefix-isolation
 def delete_cache():
-    """Flush the cache and recreate all search indexes."""
-    cache.flush()
+    """Clear this environment's cache and recreate its search indexes."""
+    if CONFIG.PREFIX:
+        cleanup_test_data()
+    else:
+        cache.flush()
     cache.create_index()
     filter_cache.create_index()
 
@@ -32,7 +36,7 @@ def delete_cache():
 # @features cache
 # @dimensions cleanup index-recreation missing-search-index redis-errors
 def cleanup_test_data():
-    """Delete all prefixed test keys and drop search indexes."""
+    """Delete all keys and search indexes scoped to the configured prefix."""
     if not CONFIG.PREFIX:
         return
 

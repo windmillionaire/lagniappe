@@ -342,6 +342,7 @@ export default class Entity extends Core {
 		layout.dataset.visible = "true";
 		if (typeof tabs.reconcile === "function") tabs.reconcile();
 		if (typeof secondary?.reconcile === "function") secondary.reconcile();
+		tabs.elt.dataset.visible = "true";
 		mobileNav.element.dataset.visible = this.mobile ? "true" : "false";
 
 		await activeTab.activate("default");

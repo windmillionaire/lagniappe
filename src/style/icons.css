@@ -133,6 +133,7 @@ button[type="submit"] .icon[data-icon="generate"] {
 
 /* @style entity.tabIcon */
 button.tab-icon .icon {
+	--icon-box-size: 1.55em;
 	--icon-size: 1.55em;
 }
 

@@ -606,8 +606,8 @@ home:
     intent: toggle presentation within home
     surfaces: [server]
   toggleLabel:
-    classes: flow-root min-w-0 flex-1 text-left
-    intent: full-width Home toggle label whose wrapped text flows beneath its leading icon
+    classes: flex min-w-0 flex-1 items-center gap-2 text-left
+    intent: full-width Home toggle label with a vertically centered leading icon
     surfaces: [server]
   listToggle:
     classes: flex w-full flex-row items-center gap-2 rounded-md bg-white hover:bg-kind-bg px-2.5 py-1.5 font-semibold text-base-dark shadow-sm outline focus-visible:outline-kind-default hover:outline-kind-default outline-base-light/50 hover:outline-2 focus-visible:outline-2 group/list-toggle
@@ -1077,6 +1077,25 @@ section:
   classes: outline outline-base-light rounded-md px-4 pb-4 bg-white w-full
   intent: shared presentation for the section UI role
   surfaces: [frontend]
+
+search:
+  pagination:
+    footer:
+      classes: flex flex-row items-center gap-3 border-t border-base-light/50 py-3
+      intent: responsive search result range and pagination control row
+      surfaces: [server]
+    summary:
+      classes: text-xs text-base-medium sm:text-base
+      intent: result range summary that remains visible in compact form on mobile
+      surfaces: [server]
+    navigation:
+      classes: ml-auto flex flex-row items-center justify-end gap-2 sm:gap-4
+      intent: right-aligned previous and next search page actions
+      surfaces: [server]
+    button:
+      classes: inline-flex shrink-0 items-center justify-center gap-1.5 rounded-md bg-kind-default px-3 py-1.5 text-sm font-semibold text-white shadow-sm
+      intent: compact horizontal search pagination action
+      surfaces: [server]
 
 select:
   container:

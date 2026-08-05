@@ -163,6 +163,10 @@ assert.throws(
 
 # @features style-build
 # @dimensions pipeline-contract
+# @style dropdown.option.action
+# @style dropdown.option.flow
+# @style dropdown.search.result
+# @style home.toggleLabel
 def test_style_pipeline_contract_names_authored_inputs_and_outputs(run_node):
     run_node(
         r"""
@@ -213,6 +217,11 @@ assert.match(
   runtimeStyles.STYLES.dropdown.option.action,
   /\bdropdown-option-action\b/,
 );
+assert.match(
+  runtimeStyles.STYLES.home.toggleLabel,
+  /\bflex\b[\s\S]*\bitems-center\b[\s\S]*\bgap-2\b/,
+);
+assert.doesNotMatch(runtimeStyles.STYLES.home.toggleLabel, /\bflow-root\b/);
 assert.match(
   runtimeStyles.STYLES.dropdown.option.flow,
   /\bdropdown-option-flow\b/,
@@ -314,8 +323,8 @@ assert.equal(plus.children[0].className, "icon-glyph");
     )
 
 
-# @features frontend-icons
-# @dimensions optical-size semantic-css stable-geometry
+# @style dropdown.icon
+# @style entity.tabIcon
 def test_material_symbol_size_exceptions_use_semantic_css(run_node):
     run_node(
         r"""
@@ -353,6 +362,10 @@ assert.match(
 );
 assert.match(
   css,
+  /button\.tab-icon \.icon\s*\{[\s\S]*?--icon-box-size: 1\.55em;[\s\S]*?--icon-size: 1\.55em;/,
+);
+assert.match(
+  css,
   /\.icon\[data-icon="close"\],\s*\.icon\[data-icon="x"\]\s*\{\s*--icon-offset-y: 1px;/,
 );
 assert.match(
@@ -383,6 +396,10 @@ assert.match(
 assert.match(
   contentCss,
   /\.dropdown-option-action\s*\{[\s\S]*?align-items: center;[\s\S]*?display: flex;[\s\S]*?gap: 0\.25rem;/,
+);
+assert.doesNotMatch(
+  contentCss,
+  /\.dropdown-option-action > span:not\(\.icon\)/,
 );
 assert.match(
   contentCss,
@@ -420,6 +437,8 @@ assert.match(
   css,
   /\.icon\[data-icon="star\.home"\]\s*\{[\s\S]*?--icon-size: 1\.5em;[\s\S]*?--icon-offset-y: -1px;/,
 );
+assert.doesNotMatch(css, /\.dropdown-option-action \.icon\[data-icon=/);
+assert.doesNotMatch(css, /\.home-toggle-label > \.icon/);
 for (const [name, size] of [
   ["xs", "0.75rem"],
   ["sm", "0.875rem"],

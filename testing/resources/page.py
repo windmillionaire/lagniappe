@@ -70,6 +70,7 @@ class Page(SiteResource):
     PHOTO_FEEDBACK = "#photo [data-role='feedback']"
 
     # Mobile Navigation
+    TABS_CARD = "#tabs"
     MOBILE_NAV = "[lp-nav][data-nav='mobile']"
     DESKTOP_TAB_NAV = "#tabs [lp-nav][data-nav='tabs']"
     MOBILE_CREATE_TASK_BUTTON = (

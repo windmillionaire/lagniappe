@@ -538,6 +538,7 @@ def test_delete_cache_flushes_db_and_recreates_indexes(monkeypatch):
 
     monkeypatch.setattr(utility, "cache", FakeCache())
     monkeypatch.setattr(utility, "filter_cache", FakeFilterCache())
+    monkeypatch.setattr(utility, "CONFIG", SimpleNamespace(PREFIX=""))
 
     utility.delete_cache()
 
@@ -545,6 +546,53 @@ def test_delete_cache_flushes_db_and_recreates_indexes(monkeypatch):
         ("flush", "search-idx"),
         ("create", "search-idx"),
         ("create", "filter-idx"),
+    ]
+
+
+# @features cache
+# @dimensions rebuild prefix-isolation
+@pytest.mark.unit
+def test_delete_cache_clears_only_prefixed_keys_and_recreates_indexes(monkeypatch):
+    calls = []
+
+    class FakeCache:
+        INDEX = "test-search-idx"
+
+        def create_index(self):
+            calls.append(("create", self.INDEX))
+
+        def flush(self):
+            pytest.fail("a prefixed cache rebuild must not flush the Redis database")
+
+        def keys(self, pattern):
+            calls.append(("keys", pattern))
+            return ["test-one", "test-two"]
+
+        def delete(self, *keys):
+            calls.append(("delete", keys))
+
+        def drop_index(self, index):
+            calls.append(("drop", index))
+
+    class FakeFilterCache:
+        INDEX = "test-filter-idx"
+
+        def create_index(self):
+            calls.append(("create", self.INDEX))
+
+    monkeypatch.setattr(utility, "cache", FakeCache())
+    monkeypatch.setattr(utility, "filter_cache", FakeFilterCache())
+    monkeypatch.setattr(utility, "CONFIG", SimpleNamespace(PREFIX="test-"))
+
+    utility.delete_cache()
+
+    assert calls == [
+        ("keys", "test-*"),
+        ("delete", ("test-one", "test-two")),
+        ("drop", "test-search-idx"),
+        ("drop", "test-filter-idx"),
+        ("create", "test-search-idx"),
+        ("create", "test-filter-idx"),
     ]
 
 

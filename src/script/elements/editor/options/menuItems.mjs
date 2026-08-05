@@ -48,7 +48,6 @@ class ToolbarMenuItem {
 
 	init(settings) {
 		Object.assign(this, settings);
-		this.button.title = this.title;
 		this.button.role = "option";
 		this.button.dataset.active = "false";
 		this.button.className = `${STYLES.dropdown.option.action} group`;

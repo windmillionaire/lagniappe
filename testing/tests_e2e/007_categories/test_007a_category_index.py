@@ -65,6 +65,74 @@ def _open_visibility_panel(user, category):
     return panel
 
 
+# @pair categories:server-render
+# @pair categories:first-batch
+# @pair pages:cursor-pagination
+# @pair table-controls:cursor-continuation
+# @template categories/index.html::view
+# @template table.html::table
+def test_category_index_renders_first_batch_before_cursor_continuation(get_user):
+    """A delayed remainder cannot hide the category's server-rendered rows."""
+    user = get_user(Users.OWNER)
+    category = Categories.test_create_page.get(user)
+    suffix = uuid4().hex
+    created = [
+        Entities.PAGE.create(
+            {
+                "name": f"Cursor Batch Page {position:02d} {suffix}",
+                "model": category.entity,
+            }
+        )
+        for position in range(26)
+    ]
+    Entities.save(*created)
+    continuation_path = f"/categories/{category.key}/rows"
+    user.page.add_init_script(
+        script=f"""
+        (() => {{
+          const continuationPath = {json.dumps(continuation_path)};
+          const nativeFetch = window.fetch.bind(window);
+          const gate = {{ requested: false, release: null }};
+          window.__categoryRowsGate = gate;
+          window.fetch = (input, init) => {{
+            const value = typeof input === "string" ? input : input.url;
+            const url = new URL(value, window.location.href);
+            if (
+              url.pathname === continuationPath &&
+              url.searchParams.has("cursor")
+            ) {{
+              gate.requested = true;
+              return new Promise((resolve, reject) => {{
+                gate.release = () => nativeFetch(input, init).then(resolve, reject);
+              }});
+            }}
+            return nativeFetch(input, init);
+          }};
+        }})();
+        """
+    )
+
+    try:
+        category.user = user
+        response = user.navigate(category.url)
+        assert response.ok
+        expect(user.locate("[lp-view]")).to_have_attribute("initialized", "")
+        body = user.locate(category.TABLE_BODY)
+        rows = body.locator("tr[lp-entity]")
+
+        user.page.wait_for_function("window.__categoryRowsGate?.requested === true")
+        expect(rows).to_have_count(25)
+        expect(rows.first).to_be_visible()
+        assert body.get_attribute("loaded") is None
+
+        user.page.evaluate("window.__categoryRowsGate.release()")
+        expect(body).to_have_attribute("loaded", "")
+        row_keys = set(rows.evaluate_all("rows => rows.map(row => row.dataset.key)"))
+        assert {page.urlsafe_key for page in created}.issubset(row_keys)
+    finally:
+        Entities.delete(*created)
+
+
 # @features pages
 # @dimensions create category-index
 def test_create_page_from_category_index(get_user):

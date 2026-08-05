@@ -8,8 +8,16 @@ import Core from "./core";
  * @tests tests_e2e/006_tasks/test_006e_task_index_mobile_ui.py::test_task_index_mobile_controls_open_with_task_columns
  * @tests tests_e2e/003_forms/test_003e_form_index_mobile_ui.py::test_form_index_mobile_tools_and_column_controls_are_exclusive
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load
+ * @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
  * @features table-controls
- * @dimensions mobile-controls columns mobile-tools mutual-exclusion mobile-startup sorting
+ * @dimensions mobile-controls columns mobile-tools mutual-exclusion mobile-startup sorting cursor-continuation
+ * @pair table-controls:mobile-controls
+ * @pair table-controls:columns
+ * @pair table-controls:mobile-tools
+ * @pair table-controls:mutual-exclusion
+ * @pair table-controls:mobile-startup
+ * @pair table-controls:sorting
+ * @pair table-controls:cursor-continuation
  */
 export default class EntityIndex extends Core {
 	constructor(node) {
@@ -25,6 +33,7 @@ export default class EntityIndex extends Core {
 		const table = this.getComponent(this.elt.querySelector("#table"));
 		const tools = this.elt.querySelector("#tools");
 		const mobileControls = this.elt.querySelector("#mobile-controls");
+		let indexTable = null;
 
 		if (this.mobile && tools) {
 			await this._createDropdown();
@@ -41,10 +50,20 @@ export default class EntityIndex extends Core {
 
 		await withTransition(async () => {
 			if (!table.elt.hasAttribute("lp-prefetch")) {
-				await table.loadWidget("IndexTable");
+				indexTable = await table.loadWidget("IndexTable");
 			}
 			await table.render(true);
 		});
+
+		const continuation = indexTable?.target.querySelector("tr[lp-load]");
+		if (continuation) {
+			const route = continuation.dataset.route;
+			continuation.remove();
+			indexTable.target.removeAttribute("loaded");
+			indexTable.loaded = false;
+			indexTable.loading = true;
+			void table.load(indexTable, route);
+		}
 
 		this._indexMobileResize = async () => {
 			await withTransition(async () => {

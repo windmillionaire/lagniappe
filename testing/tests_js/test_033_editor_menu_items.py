@@ -84,6 +84,7 @@ def test_editor_menu_item_serializes_current_active_state(run_node):
             });
 
             assert.match(item.html, /data-active="false"/);
+            assert.doesNotMatch(item.html, /title="Underline"/);
             item.enable();
             assert.match(item.html, /data-active="true"/);
             item.disable();

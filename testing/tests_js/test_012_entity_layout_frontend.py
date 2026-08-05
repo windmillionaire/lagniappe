@@ -75,7 +75,7 @@ class FakeElement {{
 
 const root = new FakeElement("root");
 const layout = new FakeElement("layout");
-const tabsElement = new FakeElement("tabs");
+const tabsElement = new FakeElement("tabs", {{ visible: "false" }});
 const desktopNav = new FakeElement("desktop-nav");
 const mobileNav = new FakeElement("mobile-nav");
 const infoElement = new FakeElement("info", {{ tab: "true" }});
@@ -261,6 +261,9 @@ if (!events.includes("outer-render-resumed")) {
 if (layout.dataset.visible !== "true") {
   throw new Error("Expected layout to be visible after render");
 }
+if (tabsElement.dataset.visible !== "true") {
+  throw new Error("Expected the resolved tabs card to be visible after render");
+}
 
 const tabs = view.getComponent(tabsElement);
 if (tabs.reconcile !== null) {
@@ -292,7 +295,11 @@ info.activate = () => {
 const initializing = view.init();
 await activationStarted;
 
-if (layout.dataset.visible !== "true" || infoElement.dataset.visible !== "true") {
+if (
+  layout.dataset.visible !== "true" ||
+  tabsElement.dataset.visible !== "true" ||
+  infoElement.dataset.visible !== "true"
+) {
   throw new Error("Entity tab selection was not included before widget activation");
 }
 if (context.transitionCalls() !== 1 || !activationTransitioned) {

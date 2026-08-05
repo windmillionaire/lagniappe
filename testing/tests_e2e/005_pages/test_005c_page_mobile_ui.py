@@ -14,8 +14,34 @@ from playwright.sync_api import expect
 from testing.definitions import Pages, Users
 from testing.elements import FormElements, MobileNav, Tabs
 from testing.resources import Page
+from testing.utility import scoped_browser_route
 
 pytestmark = pytest.mark.e2e
+
+
+def _empty_main_script(route):
+    route.fulfill(status=200, content_type="text/javascript", body="")
+
+
+# @template pages/page.html::main
+# @style entity.tabIcon
+def test_page_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_user):
+    """Desktop tab icons never paint while a phone layout is unresolved."""
+    user = get_user(Users.OWNER)
+    page = Pages.test_page_loads.get(user)
+    page.user = user
+    user.page.set_viewport_size({"width": 375, "height": 667})
+
+    with scoped_browser_route(user.page, "**/script.js?*", _empty_main_script):
+        response = user.page.goto(page.url, wait_until="load")
+
+    assert response.ok
+    assert user.locate("[lp-view]").get_attribute("initialized") is None
+    tabs_card = user.locate(page.TABS_CARD)
+    expect(tabs_card).to_have_attribute("data-visible", "false")
+    expect(tabs_card).to_be_hidden()
+    expect(user.locate(page.DESKTOP_TAB_NAV)).to_be_hidden()
+    expect(user.locate(page.MOBILE_NAV)).to_be_hidden()
 
 
 # @features entity-layout
@@ -26,6 +52,7 @@ def test_page_mobile_nav_replaces_desktop_tabs(get_user):
     page = user.go(Pages.test_page_loads)
 
     expect(user.locate(page.MOBILE_NAV)).to_be_hidden()
+    expect(user.locate(page.TABS_CARD)).to_be_visible()
     expect(user.locate(page.DESKTOP_TAB_NAV)).to_be_visible()
 
     user.mobile = True

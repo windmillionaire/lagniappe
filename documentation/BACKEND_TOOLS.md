@@ -150,6 +150,10 @@ CA bundle named by `REDIS_CA_CERT`; setup and runtime share the same connection
 option builder, and the JSON cache reuses this client rather than opening a
 second connection pool.
 
+Cache rebuilds are namespace-aware. When `CONFIG.PREFIX` is set, as it is on
+the managed test server, a rebuild deletes only that prefix's keys and search
+indexes. Only an unprefixed runtime performs a full Redis database flush.
+
 | Field | Weight | Purpose |
 |---|---|---|
 | `name` | 4 | Entity name (highest priority) |

@@ -208,8 +208,11 @@
       {% if render_photo %}{{ page_photo(page) }}{% endif %}
       <div id="tabs"
            lp-component
+           data-visible="false"
            class="{{ styles.card.primary }}">
-        <div lp-nav class="{{ styles.layout.nav.title }}" data-nav="tabs">
+        <div lp-nav
+             class="{{ styles.layout.nav.title }}"
+             data-nav="tabs">
           <div data-role="header" class="{{ styles.layout.nav.header }}">
             <span class="text-default-dark" data-role="title"></span>
             {{ sub_toggles(page) }}
