@@ -319,8 +319,13 @@ const putRequest = async (url, body, options = {}) => {
 /**
  * @testable true
  * @tests tests_js/test_009_request_csrf.py::test_request_supports_conditional_post_not_modified
+ * @tests tests_js/test_009_request_csrf.py::test_request_preserves_structured_validation_error
+ * @tests tests_js/test_009_request_csrf.py::test_request_preserves_plain_validation_error
  * @pair request:post-headers
  * @pair deferred-jobs:post-headers
+ * @pairs request-errors:structured-validation request-errors:diagnostics
+ * @pair request-errors:plain-validation
+ * @pairs polling:structured-validation polling:diagnostics
  */
 const _request = async (
 	url,
@@ -379,8 +384,13 @@ const _request = async (
 
 		if (response.status === 422) {
 			return {
-				ok: false,
-				error: await response.text(),
+				...(await _formatError(response, {
+					body,
+					method,
+					url,
+					replaceErrorPage: false,
+				})),
+				status: response.status,
 			};
 		}
 

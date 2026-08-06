@@ -262,13 +262,11 @@ export class EditWatcher {
 			}
 			if (!widget) {
 				form.dataset.operation = descriptor.operation;
-				form.dataset.operationRevision = String(
-					Number(descriptor.revision) || 0,
-				);
+				form.dataset.operationRevision = String(descriptor.revision ?? 0);
 				form.dataset.deferredLock = "form";
 			}
 			tracked.push({
-				revision: Number(descriptor.revision) || 0,
+				revision: descriptor.revision ?? 0,
 				node: widget?.target ?? form,
 			});
 		}

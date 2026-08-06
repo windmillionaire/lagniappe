@@ -225,7 +225,7 @@ def set_deployment_settings():
     try:
         deployment = normalize_deployment_settings(data)
     except DeploymentSettingsError as e:
-        return str(e), 422
+        return responses.error(str(e))
 
     database.save_site_deployment(deployment)
     return responses.json_response({"deployment": deployment})
@@ -249,7 +249,7 @@ def set_ai_settings():
             model_options=model_options,
         )
     except AISettingsError as e:
-        return str(e), 422
+        return responses.error(str(e))
 
     database.save_site_ai(ai_settings)
     return responses.json_response(
@@ -285,12 +285,12 @@ def set_site_image():
         uploaded_file = direct_uploads.direct_upload_file("site-image")
 
     if not uploaded_file:
-        return "No file uploaded", 422
+        return responses.error("No file uploaded")
     try:
         paths = site_image.create_site_image(uploaded_file)
         site_image_response = _site_image_response(paths)
     except exceptions.SiteImageError as e:
-        return str(e), 422
+        return responses.error(str(e))
 
     return responses.json_response({"site_image": site_image_response})
 

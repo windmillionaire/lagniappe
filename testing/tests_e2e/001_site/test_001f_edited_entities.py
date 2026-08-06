@@ -29,6 +29,7 @@ def poll(user, subscriptions):
                     version: 1,
                     client_id: "poll-contract-test",
                     subscriptions,
+                    closed_documents: [],
                 }),
             });
             const text = await response.text();
@@ -129,11 +130,19 @@ def test_poll_endpoint_batches_entity_changes(get_user, browser_failures):
                     "type": "document",
                     "key": page.entity.urlsafe_key,
                     "sync_id": page.entity.sync_ids["document"]["id"],
+                    "generation": None,
                     "revision": "not-an-integer",
+                    "presence_digest": None,
                 }
             ],
         )
         assert malformed_document["status"] == 422
+        assert malformed_document["data"] == {
+            "error": "Invalid polling request.",
+            "code": "invalid_poll_contract",
+            "path": "subscriptions[0].revision",
+            "reason": "type",
+        }
 
         malformed_revision = poll(owner, [{**descriptor, "revision": {"nested": True}}])
         assert malformed_revision["status"] == 422

@@ -1,4 +1,8 @@
+import { captureError } from "./errors";
+
 export const NOTIFICATION_STATE_HEADER = "X-Lagniappe-Notification-State";
+
+let invalidStateReported = false;
 
 /**
  * @testable false
@@ -44,7 +48,19 @@ const _normalized = (raw) => {
  */
 export const applyNotificationState = (raw) => {
 	const state = _normalized(raw);
-	if (!state) return null;
+	if (!state) {
+		if (raw !== null && raw !== undefined && !invalidStateReported) {
+			invalidStateReported = true;
+			captureError(
+				new TypeError("Invalid notification state response."),
+				null,
+				{
+					context: "notification-state-contract",
+				},
+			);
+		}
+		return null;
+	}
 	window.__NOTIFICATION_STATE__ = state;
 
 	if (!state.miss) {

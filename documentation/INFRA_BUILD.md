@@ -76,16 +76,19 @@ the backend `SENTRY_DSN` without hardcoded browser loader keys.
 The private application and public Manual share a small main boot entry.
 `src/script/viewRegistry.mjs` is the single source for runtime view selection
 and Rollup's stable named view entries under `chunks/views/`. Focused stable
-manual chunks separate connectivity, the shared shell/request foundation,
-Core, Entity, and EntityIndex tiers. Templates preload only the
+manual chunks separate connectivity, the shared
+shell/request/notification-state foundation, Core, Entity, and EntityIndex
+tiers. Templates preload only the
 tiers required by their current view: shell-only, Core, Entity, or Index.
 EntityIndex's dropdown styling remains lazy with the dropdown. This prevents a
 cold page from discovering interaction-critical dependencies only after DOM
 readiness without making shell or Builder closures inherit Core. Rollup
 automatically creates the remaining feature-level chunks from static and
 dynamic module boundaries.
-Editor, PDF, modal, combobox, offline, sync, notification, and other feature
-chunks remain lazy until their owning surface requests them. The vendored Material Symbols Rounded subset is declared by
+Editor, PDF, modal, combobox, offline, sync, the notification UI, and other
+feature chunks remain lazy until their owning surface requests them. The compact
+notification response-state helper stays in the request foundation. The
+vendored Material Symbols Rounded subset is declared by
 `src/style/fonts.css`, bundled into `style.css`, and emitted with the other
 self-hosted fonts under `lagniappe/web/static/fonts/`.
 

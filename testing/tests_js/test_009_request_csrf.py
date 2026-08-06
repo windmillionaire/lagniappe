@@ -109,6 +109,27 @@ context.fetch = async (url, config = {{}}) => {{
     }});
   }}
 
+  if (requestUrl === "/validation-json") {{
+    return new Response(JSON.stringify({{
+      error: "Invalid polling request.",
+      code: "invalid_poll_contract",
+      path: "subscriptions[0].revision",
+      reason: "type",
+    }}), {{
+      status: 422,
+      statusText: "Unprocessable Content",
+      headers: {{ "Content-Type": "application/json" }},
+    }});
+  }}
+
+  if (requestUrl === "/validation-text") {{
+    return new Response("Specific validation message.", {{
+      status: 422,
+      statusText: "Unprocessable Entity",
+      headers: {{ "Content-Type": "text/plain" }},
+    }});
+  }}
+
   if (requestUrl === "/html-error") {{
     return new Response("<main>replacement error page</main>", {{
       status: 500,
@@ -284,6 +305,40 @@ if (calls.length !== 1) {
 }
 if (fetchCalls.some((call) => call.url === "/l/token")) {
   throw new Error("Non-CSRF 400 triggered a token refresh");
+}
+""",
+    )
+
+
+# @features request-errors polling
+# @dimensions structured-validation diagnostics
+def test_request_preserves_structured_validation_error(run_node):
+    run_request_check(
+        run_node,
+        """
+const response = await request.post("/validation-json", { value: "invalid" });
+
+if (response.ok || response.status !== 422 ||
+    response.code !== "invalid_poll_contract" ||
+    response.path !== "subscriptions[0].revision" ||
+    response.reason !== "type") {
+  throw new Error(`Structured validation was lost: ${JSON.stringify(response)}`);
+}
+""",
+    )
+
+
+# @features request-errors
+# @dimensions plain-validation diagnostics
+def test_request_preserves_plain_validation_error(run_node):
+    run_request_check(
+        run_node,
+        """
+const response = await request.post("/validation-text", { value: "invalid" });
+
+if (response.ok || response.status !== 422 ||
+    response.error !== "Specific validation message.") {
+  throw new Error(`Plain validation was lost: ${JSON.stringify(response)}`);
 }
 """,
     )

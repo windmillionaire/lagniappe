@@ -1,4 +1,18 @@
+import { captureError } from "./errors";
 import { createIcon } from "./icons";
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/deferredOperations.mjs::DeferredOperationManager
+ * @reason server-rendered revision parsing is exercised through manager registration
+ */
+function operationRevision(value) {
+	if (typeof value === "number") return value;
+	if (typeof value === "string" && /^(0|[1-9][0-9]*)$/.test(value)) {
+		return Number(value);
+	}
+	return value;
+}
 
 /**
  * @testable false
@@ -52,10 +66,11 @@ export class DeferredOperationManager {
 		const nodes = Array.from(root.querySelectorAll?.("[data-operation]") || []);
 		if (root.matches?.("[data-operation]")) nodes.unshift(root);
 		for (const node of nodes) {
+			const revision = operationRevision(node.dataset.operationRevision);
 			const status = node.dataset.operationStatus
 				? {
 						key: node.dataset.operation,
-						revision: Number(node.dataset.operationRevision) || 0,
+						revision,
 						status: node.dataset.operationStatus,
 						phase: node.dataset.operationPhase || "unknown",
 						phase_label: node.dataset.operationPhaseLabel || "Working",
@@ -68,7 +83,7 @@ export class DeferredOperationManager {
 					}
 				: null;
 			this.track(node.dataset.operation, {
-				revision: Number(node.dataset.operationRevision) || 0,
+				revision,
 				node,
 				immediate: false,
 				status,
@@ -92,9 +107,16 @@ export class DeferredOperationManager {
 		}
 		if (decorationNode) this.decorate(decorationNode, key);
 		const current = this.operations.get(key);
+		const incomingRevision = operationRevision(revision);
+		const resolvedRevision = Number.isInteger(incomingRevision)
+			? Math.max(
+					Number.isInteger(current?.revision) ? current.revision : 0,
+					incomingRevision,
+				)
+			: incomingRevision;
 		this.operations.set(key, {
 			...current,
-			revision: Math.max(Number(current?.revision) || 0, Number(revision) || 0),
+			revision: resolvedRevision,
 			...(status ? { status: { ...status }, receivedAt: Date.now() } : {}),
 		});
 		let subscribed = false;
@@ -104,7 +126,7 @@ export class DeferredOperationManager {
 					id: `operation:${key}`,
 					type: "operation",
 					key,
-					revision: Number(this.operations.get(key)?.revision) || 0,
+					revision: this.operations.get(key)?.revision,
 				},
 				{
 					mode: "periodic",
@@ -183,14 +205,18 @@ export class DeferredOperationManager {
 
 	nudge(key, revision = null) {
 		const current = key ? this.operations.get(key) : null;
+		const incomingRevision =
+			revision === null || revision === undefined
+				? revision
+				: operationRevision(revision);
 		if (
 			current &&
-			revision !== null &&
-			revision !== undefined &&
-			Number(revision) < (Number(current.revision) || 0)
+			Number.isInteger(incomingRevision) &&
+			Number.isInteger(current.revision) &&
+			incomingRevision < current.revision
 		)
 			return false;
-		if (key && !this.track(key, { revision })) return false;
+		if (key && !this.track(key, { revision: incomingRevision })) return false;
 		this.view.PollingCoordinator?.trigger(key ? `operation:${key}` : null);
 		return true;
 	}
@@ -205,8 +231,20 @@ export class DeferredOperationManager {
 		if (this.destroyed || !status?.key || !this.operations.has(status.key))
 			return false;
 		const current = this.operations.get(status.key);
-		const revision = Number(status.revision) || 0;
-		const previousRevision = Number(current?.revision) || 0;
+		const revision = operationRevision(status.revision);
+		if (!Number.isInteger(revision) || revision < 0) {
+			captureError(
+				new TypeError("Invalid deferred operation revision."),
+				this.view.elt,
+				{
+					context: "polling-operation-payload",
+				},
+			);
+			return false;
+		}
+		const previousRevision = current?.revision;
+		if (!Number.isInteger(previousRevision) || previousRevision < 0)
+			return false;
 		if (revision < previousRevision) return false;
 		this.operations.set(status.key, {
 			revision,
@@ -250,7 +288,7 @@ export class DeferredOperationManager {
 
 	_render(status, elapsedSeconds = status.elapsed_seconds) {
 		for (const node of operationNodes(status.key)) {
-			node.dataset.operationRevision = String(Number(status.revision) || 0);
+			node.dataset.operationRevision = String(status.revision);
 			node.dataset.operationStatus = status.status || "unknown";
 			node.dataset.operationPhase = status.phase || "unknown";
 			node.dataset.operationTerminal = status.terminal ? "true" : "false";

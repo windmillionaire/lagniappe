@@ -54,7 +54,7 @@ export default class Home extends Core {
 						id,
 						type: "channel",
 						channel,
-						revision: widget.target?.dataset.pollRevision || null,
+						revision: widget.target?.dataset.pollRevision ?? null,
 					},
 					{
 						mode: "foreground",

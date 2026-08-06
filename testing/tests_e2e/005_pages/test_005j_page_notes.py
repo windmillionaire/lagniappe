@@ -125,6 +125,7 @@ def test_page_notes_visibility_and_title_menu(get_user, browser_failures):
 # @pair pages:visibility
 # @pair pages:scope
 # @pair pages:validation
+# @pair request-errors:plain-validation
 # @template pages/page.html::view_header
 # @template pages/notes.html::notes_section
 # @template notes.html::composer

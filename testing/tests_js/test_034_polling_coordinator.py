@@ -45,9 +45,11 @@ const context = {
           id: item.id,
           type: item.type,
           status: item.id === "retry:three" || index === 0 ? "changed" : "unchanged",
-          revision: index + 10,
+          revision: item.type === "operation" ? index + 10 : `revision-${index + 10}`,
           poll_after_ms: 15000,
-          ...(index === 0 ? { payload: { refresh: true } } : {}),
+          ...(item.id === "retry:three" || index === 0
+            ? { payload: { refresh: true } }
+            : {}),
         })),
       };
     },
@@ -98,7 +100,7 @@ if (timerId !== 3 || clearedTimers.join(",") !== "1,2") {
     throw new Error(`Shared beforePoll hook ran ${beforePolls} times`);
   }
   if (handled.length !== 2 ||
-      coordinator.get("entity:one").revision !== 10 ||
+      coordinator.get("entity:one").revision !== "revision-10" ||
       coordinator.get("operation:two").revision !== 11 ||
       coordinator.get("retry:three").revision !== "retry-old") {
     throw new Error("Polling results did not advance subscription cursors");
@@ -209,6 +211,7 @@ const context = {
           type: item.type,
           status: "unchanged",
           revision: item.revision,
+          poll_after_ms: 15000,
         })),
       };
     },
@@ -319,7 +322,9 @@ const context = {
           id: item.id,
           type: item.type,
           status: "changed",
-          revision: calls.length,
+          revision: `revision-${calls.length}`,
+          poll_after_ms: 15000,
+          payload: { refresh: true },
         })),
       };
     },
@@ -419,6 +424,195 @@ coordinator.subscribe(
     throw new Error("Awaited trigger resolved without polling its requested ID");
   }
 
+  coordinator.destroy();
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+"""
+    )
+
+
+# @pairs polling:validation polling:diagnostics polling:presence
+# @pairs polling:protocol polling:revision polling:batching
+def test_polling_coordinator_captures_and_isolates_contract_failures(run_node):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const calls = [];
+const captured = [];
+const handled = [];
+let mode = "normal";
+const context = {
+  console,
+  crypto: { randomUUID: () => "client-1" },
+  Date,
+  ENDPOINTS: { poll: "/l/poll" },
+  Math,
+  queueMicrotask,
+  sessionStorage: {
+    value: "   ",
+    getItem() { return this.value; },
+    setItem(_key, value) { this.value = value; },
+  },
+  captureError(error, _element, details) { captured.push({ error, details }); },
+  request: {
+    async post(_url, body) {
+      calls.push(body);
+      if (mode === "rejected") {
+        return {
+          ok: false,
+          status: 422,
+          code: "invalid_poll_contract",
+          path: "subscriptions[0].revision",
+          reason: "type",
+        };
+      }
+      let subscriptions = body.subscriptions;
+      if (mode === "missing-document") {
+        subscriptions = subscriptions.filter((item) => item.type !== "document");
+      }
+      return {
+        ok: true,
+        version: 1,
+        results: subscriptions.map((item) => {
+          if (item.type === "document") {
+            return {
+              id: item.id,
+              type: item.type,
+              status: "changed",
+              revision: 1,
+              poll_after_ms: 2000,
+              payload: {
+                generation: "generation-one",
+                revision: 1,
+                presence_digest: "presence-one",
+              },
+            };
+          }
+          const changed = item.revision !== "entity-new";
+          return {
+            id: item.id,
+            type: item.type,
+            status: changed ? "changed" : "unchanged",
+            revision: "entity-new",
+            poll_after_ms: 15000,
+            ...(changed ? { payload: { refresh: true } } : {}),
+          };
+        }),
+      };
+    },
+  },
+  window: {
+    addEventListener() {},
+    removeEventListener() {},
+    clearTimeout() {},
+    setTimeout() { return 1; },
+  },
+};
+context.globalThis = context;
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/polling.mjs", "utf8");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replace("export class PollingCoordinator", "class PollingCoordinator");
+source += "\nglobalThis.PollingCoordinator = PollingCoordinator;";
+vm.runInContext(source, context);
+
+const coordinator = new context.PollingCoordinator({
+  elt: {}, hidden: false, online: true,
+}).init();
+if (coordinator.clientId !== "client-1" || context.sessionStorage.value !== "client-1") {
+  throw new Error("Invalid stored client identity was not replaced");
+}
+
+coordinator.subscribe({
+  id: "document:invalid:document",
+  type: "document",
+  key: "entity-invalid",
+  sync_id: "invalid:document",
+  generation: null,
+  revision: 0,
+  presence_digest: null,
+  fingerprint: "must-not-be-sent",
+});
+if (coordinator.get("document:invalid:document")) {
+  throw new Error("Invalid descriptor was registered");
+}
+coordinator.subscribe({
+  id: "operation:unsafe",
+  type: "operation",
+  key: "operation-unsafe",
+  revision: Number.MAX_SAFE_INTEGER + 1,
+});
+if (coordinator.get("operation:unsafe")) {
+  throw new Error("Unsafe integer descriptor was registered");
+}
+
+coordinator.subscribe(
+  { id: "entity:one", type: "entity", key: "entity-one", revision: "entity-old" },
+  { onResult: (result) => handled.push(result) },
+);
+coordinator.subscribe(
+  {
+    id: "document:one:document",
+    type: "document",
+    key: "entity-one",
+    sync_id: "one:document",
+    generation: null,
+    revision: 0,
+    presence_digest: null,
+  },
+  { onResult: (result) => handled.push(result) },
+);
+const external = coordinator.get("entity:one");
+external.revision = "tampered";
+coordinator.update("entity:one", { revision: { invalid: true } });
+if (coordinator.get("entity:one").revision !== "entity-old") {
+  throw new Error("Invalid external/update mutation changed the accepted descriptor");
+}
+
+(async () => {
+  const first = await coordinator.trigger();
+  if (first.length !== 2 || coordinator.get("entity:one").revision !== "entity-new") {
+    throw new Error(`Valid results were not applied: ${JSON.stringify(first)}`);
+  }
+  const documentBody = calls[0].subscriptions.find((item) => item.type === "document");
+  if (Object.hasOwn(documentBody, "fingerprint") ||
+      documentBody.presence_digest !== null) {
+    throw new Error(`Document request was not canonical: ${JSON.stringify(documentBody)}`);
+  }
+
+  mode = "missing-document";
+  const second = await coordinator.trigger();
+  const missing = second.find((result) => result.id === "document:one:document");
+  if (missing?.status !== "error") {
+    throw new Error(`Missing result was not isolated: ${JSON.stringify(second)}`);
+  }
+
+  await coordinator.closeDocuments([
+    "one:document",
+    "one:document",
+    "not-a-document",
+  ]);
+  const close = calls.at(-1);
+  if (close.closed_documents.join(",") !== "one:document") {
+    throw new Error(`Close request was not canonical: ${JSON.stringify(close)}`);
+  }
+
+  mode = "rejected";
+  await coordinator.trigger("entity:one");
+  const contexts = captured.map((entry) => entry.details?.context);
+  for (const expected of [
+    "polling-request-contract",
+    "polling-response-contract",
+    "polling-request-rejected",
+  ]) {
+    if (!contexts.includes(expected)) {
+      throw new Error(`Missing ${expected} capture: ${JSON.stringify(contexts)}`);
+    }
+  }
   coordinator.destroy();
 })().catch((error) => {
   console.error(error);

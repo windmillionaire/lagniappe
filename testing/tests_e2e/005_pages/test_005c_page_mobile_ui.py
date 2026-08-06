@@ -36,7 +36,7 @@ def test_page_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_user):
         response = user.page.goto(page.url, wait_until="load")
 
     assert response.ok
-    assert user.locate("[lp-view]").get_attribute("initialized") is None
+    expect(user.locate("[lp-view]")).not_to_have_attribute("initialized", "")
     tabs_card = user.locate(page.TABS_CARD)
     expect(tabs_card).to_have_attribute("data-visible", "false")
     expect(tabs_card).to_be_hidden()

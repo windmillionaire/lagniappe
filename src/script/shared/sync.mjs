@@ -77,9 +77,9 @@ export class SyncManager {
 		return {
 			key: widget.component?.key ?? widget.key,
 			sync_id: widget.syncId,
-			fingerprint: widget.fingerprint,
 			generation: protocol?.generation ?? null,
-			revision: Number(protocol?.revision) || 0,
+			revision: protocol?.revision ?? 0,
+			presence_digest: protocol?.presence_digest ?? null,
 		};
 	}
 
@@ -89,7 +89,8 @@ export class SyncManager {
 		const source = { ...current, ...active, ...patch };
 		this._cursors.set(syncId, {
 			generation: source.generation ?? null,
-			revision: Number(source.revision) || 0,
+			revision: source.revision ?? 0,
+			presence_digest: source.presence_digest ?? null,
 		});
 	}
 
@@ -268,9 +269,9 @@ export class SyncManager {
 				type: "document",
 				key: offline.key,
 				sync_id: offline.sync_id,
-				fingerprint: offline.fingerprint,
 				generation: offline.generation ?? null,
-				revision: Number(offline.revision) || 0,
+				revision: offline.revision ?? 0,
+				presence_digest: null,
 			},
 			{ mode: "periodic", initial: "immediate" },
 		);
@@ -290,7 +291,7 @@ export class SyncManager {
 			if (!descriptor?.generation) return null;
 			const cursor = {
 				generation: descriptor.generation,
-				revision: Number(descriptor.revision) || 0,
+				revision: descriptor.revision,
 			};
 			this._rememberCursor(offline.sync_id, cursor);
 			return { cursor, payload: result.payload ?? null };

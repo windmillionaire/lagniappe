@@ -169,7 +169,7 @@ export default class Core extends ShellView {
 					id: `view:channel:${pollChannel}`,
 					type: "channel",
 					channel: pollChannel,
-					revision: this.elt.dataset.pollRevision || null,
+					revision: this.elt.dataset.pollRevision ?? null,
 				},
 				{
 					mode: "foreground",
@@ -188,7 +188,7 @@ export default class Core extends ShellView {
 					id,
 					type: "entity",
 					key: this.key,
-					revision: this.elt.dataset.fingerprint || null,
+					revision: this.elt.dataset.fingerprint ?? null,
 				},
 				{
 					mode: "periodic",
@@ -230,7 +230,7 @@ export default class Core extends ShellView {
 				id: `view:channel:${channel}`,
 				type: "channel",
 				channel,
-				revision: this.elt.dataset.fingerprint || null,
+				revision: this.elt.dataset.fingerprint ?? null,
 			},
 			{
 				mode: "foreground",

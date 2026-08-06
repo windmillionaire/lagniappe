@@ -41,9 +41,7 @@ export class FormElement {
 		for (const target of [this.target, this.initialTarget]) {
 			if (!target) continue;
 			target.dataset.operation = operation;
-			target.dataset.operationRevision = String(
-				Number(descriptor.revision) || 0,
-			);
+			target.dataset.operationRevision = String(descriptor.revision ?? 0);
 			target.dataset.deferredLock = "form";
 		}
 		this.clearUnsavedState();

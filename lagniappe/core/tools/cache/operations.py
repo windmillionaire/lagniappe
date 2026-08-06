@@ -112,7 +112,7 @@ def peek_operation_states(operations):
 # @tests tests_unit/test_025b_operation_state.py::test_operation_projection_is_revisioned_and_slides_ttl
 def operation_state_current(state, revision, *, now=None):
     """Return whether a cached revision is equal and recently durable."""
-    if not state or int(state["revision"]) != int(revision or 0):
+    if not state or state["revision"] != revision:
         return False
     current = time.time() if now is None else float(now)
     return current - float(state["verified_at"]) < OPERATION_VERIFY_SECONDS

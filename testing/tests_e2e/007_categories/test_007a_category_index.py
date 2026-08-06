@@ -11,6 +11,7 @@ Verified against:
 
 import json
 import re
+from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
 from playwright.sync_api import expect
@@ -26,7 +27,7 @@ from testing.elements import (
     SpinnerButtons,
     Table,
 )
-from testing.utility import expect_reconnect_refresh
+from testing.utility import expect_reconnect_refresh, scoped_browser_route
 
 
 def _create_page(user, page, create_form):
@@ -71,8 +72,10 @@ def _open_visibility_panel(user, category):
 # @pair table-controls:cursor-continuation
 # @template categories/index.html::view
 # @template table.html::table
-def test_category_index_renders_first_batch_before_cursor_continuation(get_user):
-    """A delayed remainder cannot hide the category's server-rendered rows."""
+def test_category_index_renders_first_batch_before_cursor_continuation(
+    get_user, browser_failures
+):
+    """A failed remainder cannot hide the category's server-rendered rows."""
     user = get_user(Users.OWNER)
     category = Categories.test_create_page.get(user)
     suffix = uuid4().hex
@@ -87,46 +90,56 @@ def test_category_index_renders_first_batch_before_cursor_continuation(get_user)
     ]
     Entities.save(*created)
     continuation_path = f"/categories/{category.key}/rows"
-    user.page.add_init_script(
-        script=f"""
-        (() => {{
-          const continuationPath = {json.dumps(continuation_path)};
-          const nativeFetch = window.fetch.bind(window);
-          const gate = {{ requested: false, release: null }};
-          window.__categoryRowsGate = gate;
-          window.fetch = (input, init) => {{
-            const value = typeof input === "string" ? input : input.url;
-            const url = new URL(value, window.location.href);
-            if (
-              url.pathname === continuationPath &&
-              url.searchParams.has("cursor")
-            ) {{
-              gate.requested = true;
-              return new Promise((resolve, reject) => {{
-                gate.release = () => nativeFetch(input, init).then(resolve, reject);
-              }});
-            }}
-            return nativeFetch(input, init);
-          }};
-        }})();
-        """
+    continuation_route = re.compile(
+        rf"^https?://[^/]+{re.escape(continuation_path)}\?.+$"
     )
+
+    def is_continuation_request(request):
+        url = urlsplit(request.url)
+        return url.path == continuation_path and "cursor" in parse_qs(url.query)
+
+    def reject_continuation(route):
+        assert is_continuation_request(route.request)
+        route.fulfill(
+            status=503,
+            content_type="text/plain",
+            body="Test-only cursor continuation failure",
+        )
 
     try:
         category.user = user
+        with browser_failures.expect_http_error(
+            user,
+            status=503,
+            path=continuation_path,
+        ):
+            with scoped_browser_route(
+                user.page.context,
+                continuation_route,
+                reject_continuation,
+            ):
+                with user.page.expect_response(
+                    lambda response: is_continuation_request(response.request)
+                    and response.status == 503
+                ):
+                    response = user.navigate(category.url)
+                assert response.ok
+                expect(user.locate("[lp-view]")).to_have_attribute(
+                    "initialized", ""
+                )
+                body = user.locate(category.TABLE_BODY)
+                rows = body.locator("tr[lp-entity]")
+
+                expect(rows).to_have_count(25)
+                expect(rows.first).to_be_visible()
+                expect(body).not_to_have_attribute("loaded", "")
+
         response = user.navigate(category.url)
         assert response.ok
-        expect(user.locate("[lp-view]")).to_have_attribute("initialized", "")
         body = user.locate(category.TABLE_BODY)
         rows = body.locator("tr[lp-entity]")
-
-        user.page.wait_for_function("window.__categoryRowsGate?.requested === true")
-        expect(rows).to_have_count(25)
-        expect(rows.first).to_be_visible()
-        assert body.get_attribute("loaded") is None
-
-        user.page.evaluate("window.__categoryRowsGate.release()")
         expect(body).to_have_attribute("loaded", "")
+        expect(rows).to_have_count(26)
         row_keys = set(rows.evaluate_all("rows => rows.map(row => row.dataset.key)"))
         assert {page.urlsafe_key for page in created}.issubset(row_keys)
     finally:

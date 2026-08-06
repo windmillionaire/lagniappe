@@ -60,8 +60,9 @@ def test_poll_operation_is_owner_safe(get_user):
                         id: index === 0 ? `operation:${key}` : `operation-${index}`,
                         type: "operation",
                         key,
-                        revision: null,
+                        revision: 0,
                     })),
+                    closed_documents: [],
                 }),
             });
             const responseText = await response.text();
@@ -84,6 +85,7 @@ def test_poll_operation_is_owner_safe(get_user):
                         key: operations[0],
                         revision: current.revision,
                     }],
+                    closed_documents: [],
                 }),
             });
             return {

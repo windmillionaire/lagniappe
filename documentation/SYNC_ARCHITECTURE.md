@@ -149,9 +149,42 @@ The version 1 request envelope is:
 }
 ```
 
-Every descriptor ID must be unique. The server allowlists descriptor types and
-channel names, bounds IDs and batch sizes, batches entity loads, and applies
-viewer permissions before returning state.
+The envelope is exact: `version`, `client_id`, `subscriptions`, and
+`closed_documents` are required, while `notification_state` is optional.
+Unknown fields are contract errors rather than compatibility data. Every
+descriptor contains `id`, `type`, and `revision`; IDs and closed document IDs
+must be unique within their lists.
+
+| Type | Type-specific fields | Revision cursor |
+|---|---|---|
+| `entity` | entity `key` | null or nonblank opaque string |
+| `channel` | allowlisted `channel` | null or nonblank opaque string |
+| `form-lock` | entity `key` | nonblank opaque string |
+| `ingress` | ingress `key` | null or nonblank opaque string |
+| `operation` | deferred-job `key` | non-negative JavaScript-safe integer |
+| `document` | entity `key`, document-suffixed `sync_id`, nullable `generation`, nullable `presence_digest` | non-negative JavaScript-safe integer |
+
+String cursors are deliberately opaque; the contract bounds them without
+coupling the browser to the server's current hash, UUID, or datastore-key
+encoding. Empty strings are invalid where `null` represents an initial cursor.
+Document `generation` and `presence_digest` fields remain present with `null`
+initial values so missing fields cannot masquerade as an intentional initial
+state.
+
+Notification state has only two request modes: a cold seed is
+`{generation: null, revision: null, seed: true}`, while a warm cursor has a
+nonblank generation, a non-negative JavaScript-safe integer revision, and
+`seed: false`.
+Omitting the field means notification state was not requested.
+
+The browser validates and canonicalizes descriptors at registration and again
+at the request boundary. A first-party producer defect is captured once and
+that descriptor is isolated from unrelated polling. The server independently
+enforces exact fields, cursor types, channel/type allowlists, document suffixes,
+uniqueness, and size bounds because the HTTP boundary remains untrusted. An
+invalid request returns a safe structured `422` with
+`code: "invalid_poll_contract"`, a field `path`, and a reason category; rejected
+values are never echoed or reported to server-side error tracking.
 
 Each result has the same outer contract:
 
@@ -172,6 +205,14 @@ Each result has the same outer contract:
 - `changed`: the new cursor and typed payload are present;
 - `unavailable`: the object is missing or no longer visible to this user;
 - `error`: this descriptor failed without failing the rest of the batch.
+
+The coordinator also validates the result set before applying cursors: every
+requested ID must appear exactly once with the matching type, a positive
+`poll_after_ms`, and the cursor type declared above. `changed` requires an
+object payload, `unchanged` carries no payload, and `unavailable`/`error` carry
+neither a revision nor a payload. A malformed or missing result is captured and
+converted to a retryable error for only its subscription. Document generation
+and presence cursors are validated before they can update coordinator state.
 
 Typed payloads are deliberately narrow:
 

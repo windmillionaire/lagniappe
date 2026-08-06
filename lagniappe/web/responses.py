@@ -39,10 +39,17 @@ def offline():
     return render_template("home/offline.html"), 200
 
 
+# @testable true
+# @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
+# @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_note_text_photo_and_delete_modal
+# @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_rejects_non_csv_upload
+# @features request-errors
+# @dimensions plain-validation
+# @pair request-errors:plain-validation
 def error(error, exception=None):
     if exception:
         exceptions.capture(exception)
-    return error, 422
+    return Response(str(error), status=422, mimetype="text/plain")
 
 
 def not_found(error):

@@ -145,6 +145,7 @@ def test_document_history_restore(get_user):
 
 # @features editor
 # @dimensions history-pin history-clear current-content validation ordering cleanup parent-scope confirmation batch
+# @pair request-errors:plain-validation
 # @template delete/document_history.html::confirmation
 def test_pin_and_clear_document_history(get_user, browser_failures):
     user = get_user(Users.OWNER)
@@ -189,7 +190,7 @@ def test_pin_and_clear_document_history(get_user, browser_failures):
 
     def assert_invalid_pin(response, message):
         assert response.status == 422
-        assert response.headers["content-type"].startswith("text/html")
+        assert response.headers["content-type"].startswith("text/plain")
         assert response.text() == message
         expect(pin_form.locator("[data-role='error']")).to_have_text(message)
         assert tuple(

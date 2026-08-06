@@ -10,6 +10,7 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 
 const events = [];
+const captured = [];
 const button = {
   dataset: { visible: "false" },
   attributes: {},
@@ -17,6 +18,7 @@ const button = {
 };
 const count = { textContent: "0" };
 const context = {
+  captured,
   console,
   CustomEvent: class {
     constructor(type, options = {}) {
@@ -40,6 +42,10 @@ vm.createContext(context);
 let source = fs.readFileSync(
   "src/script/shared/notificationState.mjs",
   "utf8",
+);
+source = source.replace(
+  'import { captureError } from "./errors";',
+  "const captureError = (...args) => captured.push(args);",
 );
 source = source.replace(/export const /g, "const ");
 source += `
@@ -79,6 +85,11 @@ const before = context.window.__NOTIFICATION_STATE__;
 if (context.applyNotificationState('{"revision":"bad"}') !== null ||
     context.window.__NOTIFICATION_STATE__ !== before) {
   throw new Error("Invalid notification state replaced the accepted cursor");
+}
+context.applyNotificationState('{"revision":"still-bad"}');
+if (captured.length !== 1 ||
+    captured[0][2]?.context !== "notification-state-contract") {
+  throw new Error(`Invalid notification state was not captured once: ${captured.length}`);
 }
 """
     )

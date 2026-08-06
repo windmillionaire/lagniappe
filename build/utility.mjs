@@ -32,6 +32,7 @@ const BOOT_CONNECTIVITY_MODULE = "shared/connectivity.mjs";
 const INTERACTION_FOUNDATION_MODULES = new Set([
 	"shared/endpoints.mjs",
 	"shared/errors.mjs",
+	"shared/notificationState.mjs",
 	"shared/request.mjs",
 	"shared/utilities.mjs",
 	"views/base/shell.mjs",

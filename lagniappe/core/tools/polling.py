@@ -121,7 +121,7 @@ def operation_statuses(
     user_key = getattr(user, "urlsafe_key", None)
     owned = []
     for descriptor in descriptors:
-        key = database.get.datastore_key(descriptor.get("key"))
+        key = database.get.datastore_key(descriptor["key"])
         parent = getattr(key, "parent", None)
         owner_key = database.get.urlsafe_key(parent) if parent is not None else None
         if user_key and owner_key == user_key:
@@ -139,7 +139,7 @@ def operation_statuses(
         for descriptor in owned
         if cache.operation_state_current(
             states.get(descriptor["key"]),
-            descriptor.get("revision"),
+            descriptor["revision"],
             now=now,
         )
     }
@@ -218,7 +218,7 @@ def _result(descriptor, status, *, revision=None, payload=None):
 # @covered-by lagniappe/core/tools/polling.py::lock_result
 # @reason revision comparison is asserted through the public lock projection
 def _revision_result(descriptor, revision, payload=None):
-    changed = str(descriptor.get("revision") or "") != str(revision)
+    changed = descriptor["revision"] != revision
     return _result(
         descriptor,
         "changed" if changed else "unchanged",
