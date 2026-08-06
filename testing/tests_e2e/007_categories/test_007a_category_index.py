@@ -232,6 +232,9 @@ def test_create_page_autofill_is_deferred(get_user):
     assert payload["deferred"] is True
     assert "locked" not in payload
     assert "Autofilling page" in payload["notification"]
+    assert "Deferred Create Autofill" in payload["html"]
+    expect(Table(user).get_row("Deferred Create Autofill")).to_be_visible()
+    expect(create_form.locator("[data-role='deferred-progress']")).to_have_count(0)
 
 
 # @pair categories:info-form

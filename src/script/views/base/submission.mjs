@@ -221,7 +221,7 @@ export class SubmissionManager {
 			response.notification ? this.view.ensureNotifications?.() : null,
 		]);
 		operations?.track(response.operation, {
-			node: component.active?.target,
+			node: response.background ? null : component.active?.target,
 		});
 		if (response.notification) {
 			notifications?.upsertNotification?.(response.notification);

@@ -420,3 +420,47 @@ if (updateRoute !== "/tasks/task/update") {
 }
 """,
     )
+
+
+# @features submit deferred-jobs
+# @dimensions deferred-create background destination-row
+def test_deferred_background_create_does_not_decorate_source_form(run_node):
+    run_submission_manager_check(
+        run_node,
+        """
+const tracked = [];
+const created = [];
+const source = { dataset: {} };
+const component = {
+  active: { target: source },
+  async created(response) { created.push(response.html); },
+};
+const view = {
+  components: {},
+  async ensureDeferredOperations() {
+    return { track(key, options) { tracked.push([key, options.node]); } };
+  },
+  async ensureNotifications() {
+    return { upsertNotification() {} };
+  },
+};
+const manager = new SubmissionManager(view);
+await manager._deferredCreated(
+  {
+    background: true,
+    deferred: true,
+    html: "<table><tr></tr></table>",
+    notification: "<li></li>",
+    operation: "operation-1",
+  },
+  component,
+);
+
+if (tracked.length !== 1 || tracked[0][0] !== "operation-1" || tracked[0][1] !== null) {
+  throw new Error(`Background create decorated its source form: ${JSON.stringify(tracked)}`);
+}
+if (created.join("") !== "<table><tr></tr></table>") {
+  throw new Error("Background create did not reconcile the destination row");
+}
+""",
+    )

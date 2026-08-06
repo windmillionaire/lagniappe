@@ -504,18 +504,25 @@ def create(key, **kwargs):
         if page.form:
             _apply_page_submission(page, request)
         page.save()
+        deferred_response = deferred_autofill.start_deferred_autofill(
+            page,
+            current_user,
+            request.form,
+            multipart_file=bool(request.files.get("autofill-file")),
+            key=category.urlsafe_key,
+            source_widget="CreatePage",
+            destination="table:IndexTable",
+            lock_target=False,
+        )
+        if not isinstance(deferred_response, tuple):
+            return responses.entity_response(deferred_response, category)
+
+        response, status = deferred_response
+        payload = response.get_json()
+        payload["background"] = True
+        payload["html"] = responses.rows(page, category.index())[0]
         return responses.entity_response(
-            deferred_autofill.start_deferred_autofill(
-                page,
-                current_user,
-                request.form,
-                multipart_file=bool(request.files.get("autofill-file")),
-                key=category.urlsafe_key,
-                source_widget="CreatePage",
-                destination="table:IndexTable",
-                lock_target=False,
-            ),
-            category,
+            responses.json_response(payload, status=status), category
         )
 
     page.save()
