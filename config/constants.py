@@ -620,11 +620,11 @@ APP_HANDLERS = [
         "upload": "lagniappe/web/static/pdfjs/wasm/(.*\\.js)",
     },
     {
-        "url": "/(.*\\.js)$",
+        "url": "/(.*\\.m?js)$",
         "mime_type": "text/javascript",
         "secure": "always",
         "static_files": "lagniappe/web/static/\\1",
-        "upload": "lagniappe/web/static/(.*\\.js)",
+        "upload": "lagniappe/web/static/(.*\\.m?js)",
     },
     {
         "url": "/(.*\\.map)",

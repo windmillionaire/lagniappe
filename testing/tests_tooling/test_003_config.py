@@ -5,6 +5,7 @@ import importlib
 import importlib.util
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import types
@@ -482,7 +483,7 @@ def test_app_engine_chunk_handler_uses_immutable_cache_before_general_js():
     general_js_index = next(
         index
         for index, handler in enumerate(handlers)
-        if handler.get("url") == "/(.*\\.js)$"
+        if handler.get("url") == "/(.*\\.m?js)$"
     )
     chunk_handler = handlers[chunk_index]
 
@@ -519,11 +520,18 @@ def test_app_engine_pdfjs_wasm_handlers_precede_general_js():
     general_js_index = next(
         index
         for index, handler in enumerate(handlers)
-        if handler.get("url") == "/(.*\\.js)$"
+        if handler.get("url") == "/(.*\\.m?js)$"
     )
+    general_js_handler = handlers[general_js_index]
 
     assert wasm_handler["mime_type"] == "application/wasm"
     assert pdfjs_index < general_js_index
+    assert general_js_handler["mime_type"] == "text/javascript"
+    assert re.fullmatch(general_js_handler["url"], "/pdf.worker.min.mjs")
+    assert re.fullmatch(
+        general_js_handler["upload"],
+        "lagniappe/web/static/pdf.worker.min.mjs",
+    )
 
 
 def test_app_engine_dynamic_handler_allowlist_covers_registered_routes():
