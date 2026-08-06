@@ -52,9 +52,10 @@ export class FormElement {
 		return this.readonly && this.component?.showEmptyFields === true;
 	}
 	get formData() {
-		return this.target instanceof HTMLFormElement
+		const data = this.target instanceof HTMLFormElement
 			? new FormData(this.target)
 			: new FormData();
+		return this.form?._subForm?.applyDirectUploads?.(data) ?? data;
 	}
 
 	get revisionEntries() {
@@ -221,9 +222,9 @@ export class FormElement {
 	 * @features forms submission deferred-jobs
 	 * @dimensions deliberate-submit form-lock no-live-sync
 	 */
-	async prepareSubmit() {
+	async prepareSubmit(options) {
 		if (this.deferredLocked) return false;
-		return true;
+		return (await this.form?._subForm?.prepareSubmit?.(options)) ?? true;
 	}
 
 	markUnsavedState() {

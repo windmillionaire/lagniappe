@@ -96,7 +96,19 @@ const target = {
   dataset: {},
   cloneNode() { return { dataset: {} }; },
 };
-const context = { BaseForm: class {}, console };
+class FakeFormData {
+  constructor(target) { this.target = target; }
+}
+class FakeHTMLFormElement {
+  constructor() { this.dataset = {}; }
+  cloneNode() { return new FakeHTMLFormElement(); }
+}
+const context = {
+  BaseForm: class {},
+  console,
+  FormData: FakeFormData,
+  HTMLFormElement: FakeHTMLFormElement,
+};
 vm.createContext(context);
 let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
 source = source.replace(/^import .*$/gm, "");
@@ -114,6 +126,33 @@ vm.runInContext(source, context);
   }
   if (!(await widget.prepareSubmit())) {
     throw new Error("Ordinary form submit was unexpectedly blocked");
+  }
+  let delegatedOptions = null;
+  widget.form = {
+    _subForm: {
+      async prepareSubmit(options) {
+        delegatedOptions = options;
+        return true;
+      },
+    },
+  };
+  const options = { route: "/pages/page-key/update" };
+  if (!(await widget.prepareSubmit(options)) || delegatedOptions !== options) {
+    throw new Error("Autofill submit preparation was not delegated to its subform");
+  }
+  const formWidget = new context.FormElement({
+    target: new context.HTMLFormElement(),
+  });
+  formWidget.form = {
+    _subForm: {
+      applyDirectUploads(data) {
+        data.directUploadApplied = true;
+        return data;
+      },
+    },
+  };
+  if (!formWidget.formData.directUploadApplied) {
+    throw new Error("Autofill direct-upload metadata was not applied to form data");
   }
   widget.lockDeferredOperation({ operation: "operation-1", revision: 3 });
   if (await widget.prepareSubmit()) {
@@ -818,7 +857,7 @@ const makeMarker = (widget) => {
   widget.target = { querySelector() { return marker; } };
   return marker;
 };
-const makeWidget = (schema, localSubmission) => ({
+const makeWidget = (schema, localSubmission, localSnapshot = "local-current") => ({
   name: "PageInfo",
   schema,
   submission: Object.fromEntries(schema.map(({ id }) => [id, "baseline"])),
@@ -838,7 +877,7 @@ const makeWidget = (schema, localSubmission) => ({
     return {
       response: {
         ...response,
-        snapshot: "local-current",
+        snapshot: localSnapshot,
         submission,
       },
     };
@@ -970,6 +1009,35 @@ vm.runInContext(source, context);
   }
   if (events.filter((event) => event.type === "apply-schema").length !== 1) {
     throw new Error("Later saved values were applied before review");
+  }
+
+  const typeEquivalentWidget = makeWidget(
+    [{ id: "minutes" }],
+    { minutes: "50" },
+    "canonical-50",
+  );
+  const typeEquivalentMarker = makeMarker(typeEquivalentWidget);
+  watcher._reconciler._state(typeEquivalentMarker).token = {};
+  await watcher._reconciler._stageRevision(
+    typeEquivalentMarker,
+    typeEquivalentWidget,
+    {
+      schema: [{ id: "minutes" }],
+      submission: { minutes: 50 },
+      snapshot: "canonical-50",
+    },
+    {
+      fingerprint: "type-equivalent-fingerprint",
+      modified: "2026-07-22T11:10:00+00:00",
+    },
+  );
+  const typeEquivalentState = watcher._reconciler._state(typeEquivalentMarker);
+  if (
+    typeEquivalentState.submissionChoice ||
+    typeEquivalentState.mode === "review" ||
+    typeEquivalentMarker.dataset.visible !== "false"
+  ) {
+    throw new Error("Equivalent rendered numeric values requested review");
   }
 
   const activeWidget = makeWidget([{ id: "same" }], { same: "active-local" });

@@ -239,6 +239,17 @@ export class EditReconciler {
 		const rendererValuesDiffer =
 			rendererCapable && this._rendererValuesDiffer(response, local.response);
 
+		if (localSnapshot === remoteSnapshot || current === remoteSnapshot) {
+			if (record) await this.view.offlineQueue?.cancel(record.id);
+			await withTransition(async () => {
+				await widget.applyRevision(response);
+				this._hide(
+					widget.target?.querySelector("[lp-edited-marker]") ?? marker,
+				);
+			});
+			return;
+		}
+
 		if (rendererValuesDiffer && !schemaOnlyRevision) {
 			this._storeRevision(marker, response, {
 				fingerprint,
@@ -295,17 +306,6 @@ export class EditReconciler {
 				if (rebased) await this.view.offlineQueue?.replay();
 			}
 			this._hide(marker);
-			return;
-		}
-
-		if (localSnapshot === remoteSnapshot || current === remoteSnapshot) {
-			if (record) await this.view.offlineQueue?.cancel(record.id);
-			await withTransition(async () => {
-				await widget.applyRevision(response);
-				this._hide(
-					widget.target?.querySelector("[lp-edited-marker]") ?? marker,
-				);
-			});
 			return;
 		}
 

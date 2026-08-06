@@ -303,6 +303,11 @@ def update(key, **kwargs):
         if locked:
             return locked
 
+    if role == "autofill-submit" and request.files.get("autofill-file"):
+        return responses.error(
+            "The autofill attachment was not uploaded. Try attaching it again."
+        )
+
     old_attributes = [a.name for a in page.attributes if page.has(a.name)]
     old_image = page.image.path if page.image else None
 
@@ -477,6 +482,11 @@ def create(key, **kwargs):
     create_data = _page_data(request.form, category=category)
     page = Entities.PAGE.create(create_data)
     role = request.form.get("role")
+
+    if role == "autofill-submit" and request.files.get("autofill-file"):
+        return responses.error(
+            "The autofill attachment was not uploaded. Try attaching it again."
+        )
 
     if role in ["autofill-submit", "explain"]:
         require_ai_access(AI.CREATE)

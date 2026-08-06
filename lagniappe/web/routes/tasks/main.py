@@ -489,6 +489,11 @@ def update(key, **kwargs):
         if locked:
             return locked
 
+    if role == "autofill-submit" and request.files.get("autofill-file"):
+        return responses.error(
+            "The autofill attachment was not uploaded. Try attaching it again."
+        )
+
     if _should_submit_task_form(active, role, task):
         task.form_submission(request)
 

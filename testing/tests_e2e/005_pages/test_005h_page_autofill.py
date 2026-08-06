@@ -16,7 +16,7 @@ from lagniappe.core.tools.database.filter import Filter, Query
 from lagniappe.core.tools.deferred_jobs import DeferredJobs
 from testing.definitions import Pages, Users
 from testing.resources import Page
-from testing.utility import expect_poll_result
+from testing.utility import expect_poll_result, multipart_form_fields
 
 
 pytestmark = pytest.mark.e2e
@@ -78,6 +78,13 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     expect(form).to_have_attribute("lp-deferred", "")
     expect(form).to_have_attribute("data-destination", "info:PageInfo")
     form.locator("[data-role='show-autofill']").click()
+    form.locator("input[name='autofill-file']").set_input_files(
+        {
+            "name": "autofill-context.txt",
+            "mimeType": "text/plain",
+            "buffer": b"Assessment context uploaded for autofill.",
+        }
+    )
     form.locator("textarea[name='autofill-description']").fill(
         "Use the attached assessment evidence."
     )
@@ -86,6 +93,9 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     form.evaluate("node => node.dataset.autofillProbe = 'mounted'")
     with user.page.expect_response("**/pages/*/update") as response_info:
         submit.click()
+    submitted_fields = dict(multipart_form_fields(response_info.value.request))
+    assert "autofill-file" not in submitted_fields
+    assert "autofill-context.txt" in submitted_fields["direct_uploads"]
     notification = _notification_from_response(response_info.value)
     assert notification.pending is True
     progress = form.locator("[data-role='deferred-progress']")
