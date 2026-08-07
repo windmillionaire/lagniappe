@@ -137,6 +137,11 @@
         data-route="{{ url_for('pages.update', key=page.urlsafe_key) }}"
         data-deferred-route="{{ url_for('pages.info', key=page.urlsafe_key) }}"
         data-destination="info:PageInfo"
+        {% if page.deferred_job %}
+          data-operation="{{ page.deferred_job.key }}"
+          data-operation-revision="{{ page.deferred_job.revision|default(0, true) }}"
+          data-deferred-lock="form"
+        {% endif %}
         {% if page.description %}data-description="{{ page.description }}"{% endif %}
         {% if page.form %}data-schema='{{ page.form.schema|tojson }}'{% endif %}
         {% if page.form %}data-submission='{{ page.properties.submission.form_value|tojson }}'{% endif %}

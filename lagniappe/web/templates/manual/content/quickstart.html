@@ -45,6 +45,19 @@
     {% endcall %}
   {% endcall %}
 
+  {{ heading("When a Basic Deployment Sleeps", icon="offline", kind="page") }}
+  {% call card() %}
+    <p class="text-base-medium leading-relaxed">
+      On basic deployments, the server goes to sleep after it has been idle, so
+      it does not incur server charges while it is unused. While the server is
+      offline, you can view only pages that have already been opened in this
+      browser. The offline icon appears next to the search bar and inside the
+      submit buttons of forms that cannot be submitted offline. The server
+      usually wakes in less than a minute, and those buttons become available
+      again when it does.
+    </p>
+  {% endcall %}
+
   {{ heading("Saving: the Important Difference", icon="builder.saved", kind="page") }}
   <div class="grid gap-4 md:grid-cols-2">
     {{ guide_item(

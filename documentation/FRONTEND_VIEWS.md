@@ -214,7 +214,7 @@ the report's server-side action ledger.
 
 **`update(component, data)`** -- sends PUT, then calls `component.updated(response)` inside a view transition. Deferred acknowledgements instead show the pending notification and mark the active subform successful. Offline `lp-offline` updates are queued and keep the form in `Queued Sync` state until replay.
 
-**`create(component, data)`** -- sends POST, then calls `component.created(response)` inside a view transition. Offline `lp-offline` creates use the same mutation queue and optimistic destination rendering. Online `lp-deferred` creates stop after the deferred acknowledgement and wait for their operation subscription to refresh the destination.
+**`create(component, data)`** -- sends POST, then calls `component.created(response)` inside a view transition. Offline `lp-offline` creates use the same mutation queue and optimistic destination rendering. A deferred create may return created destination HTML with `background: true`; the destination renders immediately, the source create form resets normally, and operation tracking continues without decorating that source form. Deferred creates without destination HTML retain the pending-state behavior until their operation refreshes the destination.
 
 **`load(component)`** -- sends GET (or uses a prefetched response from `window._prefetch`). Used for lazy-loading widget content.
 

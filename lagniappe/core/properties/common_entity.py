@@ -591,6 +591,7 @@ class Attributes(DBProperty):
     _id = "attributes"
     _blank_values = (None,)
 
+
     @property
     def kind(self):
         return self.entity.entity_kind
@@ -647,6 +648,16 @@ class Attributes(DBProperty):
                 )
 
         self.entity.db[self.id] = [a.name for a in self._value if a.active]
+
+
+# @testable true
+# @tests tests_unit/test_008_page_properties.py::test_page_deferred_job_reference_round_trips
+# @pairs deferred-jobs:active-operation pages:create-autofill
+class DeferredJobReference(DBProperty):
+    """Reference metadata for an entity's currently active background job."""
+
+    _id = "deferred_job"
+    json = True
 
 
 # @testable true

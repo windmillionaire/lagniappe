@@ -998,14 +998,15 @@ generation observability setting and preserves the existing choice on reruns.
 
 Configures Redis Cloud as the caching layer. On a fresh installation it opens
 the Redis Cloud console and explains how to sign in or create an account, create
-or select a database, keep its public endpoint and default user enabled, and
-copy the public endpoint and default-user password from the current Essentials
-or Pro configuration screens. It then prompts for those values, provides
+or select a database, click **Connect** in the database's Access panel, expand
+**Redis CLI**, and copy the command for the Internet (public endpoint)
+connection method. Setup prompts for that one command and extracts the Default
+user password, public endpoint, and port without running it. It then provides
 instructions for setting the `volatile-ttl` eviction policy, and offers
 server-verified TLS. Redis Cloud exposes database TLS on paid Essentials/Flex
 and Pro plans, not Free Essentials plans. A failed fresh-install connection
-clears the entered endpoint, port, and password without retaining them, then
-defaults to prompting for all three again inside the same setup run.
+clears the extracted endpoint, port, and password without retaining them, then
+defaults to prompting for the copied command again inside the same setup run.
 
 The TLS flow instructs the operator to enable TLS in Redis Cloud, leave Mutual
 TLS unchecked, download and unzip the certificate archive, and place the

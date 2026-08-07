@@ -233,8 +233,21 @@ def test_create_page_autofill_is_deferred(get_user):
     assert "locked" not in payload
     assert "Autofilling page" in payload["notification"]
     assert "Deferred Create Autofill" in payload["html"]
-    expect(Table(user).get_row("Deferred Create Autofill")).to_be_visible()
+    row = Table(user).get_row("Deferred Create Autofill")
+    expect(row).to_be_visible()
     expect(create_form.locator("[data-role='deferred-progress']")).to_have_count(0)
+    expect(create_form.locator(FormElements.NAME)).to_have_value("")
+    expect(create_form.locator("[data-role='submit-group']")).to_be_visible()
+
+    row.locator(Table.ENTITY_URL).click()
+
+    page_form = user.page.locator("[data-widget='PageInfo']")
+    expect(page_form).to_have_attribute("data-operation", payload["operation"])
+    expect(page_form).to_have_attribute("data-deferred-lock", "form")
+    expect(page_form.locator("[data-role='deferred-progress']")).to_be_visible()
+    expect(page_form.locator("[data-role='deferred-phase']")).to_contain_text(
+        "Autofill"
+    )
 
 
 # @pair categories:info-form

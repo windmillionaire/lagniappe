@@ -296,6 +296,7 @@ export class PageInfo extends PageForm {
 /**
  * @testable true
  * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_from_category_index
+ * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
  * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_related_form_badge_selects_form
  * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filters_hide_create_page_tool
  * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
@@ -336,13 +337,11 @@ export class CreatePage extends PageForm {
 		const created = this._created;
 		await super.postreconcile();
 
-		const nameElement = this.target.querySelector("input[name='name']");
-
 		if (created) {
-			if (nameElement) nameElement.value = "";
-			if (this.visible) this.success();
+			await this.reset();
 			this.form?.resetSubmitButton();
 		}
+		const nameElement = this.target.querySelector("input[name='name']");
 		if (this.visible && nameElement) nameElement.focus();
 	}
 }

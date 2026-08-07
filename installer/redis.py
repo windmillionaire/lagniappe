@@ -1,5 +1,7 @@
 from pathlib import Path
 import re
+import shlex
+from urllib.parse import unquote, urlsplit
 import webbrowser
 
 from runner.context import setup_command
@@ -115,7 +117,7 @@ def eviction_policy_instructions():
 # @features setup
 # @dimensions redis browser operator-guidance
 def redis_cloud_instructions():
-    """Open Redis Cloud and explain where to find connection credentials."""
+    """Open Redis Cloud and explain how to copy its Redis CLI command."""
     f = FORMATTER.initialize()
 
     print(f"\n{f.info('Configure Redis Cloud')}")
@@ -140,20 +142,20 @@ def redis_cloud_instructions():
     )
     print(
         wrap_text(
-            "3. Keep the Public endpoint and Default user enabled. Lagniappe's "
-            "guided setup currently uses both."
+            "3. In the database Configuration tab, find Access and click "
+            "Connect."
         )
     )
     print(
         wrap_text(
-            "4. Copy the Public endpoint from Access (Essentials) or General "
-            "(Pro). It normally includes both the host and port."
+            "4. Expand Redis CLI and keep Internet (public endpoint) as the "
+            "connection method."
         )
     )
     print(
         wrap_text(
-            "5. Copy the Default user password from Security. For Essentials, "
-            "select Default user, then Configure, to reveal it."
+            "5. Click Copy beside the redis-cli command. Paste that complete "
+            "command into setup when prompted; you do not need to run it."
         )
     )
 
@@ -173,38 +175,89 @@ def _is_redis_cloud_host(value):
     )
 
 
-# @testable false
-# @covered-by installer/redis.py::setup_redis
-# @reason interactive input wrapper owned by the Redis setup flow
-@validate_input(
-    "Enter Redis Public Endpoint",
-    validation_fn=_is_redis_cloud_host,
-    error_msg="Invalid Redis host format. Expected a Redis Cloud endpoint (e.g. redis-12345.c123.us-east-1-2.ec2.redislabs.com).",
-)
-def _get_redis_host(value):
-    return value
+# @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_parser_extracts_connection_details
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_parser_rejects_invalid_commands
+# @features setup
+# @dimensions redis credential-parsing validation
+def _parse_redis_cli_command(value):
+    """Extract Redis Cloud connection settings from its copied CLI command."""
+    try:
+        command = shlex.split(value)
+    except ValueError as error:
+        raise ValueError("The Redis CLI command has invalid quoting.") from error
 
+    if not command:
+        raise ValueError("The Redis CLI command is empty.")
 
-# @testable false
-# @covered-by installer/redis.py::setup_redis
-# @reason interactive input wrapper owned by the Redis setup flow
-@validate_input(
-    "Enter Redis Port",
-    validation_fn=lambda x: x.isdigit(),
-    error_msg="Redis Port must be a number",
-)
-def _get_redis_port(value):
-    return int(value)
+    executable = command[0].replace("\\", "/").rsplit("/", 1)[-1].lower()
+    if executable not in {"redis-cli", "redis-cli.exe"}:
+        raise ValueError("The command must start with redis-cli.")
+
+    uris = []
+    for index, argument in enumerate(command[1:], start=1):
+        if argument in {"-u", "--uri"}:
+            if index + 1 >= len(command):
+                raise ValueError("The Redis CLI command is missing its URI.")
+            uris.append(command[index + 1])
+        elif argument.startswith("--uri="):
+            uris.append(argument.split("=", 1)[1])
+
+    if len(uris) != 1:
+        raise ValueError("The Redis CLI command must contain one connection URI.")
+
+    try:
+        parsed = urlsplit(uris[0])
+        port = parsed.port
+    except ValueError as error:
+        raise ValueError("The Redis CLI command has an invalid endpoint.") from error
+
+    username = unquote(parsed.username or "")
+    password = unquote(parsed.password or "")
+    host = parsed.hostname or ""
+    if parsed.scheme.lower() != "redis":
+        raise ValueError("The Redis CLI command must use a redis:// URI.")
+    if username != "default":
+        raise ValueError("The Redis CLI command must use the Default user.")
+    if not password or set(password) == {"*"}:
+        raise ValueError("The Redis CLI command must include the copied password.")
+    if not _is_redis_cloud_host(host):
+        raise ValueError("The Redis CLI command must use a Redis Cloud endpoint.")
+    if port is None:
+        raise ValueError("The Redis CLI command must include the endpoint port.")
+    if parsed.path not in {"", "/", "/0"} or parsed.query or parsed.fragment:
+        raise ValueError("The Redis CLI command must use the default Redis database.")
+
+    return {"host": host, "port": port, "password": password}
 
 
 # @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_password_uses_visible_standard_input
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_parser_rejects_invalid_commands
 # @features setup
-# @dimensions redis interactive-input cancellation
-@validate_input("Enter Redis Default User Password")
-def _get_redis_password(value):
-    """Return the visibly entered Redis default-user password."""
-    return value
+# @dimensions redis credential-parsing validation
+def _is_redis_cli_command(value):
+    try:
+        _parse_redis_cli_command(value)
+    except ValueError:
+        return False
+    return True
+
+
+# @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_uses_visible_standard_input
+# @features setup
+# @dimensions redis interactive-input cancellation credential-parsing
+@validate_input(
+    "Paste Redis CLI command",
+    validation_fn=_is_redis_cli_command,
+    error_msg=(
+        "Invalid command. Copy the Redis CLI command shown by Redis Cloud; "
+        "it starts with 'redis-cli -u redis://default:'."
+    ),
+)
+def _get_redis_connection_details(value):
+    """Parse the visibly pasted Redis Cloud CLI command."""
+    return _parse_redis_cli_command(value)
 
 
 # @testable false
@@ -442,22 +495,14 @@ def setup_redis():
     redis_provider_prepared = False
 
     while True:
-        if "REDIS_HOST" not in SETTINGS.APP:
-            host = _get_redis_host()
-            parts = host.rsplit(":", 1)
-            if len(parts) == 2:
-                SETTINGS.APP["REDIS_HOST"] = parts[0]
-                SETTINGS.APP["REDIS_PORT"] = int(parts[-1])
-            else:
-                SETTINGS.APP["REDIS_HOST"] = host
-
-        if "REDIS_PORT" not in SETTINGS.APP:
-            port = _get_redis_port()
-            SETTINGS.APP["REDIS_PORT"] = int(port)
-
-        if "REDIS_PASSWORD" not in SETTINGS.APP:
-            password = _get_redis_password()
-            SETTINGS.APP["REDIS_PASSWORD"] = password
+        if not all(
+            key in SETTINGS.APP
+            for key in ("REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD")
+        ):
+            connection = _get_redis_connection_details()
+            SETTINGS.APP["REDIS_HOST"] = connection["host"]
+            SETTINGS.APP["REDIS_PORT"] = connection["port"]
+            SETTINGS.APP["REDIS_PASSWORD"] = connection["password"]
 
         if not redis_provider_prepared:
             eviction_policy_instructions()

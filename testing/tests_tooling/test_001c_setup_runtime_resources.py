@@ -611,20 +611,68 @@ def test_ai_setup_mode_configures_observability(monkeypatch):
 
 
 # @features setup
-# @dimensions redis interactive-input cancellation
-def test_redis_password_uses_visible_standard_input(monkeypatch):
+# @dimensions redis credential-parsing validation
+def test_redis_cli_command_parser_extracts_connection_details():
+    from installer import redis as redis_setup
+
+    command = (
+        "redis-cli -u "
+        "'redis://default:p%40ss%3Aword@"
+        "redis-11826.c238.us-central1-2.gce.cloud.redislabs.com:11826'"
+    )
+
+    assert redis_setup._parse_redis_cli_command(command) == {
+        "host": "redis-11826.c238.us-central1-2.gce.cloud.redislabs.com",
+        "port": 11826,
+        "password": "p@ss:word",
+    }
+    assert redis_setup._is_redis_cli_command(command)
+
+
+# @features setup
+# @dimensions redis credential-parsing validation
+@pytest.mark.parametrize(
+    "command",
+    [
+        "redis://default:secret@redis-123.redislabs.com:12345",
+        "redis-cli -u redis://owner:secret@redis-123.redislabs.com:12345",
+        "redis-cli -u redis://default:secret@localhost:6379",
+        "redis-cli -u redis://default:secret@redis-123.redislabs.com",
+        "redis-cli -u rediss://default:secret@redis-123.redislabs.com:12345",
+        "redis-cli -u redis://default:******@redis-123.redislabs.com:12345",
+    ],
+)
+def test_redis_cli_command_parser_rejects_invalid_commands(command):
+    from installer import redis as redis_setup
+
+    with pytest.raises(ValueError):
+        redis_setup._parse_redis_cli_command(command)
+    assert not redis_setup._is_redis_cli_command(command)
+
+
+# @features setup
+# @dimensions redis interactive-input cancellation credential-parsing
+def test_redis_cli_command_uses_visible_standard_input(monkeypatch):
     import installer as setup_pkg
     from installer import redis as redis_setup
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     prompts = []
+    command = (
+        "redis-cli -u "
+        "redis://default:redis-secret@redis-123.redislabs.com:12345"
+    )
     monkeypatch.setattr(
         "builtins.input",
-        lambda prompt: prompts.append(prompt) or "redis-secret",
+        lambda prompt: prompts.append(prompt) or command,
     )
 
-    assert redis_setup._get_redis_password() == "redis-secret"
-    assert prompts == ["Enter Redis Default User Password (x to exit): "]
+    assert redis_setup._get_redis_connection_details() == {
+        "host": "redis-123.redislabs.com",
+        "port": 12345,
+        "password": "redis-secret",
+    }
+    assert prompts == ["Paste Redis CLI command (x to exit): "]
 
 
 # @features setup
@@ -650,9 +698,9 @@ def test_redis_cloud_instructions_open_console_and_locate_credentials(
     assert opened == [redis_setup.REDIS_CLOUD_CONSOLE_URL]
     output = capsys.readouterr().out
     assert "open Databases and create a database" in output
-    assert "Keep the Public endpoint and Default user enabled" in output
-    assert "Copy the Public endpoint from Access (Essentials) or General (Pro)" in output
-    assert "Copy the Default user password from Security" in output
+    assert "find Access and click Connect" in output
+    assert "Expand Redis CLI" in output
+    assert "Click Copy beside the redis-cli command" in output
 
 
 # @features setup
@@ -661,12 +709,15 @@ def test_setup_redis_clears_failed_credentials_and_retries(
     monkeypatch,
     capsys,
 ):
-    import config
     import installer as setup_pkg
     from installer import redis as redis_setup
 
     settings = _fake_settings()
-    monkeypatch.setattr(config, "SETTINGS", settings)
+    _install_config_package(
+        monkeypatch,
+        _load_config_constants(),
+        settings=settings,
+    )
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     monkeypatch.setattr(redis_setup, "FORMATTER", _fake_formatter())
     monkeypatch.setattr(redis_setup, "redis_cloud_instructions", lambda: None)
@@ -677,29 +728,35 @@ def test_setup_redis_clears_failed_credentials_and_retries(
         lambda: None,
     )
 
-    hosts = iter(
+    connections = iter(
         [
-            "redis-111.redislabs.com:1111",
-            "redis-222.redislabs.com:2222",
+            {
+                "host": "redis-111.redislabs.com",
+                "port": 1111,
+                "password": "wrong-password",
+            },
+            {
+                "host": "redis-222.redislabs.com",
+                "port": 2222,
+                "password": "correct-password",
+            },
         ]
     )
-    host_calls = []
+    connection_calls = []
 
-    def get_host():
-        if host_calls:
+    def get_connection():
+        if connection_calls:
             assert not any(
                 key in settings.APP
                 for key in ("REDIS_HOST", "REDIS_PORT", "REDIS_PASSWORD")
             )
-        host_calls.append(True)
-        return next(hosts)
+        connection_calls.append(True)
+        return next(connections)
 
-    passwords = iter(["wrong-password", "correct-password"])
-    monkeypatch.setattr(redis_setup, "_get_redis_host", get_host)
     monkeypatch.setattr(
         redis_setup,
-        "_get_redis_password",
-        lambda: next(passwords),
+        "_get_redis_connection_details",
+        get_connection,
     )
 
     attempts = []
@@ -3054,9 +3111,14 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     settings.APP.clear()
     settings._saves.clear()
     monkeypatch.setattr(
-        redis_setup, "_get_redis_host", lambda: "redis-123.redislabs.com:12345"
+        redis_setup,
+        "_get_redis_connection_details",
+        lambda: {
+            "host": "redis-123.redislabs.com",
+            "port": 12345,
+            "password": "secret",
+        },
     )
-    monkeypatch.setattr(redis_setup, "_get_redis_password", lambda: "secret")
     monkeypatch.setattr(redis_setup, "redis_cloud_instructions", lambda: None)
     monkeypatch.setattr(redis_setup, "eviction_policy_instructions", lambda: None)
     monkeypatch.setattr(

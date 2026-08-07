@@ -35,6 +35,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             "description",
             "assets",
             "schema_version",
+            "deferred_job",
         }
         return frozenset(exclude)
 
@@ -116,6 +117,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
                 "is_public": common_entity.IsPublic,
                 "public_id": common_entity.PublicID,
                 "submission": form_submission.FormSubmission,
+                "deferred_job": common_entity.DeferredJobReference,
                 "restricted_to": common_entity.RestrictedTo,
             }
         )

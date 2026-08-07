@@ -512,13 +512,14 @@ def create(key, **kwargs):
             key=category.urlsafe_key,
             source_widget="CreatePage",
             destination="table:IndexTable",
-            lock_target=False,
         )
         if not isinstance(deferred_response, tuple):
             return responses.entity_response(deferred_response, category)
 
         response, status = deferred_response
         payload = response.get_json()
+        payload.pop("locked", None)
+        payload.pop("scope", None)
         payload["background"] = True
         payload["html"] = responses.rows(page, category.index())[0]
         return responses.entity_response(

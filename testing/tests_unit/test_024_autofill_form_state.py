@@ -1,4 +1,4 @@
-"""Focused contracts for lockless create-page autofill."""
+"""Focused contracts for autofill form state and optional lock behavior."""
 
 from types import SimpleNamespace
 
@@ -17,8 +17,8 @@ from lagniappe.core.tools import (
 pytestmark = pytest.mark.unit
 
 
-# @pairs deferred-jobs:form-lock pages:create-autofill
-def test_create_page_autofill_explicitly_opts_out_of_target_lock():
+# @pairs deferred-jobs:form-lock ai:autofill
+def test_autofill_explicit_lock_opt_out_skips_target_lock():
     adapter = deferred_job_adapters.AutofillAdapter()
     spec = SimpleNamespace(
         inputs={"target": SimpleNamespace(urlsafe_key="new-page")},
@@ -29,8 +29,8 @@ def test_create_page_autofill_explicitly_opts_out_of_target_lock():
     assert adapter.start_lock(spec, job) is None
 
 
-# @pairs deferred-jobs:form-revision pages:create-autofill
-def test_lockless_create_page_autofill_keeps_revision_drift_guard(monkeypatch):
+# @pairs deferred-jobs:form-revision ai:autofill
+def test_lockless_autofill_keeps_revision_drift_guard(monkeypatch):
     target = SimpleNamespace(autofill_revision="revision-one")
     context = SimpleNamespace(
         parameters={"lock_target": False},

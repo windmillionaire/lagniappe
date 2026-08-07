@@ -1177,7 +1177,7 @@ def test_autofill_status_is_visible_to_target_editor(monkeypatch):
 
 # @pairs deferred-jobs:terminal-cleanup deferred-jobs:form-lock
 def test_autofill_terminal_cleanup_releases_target_lock(monkeypatch):
-    target = SimpleNamespace(urlsafe_key="page-key")
+    target = SimpleNamespace(urlsafe_key="page-key", deferred_job=None)
     context = SimpleNamespace(
         job=SimpleNamespace(
             parameters={},
@@ -1192,6 +1192,11 @@ def test_autofill_terminal_cleanup_releases_target_lock(monkeypatch):
         deferred_job_adapters.Entities,
         "PAGE",
         type(target),
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.Entities,
+        "fetch_one",
+        lambda key, **_kwargs: target if key == "page-key" else None,
     )
     monkeypatch.setattr(
         deferred_job_adapters,
@@ -1222,6 +1227,80 @@ def test_autofill_terminal_cleanup_releases_target_lock(monkeypatch):
     )
     adapter.cleanup(missing_context, terminal=True)
     assert released[-1] == ("lock:deleted-page-key", "missing-job-key")
+
+
+# @pairs deferred-jobs:active-operation pages:create-autofill
+# @pairs deferred-jobs:terminal-cleanup deferred-jobs:compare-and-delete
+def test_autofill_page_operation_reference_is_persisted_and_compare_cleared(
+    monkeypatch,
+):
+    class Page:
+        urlsafe_key = "page-key"
+
+        def __init__(self):
+            self.deferred_job = None
+
+    page = Page()
+    job = SimpleNamespace(
+        parameters={"lock_target": True},
+        inputs={"target": {"id": page.urlsafe_key}},
+        urlsafe_key="job-key",
+        idempotency_key="request-key",
+        status_revision=2,
+    )
+    context = SimpleNamespace(
+        job=job,
+        actor=SimpleNamespace(),
+        inputs={"target": page},
+        parameters=job.parameters,
+        input=lambda name: context.inputs.get(name),
+    )
+    saved = []
+    released = []
+    monkeypatch.setattr(deferred_job_adapters.Entities, "PAGE", Page)
+    monkeypatch.setattr(
+        deferred_job_adapters.Entities,
+        "fetch_one",
+        lambda *_args, **_kwargs: page,
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.Entities,
+        "save_root",
+        lambda entity, **options: saved.append((entity, options)),
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters,
+        "deferred_job_lock_key",
+        lambda current: f"lock:{getattr(current, 'urlsafe_key', current)}",
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.database,
+        "release_deferred_job_lock",
+        lambda *values: released.append(values),
+    )
+
+    adapter = deferred_job_adapters.AutofillAdapter()
+    adapter.started(context)
+
+    assert page.deferred_job == {
+        "key": "job-key",
+        "idempotency_key": "request-key",
+        "revision": 2,
+    }
+    assert saved == [(page, {"property_mask": ("deferred_job",)})]
+
+    page.deferred_job = {"key": "newer-job"}
+    adapter.cleanup(context, terminal=True)
+
+    assert page.deferred_job == {"key": "newer-job"}
+    assert len(saved) == 1
+    assert released == [("lock:page-key", "job-key")]
+
+    page.deferred_job = {"key": "job-key"}
+    adapter.cleanup(context, terminal=True)
+
+    assert page.deferred_job is None
+    assert saved[-1] == (page, {"property_mask": ("deferred_job",)})
 
 
 # @features deferred-jobs ai files

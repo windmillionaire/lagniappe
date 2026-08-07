@@ -538,6 +538,24 @@ class AutofillAdapter(DeferredJobAdapter):
     mutation_inputs = ()
 
     # @testable true
+    # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_page_operation_reference_is_persisted_and_compare_cleared
+    # @pairs deferred-jobs:active-operation pages:create-autofill
+    def started(self, context):
+        target = context.input("target")
+        if not isinstance(target, Entities.PAGE):
+            return
+        target = Entities.fetch_one(target.urlsafe_key, request=Fetch.direct())
+        if not isinstance(target, Entities.PAGE):
+            raise exceptions.ValidationError("Deferred autofill page is missing.")
+        context.inputs["target"] = target
+        target.deferred_job = {
+            "key": context.job.urlsafe_key,
+            "idempotency_key": context.job.idempotency_key,
+            "revision": int(getattr(context.job, "status_revision", 0) or 0),
+        }
+        Entities.save_root(target, property_mask=("deferred_job",))
+
+    # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_revision_tracks_only_form_apply_state
     # @pairs deferred-jobs:form-revision ai:autofill
     def authorization(self, spec):
@@ -552,8 +570,8 @@ class AutofillAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_start_acquires_one_target_lock
-    # @tests tests_unit/test_024_autofill_form_state.py::test_create_page_autofill_explicitly_opts_out_of_target_lock
-    # @pairs deferred-jobs:form-lock ai:autofill pages:create-autofill
+    # @tests tests_unit/test_024_autofill_form_state.py::test_autofill_explicit_lock_opt_out_skips_target_lock
+    # @pairs deferred-jobs:form-lock ai:autofill
     def start_lock(self, spec, job):
         if spec.parameters.get("lock_target", True) is False:
             return None
@@ -619,8 +637,8 @@ class AutofillAdapter(DeferredJobAdapter):
     # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_revision_tracks_only_form_apply_state
     # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_lock_cleanup_is_compare_and_delete
-    # @tests tests_unit/test_024_autofill_form_state.py::test_lockless_create_page_autofill_keeps_revision_drift_guard
-    # @pairs deferred-jobs:form-revision deferred-jobs:form-lock ai:autofill pages:create-autofill
+    # @tests tests_unit/test_024_autofill_form_state.py::test_lockless_autofill_keeps_revision_drift_guard
+    # @pairs deferred-jobs:form-revision deferred-jobs:form-lock ai:autofill
     def validate_apply(self, context):
         target = context.input("target")
         if context.parameters.get("lock_target", True):
@@ -699,7 +717,9 @@ class AutofillAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_terminal_cleanup_releases_target_lock
+    # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_page_operation_reference_is_persisted_and_compare_cleared
     # @pairs deferred-jobs:terminal-cleanup deferred-jobs:form-lock
+    # @pair deferred-jobs:compare-and-delete
     def cleanup(self, context, *, terminal):
         record = context.parameters.pop("upload_record", None)
         context.job.parameters = context.parameters
@@ -722,6 +742,14 @@ class AutofillAdapter(DeferredJobAdapter):
             ):
                 lock_key = deferred_job_lock_key(target_key)
                 database.release_deferred_job_lock(lock_key, operation)
+            if target_key and operation:
+                current = Entities.fetch_one(target_key, request=Fetch.direct())
+                if (
+                    isinstance(current, Entities.PAGE)
+                    and (current.deferred_job or {}).get("key") == operation
+                ):
+                    current.deferred_job = None
+                    Entities.save_root(current, property_mask=("deferred_job",))
         if terminal and record:
             storage_assets.delete_direct_upload(record)
 

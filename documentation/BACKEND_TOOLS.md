@@ -438,16 +438,20 @@ one-off prompt attachments use direct-upload records so they remain available
 across retries; terminal job cleanup deletes the temporary object after success
 or failure.
 
-Existing page/task targets also acquire a durable `form-autofill` lock in the
+Page/task targets also acquire a durable `form-autofill` lock in the
 same transaction as the job. While it is active, form submit/quick-edit/default
 routes reject conflicting mutations. The unified `/l/poll` contract returns an
 active `form-lock` independently of fingerprint drift, allowing the browser to
 disable the form and replace the complete submit/autofill-context action area
 with progress on reload or in another tab. Forms do not register with document
 sync. Target editors may read the bounded operation status even when a
-different editor started the job. CreatePage autofill explicitly skips the
-target lock because the new Page is not an already-mounted shared edit surface;
-it retains deferred idempotency, status, and form-revision drift protection.
+different editor started the job. CreatePage autofill stores the active job
+reference on the new Page before returning its table row, while leaving the
+CreatePage source form available for another create. Opening that Page renders
+the known operation key and locks the form without a target-to-job lookup; the
+normal operation poll uses the Redis revision projection and only falls back to
+the durable job when needed. Terminal cleanup compare-clears the Page reference
+so an older worker cannot erase a newer operation.
 
 ### Report Runner (`report_runner.py`)
 

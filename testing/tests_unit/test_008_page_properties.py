@@ -9,6 +9,7 @@ Out of scope here: ``Description``; deep ``FormSubmission`` / field hydration
 ``view_access`` and datastore persistence (database or e2e).
 """
 
+import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -69,6 +70,31 @@ def test_page_details(get_test_entities):
             assert details["parent"]["id"] == page.model.urlsafe_key
         else:
             assert "parent" not in details
+
+
+# @pairs deferred-jobs:active-operation pages:create-autofill
+@pytest.mark.unit
+def test_page_deferred_job_reference_round_trips():
+    page = TestEntities.get(
+        "PAGE",
+        {"name": "Deferred Page", "hash": "pg008deferred"},
+    )
+    reference = {
+        "key": "operation-key",
+        "idempotency_key": "operation-request",
+        "revision": 2,
+    }
+
+    page.deferred_job = reference
+
+    assert page.deferred_job == reference
+    assert json.loads(page.db["deferred_job"]) == reference
+    assert "deferred_job" in page.exclude_from_index
+
+    page.deferred_job = None
+
+    assert page.deferred_job is None
+    assert "deferred_job" not in page.db
 
 
 # @features page

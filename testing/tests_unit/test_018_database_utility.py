@@ -253,6 +253,10 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
             "document_history": True,
         },
     )
+    deferred_reference = SimpleNamespace(
+        key=("instances", "deferred-reference"),
+        db={"type": "page", "deferred_job": '{"key":"operation"}'},
+    )
     fingerprint = {"type": "site", "fingerprint": "next"}
     fingerprinted = []
 
@@ -268,6 +272,7 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
             (full, None),
             (masked, ("modified", "forms")),
             (document, ("assets", "document_history")),
+            (deferred_reference, ("deferred_job",)),
         )
     )
 
@@ -283,4 +288,6 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
         "assets",
         "document_history",
     ]
-    assert batch.mutations[3].upsert is fingerprint
+    assert batch.mutations[3].update is deferred_reference.db
+    assert batch.mutations[3].property_mask.paths == ["deferred_job"]
+    assert batch.mutations[4].upsert is fingerprint

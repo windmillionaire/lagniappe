@@ -125,6 +125,12 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     form = user.page.locator("[data-widget='PageInfo']")
     expect(form).to_have_attribute("initialized", "")
     expect(form).to_have_attribute("data-operation", re.compile(r".+"))
+    operation_key = form.get_attribute("data-operation")
+    persisted_page = Entities.fetch_one(
+        page.entity.urlsafe_key,
+        request=Fetch.direct(),
+    )
+    assert persisted_page.deferred_job["key"] == operation_key
     expect(form.locator("[data-role='deferred-progress']")).to_be_visible()
     expect(form.locator("[data-role='submit-group']")).not_to_be_attached()
     expect(form.locator("[data-role='autofill']")).not_to_be_attached()
@@ -176,6 +182,8 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
             result = _run_notification_job(notification)
 
     assert result.success is True
+    completed_page = Entities.fetch_one(page.entity.urlsafe_key, request=Fetch.direct())
+    assert completed_page.deferred_job is None
     assert FILE_SUMMARY in json.dumps(prompts[0].context_blocks)
     assert prompts[0].tools == ["get_file"]
     assert prompts[0].max_tool_iterations == 2

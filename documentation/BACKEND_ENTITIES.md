@@ -519,9 +519,17 @@ from changing the target's domain fingerprint or being lost by a stale full
 entity save. Terminal cleanup compare-and-deletes the lock by operation ID;
 read paths may lazily remove a lock whose referenced job is already terminal.
 The lock itself stores no sync ID and no generated or submitted form content.
-CreatePage autofill opts out of lock creation while retaining its captured
-form revision because the newly created Page is not mounted as an editable
-target.
+CreatePage autofill persists the active job reference on the newly created Page
+and acquires the same target lock before returning its table row. The source
+CreatePage form remains available because it is not the job target. Opening the
+new Page renders the stored operation key and subscribes directly to its
+Redis-backed status without a target-to-job lookup. Terminal cleanup
+compare-clears the reference so a stale worker cannot remove a newer job's
+ownership. The reference uses an index-excluded, property-masked write that
+does not advance site fingerprints, so this internal lifecycle state cannot
+produce a user-facing form or collection change by itself. The form revision
+captured when the job is queued still guards proposal application against
+target drift.
 
 Workers use a five-minute lease renewed every 60 seconds while blocking
 provider work is active. They check deadline, cancellation, and claim ownership
