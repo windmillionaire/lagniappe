@@ -998,15 +998,20 @@ generation observability setting and preserves the existing choice on reruns.
 
 Configures Redis Cloud as the caching layer. On a fresh installation it opens
 the Redis Cloud console and explains how to sign in or create an account, create
-or select a database, click **Connect** in the database's Access panel, expand
-**Redis CLI**, and copy the command for the Internet (public endpoint)
-connection method. Setup prompts for that one command and extracts the Default
-user password, public endpoint, and port without running it. It then provides
-instructions for setting the `volatile-ttl` eviction policy, and offers
-server-verified TLS. Redis Cloud exposes database TLS on paid Essentials/Flex
-and Pro plans, not Free Essentials plans. A failed fresh-install connection
-clears the extracted endpoint, port, and password without retaining them, then
-defaults to prompting for the copied command again inside the same setup run.
+or select a database, find **Access**, click the blue **Connect** button, expand
+**Redis CLI**, keep **Internet (public endpoint)** selected, and click the blue
+**Copy** button beneath the command. Setup asks the operator to return and paste
+that complete copied command. It extracts the password, host, and port without
+running the command. A bare Redis URI or input beginning with `redis-cli` is
+accepted; CLI input may carry the connection as a URI or as host/port/password
+flags. Hostnames and other unused URI components are not matched against
+provider conventions; the authenticated Redis connection test validates the
+extracted details instead. Setup then provides instructions for setting the
+`volatile-ttl` eviction policy and offers server-verified TLS. Redis Cloud
+exposes database TLS on paid Essentials/Flex and Pro plans, not Free Essentials
+plans. A failed fresh-install connection clears the extracted host, port, and
+password without retaining them, then defaults to prompting for the copied
+command again inside the same setup run.
 
 The TLS flow instructs the operator to enable TLS in Redis Cloud, leave Mutual
 TLS unchecked, download and unzip the certificate archive, and place the

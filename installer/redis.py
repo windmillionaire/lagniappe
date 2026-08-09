@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 import shlex
 from urllib.parse import unquote, urlsplit
 import webbrowser
@@ -142,36 +141,26 @@ def redis_cloud_instructions():
     )
     print(
         wrap_text(
-            "3. In the database Configuration tab, find Access and click "
-            "Connect."
+            "3. On the database details page, find Access and click the blue "
+            "Connect button."
         )
     )
     print(
         wrap_text(
-            "4. Expand Redis CLI and keep Internet (public endpoint) as the "
-            "connection method."
+            "4. In the connection panel, expand Redis CLI and keep Internet "
+            "(public endpoint) as the connection method."
         )
     )
     print(
         wrap_text(
-            "5. Click Copy beside the redis-cli command. Paste that complete "
-            "command into setup when prompted; you do not need to run it."
+            "5. Click the blue Copy button beneath the redis-cli command."
         )
     )
-
-
-# @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_validators_cover_expected_inputs
-# @features setup
-# @dimensions validation
-def _is_redis_cloud_host(value):
-    host = value.strip().lower()
-    if ":" in host:
-        host = host.rsplit(":", 1)[0]
-    return bool(
-        host.startswith("redis-cloud")
-        or re.match(r"^redis-[0-9]+\.", host)
-        or host.endswith(".redislabs.com")
+    print(
+        wrap_text(
+            "6. Return to setup and paste the complete copied command when "
+            "prompted; you do not need to run it."
+        )
     )
 
 
@@ -181,52 +170,75 @@ def _is_redis_cloud_host(value):
 # @features setup
 # @dimensions redis credential-parsing validation
 def _parse_redis_cli_command(value):
-    """Extract Redis Cloud connection settings from its copied CLI command."""
+    """Extract host, port, and password from pasted Redis connection input."""
     try:
-        command = shlex.split(value)
+        arguments = shlex.split(value)
     except ValueError as error:
-        raise ValueError("The Redis CLI command has invalid quoting.") from error
+        raise ValueError("The pasted Redis value has invalid quoting.") from error
 
-    if not command:
-        raise ValueError("The Redis CLI command is empty.")
+    if not arguments:
+        raise ValueError("The pasted Redis value is empty.")
 
-    executable = command[0].replace("\\", "/").rsplit("/", 1)[-1].lower()
-    if executable not in {"redis-cli", "redis-cli.exe"}:
-        raise ValueError("The command must start with redis-cli.")
+    uri = None
+    for argument in arguments:
+        lowered = argument.lower()
+        starts = [
+            index
+            for index in (lowered.find("redis:"), lowered.find("rediss:"))
+            if index >= 0
+        ]
+        if starts:
+            uri = argument[min(starts) :]
+            break
 
-    uris = []
-    for index, argument in enumerate(command[1:], start=1):
-        if argument in {"-u", "--uri"}:
-            if index + 1 >= len(command):
-                raise ValueError("The Redis CLI command is missing its URI.")
-            uris.append(command[index + 1])
-        elif argument.startswith("--uri="):
-            uris.append(argument.split("=", 1)[1])
+    if uri is not None:
+        try:
+            parsed = urlsplit(uri)
+            port = parsed.port
+        except ValueError as error:
+            raise ValueError("The Redis URI has an invalid endpoint.") from error
 
-    if len(uris) != 1:
-        raise ValueError("The Redis CLI command must contain one connection URI.")
+        password = unquote(parsed.password or "")
+        host = parsed.hostname or ""
+        if parsed.scheme.lower() not in {"redis", "rediss"}:
+            raise ValueError("The pasted value must contain a Redis URI.")
+    else:
+        executable = arguments[0].replace("\\", "/").rsplit("/", 1)[-1].lower()
+        if executable not in {"redis-cli", "redis-cli.exe"}:
+            raise ValueError("Input should begin with redis: or redis-cli.")
 
-    try:
-        parsed = urlsplit(uris[0])
-        port = parsed.port
-    except ValueError as error:
-        raise ValueError("The Redis CLI command has an invalid endpoint.") from error
+        options = {}
+        option_names = {
+            "-h": "host",
+            "--host": "host",
+            "-p": "port",
+            "--port": "port",
+            "-a": "password",
+            "--pass": "password",
+        }
+        for index, argument in enumerate(arguments[1:], start=1):
+            option, separator, inline_value = argument.partition("=")
+            name = option_names.get(option)
+            if name is None:
+                continue
+            if separator:
+                options[name] = inline_value
+            elif index + 1 < len(arguments):
+                options[name] = arguments[index + 1]
 
-    username = unquote(parsed.username or "")
-    password = unquote(parsed.password or "")
-    host = parsed.hostname or ""
-    if parsed.scheme.lower() != "redis":
-        raise ValueError("The Redis CLI command must use a redis:// URI.")
-    if username != "default":
-        raise ValueError("The Redis CLI command must use the Default user.")
+        host = options.get("host", "")
+        password = options.get("password", "")
+        try:
+            port = int(options["port"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise ValueError("The Redis command must include a valid port.") from error
+
     if not password or set(password) == {"*"}:
-        raise ValueError("The Redis CLI command must include the copied password.")
-    if not _is_redis_cloud_host(host):
-        raise ValueError("The Redis CLI command must use a Redis Cloud endpoint.")
+        raise ValueError("The Redis input must include the copied password.")
+    if not host:
+        raise ValueError("The Redis input must include the endpoint host.")
     if port is None:
-        raise ValueError("The Redis CLI command must include the endpoint port.")
-    if parsed.path not in {"", "/", "/0"} or parsed.query or parsed.fragment:
-        raise ValueError("The Redis CLI command must use the default Redis database.")
+        raise ValueError("The Redis input must include the endpoint port.")
 
     return {"host": host, "port": port, "password": password}
 
@@ -248,11 +260,12 @@ def _is_redis_cli_command(value):
 # @features setup
 # @dimensions redis interactive-input cancellation credential-parsing
 @validate_input(
-    "Paste Redis CLI command",
+    "Paste copied Redis CLI command",
     validation_fn=_is_redis_cli_command,
     error_msg=(
-        "Invalid command. Copy the Redis CLI command shown by Redis Cloud; "
-        "it starts with 'redis-cli -u redis://default:'."
+        "Invalid command. In Redis Cloud, find Access, click Connect, expand "
+        "Redis CLI, click Copy, then paste the complete command here. It should "
+        "begin with 'redis-cli' or 'redis:'."
     ),
 )
 def _get_redis_connection_details(value):

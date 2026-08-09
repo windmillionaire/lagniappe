@@ -353,6 +353,16 @@ def _install_config_package(monkeypatch, constants, settings=None):
     return config_module
 
 
+@pytest.fixture(autouse=True)
+def isolated_config_package(monkeypatch):
+    """Keep this setup test module independent from real local settings."""
+    return _install_config_package(
+        monkeypatch,
+        _load_config_constants(),
+        settings=_fake_settings(),
+    )
+
+
 # @features setup
 # @dimensions development prerequisites
 def test_development_setup_requires_existing_installation(monkeypatch, capsys):
@@ -612,20 +622,52 @@ def test_ai_setup_mode_configures_observability(monkeypatch):
 
 # @features setup
 # @dimensions redis credential-parsing validation
-def test_redis_cli_command_parser_extracts_connection_details():
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        (
+            "redis-cli -u "
+            "'redis://default:p%40ss%3Aword@"
+            "redis-11826.c238.us-central1-2.gce.redns.redis-cloud.com:11826'",
+            {
+                "host": (
+                    "redis-11826.c238.us-central1-2.gce.redns.redis-cloud.com"
+                ),
+                "port": 11826,
+                "password": "p@ss:word",
+            },
+        ),
+        (
+            "Copied connection: redis-cli --uri "
+            "rediss://named-user:secret@cache.example.test:6380/7",
+            {
+                "host": "cache.example.test",
+                "port": 6380,
+                "password": "secret",
+            },
+        ),
+        (
+            "redis-cli -h cache.example.test -p 6381 -a secret",
+            {
+                "host": "cache.example.test",
+                "port": 6381,
+                "password": "secret",
+            },
+        ),
+        (
+            "redis://default:secret@cache.example.test:6379",
+            {
+                "host": "cache.example.test",
+                "port": 6379,
+                "password": "secret",
+            },
+        ),
+    ],
+)
+def test_redis_cli_command_parser_extracts_connection_details(command, expected):
     from installer import redis as redis_setup
 
-    command = (
-        "redis-cli -u "
-        "'redis://default:p%40ss%3Aword@"
-        "redis-11826.c238.us-central1-2.gce.cloud.redislabs.com:11826'"
-    )
-
-    assert redis_setup._parse_redis_cli_command(command) == {
-        "host": "redis-11826.c238.us-central1-2.gce.cloud.redislabs.com",
-        "port": 11826,
-        "password": "p@ss:word",
-    }
+    assert redis_setup._parse_redis_cli_command(command) == expected
     assert redis_setup._is_redis_cli_command(command)
 
 
@@ -634,11 +676,10 @@ def test_redis_cli_command_parser_extracts_connection_details():
 @pytest.mark.parametrize(
     "command",
     [
-        "redis://default:secret@redis-123.redislabs.com:12345",
-        "redis-cli -u redis://owner:secret@redis-123.redislabs.com:12345",
-        "redis-cli -u redis://default:secret@localhost:6379",
+        "redis-cli PING",
         "redis-cli -u redis://default:secret@redis-123.redislabs.com",
-        "redis-cli -u rediss://default:secret@redis-123.redislabs.com:12345",
+        "redis-cli -u https://default:secret@redis.example.com:12345",
+        "redis-cli -u redis://default:secret@:12345",
         "redis-cli -u redis://default:******@redis-123.redislabs.com:12345",
     ],
 )
@@ -652,7 +693,7 @@ def test_redis_cli_command_parser_rejects_invalid_commands(command):
 
 # @features setup
 # @dimensions redis interactive-input cancellation credential-parsing
-def test_redis_cli_command_uses_visible_standard_input(monkeypatch):
+def test_redis_cli_command_uses_visible_standard_input(monkeypatch, capsys):
     import installer as setup_pkg
     from installer import redis as redis_setup
 
@@ -662,9 +703,10 @@ def test_redis_cli_command_uses_visible_standard_input(monkeypatch):
         "redis-cli -u "
         "redis://default:redis-secret@redis-123.redislabs.com:12345"
     )
+    answers = iter(["not a Redis connection", command])
     monkeypatch.setattr(
         "builtins.input",
-        lambda prompt: prompts.append(prompt) or command,
+        lambda prompt: prompts.append(prompt) or next(answers),
     )
 
     assert redis_setup._get_redis_connection_details() == {
@@ -672,7 +714,10 @@ def test_redis_cli_command_uses_visible_standard_input(monkeypatch):
         "port": 12345,
         "password": "redis-secret",
     }
-    assert prompts == ["Paste Redis CLI command (x to exit): "]
+    assert prompts == ["Paste copied Redis CLI command (x to exit): "] * 2
+    output = capsys.readouterr().out
+    assert "find Access, click Connect, expand Redis CLI, click Copy" in output
+    assert "begin with 'redis-cli' or 'redis:'" in output
 
 
 # @features setup
@@ -698,9 +743,10 @@ def test_redis_cloud_instructions_open_console_and_locate_credentials(
     assert opened == [redis_setup.REDIS_CLOUD_CONSOLE_URL]
     output = capsys.readouterr().out
     assert "open Databases and create a database" in output
-    assert "find Access and click Connect" in output
-    assert "Expand Redis CLI" in output
-    assert "Click Copy beside the redis-cli command" in output
+    assert "find Access and click the blue Connect button" in output
+    assert "connection panel, expand Redis CLI" in output
+    assert "blue Copy button beneath the redis-cli command" in output
+    assert "Return to setup and paste the complete copied command" in output
 
 
 # @features setup
@@ -2147,6 +2193,7 @@ def test_upgrade_restore_deployment_settings_applies_saved_app_config(monkeypatc
 # @features setup
 # @dimensions deployment-settings app-yaml
 def test_upgrade_restore_deployment_settings_continues_when_unavailable(monkeypatch):
+    import config
     from installer import upgrade
 
     def unavailable():
@@ -2161,11 +2208,7 @@ def test_upgrade_restore_deployment_settings_continues_when_unavailable(monkeypa
         yaspin=spinner_factory(),
     )
 
-    monkeypatch.setitem(
-        sys.modules,
-        "config",
-        types.SimpleNamespace(SETTINGS=settings),
-    )
+    monkeypatch.setattr(config, "SETTINGS", settings)
 
     upgrade._update_deployment_settings(formatter)
 
@@ -2253,6 +2296,7 @@ def test_upgrade_restore_ai_settings_applies_saved_app_config(monkeypatch):
 # @features setup
 # @dimensions ai-settings app-yaml
 def test_upgrade_restore_ai_settings_continues_when_unavailable(monkeypatch):
+    import config
     from installer import upgrade
 
     def unavailable():
@@ -2267,11 +2311,7 @@ def test_upgrade_restore_ai_settings_continues_when_unavailable(monkeypatch):
         yaspin=spinner_factory(),
     )
 
-    monkeypatch.setitem(
-        sys.modules,
-        "config",
-        types.SimpleNamespace(SETTINGS=settings),
-    )
+    monkeypatch.setattr(config, "SETTINGS", settings)
 
     upgrade._update_ai_settings(formatter)
 

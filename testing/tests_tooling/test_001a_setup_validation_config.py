@@ -126,7 +126,6 @@ def _stub_existing_install_preflight(
 # @dimensions validation
 def test_setup_validators_cover_expected_inputs():
     from installer import admin
-    from installer import redis as redis_setup
     from installer.domain.validation import (
         validate_cloudflare_api_token,
         validate_domain,
@@ -138,10 +137,6 @@ def test_setup_validators_cover_expected_inputs():
     assert not validate_cloudflare_api_token("short")
     assert admin.validate_oauth_client_id("1234-test.apps.googleusercontent.com")
     assert not admin.validate_oauth_client_id("not-google")
-    assert redis_setup._is_redis_cloud_host(
-        "redis-12345.c123.us-east-1-2.ec2.redislabs.com:12345"
-    )
-    assert not redis_setup._is_redis_cloud_host("localhost")
 
 
 # @features setup
