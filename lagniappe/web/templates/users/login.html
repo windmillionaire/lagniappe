@@ -5,9 +5,9 @@
        class="{{ styles.login.message }}">{{ text }}</div>
 {% endmacro %}
 
-{% macro error(text) %}
+{% macro error(text="", visible=false) %}
   <div data-role="error"
-       class="{{ styles.login.error }}">{{ text }}</div>
+       class="{{ styles.login.error|replace(' hidden', '') if visible else styles.login.error }}">{{ text }}</div>
 {% endmacro %}
 
 {% macro success(text) %}
@@ -84,67 +84,79 @@
 {% endmacro %}
 
 {% block content %}
-  <!-- Email Check Form (shown when public registration disabled and no cookie) -->
+  <!-- Initial owner setup (shown until the configured owner first signs in) -->
+  <div id="ownerSetup"
+       class="{{ styles.form.login }} hidden">
+    {{ message("Finish setting up Lagniappe") }}
+    <div data-role="owner-google-setup">
+      {{ message("Sign in with Google using the account configured as the application owner.") }}
+      {{ error(auth_error or "", visible=auth_error) }}
+      {{ google_signin("google-signin-owner", next_url) }}
+      {{ alternate_button("show-owner-password", "Set up with a separate password instead") }}
+    </div>
+    <div data-role="owner-password-setup"
+         class="hidden">
+      {{ message("Create a separate Lagniappe password") }}
+      {{ message("Do not enter your Google password. We'll send a verification email to the owner address configured during installation.", role="password-guidance") }}
+      {{ error() }}
+      {{ success() }}
+      <div class="space-y-4">
+        {{ input("password", "password", "Choose a password") }}
+        {{ button("Create Password", role="signin") }}
+        {{ alternate_button("back-to-owner-google", "Back to Google sign-in") }}
+      </div>
+    </div>
+  </div>
+  <!-- Authentication method chooser for ordinary users -->
+  <div id="authMethod"
+       class="{{ styles.form.login }} hidden">
+    {{ message("Sign in to your account") }}
+    {{ error(auth_error or "", visible=auth_error) }}
+    {{ google_signin("google-signin-method", next_url) }}
+    {{ divider("Or") }}
+    {{ button("Sign in with email", role="show-email-check") }}
+  </div>
+  <!-- Email Check Form -->
   <div id="emailCheck"
        class="{{ styles.form.login }} hidden">
-    {{ message("Please enter your email address to continue") }}
+    {{ message("Sign in with email") }}
     {{ error() }}
     <div class="space-y-4">
       {{ input("email", "email", "Email") }}
       {{ button("Continue", role="signin") }}
+      {{ alternate_button("back-to-method", "Back") }}
     </div>
   </div>
   <!-- First Time Setup Form (for users who exist but never logged in) -->
   <div id="firstTimeSetup"
        class="{{ styles.form.login }} hidden">
-    {{ message("", role="welcome") }}
-    {{ message("Choose how you'd like to sign in to your account") }}
-    <!-- Google Sign-In for first time -->
-    {{ google_signin("google-signin-setup", next_url) }}
-    {{ divider("Or set a password") }}
+    {{ message("Create your password") }}
+    {{ message("", role="selected-email") }}
+    {{ message("We'll send a verification link to this email before your first sign-in.", role="password-guidance") }}
     {{ error() }}
     {{ success() }}
-    <!-- Password setup -->
     <div class="space-y-4">
+      <input type="hidden" name="email">
       {{ input("password", "password", "Choose a password") }}
-      {{ button("Set Password & Sign In", role="signin") }}
+      {{ button("Create Password", role="signin") }}
       {{ alternate_button("back-to-email", "Back") }}
     </div>
   </div>
-  <!-- Normal Sign In Form -->
+  <!-- Password-only sign in after the email step -->
   <div id="signIn"
        class="{{ styles.form.login }} hidden">
-    {{ message("Sign in to your account") }}
-    <!-- Google Sign-In Button -->
-    {{ google_signin("google-signin-custom", next_url) }}
-    {{ divider("Or continue with email") }}
+    {{ message("Enter your password") }}
+    {{ message("", role="selected-email") }}
     {{ error() }}
     {{ success() }}
-    <!-- Email/Password Form -->
     <div class="space-y-4">
-      {{ input("email", "email", "Email") }}
+      <input type="hidden" name="email">
       {{ input("password", "password", "Password") }}
       {{ remember_me() }}
       {{ button("Sign In", role="signin") }}
-      <!-- Create Account Button (hidden in sign-in mode) -->
-      {% if allow_registration %}{{ button("Create Account", role="create", visible=false) }}{% endif %}
-      <!-- Mode Toggle Links -->
       <div class="text-center" data-role="signin-mode-links">
-        <div>
-          {{ alternate_button("show-forgot-form", "Forgot your password?") }}
-          {% if allow_registration %}
-            <div class="mt-2 text-center">
-              <span class="text-sm text-slate-600">Don't have an account?</span>
-              {{ alternate_button("switch-to-create", "Create one", inline=true) }}
-            </div>
-          {% endif %}
-        </div>
-        {% if allow_registration %}
-          <div class="hidden">
-            <span class="text-sm text-slate-600">Already have an account?</span>
-            {{ alternate_button("switch-to-signin", "Sign in", inline=true) }}
-          </div>
-        {% endif %}
+        {{ alternate_button("show-forgot-form", "Forgot your password?") }}
+        <div class="mt-2">{{ alternate_button("back-to-email", "Use a different email") }}</div>
       </div>
     </div>
   </div>

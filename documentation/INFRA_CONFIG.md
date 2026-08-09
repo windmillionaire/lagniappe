@@ -436,9 +436,10 @@ change those to unanchored patterns like `testing/`; gitignore-style matching wo
 exclude nested runtime packages such as `lagniappe/web/routes/testing/`.
 All `config/files/` content is excluded and then only
 `lagniappe_settings.yaml` and the optional `redis_ca.pem` are re-included.
-Temporary, backup, development, generation/journal, and recovery-input files
-remain local. Deploy prints a warning because the canonical settings contain
-runtime secrets and the CA is runtime trust material.
+Downloaded `google_oauth_credentials.json`, temporary, backup, development,
+generation/journal, and recovery-input files remain local. Deploy prints a
+warning because the canonical settings contain runtime secrets and the CA is
+runtime trust material.
 
 `config/constants.py` is the template source for App Engine static handlers
 that setup/update writes back into `app.yaml`. It also carries the

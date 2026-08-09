@@ -132,11 +132,16 @@ def install_summary_lines(
                 f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
             ),
             f"Deployment completed: {'yes' if deployed else 'no'}",
-            f"Read-only check: {setup_command('doctor')}",
-            f"Repair command: {setup_command('repair')}",
+            f"Optional health check: {setup_command('doctor')}",
+            f"Repair if needed: {setup_command('repair')}",
         ]
     )
-    if not deployed:
+    if deployed:
+        lines.append(
+            "Lagniappe has been installed successfully. "
+            f"Log in at {_value(app_url)}"
+        )
+    else:
         lines.append(
             f"After manual deployment: {setup_command('jobs')}"
         )

@@ -63,6 +63,23 @@ def _remember_preference(default=True):
 
 
 # @testable true
+# @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
+# @features login
+# @dimensions owner-bootstrap
+def _owner_requires_first_login():
+    """Return whether the configured owner still needs an initial login."""
+    owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().lower()
+    if not owner_email:
+        return False
+
+    exists = database.get.user(owner_email)
+    if not exists:
+        return True
+
+    return Entities.USER(exists).last_login is None
+
+
+# @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_returns_to_requested_url_after_redirect
 # @features login
 # @dimensions redirect-target
@@ -206,24 +223,28 @@ def _enforce_auth_rate_limit(scope, limit, window_seconds, json_mode=True):
     )
 
 
-# @testable false
-# @manual true
-# @reason configured-origin URL selection is validated with live authentication email
-def _auth_action_url(mode, oob_code):
+# @testable true
+# @tests tests_e2e/001_site/test_001b_login.py::test_auth_action_url_preserves_safe_login_destination
+# @features login
+# @dimensions authentication-email redirect-target
+def _auth_action_url(mode, oob_code, next_target=None):
     """Build a Lagniappe action URL on the configured login origin."""
     login_uri = str(getattr(CONFIG, "GOOGLE_LOGIN_URI", "") or "").strip()
     configured_url = login_uri or str(CONFIG.APP_URL or "").strip()
     origin = urlsplit(configured_url)
     if origin.scheme != "https" or not origin.netloc:
         raise RuntimeError("Authentication email requires a configured HTTPS URL.")
-    query = urlencode({"mode": mode, "oobCode": oob_code})
+    query_values = {"mode": mode, "oobCode": oob_code}
+    if next_target:
+        query_values["next"] = next_target
+    query = urlencode(query_values)
     return urlunsplit((origin.scheme, origin.netloc, "/users/login", query, ""))
 
 
 # @testable false
 # @manual true
 # @reason orchestration requires live Identity Platform code generation and Gmail
-def _send_auth_action_email(email, action, *, user_ip=None):
+def _send_auth_action_email(email, action, *, user_ip=None, next_target=None):
     """Generate an Identity Platform action code and email its Lagniappe URL."""
     request_type = {
         "resetPassword": "PASSWORD_RESET",
@@ -234,7 +255,7 @@ def _send_auth_action_email(email, action, *, user_ip=None):
         email,
         user_ip=user_ip,
     )
-    action_url = _auth_action_url(action, oob_code)
+    action_url = _auth_action_url(action, oob_code, next_target)
     subject, text_body, html_body = auth_email.auth_action_message(
         action,
         CONFIG.APP_NAME,
@@ -248,9 +269,11 @@ def _send_auth_action_email(email, action, *, user_ip=None):
 # @reason account provisioning decisions are validated through live auth smoke testing
 def verify_user(email, name, picture):
     """Verify and create/update user based on authentication."""
+    email = str(email or "").strip().lower()
     exists = database.get.user(email)
 
-    if not exists and email == CONFIG.ADMIN_EMAIL:
+    owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().lower()
+    if not exists and email == owner_email:
         user = Entities.USER.create(
             {
                 "email": email,
@@ -283,8 +306,10 @@ def verify_user(email, name, picture):
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_page_loads
 # @tests tests_e2e/001_site/test_001b_login.py::test_user_login_success
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
+# @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
+# @tests tests_e2e/001_site/test_001b_login.py::test_unregistered_google_error_returns_to_method_chooser
 # @features login
-# @dimensions page-load form-state test-user session cookie-hardening
+# @dimensions page-load form-state test-user session cookie-hardening owner-bootstrap authorization-error
 @users.route("/login", methods=["GET"])
 def login():
     test_user = request.values.get("test_user", "").strip()
@@ -329,6 +354,14 @@ def login():
         return redirect(_login_redirect_url(), code=302)
 
     next_url = _store_safe_next_from_query()
+    allow_registration = Entities.PUBLIC_GROUP.enabled()
+    owner_setup = _owner_requires_first_login()
+    auth_error = {
+        "google-not-registered": (
+            "That Google account does not have access to this site. "
+            "Contact the site owner if you think this is a mistake."
+        ),
+    }.get(request.args.get("authError"))
     return render_template(
         "users/login.html",
         mode=request.args.get("mode"),
@@ -337,7 +370,10 @@ def login():
         g_client_id=CONFIG.GOOGLE_CLIENT_ID,
         g_login_uri=CONFIG.GOOGLE_LOGIN_URI,
         next_url=next_url,
-        allow_registration=Entities.PUBLIC_GROUP.enabled(),
+        allow_registration=allow_registration,
+        owner_setup=owner_setup,
+        owner_email=CONFIG.ADMIN_EMAIL if owner_setup else "",
+        auth_error=auth_error,
     )
 
 
@@ -391,6 +427,21 @@ def login_google():
         abort(400, "No credential provided")
 
     try:
+        google_claims = identity_platform.verify_google_credential(
+            token,
+            CONFIG.GOOGLE_CLIENT_ID,
+        )
+        google_email = str(google_claims.get("email") or "").strip().lower()
+        owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().lower()
+        registered = bool(database.get.user(google_email))
+        if not registered and google_email != owner_email:
+            if not Entities.PUBLIC_GROUP.enabled():
+                query = {"authError": "google-not-registered"}
+                safe_state = _safe_redirect_target(request.values.get("state"))
+                if safe_state:
+                    query["next"] = safe_state
+                return redirect(url_for("users.login", **query))
+
         google_login = urlsplit(CONFIG.GOOGLE_LOGIN_URI)
         identity_request_uri = urlunsplit(
             (google_login.scheme, google_login.netloc, "", "", "")
@@ -405,15 +456,17 @@ def login_google():
             CONFIG.IDENTITY_PLATFORM_CONFIG["projectId"],
         )
 
-        email = str(idinfo.get("email") or exchange.get("email") or "").strip()
+        email = str(idinfo.get("email") or exchange.get("email") or "").strip().lower()
         if not email or idinfo.get("email_verified") is not True:
             abort(401, "Google email is not verified")
+        if email != google_email:
+            abort(401, "Google identity email does not match")
         name = idinfo.get("name") or exchange.get("displayName")
         picture = idinfo.get("picture") or exchange.get("photoUrl")
 
         user = verify_user(email, name, picture)
         if not user:
-            abort(401, "User not registered")
+            abort(401, "Authentication failed")
 
         _login_and_seed(user, remember=_remember_preference(default=True))
         record_login(user, "identity-google")
@@ -487,7 +540,15 @@ def login_identity():
 
         user = verify_user(email, name, decoded_token.get("picture"))
         if not user:
-            return jsonify({"success": False, "error": "User not registered"}), 401
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "Incorrect email or password.",
+                    }
+                ),
+                401,
+            )
 
         _login_and_seed(user, remember=remember)
         return jsonify(
@@ -527,6 +588,7 @@ def send_password_reset_email():
             email,
             "resetPassword",
             user_ip=client_ip(request),
+            next_target=_safe_redirect_target(session.get("next")),
         )
     except Exception as error:
         # The response remains identical for unknown accounts and delivery
@@ -578,7 +640,11 @@ def send_verification_email():
         return jsonify({"success": False, "error": "No email in token"}), 401
 
     try:
-        _send_auth_action_email(email, "verifyEmail")
+        _send_auth_action_email(
+            email,
+            "verifyEmail",
+            next_target=_safe_redirect_target(session.get("next")),
+        )
     except (
         auth_email.AuthEmailError,
         identity_platform.IdentityPlatformError,
@@ -619,6 +685,8 @@ def check_user_status():
             user = Entities.USER(exists)
             if user.last_login is None:
                 next_step = "first_time_setup"
+        elif Entities.PUBLIC_GROUP.enabled():
+            next_step = "first_time_setup"
 
         return jsonify(
             {

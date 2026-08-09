@@ -55,6 +55,11 @@ def main():
         "configure_auth_email",
         _entry_point("email", behavior, status),
     )
+    _install_module(
+        "admin",
+        "configure_oauth",
+        _entry_point("oauth", behavior, status),
+    )
     _install_module("ai", "configure_ai", _entry_point("ai", behavior, status))
     _install_module(
         "security",

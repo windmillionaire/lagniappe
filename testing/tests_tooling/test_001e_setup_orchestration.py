@@ -33,6 +33,7 @@ CLI_MODES = (
     pytest.param([], "install", id="install"),
     pytest.param(["url"], "url", id="url"),
     pytest.param(["email"], "email", id="email"),
+    pytest.param(["oauth"], "oauth", id="oauth"),
     pytest.param(["ai"], "ai", id="ai"),
     pytest.param(["security"], "security", id="security"),
     pytest.param(["jobs"], "jobs", id="jobs"),

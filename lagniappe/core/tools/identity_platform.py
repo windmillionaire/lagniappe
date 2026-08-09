@@ -74,6 +74,29 @@ def verify_identity_token(token, project_id, request_adapter=None):
 
 
 # @testable true
+# @tests tests_unit/test_025_identity_platform.py::test_verify_google_credential_enforces_client_and_verified_email
+# @features login
+# @dimensions google-oauth token-verification audience email-verification
+def verify_google_credential(credential, client_id, request_adapter=None):
+    """Verify a Google Identity Services credential before account exchange."""
+    client_id = str(client_id or "").strip()
+    if not credential or not client_id:
+        raise ValueError("Google credential and client ID are required.")
+    claims = id_token.verify_oauth2_token(
+        credential,
+        request_adapter or google_requests.Request(),
+        audience=client_id,
+    )
+    if not str(claims.get("sub") or "").strip():
+        raise ValueError("Google credential subject is missing.")
+    if not str(claims.get("email") or "").strip():
+        raise ValueError("Google credential email is missing.")
+    if claims.get("email_verified") is not True:
+        raise ValueError("Google credential email is not verified.")
+    return claims
+
+
+# @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_exchange_google_credential_uses_identity_platform_idp_endpoint
 # @features login
 # @dimensions identity-platform google-oauth token-exchange

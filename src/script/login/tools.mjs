@@ -9,7 +9,9 @@ import { request } from "../shared/request";
  * @dimensions endpoint account-enumeration first-time-setup
  */
 async function getUserStatus(email) {
-	const response = await fetch(`/users/check-user-status?email=${email}`);
+	const response = await fetch(
+		`/users/check-user-status?email=${encodeURIComponent(email)}`,
+	);
 	return await response.json();
 }
 

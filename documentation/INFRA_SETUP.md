@@ -63,6 +63,9 @@ It supports subcommands for running specific steps:
   to rerun
 - `url`: App Engine custom-domain setup with provider-neutral manual DNS or
   optional DNS-only Cloudflare automation
+- `email`: replace custom-domain authentication-email delivery
+- `oauth`: replace and verify the Google Sign-In Web client, update Identity
+  Platform, and optionally redeploy
 - `ai`: configure AI
 - `security`: enable, refresh, or disable verified Redis Cloud TLS, then
   optionally redeploy
@@ -273,10 +276,11 @@ If it reports drift, first verify that its saved project and identities are the
 ones you intend to change, then run the printed `./setup.sh repair` command. A
 successful install prints an allowlisted final summary of the application,
 installer/deployer/owner/runtime identities, resource names, regions,
-Lagniappe/Python/runtime versions, deployment state, and exact doctor/repair
-commands. It never serializes the settings mapping and therefore cannot print
-private keys, passwords, tokens, Flask secrets, legacy messaging API keys, or a Sentry
-DSN.
+Lagniappe/Python/runtime versions, deployment state, and optional doctor/repair
+commands. A setup-managed deployment ends with an explicit successful-install
+message and the URL where the operator can log in. It never serializes the
+settings mapping and therefore cannot print private keys, passwords, tokens,
+Flask secrets, legacy messaging API keys, or a Sentry DSN.
 
 ## Keyless Runtime Authentication
 
@@ -522,8 +526,14 @@ The full installation runs these steps in order:
    registration and Web OAuth client creation. If the platform is not
    registered yet, the operator uses **Get started**, chooses the external
    audience, and finishes the short app-information flow before creating the
-   client. Setup registers the resulting client with Identity Platform but
-   does not persist its client secret.
+   client. Before registering the Google provider or continuing installation,
+   the operator downloads the client JSON to the exact absolute
+   `config/files/google_oauth_credentials.json` path printed by setup. Setup
+   verifies its Web-client type, project, JavaScript origin, and redirect URI
+   locally, then sends a no-follow authorization probe to confirm Google has
+   applied the client. Setup remains at this step while the operator retries
+   propagation or replaces the JSON. A verified client is registered with
+   Identity Platform, but its client secret is not persisted in settings.
 8. **Redis** -- configures Redis Cloud connection details, offers verified TLS,
    and tests access using the same connection options as the app.
 9. **Optional monitoring** -- asks whether privacy-reduced errors may go to the
@@ -646,9 +656,9 @@ not by themselves invalidate the generation marker.
 Only `config/files/lagniappe_settings.yaml` and an optional
 `config/files/redis_ca.pem` are re-included from `config/files/` in the App
 Engine upload. The settings file contains runtime secrets and the CA file is
-runtime trust material; keep both secure. Development settings, generation and
-operation journals, recovery inputs, temporary files, and backups remain
-local.
+runtime trust material; keep both secure. Downloaded
+`google_oauth_credentials.json`, development settings, generation and operation
+journals, recovery inputs, temporary files, and backups remain local.
 
 The setup CLI holds `config/files/.lagniappe_setup.lock` and updates an
 owner-only, secret-free operation journal. An interrupt reports the last
@@ -971,13 +981,59 @@ project's Google Auth Platform Clients page. When Google shows **Google Auth
 Platform not configured yet**, the operator clicks **Get started**, completes
 the app information, external audience, and contact information, then creates a
 Web application client with the displayed App Engine JavaScript origin and
-redirect URI. Google prohibits programmatic creation or modification of these
-general OAuth clients, so setup asks for the resulting client ID and secret,
-registers them as Identity Platform's Google provider, and persists only the
-public client ID. On later setup runs, a matching enabled Google provider is
-reused without asking for its secret. If the saved client no longer matches
-the provider, setup asks for that client's secret and reconciles the provider;
-the secret is sent to Google and is never saved locally.
+redirect URI. A Desktop app client is not interchangeable with this Web
+client. Google prohibits programmatic creation or modification of these
+general OAuth clients, so the operator clicks **Download JSON** under Client
+secrets and moves the download to the exact absolute path printed by setup,
+renaming it `config/files/google_oauth_credentials.json`. The downloaded JSON
+contains the client type, project, client ID and secret, JavaScript origins,
+and redirect URIs. Setup reads it locally and requires the `web` type, selected
+project, displayed origin, and displayed callback to match exactly. Desktop
+JSON and mismatched values are rejected before the Google provider or later
+installation steps can change.
+
+After local validation, setup probes Google's authorization endpoint without
+following redirects to confirm that Google has applied the client. At that
+point an OAuth error can be treated as propagation or an inactive client rather
+than an unknown local entry error. The operator may retry Google, replace the
+JSON at the same path and reload it, or stop. A successful probe allows setup
+to register the client as Identity Platform's Google provider and persist only
+the public client ID. Identity Platform stores the client secret; Lagniappe's
+runtime does not need it. Setup tells the operator that the downloaded JSON may
+be deleted or moved to secure storage and that future replacement or rotation
+uses the focused `oauth` command. On later full-setup runs, a matching enabled
+Google provider is reused without requiring the JSON again.
+
+To replace a wrong, deleted, or superseded client on an existing installation,
+run:
+
+```bash
+./setup.sh oauth
+```
+
+The focused mode activates and validates the saved project, prints the exact
+Web-client origin, callback, and absolute credential-file path again, validates
+the replacement JSON before changing the Identity Platform Google provider,
+saves its public client ID, and offers to deploy the updated application
+settings. The old general OAuth client remains a manual Google Auth Platform
+resource; delete it in the console if it is no longer needed.
+
+Until the configured owner completes their first login, `/users/login` opens a
+dedicated Google-first owner setup screen instead of the ordinary email and
+password sign-in form. A secondary password option creates a separate
+Identity Platform credential for the configured owner email and requires the
+normal verification email before login completes.
+
+After owner initialization, anonymous users first choose Google sign-in or
+email sign-in. The Google callback verifies the Google credential and confirms
+that a private-site user is provisioned before allowing Identity Platform to
+create an account. Email sign-in collects the email and password on separate
+screens: provisioned users without a prior login create a password and receive
+a verification email, while returning and unknown addresses see the same
+password-only screen and the same generic authentication error. Public sites
+continue to route unknown email addresses through account creation. Safe
+post-login destinations are retained through Google, verification-email, and
+password-reset handoffs.
 
 Setup also maintains optional agent-access settings in
 `config/files/lagniappe_settings.yaml`: `AGENT_ACCESS_ENABLED`,

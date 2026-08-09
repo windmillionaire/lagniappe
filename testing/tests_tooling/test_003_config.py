@@ -161,6 +161,7 @@ def test_gcloudignore_uploads_only_canonical_runtime_config():
     for local_only in (
         "lagniappe_dev.yaml",
         "lagniappe_generation.json",
+        "google_oauth_credentials.json",
         "recovery",
         ".tmp",
         ".backup",

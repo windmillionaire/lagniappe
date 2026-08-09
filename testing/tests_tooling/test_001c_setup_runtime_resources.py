@@ -3107,7 +3107,13 @@ def test_setup_deferred_job_reconciler_contract(monkeypatch):
 # @dimensions admin oauth optional redis identity-platform ai-model ai-observability settings-save redis-tls privacy-consent
 def test_setup_settings_mutation_flows(monkeypatch, capsys):
     constants = _load_config_constants()
-    settings = _fake_settings()
+    settings = _fake_settings(
+        app={
+            "GOOGLE_LOGIN_URI": (
+                "https://project-1.appspot.com/users/google-signin"
+            ),
+        }
+    )
     _install_config_package(monkeypatch, constants, settings=settings)
 
     from installer import admin
@@ -3122,10 +3128,12 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     monkeypatch.setattr(admin, "print_oauth_instructions", lambda: None)
     monkeypatch.setattr(
         admin,
-        "_get_oauth_client_id",
-        lambda: "1234-demo.apps.googleusercontent.com",
+        "_get_verified_oauth_credentials",
+        lambda _settings: (
+            "1234-demo.apps.googleusercontent.com",
+            "oauth-secret",
+        ),
     )
-    monkeypatch.setattr(admin, "_get_oauth_client_secret", lambda: "oauth-secret")
     provider_calls = []
     monkeypatch.setattr(
         identity,
@@ -3139,6 +3147,9 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     admin.setup_admin_and_oauth()
 
     assert settings.APP == {
+        "GOOGLE_LOGIN_URI": (
+            "https://project-1.appspot.com/users/google-signin"
+        ),
         "ADMIN_NAME": "Owner",
         "ADMIN_EMAIL": "owner@example.com",
         "GOOGLE_CLIENT_ID": "1234-demo.apps.googleusercontent.com",
@@ -3147,6 +3158,11 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     assert provider_calls == [
         ("1234-demo.apps.googleusercontent.com", "oauth-secret")
     ]
+    admin_output = capsys.readouterr().out
+    assert "Lagniappe runtime does" in admin_output
+    assert "not need" in admin_output
+    assert "delete the local JSON or move it to secure storage" in admin_output
+    assert "./setup.sh oauth" in admin_output
 
     settings.APP.clear()
     settings._saves.clear()
@@ -3300,15 +3316,398 @@ def test_oauth_instructions_open_current_project_clients_page(
     ]
     output = capsys.readouterr().out
     assert "Identity Platform is ready" in output
-    assert "will not save the secret locally" in output
+    assert "secret will not be saved" in output
+    assert "in Lagniappe settings" in output
     assert "click 'Get started'" in output
     assert "Audience: choose 'External'" in output
-    assert "On the Clients page, click 'Create client'" in output
+    assert "For a new or replacement client, click 'Create client'" in output
+    assert "For secret rotation" in output
     assert "Authorized JavaScript origin: https://app.example.com" in output
     assert (
         "Authorized redirect URI: "
         "https://app.example.com/users/google-signin"
     ) in output
+    assert "client type must" in output
+    assert "say 'Web application'; a 'Desktop app' client will not" in output
+    assert "work" in output
+    assert "click 'Download JSON'" in output
+    assert "google_oauth_credentials.json" in output
+    assert str(admin.OAUTH_CLIENT_FILE) in output
+
+
+# @features setup
+# @dimensions oauth credential-file secrets retention rotation
+def test_oauth_credential_retention_message(tmp_path, capsys):
+    from installer import admin
+
+    credential_path = tmp_path / "google_oauth_credentials.json"
+    admin._print_oauth_file_retention_message(credential_path)
+
+    output = capsys.readouterr().out
+    assert str(credential_path) in output
+    assert "Lagniappe runtime does" in output
+    assert "not need" in output
+    assert "delete the local JSON or move it to secure storage" in output
+    assert "excluded from Git and App Engine uploads" in output
+    assert "./setup.sh oauth" in output
+
+
+# @features setup
+# @dimensions oauth client-type redirect-uri validation provider-apis
+def test_oauth_web_client_probe_accepts_exact_callback():
+    from installer import admin
+
+    calls = []
+
+    def request_get(url, **kwargs):
+        calls.append((url, kwargs))
+        return types.SimpleNamespace(
+            status_code=302,
+            text="",
+            headers={"Location": "https://accounts.google.com/v3/signin"},
+        )
+
+    redirect_uri = "https://project-1.appspot.com/users/google-signin"
+    assert admin.verify_oauth_web_client(
+        "1234-demo.apps.googleusercontent.com",
+        redirect_uri,
+        request_get=request_get,
+    )
+
+    assert calls[0][0] == admin.GOOGLE_OAUTH_AUTHORIZE_URL
+    assert calls[0][1]["params"]["redirect_uri"] == redirect_uri
+    assert calls[0][1]["params"]["response_type"] == "code"
+    assert calls[0][1]["allow_redirects"] is False
+    assert calls[0][1]["timeout"] == admin.OAUTH_CLIENT_PROBE_TIMEOUT
+
+
+# @features setup
+# @dimensions oauth client-type redirect-uri validation failure-isolation
+def test_oauth_web_client_probe_rejects_redirect_mismatch():
+    from installer import admin
+
+    def request_get(_url, **_kwargs):
+        return types.SimpleNamespace(
+            status_code=302,
+            text="",
+            headers={
+                "Location": (
+                    "https://accounts.google.com/signin/oauth/error"
+                    "?authError=encoded-provider-detail"
+                )
+            },
+        )
+
+    redirect_uri = "https://project-1.appspot.com/users/google-signin"
+    with pytest.raises(
+        ProviderInvalidInput,
+        match="may not be a Web application client",
+    ) as failure:
+        admin.verify_oauth_web_client(
+            "1234-desktop.apps.googleusercontent.com",
+            redirect_uri,
+            request_get=request_get,
+        )
+
+    assert redirect_uri in str(failure.value)
+    assert "./setup.sh oauth" in failure.value.repair_action
+    assert "google_oauth_credentials.json" in failure.value.repair_action
+
+
+# @features setup
+# @dimensions oauth credential-file client-type project-isolation javascript-origin redirect-uri secrets validation
+def test_oauth_credentials_file_requires_web_project_and_exact_urls(tmp_path):
+    from installer import admin
+
+    credential_path = tmp_path / "google_oauth_credentials.json"
+    expected = {
+        "project_id": "project-1",
+        "javascript_origin": "https://project-1.appspot.com",
+        "redirect_uri": "https://project-1.appspot.com/users/google-signin",
+    }
+    web = {
+        "client_id": "1234-web.apps.googleusercontent.com",
+        "client_secret": "oauth-secret",
+        "project_id": expected["project_id"],
+        "javascript_origins": [expected["javascript_origin"]],
+        "redirect_uris": [expected["redirect_uri"]],
+    }
+    credential_path.write_text(json.dumps({"web": web}), encoding="utf-8")
+
+    assert admin.load_oauth_client_credentials(
+        credential_path,
+        **expected,
+    ) == ("1234-web.apps.googleusercontent.com", "oauth-secret")
+
+    invalid_payloads = (
+        (
+            {"installed": web},
+            "not for a Web application client.*Desktop app",
+        ),
+        (
+            {"web": {**web, "project_id": "other-project"}},
+            "belongs to project 'other-project'",
+        ),
+        (
+            {"web": {**web, "javascript_origins": ["https://wrong.example"]}},
+            "required Authorized JavaScript origin",
+        ),
+        (
+            {"web": {**web, "redirect_uris": ["https://wrong.example/login"]}},
+            "required Authorized redirect URI",
+        ),
+    )
+    for payload, message in invalid_payloads:
+        credential_path.write_text(json.dumps(payload), encoding="utf-8")
+        with pytest.raises(ProviderInvalidInput, match=message):
+            admin.load_oauth_client_credentials(
+                credential_path,
+                **expected,
+            )
+
+
+# @features setup
+# @dimensions oauth credential-file propagation interactive-retry secrets
+def test_oauth_credentials_file_retry_reloads_or_waits_for_propagation(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
+    import installer as setup_package
+    from installer import admin
+
+    monkeypatch.setattr(setup_package, "FORMATTER", _fake_formatter())
+    credential_path = tmp_path / "google_oauth_credentials.json"
+    settings = _fake_settings(
+        app={
+            "APP_URL": "https://project-1.appspot.com",
+            "GOOGLE_LOGIN_URI": (
+                "https://project-1.appspot.com/users/google-signin"
+            ),
+        },
+        gcloud={"PROJECT": "project-1"},
+    )
+    first_credentials = (
+        "1234-first.apps.googleusercontent.com",
+        "first-secret",
+    )
+    second_credentials = (
+        "1234-second.apps.googleusercontent.com",
+        "second-secret",
+    )
+    load_results = iter(
+        (
+            ProviderInvalidInput("JSON file is not present."),
+            first_credentials,
+            second_credentials,
+        )
+    )
+    load_calls = []
+
+    def load(path, **requirements):
+        load_calls.append((path, requirements))
+        result = next(load_results)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(admin, "load_oauth_client_credentials", load)
+    verification_calls = []
+
+    def verify(client_id, redirect_uri):
+        verification_calls.append((client_id, redirect_uri))
+        if len(verification_calls) == 1:
+            raise ProviderInvalidInput("Google rejected the callback.")
+        return True
+
+    monkeypatch.setattr(admin, "verify_oauth_web_client", verify)
+    choices = iter(("", "r"))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(choices))
+
+    assert admin._get_verified_oauth_credentials(
+        settings,
+        credential_path,
+    ) == second_credentials
+    assert len(load_calls) == 3
+    assert all(call[0] == credential_path for call in load_calls)
+    assert load_calls[-1][1] == {
+        "project_id": "project-1",
+        "javascript_origin": "https://project-1.appspot.com",
+        "redirect_uri": "https://project-1.appspot.com/users/google-signin",
+    }
+    assert verification_calls == [
+        (
+            "1234-first.apps.googleusercontent.com",
+            "https://project-1.appspot.com/users/google-signin",
+        ),
+        (
+            "1234-second.apps.googleusercontent.com",
+            "https://project-1.appspot.com/users/google-signin",
+        ),
+    ]
+    output = capsys.readouterr().out
+    assert str(credential_path) in output
+    assert "already matches" in output
+    assert "Google may still be applying" in output
+
+
+# @features setup
+# @dimensions oauth client-type redirect-uri failure-isolation identity-platform
+def test_admin_oauth_rejection_precedes_provider_update(monkeypatch):
+    constants = _load_config_constants()
+    settings = _fake_settings(
+        app={
+            "ADMIN_NAME": "Owner",
+            "ADMIN_EMAIL": "owner@example.com",
+            "GOOGLE_LOGIN_URI": (
+                "https://project-1.appspot.com/users/google-signin"
+            ),
+        }
+    )
+    _install_config_package(monkeypatch, constants, settings=settings)
+
+    from installer import admin, identity
+
+    monkeypatch.setattr(admin, "print_oauth_instructions", lambda: None)
+    monkeypatch.setattr(
+        admin,
+        "_get_verified_oauth_credentials",
+        lambda _settings: (_ for _ in ()).throw(
+            ProviderInvalidInput("Desktop client rejected.")
+        ),
+    )
+    provider_calls = []
+    monkeypatch.setattr(
+        identity,
+        "setup_google_provider",
+        lambda *args: provider_calls.append(args),
+    )
+
+    with pytest.raises(ProviderInvalidInput, match="Desktop client rejected"):
+        admin.setup_admin_and_oauth()
+
+    assert provider_calls == []
+    assert "GOOGLE_CLIENT_ID" not in settings.APP
+    assert settings._saves == []
+
+
+# @features setup
+# @dimensions oauth client-type interactive-retry identity-platform settings-save
+def test_existing_admin_oauth_can_replace_rejected_saved_client(monkeypatch):
+    constants = _load_config_constants()
+    settings = _fake_settings(
+        app={
+            "ADMIN_NAME": "Owner",
+            "ADMIN_EMAIL": "owner@example.com",
+            "GOOGLE_LOGIN_URI": (
+                "https://project-1.appspot.com/users/google-signin"
+            ),
+            "GOOGLE_CLIENT_ID": "1234-old.apps.googleusercontent.com",
+        }
+    )
+    _install_config_package(monkeypatch, constants, settings=settings)
+
+    from installer import admin, identity
+
+    monkeypatch.setattr(admin, "verify_oauth_web_client", lambda *_args: True)
+    monkeypatch.setattr(admin, "print_oauth_instructions", lambda: None)
+    monkeypatch.setattr(
+        admin,
+        "_get_verified_oauth_credentials",
+        lambda _settings: (
+            "1234-new.apps.googleusercontent.com",
+            "new-secret",
+        ),
+    )
+    monkeypatch.setattr(admin, "_print_oauth_file_retention_message", lambda: None)
+    provider_calls = []
+
+    def setup_provider(client_id, secret=None):
+        provider_calls.append((client_id, secret))
+        if secret is None:
+            raise ProviderInvalidInput("The replacement secret is required.")
+        return True
+
+    monkeypatch.setattr(identity, "setup_google_provider", setup_provider)
+
+    admin.setup_admin_and_oauth()
+
+    assert provider_calls == [
+        ("1234-old.apps.googleusercontent.com", None),
+        ("1234-new.apps.googleusercontent.com", "new-secret"),
+    ]
+    assert settings.APP["GOOGLE_CLIENT_ID"] == (
+        "1234-new.apps.googleusercontent.com"
+    )
+    assert settings._saves == [True]
+
+
+# @features setup
+# @dimensions oauth cli client-type redirect-uri identity-platform settings-save deploy
+def test_oauth_cli_replaces_settings_and_deploys(monkeypatch):
+    import config
+    import installer as setup_package
+    from installer import admin, identity, utils, verify
+
+    settings = _fake_settings(
+        app={
+            "APP_NAME": "Demo Lagniappe",
+            "APP_URL": "https://project-1.appspot.com",
+            "GOOGLE_LOGIN_URI": (
+                "https://project-1.appspot.com/users/google-signin"
+            ),
+            "GOOGLE_CLIENT_ID": "1234-old.apps.googleusercontent.com",
+        },
+        gcloud={"PROJECT": "project-1"},
+    )
+    monkeypatch.setattr(config, "SETTINGS", settings)
+    monkeypatch.setattr(setup_package, "FORMATTER", _fake_formatter())
+
+    events = []
+    monkeypatch.setattr(
+        verify,
+        "prepare_existing_installation",
+        lambda: events.append("verify-installation"),
+    )
+    monkeypatch.setattr(admin, "print_oauth_instructions", lambda: None)
+    monkeypatch.setattr(
+        admin,
+        "_get_verified_oauth_credentials",
+        lambda _settings: (
+            "1234-web.apps.googleusercontent.com",
+            "new-secret",
+        ),
+    )
+    monkeypatch.setattr(admin, "_print_oauth_file_retention_message", lambda: None)
+    monkeypatch.setattr(
+        identity,
+        "setup_google_provider",
+        lambda client_id, secret: events.append(
+            ("provider", client_id, secret)
+        )
+        or True,
+    )
+    monkeypatch.setattr(
+        utils,
+        "deploy_to_app_engine",
+        lambda: events.append("deploy"),
+    )
+    monkeypatch.setattr("builtins.input", lambda _prompt: "")
+
+    assert admin.configure_oauth() == 0
+    assert settings.APP["GOOGLE_CLIENT_ID"] == (
+        "1234-web.apps.googleusercontent.com"
+    )
+    assert settings._saves == [True]
+    assert events == [
+        "verify-installation",
+        (
+            "provider",
+            "1234-web.apps.googleusercontent.com",
+            "new-secret",
+        ),
+        "deploy",
+    ]
 
 
 # @features setup iam

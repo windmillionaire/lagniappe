@@ -95,6 +95,43 @@ def test_verify_identity_token_enforces_project_issuer_and_subject(monkeypatch):
 
 
 # @features login
+# @dimensions google-oauth token-verification audience email-verification
+def test_verify_google_credential_enforces_client_and_verified_email(monkeypatch):
+    claims = {
+        "sub": "google-user-1",
+        "email": "user@example.test",
+        "email_verified": True,
+    }
+    calls = []
+    monkeypatch.setattr(
+        identity_platform.id_token,
+        "verify_oauth2_token",
+        lambda token, request, audience: (
+            calls.append((token, request, audience)) or claims.copy()
+        ),
+    )
+    adapter = object()
+
+    assert (
+        identity_platform.verify_google_credential(
+            "google-token",
+            "google-client-id",
+            adapter,
+        )["email"]
+        == "user@example.test"
+    )
+    assert calls == [("google-token", adapter, "google-client-id")]
+
+    claims["email_verified"] = False
+    with pytest.raises(ValueError, match="not verified"):
+        identity_platform.verify_google_credential(
+            "google-token",
+            "google-client-id",
+            adapter,
+        )
+
+
+# @features login
 # @dimensions identity-platform google-oauth token-exchange
 def test_exchange_google_credential_uses_identity_platform_idp_endpoint():
     session = FakeSession(

@@ -29,17 +29,21 @@ Authentication Modes:
 Form State Machine:
     The login page uses a client-side state machine (login.mjs) that shows/hides
     forms based on user state:
-    1. SIGN_IN_FORM: Default email/password entry
-    2. FORGOT_PASSWORD_FORM: Password reset request
-    3. RESET_PASSWORD_FORM: New password entry
-    4. VERIFY_EMAIL_FORM: Email verification confirmation
+    1. AUTH_METHOD_FORM: Default Google-or-email chooser
+    2. EMAIL_CHECK_FORM: Email-only account routing
+    3. SIGN_IN_FORM or FIRST_TIME_SETUP_FORM: Password-only step
+    4. FORGOT_PASSWORD_FORM: Password reset request
+    5. RESET_PASSWORD_FORM: New password entry
+    6. VERIFY_EMAIL_FORM: Email verification confirmation
 """
 
 import base64
+from contextlib import contextmanager
+from datetime import datetime, timezone
 import json
 import re
 import time
-from urllib.parse import quote
+from urllib.parse import parse_qs, quote, urlsplit
 from uuid import uuid4
 
 import pytest
@@ -50,6 +54,8 @@ from playwright.sync_api import expect
 from config import SETTINGS, constants
 from lagniappe import CONFIG
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools import database
+from lagniappe.web.routes.users.login import _auth_action_url
 
 from testing.definitions import SitePages, Users
 from testing.elements import Buttons, FormElements, Roles
@@ -88,6 +94,7 @@ PASSWORD = "input[type='password']"
 FIRST_TIME_BACK = "button[data-role='back-to-email']"
 FORGOT_BACK = "button[data-role='back-to-signin']"
 VERIFY_FORGOT_PASSWORD = "#verifyEmail button[data-role='show-forgot-form']"
+OWNER_PASSWORD_SETUP = "[data-role='owner-password-setup']"
 
 _IDENTITY_PLATFORM_API = re.compile(
     r"https://identitytoolkit\.googleapis\.com/(?:v1|v2)/.*"
@@ -265,14 +272,68 @@ def _create_first_time_user(email, name="First Time User"):
     return provisioned_user
 
 
-def _open_sign_in_form(user, login_page, email):
+def _ensure_owner_initialized():
+    """Ensure ordinary login tests do not enter the owner bootstrap state."""
+    email = SETTINGS.test_config["ADMIN_EMAIL"]
+    exists = database.get.user(email)
+    owner = (
+        Entities.USER(exists)
+        if exists
+        else Entities.USER.create(
+            {
+                "email": email,
+                "name": SETTINGS.test_config["ADMIN_NAME"],
+                "test_user": True,
+            }
+        )
+    )
+    owner.last_login = datetime.now(timezone.utc)
+    owner.save()
+
+
+@contextmanager
+def _owner_waiting_for_first_login():
+    """Temporarily place an existing test owner back into first-login state."""
+    email = SETTINGS.test_config["ADMIN_EMAIL"]
+    exists = database.get.user(email)
+    had_last_login = bool(exists and "last_login" in exists)
+    previous_last_login = exists.get("last_login") if exists else None
+    if exists:
+        exists.pop("last_login", None)
+        database.save_raw(exists)
+    try:
+        yield
+    finally:
+        if exists:
+            if had_last_login:
+                exists["last_login"] = previous_last_login
+            else:
+                exists.pop("last_login", None)
+            database.save_raw(exists)
+
+
+def _open_email_check_form(user, login_page):
+    if user.locate(login_page.OWNER_SETUP_FORM).is_visible():
+        _ensure_owner_initialized()
+        user.page.reload()
+
+    auth_method = user.locate(login_page.AUTH_METHOD_FORM)
+    expect(auth_method).to_be_visible()
+    auth_method.locator("[data-role='show-email-check']").click()
+
     email_form = user.locate(login_page.EMAIL_CHECK_FORM)
+    expect(email_form).to_be_visible()
+    return email_form
+
+
+def _open_sign_in_form(user, login_page, email):
+    email_form = _open_email_check_form(user, login_page)
     email_form.locator(FormElements.EMAIL).fill(email)
     email_form.locator(Buttons.SIGNIN).click()
 
     sign_in_form = user.locate(login_page.SIGN_IN_FORM)
     expect(sign_in_form).to_be_visible()
-    expect(sign_in_form.locator(FormElements.EMAIL)).to_have_value(email)
+    expect(sign_in_form.locator("input[name='email']")).to_have_value(email)
     return sign_in_form
 
 
@@ -292,6 +353,8 @@ def test_login_page_loads(get_user):
         - src/script/views/login.mjs: Form elements have correct IDs
 
     Forms checked (from testing/resources/site.py LoginPage):
+        - OWNER_SETUP_FORM (#ownerSetup)
+        - AUTH_METHOD_FORM (#authMethod)
         - EMAIL_CHECK_FORM (#emailCheck)
         - SIGN_IN_FORM (#signIn)
         - FIRST_TIME_SETUP_FORM (#firstTimeSetup)
@@ -309,6 +372,8 @@ def test_login_page_loads(get_user):
     expect(user.page).not_to_have_title("")
 
     # Verify all login forms are present in DOM
+    expect(user.locate(login_page.OWNER_SETUP_FORM)).to_be_attached()
+    expect(user.locate(login_page.AUTH_METHOD_FORM)).to_be_attached()
     expect(user.locate(login_page.EMAIL_CHECK_FORM)).to_be_attached()
     expect(user.locate(login_page.SIGN_IN_FORM)).to_be_attached()
     expect(user.locate(login_page.FIRST_TIME_SETUP_FORM)).to_be_attached()
@@ -317,6 +382,7 @@ def test_login_page_loads(get_user):
     expect(user.locate(login_page.VERIFY_EMAIL_FORM)).to_be_attached()
 
     action_buttons = user.locate(
+        "#ownerSetup button[data-role='signin'], "
         "#emailCheck button[data-role='signin'], "
         "#firstTimeSetup button[data-role='signin'], "
         "#signIn button[data-role='signin'], "
@@ -324,11 +390,9 @@ def test_login_page_loads(get_user):
         "#resetPassword button[data-role='reset-password'], "
         "#verifyEmail button[data-role='signin']"
     )
-    expect(action_buttons).to_have_count(6)
-    expect(
-        user.locate("#signIn button[data-role='create']")
-    ).to_have_count(0)
-    for index in range(6):
+    expect(action_buttons).to_have_count(7)
+    expect(user.locate("#signIn button[data-role='create']")).to_have_count(0)
+    for index in range(7):
         button = action_buttons.nth(index)
         expect(button.locator(":scope > [data-role='icon']")).to_have_count(1)
         expect(button.locator(":scope > [data-role='text']")).to_have_count(1)
@@ -449,15 +513,29 @@ def test_login_google_buttons_carry_safe_next_state(get_user):
     target = "/pages/public-target?from=public#notes"
     user.page.goto(_site_url(f"/users/login?next={quote(target, safe='')}"))
 
-    expect(user.locate("#google-signin-custom")).to_have_attribute(
-        "data-state", target
-    )
-    expect(user.locate("#google-signin-setup")).to_have_attribute("data-state", target)
+    expect(user.locate("#google-signin-method")).to_have_attribute("data-state", target)
+    expect(user.locate("#google-signin-owner")).to_have_attribute("data-state", target)
 
     user.page.goto(_site_url("/users/login?next=https%3A%2F%2Fevil.example%2Fpage"))
-    expect(user.locate("#google-signin-custom")).not_to_have_attribute(
+    expect(user.locate("#google-signin-method")).not_to_have_attribute(
         "data-state", re.compile(".+")
     )
+
+
+# @features login
+# @dimensions authentication-email redirect-target
+def test_auth_action_url_preserves_safe_login_destination():
+    target = "/tasks/index?from=email#details"
+
+    action_url = urlsplit(_auth_action_url("verifyEmail", "code-1", target))
+
+    assert action_url.scheme == "https"
+    assert action_url.path == "/users/login"
+    assert parse_qs(action_url.query) == {
+        "mode": ["verifyEmail"],
+        "oobCode": ["code-1"],
+        "next": [target],
+    }
 
 
 # @pair login:google-signin
@@ -529,9 +607,7 @@ def test_agent_access_login_form_creates_session(get_user, browser_failures):
         path="/users/agent-login",
     ):
         agent_button.click()
-        expect(user.locate("[data-role='error']")).to_have_text(
-            "Invalid access code"
-        )
+        expect(user.locate("[data-role='error']")).to_have_text("Invalid access code")
 
     user.locate("input[name='code']").fill(constants.DEFAULT_AGENT_ACCESS_TEST_CODE)
     agent_button.click()
@@ -555,48 +631,159 @@ def test_agent_access_login_form_creates_session(get_user, browser_failures):
 
 
 # @features login
-# @dimensions email-check
-def test_login_defaults_to_email_check_form(get_user):
-    """
-    Verify owner-provisioned login starts with the email check form.
+# @dimensions owner-bootstrap verify-email
+# @template users/login.html::google_signin
+def test_uninitialized_owner_starts_google_first_setup(get_user, browser_failures):
+    """A new owner sees Google first and verifies any separate password."""
+    with _owner_waiting_for_first_login():
+        user = get_user(Users.ANONYMOUS)
+        identity_calls = _mock_identity_platform(
+            user.page,
+            sign_up_verified=False,
+        )
+        login_identity_calls = []
+        verification_email_calls = []
+        _mock_login_identity(
+            user.page,
+            login_identity_calls,
+            {"success": False, "requires_verification": True},
+            status=403,
+        )
+        _mock_verification_email_delivery(user.page, verification_email_calls)
 
-    When public registration is off, anonymous users must enter their email
-    first so the app can decide between first-time setup and standard sign-in.
+        login_page = user.go(SitePages.LOGIN_PAGE)
+        owner_setup = user.locate(login_page.OWNER_SETUP_FORM)
+        password_setup = owner_setup.locator(OWNER_PASSWORD_SETUP)
+
+        expect(owner_setup).to_be_visible()
+        expect(owner_setup).to_contain_text("Finish setting up Lagniappe")
+        expect(owner_setup.locator("#google-signin-owner")).to_be_attached()
+        expect(password_setup).not_to_be_visible()
+        expect(user.locate(login_page.EMAIL_CHECK_FORM)).not_to_be_visible()
+        expect(user.locate(login_page.SIGN_IN_FORM)).not_to_be_visible()
+
+        owner_setup.locator("[data-role='show-owner-password']").click()
+
+        expect(password_setup).to_be_visible()
+        expect(password_setup).to_contain_text("Do not enter your Google password")
+        expect(password_setup.locator("input[type='email']")).to_have_count(0)
+        password_setup.locator(PASSWORD).fill("separate-owner-password")
+
+        with browser_failures.expect_http_error(
+            user,
+            status=403,
+            path="/users/login-identity",
+        ):
+            password_setup.locator(Buttons.SIGNIN).click()
+            expect(password_setup.locator("[data-role='success']")).to_contain_text(
+                "An email verification link has been sent"
+            )
+
+        owner_email = SETTINGS.test_config["ADMIN_EMAIL"]
+        assert identity_calls["sign_up"][0]["email"] == owner_email
+        assert identity_calls["sign_up"][0]["password"] == "separate-owner-password"
+        assert login_identity_calls[0]["email"] == owner_email
+        assert verification_email_calls == [
+            {"idToken": login_identity_calls[0]["authResult"]}
+        ]
+        assert not identity_calls["unexpected"]
+
+
+# @features login
+# @dimensions auth-method google-oauth email-signin
+def test_login_defaults_to_auth_method_form(get_user):
     """
+    Verify ordinary login starts with a Google-or-email method choice.
+
+    No password field is shown beside Google sign-in. Choosing email advances
+    to an email-only screen.
+    """
+    _ensure_owner_initialized()
     user = get_user(Users.ANONYMOUS)
     login_page = user.go(SitePages.LOGIN_PAGE)
 
-    expect(user.locate(login_page.EMAIL_CHECK_FORM)).to_be_visible()
+    auth_method = user.locate(login_page.AUTH_METHOD_FORM)
+    expect(auth_method).to_be_visible()
+    expect(auth_method.locator("#google-signin-method")).to_be_attached()
+    expect(auth_method.locator(PASSWORD)).to_have_count(0)
     expect(user.locate(login_page.SIGN_IN_FORM)).not_to_be_visible()
+
+    auth_method.locator("[data-role='show-email-check']").click()
+    email_form = user.locate(login_page.EMAIL_CHECK_FORM)
+    expect(email_form).to_be_visible()
+    expect(email_form.locator(PASSWORD)).to_have_count(0)
+    expect(email_form.locator(".g_id_signin")).to_have_count(0)
+
+
+# @features login
+# @dimensions google-oauth authorization-error auth-method
+def test_unregistered_google_error_returns_to_method_chooser(get_user):
+    """A verified but unprovisioned Google account gets a useful login error."""
+    _ensure_owner_initialized()
+    user = get_user(Users.ANONYMOUS)
+    login_page = user.go(
+        SitePages.LOGIN_PAGE,
+        query_params={"authError": "google-not-registered"},
+    )
+
+    auth_method = user.locate(login_page.AUTH_METHOD_FORM)
+    expect(auth_method).to_be_visible()
+    expect(auth_method.locator(Roles.ERROR)).to_have_text(
+        "That Google account does not have access to this site. "
+        "Contact the site owner if you think this is a mistake."
+    )
+    expect(auth_method.locator(PASSWORD)).to_have_count(0)
 
 
 # @features login
 # @dimensions account-enumeration sign-in-transition
-def test_unknown_email_transitions_to_sign_in_without_leaking_existence(get_user):
+def test_unknown_email_transitions_to_sign_in_without_leaking_existence(
+    get_user,
+    browser_failures,
+):
     """
     Verify unknown emails no longer show an explicit account-not-found error.
 
     The compatibility endpoint now returns a generic next step, so the user
     should land on the sign-in form instead of seeing an existence leak.
     """
+    _ensure_owner_initialized()
     user = get_user(Users.ANONYMOUS)
+    _mock_identity_platform(user.page, sign_in_errors=["EMAIL_NOT_FOUND"])
     login_page = user.go(SitePages.LOGIN_PAGE)
-    email_form = user.locate(login_page.EMAIL_CHECK_FORM)
-    email_form.locator(FormElements.EMAIL).fill("nonexistent@test.com")
+    email = "nonexistent@test.com"
+    email_form = _open_email_check_form(user, login_page)
+    email_form.locator(FormElements.EMAIL).fill(email)
     email_form.locator(Buttons.SIGNIN).click()
 
-    expect(user.locate(login_page.SIGN_IN_FORM)).to_be_visible()
+    sign_in_form = user.locate(login_page.SIGN_IN_FORM)
+    expect(sign_in_form).to_be_visible()
+    expect(sign_in_form.locator("[data-role='selected-email']")).to_have_text(email)
+    expect(sign_in_form.locator("input[type='email']")).to_have_count(0)
+    expect(sign_in_form.locator(".g_id_signin")).to_have_count(0)
     expect(email_form.locator(Roles.ERROR)).not_to_be_visible()
+
+    sign_in_form.locator(PASSWORD).fill("not-a-real-password")
+    with browser_failures.expect_http_error(
+        user,
+        status=400,
+        path="/v1/accounts:signInWithPassword",
+    ):
+        sign_in_form.locator(Buttons.SIGNIN).click()
+        expect(sign_in_form.locator(Roles.ERROR)).to_have_text(
+            "Incorrect email or password."
+        )
 
 
 # @features login
 # @dimensions account-enumeration endpoint
 def test_check_user_status_endpoint_does_not_enumerate_accounts(get_user):
     """Unknown accounts should receive the generic sign-in next step."""
+    _ensure_owner_initialized()
     user = get_user(Users.ANONYMOUS)
     email = f"unknown-{uuid4().hex}@example.test"
     login_page = user.go(SitePages.LOGIN_PAGE)
-    email_form = user.locate(login_page.EMAIL_CHECK_FORM)
+    email_form = _open_email_check_form(user, login_page)
     email_form.locator(FormElements.EMAIL).fill(email)
 
     with expect_successful_response(
@@ -619,6 +806,7 @@ def test_check_user_status_endpoint_returns_first_time_setup(get_user):
     """Provisioned users without a prior login should get first-time setup."""
     from lagniappe.core.entities import Entities
 
+    _ensure_owner_initialized()
     user = get_user(Users.ANONYMOUS)
     email = f"first-time-{uuid4().hex}@example.test"
     provisioned_user = Entities.USER.create(
@@ -632,7 +820,7 @@ def test_check_user_status_endpoint_returns_first_time_setup(get_user):
     provisioned_user.save()
 
     login_page = user.go(SitePages.LOGIN_PAGE)
-    email_form = user.locate(login_page.EMAIL_CHECK_FORM)
+    email_form = _open_email_check_form(user, login_page)
     email_form.locator(FormElements.EMAIL).fill(email)
 
     with expect_successful_response(
@@ -718,10 +906,11 @@ def test_email_input_validation(get_user):
     Note: Exact validation behavior varies by browser (Chromium shows tooltip,
     prevents submission). Test confirms form stays visible after invalid submit.
     """
+    _ensure_owner_initialized()
     user = get_user(Users.ANONYMOUS)
     login_page = user.go(SitePages.LOGIN_PAGE)
 
-    email_form = user.locate(login_page.EMAIL_CHECK_FORM)
+    email_form = _open_email_check_form(user, login_page)
     email_input = email_form.locator(FormElements.EMAIL)
     expect(email_input).to_be_visible()
 
@@ -756,9 +945,10 @@ def test_login_responsive_design(get_user):
     Framework usage:
         - user.page.set_viewport_size(): Playwright viewport control
     """
+    _ensure_owner_initialized()
     user = get_user(Users.ANONYMOUS)
     login_page = user.go(SitePages.LOGIN_PAGE)
-    login_form = user.locate(login_page.EMAIL_CHECK_FORM)
+    login_form = user.locate(login_page.AUTH_METHOD_FORM)
 
     # Test mobile size
     user.page.set_viewport_size({"width": 375, "height": 667})
@@ -835,7 +1025,7 @@ def test_logout_clears_session_and_returns_login(get_user):
         logout.click()
 
     expect(user.page).to_have_title("Login")
-    expect(user.locate(login_page.EMAIL_CHECK_FORM)).to_be_visible()
+    expect(user.locate(login_page.AUTH_METHOD_FORM)).to_be_visible()
 
     user.navigate(home.url)
     expect(user.page).to_have_title("Login")
@@ -868,12 +1058,15 @@ def test_logout_flags_user_cache_invalidation(get_user):
     logout = user.page.get_by_role("button", name="Logout")
     expect(logout).to_be_visible()
 
-    with user.page.expect_response(
-        lambda response: (
-            response.url.endswith("/users/logout")
-            and response.request.method == "POST"
-        )
-    ) as logout_info, user.page.expect_navigation():
+    with (
+        user.page.expect_response(
+            lambda response: (
+                response.url.endswith("/users/logout")
+                and response.request.method == "POST"
+            )
+        ) as logout_info,
+        user.page.expect_navigation(),
+    ):
         logout.click()
 
     response = logout_info.value
@@ -931,9 +1124,7 @@ def test_login_sets_hardened_auth_cookies(get_user):
         assert "HttpOnly" in cookie
         assert "SameSite=Lax" in cookie
 
-    stored_cookies = {
-        cookie["name"]: cookie for cookie in user.page.context.cookies()
-    }
+    stored_cookies = {cookie["name"]: cookie for cookie in user.page.context.cookies()}
     for name in ("session", "remember_token"):
         assert stored_cookies[name]["secure"] is True
         assert stored_cookies[name]["httpOnly"] is True
@@ -949,9 +1140,10 @@ def test_known_registered_email_shows_sign_in(get_user):
     check-user-status returns ``signin`` for existing users who have logged in
     before (OWNER); UI should show the password sign-in form.
     """
+    _ensure_owner_initialized()
     user = get_user(Users.ANONYMOUS)
     login_page = user.go(SitePages.LOGIN_PAGE)
-    email_form = user.locate(login_page.EMAIL_CHECK_FORM)
+    email_form = _open_email_check_form(user, login_page)
     email_form.locator(FormElements.EMAIL).fill(SETTINGS.test_config["ADMIN_EMAIL"])
     email_form.locator(Buttons.SIGNIN).click()
 
@@ -962,9 +1154,10 @@ def test_known_registered_email_shows_sign_in(get_user):
 # @dimensions forgot-password sign-in-transition
 def test_forgot_password_form_opens_from_sign_in(get_user):
     """From sign-in, "Forgot your password?" reveals the reset-email form."""
+    _ensure_owner_initialized()
     user = get_user(Users.ANONYMOUS)
     login_page = user.go(SitePages.LOGIN_PAGE)
-    email_form = user.locate(login_page.EMAIL_CHECK_FORM)
+    email_form = _open_email_check_form(user, login_page)
     email_form.locator(FormElements.EMAIL).fill(SETTINGS.test_config["ADMIN_EMAIL"])
     email_form.locator(Buttons.SIGNIN).click()
 
@@ -1081,7 +1274,7 @@ def test_login_remember_preference_syncs_across_forms(get_user):
     expect(user.locate(login_page.SIGN_IN_FORM).locator(REMEMBER_ME)).to_be_checked()
 
     user.go(SitePages.LOGIN_PAGE)
-    email_form = user.locate(login_page.EMAIL_CHECK_FORM)
+    email_form = _open_email_check_form(user, login_page)
     email_form.locator(FormElements.EMAIL).fill(first_time_email)
     email_form.locator(Buttons.SIGNIN).click()
 
@@ -1097,6 +1290,7 @@ def test_first_time_setup_form_creates_password_and_can_return_to_email_check(
     get_user,
 ):
     """Provisioned users can back out of setup, then create a password."""
+    _ensure_owner_initialized()
     user = get_user(Users.ANONYMOUS)
     identity_calls = _mock_identity_platform(user.page)
     login_identity_calls = []
@@ -1111,13 +1305,15 @@ def test_first_time_setup_form_creates_password_and_can_return_to_email_check(
     _mock_document(user.page, "/testing-login-success", "Login Complete")
 
     login_page = user.go(SitePages.LOGIN_PAGE)
-    email_form = user.locate(login_page.EMAIL_CHECK_FORM)
+    email_form = _open_email_check_form(user, login_page)
     email_form.locator(FormElements.EMAIL).fill(email)
     email_form.locator(Buttons.SIGNIN).click()
 
     first_time_form = user.locate(login_page.FIRST_TIME_SETUP_FORM)
     expect(first_time_form).to_be_visible()
-    expect(first_time_form.locator("[data-role='welcome']")).to_contain_text("Welcome")
+    expect(first_time_form.locator("[data-role='selected-email']")).to_have_text(email)
+    expect(first_time_form.locator("input[type='email']")).to_have_count(0)
+    expect(first_time_form.locator(".g_id_signin")).to_have_count(0)
 
     first_time_form.locator(FIRST_TIME_BACK).click()
     expect(user.locate(login_page.EMAIL_CHECK_FORM)).to_be_visible()
@@ -1217,7 +1413,7 @@ def test_login_identity_client_handoff_redirects_or_requires_verification(
     _mock_login_identity(
         user.page,
         login_identity_calls,
-        {"success": False, "error": "User not registered"},
+        {"success": False, "error": "Incorrect email or password."},
         status=401,
     )
 
@@ -1233,7 +1429,7 @@ def test_login_identity_client_handoff_redirects_or_requires_verification(
 
         error = sign_in_form.locator(Roles.ERROR)
         expect(error).to_be_visible()
-        expect(error).to_contain_text("User not registered")
+        expect(error).to_contain_text("Incorrect email or password.")
 
     assert login_identity_calls[0]["email"] == email
     assert identity_calls["sign_in"][0]["email"] == email
@@ -1278,7 +1474,7 @@ def test_login_auth_error_messages_are_user_safe(get_user, browser_failures):
         path="/v1/accounts:signInWithPassword",
     ):
         sign_in_form.locator(Buttons.SIGNIN).click()
-        expect(error).to_contain_text("If you previously signed in with Google")
+        expect(error).to_contain_text("Incorrect email or password.")
         expect(error).not_to_contain_text("INVALID_LOGIN_CREDENTIALS")
         expect(error).not_to_contain_text("auth/")
     assert not identity_calls["unexpected"]
@@ -1289,7 +1485,7 @@ def test_login_auth_error_messages_are_user_safe(get_user, browser_failures):
     _create_first_time_user(email)
 
     login_page = user.go(SitePages.LOGIN_PAGE)
-    email_form = user.locate(login_page.EMAIL_CHECK_FORM)
+    email_form = _open_email_check_form(user, login_page)
     email_form.locator(FormElements.EMAIL).fill(email)
     email_form.locator(Buttons.SIGNIN).click()
 

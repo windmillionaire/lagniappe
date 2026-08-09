@@ -31,6 +31,11 @@
   </head>
   <body id="login"
         {{ allow_registration and "allow-registration" }}
+        {% if owner_setup %}
+          data-owner-setup
+          data-owner-email="{{ owner_email }}"
+        {% endif %}
+        {% if auth_error %}data-auth-error="{{ auth_error }}"{% endif %}
         data-mode="{{ mode }}"
         data-code="{{ code }}">
     <input id="token" type="hidden" value="{{ csrf_token() }}" />

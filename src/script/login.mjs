@@ -1,7 +1,9 @@
 import {
+	AuthMethodForm,
 	EmailCheckForm,
 	FirstTimeSetupForm,
 	ForgotPasswordForm,
+	OwnerSetupForm,
 	ResetPasswordForm,
 	SignInForm,
 	setLoginActionButton,
@@ -84,7 +86,9 @@ async function initializeIdentityPlatform() {
 if (document.getElementById("emailCheck")) {
 	const auth = await initializeIdentityPlatform();
 
-	let allowRegistration = document.body.hasAttribute("allow-registration");
+	const ownerSetup = document.body.hasAttribute("data-owner-setup");
+	const ownerEmail = document.body.getAttribute("data-owner-email");
+	const authError = document.body.getAttribute("data-auth-error");
 	const mode = document.body.getAttribute("data-mode");
 	const code = document.body.getAttribute("data-code");
 
@@ -130,12 +134,13 @@ if (document.getElementById("emailCheck")) {
 
 	/**
 	 * @testable true
-	 * @tests tests_e2e/001_site/test_001b_login.py::test_login_defaults_to_email_check_form
+	 * @tests tests_e2e/001_site/test_001b_login.py::test_login_defaults_to_auth_method_form
+	 * @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
 	 * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
 	 * @tests tests_e2e/001_site/test_001b_login.py::test_reset_password_mode
 	 * @tests tests_e2e/001_site/test_001b_login.py::test_verify_email_mode
 	 * @features login
-	 * @dimensions email-check sign-in-transition query-mode
+	 * @dimensions email-check sign-in-transition query-mode owner-bootstrap
 	 */
 	const showForm = (form) => {
 		withTransition(() => {
@@ -148,7 +153,6 @@ if (document.getElementById("emailCheck")) {
 	};
 
 	if (mode === "resetPassword") {
-		allowRegistration = false;
 		const resetPasswordForm = document.getElementById("resetPassword");
 		forms.resetPassword = new ResetPasswordForm(auth, resetPasswordForm);
 		forms.resetPassword.data.code = code;
@@ -158,15 +162,26 @@ if (document.getElementById("emailCheck")) {
 		forms.verifyEmail = new VerifyEmailForm(auth, verifyEmailForm);
 		forms.verifyEmail.data.code = code;
 		showForm(forms.verifyEmail);
-	} else if (allowRegistration) {
-		const signInForm = document.getElementById("signIn");
-		forms.signIn = new SignInForm(auth, signInForm);
-		showForm(forms.signIn);
+	} else if (ownerSetup) {
+		const ownerSetupForm = document.getElementById("ownerSetup");
+		forms.ownerSetup = new OwnerSetupForm(auth, ownerSetupForm);
+		forms.ownerSetup.data = { email: ownerEmail, error: authError };
+		showForm(forms.ownerSetup);
 	} else {
-		const emailCheckForm = document.getElementById("emailCheck");
-		forms.emailCheck = new EmailCheckForm(auth, emailCheckForm);
-		showForm(forms.emailCheck);
+		const authMethodForm = document.getElementById("authMethod");
+		forms.authMethod = new AuthMethodForm(auth, authMethodForm);
+		forms.authMethod.data = { error: authError };
+		showForm(forms.authMethod);
 	}
+
+	document.addEventListener("login:show-auth-method", () => {
+		if (!forms.authMethod) {
+			const formElt = document.getElementById("authMethod");
+			forms.authMethod = new AuthMethodForm(auth, formElt);
+		}
+		forms.authMethod.data = {};
+		showForm(forms.authMethod);
+	});
 
 	document.addEventListener("login:show-signin", (event) => {
 		if (!forms.signIn) {

@@ -32,6 +32,10 @@ def _parser():
         "email",
         help="Configure custom-domain authentication email",
     )
+    commands.add_parser(
+        "oauth",
+        help="Replace and verify Google Sign-In OAuth settings",
+    )
     commands.add_parser("ai", help="Configure AI")
     commands.add_parser(
         "security",
@@ -131,6 +135,10 @@ def _dispatch(args):
         from installer.auth_email import configure_auth_email
 
         return configure_auth_email()
+    if command == "oauth":
+        from installer.admin import configure_oauth
+
+        return configure_oauth()
     if command == "ai":
         from installer.ai import configure_ai
 

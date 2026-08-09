@@ -19,7 +19,7 @@ Related Files:
 
 Usage:
     login_page = user.go(SitePages.LOGIN_PAGE)
-    expect(user.locate(login_page.EMAIL_CHECK_FORM)).to_be_visible()
+    expect(user.locate(login_page.AUTH_METHOD_FORM)).to_be_visible()
 """
 
 from playwright.sync_api import expect
@@ -48,10 +48,12 @@ class LoginPage(SiteResource):
     Route: /users/login
 
     The login page uses Identity Platform with custom forms and shows different forms
-    based on authentication state (email check → sign in → setup, etc.).
+    based on authentication state (method choice → email check → password, etc.).
 
     Selectors:
-        EMAIL_CHECK_FORM: Initial email input form
+        AUTH_METHOD_FORM: Initial Google-or-email chooser
+        EMAIL_CHECK_FORM: Email input form
+        OWNER_SETUP_FORM: Initial owner Google/password setup
         SIGN_IN_FORM: Password entry form (after email verified)
         FIRST_TIME_SETUP_FORM: New user profile setup
         FORGOT_PASSWORD_FORM: Password reset request
@@ -60,7 +62,9 @@ class LoginPage(SiteResource):
         SIGN_IN_FORGOT_PASSWORD: Forgot-password control inside sign-in (not verify-email duplicate)
     """
 
+    AUTH_METHOD_FORM = "#authMethod"
     EMAIL_CHECK_FORM = "#emailCheck"
+    OWNER_SETUP_FORM = "#ownerSetup"
     SIGN_IN_FORM = "#signIn"
     FIRST_TIME_SETUP_FORM = "#firstTimeSetup"
     FORGOT_PASSWORD_FORM = "#forgotPassword"

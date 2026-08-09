@@ -51,6 +51,7 @@ Build, configuration, installation, and test workflows.
 | [INFRA_BUILD.md](INFRA_BUILD.md) | Rollup bundles (login, icons, main), production vs dev, custom plugins, chunk splitting. |
 | [INFRA_CONFIG.md](INFRA_CONFIG.md) | Runtime-safe configuration plus the local runner boundary for GCloud switching, deployment, dev/test servers, and upgrades. |
 | [INFRA_SETUP.md](INFRA_SETUP.md) | Installation flow (GCP, Identity Platform, Redis, admin, AI defaults, optional modes), plus upgrades. |
+| [MANUAL_LOGIN_FLOW_CHECK.md](../MANUAL_LOGIN_FLOW_CHECK.md) | Fresh-production login QA for live Google OAuth, Identity Platform, authentication email, redirects, account states, and browser password-manager behavior. |
 | [DATA_MIGRATIONS.md](DATA_MIGRATIONS.md) | Authoring, testing, releasing, running, auditing, and retiring persisted-data migrations. |
 | [TESTING.md](TESTING.md) | Test suites, commands, fixtures, managed test server, traceability tools. |
 | [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) | Practical guide for adding or reviewing tests. |
@@ -89,6 +90,7 @@ Build, configuration, installation, and test workflows.
 | Prepare a release | [INFRA_BUILD](INFRA_BUILD.md), [INFRA_CONFIG](INFRA_CONFIG.md) | `.github/workflows/release.yml`, `run.py` |
 | Deploy the app | [INFRA_CONFIG](INFRA_CONFIG.md) | `runner/deploy.py` |
 | Set up a new instance | [INFRA_SETUP](INFRA_SETUP.md) | `setup.sh`, `setup.cmd`, `installer/` |
+| QA login on a fresh production install | [MANUAL_LOGIN_FLOW_CHECK](../MANUAL_LOGIN_FLOW_CHECK.md) | `lagniappe/web/routes/users/login.py`, `src/script/login.mjs` |
 | Back up or restore production data | [INFRA_SETUP](INFRA_SETUP.md#disaster-recovery-backups), [INFRA_CONFIG](INFRA_CONFIG.md#data-disaster-recovery-runpy) | `runner/data_recovery.py`, `run.py` |
 | Add or run a data migration | [DATA_MIGRATIONS](DATA_MIGRATIONS.md) | `lagniappe/core/tools/database/migrations.py`, `lagniappe/web/routes/home/site.py` |
 | Change entity saves, relation writes, or delete cascades | [BACKEND_ENTITIES](BACKEND_ENTITIES.md) | `lagniappe/core/entities/__init__.py`, `lagniappe/core/mixins/related.py`, `lagniappe/core/tools/database/utility.py` |

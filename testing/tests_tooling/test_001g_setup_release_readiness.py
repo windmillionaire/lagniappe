@@ -118,20 +118,25 @@ def test_redacted_install_summary_is_allowlisted():
         ),
     }
 
-    text = "\n".join(
-        summary.install_summary_lines(
-            settings,
-            deploy={"runtime": "python314"},
-            node={"version": "0.2"},
-            gcloud_config={"NAME": "demo", "PROJECT": "demo-project"},
-        )
+    lines = summary.install_summary_lines(
+        settings,
+        deploy={"runtime": "python314"},
+        node={"version": "0.2"},
+        gcloud_config={"NAME": "demo", "PROJECT": "demo-project"},
+        deployed=True,
     )
+    text = "\n".join(lines)
 
     assert "Demo" in text
     assert "runtime@demo-project.iam.gserviceaccount.com" in text
     assert "lagniappe-tasks" in text
     assert "python314" in text
-    assert "./setup.sh repair" in text
+    assert "Optional health check: ./setup.sh doctor" in text
+    assert "Repair if needed: ./setup.sh repair" in text
+    assert lines[-1] == (
+        "Lagniappe has been installed successfully. "
+        "Log in at https://demo.example.test"
+    )
     for secret in (
         "bucket-source-secret",
         "redis-secret",
@@ -139,6 +144,9 @@ def test_redacted_install_summary_is_allowlisted():
         "sentry-secret",
     ):
         assert secret not in text
+
+    manual_lines = summary.install_summary_lines(settings)
+    assert manual_lines[-1] == "After manual deployment: ./setup.sh jobs"
 
 
 # @features setup
