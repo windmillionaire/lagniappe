@@ -3296,7 +3296,10 @@ def test_oauth_instructions_open_current_project_clients_page(
                 "https://app.example.com/users/google-signin"
             ),
         },
-        gcloud={"PROJECT": "demo-project"},
+        gcloud={
+            "PROJECT": "demo-project",
+            "ACCOUNT": "operator@example.com",
+        },
     )
     _install_config_package(monkeypatch, constants, settings=settings)
 
@@ -3316,6 +3319,11 @@ def test_oauth_instructions_open_current_project_clients_page(
     ]
     output = capsys.readouterr().out
     assert "Identity Platform is ready" in output
+    assert "Required browser account: operator@example.com" in output
+    assert "switch the" in output
+    assert "browser to this account and reload the page" in output
+    assert "setup already verified this" in output
+    assert "account's project permissions" in output
     assert "secret will not be saved" in output
     assert "in Lagniappe settings" in output
     assert "click 'Get started'" in output
@@ -3485,7 +3493,10 @@ def test_oauth_credentials_file_retry_reloads_or_waits_for_propagation(
                 "https://project-1.appspot.com/users/google-signin"
             ),
         },
-        gcloud={"PROJECT": "project-1"},
+        gcloud={
+            "PROJECT": "project-1",
+            "ACCOUNT": "operator@example.com",
+        },
     )
     first_credentials = (
         "1234-first.apps.googleusercontent.com",
@@ -3521,8 +3532,14 @@ def test_oauth_credentials_file_retry_reloads_or_waits_for_propagation(
         return True
 
     monkeypatch.setattr(admin, "verify_oauth_web_client", verify)
-    choices = iter(("", "r"))
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(choices))
+    choices = iter(("", "", "r"))
+    prompts = []
+
+    def answer(prompt):
+        prompts.append(prompt)
+        return next(choices)
+
+    monkeypatch.setattr("builtins.input", answer)
 
     assert admin._get_verified_oauth_credentials(
         settings,
@@ -3547,6 +3564,9 @@ def test_oauth_credentials_file_retry_reloads_or_waits_for_propagation(
     ]
     output = capsys.readouterr().out
     assert str(credential_path) in output
+    assert "Complete the Google Auth Platform browser steps" in prompts[0]
+    assert "signed in as 'operator@example.com'" in prompts[0]
+    assert "press Enter to verify it" in prompts[0]
     assert "already matches" in output
     assert "Google may still be applying" in output
 

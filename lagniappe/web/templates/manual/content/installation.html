@@ -286,7 +286,7 @@
       <p class="text-base-medium text-sm mb-2">
         In Windows PowerShell, use:
       </p>
-      {{ code('$lagniappePath = Join-Path $env:LOCALAPPDATA "Lagniappe"\ngit clone https://github.com/windmillionaire/lagniappe.git $lagniappePath\nSet-Location $lagniappePath') }}
+      {{ code('$lagniappePath = Join-Path $env:USERPROFILE "Lagniappe"\ngit clone https://github.com/windmillionaire/lagniappe.git $lagniappePath\nSet-Location $lagniappePath') }}
       <p class="text-base-medium text-sm my-2">
         On macOS or Linux, use:
       </p>
@@ -383,7 +383,7 @@
     <p class="text-base-medium my-3">
       In Windows PowerShell, recover into the same stable local folder:
     </p>
-    {{ code('$lagniappePath = Join-Path $env:LOCALAPPDATA "Lagniappe"\ngit clone <lagniappe-source> $lagniappePath\nSet-Location $lagniappePath\nNew-Item -ItemType Directory -Force config/files\n# Save the owner download as:\n# config/files/lagniappe_settings.yaml\n.\\setup.cmd') }}
+    {{ code('$lagniappePath = Join-Path $env:USERPROFILE "Lagniappe"\ngit clone <lagniappe-source> $lagniappePath\nSet-Location $lagniappePath\nNew-Item -ItemType Directory -Force config/files\n# Save the owner download as:\n# config/files/lagniappe_settings.yaml\n.\\setup.cmd') }}
     <p class="text-base-medium mt-3">
       Setup recognizes the downloaded settings file and uses it to rebuild the
       app without deleting or replacing its cloud data.

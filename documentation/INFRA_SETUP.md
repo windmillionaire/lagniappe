@@ -135,12 +135,14 @@ mkdir -p config/files
 
 On Windows, use a regular **PowerShell** window with Git and Google Cloud CLI
 on `PATH`. Keep the checkout outside the Google Cloud CLI installation in the
-stable per-user local application directory. This native Windows installer
-path is implemented and covered by mocked Windows CI, but remains experimental
-until a real clean-machine recovery/deploy smoke is complete:
+visible, stable per-user profile directory. Do not put it in Documents or
+another folder redirected through OneDrive: the checkout contains a live
+virtual environment and private local configuration. This native Windows
+installer path is implemented and covered by mocked Windows CI, but remains
+experimental until a real clean-machine recovery/deploy smoke is complete:
 
 ```powershell
-$lagniappePath = Join-Path $env:LOCALAPPDATA "Lagniappe"
+$lagniappePath = Join-Path $env:USERPROFILE "Lagniappe"
 git clone <lagniappe-source> $lagniappePath
 Set-Location $lagniappePath
 New-Item -ItemType Directory -Force config/files
@@ -989,10 +991,14 @@ general OAuth clients, so the operator clicks **Download JSON** under Client
 secrets and moves the download to the exact absolute path printed by setup,
 renaming it `config/files/google_oauth_credentials.json`. The downloaded JSON
 contains the client type, project, client ID and secret, JavaScript origins,
-and redirect URIs. Setup reads it locally and requires the `web` type, selected
-project, displayed origin, and displayed callback to match exactly. Desktop
-JSON and mismatched values are rejected before the Google provider or later
-installation steps can change.
+and redirect URIs. Setup prints the exact Google account selected and verified
+earlier in the installation, warns that an additional-access page usually
+means the browser is using another signed-in Google account, and waits for the
+operator to finish the browser steps before looking for the file. Setup then
+reads it locally and requires the `web` type, selected project, displayed
+origin, and displayed callback to match exactly. Desktop JSON and mismatched
+values are rejected before the Google provider or later installation steps can
+change.
 
 After local validation, setup probes Google's authorization endpoint without
 following redirects to confirm that Google has applied the client. At that

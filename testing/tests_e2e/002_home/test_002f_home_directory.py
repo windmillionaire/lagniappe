@@ -416,7 +416,7 @@ def test_manual_installation_commands_are_copyable_and_scroll_on_mobile(
     )
     expect(clone_commands).to_have_count(2)
     expect(clone_commands.nth(0)).to_have_text(
-        '$lagniappePath = Join-Path $env:LOCALAPPDATA "Lagniappe"\n'
+        '$lagniappePath = Join-Path $env:USERPROFILE "Lagniappe"\n'
         "git clone https://github.com/windmillionaire/lagniappe.git "
         "$lagniappePath\n"
         "Set-Location $lagniappePath"

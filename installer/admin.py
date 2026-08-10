@@ -31,6 +31,7 @@ def print_oauth_instructions():
     from config import SETTINGS
 
     project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
+    account = str(SETTINGS.GCLOUD_CONFIG.get("ACCOUNT") or "").strip()
     clients_url = (
         "https://console.cloud.google.com/auth/clients"
         f"?project={project_id}"
@@ -51,10 +52,23 @@ def print_oauth_instructions():
     )
     print(f"\nOpening Google Auth Platform for project '{project_id}':")
     print(f"  {clients_url}")
+    if account:
+        print(f"  Required browser account: {account}")
     try:
         webbrowser.open_new_tab(clients_url)
     except webbrowser.Error:
         pass
+
+    if account:
+        print(
+            wrap_text(
+                "\nBefore continuing, confirm the Google Cloud Console "
+                f"profile is '{account}'. If Google says you need additional "
+                "access, switch the browser to this account and reload the "
+                "page; setup already verified this account's project "
+                "permissions."
+            )
+        )
 
     print(
         wrap_text(
@@ -332,6 +346,23 @@ def _get_verified_oauth_credentials(settings, credential_path=OAUTH_CLIENT_FILE)
     credentials = None
     print("\nPlace the downloaded Google OAuth JSON at:")
     print(f"  {credential_path}")
+    account = str(settings.GCLOUD_CONFIG.get("ACCOUNT") or "").strip()
+    account_guidance = f" while signed in as '{account}'" if account else ""
+    choice = input(
+        f.info(
+            "Complete the Google Auth Platform browser steps"
+            f"{account_guidance}, place the downloaded JSON at the path "
+            "above, then press Enter to verify it, or X to stop: "
+        )
+    ).strip().casefold()
+    if choice in {"x", "exit"}:
+        raise ProviderInvalidInput(
+            "Google OAuth credential setup stopped before verification.",
+            repair_action=(
+                f"Place a correct Web-client JSON at {credential_path}, "
+                f"then run {setup_command('oauth')}."
+            ),
+        )
 
     while True:
         if credentials is None:
