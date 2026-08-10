@@ -11,6 +11,7 @@ import pytest
 from installer.errors import (
     ProviderConflict,
     ProviderError,
+    ProviderInvalidInput,
     ProviderPermissionDenied,
     ProviderTimeout,
     ProviderTransientError,
@@ -830,6 +831,74 @@ def test_identity_platform_initialization_accepts_existing_provider(
         "https://demo.example",
     ) == current
     assert mutations[0][1]["action"] == "existing"
+
+
+# @features setup
+# @dimensions identity-platform provider-state idempotency diagnostics
+def test_identity_platform_initialization_accepts_already_enabled_http_400(
+    monkeypatch,
+):
+    from installer import identity
+
+    current = {
+        "subtype": "IDENTITY_PLATFORM",
+        "client": {"apiKey": "public-key"},
+        "signIn": {"email": {"enabled": True, "passwordRequired": True}},
+        "authorizedDomains": ["demo.example"],
+    }
+    already_enabled = {
+        "error": {
+            "code": 400,
+            "message": (
+                "INVALID_PROJECT_ID : Identity platform has already been "
+                "enabled for this project."
+            ),
+            "status": "INVALID_ARGUMENT",
+        }
+    }
+    session = FakeSession(
+        [
+            FakeResponse(404, {"error": {"message": "Not initialized"}}),
+            FakeResponse(400, already_enabled),
+            FakeResponse(200, current),
+        ]
+    )
+    mutations = []
+    monkeypatch.setattr(
+        identity,
+        "record_mutation",
+        lambda description, **kwargs: mutations.append((description, kwargs)),
+    )
+
+    assert identity.reconcile_identity_platform(
+        session,
+        "project-1",
+        {},
+        "https://demo.example",
+    ) == current
+    assert [call["method"] for call in session.calls] == ["GET", "POST", "GET"]
+    assert mutations[0][1]["action"] == "existing"
+
+    unrelated_error = {
+        "error": {
+            "code": 400,
+            "message": "The project identifier is malformed.",
+            "status": "INVALID_ARGUMENT",
+        }
+    }
+    rejected_session = FakeSession(
+        [
+            FakeResponse(404, {"error": {"message": "Not initialized"}}),
+            FakeResponse(400, unrelated_error),
+        ]
+    )
+    with pytest.raises(ProviderInvalidInput, match="identifier is malformed"):
+        identity.reconcile_identity_platform(
+            rejected_session,
+            "project-1",
+            {},
+            "https://demo.example",
+        )
 
 
 # @features setup

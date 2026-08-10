@@ -137,6 +137,7 @@ def _ensure_standalone_subtype(config, project_id):
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_initialization_retries_api_activation
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_initialization_accepts_existing_provider
+# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_initialization_accepts_already_enabled_http_400
 # @features setup
 # @dimensions identity-platform provider-state authorized-domain provider-convergence retry diagnostics idempotency
 def reconcile_identity_platform(session, project_id, headers, app_url):
@@ -148,19 +149,31 @@ def reconcile_identity_platform(session, project_id, headers, app_url):
             "https://identitytoolkit.googleapis.com/v2/"
             f"projects/{project_id}/identityPlatform:initializeAuth"
         )
-        response, _ = _api_request(
-            session,
-            "POST",
-            initialize_url,
-            headers,
-            {},
-            allow_codes=[409],
-            attempts=IDENTITY_INITIALIZATION_ATTEMPTS,
-            delays=IDENTITY_INITIALIZATION_DELAYS,
-        )
+        try:
+            response, _ = _api_request(
+                session,
+                "POST",
+                initialize_url,
+                headers,
+                {},
+                allow_codes=[409],
+                attempts=IDENTITY_INITIALIZATION_ATTEMPTS,
+                delays=IDENTITY_INITIALIZATION_DELAYS,
+            )
+            created = response.status_code == 200
+        except ProviderInvalidInput as error:
+            detail = str(error).casefold()
+            already_enabled = (
+                "http 400 invalid_argument" in detail
+                and "identity platform has already been enabled for this project"
+                in detail
+            )
+            if not already_enabled:
+                raise
+            created = False
         record_mutation(
             "initialize Identity Platform",
-            action="created" if response.status_code == 200 else "existing",
+            action="created" if created else "existing",
             resource="identity-platform-config",
             identifier=project_id,
         )

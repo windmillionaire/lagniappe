@@ -878,8 +878,10 @@ commands or call the reconciliation logic directly.
 - Calls `projects.identityPlatform.initializeAuth` and requires the resulting
   subtype to be standalone `IDENTITY_PLATFORM`; any other existing
   authentication subtype is a provider conflict
-- Accepts the provider's already-initialized response, and gives a fresh
-  project's API activation a bounded retry window with visible progress
+- Accepts both the provider's conflict response and its observed HTTP 400
+  `INVALID_ARGUMENT` "already enabled" response, then verifies the live
+  configuration; unrelated invalid-input responses remain fatal. A fresh
+  project's API activation gets a bounded retry window with visible progress
 - Enables email/password sign-in, preserves existing authorized domains, and
   adds the App Engine or custom-domain host
 - Stores a public auth client config containing only project ID and Web API
