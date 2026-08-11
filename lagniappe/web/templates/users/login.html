@@ -87,17 +87,20 @@
   <!-- Initial owner setup (shown until the configured owner first signs in) -->
   <div id="ownerSetup"
        class="{{ styles.form.login }} hidden">
-    {{ message("Finish setting up Lagniappe") }}
+    <h1 data-role="owner-setup-title"
+        class="{{ styles.login.heading }}">Finish setting up Lagniappe</h1>
     <div data-role="owner-google-setup">
-      {{ message("Sign in with Google using the account configured as the application owner.") }}
+      <p class="{{ styles.login.guidance }}">Sign in with Google using the account configured as the application owner.</p>
       {{ error(auth_error or "", visible=auth_error) }}
       {{ google_signin("google-signin-owner", next_url) }}
       {{ alternate_button("show-owner-password", "Set up with a separate password instead") }}
     </div>
     <div data-role="owner-password-setup"
          class="hidden">
-      {{ message("Create a separate Lagniappe password") }}
-      {{ message("Do not enter your Google password. We'll send a verification email to the owner address configured during installation.", role="password-guidance") }}
+      <h2 data-role="owner-password-title"
+          class="{{ styles.login.subheading }}">Create a separate Lagniappe password</h2>
+      <p data-role="password-guidance"
+         class="{{ styles.login.guidance }}">Do not enter your Google password. We'll send a verification email to the application owner email configured during installation.</p>
       {{ error() }}
       {{ success() }}
       <div class="space-y-4">

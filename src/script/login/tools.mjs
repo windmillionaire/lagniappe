@@ -50,10 +50,11 @@ async function checkUserStatus(email, form) {
 /**
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_login_identity_client_handoff_redirects_or_requires_verification
+ * @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
  * @tests tests_js/test_009_request_csrf.py::test_login_handoff_refreshes_csrf_before_submit_and_retries_once
  * @tests tests_js/test_009_request_csrf.py::test_login_verification_email_reuses_refreshed_csrf
  * @features login
- * @dimensions identity-platform redirect verify-email remember-preference csrf-refresh
+ * @dimensions identity-platform redirect verify-email remember-preference csrf-refresh owner-bootstrap
  */
 async function handleIdentityUser(user, form) {
 	const body = JSON.stringify({
@@ -100,7 +101,8 @@ async function handleIdentityUser(user, form) {
 		await form.auth.sendEmailVerification(user, csrfToken);
 		localStorage.setItem("verificationEmail", user.email);
 		form.showSuccess(
-			`An email verification link has been sent to ${user.email}.`,
+			form.verificationSuccessMessage ||
+				`An email verification link has been sent to ${user.email}.`,
 		);
 	} else {
 		form.showError(results.error || "Authentication failed. Please try again.");

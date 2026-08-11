@@ -203,7 +203,7 @@ class EmailCheckForm extends LoginForms {
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
  * @features login
- * @dimensions owner-bootstrap verify-email
+ * @dimensions owner-bootstrap verify-email password-validation auth-errors
  */
 class OwnerSetupForm extends LoginForms {
 	init() {
@@ -213,6 +213,10 @@ class OwnerSetupForm extends LoginForms {
 		this.passwordSetup = this.form.querySelector(
 			"[data-role='owner-password-setup']",
 		);
+		this.googleError = this.googleSetup.querySelector("[data-role='error']");
+		this.passwordError = this.passwordSetup.querySelector("[data-role='error']");
+		this.verificationSuccessMessage =
+			"We've sent a verification link to the application owner email on file.";
 		this.password = this.passwordSetup.querySelector("input[type='password']");
 		this.showPasswordButton = this.form.querySelector(
 			"[data-role='show-owner-password']",
@@ -223,15 +227,18 @@ class OwnerSetupForm extends LoginForms {
 
 		this.setActionButton(this.form.querySelector("[data-role='signin']"));
 		this.showPasswordButton.addEventListener("click", () => {
+			this.reset();
+			this.error = this.passwordError;
 			this.googleSetup.classList.add("hidden");
 			this.passwordSetup.classList.remove("hidden");
 			this.password.focus();
 		});
 		this.backToGoogleButton.addEventListener("click", () => {
 			this.password.value = "";
+			this.reset();
+			this.error = this.googleError;
 			this.passwordSetup.classList.add("hidden");
 			this.googleSetup.classList.remove("hidden");
-			this.reset();
 		});
 		this.actionButton.addEventListener("click", this.handleSignIn.bind(this));
 	}

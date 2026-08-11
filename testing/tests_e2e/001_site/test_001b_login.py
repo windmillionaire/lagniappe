@@ -631,14 +631,18 @@ def test_agent_access_login_form_creates_session(get_user, browser_failures):
 
 
 # @features login
-# @dimensions owner-bootstrap verify-email
+# @dimensions owner-bootstrap verify-email password-validation auth-errors
 # @template users/login.html::google_signin
+# @style login.heading
+# @style login.subheading
+# @style login.guidance
 def test_uninitialized_owner_starts_google_first_setup(get_user, browser_failures):
     """A new owner sees Google first and verifies any separate password."""
     with _owner_waiting_for_first_login():
         user = get_user(Users.ANONYMOUS)
         identity_calls = _mock_identity_platform(
             user.page,
+            sign_up_errors=["WEAK_PASSWORD : Password should be at least 6 characters"],
             sign_up_verified=False,
         )
         login_identity_calls = []
@@ -656,7 +660,9 @@ def test_uninitialized_owner_starts_google_first_setup(get_user, browser_failure
         password_setup = owner_setup.locator(OWNER_PASSWORD_SETUP)
 
         expect(owner_setup).to_be_visible()
-        expect(owner_setup).to_contain_text("Finish setting up Lagniappe")
+        owner_title = owner_setup.locator("[data-role='owner-setup-title']")
+        expect(owner_title).to_have_text("Finish setting up Lagniappe")
+        expect(owner_title).to_have_class(re.compile(r".*\btext-2xl\b.*"))
         expect(owner_setup.locator("#google-signin-owner")).to_be_attached()
         expect(password_setup).not_to_be_visible()
         expect(user.locate(login_page.EMAIL_CHECK_FORM)).not_to_be_visible()
@@ -665,8 +671,30 @@ def test_uninitialized_owner_starts_google_first_setup(get_user, browser_failure
         owner_setup.locator("[data-role='show-owner-password']").click()
 
         expect(password_setup).to_be_visible()
-        expect(password_setup).to_contain_text("Do not enter your Google password")
+        password_title = password_setup.locator("[data-role='owner-password-title']")
+        guidance = password_setup.locator("[data-role='password-guidance']")
+        error = password_setup.locator(Roles.ERROR)
+        expect(password_title).to_have_class(re.compile(r".*\btext-lg\b.*"))
+        expect(guidance).to_contain_text("Do not enter your Google password")
+        expect(guidance).to_have_class(re.compile(r".*\btext-sm\b.*"))
         expect(password_setup.locator("input[type='email']")).to_have_count(0)
+
+        password_setup.locator(Buttons.SIGNIN).click()
+        expect(error).to_be_visible()
+        expect(error).to_have_text("Please choose a password")
+        assert identity_calls["sign_up"] == []
+
+        password_setup.locator(PASSWORD).fill("short")
+        with browser_failures.expect_http_error(
+            user,
+            status=400,
+            path="/v1/accounts:signUp",
+        ):
+            password_setup.locator(Buttons.SIGNIN).click()
+            expect(error).to_be_visible()
+            expect(error).to_have_text("Password must be at least 6 characters long.")
+            expect(error).not_to_contain_text("WEAK_PASSWORD")
+
         password_setup.locator(PASSWORD).fill("separate-owner-password")
 
         with browser_failures.expect_http_error(
@@ -675,13 +703,13 @@ def test_uninitialized_owner_starts_google_first_setup(get_user, browser_failure
             path="/users/login-identity",
         ):
             password_setup.locator(Buttons.SIGNIN).click()
-            expect(password_setup.locator("[data-role='success']")).to_contain_text(
-                "An email verification link has been sent"
+            expect(password_setup.locator("[data-role='success']")).to_have_text(
+                "We've sent a verification link to the application owner email on file."
             )
 
         owner_email = SETTINGS.test_config["ADMIN_EMAIL"]
-        assert identity_calls["sign_up"][0]["email"] == owner_email
-        assert identity_calls["sign_up"][0]["password"] == "separate-owner-password"
+        assert identity_calls["sign_up"][1]["email"] == owner_email
+        assert identity_calls["sign_up"][1]["password"] == "separate-owner-password"
         assert login_identity_calls[0]["email"] == owner_email
         assert verification_email_calls == [
             {"idToken": login_identity_calls[0]["authResult"]}

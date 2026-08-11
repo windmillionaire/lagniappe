@@ -925,6 +925,18 @@ loading:
     surfaces: [server]
 
 login:
+  heading:
+    classes: text-center mb-6 text-2xl font-semibold text-base-dark
+    intent: primary heading for a login workflow
+    surfaces: [server]
+  subheading:
+    classes: text-center mb-3 text-lg font-semibold text-base-dark
+    intent: nested step heading within a login workflow
+    surfaces: [server]
+  guidance:
+    classes: text-center mb-5 text-sm leading-6 text-base-medium
+    intent: supporting guidance within a login workflow
+    surfaces: [server]
   message:
     classes: text-center mb-4 text-base-dark
     intent: message presentation within login
