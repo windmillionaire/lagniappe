@@ -31,6 +31,7 @@ CLI_PROBE = REPOSITORY_ROOT / "testing" / "utility" / "setup_cli_probe.py"
 
 CLI_MODES = (
     pytest.param([], "install", id="install"),
+    pytest.param(["auth"], "auth", id="auth"),
     pytest.param(["url"], "url", id="url"),
     pytest.param(["email"], "email", id="email"),
     pytest.param(["oauth"], "oauth", id="oauth"),
@@ -380,19 +381,17 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
         assert setup_cli.main(arguments) == 0
         expected = ["runtime"]
         if arguments:
-            expected.extend(
-                (
-                    "pip",
-                    "dependencies",
+            expected.extend(("pip", "dependencies"))
+            if arguments != ["auth"]:
+                expected.append(
                     (
                         "activate-gcloud",
                         {
                             "ensure_adc": arguments != ["doctor"],
                             "ensure_cli_token": arguments != ["doctor"],
                         },
-                    ),
+                    )
                 )
-            )
         expected.append("dispatch")
         assert events == expected
 
@@ -408,6 +407,67 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
 
     monkeypatch.setattr(setup_package, "project_virtualenv_active", lambda: True)
     assert setup_package.verify_setup_runtime() is None
+
+
+# @features setup auth
+# @dimensions gcloud-token adc interactive explicit-command
+def test_setup_auth_uses_explicit_browser_flow(monkeypatch, capsys):
+    from installer import auth
+    from runner import gcloud as runner_gcloud
+
+    calls = []
+    monkeypatch.setattr(
+        runner_gcloud,
+        "activate_repository_gcloud",
+        lambda **kwargs: calls.append(kwargs),
+    )
+
+    assert auth.authenticate() == 0
+    assert calls == [
+        {
+            "ensure_adc": True,
+            "ensure_cli_token": True,
+            "allow_cli_login": True,
+            "allow_runtime_adc": False,
+            "allow_adc_login": True,
+            "select_adc_target": True,
+        }
+    ]
+    assert "Google Cloud CLI and Application Default Credentials are ready" in (
+        capsys.readouterr().out
+    )
+
+
+# @features setup
+# @dimensions gcloud-token safe-failure
+def test_stale_gcloud_token_stops_with_setup_auth_instruction(
+    monkeypatch,
+    capsys,
+):
+    import installer as setup_package
+    from installer import __main__ as setup_cli
+    from installer import package_install
+    from runner import gcloud as runner_gcloud
+
+    monkeypatch.setattr(setup_package, "verify_setup_runtime", lambda: None)
+    monkeypatch.setattr(package_install, "ensure_pip_is_available", lambda: None)
+    monkeypatch.setattr(package_install, "ensure_setup_dependencies", lambda: None)
+    monkeypatch.setattr(
+        runner_gcloud,
+        "activate_repository_gcloud",
+        lambda **kwargs: (_ for _ in ()).throw(
+            RuntimeError(
+                "The saved gcloud login needs to be refreshed. "
+                "Run ./setup.sh auth, then retry this setup command."
+            )
+        ),
+    )
+
+    assert setup_cli.cli(["upgrade"]) == 1
+    output = capsys.readouterr().out
+    assert "Setup failed [setup]" in output
+    assert "Run ./setup.sh auth" in output
+    assert "gcloud auth login" not in output
 
 
 # @features setup

@@ -343,32 +343,33 @@ partial `NAME`/`ACCOUNT`/`PROJECT` triple, and otherwise delegates to
 and project environment variables so child pytest and Flask processes inherit
 the same project selected in the CLI. Focused mutating installer commands also
 probe `gcloud auth print-access-token` before entering their operation journal;
-a stale login stops setup before mutation and prints a separate
-`gcloud auth login ACCOUNT --force` browser-login command. Setup never opens a
-password-capable gcloud reauthentication prompt. E2E and managed test-server startup also
+a stale login stops setup before mutation and directs the operator to the
+explicit `./setup.sh auth` or `.\setup.cmd auth` browser-login command. Ordinary
+setup modes never open a password-capable gcloud reauthentication prompt. E2E
+and managed test-server startup also
 use `runner/adc.py` to verify the separate Application Default Credentials
 principal, project, and quota project. Development and testing accept the saved
 human principal as the impersonation source or an already-impersonated runtime
 principal, and perform a read-only authentication preflight. Any mismatch stops
 before application import and directs the operator to
-`venv/bin/python run.py auth`. Only that explicit runner command may write human
-ADC or correct its quota project. The explicit auth command may also refresh
-the saved gcloud CLI account through a forced browser flow; focused installer,
-development, and testing commands never do. Installer commands also require
-the saved human account.
+`venv/bin/python run.py auth`. Only the explicit setup/runner auth commands may
+write human ADC or correct its quota project. Those auth commands may also
+refresh the saved gcloud CLI account through a forced browser flow; ordinary
+installer, development, and testing commands never do. Installer commands also
+require the saved human account.
 
 ## Commands
 
-### Runtime Authentication (`runner/adc.py`, `runner/gcloud.py`, `run.py`)
+### Runtime Authentication (`installer/auth.py`, `runner/adc.py`, `runner/gcloud.py`, `run.py`)
 
-`venv/bin/python run.py auth` is the explicit interactive boundary for local
-application credentials. It selects the checkout's saved gcloud account,
-checks whether that account token needs to be refreshed, selects the saved
-project, and then writes human ADC for that exact account and project. The
-command is idempotent when ADC already matches the saved principal, project,
-and quota project. Development and testing commands never invoke this
-interactive flow themselves; application configuration turns the saved human
-credential into the short-lived runtime credential during startup.
+`./setup.sh auth` and `.\setup.cmd auth` are the explicit interactive recovery
+boundary for setup credentials. They force a browser refresh when the saved
+gcloud account token is stale, then align human ADC with the exact account and
+project. The developer-facing `venv/bin/python run.py auth` remains the explicit
+ADC-alignment command for local runtime impersonation. Development and testing
+commands never invoke either interactive flow themselves; application
+configuration turns the saved human credential into the short-lived runtime
+credential during startup.
 
 ### Data Disaster Recovery (`runner/data_recovery.py`, `run.py`)
 

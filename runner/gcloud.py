@@ -16,6 +16,7 @@ def activate_repository_gcloud(
     *,
     ensure_adc=False,
     ensure_cli_token=False,
+    allow_cli_login=False,
     allow_runtime_adc=False,
     allow_adc_login=None,
     select_adc_target=False,
@@ -48,7 +49,10 @@ def activate_repository_gcloud(
     if ensure_cli_token:
         from runner.adc import ensure_gcloud_source_login
 
-        ensure_gcloud_source_login(target["ACCOUNT"], allow_login=False)
+        ensure_gcloud_source_login(
+            target["ACCOUNT"],
+            allow_login=allow_cli_login,
+        )
         print(f"[OK] gcloud account access is ready ({target['ACCOUNT']})")
     if ensure_adc:
         from runner.adc import ensure_adc_target

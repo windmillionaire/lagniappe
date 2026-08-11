@@ -40,19 +40,21 @@ direct Python invocation after the environment exists, use
 user-level virtualenv is intentionally rejected.
 
 The no-argument installer announces recovery and obtains dependency consent
-before preparing its pinned setup packages. Focused commands such as `doctor`,
-`repair`, `update`, and `upgrade` prepare those packages at the shared Python
-CLI boundary before importing their handlers, then activate the complete gcloud
-configuration/account/project saved in this checkout. This makes them work on
-the first invocation after a launcher creates the project virtualenv without
-inheriting another checkout's ambient gcloud target. An unconfigured checkout
-is left alone and a partial saved target fails closed. The full installer owns
-its activation later, after new-install selection or recovery has established
-the target.
+before preparing its pinned setup packages. Focused commands such as `auth`,
+`doctor`, `repair`, `update`, and `upgrade` prepare those packages at the shared
+Python CLI boundary before importing their handlers, then activate the complete
+gcloud configuration/account/project saved in this checkout. This makes them
+work on the first invocation after a launcher creates the project virtualenv
+without inheriting another checkout's ambient gcloud target. An unconfigured
+checkout is left alone and a partial saved target fails closed. The full
+installer owns its activation later, after new-install selection or recovery
+has established the target.
 
 It supports subcommands for running specific steps:
 
 - No args: full installation
+- `auth`: refresh the saved gcloud CLI account through Google's browser flow,
+  then align Application Default Credentials with this installation
 - `doctor`: inspect generated files, active gcloud identities, expected
   resources, and read-only provider state after activating this checkout's
   saved target; never repairs drift
@@ -1146,7 +1148,8 @@ application flow:
 
 1. Verifies the current installation is valid, confirms that the saved gcloud
    account can mint a fresh access token, and stops before making changes with
-   a forced browser-login command when that credential needs reauthentication
+   an `./setup.sh auth` or `.\setup.cmd auth` instruction when that credential
+   needs reauthentication
 2. For `upgrade`, warns that tracked local changes will be discarded, records
    their status and diffs under `reports/upgrade-local-changes-*.md`, fetches
    remotes, and resets to `origin/main` or the `origin/BRANCH` selected with

@@ -1122,11 +1122,8 @@ def test_runner_gcloud_source_login_stops_before_authentication_by_default(
 
     message = str(error.value)
     assert "Setup stopped before making changes" in message
-    assert (
-        "/usr/bin/gcloud auth login owner@example.test --force"
-        in message
-    )
-    assert "complete browser sign-in" in message
+    assert "./setup.sh auth" in message
+    assert "gcloud auth login" not in message
     assert commands == [
         (
             [

@@ -25,6 +25,10 @@ def _parser():
         help="Reconcile and validate an existing installation",
     )
     commands.add_parser(
+        "auth",
+        help="Refresh Google Cloud CLI and Application Default Credentials",
+    )
+    commands.add_parser(
         "url",
         help="Configure a custom domain",
     )
@@ -93,8 +97,9 @@ def _status(result):
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
+# @tests tests_tooling/test_001e_setup_orchestration.py::test_stale_gcloud_token_stops_with_setup_auth_instruction
 # @features setup
-# @dimensions prerequisites dependency-bootstrap focused-mode gcloud-token
+# @dimensions prerequisites dependency-bootstrap focused-mode gcloud-token safe-failure
 def _prepare_setup_dependencies(args):
     """Bootstrap focused modes before importing their dependency-backed handlers."""
     if _mode(args) == "install":
@@ -107,13 +112,21 @@ def _prepare_setup_dependencies(args):
     ensure_pip_is_available()
     ensure_setup_dependencies()
 
+    if _mode(args) == "auth":
+        return
+
     from runner.gcloud import activate_repository_gcloud
 
     mutating = _mode(args) != "doctor"
-    activate_repository_gcloud(
-        ensure_adc=mutating,
-        ensure_cli_token=mutating,
-    )
+    try:
+        activate_repository_gcloud(
+            ensure_adc=mutating,
+            ensure_cli_token=mutating,
+        )
+    except RuntimeError as error:
+        from installer.errors import SetupError
+
+        raise SetupError(str(error)) from error
 
 
 # @testable true
@@ -123,6 +136,10 @@ def _prepare_setup_dependencies(args):
 # @dimensions cli-routing lazy-imports failure-propagation
 def _dispatch(args):
     command = args.command
+    if command == "auth":
+        from installer.auth import authenticate
+
+        return authenticate()
     if command == "doctor":
         from installer.doctor import run_doctor
 

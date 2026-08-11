@@ -3,7 +3,7 @@
 import os
 import sys
 
-from runner.context import GCLOUD_CLI, format_command, python_command
+from runner.context import GCLOUD_CLI, format_command, python_command, setup_command
 from runner.process import run_command
 
 
@@ -115,10 +115,9 @@ def ensure_gcloud_source_login(account, *, allow_login=False):
     login_command = [GCLOUD_CLI, "auth", "login", account, "--force"]
     if not allow_login:
         raise RuntimeError(
-            f"The saved gcloud login for '{account}' cannot refresh an access "
-            "token. Setup stopped before making changes. Run "
-            f"{format_command(login_command)} to complete browser sign-in, "
-            "then retry setup."
+            f"The saved gcloud login for '{account}' needs to be refreshed. "
+            "Setup stopped before making changes. Run "
+            f"{setup_command('auth')}, then retry this setup command."
         )
 
     print(

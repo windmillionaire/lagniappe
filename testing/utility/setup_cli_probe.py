@@ -50,6 +50,7 @@ def main():
         "add_custom_domain",
         _entry_point("url", behavior, status),
     )
+    _install_module("auth", "authenticate", _entry_point("auth", behavior, status))
     _install_module(
         "auth_email",
         "configure_auth_email",
