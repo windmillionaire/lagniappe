@@ -959,6 +959,7 @@ def test_run_py_test_forwards_signals_to_pytest_process_group(monkeypatch):
 
 # @features setup testing development auth
 # @dimensions gcloud-config activation
+# @pair setup:gcloud-token
 def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
     from runner import adc as runner_adc
     from runner import gcloud as runner_gcloud
@@ -994,6 +995,11 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
             ("adc", account, project, kwargs)
         ),
     )
+    monkeypatch.setattr(
+        runner_adc,
+        "ensure_gcloud_source_login",
+        lambda account: calls.append(("cli-token", account)),
+    )
     monkeypatch.setitem(sys.modules, "config", config_module)
 
     assert runner_gcloud.activate_repository_gcloud() is True
@@ -1001,6 +1007,7 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
     assert (
         runner_gcloud.activate_repository_gcloud(
             ensure_adc=True,
+            ensure_cli_token=True,
             allow_runtime_adc=True,
         )
         is True
@@ -1018,6 +1025,7 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
             },
         ),
         "activate",
+        ("cli-token", "owner@example.test"),
         (
             "adc",
             "owner@example.test",
@@ -1029,6 +1037,67 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
                 ),
                 "select_gcloud_target": False,
             },
+        ),
+    ]
+
+
+# @features setup auth
+# @dimensions gcloud-token interactive refresh
+def test_runner_gcloud_source_login_refreshes_stale_token(monkeypatch):
+    from runner import adc as runner_adc
+
+    commands = []
+    token_checks = iter((1, 0))
+    monkeypatch.setattr(runner_adc, "GCLOUD_CLI", "/usr/bin/gcloud")
+
+    def run_command(command, **kwargs):
+        commands.append((command, kwargs))
+        if command[1:3] == ["auth", "print-access-token"]:
+            return types.SimpleNamespace(
+                returncode=next(token_checks),
+                stdout="",
+                stderr="",
+            )
+        return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(runner_adc, "run_command", run_command)
+
+    runner_adc.ensure_gcloud_source_login(
+        "owner@example.test",
+        allow_login=True,
+    )
+
+    assert commands == [
+        (
+            [
+                "/usr/bin/gcloud",
+                "auth",
+                "print-access-token",
+                "owner@example.test",
+            ],
+            {"check": False, "timeout": 60},
+        ),
+        (
+            [
+                "/usr/bin/gcloud",
+                "auth",
+                "login",
+                "owner@example.test",
+            ],
+            {
+                "check": False,
+                "capture_output": False,
+                "timeout": 600,
+            },
+        ),
+        (
+            [
+                "/usr/bin/gcloud",
+                "auth",
+                "print-access-token",
+                "owner@example.test",
+            ],
+            {"check": False, "timeout": 60},
         ),
     ]
 
@@ -1165,6 +1234,7 @@ def test_runner_adc_auth_selects_account_then_project_before_login(monkeypatch):
         ]
     )
     commands = []
+    token_checks = iter((1, 0))
     monkeypatch.setattr(runner_adc, "GCLOUD_CLI", "/usr/bin/gcloud")
     monkeypatch.setattr(
         runner_adc,
@@ -1174,13 +1244,13 @@ def test_runner_adc_auth_selects_account_then_project_before_login(monkeypatch):
 
     def fake_run_command(command, **kwargs):
         commands.append((command, kwargs))
-        stale_source_login = command[1:4] == [
+        source_login_check = command[1:4] == [
             "auth",
             "print-access-token",
             "owner@example.test",
         ]
         return types.SimpleNamespace(
-            returncode=1 if stale_source_login else 0,
+            returncode=next(token_checks) if source_login_check else 0,
             stdout="",
             stderr="",
         )
@@ -1227,6 +1297,15 @@ def test_runner_adc_auth_selects_account_then_project_before_login(monkeypatch):
                 "capture_output": False,
                 "timeout": 600,
             },
+        ),
+        (
+            [
+                "/usr/bin/gcloud",
+                "auth",
+                "print-access-token",
+                "owner@example.test",
+            ],
+            {"check": False, "timeout": 60},
         ),
         (
             [

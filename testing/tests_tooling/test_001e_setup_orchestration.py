@@ -328,7 +328,7 @@ def test_recovery_is_announced_before_dependency_or_provider_mutation(
 
 
 # @features setup
-# @dimensions prerequisites portability python-version virtualenv dependency-bootstrap focused-mode operation-journal
+# @dimensions prerequisites portability python-version virtualenv dependency-bootstrap focused-mode operation-journal gcloud-token
 def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
     from runner import gcloud as runner_gcloud
     import installer as setup_package
@@ -386,7 +386,10 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
                     "dependencies",
                     (
                         "activate-gcloud",
-                        {"ensure_adc": arguments != ["doctor"]},
+                        {
+                            "ensure_adc": arguments != ["doctor"],
+                            "ensure_cli_token": arguments != ["doctor"],
+                        },
                     ),
                 )
             )

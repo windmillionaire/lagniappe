@@ -1144,7 +1144,9 @@ development frontend bundle.
 first replaces tracked source and then runs that same current-version
 application flow:
 
-1. Verifies the current installation is valid
+1. Verifies the current installation is valid, confirms that the saved gcloud
+   account can mint a fresh access token, and refreshes that account login
+   interactively when required
 2. For `upgrade`, warns that tracked local changes will be discarded, records
    their status and diffs under `reports/upgrade-local-changes-*.md`, fetches
    remotes, and resets to `origin/main` or the `origin/BRANCH` selected with

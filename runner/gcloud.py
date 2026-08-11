@@ -11,9 +11,11 @@ from runner.process import run_command
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_activation_rejects_partial_saved_target
 # @features setup testing development auth
 # @dimensions gcloud-config activation unconfigured validation
+# @pair setup:gcloud-token
 def activate_repository_gcloud(
     *,
     ensure_adc=False,
+    ensure_cli_token=False,
     allow_runtime_adc=False,
     allow_adc_login=None,
     select_adc_target=False,
@@ -43,6 +45,11 @@ def activate_repository_gcloud(
         )
 
     config_gcloud()
+    if ensure_cli_token:
+        from runner.adc import ensure_gcloud_source_login
+
+        ensure_gcloud_source_login(target["ACCOUNT"])
+        print(f"[OK] gcloud account access is ready ({target['ACCOUNT']})")
     if ensure_adc:
         from runner.adc import ensure_adc_target
 

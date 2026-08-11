@@ -94,7 +94,7 @@ def _status(result):
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
 # @features setup
-# @dimensions prerequisites dependency-bootstrap focused-mode
+# @dimensions prerequisites dependency-bootstrap focused-mode gcloud-token
 def _prepare_setup_dependencies(args):
     """Bootstrap focused modes before importing their dependency-backed handlers."""
     if _mode(args) == "install":
@@ -109,7 +109,11 @@ def _prepare_setup_dependencies(args):
 
     from runner.gcloud import activate_repository_gcloud
 
-    activate_repository_gcloud(ensure_adc=_mode(args) != "doctor")
+    mutating = _mode(args) != "doctor"
+    activate_repository_gcloud(
+        ensure_adc=mutating,
+        ensure_cli_token=mutating,
+    )
 
 
 # @testable true

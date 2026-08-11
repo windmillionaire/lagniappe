@@ -75,6 +75,9 @@ def read_adc_identity(
         }
 
 
+# @testable false
+# @covered-by runner/adc.py::ensure_adc_target
+# @reason ADC mismatch normalization is exercised through target verification
 def _identity_mismatches(identity, *, principals, project):
     if identity.get("state") != "success":
         return ["ADC identity is unavailable"]
@@ -94,10 +97,12 @@ def _identity_mismatches(identity, *, principals, project):
     return mismatches
 
 
-# @testable false
-# @covered-by runner/adc.py::ensure_adc_target
-# @reason source-token refresh is exercised through explicit local ADC alignment
-def _ensure_gcloud_source_login(account):
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_source_login_refreshes_stale_token
+# @features setup auth
+# @dimensions gcloud-token interactive refresh
+def ensure_gcloud_source_login(account, *, allow_login=None):
+    """Verify that the saved gcloud account can mint a fresh access token."""
     token_check = run_command(
         [GCLOUD_CLI, "auth", "print-access-token", account],
         check=False,
@@ -106,11 +111,18 @@ def _ensure_gcloud_source_login(account):
     if token_check.returncode == 0:
         return
 
+    login_command = [GCLOUD_CLI, "auth", "login", account]
+    allow_login = sys.stdin.isatty() if allow_login is None else allow_login
+    if not allow_login:
+        raise RuntimeError(
+            f"The saved gcloud login for '{account}' cannot refresh an access "
+            f"token. Run {format_command(login_command)} and retry."
+        )
+
     print(
         f"The saved gcloud login for '{account}' needs to be refreshed; "
         "opening account authentication:"
     )
-    login_command = [GCLOUD_CLI, "auth", "login", account]
     print(f"  {format_command(login_command)}")
     result = run_command(
         login_command,
@@ -120,6 +132,15 @@ def _ensure_gcloud_source_login(account):
     )
     if result.returncode != 0:
         raise RuntimeError("The saved gcloud account login did not complete.")
+    token_check = run_command(
+        [GCLOUD_CLI, "auth", "print-access-token", account],
+        check=False,
+        timeout=60,
+    )
+    if token_check.returncode != 0:
+        raise RuntimeError(
+            "The saved gcloud account still cannot refresh an access token."
+        )
 
 
 # @testable false
@@ -131,7 +152,7 @@ def _select_gcloud_auth_target(account, project):
         [GCLOUD_CLI, "config", "set", "account", account],
         timeout=60,
     )
-    _ensure_gcloud_source_login(account)
+    ensure_gcloud_source_login(account, allow_login=True)
     print(f"[OK] Using gcloud account '{account}'")
 
     print(f"Selecting gcloud project '{project}'...")
