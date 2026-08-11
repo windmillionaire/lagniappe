@@ -343,18 +343,19 @@ partial `NAME`/`ACCOUNT`/`PROJECT` triple, and otherwise delegates to
 and project environment variables so child pytest and Flask processes inherit
 the same project selected in the CLI. Focused mutating installer commands also
 probe `gcloud auth print-access-token` before entering their operation journal;
-an interactive setup refreshes a stale account login and verifies the token
-again before continuing. E2E and managed test-server startup also
+a stale login stops setup before mutation and prints a separate
+`gcloud auth login ACCOUNT --force` browser-login command. Setup never opens a
+password-capable gcloud reauthentication prompt. E2E and managed test-server startup also
 use `runner/adc.py` to verify the separate Application Default Credentials
 principal, project, and quota project. Development and testing accept the saved
 human principal as the impersonation source or an already-impersonated runtime
 principal, and perform a read-only authentication preflight. Any mismatch stops
 before application import and directs the operator to
 `venv/bin/python run.py auth`. Only that explicit runner command may write human
-ADC or correct its quota project. Focused mutating installer commands may
-refresh the separate saved gcloud CLI account login after a failed token probe;
-development and testing commands never do. Installer commands also require the
-saved human account.
+ADC or correct its quota project. The explicit auth command may also refresh
+the saved gcloud CLI account through a forced browser flow; focused installer,
+development, and testing commands never do. Installer commands also require
+the saved human account.
 
 ## Commands
 

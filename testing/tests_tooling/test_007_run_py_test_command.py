@@ -998,7 +998,7 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
     monkeypatch.setattr(
         runner_adc,
         "ensure_gcloud_source_login",
-        lambda account: calls.append(("cli-token", account)),
+        lambda account, **kwargs: calls.append(("cli-token", account, kwargs)),
     )
     monkeypatch.setitem(sys.modules, "config", config_module)
 
@@ -1025,7 +1025,7 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
             },
         ),
         "activate",
-        ("cli-token", "owner@example.test"),
+        ("cli-token", "owner@example.test", {"allow_login": False}),
         (
             "adc",
             "owner@example.test",
@@ -1041,8 +1041,7 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
     ]
 
 
-# @features setup auth
-# @dimensions gcloud-token interactive refresh
+# @pairs auth:gcloud-token auth:interactive auth:refresh
 def test_runner_gcloud_source_login_refreshes_stale_token(monkeypatch):
     from runner import adc as runner_adc
 
@@ -1083,6 +1082,7 @@ def test_runner_gcloud_source_login_refreshes_stale_token(monkeypatch):
                 "auth",
                 "login",
                 "owner@example.test",
+                "--force",
             ],
             {
                 "check": False,
@@ -1099,6 +1099,44 @@ def test_runner_gcloud_source_login_refreshes_stale_token(monkeypatch):
             ],
             {"check": False, "timeout": 60},
         ),
+    ]
+
+
+# @pairs setup:gcloud-token setup:safe-failure
+def test_runner_gcloud_source_login_stops_before_authentication_by_default(
+    monkeypatch,
+):
+    from runner import adc as runner_adc
+
+    commands = []
+    monkeypatch.setattr(runner_adc, "GCLOUD_CLI", "/usr/bin/gcloud")
+    monkeypatch.setattr(
+        runner_adc,
+        "run_command",
+        lambda command, **kwargs: commands.append((command, kwargs))
+        or types.SimpleNamespace(returncode=1, stdout="", stderr=""),
+    )
+
+    with pytest.raises(RuntimeError) as error:
+        runner_adc.ensure_gcloud_source_login("owner@example.test")
+
+    message = str(error.value)
+    assert "Setup stopped before making changes" in message
+    assert (
+        "/usr/bin/gcloud auth login owner@example.test --force"
+        in message
+    )
+    assert "complete browser sign-in" in message
+    assert commands == [
+        (
+            [
+                "/usr/bin/gcloud",
+                "auth",
+                "print-access-token",
+                "owner@example.test",
+            ],
+            {"check": False, "timeout": 60},
+        )
     ]
 
 
@@ -1291,6 +1329,7 @@ def test_runner_adc_auth_selects_account_then_project_before_login(monkeypatch):
                 "auth",
                 "login",
                 "owner@example.test",
+                "--force",
             ],
             {
                 "check": False,

@@ -99,9 +99,10 @@ def _identity_mismatches(identity, *, principals, project):
 
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_source_login_refreshes_stale_token
-# @features setup auth
-# @dimensions gcloud-token interactive refresh
-def ensure_gcloud_source_login(account, *, allow_login=None):
+# @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_source_login_stops_before_authentication_by_default
+# @pairs setup:gcloud-token setup:safe-failure
+# @pairs auth:gcloud-token auth:interactive auth:refresh
+def ensure_gcloud_source_login(account, *, allow_login=False):
     """Verify that the saved gcloud account can mint a fresh access token."""
     token_check = run_command(
         [GCLOUD_CLI, "auth", "print-access-token", account],
@@ -111,12 +112,13 @@ def ensure_gcloud_source_login(account, *, allow_login=None):
     if token_check.returncode == 0:
         return
 
-    login_command = [GCLOUD_CLI, "auth", "login", account]
-    allow_login = sys.stdin.isatty() if allow_login is None else allow_login
+    login_command = [GCLOUD_CLI, "auth", "login", account, "--force"]
     if not allow_login:
         raise RuntimeError(
             f"The saved gcloud login for '{account}' cannot refresh an access "
-            f"token. Run {format_command(login_command)} and retry."
+            "token. Setup stopped before making changes. Run "
+            f"{format_command(login_command)} to complete browser sign-in, "
+            "then retry setup."
         )
 
     print(
