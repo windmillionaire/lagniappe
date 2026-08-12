@@ -100,7 +100,7 @@ async function handleIdentityUser(user, form) {
 	} else if (results.requires_verification) {
 		await form.auth.sendEmailVerification(user, csrfToken);
 		localStorage.setItem("verificationEmail", user.email);
-		form.showSuccess(
+		form.showConfirmation(
 			form.verificationSuccessMessage ||
 				`An email verification link has been sent to ${user.email}.`,
 		);

@@ -76,15 +76,19 @@ def _delete_identity_login_account(user):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_from_index
+# @tests tests_e2e/008_users/test_008a_user_index.py::test_owner_create_adopts_public_user_and_resets_form
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_non_owner_cannot_set_ai_access_when_creating_user
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_attached_to_existing_page_preserves_page_info_form
 # @features users
-# @dimensions create-submit created-row attach-existing-page page-form-preserved ai-access owner-only
+# @dimensions create-submit created-row attach-existing-page page-form-preserved ai-access owner-only public-user-adoption submitted-form-data
 @users.route("/create", methods=["POST"])
 @permission(Resource.USERS, Action.CREATE)
 def create():
     try:
-        new_user = Entities.USER.create(user_data(request))
+        new_user = Entities.USER.create(
+            user_data(request),
+            adopt_public=current_user.is_owner,
+        )
     except (TypeError, ValueError) as error:
         return responses.error(str(error))
 

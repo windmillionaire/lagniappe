@@ -200,7 +200,7 @@ def _create_user(user, create_form, definition):
 
 
 # @features users
-# @dimensions create-form create-submit created-row ai-access
+# @dimensions create-form create-submit created-row ai-access create-form-reset
 # @template users/index.html::tools_section
 # @template users/tools.html::create_user
 def test_create_user_from_index(get_user):
@@ -241,6 +241,14 @@ def test_create_user_from_index(get_user):
 
     new_row = _create_user(owner, create_form, created_user)
     assert Entities.USER.load(created_user.email).ai_access == "ASK"
+    reset_payload = create_form.evaluate(
+        "form => Object.fromEntries(new FormData(form).entries())"
+    )
+    assert reset_payload == {
+        "name": "",
+        "email": "",
+        "ai_access": "NONE",
+    }
 
     new_row.locator(Table.ENTITY_URL).click()
     expect(owner.page).to_have_title(re.compile(created_user.name))
@@ -252,6 +260,92 @@ def test_create_user_from_index(get_user):
     expect(
         settings_panel.locator("input[name='ai_access'][value='ASK']")
     ).to_be_checked()
+
+
+# @pairs user:public-adoption user:submitted-create-data user:page-reassign
+# @pairs users:public-user-adoption users:create-form-reset users:submitted-form-data
+# @template users/tools.html::create_user
+def test_owner_create_adopts_public_user_and_resets_form(get_user):
+    """Owner provisioning replaces public status and starts a fresh create form."""
+    owner = get_user(Users.OWNER)
+    suffix = uuid4().hex
+    public_user = _create_public_user(
+        f"adopt-public-{suffix}@example.test",
+        f"Public User Before Adoption {suffix}",
+    )
+    public_user_key = public_user.key
+    previous_page_key = public_user.page.key
+
+    category = Categories.test_basic_inputs_submission.get(owner)
+    target_page = Entities.PAGE.create(
+        {
+            "name": f"Adopted User Page {suffix}",
+            "model": category.entity,
+            "attributes": [],
+        }
+    )
+    target_page.save()
+    group = Groups.general_users_view_only.get(owner)
+    adopted_name = f"Owner Provisioned User {suffix}"
+
+    user_index = owner.go(SitePages.USER_INDEX)
+    create_form = user_index.create_user_form
+    create_form.locator("input[name='name']").fill(adopted_name)
+    create_form.locator("input[name='email']").fill(public_user.email)
+    create_form.locator("input[name='ai_access'][value='ASK']").check()
+
+    page_select = Select(
+        create_form.locator("label").filter(has_text="Attach to Existing Page")
+    )
+    page_select.input.fill(target_page.name)
+    page_select.select_by_key(target_page.urlsafe_key)
+    group_select = Select(
+        create_form.locator("label").filter(has_text="User Group(s)")
+    )
+    group_select.select_by_name(group.definition.name)
+
+    new_row = _create_user(
+        owner,
+        create_form,
+        SimpleNamespace(name=adopted_name),
+    )
+    expect(new_row).to_be_visible()
+
+    saved_user = Entities.USER.load(public_user.email)
+    saved_previous_page = Entities.fetch_one(
+        previous_page_key,
+        request=Fetch.direct(),
+    )
+    assert saved_user.key == public_user_key
+    assert saved_user.name == adopted_name
+    assert saved_user.is_public is False
+    assert saved_user.page.key == target_page.key
+    assert saved_user.ai_access == "ASK"
+    assert [saved_group.key for saved_group in saved_user.groups] == [
+        group.entity.key
+    ]
+    assert saved_user.invalidate_cache is True
+    assert saved_previous_page.user is None
+
+    reset_state = create_form.evaluate(
+        """form => {
+            const data = new FormData(form);
+            return {
+                name: data.get("name"),
+                email: data.get("email"),
+                aiAccess: data.get("ai_access"),
+                page: data.get("page"),
+                groups: data.getAll("group"),
+            };
+        }"""
+    )
+    assert reset_state == {
+        "name": "",
+        "email": "",
+        "aiAccess": "NONE",
+        "page": None,
+        "groups": [],
+    }
 
 
 # @features users

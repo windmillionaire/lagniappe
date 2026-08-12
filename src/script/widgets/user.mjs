@@ -7,11 +7,13 @@ import { RadioElement } from "../elements/radio";
 /**
  * @testable true
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_from_index
+ * @tests tests_e2e/008_users/test_008a_user_index.py::test_owner_create_adopts_public_user_and_resets_form
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_attached_to_existing_page_preserves_page_info_form
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_group_selector_accepts_multiple_groups
  * @features users
- * @dimensions create-form create-submit created-row attach-existing-page page-form-preserved
+ * @dimensions create-form create-submit created-row attach-existing-page page-form-preserved create-form-reset submitted-form-data
  * @pairs users:group-selector users:multiple
+ * @pairs users:create-form-reset users:submitted-form-data
  */
 export class CreateUser extends FormElement {
 	init() {
@@ -88,13 +90,12 @@ export class CreateUser extends FormElement {
 		return [details, aiAccess, page.edit, group.edit].filter(Boolean);
 	}
 
-	postreconcile() {
+	async postreconcile() {
 		const created = this._created;
-		super.postreconcile();
+		await super.postreconcile();
 
 		if (created) {
-			this.nameElement.clear();
-			this.success();
+			await this.reset();
 			this.form?.resetSubmitButton();
 		}
 		this.nameElement.focus();

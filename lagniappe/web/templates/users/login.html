@@ -1,8 +1,18 @@
 {% extends "layouts/login.html" %}
 
-{% macro message(text, role="message") %}
-  <div data-role="{{ role }}"
-       class="{{ styles.login.message }}">{{ text }}</div>
+{% macro heading(text, role="message") %}
+  <h1 data-role="{{ role }}"
+      class="{{ styles.login.heading }}">{{ text }}</h1>
+{% endmacro %}
+
+{% macro subheading(text, role="subheading") %}
+  <h2 data-role="{{ role }}"
+      class="{{ styles.login.subheading }}">{{ text }}</h2>
+{% endmacro %}
+
+{% macro guidance(text, role="guidance") %}
+  <p data-role="{{ role }}"
+     class="{{ styles.login.guidance }}">{{ text }}</p>
 {% endmacro %}
 
 {% macro error(text="", visible=false) %}
@@ -10,8 +20,9 @@
        class="{{ styles.login.error|replace(' hidden', '') if visible else styles.login.error }}">{{ text }}</div>
 {% endmacro %}
 
-{% macro success(text) %}
+{% macro success(text="") %}
   <div data-role="success"
+       data-kind="user"
        class="{{ styles.login.success }}">{{ text }}</div>
 {% endmacro %}
 
@@ -87,25 +98,24 @@
   <!-- Initial owner setup (shown until the configured owner first signs in) -->
   <div id="ownerSetup"
        class="{{ styles.form.login }} hidden">
-    <h1 data-role="owner-setup-title"
-        class="{{ styles.login.heading }}">Finish setting up Lagniappe</h1>
+    {{ heading("Finish setting up Lagniappe", role="owner-setup-title") }}
     <div data-role="owner-google-setup">
-      <p class="{{ styles.login.guidance }}">Sign in with Google using the account configured as the application owner.</p>
+      {{ guidance("Sign in with Google using the account configured as the application owner.") }}
       {{ error(auth_error or "", visible=auth_error) }}
       {{ google_signin("google-signin-owner", next_url) }}
       {{ alternate_button("show-owner-password", "Set up with a separate password instead") }}
     </div>
     <div data-role="owner-password-setup"
          class="hidden">
-      <h2 data-role="owner-password-title"
-          class="{{ styles.login.subheading }}">Create a separate Lagniappe password</h2>
-      <p data-role="password-guidance"
-         class="{{ styles.login.guidance }}">Do not enter your Google password. We'll send a verification email to the application owner email configured during installation.</p>
+      {{ subheading("Create a separate Lagniappe password", role="owner-password-title") }}
+      {{ guidance("Do not enter your Google password. We'll send a verification email to the application owner email configured during installation.", role="password-guidance") }}
       {{ error() }}
       {{ success() }}
       <div class="space-y-4">
-        {{ input("password", "password", "Choose a password") }}
-        {{ button("Create Password", role="signin") }}
+        <div data-hide-on-confirmation class="space-y-4">
+          {{ input("password", "password", "Choose a password") }}
+          {{ button("Create Password", role="signin") }}
+        </div>
         {{ alternate_button("back-to-owner-google", "Back to Google sign-in") }}
       </div>
     </div>
@@ -113,7 +123,7 @@
   <!-- Authentication method chooser for ordinary users -->
   <div id="authMethod"
        class="{{ styles.form.login }} hidden">
-    {{ message("Sign in to your account") }}
+    {{ heading("Sign in to your account") }}
     {{ error(auth_error or "", visible=auth_error) }}
     {{ google_signin("google-signin-method", next_url) }}
     {{ divider("Or") }}
@@ -122,7 +132,7 @@
   <!-- Email Check Form -->
   <div id="emailCheck"
        class="{{ styles.form.login }} hidden">
-    {{ message("Sign in with email") }}
+    {{ heading("Sign in with email") }}
     {{ error() }}
     <div class="space-y-4">
       {{ input("email", "email", "Email") }}
@@ -133,52 +143,58 @@
   <!-- First Time Setup Form (for users who exist but never logged in) -->
   <div id="firstTimeSetup"
        class="{{ styles.form.login }} hidden">
-    {{ message("Create your password") }}
-    {{ message("", role="selected-email") }}
-    {{ message("We'll send a verification link to this email before your first sign-in.", role="password-guidance") }}
+    {{ heading("Create your password") }}
+    {{ subheading("", role="selected-email") }}
+    {{ guidance("We'll send a verification link to this email before your first sign-in.", role="password-guidance") }}
     {{ error() }}
     {{ success() }}
     <div class="space-y-4">
       <input type="hidden" name="email">
-      {{ input("password", "password", "Choose a password") }}
-      {{ button("Create Password", role="signin") }}
+      <div data-hide-on-confirmation class="space-y-4">
+        {{ input("password", "password", "Choose a password") }}
+        {{ button("Create Password", role="signin") }}
+      </div>
       {{ alternate_button("back-to-email", "Back") }}
     </div>
   </div>
   <!-- Password-only sign in after the email step -->
   <div id="signIn"
        class="{{ styles.form.login }} hidden">
-    {{ message("Enter your password") }}
-    {{ message("", role="selected-email") }}
+    {{ heading("Enter your password") }}
+    {{ subheading("", role="selected-email") }}
     {{ error() }}
     {{ success() }}
     <div class="space-y-4">
       <input type="hidden" name="email">
-      {{ input("password", "password", "Password") }}
-      {{ remember_me() }}
-      {{ button("Sign In", role="signin") }}
-      <div class="text-center" data-role="signin-mode-links">
+      <div data-hide-on-confirmation class="space-y-4">
+        {{ input("password", "password", "Password") }}
+        {{ remember_me() }}
+        {{ button("Sign In", role="signin") }}
         {{ alternate_button("show-forgot-form", "Forgot your password?") }}
-        <div class="mt-2">{{ alternate_button("back-to-email", "Use a different email") }}</div>
+      </div>
+      <div class="text-center" data-role="signin-mode-links">
+        {{ alternate_button("back-to-email", "Use a different email") }}
       </div>
     </div>
   </div>
   <!-- Forgot Password Form -->
   <div id="forgotPassword"
        class="{{ styles.form.login }} hidden">
-    {{ message("Reset Password") }}
+    {{ heading("Reset your password") }}
     {{ error() }}
     {{ success() }}
     <div class="space-y-4">
-      {{ input("email", "reset-email", "Email") }}
-      {{ button("Send Reset Email", role="reset-password-email") }}
+      <div data-hide-on-confirmation class="space-y-4">
+        {{ input("email", "reset-email", "Email") }}
+        {{ button("Send Reset Email", role="reset-password-email") }}
+      </div>
       {{ alternate_button("back-to-signin", "Back to Sign In") }}
     </div>
   </div>
   <!-- Reset Password Form -->
   <div id="resetPassword"
        class="{{ styles.form.login }} hidden">
-    {{ message("Create New Password") }}
+    {{ heading("Create a new password") }}
     {{ error() }}
     {{ success() }}
     <div class="space-y-4">
@@ -189,7 +205,7 @@
   <!-- Verify Email Form -->
   <div id="verifyEmail"
        class="{{ styles.form.login }} hidden">
-    {{ message("Please sign in to your new account") }}
+    {{ heading("Please sign in to your new account") }}
     {{ error() }}
     {{ success() }}
     <!-- Email/Password Form -->

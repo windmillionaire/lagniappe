@@ -640,7 +640,7 @@ const form = {
   showError(message) {
     errors.push(message);
   },
-  showSuccess(message) {
+  showConfirmation(message) {
     throw new Error(`Unexpected success message: ${message}`);
   },
 };
@@ -743,7 +743,7 @@ const form = {
   showError(message) {
     throw new Error(`Unexpected error: ${message}`);
   },
-  showSuccess() {},
+  showConfirmation() {},
 };
 
 (async () => {

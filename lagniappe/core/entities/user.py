@@ -4,7 +4,7 @@ from flask_login import UserMixin
 
 from lagniappe import CONFIG
 
-from ..definitions import AI, Action, Fetch, Resource
+from ..definitions import AI, Action, Fetch, FetchReason, MutationIntent, Resource
 from ..properties import (
     common_entity,
     user_related,
@@ -167,21 +167,34 @@ class User(AssetMixin, UserMixin, Entity):
     # @tests tests_unit/test_009a_user.py::test_user_create_does_not_leave_initial_cache_invalidation
     # @tests tests_unit/test_009a_user.py::test_user_create_public_user_assigns_public_group
     # @tests tests_unit/test_009f_user_ai_access.py::test_user_create_defaults_non_owner_to_none
+    # @tests tests_e2e/008_users/test_008a_user_index.py::test_owner_create_adopts_public_user_and_resets_form
     # @pairs user:create user:owner user:page user:groups user:cache-invalidation
     # @pairs user:public-user user:public-group user:personal-page user:limited-attrs
     # @pair user:new-user-default
+    # @pairs user:public-adoption user:submitted-create-data user:page-reassign
     # @pairs public-users:create public-users:public-user public-users:public-group
     # @pairs public-users:personal-page public-users:limited-attrs
     @classmethod
-    def create(cls, data):
+    def create(cls, data, *, adopt_public=False):
         if not data.get("name"):
             raise ValueError("name is required")
         if not data.get("email"):
             raise ValueError("email is required")
 
         exists = database.get.user(data.get("email"))
-        if exists:
+        adopting_public = bool(
+            exists and adopt_public and exists.get("public", False)
+        )
+        if exists and not adopting_public:
             return cls(exists)
+
+        previous_page = None
+        if adopting_public:
+            new_user = Entities.fetch_one(
+                exists,
+                request=Fetch.nested(because=FetchReason.USER_SAVE_REQUIREMENTS),
+            )
+            previous_page = new_user.page
         else:
             new_user = cls()
 
@@ -207,7 +220,31 @@ class User(AssetMixin, UserMixin, Entity):
             else data.get("groups", [])
         )
         new_user.properties.permissions.create()
-        new_user.invalidate_cache = False
+
+        if previous_page and previous_page.key != new_user.page.key:
+            users_model = Entities.USERS.get()
+            previous_page.user = None
+            previous_page.properties.categories.remove(users_model)
+            previous_page.add_mutation_intents(
+                MutationIntent.touch(
+                    users_model,
+                    reason="user-public-adoption-previous-users-owner",
+                ),
+                MutationIntent.delete_from_search(
+                    "user",
+                    previous_page,
+                    reason="user-public-adoption-search-removal",
+                ),
+            )
+            new_user.add_mutation_intents(
+                MutationIntent.standard(
+                    previous_page,
+                    reason="user-public-adoption-previous-page",
+                )
+            )
+
+        if not adopting_public:
+            new_user.invalidate_cache = False
         return new_user
 
     # @testable true

@@ -246,6 +246,16 @@ def _mock_verification_email_delivery(page, calls):
     page.route("**/users/send-verification-email", handler)
 
 
+def _mock_password_reset_email_delivery(page, calls):
+    """Stub password-reset delivery while preserving the visible form flow."""
+
+    def handler(route):
+        calls.append(_request_json(route.request))
+        _json_response(route, {"success": True})
+
+    page.route("**/users/send-password-reset-email", handler)
+
+
 def _mock_document(page, path, title):
     page.route(
         f"**{path}",
@@ -340,6 +350,14 @@ def _open_sign_in_form(user, login_page, email):
 # @features login
 # @dimensions page-load form-state
 # @template users/login.html::button
+# @template users/login.html::heading
+# @template users/login.html::subheading
+# @template users/login.html::guidance
+# @template users/login.html::success
+# @style login.heading
+# @style login.subheading
+# @style login.guidance
+# @style login.success
 def test_login_page_loads(get_user):
     """
     Verify login page loads with all authentication forms in DOM.
@@ -396,6 +414,26 @@ def test_login_page_loads(get_user):
         button = action_buttons.nth(index)
         expect(button.locator(":scope > [data-role='icon']")).to_have_count(1)
         expect(button.locator(":scope > [data-role='text']")).to_have_count(1)
+
+    workflow_forms = user.locate(
+        "#ownerSetup, #authMethod, #emailCheck, #firstTimeSetup, #signIn, "
+        "#forgotPassword, #resetPassword, #verifyEmail"
+    )
+    expect(workflow_forms).to_have_count(8)
+    for index in range(8):
+        heading = workflow_forms.nth(index).locator(":scope > h1")
+        expect(heading).to_have_count(1)
+        expect(heading).to_have_class(re.compile(r".*\btext-2xl\b.*"))
+
+    confirmations = user.locate("[data-role='success']")
+    expect(confirmations).to_have_count(6)
+    for index in range(6):
+        confirmation = confirmations.nth(index)
+        expect(confirmation).to_have_attribute("data-kind", "user")
+        expect(confirmation).to_have_class(re.compile(r".*\bbg-kind-bg\b.*"))
+        expect(confirmation).to_have_class(
+            re.compile(r".*\bborder-kind-default\b.*")
+        )
 
 
 # @features login
@@ -590,11 +628,14 @@ def test_login_accepts_google_state_redirect_target(get_user):
 # @features login
 # @dimensions agent-access session user-page
 # @template users/agent_login.html::agent_login_form
+# @style login.heading
 def test_agent_access_login_form_creates_session(get_user, browser_failures):
     user = get_user(Users.ANONYMOUS)
     user.page.goto(_site_url("/users/agent-login"))
 
-    expect(user.locate("[data-role='message']")).to_have_text("Agent access")
+    heading = user.locate("[data-role='message']")
+    expect(heading).to_have_text("Agent access")
+    expect(heading).to_have_class(re.compile(r".*\btext-2xl\b.*"))
 
     agent_button = user.locate("button[data-role='agent-login']")
     expect(agent_button.locator(":scope > [data-role='icon']")).to_have_count(1)
@@ -706,6 +747,8 @@ def test_uninitialized_owner_starts_google_first_setup(get_user, browser_failure
             expect(password_setup.locator("[data-role='success']")).to_have_text(
                 "We've sent a verification link to the application owner email on file."
             )
+            expect(password_setup.locator(PASSWORD)).not_to_be_visible()
+            expect(password_setup.locator(Buttons.SIGNIN)).not_to_be_visible()
 
         owner_email = SETTINGS.test_config["ADMIN_EMAIL"]
         assert identity_calls["sign_up"][1]["email"] == owner_email
@@ -911,11 +954,18 @@ def test_verify_email_mode(get_user):
         - VERIFY_EMAIL_FORM (#verifyEmail): Email verification form selector
     """
     user = get_user(Users.ANONYMOUS)
+    identity_calls = _mock_identity_platform(user.page)
     params = {"mode": "verifyEmail", "oobCode": "test123"}
     login_page = user.go(SitePages.LOGIN_PAGE, query_params=params)
 
-    # Should show email verification form
-    expect(user.locate(login_page.VERIFY_EMAIL_FORM)).to_be_visible()
+    verify_form = user.locate(login_page.VERIFY_EMAIL_FORM)
+    expect(verify_form).to_be_visible()
+    expect(verify_form.locator("[data-role='success']")).to_have_text(
+        "Email verified successfully"
+    )
+    expect(verify_form.locator(Buttons.SIGNIN)).to_be_enabled()
+    assert identity_calls["update"] == [{"oobCode": "test123"}]
+    assert not identity_calls["unexpected"]
 
 
 # @features login
@@ -1030,6 +1080,7 @@ def test_csrf_failure_is_identified_for_targeted_retry(get_user, browser_failure
 # @features login
 # @dimensions logout session redirect session-keys clear
 # @pair cache:invalidation-acknowledgement
+# @style login.heading
 def test_logout_clears_session_and_returns_login(get_user):
     """
     Authenticated users visiting /users/login see logged-in shell; POST logout
@@ -1046,6 +1097,9 @@ def test_logout_clears_session_and_returns_login(get_user):
     login_page = user.go(SitePages.LOGIN_PAGE)
 
     expect(user.page).to_have_title("Logged In")
+    expect(user.page.get_by_role("heading", name="You are logged in")).to_have_class(
+        re.compile(r".*\btext-2xl\b.*")
+    )
     logout = user.page.get_by_role("button", name="Logout")
     expect(logout).to_be_visible()
 
@@ -1180,10 +1234,14 @@ def test_known_registered_email_shows_sign_in(get_user):
 
 # @features login
 # @dimensions forgot-password sign-in-transition
+# @template users/login.html::success
+# @style login.success
 def test_forgot_password_form_opens_from_sign_in(get_user):
-    """From sign-in, "Forgot your password?" reveals the reset-email form."""
+    """Forgot-password delivery replaces its inputs with confirmation feedback."""
     _ensure_owner_initialized()
     user = get_user(Users.ANONYMOUS)
+    reset_email_calls = []
+    _mock_password_reset_email_delivery(user.page, reset_email_calls)
     login_page = user.go(SitePages.LOGIN_PAGE)
     email_form = _open_email_check_form(user, login_page)
     email_form.locator(FormElements.EMAIL).fill(SETTINGS.test_config["ADMIN_EMAIL"])
@@ -1198,6 +1256,18 @@ def test_forgot_password_form_opens_from_sign_in(get_user):
             'input[name="reset-email"]'
         )
     ).to_be_visible()
+
+    forgot_form = user.locate(login_page.FORGOT_PASSWORD_FORM)
+    forgot_form.locator("button[data-role='reset-password-email']").click()
+
+    expect(forgot_form.locator("[data-role='success']")).to_have_text(
+        "A password reset link has been sent to your email address."
+    )
+    expect(forgot_form.locator('input[name="reset-email"]')).not_to_be_visible()
+    expect(
+        forgot_form.locator("button[data-role='reset-password-email']")
+    ).not_to_be_visible()
+    assert reset_email_calls == [{"email": SETTINGS.test_config["ADMIN_EMAIL"]}]
 
 
 # @features login
@@ -1316,21 +1386,24 @@ def test_login_remember_preference_syncs_across_forms(get_user):
 # @dimensions first-time-setup account-create form-state
 def test_first_time_setup_form_creates_password_and_can_return_to_email_check(
     get_user,
+    browser_failures,
 ):
-    """Provisioned users can back out of setup, then create a password."""
+    """Provisioned users can back out, then create a password for verification."""
     _ensure_owner_initialized()
     user = get_user(Users.ANONYMOUS)
-    identity_calls = _mock_identity_platform(user.page)
+    identity_calls = _mock_identity_platform(user.page, sign_up_verified=False)
     login_identity_calls = []
+    verification_email_calls = []
     email = f"first-time-password-{uuid4().hex}@example.test"
     password = "new-password-123"
     _create_first_time_user(email)
     _mock_login_identity(
         user.page,
         login_identity_calls,
-        {"success": True, "redirect": "/testing-login-success"},
+        {"success": False, "requires_verification": True},
+        status=403,
     )
-    _mock_document(user.page, "/testing-login-success", "Login Complete")
+    _mock_verification_email_delivery(user.page, verification_email_calls)
 
     login_page = user.go(SitePages.LOGIN_PAGE)
     email_form = _open_email_check_form(user, login_page)
@@ -1339,7 +1412,11 @@ def test_first_time_setup_form_creates_password_and_can_return_to_email_check(
 
     first_time_form = user.locate(login_page.FIRST_TIME_SETUP_FORM)
     expect(first_time_form).to_be_visible()
-    expect(first_time_form.locator("[data-role='selected-email']")).to_have_text(email)
+    selected_email = first_time_form.locator("[data-role='selected-email']")
+    guidance = first_time_form.locator("[data-role='password-guidance']")
+    expect(selected_email).to_have_text(email)
+    expect(selected_email).to_have_class(re.compile(r".*\btext-lg\b.*"))
+    expect(guidance).to_have_class(re.compile(r".*\btext-sm\b.*"))
     expect(first_time_form.locator("input[type='email']")).to_have_count(0)
     expect(first_time_form.locator(".g_id_signin")).to_have_count(0)
 
@@ -1351,15 +1428,25 @@ def test_first_time_setup_form_creates_password_and_can_return_to_email_check(
     expect(first_time_form).to_be_visible()
 
     first_time_form.locator(PASSWORD).fill(password)
-    first_time_form.locator(Buttons.SIGNIN).click()
-
-    expect(user.page).to_have_url(_site_url("/testing-login-success"))
-    expect(user.page).to_have_title("Login Complete")
+    with browser_failures.expect_http_error(
+        user,
+        status=403,
+        path="/users/login-identity",
+    ):
+        first_time_form.locator(Buttons.SIGNIN).click()
+        expect(first_time_form.locator("[data-role='success']")).to_have_text(
+            f"An email verification link has been sent to {email}."
+        )
+        expect(first_time_form.locator(PASSWORD)).not_to_be_visible()
+        expect(first_time_form.locator(Buttons.SIGNIN)).not_to_be_visible()
 
     assert identity_calls["sign_up"][0]["email"] == email
     assert identity_calls["sign_up"][0]["password"] == password
     assert login_identity_calls[0]["email"] == email
     assert login_identity_calls[0]["authResult"]
+    assert verification_email_calls == [
+        {"idToken": login_identity_calls[0]["authResult"]}
+    ]
     assert not identity_calls["unexpected"]
 
 
@@ -1426,6 +1513,8 @@ def test_login_identity_client_handoff_redirects_or_requires_verification(
         expect(success).to_contain_text(
             f"An email verification link has been sent to {email}."
         )
+        expect(sign_in_form.locator(PASSWORD)).not_to_be_visible()
+        expect(sign_in_form.locator(Buttons.SIGNIN)).not_to_be_visible()
 
     assert login_identity_calls[0]["email"] == email
     assert login_identity_calls[0]["remember"] is True

@@ -40,6 +40,19 @@ Identity Platform OOB code and deliver the local action URL through the
 operator-configured SMTP service. The bundle does not load a provider-owned
 authentication SDK.
 
+The returned Identity Platform Web API key and project ID are public client
+configuration: they select the provider project and quota but do not authorize
+access to Lagniappe or Google Cloud resources. Email/password operations return
+an Identity Platform ID token to the browser. The browser passes that token to
+`/users/login-identity`, where the server verifies its signature, issuer,
+audience, subject, email, and verification state before applying Lagniappe's
+own owner/provisioning/public-registration rules and creating a session. The
+browser does not persist the provider refresh token. Google sign-in is a
+separate path: the provider-owned GIS button iframe posts a Google credential
+to `/users/google-signin`; the server verifies it, exchanges it through
+Identity Platform, verifies the resulting project token, and only then creates
+the Lagniappe session.
+
 ### `sentry.mjs` (conditional production monitoring)
 
 A separate local bundle for `@sentry/browser`. Production templates load it

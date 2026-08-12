@@ -896,6 +896,15 @@ commands or call the reconciliation logic directly.
   and provider message instead of printing the request URL and complete
   structured response
 
+`initializeAuth` owns creation of the project's default browser key. The
+installer reads that provider-generated key from `config.client.apiKey`; it
+does not call the API Keys API or choose the key's API targets or browser
+referrer restrictions. Enabling `identitytoolkit.googleapis.com` in the
+required-service list makes the Identity Platform API available to the
+project, while the installer's ADC OAuth scope authorizes its administrative
+requests. Neither setting is a restriction or permission carried by the
+public Web API key.
+
 The generic authenticated Google REST helpers live in
 `installer/google_provider.py`. Setup re-reads Identity Platform after
 reconciliation and fails closed unless the subtype is `IDENTITY_PLATFORM`,

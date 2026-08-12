@@ -52,6 +52,9 @@ class LoginForms {
 		this.actionButton = null;
 		this.error = this.form.querySelector("[data-role='error']");
 		this.success = this.form.querySelector("[data-role='success']");
+		this.hideOnConfirmation = this.form.querySelectorAll(
+			"[data-hide-on-confirmation]",
+		);
 	}
 
 	show() {
@@ -102,6 +105,16 @@ class LoginForms {
 		this.success.classList.remove("hidden");
 	}
 
+	showConfirmation(message) {
+		this.showSuccess(message);
+		this.form.querySelectorAll("input[type='password']").forEach((input) => {
+			input.value = "";
+		});
+		this.hideOnConfirmation.forEach((element) => {
+			element.classList.add("hidden");
+		});
+	}
+
 	showError(message) {
 		this.reset();
 		this.error.textContent = message;
@@ -126,6 +139,9 @@ class LoginForms {
 			this.error.textContent = "";
 			this.error.classList.add("hidden");
 		}
+		this.hideOnConfirmation.forEach((element) => {
+			element.classList.remove("hidden");
+		});
 	}
 }
 
@@ -214,7 +230,9 @@ class OwnerSetupForm extends LoginForms {
 			"[data-role='owner-password-setup']",
 		);
 		this.googleError = this.googleSetup.querySelector("[data-role='error']");
-		this.passwordError = this.passwordSetup.querySelector("[data-role='error']");
+		this.passwordError = this.passwordSetup.querySelector(
+			"[data-role='error']",
+		);
 		this.verificationSuccessMessage =
 			"We've sent a verification link to the application owner email on file.";
 		this.password = this.passwordSetup.querySelector("input[type='password']");
@@ -426,7 +444,7 @@ class ForgotPasswordForm extends LoginForms {
 		this.auth
 			.sendPasswordResetEmail(email, this.getToken())
 			.then(() => {
-				this.showSuccess(
+				this.showConfirmation(
 					"A password reset link has been sent to your email address.",
 				);
 			})
@@ -486,7 +504,6 @@ class ResetPasswordForm extends LoginForms {
  */
 class VerifyEmailForm extends LoginForms {
 	init() {
-		let verified = false;
 		this.password = this.form.querySelector("input[type='password']");
 		this.signinButton = this.form.querySelector("[data-role='signin']");
 		this.signinButton.disabled = true;
@@ -507,22 +524,18 @@ class VerifyEmailForm extends LoginForms {
 		this.auth
 			.applyActionCode(this.data.code)
 			.then(() => {
-				verified = true;
 				this.signinButton.disabled = false;
 				this.setActionButton(this.signinButton);
 				this.actionButton.addEventListener(
 					"click",
 					this.handleSignIn.bind(this),
 				);
+				this.showSuccess("Email verified successfully");
 			})
 			.catch((error) => {
 				captureLoginError(error, "verify_email");
 				this.showError(getAuthErrorMessage(error));
 			});
-
-		if (verified) {
-			this.showSuccess("Email verified successfully");
-		}
 	}
 
 	handleSignIn() {

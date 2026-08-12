@@ -296,9 +296,8 @@ STYLES = {
 		"heading": "text-center mb-6 text-2xl font-semibold text-base-dark",
 		"subheading": "text-center mb-3 text-lg font-semibold text-base-dark",
 		"guidance": "text-center mb-5 text-sm leading-6 text-base-medium",
-		"message": "text-center mb-4 text-base-dark",
 		"error": "border px-4 py-3 rounded-md mb-4 hidden bg-delete-bg border-delete-default text-delete-default",
-		"success": "border px-4 py-3 rounded-md mb-4 hidden bg-saved-bg border-saved-default text-saved-default"
+		"success": "border px-4 py-3 rounded-md mb-4 hidden bg-kind-bg border-kind-default text-kind-default"
 	},
 	"manual": {
 		"button": "flex grow flex-row items-center justify-center gap-2 rounded-md bg-kind-default px-3 py-1.5 text-base font-semibold text-white shadow-sm",

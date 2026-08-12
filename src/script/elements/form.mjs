@@ -52,9 +52,10 @@ export class FormElement {
 		return this.readonly && this.component?.showEmptyFields === true;
 	}
 	get formData() {
-		const data = this.target instanceof HTMLFormElement
-			? new FormData(this.target)
-			: new FormData();
+		const data =
+			this.target instanceof HTMLFormElement
+				? new FormData(this.target)
+				: new FormData();
 		return this.form?._subForm?.applyDirectUploads?.(data) ?? data;
 	}
 

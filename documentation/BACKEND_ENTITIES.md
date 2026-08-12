@@ -153,6 +153,13 @@ set `preserve_user_pages=True` delete only the user, clear the page's `user`
 relationship, and remove the reserved `USERS` model. A preserved page keeps any
 other categories; if it has none, `Uncategorized Pages` becomes its model.
 
+The owner-facing create-user route may adopt an existing public user instead of
+creating a duplicate. Adoption keeps the Identity Platform/user key, clears the
+public flag, and applies the submitted name, page, AI access, and groups through
+the normal user-creation assignments. If the submitted page replaces the
+public user's page, the previous page is unlinked and removed from the reserved
+Users model while the adopted user's active-session cache is marked stale.
+
 ### Permissions
 
 `allowed(action, user)` checks if the current user has permission to perform an action on the entity. Delegates to `user.has_permission(self, action)`.

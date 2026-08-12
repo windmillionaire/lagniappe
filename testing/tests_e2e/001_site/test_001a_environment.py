@@ -247,10 +247,25 @@ def test_authenticated_home_response_headers_include_etag(get_user):
     assert headers["x-frame-options"] == "SAMEORIGIN"
     assert headers["x-content-type-options"] == "nosniff"
     assert headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    assert "content-security-policy-report-only" not in headers
     assert '<div lp-view data-kind="home"' in direct.text
     csp = headers["content-security-policy"]
-    assert "script-src 'self' https://accounts.google.com" in csp
-    assert "connect-src 'self' https://*.googleapis.com" in csp
+    assert (
+        "script-src 'self' https://accounts.google.com/gsi/client" in csp
+    )
+    assert (
+        "style-src 'self' 'unsafe-inline' "
+        "https://accounts.google.com/gsi/style" in csp
+    )
+    assert (
+        "connect-src 'self' https://*.googleapis.com "
+        "https://accounts.google.com/gsi/" in csp
+    )
+    assert (
+        "frame-src 'self' https://www.youtube-nocookie.com "
+        "https://accounts.google.com/gsi/" in csp
+    )
+    assert "frame-ancestors 'self'" in csp
     assert "img-src 'self' blob: data: https://storage.googleapis.com" in csp
     assert "media-src 'self' https://storage.googleapis.com" in csp
     if CONFIG.capture_errors:

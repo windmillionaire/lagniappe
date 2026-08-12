@@ -64,8 +64,14 @@ csrf = CSRFProtect()
 csrf.init_app(app)
 initialize_app(app, csrf)
 
-SCRIPT_SRC = "script-src 'self' https://accounts.google.com"
-CONNECT_SRC = "connect-src 'self' https://*.googleapis.com"
+GOOGLE_IDENTITY_BASE = "https://accounts.google.com/gsi/"
+GOOGLE_IDENTITY_SCRIPT = f"{GOOGLE_IDENTITY_BASE}client"
+GOOGLE_IDENTITY_STYLE = f"{GOOGLE_IDENTITY_BASE}style"
+SCRIPT_SRC = f"script-src 'self' {GOOGLE_IDENTITY_SCRIPT}"
+CONNECT_SRC = (
+    "connect-src 'self' https://*.googleapis.com "
+    f"{GOOGLE_IDENTITY_BASE}"
+)
 STORAGE_SRC = "https://storage.googleapis.com"
 
 if SENTRY_LOADED and CONFIG.SENTRY_JS_DSN:
@@ -82,12 +88,16 @@ CSP = "; ".join(
     [
         "default-src 'self'",
         SCRIPT_SRC,
-        "style-src 'self' 'unsafe-inline' https://accounts.google.com",
+        f"style-src 'self' 'unsafe-inline' {GOOGLE_IDENTITY_STYLE}",
         f"img-src 'self' blob: data: {STORAGE_SRC}",
         f"media-src 'self' {STORAGE_SRC}",
         "font-src 'self'",
         CONNECT_SRC,
-        "frame-src 'self' https://www.youtube-nocookie.com https://accounts.google.com",
+        (
+            "frame-src 'self' https://www.youtube-nocookie.com "
+            f"{GOOGLE_IDENTITY_BASE}"
+        ),
+        "frame-ancestors 'self'",
         "worker-src 'self' blob:",
         "manifest-src 'self'",
         "base-uri 'self'",

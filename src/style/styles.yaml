@@ -937,17 +937,13 @@ login:
     classes: text-center mb-5 text-sm leading-6 text-base-medium
     intent: supporting guidance within a login workflow
     surfaces: [server]
-  message:
-    classes: text-center mb-4 text-base-dark
-    intent: message presentation within login
-    surfaces: [server]
   error:
     classes: border px-4 py-3 rounded-md mb-4 hidden bg-delete-bg border-delete-default text-delete-default
     intent: error presentation within login
     surfaces: [server]
   success:
-    classes: border px-4 py-3 rounded-md mb-4 hidden bg-saved-bg border-saved-default text-saved-default
-    intent: success presentation within login
+    classes: border px-4 py-3 rounded-md mb-4 hidden bg-kind-bg border-kind-default text-kind-default
+    intent: user-kind confirmation feedback within a login workflow
     surfaces: [server]
 
 manual:
