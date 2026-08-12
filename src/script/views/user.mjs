@@ -132,11 +132,20 @@ export default class Users extends EntityIndex {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008b_user_groups.py::test_delete_group_refreshes_group_navigation
+	 * @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
 	 * @features user-groups
-	 * @dimensions group-delete nav-refresh polling
+	 * @dimensions group-delete nav-refresh polling unrelated-delete
 	 */
 	async refreshSupplementalCollections(changes = []) {
-		if (changes.some(({ type }) => type === "delete")) {
+		const groupsElt = this.elt?.querySelector("[id='user-groups']");
+		const groups = groupsElt ? this.getComponent(groupsElt) : null;
+		const activeGroupKey = groups?.active?.target?.dataset.key;
+		if (
+			activeGroupKey &&
+			changes.some(
+				({ type, key }) => type === "delete" && key === activeGroupKey,
+			)
+		) {
 			await this._refreshGroups();
 		}
 	}

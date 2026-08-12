@@ -540,8 +540,10 @@ def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user
 
 # @pairs users:delete users:default-cascade users:preserve-page
 # @pairs users:category-fallback users:options
+# @pair user-groups:unrelated-delete
 # @pairs pages:delete pages:default-cascade pages:preserve-page
 # @pair pages:category-fallback
+# @template table.html::row
 def test_delete_user_can_preserve_page(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -568,7 +570,9 @@ def test_delete_user_can_preserve_page(get_user):
     page_key = created_user.page.key
 
     try:
-        owner.go(SitePages.USER_INDEX)
+        user_index = owner.go(SitePages.USER_INDEX)
+        groups_tool = owner.locate(user_index.USER_GROUPS_COMPONENT)
+        expect(groups_tool).not_to_be_visible()
         cascade_row = Table(owner).get_row(cascade_user.name)
         expect(cascade_row).to_be_visible()
 
@@ -584,6 +588,8 @@ def test_delete_user_can_preserve_page(get_user):
             cascade_modal.delete()
 
         expect(cascade_row).not_to_be_attached()
+        expect(groups_tool).not_to_be_visible()
+        expect(owner.page).to_have_url(re.compile(r"/users/index$"))
         assert response_info.value.request.post_data_json == {"delete-page": True}
         assert Entities.fetch_one(cascade_user_key, request=Fetch.root()) is None
         assert Entities.fetch_one(cascade_page_key, request=Fetch.root()) is None
@@ -602,6 +608,8 @@ def test_delete_user_can_preserve_page(get_user):
             modal.delete()
 
         expect(row).not_to_be_attached()
+        expect(groups_tool).not_to_be_visible()
+        expect(owner.page).to_have_url(re.compile(r"/users/index$"))
         assert response_info.value.request.post_data_json == {"delete-page": False}
         assert Entities.fetch_one(user_key, request=Fetch.root()) is None
 
