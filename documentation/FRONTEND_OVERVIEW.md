@@ -51,7 +51,9 @@ browser does not persist the provider refresh token. Google sign-in is a
 separate path: the provider-owned GIS button iframe posts a Google credential
 to `/users/google-signin`; the server verifies it, exchanges it through
 Identity Platform, verifies the resulting project token, and only then creates
-the Lagniappe session.
+the Lagniappe session. The server renders that path only when the installation's
+`GOOGLE_SIGNIN_ENABLED` intent is true and the live provider is not explicitly
+disabled; it also enforces the intent again at the callback route.
 
 ### `sentry.mjs` (conditional production monitoring)
 

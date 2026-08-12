@@ -1244,7 +1244,14 @@ def test_update_config_sets_application_version_from_package(monkeypatch):
     settings = types.SimpleNamespace(APP={"VERSION": "1.0"}, NODE={"version": "2.0"})
     calls = []
 
-    monkeypatch.setitem(sys.modules, "config", types.SimpleNamespace(SETTINGS=settings))
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(
+            SETTINGS=settings,
+            constants=types.SimpleNamespace(DEFAULT_GOOGLE_SIGNIN_ENABLED=True),
+        ),
+    )
     def fake_set_default_config():
         calls.append(("defaults", settings.APP["VERSION"]))
         settings.APP.setdefault("AGENT_ACCESS_ENABLED", False)
@@ -1255,6 +1262,7 @@ def test_update_config_sets_application_version_from_package(monkeypatch):
     assert settings.APP["VERSION"] == "2.0"
     assert "BUILD_ID" not in settings.APP
     assert settings.APP["AGENT_ACCESS_ENABLED"] is False
+    assert settings.APP["GOOGLE_SIGNIN_ENABLED"] is True
     assert calls == [("defaults", "2.0")]
 
 
@@ -1502,6 +1510,38 @@ def test_verify_application_config_reports_missing_areas(monkeypatch, capsys):
     assert "preserving the current configuration" in output
     assert "ADMIN_EMAIL" not in output
     assert "SECRET_KEY" not in output
+
+
+# @features setup
+# @dimensions config-files validation google-oauth optional
+def test_verify_application_config_requires_google_client_only_when_enabled(
+    monkeypatch,
+    capsys,
+):
+    import installer as setup_pkg
+    from installer import create_config
+
+    settings = types.SimpleNamespace(APP={"GOOGLE_SIGNIN_ENABLED": False})
+    fake_config = types.SimpleNamespace(
+        constants=types.SimpleNamespace(
+            REQUIRED_APPLICATION_SETTINGS={
+                "GOOGLE_SIGNIN_ENABLED": "Authentication",
+            }
+        ),
+        SETTINGS=settings,
+    )
+    monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
+    monkeypatch.setitem(sys.modules, "config", fake_config)
+
+    assert create_config.verify_application_config()
+
+    settings.APP["GOOGLE_SIGNIN_ENABLED"] = True
+    with pytest.raises(SetupError):
+        create_config.verify_application_config()
+    assert "Missing configuration areas: Authentication" in capsys.readouterr().out
+
+    settings.APP["GOOGLE_CLIENT_ID"] = "1234-web.apps.googleusercontent.com"
+    assert create_config.verify_application_config()
 
 
 # @features setup

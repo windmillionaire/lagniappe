@@ -162,6 +162,14 @@ Source card. Setup defaults it to the canonical Lagniappe repository and
 preserves an operator-authored repository, fork, tag, or commit URL on later
 refreshes. Set it to an empty string to hide the link.
 
+`GOOGLE_SIGNIN_ENABLED` is the persisted operator intent for Google sign-in.
+Fresh setup asks before beginning Google Auth Platform or OAuth client work and
+defaults to the existing enabled behavior. When false, setup skips Google OAuth
+instructions and Identity Platform Google-provider reconciliation; standalone
+Identity Platform email/password authentication remains required. Existing and
+recovered settings without the key migrate to `true`. A successful focused
+`./setup.sh oauth` run stores `true` explicitly.
+
 `INSTALLER_EMAIL` and `DEPLOYER_EMAIL` record the Google identities selected by
 the current setup run. The built-in flow uses the active
 `GCLOUD_CONFIG.ACCOUNT` for both responsibilities, including during recovery,

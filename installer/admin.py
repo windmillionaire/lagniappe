@@ -477,20 +477,72 @@ def _get_admin_email(value):
 
 
 # @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_google_signin_is_an_explicit_preserved_setup_choice
+# @features setup
+# @dimensions google-oauth optional settings-save rerun
+def configure_google_signin_choice():
+    """Read or collect the persisted operator choice for Google sign-in."""
+    from config import SETTINGS
+
+    existing = SETTINGS.APP.get("GOOGLE_SIGNIN_ENABLED")
+    if existing is None and str(SETTINGS.APP.get("GOOGLE_CLIENT_ID") or "").strip():
+        existing = True
+    if existing is not None:
+        if not isinstance(existing, bool):
+            normalized = str(existing).strip().casefold()
+            if normalized not in {"true", "false"}:
+                raise ValueError("GOOGLE_SIGNIN_ENABLED must be true or false.")
+            existing = normalized == "true"
+        SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] = existing
+        print(f"Google sign-in is {'enabled' if existing else 'disabled'}.")
+        return existing
+
+    print("\nOptional Google Sign-In")
+    print(
+        wrap_text(
+            "Email and password authentication will remain available either "
+            "way. Enabling Google sign-in adds the Google Auth Platform and "
+            "OAuth client setup steps."
+        )
+    )
+    enabled = input("Enable Google sign-in? [Y/n]: ").strip().casefold() not in {
+        "n",
+        "no",
+    }
+    SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] = enabled
+    print(f"Google sign-in {'enabled' if enabled else 'disabled'}.")
+    return enabled
+
+
+# @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_disabled_google_signin_skips_oauth_setup
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_admin_oauth_rejection_precedes_provider_update
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_existing_admin_oauth_can_replace_rejected_saved_client
 # @features setup
-# @dimensions admin oauth settings-save client-type redirect-uri failure-isolation identity-platform interactive-retry
+# @dimensions admin oauth settings-save client-type redirect-uri failure-isolation identity-platform interactive-retry optional disabled-provider
 def setup_admin_and_oauth():
     """Configure the admin and Identity Platform's Google provider."""
     from config import SETTINGS
     from installer.identity import setup_google_provider
 
+    settings_changed = False
     if "ADMIN_NAME" not in SETTINGS.APP:
         SETTINGS.APP["ADMIN_NAME"] = _get_admin_name()
         SETTINGS.APP["ADMIN_EMAIL"] = _get_admin_email()
+        settings_changed = True
+
+    previous_google_choice = SETTINGS.APP.get("GOOGLE_SIGNIN_ENABLED")
+    google_signin_enabled = configure_google_signin_choice()
+    if previous_google_choice is None or previous_google_choice is not google_signin_enabled:
+        settings_changed = True
+
+    if settings_changed:
         SETTINGS.save()
+
+    if not google_signin_enabled:
+        print("Skipping Google OAuth and Identity Platform provider setup.")
+        return True
 
     if "GOOGLE_CLIENT_ID" not in SETTINGS.APP:
         print_oauth_instructions()
@@ -550,6 +602,7 @@ def configure_oauth():
     client_id, client_secret = _get_verified_oauth_credentials(SETTINGS)
     setup_google_provider(client_id, client_secret)
     SETTINGS.APP["GOOGLE_CLIENT_ID"] = client_id
+    SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] = True
     SETTINGS.save()
     print(f.success("Google OAuth settings verified and saved."))
     _print_oauth_file_retention_message()

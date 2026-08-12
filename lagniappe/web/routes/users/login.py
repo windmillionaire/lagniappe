@@ -308,8 +308,11 @@ def verify_user(email, name, picture):
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
 # @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
 # @tests tests_e2e/001_site/test_001b_login.py::test_unregistered_google_error_returns_to_method_chooser
+# @tests tests_e2e/001_site/test_001b_login.py::test_disabled_google_error_returns_to_method_chooser
+# @tests tests_e2e/001_site/test_001b_login.py::test_login_hides_google_when_provider_is_disabled
+# @tests tests_e2e/001_site/test_001b_login.py::test_google_signin_setting_disables_ui_and_callback
 # @features login
-# @dimensions page-load form-state test-user session cookie-hardening owner-bootstrap authorization-error
+# @dimensions page-load form-state test-user session cookie-hardening owner-bootstrap authorization-error google-oauth disabled-account disabled-provider operator-intent auth-method safe-error
 @users.route("/login", methods=["GET"])
 def login():
     test_user = request.values.get("test_user", "").strip()
@@ -356,9 +359,26 @@ def login():
     next_url = _store_safe_next_from_query()
     allow_registration = Entities.PUBLIC_GROUP.enabled()
     owner_setup = _owner_requires_first_login()
+    google_signin_enabled = CONFIG.GOOGLE_SIGNIN_ENABLED is True
+    google = CONFIG.production and google_signin_enabled
+    if google:
+        try:
+            google = identity_platform.google_provider_enabled()
+        except (identity_platform.IdentityPlatformError, RuntimeError) as error:
+            exceptions.capture(
+                error,
+                context={"auth": {"operation": "google_provider_status"}},
+                level="warning",
+            )
+            # A control-plane read failure should not disable a working login method.
+            google = True
     auth_error = {
         "google-not-registered": (
             "That Google account does not have access to this site. "
+            "Contact the site owner if you think this is a mistake."
+        ),
+        "google-user-disabled": (
+            "This account is disabled and cannot sign in. "
             "Contact the site owner if you think this is a mistake."
         ),
     }.get(request.args.get("authError"))
@@ -366,7 +386,8 @@ def login():
         "users/login.html",
         mode=request.args.get("mode"),
         code=request.args.get("oobCode"),
-        google=CONFIG.production,
+        google=google,
+        google_available=google_signin_enabled and (not CONFIG.production or google),
         g_client_id=CONFIG.GOOGLE_CLIENT_ID,
         g_login_uri=CONFIG.GOOGLE_LOGIN_URI,
         next_url=next_url,
@@ -422,6 +443,13 @@ def login_google():
 
     verify_google_csrf(request)
 
+    if CONFIG.GOOGLE_SIGNIN_ENABLED is not True:
+        query = {}
+        safe_state = _safe_redirect_target(request.values.get("state"))
+        if safe_state:
+            query["next"] = safe_state
+        return redirect(url_for("users.login", **query))
+
     token = request.values.get("credential")
     if not token:
         abort(400, "No credential provided")
@@ -470,7 +498,25 @@ def login_google():
 
         _login_and_seed(user, remember=_remember_preference(default=True))
         record_login(user, "identity-google")
-    except (ValueError, identity_platform.IdentityPlatformError) as e:
+    except identity_platform.IdentityPlatformError as e:
+        context = {
+            "auth": {
+                "operation": "identity_google_exchange",
+                "has_token": bool(token),
+                "provider_code": e.provider_code,
+            }
+        }
+        exceptions.capture(e, context)
+        if e.provider_code in {"USER_DISABLED", "OPERATION_NOT_ALLOWED"}:
+            query = {}
+            if e.provider_code == "USER_DISABLED":
+                query["authError"] = "google-user-disabled"
+            safe_state = _safe_redirect_target(request.values.get("state"))
+            if safe_state:
+                query["next"] = safe_state
+            return redirect(url_for("users.login", **query))
+        abort(401, "Invalid token")
+    except ValueError as e:
         context = {
             "auth": {
                 "operation": "identity_google_exchange",

@@ -525,9 +525,12 @@ The full installation runs these steps in order:
    Workspace mailbox over SMTP/STARTTLS as the zero-domain bootstrap. It then
    initializes standalone Identity Platform against the selected public
    origin and enables email/password authentication.
-7. **Admin/OAuth** -- sets the admin user, opens the target project's current
-   Google Auth Platform Clients page, and guides the remaining one-time
-   registration and Web OAuth client creation. If the platform is not
+7. **Admin/OAuth** -- sets the admin user and asks whether Google sign-in should
+   be enabled. Declining persists `GOOGLE_SIGNIN_ENABLED: false` and skips the
+   remaining Google OAuth/provider work while leaving email/password sign-in
+   available. When enabled, setup opens the target project's current Google Auth
+   Platform Clients page and guides the remaining one-time registration and Web
+   OAuth client creation. If the platform is not
    registered yet, the operator uses **Get started**, chooses the external
    audience, and finishes the short app-information flow before creating the
    client. Before registering the Google provider or continuing installation,
@@ -896,6 +899,9 @@ commands or call the reconciliation logic directly.
   and provider message instead of printing the request URL and complete
   structured response
 
+This email/password setup is unconditional. `GOOGLE_SIGNIN_ENABLED` controls
+only the later Google Auth Platform, OAuth client, and Google-provider steps.
+
 `initializeAuth` owns creation of the project's default browser key. The
 installer reads that provider-generated key from `config.client.apiKey`; it
 does not call the API Keys API or choose the key's API targets or browser
@@ -1033,13 +1039,15 @@ run:
 The focused mode activates and validates the saved project, prints the exact
 Web-client origin, callback, and absolute credential-file path again, validates
 the replacement JSON before changing the Identity Platform Google provider,
-saves its public client ID, and offers to deploy the updated application
+saves its public client ID, explicitly enables `GOOGLE_SIGNIN_ENABLED`, and
+offers to deploy the updated application
 settings. The old general OAuth client remains a manual Google Auth Platform
 resource; delete it in the console if it is no longer needed.
 
 Until the configured owner completes their first login, `/users/login` opens a
-dedicated Google-first owner setup screen instead of the ordinary email and
-password sign-in form. A secondary password option creates a separate
+dedicated Google-first owner setup screen when Google sign-in is enabled. With
+Google sign-in disabled, it opens directly on separate-password setup. That
+password option creates a separate
 Identity Platform credential for the configured owner email and requires the
 normal verification email before login completes.
 
@@ -1053,6 +1061,15 @@ password-only screen and the same generic authentication error. Public sites
 continue to route unknown email addresses through account creation. Safe
 post-login destinations are retained through Google, verification-email, and
 password-reset handoffs.
+
+The production login page first applies `GOOGLE_SIGNIN_ENABLED`. When false it
+omits Google controls, skips the live provider lookup, and refuses direct Google
+callback posts. When true, it reads the same live Identity Platform
+Google-provider configuration used by setup. If that provider is disabled or
+absent, Google controls are omitted and initial owner setup opens directly on
+its separate password option. Runtime status-read failures leave Google
+available rather than turning a transient control-plane outage into a
+login-method outage.
 
 Setup also maintains optional agent-access settings in
 `config/files/lagniappe_settings.yaml`: `AGENT_ACCESS_ENABLED`,

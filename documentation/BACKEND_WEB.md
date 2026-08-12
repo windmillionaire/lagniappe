@@ -136,7 +136,13 @@ before handing an Identity Platform credential to
 and retries once. Other `400` responses are not retried. The server verifies
 the exact Secure Token issuer, project audience, and subject before creating a
 Lagniappe session. Popup-free Google Identity Services credentials are first
-exchanged through Identity Platform's `accounts:signInWithIdp` endpoint.
+exchanged through Identity Platform's `accounts:signInWithIdp` endpoint. In
+production, `GOOGLE_SIGNIN_ENABLED` is checked before the login page reads live
+Google provider configuration with the runtime service account. Disabled intent
+omits Google controls and rejects direct callback posts. Enabled intent still
+omits the controls when the live provider is explicitly disabled or absent. A
+control-plane read failure is fail-open so a transient status outage does not
+remove an otherwise working login method.
 
 ### Permission Decorators
 

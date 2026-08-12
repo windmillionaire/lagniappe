@@ -602,6 +602,32 @@ def test_ai_observability_is_an_explicit_preserved_setup_choice(
     assert settings.APP["AI_OBSERVABILITY"] is True
 
 
+# @features setup
+# @dimensions google-oauth optional settings-save rerun
+def test_google_signin_is_an_explicit_preserved_setup_choice(monkeypatch, capsys):
+    import config
+    from installer import admin
+
+    settings = _fake_settings()
+    monkeypatch.setattr(config, "SETTINGS", settings)
+    prompts = []
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: prompts.append(prompt) or "n",
+    )
+
+    assert admin.configure_google_signin_choice() is False
+    assert settings.APP["GOOGLE_SIGNIN_ENABLED"] is False
+    assert prompts == ["Enable Google sign-in? [Y/n]: "]
+
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda _prompt: pytest.fail("saved choice must not be prompted again"),
+    )
+    assert admin.configure_google_signin_choice() is False
+    assert "Google sign-in is disabled" in capsys.readouterr().out
+
+
 # @features setup ai-observability
 # @dimensions ai-cache privacy-consent settings-save
 def test_ai_setup_mode_configures_observability(monkeypatch):
@@ -1213,7 +1239,7 @@ def test_gcp_domain_mapping_and_ai_cache_commands(monkeypatch):
 
 
 # @features setup
-# @dimensions custom-domain cloudflare-dns dns-only provider-records idempotence
+# @dimensions custom-domain cloudflare-dns dns-only provider-records idempotence disabled-provider
 def test_custom_domain_uses_provider_records_and_dns_only_cloudflare(monkeypatch):
     import installer as setup_package
     from installer import custom_domain
@@ -1272,7 +1298,12 @@ def test_custom_domain_uses_provider_records_and_dns_only_cloudflare(monkeypatch
             or ["record-1"]
         ),
     )
-    monkeypatch.setattr(domain, "update_oauth_redirect_uris", lambda value: None)
+    oauth_domains = []
+    monkeypatch.setattr(
+        domain,
+        "update_oauth_redirect_uris",
+        oauth_domains.append,
+    )
     identity_urls = []
     monkeypatch.setattr(
         identity,
@@ -1295,6 +1326,15 @@ def test_custom_domain_uses_provider_records_and_dns_only_cloudflare(monkeypatch
     assert settings.APP["CLOUDFLARE_ZONE_ID"] == "zone-1"
     assert settings.APP["CLOUDFLARE_ACCOUNT_ID"] == "account-1"
     assert identity_urls == ["https://app.example.com"]
+    assert oauth_domains == ["app.example.com"]
+
+    settings.APP["GOOGLE_SIGNIN_ENABLED"] = False
+    identity_urls.clear()
+    answers = iter(["no-google.example.com", "y"])
+
+    assert custom_domain._setup_custom_domain()
+    assert oauth_domains == ["app.example.com"]
+    assert identity_urls == ["https://no-google.example.com"]
 
 
 # @features setup
@@ -3143,6 +3183,7 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
         )
         or True,
     )
+    monkeypatch.setattr("builtins.input", lambda _prompt: "")
 
     admin.setup_admin_and_oauth()
 
@@ -3152,6 +3193,7 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
         ),
         "ADMIN_NAME": "Owner",
         "ADMIN_EMAIL": "owner@example.com",
+        "GOOGLE_SIGNIN_ENABLED": True,
         "GOOGLE_CLIENT_ID": "1234-demo.apps.googleusercontent.com",
     }
     assert len(settings._saves) == 2
@@ -3278,6 +3320,41 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     assert settings.APP["AI_IMAGE_MODEL"] == "imagen-new"
     assert settings.APP["AI_OBSERVABILITY"] is True
     assert len(settings._saves) == 2
+
+
+# @features setup
+# @dimensions admin oauth optional disabled-provider settings-save
+def test_disabled_google_signin_skips_oauth_setup(monkeypatch, capsys):
+    constants = _load_config_constants()
+    settings = _fake_settings(
+        app={
+            "ADMIN_NAME": "Owner",
+            "ADMIN_EMAIL": "owner@example.com",
+            "GOOGLE_SIGNIN_ENABLED": False,
+            "GOOGLE_CLIENT_ID": "retained-client.apps.googleusercontent.com",
+        }
+    )
+    _install_config_package(monkeypatch, constants, settings=settings)
+
+    from installer import admin, identity
+
+    monkeypatch.setattr(
+        admin,
+        "print_oauth_instructions",
+        lambda: pytest.fail("disabled Google sign-in must skip OAuth instructions"),
+    )
+    monkeypatch.setattr(
+        identity,
+        "setup_google_provider",
+        lambda *_args, **_kwargs: pytest.fail(
+            "disabled Google sign-in must skip provider reconciliation"
+        ),
+    )
+
+    assert admin.setup_admin_and_oauth()
+    assert settings.APP["GOOGLE_CLIENT_ID"].startswith("retained-client")
+    assert settings._saves == []
+    assert "Skipping Google OAuth" in capsys.readouterr().out
 
 
 # @features setup
@@ -3579,6 +3656,7 @@ def test_admin_oauth_rejection_precedes_provider_update(monkeypatch):
         app={
             "ADMIN_NAME": "Owner",
             "ADMIN_EMAIL": "owner@example.com",
+            "GOOGLE_SIGNIN_ENABLED": True,
             "GOOGLE_LOGIN_URI": (
                 "https://project-1.appspot.com/users/google-signin"
             ),
@@ -3659,7 +3737,8 @@ def test_existing_admin_oauth_can_replace_rejected_saved_client(monkeypatch):
     assert settings.APP["GOOGLE_CLIENT_ID"] == (
         "1234-new.apps.googleusercontent.com"
     )
-    assert settings._saves == [True]
+    assert settings.APP["GOOGLE_SIGNIN_ENABLED"] is True
+    assert settings._saves == [True, True]
 
 
 # @features setup
@@ -3718,6 +3797,7 @@ def test_oauth_cli_replaces_settings_and_deploys(monkeypatch):
     assert settings.APP["GOOGLE_CLIENT_ID"] == (
         "1234-web.apps.googleusercontent.com"
     )
+    assert settings.APP["GOOGLE_SIGNIN_ENABLED"] is True
     assert settings._saves == [True]
     assert events == [
         "verify-installation",

@@ -7,20 +7,27 @@ from google.auth.transport import requests as google_requests
 from google.oauth2 import id_token
 
 IDENTITY_TOOLKIT_API = "https://identitytoolkit.googleapis.com/v1"
+IDENTITY_TOOLKIT_ADMIN_API = "https://identitytoolkit.googleapis.com/admin/v2"
 IDENTITY_REQUEST_TIMEOUT = 10
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/identity_platform.py::exchange_google_credential
+# @covered-by lagniappe/core/tools/identity_platform.py::google_provider_enabled
 # @covered-by lagniappe/core/tools/identity_platform.py::generate_email_action_code
 # @covered-by lagniappe/core/tools/identity_platform.py::delete_account_by_email
 # @reason typed provider exception is exercised by the public request operations
 class IdentityPlatformError(RuntimeError):
     """Raised when Identity Platform rejects or cannot complete an operation."""
 
+    def __init__(self, message, *, provider_code=None):
+        super().__init__(message)
+        self.provider_code = str(provider_code or "").strip() or None
+
 
 # @testable false
 # @covered-by lagniappe/core/tools/identity_platform.py::exchange_google_credential
+# @covered-by lagniappe/core/tools/identity_platform.py::google_provider_enabled
 # @covered-by lagniappe/core/tools/identity_platform.py::generate_email_action_code
 # @covered-by lagniappe/core/tools/identity_platform.py::delete_account_by_email
 # @reason response normalization is exercised through public provider operations
@@ -32,8 +39,12 @@ def _response_json(response, operation):
     if response.ok:
         return data
     provider_message = str(((data.get("error") or {}).get("message")) or "").strip()
+    provider_code = provider_message.split(" : ", 1)[0].strip() or None
     detail = provider_message or f"HTTP {response.status_code}"
-    raise IdentityPlatformError(f"{operation} failed: {detail}")
+    raise IdentityPlatformError(
+        f"{operation} failed: {detail}",
+        provider_code=provider_code,
+    )
 
 
 # @testable false
@@ -99,7 +110,7 @@ def verify_google_credential(credential, client_id, request_adapter=None):
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_exchange_google_credential_uses_identity_platform_idp_endpoint
 # @features login
-# @dimensions identity-platform google-oauth token-exchange
+# @dimensions identity-platform google-oauth token-exchange provider-error-code
 def exchange_google_credential(
     credential,
     client_config,
@@ -145,10 +156,57 @@ def exchange_google_credential(
     return data
 
 
+# @testable true
+# @tests tests_unit/test_025_identity_platform.py::test_google_provider_enabled_reads_live_provider_state
+# @features login
+# @dimensions identity-platform google-oauth provider-state
+def google_provider_enabled(
+    *,
+    project_id=None,
+    access_token=None,
+    session=None,
+):
+    """Return whether the project's live Google sign-in provider is enabled."""
+    config = None
+    if not project_id or not access_token:
+        from lagniappe import CONFIG
+
+        config = CONFIG
+    project_id = str(project_id or config.GOOGLE_CLOUD_PROJECT or "").strip()
+    if not project_id:
+        raise IdentityPlatformError(
+            "Google provider status requires an Identity Platform project ID."
+        )
+    access_token = access_token or config.google_access_token()
+    session = session or http_requests.Session()
+    try:
+        response = session.get(
+            (
+                f"{IDENTITY_TOOLKIT_ADMIN_API}/projects/"
+                f"{quote(project_id, safe='')}/defaultSupportedIdpConfigs/google.com"
+            ),
+            headers=_admin_headers(access_token),
+            timeout=IDENTITY_REQUEST_TIMEOUT,
+        )
+    except http_requests.RequestException as error:
+        raise IdentityPlatformError("Google provider status lookup failed.") from error
+    if response.status_code == 404:
+        return False
+    data = _response_json(response, "Google provider status lookup")
+    if data.get("enabled") is True:
+        return True
+    if data.get("enabled") is False:
+        return False
+    raise IdentityPlatformError(
+        "Google provider status lookup returned no enabled state."
+    )
+
+
 # @testable false
+# @covered-by lagniappe/core/tools/identity_platform.py::google_provider_enabled
 # @covered-by lagniappe/core/tools/identity_platform.py::generate_email_action_code
 # @covered-by lagniappe/core/tools/identity_platform.py::delete_account_by_email
-# @reason bearer-header construction is exercised through account deletion
+# @reason bearer-header construction is exercised through public admin operations
 def _admin_headers(access_token):
     access_token = str(access_token or "").strip()
     if not access_token:

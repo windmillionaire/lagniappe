@@ -129,6 +129,7 @@ def build_recovery_snapshot(
 
     snapshot["CONFIG_KIND"] = CONFIG_KIND
     snapshot["CONFIG_SCHEMA_VERSION"] = CONFIG_SCHEMA_VERSION
+    snapshot.setdefault("GOOGLE_SIGNIN_ENABLED", True)
 
     if redis_tls_enabled(snapshot):
         if not redis_ca_pem:
@@ -248,6 +249,12 @@ def validate_recovery_document(settings):
         )
     recovered["CONFIG_SCHEMA_VERSION"] = CONFIG_SCHEMA_VERSION
     recovered.pop("FIREBASE_CONFIG", None)
+    google_signin_value = recovered.get("GOOGLE_SIGNIN_ENABLED", True)
+    if not isinstance(google_signin_value, bool):
+        raise RecoveryConfigurationError(
+            "GOOGLE_SIGNIN_ENABLED must be true or false."
+        )
+    recovered["GOOGLE_SIGNIN_ENABLED"] = google_signin_value
     unsupported = sorted(UNSUPPORTED_SETTING_KEYS.intersection(recovered))
     if unsupported:
         raise RecoveryConfigurationError(

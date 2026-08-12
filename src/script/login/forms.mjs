@@ -218,8 +218,9 @@ class EmailCheckForm extends LoginForms {
 /**
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
+ * @tests tests_js/test_034_login_buttons.py::test_owner_setup_supports_password_only_mode
  * @features login
- * @dimensions owner-bootstrap verify-email password-validation auth-errors
+ * @dimensions owner-bootstrap verify-email password-validation auth-errors disabled-provider
  */
 class OwnerSetupForm extends LoginForms {
 	init() {
@@ -244,14 +245,15 @@ class OwnerSetupForm extends LoginForms {
 		);
 
 		this.setActionButton(this.form.querySelector("[data-role='signin']"));
-		this.showPasswordButton.addEventListener("click", () => {
+		if (!this.showPasswordButton) this.error = this.passwordError;
+		this.showPasswordButton?.addEventListener("click", () => {
 			this.reset();
 			this.error = this.passwordError;
 			this.googleSetup.classList.add("hidden");
 			this.passwordSetup.classList.remove("hidden");
 			this.password.focus();
 		});
-		this.backToGoogleButton.addEventListener("click", () => {
+		this.backToGoogleButton?.addEventListener("click", () => {
 			this.password.value = "";
 			this.reset();
 			this.error = this.googleError;

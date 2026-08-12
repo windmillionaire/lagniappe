@@ -1392,12 +1392,16 @@ def _set_default_config():
 # @dimensions config-files config-version
 def update_config():
     """Refresh generated config defaults and return the active package version."""
-    from config import SETTINGS
+    from config import SETTINGS, constants
 
     version = str(SETTINGS.NODE.get("version") or "").strip()
     if not version:
         raise RuntimeError("package.json must define the current application version.")
     SETTINGS.APP["VERSION"] = version
+    SETTINGS.APP.setdefault(
+        "GOOGLE_SIGNIN_ENABLED",
+        constants.DEFAULT_GOOGLE_SIGNIN_ENABLED,
+    )
     _set_default_config()
 
     return version
@@ -1648,10 +1652,11 @@ def _set_application_defaults():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_reports_missing_areas
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_requires_google_client_only_when_enabled
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_rejects_keyless_identity_mismatch
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_reports_invalid_redis_tls
 # @features setup
-# @dimensions config-files validation redis-tls keyless-config project-identity
+# @dimensions config-files validation redis-tls keyless-config project-identity google-oauth optional
 def verify_application_config(upgrade=False):
     from installer import FORMATTER
 
@@ -1700,6 +1705,15 @@ def verify_application_config(upgrade=False):
             and "Authentication email" not in missing_areas
         ):
             missing_areas.append("Authentication email")
+
+    if "GOOGLE_SIGNIN_ENABLED" in required_settings:
+        google_signin_enabled = SETTINGS.APP.get("GOOGLE_SIGNIN_ENABLED") is True
+        if (
+            google_signin_enabled
+            and not str(SETTINGS.APP.get("GOOGLE_CLIENT_ID") or "").strip()
+            and "Authentication" not in missing_areas
+        ):
+            missing_areas.append("Authentication")
 
     if SETTINGS.APP.get("REDIS_TLS"):
         from config.redis import (

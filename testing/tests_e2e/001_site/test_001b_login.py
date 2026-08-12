@@ -51,10 +51,12 @@ from flask import Flask
 from flask.sessions import SecureCookieSessionInterface
 from playwright.sync_api import expect
 
-from config import SETTINGS, constants
+from config import SETTINGS, Environment, constants
 from lagniappe import CONFIG
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
+from lagniappe.web import app
+from lagniappe.web.routes.users import login as login_routes
 from lagniappe.web.routes.users.login import _auth_action_url
 
 from testing.definitions import SitePages, Users
@@ -357,7 +359,9 @@ def _open_sign_in_form(user, login_page, email):
 # @style login.heading
 # @style login.subheading
 # @style login.guidance
+# @style login.error
 # @style login.success
+# @style form.login
 def test_login_page_loads(get_user):
     """
     Verify login page loads with all authentication forms in DOM.
@@ -421,9 +425,19 @@ def test_login_page_loads(get_user):
     )
     expect(workflow_forms).to_have_count(8)
     for index in range(8):
-        heading = workflow_forms.nth(index).locator(":scope > h1")
+        workflow_form = workflow_forms.nth(index)
+        expect(workflow_form).to_have_class(re.compile(r".*\bmax-w-md\b.*"))
+        expect(workflow_form).to_have_class(re.compile(r".*\brounded-lg\b.*"))
+        heading = workflow_form.locator(":scope > h1")
         expect(heading).to_have_count(1)
         expect(heading).to_have_class(re.compile(r".*\btext-2xl\b.*"))
+
+    errors = user.locate("[data-role='error']")
+    expect(errors).to_have_count(9)
+    for index in range(9):
+        error = errors.nth(index)
+        expect(error).to_have_class(re.compile(r".*\bbg-delete-bg\b.*"))
+        expect(error).to_have_class(re.compile(r".*\bborder-delete-default\b.*"))
 
     confirmations = user.locate("[data-role='success']")
     expect(confirmations).to_have_count(6)
@@ -804,6 +818,166 @@ def test_unregistered_google_error_returns_to_method_chooser(get_user):
         "Contact the site owner if you think this is a mistake."
     )
     expect(auth_method.locator(PASSWORD)).to_have_count(0)
+
+
+# @features login
+# @dimensions google-oauth disabled-account auth-method safe-error
+def test_disabled_google_error_returns_to_method_chooser(get_user):
+    """A disabled Identity Platform account gets a useful, provider-safe error."""
+    _ensure_owner_initialized()
+    user = get_user(Users.ANONYMOUS)
+    login_page = user.go(
+        SitePages.LOGIN_PAGE,
+        query_params={"authError": "google-user-disabled"},
+    )
+
+    auth_method = user.locate(login_page.AUTH_METHOD_FORM)
+    expect(auth_method).to_be_visible()
+    error = auth_method.locator(Roles.ERROR)
+    expect(error).to_have_text(
+        "This account is disabled and cannot sign in. "
+        "Contact the site owner if you think this is a mistake."
+    )
+    expect(error).not_to_contain_text("USER_DISABLED")
+    expect(auth_method.locator(PASSWORD)).to_have_count(0)
+
+
+# @features login
+# @dimensions google-oauth disabled-provider auth-method
+# @template users/login.html::google_signin
+def test_login_hides_google_when_provider_is_disabled(monkeypatch):
+    """Production login omits Google controls when the live provider is off."""
+    _ensure_owner_initialized()
+    monkeypatch.setattr(CONFIG, "ENV", Environment.PRODUCTION)
+    monkeypatch.setattr(
+        login_routes.identity_platform,
+        "google_provider_enabled",
+        lambda: False,
+    )
+
+    response = app.test_client().get("/users/login")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "google-signin-method" not in html
+    assert "google-signin-owner" not in html
+    assert "accounts.google.com/gsi/client" not in html
+    assert 'data-role="show-email-check"' in html
+
+    with _owner_waiting_for_first_login():
+        owner_response = app.test_client().get("/users/login")
+    owner_html = owner_response.get_data(as_text=True)
+    password_setup_class = re.search(
+        r'data-role="owner-password-setup"\s+class="([^"]*)"',
+        owner_html,
+    )
+
+    assert owner_response.status_code == 200
+    assert "google-signin-owner" not in owner_html
+    assert password_setup_class is not None
+    assert "hidden" not in password_setup_class.group(1).split()
+    assert 'data-role="back-to-owner-google"' not in owner_html
+
+
+# @features login
+# @dimensions google-oauth disabled-provider operator-intent auth-method
+def test_google_signin_setting_disables_ui_and_callback(monkeypatch):
+    """The persisted opt-out hides Google and rejects direct callback posts."""
+    _ensure_owner_initialized()
+    monkeypatch.setattr(CONFIG, "ENV", Environment.PRODUCTION)
+    monkeypatch.setattr(CONFIG, "GOOGLE_SIGNIN_ENABLED", False)
+    monkeypatch.setattr(
+        login_routes.identity_platform,
+        "google_provider_enabled",
+        lambda: pytest.fail("disabled intent must skip live provider lookup"),
+    )
+
+    response = app.test_client().get("/users/login")
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert "google-signin-method" not in html
+    assert "accounts.google.com/gsi/client" not in html
+    assert 'data-role="show-email-check"' in html
+
+    client = app.test_client()
+    client.set_cookie("g_csrf_token", "csrf-token")
+    callback = client.post(
+        "/users/google-signin",
+        data={
+            "credential": "unused-google-credential",
+            "g_csrf_token": "csrf-token",
+            "state": "/tasks/index?from=google",
+        },
+    )
+    location = urlsplit(callback.headers["Location"])
+
+    assert callback.status_code == 302
+    assert location.path == "/users/login"
+    assert parse_qs(location.query) == {
+        "next": ["/tasks/index?from=google"],
+    }
+
+
+@pytest.mark.parametrize(
+    ("provider_code", "expected_auth_error"),
+    [
+        ("USER_DISABLED", "google-user-disabled"),
+        ("OPERATION_NOT_ALLOWED", None),
+    ],
+)
+# @features login
+# @dimensions google-oauth disabled-account disabled-provider safe-error redirect-target
+def test_google_provider_rejections_return_safely(
+    monkeypatch,
+    provider_code,
+    expected_auth_error,
+):
+    """Known provider rejections return to login without a raw error page."""
+    _ensure_owner_initialized()
+    monkeypatch.setattr(
+        login_routes.identity_platform,
+        "verify_google_credential",
+        lambda *_args, **_kwargs: {
+            "sub": "google-user-1",
+            "email": CONFIG.ADMIN_EMAIL,
+            "email_verified": True,
+        },
+    )
+
+    def reject_exchange(*_args, **_kwargs):
+        raise login_routes.identity_platform.IdentityPlatformError(
+            "provider rejected credential",
+            provider_code=provider_code,
+        )
+
+    monkeypatch.setattr(
+        login_routes.identity_platform,
+        "exchange_google_credential",
+        reject_exchange,
+    )
+    client = app.test_client()
+    client.set_cookie("g_csrf_token", "csrf-token")
+
+    response = client.post(
+        "/users/google-signin",
+        data={
+            "credential": "google-credential",
+            "g_csrf_token": "csrf-token",
+            "state": "/tasks/index?from=google",
+        },
+    )
+    location = urlsplit(response.headers["Location"])
+    query = parse_qs(location.query)
+
+    assert response.status_code == 302
+    assert location.path == "/users/login"
+    assert query["next"] == ["/tasks/index?from=google"]
+    if expected_auth_error:
+        assert query["authError"] == [expected_auth_error]
+    else:
+        assert "authError" not in query
+    assert provider_code not in response.headers["Location"]
 
 
 # @features login

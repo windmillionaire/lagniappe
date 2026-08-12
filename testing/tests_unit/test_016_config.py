@@ -67,6 +67,8 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
         == "runtime@project-1.iam.gserviceaccount.com"
     )
     assert module.CONFIG.AI_OBSERVABILITY is False
+    assert module.CONFIG.GOOGLE_SIGNIN_ENABLED is True
+    assert module.CONFIG.GOOGLE_CLIENT_ID == ""
     assert module.CONFIG.REDIS_TLS is False
     assert module.CONFIG.REDIS_CA_CERT is None
     assert module.CONFIG.SOURCE_URL == "https://example.test/default-source"
@@ -84,13 +86,14 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
     )
 
 
-# @pair config:observability-setting
+# @pair config:observability-setting config:google-signin
 # @pair ai:observability
 def test_config_honors_ai_observability_setting(monkeypatch):
     app_settings = {
         "CONFIG_KIND": "lagniappe-settings",
         "CONFIG_SCHEMA_VERSION": 3,
         "AI_OBSERVABILITY": True,
+        "GOOGLE_SIGNIN_ENABLED": False,
         "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
             "runtime@project-1.iam.gserviceaccount.com"
         ),
@@ -126,6 +129,8 @@ def test_config_honors_ai_observability_setting(monkeypatch):
     spec.loader.exec_module(module)
 
     assert module.CONFIG.AI_OBSERVABILITY is True
+    assert module.CONFIG.GOOGLE_SIGNIN_ENABLED is False
+    assert module.CONFIG.GOOGLE_CLIENT_ID == ""
     assert module.CONFIG.ANALYTICS is False
     assert module.CONFIG.REDIS_TLS is True
     assert module.CONFIG.REDIS_CA_CERT == "config/files/redis_ca.pem"

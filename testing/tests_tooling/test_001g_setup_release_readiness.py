@@ -131,6 +131,7 @@ def test_redacted_install_summary_is_allowlisted():
     assert "runtime@demo-project.iam.gserviceaccount.com" in text
     assert "lagniappe-tasks" in text
     assert "python314" in text
+    assert "Google sign-in: enabled" in text
     assert "Optional health check: ./setup.sh doctor" in text
     assert "Repair if needed: ./setup.sh repair" in text
     assert lines[-1] == (

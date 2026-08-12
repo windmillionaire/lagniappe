@@ -115,6 +115,10 @@ def install_summary_lines(
             "Identity Platform project: "
             f"{_value(identity.get('projectId'))}"
         ),
+        (
+            "Google sign-in: "
+            f"{'enabled' if settings.get('GOOGLE_SIGNIN_ENABLED', True) else 'disabled'}"
+        ),
         f"Redis endpoint: {_value(redis_endpoint)}",
     ]
     for kind, name in _bucket_names(settings).items():

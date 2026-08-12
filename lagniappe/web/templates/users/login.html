@@ -99,14 +99,17 @@
   <div id="ownerSetup"
        class="{{ styles.form.login }} hidden">
     {{ heading("Finish setting up Lagniappe", role="owner-setup-title") }}
-    <div data-role="owner-google-setup">
+    <div data-role="owner-google-setup"
+         class="{{ 'hidden' if not google_available }}">
       {{ guidance("Sign in with Google using the account configured as the application owner.") }}
       {{ error(auth_error or "", visible=auth_error) }}
-      {{ google_signin("google-signin-owner", next_url) }}
-      {{ alternate_button("show-owner-password", "Set up with a separate password instead") }}
+      {% if google_available %}
+        {{ google_signin("google-signin-owner", next_url) }}
+        {{ alternate_button("show-owner-password", "Set up with a separate password instead") }}
+      {% endif %}
     </div>
     <div data-role="owner-password-setup"
-         class="hidden">
+         class="{{ 'hidden' if google_available }}">
       {{ subheading("Create a separate Lagniappe password", role="owner-password-title") }}
       {{ guidance("Do not enter your Google password. We'll send a verification email to the application owner email configured during installation.", role="password-guidance") }}
       {{ error() }}
@@ -116,7 +119,9 @@
           {{ input("password", "password", "Choose a password") }}
           {{ button("Create Password", role="signin") }}
         </div>
-        {{ alternate_button("back-to-owner-google", "Back to Google sign-in") }}
+        {% if google_available %}
+          {{ alternate_button("back-to-owner-google", "Back to Google sign-in") }}
+        {% endif %}
       </div>
     </div>
   </div>
@@ -125,8 +130,10 @@
        class="{{ styles.form.login }} hidden">
     {{ heading("Sign in to your account") }}
     {{ error(auth_error or "", visible=auth_error) }}
-    {{ google_signin("google-signin-method", next_url) }}
-    {{ divider("Or") }}
+    {% if google_available %}
+      {{ google_signin("google-signin-method", next_url) }}
+      {{ divider("Or") }}
+    {% endif %}
     {{ button("Sign in with email", role="show-email-check") }}
   </div>
   <!-- Email Check Form -->

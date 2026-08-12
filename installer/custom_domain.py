@@ -43,7 +43,7 @@ def add_custom_domain():
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_custom_domain_uses_provider_records_and_dns_only_cloudflare
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_custom_domain_supports_manual_dns
 # @features setup
-# @dimensions custom-domain cloudflare-dns dns-only provider-records idempotence
+# @dimensions custom-domain cloudflare-dns dns-only provider-records idempotence disabled-provider
 def _setup_custom_domain(*, configure_auth=True):
     """Create the domain mapping and optionally update existing authentication."""
     from config import SETTINGS
@@ -75,7 +75,11 @@ def _setup_custom_domain(*, configure_auth=True):
     def get_domain(value):
         return value.strip().lower()
 
-    explain_domain_setup(configure_auth=configure_auth)
+    google_signin_enabled = SETTINGS.APP.get("GOOGLE_SIGNIN_ENABLED", True) is True
+    explain_domain_setup(
+        configure_auth=configure_auth,
+        google_signin=google_signin_enabled,
+    )
     domain = get_domain()
     if not confirm_domain_ownership(domain):
         print(
@@ -142,18 +146,19 @@ def _setup_custom_domain(*, configure_auth=True):
     )
     SETTINGS.APP["CUSTOM_DOMAIN"] = domain
     if configure_auth:
-        update_oauth_redirect_uris(domain)
-        confirmed = input(
-            f.info("Have you updated the Google OAuth settings? [y/N]: ")
-        )
-        if confirmed.casefold() != "y":
-            print(
-                f.warning(
-                    "The domain mapping and DNS records were retained. Complete "
-                    "the authentication settings and rerun this command."
-                )
+        if google_signin_enabled:
+            update_oauth_redirect_uris(domain)
+            confirmed = input(
+                f.info("Have you updated the Google OAuth settings? [y/N]: ")
             )
-            return False
+            if confirmed.casefold() != "y":
+                print(
+                    f.warning(
+                        "The domain mapping and DNS records were retained. Complete "
+                        "the authentication settings and rerun this command."
+                    )
+                )
+                return False
 
         from .identity import setup_identity_platform
 

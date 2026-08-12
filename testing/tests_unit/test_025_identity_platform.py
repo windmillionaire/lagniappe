@@ -26,6 +26,10 @@ class FakeSession:
         self.calls.append((url, kwargs))
         return next(self.responses)
 
+    def get(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        return next(self.responses)
+
 
 class FakeSMTP:
     instances = []
@@ -132,7 +136,7 @@ def test_verify_google_credential_enforces_client_and_verified_email(monkeypatch
 
 
 # @features login
-# @dimensions identity-platform google-oauth token-exchange
+# @dimensions identity-platform google-oauth token-exchange provider-error-code
 def test_exchange_google_credential_uses_identity_platform_idp_endpoint():
     session = FakeSession(
         [
@@ -162,6 +166,71 @@ def test_exchange_google_credential_uses_identity_platform_idp_endpoint():
         kwargs["json"]["postBody"] == "id_token=google-id-token&providerId=google.com"
     )
     assert kwargs["json"]["returnSecureToken"] is True
+
+    disabled_session = FakeSession(
+        [
+            FakeResponse(
+                {"error": {"message": "USER_DISABLED"}},
+                ok=False,
+                status_code=400,
+            )
+        ]
+    )
+    with pytest.raises(identity_platform.IdentityPlatformError) as error:
+        identity_platform.exchange_google_credential(
+            "google-id-token",
+            {"apiKey": "public-key", "projectId": "project-1"},
+            "https://project-1.example",
+            disabled_session,
+        )
+    assert error.value.provider_code == "USER_DISABLED"
+
+
+# @features login
+# @dimensions identity-platform google-oauth provider-state
+def test_google_provider_enabled_reads_live_provider_state():
+    session = FakeSession(
+        [
+            FakeResponse({"enabled": True}),
+            FakeResponse({"enabled": False}),
+            FakeResponse({}, ok=False, status_code=404),
+        ]
+    )
+
+    arguments = {
+        "project_id": "project/one",
+        "access_token": "access-token",
+        "session": session,
+    }
+    assert identity_platform.google_provider_enabled(**arguments) is True
+    assert identity_platform.google_provider_enabled(**arguments) is False
+    assert identity_platform.google_provider_enabled(**arguments) is False
+
+    url, request = session.calls[0]
+    assert url.endswith(
+        "/projects/project%2Fone/defaultSupportedIdpConfigs/google.com"
+    )
+    assert request["headers"]["Authorization"] == "Bearer access-token"
+    assert request["timeout"] == identity_platform.IDENTITY_REQUEST_TIMEOUT
+
+    unavailable_session = FakeSession([])
+    unavailable_session.get = lambda *_args, **_kwargs: (_ for _ in ()).throw(
+        identity_platform.http_requests.Timeout("timed out")
+    )
+    with pytest.raises(identity_platform.IdentityPlatformError, match="lookup failed"):
+        identity_platform.google_provider_enabled(
+            project_id="project-1",
+            access_token="access-token",
+            session=unavailable_session,
+        )
+
+    malformed_session = FakeSession([FakeResponse({})])
+    with pytest.raises(identity_platform.IdentityPlatformError, match="enabled state"):
+        identity_platform.google_provider_enabled(
+            project_id="project-1",
+            access_token="access-token",
+            session=malformed_session,
+        )
 
 
 # @features login

@@ -31,6 +31,7 @@ def _env_flag(name, default=False):
 # @pair config:constants
 # @pair config:stale-settings
 # @pair config:observability-setting
+# @pair config:google-signin
 # @pair config:source-link
 # @pair ai:observability
 class Config:
@@ -113,6 +114,14 @@ class Config:
         self.TASK_QUEUE_ENABLED = _env_flag("TASK_QUEUE_ENABLED", self.production)
         self.TEST_CURRENT_USER = None
         self.ANALYTICS = getattr(self, "ANALYTICS", False)
+        self.GOOGLE_SIGNIN_ENABLED = getattr(
+            self,
+            "GOOGLE_SIGNIN_ENABLED",
+            getattr(constants, "DEFAULT_GOOGLE_SIGNIN_ENABLED", True),
+        )
+        self.GOOGLE_CLIENT_ID = str(
+            getattr(self, "GOOGLE_CLIENT_ID", "") or ""
+        ).strip()
         self.AI_OBSERVABILITY = getattr(
             self,
             "AI_OBSERVABILITY",
