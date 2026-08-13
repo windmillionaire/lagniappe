@@ -170,7 +170,7 @@ def test_exchange_google_credential_uses_identity_platform_idp_endpoint():
     disabled_session = FakeSession(
         [
             FakeResponse(
-                {"error": {"message": "USER_DISABLED"}},
+                {"error": {"message": "USER_DISABLED: Account disabled"}},
                 ok=False,
                 status_code=400,
             )
@@ -185,6 +185,18 @@ def test_exchange_google_credential_uses_identity_platform_idp_endpoint():
         )
     assert error.value.provider_code == "USER_DISABLED"
 
+    payload_error_session = FakeSession(
+        [FakeResponse({"errorMessage": "USER_DISABLED : Account disabled"})]
+    )
+    with pytest.raises(identity_platform.IdentityPlatformError) as error:
+        identity_platform.exchange_google_credential(
+            "google-id-token",
+            {"apiKey": "public-key", "projectId": "project-1"},
+            "https://project-1.example",
+            payload_error_session,
+        )
+    assert error.value.provider_code == "USER_DISABLED"
+
 
 # @features login
 # @dimensions identity-platform google-oauth provider-state
@@ -193,6 +205,7 @@ def test_google_provider_enabled_reads_live_provider_state():
         [
             FakeResponse({"enabled": True}),
             FakeResponse({"enabled": False}),
+            FakeResponse({"name": "projects/project-1/google.com"}),
             FakeResponse({}, ok=False, status_code=404),
         ]
     )
@@ -203,6 +216,7 @@ def test_google_provider_enabled_reads_live_provider_state():
         "session": session,
     }
     assert identity_platform.google_provider_enabled(**arguments) is True
+    assert identity_platform.google_provider_enabled(**arguments) is False
     assert identity_platform.google_provider_enabled(**arguments) is False
     assert identity_platform.google_provider_enabled(**arguments) is False
 
@@ -223,15 +237,6 @@ def test_google_provider_enabled_reads_live_provider_state():
             access_token="access-token",
             session=unavailable_session,
         )
-
-    malformed_session = FakeSession([FakeResponse({})])
-    with pytest.raises(identity_platform.IdentityPlatformError, match="enabled state"):
-        identity_platform.google_provider_enabled(
-            project_id="project-1",
-            access_token="access-token",
-            session=malformed_session,
-        )
-
 
 # @features login
 # @dimensions identity-platform authentication-email action-codes

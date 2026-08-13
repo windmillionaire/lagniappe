@@ -1,5 +1,7 @@
 """Google Identity Platform token and account operations."""
 
+import re
+
 from urllib.parse import quote, urlencode
 
 import requests as http_requests
@@ -27,6 +29,15 @@ class IdentityPlatformError(RuntimeError):
 
 # @testable false
 # @covered-by lagniappe/core/tools/identity_platform.py::exchange_google_credential
+# @reason provider error normalization is exercised through credential exchange
+def _provider_error_code(value):
+    """Extract a stable provider code without retaining diagnostic prose."""
+    match = re.match(r"^([A-Z][A-Z0-9_]+)(?:\b|\s|:)", str(value or "").strip())
+    return match.group(1) if match else None
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/identity_platform.py::exchange_google_credential
 # @covered-by lagniappe/core/tools/identity_platform.py::google_provider_enabled
 # @covered-by lagniappe/core/tools/identity_platform.py::generate_email_action_code
 # @covered-by lagniappe/core/tools/identity_platform.py::delete_account_by_email
@@ -38,8 +49,12 @@ def _response_json(response, operation):
         data = {}
     if response.ok:
         return data
-    provider_message = str(((data.get("error") or {}).get("message")) or "").strip()
-    provider_code = provider_message.split(" : ", 1)[0].strip() or None
+    provider_error = data.get("error") if isinstance(data, dict) else {}
+    provider_error = provider_error if isinstance(provider_error, dict) else {}
+    provider_message = str(provider_error.get("message") or "").strip()
+    provider_code = _provider_error_code(provider_message) or _provider_error_code(
+        provider_error.get("status")
+    )
     detail = provider_message or f"HTTP {response.status_code}"
     raise IdentityPlatformError(
         f"{operation} failed: {detail}",
@@ -145,6 +160,12 @@ def exchange_google_credential(
         timeout=IDENTITY_REQUEST_TIMEOUT,
     )
     data = _response_json(response, "Google identity exchange")
+    provider_code = _provider_error_code(data.get("errorMessage"))
+    if provider_code:
+        raise IdentityPlatformError(
+            f"Google identity exchange was rejected: {provider_code}",
+            provider_code=provider_code,
+        )
     if data.get("needConfirmation"):
         raise IdentityPlatformError(
             "This Google email is already attached to another sign-in method."
@@ -193,13 +214,10 @@ def google_provider_enabled(
     if response.status_code == 404:
         return False
     data = _response_json(response, "Google provider status lookup")
-    if data.get("enabled") is True:
-        return True
-    if data.get("enabled") is False:
-        return False
-    raise IdentityPlatformError(
-        "Google provider status lookup returned no enabled state."
-    )
+    # This API uses protobuf JSON encoding, which omits scalar fields at their
+    # default value. An enabled provider returns ``enabled: true``; a disabled
+    # provider can therefore omit ``enabled`` entirely.
+    return isinstance(data, dict) and data.get("enabled") is True
 
 
 # @testable false

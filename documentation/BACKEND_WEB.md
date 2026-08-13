@@ -129,20 +129,11 @@ error pages).
 
 ## Authentication (`web/auth/`)
 
-The login page refreshes its Flask-WTF token from `GET /l/token` immediately
-before handing an Identity Platform credential to
-`POST /users/login-identity`. If that write still receives a CSRF-specific
-`400` response, identified by `X-Lagniappe-CSRF: invalid`, the client refreshes
-and retries once. Other `400` responses are not retried. The server verifies
-the exact Secure Token issuer, project audience, and subject before creating a
-Lagniappe session. Popup-free Google Identity Services credentials are first
-exchanged through Identity Platform's `accounts:signInWithIdp` endpoint. In
-production, `GOOGLE_SIGNIN_ENABLED` is checked before the login page reads live
-Google provider configuration with the runtime service account. Disabled intent
-omits Google controls and rejects direct callback posts. Enabled intent still
-omits the controls when the live provider is explicitly disabled or absent. A
-control-plane read failure is fail-open so a transient status outage does not
-remove an otherwise working login method.
+Authentication routes verify provider tokens and apply Lagniappe access rules
+before creating Flask-Login sessions. The complete email/password and Google
+flows, CSRF retry, public-client boundary, provider-state handling, safe errors,
+and first-login recovery contract live in
+[AUTHENTICATION.md](AUTHENTICATION.md).
 
 ### Permission Decorators
 

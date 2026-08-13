@@ -153,6 +153,10 @@ class IdentityPlatformClient {
 		});
 	}
 
+	verifyPasswordResetCode(oobCode) {
+		return this.request("accounts:resetPassword", { oobCode });
+	}
+
 	applyActionCode(oobCode) {
 		return this.request("accounts:update", { oobCode });
 	}

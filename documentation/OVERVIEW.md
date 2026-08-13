@@ -10,6 +10,7 @@ Start here to understand how the system works.
 
 | Document | Covers |
 |---|---|
+| [AUTHENTICATION.md](AUTHENTICATION.md) | Identity Platform and Google setup, public-client trust boundaries, login state, email verification, recovery, and safe authentication failures. |
 | [BACKEND_ENTITIES.md](BACKEND_ENTITIES.md) | Context-aware property system, mixins, entity types, EntityRegistry, indexes, task scheduling. The most important backend doc. |
 | [FRONTEND_VIEWS.md](FRONTEND_VIEWS.md) | Core/Entity/EntityIndex view hierarchy, ViewComponent lifecycle, widget contract and loader, reconciliation cycle. The most important frontend doc. |
 | [FRONTEND_OVERVIEW.md](FRONTEND_OVERVIEW.md) | Entry points (`main.mjs`, `login.mjs`), view registry, shared utilities, style system (YAML to CSS/Python pipeline). |
@@ -80,6 +81,7 @@ Build, configuration, installation, and test workflows.
 | Work on CSV import | [BACKEND_INGRESS](BACKEND_INGRESS.md) | `lagniappe/core/tools/ingress.py`, `lagniappe/core/properties/file_ingress.py` |
 | Work on task scheduling | [BACKEND_ENTITIES](BACKEND_ENTITIES.md) | `lagniappe/core/properties/task_scheduling.py`, `lagniappe/core/tools/dates.py` |
 | Work on permissions | [BACKEND_DEFINITIONS](BACKEND_DEFINITIONS.md) | `lagniappe/core/definitions/permissions.py`, `lagniappe/web/auth/auth.py` |
+| Work on login or authentication | [AUTHENTICATION](AUTHENTICATION.md) | `installer/identity.py`, `lagniappe/core/tools/identity_platform.py`, `lagniappe/web/routes/users/login.py`, `src/script/login/` |
 | Change styles or icons | [FRONTEND_OVERVIEW](FRONTEND_OVERVIEW.md), [INFRA_BUILD](INFRA_BUILD.md), [STYLE_CANDIDATES](STYLE_CANDIDATES.md) | `src/style/styles.yaml`, `src/style/icons.yaml` |
 | Work on caching/ETags | [FRONTEND_SERVICE_WORKER](FRONTEND_SERVICE_WORKER.md), [BACKEND_TOOLS](BACKEND_TOOLS.md) | `src/script/sw.template.mjs`, `lagniappe/core/tools/cache/` |
 | Work on real-time sync/collaboration | [SYNC_ARCHITECTURE](SYNC_ARCHITECTURE.md), [FRONTEND_EDITOR](FRONTEND_EDITOR.md) | `src/script/shared/sync.mjs`, `src/script/elements/editor/collaborative.mjs`, `lagniappe/core/tools/cache/documents.py`, `lagniappe/web/routes/home/sync.py` |
@@ -90,7 +92,7 @@ Build, configuration, installation, and test workflows.
 | Prepare a release | [INFRA_BUILD](INFRA_BUILD.md), [INFRA_CONFIG](INFRA_CONFIG.md) | `.github/workflows/release.yml`, `run.py` |
 | Deploy the app | [INFRA_CONFIG](INFRA_CONFIG.md) | `runner/deploy.py` |
 | Set up a new instance | [INFRA_SETUP](INFRA_SETUP.md) | `setup.sh`, `setup.cmd`, `installer/` |
-| QA login on a fresh production install | [MANUAL_LOGIN_FLOW_CHECK](../MANUAL_LOGIN_FLOW_CHECK.md) | `lagniappe/web/routes/users/login.py`, `src/script/login.mjs` |
+| QA login on a fresh production install | [AUTHENTICATION](AUTHENTICATION.md), [MANUAL_LOGIN_FLOW_CHECK](../MANUAL_LOGIN_FLOW_CHECK.md) | `lagniappe/web/routes/users/login.py`, `src/script/login.mjs` |
 | Back up or restore production data | [INFRA_SETUP](INFRA_SETUP.md#disaster-recovery-backups), [INFRA_CONFIG](INFRA_CONFIG.md#data-disaster-recovery-runpy) | `runner/data_recovery.py`, `run.py` |
 | Add or run a data migration | [DATA_MIGRATIONS](DATA_MIGRATIONS.md) | `lagniappe/core/tools/database/migrations.py`, `lagniappe/web/routes/home/site.py` |
 | Change entity saves, relation writes, or delete cascades | [BACKEND_ENTITIES](BACKEND_ENTITIES.md) | `lagniappe/core/entities/__init__.py`, `lagniappe/core/mixins/related.py`, `lagniappe/core/tools/database/utility.py` |

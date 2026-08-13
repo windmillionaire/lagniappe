@@ -96,6 +96,8 @@ PASSWORD = "input[type='password']"
 FIRST_TIME_BACK = "button[data-role='back-to-email']"
 FORGOT_BACK = "button[data-role='back-to-signin']"
 VERIFY_FORGOT_PASSWORD = "#verifyEmail button[data-role='show-forgot-form']"
+RESET_PASSWORD = "button[data-role='reset-password']"
+REQUEST_NEW_RESET_LINK = "button[data-role='request-new-reset-link']"
 OWNER_PASSWORD_SETUP = "[data-role='owner-password-setup']"
 
 _IDENTITY_PLATFORM_API = re.compile(
@@ -154,6 +156,7 @@ def _mock_identity_platform(
     *,
     sign_up_errors=None,
     sign_in_errors=None,
+    reset_password_errors=None,
     sign_up_verified=True,
     sign_in_verified=True,
 ):
@@ -162,11 +165,13 @@ def _mock_identity_platform(
         "send_oob": [],
         "sign_in": [],
         "sign_up": [],
+        "reset_password": [],
         "update": [],
         "unexpected": [],
     }
     sign_up_errors = list(sign_up_errors or [])
     sign_in_errors = list(sign_in_errors or [])
+    reset_password_errors = list(reset_password_errors or [])
     users_by_token = {}
 
     def success_response(payload, verified):
@@ -207,6 +212,15 @@ def _mock_identity_platform(
                 _identity_error(route, sign_in_errors.pop(0))
             else:
                 _json_response(route, success_response(payload, sign_in_verified))
+        elif "accounts:resetPassword" in url:
+            calls["reset_password"].append(payload)
+            reset_error = (
+                reset_password_errors.pop(0) if reset_password_errors else None
+            )
+            if reset_error:
+                _identity_error(route, reset_error)
+            else:
+                _json_response(route, {"email": "reset-user@example.test"})
         elif "accounts:lookup" in url:
             calls["lookup"].append(payload)
             user_data = users_by_token[payload["idToken"]]
@@ -1083,8 +1097,8 @@ def test_check_user_status_endpoint_returns_first_time_setup(get_user):
 
 
 # @features login
-# @dimensions reset-password query-mode
-def test_reset_password_mode(get_user):
+# @dimensions reset-password query-mode action-code-validation expired-link
+def test_reset_password_mode(get_user, browser_failures):
     """
     Verify reset password form displays with correct query parameters.
 
@@ -1102,12 +1116,59 @@ def test_reset_password_mode(get_user):
         - RESET_PASSWORD_FORM (#resetPassword): Password reset form selector
     """
     user = get_user(Users.ANONYMOUS)
+    identity_calls = _mock_identity_platform(
+        user.page,
+        reset_password_errors=[None, None, "INVALID_OOB_CODE"],
+    )
     params = {"mode": "resetPassword", "oobCode": "test123"}
     login_page = user.go(SitePages.LOGIN_PAGE, query_params=params)
 
-    # Should show reset password form
-    expect(user.locate(login_page.RESET_PASSWORD_FORM)).to_be_visible()
-    expect(user.locate('input[name="new-password"]')).to_be_visible()
+    reset_form = user.locate(login_page.RESET_PASSWORD_FORM)
+    expect(reset_form).to_be_visible()
+    expect(reset_form.locator('input[name="new-password"]')).to_be_visible()
+    expect(reset_form.locator(RESET_PASSWORD)).to_be_enabled()
+    assert identity_calls["reset_password"] == [{"oobCode": "test123"}]
+
+    reset_form.locator('input[name="new-password"]').fill("new-password-123")
+    reset_form.locator(RESET_PASSWORD).click()
+    sign_in_form = user.locate(login_page.SIGN_IN_FORM)
+    expect(sign_in_form).to_be_visible()
+    expect(sign_in_form.locator("input[name='email']")).to_have_value(
+        "reset-user@example.test"
+    )
+    expect(sign_in_form.locator("[data-role='success']")).to_have_text(
+        "Password updated successfully. Please sign in with your new password."
+    )
+
+    with browser_failures.expect_http_error(
+        user,
+        status=400,
+        path="/v1/accounts:resetPassword",
+    ):
+        user.go(
+            SitePages.LOGIN_PAGE,
+            query_params={"mode": "resetPassword", "oobCode": "used-code"},
+        )
+        reset_form = user.locate(login_page.RESET_PASSWORD_FORM)
+        expect(reset_form).to_be_visible()
+        expect(reset_form.locator(Roles.ERROR)).to_have_text(
+            "This link is invalid or expired. Please request a new one."
+        )
+        expect(reset_form.locator('input[name="new-password"]')).not_to_be_visible()
+        expect(reset_form.locator(RESET_PASSWORD)).not_to_be_visible()
+        expect(reset_form.locator(REQUEST_NEW_RESET_LINK)).to_be_visible()
+
+    reset_form.locator(REQUEST_NEW_RESET_LINK).click()
+    forgot_form = user.locate(login_page.FORGOT_PASSWORD_FORM)
+    expect(forgot_form).to_be_visible()
+    expect(forgot_form.locator('input[name="reset-email"]')).to_be_visible()
+
+    assert identity_calls["reset_password"] == [
+        {"oobCode": "test123"},
+        {"oobCode": "test123", "newPassword": "new-password-123"},
+        {"oobCode": "used-code"},
+    ]
+    assert not identity_calls["unexpected"]
 
 
 # @features login
@@ -1728,9 +1789,10 @@ def test_login_identity_client_handoff_redirects_or_requires_verification(
 
 
 # @features login
-# @dimensions auth-errors
+# @dimensions auth-errors first-time-setup existing-account recovery sign-in-transition
 def test_login_auth_error_messages_are_user_safe(get_user, browser_failures):
     """Identity Platform error codes should render safe messages, not provider internals."""
+    _ensure_owner_initialized()
     user = get_user(Users.ANONYMOUS)
     identity_calls = _mock_identity_platform(
         user.page,
@@ -1772,8 +1834,15 @@ def test_login_auth_error_messages_are_user_safe(get_user, browser_failures):
 
     user = get_user(Users.ANONYMOUS)
     identity_calls = _mock_identity_platform(user.page, sign_up_errors=["EMAIL_EXISTS"])
+    login_identity_calls = []
     email = f"existing-identity-{uuid4().hex}@example.test"
     _create_first_time_user(email)
+    _mock_login_identity(
+        user.page,
+        login_identity_calls,
+        {"success": True, "redirect": "/testing-login-success"},
+    )
+    _mock_document(user.page, "/testing-login-success", "Login Complete")
 
     login_page = user.go(SitePages.LOGIN_PAGE)
     email_form = _open_email_check_form(user, login_page)
@@ -1782,7 +1851,6 @@ def test_login_auth_error_messages_are_user_safe(get_user, browser_failures):
 
     first_time_form = user.locate(login_page.FIRST_TIME_SETUP_FORM)
     expect(first_time_form).to_be_visible()
-    first_time_error = first_time_form.locator(Roles.ERROR)
 
     first_time_form.locator(PASSWORD).fill("valid-password")
     with browser_failures.expect_http_error(
@@ -1791,11 +1859,19 @@ def test_login_auth_error_messages_are_user_safe(get_user, browser_failures):
         path="/v1/accounts:signUp",
     ):
         first_time_form.locator(Buttons.SIGNIN).click()
-
-        expect(first_time_error).to_be_visible()
-        expect(first_time_error).to_contain_text(
-            "An account with this email already exists."
+        sign_in_form = user.locate(login_page.SIGN_IN_FORM)
+        expect(sign_in_form).to_be_visible()
+        expect(sign_in_form.locator("input[name='email']")).to_have_value(email)
+        expect(sign_in_form.locator("[data-role='success']")).to_have_text(
+            "Your password is already set. Sign in to continue."
         )
-        expect(first_time_error).not_to_contain_text("EMAIL_EXISTS")
-        expect(first_time_error).not_to_contain_text("auth/")
+
+    sign_in_form.locator(PASSWORD).fill("valid-password")
+    sign_in_form.locator(Buttons.SIGNIN).click()
+    expect(user.page).to_have_url(_site_url("/testing-login-success"))
+    expect(user.page).to_have_title("Login Complete")
+
+    assert identity_calls["sign_up"][0]["email"] == email
+    assert identity_calls["sign_in"][0]["email"] == email
+    assert login_identity_calls[0]["email"] == email
     assert not identity_calls["unexpected"]

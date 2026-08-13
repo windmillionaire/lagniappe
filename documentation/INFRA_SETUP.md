@@ -284,7 +284,7 @@ Lagniappe/Python/runtime versions, deployment state, and optional doctor/repair
 commands. A setup-managed deployment ends with an explicit successful-install
 message and the URL where the operator can log in. It never serializes the
 settings mapping and therefore cannot print private keys, passwords, tokens,
-Flask secrets, legacy messaging API keys, or a Sentry DSN.
+Flask secrets, or a Sentry DSN.
 
 ## Keyless Runtime Authentication
 
@@ -899,37 +899,15 @@ commands or call the reconciliation logic directly.
   and provider message instead of printing the request URL and complete
   structured response
 
-This email/password setup is unconditional. `GOOGLE_SIGNIN_ENABLED` controls
-only the later Google Auth Platform, OAuth client, and Google-provider steps.
-
-`initializeAuth` owns creation of the project's default browser key. The
-installer reads that provider-generated key from `config.client.apiKey`; it
-does not call the API Keys API or choose the key's API targets or browser
-referrer restrictions. Enabling `identitytoolkit.googleapis.com` in the
-required-service list makes the Identity Platform API available to the
-project, while the installer's ADC OAuth scope authorizes its administrative
-requests. Neither setting is a restriction or permission carried by the
-public Web API key.
+Email/password setup is unconditional; Google provider setup remains optional.
+The browser-key authority, installer/runtime credential boundary, and Google
+choice contract are documented in
+[AUTHENTICATION.md](AUTHENTICATION.md#installation-contract).
 
 The generic authenticated Google REST helpers live in
 `installer/google_provider.py`. Setup re-reads Identity Platform after
 reconciliation and fails closed unless the subtype is `IDENTITY_PLATFORM`,
 email/password remains enabled, and the authorized domain remains intact.
-
-#### Retiring resources from older installations
-
-Schema-2 recovery upgrades to schema 3 and discards `FIREBASE_CONFIG`.
-Upgrade/repair removes the runtime Cloud Messaging IAM role. It deliberately
-does not delete cloud APIs, Web Apps, or project resources because that is an
-operator-owned destructive action and an older deployed version may still use
-them.
-
-After the schema-3 release is deployed and rollback to an FCM-dependent version
-is no longer required, the operator may remove the obsolete Firebase Web App,
-Web Push certificate, and Messaging API/resource configuration in Google
-Cloud/Firebase Console. Keep Identity Platform itself: authentication still
-uses it, and Google names its Identity Platform permissions and token verifier
-with `firebaseauth`/`verify_firebase_token` identifiers.
 
 `installer/auth_email.py` runs immediately before Identity Platform setup. If the
 installation does not already have a custom domain, it first asks whether the
@@ -980,13 +958,9 @@ settings immediately. The temporary Cloudflare API token used by the App Engine
 domain flow is never persisted, and Cloudflare never receives or exposes the
 email-service credential.
 
-At runtime, Lagniappe uses authenticated ADC and
-`accounts:sendOobCode` with `returnOobLink: true` to obtain an OOB code without
-asking Google to send an email. The code is embedded in the existing
-`/users/login` verification or password-reset URL on the configured Google
-login origin (including a custom domain), and the configured SMTP service sends
-that URL. The browser never receives the runtime Google access token or SMTP
-password/API key.
+Runtime verification/reset delivery and its browser/server secret boundary are
+documented in
+[AUTHENTICATION.md](AUTHENTICATION.md#authentication-email).
 
 Recovery checks live standalone Identity Platform state. Missing, forbidden,
 mismatched, and unavailable states remain distinct and cannot silently replace
@@ -1044,41 +1018,9 @@ offers to deploy the updated application
 settings. The old general OAuth client remains a manual Google Auth Platform
 resource; delete it in the console if it is no longer needed.
 
-Until the configured owner completes their first login, `/users/login` opens a
-dedicated Google-first owner setup screen when Google sign-in is enabled. With
-Google sign-in disabled, it opens directly on separate-password setup. That
-password option creates a separate
-Identity Platform credential for the configured owner email and requires the
-normal verification email before login completes.
-
-After owner initialization, anonymous users first choose Google sign-in or
-email sign-in. The Google callback verifies the Google credential and confirms
-that a private-site user is provisioned before allowing Identity Platform to
-create an account. Email sign-in collects the email and password on separate
-screens: provisioned users without a prior login create a password and receive
-a verification email, while returning and unknown addresses see the same
-password-only screen and the same generic authentication error. Public sites
-continue to route unknown email addresses through account creation. Safe
-post-login destinations are retained through Google, verification-email, and
-password-reset handoffs.
-
-The production login page first applies `GOOGLE_SIGNIN_ENABLED`. When false it
-omits Google controls, skips the live provider lookup, and refuses direct Google
-callback posts. When true, it reads the same live Identity Platform
-Google-provider configuration used by setup. If that provider is disabled or
-absent, Google controls are omitted and initial owner setup opens directly on
-its separate password option. Runtime status-read failures leave Google
-available rather than turning a transient control-plane outage into a
-login-method outage.
-
-Setup also maintains optional agent-access settings in
-`config/files/lagniappe_settings.yaml`: `AGENT_ACCESS_ENABLED`,
-`AGENT_ACCESS_EMAIL`, `AGENT_ACCESS_NAME`, and `AGENT_ACCESS_CODE`. New or
-refreshed installs get the option disabled by default; non-empty local edits are
-preserved, and missing email/name/code values are filled when setup refreshes
-the config. Agent login uses the configured email as a normal user account so
-browser-review permissions can be managed by reassigning that user's groups from
-the normal user settings UI.
+Owner bootstrap, invited/returning user state, verification recovery,
+Google-provider availability, safe errors, and optional agent access are
+documented in [AUTHENTICATION.md](AUTHENTICATION.md#login-ui-and-account-state).
 
 ### AI (`installer/ai.py`)
 

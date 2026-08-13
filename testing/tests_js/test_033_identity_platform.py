@@ -17,6 +17,7 @@ const responses = [
   { success: true },
   { email: "user@example.test" },
   { email: "user@example.test" },
+  { email: "user@example.test" },
 ];
 let auth;
 async function fakeFetch(url, options) {
@@ -57,6 +58,7 @@ vm.runInContext(source, context);
   await auth.signInWithPassword("user@example.test", "password");
   await auth.sendPasswordResetEmail("user@example.test", "csrf-token");
   await auth.sendEmailVerification({ idToken: "signup-token" }, "csrf-token");
+  await auth.verifyPasswordResetCode("reset-code");
   await auth.confirmPasswordReset("reset-code", "new-password");
   await auth.applyActionCode("verify-code");
 
@@ -67,12 +69,13 @@ vm.runInContext(source, context);
     "send-password-reset-email",
     "send-verification-email",
     "accounts:resetPassword",
+    "accounts:resetPassword",
     "accounts:update",
   ];
   if (JSON.stringify(methods) !== JSON.stringify(expected)) {
     throw new Error(`Unexpected Identity Platform methods: ${JSON.stringify(methods)}`);
   }
-  if (![calls[0], calls[1], calls[4], calls[5]].every(
+  if (![calls[0], calls[1], calls[4], calls[5], calls[6]].every(
     (call) => call.url.endsWith("?key=public%20key"),
   )) {
     throw new Error("Public API key was not encoded on provider requests");
@@ -93,7 +96,13 @@ vm.runInContext(source, context);
   }
   if (
     calls[4].body.oobCode !== "reset-code" ||
-    calls[4].body.newPassword !== "new-password"
+    Object.hasOwn(calls[4].body, "newPassword")
+  ) {
+    throw new Error("Password reset link validation attempted to change the password");
+  }
+  if (
+    calls[5].body.oobCode !== "reset-code" ||
+    calls[5].body.newPassword !== "new-password"
   ) {
     throw new Error("Password reset did not carry its action code and password");
   }

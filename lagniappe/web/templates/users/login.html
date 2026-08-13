@@ -204,9 +204,13 @@
     {{ heading("Create a new password") }}
     {{ error() }}
     {{ success() }}
-    <div class="space-y-4">
+    <div data-role="reset-password-controls"
+         class="space-y-4">
       {{ input("password", "new-password", "Password") }}
       {{ button("Update Password", role="reset-password") }}
+    </div>
+    <div class="mt-4">
+      {{ alternate_button("request-new-reset-link", "Request a new reset link") }}
     </div>
   </div>
   <!-- Verify Email Form -->

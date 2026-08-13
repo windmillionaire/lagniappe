@@ -41,6 +41,22 @@ const setLoginActionButton = (button, text, icon = null) => {
 
 /**
  * @testable false
+ * @covered-by src/script/login/forms.mjs::FirstTimeSetupForm
+ * @covered-by src/script/login/forms.mjs::OwnerSetupForm
+ * @reason shared recovery transition for account-creation forms
+ */
+const recoverExistingAccount = (error, email) => {
+	if (error.code !== "auth/email-already-in-use") return false;
+	document.dispatchEvent(
+		new CustomEvent("login:show-signin", {
+			detail: { email, action: "existing-account" },
+		}),
+	);
+	return true;
+};
+
+/**
+ * @testable false
  * @reason base form shell; concrete login forms own the tested workflows
  */
 class LoginForms {
@@ -282,6 +298,7 @@ class OwnerSetupForm extends LoginForms {
 				handleIdentityUser(user, this);
 			})
 			.catch((error) => {
+				if (recoverExistingAccount(error, email)) return;
 				this.showError(getAuthErrorMessage(error));
 			});
 	}
@@ -294,8 +311,9 @@ class OwnerSetupForm extends LoginForms {
 /**
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_first_time_setup_form_creates_password_and_can_return_to_email_check
+ * @tests tests_e2e/001_site/test_001b_login.py::test_login_auth_error_messages_are_user_safe
  * @features login
- * @dimensions first-time-setup account-create form-state
+ * @dimensions first-time-setup account-create form-state existing-account recovery
  */
 class FirstTimeSetupForm extends LoginForms {
 	init() {
@@ -333,6 +351,7 @@ class FirstTimeSetupForm extends LoginForms {
 				handleIdentityUser(user, this);
 			})
 			.catch((error) => {
+				if (recoverExistingAccount(error, this.email.value)) return;
 				this.showError(getAuthErrorMessage(error));
 			});
 	}
@@ -342,8 +361,9 @@ class FirstTimeSetupForm extends LoginForms {
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
  * @tests tests_e2e/001_site/test_001b_login.py::test_forgot_password_form_opens_from_sign_in
+ * @tests tests_e2e/001_site/test_001b_login.py::test_login_auth_error_messages_are_user_safe
  * @features login
- * @dimensions sign-in-transition forgot-password
+ * @dimensions sign-in-transition forgot-password existing-account recovery
  */
 class SignInForm extends LoginForms {
 	init() {
@@ -380,6 +400,8 @@ class SignInForm extends LoginForms {
 			this.showSuccess(
 				"Password updated successfully. Please sign in with your new password.",
 			);
+		} else if (this.data.action === "existing-account") {
+			this.showSuccess("Your password is already set. Sign in to continue.");
 		}
 		this.password.focus();
 	}
@@ -461,19 +483,52 @@ class ForgotPasswordForm extends LoginForms {
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_reset_password_mode
  * @features login
- * @dimensions reset-password query-mode
+ * @dimensions reset-password query-mode action-code-validation expired-link
  */
 class ResetPasswordForm extends LoginForms {
 	init() {
+		this.linkValidated = false;
 		this.password = this.form.querySelector("input[type='password']");
+		this.controls = this.form.querySelector(
+			"[data-role='reset-password-controls']",
+		);
 		this.resetPasswordButton = this.form.querySelector(
 			"[data-role='reset-password']",
 		);
+		this.requestNewLinkButton = this.form.querySelector(
+			"[data-role='request-new-reset-link']",
+		);
+		this.resetPasswordButton.disabled = true;
 		this.setActionButton(this.resetPasswordButton);
 		this.actionButton.addEventListener(
 			"click",
 			this.handleResetPassword.bind(this),
 		);
+		this.requestNewLinkButton.addEventListener("click", () => {
+			document.dispatchEvent(
+				new CustomEvent("login:show-forgot-form", {
+					detail: { email: this.email || "" },
+				}),
+			);
+		});
+		this.auth
+			.verifyPasswordResetCode(this.data.code)
+			.then((result) => {
+				this.email = result.email || "";
+				this.linkValidated = true;
+				this.resetPasswordButton.disabled = false;
+				setLoginActionButton(this.actionButton, this.oldActionText);
+				this.password.focus();
+			})
+			.catch((error) => {
+				this.linkValidated = true;
+				this.showError(getAuthErrorMessage(error));
+				this.controls.classList.add("hidden");
+			});
+	}
+
+	sync() {
+		if (!this.linkValidated) this.setActionState("Checking Link");
 	}
 
 	handleResetPassword() {

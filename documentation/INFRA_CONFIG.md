@@ -162,30 +162,16 @@ Source card. Setup defaults it to the canonical Lagniappe repository and
 preserves an operator-authored repository, fork, tag, or commit URL on later
 refreshes. Set it to an empty string to hide the link.
 
-`GOOGLE_SIGNIN_ENABLED` is the persisted operator intent for Google sign-in.
-Fresh setup asks before beginning Google Auth Platform or OAuth client work and
-defaults to the existing enabled behavior. When false, setup skips Google OAuth
-instructions and Identity Platform Google-provider reconciliation; standalone
-Identity Platform email/password authentication remains required. Existing and
-recovered settings without the key migrate to `true`. A successful focused
-`./setup.sh oauth` run stores `true` explicitly.
+Authentication settings include `IDENTITY_PLATFORM_CONFIG`,
+`GOOGLE_SIGNIN_ENABLED`, `GOOGLE_CLIENT_ID`, `GOOGLE_LOGIN_URI`, and
+`AUTH_EMAIL_CONFIG`. Their public/secret boundaries, defaults, migration,
+installer behavior, and runtime enforcement are documented canonically in
+[AUTHENTICATION.md](AUTHENTICATION.md).
 
 `INSTALLER_EMAIL` and `DEPLOYER_EMAIL` record the Google identities selected by
 the current setup run. The built-in flow uses the active
 `GCLOUD_CONFIG.ACCOUNT` for both responsibilities, including during recovery,
 while preserving `ADMIN_EMAIL` as the distinct application owner.
-`AUTH_EMAIL_CONFIG` stores an authenticated SMTP transport: provider label,
-host, port, STARTTLS or implicit SSL/TLS mode, username, password or API key,
-sender address, and sender name. Fresh setup creates this schema directly from
-the chosen SMTP provider when a custom domain is configured, or from a Gmail
-or Google Workspace mailbox and Google App Password as the no-domain
-bootstrap. Once a custom domain is configured, `./setup.sh email` can replace
-the sender with any SMTP provider. Its Resend shortcut fills the provider's
-fixed SMTP transport values and uses a domain-scoped Sending access API key as
-the SMTP password; Resend's optional Cloudflare Domain Connect authorization
-remains browser-owned and is not stored in application configuration. The
-sender does not need project IAM and does not need to match the installer,
-deployer, application owner, or administrator.
 `RUNTIME_SERVICE_ACCOUNT_EMAIL` is the App Engine attachment and Storage
 signed-URL account. `INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL` is the identity
 expected in Cloud Tasks and Scheduler OIDC tokens. They are equal for this
@@ -206,9 +192,8 @@ boundary without a private key.
 Successful setup output is built from an explicit safe-field allowlist. It may
 show identities, project/resource names, regions, versions, and commands, but
 never dumps the `APP` mapping. In particular it omits service-account private
-keys, `GIBBERISH`, `SECRET_KEY`, Redis passwords, legacy messaging API keys, Sentry
-DSNs, SMTP passwords/API keys, and access tokens. Legacy schema-2 recovery
-also discards the retired `FIREBASE_CONFIG` value.
+keys, `GIBBERISH`, `SECRET_KEY`, Redis passwords, Sentry DSNs, SMTP
+passwords/API keys, and access tokens.
 
 Google locations are intentionally split:
 

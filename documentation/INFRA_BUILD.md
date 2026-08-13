@@ -62,7 +62,8 @@ Three Rollup entry points produce independent bundles:
 The unauthenticated login page. Includes the focused Identity Platform REST
 client and the existing custom forms, but not a provider-owned Auth SDK. It remains
 separate from the main bundle so unauthenticated users do not download the full
-app.
+app. Its behavioral and trust-boundary contract is documented in
+[AUTHENTICATION.md](AUTHENTICATION.md).
 
 ### Sentry (`sentry.mjs` → `sentry.js`)
 
