@@ -11,10 +11,12 @@ from installer.errors import (
 )
 from installer.package_install import install_if_missing
 from installer.state import record_mutation
+from installer import wrap_text
 
 from .validation import validate_cloudflare_api_token
 
 CLOUDFLARE_API_ROOT = "https://api.cloudflare.com/client/v4"
+CLOUDFLARE_API_TOKEN_URL = "https://dash.cloudflare.com/profile/api-tokens"
 CLOUDFLARE_API_TIMEOUT = 10
 CLOUDFLARE_RECORD_COMMENT = "Managed by Lagniappe App Engine domain setup"
 
@@ -90,19 +92,57 @@ def _cloudflare_request(method, path, api_token, *, params=None, json_data=None)
     )
 
 
-# @testable false
-# @covered-by installer/custom_domain.py::_setup_custom_domain
-# @reason secret input wrapper is exercised through the custom-domain flow
+# @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_cloudflare_token_prompt_explains_dashboard_steps_and_scope
+# @features setup
+# @dimensions cloudflare-api interactive-input least-privilege
 def get_cloudflare_api_token():
     """Prompt for a scoped token without echoing or persisting it."""
-    print("\nCloudflare DNS automation uses a temporary scoped API token.")
-    print("Create the token from Cloudflare's 'Edit zone DNS' template.")
-    print("Limit its resources to the one DNS zone you are configuring.")
-    print("Required permissions: Zone / Zone / Read and Zone / DNS / Edit.")
+    print(
+        "\n"
+        + wrap_text(
+            "Cloudflare DNS automation uses a scoped user API token. "
+            "Lagniappe uses it only during this run and does not save it."
+        )
+    )
+    print("1. Open Cloudflare's API Tokens page:")
+    print(f"   {CLOUDFLARE_API_TOKEN_URL}")
+    print(
+        wrap_text(
+            "   Or, in the Cloudflare dashboard, open My Profile > API Tokens."
+        )
+    )
+    print(wrap_text("2. Select Create Token."))
+    print(
+        wrap_text(
+            "3. Find the 'Edit zone DNS' template and select Use template."
+        )
+    )
+    print(
+        wrap_text(
+            "4. Set the resource scope to Specified Domains, then select only "
+            "the DNS zone you are configuring."
+        )
+    )
+    print(
+        wrap_text(
+            "5. Under DNS & Zones, select DNS > Edit and Zone > Read. Leave "
+            "Zone > Edit off, and do not select all permissions."
+        )
+    )
+    print(
+        wrap_text(
+            "6. Continue to summary, create the token, and paste the token "
+            "shown once below. You can delete it from Cloudflare after setup."
+        )
+    )
     while True:
-        token = getpass("Cloudflare API token (x to cancel): ").strip()
-        if token.casefold() == "x":
-            raise SetupCancelled("Cloudflare DNS setup cancelled.")
+        ready = input(
+            "Press Enter to paste the token, or x to stop setup: "
+        ).strip()
+        if ready.casefold() == "x":
+            raise SetupCancelled("Setup stopped before Cloudflare DNS changes.")
+        token = getpass("Paste Cloudflare API token (input hidden): ").strip()
         if validate_cloudflare_api_token(token):
             return token
         print("Enter a non-empty scoped Cloudflare API token.")

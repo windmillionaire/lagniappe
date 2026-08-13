@@ -1239,6 +1239,96 @@ def test_gcp_domain_mapping_and_ai_cache_commands(monkeypatch):
 
 
 # @features setup
+# @dimensions custom-domain ownership account-identity interactive-input
+def test_domain_ownership_instructions_name_selected_gcloud_account(
+    monkeypatch,
+    capsys,
+):
+    import installer as setup_package
+    from installer.domain import manual as domain_manual
+
+    settings = _fake_settings(
+        gcloud={"ACCOUNT": "installer@example.com"},
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(SETTINGS=settings),
+    )
+    monkeypatch.setattr(setup_package, "FORMATTER", _fake_formatter())
+    monkeypatch.setattr(domain_manual, "FORMATTER", _fake_formatter())
+    prompts = []
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: prompts.append(prompt) or "y",
+    )
+
+    assert domain_manual.confirm_domain_ownership("app.example.com")
+
+    output = capsys.readouterr().out
+    assert "installer@example.com" in output
+    assert "signed in to that exact account" in output
+    assert "confirm that account is an Owner" in output
+    assert prompts == [
+        "Has Google confirmed that installer@example.com owns "
+        "app.example.com? [y/N]: "
+    ]
+
+
+# @features setup
+# @dimensions cloudflare-api interactive-input least-privilege
+def test_cloudflare_token_prompt_explains_dashboard_steps_and_scope(
+    monkeypatch,
+    capsys,
+):
+    from installer.domain import cloudflare
+
+    choices = []
+    prompts = []
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: choices.append(prompt) or "",
+    )
+    monkeypatch.setattr(
+        cloudflare,
+        "getpass",
+        lambda prompt: prompts.append(prompt) or "scoped-token-" + ("a" * 20),
+    )
+
+    assert cloudflare.get_cloudflare_api_token() == (
+        "scoped-token-" + ("a" * 20)
+    )
+
+    output = capsys.readouterr().out
+    assert cloudflare.CLOUDFLARE_API_TOKEN_URL in output
+    assert "My Profile > API Tokens" in output
+    assert "Select Create Token" in output
+    assert "'Edit zone DNS' template" in output
+    assert "Specified Domains" in output
+    assert "DNS > Edit and Zone > Read" in output
+    assert "Leave Zone > Edit off" in output
+    assert "do not select all permissions" in output
+    assert "does not save it" in output
+    assert "delete it from Cloudflare after setup" in output
+    assert choices == [
+        "Press Enter to paste the token, or x to stop setup: "
+    ]
+    assert prompts == ["Paste Cloudflare API token (input hidden): "]
+
+    monkeypatch.setattr("builtins.input", lambda prompt: "x")
+    monkeypatch.setattr(
+        cloudflare,
+        "getpass",
+        lambda prompt: pytest.fail("stopping must happen before hidden input"),
+    )
+    with pytest.raises(
+        SetupCancelled,
+        match="stopped before Cloudflare DNS changes",
+    ):
+        cloudflare.get_cloudflare_api_token()
+
+
+# @features setup
 # @dimensions custom-domain cloudflare-dns dns-only provider-records idempotence disabled-provider
 def test_custom_domain_uses_provider_records_and_dns_only_cloudflare(monkeypatch):
     import installer as setup_package

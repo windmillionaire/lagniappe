@@ -3,19 +3,34 @@
 from installer import FORMATTER
 
 
-# @testable false
-# @covered-by installer/custom_domain.py::_setup_custom_domain
-# @reason manual Search Console confirmation belongs to the interactive flow
+# @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_domain_ownership_instructions_name_selected_gcloud_account
+# @features setup
+# @dimensions custom-domain ownership account-identity interactive-input
 def confirm_domain_ownership(domain):
     """Explain Google ownership verification and require confirmation."""
+    from config import SETTINGS
+
     f = FORMATTER.initialize()
+    account = SETTINGS.GCLOUD_CONFIG["ACCOUNT"]
     print(f"\n{f.info('Verify domain ownership with Google')}")
-    print("1. Open https://search.google.com/search-console")
-    print("2. Add the registrable domain as a Domain property")
-    print("3. Add the verification TXT record at your DNS provider")
-    print("4. Wait for Google Search Console to confirm ownership")
+    print("1. Use the Google account selected by this installation:")
+    print(f"   {account}")
+    print(
+        "2. Open https://search.google.com/search-console while signed in "
+        "to that exact account"
+    )
+    print("3. Add the registrable domain as a Domain property")
+    print("4. Add the verification TXT record at your DNS provider")
+    print("5. Wait for Google Search Console to confirm ownership")
+    print(
+        "6. In Search Console Settings > Users and permissions, confirm "
+        "that account is an Owner"
+    )
     verified = input(
-        f.info(f"Has Google confirmed ownership for {domain}? [y/N]: ")
+        f.info(
+            f"Has Google confirmed that {account} owns {domain}? [y/N]: "
+        )
     )
     return verified.casefold() == "y"
 

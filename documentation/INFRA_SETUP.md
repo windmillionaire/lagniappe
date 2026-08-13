@@ -956,9 +956,17 @@ name, and a test recipient. The operator verifies the sending domain and
 publishes the provider's SPF and DKIM records first. New settings are saved only
 after the test message succeeds; a failed test leaves the previous sender
 unchanged. The later command requires `CUSTOM_DOMAIN` and can deploy the saved
-settings immediately. The temporary Cloudflare API token used by the App Engine
-domain flow is never persisted, and Cloudflare never receives or exposes the
-email-service credential.
+settings immediately. The scoped Cloudflare user API token used by the App
+Engine domain flow is never persisted, and Cloudflare never receives or exposes
+the email-service credential. Setup prints the direct Cloudflare **My Profile >
+API Tokens** URL and walks through **Create Token > Edit zone DNS > Use
+template**, including restricting **Zone Resources** to the one specific zone.
+In Cloudflare's current policy editor, the exact contract is **Specified
+Domains** for that zone, **DNS > Edit**, and **Zone > Read**; **Zone > Edit** and
+the broad **Select all permissions** option remain off. The token remains active
+at Cloudflare until the operator deletes it after setup. Before the hidden token
+field, setup uses a separate visible prompt where `x` stops the current setup
+run without implying that completed provider mutations will be undone.
 
 Runtime verification/reset delivery and its browser/server secret boundary are
 documented in
@@ -1220,6 +1228,8 @@ Cloudflare DNS-only automation or provider-neutral manual DNS setup.
 1. **`installer/domain/instructions.py`** -- explains the process to the user
 2. **`installer/domain/validation.py`** -- validates the hostname and scoped token
 3. **`installer/domain/manual.py`** -- guides Search Console ownership verification
+   under the exact gcloud account selected for the installation and asks the
+   operator to confirm that account is an owner
 4. **`installer/domain/gcp.py`** -- discovers or creates the App Engine mapping and
    verifies its exact provider-returned `resourceRecords`
 5. DNS setup (one of):
