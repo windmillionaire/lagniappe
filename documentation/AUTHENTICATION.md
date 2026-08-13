@@ -188,6 +188,14 @@ server generates and sends the verification link. Once delivery is confirmed,
 the password field and create action are removed from the form rather than left
 active beneath the confirmation.
 
+If verification delivery fails, the browser catches the generic application
+error and opens ordinary sign-in for the same email with safe visible guidance;
+it does not leave an unhandled promise or expose SMTP/provider detail. The
+server reports the underlying provider exception to Sentry. The password was
+already created, so signing in with it retries verification delivery. Restoring
+the sender configuration therefore recovers without creating another Identity
+Platform account.
+
 An invited user can apply the verification link and close the page before the
 final password sign-in. Their local `last_login` is still empty, so a later
 email check may offer first-time setup again. The repeated provider create then

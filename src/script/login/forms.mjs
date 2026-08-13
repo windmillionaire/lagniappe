@@ -362,8 +362,9 @@ class FirstTimeSetupForm extends LoginForms {
  * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
  * @tests tests_e2e/001_site/test_001b_login.py::test_forgot_password_form_opens_from_sign_in
  * @tests tests_e2e/001_site/test_001b_login.py::test_login_auth_error_messages_are_user_safe
+ * @tests tests_e2e/001_site/test_001b_login.py::test_verification_delivery_failure_recovers_safely
  * @features login
- * @dimensions sign-in-transition forgot-password existing-account recovery
+ * @dimensions sign-in-transition forgot-password existing-account recovery delivery-failure safe-error
  */
 class SignInForm extends LoginForms {
 	init() {
@@ -402,6 +403,10 @@ class SignInForm extends LoginForms {
 			);
 		} else if (this.data.action === "existing-account") {
 			this.showSuccess("Your password is already set. Sign in to continue.");
+		} else if (this.data.action === "verification-delivery-failed") {
+			this.showError(
+				"We couldn't send the verification email. Sign in again to retry delivery.",
+			);
 		}
 		this.password.focus();
 	}

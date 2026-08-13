@@ -252,11 +252,23 @@ def _mock_login_identity(page, calls, response, status=200):
     page.route("**/users/login-identity", handler)
 
 
-def _mock_verification_email_delivery(page, calls):
+def _mock_verification_email_delivery(page, calls, failures=None):
     """Stub the live provider/email boundary while preserving the browser request."""
+
+    failures = list(failures or [])
 
     def handler(route):
         calls.append(_request_json(route.request))
+        if failures and failures.pop(0):
+            _json_response(
+                route,
+                {
+                    "success": False,
+                    "error": "Email delivery failed: private provider detail",
+                },
+                status=503,
+            )
+            return
         _json_response(route, {"success": True})
 
     page.route("**/users/send-verification-email", handler)
@@ -1720,6 +1732,7 @@ def test_login_identity_client_handoff_redirects_or_requires_verification(
     assert login_identity_calls[0]["authResult"]
     assert not identity_calls["unexpected"]
 
+
     user = get_user(Users.ANONYMOUS)
     identity_calls = _mock_identity_platform(user.page, sign_in_verified=False)
     login_identity_calls = []
@@ -1785,6 +1798,86 @@ def test_login_identity_client_handoff_redirects_or_requires_verification(
 
     assert login_identity_calls[0]["email"] == email
     assert identity_calls["sign_in"][0]["email"] == email
+    assert not identity_calls["unexpected"]
+
+
+# @features login
+# @dimensions identity-platform verify-email delivery-failure recovery safe-error
+def test_verification_delivery_failure_recovers_safely(
+    get_user,
+    browser_failures,
+):
+    """A failed verification email is visible and can be retried by signing in."""
+    _ensure_owner_initialized()
+    user = get_user(Users.ANONYMOUS)
+    identity_calls = _mock_identity_platform(
+        user.page,
+        sign_up_verified=False,
+        sign_in_verified=False,
+    )
+    login_identity_calls = []
+    verification_email_calls = []
+    email = f"verification-delivery-{uuid4().hex}@example.test"
+    password = "new-password-123"
+    _create_first_time_user(email)
+    _mock_login_identity(
+        user.page,
+        login_identity_calls,
+        {"success": False, "requires_verification": True},
+        status=403,
+    )
+    _mock_verification_email_delivery(
+        user.page,
+        verification_email_calls,
+        failures=[True],
+    )
+
+    login_page = user.go(SitePages.LOGIN_PAGE)
+    email_form = _open_email_check_form(user, login_page)
+    email_form.locator(FormElements.EMAIL).fill(email)
+    email_form.locator(Buttons.SIGNIN).click()
+    first_time_form = user.locate(login_page.FIRST_TIME_SETUP_FORM)
+    expect(first_time_form).to_be_visible()
+    first_time_form.locator(PASSWORD).fill(password)
+
+    with browser_failures.expect_http_error(
+        user,
+        status=503,
+        path="/users/send-verification-email",
+    ):
+        with browser_failures.expect_http_error(
+            user,
+            status=403,
+            path="/users/login-identity",
+        ):
+            first_time_form.locator(Buttons.SIGNIN).click()
+            sign_in_form = user.locate(login_page.SIGN_IN_FORM)
+            expect(sign_in_form).to_be_visible()
+            error = sign_in_form.locator(Roles.ERROR)
+            expect(error).to_have_text(
+                "We couldn't send the verification email. "
+                "Sign in again to retry delivery."
+            )
+            expect(error).not_to_contain_text("private provider detail")
+            expect(sign_in_form.locator("input[name='email']")).to_have_value(email)
+
+    sign_in_form.locator(PASSWORD).fill(password)
+    with browser_failures.expect_http_error(
+        user,
+        status=403,
+        path="/users/login-identity",
+    ):
+        sign_in_form.locator(Buttons.SIGNIN).click()
+        expect(sign_in_form.locator("[data-role='success']")).to_have_text(
+            f"An email verification link has been sent to {email}."
+        )
+        expect(sign_in_form.locator(PASSWORD)).not_to_be_visible()
+        expect(sign_in_form.locator(Buttons.SIGNIN)).not_to_be_visible()
+
+    assert identity_calls["sign_up"][0]["email"] == email
+    assert identity_calls["sign_in"][0]["email"] == email
+    assert len(login_identity_calls) == 2
+    assert len(verification_email_calls) == 2
     assert not identity_calls["unexpected"]
 
 
