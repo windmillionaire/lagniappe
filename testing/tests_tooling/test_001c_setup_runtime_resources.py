@@ -1132,8 +1132,8 @@ def test_redis_tls_disablement_is_transactional(monkeypatch, tmp_path):
 
 
 # @features setup
-# @dimensions gcp-domain managed-certificate deploy retry provider-status https
-def test_managed_certificate_waits_for_provider_and_https_readiness(
+# @dimensions gcp-domain managed-certificate deploy retry provider-status https success
+def test_managed_certificate_waits_for_provider_then_reports_active(
     monkeypatch,
     capsys,
 ):
@@ -1167,8 +1167,6 @@ def test_managed_certificate_waits_for_provider_and_https_readiness(
             pending_mapping,
             active_mapping,
             active_mapping,
-            active_mapping,
-            active_mapping,
         ]
     )
     gcloud_calls = []
@@ -1181,7 +1179,6 @@ def test_managed_certificate_waits_for_provider_and_https_readiness(
         assert "ssl-certificates" in arguments
         return {"managedCertificate": {"status": "PENDING"}}
 
-    tls_results = iter([False, True])
     delays = []
     monkeypatch.setattr(domain_gcp, "_run_gcloud_json", fake_gcloud)
 
@@ -1189,10 +1186,9 @@ def test_managed_certificate_waits_for_provider_and_https_readiness(
         "app.example.com",
         poll_delays=(0, 2, 3),
         sleep=delays.append,
-        https_probe=lambda domain: next(tls_results),
     )
 
-    assert delays == [2, 3]
+    assert delays == [2]
     assert gcloud_calls[0][0][:3] == ["app", "domain-mappings", "list"]
     assert "--project=project-1" in gcloud_calls[0][0]
     assert "--account=owner@example.com" in gcloud_calls[0][0]
@@ -1206,8 +1202,18 @@ def test_managed_certificate_waits_for_provider_and_https_readiness(
         "in Google Cloud project project-1 using owner@example.com: PENDING"
     ) in output
     assert "certificate cert-active active" in output
-    assert "HTTPS edge is not serving it yet" in output
-    assert "certificate cert-active active for https://app.example.com" in output
+    assert "Google's HTTPS frontend may need a little additional time" in output
+    assert "Retrying in 3 seconds" not in output
+
+
+# @features setup
+# @dimensions managed-certificate retry timeout
+def test_managed_certificate_default_polling_backs_off_without_extending_timeout():
+    from installer.domain import gcp as domain_gcp
+
+    assert domain_gcp.MANAGED_CERTIFICATE_POLL_DELAYS[:3] == (0, 30, 30)
+    assert domain_gcp.MANAGED_CERTIFICATE_POLL_DELAYS[3:] == (60,) * 9
+    assert sum(domain_gcp.MANAGED_CERTIFICATE_POLL_DELAYS) == 600
 
 
 # @features setup

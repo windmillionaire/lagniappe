@@ -1,8 +1,6 @@
 """App Engine custom-domain mapping discovery and reconciliation."""
 
 import json
-import socket
-import ssl
 import subprocess
 import time
 
@@ -19,7 +17,7 @@ from installer.errors import (
 from installer.state import record_mutation
 
 DOMAIN_MAPPING_POLL_DELAYS = (0, 1, 2, 4, 8)
-MANAGED_CERTIFICATE_POLL_DELAYS = (0,) + (15,) * 40
+MANAGED_CERTIFICATE_POLL_DELAYS = (0, 30, 30) + (60,) * 9
 
 
 # @testable false
@@ -131,19 +129,6 @@ def _get_ssl_certificate(project_id, certificate_id, account=None):
 
 # @testable false
 # @covered-by installer/domain/gcp.py::wait_for_managed_certificate
-# @reason TLS handshake adapter is exercised through readiness polling
-def _https_certificate_is_served(domain, *, timeout=10):
-    context = ssl.create_default_context()
-    try:
-        with socket.create_connection((domain, 443), timeout=timeout) as connection:
-            with context.wrap_socket(connection, server_hostname=domain):
-                return True
-    except OSError:
-        return False
-
-
-# @testable false
-# @covered-by installer/domain/gcp.py::wait_for_managed_certificate
 # @reason provider response normalization is owned by readiness polling
 def _managed_certificate_status(certificate):
     if not isinstance(certificate, dict):
@@ -218,20 +203,20 @@ def _listed_domain_mapping(mappings, project_id, domain):
 
 
 # @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_waits_for_provider_and_https_readiness
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_waits_for_provider_then_reports_active
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_default_polling_backs_off_without_extending_timeout
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_reports_permanent_provider_failure
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_timeout_keeps_deployment_incomplete
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_reports_missing_domain_mapping
 # @features setup
-# @dimensions gcp-domain managed-certificate deploy retry timeout operator-guidance https provider-status provider-failure incomplete-deployment missing-resource account-project
+# @dimensions gcp-domain managed-certificate deploy retry timeout operator-guidance https provider-status provider-failure incomplete-deployment missing-resource account-project success
 def wait_for_managed_certificate(
     domain,
     *,
     sleep=time.sleep,
     poll_delays=MANAGED_CERTIFICATE_POLL_DELAYS,
-    https_probe=_https_certificate_is_served,
 ):
-    """Wait for Google's managed certificate and a verified TLS handshake."""
+    """Wait for Google to attach an active managed certificate."""
     from config import SETTINGS
 
     f = FORMATTER.initialize()
@@ -322,15 +307,15 @@ def wait_for_managed_certificate(
 
         if active_id:
             last_status = "ACTIVE"
-            if https_probe(domain):
-                print(
-                    f.success(
-                        f"Managed TLS certificate {active_id} active for "
-                        f"https://{domain} in {target}; HTTPS ready."
-                    )
+            print(
+                f.success(
+                    f"Managed TLS certificate {active_id} active for "
+                    f"https://{domain} in {target}. Google's HTTPS frontend may "
+                    "need a little additional time before the hostname opens "
+                    "in a browser."
                 )
-                return True
-            last_status = "ACTIVE; WAITING FOR HTTPS"
+            )
+            return True
         elif pending_id:
             certificate = retry_provider_call(
                 lambda: _get_ssl_certificate(project_id, pending_id, account),
@@ -353,18 +338,11 @@ def wait_for_managed_certificate(
 
         if attempt < len(delays) - 1:
             next_delay = delays[attempt + 1]
-            if last_status == "ACTIVE; WAITING FOR HTTPS":
-                detail = (
-                    f"Google reports certificate {active_id} active for "
-                    f"https://{domain} in {target}, but the HTTPS "
-                    "edge is not serving it yet"
-                )
-            else:
-                certificate_id = pending_id or "not assigned yet"
-                detail = (
-                    f"Managed TLS certificate {certificate_id} for "
-                    f"https://{domain} in {target}: {last_status}"
-                )
+            certificate_id = pending_id or "not assigned yet"
+            detail = (
+                f"Managed TLS certificate {certificate_id} for "
+                f"https://{domain} in {target}: {last_status}"
+            )
             print(f"{detail}. Retrying in {next_delay} seconds...")
 
     raise ProviderTimeout(

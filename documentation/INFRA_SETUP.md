@@ -585,13 +585,18 @@ response is accepted and setup continues by verifying the live configuration.
     the generated files already present in the repository. When a custom domain
     is configured, the shared deploy helper then polls App Engine's domain
     mapping and managed-certificate status for up to ten minutes. It reports
-    states such as `PENDING` or `FAILED_RETRYING_NOT_VISIBLE`, and after Google
-    attaches the certificate it verifies a trusted TLS handshake to the custom
-    hostname. Setup does not print deployment or installation completion while
-    that check is pending. A permanent certificate failure or a certificate
-    that remains unavailable after the bounded wait leaves the successful app
-    deployment intact but returns nonzero with DNS, CAA, and rerun guidance;
-    the default App Engine URL remains available.
+    states such as `PENDING` or `FAILED_RETRYING_NOT_VISIBLE`. The first two
+    certificate-status retries wait 30 seconds; later retries wait 60 seconds
+    to keep the console readable without extending the ten-minute limit. Setup
+    does not print deployment or installation completion while Google still
+    reports the managed certificate as pending. A permanent certificate failure
+    or a certificate that remains unavailable after the bounded wait leaves the
+    successful app deployment intact but returns nonzero with DNS, CAA, and
+    rerun guidance; the default App Engine URL remains available.
+
+    After Google attaches an active certificate, setup reports success without
+    making repeated HTTPS requests. Google's HTTPS frontend may need a little
+    additional time before the hostname opens in a browser.
 
     After custom-domain readiness, setup creates the deferred-job recovery
     schedule during a quiet wrapping-up phase. The schedule is installed
@@ -1216,8 +1221,8 @@ Shared helpers:
 - `run_gcloud_command(command)` -- subprocess wrapper for gcloud CLI
 - `deploy_to_app_engine()` -- delegates to `runner.deploy.deploy()` in publish-only
   mode, deploying indexes and app without rebuilding JS or incrementing version;
-  when `CUSTOM_DOMAIN` is set, it waits for the App Engine managed certificate
-  and a verified HTTPS handshake before reporting completion
+  when `CUSTOM_DOMAIN` is set, it waits for Google to attach an active App
+  Engine managed certificate before reporting completion
 - `print_summary()` -- displays the allowlisted secret-safe final summary
 
 ### Package Install (`installer/package_install.py`)
