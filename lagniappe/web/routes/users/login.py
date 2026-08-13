@@ -630,6 +630,29 @@ def send_password_reset_email():
         return jsonify({"success": False, "error": "Email required"}), 400
 
     try:
+        # Check the sender before consulting Identity Platform so an unavailable
+        # SMTP account produces the same response for every submitted address.
+        auth_email.check_auth_email_connection()
+    except auth_email.AuthEmailError as error:
+        exceptions.capture(
+            error,
+            {
+                "auth": {
+                    "operation": "password_reset_email_availability",
+                }
+            },
+        )
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": "Password reset email is temporarily unavailable",
+                }
+            ),
+            503,
+        )
+
+    try:
         _send_auth_action_email(
             email,
             "resetPassword",

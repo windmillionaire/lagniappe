@@ -212,6 +212,15 @@ a **Request a new reset link** action that opens the existing forgot-password
 form without requiring URL editing. After a successful reset, the UI returns to
 ordinary password sign-in with confirmation feedback.
 
+Before generating a reset link, the server checks SMTP availability without
+consulting the submitted address. An unavailable sender therefore returns the
+same generic `503` for every address; the forgot-password form retains its email
+and action controls and displays safe retry guidance. Account lookup and any
+later account-specific delivery outcome retain the generic success response so
+password-reset behavior cannot be used to enumerate accounts. The backend
+reports both failure classes to Sentry without exposing provider detail in the
+browser.
+
 ## Google availability and safe failures
 
 Google controls require both operator intent and usable provider state:

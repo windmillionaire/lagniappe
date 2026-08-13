@@ -430,8 +430,9 @@ class SignInForm extends LoginForms {
 /**
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_forgot_password_form_opens_from_sign_in
+ * @tests tests_e2e/001_site/test_001b_login.py::test_password_reset_delivery_failure_recovers_safely
  * @features login
- * @dimensions forgot-password
+ * @dimensions forgot-password delivery-failure recovery safe-error
  */
 class ForgotPasswordForm extends LoginForms {
 	init() {
@@ -477,9 +478,10 @@ class ForgotPasswordForm extends LoginForms {
 					"A password reset link has been sent to your email address.",
 				);
 			})
-			.catch((error) => {
-				captureLoginError(error, "reset_password");
-				this.showError(getAuthErrorMessage(error));
+			.catch((_error) => {
+				this.showError(
+					"We couldn't send the password reset email. Please try again later.",
+				);
 			});
 	}
 }

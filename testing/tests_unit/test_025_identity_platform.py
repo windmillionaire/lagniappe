@@ -1,5 +1,7 @@
 """Unit tests for Identity Platform runtime operations."""
 
+import smtplib
+
 import pytest
 
 from lagniappe.core.tools import auth_email, identity_platform
@@ -58,6 +60,11 @@ class FakeSMTP:
 
     def send_message(self, message):
         self.message = message
+
+
+class RejectedSMTP(FakeSMTP):
+    def login(self, email, password):
+        raise smtplib.SMTPAuthenticationError(535, b"Bad credentials")
 
 
 # @features login
@@ -264,6 +271,41 @@ def test_generate_email_action_code_returns_provider_code_without_sending():
         "userIp": "203.0.113.1",
     }
     assert request["timeout"] == identity_platform.IDENTITY_REQUEST_TIMEOUT
+
+
+# @features login
+# @dimensions authentication-email smtp availability account-enumeration
+def test_auth_email_connection_preflight_is_address_independent():
+    config = {
+        "provider": "smtp",
+        "service": "Resend",
+        "host": "smtp.resend.test",
+        "port": 587,
+        "security": "starttls",
+        "username": "resend",
+        "password": "provider-key",
+        "senderEmail": "sender@example.test",
+        "senderName": "Demo",
+    }
+    FakeSMTP.instances.clear()
+    tls_context = object()
+
+    assert auth_email.check_auth_email_connection(
+        config=config,
+        smtp_factory=FakeSMTP,
+        tls_context=tls_context,
+    )
+    available = FakeSMTP.instances[0]
+    assert available.started_tls is tls_context
+    assert available.credentials == ("resend", "provider-key")
+    assert available.message is None
+
+    with pytest.raises(auth_email.AuthEmailError, match="SMTP service rejected"):
+        auth_email.check_auth_email_connection(
+            config=config,
+            smtp_factory=RejectedSMTP,
+            tls_context=tls_context,
+        )
 
 
 # @features login

@@ -3,6 +3,7 @@
 import re
 import smtplib
 import ssl
+from contextlib import contextmanager
 from email.message import EmailMessage
 from email.utils import formataddr
 from html import escape
@@ -50,6 +51,72 @@ def _smtp_config(config):
     return normalized
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/auth_email.py::check_auth_email_connection
+# @covered-by lagniappe/core/tools/auth_email.py::send_auth_email
+# @reason shared SMTP connection setup is exercised through availability checks and delivery
+@contextmanager
+def _authenticated_smtp(
+    smtp_config,
+    *,
+    smtp_factory=smtplib.SMTP,
+    smtp_ssl_factory=smtplib.SMTP_SSL,
+    tls_context=None,
+):
+    """Open and authenticate one configured SMTP connection."""
+    context = tls_context or ssl.create_default_context()
+    try:
+        if smtp_config["security"] == "ssl":
+            smtp_connection = smtp_ssl_factory(
+                smtp_config["host"],
+                smtp_config["port"],
+                timeout=SMTP_TIMEOUT,
+                context=context,
+            )
+        else:
+            smtp_connection = smtp_factory(
+                smtp_config["host"],
+                smtp_config["port"],
+                timeout=SMTP_TIMEOUT,
+            )
+        with smtp_connection as smtp:
+            if smtp_config["security"] == "starttls":
+                smtp.starttls(context=context)
+            smtp.login(smtp_config["username"], smtp_config["password"])
+            yield smtp
+    except (OSError, smtplib.SMTPException) as error:
+        raise AuthEmailError(
+            "The SMTP service rejected or could not deliver the authentication email."
+        ) from error
+
+
+# @testable true
+# @tests tests_unit/test_025_identity_platform.py::test_auth_email_connection_preflight_is_address_independent
+# @features login
+# @dimensions authentication-email smtp availability account-enumeration
+def check_auth_email_connection(
+    *,
+    config=None,
+    smtp_factory=smtplib.SMTP,
+    smtp_ssl_factory=smtplib.SMTP_SSL,
+    tls_context=None,
+):
+    """Confirm sender availability without consulting or sending to a recipient."""
+    if config is None:
+        from lagniappe import CONFIG
+
+        config = getattr(CONFIG, "AUTH_EMAIL_CONFIG", None)
+    smtp_config = _smtp_config(config)
+    with _authenticated_smtp(
+        smtp_config,
+        smtp_factory=smtp_factory,
+        smtp_ssl_factory=smtp_ssl_factory,
+        tls_context=tls_context,
+    ):
+        pass
+    return True
+
+
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_send_auth_email_supports_generic_smtp_transports
 # @features login
@@ -84,30 +151,13 @@ def send_auth_email(
     message.set_content(str(text_body or ""))
     message.add_alternative(str(html_body or ""), subtype="html")
 
-    context = tls_context or ssl.create_default_context()
-    try:
-        if smtp_config["security"] == "ssl":
-            smtp_connection = smtp_ssl_factory(
-                smtp_config["host"],
-                smtp_config["port"],
-                timeout=SMTP_TIMEOUT,
-                context=context,
-            )
-        else:
-            smtp_connection = smtp_factory(
-                smtp_config["host"],
-                smtp_config["port"],
-                timeout=SMTP_TIMEOUT,
-            )
-        with smtp_connection as smtp:
-            if smtp_config["security"] == "starttls":
-                smtp.starttls(context=context)
-            smtp.login(smtp_config["username"], smtp_config["password"])
-            smtp.send_message(message)
-    except (OSError, smtplib.SMTPException) as error:
-        raise AuthEmailError(
-            "The SMTP service rejected or could not deliver the authentication email."
-        ) from error
+    with _authenticated_smtp(
+        smtp_config,
+        smtp_factory=smtp_factory,
+        smtp_ssl_factory=smtp_ssl_factory,
+        tls_context=tls_context,
+    ) as smtp:
+        smtp.send_message(message)
     return True
 
 

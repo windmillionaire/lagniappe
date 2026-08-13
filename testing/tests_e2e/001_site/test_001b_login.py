@@ -274,11 +274,23 @@ def _mock_verification_email_delivery(page, calls, failures=None):
     page.route("**/users/send-verification-email", handler)
 
 
-def _mock_password_reset_email_delivery(page, calls):
+def _mock_password_reset_email_delivery(page, calls, failures=None):
     """Stub password-reset delivery while preserving the visible form flow."""
+
+    failures = list(failures or [])
 
     def handler(route):
         calls.append(_request_json(route.request))
+        if failures and failures.pop(0):
+            _json_response(
+                route,
+                {
+                    "success": False,
+                    "error": "Password reset failed: private provider detail",
+                },
+                status=503,
+            )
+            return
         _json_response(route, {"success": True})
 
     page.route("**/users/send-password-reset-email", handler)
@@ -1515,6 +1527,57 @@ def test_forgot_password_form_opens_from_sign_in(get_user):
         forgot_form.locator("button[data-role='reset-password-email']")
     ).not_to_be_visible()
     assert reset_email_calls == [{"email": SETTINGS.test_config["ADMIN_EMAIL"]}]
+
+
+# @features login
+# @dimensions forgot-password delivery-failure recovery safe-error
+def test_password_reset_delivery_failure_recovers_safely(
+    get_user,
+    browser_failures,
+):
+    """Unavailable reset delivery is safe, visible, and retryable in place."""
+    _ensure_owner_initialized()
+    user = get_user(Users.ANONYMOUS)
+    reset_email_calls = []
+    _mock_password_reset_email_delivery(
+        user.page,
+        reset_email_calls,
+        failures=[True],
+    )
+    login_page = user.go(SitePages.LOGIN_PAGE)
+    email_form = _open_email_check_form(user, login_page)
+    email_form.locator(FormElements.EMAIL).fill(SETTINGS.test_config["ADMIN_EMAIL"])
+    email_form.locator(Buttons.SIGNIN).click()
+    user.locate(login_page.SIGN_IN_FORGOT_PASSWORD).click()
+    forgot_form = user.locate(login_page.FORGOT_PASSWORD_FORM)
+    reset_button = forgot_form.locator("button[data-role='reset-password-email']")
+
+    with browser_failures.expect_http_error(
+        user,
+        status=503,
+        path="/users/send-password-reset-email",
+    ):
+        reset_button.click()
+        error = forgot_form.locator(Roles.ERROR)
+        expect(error).to_have_text(
+            "We couldn't send the password reset email. Please try again later."
+        )
+        expect(error).not_to_contain_text("private provider detail")
+        expect(forgot_form.locator('input[name="reset-email"]')).to_have_value(
+            SETTINGS.test_config["ADMIN_EMAIL"]
+        )
+        expect(reset_button).to_be_visible()
+
+    reset_button.click()
+    expect(forgot_form.locator("[data-role='success']")).to_have_text(
+        "A password reset link has been sent to your email address."
+    )
+    expect(forgot_form.locator('input[name="reset-email"]')).not_to_be_visible()
+    expect(reset_button).not_to_be_visible()
+    assert reset_email_calls == [
+        {"email": SETTINGS.test_config["ADMIN_EMAIL"]},
+        {"email": SETTINGS.test_config["ADMIN_EMAIL"]},
+    ]
 
 
 # @features login
