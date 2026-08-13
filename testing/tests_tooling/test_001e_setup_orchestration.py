@@ -260,6 +260,7 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
     output = capsys.readouterr().out
     assert "Wrapping up installation..." in output
     assert "Deployment complete!" in output
+    assert output.index("Deployment complete!") < output.index("Setup complete!")
     assert "Manual deployment steps:" not in output
 
 

@@ -117,8 +117,6 @@ def install():
     record_step("persist generated configuration")
     SETTINGS.save()
 
-    print(f"\n{f.success('Setup complete!')}")
-
     deployed = False
     consent = input(f.info("Would you like to deploy the app now? [y/N]: "))
     if consent.lower() == "y":
@@ -149,6 +147,8 @@ def install():
             f"{format_command([GCLOUD_CLI, 'app', 'deploy', File.APP_YAML.value])}"
         )
         print(f"After deployment, run: {setup_command('jobs')}")
+
+    print(f"\n{f.success('Setup complete!')}")
 
     from installer.summary import print_install_summary
 

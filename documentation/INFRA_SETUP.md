@@ -521,12 +521,18 @@ The full installation runs these steps in order:
    processor.
 6. **Domain, authentication email, and Identity Platform**
    -- asks whether the operator already has a custom domain. When they do,
-   setup creates the App Engine mapping, reconciles or prints its DNS records,
-   and tests an operator-selected SMTP provider directly. Otherwise it opens a
-   Google account picker for App Passwords and tests a Gmail or Google
-   Workspace mailbox over SMTP/STARTTLS as the zero-domain bootstrap. It then
-   initializes standalone Identity Platform against the selected public
-   origin and enables email/password authentication.
+   setup creates or discovers the App Engine mapping, reconciles an existing
+   mapping to automatic Google-managed TLS when necessary, verifies that the
+   returned mapping actually has automatic certificate management, reconciles
+   or prints its DNS records, and tests an operator-selected SMTP provider
+   directly. Every domain-mapping and certificate lookup is explicitly scoped
+   to the saved gcloud project and account, and status output names that target,
+   hostname, and certificate ID so installations with several projects or
+   certificates are unambiguous. Otherwise it opens a Google account picker for
+   App Passwords and
+   tests a Gmail or Google Workspace mailbox over SMTP/STARTTLS as the
+   zero-domain bootstrap. It then initializes standalone Identity Platform
+   against the selected public origin and enables email/password authentication.
 7. **Admin/OAuth** -- sets the admin user and asks whether Google sign-in should
    be enabled. Declining persists `GOOGLE_SIGNIN_ENABLED: false` and skips the
    remaining Google OAuth/provider work while leaving email/password sign-in
@@ -573,12 +579,22 @@ response is accepted and setup continues by verifying the live configuration.
 11. **Version/manifest** -- updates stored version when package metadata is
     newer and creates the PWA manifest if needed.
 12. **Deployment** -- deploys indexes and the app to Google App Engine using
-    the generated files already present in the repository, then creates the
-    deferred-job recovery schedule during a quiet wrapping-up phase after a
-    successful deployment. The schedule is installed proactively because
-    future jobs need it even when no job exists during installation. If
-    deployment is deferred, setup prints the separate `jobs` command. If
-    recovery provisioning fails after deployment, update reports a
+    the generated files already present in the repository. When a custom domain
+    is configured, the shared deploy helper then polls App Engine's domain
+    mapping and managed-certificate status for up to ten minutes. It reports
+    states such as `PENDING` or `FAILED_RETRYING_NOT_VISIBLE`, and after Google
+    attaches the certificate it verifies a trusted TLS handshake to the custom
+    hostname. Setup does not print deployment or installation completion while
+    that check is pending. A permanent certificate failure or a certificate
+    that remains unavailable after the bounded wait leaves the successful app
+    deployment intact but returns nonzero with DNS, CAA, and rerun guidance;
+    the default App Engine URL remains available.
+
+    After custom-domain readiness, setup creates the deferred-job recovery
+    schedule during a quiet wrapping-up phase. The schedule is installed
+    proactively because future jobs need it even when no job exists during
+    installation. If deployment is deferred, setup prints the separate `jobs`
+    command. If recovery provisioning fails after deployment, update reports a
     warning, leaves the successful deployment intact, and returns nonzero;
     active deferred jobs may fail until the operator repairs the schedule with
     `./setup.sh jobs`. The deploy helper announces its ten-minute upper wait
@@ -1196,7 +1212,9 @@ Shared helpers:
 - `validate_input(prompt, ...)` -- decorator factory for validated user input with retry loop
 - `run_gcloud_command(command)` -- subprocess wrapper for gcloud CLI
 - `deploy_to_app_engine()` -- delegates to `runner.deploy.deploy()` in publish-only
-  mode, deploying indexes and app without rebuilding JS or incrementing version
+  mode, deploying indexes and app without rebuilding JS or incrementing version;
+  when `CUSTOM_DOMAIN` is set, it waits for the App Engine managed certificate
+  and a verified HTTPS handshake before reporting completion
 - `print_summary()` -- displays the allowlisted secret-safe final summary
 
 ### Package Install (`installer/package_install.py`)

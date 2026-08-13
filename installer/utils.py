@@ -162,6 +162,7 @@ def run_gcloud_command(command, check=True, timeout=GCLOUD_TIMEOUT):
 # @features setup
 # @dimensions deploy gcloud-command
 def deploy_to_app_engine(*, print_final_summary=True):
+    from config import SETTINGS
     from runner.deploy import deploy
 
     print(
@@ -174,6 +175,14 @@ def deploy_to_app_engine(*, print_final_summary=True):
         quiet=True,
         announce_completion=False,
     )
+
+    custom_domain = str(SETTINGS.APP.get("CUSTOM_DOMAIN") or "").strip()
+    if custom_domain:
+        from installer.domain.gcp import wait_for_managed_certificate
+        from installer.state import record_step
+
+        record_step("verify custom-domain TLS certificate")
+        wait_for_managed_certificate(custom_domain)
 
     if print_final_summary:
         print("Deployment complete!")

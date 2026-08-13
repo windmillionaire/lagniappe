@@ -1132,6 +1132,235 @@ def test_redis_tls_disablement_is_transactional(monkeypatch, tmp_path):
 
 
 # @features setup
+# @dimensions gcp-domain managed-certificate deploy retry provider-status https
+def test_managed_certificate_waits_for_provider_and_https_readiness(
+    monkeypatch,
+    capsys,
+):
+    from installer.domain import gcp as domain_gcp
+
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(
+            SETTINGS=_fake_settings(
+                gcloud={
+                    "PROJECT": "project-1",
+                    "ACCOUNT": "owner@example.com",
+                }
+            )
+        ),
+    )
+    mappings = iter(
+        [
+            {
+                "sslSettings": {
+                    "pendingManagedCertificateId": "cert-pending"
+                }
+            },
+            {"sslSettings": {"certificateId": "cert-active"}},
+            {"sslSettings": {"certificateId": "cert-active"}},
+        ]
+    )
+    gcloud_calls = []
+
+    def fake_gcloud(arguments, **kwargs):
+        gcloud_calls.append((arguments, kwargs))
+        if "domain-mappings" in arguments:
+            return next(mappings)
+        assert "ssl-certificates" in arguments
+        return {"managedCertificate": {"status": "PENDING"}}
+
+    tls_results = iter([False, True])
+    delays = []
+    monkeypatch.setattr(domain_gcp, "_run_gcloud_json", fake_gcloud)
+
+    assert domain_gcp.wait_for_managed_certificate(
+        "app.example.com",
+        poll_delays=(0, 2, 3),
+        sleep=delays.append,
+        https_probe=lambda domain: next(tls_results),
+    )
+
+    assert delays == [2, 3]
+    assert gcloud_calls[0][0][:3] == ["app", "domain-mappings", "describe"]
+    assert "--project=project-1" in gcloud_calls[0][0]
+    assert "--account=owner@example.com" in gcloud_calls[0][0]
+    assert gcloud_calls[1][0][:3] == ["app", "ssl-certificates", "describe"]
+    assert "--project=project-1" in gcloud_calls[1][0]
+    assert "--account=owner@example.com" in gcloud_calls[1][0]
+    output = capsys.readouterr().out
+    assert (
+        "Managed TLS certificate cert-pending for https://app.example.com "
+        "in Google Cloud project project-1 using owner@example.com: PENDING"
+    ) in output
+    assert "certificate cert-active active" in output
+    assert "HTTPS edge is not serving it yet" in output
+    assert "certificate cert-active active for https://app.example.com" in output
+
+
+# @features setup
+# @dimensions gcp-domain managed-certificate provider-failure operator-guidance
+def test_managed_certificate_reports_permanent_provider_failure(monkeypatch):
+    from installer.domain import gcp as domain_gcp
+
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(
+            SETTINGS=_fake_settings(gcloud={"PROJECT": "project-1"})
+        ),
+    )
+    monkeypatch.setattr(
+        domain_gcp,
+        "_get_domain_mapping",
+        lambda project, domain, account=None: {
+            "sslSettings": {"pendingManagedCertificateId": "cert-failed"}
+        },
+    )
+    monkeypatch.setattr(
+        domain_gcp,
+        "_get_ssl_certificate",
+        lambda project, certificate, account=None: {
+            "managedCertificate": {"status": "FAILED_PERMANENT"}
+        },
+    )
+
+    with pytest.raises(ProviderError, match="permanently failed") as raised:
+        domain_gcp.wait_for_managed_certificate(
+            "app.example.com",
+            poll_delays=(0,),
+            sleep=lambda delay: pytest.fail("permanent failure must not retry"),
+        )
+
+    assert "DNS records and CAA" in raised.value.repair_action
+
+
+# @features setup
+# @dimensions gcp-domain managed-certificate timeout incomplete-deployment
+def test_managed_certificate_timeout_keeps_deployment_incomplete(monkeypatch):
+    from installer.domain import gcp as domain_gcp
+
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(
+            SETTINGS=_fake_settings(gcloud={"PROJECT": "project-1"})
+        ),
+    )
+    monkeypatch.setattr(
+        domain_gcp,
+        "_get_domain_mapping",
+        lambda project, domain, account=None: {
+            "sslSettings": {"pendingManagedCertificateId": "cert-pending"}
+        },
+    )
+    monkeypatch.setattr(
+        domain_gcp,
+        "_get_ssl_certificate",
+        lambda project, certificate, account=None: {
+            "managedCertificate": {"status": "FAILED_RETRYING_NOT_VISIBLE"}
+        },
+    )
+    delays = []
+
+    with pytest.raises(ProviderTimeout, match="Deployment succeeded") as raised:
+        domain_gcp.wait_for_managed_certificate(
+            "app.example.com",
+            poll_delays=(0, 1),
+            sleep=delays.append,
+        )
+
+    assert delays == [1]
+    assert "FAILED_RETRYING_NOT_VISIBLE" in str(raised.value)
+    assert "rerun setup" in raised.value.repair_action
+
+
+# @features setup
+# @dimensions gcp-domain managed-certificate missing-resource account-project
+def test_managed_certificate_reports_missing_domain_mapping(monkeypatch):
+    from installer.domain import gcp as domain_gcp
+
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(
+            SETTINGS=_fake_settings(gcloud={"PROJECT": "project-1"})
+        ),
+    )
+    monkeypatch.setattr(
+        domain_gcp,
+        "_get_domain_mapping",
+        lambda project, domain, account=None: None,
+    )
+
+    with pytest.raises(ProviderNotFound, match="project project-1") as raised:
+        domain_gcp.wait_for_managed_certificate(
+            "app.example.com",
+            poll_delays=(0,),
+        )
+
+    assert "Confirm account" in raised.value.repair_action
+    assert "project project-1" in raised.value.repair_action
+
+
+# @features setup
+# @dimensions gcp-domain managed-certificate reconciliation idempotence
+def test_existing_domain_mapping_enables_managed_tls(monkeypatch):
+    from installer.domain import gcp as domain_gcp
+
+    sp = SpinnerRecorder()
+    mapping_without_ssl = {
+        "id": "app.example.com",
+        "resourceRecords": [
+            {
+                "type": "CNAME",
+                "name": "app",
+                "rrdata": "ghs.googlehosted.com.",
+            }
+        ],
+    }
+    managed_mapping = {
+        **mapping_without_ssl,
+        "sslSettings": {
+            "sslManagementType": "AUTOMATIC",
+            "pendingManagedCertificateId": "cert-pending",
+        },
+    }
+    responses = iter([mapping_without_ssl, {}, managed_mapping])
+    calls = []
+
+    def fake_gcloud(arguments, **kwargs):
+        calls.append(arguments)
+        return next(responses)
+
+    monkeypatch.setattr(domain_gcp, "_run_gcloud_json", fake_gcloud)
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(
+            SETTINGS=_fake_settings(
+                gcloud={
+                    "PROJECT": "project-1",
+                    "ACCOUNT": "owner@example.com",
+                }
+            )
+        ),
+    )
+
+    assert (
+        domain_gcp.create_gcp_domain_mapping("app.example.com", sp)
+        == managed_mapping
+    )
+    assert calls[1][:4] == ["app", "domain-mappings", "update", "app.example.com"]
+    assert "--certificate-management=automatic" in calls[1]
+    assert "--project=project-1" in calls[1]
+    assert "--account=owner@example.com" in calls[1]
+    assert any("domain mapping updated" in message for message in sp.messages)
+    assert any("project project-1" in message for message in sp.messages)
+
+
+# @features setup
 # @dimensions gcp-domain ai-cache idempotence provider-records
 def test_gcp_domain_mapping_and_ai_cache_commands(monkeypatch):
     from installer import ai
@@ -1142,6 +1371,10 @@ def test_gcp_domain_mapping_and_ai_cache_commands(monkeypatch):
     mapping = {
         "id": "app.example.com",
         "name": "apps/project-1/domainMappings/app.example.com",
+        "sslSettings": {
+            "sslManagementType": "AUTOMATIC",
+            "pendingManagedCertificateId": "cert-pending",
+        },
         "resourceRecords": [
             {
                 "type": "CNAME",
@@ -3009,6 +3242,7 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
 # @dimensions gcloud-command deploy
 def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     from installer import utils
+    from installer.domain import gcp as domain_gcp
 
     monkeypatch.setattr(utils, "GCLOUD_CLI", None)
     with pytest.raises(SetupError):
@@ -3053,6 +3287,16 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
         utils.run_gcloud_command(["bad"], check=True)
 
     deploy_commands = []
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(
+            SETTINGS=_fake_settings(
+                app={"CUSTOM_DOMAIN": "app.example.com"},
+                gcloud={"PROJECT": "project-1"},
+            )
+        ),
+    )
     monkeypatch.setattr(
         "builtins.input",
         lambda prompt: (_ for _ in ()).throw(
@@ -3068,6 +3312,11 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     )
     monkeypatch.setattr(
         utils, "print_summary", lambda: deploy_commands.append("summary")
+    )
+    monkeypatch.setattr(
+        domain_gcp,
+        "wait_for_managed_certificate",
+        lambda domain: deploy_commands.append(("certificate", domain)),
     )
     deploy_module = types.ModuleType("runner.deploy")
     deploy_module.deploy = lambda **kwargs: deploy_commands.append(
@@ -3088,6 +3337,7 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
                 "announce_completion": False,
             },
         ),
+        ("certificate", "app.example.com"),
         "summary",
     ]
 
