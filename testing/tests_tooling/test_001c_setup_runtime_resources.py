@@ -1151,15 +1151,24 @@ def test_managed_certificate_waits_for_provider_and_https_readiness(
             )
         ),
     )
-    mappings = iter(
+    pending_mapping = {
+        "id": "app.example.com",
+        "name": "apps/project-1/domainMappings/app.example.com",
+        "sslSettings": {"pendingManagedCertificateId": "cert-pending"},
+    }
+    active_mapping = {
+        "id": "app.example.com",
+        "name": "apps/project-1/domainMappings/app.example.com",
+        "sslSettings": {"certificateId": "cert-active"},
+    }
+    mapping_states = iter(
         [
-            {
-                "sslSettings": {
-                    "pendingManagedCertificateId": "cert-pending"
-                }
-            },
-            {"sslSettings": {"certificateId": "cert-active"}},
-            {"sslSettings": {"certificateId": "cert-active"}},
+            pending_mapping,
+            pending_mapping,
+            active_mapping,
+            active_mapping,
+            active_mapping,
+            active_mapping,
         ]
     )
     gcloud_calls = []
@@ -1167,7 +1176,8 @@ def test_managed_certificate_waits_for_provider_and_https_readiness(
     def fake_gcloud(arguments, **kwargs):
         gcloud_calls.append((arguments, kwargs))
         if "domain-mappings" in arguments:
-            return next(mappings)
+            mapping = next(mapping_states)
+            return [mapping] if "list" in arguments else mapping
         assert "ssl-certificates" in arguments
         return {"managedCertificate": {"status": "PENDING"}}
 
@@ -1183,12 +1193,13 @@ def test_managed_certificate_waits_for_provider_and_https_readiness(
     )
 
     assert delays == [2, 3]
-    assert gcloud_calls[0][0][:3] == ["app", "domain-mappings", "describe"]
+    assert gcloud_calls[0][0][:3] == ["app", "domain-mappings", "list"]
     assert "--project=project-1" in gcloud_calls[0][0]
     assert "--account=owner@example.com" in gcloud_calls[0][0]
-    assert gcloud_calls[1][0][:3] == ["app", "ssl-certificates", "describe"]
-    assert "--project=project-1" in gcloud_calls[1][0]
-    assert "--account=owner@example.com" in gcloud_calls[1][0]
+    assert gcloud_calls[1][0][:3] == ["app", "domain-mappings", "describe"]
+    assert gcloud_calls[2][0][:3] == ["app", "ssl-certificates", "describe"]
+    assert "--project=project-1" in gcloud_calls[2][0]
+    assert "--account=owner@example.com" in gcloud_calls[2][0]
     output = capsys.readouterr().out
     assert (
         "Managed TLS certificate cert-pending for https://app.example.com "
@@ -1213,8 +1224,20 @@ def test_managed_certificate_reports_permanent_provider_failure(monkeypatch):
     )
     monkeypatch.setattr(
         domain_gcp,
+        "_list_domain_mappings",
+        lambda project, account=None: [
+            {
+                "id": "app.example.com",
+                "name": "apps/project-1/domainMappings/app.example.com",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        domain_gcp,
         "_get_domain_mapping",
         lambda project, domain, account=None: {
+            "id": domain,
+            "name": f"apps/{project}/domainMappings/{domain}",
             "sslSettings": {"pendingManagedCertificateId": "cert-failed"}
         },
     )
@@ -1250,8 +1273,20 @@ def test_managed_certificate_timeout_keeps_deployment_incomplete(monkeypatch):
     )
     monkeypatch.setattr(
         domain_gcp,
+        "_list_domain_mappings",
+        lambda project, account=None: [
+            {
+                "id": "app.example.com",
+                "name": "apps/project-1/domainMappings/app.example.com",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        domain_gcp,
         "_get_domain_mapping",
         lambda project, domain, account=None: {
+            "id": domain,
+            "name": f"apps/{project}/domainMappings/{domain}",
             "sslSettings": {"pendingManagedCertificateId": "cert-pending"}
         },
     )
@@ -1290,8 +1325,8 @@ def test_managed_certificate_reports_missing_domain_mapping(monkeypatch):
     )
     monkeypatch.setattr(
         domain_gcp,
-        "_get_domain_mapping",
-        lambda project, domain, account=None: None,
+        "_list_domain_mappings",
+        lambda project, account=None: [],
     )
 
     with pytest.raises(ProviderNotFound, match="project project-1") as raised:
@@ -1305,6 +1340,69 @@ def test_managed_certificate_reports_missing_domain_mapping(monkeypatch):
 
 
 # @features setup
+# @dimensions gcp-domain managed-certificate missing-resource reconciliation
+def test_empty_mapping_list_creates_managed_mapping(monkeypatch):
+    from installer.domain import gcp as domain_gcp
+
+    sp = SpinnerRecorder()
+    mapping = {
+        "id": "app.example.com",
+        "name": "apps/project-1/domainMappings/app.example.com",
+        "sslSettings": {
+            "sslManagementType": "AUTOMATIC",
+            "pendingManagedCertificateId": "cert-pending",
+        },
+        "resourceRecords": [
+            {
+                "type": "CNAME",
+                "name": "app",
+                "rrdata": "ghs.googlehosted.com.",
+            }
+        ],
+    }
+    listed = iter([[], [mapping]])
+    mutations = []
+    monkeypatch.setattr(
+        domain_gcp,
+        "_list_domain_mappings",
+        lambda project, account=None: next(listed),
+    )
+    monkeypatch.setattr(
+        domain_gcp,
+        "_get_domain_mapping",
+        lambda project, domain, account=None: mapping,
+    )
+    monkeypatch.setattr(
+        domain_gcp,
+        "_run_gcloud_json",
+        lambda arguments, **kwargs: mutations.append(arguments) or {},
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(
+            SETTINGS=_fake_settings(
+                gcloud={
+                    "PROJECT": "project-1",
+                    "ACCOUNT": "owner@example.com",
+                }
+            )
+        ),
+    )
+
+    assert domain_gcp.create_gcp_domain_mapping("app.example.com", sp) == mapping
+    assert mutations[0][:4] == [
+        "app",
+        "domain-mappings",
+        "create",
+        "app.example.com",
+    ]
+    assert "--certificate-management=automatic" in mutations[0]
+    assert any("domain mapping created" in message for message in sp.messages)
+    assert not any("domain mapping existing" in message for message in sp.messages)
+
+
+# @features setup
 # @dimensions gcp-domain managed-certificate reconciliation idempotence
 def test_existing_domain_mapping_enables_managed_tls(monkeypatch):
     from installer.domain import gcp as domain_gcp
@@ -1312,6 +1410,7 @@ def test_existing_domain_mapping_enables_managed_tls(monkeypatch):
     sp = SpinnerRecorder()
     mapping_without_ssl = {
         "id": "app.example.com",
+        "name": "apps/project-1/domainMappings/app.example.com",
         "resourceRecords": [
             {
                 "type": "CNAME",
@@ -1327,7 +1426,15 @@ def test_existing_domain_mapping_enables_managed_tls(monkeypatch):
             "pendingManagedCertificateId": "cert-pending",
         },
     }
-    responses = iter([mapping_without_ssl, {}, managed_mapping])
+    responses = iter(
+        [
+            [mapping_without_ssl],
+            mapping_without_ssl,
+            {},
+            [managed_mapping],
+            managed_mapping,
+        ]
+    )
     calls = []
 
     def fake_gcloud(arguments, **kwargs):
@@ -1352,12 +1459,17 @@ def test_existing_domain_mapping_enables_managed_tls(monkeypatch):
         domain_gcp.create_gcp_domain_mapping("app.example.com", sp)
         == managed_mapping
     )
-    assert calls[1][:4] == ["app", "domain-mappings", "update", "app.example.com"]
-    assert "--certificate-management=automatic" in calls[1]
-    assert "--project=project-1" in calls[1]
-    assert "--account=owner@example.com" in calls[1]
+    assert calls[2][:4] == ["app", "domain-mappings", "update", "app.example.com"]
+    assert "--certificate-management=automatic" in calls[2]
+    assert "--project=project-1" in calls[2]
+    assert "--account=owner@example.com" in calls[2]
     assert any("domain mapping updated" in message for message in sp.messages)
-    assert any("project project-1" in message for message in sp.messages)
+    assert any(
+        "apps/project-1/domainMappings/app.example.com" in message
+        for message in sp.messages
+    )
+    assert any("managed TLS AUTOMATIC" in message for message in sp.messages)
+    assert any("certificate cert-pending" in message for message in sp.messages)
 
 
 # @features setup
@@ -1386,12 +1498,10 @@ def test_gcp_domain_mapping_and_ai_cache_commands(monkeypatch):
 
     def fake_domain_run(command, **kwargs):
         domain_calls.append(command)
-        if "describe" in command and len(domain_calls) == 1:
-            return completed_process(
-                command,
-                returncode=1,
-                stderr="NOT_FOUND: mapping not found",
-            )
+        if "list" in command:
+            prior_lists = sum("list" in call for call in domain_calls[:-1])
+            payload = [] if prior_lists == 0 else [mapping]
+            return completed_process(command, stdout=json.dumps(payload))
         if "create" in command:
             return completed_process(command, stdout="{}")
         return completed_process(command, stdout=json.dumps(mapping))
@@ -1412,7 +1522,7 @@ def test_gcp_domain_mapping_and_ai_cache_commands(monkeypatch):
         "/usr/bin/gcloud",
         "app",
         "domain-mappings",
-        "describe",
+        "list",
     ]
     assert domain_calls[1][:4] == [
         "/usr/bin/gcloud",
@@ -1425,6 +1535,12 @@ def test_gcp_domain_mapping_and_ai_cache_commands(monkeypatch):
         "/usr/bin/gcloud",
         "app",
         "domain-mappings",
+        "list",
+    ]
+    assert domain_calls[3][:4] == [
+        "/usr/bin/gcloud",
+        "app",
+        "domain-mappings",
         "describe",
     ]
     first_run_call_count = len(domain_calls)
@@ -1432,7 +1548,7 @@ def test_gcp_domain_mapping_and_ai_cache_commands(monkeypatch):
         domain_gcp.create_gcp_domain_mapping("app.example.com", sp)
         == mapping
     )
-    assert len(domain_calls) == first_run_call_count + 2
+    assert len(domain_calls) == first_run_call_count + 4
     assert not any(
         "create" in command for command in domain_calls[first_run_call_count:]
     )

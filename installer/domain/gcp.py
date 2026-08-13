@@ -87,6 +87,30 @@ def _get_domain_mapping(project_id, domain, account=None):
 
 
 # @testable false
+# @covered-by installer/domain/gcp.py::create_gcp_domain_mapping
+# @covered-by installer/domain/gcp.py::wait_for_managed_certificate
+# @reason list adapter is owned by domain reconciliation and readiness polling
+def _list_domain_mappings(project_id, account=None):
+    target_flags = [f"--project={project_id}"]
+    if account:
+        target_flags.append(f"--account={account}")
+    mappings = _run_gcloud_json(
+        [
+            "app",
+            "domain-mappings",
+            "list",
+            *target_flags,
+        ]
+    )
+    if not isinstance(mappings, list):
+        raise ProviderError(
+            "gcloud returned malformed JSON while listing App Engine domain "
+            f"mappings for project {project_id}."
+        )
+    return mappings
+
+
+# @testable false
 # @covered-by installer/domain/gcp.py::wait_for_managed_certificate
 # @reason discovery adapter is owned by managed-certificate readiness polling
 def _get_ssl_certificate(project_id, certificate_id, account=None):
@@ -163,6 +187,36 @@ def _uses_automatic_ssl(mapping):
     }
 
 
+# @testable false
+# @covered-by installer/domain/gcp.py::create_gcp_domain_mapping
+# @covered-by installer/domain/gcp.py::wait_for_managed_certificate
+# @reason provider resource identity validation is owned by domain reconciliation
+def _mapping_matches_target(mapping, project_id, domain):
+    if not isinstance(mapping, dict):
+        return False
+    expected_name = f"apps/{project_id}/domainMappings/{domain}"
+    return mapping.get("id") == domain and mapping.get("name") == expected_name
+
+
+# @testable false
+# @covered-by installer/domain/gcp.py::create_gcp_domain_mapping
+# @covered-by installer/domain/gcp.py::wait_for_managed_certificate
+# @reason exact list selection is owned by domain reconciliation/readiness
+def _listed_domain_mapping(mappings, project_id, domain):
+    expected_name = f"apps/{project_id}/domainMappings/{domain}"
+    for mapping in mappings:
+        if not isinstance(mapping, dict):
+            continue
+        if mapping.get("id") == domain or mapping.get("name") == expected_name:
+            if not _mapping_matches_target(mapping, project_id, domain):
+                raise ProviderError(
+                    "Google Cloud listed a custom-domain resource that did not "
+                    f"match {expected_name}: {mapping.get('name')!r}."
+                )
+            return mapping
+    return None
+
+
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_waits_for_provider_and_https_readiness
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_reports_permanent_provider_failure
@@ -204,11 +258,12 @@ def wait_for_managed_certificate(
         if delay:
             sleep(delay)
 
-        mapping = retry_provider_call(
-            lambda: _get_domain_mapping(project_id, domain, account),
-            description=f"Check App Engine domain mapping {domain}",
+        mappings = retry_provider_call(
+            lambda: _list_domain_mappings(project_id, account),
+            description=f"List App Engine domain mappings in project {project_id}",
         )
-        if mapping is None:
+        listed_mapping = _listed_domain_mapping(mappings, project_id, domain)
+        if listed_mapping is None:
             raise ProviderNotFound(
                 "Deployment succeeded, but no App Engine domain mapping for "
                 f"{domain} exists in Google Cloud project {project_id}.",
@@ -217,6 +272,21 @@ def wait_for_managed_certificate(
                     f"project {project_id}, then run `gcloud app domain-mappings "
                     f"describe {domain} {inspection_flags}` and rerun the "
                     "custom-domain setup."
+                ),
+            )
+        mapping = retry_provider_call(
+            lambda: _get_domain_mapping(project_id, domain, account),
+            description=f"Describe App Engine domain mapping {domain}",
+        )
+        if not _mapping_matches_target(mapping, project_id, domain):
+            raise ProviderError(
+                "Google Cloud returned an unexpected App Engine domain mapping "
+                f"while checking https://{domain} in {target}: "
+                f"{mapping.get('name') if isinstance(mapping, dict) else mapping!r}.",
+                repair_action=(
+                    "Run `gcloud app domain-mappings describe "
+                    f"{domain} {inspection_flags} --format=json` and confirm its "
+                    f"name is apps/{project_id}/domainMappings/{domain}."
                 ),
             )
         ssl_settings = _ssl_settings(mapping)
@@ -312,8 +382,8 @@ def wait_for_managed_certificate(
 # @testable false
 # @covered-by installer/domain/gcp.py::create_gcp_domain_mapping
 # @reason provider response validation is owned by mapping reconciliation
-def _validated_mapping(mapping, domain):
-    if not isinstance(mapping, dict) or mapping.get("id") != domain:
+def _validated_mapping(mapping, project_id, domain):
+    if not _mapping_matches_target(mapping, project_id, domain):
         return None
     records = mapping.get("resourceRecords")
     if not isinstance(records, list) or not records:
@@ -330,10 +400,11 @@ def _validated_mapping(mapping, domain):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_gcp_domain_mapping_and_ai_cache_commands
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_empty_mapping_list_creates_managed_mapping
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_existing_domain_mapping_enables_managed_tls
 # @tests tests_tooling/test_001d_setup_drift.py::test_app_engine_discovery_has_domain_mapping_create
 # @features setup
-# @dimensions gcp-domain managed-certificate reconciliation api-drift idempotence provider-records
+# @dimensions gcp-domain managed-certificate missing-resource reconciliation api-drift idempotence provider-records
 def create_gcp_domain_mapping(domain, sp, *, sleep=time.sleep):
     """Discover or create a mapping and return Google's exact DNS records."""
     from config import SETTINGS
@@ -348,10 +419,22 @@ def create_gcp_domain_mapping(domain, sp, *, sleep=time.sleep):
     if account:
         target += f" using {account}"
 
-    mapping = retry_provider_call(
-        lambda: _get_domain_mapping(project_id, domain, account),
-        description=f"Discover App Engine domain mapping {domain}",
+    mappings = retry_provider_call(
+        lambda: _list_domain_mappings(project_id, account),
+        description=f"List App Engine domain mappings in project {project_id}",
     )
+    mapping = _listed_domain_mapping(mappings, project_id, domain)
+    if mapping is not None:
+        mapping = retry_provider_call(
+            lambda: _get_domain_mapping(project_id, domain, account),
+            description=f"Describe App Engine domain mapping {domain}",
+        )
+        if not _mapping_matches_target(mapping, project_id, domain):
+            raise ProviderError(
+                "Google Cloud described an App Engine domain mapping outside "
+                f"apps/{project_id}/domainMappings/{domain}: "
+                f"{mapping.get('name') if isinstance(mapping, dict) else mapping!r}."
+            )
     created = False
     updated = False
     if mapping is None:
@@ -392,13 +475,31 @@ def create_gcp_domain_mapping(domain, sp, *, sleep=time.sleep):
     for delay in DOMAIN_MAPPING_POLL_DELAYS:
         if delay:
             sleep(delay)
+        mappings = retry_provider_call(
+            lambda: _list_domain_mappings(project_id, account),
+            description=f"Verify App Engine domain mapping list for {domain}",
+        )
+        listed_mapping = _listed_domain_mapping(mappings, project_id, domain)
+        if listed_mapping is None:
+            continue
         mapping = retry_provider_call(
             lambda: _get_domain_mapping(project_id, domain, account),
             description=f"Verify App Engine domain mapping {domain}",
         )
-        validated = _validated_mapping(mapping, domain)
+        validated = _validated_mapping(mapping, project_id, domain)
         if validated is not None and _uses_automatic_ssl(validated):
             action = "created" if created else "updated" if updated else "existing"
+            ssl_settings = _ssl_settings(validated) or {}
+            management_type = str(
+                ssl_settings.get("sslManagementType")
+                or ssl_settings.get("ssl_management_type")
+                or "SSL_MANAGEMENT_TYPE_UNSPECIFIED"
+            ).strip().upper()
+            certificate_id = str(
+                ssl_settings.get("certificateId")
+                or ssl_settings.get("pendingManagedCertificateId")
+                or "not assigned yet"
+            ).strip()
             record_mutation(
                 "custom-domain-mapping",
                 action=action,
@@ -407,7 +508,9 @@ def create_gcp_domain_mapping(domain, sp, *, sleep=time.sleep):
             )
             sp.write(
                 f.success(
-                    f"App Engine domain mapping {action} in {target}: {domain}"
+                    f"App Engine domain mapping {action}: {validated['name']} "
+                    f"using {account or '<configured-account>'}; managed TLS "
+                    f"{management_type}, certificate {certificate_id}"
                 )
             )
             return validated

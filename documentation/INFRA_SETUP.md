@@ -525,11 +525,14 @@ The full installation runs these steps in order:
    mapping to automatic Google-managed TLS when necessary, verifies that the
    returned mapping actually has automatic certificate management, reconciles
    or prints its DNS records, and tests an operator-selected SMTP provider
-   directly. Every domain-mapping and certificate lookup is explicitly scoped
-   to the saved gcloud project and account, and status output names that target,
-   hostname, and certificate ID so installations with several projects or
-   certificates are unambiguous. Otherwise it opens a Google account picker for
-   App Passwords and
+   directly. Discovery requires the exact
+   `apps/PROJECT/domainMappings/HOSTNAME` resource to appear in both the
+   project-scoped mapping list and describe results; an empty list creates the
+   mapping and can never be reported as an existing mapping. Every
+   domain-mapping and certificate lookup is explicitly scoped to the saved
+   gcloud project and account, and status output names that target, hostname,
+   and certificate ID so installations with several projects or certificates
+   are unambiguous. Otherwise it opens a Google account picker for App Passwords and
    tests a Gmail or Google Workspace mailbox over SMTP/STARTTLS as the
    zero-domain bootstrap. It then initializes standalone Identity Platform
    against the selected public origin and enables email/password authentication.
