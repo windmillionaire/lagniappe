@@ -1,7 +1,5 @@
 """Optional Cloudflare DNS-only reconciliation for custom domains."""
 
-from getpass import getpass
-
 from installer.errors import (
     ProviderError,
     ProviderNotFound,
@@ -120,29 +118,28 @@ def get_cloudflare_api_token():
     )
     print(
         wrap_text(
-            "4. Set the resource scope to Specified Domains, then select only "
-            "the DNS zone you are configuring."
+            "4. Under Zone Resources, choose Include > Specific zone, then "
+            "select the DNS zone you are configuring."
         )
     )
     print(
         wrap_text(
-            "5. Under DNS & Zones, select DNS > Edit and Zone > Read. Leave "
-            "Zone > Edit off, and do not select all permissions."
+            "5. Under Permissions, keep the template's Zone > DNS > Edit row. "
+            "Select + Add more, then add Zone > Zone > Read. Do not select "
+            "Edit for Zone."
         )
     )
     print(
         wrap_text(
-            "6. Continue to summary, create the token, and paste the token "
+            "6. Continue to summary and confirm the selected domain lists both "
+            "DNS:Edit and Zone:Read. Create the token, then paste the token "
             "shown once below. You can delete it from Cloudflare after setup."
         )
     )
     while True:
-        ready = input(
-            "Press Enter to paste the token, or x to stop setup: "
-        ).strip()
-        if ready.casefold() == "x":
-            raise SetupCancelled("Setup stopped before Cloudflare DNS changes.")
-        token = getpass("Paste Cloudflare API token (input hidden): ").strip()
+        token = input("Cloudflare API token (x to cancel): ").strip()
+        if token.casefold() == "x":
+            raise SetupCancelled("Cloudflare DNS setup cancelled.")
         if validate_cloudflare_api_token(token):
             return token
         print("Enter a non-empty scoped Cloudflare API token.")

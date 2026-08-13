@@ -1283,15 +1283,9 @@ def test_cloudflare_token_prompt_explains_dashboard_steps_and_scope(
 ):
     from installer.domain import cloudflare
 
-    choices = []
     prompts = []
     monkeypatch.setattr(
         "builtins.input",
-        lambda prompt: choices.append(prompt) or "",
-    )
-    monkeypatch.setattr(
-        cloudflare,
-        "getpass",
         lambda prompt: prompts.append(prompt) or "scoped-token-" + ("a" * 20),
     )
 
@@ -1299,31 +1293,27 @@ def test_cloudflare_token_prompt_explains_dashboard_steps_and_scope(
         "scoped-token-" + ("a" * 20)
     )
 
-    output = capsys.readouterr().out
+    output = " ".join(capsys.readouterr().out.split())
     assert cloudflare.CLOUDFLARE_API_TOKEN_URL in output
     assert "My Profile > API Tokens" in output
     assert "Select Create Token" in output
     assert "'Edit zone DNS' template" in output
-    assert "Specified Domains" in output
-    assert "DNS > Edit and Zone > Read" in output
-    assert "Leave Zone > Edit off" in output
-    assert "do not select all permissions" in output
+    assert "Under Zone Resources" in output
+    assert "Include > Specific zone" in output
+    assert "Under Permissions" in output
+    assert "Zone > DNS > Edit" in output
+    assert "Select + Add more" in output
+    assert "Zone > Zone > Read" in output
+    assert "Do not select Edit for Zone" in output
+    assert "both DNS:Edit and Zone:Read" in output
     assert "does not save it" in output
     assert "delete it from Cloudflare after setup" in output
-    assert choices == [
-        "Press Enter to paste the token, or x to stop setup: "
-    ]
-    assert prompts == ["Paste Cloudflare API token (input hidden): "]
+    assert prompts == ["Cloudflare API token (x to cancel): "]
 
     monkeypatch.setattr("builtins.input", lambda prompt: "x")
-    monkeypatch.setattr(
-        cloudflare,
-        "getpass",
-        lambda prompt: pytest.fail("stopping must happen before hidden input"),
-    )
     with pytest.raises(
         SetupCancelled,
-        match="stopped before Cloudflare DNS changes",
+        match="Cloudflare DNS setup cancelled",
     ):
         cloudflare.get_cloudflare_api_token()
 

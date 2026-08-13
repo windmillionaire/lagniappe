@@ -960,13 +960,15 @@ settings immediately. The scoped Cloudflare user API token used by the App
 Engine domain flow is never persisted, and Cloudflare never receives or exposes
 the email-service credential. Setup prints the direct Cloudflare **My Profile >
 API Tokens** URL and walks through **Create Token > Edit zone DNS > Use
-template**, including restricting **Zone Resources** to the one specific zone.
-In Cloudflare's current policy editor, the exact contract is **Specified
-Domains** for that zone, **DNS > Edit**, and **Zone > Read**; **Zone > Edit** and
-the broad **Select all permissions** option remain off. The token remains active
-at Cloudflare until the operator deletes it after setup. Before the hidden token
-field, setup uses a separate visible prompt where `x` stops the current setup
-run without implying that completed provider mutations will be undone.
+template**. Under **Zone Resources**, it restricts access with **Include >
+Specific zone > the selected domain**. In the profile token's **Permissions**
+section, the template supplies **Zone > DNS > Edit**; setup directs the operator
+to use **+ Add more** for **Zone > Zone > Read**, which Cloudflare requires for
+the zone-list lookup. The summary must show both **DNS:Edit** and **Zone:Read**
+for the selected domain, while **Zone > Zone > Edit** remains off. The token
+remains active at Cloudflare until the operator deletes it after setup. Setup
+uses one visible token prompt, where `x` cancels the current setup run without
+undoing completed provider mutations.
 
 Runtime verification/reset delivery and its browser/server secret boundary are
 documented in
