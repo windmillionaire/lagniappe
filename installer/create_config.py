@@ -392,14 +392,21 @@ def _get_gcloud_account(account):
 
 
 # @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_uses_unique_confirmed_candidate
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_prefers_requested_name_and_suffixes_collisions
 # @features setup
 # @dimensions project-id interactive-input
-def _suggest_project_id(sanitized_app_name):
+def _project_id_from_app_name(sanitized_app_name):
     base = re.sub(r"[^a-z0-9-]", "-", sanitized_app_name.lower()).strip("-")
     if not base or not base[0].isalpha():
         base = f"lagniappe-{base}".strip("-")
-    base = re.sub(r"-+", "-", base)[:23].rstrip("-")
+    return re.sub(r"-+", "-", base)[:30].rstrip("-")
+
+
+# @testable false
+# @covered-by installer/create_config.py::_get_gcloud_project
+# @reason collision fallback is exercised through interactive project selection
+def _randomized_project_id(sanitized_app_name):
+    base = _project_id_from_app_name(sanitized_app_name)[:23].rstrip("-")
     return f"{base}-{secrets.token_hex(3)}"
 
 
@@ -448,7 +455,7 @@ def _project_state(project_id):
 
 
 # @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_uses_unique_confirmed_candidate
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_prefers_requested_name_and_suffixes_collisions
 # @features setup
 # @dimensions project-id interactive-input
 def _confirm_project_candidate(project_id, state, formatter):
@@ -475,7 +482,7 @@ def _confirm_project_candidate(project_id, state, formatter):
 
 
 # @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_uses_unique_confirmed_candidate
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_prefers_requested_name_and_suffixes_collisions
 # @features setup
 # @dimensions project-id interactive-input
 def _get_gcloud_project(project_id, sanitized_app_name):
@@ -499,6 +506,7 @@ def _get_gcloud_project(project_id, sanitized_app_name):
         )
         _fail()
 
+    declined_existing_projects = set()
     if configured_project["state"] == GCLOUD_VALUE_SUCCESS:
         candidate = configured_project["value"]
         configured_name = _gcloud_debug_value(
@@ -518,8 +526,12 @@ def _get_gcloud_project(project_id, sanitized_app_name):
             state = _project_state(candidate)
             if _confirm_project_candidate(candidate, state, f):
                 return candidate
+            if state["state"] == "available":
+                declined_existing_projects.add(candidate)
 
-    suggestion = _suggest_project_id(sanitized_app_name)
+    suggestion = _project_id_from_app_name(sanitized_app_name)
+    if suggestion in declined_existing_projects:
+        suggestion = _randomized_project_id(sanitized_app_name)
     while True:
         entered = input(
             f.info(
@@ -533,6 +545,8 @@ def _get_gcloud_project(project_id, sanitized_app_name):
         state = _project_state(candidate)
         if _confirm_project_candidate(candidate, state, f):
             return candidate
+        if candidate == suggestion and state["state"] == "available":
+            suggestion = _randomized_project_id(sanitized_app_name)
 
 
 # @testable false

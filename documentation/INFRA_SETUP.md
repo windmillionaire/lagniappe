@@ -474,7 +474,8 @@ The full installation runs these steps in order:
    the exact setup dependency pins as one transaction; and runs `pip check`.
 2. **Identity and target preflight** -- obtains a validated application name;
    selects a confirmed, syntax-valid project ID
-   with a randomized suggestion for new installs; activates and re-reads the
+   by first suggesting the normalized application name for new installs;
+   activates and re-reads the
    named gcloud configuration/account/project; identifies the ADC principal,
    ADC project, and quota project; and performs read-only project, billing
    account, project billing, and required-API checks. Before those provider
@@ -484,11 +485,12 @@ The full installation runs these steps in order:
    and its bootstrap APIs do not exist yet. An empty billing-account listing is
    not treated as an authentication failure. The ambient gcloud project is
    offered only when its active configuration name exactly matches the
-   normalized installation name. Declining that existing project continues to
-   the randomized new-project suggestion; declining a proposed new project
-   exits setup. Every value prompt that displays a bracketed suggestion
+   normalized installation name. When the normalized application name belongs
+   to an accessible existing project and the operator declines to use it, setup
+   then suggests a randomized project ID. Declining a proposed new project exits
+   setup. Every value prompt that displays a bracketed suggestion
    explicitly says that Enter accepts it and substitutes that value before
-   validation. This includes randomized project IDs, the default administrator
+   validation. This includes project IDs, the default administrator
    name, and suggested email/SMTP values. Choice prompts use the conventional
    capitalized Enter default, such as `Y` in `[Y/n]` or `N` in `[y/N]`.
 3. **Draft and mutation confirmation** -- for recovery, validates the exact
@@ -499,7 +501,7 @@ The full installation runs these steps in order:
    `Continue with installation?` with a default-no confirmation.
 4. **Confirmed project preparation** -- for an existing project, explicitly
    aligns and re-verifies ADC before confirmation. For a new project, creates
-   only the confirmed randomized or entered ID, enables the Cloud Resource
+   only the confirmed suggested or entered ID, enables the Cloud Resource
    Manager, Service Usage, and Cloud Billing bootstrap APIs, and then repeats
    billing-account discovery before aligning ADC. Setup automatically selects
    the sole accessible open billing account and links it. When no account is

@@ -58,6 +58,11 @@ def fake_yaspin_module(monkeypatch):
     )
 
 
+@pytest.fixture
+def isolated_setup_config(monkeypatch, tmp_path):
+    _use_isolated_app_dir(monkeypatch, tmp_path)
+
+
 def _stub_existing_install_preflight(
     monkeypatch,
     create_config,
@@ -189,7 +194,10 @@ def test_validate_input_retries_allows_empty_and_exits(monkeypatch):
 
 # @features setup
 # @dimensions project-id
-def test_validate_project_id_and_project_state_are_non_mutating(monkeypatch):
+def test_validate_project_id_and_project_state_are_non_mutating(
+    monkeypatch,
+    isolated_setup_config,
+):
     from installer import create_config
 
     calls = []
@@ -253,7 +261,10 @@ def test_validate_project_id_and_project_state_are_non_mutating(monkeypatch):
 
 # @features setup
 # @dimensions project-id interactive-input
-def test_project_id_selection_uses_unique_confirmed_candidate(monkeypatch):
+def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
+    monkeypatch,
+    isolated_setup_config,
+):
     import installer as setup_pkg
     from installer import create_config
 
@@ -287,10 +298,16 @@ def test_project_id_selection_uses_unique_confirmed_candidate(monkeypatch):
         lambda prompt: prompts.append(prompt) or next(answers),
     )
 
-    assert create_config._get_gcloud_project("", "demo-app") == "demo-app-abc123"
-    assert inspected == ["demo-app-abc123"]
-    assert create_config.validate_project_id("demo-app-abc123")
-    assert prompts[-1] == "Create a new project 'demo-app-abc123'? [y/N]: "
+    assert create_config._get_gcloud_project("", "demo-app") == "demo-app"
+    assert inspected == ["demo-app"]
+    assert create_config.validate_project_id("demo-app")
+    assert prompts == [
+        (
+            "Press Enter to use the suggested Google Cloud project ID "
+            "[demo-app], or type a different project ID: "
+        ),
+        "Create a new project 'demo-app'? [y/N]: ",
+    ]
 
     def matching_active_config(command):
         value = (
@@ -335,11 +352,56 @@ def test_project_id_selection_uses_unique_confirmed_candidate(monkeypatch):
     )
     assert prompts == ["Use the existing project 'active-project-1'? [y/N]: "]
 
+    monkeypatch.setattr(
+        create_config,
+        "_project_state",
+        lambda project_id: {
+            "state": (
+                "available"
+                if project_id in {"active-project-1", "demo-app"}
+                else "unverified"
+            ),
+            "details": (
+                {"projectId": project_id}
+                if project_id in {"active-project-1", "demo-app"}
+                else None
+            ),
+            "error": None,
+        },
+    )
+    prompts.clear()
+    answers = iter(["n", "", "n", "", "y"])
+    assert create_config._get_gcloud_project("", "demo-app") == "demo-app-abc123"
+    assert prompts == [
+        "Use the existing project 'active-project-1'? [y/N]: ",
+        (
+            "Press Enter to use the suggested Google Cloud project ID "
+            "[demo-app], or type a different project ID: "
+        ),
+        "Use the existing project 'demo-app'? [y/N]: ",
+        (
+            "Press Enter to use the suggested Google Cloud project ID "
+            "[demo-app-abc123], or type a different project ID: "
+        ),
+        "Create a new project 'demo-app-abc123'? [y/N]: ",
+    ]
+
+    def matching_exact_active_config(command):
+        result = matching_active_config(command)
+        if command == ["config", "get-value", "project"]:
+            result["value"] = "demo-app"
+        return result
+
+    monkeypatch.setattr(
+        create_config,
+        "_gcloud_debug_value",
+        matching_exact_active_config,
+    )
     prompts.clear()
     answers = iter(["n", "", "y"])
     assert create_config._get_gcloud_project("", "demo-app") == "demo-app-abc123"
     assert prompts == [
-        "Use the existing project 'active-project-1'? [y/N]: ",
+        "Use the existing project 'demo-app'? [y/N]: ",
         (
             "Press Enter to use the suggested Google Cloud project ID "
             "[demo-app-abc123], or type a different project ID: "
@@ -362,7 +424,7 @@ def test_project_id_selection_uses_unique_confirmed_candidate(monkeypatch):
     answers = iter(["", "y"])
     assert (
         create_config._get_gcloud_project("", "new-lagniappe")
-        == "new-lagniappe-abc123"
+        == "new-lagniappe"
     )
     assert not any("active-project-1" in prompt for prompt in prompts)
 
@@ -374,13 +436,16 @@ def test_project_id_selection_uses_unique_confirmed_candidate(monkeypatch):
     ):
         create_config._get_gcloud_project("", "new-lagniappe")
     assert prompts[-1] == (
-        "Create a new project 'new-lagniappe-abc123'? [y/N]: "
+        "Create a new project 'new-lagniappe'? [y/N]: "
     )
 
 
 # @features setup
 # @dimensions gcloud-config adc
-def test_adc_identity_reports_principal_project_and_quota(monkeypatch):
+def test_adc_identity_reports_principal_project_and_quota(
+    monkeypatch,
+    isolated_setup_config,
+):
     from installer import create_config
     import installer.utils as setup_utils
     import google.auth
@@ -413,7 +478,10 @@ def test_adc_identity_reports_principal_project_and_quota(monkeypatch):
 
 # @features setup
 # @dimensions gcloud-config adc identity
-def test_adc_principal_mismatch_requires_explicit_reauthentication(monkeypatch):
+def test_adc_principal_mismatch_requires_explicit_reauthentication(
+    monkeypatch,
+    isolated_setup_config,
+):
     import installer as setup_pkg
     from installer import create_config
 
@@ -459,6 +527,7 @@ def test_adc_principal_mismatch_requires_explicit_reauthentication(monkeypatch):
 def test_billing_selection_defers_to_project_console_when_cli_returns_no_open_account(
     monkeypatch,
     capsys,
+    isolated_setup_config,
 ):
     import installer as setup_pkg
     from installer import create_config
@@ -487,6 +556,7 @@ def test_billing_selection_defers_to_project_console_when_cli_returns_no_open_ac
 def test_project_billing_authorization_uses_existing_account_and_project_console(
     monkeypatch,
     capsys,
+    isolated_setup_config,
 ):
     import installer as setup_pkg
     from installer import create_config
@@ -542,7 +612,10 @@ def test_project_billing_authorization_uses_existing_account_and_project_console
 
 # @features setup
 # @dimensions preflight billing provider-apis
-def test_target_preflight_selects_billing_and_reports_required_apis(monkeypatch):
+def test_target_preflight_selects_billing_and_reports_required_apis(
+    monkeypatch,
+    isolated_setup_config,
+):
     from installer import create_config
 
     fake_config = types.SimpleNamespace(
@@ -606,6 +679,7 @@ def test_target_preflight_selects_billing_and_reports_required_apis(monkeypatch)
 # @dimensions preflight project-create billing provider-apis
 def test_target_preflight_defers_billing_discovery_until_new_project_exists(
     monkeypatch,
+    isolated_setup_config,
 ):
     from installer import create_config
 
@@ -638,7 +712,10 @@ def test_target_preflight_defers_billing_discovery_until_new_project_exists(
 
 # @features setup
 # @dimensions preflight project-create billing
-def test_apply_target_preflight_creates_and_bills_confirmed_project(monkeypatch):
+def test_apply_target_preflight_creates_and_bills_confirmed_project(
+    monkeypatch,
+    isolated_setup_config,
+):
     import installer as setup_pkg
     from installer import create_config
 
@@ -708,6 +785,7 @@ def test_apply_target_preflight_creates_and_bills_confirmed_project(monkeypatch)
 # @dimensions preflight project-create billing browser
 def test_apply_target_preflight_authorizes_billing_after_project_creation_when_cli_list_is_empty(
     monkeypatch,
+    isolated_setup_config,
 ):
     import installer as setup_pkg
     from installer import create_config
@@ -778,6 +856,7 @@ def test_apply_target_preflight_authorizes_billing_after_project_creation_when_c
 # @dimensions preflight project-create billing provider-apis
 def test_apply_target_preflight_rediscovers_and_links_existing_billing_account(
     monkeypatch,
+    isolated_setup_config,
 ):
     import installer as setup_pkg
     from installer import create_config
@@ -864,7 +943,9 @@ def test_apply_target_preflight_rediscovers_and_links_existing_billing_account(
 
 # @features setup
 # @dimensions validation app-name
-def test_app_name_validation_rejects_control_characters_and_long_names():
+def test_app_name_validation_rejects_control_characters_and_long_names(
+    isolated_setup_config,
+):
     from installer import create_config
 
     assert create_config._validate_app_name("My Installation")
@@ -878,7 +959,10 @@ def test_app_name_validation_rejects_control_characters_and_long_names():
 
 # @features setup
 # @dimensions gcloud-config identity
-def test_cli_identity_snapshot_fails_closed_on_unset_or_error(monkeypatch):
+def test_cli_identity_snapshot_fails_closed_on_unset_or_error(
+    monkeypatch,
+    isolated_setup_config,
+):
     from installer import create_config
 
     results = iter(
