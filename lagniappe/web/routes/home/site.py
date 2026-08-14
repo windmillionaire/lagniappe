@@ -105,6 +105,7 @@ def site_update():
 @internal.route("/site-settings", methods=["GET"])
 @permission(Resource.SITE)
 def site_settings():
+    g.NO_CACHE = True
     project_id = CONFIG.GOOGLE_CLOUD_PROJECT
     google_console_url = "https://console.cloud.google.com"
 
