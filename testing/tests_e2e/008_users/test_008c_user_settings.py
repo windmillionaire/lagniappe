@@ -242,6 +242,17 @@ def _select_deployment_option(user, form, field_name, option_name):
     user.page.get_by_role("option", name=option_name, exact=True).click()
 
 
+def _select_ai_option(user, form, field_name, option_value):
+    select = form.locator(
+        f"[data-role='ai-select']:has(select[name='{field_name}'])"
+    )
+    option_name = select.locator(
+        f"select option[value='{option_value}']"
+    ).text_content()
+    select.locator("input[role='combobox']").click()
+    user.page.get_by_role("option", name=option_name, exact=True).click()
+
+
 def _create_user_page_reassign_target(owner, name):
     category = Categories.test_create_page.get(owner)
     page = Entities.PAGE.create(
@@ -1231,16 +1242,30 @@ def test_site_settings_deployment_form_saves_and_updates_summary(
 
 
 # @features admin
-# @dimensions ai-settings metadata validation
+# @dimensions ai-settings metadata validation model-selection saved-values
 # @template home/site_settings.html::site_settings
 def test_site_settings_ai_form_saves_current_models_through_route(
     get_user,
     browser_failures,
 ):
     owner = get_user(Users.OWNER)
-    _, settings_panel = _open_owner_site_settings(owner)
+    admin, settings_panel = _open_owner_site_settings(owner)
     ai_models = _open_site_settings_section(settings_panel, "ai-models")
     form = ai_models.locator("[data-role='ai-settings']")
+
+    primary = form.locator("select[name='AI_MODEL']")
+    current_primary = primary.input_value()
+    primary_options = primary.locator("option").evaluate_all(
+        "options => options.map(option => option.value)"
+    )
+    selected_primary = next(
+        (option for option in primary_options if option != current_primary),
+        None,
+    )
+    assert selected_primary, "AI model chooser did not offer an alternate model"
+    _select_ai_option(owner, form, "AI_MODEL", selected_primary)
+    expect(primary).to_have_value(selected_primary)
+
     expected = {
         name: form.locator(f"[name='{name}']").input_value()
         for name in (
@@ -1262,6 +1287,17 @@ def test_site_settings_ai_form_saves_current_models_through_route(
     )
     saved = dict(database.get.site_ai())
     assert {name: saved[name] for name in expected} == expected
+
+    owner.page.reload(wait_until="domcontentloaded")
+    reloaded_settings_panel = owner.locate(admin.SITE_SETTINGS_FORM)
+    expect(reloaded_settings_panel).to_have_attribute("initialized", "")
+    reloaded_ai_models = _open_site_settings_section(
+        reloaded_settings_panel,
+        "ai-models",
+    )
+    reloaded_form = reloaded_ai_models.locator("[data-role='ai-settings']")
+    for name, value in expected.items():
+        expect(reloaded_form.locator(f"[name='{name}']")).to_have_value(value)
 
     with browser_failures.expect_http_error(
         owner,

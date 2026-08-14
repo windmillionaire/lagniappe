@@ -198,6 +198,82 @@ if (!calls.includes("set:AI_MODEL:saved-primary") ||
     )
 
 
+# @features admin
+# @dimensions ai-settings model-selection submission
+def test_site_settings_ai_submission_uses_visible_combobox_values(run_node):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+class FormData {
+  constructor(form) {
+    this.data = new Map(form.initialData);
+  }
+  get(name) {
+    return this.data.get(name);
+  }
+  set(name, value) {
+    this.data.set(name, value);
+  }
+}
+
+const context = {
+  SiteSetting: class {},
+  SelectBox: class {},
+  buttons: {},
+  console,
+  FormData,
+  request: {},
+};
+
+vm.createContext(context);
+let source = fs.readFileSync("src/script/widgets/siteSettings/aiModels.mjs", "utf8");
+source = source.replace(/import[\s\S]*?from ".*?";\n/g, "");
+source = source.replace("export class SiteAiModels", "class SiteAiModels");
+source += "\nglobalThis.SiteAiModels = SiteAiModels;";
+vm.runInContext(source, context);
+
+const primary = {
+  name: "AI_MODEL",
+  value: "stale-native-primary",
+  closest: () => ({
+    _lp_combobox: { values: new Set(["visible-primary"]) },
+  }),
+};
+const utility = {
+  name: "AI_UTILITY_MODEL",
+  value: "native-utility",
+  closest: () => ({
+    _lp_combobox: { values: new Set() },
+  }),
+};
+const form = {
+  initialData: [
+    ["AI_MODEL", "stale-form-primary"],
+    ["AI_UTILITY_MODEL", "stale-form-utility"],
+    ["AI_IMAGE_MODEL", "saved-image"],
+    ["AI_LOCATION", "global"],
+  ],
+  querySelectorAll: () => [primary, utility],
+};
+const settings = Object.create(context.SiteAiModels.prototype);
+settings.aiForm = form;
+
+const data = settings._aiSettingsFormData();
+if (data.get("AI_MODEL") !== "visible-primary") {
+  throw new Error(`Visible primary selection was not submitted: ${data.get("AI_MODEL")}`);
+}
+if (data.get("AI_UTILITY_MODEL") !== "native-utility") {
+  throw new Error(`Native fallback was not submitted: ${data.get("AI_UTILITY_MODEL")}`);
+}
+if (data.get("AI_IMAGE_MODEL") !== "saved-image" || data.get("AI_LOCATION") !== "global") {
+  throw new Error("Non-combobox AI fields changed while constructing the submission");
+}
+"""
+    )
+
+
 # @features forms form-schema
 # @dimensions visibility canonical-list legacy-object-rejected
 def test_renderer_visibility_requires_canonical_condition_lists(run_node):

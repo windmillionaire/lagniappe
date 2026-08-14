@@ -6,8 +6,9 @@ import { SiteSetting } from "./base";
 /**
  * @testable true
  * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_initializes_ai_selects_before_syncing_saved_values
+ * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
  * @features admin
- * @dimensions ai-settings model-options saved-values
+ * @dimensions ai-settings model-options saved-values model-selection
  */
 export class SiteAiModels extends SiteSetting {
 	constructor(attributes) {
@@ -137,6 +138,25 @@ export class SiteAiModels extends SiteSetting {
 		error.dataset.visible = message ? "true" : "false";
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_ai_submission_uses_visible_combobox_values
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
+	 * @features admin
+	 * @dimensions ai-settings model-selection submission
+	 */
+	_aiSettingsFormData() {
+		const data = new FormData(this.aiForm);
+		this.aiForm
+			.querySelectorAll("[data-role='ai-select'] select")
+			.forEach((select) => {
+				const combobox = select.closest("[lp-select]")?._lp_combobox;
+				const selected = combobox?.values?.values().next().value;
+				data.set(select.name, selected ?? select.value ?? "");
+			});
+		return data;
+	}
+
 	async _saveAiSettings(event) {
 		event.preventDefault();
 		event.stopPropagation();
@@ -145,7 +165,7 @@ export class SiteAiModels extends SiteSetting {
 		this.aiButton.activate();
 		const response = await request.post(
 			this.endpoints.setAiSettings,
-			new FormData(this.aiForm),
+			this._aiSettingsFormData(),
 		);
 		if (!response.ok) {
 			this._showAiError(response.error || "Unable to save AI model settings.");
