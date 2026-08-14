@@ -120,11 +120,15 @@
       </a>
       {%- if not public -%}
         <div class="flex items-center justify-end gap-4">
-          <div class="w-48 sm:w-64" lp-search>
+          <form class="w-48 sm:w-64"
+                action="{{ url_for('internal.search_page') }}"
+                method="get"
+                lp-search>
             <div class="relative flex items-center">
               {{ render_icon("search", (styles.nav.search.icon)) }}
               <input type="search"
                      name="q"
+                     required
                      class="{{ styles.nav.search.input }} translate-y-0.5"
                      placeholder="Search..."
                      autocomplete="off"
@@ -133,7 +137,7 @@
                      data-1p-ignore
                      aria-label="Search">
             </div>
-          </div>
+          </form>
           <div data-role="offline" class="size-8" data-visible="false">
             <span class="grid place-items-center size-full">{{ render_icon("offline", "icon-2xl text-white") }}</span>
           </div>

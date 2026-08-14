@@ -1060,7 +1060,9 @@ documented in [AUTHENTICATION.md](AUTHENTICATION.md#login-ui-and-account-state).
 
 ### AI (`installer/ai.py`)
 
-Configures Google Vertex AI models for text generation (form schema generation, document assistance) and image generation (site images, page images). Sets model names and location in app settings.
+Configures Google Gemini Enterprise Agent Platform models for text generation
+(form schema generation, document assistance) and image generation (site
+images, page images). Sets model names and location in app settings.
 The ordinary setup flow also offers the separate, default-off owner-only AI
 generation observability setting and preserves the existing choice on reruns.
 
@@ -1132,7 +1134,8 @@ Optional post-install configuration:
   An opted-in normal installation can use the maintainer project or supply its
   own DSN. `./setup.sh development` rejects the maintainer DSN and requires an
   operator-owned DSN or disabled monitoring.
-- **AI model change**: Switch between available Vertex AI models and explicitly
+- **AI model change**: Switch between available Gemini Enterprise Agent
+  Platform models and explicitly
   choose whether the default-off `AI_OBSERVABILITY` summaries are enabled
 
 ### Development (`installer/development.py`)

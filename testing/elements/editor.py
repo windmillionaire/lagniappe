@@ -310,8 +310,25 @@ class Editor:
 
     def focus(self):
         """Move focus to the end of the document."""
-        self.text_entry.click()
-        self.text_entry.press("Control+End")
+        text_entry = self.text_entry
+        text_entry.click()
+        text_entry.press("Control+End")
+
+        # A contenteditable keypress can return before Chromium propagates its
+        # native selection into ProseMirror. Do not type until the editor has
+        # observed the collapsed selection at the end of the text block.
+        element = text_entry.element_handle()
+        assert element is not None
+        self.editor.page.wait_for_function(
+            """element => {
+                const editor = element.closest('[data-widget]')?._lp_widget?.editor;
+                const selection = editor?.state?.selection;
+                return Boolean(
+                    selection?.empty && selection.$from.pos === selection.$from.end()
+                );
+            }""",
+            arg=element,
+        )
 
     def type_text(self, text: str):
         """Type text into the editor."""

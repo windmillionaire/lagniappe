@@ -161,6 +161,10 @@ class IngressWizard:
             Select(self.progress.locator("[data-option='page-form']")).select_by_name(
                 name
             )
+        selected_form = self.progress.locator(
+            "[data-option='page-form'] input[role='combobox']"
+        )
+        expect(selected_form).to_have_attribute("placeholder", name)
 
     def select_index_source(self, name):
         with self.page.expect_response("**/update"):

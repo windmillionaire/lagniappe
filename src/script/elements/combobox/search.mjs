@@ -70,6 +70,7 @@ export class SearchBox extends Combobox {
 		if (event.defaultPrevented) return;
 
 		if (event.key === "Enter") {
+			event.preventDefault();
 			event.stopPropagation();
 			const params = new URLSearchParams();
 			params.set("q", this.element.value);

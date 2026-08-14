@@ -1,5 +1,6 @@
 """E2E coverage for Page note visibility, composition, and deletion."""
 
+from urllib.parse import urlsplit
 from uuid import uuid4
 
 import pytest
@@ -138,7 +139,10 @@ def test_page_note_text_photo_and_delete_modal(get_user, browser_failures):
 
     notes_path = f"/pages/{page.key}/notes"
     with browser_failures.expect_http_error(owner, status=422, path=notes_path):
-        with owner.page.expect_response("**/pages/*/notes") as invalid_response:
+        with owner.page.expect_response(
+            lambda response: response.request.method == "POST"
+            and urlsplit(response.url).path == notes_path
+        ) as invalid_response:
             composer.locator("button[type='submit']").click()
         assert invalid_response.value.status == 422
         expect(composer.locator("[data-role='error']")).to_contain_text(

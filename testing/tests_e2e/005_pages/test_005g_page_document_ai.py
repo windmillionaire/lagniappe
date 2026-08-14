@@ -209,7 +209,12 @@ def test_generate_text_replaces_selection_and_posts_selected_text(get_user):
         selected_text
     )
     expect(form.form.locator('input[value="replace-selection"]')).to_be_checked()
+    selection_highlight = editor.text_entry.locator(
+        "[data-role='selection-highlight']"
+    )
+    expect(selection_highlight).to_have_text(selected_text)
     form.fill_prompt("Rewrite the selected text")
+    expect(selection_highlight).to_have_text(selected_text)
 
     with _mock_generate_text(
         user.page,
@@ -229,6 +234,7 @@ def test_generate_text_replaces_selection_and_posts_selected_text(get_user):
         assert "replace-selection" in _field_values(requests[0], "insert_mode")
         expect(editor.text_entry).to_contain_text("Generated selection marker")
         expect(editor.text_entry).not_to_contain_text(selected_text)
+        expect(selection_highlight).to_have_count(0)
 
 
 # @features editor ai

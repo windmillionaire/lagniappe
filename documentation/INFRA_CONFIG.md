@@ -242,8 +242,19 @@ retries, tool calls, and structured final passes. `./setup.sh update` restores
 the entity into
 `config/files/lagniappe_settings.yaml` before deployment. `config/ai_models.py`
 owns the curated Gemini model fallback list, live SDK discovery, retry defaults,
-and the direct pricing URL. `config/ai_settings.py` owns validation and
-application of saved model settings.
+and the direct pricing URL. Discovery uses the Gemini Enterprise Agent Platform
+Model Garden `v1beta1` list endpoint because the stable `v1` generation
+endpoint does not expose publisher-model listing. A successful live response
+is authoritative, is cached for six hours, and is filtered to ordinary content
+and image generation families; embedding, TTS, Live, and native-audio models
+and numeric Gemini generations older than 2.5 are excluded. Superseded preview
+aliases are removed when their stable model is present. Agent Platform currently
+returns sparse metadata for newer models, so `supported_actions` is used when
+present and model family names provide the fallback capability signal. Each
+chooser is capped at the newest ten compatible options while reserving slots
+for its saved selections. A failed discovery uses the curated catalog for one
+minute before retrying. `config/ai_settings.py` owns validation and application
+of saved model settings.
 
 `AI_OBSERVABILITY` is a separate, default-off operator choice with a runtime
 fallback of `false`. The ordinary installer asks whether to store owner-only AI
@@ -479,9 +490,13 @@ in `installer/deployment.py`.
 ### AI Settings (`ai_settings.py`, `ai_models.py`)
 
 Normalizes AI model settings used by setup-generated app settings and runtime
-site-settings validation. Model discovery uses `google-genai` when credentials
-and project context are available, but silently falls back to a curated Gemini
-catalog and preserves any saved custom current model names.
+site-settings validation. Model discovery uses `google-genai` and the Gemini
+Enterprise Agent Platform Model Garden `v1beta1` list API when credentials and
+project context are available. Successful discovery results replace the
+curated list so newly released compatible models appear without an application
+deployment; failed discovery falls back briefly to the curated catalog. Saved
+custom current model names remain selectable even when the provider no longer
+lists them.
 
 ### Testing (`runner/testing.py`)
 

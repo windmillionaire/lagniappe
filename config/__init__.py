@@ -501,6 +501,7 @@ class Settings:
                 "AGENT_ACCESS_CODE": constants.DEFAULT_AGENT_ACCESS_TEST_CODE,
                 "ANALYTICS": True,
                 "AI_OBSERVABILITY": True,
+                "PUBLIC_MANUAL": True,
             }
         )
         app_settings.update(self.TEST_CONFIG)

@@ -54,10 +54,8 @@ from playwright.sync_api import expect
 from config import SETTINGS, Environment, constants
 from lagniappe import CONFIG
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools import auth_email, database, identity_platform
 from lagniappe.web import app
-from lagniappe.web.routes.users import login as login_routes
-from lagniappe.web.routes.users.login import _auth_action_url
 
 from testing.definitions import SitePages, Users
 from testing.elements import Buttons, FormElements, Roles
@@ -614,15 +612,51 @@ def test_login_google_buttons_carry_safe_next_state(get_user):
 
 # @features login
 # @dimensions authentication-email redirect-target
-def test_auth_action_url_preserves_safe_login_destination():
+def test_auth_action_url_preserves_safe_login_destination(monkeypatch):
     target = "/tasks/index?from=email#details"
+    delivered = {}
+    monkeypatch.setattr(CONFIG, "GOOGLE_LOGIN_URI", "https://login.example.test")
+    monkeypatch.setattr(auth_email, "check_auth_email_connection", lambda: True)
+    monkeypatch.setattr(
+        identity_platform,
+        "generate_email_action_code",
+        lambda *_args, **_kwargs: "code-1",
+    )
+    monkeypatch.setattr(
+        auth_email,
+        "send_auth_email",
+        lambda recipient, subject, text_body, html_body: delivered.update(
+            {
+                "recipient": recipient,
+                "subject": subject,
+                "text_body": text_body,
+                "html_body": html_body,
+            }
+        ),
+    )
 
-    action_url = urlsplit(_auth_action_url("verifyEmail", "code-1", target))
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["next"] = target
+    login_response = client.get("/users/login")
+    csrf_token = re.search(
+        r'id="token" type="hidden" value="([^"]+)"',
+        login_response.get_data(as_text=True),
+    ).group(1)
+    response = client.post(
+        "/users/send-password-reset-email",
+        json={"email": "reset@example.test"},
+        headers={"X-CSRFToken": csrf_token},
+        environ_base={"REMOTE_ADDR": f"2001:db8::{uuid4().hex}"},
+    )
 
+    assert response.status_code == 200
+    action_url = urlsplit(re.search(r"https://\S+", delivered["text_body"]).group())
     assert action_url.scheme == "https"
+    assert action_url.netloc == "login.example.test"
     assert action_url.path == "/users/login"
     assert parse_qs(action_url.query) == {
-        "mode": ["verifyEmail"],
+        "mode": ["resetPassword"],
         "oobCode": ["code-1"],
         "next": [target],
     }
@@ -888,7 +922,7 @@ def test_login_hides_google_when_provider_is_disabled(monkeypatch):
     _ensure_owner_initialized()
     monkeypatch.setattr(CONFIG, "ENV", Environment.PRODUCTION)
     monkeypatch.setattr(
-        login_routes.identity_platform,
+        identity_platform,
         "google_provider_enabled",
         lambda: False,
     )
@@ -925,7 +959,7 @@ def test_google_signin_setting_disables_ui_and_callback(monkeypatch):
     monkeypatch.setattr(CONFIG, "ENV", Environment.PRODUCTION)
     monkeypatch.setattr(CONFIG, "GOOGLE_SIGNIN_ENABLED", False)
     monkeypatch.setattr(
-        login_routes.identity_platform,
+        identity_platform,
         "google_provider_enabled",
         lambda: pytest.fail("disabled intent must skip live provider lookup"),
     )
@@ -974,7 +1008,7 @@ def test_google_provider_rejections_return_safely(
     """Known provider rejections return to login without a raw error page."""
     _ensure_owner_initialized()
     monkeypatch.setattr(
-        login_routes.identity_platform,
+        identity_platform,
         "verify_google_credential",
         lambda *_args, **_kwargs: {
             "sub": "google-user-1",
@@ -984,13 +1018,13 @@ def test_google_provider_rejections_return_safely(
     )
 
     def reject_exchange(*_args, **_kwargs):
-        raise login_routes.identity_platform.IdentityPlatformError(
+        raise identity_platform.IdentityPlatformError(
             "provider rejected credential",
             provider_code=provider_code,
         )
 
     monkeypatch.setattr(
-        login_routes.identity_platform,
+        identity_platform,
         "exchange_google_credential",
         reject_exchange,
     )
@@ -1981,6 +2015,8 @@ def test_login_auth_error_messages_are_user_safe(get_user, browser_failures):
         user,
         status=400,
         path="/v1/accounts:signInWithPassword",
+        count=0,
+        max_count=1,
     ):
         sign_in_form.locator(Buttons.SIGNIN).click()
         expect(error).to_contain_text("Incorrect email or password.")

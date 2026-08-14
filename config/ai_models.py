@@ -1,5 +1,7 @@
 """Gemini model catalog, discovery, and retry defaults."""
 
+import logging
+import re
 import time
 
 AI_PRICING_URL = "https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing"
@@ -12,10 +14,17 @@ AI_RETRY_EXP_BASE = 2.0
 AI_RETRY_JITTER = 1.0
 AI_REQUEST_TIMEOUT_MS = 120 * 1000
 
-DISCOVERY_TIMEOUT_MS = 2500
+DISCOVERY_API_VERSION = "v1beta1"
+DISCOVERY_TIMEOUT_MS = 10 * 1000
 DISCOVERY_CACHE_SECONDS = 6 * 60 * 60
+DISCOVERY_FAILURE_CACHE_SECONDS = 60
+MAX_MODEL_OPTIONS_PER_KIND = 10
+MINIMUM_GEMINI_GENERATION_VERSION = (2, 5, 0)
+
+UNSUPPORTED_MODEL_FAMILIES = frozenset({"audio", "embedding", "live", "tts"})
 
 _DISCOVERY_CACHE = {}
+_LOGGER = logging.getLogger(__name__)
 
 
 MODEL_CATALOG = [
@@ -89,6 +98,59 @@ def _model_id(name):
 
 # @testable false
 # @covered-by config/ai_models.py::discover_model_options
+# @reason provider label fallback is covered through discovery tests
+def _model_label(model_id):
+    words = [word for word in re.split(r"[-_]+", model_id) if word]
+    label = " ".join(
+        word if word[:1].isdigit() else word.capitalize() for word in words
+    )
+    return label.replace("Flash Lite", "Flash-Lite")
+
+
+# @testable false
+# @covered-by config/ai_models.py::discover_model_options
+# @reason numeric version parsing is covered through discovery tests
+def _model_version(model_id):
+    match = re.match(r"gemini-(\d+)(?:\.(\d+))?(?:\.(\d+))?", model_id.lower())
+    if not match:
+        return None
+    return tuple(int(part or 0) for part in match.groups())
+
+
+# @testable false
+# @covered-by config/ai_models.py::discover_model_options
+# @reason model-family filtering is covered through discovery tests
+def _model_kind(model_id):
+    tokens = set(re.findall(r"[a-z0-9]+", model_id.lower()))
+    if tokens & UNSUPPORTED_MODEL_FAMILIES:
+        return None
+    version = _model_version(model_id)
+    if version and version < MINIMUM_GEMINI_GENERATION_VERSION:
+        return None
+    return "image" if "image" in tokens else "text"
+
+
+# @testable false
+# @covered-by config/ai_models.py::discover_model_options
+# @reason natural provider ordering is covered through discovery tests
+def _model_sort_key(option):
+    model_id = option["id"].lower()
+    version = _model_version(model_id) or (0, 0, 0)
+    prerelease = int(any(marker in model_id for marker in ("preview", "-exp")))
+    family_rank = 0 if "-pro" in model_id else 2 if "-lite" in model_id else 1
+    return tuple(-part for part in version) + (prerelease, family_rank, model_id)
+
+
+# @testable false
+# @covered-by config/ai_models.py::discover_model_options
+# @reason superseded alias filtering is covered through discovery tests
+def _has_stable_replacement(model_id, provider_ids):
+    prerelease = re.search(r"-(?:preview|exp)(?:-|$)", model_id)
+    return bool(prerelease and model_id[: prerelease.start()] in provider_ids)
+
+
+# @testable false
+# @covered-by config/ai_models.py::discover_model_options
 # @reason simple catalog copy covered through public discovery behavior
 def _catalog_options():
     options = []
@@ -111,6 +173,10 @@ def _option_from_model(model):
     if not model_id.startswith("gemini-"):
         return None
 
+    kind = _model_kind(model_id)
+    if kind is None:
+        return None
+
     supported_actions = list(getattr(model, "supported_actions", None) or [])
     action_text = " ".join(str(action).lower() for action in supported_actions)
     if action_text and not any(
@@ -124,14 +190,23 @@ def _option_from_model(model):
     ):
         return None
 
-    kind = "image" if "image" in model_id else "text"
-    display_name = getattr(model, "display_name", None) or model_id
-    description = getattr(model, "description", None) or ""
+    display_name = getattr(model, "display_name", None) or _model_label(model_id)
+    description = getattr(model, "description", None) or (
+        "Available Gemini image generation model."
+        if kind == "image"
+        else "Available Gemini content generation model."
+    )
     option = {
         "id": model_id,
         "label": display_name,
         "kind": kind,
-        "tier": "image" if kind == "image" else "primary",
+        "tier": (
+            "image"
+            if kind == "image"
+            else "utility"
+            if "lite" in model_id.lower()
+            else "primary"
+        ),
         "description": description,
         "source": "provider",
         "preview": "preview" in f"{model_id} {display_name}".lower(),
@@ -144,18 +219,19 @@ def _option_from_model(model):
 # @covered-by config/ai_models.py::discover_model_options
 # @reason merge behavior covered through public discovery behavior
 def _merge_options(catalog_options, provider_options):
-    merged = {option["id"]: dict(option) for option in catalog_options}
+    catalog = {option["id"]: option for option in catalog_options}
+    provider_ids = {option["id"] for option in provider_options}
+    merged = {}
     for option in provider_options:
-        existing = merged.get(option["id"], {})
+        if _has_stable_replacement(option["id"], provider_ids):
+            continue
+        existing = catalog.get(option["id"], {})
         if existing.get("description") and not option.get("description"):
             option["description"] = existing["description"]
         if existing.get("tier") and option.get("tier") == "primary":
             option["tier"] = existing["tier"]
         merged[option["id"]] = {**existing, **option}
-    ordered_ids = [option["id"] for option in catalog_options]
-    ordered = [merged.pop(model_id) for model_id in ordered_ids if model_id in merged]
-    ordered.extend(sorted(merged.values(), key=lambda option: option["label"].lower()))
-    return ordered
+    return sorted(merged.values(), key=_model_sort_key)
 
 
 # @testable false
@@ -188,8 +264,32 @@ def _options_response(options, current_settings=None):
     _add_current_model(options, current_settings.get("AI_UTILITY_MODEL"), "text")
     _add_current_model(options, current_settings.get("AI_IMAGE_MODEL"), "image")
 
-    text_options = [option for option in options if option["kind"] == "text"]
-    image_options = [option for option in options if option["kind"] == "image"]
+    # @testable false
+    # @covered-by config/ai_models.py::discover_model_options
+    # @reason per-kind limit and current selection preservation use public coverage
+    def limited_options(kind, current_ids):
+        kind_options = [option for option in options if option["kind"] == kind]
+        available_ids = {option["id"] for option in kind_options}
+        selected_ids = {
+            model_id for model_id in current_ids if model_id in available_ids
+        }
+        for option in kind_options:
+            if len(selected_ids) >= MAX_MODEL_OPTIONS_PER_KIND:
+                break
+            selected_ids.add(option["id"])
+        return [option for option in kind_options if option["id"] in selected_ids]
+
+    text_options = limited_options(
+        "text",
+        (
+            current_settings.get("AI_MODEL"),
+            current_settings.get("AI_UTILITY_MODEL"),
+        ),
+    )
+    image_options = limited_options(
+        "image",
+        (current_settings.get("AI_IMAGE_MODEL"),),
+    )
     return {
         "pricing_url": AI_PRICING_URL,
         "text": text_options,
@@ -199,8 +299,10 @@ def _options_response(options, current_settings=None):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_model_discovery_falls_back_to_catalog_and_preserves_custom
+# @tests tests_unit/test_015_ai_tools.py::test_ai_model_discovery_uses_agent_platform_catalog_and_filters_specialized_models
+# @tests tests_unit/test_015_ai_tools.py::test_ai_model_discovery_limits_options_and_preserves_current_models
 # @features ai
-# @dimensions model-discovery fallback custom-current
+# @dimensions model-discovery provider-filtering ordering api-version option-limit fallback custom-current
 def discover_model_options(
     project=None,
     location="global",
@@ -216,13 +318,14 @@ def discover_model_options(
 
     if use_cache and client is None:
         cached = _DISCOVERY_CACHE.get(cache_key)
-        if cached and now - cached["time"] < DISCOVERY_CACHE_SECONDS:
+        if cached and now - cached["time"] < cached["ttl"]:
             return _options_response(
                 [dict(option) for option in cached["options"]],
                 current_settings=current_settings,
             )
 
     provider_options = []
+    discovery_succeeded = False
     try:
         if client is None:
             if not project:
@@ -232,7 +335,7 @@ def discover_model_options(
             from google.genai import types
 
             http_options = types.HttpOptions(
-                api_version="v1",
+                api_version=DISCOVERY_API_VERSION,
                 timeout=DISCOVERY_TIMEOUT_MS,
             )
             client = genai.Client(
@@ -254,14 +357,25 @@ def discover_model_options(
             option = _option_from_model(model)
             if option:
                 provider_options.append(option)
-    except Exception:
-        provider_options = []
+        discovery_succeeded = True
+    except Exception as error:
+        if project or client is not None:
+            _LOGGER.warning(
+                "Gemini model discovery failed; using the fallback catalog (%s).",
+                type(error).__name__,
+            )
 
-    merged = _merge_options(catalog, provider_options)
+    using_provider = discovery_succeeded and bool(provider_options)
+    merged = _merge_options(catalog, provider_options) if using_provider else catalog
     if use_cache and client is None:
         _DISCOVERY_CACHE[cache_key] = {
             "time": now,
             "options": [dict(option) for option in merged],
+            "ttl": (
+                DISCOVERY_CACHE_SECONDS
+                if using_provider
+                else DISCOVERY_FAILURE_CACHE_SECONDS
+            ),
         }
 
     return _options_response(merged, current_settings=current_settings)

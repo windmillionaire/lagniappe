@@ -136,7 +136,10 @@ function stopPolling() {
  */
 function pollServer(online) {
 	stopPolling();
-	if (window.__TESTING__) return;
+	// Healthy testing-mode views do not need the production keep-awake timer,
+	// but an offline view still needs a retry in case the browser misses the
+	// native online transition after an offline reload.
+	if (window.__TESTING__ && online) return;
 
 	const browserOnline = connectivity.snapshot().browser === "online";
 	const delay = online

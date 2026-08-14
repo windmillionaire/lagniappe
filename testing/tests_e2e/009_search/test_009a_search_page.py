@@ -108,16 +108,20 @@ def test_search_page_requires_login(get_user):
 
 # @features search
 # @dimensions navbar-submit page-navigation results
+# @template nav.html::navbar
 def test_search_from_navbar(get_user):
     """Test initiating search from navbar search input."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(SitePages.HOME)
 
-    search_input = user.locate(SEARCH_INPUT)
+    search_form = user.locate("[lp-search]")
+    expect(search_form).to_have_attribute("method", "get")
+    expect(search_form).to_have_attribute("action", re.compile(r"/l/search-page$"))
+    search_input = search_form.locator("input[name='q']")
+    expect(search_input).to_have_attribute("required", "")
     search_input.fill(project.definition.name)
-    with user.page.expect_navigation(url="**/l/search-page**"):
-        search_input.press("Enter")
+    search_input.press("Enter")
 
     expect(user.page).to_have_url(re.compile(r".*/search-page\?q=.*"))
     expect(user.locate("[lp-view][data-kind='results']")).to_be_visible()

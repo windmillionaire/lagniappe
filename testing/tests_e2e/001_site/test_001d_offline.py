@@ -132,7 +132,7 @@ def test_offline_poll_recovers_without_online_event(get_user, browser_failures):
     Test that retry polling recovers after the native online event fails.
 
     Flow:
-        1. Navigate home and allow production polling
+        1. Navigate home in the normal testing mode
         2. Set the browser context offline
         3. Verify the offline indicator becomes visible
         4. Restore the browser context and fail that native reconnect ping
@@ -144,7 +144,6 @@ def test_offline_poll_recovers_without_online_event(get_user, browser_failures):
     """
     user = get_user(Users.OWNER)
     user.go(SitePages.HOME)
-    user.page.evaluate("window.__TESTING__ = false;")
 
     indicator = user.locate(OFFLINE_INDICATOR)
     with browser_failures.expect_offline(user):

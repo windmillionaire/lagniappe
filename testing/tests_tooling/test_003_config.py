@@ -420,6 +420,7 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
         assert SETTINGS.test_config["AGENT_ACCESS_ENABLED"] is True
         assert SETTINGS.test_config["ANALYTICS"] is True
         assert SETTINGS.test_config["AI_OBSERVABILITY"] is True
+        assert SETTINGS.test_config["PUBLIC_MANUAL"] is True
         assert "BUILD_ID" not in SETTINGS.app_config
         assert "BUILD_ID" not in SETTINGS.app_settings
         assert (

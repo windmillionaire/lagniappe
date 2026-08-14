@@ -9,8 +9,8 @@
     </p>
     <p class="text-base-medium">
       A Lagniappe install does not depend on a centralized Lagniappe SaaS
-      control plane. Your records, files, cache data, billing, IAM policy, and
-      provider accounts live with the services you configure for your instance.
+      control plane. Your records, files, cache data, and provider accounts
+      stay with the services you configure for your instance.
     </p>
   {% endcall %}
   {{ heading("Security Model") }}
@@ -32,8 +32,8 @@
       Going directly to Google Cloud removes one extra hosted application layer:
       there is no Lagniappe-hosted admin dashboard, tenant database, or licensing
       service that can inspect or mediate your instance. Google Cloud and Redis
-      Cloud are still service providers, so their own account, IAM, billing,
-      support, and security settings matter.
+      Cloud are still service providers, so protect those accounts and review
+      their security settings when access changes.
     {% endcall %}
   {% endcall %}
   {{ heading("Client and Server Split") }}
@@ -111,28 +111,23 @@
     <p class="text-base-medium mb-3">
       Google Cloud provides default encryption at rest for customer content and
       protects traffic moving within its infrastructure. Those provider
-      controls reduce the infrastructure you have to operate yourself, but they
-      do not replace your responsibilities: keep Google accounts protected, use
-      least-privilege IAM, prefer Application Default Credentials and
-      short-lived impersonation over service account keys, set budget alerts,
-      and monitor who has access to the project.
+      controls reduce the infrastructure you have to operate yourself. The
+      installer configures the access the application needs; protect the Google
+      accounts that administer the project and review that administrator access
+      when people or responsibilities change.
     </p>
     <div class="grid md:grid-cols-2 gap-4">
       {% call concept("Datastore", icon="sitemap", kind="page") %}
         Firestore in Datastore mode is the fully managed NoSQL database
-        Lagniappe uses for entities and metadata. It is built for high
-        availability, access is controlled through Google Cloud IAM, and stored
-        data is encrypted at rest.
-        References: {{ link("https://docs.cloud.google.com/datastore/docs/concepts/overview", "Datastore overview") }}
-        and {{ link("https://docs.cloud.google.com/datastore/docs/access/iam", "Datastore IAM") }}.
+        Lagniappe uses for entities and metadata. Google manages the service and
+        encrypts the stored data at rest.
+        Reference: {{ link("https://docs.cloud.google.com/datastore/docs/concepts/overview", "Datastore overview") }}.
       {% endcall %}
       {% call concept("Cloud Storage", icon="installation", kind="file") %}
         Cloud Storage is the object store for uploaded files and generated
         assets. Objects are encrypted server-side before they are written to
-        disk and decrypted for authorized reads; access is controlled through
-        IAM and bucket policies.
-        References: {{ link("https://docs.cloud.google.com/storage/docs/encryption/default-keys", "Cloud Storage encryption") }}
-        and {{ link("https://docs.cloud.google.com/storage/docs/access-control/iam", "Cloud Storage IAM") }}.
+        disk and decrypted for authorized reads.
+        Reference: {{ link("https://docs.cloud.google.com/storage/docs/encryption/default-keys", "Cloud Storage encryption") }}.
       {% endcall %}
     </div>
   {% endcall %}
@@ -242,10 +237,10 @@
     <ul class="text-base-medium space-y-2">
       <li>Use strong Google account protection and keep at least one recovery path for the Cloud project.</li>
       <li>
-        Keep IAM narrow: only trusted operators should have broad project, App Engine, Datastore, Storage, service-account, billing, or Identity Platform access.
+        Give Lagniappe owner and administrative permissions only to people who
+        need them, and review user and group access when responsibilities change.
       </li>
-      <li>Protect local settings files and service account credentials; do not commit secrets to a public repository.</li>
-      <li>Set Google Cloud budget alerts and review provider access after staff or role changes.</li>
+      <li>Protect local settings files and recovery downloads; do not commit secrets to a public repository.</li>
       <li>Review public pages, public files, public permissions, and group memberships from a non-owner account.</li>
       <li>
         Decide whether optional analytics, AI generation observability, AI/OCR, and error reporting match your privacy expectations before enabling them.

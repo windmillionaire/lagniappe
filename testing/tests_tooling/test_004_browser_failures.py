@@ -312,6 +312,24 @@ def test_http_error_scope_matches_status_path_and_count():
     collector.assert_clean()
 
 
+def test_http_error_scope_supports_bounded_optional_console_reporting():
+    collector = BrowserFailureCollector()
+    context = FakeContext()
+    collector.monitor_context(context, label="Owner")
+    page = context.new_page()
+
+    with collector.expect_http_error(
+        _user(page),
+        status=400,
+        path="http://test.local/auth",
+        count=0,
+        max_count=1,
+    ):
+        pass
+
+    collector.assert_clean()
+
+
 @pytest.mark.parametrize("count", [0, 2])
 def test_expected_scope_fails_when_failure_count_is_not_exact(count):
     collector = BrowserFailureCollector()

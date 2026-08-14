@@ -33,6 +33,11 @@ appropriate, and replays the intended open/search action after initialization.
 Repeated activation shares one promise. Import failure clears transient state
 so a later interaction can retry.
 
+The navbar search remains a native GET form while `SearchBox` loads, so an
+immediate Enter submission cannot be lost between first input and deferred
+component initialization. Once initialized, `SearchBox` prevents that native
+submission and owns keyboard routing and result selection.
+
 Field-specific comboboxes remain widget/element-owned and load with their
 containing form. Index tools and Manual dropdowns are further gated on mobile
 mode.

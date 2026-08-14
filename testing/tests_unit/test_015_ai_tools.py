@@ -242,9 +242,9 @@ def test_ai_model_discovery_falls_back_to_catalog_and_preserves_custom():
         def list(self):
             return [
                 SimpleNamespace(
-                    name="publishers/google/models/gemini-live-preview",
-                    display_name="Gemini Live Preview",
-                    description="Live option",
+                    name="publishers/google/models/gemini-3.8-flash-preview",
+                    display_name="Gemini 3.8 Flash Preview",
+                    description="Preview option",
                     supported_actions=["generateContent"],
                 )
             ]
@@ -254,11 +254,114 @@ def test_ai_model_discovery_falls_back_to_catalog_and_preserves_custom():
         use_cache=False,
     )
     live = next(
-        option for option in live_options["text"] if option["id"] == "gemini-live-preview"
+        option
+        for option in live_options["text"]
+        if option["id"] == "gemini-3.8-flash-preview"
     )
     assert live["source"] == "provider"
     assert live["preview"] is True
     assert "Preview" in live["label"]
+
+
+# @features ai
+# @dimensions model-discovery provider-filtering ordering api-version
+@pytest.mark.unit
+def test_ai_model_discovery_uses_agent_platform_catalog_and_filters_specialized_models(
+    monkeypatch,
+):
+    from google import genai
+
+    captured = {}
+
+    class LiveModels:
+        def list(self, *, config):
+            captured["list_config"] = config
+            return [
+                SimpleNamespace(name="publishers/google/models/gemini-3.5-flash-lite"),
+                SimpleNamespace(name="publishers/google/models/gemini-3.6-flash"),
+                SimpleNamespace(name="publishers/google/models/gemini-3.7-flash"),
+                SimpleNamespace(name="publishers/google/models/gemini-3.1-flash-image"),
+                SimpleNamespace(
+                    name="publishers/google/models/gemini-3.1-flash-image-preview"
+                ),
+                SimpleNamespace(name="publishers/google/models/gemini-embedding-2"),
+                SimpleNamespace(name="publishers/google/models/gemini-2.5-pro-tts"),
+                SimpleNamespace(
+                    name="publishers/google/models/gemini-1.5-pro-002",
+                    supported_actions=["generateContent"],
+                ),
+                SimpleNamespace(
+                    name="publishers/google/models/gemini-live-2.5-flash-native-audio"
+                ),
+                SimpleNamespace(
+                    name="publishers/google/models/gemini-actionless",
+                    supported_actions=["embedContent"],
+                ),
+            ]
+
+    def client(**kwargs):
+        captured["client"] = kwargs
+        return SimpleNamespace(models=LiveModels())
+
+    monkeypatch.setattr(genai, "Client", client)
+
+    options = config_ai_models.discover_model_options(
+        project="example-project",
+        location="global",
+        credentials="credentials",
+        use_cache=False,
+    )
+
+    assert captured["client"]["http_options"].api_version == "v1beta1"
+    assert captured["list_config"].page_size == 100
+    assert [option["id"] for option in options["text"]] == [
+        "gemini-3.7-flash",
+        "gemini-3.6-flash",
+        "gemini-3.5-flash-lite",
+    ]
+    assert [option["id"] for option in options["image"]] == ["gemini-3.1-flash-image"]
+    assert options["text"][0]["label"] == "Gemini 3.7 Flash"
+    assert all(option["source"] == "provider" for option in options["text"])
+
+
+# @features ai
+# @dimensions model-discovery option-limit custom-current
+@pytest.mark.unit
+def test_ai_model_discovery_limits_options_and_preserves_current_models():
+    class ManyModels:
+        def list(self):
+            text_models = [
+                SimpleNamespace(
+                    name=f"publishers/google/models/gemini-{version}.0-flash"
+                )
+                for version in range(20, 8, -1)
+            ]
+            image_models = [
+                SimpleNamespace(
+                    name=f"publishers/google/models/gemini-{version}.0-flash-image"
+                )
+                for version in range(20, 9, -1)
+            ]
+            return text_models + image_models
+
+    options = config_ai_models.discover_model_options(
+        client=SimpleNamespace(models=ManyModels()),
+        current_settings={
+            "AI_MODEL": "gemini-2.5-flash",
+            "AI_UTILITY_MODEL": "gemini-2.5-flash-lite",
+            "AI_IMAGE_MODEL": "gemini-2.5-flash-image",
+        },
+        use_cache=False,
+    )
+
+    assert len(options["text"]) == config_ai_models.MAX_MODEL_OPTIONS_PER_KIND
+    assert len(options["image"]) == config_ai_models.MAX_MODEL_OPTIONS_PER_KIND
+    assert options["text"][0]["id"] == "gemini-20.0-flash"
+    assert options["image"][0]["id"] == "gemini-20.0-flash-image"
+    assert {"gemini-2.5-flash", "gemini-2.5-flash-lite"} <= {
+        option["id"] for option in options["text"]
+    }
+    assert "gemini-2.5-flash-image" in {option["id"] for option in options["image"]}
 
 
 # @features ai

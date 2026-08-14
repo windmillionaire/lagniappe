@@ -381,7 +381,9 @@
     </p>
     {{ code("git clone <lagniappe-source>\ncd <lagniappe-source>\nmkdir -p config/files\n# Save the owner download as:\n# config/files/lagniappe_settings.yaml\n./setup.sh") }}
     <p class="text-base-medium my-3">
-      In Windows PowerShell, recover into the same stable local folder:
+      In Windows PowerShell, use a fresh <code>Lagniappe</code> checkout
+      directly under your Windows user profile, matching the location used by
+      a fresh installation:
     </p>
     {{ code('$lagniappePath = Join-Path $env:USERPROFILE "Lagniappe"\ngit clone <lagniappe-source> $lagniappePath\nSet-Location $lagniappePath\nNew-Item -ItemType Directory -Force config/files\n# Save the owner download as:\n# config/files/lagniappe_settings.yaml\n.\\setup.cmd') }}
     <p class="text-base-medium mt-3">

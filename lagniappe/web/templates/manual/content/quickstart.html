@@ -1,4 +1,4 @@
-{% from "manual/macros.html" import heading, card, callout, nav_buttons %}
+{% from "manual/macros.html" import heading, card, callout, link, nav_buttons %}
 
 {% macro guide_item(icon, title, description, kind="page") %}
   <div data-kind="{{ kind }}"
@@ -45,16 +45,30 @@
     {% endcall %}
   {% endcall %}
 
-  {{ heading("When a Basic Deployment Sleeps", icon="offline", kind="page") }}
+  {{ heading("When the Server Is Waking Up", icon="offline", kind="page") }}
   {% call card() %}
+    <p class="text-base-medium leading-relaxed mb-3">
+      Lagniappe uses basic scaling by default, which lets App Engine stop the
+      server after it has been idle instead of charging to keep it running all
+      day. The first request after that is a cold start. The server usually
+      wakes in less than a minute; once it is awake, Lagniappe should respond
+      quickly. Continuing slowness is not an expected part of this setting.
+    </p>
+    <p class="text-base-medium leading-relaxed mb-3">
+      While the server wakes, you can view only pages that have already been
+      opened in this browser. The offline icon appears next to the search bar
+      and inside the submit buttons of forms that cannot be submitted offline.
+      Those buttons become available again when the server reconnects.
+    </p>
     <p class="text-base-medium leading-relaxed">
-      On basic deployments, the server goes to sleep after it has been idle, so
-      it does not incur server charges while it is unused. While the server is
-      offline, you can view only pages that have already been opened in this
-      browser. The offline icon appears next to the search bar and inside the
-      submit buttons of forms that cannot be submitted offline. The server
-      usually wakes in less than a minute, and those buttons become available
-      again when it does.
+      If immediate first-page responses matter more than the additional cost,
+      the owner can choose automatic scaling under <strong>Admin</strong>,
+      <strong>Settings</strong>, then <strong>Deployment</strong>. Follow the
+      {{ link(
+        url_for("manual.index", section="personalization"),
+        "Deployment Settings"
+      ) }}
+      instructions to apply and deploy that choice.
     </p>
   {% endcall %}
 

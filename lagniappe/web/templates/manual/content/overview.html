@@ -40,6 +40,31 @@
       cloud setting.
     {% endcall %}
   {% endcall %}
+  {{ heading("Fast When Awake, Inexpensive When Idle", icon="offline", kind="page") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Lagniappe is designed to run economically without keeping an App Engine
+      server running around the clock. The default deployment can sleep when
+      nobody is using it, which can make a substantial difference to the
+      monthly hosting cost.
+    </p>
+    <p class="text-base-medium mb-3">
+      The first page after an idle period may take a little longer—usually less
+      than a minute—while the server starts. Once awake, Lagniappe should feel
+      fast and fully interactive. This cold start is intentional cost control,
+      not the app's normal speed.
+    </p>
+    <p class="text-base-medium">
+      Owners who prefer an always-warm server can switch to automatic scaling
+      under <strong>Admin</strong>, <strong>Settings</strong>, then
+      <strong>Deployment</strong>, usually at a higher cost. See
+      {{ link(
+        url_for("manual.index", section="personalization"),
+        "Deployment Settings"
+      ) }}
+      for the complete steps.
+    </p>
+  {% endcall %}
   {{ heading("Good Fit") }}
   {% call card() %}
     <ul class="text-base-medium space-y-2">

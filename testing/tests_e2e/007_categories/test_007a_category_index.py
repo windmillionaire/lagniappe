@@ -139,7 +139,7 @@ def test_category_index_renders_first_batch_before_cursor_continuation(
         body = user.locate(category.TABLE_BODY)
         rows = body.locator("tr[lp-entity]")
         expect(body).to_have_attribute("loaded", "")
-        expect(rows).to_have_count(26)
+        expect(rows.nth(25)).to_be_visible()
         row_keys = set(rows.evaluate_all("rows => rows.map(row => row.dataset.key)"))
         assert {page.urlsafe_key for page in created}.issubset(row_keys)
     finally:

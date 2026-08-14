@@ -196,10 +196,10 @@ def test_mobile_selected_section_persists_after_reload(get_user):
 
     project.mobile_nav.select_section("model-tasks", "ModelTaskList")
     expect(project.model_tasks_card).to_be_visible()
-    assert project.mobile_nav.get_section_title() == "Model Tasks"
+    expect(user.locate(project.MOBILE_SECTION_TITLE)).to_have_text("Model Tasks")
 
     user.page.reload(wait_until="load")
 
     expect(user.locate(project.MOBILE_NAV)).to_be_visible()
     expect(project.model_tasks_card).to_be_visible()
-    assert project.mobile_nav.get_section_title() == "Model Tasks"
+    expect(user.locate(project.MOBILE_SECTION_TITLE)).to_have_text("Model Tasks")

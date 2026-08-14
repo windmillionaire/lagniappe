@@ -140,13 +140,15 @@ class BrowserFailureCollector:
         status: int,
         path: str,
         count: int = 1,
+        max_count: int | None = None,
     ) -> "ExpectedBrowserFailure":
-        """Account for one exact intentional HTTP error reported by Chromium."""
+        """Account for an intentional HTTP error reported by Chromium."""
         source_path = urlsplit(path).path
         return self.expect(
             user,
             kind="console",
             count=count,
+            max_count=max_count,
             console_type="error",
             text_contains=f"status of {status} ",
             source_path=source_path,

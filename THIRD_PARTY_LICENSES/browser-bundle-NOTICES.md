@@ -1,7 +1,7 @@
 # Browser bundle notices
 
 These notices cover third-party code incorporated into Lagniappe's generated
-browser bundles for release 0.2. Exact package versions are recorded in
+browser bundles for release 0.1. Exact package versions are recorded in
 `package-lock.json`. Packages installed only for development are not part of
 the distributed browser code.
 

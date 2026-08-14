@@ -292,8 +292,18 @@ def test_set_public_permissions(get_user):
 
     anonymous = get_user(Users.ANONYMOUS)
     login_page = anonymous.go(SitePages.LOGIN_PAGE)
-    expect(anonymous.locate(login_page.EMAIL_CHECK_FORM)).to_be_visible()
-    expect(anonymous.locate(login_page.SIGN_IN_FORM)).not_to_be_visible()
+    auth_method = anonymous.locate(login_page.AUTH_METHOD_FORM)
+    expect(auth_method).to_be_visible()
+    auth_method.locator("[data-role='show-email-check']").click()
+    email_check = anonymous.locate(login_page.EMAIL_CHECK_FORM)
+    expect(email_check).to_be_visible()
+    email_check.locator("input[type='email']").fill(
+        f"closed-public-{uuid4().hex}@example.test"
+    )
+    with anonymous.page.expect_response("**/users/check-user-status?**"):
+        email_check.locator(Buttons.SIGNIN).click()
+    expect(anonymous.locate(login_page.SIGN_IN_FORM)).to_be_visible()
+    expect(anonymous.locate(login_page.FIRST_TIME_SETUP_FORM)).not_to_be_visible()
 
     try:
         permissions_form.set(Site.PUBLIC, Levels.TRUE)
@@ -304,10 +314,18 @@ def test_set_public_permissions(get_user):
 
         anonymous = get_user(Users.ANONYMOUS)
         login_page = anonymous.go(SitePages.LOGIN_PAGE)
-        sign_in = anonymous.locate(login_page.SIGN_IN_FORM)
-        expect(sign_in).to_be_visible()
-        expect(sign_in.locator("button[data-role='switch-to-create']")).to_be_visible()
-        expect(anonymous.locate(login_page.EMAIL_CHECK_FORM)).not_to_be_visible()
+        auth_method = anonymous.locate(login_page.AUTH_METHOD_FORM)
+        expect(auth_method).to_be_visible()
+        auth_method.locator("[data-role='show-email-check']").click()
+        email_check = anonymous.locate(login_page.EMAIL_CHECK_FORM)
+        expect(email_check).to_be_visible()
+        email_check.locator("input[type='email']").fill(
+            f"open-public-{uuid4().hex}@example.test"
+        )
+        with anonymous.page.expect_response("**/users/check-user-status?**"):
+            email_check.locator(Buttons.SIGNIN).click()
+        expect(anonymous.locate(login_page.FIRST_TIME_SETUP_FORM)).to_be_visible()
+        expect(anonymous.locate(login_page.SIGN_IN_FORM)).not_to_be_visible()
     finally:
         user_index = owner.go(SitePages.USER_INDEX)
         public_form = user_index.public_permissions_form

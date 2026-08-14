@@ -145,6 +145,9 @@ def test_two_users_see_document_edits_without_reload(
     assert remote_revision["author"] == owner.entity.name
     assert remote_revision["title"] == f"Edited by {owner.entity.name}"
     assert remote_revision["label"] == owner.entity.name
+    expect(
+        collaborator_editor.text_entry.locator(".remote-change-flash")
+    ).to_have_count(0, timeout=3000)
 
     owner.go(project)
     expect(project.editor.text_entry).to_contain_text(text)
