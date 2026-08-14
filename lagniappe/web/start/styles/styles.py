@@ -187,7 +187,7 @@ STYLES = {
 		"view": "grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 w-full p-4 sm:pb-0 sm:pt-6 lg:pt-8 sm:px-6 lg:px-8 mx-auto max-w-7xl"
 	},
 	"note": {
-		"section": "mt-4 flex flex-col gap-4",
+		"section": "page-note-section mt-4 flex flex-col gap-4",
 		"form": {
 			"home": "group/form flex flex-col gap-5 rounded-md bg-note-bg p-4 outline-2 outline-note-default shadow-sm",
 			"page": "group/form flex w-full flex-col gap-5 rounded-md bg-note-bg p-4 outline-2 outline-note-default shadow-sm sm:p-5"

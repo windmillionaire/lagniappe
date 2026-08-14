@@ -114,7 +114,7 @@ vm.runInContext(source, context);
     }
   }
 
-  await settings._setOpenSection("site-image");
+  await settings._toggleSection("site-image");
   const image = widgets.get("SiteImage");
   if (image.openedCount !== 1 || storage.get("lagniappe:site-settings-section") !== "site-image") {
     throw new Error("Opening Site Image did not persist state or invoke its lifecycle hook");
@@ -123,7 +123,7 @@ vm.runInContext(source, context);
     throw new Error("Opening one section did not close the prior section");
   }
 
-  await settings._setOpenSection(null);
+  await settings._toggleSection("site-image");
   if (storage.has("lagniappe:site-settings-section") || sections.some((section) => section.dataset.open === "true")) {
     throw new Error("Collapsing the active section did not clear persisted state");
   }

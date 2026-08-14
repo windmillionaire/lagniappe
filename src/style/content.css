@@ -133,6 +133,11 @@
    LIST ITEMS
    ========================================================================== */
 
+/* @style note.section */
+.page-note-section:not(:has(> [data-visible="true"])) {
+	display: none;
+}
+
 /* @style list.container */
 li[lp-component][data-open="false"] {
 	@media (min-width: 640px) {

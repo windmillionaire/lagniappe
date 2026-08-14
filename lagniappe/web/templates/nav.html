@@ -138,7 +138,10 @@
                      aria-label="Search">
             </div>
           </form>
-          <div data-role="offline" class="size-8" data-visible="false">
+          <div data-role="offline"
+               class="size-8"
+               data-visible="false"
+               aria-hidden="true">
             <span class="grid place-items-center size-full">{{ render_icon("offline", "icon-2xl text-white") }}</span>
           </div>
           {%- if current_user.is_authenticated -%}
@@ -146,6 +149,8 @@
             <button class="{{ styles.nav.link }}"
                     data-role="notifications"
                     data-visible="false"
+                    aria-hidden="true"
+                    tabindex="-1"
                     aria-label="Notifications: 0">
               <div class="size-8 rounded-full bg-white">
                 <span class="grid size-full place-items-center text-base font-bold"

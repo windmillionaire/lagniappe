@@ -1,5 +1,6 @@
 import { captureError } from "./errors";
 import { createIcon } from "./icons";
+import { withTransition } from "./utilities";
 
 /**
  * @testable false
@@ -105,7 +106,11 @@ export class DeferredOperationManager {
 			this.unsubscribers.delete(previous);
 			this._ignore(previous);
 		}
-		if (decorationNode) this.decorate(decorationNode, key);
+		if (decorationNode) {
+			void withTransition(() => this.decorate(decorationNode, key), {
+				label: "deferred-operation:decorate",
+			});
+		}
 		const current = this.operations.get(key);
 		const incomingRevision = operationRevision(revision);
 		const resolvedRevision = Number.isInteger(incomingRevision)

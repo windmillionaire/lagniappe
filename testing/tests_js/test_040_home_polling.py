@@ -34,7 +34,11 @@ class Core {
   async reconcilePollingSubscriptions() {}
   destroy() { this.coreDestroyed = true; }
 }
-const context = { console, Core };
+const context = {
+  console,
+  Core,
+  withTransition(callback) { return callback(); },
+};
 context.globalThis = context;
 vm.createContext(context);
 let source = fs.readFileSync("src/script/views/home.mjs", "utf8");

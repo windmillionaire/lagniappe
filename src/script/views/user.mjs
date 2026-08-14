@@ -156,16 +156,20 @@ export default class Users extends EntityIndex {
 		const groups = this.getComponent(groupsElt);
 		if (!groups) return;
 
-		await withTransition(async () => {
-			await groups.activate("nav");
-			Object.entries(groups.widgets).forEach(([key, widget]) => {
-				if (!groups.elt.contains(widget.target)) {
-					widget.destroy();
-					delete groups.widgets[key];
-				}
-			});
-			groups.render(true);
-		});
+		await groups.activate("nav");
+		await groups.prepareRender(true);
+		await withTransition(
+			() => {
+				Object.entries(groups.widgets).forEach(([key, widget]) => {
+					if (!groups.elt.contains(widget.target)) {
+						widget.destroy();
+						delete groups.widgets[key];
+					}
+				});
+				groups.render(true);
+			},
+			{ label: "users:refresh-groups" },
+		);
 	}
 
 	/**
@@ -210,13 +214,16 @@ export default class Users extends EntityIndex {
 		);
 		if (!body) return;
 
-		await withTransition(async () => {
-			this.elt.dataset.userMode = mode;
-			this._replaceUserRows(table, body, route);
-			this._syncPublicModeControls();
-			this._setCreateUserAvailability();
-			await table.render(true);
-		});
+		await withTransition(
+			() => {
+				this.elt.dataset.userMode = mode;
+				this._replaceUserRows(table, body, route);
+				this._syncPublicModeControls();
+				this._setCreateUserAvailability();
+				table.render(true);
+			},
+			{ label: "users:change-index-mode" },
+		);
 	}
 
 	/**
@@ -227,6 +234,7 @@ export default class Users extends EntityIndex {
 	_replaceUserRows(table, body, route = null) {
 		const refreshRoute = route || body.dataset.route;
 		if (refreshRoute) body.dataset.route = refreshRoute;
+		body.setAttribute("loaded", "");
 
 		const oldBody = table.elt.querySelector("tbody[data-widget='IndexTable']");
 		oldBody?.replaceWith(body);

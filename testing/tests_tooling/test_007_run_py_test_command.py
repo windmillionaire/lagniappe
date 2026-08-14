@@ -143,8 +143,8 @@ def test_traceability_result_plugin_merges_focused_results_without_session_histo
 ):
     tests_root = tmp_path / "testing/tests_unit"
     tests_root.mkdir(parents=True)
-    (tests_root / "test_a.py").write_text("")
-    (tests_root / "test_b.py").write_text("")
+    (tests_root / "test_a.py").write_text("def test_a():\n    pass\n")
+    (tests_root / "test_b.py").write_text("def test_b():\n    pass\n")
     generated_at = "2026-01-01T00:00:00+00:00"
     monkeypatch.setattr(
         traceability_results,
@@ -284,8 +284,8 @@ def test_traceability_result_plugin_keeps_other_tests_across_tree_changes(
 ):
     tests_root = tmp_path / "testing/tests_unit"
     tests_root.mkdir(parents=True)
-    (tests_root / "test_a.py").write_text("")
-    (tests_root / "test_b.py").write_text("")
+    (tests_root / "test_a.py").write_text("def test_a():\n    pass\n")
+    (tests_root / "test_b.py").write_text("def test_b():\n    pass\n")
     generated_times = iter(
         [
             "2026-01-01T00:00:00+00:00",
@@ -332,8 +332,8 @@ def test_traceability_result_plugin_prunes_deleted_test_modules(monkeypatch, tmp
     tests_root.mkdir(parents=True)
     deleted_path = tests_root / "test_deleted.py"
     retained_path = tests_root / "test_retained.py"
-    deleted_path.write_text("")
-    retained_path.write_text("")
+    deleted_path.write_text("def test_deleted():\n    pass\n")
+    retained_path.write_text("def test_retained():\n    pass\n")
     snapshots = iter(
         [
             (
@@ -380,13 +380,57 @@ def test_traceability_result_plugin_prunes_deleted_test_modules(monkeypatch, tmp
     }
 
 
+def test_traceability_result_plugin_prunes_deleted_test_functions(
+    monkeypatch, tmp_path
+):
+    tests_root = tmp_path / "testing/tests_unit"
+    tests_root.mkdir(parents=True)
+    module = tests_root / "test_example.py"
+    module.write_text(
+        "def test_removed():\n    pass\n\n"
+        "def test_retained():\n    pass\n"
+    )
+    snapshots = iter(
+        [
+            ("snapshot-one", {"testing/tests_unit/test_example.py": "old"}),
+            ("snapshot-two", {"testing/tests_unit/test_example.py": "current"}),
+        ]
+    )
+    monkeypatch.setattr(
+        traceability_results, "behavior_snapshot", lambda repo_root: next(snapshots)
+    )
+    removed = "tests_unit/test_example.py::test_removed"
+    retained = "tests_unit/test_example.py::test_retained"
+    traceability_results._write_manifest(
+        tmp_path,
+        ["run.py", "test", "testing/tests_unit"],
+        {
+            removed: {"outcome": "passed", "duration": 0.1},
+            retained: {"outcome": "passed", "duration": 0.1},
+        },
+        0,
+    )
+
+    module.write_text("def test_retained():\n    pass\n")
+    traceability_results._write_manifest(
+        tmp_path,
+        ["run.py", "test", retained],
+        {retained: {"outcome": "passed", "duration": 0.1}},
+        0,
+    )
+
+    payload = json.loads((tmp_path / "testing/evidence/latest.json").read_text())
+    assert set(payload["tests"]) == {retained}
+    assert set(payload["snapshots"]) == {"snapshot-two"}
+
+
 def test_traceability_result_plugin_migrates_legacy_snapshot_maps(
     monkeypatch, tmp_path
 ):
     tests_root = tmp_path / "testing/tests_unit"
     tests_root.mkdir(parents=True)
-    (tests_root / "test_a.py").write_text("")
-    (tests_root / "test_b.py").write_text("")
+    (tests_root / "test_a.py").write_text("def test_a():\n    pass\n")
+    (tests_root / "test_b.py").write_text("def test_b():\n    pass\n")
     destination = tmp_path / "testing/evidence/latest.json"
     destination.parent.mkdir(parents=True)
     destination.write_text(

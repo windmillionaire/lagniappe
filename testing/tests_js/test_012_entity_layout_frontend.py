@@ -79,9 +79,16 @@ const tabsElement = new FakeElement("tabs", {{ visible: "false" }});
 const desktopNav = new FakeElement("desktop-nav");
 const mobileNav = new FakeElement("mobile-nav");
 const infoElement = new FakeElement("info", {{ tab: "true" }});
+const photoElement = new FakeElement("photo", {{
+  attribute: "photo",
+  persistent: "false",
+  tab: "true",
+  visible: "false",
+}});
 
 tabsElement.navElement = desktopNav;
 tabsElement.appendChild(infoElement);
+layout.appendChild(photoElement);
 root.appendChild(layout);
 root.appendChild(tabsElement);
 root.appendChild(mobileNav);
@@ -93,17 +100,21 @@ const byId = new Map([
   [desktopNav.id, desktopNav],
   [mobileNav.id, mobileNav],
   [infoElement.id, infoElement],
+  [photoElement.id, photoElement],
 ]);
 
 root.querySelector = (selector) => {{
   if (selector === "#tabs") return tabsElement;
   if (selector === "#layout") return layout;
+  if (selector === "#photo") return photoElement;
   if (selector === "[lp-nav][data-nav='mobile']") return mobileNav;
   return null;
 }};
 
 root.querySelectorAll = (selector) => {{
-  if (selector === "[lp-component][data-tab='true']") return [infoElement];
+  if (selector === "[lp-component][data-tab='true']") {{
+    return [infoElement, photoElement];
+  }}
   return [];
 }};
 
@@ -158,13 +169,12 @@ class FakeComponent {{
     events.push(`${{this.name}}:activate:${{show}}`);
   }}
 
-  async render(visible) {{
+  async prepareRender(visible) {{
+    events.push(`${{this.name}}:prepare:${{visible}}`);
+  }}
+
+  render(visible) {{
     events.push(`${{this.name}}:render:${{visible}}`);
-    if (this.name === "info" && !this.view._nestedLayoutStarted) {{
-      this.view._nestedLayoutStarted = true;
-      await this.view._renderLayoutBody();
-      events.push("outer-render-resumed");
-    }}
   }}
 }}
 
@@ -247,15 +257,16 @@ def test_entity_layout_ignores_already_consumed_reconcile_callback(run_node):
         run_node,
         """
 const view = new context.Entity(root);
-await view._renderLayoutBody();
+const outer = await view._prepareLayoutBody();
+const inner = await view._prepareLayoutBody();
+await context.withTransition(() => {
+  view._commitLayoutBody(inner);
+  view._commitLayoutBody(outer);
+});
 
 const renders = events.filter((event) => event === "info:render:true").length;
 if (renders !== 2) {
   throw new Error(`Expected nested and outer tab renders, got ${renders}`);
-}
-
-if (!events.includes("outer-render-resumed")) {
-  throw new Error(`Expected outer render to resume: ${events.join(",")}`);
 }
 
 if (layout.dataset.visible !== "true") {
@@ -276,7 +287,7 @@ if (tabs.reconcile !== null) {
 # @pair startup:view-ready
 # @features entity-layout startup
 # @dimensions structural-selection initial-transition atomic-enhancement
-def test_initial_entity_layout_keeps_tab_and_widget_in_one_transition(run_node):
+def test_initial_entity_layout_prepares_widget_before_one_transition(run_node):
     run_entity_layout_check(
         run_node,
         """
@@ -296,17 +307,69 @@ const initializing = view.init();
 await activationStarted;
 
 if (
-  layout.dataset.visible !== "true" ||
-  tabsElement.dataset.visible !== "true" ||
-  infoElement.dataset.visible !== "true"
+  layout.dataset.visible === "true" ||
+  tabsElement.dataset.visible === "true" ||
+  infoElement.dataset.visible === "true"
 ) {
-  throw new Error("Entity tab selection was not included before widget activation");
+  throw new Error("Entity tab selection committed before widget preparation");
 }
-if (context.transitionCalls() !== 1 || !activationTransitioned) {
-  throw new Error("Initial tab selection and widget activation did not share one transition");
+if (context.transitionCalls() !== 0 || activationTransitioned) {
+  throw new Error("Widget activation ran inside the visual transition");
 }
 
 resolveActivation();
 await initializing;
+if (
+  context.transitionCalls() !== 1 ||
+  layout.dataset.visible !== "true" ||
+  tabsElement.dataset.visible !== "true" ||
+  infoElement.dataset.visible !== "true"
+) {
+  throw new Error("Prepared entity layout was not committed in one transition");
+}
+""",
+    )
+
+
+# @pair entity-layout:dynamic-secondary
+def test_dynamic_mobile_secondary_uses_final_layout_state(run_node):
+    run_entity_layout_check(
+        run_node,
+        """
+const view = new context.Entity(root);
+view.mobile = true;
+Object.defineProperty(view, "secondaryCard", {
+  get() {
+    return root.dataset.secondary === "true" ? photoElement : null;
+  },
+});
+
+await view.updateLayout({
+  activeTabId: "photo",
+  secondary: photoElement,
+  secondaryActive: true,
+});
+
+if (photoElement.parentElement !== tabsElement) {
+  throw new Error("Dynamic secondary card was not moved into the mobile tabs card");
+}
+if (
+  photoElement.dataset.visible !== "true" ||
+  photoElement.dataset.persistent !== "false"
+) {
+  throw new Error("Dynamic secondary card did not acquire mobile tab visibility");
+}
+if (infoElement.dataset.visible !== "false") {
+  throw new Error("Previous mobile tab remained visible beside the secondary card");
+}
+
+await view.updateLayout({ activeTabId: "info" });
+
+if (photoElement.dataset.visible !== "false") {
+  throw new Error("Dynamic secondary card remained visible after selecting another tab");
+}
+if (infoElement.dataset.visible !== "true") {
+  throw new Error("Standard mobile tab did not recover after leaving the secondary card");
+}
 """,
     )

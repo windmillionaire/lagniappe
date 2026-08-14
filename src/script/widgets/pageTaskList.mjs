@@ -1,4 +1,5 @@
 import { BaseList } from "../elements/base/baseList";
+import { withTransition } from "../shared";
 
 /**
  * @testable true
@@ -11,11 +12,12 @@ import { BaseList } from "../elements/base/baseList";
  * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_completed_only_task_list_hides_empty_marker
  * @tests tests_js/test_028_form_state_split.py::test_task_list_refresh_preserves_rows_with_local_form_state
  * @tests tests_js/test_028_form_state_split.py::test_task_list_reconcile_deduplicates_created_row_already_added_by_refresh
+ * @tests tests_js/test_028_form_state_split.py::test_task_list_initial_reconciliation_publishes_list_visibility
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_task_collection_refresh_preserves_active_form_for_revision_review
  * @tests tests_js/test_028_form_state_split.py::test_task_list_empty_marker_requires_closed_create_form_and_no_tasks
  * @tests tests_js/test_028_form_state_split.py::test_task_list_reconciliation_rejects_incomplete_structure
  * @features tasks
- * @dimensions readonly assignee permission-gates refresh update-state stale-widget create while-open list-state dedupe unsaved-marker active-form-preservation dirty-form-preservation
+ * @dimensions readonly assignee permission-gates refresh update-state stale-widget create while-open list-state dedupe unsaved-marker active-form-preservation dirty-form-preservation initial-render
  * @pair tasks:active-form-preservation
  * @pair tasks:dirty-form-preservation
  * @pairs tasks:completed-only tasks:empty-state tasks:create-close
@@ -143,12 +145,17 @@ export class PageTaskList extends BaseList {
 		const task = this.view.getComponent(taskElt);
 		if (!task) return false;
 
-		if (this.completedTasks.contains(taskElt)) {
-			this._openCompletedTasks();
-		}
+		const revealCompleted = this.completedTasks.contains(taskElt);
 		await task.activate("default");
-		await task.render(true);
-		taskElt.scrollIntoView({ behavior: "smooth", block: "start" });
+		await task.prepareRender(true);
+		await withTransition(
+			() => {
+				if (revealCompleted) this._openCompletedTasks();
+				task.render(true);
+			},
+			{ label: "page-tasks:focus" },
+		);
+		taskElt.scrollIntoView({ behavior: "auto", block: "start" });
 		return true;
 	}
 
@@ -256,7 +263,7 @@ export class PageTaskList extends BaseList {
 	 * @testable infrastructure
 	 * @covered-by src/script/views/base/core.mjs::Core._refreshCollectionComponents
 	 */
-	async refreshDelta(delta) {
+	async prepareRefreshDelta(delta) {
 		const existing = new Map(
 			Array.from(
 				this.target.querySelectorAll("li[lp-entity][data-kind='task']"),
@@ -279,37 +286,45 @@ export class PageTaskList extends BaseList {
 			else this._added.push(task);
 		}
 
-		await this.postreconcile();
+		await this.prereconcile();
+		return () => {
+			this.postreconcile();
 
-		const refreshed = new Map(
-			Array.from(
-				this.target.querySelectorAll("li[lp-entity][data-kind='task']"),
-				(task) => [task.dataset.key, task],
-			),
-		);
-		for (const key of delta.order || []) {
-			const task = refreshed.get(key);
-			if (!task) {
-				throw new Error("Page-task refresh order references a missing row");
+			const refreshed = new Map(
+				Array.from(
+					this.target.querySelectorAll("li[lp-entity][data-kind='task']"),
+					(task) => [task.dataset.key, task],
+				),
+			);
+			for (const key of delta.order || []) {
+				const task = refreshed.get(key);
+				if (!task) {
+					throw new Error("Page-task refresh order references a missing row");
+				}
+				const list =
+					task.dataset.completed === "true"
+						? this.completedTasks
+						: this.activeTasks;
+				list.append(task);
 			}
-			const list =
-				task.dataset.completed === "true"
-					? this.completedTasks
-					: this.activeTasks;
-			list.append(task);
-		}
 
-		this.target.querySelectorAll("li[data-role='empty']").forEach((empty) => {
-			empty.remove();
-		});
-		this._isEmpty = (delta.order || []).length === 0;
-		if (this._isEmpty && delta.empty) {
-			const template = document.createElement("template");
-			template.innerHTML = delta.empty.trim();
-			const empty = template.content.querySelector("li[data-role='empty']");
-			if (empty) this.activeTasks.append(empty);
-		}
-		this._setListVisibility();
+			this.target.querySelectorAll("li[data-role='empty']").forEach((empty) => {
+				empty.remove();
+			});
+			this._isEmpty = (delta.order || []).length === 0;
+			if (this._isEmpty && delta.empty) {
+				const template = document.createElement("template");
+				template.innerHTML = delta.empty.trim();
+				const empty = template.content.querySelector("li[data-role='empty']");
+				if (empty) this.activeTasks.append(empty);
+			}
+			this._setListVisibility();
+		};
+	}
+
+	async refreshDelta(delta) {
+		const commit = await this.prepareRefreshDelta(delta);
+		commit();
 	}
 
 	updated(response) {
@@ -334,9 +349,15 @@ export class PageTaskList extends BaseList {
 	 * @features tasks
 	 * @dimensions refresh update-state
 	 */
-	async refresh(response) {
+	async prepareRefresh(response) {
 		if (!this._queueRefresh(response)) return;
-		await this.postreconcile();
+		await this.prereconcile();
+		return () => this.postreconcile();
+	}
+
+	async refresh(response) {
+		const commit = await this.prepareRefresh(response);
+		commit?.();
 	}
 
 	_queueRefresh(response) {
@@ -418,11 +439,7 @@ export class PageTaskList extends BaseList {
 		});
 	}
 
-	async postreconcile() {
-		if (this.component.active?.name === "CreateTask") {
-			this._closeOpenTasks();
-		}
-
+	async prereconcile() {
 		const needsRefresh = this.activeCount > 0 || this.completedCount > 0;
 		const hasUpdated = this._updated.length > 0;
 		if (hasUpdated) {
@@ -431,55 +448,100 @@ export class PageTaskList extends BaseList {
 				html.append(...this._updated);
 				this._queueRefresh({ html });
 			} else {
-				this.target.replaceChildren(...this._updated);
+				this._replaceAll = [...this._updated];
 			}
 		}
 		this._updated = [];
 
+		this._removed = this._removed.filter((elt) => {
+			const component = this.view.getComponent(elt);
+			return !this._hasPendingLocalFormState(component);
+		});
+
+		this._preparedReplacements = [];
+		for (const { from, to } of this._replaced) {
+			const current = this.view.getComponent(from);
+			if (this._hasPendingLocalFormState(current, to)) continue;
+			const open = this._restorableWidgetName(to, current?.open);
+			const replacement = this.view.getComponent(to);
+			if (current?.key) this.view.components[current.key] = current;
+			if (replacement && open) {
+				await replacement.activate(open);
+				await replacement.prepareRender(true);
+			}
+			this._preparedReplacements.push({
+				current,
+				from,
+				replacement,
+				to,
+			});
+		}
+		this._replaced = [];
+
+		this._preparedCreated = [];
+		for (const elt of this._created) {
+			const pendingAdded = this._added.some((added) => {
+				return (
+					(elt.dataset.key && added.dataset.key === elt.dataset.key) ||
+					(elt.id && added.id === elt.id)
+				);
+			});
+			if (pendingAdded || this._existingTask(elt)) continue;
+
+			const newTask = this.view.getComponent(elt);
+			const hasForm = newTask.elt.dataset.default === "TaskForm";
+			if (hasForm) {
+				await newTask.activate("TaskForm");
+				await newTask.prepareRender(true);
+			}
+			this._preparedCreated.push({ hasForm, newTask, elt });
+		}
+		this._created = [];
+	}
+
+	postreconcile() {
+		if (this.component.active?.name === "CreateTask") {
+			this._closeOpenTasks();
+		}
+
+		if (this._replaceAll) {
+			this.target.replaceChildren(...this._replaceAll);
+			this._replaceAll = null;
+		}
+
 		for (const elt of this._removed) {
 			const component = this.view.getComponent(elt);
-			if (this._hasPendingLocalFormState(component)) continue;
 			component?.destroy?.();
 			elt.remove();
 		}
 		this._removed = [];
 
-		for (const { from, to } of this._replaced) {
-			let component = this.view.getComponent(from);
-			if (this._hasPendingLocalFormState(component, to)) continue;
-			const open = this._restorableWidgetName(to, component?.open);
+		for (const { current, from, replacement, to } of this
+			._preparedReplacements || []) {
 			from.replaceWith(to);
-			component?.destroy?.();
-			component = this.view.getComponent(to);
-			if (component && open) {
-				await component.activate(open);
-				await component.render(true);
+			current?.destroy?.();
+			if (replacement) {
+				this.view.components[replacement.key] = replacement;
+				if (replacement.active) replacement.render(true);
 			}
 			this._moveTaskIfNecessary(to);
 		}
-		this._replaced = [];
+		this._preparedReplacements = [];
 
 		for (const elt of this._added) {
 			this._moveTaskIfNecessary(elt);
 		}
 		this._added = [];
 
-		for (const elt of this._created) {
-			if (this._existingTask(elt)) continue;
-
+		for (const { hasForm, newTask, elt } of this._preparedCreated || []) {
 			this.activeTasks.prepend(elt);
 			this.view.addFlash(elt);
-			const newTask = this.view.getComponent(elt);
-			const hasForm = newTask.elt.dataset.default === "TaskForm";
-			if (hasForm) {
-				await newTask.activate("TaskForm");
-				await newTask.render(true);
-			}
+			if (hasForm) newTask.render(true);
 		}
-		this._created = [];
+		this._preparedCreated = [];
 
-		this._setListVisibility();
 		this.target.setAttribute("loaded", "");
+		this._setListVisibility();
 	}
 
 	_closeOpenTasks() {

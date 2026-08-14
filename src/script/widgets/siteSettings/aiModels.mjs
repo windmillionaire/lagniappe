@@ -1,6 +1,6 @@
 import { buttons } from "../../elements/buttons";
 import { SelectBox } from "../../elements/combobox";
-import { request } from "../../shared";
+import { request, withTransition } from "../../shared";
 import { SiteSetting } from "./base";
 
 /**
@@ -175,7 +175,12 @@ export class SiteAiModels extends SiteSetting {
 
 		this._aiSettings = response.ai_settings;
 		this._aiModelOptions = response.ai_model_options;
-		this._renderAiSettings(response.ai_settings, response.ai_model_options);
-		this.aiButton.deactivate();
+		await withTransition(
+			() => {
+				this._renderAiSettings(response.ai_settings, response.ai_model_options);
+				this.aiButton.deactivate();
+			},
+			{ label: "site-settings:save-ai-models" },
+		);
 	}
 }

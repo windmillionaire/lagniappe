@@ -1077,6 +1077,7 @@ def test_site_settings_is_owner_only(get_user, browser_failures):
 # @features admin
 # @dimensions site-settings sections configuration-modal environment-variables service-providers external-links
 # @pairs admin:configuration-display admin:recovery-export admin:secrets admin:web-headers
+# @pair admin:configuration-modal
 # @template home/admin.html::main
 # @template home/site_settings.html::site_settings
 def test_site_settings_sections_expand_help_and_configuration(get_user):

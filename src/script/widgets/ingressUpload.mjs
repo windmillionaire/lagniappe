@@ -45,9 +45,9 @@ export class IngressFileUpload extends BaseUpload {
 		this.createdFile = true;
 	}
 
-	async postreconcile() {
+	postreconcile() {
 		if (this.createdFile) {
-			await super.reset();
+			super.reset();
 			this.visible = false;
 			this.target.dataset.visible = "false";
 			this.createdFile = false;

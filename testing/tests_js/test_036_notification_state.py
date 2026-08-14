@@ -2,7 +2,7 @@
 
 
 # @features notifications
-# @dimensions badge redis-projection cold-seed response-header
+# @dimensions badge redis-projection cold-seed response-header accessible-state
 def test_notification_state_updates_badge_and_reports_cache_miss(run_node):
     run_node(
         r"""
@@ -73,6 +73,8 @@ if (
   context.window.__NOTIFICATION_STATE__?.revision !== 4 ||
   count.textContent !== "3" ||
   button.dataset.visible !== "true" ||
+  button.attributes["aria-hidden"] !== "false" ||
+  button.tabIndex !== 0 ||
   button.attributes["aria-label"] !== "Notifications: 3"
 ) {
   throw new Error("Warm notification state did not update the badge");

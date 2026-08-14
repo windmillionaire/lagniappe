@@ -1,7 +1,7 @@
 import { STYLES } from "styles";
 import { BaseList } from "../../elements/base/baseList";
 import { Dropdown } from "../../elements/combobox";
-import { request } from "../../shared";
+import { request, withTransition } from "../../shared";
 import { setIcon } from "../../shared/icons";
 
 /**
@@ -255,8 +255,12 @@ export class HomeTaskList extends BaseList {
 
 	handleOfflineQueue({ phase, queue, record }) {
 		if (phase === "queued") return this._offlineQueued(record, queue);
-		if (phase === "cancelled") this._offlineCancelled(record);
-		if (phase === "replayed" && record.kind === "task") this._syncList();
+		if (phase === "cancelled") return this._offlineCancelled(record);
+		if (phase === "replayed" && record.kind === "task") {
+			return withTransition(() => this._syncList(), {
+				label: "home:task-replayed",
+			});
+		}
 	}
 
 	_offlineQueued(record, queue) {
@@ -269,18 +273,28 @@ export class HomeTaskList extends BaseList {
 		}
 
 		if (record.kind === "task" && record.action === "complete") {
-			this._removeTaskByKey(record.target_key);
-			this._syncList();
-			this._updateUserTaskCountOffline(-1);
+			return withTransition(
+				() => {
+					this._removeTaskByKey(record.target_key);
+					this._syncList();
+					this._updateUserTaskCountOffline(-1);
+				},
+				{ label: "home:task-complete-offline" },
+			);
 		}
 	}
 
 	_offlineCancelled(record) {
 		if (record.kind !== "task" || record.action !== "create") return;
 
-		this._removeTaskByKey(record.client_key);
-		this._syncList();
-		this._updateUserTaskCountOffline(-1);
+		return withTransition(
+			() => {
+				this._removeTaskByKey(record.client_key);
+				this._syncList();
+				this._updateUserTaskCountOffline(-1);
+			},
+			{ label: "home:task-cancel-offline" },
+		);
 	}
 
 	/**
@@ -337,19 +351,9 @@ export class HomeTaskList extends BaseList {
 			return;
 		}
 
-		if (response.removed) {
-			elt.remove();
-		} else if (response.html) {
-			const newTask = response.html.querySelector("[lp-entity]");
-			if (newTask) {
-				elt.remove();
-				_insertSorted(this.target, newTask);
-				this._initPostponeMenus(newTask);
-			}
-		}
-
-		this._syncList();
-		this._updateUserTaskCount(response.count);
+		await withTransition(() => this._commitTaskResponse(elt, response), {
+			label: "home:task-complete",
+		});
 	}
 
 	updated(response) {
@@ -416,6 +420,12 @@ export class HomeTaskList extends BaseList {
 			return;
 		}
 
+		await withTransition(() => this._commitTaskResponse(elt, response), {
+			label: "home:task-postpone",
+		});
+	}
+
+	_commitTaskResponse(elt, response) {
 		if (response.removed) {
 			elt.remove();
 		} else if (response.html) {

@@ -214,17 +214,23 @@ export class ExpandedTableCell {
 		return this.row.dataset.visible === "true";
 	}
 
-	toggle(hide = false) {
-		withTransition(async () => {
-			if (!this.table) await this.create();
-			const visible = hide ? true : this.visible;
-			this.row.dataset.visible = visible ? "false" : "true";
-			if (this.view.mobile && this.row.closest("[data-widget='IndexTable']")) {
-				this.row.style.display = visible ? "none" : "block";
-			}
-			this.button.dataset.open = visible ? "false" : "true";
-			this.button.setAttribute("aria-expanded", visible ? "false" : "true");
-		});
+	async toggle(hide = false) {
+		if (!this.table) await this.create();
+		await withTransition(
+			() => {
+				const visible = hide ? true : this.visible;
+				this.row.dataset.visible = visible ? "false" : "true";
+				if (
+					this.view.mobile &&
+					this.row.closest("[data-widget='IndexTable']")
+				) {
+					this.row.style.display = visible ? "none" : "block";
+				}
+				this.button.dataset.open = visible ? "false" : "true";
+				this.button.setAttribute("aria-expanded", visible ? "false" : "true");
+			},
+			{ label: "embedded-table:toggle" },
+		);
 	}
 
 	destroy() {

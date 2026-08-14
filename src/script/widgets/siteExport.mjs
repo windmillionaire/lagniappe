@@ -60,7 +60,10 @@ export class SiteExport {
 			notifications?.upsertNotification?.(response.notification);
 		}
 		if (response.html) {
-			await this.updated(response);
+			this.updated(response);
+			await withTransition(() => this.postreconcile(), {
+				label: "site-export:refresh",
+			});
 		}
 		const operations = await this.view.ensureDeferredOperations?.();
 		operations?.track(response.operation, {
@@ -69,29 +72,40 @@ export class SiteExport {
 		this.startButton.deactivate("Export Queued");
 	}
 
-	async updated(response) {
+	updated(response) {
 		const replacement = response.html?.querySelector(
 			`[data-widget='${this.name}']`,
 		);
 		if (!replacement) return;
 
-		const wasVisible = this.visible || this.target.dataset.visible === "true";
+		this._replacement = replacement;
+		this._replacementVisible =
+			this.visible || this.target.dataset.visible === "true";
+	}
+
+	prepareRefresh(response) {
+		this.updated(response);
+		return () => this.postreconcile();
+	}
+
+	refresh(response) {
+		const commit = this.prepareRefresh(response);
+		commit();
+	}
+
+	postreconcile() {
+		if (!this._replacement) return;
+		const replacement = this._replacement;
+		const visible = this._replacementVisible;
+		this._replacement = null;
 		this.destroy();
-		await withTransition(() => {
-			this.target.replaceWith(replacement);
-			this.target = replacement;
-			this.visible = wasVisible;
-			if (wasVisible) this.target.dataset.visible = "true";
-			this.target._lp_widget = this;
-			this._bind();
-		});
+		this.target.replaceWith(replacement);
+		this.target = replacement;
+		this.visible = visible;
+		if (visible) this.target.dataset.visible = "true";
+		this.target._lp_widget = this;
+		this._bind();
 	}
-
-	async refresh(response) {
-		await this.updated(response);
-	}
-
-	postreconcile() {}
 
 	_showError(message) {
 		if (!this.error) return;

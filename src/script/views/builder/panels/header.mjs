@@ -60,33 +60,41 @@ export class Header {
 	 * @features forms
 	 * @dimensions builder-preview
 	 */
-	togglePreviewPanel() {
+	async togglePreviewPanel() {
 		const active = this.previewToggle.dataset.active === "true";
 		this.previewToggle.dataset.active = active ? "false" : "true";
 		this.previewToggle.setAttribute("aria-checked", active ? "false" : "true");
 
-		withTransition(async () => {
-			if (!active) {
-				this.renderer = new Renderer({
-					target: this.previewPanel,
-					schema: this.builder.schema,
-					kind: "form",
-					key: this.builder.key,
-					submission: {},
-				});
-				await this.renderer.render();
-				this.builder.elt.dataset.expanded = "true";
-				this.previewPanel.dataset.visible = "true";
-				this.builder.conditions.hide();
-				this.builder.model.hide();
-			} else {
-				this.renderer.destroy();
-				this.renderer = null;
-				this.builder.elt.dataset.expanded = "false";
-				this.previewPanel.dataset.visible = "false";
-				this.builder.model.show();
-			}
-		});
+		let renderer = null;
+		if (!active) {
+			renderer = new Renderer({
+				target: this.previewPanel,
+				schema: this.builder.schema,
+				kind: "form",
+				key: this.builder.key,
+				submission: {},
+			});
+			await renderer.render();
+		}
+
+		await withTransition(
+			() => {
+				if (!active) {
+					this.renderer = renderer;
+					this.builder.elt.dataset.expanded = "true";
+					this.previewPanel.dataset.visible = "true";
+					this.builder.conditions.hide();
+					this.builder.model.hide();
+				} else {
+					this.renderer.destroy();
+					this.renderer = null;
+					this.builder.elt.dataset.expanded = "false";
+					this.previewPanel.dataset.visible = "false";
+					this.builder.model.show();
+				}
+			},
+			{ label: "builder:toggle-preview" },
+		);
 	}
 
 	/**

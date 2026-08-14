@@ -418,7 +418,7 @@ body.editor-focus-mode {
 
 /* Smooth transition for remote collaborative updates */
 .remote-change-flash {
-	animation: flash-fade-in 0.4s ease-in;
+	animation: flash-fade-in 160ms ease-out;
 }
 
 .remote-change-flash[data-editor-author] {

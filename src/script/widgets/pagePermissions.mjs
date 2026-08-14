@@ -1,7 +1,7 @@
 import { FacetsBox } from "../elements/combobox";
 import { FormElement } from "../elements/form";
 import { primitives } from "../elements/primitives";
-import { request } from "../shared";
+import { request, withTransition } from "../shared";
 
 /**
  * @testable true
@@ -102,8 +102,13 @@ export class PagePermissions extends FormElement {
 		const route = this.endpoints.viewAccess;
 		const response = await request.put(route, data);
 		if (response.ok) {
-			this._replaceBadges(response.viewers);
-			this._replaceGroupList(response.group_list);
+			await withTransition(
+				() => {
+					this._replaceBadges(response.viewers);
+					this._replaceGroupList(response.group_list);
+				},
+				{ label: "page-permissions:update-restrictions" },
+			);
 		}
 	}
 

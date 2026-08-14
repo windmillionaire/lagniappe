@@ -39,6 +39,40 @@ authenticated lifecycle work.
 Component-capable base class for Home, entity/detail views, indexes, Report, and
 Admin. `getView()` creates it through the stable entry in `viewRegistry.mjs`.
 
+### Transition and DOM commit policy
+
+Noticeable structural DOM changes use one of two boundaries:
+
+- document navigation uses the CSS View Transition opt-in in `motion.css`;
+- in-page changes use `withTransition()` and a synchronous commit callback.
+
+`withTransition()` batches calls made in the same microtask into one browser
+transition, executes every queued callback exactly once, and resolves after the
+browser's update callback completes. It deliberately does not wait for the
+visual animation to finish. Nested calls join the active commit, unsupported
+browsers run the same callbacks directly, and a skipped browser transition is
+observed without replaying its DOM work. Labels identify slow commits in
+development diagnostics.
+
+Network requests, dynamic imports, detached rendering, widget activation, and
+other awaited preparation happen before `withTransition()`. Its callback may
+only apply already-prepared connected-DOM changes. This keeps the old snapshot
+from being held while asynchronous work runs and prevents partially committed
+widgets from appearing between frames.
+
+`motion.css` keeps root navigation and nav snapshots instant, with no crossfade.
+Collection rows deliberately do not receive independent transition snapshots:
+their old images can otherwise outlive a collapsing widget and briefly overlay
+the following content. Conditional global nav controls leave the layout when
+hidden, while submit buttons retain a fixed leading icon slot so spinner state
+does not shift their text.
+
+Do not add transitions to high-frequency progress text, editor caret/content
+updates, pointer-driven table work, or status counters whose geometry is
+already stable. Those should update immediately. Prefer a short geometry
+transition over opacity, crossfade, smooth scrolling, or long easing when a
+structural change is visible.
+
 ### Constructor
 
 Reads `data-kind`, `data-hash`, `data-key`, and `data-readonly` from the root
@@ -212,9 +246,21 @@ the report's server-side action ledger.
 - `response.modal` → attaches a modal with the response HTML
 - `response.html` → parses the HTML string into a document for widget consumption
 
-**`update(component, data)`** -- sends PUT, then calls `component.updated(response)` inside a view transition. Deferred acknowledgements instead show the pending notification and mark the active subform successful. Offline `lp-offline` updates are queued and keep the form in `Queued Sync` state until replay.
+**`update(component, data)`** -- sends PUT, lets widgets perform awaited
+preparation, then commits component replacement, visibility, nav, and widget
+`postreconcile()` work in one view transition. Deferred acknowledgements instead
+show the pending notification and mark the active subform successful. Offline
+`lp-offline` updates are queued and keep the form in `Queued Sync` state until
+replay.
 
-**`create(component, data)`** -- sends POST, then calls `component.created(response)` inside a view transition. Offline `lp-offline` creates use the same mutation queue and optimistic destination rendering. A deferred create may return created destination HTML with `background: true`; the destination renders immediately, the source create form resets normally, and operation tracking continues without decorating that source form. Deferred creates without destination HTML retain the pending-state behavior until their operation refreshes the destination.
+**`create(component, data)`** -- sends POST, prepares source/destination widgets
+and detached form resets, then renders both components in one view transition.
+Offline `lp-offline` creates use the same mutation queue and optimistic
+destination rendering. A deferred create may return created destination HTML
+with `background: true`; the destination renders immediately, the source create
+form resets normally, and operation tracking continues without decorating that
+source form. Deferred creates without destination HTML retain the pending-state
+behavior until their operation refreshes the destination.
 
 **`load(component)`** -- sends GET (or uses a prefetched response from `window._prefetch`). Used for lazy-loading widget content.
 
@@ -327,7 +373,8 @@ Parses a `componentId:widgetName` pair from `lp-show` or `lp-close` attributes. 
 - `"default"` → shows the component's `data-default` widget
 - Toggle behavior (`data-toggle="true"`) → hides the widget if it's already showing
 
-Calls `component.activate(widgetName)` then `component.render()` inside a view transition.
+Calls `component.activate(widgetName)`, awaits `component.prepareRender()`, then
+calls synchronous `component.render()` inside a view transition.
 If the requested widget target exists, is not yet `loaded`, and has `lp-load`
 or `lp-prefetch`, the clicked trigger gets `data-loading="true"` and
 `aria-busy="true"` until activation and rendering finish. Templates can use
@@ -352,10 +399,13 @@ Extends Core for entity detail pages (project, page, file). Adds:
 - **Tab management**: Components with `data-tab="true"` are treated as tabs. The active tab is persisted in `localStorage` keyed by `data-hash`. On mobile, all tabs collapse into a shared container with a unified mobile nav. Page and project document tabs are rendered for editors or when saved document content exists, so readonly viewers do not see empty document affordances.
 - **Mobile layout**: Listens for `mobile-resize` events. On mobile, moves secondary card components into the tabs container and shows a shared `mobileNav`. On desktop, restores the original layout.
 
-Initial entity tab selection and active widget initialization stay together in
-one atomic transition. The transition contains only structural/widget work;
-polling, offline replay, and other deferred services begin after publication.
-Later tab, secondary-card, and responsive layout changes use the same path.
+Initial entity tab selection and active widget initialization are prepared
+before one atomic transition. Only the final tab, card, nav, and widget DOM
+commit runs inside the transition; polling, offline replay, and other deferred
+services begin after publication. Later tab, secondary-card, and responsive
+layout changes use the same path. When a secondary card is enabled dynamically,
+preparation uses its requested final state so mobile wiring moves it into the
+tab container and makes it non-persistent before the new layout is published.
 
 Views extending Entity: `project.mjs`, `page.mjs`, `file.mjs`.
 
@@ -430,12 +480,14 @@ Manages the widget lifecycle within a component. A component is a `[lp-component
 
 Delegates to `view.load(this)` to fetch data. Passes the response to `active.updated()`. If the response contains a new `[lp-load]` element with a different route, recursively loads again (paginated/chained loading).
 
-### `refreshCollections()`
+### `prepareCollectionRefresh()` / `refreshCollections()`
 
 Refreshes loaded widgets only when they declare `refreshScope = "collection"`.
 Widgets already reconciled by the batched `/l/refresh` manifest are skipped;
 remaining collection widgets use their normal GET/`refresh()` path. Form widgets
-are outside this contract and are reconciled by `EditWatcher`.
+are outside this contract and are reconciled by `EditWatcher`. Requests and row
+preparation happen first; the returned commit closures are applied together
+with the root fingerprint and any committed deletion inside one transition.
 
 ### `updated(response)`
 
@@ -444,23 +496,27 @@ Called after a successful PUT. Finds the component's own element in the response
 - If found, replaces the entire component element (full refresh)
 - If not found, iterates `[data-widget]` elements in the response and either calls `widget.updated()` on loaded widgets or replaces unloaded widget targets in-place
 
-Sets `this.reconcile` to a function that performs the actual DOM mutations, called later during `render()`.
+Awaits widget update preparation and `prepareRender()`, then performs component
+replacement and the synchronous render commit together inside
+`withTransition()`.
 
 ### `created(response)`
 
-Called after a successful POST. Reads `data-destination` from the active widget to find the receiving component and widget. Activates the receiver, then calls `render()` on both the source and destination components.
+Called after a successful POST. Reads `data-destination` from the active widget
+to find the receiving component and widget. It activates and prepares the
+receiver, then commits `render()` on both source and destination components in
+one transition.
 
 ### `render(visible)`
 
 The reconciliation entry point. User-initiated component changes and initial
 entity enhancement are called inside a `withTransition()`:
 
-1. Runs `this.reconcile()` if set (deferred DOM mutations from `updated`/`created`)
-2. Sets `data-visible` and `data-open` on the component element
-3. Calls `_setParentComponent()` to manage sub-component visibility
-4. Iterates all widgets and calls `widget.reconcile()` on each
-5. Updates the nav bar
-6. Schedules polling subscription ownership reconciliation as a coalesced
+1. Sets `data-visible` and `data-open` on the component element
+2. Calls `_setParentComponent()` to manage sub-component visibility
+3. Iterates all widgets and calls synchronous `widget.reconcile()` on each
+4. Updates the nav bar
+5. Schedules polling subscription ownership reconciliation as a coalesced
    background task; rendering never waits for manager or poll work
 
 ### Data Aggregation
@@ -511,7 +567,8 @@ The loader provides default implementations of `enable()`, `disable()`, and `rec
 | `init()` | async fn | One-time setup after instantiation |
 | `updated(response)` | fn | Handle server response after PUT |
 | `created(response)` | fn | Handle post-create (e.g. reset a form) |
-| `postreconcile()` | async fn | DOM manipulation after visibility is synced (runs inside the transition) |
+| `prereconcile()` | async fn | Load, initialize, or render detached state before the transition |
+| `postreconcile()` | sync fn | Commit connected-DOM manipulation after visibility is synced inside the transition |
 | `data` | FormData getter | Data to include in form submissions |
 | `showError(msg)` | fn | Display a validation error. Falls back to the component-level `showError()` if not defined. |
 | `destroy()` | fn | Cleanup listeners, teardown |
@@ -586,10 +643,12 @@ click [lp-show="tools:CreateUser"]
       → component.activate("CreateUser")
         → loadWidget(component, "CreateUser")  [first time only]
         → widget.enable()
+      → component.prepareRender()
+        → all modified widgets: prereconcile()
       → withTransition()
         → component.render(true)
           → set data-visible, data-open
-          → all widgets: reconcile()
+          → all modified widgets: postreconcile()
           → nav.reconcile()
 ```
 
@@ -602,12 +661,11 @@ submit
     → Core.create(component, data)
       → request.post(component.route, data)
       → successfulResponse(response)
+      → component.created(response)
+        → source/destination widgets: created() + prereconcile()
       → withTransition()
-        → component.created(response)
-          → active.created()           [reset the form]
-          → activate destination widget
-          → destination.created(response)
-          → render both components
+        → source/destination widgets: postreconcile()
+        → render both components
 ```
 
 ### User Submits an Update Form
@@ -619,10 +677,10 @@ submit
     → Core.update(component, data)
       → request.put(component.route, data)
       → successfulResponse(response)
+      → component.updated(response)
+        → loaded widgets: updated() + prereconcile()
       → withTransition()
-        → component.updated(response)
-          → match [data-widget] elements in response HTML
-          → widget.updated(response) for loaded widgets
-          → replace targets for unloaded widgets
-          → reconcile all, update nav
+        → replace unloaded widget targets/component fragments
+        → loaded widgets: postreconcile()
+        → reconcile visibility and nav
 ```

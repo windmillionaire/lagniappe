@@ -88,10 +88,26 @@ export class TaskForm extends FormElement {
 		await this.loadHistoryFill();
 	}
 
-	async reset() {
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/taskForm.mjs::TaskForm
+	 * @reason detached task-form resets preserve history-fill initialization
+	 */
+	async prepareReset(options = {}) {
 		this._resetHistoryFillCache();
-		await super.reset();
-		await this.loadHistoryFill();
+		const afterInit = options.afterInit;
+		await super.prepareReset({
+			...options,
+			afterInit: async (widget) => {
+				await afterInit?.(widget);
+				await widget.loadHistoryFill();
+			},
+		});
+	}
+
+	async reset() {
+		await this.prepareReset();
+		this.commitReset();
 	}
 
 	async latestHistorySubmission() {

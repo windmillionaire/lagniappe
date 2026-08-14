@@ -1,5 +1,6 @@
 import { createIcon, setIcon } from "../shared/icons";
 import { request } from "../shared/request";
+import { withTransition } from "../shared/utilities";
 import Core from "./base/core";
 
 const REPORT_FORM_SELECTOR =
@@ -268,51 +269,55 @@ export default class Report extends Core {
 	}
 
 	_showDeferredReportStatus(statusValue, message) {
-		this.elt.dataset.pending = "true";
-		this.elt.dataset.status = statusValue;
-
 		const section = this.elt.querySelector("#layout section");
 		if (!section) return;
+		void withTransition(
+			() => {
+				this.elt.dataset.pending = "true";
+				this.elt.dataset.status = statusValue;
 
-		let status = section.querySelector("[data-role='report-status']");
-		if (!status) {
-			status = document.createElement("div");
-			status.dataset.role = "report-status";
-			status.className = "flex flex-col gap-1";
+				let status = section.querySelector("[data-role='report-status']");
+				if (!status) {
+					status = document.createElement("div");
+					status.dataset.role = "report-status";
+					status.className = "flex flex-col gap-1";
 
-			const heading = document.createElement("h2");
-			heading.className = "text-base font-semibold text-base-dark";
-			heading.textContent = "Status";
+					const heading = document.createElement("h2");
+					heading.className = "text-base font-semibold text-base-dark";
+					heading.textContent = "Status";
 
-			const note = document.createElement("p");
-			note.dataset.role = "report-status-note";
-			note.className = "text-base-dark";
-			status.append(heading, note);
-			section.prepend(status);
-		}
+					const note = document.createElement("p");
+					note.dataset.role = "report-status-note";
+					note.className = "text-base-dark";
+					status.append(heading, note);
+					section.prepend(status);
+				}
 
-		const note =
-			status.querySelector("[data-role='report-status-note']") || status;
-		const spinner = createIcon("spinner", "mr-1");
-		spinner.setAttribute("aria-hidden", "true");
-		note.replaceChildren(spinner, ` ${message}`);
-		let progress = status.querySelector("[data-role='deferred-progress']");
-		if (!progress) {
-			progress = document.createElement("p");
-			progress.dataset.role = "deferred-progress";
-			progress.className = "text-sm text-base-medium";
-			const phase = document.createElement("span");
-			phase.dataset.role = "deferred-phase";
-			phase.textContent = "Waiting to start";
-			const separator = document.createElement("span");
-			separator.setAttribute("aria-hidden", "true");
-			separator.textContent = " · ";
-			const elapsed = document.createElement("span");
-			elapsed.dataset.role = "deferred-elapsed";
-			elapsed.textContent = "just now";
-			progress.append(phase, separator, elapsed);
-			status.append(progress);
-		}
+				const note =
+					status.querySelector("[data-role='report-status-note']") || status;
+				const spinner = createIcon("spinner", "mr-1");
+				spinner.setAttribute("aria-hidden", "true");
+				note.replaceChildren(spinner, ` ${message}`);
+				let progress = status.querySelector("[data-role='deferred-progress']");
+				if (!progress) {
+					progress = document.createElement("p");
+					progress.dataset.role = "deferred-progress";
+					progress.className = "text-sm text-base-medium";
+					const phase = document.createElement("span");
+					phase.dataset.role = "deferred-phase";
+					phase.textContent = "Waiting to start";
+					const separator = document.createElement("span");
+					separator.setAttribute("aria-hidden", "true");
+					separator.textContent = " · ";
+					const elapsed = document.createElement("span");
+					elapsed.dataset.role = "deferred-elapsed";
+					elapsed.textContent = "just now";
+					progress.append(phase, separator, elapsed);
+					status.append(progress);
+				}
+			},
+			{ label: "report:show-deferred-status" },
+		);
 	}
 
 	_receiveDeferredOperation(event) {
@@ -360,12 +365,17 @@ export default class Report extends Core {
 		if (!response?.ok) return;
 
 		const skipped = new Set(response.skipped || []);
-		this.elt.querySelectorAll("[data-action-index]").forEach((item) => {
-			this._setActionSkipped(
-				item,
-				skipped.has(Number(item.dataset.actionIndex)),
-			);
-		});
+		await withTransition(
+			() => {
+				this.elt.querySelectorAll("[data-action-index]").forEach((item) => {
+					this._setActionSkipped(
+						item,
+						skipped.has(Number(item.dataset.actionIndex)),
+					);
+				});
+			},
+			{ label: "report:toggle-skipped-actions" },
+		);
 	}
 
 	_setActionSkipped(item, skipped) {
@@ -392,15 +402,20 @@ export default class Report extends Core {
 		}
 	}
 
-	_toggleAccordion(button) {
+	async _toggleAccordion(button) {
 		const accordion = button.closest("[data-role='accordion']");
 		const panel = accordion?.querySelector("[data-role='accordion-panel']");
 		if (!accordion || !panel) return;
 
-		const open = accordion.dataset.open !== "true";
-		accordion.dataset.open = open ? "true" : "false";
-		button.dataset.open = accordion.dataset.open;
-		button.setAttribute("aria-expanded", open ? "true" : "false");
-		panel.dataset.visible = accordion.dataset.open;
+		await withTransition(
+			() => {
+				const open = accordion.dataset.open !== "true";
+				accordion.dataset.open = open ? "true" : "false";
+				button.dataset.open = accordion.dataset.open;
+				button.setAttribute("aria-expanded", open ? "true" : "false");
+				panel.dataset.visible = accordion.dataset.open;
+			},
+			{ label: "report:toggle-accordion" },
+		);
 	}
 }

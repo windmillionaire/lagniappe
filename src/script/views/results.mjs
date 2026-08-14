@@ -1,4 +1,5 @@
 import { request } from "../shared/request";
+import { withTransition } from "../shared/utilities";
 import ShellView from "./base/shell";
 
 /**
@@ -98,8 +99,13 @@ export default class Results extends ShellView {
 		const url = new URL(window.location.href);
 		url.searchParams.set("page", page);
 		const response = await request.get(url.toString());
-		this.updateResults(response.html);
-		window.history.pushState({}, "", url.toString());
+		await withTransition(
+			() => {
+				this.updateResults(response.html);
+				window.history.pushState({}, "", url.toString());
+			},
+			{ label: "search:paginate" },
+		);
 	}
 
 	/**
@@ -113,20 +119,25 @@ export default class Results extends ShellView {
 		e.preventDefault();
 		e.stopPropagation();
 
-		this.facets.forEach((facet) => {
-			facet.dataset.selected = "false";
-			delete facet.dataset.justSelected;
-		});
 		this.selected.clear();
-		this.updateSelectionState();
 
 		const url = new URL(window.location.href);
 		url.searchParams.delete("kind");
 		url.searchParams.delete("page");
 		const newUrl = url.toString();
 		const response = await request.get(newUrl);
-		this.updateResults(response.html);
-		window.history.pushState({}, "", newUrl);
+		await withTransition(
+			() => {
+				this.facets.forEach((facet) => {
+					facet.dataset.selected = "false";
+					delete facet.dataset.justSelected;
+				});
+				this.updateSelectionState();
+				this.updateResults(response.html);
+				window.history.pushState({}, "", newUrl);
+			},
+			{ label: "search:reset-facets" },
+		);
 	}
 
 	/**
@@ -149,21 +160,23 @@ export default class Results extends ShellView {
 		if (this.selected.has(kind)) {
 			this.selected.delete(kind);
 			url.searchParams.delete("kind", kind);
-			facet.dataset.selected = "false";
 		} else {
 			this.selected.add(kind);
 			url.searchParams.append("kind", kind);
-			facet.dataset.selected = "true";
-
-			if (!wasSelected) {
-				facet.dataset.justSelected = "true";
-			}
 		}
 
-		this.updateSelectionState();
 		const newUrl = url.toString();
 		const response = await request.get(newUrl);
-		this.updateResults(response.html);
-		window.history.pushState({}, "", newUrl);
+		await withTransition(
+			() => {
+				const selected = this.selected.has(kind);
+				facet.dataset.selected = selected ? "true" : "false";
+				if (selected && !wasSelected) facet.dataset.justSelected = "true";
+				this.updateSelectionState();
+				this.updateResults(response.html);
+				window.history.pushState({}, "", newUrl);
+			},
+			{ label: "search:change-facet" },
+		);
 	}
 }

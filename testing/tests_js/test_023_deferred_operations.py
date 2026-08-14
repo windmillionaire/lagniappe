@@ -50,6 +50,7 @@ const context = {
     constructor(type, options) { this.type = type; this.detail = options.detail; }
   },
   createIcon() { return {}; },
+  withTransition(callback) { return callback(); },
   document: {
     querySelectorAll(selector) {
       return selector === "[data-operation]" ? nodes : [];

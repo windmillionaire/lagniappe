@@ -113,6 +113,32 @@ def test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop(get_user):
     expect(desktop_photo_toggle).to_be_hidden()
 
 
+# @pairs pages:photo-prompt pages:mobile-photo-tab
+# @pair entity-layout:dynamic-secondary
+# @template pages/page.html::main
+def test_mobile_photo_prompt_rejoins_section_switching(get_user):
+    user = get_user(Users.OWNER)
+    page = user.go(Pages.test_generated_image_page)
+    attributes = Attributes(page.info_form)
+
+    attributes.set_selected("photo", False)
+    user.mobile = True
+    attributes.set_selected("photo", True)
+    prompt = _photo_prompt(page)
+
+    prompt.locator(page.PHOTO_PROMPT_UPLOAD).click()
+    photo_form = _photo_form(user)
+    photo_component = user.locate("#photo")
+    expect(user.locate("#tabs > #photo")).to_have_count(1)
+    expect(photo_component).to_have_attribute("data-persistent", "false")
+
+    document = page.mobile_nav.select_section("document")
+
+    expect(document).to_be_visible()
+    expect(photo_component).to_have_attribute("data-visible", "false")
+    expect(photo_form).to_be_hidden()
+
+
 # @features pages
 # @dimensions image-replace
 def test_replace_image_on_page(get_user):

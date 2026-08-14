@@ -239,7 +239,7 @@ export class FormRevisionModal extends Modal {
 			await this.remove();
 		});
 
-		super.attach(modal, this.widget.component);
+		await super.attach(modal, this.widget.component);
 		update.focus();
 		return true;
 	}
@@ -310,7 +310,7 @@ export class WholeFormRevisionModal extends Modal {
 			await this.remove();
 		});
 
-		super.attach(modal, this.widget.component);
+		await super.attach(modal, this.widget.component);
 		saved.focus();
 	}
 }

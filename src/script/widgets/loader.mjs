@@ -3,7 +3,8 @@
  * - target: Element - DOM element for this widget
  * - enable(): Set this.active = true,
  * - disable(): Set this.active = false, cleanup
- * - reconcile(): Sync this.visible → target.dataset.visible (in transition)
+ * - prereconcile(): Optional async preparation without connected-DOM writes
+ * - reconcile(): Sync this.visible and prepared state to the DOM (in transition)
  * - updated(response): Handle server response
  * - created(response): Post-create handling (reset forms)
  * - data: FormData getter for submissions
@@ -11,6 +12,7 @@
  */
 
 import { ENDPOINTS } from "../shared/endpoints";
+import { captureError } from "../shared/errors";
 
 const WIDGETS = {
 	BaseList: () => import("../elements/base/baseList"),
@@ -143,7 +145,7 @@ const _defineReadonly = (widget, component) => {
 		configurable: true,
 		enumerable: true,
 		get() {
-			return component.readonly || widget.target?.dataset.readonly === "true";
+			return component.readonly || this.target?.dataset.readonly === "true";
 		},
 	});
 };
@@ -187,9 +189,14 @@ export async function loadWidget(component, show, extraAttributes = {}) {
 		widget.visible = false;
 	};
 
-	// All DOM manipulation should be done here, this is wrapped in a transition
-	// it is called for each changed widget in the component's render() method
-	widget.reconcile = async (silent = false) => {
+	widget.prepareReconcile = async (silent = false) => {
+		if (!widget.modified || silent) return;
+		await widget.prereconcile?.();
+	};
+
+	// Connected-DOM manipulation is committed here inside the component's
+	// transition. Long-running work belongs in prereconcile().
+	widget.reconcile = (silent = false) => {
 		if (widget.target && !widget.persistent) {
 			widget.target.dataset.visible = widget.visible ? "true" : "false";
 		}
@@ -197,7 +204,18 @@ export async function loadWidget(component, show, extraAttributes = {}) {
 		if (!widget.modified) return;
 		widget.modified = false;
 
-		if (widget.postreconcile && !silent) await widget.postreconcile();
+		if (widget.postreconcile && !silent) {
+			const result = widget.postreconcile();
+			if (result?.then) {
+				captureError(
+					new TypeError(
+						`${widget.name}.postreconcile() must commit synchronously. Move awaited work to prereconcile().`,
+					),
+					widget.target,
+				);
+				void result.catch(captureError);
+			}
+		}
 	};
 
 	if (widget.target) widget.target._lp_widget = widget;
@@ -252,7 +270,8 @@ export async function loadRevisionPreview(
 	};
 
 	if (preview.updated) await preview.updated(previewResponse);
-	if (preview.postreconcile) await preview.postreconcile();
+	if (preview.prereconcile) await preview.prereconcile();
+	if (preview.postreconcile) preview.postreconcile();
 	return preview;
 }
 

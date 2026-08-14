@@ -94,6 +94,9 @@ event details, and captures the usual browser artifact first.
 Playwright's exact `net::ERR_ABORTED` navigation cancellations are reported in
 diagnostic output but are not treated as failures; they are browser lifecycle
 cancellation, not a completed request failing in the application.
+Chromium's exact `Transition was skipped` page error is handled the same way:
+cross-document View Transitions may be cancelled by navigation after the new
+document has already loaded successfully.
 
 When a test deliberately exercises one of those failures, scope its exact
 request or error instead of adding a global ignore:
@@ -364,8 +367,8 @@ their beginning and end and are marked with `traceback_truncated: true`.
 Unlike generated reports, this manifest is tracked. It is current evidence
 rather than a run log: it keeps one latest result per exact test nodeid and
 invocation metadata for only the newest pytest session. Each test run prunes
-results whose owning test module no longer exists while retaining unselected
-results from modules still in the tree. Its semantic snapshots use an interned
+results whose test module or source test definition no longer exists while
+retaining unselected tests still in the tree. Its semantic snapshots use an interned
 path/fingerprint table so snapshots from separate focused runs do not duplicate
 the full path strings and hashes. It excludes
 `testing/evidence/` and `.github/` from those snapshots so writing evidence or

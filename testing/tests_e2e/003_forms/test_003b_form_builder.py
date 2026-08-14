@@ -226,6 +226,8 @@ def test_field_visibility_select_multiple_values(get_user):
         builder.save_condition()
         _close_condition(builder)
 
+    assert _option_labels(builder.schema_field(color.id)) == ["Red", "Blue", "Green"]
+
     builder.add_field(notes)
     for option in ["Red", "Blue"]:
         builder.open_condition("visibility")

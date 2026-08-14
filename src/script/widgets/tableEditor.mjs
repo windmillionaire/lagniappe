@@ -35,6 +35,7 @@ export class TableEditor {
 		);
 		this.activeEdit = null;
 		this.checkboxEdits = new Map();
+		this._preparedCheckboxEdits = [];
 	}
 
 	async init() {
@@ -162,20 +163,24 @@ export class TableEditor {
 
 	async _openCheckboxes() {
 		this._cleanupCheckboxEdits();
-
-		await Promise.all(
-			this._editableCells()
-				.filter((cell) => this._isCheckboxCell(cell))
-				.map((cell) => this._openCheckbox(cell)),
-		);
+		this._preparedCheckboxEdits = (
+			await Promise.all(
+				this._editableCells()
+					.filter((cell) => this._isCheckboxCell(cell))
+					.map((cell) => this._prepareCheckbox(cell)),
+			)
+		).filter(Boolean);
+		await withTransition(() => this._commitPreparedCheckboxes(), {
+			label: "table-editor:refresh-checkboxes",
+		});
 	}
 
 	async refreshCheckboxes() {
 		if (this.visible) await this._openCheckboxes();
 	}
 
-	async _openCheckbox(cell) {
-		if (this.checkboxEdits.has(cell)) return;
+	async _prepareCheckbox(cell) {
+		if (this.checkboxEdits.has(cell)) return null;
 
 		const schema = this._schema(cell);
 		const value = this._parseValue(cell);
@@ -183,18 +188,32 @@ export class TableEditor {
 		const editor = element.cell;
 		if (!editor) {
 			element.destroy();
-			return;
+			return null;
 		}
 
-		this.checkboxEdits.set(cell, {
-			before: cell.innerHTML,
-			cell,
-			column: this._column(cell),
-			element,
-			value,
-		});
-		cell.dataset.editState = "editing";
-		cell.replaceChildren(editor);
+		return {
+			editor,
+			record: {
+				before: cell.innerHTML,
+				cell,
+				column: this._column(cell),
+				element,
+				value,
+			},
+		};
+	}
+
+	_commitPreparedCheckboxes() {
+		for (const { editor, record } of this._preparedCheckboxEdits) {
+			if (!record.cell.isConnected) {
+				record.element.destroy();
+				continue;
+			}
+			this.checkboxEdits.set(record.cell, record);
+			record.cell.dataset.editState = "editing";
+			record.cell.replaceChildren(editor);
+		}
+		this._preparedCheckboxEdits = [];
 	}
 
 	_cleanupCheckboxEdits() {
@@ -278,17 +297,20 @@ export class TableEditor {
 			return;
 		}
 
-		await withTransition(async () => {
-			cell.dataset.editState = "editing";
-			this.activeEdit = {
-				before: cell.innerHTML,
-				cell,
-				column: this._column(cell),
-				element,
-				value,
-			};
-			cell.replaceChildren(editor);
-		});
+		await withTransition(
+			() => {
+				cell.dataset.editState = "editing";
+				this.activeEdit = {
+					before: cell.innerHTML,
+					cell,
+					column: this._column(cell),
+					element,
+					value,
+				};
+				cell.replaceChildren(editor);
+			},
+			{ label: "table-editor:open-cell" },
+		);
 
 		const control = this._control(editor);
 		control?.focus({ preventScroll: true });
@@ -420,7 +442,7 @@ export class TableEditor {
 		return true;
 	}
 
-	async postreconcile() {
+	async prereconcile() {
 		const visibility = this.component.active;
 		const preserveForVisibility =
 			!this.visible &&
@@ -430,7 +452,19 @@ export class TableEditor {
 			this.visible = true;
 			visibility.preserveEditor?.(this);
 		}
+		if (!this.visible) return;
 
+		this._cleanupCheckboxEdits();
+		this._preparedCheckboxEdits = (
+			await Promise.all(
+				this._editableCells()
+					.filter((cell) => this._isCheckboxCell(cell))
+					.map((cell) => this._prepareCheckbox(cell)),
+			)
+		).filter(Boolean);
+	}
+
+	postreconcile() {
 		if (!this.visible && this.activeEdit) this._cancel(this.activeEdit.cell);
 		if (!this.visible) {
 			this._cancelCheckboxes();
@@ -444,6 +478,6 @@ export class TableEditor {
 				button.setAttribute("aria-pressed", this.visible ? "true" : "false");
 			});
 
-		if (this.visible) await this._openCheckboxes();
+		if (this.visible) this._commitPreparedCheckboxes();
 	}
 }

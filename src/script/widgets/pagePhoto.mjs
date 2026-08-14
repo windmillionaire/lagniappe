@@ -173,8 +173,8 @@ export class PagePhoto extends BaseUpload {
 				attributeActive: true,
 				secondary: this.component.elt,
 				secondaryActive: true,
-				mutate: async () => {
-					await mutate();
+				mutate: () => () => {
+					mutate();
 					this._removePhotoPrompt();
 				},
 			});

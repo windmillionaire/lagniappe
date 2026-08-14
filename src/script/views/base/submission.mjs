@@ -151,10 +151,13 @@ export class SubmissionManager {
 				this.view.offlineQueue || (await this.view.ensureOfflineQueue?.());
 			const response = await queue?.queueSubmit(component, data, route, "PUT");
 			if (response) {
-				await withTransition(async () => {
-					component.active?.form?.queued?.();
-					this._clearActiveSubmitter();
-				});
+				await withTransition(
+					() => {
+						component.active?.form?.queued?.();
+						this._clearActiveSubmitter();
+					},
+					{ label: "submission:queue-offline" },
+				);
 			} else {
 				this._clearActiveSubmitter();
 			}
@@ -236,12 +239,16 @@ export class SubmissionManager {
 			return;
 		}
 
-		await withTransition(async () => {
-			component.active?.created?.(response);
-			await component.active?.postreconcile?.();
-			component.active?.success?.();
-			this._clearActiveSubmitter();
-		});
+		await component.active?.created?.(response);
+		await component.active?.prereconcile?.();
+		await withTransition(
+			() => {
+				component.active?.postreconcile?.();
+				component.active?.success?.();
+				this._clearActiveSubmitter();
+			},
+			{ label: "submission:create-without-html" },
+		);
 	}
 
 	/**

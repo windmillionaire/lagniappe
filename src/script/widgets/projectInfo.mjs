@@ -68,8 +68,8 @@ export class ProjectInfo extends ProjectForm {
 		];
 	}
 
-	async postreconcile() {
-		await super.postreconcile();
+	postreconcile() {
+		super.postreconcile();
 		this.setEntityMetadata();
 	}
 }

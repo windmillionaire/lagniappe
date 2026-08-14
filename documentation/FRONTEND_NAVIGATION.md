@@ -6,7 +6,17 @@ Reference for authoring templates that use the navigation system. The nav system
 
 A **view** (`lp-view`) contains **components** (`lp-component`). Each component can display one active **widget** (`data-widget`) at a time. Navigation is driven by `lp-show` attributes on buttons/elements — when clicked, the Core view parses the `componentId:widgetName` pair, activates that widget in that component, and reconciles the nav bar to reflect the new state.
 
-Widgets are lazily loaded on first activation. Once loaded they stay cached on the component. All DOM visibility changes happen inside a transition via the `reconcile()` cycle — the nav reads `data-*` attributes off the active widget's target element to determine what title, controls, and toggles to display.
+Widgets are lazily loaded on first activation. Once loaded they stay cached on
+the component. Activation and `prepareRender()` finish before the visual
+boundary; one synchronous `render()`/`reconcile()` commit then changes widget,
+component, and nav visibility together. The nav reads `data-*` attributes off
+the active widget's target element to determine what title, controls, and
+toggles to display.
+
+Conditional global nav controls leave the layout when hidden and publish
+`aria-hidden`/focus state with their visible state. Nav transitions never
+crossfade, and list rows do not receive independent transition snapshots that
+could outlive a collapsing widget.
 
 ## View & Component Structure
 

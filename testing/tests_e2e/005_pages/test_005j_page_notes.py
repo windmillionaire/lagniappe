@@ -129,12 +129,24 @@ def test_page_notes_visibility_and_title_menu(get_user, browser_failures):
 # @pair request-errors:plain-validation
 # @template pages/page.html::view_header
 # @template pages/notes.html::notes_section
+# @template pages/notes.html::note_list
 # @template notes.html::composer
 # @template notes.html::note_item
+# @style note.section
 def test_page_note_text_photo_and_delete_modal(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = owner.go(Pages.test_create_page)
     body = _unique("Page text and photo note")
+    notes_section = owner.locate("#page-notes")
+    note_list = notes_section.locator("[data-widget='BaseList']")
+    expect(note_list).to_have_attribute("loaded", "")
+    expect(notes_section).to_be_hidden()
+
+    composer = _open_note_composer(owner)
+    expect(notes_section).to_be_visible()
+    composer.locator("[lp-close='page-notes:BaseList']").click()
+    expect(notes_section).to_be_hidden()
+
     composer = _open_note_composer(owner)
 
     notes_path = f"/pages/{page.key}/notes"
@@ -186,4 +198,5 @@ def test_page_note_text_photo_and_delete_modal(get_user, browser_failures):
     ):
         modal.delete()
     expect(item).not_to_be_attached()
+    expect(notes_section).to_be_hidden()
     assert Entities.fetch_one(key, request=Fetch.root()) is None

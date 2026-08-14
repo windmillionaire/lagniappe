@@ -100,6 +100,9 @@ class Builder:
 
     def save_condition(self):
         self.condition.locator("button[data-role='save']").click()
+        expect(
+            self.condition.locator("[data-role='title'] [data-kind='success']")
+        ).to_be_visible()
 
     def toggle_preview(self):
         self.page.locator(self.PREVIEW_TOGGLE).click()

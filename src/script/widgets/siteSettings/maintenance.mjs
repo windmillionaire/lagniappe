@@ -1,6 +1,11 @@
 import { STYLES } from "styles";
 import { buttons } from "../../elements/buttons";
-import { clearRecentSearchResults, Modal, request } from "../../shared";
+import {
+	clearRecentSearchResults,
+	Modal,
+	request,
+	withTransition,
+} from "../../shared";
 import { SiteSetting } from "./base";
 
 /**
@@ -51,8 +56,13 @@ export class SiteMaintenance extends SiteSetting {
 				this._migrationStatus = response.migration_status;
 			}
 			if (!response.ok) {
-				rebuildCache.deactivate("Refresh Cache");
-				this._renderMigrationStatus(this._migrationStatus);
+				await withTransition(
+					() => {
+						rebuildCache.deactivate("Refresh Cache");
+						this._renderMigrationStatus(this._migrationStatus);
+					},
+					{ label: "site-settings:cache-error" },
+				);
 				return;
 			}
 			rebuildCache.deactivate();
@@ -75,12 +85,22 @@ export class SiteMaintenance extends SiteSetting {
 				this._migrationStatus = response.migration_status;
 			}
 			if (!response.ok) {
-				applyUpdates.deactivate("Apply Updates");
-				this._renderMigrationStatus(this._migrationStatus);
+				await withTransition(
+					() => {
+						applyUpdates.deactivate("Apply Updates");
+						this._renderMigrationStatus(this._migrationStatus);
+					},
+					{ label: "site-settings:update-error" },
+				);
 				return;
 			}
-			applyUpdates.deactivate();
-			this._renderMigrationStatus(this._migrationStatus);
+			await withTransition(
+				() => {
+					applyUpdates.deactivate();
+					this._renderMigrationStatus(this._migrationStatus);
+				},
+				{ label: "site-settings:update-complete" },
+			);
 			clearRecentSearchResults();
 		});
 	}

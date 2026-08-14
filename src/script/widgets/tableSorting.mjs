@@ -57,14 +57,19 @@ export class TableSorting {
 			const column = e.detail.column;
 
 			if (this.view.mobile) {
-				const sort = this._enableSort(this.sorts.get(column));
-				if (sort.active) {
-					const toggle = this.toggles.get(column);
-					toggle.dataset.active = "true";
-				}
-				const container = this.containers.get(column);
-				const visible = container.dataset.visible === "true";
-				container.dataset.visible = visible ? "false" : "true";
+				void withTransition(
+					() => {
+						const sort = this._enableSort(this.sorts.get(column));
+						if (sort.active) {
+							const toggle = this.toggles.get(column);
+							toggle.dataset.active = "true";
+						}
+						const container = this.containers.get(column);
+						const visible = container.dataset.visible === "true";
+						container.dataset.visible = visible ? "false" : "true";
+					},
+					{ label: "table-sorting:toggle-mobile" },
+				);
 				return;
 			} else {
 				const button = e.detail.button;
@@ -217,37 +222,40 @@ export class TableSorting {
 			});
 	}
 
-	_toggleColumn(column, button) {
-		const sort = this._enableSort(this.sorts.get(column));
-		if (sort.disabled) return;
+	async _toggleColumn(column, button) {
+		await withTransition(
+			() => {
+				const sort = this._enableSort(this.sorts.get(column));
+				if (sort.disabled) return;
 
-		const visible = this.visible;
-		const container = this.containers.get(column);
-		this.containers.forEach((c) => {
-			if (c !== container) c.dataset.visible = "false";
-		});
+				const visible = this.visible;
+				const container = this.containers.get(column);
+				this.containers.forEach((candidate) => {
+					if (candidate !== container) candidate.dataset.visible = "false";
+				});
 
-		if (button && sort.active) {
-			this.visible = false;
-			sort.sortedBy = null;
-			this.sort();
-		} else if (this.visible && container.dataset.visible === "true") {
-			this.visible = false;
-		} else {
-			container.dataset.visible = "true";
-			this.visible = true;
-		}
+				if (button && sort.active) {
+					this.visible = false;
+					sort.sortedBy = null;
+					this.sort();
+				} else if (this.visible && container.dataset.visible === "true") {
+					this.visible = false;
+				} else {
+					container.dataset.visible = "true";
+					this.visible = true;
+				}
 
-		this.modified = visible !== this.visible;
-		withTransition(() => {
-			if (this.modified && this.visible) {
-				this.component.active = this;
-				this.component.render(true);
-			} else if (this.modified && !this.visible) {
-				this.component.active = null;
-				this.component.render(false);
-			}
-		});
+				this.modified = visible !== this.visible;
+				if (this.modified && this.visible) {
+					this.component.active = this;
+					this.component.render(true);
+				} else if (this.modified && !this.visible) {
+					this.component.active = null;
+					this.component.render(false);
+				}
+			},
+			{ label: "table-sorting:toggle" },
+		);
 	}
 
 	_resetRows(reorderRows, showRows) {

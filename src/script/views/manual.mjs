@@ -1,5 +1,6 @@
 import { ENDPOINTS } from "../shared/endpoints";
 import { request } from "../shared/request";
+import { withTransition } from "../shared/utilities";
 import ShellView from "./base/shell";
 
 /**
@@ -174,16 +175,20 @@ export default class Manual extends ShellView {
 		if (response?.html) {
 			const target = this.elt.querySelector("[data-role='manual-content']");
 			const newTarget = response.html.querySelector("body");
-			if (newTarget) target.replaceChildren(newTarget);
-
-			if (pushState) {
-				const url = `/manual/${key}`;
-				history.pushState({ manualSection: key }, "", url);
-			}
+			await withTransition(
+				() => {
+					if (newTarget) target.replaceChildren(newTarget);
+					if (pushState) {
+						const url = `/manual/${key}`;
+						history.pushState({ manualSection: key }, "", url);
+					}
+				},
+				{ label: "manual:change-section" },
+			);
 		}
 
 		this.loading = false;
-		window.scrollTo({ top: 0 });
+		window.scrollTo({ top: 0, behavior: "auto" });
 	}
 
 	destroy() {

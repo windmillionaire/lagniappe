@@ -5,6 +5,31 @@ export const NOTIFICATION_STATE_HEADER = "X-Lagniappe-Notification-State";
 let invalidStateReported = false;
 
 /**
+ * Publish the notification badge's count, visibility, and accessible state as
+ * one DOM commit.
+ *
+ * @testable true
+ * @tests tests_js/test_036_notification_state.py::test_notification_state_updates_badge_and_reports_cache_miss
+ * @pairs notifications:badge notifications:accessible-state
+ */
+export const renderNotificationBadge = (count) => {
+	const normalized = Number.isInteger(Number(count)) ? Number(count) : 0;
+	const button = document.querySelector("[data-role='notifications']");
+	const countElement = document.querySelector(
+		"[data-role='notification-count']",
+	);
+	if (countElement) countElement.textContent = String(normalized);
+	if (!button) return normalized;
+
+	const visible = normalized > 0;
+	button.dataset.visible = visible ? "true" : "false";
+	button.setAttribute("aria-hidden", visible ? "false" : "true");
+	button.setAttribute("aria-label", `Notifications: ${normalized}`);
+	button.tabIndex = visible ? 0 : -1;
+	return normalized;
+};
+
+/**
  * @testable false
  * @covered-by src/script/shared/notificationState.mjs::applyNotificationState
  * @reason input normalization is exercised through the public state publisher
@@ -64,13 +89,7 @@ export const applyNotificationState = (raw) => {
 	window.__NOTIFICATION_STATE__ = state;
 
 	if (!state.miss) {
-		const button = document.querySelector("[data-role='notifications']");
-		const count = document.querySelector("[data-role='notification-count']");
-		if (count) count.textContent = String(state.count);
-		if (button) {
-			button.dataset.visible = state.count > 0 ? "true" : "false";
-			button.setAttribute("aria-label", `Notifications: ${state.count}`);
-		}
+		renderNotificationBadge(state.count);
 	}
 
 	window.dispatchEvent(

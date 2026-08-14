@@ -485,7 +485,8 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
 
 
 # @features notifications
-# @dimensions delete clear-all menu-open ownership dropdown-refresh
+# @dimensions delete clear-all menu-open ownership dropdown-refresh accessible-state
+# @template nav.html::navbar
 def test_notification_menu_deletes_and_clears(get_user):
     user = get_user(Users.OWNER)
     first_body = _unique("Notification delete one")
@@ -513,6 +514,8 @@ def test_notification_menu_deletes_and_clears(get_user):
     expect(notifications).to_have_attribute(
         "aria-label", f"Notifications: {starting_count + 2}"
     )
+    expect(notifications).to_have_attribute("aria-hidden", "false")
+    expect(notifications).to_have_attribute("tabindex", "0")
 
     notifications.click()
     panel = user.page.locator("[role='listbox'][data-visible='true']")
@@ -547,6 +550,8 @@ def test_notification_menu_deletes_and_clears(get_user):
 
     expect(panel).to_be_hidden()
     expect(notifications).to_have_attribute("data-visible", "false")
+    expect(notifications).to_have_attribute("aria-hidden", "true")
+    expect(notifications).to_have_attribute("tabindex", "-1")
     expect(notifications).to_have_attribute("aria-label", "Notifications: 0")
     assert Entities.fetch_one(first.urlsafe_key, request=Fetch.root()) is None
     assert Entities.fetch_one(second.urlsafe_key, request=Fetch.root()) is None
@@ -635,7 +640,7 @@ def test_offline_home_create_mutations_persist_after_reload(get_user, browser_fa
 
 
 # @features offline
-# @dimensions server-first reload replay
+# @dimensions server-first reload replay optimistic-mutation
 # @template home/notes.html::list
 # @template home/tasks.html::list
 def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_failures):

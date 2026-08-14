@@ -1,3 +1,4 @@
+import { withTransition } from "../shared";
 import Core from "./base/core";
 
 const HOME_CHANNELS = Object.freeze({
@@ -75,17 +76,28 @@ export default class Home extends Core {
 		}
 	}
 
-	async _refreshHomeWidget(component, widget) {
-		if (!widget?.loaded || !widget.route) return false;
+	async _prepareHomeWidgetRefresh(component, widget) {
+		if (!widget?.loaded || !widget.route) return null;
 		const response = await this.load(component, widget.route);
-		if (!response || response.updated === false) return false;
-		await widget.refresh?.(response);
-		if (response.pollChannel) {
-			widget.target.dataset.pollChannel = response.pollChannel;
-		}
-		if (response.pollRevision) {
-			widget.target.dataset.pollRevision = response.pollRevision;
-		}
+		if (!response || response.updated === false) return null;
+		const commit = widget.prepareRefresh
+			? await widget.prepareRefresh(response)
+			: () => widget.refresh?.(response);
+		return () => {
+			if (typeof commit === "function") commit();
+			if (response.pollChannel) {
+				widget.target.dataset.pollChannel = response.pollChannel;
+			}
+			if (response.pollRevision) {
+				widget.target.dataset.pollRevision = response.pollRevision;
+			}
+		};
+	}
+
+	async _refreshHomeWidget(component, widget) {
+		const commit = await this._prepareHomeWidgetRefresh(component, widget);
+		if (!commit) return false;
+		await withTransition(commit, { label: `home:refresh-${widget.name}` });
 		return true;
 	}
 
@@ -121,8 +133,17 @@ export default class Home extends Core {
 			existingWidget || (await starredComponent.loadWidget("StarredList"));
 		if (!widget) return;
 
-		if (existingWidget) await this._refreshHomeWidget(starredComponent, widget);
-		if (starredComponent.active === widget) await starredComponent.render(true);
+		const commit = existingWidget
+			? await this._prepareHomeWidgetRefresh(starredComponent, widget)
+			: null;
+		await starredComponent.prepareRender(true);
+		await withTransition(
+			() => {
+				if (commit) commit();
+				if (starredComponent.active === widget) starredComponent.render(true);
+			},
+			{ label: "home:refresh-starred" },
+		);
 		this._syncHomePollingSubscriptions();
 	}
 

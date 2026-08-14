@@ -1,3 +1,4 @@
+import { withTransition } from "../shared";
 import { BaseForm } from "./base/baseForm";
 
 /**
@@ -22,6 +23,7 @@ export class FormElement {
 		this._created = false;
 		this._updated = false;
 		this._success = false;
+		this._preparedReset = null;
 
 		this._deferredOperation = this.target?.dataset?.operation || null;
 
@@ -175,14 +177,22 @@ export class FormElement {
 		};
 	}
 
-	async applyRevision(response) {
+	async prepareRevision(response) {
 		await this.updated(response);
 		this._success = false;
-		await this.postreconcile();
-		this.commitRevisionBaseline({ clearUnsaved: true });
+		await this.prereconcile();
+		return () => {
+			this.postreconcile();
+			this.commitRevisionBaseline({ clearUnsaved: true });
+		};
 	}
 
-	async applyLocalRevision(
+	async applyRevision(response) {
+		const commit = await this.prepareRevision(response);
+		commit();
+	}
+
+	async prepareLocalRevision(
 		response,
 		{
 			remoteSnapshot = null,
@@ -196,25 +206,34 @@ export class FormElement {
 		if (selectedSubmission !== undefined) {
 			local.response.submission = selectedSubmission;
 		}
-		this._skipQueuedRestore = true;
-		try {
-			await this.updated(local.response);
-			this._success = false;
-			await this.postreconcile();
-			this._restoreQueuedFiles(local.state);
-		} finally {
-			this._skipQueuedRestore = false;
-		}
+		await this.updated(local.response);
+		this._success = false;
+		await this.prereconcile();
 
-		if (remoteSnapshot !== null) this._revisionBaseline = remoteSnapshot;
-		if (wasQueued) {
-			this.form?.queued();
-		} else if (wasUnsaved || markUnsaved) {
-			this.markUnsavedState();
-		} else {
-			this.commitRevisionBaseline({ clearUnsaved: true });
-		}
-		return local;
+		return () => {
+			this._skipQueuedRestore = true;
+			try {
+				this.postreconcile();
+				this._restoreQueuedFiles(local.state);
+			} finally {
+				this._skipQueuedRestore = false;
+			}
+
+			if (remoteSnapshot !== null) this._revisionBaseline = remoteSnapshot;
+			if (wasQueued) {
+				this.form?.queued();
+			} else if (wasUnsaved || markUnsaved) {
+				this.markUnsavedState();
+			} else {
+				this.commitRevisionBaseline({ clearUnsaved: true });
+			}
+			return local;
+		};
+	}
+
+	async applyLocalRevision(response, options = {}) {
+		const commit = await this.prepareLocalRevision(response, options);
+		return commit();
 	}
 
 	/**
@@ -344,8 +363,8 @@ export class FormElement {
 		}
 	}
 
-	async _initForm() {
-		if (this.initialTarget) {
+	async _initForm({ replace = true } = {}) {
+		if (replace && this.initialTarget) {
 			const visible = this.target?.dataset.visible;
 			if (visible !== undefined) {
 				this.initialTarget.dataset.visible = visible;
@@ -353,7 +372,7 @@ export class FormElement {
 			this.target.replaceWith(this.initialTarget);
 			this.target = this.initialTarget;
 			this.initialTarget = this.target.cloneNode(true);
-		} else {
+		} else if (!this.initialTarget) {
 			this.initialTarget = this.target.cloneNode(true);
 		}
 		this.target._lp_widget = this;
@@ -380,7 +399,12 @@ export class FormElement {
 		e.stopPropagation();
 
 		if (role === "edit") {
-			element.dataset.mode = "edit";
+			void withTransition(
+				() => {
+					element.dataset.mode = "edit";
+				},
+				{ label: "form:edit-field" },
+			);
 		} else if (role === "clear") {
 			const field =
 				element?._lp_element ?? this.form.renderer?.elements.get(element.id);
@@ -400,11 +424,81 @@ export class FormElement {
 		return this.target?.querySelector('button[type="submit"]:not([data-role])');
 	}
 
-	async reset() {
+	async prepareReset({
+		nextTarget = this.initialTarget || this.target.cloneNode(true),
+		staged = {},
+		beforeInit = null,
+		afterInit = null,
+	} = {}) {
+		if (this._preparedReset) return;
+
+		const visible = this.target?.dataset.visible;
+		if (visible !== undefined) nextTarget.dataset.visible = visible;
+
+		const stagedState = {
+			target: nextTarget,
+			initialTarget: null,
+			form: null,
+			destroyables: [],
+			...staged,
+		};
+		const stagedWidget = new Proxy(this, {
+			get(target, property, receiver) {
+				if (Object.hasOwn(stagedState, property)) {
+					return stagedState[property];
+				}
+				return Reflect.get(target, property, receiver);
+			},
+			set(target, property, value) {
+				if (Object.hasOwn(stagedState, property)) {
+					stagedState[property] = value;
+					return true;
+				}
+				return Reflect.set(target, property, value);
+			},
+		});
+
+		await beforeInit?.(stagedWidget);
+		await stagedWidget._initForm({ replace: false });
+		await afterInit?.(stagedWidget);
+		this._preparedReset = {
+			adopt: Object.keys(stagedState),
+			state: stagedState,
+			revisionBaseline: stagedWidget.revisionSnapshot(),
+		};
+	}
+
+	commitReset() {
+		if (!this._preparedReset) return false;
+		const { adopt, state, revisionBaseline } = this._preparedReset;
+		this._preparedReset = null;
+		const previousTarget = this.target;
+		const visible = previousTarget?.dataset.visible;
+		if (visible !== undefined) state.target.dataset.visible = visible;
+
 		this.clearUnsavedState();
 		this.destroy();
-		await this._initForm();
-		this.commitRevisionBaseline();
+		if (previousTarget !== state.target)
+			previousTarget.replaceWith(state.target);
+		for (const property of adopt) this[property] = state[property];
+		this.target._lp_widget = this;
+		this._revisionBaseline = revisionBaseline;
+		return true;
+	}
+
+	discardPreparedReset() {
+		if (!this._preparedReset) return;
+		const { state } = this._preparedReset;
+		state.form?.destroy?.();
+		state.destroyables?.forEach((destroyable) => {
+			destroyable.destroy?.();
+		});
+		this._preparedReset = null;
+	}
+
+	async reset() {
+		await this.prepareReset();
+		this.commitReset();
 	}
 
 	setEntityMetadata() {
@@ -468,7 +562,11 @@ export class FormElement {
 		}
 	}
 
-	async postreconcile() {
+	async prereconcile() {
+		if (this._updated) await this.prepareReset();
+	}
+
+	postreconcile() {
 		const updated = this._updated;
 		if (!this._created && !updated) return;
 
@@ -476,7 +574,7 @@ export class FormElement {
 		this._updated = false;
 
 		if (updated) {
-			await this.reset();
+			this.commitReset();
 			if (this.visible) this.target.dataset.visible = "true";
 		}
 

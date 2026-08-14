@@ -51,31 +51,34 @@ export class AutofillUpload extends BaseUpload {
 		return false;
 	}
 
-	_click(e) {
+	async _click(e) {
 		const role = e.target.closest("button")?.dataset?.role;
 		if (!["cancel-autofill", "show-autofill"].includes(role)) return;
 
 		e.preventDefault();
 		e.stopPropagation();
 
-		withTransition(async () => {
-			if (!this._initialized) {
-				await super.init();
-				this.target.append(this.submitGroup);
-				this._initialized = true;
-			}
+		if (!this._initialized) {
+			await super.init();
+			this.target.append(this.submitGroup);
+			this._initialized = true;
+		}
 
-			if (role === "show-autofill") {
-				this.target.dataset.visible = "true";
-				this.parent.form.toggleSubForm(this);
-				this.target.querySelector("textarea").focus();
-			} else if (role === "cancel-autofill") {
-				this.target.dataset.visible = "false";
-				this.parent.form.toggleSubForm();
-				this.reset();
-				this.target.querySelector("textarea").value = "";
-			}
-		});
+		await withTransition(
+			() => {
+				if (role === "show-autofill") {
+					this.target.dataset.visible = "true";
+					this.parent.form.toggleSubForm(this);
+					this.target.querySelector("textarea").focus();
+				} else if (role === "cancel-autofill") {
+					this.target.dataset.visible = "false";
+					this.parent.form.toggleSubForm();
+					this.reset();
+					this.target.querySelector("textarea").value = "";
+				}
+			},
+			{ label: `autofill:${role}` },
+		);
 	}
 
 	get html() {

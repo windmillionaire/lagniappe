@@ -55,8 +55,8 @@ reviewable evidence that the maintainer ran the relevant tests on configured
 infrastructure. It keeps only the most recent result
 for each exact test nodeid and only the newest pytest session's invocation
 metadata. Separate focused results are merged even when the working tree
-changes. A merge prunes results whose owning test module has been deleted while
-retaining unselected results for modules that still exist. Failed results also
+changes. A merge prunes results whose test module or source test definition has
+been deleted while retaining unselected tests that still exist. Failed results also
 record `failed_phase` and a bounded pytest `traceback`; `traceback_truncated`
 identifies the rare result whose traceback exceeded the manifest limit. Each
 result records a semantic snapshot, and

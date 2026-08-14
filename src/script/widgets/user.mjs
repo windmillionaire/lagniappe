@@ -90,12 +90,17 @@ export class CreateUser extends FormElement {
 		return [details, aiAccess, page.edit, group.edit].filter(Boolean);
 	}
 
-	async postreconcile() {
+	async prereconcile() {
+		await super.prereconcile();
+		if (this._created) await this.prepareReset();
+	}
+
+	postreconcile() {
 		const created = this._created;
-		await super.postreconcile();
+		if (created) this.commitReset();
+		super.postreconcile();
 
 		if (created) {
-			await this.reset();
 			this.form?.resetSubmitButton();
 		}
 		this.nameElement.focus();
@@ -141,24 +146,28 @@ export class CreateUserGroup extends FormElement {
 		this._newGroupSelector = response.html?.body.querySelector(
 			"button[lp-show]:not([lp-control])",
 		);
-		if (this._newGroupSelector) {
-			this.selectors.appendChild(this._newGroupSelector);
-			this._newGroupSelector = null;
-			this.component.nav = null;
-		}
 
 		this._newGroupForm = response.html?.body.querySelector("form");
 		if (this._newGroupForm) {
+			this._newGroupForm.dataset.visible = "false";
 			this.component.elt.appendChild(this._newGroupForm);
 			const newGroupWidget = this._newGroupForm.dataset.widget;
 			await this.component.activate(newGroupWidget);
 		}
 	}
 
-	async postreconcile() {
+	async prereconcile() {
+		await super.prereconcile();
+		if (this._newGroupSelector) await this.prepareReset();
+	}
+
+	postreconcile() {
 		if (this._newGroupSelector) {
-			await this.reset();
+			this.commitReset();
 			this.target.dataset.visible = "false";
+			this.selectors.appendChild(this._newGroupSelector);
+			this._newGroupSelector = null;
+			this.component.nav = null;
 		}
 	}
 }

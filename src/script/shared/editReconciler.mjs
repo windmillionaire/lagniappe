@@ -61,6 +61,24 @@ export class EditReconciler {
 		return marker._lp_edited_state;
 	}
 
+	async _prepareRevision(widget, response) {
+		if (widget.prepareRevision) return await widget.prepareRevision(response);
+		return () => {
+			const result = widget.applyRevision(response);
+			if (result?.then) void result.catch(captureError);
+		};
+	}
+
+	async _prepareLocalRevision(widget, response, options) {
+		if (widget.prepareLocalRevision) {
+			return await widget.prepareLocalRevision(response, options);
+		}
+		return () => {
+			const result = widget.applyLocalRevision(response, options);
+			if (result?.then) void result.catch(captureError);
+		};
+	}
+
 	_setAction(marker, mode, message = null) {
 		const state = this._state(marker);
 		state.mode = mode;
@@ -212,12 +230,16 @@ export class EditReconciler {
 		const protectedRevision =
 			unsaved || queued || (!ownedDeferredCompletion && (active || focused));
 		if (!protectedRevision) {
-			await withTransition(async () => {
-				await widget.applyRevision(response);
-				this._hide(
-					widget.target?.querySelector("[lp-edited-marker]") ?? marker,
-				);
-			});
+			const commitRevision = await this._prepareRevision(widget, response);
+			await withTransition(
+				() => {
+					commitRevision();
+					this._hide(
+						widget.target?.querySelector("[lp-edited-marker]") ?? marker,
+					);
+				},
+				{ label: "edit-reconcile:apply-remote" },
+			);
 			return;
 		}
 
@@ -241,12 +263,16 @@ export class EditReconciler {
 
 		if (localSnapshot === remoteSnapshot || current === remoteSnapshot) {
 			if (record) await this.view.offlineQueue?.cancel(record.id);
-			await withTransition(async () => {
-				await widget.applyRevision(response);
-				this._hide(
-					widget.target?.querySelector("[lp-edited-marker]") ?? marker,
-				);
-			});
+			const commitRevision = await this._prepareRevision(widget, response);
+			await withTransition(
+				() => {
+					commitRevision();
+					this._hide(
+						widget.target?.querySelector("[lp-edited-marker]") ?? marker,
+					);
+				},
+				{ label: "edit-reconcile:accept-matching" },
+			);
 			return;
 		}
 
@@ -271,32 +297,53 @@ export class EditReconciler {
 		}
 
 		if (rendererCapable && schemaChanged) {
-			await withTransition(async () => {
-				await widget.applyLocalRevision(response, { remoteSnapshot });
-				marker = widget.target.querySelector("[lp-edited-marker]") ?? marker;
-				this._storeRevision(marker, response, {
-					fingerprint,
-					modified,
-					record,
+			const commitRevision = await this._prepareLocalRevision(
+				widget,
+				response,
+				{
 					remoteSnapshot,
-					schemaChanged,
-					submissionChoice: false,
-				});
-				this._setAction(
-					marker,
-					record ? "apply" : "dismiss",
-					"This form's fields have changed. It has been updated to reflect the latest schema.",
-				);
-				this._show(marker);
-			});
+				},
+			);
+			await withTransition(
+				() => {
+					commitRevision();
+					marker = widget.target.querySelector("[lp-edited-marker]") ?? marker;
+					this._storeRevision(marker, response, {
+						fingerprint,
+						modified,
+						record,
+						remoteSnapshot,
+						schemaChanged,
+						submissionChoice: false,
+					});
+					this._setAction(
+						marker,
+						record ? "apply" : "dismiss",
+						"This form's fields have changed. It has been updated to reflect the latest schema.",
+					);
+					this._show(marker);
+				},
+				{ label: "edit-reconcile:rebase-schema" },
+			);
 			return;
 		}
 
 		if (rendererCapable && remoteSnapshot === widget.revisionBaseline) {
-			await withTransition(async () => {
-				await widget.applyLocalRevision(response, { remoteSnapshot });
-				marker = widget.target.querySelector("[lp-edited-marker]") ?? marker;
-			});
+			const commitRevision = await this._prepareLocalRevision(
+				widget,
+				response,
+				{
+					remoteSnapshot,
+				},
+			);
+			await withTransition(
+				() => {
+					commitRevision();
+					marker = widget.target.querySelector("[lp-edited-marker]") ?? marker;
+					this._hide(marker);
+				},
+				{ label: "edit-reconcile:rebase-values" },
+			);
 			if (record) {
 				const rebased = await this.view.offlineQueue?.rebaseSubmit(
 					record,
@@ -305,7 +352,6 @@ export class EditReconciler {
 				);
 				if (rebased) await this.view.offlineQueue?.replay();
 			}
-			this._hide(marker);
 			return;
 		}
 
@@ -492,7 +538,13 @@ export class EditReconciler {
 
 		if (!localSelected) {
 			if (state.record) await this.view.offlineQueue?.cancel(state.record.id);
-			await withTransition(() => widget.applyRevision(state.response));
+			const commitRevision = await this._prepareRevision(
+				widget,
+				state.response,
+			);
+			await withTransition(() => commitRevision(), {
+				label: "edit-reconcile:resolve-server",
+			});
 		} else {
 			let selectedSubmission;
 			if (fieldSelection) {
@@ -507,13 +559,18 @@ export class EditReconciler {
 					}
 				}
 			}
-			await withTransition(() =>
-				widget.applyLocalRevision(state.response, {
+			const commitRevision = await this._prepareLocalRevision(
+				widget,
+				state.response,
+				{
 					remoteSnapshot: state.remoteSnapshot,
 					markUnsaved: !state.record,
 					selectedSubmission,
-				}),
+				},
 			);
+			await withTransition(() => commitRevision(), {
+				label: "edit-reconcile:resolve-local",
+			});
 			if (state.record) {
 				const rebased = await this.view.offlineQueue?.rebaseSubmit(
 					state.record,

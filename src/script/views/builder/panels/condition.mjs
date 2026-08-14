@@ -47,7 +47,7 @@ export class ConditionPanel {
 		});
 	}
 
-	async open(condition) {
+	open(condition) {
 		this.builder.model.sortable.option("disabled", true);
 		this.builder.components.sortable.option("disabled", true);
 		this.builder.model.focusItem();

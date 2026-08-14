@@ -26,9 +26,17 @@ export const generateElementId = (type) => {
  * @covered-by src/script/shared/utilities.mjs::withTransition
  * @reason no-transition fallback is part of the transition wrapper
  */
-const runWithoutTransition = async (callback) => {
+const runWithoutTransition = async (callback, label = "unlabeled") => {
 	try {
-		await callback();
+		const result = callback();
+		if (result?.then) {
+			captureError(
+				new TypeError(
+					`View transition commit "${label}" returned a promise. Prepare asynchronous work before committing DOM changes.`,
+				),
+			);
+			await result;
+		}
 		return true;
 	} catch (error) {
 		captureError(error);
@@ -43,63 +51,193 @@ const runWithoutTransition = async (callback) => {
  */
 let transitionQueue = Promise.resolve();
 let transitionDepth = 0;
+let pendingTransitionBatch = null;
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @reason development-only timing diagnostic is part of the transition wrapper
+ */
+const reportSlowCommit = (label, started) => {
+	if (typeof performance === "undefined" || !performance.now) return;
+	if (typeof __BUILD_ID__ !== "undefined") return;
+
+	const duration = performance.now() - started;
+	if (duration <= 50) return;
+	console.warn(
+		`View transition commit "${label}" took ${duration.toFixed(1)}ms.`,
+	);
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @reason exact-once commit execution is exercised through the public transition wrapper
+ */
+const runCommit = (callback, label) => {
+	const started =
+		typeof performance !== "undefined" && performance.now
+			? performance.now()
+			: null;
+	try {
+		const result = callback();
+		if (!result?.then) {
+			if (started !== null) reportSlowCommit(label, started);
+			return true;
+		}
+
+		captureError(
+			new TypeError(
+				`View transition commit "${label}" returned a promise. Prepare asynchronous work before committing DOM changes.`,
+			),
+		);
+		return Promise.resolve(result)
+			.then(() => true)
+			.catch((error) => {
+				captureError(error);
+				return false;
+			})
+			.finally(() => {
+				if (started !== null) reportSlowCommit(label, started);
+			});
+	} catch (error) {
+		captureError(error);
+		if (started !== null) reportSlowCommit(label, started);
+		return false;
+	}
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/utilities.mjs::withTransition
+ * @reason same-turn commit batching is exercised through the public transition wrapper
+ */
+const runTransitionBatch = (entries) => {
+	const results = new Array(entries.length).fill(false);
+	const pending = [];
+
+	transitionDepth += 1;
+	entries.forEach(({ callback, label }, index) => {
+		const result = runCommit(callback, label);
+		if (result?.then) {
+			pending.push(
+				result.then((successful) => {
+					results[index] = successful;
+				}),
+			);
+		} else {
+			results[index] = result;
+		}
+	});
+
+	if (!pending.length) {
+		transitionDepth -= 1;
+		return { results, pending: null };
+	}
+
+	return {
+		results,
+		pending: Promise.all(pending).finally(() => {
+			transitionDepth -= 1;
+		}),
+	};
+};
 
 /**
  * @testable false
  * @covered-by src/script/shared/utilities.mjs::withTransition
  * @reason single-transition runner is private to the queued wrapper
  */
-const executeTransition = async (callback) => {
-	if (!document.startViewTransition) {
-		return runWithoutTransition(callback);
-	}
+const executeTransition = async (entries) => {
+	let batch = null;
+	let updateStarted = false;
+	/**
+	 * @testable false
+	 * @covered-by src/script/shared/utilities.mjs::withTransition
+	 * @reason browser update callback is private transition-wrapper plumbing
+	 */
+	const update = () => {
+		updateStarted = true;
+		batch = runTransitionBatch(entries);
+		return batch.pending || undefined;
+	};
 
-	try {
-		const transition = document.startViewTransition(async () => {
-			transitionDepth += 1;
-			try {
-				await callback();
-			} finally {
-				transitionDepth -= 1;
-			}
-		});
-		transition.ready.catch(() => {});
+	let transition = null;
+	if (document.startViewTransition) {
 		try {
-			await transition.finished;
-			return true;
+			transition = document.startViewTransition(update);
 		} catch (error) {
-			if (isSkippedViewTransitionError(error)) {
-				return runWithoutTransition(callback);
-			}
-
-			captureError(error);
-			return false;
+			if (!isSkippedViewTransitionError(error)) captureError(error);
 		}
-	} catch (error) {
-		if (isSkippedViewTransitionError(error)) {
-			return runWithoutTransition(callback);
-		}
-
-		captureError(error);
-		return false;
 	}
+
+	if (!transition) {
+		if (!updateStarted) update();
+		if (batch?.pending) await batch.pending;
+		entries.forEach((entry, index) => {
+			entry.resolve(batch.results[index]);
+		});
+		return;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/shared/utilities.mjs::withTransition
+	 * @reason transition promise observation is exercised through public error handling
+	 */
+	const observeTransitionError = (error) => {
+		if (!isSkippedViewTransitionError(error)) captureError(error);
+	};
+	void transition.ready?.catch(observeTransitionError);
+
+	const updateDone = transition.updateCallbackDone || transition.finished;
+	if (transition.finished !== updateDone) {
+		void transition.finished?.catch(observeTransitionError);
+	}
+	try {
+		await updateDone;
+	} catch (error) {
+		observeTransitionError(error);
+	}
+
+	entries.forEach((entry, index) => {
+		entry.resolve(batch?.results[index] ?? false);
+	});
 };
 
 /**
  * @testable true
  * @tests tests_js/test_011_view_transitions_frontend.py::test_nested_transition_joins_active_transition_without_error_report
+ * @tests tests_js/test_011_view_transitions_frontend.py::test_transition_resolves_after_update_without_waiting_for_animation
+ * @tests tests_js/test_011_view_transitions_frontend.py::test_same_turn_commits_share_one_transition_and_run_once
+ * @tests tests_js/test_011_view_transitions_frontend.py::test_ready_rejection_does_not_replay_commit
  * @features view-transition
- * @dimensions nested-callback error-reporting
+ * @dimensions nested-callback error-reporting exact-once ready-rejection coalescing animation-lifecycle queueing update-completion
  */
-export const withTransition = (callback) => {
+export const withTransition = (callback, { label = "unlabeled" } = {}) => {
 	if (transitionDepth > 0) {
 		// Nested callers are already inside the browser's transition update.
-		return runWithoutTransition(callback);
+		return runWithoutTransition(callback, label);
 	}
 
-	const result = transitionQueue.then(() => executeTransition(callback));
-	transitionQueue = result.catch(() => {});
-	return result;
+	return new Promise((resolve) => {
+		if (!pendingTransitionBatch) {
+			pendingTransitionBatch = [];
+			queueMicrotask(() => {
+				const entries = pendingTransitionBatch;
+				pendingTransitionBatch = null;
+				transitionQueue = transitionQueue
+					.then(() => executeTransition(entries))
+					.catch((error) => {
+						captureError(error);
+						entries.forEach((entry) => {
+							entry.resolve(false);
+						});
+					});
+			});
+		}
+		pendingTransitionBatch.push({ callback, label, resolve });
+	});
 };
 
 /**
@@ -108,19 +246,35 @@ export const withTransition = (callback) => {
  * @covered-by src/script/elements/base/baseForm.mjs::BaseForm
  * @reason transient UI feedback helper exercised through form/component flows
  */
-export const showBriefly = (element, content) => {
-	element.replaceChildren(content);
-	element.dataset.visible = "true";
-	element.classList.add("fade-out");
-	element.addEventListener(
-		"animationend",
+const briefMessageTimers = new WeakMap();
+
+/**
+ * @testable false
+ * @covered-by src/script/elements/base/baseForm.mjs::BaseForm
+ * @covered-by src/script/views/base/component.mjs::ViewComponent
+ * @reason transient status feedback is exercised through form and component flows
+ */
+export const showBriefly = (element, content, duration = 1500) => {
+	clearTimeout(briefMessageTimers.get(element));
+	void withTransition(
 		() => {
-			element.classList.remove("fade-out");
-			element.dataset.visible = "false";
-			element.replaceChildren();
+			element.replaceChildren(content);
+			element.dataset.visible = "true";
 		},
-		{ once: true },
+		{ label: "brief-message-show" },
 	);
+
+	const timer = setTimeout(() => {
+		briefMessageTimers.delete(element);
+		void withTransition(
+			() => {
+				element.dataset.visible = "false";
+				element.replaceChildren();
+			},
+			{ label: "brief-message-hide" },
+		);
+	}, duration);
+	briefMessageTimers.set(element, timer);
 };
 
 /**

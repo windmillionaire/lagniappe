@@ -180,11 +180,15 @@ export class Filters {
 		const saved = await tools.loadWidget("SavedFilters");
 		await tools.activate("SavedFilters");
 		await saved.created(response);
+		await tools.prepareRender(true);
 
-		await withTransition(async () => {
-			await tools.render(true);
-			this._buttons.save.deactivate();
-		});
+		await withTransition(
+			() => {
+				tools.render(true);
+				this._buttons.save.deactivate();
+			},
+			{ label: "filters:save" },
+		);
 	}
 
 	/**
@@ -208,11 +212,15 @@ export class Filters {
 		await results.updated(response);
 		await this.component.activate("FilterResults");
 		this.target.dataset.filterList = "filters:FilterResults";
+		await this.component.prepareRender(true);
 
-		withTransition(() => {
-			this.component.render(true);
-			this._buttons.run.deactivate();
-		});
+		withTransition(
+			() => {
+				this.component.render(true);
+				this._buttons.run.deactivate();
+			},
+			{ label: "filters:run" },
+		);
 	}
 
 	_createFormConditions(response) {

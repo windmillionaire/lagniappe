@@ -274,6 +274,8 @@ class BrowserFailureCollector:
             message=str(error),
             stack=getattr(error, "stack", None),
         )
+        if str(error) == "Transition was skipped":
+            self.events[-1].ignored_reason = "browser-view-transition-skip"
 
     def _capture_request(self, page: Any, request: Any) -> None:
         parsed = urlsplit(request.url)

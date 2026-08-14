@@ -432,14 +432,26 @@ const showPhotoLayout = async (form, section, callback = null) => {
 	 * @covered-by src/script/elements/sections.mjs::photoPrompt
 	 * @reason private photo prompt activation runs inside the entity layout transition
 	 */
-	const activatePhoto = async ({ transition = false } = {}) => {
-		ensurePhotoMobileToggle(form, section);
-		syncPhotoPrompt(form, false);
-
+	const activatePhoto = async ({
+		transition = false,
+		deferCommit = false,
+	} = {}) => {
 		const photoComponent = form.view.getComponent(photo);
 		await photoComponent.activate("PagePhoto");
 		widget = photoComponent.active;
-		if (widget && callback) await callback(widget, { transition });
+		await photoComponent.prepareRender?.(true);
+		/**
+		 * @testable false
+		 * @covered-by src/script/elements/sections.mjs::photoPrompt
+		 * @reason private synchronous commit is exercised through photo prompt activation
+		 */
+		const commit = () => {
+			ensurePhotoMobileToggle(form, section);
+			syncPhotoPrompt(form, false);
+			if (widget && callback) callback(widget, { transition });
+		};
+		if (deferCommit) return commit;
+		commit();
 	};
 
 	if (typeof form.view.updateLayout === "function") {
@@ -449,7 +461,7 @@ const showPhotoLayout = async (form, section, callback = null) => {
 			secondary: photo,
 			secondaryActive: true,
 			activeTabId: form.view.mobile ? "photo" : null,
-			mutate: () => activatePhoto({ transition: false }),
+			mutate: () => activatePhoto({ transition: false, deferCommit: true }),
 		});
 		return widget;
 	}
@@ -495,7 +507,7 @@ const hidePhotoLayout = async (
 			secondary: photo,
 			secondaryActive: false,
 			activeTabId,
-			mutate: () => syncPhotoPrompt(form, promptActive),
+			mutate: () => () => syncPhotoPrompt(form, promptActive),
 		});
 		return;
 	}
@@ -529,8 +541,9 @@ const hidePhotoLayout = async (
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_empty_page_photo_prompt_can_disable_photo_without_reload
+ * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
  * @features pages
- * @dimensions photo-prompt image-generate image-add photo-disable desktop-tabs
+ * @dimensions photo-prompt image-generate image-add photo-disable desktop-tabs mobile-photo-tab
  */
 const photoPrompt = (form) => {
 	const section = form.target.querySelector("[data-role='photo-prompt']");

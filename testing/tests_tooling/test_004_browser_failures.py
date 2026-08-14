@@ -378,6 +378,17 @@ def test_navigation_cancellations_are_reported_but_do_not_fail_teardown():
     assert collector.events[0].ignored_reason == "browser-navigation-cancellation"
 
 
+def test_view_transition_skips_are_reported_but_do_not_fail_teardown():
+    collector = BrowserFailureCollector()
+    context = FakeContext()
+    collector.monitor_context(context, label="Owner")
+    page = context.new_page()
+    page.emit("pageerror", RuntimeError("Transition was skipped"))
+
+    collector.assert_clean()
+    assert collector.events[0].ignored_reason == "browser-view-transition-skip"
+
+
 def test_diagnostic_report_preserves_expected_and_unexpected_events(tmp_path):
     collector = BrowserFailureCollector()
     context = FakeContext()

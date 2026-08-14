@@ -1,10 +1,13 @@
+import { withTransition } from "../shared";
 import Entity from "./base/entity";
 
 /**
  * @testable true
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_add_image_to_page
+ * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
+ * @tests tests_js/test_038_startup_specializations.py::test_page_photo_initializes_only_when_selected_or_visible
  * @features pages
- * @dimensions image-add photo-prompt
+ * @dimensions image-add photo-prompt photo-lazy-activation photo-visible-startup mobile-photo-tab
  */
 export default class Page extends Entity {
 	async init() {
@@ -47,14 +50,15 @@ export default class Page extends Entity {
 	/**
 	 * @testable false
 	 * @covered-by src/script/views/base/entity.mjs::Entity._renderLayout
+	 * @covered-by src/script/views/base/entity.mjs::Entity.updateLayout
 	 * @reason page-specific inactive attribute guard feeds the shared layout renderer
 	 */
-	_prerender(tabId) {
+	_prerender(tabId, secondaryElement = undefined) {
 		const tab = this._tabElement(tabId);
 		if (tab?.dataset.hasAttribute === "false") {
 			tabId = this._defaultTabId;
 		}
-		return super._prerender(tabId);
+		return super._prerender(tabId, secondaryElement);
 	}
 
 	/**
@@ -66,7 +70,10 @@ export default class Page extends Entity {
 	async _focusTask(taskId) {
 		const taskTab = this.getComponent(this.elt.querySelector("#tasks"));
 		await taskTab.activate("PageTaskList");
-		await taskTab.render(true);
+		await taskTab.prepareRender(true);
+		await withTransition(() => taskTab.render(true), {
+			label: "page:focus-task-tab",
+		});
 		await taskTab.active.focusTask(taskId);
 		this._replaceFocusedTaskUrl();
 		this.postRender = null;

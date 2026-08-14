@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import os
 from pathlib import Path
@@ -96,15 +97,63 @@ def _base_nodeid(nodeid: str) -> str:
     return "::".join(parts)
 
 
-def _test_module_exists(repo_root: Path, nodeid: str) -> bool:
-    """Return whether a recorded node ID still belongs to a test module."""
+def _test_module_path(repo_root: Path, nodeid: str) -> Path:
+    """Resolve the test module path for a recorded node ID."""
     raw_path = nodeid.partition("::")[0]
     path = Path(raw_path)
     if path.is_absolute():
-        return path.is_file()
+        return path
     if path.parts and path.parts[0] == "testing":
-        return (repo_root / path).is_file()
-    return (repo_root / "testing" / path).is_file() or (repo_root / path).is_file()
+        return repo_root / path
+    testing_path = repo_root / "testing" / path
+    return testing_path if testing_path.is_file() else repo_root / path
+
+
+def _test_node_exists(
+    repo_root: Path,
+    nodeid: str,
+    parsed_modules: dict[Path, ast.Module | None],
+) -> bool:
+    """Return whether a recorded node ID still has a source test definition."""
+    path = _test_module_path(repo_root, nodeid)
+    if not path.is_file():
+        return False
+
+    base_nodeid = PARAMETER_SUFFIX_RE.sub("", nodeid)
+    symbols = base_nodeid.split("::")[1:]
+    if not symbols or path.suffix != ".py":
+        return True
+
+    if path not in parsed_modules:
+        try:
+            parsed_modules[path] = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError, UnicodeError):
+            # Evidence cleanup must not hide the original filesystem or
+            # collection problem. Keep the record until the module is readable.
+            parsed_modules[path] = None
+
+    module = parsed_modules[path]
+    if module is None:
+        return True
+
+    body = module.body
+    definitions = (ast.AsyncFunctionDef, ast.ClassDef, ast.FunctionDef)
+    for index, symbol in enumerate(symbols):
+        definition = next(
+            (
+                statement
+                for statement in body
+                if isinstance(statement, definitions) and statement.name == symbol
+            ),
+            None,
+        )
+        if definition is None:
+            return False
+        if index < len(symbols) - 1:
+            if not isinstance(definition, ast.ClassDef):
+                return False
+            body = definition.body
+    return True
 
 
 def _completed_parameter_sets(
@@ -163,10 +212,12 @@ def _write_manifest(
             tests.update(previous_tests)
         snapshots.update(decode_test_run_snapshots(previous))
 
+    parsed_modules: dict[Path, ast.Module | None] = {}
     tests = {
         nodeid: row
         for nodeid, row in tests.items()
-        if nodeid in outcomes or _test_module_exists(repo_root, nodeid)
+        if nodeid in outcomes
+        or _test_node_exists(repo_root, nodeid, parsed_modules)
     }
 
     snapshots[snapshot_id] = path_fingerprints

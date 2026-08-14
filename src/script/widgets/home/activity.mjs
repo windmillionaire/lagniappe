@@ -1,6 +1,6 @@
 import { STYLES } from "styles";
 import { BaseList } from "../../elements/base/baseList";
-import { request } from "../../shared";
+import { request, withTransition } from "../../shared";
 import { setIcon } from "../../shared/icons";
 
 /**
@@ -25,7 +25,7 @@ export class HomeActivityList extends BaseList {
 
 	handleOfflineQueue({ phase, queue, record }) {
 		if (phase === "queued") return this._offlineQueued(record, queue);
-		if (phase === "cancelled") this._offlineCancelled(record);
+		if (phase === "cancelled") return this._offlineCancelled(record);
 	}
 
 	_offlineQueued(record, queue) {
@@ -33,11 +33,11 @@ export class HomeActivityList extends BaseList {
 			return queue.response(this._renderNote(record, queue));
 		}
 
-		if (record.action === "delete") this._removeByKey(record.target_key);
+		if (record.action === "delete") return this._removeByKey(record.target_key);
 	}
 
 	_offlineCancelled(record) {
-		if (record.action === "create") this._removeByKey(record.client_key);
+		if (record.action === "create") return this._removeByKey(record.client_key);
 	}
 
 	/**
@@ -80,7 +80,11 @@ export class HomeActivityList extends BaseList {
 		button.disabled = true;
 		const response = await request.delete(route);
 		button.disabled = false;
-		if (response?.ok) this._removeItem(item);
+		if (response?.ok) {
+			await withTransition(() => this._commitRemoveItem(item), {
+				label: "home:activity-delete",
+			});
+		}
 	}
 
 	_renderNote(record, queue) {
@@ -143,7 +147,10 @@ export class HomeActivityList extends BaseList {
 
 	_removeByKey(key) {
 		const item = this._itemByKey(this.target, key);
-		if (item) this._removeItem(item);
+		if (!item) return undefined;
+		return withTransition(() => this._commitRemoveItem(item), {
+			label: "home:activity-offline-remove",
+		});
 	}
 
 	/**
@@ -152,7 +159,7 @@ export class HomeActivityList extends BaseList {
 	 * @features offline
 	 * @dimensions optimistic-mutation
 	 */
-	_removeItem(item) {
+	_commitRemoveItem(item) {
 		const list = item.closest("ul");
 		item.remove();
 

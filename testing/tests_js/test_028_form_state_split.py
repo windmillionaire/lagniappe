@@ -345,6 +345,7 @@ const widget = {
   },
 };
 const context = {
+  captureError(error) { throw error; },
   console,
   deleteOfflineMutations: async () => {},
   File: FakeFile,
@@ -1599,6 +1600,7 @@ const vm = require("node:vm");
 
 const events = [];
 const context = {
+  captureError(error) { throw error; },
   console,
   NavElement: class {},
   showBriefly() {},
@@ -1681,21 +1683,34 @@ vm.runInContext(source, context);
 
 const events = [];
 const widget = Object.create(context.PermissionsForm.prototype);
+widget.sections = new Map();
 widget._rebuildSections = false;
+widget._sectionReconcile = null;
 widget._success = false;
-widget.destroy = () => events.push("destroy");
-widget.init = async () => events.push("init");
+widget.target = { cloneNode() { return {}; } };
+widget.discardPreparedReset = () => events.push("discard");
+widget.prepareReset = async () => {
+  events.push("prepare");
+  widget._preparedReset = true;
+};
+widget.commitReset = () => {
+  events.push("commit");
+  widget._preparedReset = false;
+};
 
 (async () => {
-  await widget.postreconcile();
+  await widget.prereconcile();
+  widget.postreconcile();
   if (events.length !== 0) {
     throw new Error(`Visibility-only reconciliation rebuilt the form: ${events}`);
   }
 
   widget._rebuildSections = true;
-  await widget.postreconcile();
-  await widget.postreconcile();
-  const expected = ["destroy", "init"];
+  await widget.prereconcile();
+  widget.postreconcile();
+  await widget.prereconcile();
+  widget.postreconcile();
+  const expected = ["discard", "prepare", "commit"];
   if (JSON.stringify(events) !== JSON.stringify(expected)) {
     throw new Error(`Server sections were not rebuilt exactly once: ${JSON.stringify(events)}`);
   }
@@ -1739,28 +1754,33 @@ widget.sections = new Map();
 widget._rebuildSections = false;
 widget._sectionReconcile = null;
 widget._success = false;
-widget.target = { inert: false };
+widget.target = { inert: false, cloneNode() { return {}; } };
 widget.form = null;
-widget.setSections = () => events.push("sections");
-widget.destroy = () => events.push("destroy");
-widget.init = async () => {
-  events.push("init");
-  if (events.filter((event) => event === "init").length === 1) await firstInit;
+widget.discardPreparedReset = () => events.push("discard");
+widget.prepareReset = async () => {
+  events.push("prepare");
+  widget._preparedReset = true;
+  if (events.filter((event) => event === "prepare").length === 1) await firstInit;
+};
+widget.commitReset = () => {
+  events.push("commit");
+  widget._preparedReset = false;
 };
 
 (async () => {
   await widget.updated({ sections: {} });
-  const first = widget.postreconcile();
+  const first = widget.prereconcile();
   if (!widget.target.inert) {
     throw new Error("Permission controls became interactive during rebuild");
   }
 
   await widget.updated({ sections: {} });
-  const second = widget.postreconcile();
+  const second = widget.prereconcile();
   releaseFirstInit();
   await Promise.all([first, second]);
+  widget.postreconcile();
 
-  const expected = ["sections", "destroy", "init", "sections", "destroy", "init"];
+  const expected = ["discard", "prepare", "discard", "prepare", "commit"];
   if (JSON.stringify(events) !== JSON.stringify(expected)) {
     throw new Error(`Overlapping permission rebuilds were not serialized: ${events}`);
   }
@@ -1832,6 +1852,7 @@ widget.setSections = () => events.push("setSections");
 # @dimensions active-row dirty-row queued-row staged-review replacement removal preservation
 # @pair tasks:active-form-preservation
 # @pair tasks:dirty-form-preservation
+# @pair tasks:stale-widget
 def test_task_list_refresh_preserves_rows_with_local_form_state(run_node):
     run_node(
         r'''
@@ -1930,7 +1951,8 @@ Object.defineProperty(list, "activeCount", { value: 1 });
 Object.defineProperty(list, "completedCount", { value: 0 });
 
 (async () => {
-  await list.postreconcile();
+  await list.prereconcile();
+  list.postreconcile();
   if (list._removed.length || list._replaced.length) {
     throw new Error("Refresh work queues were not cleared");
   }
@@ -2005,7 +2027,8 @@ list._created = [createdRow];
 list._setListVisibility = () => {};
 
 (async () => {
-  await list.postreconcile();
+  await list.prereconcile();
+  list.postreconcile();
   if (
     rows.length !== 1 ||
     rows[0] !== refreshRow ||
@@ -2026,6 +2049,62 @@ list._setListVisibility = () => {};
   console.error(error);
   process.exit(1);
 });
+'''
+    )
+
+
+# @pair tasks:initial-render
+def test_task_list_initial_reconciliation_publishes_list_visibility(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const context = { BaseList: class {}, console };
+vm.createContext(context);
+let source = fs.readFileSync("src/script/widgets/pageTaskList.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class PageTaskList", "class PageTaskList");
+source += "\nglobalThis.PageTaskList = PageTaskList;";
+vm.runInContext(source, context);
+
+const attributes = new Set();
+const activeTasks = {
+  dataset: {},
+  querySelector() { return null; },
+};
+const completedTasks = { dataset: {} };
+const completedHeader = { dataset: {} };
+const list = Object.create(context.PageTaskList.prototype);
+
+list.target = {
+  hasAttribute(name) { return attributes.has(name); },
+  setAttribute(name) { attributes.add(name); },
+};
+list.component = { active: list };
+list._removed = [];
+list._added = [];
+list._preparedReplacements = [];
+list._preparedCreated = [];
+Object.defineProperties(list, {
+  activeTasks: { value: activeTasks },
+  completedTasks: { value: completedTasks },
+  completedHeader: { value: completedHeader },
+  activeCount: { value: 1 },
+  completedCount: { value: 0 },
+});
+
+list.postreconcile();
+
+if (!attributes.has("loaded")) {
+  throw new Error("Initial task-list reconciliation did not publish loaded state");
+}
+if (activeTasks.dataset.visible !== "true") {
+  throw new Error("Initial active tasks remained hidden until a later render");
+}
+if (completedHeader.dataset.visible !== "false") {
+  throw new Error("Initial completed-task header visibility was not reconciled");
+}
 '''
     )
 

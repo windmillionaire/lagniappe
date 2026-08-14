@@ -280,24 +280,27 @@ export class Toolbar {
 		return dropdownButton;
 	}
 
-	_toggleForm(command) {
+	async _toggleForm(command) {
 		const form = this.forms[command];
 		const toggle = this.toggles[command];
+		const loaded = form || (await this._loadForm(command));
 
-		return withTransition(async () => {
-			if (form) {
-				form.active = !form.active;
-				this.element.dataset.openForm = form.active ? command : "false";
-				form.active ? toggle?.enable() : toggle?.disable();
-				if (!form.active && form.reset) form.reset();
-			} else {
-				const form = await this._loadForm(command);
-				this.forms[command] = form;
-				this.element.dataset.openForm = command;
-				form.active = true;
-				toggle?.enable();
-			}
-		});
+		return withTransition(
+			() => {
+				if (form) {
+					form.active = !form.active;
+					this.element.dataset.openForm = form.active ? command : "false";
+					form.active ? toggle?.enable() : toggle?.disable();
+					if (!form.active && form.reset) form.reset();
+				} else {
+					this.forms[command] = loaded;
+					this.element.dataset.openForm = command;
+					loaded.active = true;
+					toggle?.enable();
+				}
+			},
+			{ label: `editor:toggle-${command}` },
+		);
 	}
 
 	destroy() {

@@ -1,5 +1,5 @@
 import { getFormElement } from "../elements/loader";
-import { captureError, generateElementId } from "../shared";
+import { captureError, generateElementId, withTransition } from "../shared";
 
 /**
  * @testable infrastructure
@@ -168,9 +168,23 @@ export class Renderer {
 		const targets = this.visibilityTriggers.get(trigger);
 		if (!targets) return;
 
-		targets.forEach((target) => {
-			this._updateVisibilityTarget(target);
-		});
+		const changes = Array.from(targets, (target) => ({
+			target,
+			visible: this._visibilityConditionsMatch(target),
+		})).filter(
+			({ target, visible }) =>
+				target.elt.dataset.visible !== (visible ? "true" : "false"),
+		);
+		if (!changes.length) return;
+
+		void withTransition(
+			() => {
+				changes.forEach(({ target, visible }) => {
+					target.elt.dataset.visible = visible ? "true" : "false";
+				});
+			},
+			{ label: "form:conditional-visibility" },
+		);
 	}
 
 	_updateVisibilityTarget(target) {

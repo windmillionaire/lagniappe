@@ -587,11 +587,8 @@ vm.runInContext(source, context);
     _setParentComponent() {},
   });
 
-  const outcome = await Promise.race([
-    component.render(true).then(() => "rendered"),
-    new Promise((resolve) => setTimeout(() => resolve("blocked"), 50)),
-  ]);
-  if (outcome !== "rendered" || reconciled !== 1 || scheduled !== 1) {
+  const outcome = component.render(true);
+  if (outcome !== undefined || reconciled !== 1 || scheduled !== 1) {
     throw new Error("Component rendering waited for background subscription work");
   }
 })().catch((error) => {
@@ -613,6 +610,7 @@ const context = { console };
 vm.createContext(context);
 
 let source = fs.readFileSync("src/script/elements/form.mjs", "utf8");
+source = source.replace('import { withTransition } from "../shared";\n', "");
 source = source.replace(
   'import { BaseForm } from "./base/baseForm";',
   "const BaseForm = class {};",

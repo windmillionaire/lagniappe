@@ -72,12 +72,18 @@ Widget layer (loader.mjs)
 | `created()` | Sets a `_created` flag for postreconcile |
 | `updated(response)` | Stores new schema/submission from the response, updates the initial target snapshot, sets `_updated` flag |
 | `markUnsavedState()` / `clearUnsavedState()` | Tracks local edits for submit-button feedback independently of live sync |
-| `postreconcile()` | If created or updated, calls `reset()` to re-render the form with new data. Shows success feedback if the response had HTML. |
+| `prereconcile()` | Renders an authoritative replacement form against a detached target when created or updated. |
+| `postreconcile()` | Synchronously destroys the old form and swaps in the prepared target inside the component transition. Shows success feedback if the response had HTML. |
 | `destroy()` | Destroys the form and all destroyables |
 
 ### Reset Flow
 
-`reset()` destroys the current form, replaces the DOM target with the initial clone, creates a new `BaseForm`, and re-renders. This gives widgets a clean re-initialization after create or update operations without needing custom reconciliation logic.
+`prepareReset()` creates a detached target and initializes a staged `BaseForm`
+without disturbing the connected form. `commitReset()` then destroys the old
+form, swaps the prepared target, and adopts its staged state synchronously.
+`reset()` remains the compatibility convenience that runs both phases. This
+gives widgets a clean re-initialization after create or update operations while
+keeping dynamic imports and renderer work outside the visual transition.
 
 ## BaseForm (`elements/base/baseForm.mjs`)
 
@@ -105,6 +111,11 @@ The submit button cycles through states defined by `messages`:
 | `messages.submit` | Default state (e.g. "Save", "Create") |
 | `messages.submitting` | After click, before response (e.g. "Saving..." with spinner) |
 | `messages.submitted` | After `success()` is called (e.g. "Saved" with check icon) |
+
+Submit buttons use a stable, absolutely positioned leading icon slot. Changing
+between no icon, unsaved, spinner, offline, and success states therefore does
+not recenter or resize the text. Brief success feedback is shown and hidden by
+short atomic commits rather than opacity fades.
 
 Any editable form with a submit button shows the cloud-exclamation icon after
 a local field change. Forms do not use live sync. A successful submit or form
@@ -176,6 +187,10 @@ The renderer receives a `form` widget that provides `schema` (field definitions)
 - **Clear button**: Fields with `schema.clear` get a clear button that calls `element.clear()`.
 - **Visibility triggers**: Fields with `schema.visibility` are shown/hidden based on other fields' values. Multiple conditions for the same trigger field are alternatives; conditions for different trigger fields must all match. Initial visibility is evaluated for readonly renders too; readonly forms do not attach change listeners.
 - **Status triggers**: Status-type elements update their messages whenever trigger fields change.
+
+One input event computes all visibility changes first and commits their
+`data-visible` state in one `withTransition()` call. Status text remains an
+immediate update so rapid input does not create a queue of cosmetic animations.
 
 `render()` may replace the host children only during `BaseForm.init()`; the
 base form then adds headers, prepend/append content, and submit controls.

@@ -1,6 +1,8 @@
 import { STYLES } from "styles";
 import { ENDPOINTS, request } from "../shared";
 import { createIcon } from "../shared/icons";
+import { renderNotificationBadge } from "../shared/notificationState";
+import { withTransition } from "../shared/utilities";
 import { Dropdown } from "./combobox/dropdown";
 
 const CLEAR_ALL_KEY = "__clear_all_notifications__";
@@ -10,7 +12,7 @@ const CLEAR_ALL_KEY = "__clear_all_notifications__";
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_renders_target_and_preserves_pending_state
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_deletes_and_clears
  * @features notifications
- * @dimensions menu-open dropdown-refresh delete clear-all long-text-wrap
+ * @dimensions menu-open dropdown-refresh delete clear-all long-text-wrap accessible-state
  */
 export class Notifications {
 	constructor(view) {
@@ -37,7 +39,10 @@ export class Notifications {
 
 	set visible(value) {
 		if (!this.button) return;
-		this.button.dataset.visible = value ? "true" : "false";
+		const visible = Boolean(value);
+		this.button.dataset.visible = visible ? "true" : "false";
+		this.button.setAttribute("aria-hidden", visible ? "false" : "true");
+		this.button.tabIndex = visible ? 0 : -1;
 	}
 
 	init(notifications = []) {
@@ -232,8 +237,15 @@ export class Notifications {
 	_updateDropdown() {
 		if (!this.dropdown) return;
 
-		this.dropdown.updateOptions(this._dropdownItems());
+		const items = this._dropdownItems();
 		this._updateCount();
+		if (!this.menuOpen) {
+			this.dropdown.items = items;
+			return;
+		}
+		void withTransition(() => this.dropdown.updateOptions(items), {
+			label: "notifications:update-open-menu",
+		});
 	}
 
 	_updateCount() {
@@ -246,11 +258,7 @@ export class Notifications {
 					: Number.isInteger(projected)
 						? projected
 						: 0;
-		if (this.count) this.count.textContent = count;
-		if (this.button) {
-			this.button.setAttribute("aria-label", `Notifications: ${count}`);
-		}
-		this.visible = count > 0;
+		renderNotificationBadge(count);
 	}
 
 	destroy() {

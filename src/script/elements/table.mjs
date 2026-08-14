@@ -200,11 +200,15 @@ export class TableElement extends BaseElement {
 
 		if (role === "create") {
 			if (this._form) return;
-			withTransition(async () => {
-				this._container.dataset.visible = "false";
-				this._form = await this.form();
-				this._edit.appendChild(this._form);
-			});
+			const form = await this.form();
+			await withTransition(
+				() => {
+					this._container.dataset.visible = "false";
+					this._form = form;
+					this._edit.appendChild(this._form);
+				},
+				{ label: "embedded-form:create" },
+			);
 		} else if (role === "cancel") {
 			withTransition(() => {
 				this._removeForm();
@@ -213,13 +217,16 @@ export class TableElement extends BaseElement {
 			const index = this._actionRow(e)?.dataset.index;
 			if (index === undefined) return;
 			this._hideActions();
-			withTransition(async () => {
-				this._container.dataset.visible = "false";
-				this._form = await this.form(index);
-				this._edit.appendChild(this._form);
-			}).then((success) => {
-				if (success) this._scrollFormIntoView();
-			});
+			const form = await this.form(index);
+			const success = await withTransition(
+				() => {
+					this._container.dataset.visible = "false";
+					this._form = form;
+					this._edit.appendChild(this._form);
+				},
+				{ label: "embedded-form:edit" },
+			);
+			if (success) this._scrollFormIntoView();
 		} else if (role === "delete") {
 			const index = Number.parseInt(
 				this._actionRow(e)?.dataset.index ?? "",

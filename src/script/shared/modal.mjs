@@ -85,9 +85,12 @@ export class Modal {
 	}
 
 	async remove() {
-		await withTransition(async () => {
-			this.destroy();
-		});
+		await withTransition(
+			() => {
+				this.destroy();
+			},
+			{ label: "modal:remove" },
+		);
 	}
 
 	async load(route) {
@@ -103,7 +106,7 @@ export class Modal {
 				if (this.trigger) this.trigger.disabled = false;
 				return null;
 			}
-			this.attach(modal.html);
+			await this.attach(modal.html);
 			if (this.trigger) this.trigger.disabled = false;
 		} catch (error) {
 			captureError(error, this.trigger, this.view?.dataset);
@@ -111,14 +114,21 @@ export class Modal {
 		}
 	}
 
-	attach(html, component) {
+	async attach(html, component) {
 		try {
 			if (this.trigger) this.trigger.disabled = true;
 			const modal = html.querySelector("#modal") || html;
-			document.body.appendChild(modal);
-			this._attachListeners();
+			await withTransition(
+				() => {
+					document.body.appendChild(modal);
+					this._attachListeners();
+				},
+				{ label: "modal:attach" },
+			);
+			return modal;
 		} catch (error) {
 			captureError(error, component, this.view?.dataset);
+			return null;
 		}
 	}
 }
@@ -250,7 +260,7 @@ export class HelpModal extends Modal {
  * @testable infrastructure
  */
 export class OfflineModal extends Modal {
-	attach() {
+	async attach() {
 		const modal = document.createElement("div");
 		modal.id = "modal";
 		modal.className = STYLES.modal.wrapper;
@@ -268,7 +278,7 @@ export class OfflineModal extends Modal {
 		close.textContent = "Close";
 		close.className = `${STYLES.button.close}`;
 		close.onclick = () => {
-			modal.remove();
+			void this.remove();
 		};
 
 		const body = content.appendChild(document.createElement("div"));
@@ -278,7 +288,7 @@ export class OfflineModal extends Modal {
 			"You are offline (or the server is starting up). You will be able to view any pages that have been " +
 			"cached, but search, documents and forms will be in read-only mode until you are online again.";
 
-		super.attach(modal);
+		await super.attach(modal);
 	}
 
 	enable() {

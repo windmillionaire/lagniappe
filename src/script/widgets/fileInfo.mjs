@@ -198,8 +198,8 @@ export class FileInfo extends FormElement {
 			this.options.extract?.complete === true && !hasTextTab;
 	}
 
-	async postreconcile() {
-		await super.postreconcile();
+	postreconcile() {
+		super.postreconcile();
 		this.setEntityMetadata();
 		if (this._refreshExtractOnReconcile) {
 			this._refreshExtractOnReconcile = false;

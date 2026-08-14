@@ -88,8 +88,8 @@ export class ModelTaskInfo extends ModelTask {
 		};
 	}
 
-	async postreconcile() {
-		await super.postreconcile();
+	postreconcile() {
+		super.postreconcile();
 		const name =
 			this.nameElement?.value ||
 			this.target.dataset.name ||

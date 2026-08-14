@@ -621,9 +621,11 @@ home:
 
 note:
   section:
-    classes: mt-4 flex flex-col gap-4
+    classes: page-note-section mt-4 flex flex-col gap-4
     intent: full-width Page note composer and list below the entity title
     surfaces: [server]
+    hooks: [page-note-section]
+    css: [src/style/content.css]
   form:
     home:
       classes: group/form flex flex-col gap-5 rounded-md bg-note-bg p-4 outline-2 outline-note-default shadow-sm

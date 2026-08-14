@@ -41,28 +41,38 @@ export default class Analytics extends ShellView {
 		super._click(event);
 	}
 
-	_toggleRetention(toggle) {
+	async _toggleRetention(toggle) {
 		const retention = toggle.closest("[data-role='analytics-retention']");
 		const panel = retention?.querySelector(
 			"[data-role='analytics-retention-panel']",
 		);
 		if (!panel) return;
 
-		const open = panel.dataset.visible !== "true";
-		panel.dataset.visible = open ? "true" : "false";
-		toggle.dataset.open = panel.dataset.visible;
-		toggle.setAttribute("aria-expanded", open ? "true" : "false");
-		if (retention) retention.dataset.open = panel.dataset.visible;
+		await withTransition(
+			() => {
+				const open = panel.dataset.visible !== "true";
+				panel.dataset.visible = open ? "true" : "false";
+				toggle.dataset.open = panel.dataset.visible;
+				toggle.setAttribute("aria-expanded", open ? "true" : "false");
+				if (retention) retention.dataset.open = panel.dataset.visible;
+			},
+			{ label: "analytics:toggle-retention" },
+		);
 	}
 
-	_toggleGroup(group, toggle) {
+	async _toggleGroup(group, toggle) {
 		const open = group.dataset.open !== "true";
-		group.dataset.open = open ? "true" : "false";
-		toggle.dataset.open = group.dataset.open;
-		toggle.setAttribute("aria-expanded", open ? "true" : "false");
+		await withTransition(
+			() => {
+				group.dataset.open = open ? "true" : "false";
+				toggle.dataset.open = group.dataset.open;
+				toggle.setAttribute("aria-expanded", open ? "true" : "false");
 
-		const target = group.querySelector("[data-role='analytics-events']");
-		if (target) target.dataset.visible = group.dataset.open;
+				const target = group.querySelector("[data-role='analytics-events']");
+				if (target) target.dataset.visible = group.dataset.open;
+			},
+			{ label: "analytics:toggle-group" },
+		);
 
 		if (open) this._loadGroup(group);
 	}
@@ -76,12 +86,16 @@ export default class Analytics extends ShellView {
 
 		group.dataset.loaded = "true";
 		const response = await request.get(route);
-		if (response?.ok && response.html) {
-			target.innerHTML = response.html.body.innerHTML;
-		} else {
-			target.innerHTML =
-				'<div class="p-2 text-sm text-base-medium sm:px-6">Unable to load events.</div>';
-		}
+		const html =
+			response?.ok && response.html
+				? response.html.body.innerHTML
+				: '<div class="p-2 text-sm text-base-medium sm:px-6">Unable to load events.</div>';
+		await withTransition(
+			() => {
+				target.innerHTML = html;
+			},
+			{ label: "analytics:load-group" },
+		);
 	}
 
 	async _clearRecords(button) {
@@ -136,24 +150,28 @@ export default class Analytics extends ShellView {
 		);
 		if (!response?.ok || !view) return null;
 
-		await withTransition(() => {
-			this.elt.innerHTML = view.innerHTML;
-		});
-		const retention = this.elt.querySelector(
-			`[data-role='analytics-retention'][data-dataset='${dataset}']`,
+		let panel = null;
+		await withTransition(
+			() => {
+				this.elt.innerHTML = view.innerHTML;
+				const retention = this.elt.querySelector(
+					`[data-role='analytics-retention'][data-dataset='${dataset}']`,
+				);
+				panel = retention?.querySelector(
+					"[data-role='analytics-retention-panel']",
+				);
+				const toggle = retention?.querySelector(
+					"[data-role='analytics-retention-toggle']",
+				);
+				if (panel) panel.dataset.visible = "true";
+				if (retention) retention.dataset.open = "true";
+				if (toggle) {
+					toggle.dataset.open = "true";
+					toggle.setAttribute("aria-expanded", "true");
+				}
+			},
+			{ label: "analytics:refresh-dashboard" },
 		);
-		const panel = retention?.querySelector(
-			"[data-role='analytics-retention-panel']",
-		);
-		const toggle = retention?.querySelector(
-			"[data-role='analytics-retention-toggle']",
-		);
-		if (panel) panel.dataset.visible = "true";
-		if (retention) retention.dataset.open = "true";
-		if (toggle) {
-			toggle.dataset.open = "true";
-			toggle.setAttribute("aria-expanded", "true");
-		}
 		return panel || null;
 	}
 }

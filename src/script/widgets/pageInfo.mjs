@@ -205,9 +205,25 @@ export class PageInfo extends PageForm {
 		this.target.addEventListener("updated", this._changeForm);
 	}
 
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/pageInfo.mjs::PageInfo
+	 * @reason detached page-info resets retain the form-selection listener
+	 */
+	async prepareReset(options = {}) {
+		const afterInit = options.afterInit;
+		await super.prepareReset({
+			...options,
+			afterInit: async (widget) => {
+				await afterInit?.(widget);
+				widget.target.addEventListener("updated", widget._changeForm);
+			},
+		});
+	}
+
 	async reset() {
-		await super.reset();
-		this.target.addEventListener("updated", this._changeForm);
+		await this.prepareReset();
+		this.commitReset();
 	}
 
 	offline({ data, method, route }) {
@@ -277,18 +293,22 @@ export class PageInfo extends PageForm {
 		this.schema = response.schema;
 		this.submission = response.submission;
 
-		withTransition(async () => {
-			const formSelect = this.initialTarget.querySelector(
-				'[data-action="select-form"]',
-			);
-			formSelect.dataset.preload = JSON.stringify(selectedForm);
-			await this.reset();
-			this.target.dataset.visible = "true";
-		});
+		const nextFormSelect = this.initialTarget.querySelector(
+			'[data-action="select-form"]',
+		);
+		nextFormSelect.dataset.preload = JSON.stringify(selectedForm);
+		await this.prepareReset();
+		await withTransition(
+			() => {
+				this.commitReset();
+				this.target.dataset.visible = "true";
+			},
+			{ label: "page-info:change-form" },
+		);
 	}
 
-	async postreconcile() {
-		await super.postreconcile();
+	postreconcile() {
+		super.postreconcile();
 		this.setEntityMetadata();
 	}
 }
@@ -333,12 +353,17 @@ export class CreatePage extends PageForm {
 		return [];
 	}
 
-	async postreconcile() {
+	async prereconcile() {
+		await super.prereconcile();
+		if (this._created) await this.prepareReset();
+	}
+
+	postreconcile() {
 		const created = this._created;
-		await super.postreconcile();
+		if (created) this.commitReset();
+		super.postreconcile();
 
 		if (created) {
-			await this.reset();
 			this.form?.resetSubmitButton();
 		}
 		const nameElement = this.target.querySelector("input[name='name']");
@@ -574,12 +599,12 @@ export class UserSettings extends PagePermissions {
 		return data;
 	}
 
-	async postreconcile() {
+	postreconcile() {
 		const updated = this._updated;
 		if (!updated) return;
 
 		this._updated = false;
-		await this.reset();
+		this.commitReset();
 		this.target.dataset.visible = "true";
 		this.setEntityMetadata();
 		if (this._success) {

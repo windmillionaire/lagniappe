@@ -43,14 +43,9 @@ export class Condition {
 		this.header.querySelector("[data-role='title']").appendChild(status);
 
 		setTimeout(() => {
-			status.style.animation = "fade-out 300ms ease-out forwards";
-			status.addEventListener(
-				"animationend",
-				() => {
-					status.remove();
-				},
-				{ once: true },
-			);
+			void withTransition(() => status.remove(), {
+				label: "builder:condition-success",
+			});
 		}, 1000);
 	}
 

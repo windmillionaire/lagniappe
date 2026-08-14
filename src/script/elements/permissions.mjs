@@ -1,4 +1,5 @@
 import { STYLES } from "styles";
+import { withTransition } from "../shared";
 import { BaseForm } from "./base/baseForm";
 import { FacetsBox } from "./combobox";
 import { FormElement } from "./form";
@@ -128,13 +129,12 @@ export class PermissionsForm extends FormElement {
 			}
 		});
 
-		this.setSections();
 		this._rebuildSections = true;
 
 		if (this.form) this._success = true;
 	}
 
-	async postreconcile() {
+	async prereconcile() {
 		if (this._sectionReconcile) return this._sectionReconcile;
 		if (!this._rebuildSections) return;
 
@@ -144,19 +144,42 @@ export class PermissionsForm extends FormElement {
 			// the first user input on a newly activated form.
 			while (this._rebuildSections) {
 				this._rebuildSections = false;
-				this.destroy();
-				await this.init();
+				this.discardPreparedReset();
+				const sections = new Map(
+					Array.from(this.sections, ([name, section]) => [
+						name,
+						{ config: section.config },
+					]),
+				);
+				await this.prepareReset({
+					nextTarget: this.target.cloneNode(true),
+					staged: { sections },
+					beforeInit: (widget) => {
+						widget.setSections();
+					},
+					afterInit: (widget) => {
+						widget.setVisibility();
+						widget.target.addEventListener("updated", widget._update);
+						widget.target.addEventListener("change", widget._change);
+					},
+				});
 			}
-			if (this._success) this.form.success();
-			this._success = false;
 		})();
 
 		try {
 			await this._sectionReconcile;
 		} finally {
 			this._sectionReconcile = null;
-			if (this.target) this.target.inert = false;
+			if (!this._preparedReset && this.target) this.target.inert = false;
 		}
+	}
+
+	postreconcile() {
+		if (!this._preparedReset) return;
+		this.commitReset();
+		if (this.target) this.target.inert = false;
+		if (this._success) this.form.success();
+		this._success = false;
 	}
 
 	_update(event) {
@@ -164,33 +187,45 @@ export class PermissionsForm extends FormElement {
 		const newEntry = Object.values(event.detail.options)[0];
 		if (!section || !newEntry?.id) return;
 
-		if (!section.list.querySelector(`[name="${newEntry.id}"]`)) {
-			section.list.appendChild(addSpecificPermission(section.config, newEntry));
-		}
-		section.select.clear();
+		void withTransition(
+			() => {
+				if (!section.list.querySelector(`[name="${newEntry.id}"]`)) {
+					section.list.appendChild(
+						addSpecificPermission(section.config, newEntry),
+					);
+				}
+				section.select.clear();
+			},
+			{ label: "permissions:add-entry" },
+		);
 	}
 
 	_change(event) {
 		const sectionContainer = event.target.closest("[data-section]");
 		if (!sectionContainer) return;
-		const section = sectionContainer.dataset.section;
-		if (event.target.type === "checkbox" && !event.target.checked) {
-			const permission = event.target.closest("li");
-			permission.remove();
-		}
+		void withTransition(
+			() => {
+				const section = sectionContainer.dataset.section;
+				if (event.target.type === "checkbox" && !event.target.checked) {
+					const permission = event.target.closest("li");
+					permission.remove();
+				}
 
-		const changed = this.sections.get(section);
-		if (["public"].includes(section)) {
-			changed.set = event.target.value === "TRUE";
-		} else if ("list" in this.sections.get(section)) {
-			changed.set = this.sections.get(section).list.children.length > 0;
-		} else if (section === "users") {
-			changed.set = !["NONE", "VIEW"].includes(event.target.value);
-		} else {
-			changed.set = event.target.value !== "NONE";
-		}
+				const changed = this.sections.get(section);
+				if (["public"].includes(section)) {
+					changed.set = event.target.value === "TRUE";
+				} else if ("list" in this.sections.get(section)) {
+					changed.set = this.sections.get(section).list.children.length > 0;
+				} else if (section === "users") {
+					changed.set = !["NONE", "VIEW"].includes(event.target.value);
+				} else {
+					changed.set = event.target.value !== "NONE";
+				}
 
-		this.setVisibility();
+				this.setVisibility();
+			},
+			{ label: "permissions:change" },
+		);
 	}
 
 	setSections() {

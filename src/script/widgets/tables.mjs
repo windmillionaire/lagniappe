@@ -92,7 +92,7 @@ export class IndexTable extends BaseTable {
 	 * @testable infrastructure
 	 * @covered-by src/script/views/base/core.mjs::Core._refreshCollectionComponents
 	 */
-	async refreshDelta(delta) {
+	refreshDelta(delta) {
 		const existing = new Map(
 			Array.from(this.target.querySelectorAll("tr[lp-entity]"), (row) => [
 				row.dataset.key,
@@ -141,7 +141,7 @@ export class IndexTable extends BaseTable {
 	 * @tests tests_js/test_022_refresh_frontend.py::test_index_table_row_updates_rebuild_active_sort
 	 * @pairs form-index:destination-refresh form-index:sorting form-index:delete-target
 	 */
-	async refresh(response) {
+	refresh(response) {
 		if (!response?.html) return;
 		const newRows = [...response.html.querySelectorAll("tr[lp-entity]")];
 		const newKeys = new Set(
@@ -181,7 +181,16 @@ export class IndexTable extends BaseTable {
 	 * @features form-index
 	 * @dimensions created-row sorting
 	 */
-	async postreconcile() {
+	async prereconcile() {
+		const loaded = this.target.hasAttribute("loaded");
+		if (!this.loaded || loaded) return;
+
+		const sorting = await this.component.loadWidget("TableSorting");
+		if (sorting) await sorting.init();
+		this._finishLoading = true;
+	}
+
+	postreconcile() {
 		const target = this.target;
 		let rowsChanged = false;
 		const sortingWasInitialized = this.sortingWidget?.initialized === true;
@@ -193,7 +202,7 @@ export class IndexTable extends BaseTable {
 			rowsChanged = true;
 
 			if (this.view.mobile) {
-				target.scrollIntoView({ behavior: "smooth", block: "start" });
+				target.scrollIntoView({ behavior: "auto", block: "start" });
 			}
 		}
 
@@ -203,10 +212,8 @@ export class IndexTable extends BaseTable {
 			rowsChanged = true;
 		}
 
-		const loaded = target.hasAttribute("loaded");
-		if (this.loaded && !loaded) {
-			const sorting = await this.component.loadWidget("TableSorting");
-			if (sorting) await sorting.init();
+		if (this._finishLoading) {
+			this._finishLoading = false;
 			this.target.setAttribute("loaded", "");
 			this.setEmptyRowVisibility();
 			target.dataset.visible = true;
@@ -242,7 +249,7 @@ export class TaskHistory extends EmbeddedTable {
 		this._updated = response.html.querySelector("table");
 	}
 
-	async postreconcile() {
+	postreconcile() {
 		if (!this._updated) return;
 
 		this.visible = true;

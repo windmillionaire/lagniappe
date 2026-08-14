@@ -25,6 +25,7 @@ export class SiteSettings {
 		Object.assign(this, attributes);
 		this.sections = new Map();
 		this.settingWidgets = new Map();
+		this._sectionRequest = 0;
 		this._click = this._click.bind(this);
 	}
 
@@ -37,7 +38,8 @@ export class SiteSettings {
 		const initialSection = this.sections.has(savedSection)
 			? savedSection
 			: DEFAULT_SECTION;
-		await this._setOpenSection(initialSection, { persist: false });
+		await this.settingWidgets.get(initialSection)?.opened?.();
+		this._setOpenSection(initialSection, { persist: false });
 		this.target.setAttribute("initialized", "");
 	}
 
@@ -89,14 +91,19 @@ export class SiteSettings {
 		void this._toggleSection(section.dataset.section);
 	}
 
-	_toggleSection(name) {
+	async _toggleSection(name) {
 		const nextOpen = !this._isSectionOpen(name);
-		return withTransition(() => {
-			return this._setOpenSection(nextOpen ? name : null);
+		const nextSection = nextOpen ? name : null;
+		const request = ++this._sectionRequest;
+		await this.settingWidgets.get(nextSection)?.opened?.();
+		if (request !== this._sectionRequest) return;
+
+		return withTransition(() => this._setOpenSection(nextSection), {
+			label: "site-settings:toggle-section",
 		});
 	}
 
-	async _setOpenSection(name, { persist = true } = {}) {
+	_setOpenSection(name, { persist = true } = {}) {
 		this.sections.forEach((section, sectionName) => {
 			const open = sectionName === name;
 			section.dataset.open = open ? "true" : "false";
@@ -120,8 +127,6 @@ export class SiteSettings {
 				localStorage.removeItem(SECTION_STORAGE_KEY);
 			}
 		}
-
-		await this.settingWidgets.get(name)?.opened?.();
 	}
 
 	_isSectionOpen(name) {

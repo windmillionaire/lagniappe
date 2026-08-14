@@ -107,12 +107,18 @@ def _poll_ask_job_completion(user, job):
             const view = document.querySelector("[lp-view]")?._lp_view;
             if (!view) throw new Error("Ask view is not initialized");
             const operations = await view.ensureDeferredOperations();
-            if (!operations?.operations?.has(key)) {
-                throw new Error("Ask operation is not tracked");
+            if (operations?.operations?.has(key)) {
+                await view.PollingCoordinator.trigger(`operation:${key}`, {
+                    fresh: true,
+                });
+                return;
             }
-            await view.PollingCoordinator.trigger(`operation:${key}`, {
-                fresh: true,
-            });
+            const pending = Array.from(
+                document.querySelectorAll("[data-operation]"),
+            ).some((node) => node.dataset.operation === key);
+            if (pending) {
+                throw new Error("Pending Ask operation is not tracked");
+            }
         }""",
         job.urlsafe_key,
     )

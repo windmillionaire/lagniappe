@@ -100,8 +100,8 @@ export class CategoryInfo extends CategoryForm {
 		];
 	}
 
-	async postreconcile() {
-		await super.postreconcile();
+	postreconcile() {
+		super.postreconcile();
 		this.setEntityMetadata();
 	}
 }
@@ -224,9 +224,15 @@ export class GeneratePages extends FormElement {
 		this._success = false;
 	}
 
-	async postreconcile() {
+	async prereconcile() {
+		await super.prereconcile();
+		if (this._created) await this.prepareReset();
+	}
+
+	postreconcile() {
 		const created = this._created;
-		await super.postreconcile();
+		if (created) this.commitReset();
+		super.postreconcile();
 
 		if (created) {
 			this.success();

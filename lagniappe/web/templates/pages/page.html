@@ -38,14 +38,16 @@
              data-kind="user"
              class="{{ styles.link.default }}">{{- page.model.name -}}</a>
           {{- name_separator() -}}
-        </span><wbr>
+        </span>
+        <wbr>
       {%- elif page.categories -%}
         <span class="{{ styles.entity.name.parent }}">
           <a href="{{ url_for('categories.index', key=page.categories[0].urlsafe_key) }}"
              data-kind="category"
              class="{{ styles.link.default }}">{{- page.categories[0].name -}}</a>
           {{- name_separator() -}}
-        </span><wbr>
+        </span>
+        <wbr>
       {%- endif -%}
       <span data-menu-anchor class="{{ styles.entity.name.anchor }}">
         {#- Prevent indentation from becoming leading inline title space. -#}
@@ -70,41 +72,31 @@
               data-kind="page"
               data-attribute="photo"
               data-has-attribute="{{ has_image|yesno }}"
-              class="{{ styles.entity.tabIcon }} sm:hidden">
-        {{ render_icon("image") }}
-      </button>
+              class="{{ styles.entity.tabIcon }} sm:hidden">{{ render_icon("image") }}</button>
     {% endif %}
     {% if render_document %}
       <button lp-show="document:active"
               data-kind="page"
               data-attribute="document"
               data-has-attribute="{{ has_document|yesno }}"
-              class="{{ styles.entity.tabIcon }}">
-        {{ render_icon("document") }}
-      </button>
+              class="{{ styles.entity.tabIcon }}">{{ render_icon("document") }}</button>
     {% endif %}
     <button lp-show="info:active"
             data-kind="page"
-            class="{{ styles.entity.tabIcon }}">
-      {{ render_icon("info") }}
-    </button>
+            class="{{ styles.entity.tabIcon }}">{{ render_icon("info") }}</button>
     {% if render_tasks %}
       <button lp-show="tasks:active"
               data-kind="task"
               data-attribute="tasks"
               data-has-attribute="{{ has_tasks|yesno }}"
-              class="{{ styles.entity.tabIcon }}">
-        {{ render_icon("task") }}
-      </button>
+              class="{{ styles.entity.tabIcon }}">{{ render_icon("task") }}</button>
     {% endif %}
     {% if render_files %}
       <button lp-show="files:active"
               data-kind="file"
               data-attribute="files"
               data-has-attribute="{{ has_files|yesno }}"
-              class="{{ styles.entity.tabIcon }}">
-        {{ render_icon("files") }}
-      </button>
+              class="{{ styles.entity.tabIcon }}">{{ render_icon("files") }}</button>
     {% endif %}
   </nav>
 {% endmacro %}
@@ -114,16 +106,12 @@
     <button lp-show="info:UserSettings"
             data-kind="user"
             data-visible="false"
-            class="{{ styles.toggle.container }}">
-      {{ render_icon("user") }}
-    </button>
+            class="{{ styles.toggle.container }}">{{ render_icon("user") }}</button>
   {% elif view_permissions %}
     <button lp-show="info:PagePermissions"
             data-kind="user"
             data-visible="false"
-            class="{{ styles.toggle.container }}">
-      {{ render_icon("permissions") }}
-    </button>
+            class="{{ styles.toggle.container }}">{{ render_icon("permissions") }}</button>
   {% endif %}
   {% if page.allowed(Action.PUBLISH) and render_document %}
     <button lp-show="document:DocumentSettings"
@@ -141,9 +129,7 @@
             data-visible="false"
             data-attribute="tasks"
             data-has-attribute="{{ has_tasks|yesno }}"
-            class="{{ styles.toggle.container }}">
-      {{ render_icon("plus") }}
-    </button>
+            class="{{ styles.toggle.container }}">{{ render_icon("plus") }}</button>
   {% endif %}
   {% if page.allowed(Action.EDIT) and not is_public_user and render_files %}
     <button lp-show="files:FileUpload"
@@ -151,9 +137,7 @@
             data-visible="false"
             data-attribute="files"
             data-has-attribute="{{ has_files|yesno }}"
-            class="{{ styles.toggle.container }}">
-      {{ render_icon("plus") }}
-    </button>
+            class="{{ styles.toggle.container }}">{{ render_icon("plus") }}</button>
   {% endif %}
 {% endmacro %}
 
@@ -168,10 +152,7 @@
       {{ controls.page_controls() }}
     </div>
     <div class="{{ styles.layout.nav.group }}" data-flipped="false">
-      <button data-role="flipper"
-              class="{{ styles.layout.nav.flipper }} text-xl">
-        {{ render_icon("flipper.left") }}
-      </button>
+      <button data-role="flipper" class="{{ styles.layout.nav.flipper }} text-xl">{{ render_icon("flipper.left") }}</button>
       {{ toggles('mobile', has_image) }}
     </div>
   </div>
@@ -210,9 +191,7 @@
            lp-component
            data-visible="false"
            class="{{ styles.card.primary }}">
-        <div lp-nav
-             class="{{ styles.layout.nav.title }}"
-             data-nav="tabs">
+        <div lp-nav class="{{ styles.layout.nav.title }}" data-nav="tabs">
           <div data-role="header" class="{{ styles.layout.nav.header }}">
             <span class="text-default-dark" data-role="title"></span>
             {{ sub_toggles(page) }}

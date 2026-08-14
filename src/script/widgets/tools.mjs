@@ -154,15 +154,19 @@ export class CreateToolReport extends BaseUpload {
 		this.createdReport = true;
 	}
 
-	reset() {
-		super.reset();
+	_resetUI() {
 		this.context?.clear();
 		this.setTool(this.activeTool, { reset: false });
 		this.form?.hideSubmitButton();
 		this.toggleExplainButton();
 	}
 
-	async postreconcile() {
+	reset() {
+		super.reset();
+		this._resetUI();
+	}
+
+	postreconcile() {
 		if (this.createdReport) {
 			this.reset();
 			this.visible = false;

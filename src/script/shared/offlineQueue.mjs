@@ -128,6 +128,12 @@ export class OfflineQueue {
 		});
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_028_form_state_split.py::test_offline_submit_record_keeps_originating_entity_fingerprint
+	 * @features offline
+	 * @dimensions queue-submit fingerprint immutable-command
+	 */
 	async queueSubmit(component, data, route, method = "POST") {
 		const widget = component.active;
 		const target = widget?.target;

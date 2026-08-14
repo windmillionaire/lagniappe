@@ -256,7 +256,11 @@ export default class Entity extends Core {
 	}
 
 	/**
-	 * @testable infrastructure
+	 * @testable true
+	 * @tests tests_js/test_012_entity_layout_frontend.py::test_dynamic_mobile_secondary_uses_final_layout_state
+	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
+	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_enabled_model_tasks_rejoins_section_switching
+	 * @pair entity-layout:dynamic-secondary
 	 */
 	async updateLayout({
 		attribute = null,
@@ -270,25 +274,43 @@ export default class Entity extends Core {
 		const secondaryElement = this._componentElement(secondary);
 		const before = this._layoutSnapshot(secondaryElement);
 		let mutationResult = null;
+		let commitMutation = null;
 		let activeLayoutTabId = null;
 		let layoutChanged = false;
 
-		await withTransition(async () => {
-			if (attribute && attributeActive !== null) {
-				this.setAttributeActive(attribute, attributeActive);
-			}
-			if (secondaryElement && secondaryActive !== null) {
-				this.setSecondaryCardActive(secondaryElement, secondaryActive);
-			}
-			if (activeTabId) {
-				localStorage.setItem(`${this.hash}-active`, activeTabId);
-			}
+		if (activeTabId) {
+			localStorage.setItem(`${this.hash}-active`, activeTabId);
+		}
+		const preparedMutation = await mutate?.({ layoutChanged: false });
+		if (typeof preparedMutation === "function") {
+			commitMutation = preparedMutation;
+		} else {
+			mutationResult = preparedMutation;
+		}
+		const preparedSecondary =
+			secondaryActive === null
+				? undefined
+				: secondaryActive
+					? secondaryElement
+					: null;
+		const preparedLayout = await this._prepareLayoutBody(preparedSecondary);
 
-			const prepared = this._layoutSnapshot(secondaryElement);
-			layoutChanged = this._layoutChanged(before, prepared);
-			mutationResult = await mutate?.({ layoutChanged });
-			activeLayoutTabId = await this._renderLayoutBody();
-		});
+		await withTransition(
+			() => {
+				commitMutation?.();
+				if (attribute && attributeActive !== null) {
+					this.setAttributeActive(attribute, attributeActive);
+				}
+				if (secondaryElement && secondaryActive !== null) {
+					this.setSecondaryCardActive(secondaryElement, secondaryActive);
+				}
+				const prepared = this._layoutSnapshot(secondaryElement);
+				layoutChanged = this._layoutChanged(before, prepared);
+				activeLayoutTabId = this._commitLayoutBody(preparedLayout);
+			},
+			{ label: "entity:update-layout" },
+		);
+		if (this.postRender) await this.postRender();
 
 		const after = this._layoutSnapshot(secondaryElement);
 		layoutChanged = layoutChanged || this._layoutChanged(before, after);
@@ -314,40 +336,52 @@ export default class Entity extends Core {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_012_entity_layout_frontend.py::test_entity_layout_ignores_already_consumed_reconcile_callback
-	 * @tests tests_js/test_012_entity_layout_frontend.py::test_initial_entity_layout_keeps_tab_and_widget_in_one_transition
+	 * @tests tests_js/test_012_entity_layout_frontend.py::test_initial_entity_layout_prepares_widget_before_one_transition
 	 * @features entity-layout
 	 * @dimensions nested-layout reconcile-callback
 	 * @pairs entity-layout:nested-layout entity-layout:reconcile-callback
 	 * @pair startup:view-ready
 	 */
 	async _renderLayoutBody() {
+		const prepared = await this._prepareLayoutBody();
+		await withTransition(() => this._commitLayoutBody(prepared), {
+			label: "entity:render-layout",
+		});
+		if (this.postRender) await this.postRender();
+		return prepared.activeTabId;
+	}
+
+	async _prepareLayoutBody(secondaryElement = undefined) {
 		const tabId = this._initialTabId();
-		const [tabs, secondary, activeTabId] = this._prerender(tabId);
+		const [tabs, secondary, activeTabId] = this._prerender(
+			tabId,
+			secondaryElement,
+		);
 		const activeTabElt = this._tabElement(activeTabId);
-		const mobileNav = this.mobileNav;
 		const layout = this.elt.querySelector("#layout");
 
 		const activeTab = this.getComponent(activeTabElt);
 
-		tabs.nav = this.mobile ? mobileNav : null;
+		await activeTab.activate("default");
+		await activeTab.prepareRender?.(true);
+		return { activeTab, activeTabId, layout, secondary, tabs };
+	}
 
+	_commitLayoutBody({ activeTab, activeTabId, layout, secondary, tabs }) {
+		const mobileNav = this.mobileNav;
+		tabs.nav = this.mobile ? mobileNav : null;
 		Object.values(this.components).forEach((component) => {
 			if (component.elt.dataset.tab === "true") {
 				component.nav = this.mobile ? tabs.nav : null;
 			}
 		});
 
-		// Select the structural tab before widget initialization so both mutations
-		// remain part of this transition's single atomic update.
 		layout.dataset.visible = "true";
 		if (typeof tabs.reconcile === "function") tabs.reconcile();
 		if (typeof secondary?.reconcile === "function") secondary.reconcile();
 		tabs.elt.dataset.visible = "true";
 		mobileNav.element.dataset.visible = this.mobile ? "true" : "false";
-
-		await activeTab.activate("default");
-		await activeTab.render(true);
-		if (this.postRender) await this.postRender();
+		activeTab.render(true);
 		localStorage.setItem(`${this.hash}-active`, activeTabId);
 		return activeTabId;
 	}
@@ -403,13 +437,16 @@ export default class Entity extends Core {
 	/**
 	 * @testable false
 	 * @covered-by src/script/views/base/entity.mjs::Entity._renderLayout
+	 * @covered-by src/script/views/base/entity.mjs::Entity.updateLayout
 	 * @reason pre-render selection feeds the annotated mobile layout reconciliation
 	 */
-	_prerender(tabId) {
+	_prerender(tabId, secondaryElement = undefined) {
 		tabId ??= this._defaultTabId;
 		const tabs = this.getComponent(this.tabsCard);
-		const secondary = this.secondaryCard
-			? this.getComponent(this.secondaryCard)
+		const resolvedSecondary =
+			secondaryElement === undefined ? this.secondaryCard : secondaryElement;
+		const secondary = resolvedSecondary
+			? this.getComponent(resolvedSecondary)
 			: null;
 
 		if (!this.mobile && tabId === secondary?.name) {

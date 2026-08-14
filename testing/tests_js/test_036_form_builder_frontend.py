@@ -66,7 +66,10 @@ const vm = require("node:vm");
 
 (async () => {
 const search = { dataset: {} };
-const indicator = { dataset: {} };
+const indicator = {
+  dataset: {},
+  setAttribute(name, value) { this[name] = value; },
+};
 const saveButton = { dataset: {} };
 const context = {
   connectivity: {

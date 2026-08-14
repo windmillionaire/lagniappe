@@ -4,7 +4,7 @@
   <ul data-widget="BaseList"
       lp-prefetch
       data-persistent="true"
-      data-visible="true"
+      data-visible="false"
       data-route="{{ url_for('pages.get_notes', key=page.urlsafe_key) }}"
       class="{{ styles.note.list.page }}">
     {% if notes is not none %}

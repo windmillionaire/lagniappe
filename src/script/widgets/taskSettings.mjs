@@ -2,6 +2,7 @@ import { FormElement } from "../elements/form";
 import { InputElement } from "../elements/input";
 import { SectionToggle } from "../elements/sectionToggle";
 import { TextareaElement } from "../elements/textarea";
+import { withTransition } from "../shared";
 
 const TASK_BUTTONS = {
 	selectUser: "facet",
@@ -47,10 +48,15 @@ export class BaseTaskSettings extends FormElement {
 			if (!existingForm || existingForm === formKey) return;
 
 			const form = this.component.widgets.TaskForm;
-			form.destroy();
-			delete this.component.widgets.TaskForm;
-			this.component.elt.querySelector(`[data-widget="TaskForm"]`).remove();
-			this.component.elt.querySelector('[lp-control="form"]').remove();
+			void withTransition(
+				() => {
+					form.destroy();
+					delete this.component.widgets.TaskForm;
+					this.component.elt.querySelector(`[data-widget="TaskForm"]`).remove();
+					this.component.elt.querySelector('[lp-control="form"]').remove();
+				},
+				{ label: "task-settings:replace-attached-form" },
+			);
 		}
 	}
 
@@ -237,15 +243,20 @@ export class CreateUserTask extends BaseTaskSettings {
 		};
 	}
 
-	async postreconcile() {
-		await super.postreconcile();
+	postreconcile() {
+		if (this._resetAfterCreate) {
+			this.commitReset();
+			this._resetAfterCreate = false;
+		}
+		super.postreconcile();
 		if (this.target.dataset.visible === "true") {
 			this.target.querySelector("input[name='name']")?.focus();
 		}
 	}
 
 	async created() {
-		await this.reset();
+		await this.prepareReset();
+		this._resetAfterCreate = true;
 	}
 
 	offline() {
@@ -277,17 +288,26 @@ export class CreateTask extends BaseTaskSettings {
 		}
 	}
 
-	async postreconcile() {
-		await super.postreconcile();
+	postreconcile() {
+		if (this._resetAfterCreate) {
+			this.commitReset();
+			this._resetAfterCreate = false;
+		}
+		if (this._closeAfterCreate) {
+			this.target.dataset.close = this._closeAfterCreate;
+			this._closeAfterCreate = null;
+		}
+		super.postreconcile();
 		if (this.target.dataset.visible === "true") {
 			this.target.querySelector("input[name='name']").focus();
 		}
 	}
 
 	async created() {
-		await this.reset();
+		await this.prepareReset();
+		this._resetAfterCreate = true;
 		if (this.component.widgets.PageTaskList?.itemCount > 0) {
-			this.target.dataset.close = "tasks:PageTaskList";
+			this._closeAfterCreate = "tasks:PageTaskList";
 		}
 	}
 }

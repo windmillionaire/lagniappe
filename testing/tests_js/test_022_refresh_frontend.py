@@ -385,7 +385,8 @@ view.Notifications = { async refresh() { events.push({ type: "notifications" });
       events.push({ type: "enqueue-invalidation", keys });
     },
   };
-  view.refreshCollections = async () => {
+  view.refreshCollections = async (_navigation, options = {}) => {
+    options.beforeCommit?.();
     events.push({ type: "refresh-mounted" });
   };
   view.refreshSupplementalCollections = async () => {};

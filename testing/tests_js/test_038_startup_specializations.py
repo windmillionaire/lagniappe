@@ -187,6 +187,7 @@ const context = {
 vm.createContext(context);
 
 let source = fs.readFileSync("src/script/views/page.mjs", "utf8");
+source = source.replace('import { withTransition } from "../shared";\n', "");
 source = source.replace(
   'import Entity from "./base/entity";',
   `

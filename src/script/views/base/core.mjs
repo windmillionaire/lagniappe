@@ -302,6 +302,7 @@ export default class Core extends ShellView {
 		try {
 			const response = await request.patch(ENDPOINTS.toggleStar(key));
 			if (!response?.ok) throw new Error("Unable to update star");
+			button.disabled = false;
 			await this.reconcileChange({
 				type: response.starred ? "star" : "unstar",
 				key,
@@ -324,8 +325,13 @@ export default class Core extends ShellView {
 	}
 
 	set offline(offline) {
-		if (this.offlineIndicator)
+		if (this.offlineIndicator) {
 			this.offlineIndicator.dataset.visible = offline ? "true" : "false";
+			this.offlineIndicator.setAttribute(
+				"aria-hidden",
+				offline ? "false" : "true",
+			);
+		}
 		this.elt.dispatchEvent(
 			new CustomEvent("offline-status", {
 				detail: { offline: Boolean(offline) },
@@ -511,12 +517,20 @@ export default class Core extends ShellView {
 
 	async refreshCollections(navigation = false, options = {}) {
 		const components = Object.values(this.components);
-		const refreshed = async () =>
-			await this._refreshCollectionComponents(components, options);
+		const { beforeCommit = null, ...refreshOptions } = options;
+		const commit = await this._refreshCollectionComponents(components, {
+			...refreshOptions,
+			deferCommit: true,
+		});
+		if (!commit) return;
+		const commitRefresh = () => {
+			beforeCommit?.();
+			commit();
+		};
 		if (navigation) {
-			await refreshed();
+			commitRefresh();
 		} else {
-			await withTransition(refreshed);
+			await withTransition(commitRefresh, { label: "collections:refresh" });
 		}
 	}
 
@@ -819,12 +833,16 @@ export default class Core extends ShellView {
 
 		const pending = component
 			.activate(widgetName)
-			.then((activated) => {
+			.then(async (activated) => {
 				if (this._destroyed || trigger.isConnected === false) return null;
-				return withTransition(async () => {
-					if (this._destroyed) return;
-					await component.render(activated);
-				});
+				await component.prepareRender(activated);
+				return withTransition(
+					() => {
+						if (this._destroyed) return;
+						component.render(activated);
+					},
+					{ label: `${component.name}:activate` },
+				);
 			})
 			.catch((error) => {
 				this.reportStartupError(error, trigger, "component-activation");

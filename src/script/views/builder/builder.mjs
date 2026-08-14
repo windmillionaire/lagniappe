@@ -92,8 +92,13 @@ class FormBuilder {
 	 */
 	offline(offline) {
 		const search = document.querySelector("[lp-search]");
-		if (this.offlineIndicator)
+		if (this.offlineIndicator) {
 			this.offlineIndicator.dataset.visible = offline ? "true" : "false";
+			this.offlineIndicator.setAttribute(
+				"aria-hidden",
+				offline ? "false" : "true",
+			);
+		}
 		if (search) search.dataset.visible = offline ? "false" : "true";
 		const saveButton = this.header.saveButton;
 		if (saveButton) saveButton.dataset.visible = offline ? "false" : "true";
@@ -277,9 +282,12 @@ class FormBuilder {
 		condition.index = index;
 		await condition.init();
 
-		withTransition(async () => {
-			await this.conditions.open(condition);
-		});
+		await withTransition(
+			() => {
+				this.conditions.open(condition);
+			},
+			{ label: "builder:show-condition" },
+		);
 	}
 
 	updateSchemaOrder() {

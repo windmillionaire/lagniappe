@@ -48,12 +48,16 @@ export default class EntityIndex extends Core {
 			columns: table.preload("columns") || [],
 		}).init();
 
-		await withTransition(async () => {
-			if (!table.elt.hasAttribute("lp-prefetch")) {
-				indexTable = await table.loadWidget("IndexTable");
-			}
-			await table.render(true);
-		});
+		if (!table.elt.hasAttribute("lp-prefetch")) {
+			indexTable = await table.loadWidget("IndexTable");
+		}
+		await table.prepareRender(true);
+		await withTransition(
+			() => {
+				table.render(true);
+			},
+			{ label: "index:initial-table" },
+		);
 
 		const continuation = indexTable?.target.querySelector("tr[lp-load]");
 		if (continuation) {
@@ -66,19 +70,22 @@ export default class EntityIndex extends Core {
 		}
 
 		this._indexMobileResize = async () => {
-			await withTransition(async () => {
-				const toolsNav = document.querySelector("nav[data-nav='tools']");
-				if (!this.mobile) {
-					if (mobileControls) mobileControls.dataset.visible = "false";
-					this._setMobileControlsDropdownOpen(false);
-					toolsNav?.removeAttribute("style");
-				} else {
-					if (tools) this.getComponent(tools).deactivate(false);
-					await this._createDropdown();
-					if (toolsNav) toolsNav.style.display = "none";
-				}
-				table.widgets.TableSorting?.reset();
-			});
+			const toolsNav = document.querySelector("nav[data-nav='tools']");
+			if (this.mobile) await this._createDropdown();
+			await withTransition(
+				() => {
+					if (!this.mobile) {
+						if (mobileControls) mobileControls.dataset.visible = "false";
+						this._setMobileControlsDropdownOpen(false);
+						toolsNav?.removeAttribute("style");
+					} else {
+						if (tools) this.getComponent(tools).deactivate(false);
+						if (toolsNav) toolsNav.style.display = "none";
+					}
+					table.widgets.TableSorting?.reset();
+				},
+				{ label: "index:mobile-resize" },
+			);
 		};
 		this.elt.addEventListener("mobile-resize", this._indexMobileResize);
 
@@ -192,9 +199,13 @@ export default class EntityIndex extends Core {
 		if (!component) return;
 
 		const activated = await component.activate(target.widgetName || "default");
-		await withTransition(async () => {
-			await component.render(activated);
-		});
+		await component.prepareRender(activated);
+		await withTransition(
+			() => {
+				component.render(activated);
+			},
+			{ label: "index:default-tool" },
+		);
 	}
 
 	/**

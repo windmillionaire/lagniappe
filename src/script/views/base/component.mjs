@@ -1,4 +1,5 @@
 import { NavElement } from "../../elements/nav";
+import { captureError } from "../../shared/errors";
 import { showBriefly, withTransition } from "../../shared/utilities";
 import { loadWidget } from "../../widgets/loader";
 
@@ -155,13 +156,13 @@ export default class ViewComponent {
 	 * @features reconnect-refresh collections forms
 	 * @dimensions explicit-collection-scope form-exclusion
 	 */
-	async refreshCollections(skip = new Set()) {
+	async prepareCollectionRefresh(skip = new Set()) {
 		const widgets = Object.values(this.widgets);
-		await Promise.all(
+		const commits = await Promise.all(
 			widgets.map(async (widget) => {
-				if (skip.has(widget)) return;
-				if (widget.refreshScope !== "collection") return;
-				if (!widget.refresh) return;
+				if (skip.has(widget)) return null;
+				if (widget.refreshScope !== "collection") return null;
+				if (!widget.refresh) return null;
 				if (
 					widget.unsavedState === true ||
 					widget.form?._queued === true ||
@@ -169,12 +170,26 @@ export default class ViewComponent {
 						"[lp-edited-marker][data-visible='true']",
 					)
 				)
-					return;
+					return null;
 				const response = await this.view.load(this, widget.route);
-				if (!response || response.updated === false) return;
-				await widget.refresh(response);
+				if (!response || response.updated === false) return null;
+				if (widget.prepareRefresh) {
+					return await widget.prepareRefresh(response);
+				}
+				return () => {
+					const result = widget.refresh(response);
+					if (result?.then) void result.catch(captureError);
+				};
 			}),
 		);
+		return commits.filter(Boolean);
+	}
+
+	async refreshCollections(skip = new Set()) {
+		const commits = await this.prepareCollectionRefresh(skip);
+		commits.forEach((commit) => {
+			commit();
+		});
 	}
 
 	/**
@@ -237,7 +252,10 @@ export default class ViewComponent {
 		const append = await widget.updated(response);
 		if (append) this.load(widget, append.dataset.route);
 		if (widget !== this.active) {
-			await widget.postreconcile();
+			await widget.prepareReconcile();
+			await withTransition(() => widget.reconcile(), {
+				label: `${this.name}:${widget.name}:load`,
+			});
 		}
 	}
 
@@ -248,13 +266,14 @@ export default class ViewComponent {
 	async updated(response) {
 		const updates = { replace: [], append: [] };
 
+		const widgetUpdates = [];
 		response.html?.querySelectorAll("[data-widget]").forEach((elt) => {
 			const name = elt.dataset.widget;
 			const widget = this.widgets[name];
 			const target = this.elt.querySelector(`[data-widget='${name}']`);
 
 			if (widget?.updated) {
-				widget.updated(response);
+				widgetUpdates.push(widget.updated(response));
 				widget.modified = true;
 			} else if (target) {
 				updates.replace.push({ target, elt });
@@ -262,15 +281,20 @@ export default class ViewComponent {
 				updates.append.push(elt);
 			}
 		});
+		await Promise.all(widgetUpdates);
+		await this.prepareRender(true);
 
-		await withTransition(async () => {
-			updates.replace.forEach(({ target, elt }) => {
-				target.replaceWith(elt);
-			});
-			this.elt.append(...updates.append);
-			this.active?.success?.();
-			await this.render(true);
-		});
+		await withTransition(
+			() => {
+				updates.replace.forEach(({ target, elt }) => {
+					target.replaceWith(elt);
+				});
+				this.elt.append(...updates.append);
+				this.active?.success?.();
+				this.render(true);
+			},
+			{ label: `${this.name}:update` },
+		);
 	}
 
 	disable() {
@@ -318,10 +342,15 @@ export default class ViewComponent {
 			component = null;
 		}
 
-		await withTransition(async () => {
-			await this.render(true);
-			if (component && this !== component) await component.render(true);
-		});
+		await this.prepareRender(true);
+		if (component && this !== component) await component.prepareRender(true);
+		await withTransition(
+			() => {
+				this.render(true);
+				if (component && this !== component) component.render(true);
+			},
+			{ label: `${this.name}:create` },
+		);
 		this._creating = false;
 	}
 
@@ -423,8 +452,16 @@ export default class ViewComponent {
 		subComponent.elt.dispatchEvent(event);
 	}
 
+	async prepareRender() {
+		await Promise.all(
+			Object.values(this.widgets).map((widget) => {
+				return widget.prepareReconcile();
+			}),
+		);
+	}
+
 	// User actions and initial entity enhancement call this within a transition.
-	// Any DOM manipulation in a widget should be done in postreconcile().
+	// Connected-DOM manipulation in widgets belongs in postreconcile().
 	/**
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.py::test_component_render_does_not_wait_for_polling_reconciliation
@@ -433,17 +470,15 @@ export default class ViewComponent {
 	 * @pairs startup:deferred-services startup:component-render startup:nonblocking
 	 * @pairs polling:subscription-lifecycle polling:component-render polling:nonblocking
 	 */
-	async render(visible) {
+	render(visible) {
 		const open = visible ? this.active?.name || "true" : false;
 		this.elt.dataset.visible = this.persistent || visible ? "true" : "false";
 
 		this._setParentComponent();
 
-		await Promise.all(
-			Object.values(this.widgets).map((widget) => {
-				return widget.reconcile();
-			}),
-		);
+		Object.values(this.widgets).forEach((widget) => {
+			widget.reconcile();
+		});
 
 		if (this.nav) {
 			this.nav.enable(this);

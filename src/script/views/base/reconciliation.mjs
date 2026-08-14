@@ -40,6 +40,10 @@ const removeDeletedEntity = (view, key) => {
 	}
 };
 
+/**
+ * @testable infrastructure
+ * @covered-by src/script/views/base/core.mjs::Core.reconcileChange
+ */
 export const reconcileChange = (view, change = {}) => {
 	view._pendingChanges.push({ ...change });
 	if (view._reconcilePromise) return view._reconcilePromise;
@@ -70,9 +74,9 @@ export const reconcileChange = (view, change = {}) => {
 					...new Set(changes.map(({ key }) => key).filter(Boolean)),
 				];
 				if (keys.length) await loadMountedCollectionOwners(view, keys);
-				for (const { key, type } of changes) {
-					if (type === "delete" && key) removeDeletedEntity(view, key);
-				}
+				const deletedKeys = changes
+					.filter(({ key, type }) => type === "delete" && key)
+					.map(({ key }) => key);
 				const formKeys = [
 					...new Set([
 						...changes
@@ -89,7 +93,14 @@ export const reconcileChange = (view, change = {}) => {
 					if (view.PollingCoordinator?.activePoll) watcher?.enqueue(formKeys);
 					else await watcher?.invalidate(formKeys);
 				}
-				await view.refreshCollections(false, { fingerprint });
+				await view.refreshCollections(false, {
+					fingerprint,
+					beforeCommit: () => {
+						deletedKeys.forEach((key) => {
+							removeDeletedEntity(view, key);
+						});
+					},
+				});
 				await view.refreshSupplementalCollections(changes);
 				for (const item of changes) await view.afterReconcileChange(item);
 			} while (view._pendingChanges.length);
@@ -128,10 +139,14 @@ export const collectRefreshTargets = (_view, components) => {
 export const refreshCollectionComponents = async (
 	view,
 	components,
-	{ fingerprint = view.elt.dataset.fingerprint || null } = {},
+	{
+		fingerprint = view.elt.dataset.fingerprint || null,
+		deferCommit = false,
+	} = {},
 ) => {
 	const targets = collectRefreshTargets(view, components);
 	const reconciled = new Set();
+	const commits = [];
 	let refreshedFingerprint = null;
 	if (targets.size) {
 		const response = await request.post("/l/refresh", {
@@ -160,7 +175,16 @@ export const refreshCollectionComponents = async (
 				const result = results.get(id);
 				if (!result || result.fallback) continue;
 				try {
-					await widget.refreshDelta(result);
+					if (deferCommit && widget.prepareRefreshDelta) {
+						commits.push(await widget.prepareRefreshDelta(result));
+					} else if (deferCommit) {
+						commits.push(() => {
+							const pending = widget.refreshDelta(result);
+							if (pending?.then) void pending.catch(captureError);
+						});
+					} else {
+						await widget.refreshDelta(result);
+					}
 					reconciled.add(widget);
 				} catch (error) {
 					captureError(error);
@@ -168,6 +192,24 @@ export const refreshCollectionComponents = async (
 			}
 		}
 	}
+	if (deferCommit) {
+		const prepared = await Promise.all(
+			components.map(async (component) => {
+				if (component.elt && !component.elt.isConnected) return [];
+				return await component.prepareCollectionRefresh(reconciled);
+			}),
+		);
+		commits.push(...prepared.flat());
+		return () => {
+			commits.filter(Boolean).forEach((commit) => {
+				commit();
+			});
+			if (refreshedFingerprint) {
+				view.elt.dataset.fingerprint = refreshedFingerprint;
+			}
+		};
+	}
+
 	await Promise.all(
 		components.map(async (component) => {
 			if (component.elt && !component.elt.isConnected) return;
@@ -175,4 +217,5 @@ export const refreshCollectionComponents = async (
 		}),
 	);
 	if (refreshedFingerprint) view.elt.dataset.fingerprint = refreshedFingerprint;
+	return null;
 };

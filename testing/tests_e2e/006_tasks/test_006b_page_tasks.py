@@ -603,6 +603,7 @@ def test_submit_attached_task_form(get_user):
 
 
 # @pair tasks:update-state
+# @pair tasks:refresh
 # @pair tasks:complete
 # @pair tasks:readonly
 # @pair tasks:attached-form
