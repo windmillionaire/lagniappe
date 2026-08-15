@@ -116,6 +116,21 @@
       their SMTP dashboards.
     {% endcall %}
   {% endcall %}
+  {{ heading("AI Email Submissions", icon="email", kind="form") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      AI email lets registered users send questions, creation requests, and
+      attachments to one Lagniappe address. It requires a custom application
+      URL and authentication email configured through <strong>Resend</strong>;
+      the receiving flow uses a dedicated inbound subdomain and reuses the
+      verified Resend sender for replies.
+    </p>
+    <p class="text-base-medium mb-3">
+      The main installer offers AI email when those prerequisites are ready.
+      To add or reconcile it later, run:
+    </p>
+    {{ code("./setup.sh ai-email") }}
+  {% endcall %}
   {{ heading("Updates") }}
   {% call card() %}
     <p class="text-base-medium mb-3">

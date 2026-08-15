@@ -5,7 +5,7 @@
 {% import 'controls.html' as controls %}
 
 {% macro view_header() %}
-  <nav class="{{ styles.layout.view.title }}">
+  <nav class="{{ styles.layout.view.title }} {{ styles.index.header.iconContext }}">
     <span data-role="title">Form Index</span>
     <div data-role="actions">
       <button class="{{ styles.nav.mobileButton }}"

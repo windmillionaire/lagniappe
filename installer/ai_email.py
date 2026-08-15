@@ -20,6 +20,7 @@ from installer.errors import (
     retry_provider_call,
 )
 from installer.state import record_mutation
+from runner.context import setup_command
 
 
 RESEND_API_ROOT = "https://api.resend.com"
@@ -586,15 +587,106 @@ def _disable(existing):
 
 
 # @testable true
+# @tests tests_tooling/test_001h_setup_ai_email.py::test_main_install_ai_email_offer_requires_custom_domain_and_resend
+# @features setup ai-email
+# @dimensions main-install prerequisites optional deferred-activation
+def setup_ai_email():
+    """Offer AI email during a fresh install and defer activation to its deploy."""
+    from config import SETTINGS
+
+    f = FORMATTER.initialize()
+    settings = SETTINGS.APP
+    custom_domain = str(settings.get("CUSTOM_DOMAIN") or "").strip()
+    auth_email = settings.get("AUTH_EMAIL_CONFIG") or {}
+    resend_ready = (
+        str(auth_email.get("provider") or "").casefold() == "smtp"
+        and str(auth_email.get("service") or "").casefold() == "resend"
+        and bool(auth_email.get("password"))
+    )
+
+    if not custom_domain or not resend_ready:
+        print(
+            f.info(
+                "AI email submissions can be added after a custom application "
+                "domain and Resend authentication email are configured."
+            )
+        )
+        print("To add it later:")
+        print(f"  1. Configure the custom URL: {setup_command('url')}")
+        print(f"  2. Choose Resend for email: {setup_command('email')}")
+        print(f"  3. Configure AI email: {setup_command('ai-email')}")
+        return None
+
+    _prerequisites(settings)
+    choice = (
+        input(
+            "Configure inbound AI email submissions through Resend now? "
+            "[y/N] (x to exit): "
+        )
+        .strip()
+        .casefold()
+    )
+    if choice == "x":
+        raise SetupCancelled("Installation cancelled before AI email setup.")
+    if choice != "y":
+        print(f"AI email can be configured later with {setup_command('ai-email')}.")
+        return None
+    return configure_ai_email(prepare_installation=False, deploy=False)
+
+
+# @testable true
+# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_setup_saves_deploys_then_enables_webhook
+# @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_activates_ai_email_after_deploy_and_jobs
+# @pair ai-email:activation
+# @pair ai-email:provider-verification
+# @pair setup:main-install
+def activate_ai_email(candidate=None):
+    """Enable and verify a configured webhook after its application deploy."""
+    from config import SETTINGS
+
+    candidate = normalize_ai_email_config(
+        candidate or SETTINGS.APP.get("AI_EMAIL_CONFIG")
+    )
+    if not candidate or not candidate["enabled"]:
+        raise ProviderInvalidInput("Enabled AI email configuration is unavailable.")
+    endpoint = f"https://{SETTINGS.APP['CUSTOM_DOMAIN']}{WEBHOOK_PATH}"
+    webhook_id = candidate["resend"]["webhookId"]
+    client = ResendSetupClient(candidate["resend"]["inboundApiKey"])
+    client.update_webhook(webhook_id, endpoint=endpoint, status="enabled")
+    current_webhook = client.get_webhook(webhook_id)
+    if str(current_webhook.get("status") or "").casefold() != "enabled":
+        raise ProviderError(
+            "Resend did not enable the AI email webhook. Rerun setup to reconcile it."
+        )
+
+    f = FORMATTER.initialize()
+    print(f.success("AI email provider configuration is ready."))
+    for tool in ("ai", "ask", "create", "organize"):
+        print(f"  {tool.title():<8} {candidate['aliases'][tool]}@{candidate['domain']}")
+    print("\nNext steps:")
+    print("  1. Send a normal email from a registered user's exact email address.")
+    print("  2. Confirm the acceptance email links to a pending report, then confirm")
+    print("     the result email links to the completed answer/proposal.")
+    print(
+        wrap_text(
+            "Create and Organize emails only prepare reports. Applying a proposal still "
+            "requires the user to sign in, review it, and run it in Lagniappe."
+        )
+    )
+    return True
+
+
+# @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_setup_requires_custom_domain_and_supporting_services
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_setup_saves_deploys_then_enables_webhook
 # @features ai-email
 # @dimensions setup prerequisites provider-verification deployment-guidance deploy disabled-first manual-smoke-test
-def configure_ai_email():
+def configure_ai_email(*, prepare_installation=True, deploy=True):
     """Configure production Resend receiving and optionally deploy it."""
-    from installer.verify import prepare_existing_installation
+    if prepare_installation:
+        from installer.verify import prepare_existing_installation
 
-    prepare_existing_installation()
+        prepare_existing_installation()
     from config import SETTINGS
     from installer import utils
 
@@ -723,6 +815,15 @@ def configure_ai_email():
     SETTINGS.APP["AI_EMAIL_CONFIG"] = candidate
     SETTINGS.save()
 
+    if not deploy:
+        print(
+            f.success(
+                "AI email settings are ready; the webhook will remain disabled "
+                "until the main installation deploy succeeds."
+            )
+        )
+        return candidate
+
     print("\nNext step: deploy and activate AI email submissions.")
     print(
         wrap_text(
@@ -747,32 +848,15 @@ def configure_ai_email():
         return 0
 
     utils.deploy_to_app_engine()
-    client.update_webhook(webhook["id"], endpoint=endpoint, status="enabled")
-    current_webhook = client.get_webhook(webhook["id"])
-    if str(current_webhook.get("status") or "").casefold() != "enabled":
-        raise ProviderError(
-            "Resend did not enable the AI email webhook. Rerun setup to reconcile it."
-        )
-
-    print(f.success("AI email provider configuration is ready."))
-    for tool in ("ai", "ask", "create", "organize"):
-        print(f"  {tool.title():<8} {candidate['aliases'][tool]}@{candidate['domain']}")
-    print("\nNext steps:")
-    print("  1. Send a normal email from a registered user's exact email address.")
-    print("  2. Confirm the acceptance email links to a pending report, then confirm")
-    print("     the result email links to the completed answer/proposal.")
-    print(
-        wrap_text(
-            "Create and Organize emails only prepare reports. Applying a proposal still "
-            "requires the user to sign in, review it, and run it in Lagniappe."
-        )
-    )
+    activate_ai_email(candidate)
     return 0
 
 
 __all__ = [
     "ResendSetupClient",
+    "activate_ai_email",
     "configure_ai_email",
+    "setup_ai_email",
     "guide_resend_receiving_key",
     "guide_resend_receiving_dns",
     "guide_resend_sending_identity",

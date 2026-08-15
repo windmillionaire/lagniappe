@@ -28,8 +28,10 @@ def _recovery_file_present(app_dir=None):
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_characterization_starts_empty_and_reaches_all_boundaries
-# @features setup
-# @dimensions prerequisites virtualenv
+# @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_activates_ai_email_after_deploy_and_jobs
+# @pair setup:prerequisites
+# @pair setup:virtualenv
+# @pair setup:main-install
 def install():
     print("Welcome to Lagniappe Setup!")
     if _recovery_file_present():
@@ -73,6 +75,7 @@ def install():
 
     from installer import (
         admin,
+        ai_email,
         auth_email,
         gcloud,
         identity,
@@ -102,6 +105,7 @@ def install():
         record_step(step_name)
         operation()
 
+    ai_email_config = None
     if getattr(SETTINGS, "RECOVERY_MODE", False):
         print(
             f.info(
@@ -113,6 +117,8 @@ def install():
     else:
         optional.setup_error_monitoring()
         optional.change_ai_model()
+        record_step("configure AI email submissions")
+        ai_email_config = ai_email.setup_ai_email()
 
     record_step("persist generated configuration")
     SETTINGS.save()
@@ -127,6 +133,9 @@ def install():
         print(f"\n{f.info('Wrapping up installation...')}")
         if not _configure_deferred_job_recovery(f, gcloud):
             return 1
+        if ai_email_config:
+            record_step("activate AI email submissions")
+            ai_email.activate_ai_email(ai_email_config)
         print(f"\n{f.success('Deployment complete!')}")
         deployed = True
     else:
@@ -147,6 +156,11 @@ def install():
             f"{format_command([GCLOUD_CLI, 'app', 'deploy', File.APP_YAML.value])}"
         )
         print(f"After deployment, run: {setup_command('jobs')}")
+        if ai_email_config:
+            print(
+                "Then activate the saved AI email configuration with: "
+                f"{setup_command('ai-email')}"
+            )
 
     print(f"\n{f.success('Setup complete!')}")
 

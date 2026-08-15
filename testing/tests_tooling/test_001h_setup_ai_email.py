@@ -352,6 +352,61 @@ def test_ai_email_setup_requires_custom_domain_and_supporting_services():
     )
 
 
+# @features setup ai-email
+# @dimensions main-install prerequisites optional deferred-activation
+def test_main_install_ai_email_offer_requires_custom_domain_and_resend(
+    monkeypatch,
+    capsys,
+):
+    import builtins
+    import types
+
+    import config
+    from installer import ai_email
+
+    settings = types.SimpleNamespace(
+        APP={
+            "AUTH_EMAIL_CONFIG": {
+                "provider": "smtp",
+                "service": "Gmail",
+                "password": "app-password",
+            }
+        }
+    )
+    monkeypatch.setattr(config, "SETTINGS", settings)
+
+    assert ai_email.setup_ai_email() is None
+    output = capsys.readouterr().out
+    assert "custom application domain" in output
+    assert "Resend authentication email" in output
+    assert "./setup.sh ai-email" in output
+
+    settings.APP = {
+        "CUSTOM_DOMAIN": "app.example.com",
+        "AUTH_EMAIL_CONFIG": {
+            "provider": "smtp",
+            "service": "Resend",
+            "password": "re_send",
+            "senderEmail": "noreply@example.com",
+            "senderName": "Lagniappe",
+        },
+        "AI_MODEL": "gemini-test",
+        "RESOURCE_REGION": "us-central1",
+        "RUNTIME_SERVICE_ACCOUNT_EMAIL": "runtime@example.test",
+    }
+    candidate = {"enabled": True}
+    calls = []
+    monkeypatch.setattr(
+        ai_email,
+        "configure_ai_email",
+        lambda **kwargs: calls.append(kwargs) or candidate,
+    )
+    monkeypatch.setattr(builtins, "input", lambda _prompt="": "y")
+
+    assert ai_email.setup_ai_email() is candidate
+    assert calls == [{"prepare_installation": False, "deploy": False}]
+
+
 # @features ai-email
 # @dimensions setup deploy manual-smoke-test disabled-first provider-verification deployment-guidance
 def test_ai_email_setup_saves_deploys_then_enables_webhook(

@@ -6,7 +6,7 @@
 {% from 'filters.html' import filtered_conditions %}
 
 {% macro view_header() %}
-  <nav class="{{ styles.layout.view.title }}" data-role="page-header">
+  <nav class="{{ styles.layout.view.title }} {{ styles.index.header.iconContext }}" data-role="page-header">
     {% if filtered %}
       <a href="{{ filtered.parent_filters_url }}"
          data-role="title"

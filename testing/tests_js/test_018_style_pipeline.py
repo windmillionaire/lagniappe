@@ -428,6 +428,7 @@ assert.equal(plus.children[0].className, "icon-glyph");
 
 # @style dropdown.icon
 # @style entity.tabIcon
+# @style index.header.iconContext
 def test_material_symbol_size_exceptions_use_semantic_css(run_node):
     run_node(
         r"""
@@ -572,6 +573,23 @@ assert.match(
   css,
   /\.layout-nav-title \.icon\s*\{[\s\S]*?--icon-box-size: var\(--icon-lg-box-size\);[\s\S]*?--icon-default-size: var\(--icon-lg-glyph-size\);/,
 );
+assert.match(
+  css,
+  /\.index-header-icon-context \.icon\s*\{[\s\S]*?--icon-box-size: var\(--icon-lg-box-size\);[\s\S]*?--icon-default-size: var\(--icon-lg-glyph-size\);/,
+);
+for (const path of [
+  "categories/index.html",
+  "forms/index.html",
+  "tasks/index.html",
+  "users/index.html",
+]) {
+  const template = readFileSync(`./lagniappe/web/templates/${path}`, "utf8");
+  assert.match(
+    template,
+    /<nav class="\{\{ styles\.layout\.view\.title \}\} \{\{ styles\.index\.header\.iconContext \}\}"/,
+    `${path} must use the shared large index-header icon context`,
+  );
+}
 assert.match(
   css,
   /\.checkbox-icon\s*\{[\s\S]*?--icon-box-size: 1rem;[\s\S]*?--icon-size: 1rem;[\s\S]*?font-size: 1rem;/,

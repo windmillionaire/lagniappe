@@ -7,7 +7,7 @@
 {% import 'categories/tools.html' as tools %}
 
 {% macro view_header(category) %}
-  <nav class="{{ styles.layout.view.title }}" data-nav="view">
+  <nav class="{{ styles.layout.view.title }} {{ styles.index.header.iconContext }}" data-nav="view">
     <div>
       {% if filtered %}
         <a href="{{ filtered.parent_filters_url }}"

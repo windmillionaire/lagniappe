@@ -50,6 +50,16 @@ checkout is left alone and a partial saved target fails closed. The full
 installer owns its activation later, after new-install selection or recovery
 has established the target.
 
+On a fresh installation, the main path also offers AI email after custom-domain
+authentication email and AI configuration. The offer is available when the
+application has a custom domain and authentication email uses Resend. Setup
+reconciles the receiving domain and a disabled webhook before the normal shared
+deployment, then enables the webhook only after deployment and deferred-job
+recovery setup succeed. Declining deployment leaves the saved webhook disabled
+and directs the operator to the focused `ai-email` command after manual deploy.
+Recovery mode preserves the saved choice without re-running this optional
+provider flow.
+
 It supports subcommands for running specific steps:
 
 - No args: full installation
@@ -1002,9 +1012,11 @@ documented in
 
 ### AI Email Submissions (`installer/ai_email.py`)
 
-`./setup.sh ai-email` configures production inbound AI reports. It requires a
-completed custom-domain installation, Resend-backed authentication email, AI
-settings, and the deferred-job runtime identity/region. It then:
+The no-argument installer offers this flow during a fresh install when its
+prerequisites are already present. `./setup.sh ai-email` configures or
+reconciles it later. Both paths require a custom application domain,
+Resend-backed authentication email, AI settings, and the deferred-job runtime
+identity/region. The flow then:
 
 1. suggests `inbound.<CUSTOM_DOMAIN>` and requires a dedicated subdomain below
    the application domain, with operator confirmation that it has no unrelated

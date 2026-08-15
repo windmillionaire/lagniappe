@@ -222,6 +222,12 @@ button.tab-icon .icon {
 	--icon-default-size: var(--icon-lg-glyph-size);
 }
 
+/* @style index.header.iconContext */
+.index-header-icon-context .icon {
+	--icon-box-size: var(--icon-lg-box-size);
+	--icon-default-size: var(--icon-lg-glyph-size);
+}
+
 /* @style table.thead.actionIcon */
 .embedded-table-action-icon {
 	--icon-box-size: var(--icon-base-box-size);

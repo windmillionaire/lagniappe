@@ -101,7 +101,13 @@ def _module(monkeypatch, setup_package, name, **members):
     return module
 
 
-def _install_harness(monkeypatch, *, fail_at=None, deploy=False):
+def _install_harness(
+    monkeypatch,
+    *,
+    fail_at=None,
+    deploy=False,
+    with_ai_email=False,
+):
     import installer as setup_package
     from installer import install as install_module
 
@@ -211,6 +217,22 @@ def _install_harness(monkeypatch, *, fail_at=None, deploy=False):
         setup_error_monitoring=step("setup_error_monitoring"),
         change_ai_model=step("change_ai_model"),
     )
+    ai_email_candidate = {"enabled": True} if with_ai_email else None
+
+    def activate_ai_email(candidate):
+        assert candidate is ai_email_candidate
+        events.append("activate_ai_email")
+        if fail_at == "activate_ai_email":
+            raise RuntimeError("injected failure at activate_ai_email")
+        return True
+
+    _module(
+        monkeypatch,
+        setup_package,
+        "ai_email",
+        setup_ai_email=step("setup_ai_email", ai_email_candidate),
+        activate_ai_email=activate_ai_email,
+    )
 
     monkeypatch.setattr(
         install_module,
@@ -254,6 +276,7 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
         "setup_redis",
         "setup_error_monitoring",
         "change_ai_model",
+        "setup_ai_email",
         "settings.save",
         "deploy_to_app_engine",
         "create_deferred_job_reconciler",
@@ -282,6 +305,27 @@ def test_default_install_only_prints_manual_deployment_steps_when_declined(
     assert "deploy_to_app_engine" not in events
 
 
+# @pair setup:main-install
+# @pair ai-email:activation
+def test_default_install_activates_ai_email_after_deploy_and_jobs(
+    monkeypatch,
+):
+    install_module, _settings, events = _install_harness(
+        monkeypatch,
+        deploy=True,
+        with_ai_email=True,
+    )
+
+    assert install_module.install() == 0
+    assert events.index("setup_ai_email") < events.index("settings.save")
+    assert events.index("deploy_to_app_engine") < events.index(
+        "create_deferred_job_reconciler"
+    )
+    assert events.index("create_deferred_job_reconciler") < events.index(
+        "activate_ai_email"
+    )
+
+
 def test_recovery_install_skips_optional_reconfiguration(monkeypatch):
     install_module, settings, events = _install_harness(monkeypatch)
     settings.RECOVERY_MODE = True
@@ -289,6 +333,7 @@ def test_recovery_install_skips_optional_reconfiguration(monkeypatch):
     assert install_module.install() == 0
     assert "setup_error_monitoring" not in events
     assert "change_ai_model" not in events
+    assert "setup_ai_email" not in events
     assert "setup_redis" in events
     assert "settings.save" in events
 
@@ -1271,8 +1316,10 @@ REMOTE_MUTATION_BOUNDARIES = (
     "setup_redis",
     "setup_error_monitoring",
     "change_ai_model",
+    "setup_ai_email",
     "deploy_to_app_engine",
     "create_deferred_job_reconciler",
+    "activate_ai_email",
 )
 
 
@@ -1285,6 +1332,7 @@ def test_default_install_stops_after_each_injected_remote_failure(
         monkeypatch,
         fail_at=failure_boundary,
         deploy=True,
+        with_ai_email=failure_boundary == "activate_ai_email",
     )
 
     if failure_boundary == "create_deferred_job_reconciler":

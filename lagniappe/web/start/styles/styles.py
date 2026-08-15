@@ -231,6 +231,9 @@ STYLES = {
 		"icon": "float-left mr-2"
 	},
 	"index": {
+		"header": {
+			"iconContext": "index-header-icon-context"
+		},
 		"mobile": {
 			"controls": "rounded-md bg-kind-bg p-4 text-base flex flex-col gap-2 font-semibold mt-4",
 			"row": "flex flex-row items-center justify-between gap-4 group/form"

@@ -740,6 +740,13 @@ iconLabel:
     intent: leading inline icon aligned to the first label line without reserving a permanent column
     surfaces: [server, frontend]
 index:
+  header:
+    iconContext:
+      classes: index-header-icon-context
+      intent: larger matched icon geometry for entity index header actions
+      surfaces: [server]
+      hooks: [index-header-icon-context]
+      css: [src/style/icons.css]
   mobile:
     controls:
       classes: rounded-md bg-kind-bg p-4 text-base flex flex-col gap-2 font-semibold mt-4
