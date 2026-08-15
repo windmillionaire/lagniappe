@@ -60,7 +60,9 @@ async ({{ storeName, minimum, exact, savedHtmlContains, recordKey, recordValue }
 SYNC_MANAGER_READY = """
 async () => {
     const view = document.querySelector("[lp-view]")?._lp_view;
-    const manager = await view?.syncReady;
+    if (!view) return false;
+    await view.servicesReady;
+    const manager = view.SyncManager ?? (await view.syncReady);
     if (!manager) return false;
     await manager.ready;
     return true;
@@ -72,10 +74,13 @@ async () => {
 def expect_offline_sync_replay(
     user,
     *,
+    sync_id,
     request_payload_contains,
     expected_count=1,
 ):
-    """Observe startup-owned document replay and await its SyncManager."""
+    """Observe startup replay and await its scoped queue row and SyncManager."""
+    if not sync_id:
+        raise ValueError("A sync ID is required when waiting for offline replay.")
     markers = (
         (request_payload_contains,)
         if isinstance(request_payload_contains, str)
@@ -102,6 +107,12 @@ def expect_offline_sync_replay(
     page.on("response", record_replay)
     try:
         yield responses
+        wait_for_offline_sync_records(
+            user,
+            sync_id=sync_id,
+            exact=0,
+            timeout=30000,
+        )
         manager_ready = page.evaluate(SYNC_MANAGER_READY)
     finally:
         page.remove_listener("response", record_replay)

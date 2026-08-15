@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as captureError, w as withTransition, r as request } from './foundation.js?v=b5d60d88';
-import './connectivity.js?v=b5d60d88';
+import { c as captureError, w as withTransition, r as request } from './foundation.js?v=bd5baecd';
+import './connectivity.js?v=bd5baecd';
 
 /**
  * Coordinates the view-scoped form submission lifecycle.

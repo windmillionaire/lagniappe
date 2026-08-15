@@ -27,9 +27,12 @@ class Combobox:
 
     def open(self):
         panel = self.panel
-        if panel.is_visible():
-            return panel
-        self.click()
+        if not panel.is_visible():
+            # Playwright's click already waits for actionability. If a proven
+            # pointer-transition race remains, hover here before clicking.
+            self.click()
+        expect(panel).to_be_visible()
+        expect(panel).to_have_attribute("data-positioned", "true")
         return panel
 
     def click(self):

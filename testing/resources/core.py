@@ -7,6 +7,9 @@ from lagniappe.core.entities import Entities
 from testing.elements import MobileNav
 
 
+VIEW_INITIALIZATION_TIMEOUT = 15000
+
+
 class SiteResource:
     _user = None
     _url_prefix = SETTINGS.test_config["BASE_URL"]
@@ -28,7 +31,11 @@ class SiteResource:
 
     def initialize_view(self):
         if self._initialize:
-            expect(self.user.locate("[lp-view]")).to_have_attribute("initialized", "")
+            # Locator assertions have their own 5-second default; use the
+            # standard E2E timeout under full-suite load.
+            expect(self.user.locate("[lp-view]")).to_have_attribute(
+                "initialized", "", timeout=VIEW_INITIALIZATION_TIMEOUT
+            )
 
     def reload(self, wait_until="load"):
         self.user.page.reload(wait_until=wait_until)

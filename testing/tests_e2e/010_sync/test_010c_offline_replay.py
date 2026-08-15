@@ -238,6 +238,7 @@ def test_offline_replay_does_not_duplicate_after_reload(get_user, browser_failur
 
     with expect_offline_sync_replay(
         user,
+        sync_id=document_sync_id,
         request_payload_contains=text,
     ):
         user.go(SitePages.HOME)
@@ -291,6 +292,7 @@ def test_headless_offline_replay_merges_concurrent_remote_edits(
     _replace_page(owner)
     with expect_offline_sync_replay(
         owner,
+        sync_id=document_sync_id,
         request_payload_contains=(offline_text, remote_text),
     ) as replay_responses:
         owner.go(SitePages.HOME)

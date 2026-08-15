@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as Entity } from '../entity-foundation.js?v=b5d60d88';
-import '../core-foundation.js?v=b5d60d88';
-import '../connectivity.js?v=b5d60d88';
-import '../foundation.js?v=b5d60d88';
+import { E as Entity } from '../entity-foundation.js?v=bd5baecd';
+import '../core-foundation.js?v=bd5baecd';
+import '../connectivity.js?v=bd5baecd';
+import '../foundation.js?v=bd5baecd';
 
 /**
  * @testable true

@@ -1,7 +1,7 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { getOfflineMutations, deleteOfflineMutations, setOfflineMutation } from './offline.js?v=b5d60d88';
-import { r as request } from './foundation.js?v=b5d60d88';
-import './connectivity.js?v=b5d60d88';
+import { getOfflineMutations, deleteOfflineMutations, setOfflineMutation } from './offline.js?v=bd5baecd';
+import { r as request } from './foundation.js?v=bd5baecd';
+import './connectivity.js?v=bd5baecd';
 
 /**
  * @testable false

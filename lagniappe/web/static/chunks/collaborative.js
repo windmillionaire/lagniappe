@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b5d60d88';
-import { D as Doc, c as collaborativeEditor, M as MentionSuggestions, T as Toolbar, m as mergeUpdates, e as encodeStateAsUpdate, a as applyUpdate } from './toolbar.js?v=b5d60d88';
-import { h as waitForAttribute, u as uint8ArrayToBase64, i as base64ToUint8Array } from './foundation.js?v=b5d60d88';
-import './connectivity.js?v=b5d60d88';
-import { p as primitives } from './primitives.js?v=b5d60d88';
-import './combobox.js?v=b5d60d88';
-import './icons.js?v=b5d60d88';
-import './dropdown.js?v=b5d60d88';
+import { STYLES } from './styles.js?v=bd5baecd';
+import { D as Doc, c as collaborativeEditor, M as MentionSuggestions, T as Toolbar, m as mergeUpdates, e as encodeStateAsUpdate, a as applyUpdate } from './toolbar.js?v=bd5baecd';
+import { h as waitForAttribute, u as uint8ArrayToBase64, i as base64ToUint8Array } from './foundation.js?v=bd5baecd';
+import './connectivity.js?v=bd5baecd';
+import { p as primitives } from './primitives.js?v=bd5baecd';
+import './combobox.js?v=bd5baecd';
+import './icons.js?v=bd5baecd';
+import './dropdown.js?v=bd5baecd';
 
 /**
  * @testable true

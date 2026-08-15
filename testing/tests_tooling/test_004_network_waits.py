@@ -481,9 +481,17 @@ class FakeOfflineReplayPage:
         self.listener(response)
 
 
-def test_offline_sync_replay_waits_for_manager_and_exact_matching_response():
+def test_offline_sync_replay_waits_for_manager_and_exact_matching_response(
+    monkeypatch,
+):
     page = FakeOfflineReplayPage()
     user = SimpleNamespace(page=page)
+    queue_drains = []
+    monkeypatch.setattr(
+        offline,
+        "wait_for_offline_sync_records",
+        lambda actual_user, **kwargs: queue_drains.append((actual_user, kwargs)),
+    )
     expected = FakeResponse(
         url="http://test.local/l/sync",
         post_data='{"updates":["offline edit","remote edit"]}',
@@ -491,6 +499,7 @@ def test_offline_sync_replay_waits_for_manager_and_exact_matching_response():
 
     with offline.expect_offline_sync_replay(
         user,
+        sync_id="project:document",
         request_payload_contains=("offline edit", "remote edit"),
     ) as responses:
         page.respond(
@@ -502,7 +511,18 @@ def test_offline_sync_replay_waits_for_manager_and_exact_matching_response():
         page.respond(expected)
 
     assert responses == [expected]
-    assert "await view?.syncReady" in page.evaluation
+    assert queue_drains == [
+        (
+            user,
+            {
+                "sync_id": "project:document",
+                "exact": 0,
+                "timeout": 30000,
+            },
+        )
+    ]
+    assert "await view.servicesReady" in page.evaluation
+    assert "view.SyncManager ?? (await view.syncReady)" in page.evaluation
     assert "await manager.ready" in page.evaluation
     assert page.listener is None
 

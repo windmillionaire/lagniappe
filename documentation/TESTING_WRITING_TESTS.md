@@ -219,9 +219,10 @@ header. Keep the visible postcondition after the wait, and reload or use a
 fresh context when durable state is part of the story.
 
 For persisted document replay after replacing or reloading the page, use
-`expect_offline_sync_replay()`. It installs the `/l/sync` response listener
-before navigation, awaits the new view's `syncReady` manager and the manager's
-own `ready` replay, and verifies the expected number of successful matching
+`expect_offline_sync_replay()` with the durable sync ID. It installs the
+`/l/sync` response listener before navigation, waits for that sync ID's
+IndexedDB rows to drain, awaits the new view's current sync manager and its own
+`ready` replay, and verifies the expected number of successful matching
 responses. Do not make ordinary `User.go()` or view initialization await this
 background work; normal application startup intentionally remains non-blocking.
 

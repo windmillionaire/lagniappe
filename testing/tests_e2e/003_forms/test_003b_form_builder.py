@@ -39,6 +39,13 @@ def _option_labels(field):
     return [option["label"] for option in field.get("options", [])]
 
 
+def _save_select_option(builder, label):
+    builder.condition.locator("button[data-role='save']").click()
+    expect(
+        builder.settings.locator("[data-setting='options']")
+    ).to_contain_text(label)
+
+
 def _custom_schema(builder):
     return [
         field
@@ -127,7 +134,7 @@ def test_change_select_options(get_user):
     for option in ["Apple", "Banana"]:
         option_name = builder.condition.locator("input[name='option-name']")
         option_name.fill(option)
-        builder.save_condition()
+        _save_select_option(builder, option)
         expect(builder.condition.locator("input[name='option-name']")).to_be_focused()
     _close_condition(builder)
 
@@ -139,12 +146,12 @@ def test_change_select_options(get_user):
     option_name = builder.condition.locator("input[name='option-name']")
     expect(option_name).to_have_value("Apple")
     option_name.fill("Apricot")
-    builder.save_condition()
+    _save_select_option(builder, "Apricot")
     _close_condition(builder)
 
     builder.open_condition("options")
     builder.condition.locator("input[name='option-name']").fill("Cherry")
-    builder.save_condition()
+    _save_select_option(builder, "Cherry")
     _close_condition(builder)
 
     assert _option_labels(builder.schema_field(field.id)) == [

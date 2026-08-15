@@ -1,19 +1,19 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b5d60d88';
-import { b as buttons } from './buttons.js?v=b5d60d88';
-import './foundation.js?v=b5d60d88';
-import './connectivity.js?v=b5d60d88';
-import { F as FacetsBox } from './facets.js?v=b5d60d88';
-import './styles.js?v=b5d60d88';
-import './icons.js?v=b5d60d88';
-import './dropdown.js?v=b5d60d88';
-import './combobox.js?v=b5d60d88';
-import './primitives.js?v=b5d60d88';
-import './baseForm.js?v=b5d60d88';
-import './loader.js?v=b5d60d88';
-import './formatting.js?v=b5d60d88';
-import './results.js?v=b5d60d88';
-import './submitter.js?v=b5d60d88';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=bd5baecd';
+import { b as buttons } from './buttons.js?v=bd5baecd';
+import './foundation.js?v=bd5baecd';
+import './connectivity.js?v=bd5baecd';
+import { F as FacetsBox } from './facets.js?v=bd5baecd';
+import './styles.js?v=bd5baecd';
+import './icons.js?v=bd5baecd';
+import './dropdown.js?v=bd5baecd';
+import './combobox.js?v=bd5baecd';
+import './primitives.js?v=bd5baecd';
+import './baseForm.js?v=bd5baecd';
+import './loader.js?v=bd5baecd';
+import './formatting.js?v=bd5baecd';
+import './results.js?v=bd5baecd';
+import './submitter.js?v=bd5baecd';
 
 const FILE_DROPZONE_TEXT =
 	"Drop file here, click to upload, or tap to choose camera/files";
