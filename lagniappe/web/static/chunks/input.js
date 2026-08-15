@@ -1,2 +1,88 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="40e6403e-c6f0-4788-8256-11b854da4a86",e._sentryDebugIdIdentifier="sentry-dbid-40e6403e-c6f0-4788-8256-11b854da4a86");}catch(e){}}();import{STYLES as e}from"./styles.js?v=bffda82b";import{B as s}from"./baseElement.js?v=bffda82b";import{f as i}from"./formatting.js?v=bffda82b";import{p as n}from"./primitives.js?v=bffda82b";import"./icons.js?v=bffda82b";class r extends s{get value(){const t=this.elt?.matches?.("input")?this.elt:this.elt?.querySelector("input");return t?t.value:this.submission===null||this.submission===void 0?null:String(this.submission)}changed(t){return this.value!==String(t??"")}clear(){this.submission=null;const t=this._edit?.querySelector("input");t&&(t.value="")}focus(){const t=this._edit?.querySelector("input");t&&t.focus()}get read(){return this._read?this._read:(this._read=document.createElement("p"),this._read.className=e.form.submission.default,this.submission&&this.schema.input==="date"?this._read.textContent=i.date(this.submission)||"":this.submission&&this.schema.input==="time"?this._read.textContent=i.time(this.submission):this.submission&&this.schema.input==="tel"?this._read.textContent=i.tel(this.submission):this.submission&&this.schema.input==="email"?this._read.appendChild(i.email(this.submission)):this._read.textContent=this.hasSubmission?String(this.submission):"",this._read.classList.add("group-data-[mode=edit]/element:hidden"),this._read)}get cell(){return this.cellEditing?this.cellEdit:this.hasSubmission?this.read.innerHTML:null}get edit(){return this._edit?this._edit:(this._edit=n.input({label:this.label,name:this.schema.id||this.schema.name,type:this.schema.input||"text",placeholder:this.schema.placeholder,value:this.submission,disabled:this.renderer.readonly}),(this._edit.matches?.("input")?this._edit:this._edit.querySelector("input"))?.classList.add("group-data-[mode=read]/element:hidden"),this._edit)}}export{r as InputElement};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { STYLES } from './styles.js?v=b13679a7';
+import { B as BaseElement } from './baseElement.js?v=b13679a7';
+import { f as formatting } from './formatting.js?v=b13679a7';
+import { p as primitives } from './primitives.js?v=b13679a7';
+import './icons.js?v=b13679a7';
+
+/**
+ * @testable infrastructure
+ */
+class InputElement extends BaseElement {
+	get value() {
+		const input = this.elt?.matches?.("input")
+			? this.elt
+			: this.elt?.querySelector("input");
+		if (input) return input.value;
+		if (this.submission === null || this.submission === undefined) return null;
+		return String(this.submission);
+	}
+
+	changed(value) {
+		if (this.value === String(value ?? "")) return false;
+		return true;
+	}
+
+	clear() {
+		this.submission = null;
+		const input = this._edit?.querySelector("input");
+		if (input) input.value = "";
+	}
+
+	focus() {
+		const input = this._edit?.querySelector("input");
+		if (input) input.focus();
+	}
+
+	get read() {
+		if (this._read) return this._read;
+
+		this._read = document.createElement("p");
+		this._read.className = STYLES.form.submission.default;
+
+		if (this.submission && this.schema.input === "date") {
+			this._read.textContent = formatting.date(this.submission) || "";
+		} else if (this.submission && this.schema.input === "time") {
+			this._read.textContent = formatting.time(this.submission);
+		} else if (this.submission && this.schema.input === "tel") {
+			this._read.textContent = formatting.tel(this.submission);
+		} else if (this.submission && this.schema.input === "email") {
+			this._read.appendChild(formatting.email(this.submission));
+		} else {
+			this._read.textContent = this.hasSubmission
+				? String(this.submission)
+				: "";
+		}
+		this._read.classList.add("group-data-[mode=edit]/element:hidden");
+
+		return this._read;
+	}
+
+	get cell() {
+		if (this.cellEditing) return this.cellEdit;
+		if (!this.hasSubmission) return null;
+		return this.read.innerHTML;
+	}
+
+	get edit() {
+		if (this._edit) return this._edit;
+
+		this._edit = primitives.input({
+			label: this.label,
+			name: this.schema.id || this.schema.name,
+			type: this.schema.input || "text",
+			placeholder: this.schema.placeholder,
+			value: this.submission,
+			disabled: this.renderer.readonly,
+		});
+
+		const input = this._edit.matches?.("input")
+			? this._edit
+			: this._edit.querySelector("input");
+		input?.classList.add("group-data-[mode=read]/element:hidden");
+
+		return this._edit;
+	}
+}
+
+export { InputElement };

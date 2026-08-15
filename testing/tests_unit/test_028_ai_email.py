@@ -282,6 +282,35 @@ def test_inbound_message_normalization_routes_alias_and_strips_reply_marker():
             parse_mailbox(malformed)
 
 
+# @features ai-email
+# @dimensions attachments content-disposition content-id inline
+def test_inbound_attachment_disposition_overrides_content_id():
+    attachment = InboundAttachment(
+        "attachment-1",
+        "photo.jpg",
+        "image/jpeg",
+        77_546,
+        content_disposition="attachment",
+        content_id="provider-content-id",
+    )
+    assert not attachment.inline
+    assert InboundAttachment(
+        "attachment-2",
+        "inline.jpg",
+        "image/jpeg",
+        100,
+        content_disposition="inline",
+        content_id="provider-content-id",
+    ).inline
+    assert InboundAttachment(
+        "attachment-3",
+        "legacy-inline.jpg",
+        "image/jpeg",
+        100,
+        content_id="provider-content-id",
+    ).inline
+
+
 # @features ai-email ai-report
 # @dimensions origin legacy-default inbound-manifest privacy
 def test_email_report_shape_preserves_safe_inbound_display_fields():

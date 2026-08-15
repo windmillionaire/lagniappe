@@ -58,6 +58,10 @@ class AIEmailRejection(ValueError):
         self.silent = bool(silent)
 
 
+# @testable true
+# @tests tests_unit/test_028_ai_email.py::test_inbound_attachment_disposition_overrides_content_id
+# @features ai-email
+# @dimensions attachments
 @dataclass(frozen=True)
 class InboundAttachment:
     """Provider-neutral attachment metadata with no signed URL."""
@@ -69,9 +73,15 @@ class InboundAttachment:
     content_disposition: str | None = None
     content_id: str | None = None
 
+    # @testable true
+    # @tests tests_unit/test_028_ai_email.py::test_inbound_attachment_disposition_overrides_content_id
+    # @features ai-email
+    # @dimensions attachments content-disposition content-id inline
     @property
     def inline(self):
-        return self.content_disposition == "inline" or bool(self.content_id)
+        if self.content_disposition:
+            return self.content_disposition == "inline"
+        return bool(self.content_id)
 
     def job_record(self):
         return {

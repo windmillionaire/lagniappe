@@ -581,11 +581,10 @@ def _disable(existing):
 
 
 # @testable true
-# @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_routes_every_mode_and_returns_status
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_setup_requires_custom_domain_and_supporting_services
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_setup_saves_deploys_then_enables_webhook
 # @features ai-email
-# @dimensions setup cli prerequisites provider-verification deployment-guidance
+# @dimensions setup prerequisites provider-verification deployment-guidance deploy disabled-first manual-smoke-test
 def configure_ai_email():
     """Configure production Resend receiving and optionally deploy it."""
     from installer.verify import prepare_existing_installation
@@ -752,7 +751,7 @@ def configure_ai_email():
 
     print(f.success("AI email provider configuration is ready."))
     for tool in ("ask", "create", "organize"):
-        print(f"  {tool.title():<8}{candidate['aliases'][tool]}@{candidate['domain']}")
+        print(f"  {tool.title():<8} {candidate['aliases'][tool]}@{candidate['domain']}")
     print("\nNext steps:")
     print("  1. Send a normal email from a registered user's exact email address.")
     print("  2. Confirm the acceptance email links to a pending report, then confirm")

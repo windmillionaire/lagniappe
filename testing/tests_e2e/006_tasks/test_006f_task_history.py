@@ -42,7 +42,7 @@ def _add_task_row_pressure(task, count=40):
     Entities.save(*filler_tasks, page)
 
 
-def _complete_then_uncomplete(task):
+def _complete_then_uncomplete(task, *, reload=True):
     task.complete()
     assert task.completed
     task.uncomplete()
@@ -53,8 +53,9 @@ def _complete_then_uncomplete(task):
         task.element.locator("button[lp-control='history']:visible")
     ).to_have_count(1)
     expect(task.element.locator(Task.TASK_HISTORY)).to_have_count(1)
-    task.user.reload()
-    task.wait_for_load()
+    if reload:
+        task.user.reload()
+        task.wait_for_load()
 
 
 def _open_history(task):
@@ -233,14 +234,12 @@ def test_task_history_visibility_persists_after_reload(get_user):
 
 
 # @features tasks
-# @dimensions history-fill latest-submission repeating-default patch
+# @dimensions history-fill latest-submission repeating-default patch live-update
 # @template pages/tasks.html::task_form
 def test_task_form_field_fills_from_latest_history(get_user):
     user = get_user(Users.OWNER)
     task = Tasks.test_history_fill_task.get(user)
     user.go(task)
-
-    _complete_then_uncomplete(task)
 
     history_fill_requests = []
     user.page.on(
@@ -250,8 +249,9 @@ def test_task_form_field_fills_from_latest_history(get_user):
         else None,
     )
 
-    task_form = task.task_form
+    _complete_then_uncomplete(task, reload=False)
 
+    task_form = task.task_form
     text_field = task_form.locator("[id^='input-textab12'].form-element")
     expect(text_field).to_be_visible()
     fill_button = text_field.locator("[data-role='history-fill']")
@@ -290,6 +290,187 @@ def test_task_form_field_fills_from_latest_history(get_user):
         "input-textab12": "Historical text value",
         "input-numgh78": 42.0,
     }
+
+
+# @pairs tasks:history-fill tasks:latest-submission tasks:live-update tasks:element-matrix
+# @template pages/tasks.html::task_form
+def test_task_history_fill_controls_cover_submission_elements(get_user):
+    user = get_user(Users.OWNER)
+    parent = Pages.test_create_page_task.get(user)
+    suffix = uuid4().hex
+    options = [
+        {"label": "First option", "value": "first"},
+        {"label": "Second option", "value": "second"},
+    ]
+    form = Entities.FORM.create(
+        {"name": f"History Fill Matrix Form {suffix}", "form-type": "task"}
+    )
+    form.schema = [
+        {
+            "id": "history-text",
+            "type": "input",
+            "input": "text",
+            "title": "Text",
+        },
+        {
+            "id": "history-date",
+            "type": "input",
+            "input": "date",
+            "title": "Date",
+        },
+        {
+            "id": "history-time",
+            "type": "input",
+            "input": "time",
+            "title": "Time",
+        },
+        {
+            "id": "history-number",
+            "type": "input",
+            "input": "number",
+            "title": "Number",
+        },
+        {
+            "id": "history-email",
+            "type": "input",
+            "input": "email",
+            "title": "Email",
+        },
+        {
+            "id": "history-phone",
+            "type": "input",
+            "input": "tel",
+            "title": "Phone",
+        },
+        {"id": "history-notes", "type": "textarea", "title": "Notes"},
+        {"id": "history-checkbox", "type": "checkbox", "title": "Checkbox"},
+        {
+            "id": "history-radio",
+            "type": "radio",
+            "title": "Radio",
+            "options": options,
+        },
+        {
+            "id": "history-select",
+            "type": "select",
+            "title": "Select",
+            "options": options,
+        },
+        {
+            "id": "history-multiselect",
+            "type": "select",
+            "title": "Multiple Select",
+            "multiple": True,
+            "options": options,
+        },
+        {
+            "id": "history-link",
+            "type": "link",
+            "title": "External Link",
+            "location": "out",
+        },
+        {"id": "history-location", "type": "location", "title": "Location"},
+        {
+            "id": "history-table",
+            "type": "table",
+            "title": "Table",
+            "columns": [
+                {
+                    "id": "history-row-note",
+                    "type": "input",
+                    "input": "text",
+                    "title": "Row Note",
+                }
+            ],
+        },
+        {"id": "history-todo", "type": "todo", "title": "To-do List"},
+        {
+            "id": "history-signature",
+            "type": "signature",
+            "title": "Signature",
+        },
+    ]
+    form.save()
+
+    fillable_values = {
+        "history-text": "Historical text",
+        "history-date": "2026-08-15",
+        "history-time": "13:45",
+        "history-number": 42,
+        "history-email": "history@example.com",
+        "history-phone": "5551234567",
+        "history-notes": "Historical notes",
+        "history-checkbox": True,
+        "history-radio": "second",
+        "history-select": "first",
+        "history-multiselect": ["first", "second"],
+        "history-link": {
+            "url": "https://example.com/history",
+            "title": "History Link",
+        },
+        "history-location": {
+            "id": "history-place",
+            "name": "History Place",
+            "address": "123 History Street, Test City",
+        },
+        "history-table": {"rows": [{"history-row-note": "Historical row"}]},
+        "history-todo": {
+            "items": [{"text": "Historical to-do", "checked": True}]
+        },
+    }
+    task_entity = Entities.TASK.create(
+        {
+            "name": f"History Fill Matrix Task {suffix}",
+            "page": parent.entity,
+            "form": form,
+            "submission": fillable_values,
+        }
+    )
+    task_entity = Entities.fetch_one(
+        task_entity,
+        request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
+    )
+    task_entity.save()
+    task = Task(user=user)
+    task.entity = task_entity
+
+    try:
+        user.go(task)
+        parent.complete_task(task)
+        parent.uncomplete_task(task)
+
+        task_form = task.task_form
+        for field_id in fillable_values:
+            field = task_form.locator(f"[id^='{field_id}-'].form-element")
+            expect(field).to_be_visible()
+            history_fill = field.locator("[data-role='history-fill']")
+            expect(history_fill).to_be_visible()
+            expect(history_fill).to_have_attribute(
+                "aria-label", "Fill from latest history"
+            )
+
+        signature = task_form.locator(
+            "[id^='history-signature-'].form-element"
+        )
+        expect(signature).to_be_visible()
+        expect(signature.locator("[data-role='history-fill']")).to_have_count(0)
+
+        table = task_form.locator("[id^='history-table-'].form-element")
+        with expect_successful_response(
+            user.page,
+            method="PATCH",
+            path=f"/tasks/{task.key}/default-submission",
+            entity_key=task.key,
+        ):
+            table.locator("[data-role='history-fill']").click()
+        expect(table.locator("tbody tr[data-index]")).to_have_count(1)
+
+        todo = task_form.locator("[id^='history-todo-'].form-element")
+        todo.locator("[data-role='history-fill']").click()
+        expect(todo.locator("[data-role='todo-check']")).not_to_be_checked()
+    finally:
+        Entities.delete(task_entity)
+        Entities.delete(form)
 
 
 # @features embedded-table

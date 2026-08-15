@@ -6,7 +6,6 @@ const NON_HISTORY_FILLABLE_TYPES = new Set([
 	"html",
 	"signature",
 	"status",
-	"table",
 ]);
 
 /**
@@ -53,6 +52,12 @@ export class BaseElement {
 		return this.renderer.showEmptyFields;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
+	 * @features tasks
+	 * @dimensions history-fill element-matrix
+	 */
 	get historyFillable() {
 		return !NON_HISTORY_FILLABLE_TYPES.has(this.schema?.type);
 	}

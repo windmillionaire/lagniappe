@@ -343,7 +343,7 @@ def test_ai_email_setup_requires_custom_domain_and_supporting_services():
 
 
 # @features ai-email
-# @dimensions setup cli prerequisites deploy manual-smoke-test disabled-first
+# @dimensions setup deploy manual-smoke-test disabled-first provider-verification deployment-guidance
 def test_ai_email_setup_saves_deploys_then_enables_webhook(
     monkeypatch,
     capsys,
@@ -446,6 +446,13 @@ def test_ai_email_setup_saves_deploys_then_enables_webhook(
     output = capsys.readouterr().out
     assert "Next step: deploy and activate AI email submissions." in output
     assert "no synthetic email or health probe is run" in output
+    assert "\n".join(
+        (
+            "  Ask      ask@inbound.app.example.com",
+            "  Create   create@inbound.app.example.com",
+            "  Organize organize@inbound.app.example.com",
+        )
+    ) in output
     assert "Send a normal email from a registered user's exact email address" in output
 
 

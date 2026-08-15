@@ -327,6 +327,10 @@ escape path. The latest-history control restores the most recent item texts
 with every checkbox reset to unchecked, and unlike ordinary fields does not
 persist that value as a repeating task default.
 
+When a reopened task has history, every submission-bearing element exposes a
+latest-history control while empty, including table and to-do elements. Static
+HTML, computed status, and signature assets do not expose that control.
+
 ## Primitives (`elements/primitives.mjs`)
 
 Factory functions for creating DOM elements. All accept an attributes object. Used by elements to build their read/edit views without writing raw DOM manipulation.

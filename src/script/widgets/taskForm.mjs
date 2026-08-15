@@ -43,9 +43,17 @@ export class TaskForm extends FormElement {
 		return Boolean(!this.readonly && this.hasHistory && this.historyFillRoute);
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
+	 * @features tasks
+	 * @dimensions history-fill live-update
+	 */
 	get hasHistory() {
 		return Boolean(
-			this.component?.elt.querySelector("[data-widget='TaskHistory']"),
+			this.target?.dataset.history ||
+				this.component?.elt.querySelector("[data-widget='TaskHistory']"),
 		);
 	}
 

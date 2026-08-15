@@ -93,8 +93,9 @@ export class Renderer {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
+	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
 	 * @features tasks
-	 * @dimensions history-fill latest-submission
+	 * @dimensions history-fill latest-submission element-matrix
 	 */
 	addHistoryFillButtons(submission, onFill = null) {
 		if (!this.historyFillEnabled || !submission) return;
