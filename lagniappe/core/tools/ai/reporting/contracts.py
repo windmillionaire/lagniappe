@@ -1,6 +1,7 @@
 """Shared action contracts, response schemas, and permissions for AI reports."""
 
 from ..autofill import submission_response_schema
+from .schedules import task_schedule_response_schema
 
 READ_ONLY_CONTEXT_TOOLS = (
     "list_workspace_resources",
@@ -239,6 +240,7 @@ REPORT_ACTION_DATA_CONTRACTS = {
             "form_action",
             "form_name",
             "due_date",
+            "schedule",
             "completed",
             "completed_on",
             "submission",
@@ -333,7 +335,7 @@ REPORT_ACTION_DATA_CONTRACTS = {
         "required_groups": (("form", "form_action"),),
     },
     "update_submission_fields": {
-        "fields": ("updates",),
+        "fields": ("page", "page_name", "task", "task_name", "updates"),
         "required": ("updates",),
     },
     "attach_file_to_page": {
@@ -434,6 +436,7 @@ def _report_action_data_properties():
         "submission_empty_reason": {"type": "string"},
         "document": {"type": "string"},
         "due_date": {"type": "string"},
+        "schedule": task_schedule_response_schema(),
         "completed": {"type": "boolean"},
         "completed_on": {"type": "string"},
         "note": {"type": "string"},
@@ -453,7 +456,7 @@ def _report_action_data_response_schema(action_type, include_submission_fields):
     omitted = (
         set()
         if include_submission_fields
-        else {"submission", "submission_empty_reason"}
+        else {"submission", "submission_empty_reason", "updates"}
     )
     fields = [field for field in contract["fields"] if field not in omitted]
     required = [field for field in contract.get("required", ()) if field in fields]

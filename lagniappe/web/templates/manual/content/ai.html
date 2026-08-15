@@ -48,6 +48,7 @@
         acceptance email and a result email linking back to the saved report.
       </p>
       <ul class="text-base-medium space-y-2">
+        <li><strong>AI (recommended):</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ai }} — questions, requests, and attachments are routed automatically.</li>
         <li><strong>Ask:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ask }} — subject or message required; up to 20 ordinary attachments are optional.</li>
         {% if current_user.access(AI.CREATE) %}
           <li><strong>Create:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.create }} — subject or message required; attachments are not accepted.</li>

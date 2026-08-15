@@ -7,6 +7,7 @@ from .guidelines import (
     HTML_GENERATION_RULES,
     LAGNIAPPE_WORKSPACE_CONCEPTS,
     REPORT_PREFLIGHT_CHECKS,
+    REPORT_TASK_SCHEDULING_GUIDELINES,
 )
 from .reporting.contracts import (
     READ_ONLY_CONTEXT_TOOLS,
@@ -110,7 +111,7 @@ Common data shapes:
 - create_project: {"name": string, "description": string}
 - create_model_task: {"name": string, "project": entity_or_action_ref, "form": entity_or_action_ref}
 - create_page: {"name": string, "description": string, "category": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "document": html_string}
-- create_task: {"name": string, "description": string, "page": entity_or_action_ref, "project": entity_or_action_ref, "model": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "due_date": "YYYY-MM-DD"}
+- create_task: {"name": string, "description": string, "page": entity_or_action_ref, "project": entity_or_action_ref, "model": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "due_date": "YYYY-MM-DD", "schedule": canonical_schedule_object}
 - needs_review: {"note": string, "questions": [string]}
 """
 
@@ -155,6 +156,7 @@ def _create_prompt_base(report, user, intro, extra_contexts=()):
         prompt.add_context(key, value, quote=quote)
     prompt.add_workspace_concepts(LAGNIAPPE_WORKSPACE_CONCEPTS)
     prompt.add_instructions(CONTEXT_USAGE_GUIDELINES)
+    prompt.add_instructions(REPORT_TASK_SCHEDULING_GUIDELINES)
     prompt.add_instructions(
         report_action_permission_instructions(),
         section_title="Report action permissions",

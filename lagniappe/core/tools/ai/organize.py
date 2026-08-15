@@ -102,6 +102,7 @@ ORGANIZE_ACTION_TYPES = frozenset(
         "add_form_to_page",
         "add_category",
         "update_form_schema",
+        "update_submission_fields",
         "attach_file_to_page",
         "attach_file_to_task",
         "delete_page",
@@ -139,7 +140,6 @@ def _organize_action_permission_context(user, allowed_actions):
             "can_move_tasks",
             "can_move_files",
             "can_rename_entities",
-            "can_update_submissions",
         }
     }
     if "add_category" in set(allowed_actions or ()):
@@ -205,9 +205,10 @@ task choices. Prefer an existing matching form/category/project/model task when
 one is a close conceptual fit; otherwise propose creating the needed structure
 before creating pages or tasks that depend on it.
 
-Do not preserve or generate data.submission. Select the right form and assign
-the exact supporting files; the submission completion stage will rebuild form
-data from the revised structure and summaries.
+Do not preserve or generate data.submission or data.updates values. Select the
+right form or exact existing page/task target and assign the exact supporting
+files; the submission completion stage will rebuild form data from the revised
+structure and summaries.
 
 References in current_proposal_json may already be executable stored ids.
 Preserve those references exactly when keeping an existing page/task/form/file;
@@ -376,6 +377,8 @@ def generate_organize_plan(prompt):
             prompt,
             proposal,
             report_label="Organize",
+            allow_empty_submission_updates=True,
+            require_pending_submission_target=True,
             allow_pending_submissions=True,
         )
 

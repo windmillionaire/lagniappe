@@ -28,6 +28,7 @@ from lagniappe.core.tools.ai import (
 from lagniappe.core.tools.ai.reporting.actions import lifecycle as report_action_lifecycle
 from lagniappe.core.tools.ai.reporting import contracts as report_contracts
 from lagniappe.core.tools.ai.reporting import organize_completion
+from lagniappe.core.tools.ai.reporting import schedules as report_schedules
 from testing.utility.mock_restrictions import MockRestrictions
 from testing.utility.test_entities import TestEntities
 
@@ -1681,6 +1682,7 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit():
         "add_form_to_page",
         "add_category",
         "update_form_schema",
+        "update_submission_fields",
         "attach_file_to_page",
         "attach_file_to_task",
         "delete_page",
@@ -1688,7 +1690,7 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit():
         "needs_review",
     }
     assert "summarize_file" not in prompt.allowed_actions
-    assert "update_submission_fields" not in prompt.allowed_actions
+    assert "update_submission_fields" in prompt.allowed_actions
     assert "move_page" not in prompt.allowed_actions
     assert "move_task" not in prompt.allowed_actions
     assert "move_file" not in prompt.allowed_actions
@@ -2313,6 +2315,16 @@ def test_report_prompts_attach_provider_json_schema():
     assert update_schema["properties"]["schema_id"] == {"type": "string"}
     assert update_schema["properties"]["new_value"] == {}
     assert "anyOf" not in update_schema
+    organize_update_data = all_actions["update_submission_fields"]["properties"][
+        "data"
+    ]
+    assert set(organize_update_data["properties"]) == {
+        "page",
+        "page_name",
+        "task",
+        "task_name",
+    }
+    assert "updates" not in organize_update_data["properties"]
     add_category_data = organize_actions["add_category"]["properties"]["data"]
     assert set(add_category_data["properties"]) == {
         "page",
@@ -2423,6 +2435,7 @@ def test_report_prompts_filter_actions_by_user_permissions():
         "create_task",
         "add_form_to_page",
         "add_category",
+        "update_submission_fields",
         "attach_file_to_page",
         "attach_file_to_task",
         "skip",
@@ -2466,6 +2479,7 @@ def test_report_prompts_filter_actions_by_user_permissions():
         "can_attach_files_to_tasks": True,
         "can_add_page_categories": True,
         "can_update_form_schemas": False,
+        "can_update_submissions": True,
         "can_delete_pages": False,
     }
     assert permissions["allowed_actions"] == list(organize_prompt.allowed_actions)
@@ -4862,6 +4876,110 @@ def test_complete_organize_submissions_uses_target_task_form(
     assert data["submission"] == {"input-textab12": "10 mg daily"}
 
 
+# @features ai-report
+# @dimensions submission-completion existing-task partial-update evidence-mapping
+@pytest.mark.unit
+def test_complete_organize_submissions_updates_existing_task_submission(
+    monkeypatch,
+    get_schema,
+):
+    user = _test_user("existing-task-completion-owner")
+    page = TestEntities.get(
+        "PAGE",
+        {"name": "Accounts Payable", "hash": "existing-invoice-page"},
+    )
+    form = TestEntities.get(
+        "FORM",
+        {"name": "Invoice", "hash": "existing-invoice-form"},
+    )
+    form.form_type = "task"
+    form.schema = get_schema("text_input_only")
+    task = TestEntities.get(
+        "TASK",
+        {"name": "Acme invoice", "hash": "existing-invoice-task"},
+        page=page,
+    )
+    task.form = form
+    task.submission = {"input-textab12": "Pending"}
+    file = _test_file("acme-paid.pdf", "application/pdf")
+    file.summary = "Acme invoice paid. Confirmation number 834921."
+    report = TestEntities.get(
+        "REPORT",
+        {
+            "name": "Update invoice confirmation",
+            "hash": "existing-invoice-report",
+            "parent": user,
+            "user": user,
+            "instructions": "Add the payment confirmation to the existing invoice.",
+            "input_files": [file],
+        },
+    )
+    proposal = {
+        "summary": "Update the invoice and retain its confirmation.",
+        "confidence": 0.95,
+        "issues": [],
+        "actions": [
+            {
+                "id": "update_invoice",
+                "type": "update_submission_fields",
+                "display_label": "Update Acme invoice",
+                "data": {"task": task.urlsafe_key},
+            },
+            {
+                "id": "attach_confirmation",
+                "type": "attach_file_to_task",
+                "data": {"task": task.urlsafe_key, "file": file.urlsafe_key},
+            },
+        ],
+    }
+    monkeypatch.setattr(
+        organize.Entities,
+        "fetch_one",
+        _fetch_one_from(
+            {
+                task.urlsafe_key: task,
+                form.urlsafe_key: form,
+                form.key: form,
+            }
+        ),
+    )
+    prompts = []
+
+    def generate(prompt):
+        prompts.append(prompt)
+        return {
+            "submissions": [
+                {
+                    "action_id": "update_invoice",
+                    "submission": {
+                        "input-textab12": "Confirmation 834921",
+                    },
+                }
+            ]
+        }
+
+    completed = organize.complete_organize_submissions(
+        proposal,
+        report,
+        user,
+        generate=generate,
+    )
+
+    context = _prompt_context_json(prompts[0], "Completion Context")
+    assert context["records"][0]["existing_submission"] == {
+        "input-textab12": "Pending"
+    }
+    assert context["records"][0]["supporting_file_refs"] == [file.urlsafe_key]
+    assert completed["actions"][0]["data"]["updates"] == [
+        {
+            "task": task.urlsafe_key,
+            "schema_id": "input-textab12",
+            "new_value": "Confirmation 834921",
+        }
+    ]
+    assert completed["actions"][1]["type"] == "attach_file_to_task"
+
+
 # @features ai-report form-schema submission
 # @dimensions submission-completion empty preservation issue
 @pytest.mark.unit
@@ -5584,6 +5702,117 @@ def test_run_report_attach_file_to_task_targets_created_task(monkeypatch, get_sc
     ]
     assert tasks[0].files == [file]
     assert tasks[0].submission == {"input-textab12": "Physical reviewed."}
+
+
+# @features ai-report task-scheduling
+# @dimensions structured-output recurring scheduled periodic validation normalization
+@pytest.mark.unit
+def test_report_task_schedule_contract_validates_supported_patterns():
+    schema = report_contracts.report_proposal_response_schema(("create_task",))
+    create_task_data = schema["properties"]["actions"]["items"]["anyOf"][0][
+        "properties"
+    ]["data"]
+    assert create_task_data["properties"]["schedule"] == (
+        report_schedules.task_schedule_response_schema()
+    )
+    assert report_schedules.validate_task_schedule(
+        {"kind": "recurring", "interval": 2, "unit": "week"}
+    ) == {"kind": "recurring", "interval": 2, "unit": "week"}
+    assert report_schedules.validate_task_schedule(
+        {
+            "kind": "scheduled",
+            "mode": "monthly",
+            "pattern_type": "ordinal_weekday",
+            "ordinal": -1,
+            "weekday": 4,
+            "description": "last Friday of the month",
+        }
+    ) == {
+        "kind": "scheduled",
+        "mode": "monthly",
+        "pattern_type": "ordinal_weekday",
+        "ordinal": -1,
+        "weekday": 4,
+        "description": "last Friday of the month",
+        "user_prompt": "last Friday of the month",
+    }
+    with pytest.raises(exceptions.AIException, match="weekday"):
+        report_schedules.validate_task_schedule(
+            {"kind": "scheduled", "mode": "weekly", "days": [7]}
+        )
+
+
+# @features ai-report task-scheduling
+# @dimensions persistence recurring
+@pytest.mark.unit
+def test_run_report_creates_task_with_reviewed_schedule(monkeypatch):
+    _patch_fake_keys(monkeypatch)
+    user = _test_user("runner-scheduled-task-owner")
+    page = TestEntities.get(
+        "PAGE",
+        {"name": "Household", "hash": "scheduled-task-page"},
+    )
+    report = TestEntities.get(
+        "REPORT",
+        {
+            "name": "Recurring filter reminder",
+            "hash": "runner-scheduled-task-report",
+            "parent": user,
+            "user": user,
+            "status": "ready",
+            "pending": False,
+            "proposal": {
+                "summary": "Create a recurring reminder.",
+                "confidence": 0.95,
+                "actions": [
+                    {
+                        "id": "replace_filter",
+                        "type": "create_task",
+                        "data": {
+                            "name": "Replace HVAC filter",
+                            "page": page.urlsafe_key,
+                            "schedule": {
+                                "kind": "recurring",
+                                "interval": 3,
+                                "unit": "month",
+                            },
+                        },
+                    }
+                ],
+            },
+        },
+    )
+    saved = []
+    monkeypatch.setattr(
+        report_runner.Entities,
+        "fetch_one",
+        _fetch_one_from({page.urlsafe_key: page}),
+    )
+    monkeypatch.setattr(
+        report_runner.Entities,
+        "save",
+        lambda *entities_to_save: saved.append(entities_to_save),
+    )
+
+    result = report_runner.run_report(report, user)
+
+    task = next(
+        entity
+        for batch in saved
+        for entity in batch
+        if getattr(entity, "entity_kind", None) == "task"
+    )
+    assert task.processes["schedule"]["recurring"] == {
+        "interval": 3,
+        "unit": "month",
+        "complete": True,
+    }
+    assert result["actions"][0]["schedule"] == {
+        "kind": "recurring",
+        "interval": 3,
+        "unit": "month",
+        "complete": True,
+    }
 
 
 # @features ai-report files

@@ -18,6 +18,7 @@
         Send from your exact registered email address. Email creates the same saved report as this panel and sends acceptance/result links; it does not apply proposed changes.
       </p>
       <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-base-medium">
+        <li>AI: {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ai }} — recommended; automatically selects Ask, Create, or Organize.</li>
         <li>Ask: {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ask }} — text required, attachments optional.</li>
         {% if current_user.access(AI.CREATE) %}
           <li>Create: {{ CONFIG.AI_EMAIL_PUBLIC.addresses.create }} — text required, no attachments.</li>
@@ -46,13 +47,13 @@
     {{ subheading("Available Tools") }}
     <div class="space-y-3">
       {% call feature("Organize", icon="organize", kind="default") %}
-        Drop files, paste screenshots, or add instructions when you want Lagniappe to decide how something should be saved. Organize can propose pages, tasks, forms, categories, projects, model tasks, file attachments, and summaries.
+        Drop files, paste screenshots, or add instructions when you want Lagniappe to decide how something should be saved. Organize can propose pages, tasks, forms, categories, projects, model tasks, file attachments, and evidence-backed updates to existing page or task submissions.
       {% endcall %}
       {% call feature("Ask", icon="ask", kind="default") %}
         Ask a question about your workspace. Ask can search permitted pages, tasks, projects, categories, forms, and files, then answer with links and cite the workspace context it used. If the answer naturally implies follow-up work, it can also propose actions.
       {% endcall %}
       {% call feature("Create", icon="create", kind="default") %}
-        Describe what you want Lagniappe to create. Create can draft workspace structure and content as a saved proposal that you can revise, skip, or run manually.
+        Describe what you want Lagniappe to create. Create can draft workspace structure, one-time reminders, and recurring tasks as a saved proposal that you can revise, skip, or run manually.
       {% endcall %}
       {% call feature("Permissioned Context", icon="permissions", kind="user") %}
         AI tools use the same permissions as the current user. They should only see and propose work with records the user is allowed to access.

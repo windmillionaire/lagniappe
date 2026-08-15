@@ -15,7 +15,7 @@ AI_EMAIL_LIMITS = {
     "hourlyPerUser": 30,
     "dailyPerUser": 200,
 }
-AI_EMAIL_TOOLS = ("ask", "create", "organize")
+AI_EMAIL_TOOLS = ("ai", "ask", "create", "organize")
 
 _TOP_LEVEL_KEYS = {
     "version",
@@ -134,15 +134,20 @@ def normalize_email_domain(value, name="AI email domain"):
     return ascii_domain
 
 
-# @testable false
-# @covered-by config/ai_email.py::normalize_ai_email_config
-# @reason alias schema details are exercised through the public normalizer
+# @testable true
+# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
+# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_rejects_security_weakening_values
+# @features ai-email
+# @dimensions aliases
 def _normalize_aliases(value):
     aliases = _mapping(value, "AI_EMAIL_CONFIG.aliases")
     _reject_unknown_keys(aliases, set(AI_EMAIL_TOOLS), "AI_EMAIL_CONFIG.aliases")
     normalized = {}
     for tool in AI_EMAIL_TOOLS:
-        alias = str(aliases.get(tool) or "").strip().casefold()
+        raw_alias = aliases.get(tool)
+        if tool == "ai" and raw_alias in (None, ""):
+            raw_alias = "ai"
+        alias = str(raw_alias or "").strip().casefold()
         if not _ALIAS_PATTERN.fullmatch(alias) or "+" in alias:
             raise AIEmailConfigurationError(
                 f"AI_EMAIL_CONFIG.aliases.{tool} is invalid."
@@ -202,7 +207,7 @@ def _normalize_resend(value):
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_rejects_security_weakening_values
 # @tests tests_tooling/test_003_config.py::test_recovery_accepts_and_redacts_optional_ai_email_config
 # @features ai-email
-# @dimensions config normalization secrets limits
+# @dimensions config normalization validation secrets limits
 def normalize_ai_email_config(value):
     """Return canonical schema-1 configuration, or ``None`` when absent."""
     if value in (None, ""):

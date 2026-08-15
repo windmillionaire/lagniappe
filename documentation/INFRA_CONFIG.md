@@ -172,11 +172,16 @@ installer behavior, and runtime enforcement are documented canonically in
 `config/ai_email.py`. It is intentionally absent from
 `REQUIRED_APPLICATION_SETTINGS`. The schema rejects unknown security keys,
 normalizes the dedicated receiving domain to lower-case IDNA ASCII, requires
-three unique conservative aliases, requires distinct receiving and sending API
+four unique conservative aliases (`ai`, `ask`, `create`, and `organize`),
+requires distinct receiving and sending API
 keys, and fixes the version-1 body/file/rate limits rather than accepting
 operator values that could weaken the envelope. The receiving key is Full
 access; the sending key and verified sender are reused from Resend-backed
 authentication email.
+
+The schema version remains 1. A schema-1 configuration saved before the shared
+address was added normalizes a missing `aliases.ai` to `ai`; the next installer
+save writes all four aliases explicitly.
 
 When `enabled` is false or the object is absent, the webhook is unavailable and
 the public projection is `{enabled: false, addresses: {}}`. When enabled, the

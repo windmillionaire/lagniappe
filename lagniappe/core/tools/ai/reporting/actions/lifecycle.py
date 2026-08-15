@@ -421,6 +421,7 @@ def _record_action_result(record, action, entity, to_save, metadata, created, co
         "created_histories",
         "file_summary",
         "submission",
+        "schedule",
         "project",
         "model",
         "form",

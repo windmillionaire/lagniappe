@@ -1032,7 +1032,7 @@ settings, and the deferred-job runtime identity/region. It then:
    action will deploy the current checkout and settings;
 9. offers to deploy, matching the other primary configuration flows. If
    accepted, it deploys first, enables the Resend webhook only after deployment
-   succeeds, verifies the enabled provider state, and prints the three live
+   succeeds, verifies the enabled provider state, and prints the four live
    addresses plus manual smoke-test steps. No synthetic email or route-health
    probe is run.
 
@@ -1054,15 +1054,19 @@ After a successful deploy, setup asks for a normal registered-user smoke test:
 
 ```text
 From:    <exact registered user email>
-To:      ask@<inbound-domain>
-Subject: <normal Ask request>
+To:      ai@<inbound-domain>
+Subject: <normal Ask, Create, or Organize request>
 ```
 
 The endpoint verifies the untouched request bytes with the webhook secret and a
 five-minute Svix timestamp window, retrieves the message and attachment metadata
 through the Full access key, matches one exact stored user email, and hands the
 submission to the durable replay/ingest job. That job starts the existing Ask,
-Create, or Organize report pipeline. Acceptance and terminal feedback use the
+Create, or Organize report pipeline. Mail sent to `ai@` is first classified by
+the configured utility model from subject/body and safe attachment metadata;
+the resolved workflow is persisted before attachment download so retries do not
+reclassify it. The explicit workflow aliases remain available. Acceptance and
+terminal feedback use the
 authentication-email sender and separate Sending key. Create and Organize only
 produce proposals; applying them still requires normal login, review, and
 execution.

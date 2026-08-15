@@ -370,7 +370,10 @@ not skip the existing-page checks before proposing a new page.
    additive changes when needed. Never split a coherent subject to make a form
    fit. Give a category a default form only when the user requests it or its pages
    are unambiguously repeated instances of one type with a small stable schema.
-   Leave `data.submission` to the completion stage.
+   When uploaded evidence should populate the form on an exact existing page or
+   open task, propose `update_submission_fields` with that page/task reference
+   and leave `data.updates` to the completion stage. Leave new-record
+   `data.submission` to that stage as well.
 9. Build the ordered proposal. Give every uploaded file an attachment, review, or
    explicit skip outcome; use skip rarely and `needs_review` only for genuine
    ambiguity or permission limits. Attach exact report file refs after their
@@ -427,7 +430,9 @@ ORGANIZE_PLANNING_ACTIONS = """
   `data.category` (or use `page_action`/`category_action` for earlier proposal
   actions). A page or category name in display text does not execute.
 - Do not include submission, submission_empty_reason, submission_needed,
-  submission_request, or submission_context. Completion owns form values.
+  submission_request, submission_context, or update rows.
+- Completion owns form values. A planned update_submission_fields action contains exactly one existing
+  page or task reference; omit data.updates.
 - Attach report uploads with attach_file_to_page or attach_file_to_task using the
   exact report_file_ref. Filenames and display names are labels, not refs.
 - Use update_form_schema only for additive fields or select/radio options.
@@ -499,10 +504,12 @@ Common data shapes:
 - create_page: {"name", "description", "category", "form", "document"}
 - create_task: {"name", "description", "page", optional "task" or
   "task_action" for exact completed-task identity, "project", "model", "form",
-  "due_date", or `"completed": true` with optional "completed_on"}
+  "due_date", optional canonical "schedule", or `"completed": true` with
+  optional "completed_on"}
 - add_form_to_page: {"page" or "page_action", "form" or "form_action"}
 - add_category: {"page" or "page_action", "category" or "category_action"}
 - update_form_schema: {"form", "operations"}
+- update_submission_fields: {"page" or "task"}; omit "updates" during planning
 - attach_file_to_page: {"page" or "page_action", "file"}
 - attach_file_to_task: {"task" or "task_action", "file"}
 - needs_review: {"note", "questions"}

@@ -21,7 +21,12 @@ def _valid_config():
         "provider": "resend",
         "enabled": False,
         "domain": "INBOUND.Exämple.COM.",
-        "aliases": {"ask": "ASK", "create": "create", "organize": "organize"},
+        "aliases": {
+            "ai": "ai",
+            "ask": "ASK",
+            "create": "create",
+            "organize": "organize",
+        },
         "resend": {
             "domainId": "domain-1",
             "webhookId": "webhook-1",
@@ -35,12 +40,16 @@ def _valid_config():
     }
 
 
-# @features ai-email config
+# @features ai-email
 # @dimensions config normalization domain email-address idna aliases public-projection secrets limits
 def test_ai_email_config_normalizes_domains_aliases_and_public_projection():
     normalized = normalize_ai_email_config(_valid_config())
 
     assert normalized["domain"] == "inbound.xn--exmple-cua.com"
+    assert normalized["version"] == 1
+    legacy_schema_one = _valid_config()
+    legacy_schema_one["aliases"].pop("ai")
+    assert normalize_ai_email_config(legacy_schema_one)["aliases"]["ai"] == "ai"
     assert normalized["aliases"]["ask"] == "ask"
     assert ai_email_public_config(normalized) == {
         "enabled": False,
@@ -52,6 +61,7 @@ def test_ai_email_config_normalizes_domains_aliases_and_public_projection():
     assert ai_email_public_config(enabled) == {
         "enabled": True,
         "addresses": {
+            "ai": "ai@inbound.xn--exmple-cua.com",
             "ask": "ask@inbound.xn--exmple-cua.com",
             "create": "create@inbound.xn--exmple-cua.com",
             "organize": "organize@inbound.xn--exmple-cua.com",
@@ -59,8 +69,8 @@ def test_ai_email_config_normalizes_domains_aliases_and_public_projection():
     }
 
 
-# @features ai-email config
-# @dimensions config validation normalization domain email-address idna limits aliases secrets public-projection
+# @features ai-email
+# @dimensions config validation limits aliases secrets
 def test_ai_email_config_rejects_security_weakening_values():
     mutations = (
         lambda value: value.update(unknown=True),
@@ -448,6 +458,7 @@ def test_ai_email_setup_saves_deploys_then_enables_webhook(
     assert "no synthetic email or health probe is run" in output
     assert "\n".join(
         (
+            "  Ai       ai@inbound.app.example.com",
             "  Ask      ask@inbound.app.example.com",
             "  Create   create@inbound.app.example.com",
             "  Organize organize@inbound.app.example.com",

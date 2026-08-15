@@ -682,7 +682,8 @@ are saved, allowing a worker retry to repeat an interrupted copy. The report's
 
 Email-origin reports use `origin: "email"` and an index-excluded
 `inbound_manifest` containing only normalized subject/body, selected address,
-received timestamp, and safe attachment display metadata. Provider IDs,
+requested/resolved workflow routing data, received timestamp, and safe
+attachment display metadata. Provider IDs,
 headers, and signed URLs remain outside the report. Email attachments are
 ordinary `File` entities with a temporary `report_user` view relationship so
 the submitting user can read report-only evidence without gaining edit or
@@ -816,6 +817,11 @@ modification time. `Entities.fetch()` preserves the query-key order, so
 ## Task Scheduling (`properties/task_scheduling.py`, `properties/task_dates.py`)
 
 Tasks support three scheduling models for recurring work. The scheduling system uses `ProcessProperty` to store schedule configuration as JSON sections within the task's `schedule` process key.
+
+Reviewed AI report task creation uses the same process sections. Its canonical
+`create_task.data.schedule` is validated during proposal preparation and mapped
+deterministically into `recurring`, `scheduled`, or `periodic` state during
+execution; report execution never invokes the scheduling model.
 
 ### Schedule Property
 

@@ -1,20 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="bf7e8688-7d60-4024-9d3f-2c248dccf944",e._sentryDebugIdIdentifier="sentry-dbid-bf7e8688-7d60-4024-9d3f-2c248dccf944");}catch(e){}}();import{E as s}from"../entity-foundation.js?v=bc17494f";import"../core-foundation.js?v=bc17494f";import"../connectivity.js?v=bc17494f";import"../foundation.js?v=bc17494f";class a extends s{constructor(t){super(t),this._defaultTabId=t.dataset.defaultTab||"settings"}}export{a as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import { E as Entity } from '../entity-foundation.js?v=bd5baecd';
-import '../core-foundation.js?v=bd5baecd';
-import '../connectivity.js?v=bd5baecd';
-import '../foundation.js?v=bd5baecd';
-
-/**
- * @testable true
- * @tests tests_e2e/002_home/test_002f_home_directory.py::test_admin_directory_link_opens_admin_settings
- * @features admin
- * @dimensions page-load site-settings
- */
-class Admin extends Entity {
-	constructor(node) {
-		super(node);
-		this._defaultTabId = node.dataset.defaultTab || "settings";
-	}
-}
-
-export { Admin as default };

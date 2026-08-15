@@ -3,7 +3,7 @@
 import copy
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Fetch, LARGE_ASSET_BYTES
+from lagniappe.core.definitions import Action, Fetch, LARGE_ASSET_BYTES
 from lagniappe.core.entities import Entities
 
 from ..autofill import validate_submission
@@ -150,9 +150,10 @@ def summarize_report_input_files(
 # @testable true
 # @tests tests_unit/test_020_ai_reports.py::test_complete_organize_submissions_uses_one_focused_prompt
 # @tests tests_unit/test_020_ai_reports.py::test_complete_organize_submissions_preserves_empty_form_records
+# @tests tests_unit/test_020_ai_reports.py::test_complete_organize_submissions_updates_existing_task_submission
 # @tests tests_unit/test_020_ai_reports.py::test_unreadable_pdf_is_saved_skipped_and_reported
 # @features ai-report
-# @dimensions submission-completion focused-prompt evidence-mapping persistence unreadable-pdf issue
+# @dimensions submission-completion focused-prompt evidence-mapping persistence unreadable-pdf issue existing-task partial-update
 def complete_organize_submissions(
     proposal,
     report,
@@ -164,7 +165,8 @@ def complete_organize_submissions(
     """Complete every form-backed Organize target in one focused model call."""
     proposal = validate_proposal(
         proposal,
-        allow_empty_submission_updates=allow_empty_submission_updates,
+        allow_empty_submission_updates=True,
+        require_pending_submission_target=True,
         allow_pending_submissions=True,
     )
     actions = proposal.get("actions") or []
@@ -180,7 +182,11 @@ def complete_organize_submissions(
         if action_type == "update_form_schema":
             prior_schema_updates.append(action)
             continue
-        if action_type not in {"create_page", "create_task"}:
+        if action_type not in {
+            "create_page",
+            "create_task",
+            "update_submission_fields",
+        }:
             continue
 
         data = action.get("data") or {}
@@ -199,7 +205,7 @@ def complete_organize_submissions(
             prior_schema_updates,
             context,
         )
-        expected_type = "page" if action_type == "create_page" else "task"
+        expected_type = _completion_target_type(action)
         if form_info.get("form_type") != expected_type:
             raise exceptions.AIException(
                 f"Organize action {action.get('id') or index + 1} resolved a "
@@ -262,7 +268,15 @@ def complete_organize_submissions(
             index, action = request_actions[request_id]
             result = results.get(request_id, {})
             submission = result.get("submission")
-            if isinstance(submission, dict) and submission:
+            if action.get("type") == "update_submission_fields":
+                _apply_completed_submission_update(
+                    proposal,
+                    action,
+                    target,
+                    submission,
+                    result.get("empty_reason"),
+                )
+            elif isinstance(submission, dict) and submission:
                 data = action.setdefault("data", {})
                 data["submission"] = submission
                 data.pop("submission_empty_reason", None)
@@ -326,6 +340,11 @@ def _completion_target_context(
             "files": _completion_evidence_files(files, fallback_files),
         }
     )
+    if action.get("type") == "update_submission_fields":
+        target["existing_submission"] = _completion_existing_submission(
+            action,
+            context,
+        )
     return {key: value for key, value in target.items() if value is not None}
 
 
@@ -407,6 +426,8 @@ Complete only their form submissions.
   titles and labels explain meaning but are never keys.
 - Fill every field directly supported by the report intent, record metadata, or
   assigned summaries. Partial submissions are expected.
+- For an existing record, return only fields whose values should change. Preserve
+  existing values that the evidence does not replace and omit unchanged fields.
 - Omit unsupported fields. Do not invent private facts, infer subjective answers,
   or fill one person's/provider's data into another role.
 - Required fields, internal links, dates, selects, and other unknown fields do not
@@ -681,6 +702,15 @@ def _completion_form_info(action, context):
             return task_form
         model_ref = _first_data_reference(data, "model")
         return _model_task_form_info(model_ref, context)
+    if action_type == "update_submission_fields":
+        entity, _target_type, _reference = _completion_existing_target(
+            action,
+            context,
+        )
+        form = _attached_completion_form(entity)
+        if form is None and isinstance(entity, Entities.TASK):
+            form = _attached_completion_form(getattr(entity, "model", None))
+        return _form_info_from_entity(form) if form else None
     return None
 
 
@@ -853,8 +883,7 @@ def _completion_file_contexts_for_action(action, context):
 # @reason request shaping is asserted through completion behavior tests
 def _completion_request_target(action, context):
     data = action.get("data") or {}
-    action_type = action.get("type")
-    target_type = "page" if action_type == "create_page" else "task"
+    target_type = _completion_target_type(action)
     target = {
         "type": target_type,
         "name": _completion_target_name(action, context),
@@ -885,6 +914,14 @@ def _completion_request_form(form_info):
 # @reason request shaping is asserted through completion behavior tests
 def _completion_target_name(action, context):
     data = action.get("data") or {}
+    if action.get("type") == "update_submission_fields":
+        entity, target_type, _reference = _completion_existing_target(action, context)
+        return (
+            _completion_data_label(data, target_type)
+            or _proposal_text(getattr(entity, "name", None))
+            or _proposal_text(action.get("display_label"))
+            or _proposal_text(action.get("id"))
+        )
     return (
         _completion_data_label(data, "target")
         or _proposal_text(data.get("name"))
@@ -961,8 +998,16 @@ def _completion_evidence_files(files, fallback_files):
 def _completion_action_file_refs(action, context):
     refs = []
     action_id = action.get("id")
-    if action_id:
-        source_type = action.get("type")
+    source_type = action.get("type")
+    if action_id or source_type == "update_submission_fields":
+        update_target_type = None
+        update_target = None
+        if source_type == "update_submission_fields":
+            update_target_type = _completion_target_type(action)
+            update_target = _first_data_reference(
+                action.get("data") or {},
+                update_target_type,
+            )
         for candidate in context["actions"]:
             if not isinstance(candidate, dict):
                 continue
@@ -974,11 +1019,131 @@ def _completion_action_file_refs(action, context):
                 source_type == "create_task" and candidate_type == "attach_file_to_task"
             ):
                 target = _first_data_reference(candidate_data, "task")
+            elif (
+                source_type == "update_submission_fields"
+                and update_target_type == "page"
+                and candidate_type == "attach_file_to_page"
+            ):
+                target = _first_data_reference(candidate_data, "page")
+            elif (
+                source_type == "update_submission_fields"
+                and update_target_type == "task"
+                and candidate_type == "attach_file_to_task"
+            ):
+                target = _first_data_reference(candidate_data, "task")
             else:
                 continue
-            if isinstance(target, str) and _strip_action_reference(target) == action_id:
+            matches_created_action = (
+                isinstance(target, str)
+                and action_id
+                and _strip_action_reference(target) == action_id
+            )
+            matches_existing_target = (
+                isinstance(target, str)
+                and isinstance(update_target, str)
+                and _strip_action_reference(target)
+                == _strip_action_reference(update_target)
+            )
+            if matches_created_action or matches_existing_target:
                 refs.extend(_proposal_file_refs(candidate_data))
     return [str(ref) for ref in refs if ref]
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @reason existing-target resolution is exercised through completion behavior tests
+def _completion_target_type(action):
+    action_type = action.get("type")
+    if action_type == "create_page":
+        return "page"
+    if action_type == "create_task":
+        return "task"
+    data = action.get("data") or {}
+    return "page" if _first_data_reference(data, "page") else "task"
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @reason exact entity loading and authorization are exercised through completion tests
+def _completion_existing_target(action, context):
+    target_type = _completion_target_type(action)
+    reference = _first_data_reference(action.get("data") or {}, target_type)
+    expected = Entities.PAGE if target_type == "page" else Entities.TASK
+    entity = _load_completion_entity(reference, expected)
+    if entity is None:
+        raise exceptions.AIException(
+            f"Organize action {action.get('id') or 'submission update'} references "
+            f"an existing {target_type} that could not be resolved."
+        )
+    if not entity.allowed(Action.EDIT, user=context["user"]):
+        raise exceptions.AIException(
+            "You do not have permission to update this submission."
+        )
+    return entity, target_type, reference
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @reason existing values are asserted through focused completion prompt tests
+def _completion_existing_submission(action, context):
+    entity, _target_type, _reference = _completion_existing_target(action, context)
+    submission = getattr(entity, "submission", None)
+    return copy.deepcopy(submission) if isinstance(submission, dict) else {}
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @reason completed update rows and safe empty fallback are asserted through completion tests
+def _apply_completed_submission_update(
+    proposal,
+    action,
+    target,
+    submission,
+    empty_reason,
+):
+    data = action.setdefault("data", {})
+    target_type = target["type"]
+    reference = _first_data_reference(data, target_type)
+    existing = target.get("existing_submission") or {}
+    updates = (
+        [
+            {
+                target_type: reference,
+                "schema_id": schema_id,
+                "new_value": value,
+            }
+            for schema_id, value in (submission or {}).items()
+            if existing.get(schema_id) != value or schema_id not in existing
+        ]
+        if isinstance(submission, dict)
+        else []
+    )
+    if updates:
+        data["updates"] = updates
+        return
+
+    reason = empty_reason or (
+        "No supported changes to the existing submission were found in the "
+        "available evidence."
+    )
+    request_id = action.get("id") or "submission update"
+    display_label = action.get("display_label") or request_id
+    action.clear()
+    action.update(
+        {
+            "id": request_id,
+            "type": "needs_review",
+            "display_label": display_label,
+            "reason": reason,
+            "data": {
+                "note": reason,
+                "questions": ["Which submission fields should be updated?"],
+            },
+        }
+    )
+    issue = f"{display_label}: {reason}"
+    if issue not in proposal["issues"]:
+        proposal["issues"].append(issue)
 
 
 # @testable false

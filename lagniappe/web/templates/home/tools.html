@@ -68,6 +68,7 @@
     {% if CONFIG.AI_EMAIL_PUBLIC.enabled %}
       {% set addresses = CONFIG.AI_EMAIL_PUBLIC.addresses %}
       <div data-role="email-submissions"
+           data-address-ai="{{ addresses.ai }}"
            data-address-ask="{{ addresses.ask }}"
            {% if current_user.access(AI.CREATE) %}
              data-address-create="{{ addresses.create }}"
@@ -76,13 +77,13 @@
            class="flex flex-col gap-1 rounded-md bg-base-bg p-3 text-sm">
         <span class="font-semibold text-base-dark">Email submissions</span>
         <div class="flex min-w-0 items-center gap-2">
-          <code data-role="email-address" class="min-w-0 flex-1 truncate">{{ addresses[default_tool] }}</code>
+          <code data-role="email-address" class="min-w-0 flex-1 truncate">{{ addresses.ai }}</code>
           <button type="button"
                   data-role="email-copy"
                   class="shrink-0 rounded-md bg-kind-default px-3 py-1.5 text-sm font-semibold text-white shadow-sm"
                   aria-label="Copy AI email address">Copy</button>
         </div>
-        <p class="text-xs text-base-medium">Sending here creates the selected report; proposed changes still require review.</p>
+        <p class="text-xs text-base-medium">Send questions, requests, or files here; Lagniappe selects the report workflow. Proposed changes still require review.</p>
       </div>
     {% endif %}
     <div class="{{ styles.form.submit.group }} -mt-2 flex flex-col gap-2"

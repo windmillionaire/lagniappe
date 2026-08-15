@@ -275,7 +275,12 @@ feedback. It never stores raw webhook payloads, raw mail, signed attachment
 URLs, or authentication headers.
 
 `EMAIL_INGEST` performs attachment I/O outside the webhook request and starts
-the existing report job for the selected tool. The shared deferred-job terminal
+the existing report job for the selected tool. The shared `ai@` alias runs the
+configured utility model first through `ai/email_router.py`, with no tools or
+search and only normalized subject/body plus safe attachment metadata. Its
+entitlement-filtered choice and short diagnostic are saved in the report's
+inbound manifest before downloads; explicit aliases skip this step. The shared
+deferred-job terminal
 delivery hook sends one result email for the initial email-origin report only;
 browser reports, revisions, execution, and undo do not send that feedback cycle.
 
@@ -494,6 +499,13 @@ become task history. Exact `task` and `task_action` references remain overrides.
 `undo_report()` reverses completed executions by restoring move parents,
 previous schema/submission field values, removing report-created file links, and
 deleting created entities while preserving the report's uploaded input files.
+
+Create and Organize `create_task` actions may also carry a canonical reviewed
+`schedule`. Validation accepts recurring intervals, daily/weekly calendar
+schedules, monthly/yearly patterns, and periodic intervals. The runner writes
+that schedule directly to the task process without another model call. Create
+continues to reject attachments; attachment-backed task creation or submission
+autofill belongs to Organize, which proposes the corresponding file attachment.
 
 Execution is submitted as a dedicated `report-execution` `DeferredJob`; the
 request returns after durable queueing and the worker calls `run_report()`.

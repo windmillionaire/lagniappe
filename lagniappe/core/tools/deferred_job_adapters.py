@@ -37,7 +37,7 @@ from .deferred_jobs import (
 # @tests tests_unit/test_028_ai_email.py::test_email_ingest_adapter_starts_existing_report_job_idempotently
 # @tests tests_unit/test_028_ai_email.py::test_email_ingest_failure_surfaces_bounded_diagnostic
 # @features ai-email deferred-jobs
-# @dimensions attachments deterministic-files report-handoff acceptance
+# @dimensions report-handoff acceptance
 class EmailIngestAdapter(DeferredJobAdapter):
     """Finalize received attachments, then start the normal report adapter."""
 
@@ -91,6 +91,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
         attachments = parameters.get("attachments") or []
         if not isinstance(attachments, list):
             raise exceptions.ValidationError("Email attachment manifest is invalid.")
+        self._route_shared_address(report, actor, parameters, attachments)
         config = CONFIG.AI_EMAIL_CONFIG
         if not config:
             raise exceptions.ValidationError("AI email configuration is unavailable.")
@@ -196,6 +197,56 @@ class EmailIngestAdapter(DeferredJobAdapter):
         )
         return context.checkpoint
 
+    # @testable true
+    # @tests tests_unit/test_028_ai_email.py::test_email_ingest_adapter_routes_shared_address_once
+    # @features ai-email deferred-jobs
+    # @dimensions routing utility-model idempotency permissions
+    def _route_shared_address(self, report, actor, parameters, attachments):
+        manifest = dict(report.inbound_manifest or {})
+        requested_tool = (
+            parameters.get("requested_tool")
+            or manifest.get("requested_tool")
+            or manifest.get("tool")
+            or report.tool
+        )
+        if requested_tool != "ai":
+            return report.tool
+
+        resolved_tool = manifest.get("resolved_tool")
+        if resolved_tool not in {"ask", "create", "organize"}:
+            eligible = ["ask"]
+            if actor.access(AI.CREATE):
+                eligible.extend(("create", "organize"))
+            parameters["_diagnostic_code"] = "email_route_failed"
+            route = ai.route_ai_email(
+                manifest.get("subject"),
+                manifest.get("body"),
+                attachments,
+                eligible,
+            )
+            resolved_tool = route["workflow"]
+            manifest.update(
+                {
+                    "requested_tool": "ai",
+                    "resolved_tool": resolved_tool,
+                    "tool": resolved_tool,
+                    "route_confidence": route["confidence"],
+                    "route_reason": route["reason"],
+                }
+            )
+            report.inbound_manifest = manifest
+
+        required = AI.ASK if resolved_tool == "ask" else AI.CREATE
+        if not actor.access(required):
+            raise exceptions.ValidationError(
+                "This user does not have the required AI access."
+            )
+        if report.tool != resolved_tool or report.inbound_manifest != manifest:
+            report.tool = resolved_tool
+            report.inbound_manifest = manifest
+        Entities.save(report, actor)
+        return resolved_tool
+
     def apply(self, context):
         return {
             "report_key": context.input("report").urlsafe_key,
@@ -221,6 +272,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
             return
         diagnostic_codes = {
             "email_ingest_failed",
+            "email_route_failed",
             "attachment_download_failed",
             "attachment_prepare_failed",
             "report_start_failed",
@@ -247,6 +299,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
         context.parameters.pop("provider_message_id", None)
         context.parameters.pop("attachments", None)
         context.parameters.pop("event_digest", None)
+        context.parameters.pop("requested_tool", None)
         context.parameters.pop("_diagnostic_code", None)
 
     def external_delivery_required(self, context):

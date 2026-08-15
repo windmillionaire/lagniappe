@@ -12,6 +12,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database, dates
 
 from ...debug import ai_debug
+from ..schedules import apply_task_schedule
 from .operations import (
     TASK_FORM_TYPE_ERROR,
     _data,
@@ -238,9 +239,15 @@ def _create_task(action, _report, user, created, context=None):
     )
     if form is not None and "submission" in data:
         task.ai_submission(data.get("submission") or {})
+    if data.get("schedule") is not None:
+        metadata_schedule = apply_task_schedule(task, data["schedule"])
+    else:
+        metadata_schedule = None
 
     metadata = _task_structure_result(task)
     metadata["page"] = _entity_result(page)
+    if metadata_schedule is not None:
+        metadata["schedule"] = metadata_schedule
     if "submission" in data:
         metadata["submission"] = _submission_result(
             task,

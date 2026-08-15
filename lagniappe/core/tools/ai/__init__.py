@@ -55,6 +55,11 @@ from .report_uploads import (
     finalize_report_upload_manifest,
     prepare_report_upload_manifest,
 )
+from .email_router import (
+    ai_email_routing_prompt,
+    route_ai_email,
+    validate_ai_email_route,
+)
 from .core import ai_model
 
 
@@ -116,4 +121,7 @@ __all__ = [
     "cleanup_report_upload_manifest",
     "finalize_report_upload_manifest",
     "prepare_report_upload_manifest",
+    "ai_email_routing_prompt",
+    "route_ai_email",
+    "validate_ai_email_route",
 ]

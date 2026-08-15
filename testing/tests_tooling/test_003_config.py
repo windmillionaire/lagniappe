@@ -1021,7 +1021,12 @@ def test_recovery_accepts_and_redacts_optional_ai_email_config():
         "provider": "resend",
         "enabled": False,
         "domain": "inbound.example.com",
-        "aliases": {"ask": "ask", "create": "create", "organize": "organize"},
+        "aliases": {
+            "ai": "ai",
+            "ask": "ask",
+            "create": "create",
+            "organize": "organize",
+        },
         "resend": {
             "domainId": "domain-1",
             "webhookId": "webhook-1",

@@ -11,6 +11,7 @@ import pytest
 from config.ai_email import AI_EMAIL_LIMITS, normalize_ai_email_config
 from lagniappe.core.definitions import Action
 from lagniappe.core.tools import ai_email
+from lagniappe.core.tools import ai as ai_tools
 from lagniappe.core.tools.ai_email import (
     AIEmailRejection,
     AIEmailWebhookError,
@@ -36,7 +37,12 @@ def _config():
             "provider": "resend",
             "enabled": True,
             "domain": "inbound.example.com",
-            "aliases": {"ask": "ask", "create": "create", "organize": "organize"},
+            "aliases": {
+                "ai": "ai",
+                "ask": "ask",
+                "create": "create",
+                "organize": "organize",
+            },
             "resend": {
                 "domainId": "domain-1",
                 "webhookId": "webhook-1",
@@ -346,6 +352,71 @@ def test_email_report_shape_preserves_safe_inbound_display_fields():
     assert legacy.origin == "web"
 
 
+# @features ai-email
+# @dimensions routing utility-model structured-output attachments privacy generation validation
+def test_ai_email_router_uses_utility_model_and_safe_metadata(monkeypatch):
+    prompts = []
+
+    def generate(prompt, *, validator=None):
+        prompts.append(prompt)
+        result = {
+            "workflow": "organize",
+            "confidence": 0.97,
+            "reason": "The attached invoice should fill a task submission.",
+        }
+        return validator(result) if validator else result
+
+    monkeypatch.setattr(ai_tools.ai_model, "generate_content", generate)
+    route = ai_tools.route_ai_email(
+        "Paid invoice",
+        "Update the existing task with its confirmation number.",
+        [
+            {
+                "id": "private-provider-id",
+                "filename": "invoice.pdf",
+                "content_type": "application/pdf",
+                "size": 1200,
+                "download_url": "https://provider.example/private",
+            }
+        ],
+        ("ask", "create", "organize"),
+    )
+
+    assert route["workflow"] == "organize"
+    prompt = prompts[0]
+    assert prompt.prompt_type == "ai email router"
+    assert prompt.model_tier == "utility"
+    assert prompt.thinking_budget == 0
+    assert prompt.search is False
+    assert prompt.tools is None
+    assert prompt.response_schema["properties"]["workflow"]["enum"] == [
+        "ask",
+        "organize",
+    ]
+    built = prompt.build()
+    assert "invoice.pdf" in built
+    assert "private-provider-id" not in built
+    assert "download_url" not in built
+
+
+# @features ai-email
+# @dimensions routing validation attachment-contract
+def test_ai_email_router_normalizes_attachment_create_to_organize():
+    assert ai_tools.validate_ai_email_route(
+        {
+            "workflow": "create",
+            "confidence": 0.8,
+            "reason": "Create an invoice task from the attachment.",
+        },
+        attachments=[{"filename": "invoice.pdf"}],
+        eligible_workflows=("ask", "create", "organize"),
+    ) == {
+        "workflow": "organize",
+        "confidence": 0.8,
+        "reason": "Attachment-backed creation uses Organize.",
+    }
+
+
 # @features ai-email files
 # @dimensions temporary-view-ownership
 def test_email_report_file_is_viewable_only_by_submitter_or_owner():
@@ -361,7 +432,7 @@ def test_email_report_file_is_viewable_only_by_submitter_or_owner():
     assert not file.allowed(Action.VIEW, user=stranger)
 
 
-# @features ai-email feedback
+# @features ai-email
 # @dimensions acceptance terminal-link reply-to idempotency disabled-completion
 def test_report_feedback_links_to_report_and_remains_available_after_disable(
     monkeypatch,
@@ -380,6 +451,11 @@ def test_report_feedback_links_to_report_and_remains_available_after_disable(
         },
     )
     report.origin = "email"
+    report.inbound_manifest = {
+        "alias": "ai@inbound.example.com",
+        "requested_tool": "ai",
+        "resolved_tool": "ask",
+    }
     config = _config()
     config["enabled"] = False
     monkeypatch.setattr(CONFIG, "AI_EMAIL_CONFIG", config)
@@ -396,7 +472,7 @@ def test_report_feedback_links_to_report_and_remains_available_after_disable(
 
     payload, idempotency_key = sent[0]
     assert payload["to"] == ["Owner@example.com"]
-    assert payload["reply_to"] == "ask@inbound.example.com"
+    assert payload["reply_to"] == "ai@inbound.example.com"
     assert (
         "https://app.example.com/tools/reports/email-report-one"
         in payload["text"]
@@ -544,6 +620,67 @@ def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch)
     assert states == ["accepted"]
 
 
+# @features ai-email
+# @dimensions report-handoff routing idempotency privacy
+def test_create_shared_address_email_report_preserves_routing_input(monkeypatch):
+    from lagniappe.core.entities import Entities
+    from lagniappe.core.tools import database
+    from lagniappe.core.tools.deferred_jobs import DeferredJobs
+
+    user = SimpleNamespace(urlsafe_key="user-one")
+    message = SimpleNamespace(
+        provider_message_id="provider-message-one",
+        subject="Paid invoice",
+        text_body="Fill its task and save the confirmation number.",
+        received_at="2026-08-15T12:00:00Z",
+    )
+    attachment = InboundAttachment(
+        "attachment-one",
+        "invoice.pdf",
+        "application/pdf",
+        1200,
+    )
+    saved = []
+    starts = []
+
+    monkeypatch.setattr(database, "create_named_key", lambda *_args: "report-key")
+    monkeypatch.setattr(Entities, "fetch_one", lambda *_args, **_kwargs: None)
+
+    def create_report(data, *, key):
+        return SimpleNamespace(
+            **data,
+            key=key,
+            urlsafe_key="email-report-one",
+        )
+
+    monkeypatch.setattr(Entities.REPORT, "create", create_report)
+    monkeypatch.setattr(Entities, "save", lambda *entities: saved.append(entities))
+    monkeypatch.setattr(
+        DeferredJobs,
+        "start",
+        lambda spec: starts.append(spec) or (SimpleNamespace(), None),
+    )
+
+    report = ai_email._create_email_report(
+        message,
+        "ai",
+        user,
+        "Subject: Paid invoice\n\nFill its task.",
+        (attachment,),
+        "a" * 64,
+        _config(),
+    )
+
+    assert report.tool == "ask"
+    assert report.inbound_manifest["requested_tool"] == "ai"
+    assert report.inbound_manifest["tool"] == "ask"
+    assert report.inbound_manifest["alias"] == "ai@inbound.example.com"
+    assert report.inbound_manifest["attachments"] == [attachment.display_record()]
+    assert saved == [(report, user)]
+    assert starts[0].parameters["requested_tool"] == "ai"
+    assert starts[0].parameters["attachments"] == [attachment.job_record()]
+
+
 # @features ai-email deferred-jobs
 # @dimensions report-handoff idempotency acceptance
 def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatch):
@@ -606,6 +743,75 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
     assert starts[0].job_type.value == "report-ask"
     assert starts[0].idempotency_key == f"ai-email/report/{'a' * 64}"
     assert feedback == [(report, "acceptance")]
+
+
+# @features ai-email deferred-jobs
+# @dimensions routing utility-model idempotency permissions
+def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
+    from lagniappe.core.tools import deferred_job_adapters
+
+    user = TestEntities.get("USER", {"name": "Owner", "owner": False})
+    user.access = lambda _required: True
+    report = TestEntities.get(
+        "REPORT",
+        {
+            "name": "AI: Paid invoice",
+            "tool": "ask",
+            "user": user,
+            "parent": user,
+        },
+    )
+    report.origin = "email"
+    report.inbound_manifest = {
+        "subject": "Paid invoice",
+        "body": "Fill the existing task with the confirmation number.",
+        "tool": "ask",
+        "requested_tool": "ai",
+        "alias": "ai@inbound.example.com",
+    }
+    calls = []
+    saved = []
+    monkeypatch.setattr(
+        deferred_job_adapters.ai,
+        "route_ai_email",
+        lambda *args: calls.append(args)
+        or {
+            "workflow": "organize",
+            "confidence": 0.96,
+            "reason": "The attachment should update a submission.",
+        },
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.Entities,
+        "save",
+        lambda *entities: saved.append(entities),
+    )
+    parameters = {"requested_tool": "ai"}
+    attachments = [
+        {
+            "id": "attachment-1",
+            "filename": "invoice.pdf",
+            "content_type": "application/pdf",
+            "size": 1200,
+        }
+    ]
+    adapter = deferred_job_adapters.EmailIngestAdapter()
+
+    assert (
+        adapter._route_shared_address(report, user, parameters, attachments)
+        == "organize"
+    )
+    assert (
+        adapter._route_shared_address(report, user, parameters, attachments)
+        == "organize"
+    )
+
+    assert len(calls) == 1
+    assert report.tool == "organize"
+    assert report.inbound_manifest["requested_tool"] == "ai"
+    assert report.inbound_manifest["resolved_tool"] == "organize"
+    assert report.inbound_manifest["route_confidence"] == 0.96
+    assert len(saved) == 2
 
 
 # @features ai-email deferred-jobs feedback
@@ -676,7 +882,7 @@ def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
     assert context.parameters == {"_diagnostic_message": expected}
 
 
-# @features ai-email policy
+# @features ai-email
 # @dimensions access attachment-contract body-contract rate-limit
 def test_submission_contract_keeps_create_and_organize_report_only(monkeypatch):
     monkeypatch.setattr(
@@ -703,3 +909,11 @@ def test_submission_contract_keeps_create_and_organize_report_only(monkeypatch):
             user,
             _config(),
         )
+    instructions, attachments = ai_email._preflight_submission(
+        message,
+        "ai",
+        user,
+        _config(),
+    )
+    assert instructions.startswith("Subject: Create this")
+    assert [attachment.filename for attachment in attachments] == ["notes.txt"]

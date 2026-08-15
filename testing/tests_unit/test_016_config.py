@@ -23,7 +23,12 @@ def _disabled_ai_email_config():
         "provider": "resend",
         "enabled": False,
         "domain": "INBOUND.Example.COM.",
-        "aliases": {"ask": "ASK", "create": "create", "organize": "organize"},
+        "aliases": {
+            "ai": "ai",
+            "ask": "ASK",
+            "create": "create",
+            "organize": "organize",
+        },
         "resend": {
             "domainId": "domain-1",
             "webhookId": "webhook-1",

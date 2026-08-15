@@ -496,7 +496,12 @@ def _setup_config(
             "enabled": True,
             "domain": domain,
             "aliases": (existing or {}).get("aliases")
-            or {"ask": "ask", "create": "create", "organize": "organize"},
+            or {
+                "ai": "ai",
+                "ask": "ask",
+                "create": "create",
+                "organize": "organize",
+            },
             "resend": {
                 "domainId": domain_id,
                 "webhookId": webhook["id"],
@@ -617,9 +622,9 @@ def configure_ai_email():
     print(f"\n{f.info('AI Email Submissions')}")
     print(
         wrap_text(
-            "This configures Resend receiving and the Lagniappe Ask, Create, and "
-            "Organize addresses. It verifies the provider resources and saves the "
-            "application configuration, then offers to deploy and activate it."
+            "This configures Resend receiving and the Lagniappe AI, Ask, Create, "
+            "and Organize addresses. It verifies the provider resources and saves "
+            "the application configuration, then offers to deploy and activate it."
         )
     )
     default_domain = (existing or {}).get("domain") or f"inbound.{custom_domain}"
@@ -750,7 +755,7 @@ def configure_ai_email():
         )
 
     print(f.success("AI email provider configuration is ready."))
-    for tool in ("ask", "create", "organize"):
+    for tool in ("ai", "ask", "create", "organize"):
         print(f"  {tool.title():<8} {candidate['aliases'][tool]}@{candidate['domain']}")
     print("\nNext steps:")
     print("  1. Send a normal email from a registered user's exact email address.")

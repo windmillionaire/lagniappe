@@ -25,8 +25,9 @@ const TOOL_DEFAULTS = {
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_tools_create_form_has_expected_controls
+ * @tests tests_js/test_043_ai_email_frontend.py::test_ai_email_address_selection_and_copy_controls
  * @features ai-report
- * @dimensions upload-form multi-file instructions tool-switcher ask create explain-button
+ * @dimensions upload-form multi-file instructions tool-switcher ask create explain-button email-address-selection clipboard-fallback status-reset absent-markup
  */
 export class CreateToolReport extends BaseUpload {
 	constructor(attributes) {
@@ -149,7 +150,9 @@ export class CreateToolReport extends BaseUpload {
 	updateEmailAddress(tool) {
 		if (!this.emailSubmissions || !this.emailAddress) return;
 		const key = `address${tool.charAt(0).toUpperCase()}${tool.slice(1)}`;
-		const address = this.emailSubmissions.dataset[key];
+		const address =
+			this.emailSubmissions.dataset.addressAi ||
+			this.emailSubmissions.dataset[key];
 		if (address) this.emailAddress.textContent = address;
 	}
 

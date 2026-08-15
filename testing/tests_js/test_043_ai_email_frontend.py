@@ -1,8 +1,8 @@
 """Node-backed checks for AI email address selection and copy behavior."""
 
 
-# @features ai-email frontend
-# @dimensions tool-selection eligibility clipboard fallback status-reset absent-markup
+# @features ai-report
+# @dimensions email-address-selection clipboard-fallback status-reset absent-markup
 def test_ai_email_address_selection_and_copy_controls(run_node):
     run_node(
         r"""
@@ -48,11 +48,12 @@ vm.runInContext(source, context);
 const widget = Object.create(context.CreateToolReport.prototype);
 widget.emailSubmissions = {
   dataset: {
+    addressAi: "ai@inbound.example.com",
     addressAsk: "ask@inbound.example.com",
     addressCreate: "create@inbound.example.com",
   },
 };
-widget.emailAddress = { textContent: "ask@inbound.example.com" };
+widget.emailAddress = { textContent: "ai@inbound.example.com" };
 widget.emailCopyButton = {
   textContent: "Copy",
   isConnected: true,
@@ -61,16 +62,16 @@ widget.emailCopyButton = {
 
 (async () => {
   widget.updateEmailAddress("create");
-  if (widget.emailAddress.textContent !== "create@inbound.example.com") {
-    throw new Error("Eligible tool selection did not update the address");
+  if (widget.emailAddress.textContent !== "ai@inbound.example.com") {
+    throw new Error("Tool selection replaced the shared AI address");
   }
   widget.updateEmailAddress("organize");
-  if (widget.emailAddress.textContent !== "create@inbound.example.com") {
-    throw new Error("Missing/ineligible address should not replace the visible value");
+  if (widget.emailAddress.textContent !== "ai@inbound.example.com") {
+    throw new Error("Shared AI address should remain visible");
   }
 
   await widget.copyEmailAddress();
-  if (clipboardText !== "create@inbound.example.com" ||
+  if (clipboardText !== "ai@inbound.example.com" ||
       widget.emailCopyButton.textContent !== "Copied") {
     throw new Error("Clipboard success was not reported");
   }

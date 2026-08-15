@@ -93,8 +93,12 @@ The signed Resend webhook claims an HMAC-only replay record, retrieves and
 normalizes the message, matches one exact stored user email, creates a
 deterministic pending `AIReport`, and starts `EMAIL_INGEST`. That adapter streams
 ordinary attachments into deterministic report-owned `File` entities and then
-starts the normal `REPORT_ASK`, `REPORT_CREATE`, or `REPORT_ORGANIZE` job. It
-does not create a second prompt or proposal implementation. Acceptance and
+starts the normal `REPORT_ASK`, `REPORT_CREATE`, or `REPORT_ORGANIZE` job. For
+the shared `ai@` alias, a no-tools/no-search utility-model classifier selects an
+eligible workflow from subject/body and safe attachment metadata before any
+download; the result is persisted in `inbound_manifest` for retry stability.
+Explicit aliases bypass classification. This does not create a second proposal
+implementation. Acceptance and
 terminal result email are independently idempotent; Create/Organize proposals
 still require browser review and deterministic execution.
 
@@ -105,7 +109,7 @@ still require browser review and deterministic execution.
 | Prompt composition | `ai/prompt.py` and workflow builders | System instruction, context/instructions ordering, output contract, attachments, tools, search, model/tier, and limits. |
 | Provider lifecycle | `ai/core.py` | Runtime model selection, Gemini configuration, SDK calls, tool loop, structured-final call, cleanup, and debug usage. |
 | Workspace retrieval | `ai/functions.py` and `function_definitions/` | Tool declaration, hash normalization, permission-filtered handler execution, exact-call cache, result/file parts, and failure trace. |
-| AI workflow | `ai/ask.py`, `create.py`, `organize.py`, `autofill.py` | Workflow-specific context, tool selection, generation stages, and fallback. |
+| AI workflow | `ai/ask.py`, `create.py`, `organize.py`, `autofill.py`, `email_router.py` | Workflow-specific context, tool selection, email intent classification, generation stages, and fallback. |
 | Report proposal contract | `ai/reporting/contracts.py`, `proposals.py`, and `organize_completion.py` | Shared action schemas and ordering, proposal validation/repair, and Organize file-summary/submission completion. |
 | Durable generation | `deferred_jobs.py` and adapters | Job creation, claim/lease, retries, checkpoint, inspect/apply, cleanup, and durable notification state. |
 | Proposal application | `ai/report_runner.py` and `ai/reporting/actions/` | Ledger coordination plus callback-registered deterministic action inspection, execution, retry, compensation, and undo. |
@@ -231,7 +235,10 @@ contracts in `ai/reporting/`. `contracts.py` owns the allowed action set, action
 ordering, and typed action-data schemas; `proposals.py` owns their shared
 validation, normalization, and repair. Organize adds its workflow-specific
 file-summary and form-submission completion in `organize_completion.py`,
-including narrow deterministic repairs such as stable field IDs and
+including new records and exact existing page/task targets. Existing targets
+receive only evidence-backed changed fields, projected as reviewed
+`update_submission_fields` rows; the paired source file remains a normal
+attachment action. Narrow deterministic repairs cover stable field IDs and
 unambiguous form links, before spending another model call on repair. Unsafe
 residual actions become review items; a structurally unusable plan becomes an
 accurately labeled review-only proposal.
@@ -272,6 +279,7 @@ plus `EditWatcher`'s entity fingerprint refetch.
 | Ask | Lean question/report context | Google Search, shared workspace tools, task history, filter schema/query | Initial, zero or more tool turns, structured final, optional repair | Answer plus optional reviewed actions |
 | Create | Lean creation request and workspace concepts | Google Search and shared workspace tools | Initial, zero or more tool turns, structured final, optional repair | Reviewed creation proposal |
 | Organize | Uploaded-file metadata, saved summaries, up to two retrieval terms per file, bounded Redis candidates | Shared workspace tools; no Google Search in planning | Utility summary per missing file, primary plan/tool loop, optional repair, optional primary form completion | Reviewed organization proposal |
+| Shared AI email router | Subject/body and safe attachment metadata only | No search or tools; entitlement-filtered Ask/Create/Organize enum | One utility-model structured classification | Persisted workflow selection, then the normal email/report pipeline |
 | Page/task autofill | Eager target/form/submission context, compact parent/category/document context, and target-specific `File.to_ai()` projections | Google Search; conditional two-round `get_file` fallback only | One JSON/tool conversation plus local validation | Generated submission applied to target |
 | File summary | File plus summary instructions | Utility model and optional retrieval-term generation | One generation, provider/file fallback as supported | Summary/process state on File |
 | Report execution | Already reviewed proposal; no model | Deterministic action handlers only | No provider call | Versioned execution/undo ledger and domain mutations |
@@ -311,9 +319,9 @@ Organize has the strongest deliberate context design:
 4. the primary model plans the whole batch using summaries, metadata, candidates,
    and tools when needed;
 5. local validation/repair protects file coverage and action structure;
-6. when form-backed targets exist, one focused completion call fills all of them
-   from compact schemas, relationships, and assigned summaries, without tools or
-   original files.
+6. when form-backed new or existing targets exist, one focused completion call
+   fills or partially updates them from compact schemas, current values,
+   relationships, and assigned summaries, without tools or original files.
 
 This avoids loading the whole workspace or every original file into planning.
 The job checkpoints finalized uploads, saved summaries, the structural plan,

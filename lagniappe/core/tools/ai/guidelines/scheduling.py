@@ -105,3 +105,32 @@ PERIODIC_SCHEDULING_OUTPUT_REQUIREMENTS = """
 **Include all properties. If not applicable, set to `null`.**
 **If the request is unclear, make your best guess. If the request is clearly impossible, set all properties to `null`.**
 """
+
+
+REPORT_TASK_SCHEDULING_GUIDELINES = """
+### Report Task Scheduling
+
+`create_task.data.schedule` creates reviewed repeating work. Keep a one-time
+reminder in `due_date` without a schedule. When a schedule is requested, return
+one of these canonical shapes and also include a concrete `due_date` when the
+user supplied or implied a starting date:
+
+- Repeat after completion: `{"kind": "recurring", "interval": 2, "unit": "week"}`.
+- Daily calendar schedule: `{"kind": "scheduled", "mode": "daily"}`.
+- Weekly calendar schedule: `{"kind": "scheduled", "mode": "weekly", "days": [0, 2]}`,
+  where Monday is 0 and Sunday is 6.
+- Monthly calendar pattern: `{"kind": "scheduled", "mode": "monthly",
+  "pattern_type": "specific_day"|"ordinal_weekday"|"first_day"|"last_day",
+  ...pattern fields..., "description": "...", "user_prompt": "..."}`.
+- Yearly calendar pattern: the monthly shape with `mode: "yearly"` and `month`
+  from 1 through 12.
+- A freeform fixed interval: `{"kind": "periodic", "interval": 3,
+  "unit": "month", "description": "every quarter", "user_prompt": "quarterly"}`.
+
+Units are `day`, `week`, `month`, or `year`; intervals are positive integers.
+For `specific_day`, include `day` from 1 through 31. For `ordinal_weekday`,
+include `ordinal` as 1, 2, 3, 4, or -1 for last, plus `weekday` from 0 through 6.
+Use the user's wording for `user_prompt` and a concise readable rendering for
+`description`. Do not add a schedule to a completed occurrence, and do not
+invent recurrence when the request describes only one deadline or reminder.
+"""

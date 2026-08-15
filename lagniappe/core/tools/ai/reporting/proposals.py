@@ -13,6 +13,7 @@ from ..observability import mark_outcome
 from ..prompt import Prompt
 from ..references import normalize_hash_references
 from .contracts import ALLOWED_ACTIONS, report_proposal_response_schema
+from .schedules import validate_task_schedule
 
 ENTITY_PAIR_ACTION_REFERENCES = {
     "add_form_to_page": ("page", ("form",)),
@@ -638,6 +639,7 @@ def validate_proposal(
     proposal,
     allowed_actions=None,
     allow_empty_submission_updates=False,
+    require_pending_submission_target=False,
     allow_pending_submissions=False,
     required_file_refs=None,
     validate_reference_kinds=False,
@@ -700,6 +702,7 @@ def validate_proposal(
             action,
             action_label,
             allow_empty_submission_updates=allow_empty_submission_updates,
+            require_pending_submission_target=require_pending_submission_target,
             allow_pending_submissions=allow_pending_submissions,
         )
         _validate_completed_task_target_action(
@@ -800,6 +803,8 @@ def validate_or_repair_proposal(
     prompt,
     proposal,
     report_label="Organize",
+    allow_empty_submission_updates=False,
+    require_pending_submission_target=False,
     allow_pending_submissions=True,
     validator=None,
 ):
@@ -809,6 +814,13 @@ def validate_or_repair_proposal(
         "allowed_actions": getattr(prompt, "allowed_actions", None),
         "allow_pending_submissions": allow_pending_submissions,
     }
+    if validator is validate_proposal:
+        validation_options["allow_empty_submission_updates"] = (
+            allow_empty_submission_updates
+        )
+        validation_options["require_pending_submission_target"] = (
+            require_pending_submission_target
+        )
     if report_label == "Organize":
         validation_options["required_file_refs"] = _organize_prompt_report_file_refs(
             prompt
@@ -1095,9 +1107,11 @@ source reference using from_page/from_task or their aliases, and exactly one
 target reference using to_page/to_task or their aliases. For existing page files,
 use get_page_file_list to get the file hash and source page; include display_name
 or file_name only as a readable label, not as the executable file reference.
-update_submission_fields actions must include data.updates with at least one
-object. Each update object must include exactly one page or task reference, a
-schema_id or field_id, and a new_value key.
+For Organize planning, update_submission_fields must identify exactly one
+existing target in data.page or data.task and omit data.updates so the focused
+submission completion stage can derive evidence-backed values. In other report
+types, data.updates must contain at least one object with exactly one page or
+task reference, a schema_id or field_id, and a new_value key.
 rename_entity actions must include the existing entity in data.entity and a
 non-empty replacement name in data.name. Renaming changes only the entity name;
 do not put descriptions or other attribute edits in this action.
@@ -1169,6 +1183,10 @@ def _validate_existing_reference_kinds(action, action_label, resolved_details):
         ),
         "attach_file_to_page": (("page", {"page"}),),
         "attach_file_to_task": (("task", {"task", "task_history"}),),
+        "update_submission_fields": (
+            ("page", {"page"}),
+            ("task", {"task"}),
+        ),
         "delete_page": (("page", {"page"}),),
     }
     data = action.get("data") if isinstance(action, dict) else None
@@ -1266,6 +1284,7 @@ def _validate_action_data_shape(
     action,
     action_label,
     allow_empty_submission_updates=False,
+    require_pending_submission_target=False,
     allow_pending_submissions=True,
 ):
     action_type = action.get("type")
@@ -1305,6 +1324,7 @@ def _validate_action_data_shape(
             data,
             action_label,
             allow_empty=allow_empty_submission_updates,
+            require_pending_target=require_pending_submission_target,
         )
 
 
@@ -1454,6 +1474,12 @@ def _validate_create_task_action_data(data, action_label):
             f"Action {action_label} may target an existing task only for a "
             "completed occurrence."
         )
+    if data.get("schedule") is not None:
+        if _is_completed_task_action_data(data):
+            raise exceptions.AIException(
+                f"Action {action_label} cannot schedule a completed occurrence."
+            )
+        data["schedule"] = validate_task_schedule(data["schedule"])
 
 
 # @testable false
@@ -1595,13 +1621,33 @@ def _validate_entity_pair_action_data(
 # @testable false
 # @covered-by lagniappe/core/tools/ai/reporting/proposals.py::validate_proposal
 # @reason update-shape errors are exercised through proposal validation tests
-def _validate_submission_update_action_data(data, action_label, allow_empty=False):
+def _validate_submission_update_action_data(
+    data,
+    action_label,
+    allow_empty=False,
+    require_pending_target=False,
+):
     updates = data.get("updates")
     if not isinstance(updates, list) or not updates:
         if allow_empty and (updates is None or updates == []):
+            if require_pending_target:
+                page_reference = _first_data_reference(data, "page")
+                task_reference = _first_data_reference(data, "task")
+                if bool(page_reference) == bool(task_reference):
+                    raise exceptions.AIException(
+                        f"Action {action_label} requires exactly one top-level page or "
+                        "task while submission values are pending."
+                    )
             return
         raise exceptions.AIException(
             f"Action {action_label} requires at least one data.updates row."
+        )
+
+    top_level_page = _first_data_reference(data, "page")
+    top_level_task = _first_data_reference(data, "task")
+    if top_level_page and top_level_task:
+        raise exceptions.AIException(
+            f"Action {action_label} may use only one top-level page or task."
         )
 
     for index, update in enumerate(updates, 1):
