@@ -2,11 +2,7 @@ import { STYLES } from "styles";
 import { setIcon } from "../../shared/icons";
 import { primitives } from "../primitives";
 
-const NON_HISTORY_FILLABLE_TYPES = new Set([
-	"html",
-	"signature",
-	"status",
-]);
+const NON_HISTORY_FILLABLE_TYPES = new Set(["html", "signature", "status"]);
 
 /**
  * @testable infrastructure
@@ -169,7 +165,7 @@ export class BaseElement {
 		button.className = STYLES.form.icon;
 		setIcon(
 			button.appendChild(document.createElement("span")),
-			"reset",
+			"historyFill",
 			"icon-sm",
 		);
 

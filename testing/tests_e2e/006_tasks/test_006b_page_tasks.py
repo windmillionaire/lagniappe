@@ -379,6 +379,12 @@ def test_update_page_task_settings_from_row(get_user):
 
     settings_form = task.settings_form
     save_toggle = task.element.locator("[data-role='save-toggle']")
+    expect(
+        task.element.locator("[data-role='save-toggle'] ~ [data-role='controls']")
+    ).to_have_count(1)
+    expect(
+        task.element.locator("[data-role='save-toggle'] ~ [data-role='nav-toggles']")
+    ).to_have_count(1)
     expect(save_toggle).to_be_hidden()
     expect(save_toggle).to_have_attribute("data-saved", "false")
     _fill_editable_field(settings_form, "name", FormElements.NAME, updated_name)

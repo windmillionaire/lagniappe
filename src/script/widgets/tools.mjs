@@ -50,8 +50,12 @@ export class CreateToolReport extends BaseUpload {
 		this.emailSubmissions = this.target.querySelector(
 			"[data-role='email-submissions']",
 		);
-		this.emailAddress = this.target.querySelector("[data-role='email-address']");
-		this.emailCopyButton = this.target.querySelector("[data-role='email-copy']");
+		this.emailAddress = this.target.querySelector(
+			"[data-role='email-address']",
+		);
+		this.emailCopyButton = this.target.querySelector(
+			"[data-role='email-copy']",
+		);
 		this.activeTool = this.toolInput?.value || "organize";
 		this.context = uploadElement.contextUpload({
 			text: ORGANIZE_DROPZONE_TEXT,

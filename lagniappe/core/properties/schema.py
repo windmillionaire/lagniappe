@@ -141,7 +141,7 @@ _FIELD_TITLES = {
     "signature": "Signature",
     "status": "Status",
     "table": "Table",
-    "todo": "To-do List",
+    "todo": "Todo List",
     "textarea": "Text",
 }
 
@@ -363,7 +363,7 @@ def canonicalize_schema(
         if form_type == "page" and field["type"] == "todo":
             if discard_invalid:
                 continue
-            raise SchemaValidationError("To-do lists are supported only on task forms")
+            raise SchemaValidationError("Todo lists are supported only on task forms")
         field_ids.add(field["id"])
         fields.append(field)
 

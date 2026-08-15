@@ -321,14 +321,16 @@ Common properties passed via the `schema` object:
 | `location` | `"in"` for internal link search, `"out"` for external URL |
 | `clear` | If truthy, adds a clear button |
 
-To-do values use `{items: [{text, checked}]}`. Enter or forward Tab from the
+Todo values use `{items: [{text, checked}]}`. Enter or forward Tab from the
 draft commits a non-empty item and focuses a fresh draft; Shift+Tab remains an
 escape path. The latest-history control restores the most recent item texts
 with every checkbox reset to unchecked, and unlike ordinary fields does not
-persist that value as a repeating task default.
+persist that value as a repeating task default. Todo title actions use the
+same lightweight icon treatment as table title actions: add and done are green,
+while edit and latest-history retain the form color.
 
 When a reopened task has history, every submission-bearing element exposes a
-latest-history control while empty, including table and to-do elements. Static
+latest-history control while empty, including table and todo elements. Static
 HTML, computed status, and signature assets do not expose that control.
 
 ## Primitives (`elements/primitives.mjs`)

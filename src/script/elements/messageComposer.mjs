@@ -1,7 +1,7 @@
-import { FacetsBox } from "./combobox";
+import { STYLES } from "styles";
 import { ENDPOINTS, Modal, request } from "../shared";
 import { createIcon } from "../shared/icons";
-import { STYLES } from "styles";
+import { FacetsBox } from "./combobox";
 
 /**
  * @testable infrastructure

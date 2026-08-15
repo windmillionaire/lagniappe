@@ -67,7 +67,7 @@
                 data-kind="model-task"
                 data-attribute="tasks"
                 data-has-attribute="{{ has_tasks|yesno }}"
-                class="{{ styles.toggle.container }}">{{ render_icon("plus") }}</button>
+                class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
       {% endif %}
     </div>
     <div class="{{ styles.layout.nav.group }}" data-flipped="false">
@@ -100,7 +100,7 @@
           <button lp-show="model-tasks:CreateModelTask"
                   data-attribute="tasks"
                   data-has-attribute="{{ active|yesno }}"
-                  class="{{ styles.toggle.container }}">{{ render_icon("plus") }}</button>
+                  class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
         {% endif %}
       </nav>
     </div>

@@ -17,7 +17,7 @@ JSON_OUTPUT_RULES = """
 TASK_LIST_HTML_RULES = """
 ### Editable Document Checklists
 
-- When the user asks for a checklist, shopping list, packing list, to-do list,
+- When the user asks for a checklist, shopping list, packing list, todo list,
   or similar checkable document list, use editor task-list HTML instead of a
   plain `<ul>`
 - Use this exact structure so the editor can display checkboxes and preserve

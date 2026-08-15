@@ -397,6 +397,9 @@ assert.equal(edit.dataset.fill, "0");
 const clear = module.createIcon("clear");
 assert.equal(clear.textContent, "do_not_disturb_on");
 
+const historyFill = module.createIcon("historyFill");
+assert.equal(historyFill.textContent, "settings_backup_restore");
+
 const attributeAdd = module.createIcon("attribute.add");
 assert.equal(attributeAdd.textContent, "add_circle");
 
@@ -438,39 +441,49 @@ const navigationCss = readFileSync("./src/style/navigation.css", "utf8");
 const primitivesSource = readFileSync("./src/script/elements/primitives.mjs", "utf8");
 assert.match(
   css,
-  /\.icon\s*\{[\s\S]*?--icon-box-size: 1\.45em;[\s\S]*?--icon-default-size: 1\.3em;[\s\S]*?inline-size: var\(--icon-box-size\);[\s\S]*?block-size: var\(--icon-box-size\);/,
+  /\.icon\s*\{[\s\S]*?--icon-xs-box-size: 1\.125rem;[\s\S]*?--icon-xs-glyph-size: 1rem;[\s\S]*?--icon-sm-box-size: 1\.25rem;[\s\S]*?--icon-sm-glyph-size: 1\.125rem;[\s\S]*?--icon-base-box-size: 1\.5rem;[\s\S]*?--icon-base-glyph-size: 1\.25rem;[\s\S]*?--icon-lg-box-size: 1\.625rem;[\s\S]*?--icon-lg-glyph-size: 1\.5rem;[\s\S]*?--icon-xl-box-size: 1\.875rem;[\s\S]*?--icon-xl-glyph-size: 1\.625rem;[\s\S]*?--icon-2xl-box-size: 2\.25rem;[\s\S]*?--icon-2xl-glyph-size: 2rem;[\s\S]*?--icon-box-size: var\(--icon-base-box-size\);[\s\S]*?--icon-default-size: var\(--icon-base-glyph-size\);[\s\S]*?font-size: 1rem;[\s\S]*?inline-size: var\(--icon-box-size\);[\s\S]*?block-size: var\(--icon-box-size\);/,
+);
+assert.doesNotMatch(
+  css,
+  /--icon-(?:box-size|default-size|size):[^;]*\d(?:\.\d+)?em;/,
 );
 assert.match(
   css,
-  /\.icon-glyph\s*\{[\s\S]*?font-size: var\(--icon-size, var\(--icon-default-size\)\);[\s\S]*?transform: translate\(/,
+  /\.icon-glyph\s*\{[\s\S]*?font-size: var\(--icon-size, var\(--icon-default-size\)\);[\s\S]*?inset-block-start: var\(--icon-offset-y, 0\);[\s\S]*?inset-inline-start: var\(--icon-offset-x, 0\);[\s\S]*?position: relative;/,
+);
+assert.doesNotMatch(css, /\.icon-glyph\s*\{[^}]*transform:/);
+assert.match(
+  css,
+  /\.icon\[data-icon="plus"\]\s*\{\s*--icon-size: var\(--icon-base-glyph-size\);/,
 );
 assert.match(
   css,
-  /\.icon\[data-icon="plus"\]\s*\{\s*--icon-size: 1\.25em;/,
+  /\.icon\[data-icon="page"\]\s*\{\s*--icon-size: var\(--icon-base-glyph-size\);/,
 );
 assert.match(
   css,
-  /\.icon\[data-icon="page"\]\s*\{\s*--icon-size: 1\.2em;/,
+  /\.icon\[data-icon="help"\]\s*\{\s*--icon-size: var\(--icon-base-glyph-size\);/,
 );
 assert.match(
   css,
-  /\.icon\[data-icon="help"\]\s*\{\s*--icon-size: 1\.2rem;/,
+  /\.icon\[data-icon="document"\],\s*\.icon\[data-icon="info"\]\s*\{\s*--icon-size: var\(--icon-lg-glyph-size\);/,
 );
 assert.match(
   css,
-  /\.icon\[data-icon="document"\],\s*\.icon\[data-icon="info"\]\s*\{\s*--icon-size: 1\.55em;/,
+  /button\.tab-icon \.icon\s*\{[\s\S]*?--icon-box-size: var\(--icon-xl-box-size\);[\s\S]*?--icon-size: var\(--icon-xl-glyph-size\);/,
 );
 assert.match(
   css,
-  /button\.tab-icon \.icon\s*\{[\s\S]*?--icon-box-size: 1\.55em;[\s\S]*?--icon-size: 1\.55em;/,
+  /\.icon\[data-icon="close"\],\s*\.icon\[data-icon="x"\]\s*\{[\s\S]*?--icon-offset-x: 0\.5px;[\s\S]*?--icon-offset-y: 0\.5px;/,
 );
 assert.match(
   css,
-  /\.icon\[data-icon="close"\],\s*\.icon\[data-icon="x"\]\s*\{\s*--icon-offset-y: 1px;/,
+  /\.task-history-icon\s*\{\s*--icon-offset-y: 1px;/,
 );
+assert.doesNotMatch(css, /\.task-control-icon/);
 assert.match(
   css,
-  /\.editor-toolbar-icon-context \.icon,\s*\.editor-toolbar-portal-icon-context \.icon\s*\{[\s\S]*?--icon-box-size: 1\.45em;[\s\S]*?--icon-default-size: 1\.45em;[\s\S]*?--icon-size: 1\.45em;/,
+  /\.editor-toolbar-icon-context \.icon,\s*\.editor-toolbar-portal-icon-context \.icon\s*\{[\s\S]*?--icon-box-size: var\(--icon-base-box-size\);[\s\S]*?--icon-default-size: var\(--icon-lg-glyph-size\);[\s\S]*?--icon-size: var\(--icon-lg-glyph-size\);/,
 );
 assert.match(
   css,
@@ -482,7 +495,7 @@ assert.match(
 );
 assert.match(
   css,
-  /\.editor-toolbar-icon-context \.editor-toolbar-caret\s*\{[\s\S]*?--icon-box-size: 1\.2em;[\s\S]*?--icon-size: 1\.2em;[\s\S]*?--icon-offset-y: 1px;/,
+  /\.editor-toolbar-icon-context \.editor-toolbar-caret\s*\{[\s\S]*?--icon-box-size: var\(--icon-sm-box-size\);[\s\S]*?--icon-size: var\(--icon-sm-glyph-size\);[\s\S]*?--icon-offset-y: 1px;/,
 );
 assert.doesNotMatch(css, /\.dropdown-icon/);
 assert.match(
@@ -507,15 +520,15 @@ assert.match(
 );
 assert.match(
   css,
-  /\.icon\[data-icon="menu"\]\s*\{[\s\S]*?--icon-box-size: 1\.25rem;[\s\S]*?--icon-size: 1\.3rem;/,
+  /\.icon\[data-icon="menu"\]\s*\{[\s\S]*?--icon-box-size: var\(--icon-sm-box-size\);[\s\S]*?--icon-size: var\(--icon-base-glyph-size\);/,
 );
 assert.match(
   css,
-  /\[lp-menu="title"\] \.icon\[data-icon="menu"\]\s*\{[\s\S]*?--icon-box-size: 1\.45rem;[\s\S]*?--icon-offset-y: 0\.125rem;/,
+  /\[lp-menu="title"\] \.icon\[data-icon="menu"\]\s*\{[\s\S]*?--icon-box-size: var\(--icon-base-box-size\);[\s\S]*?--icon-offset-y: 0\.125rem;/,
 );
 assert.match(
   css,
-  /\.icon\[data-icon="spinner"\]\s*\{\s*--icon-size: 1\.1em;/,
+  /\.icon\[data-icon="spinner"\]\s*\{\s*--icon-size: var\(--icon-sm-glyph-size\);/,
 );
 assert.match(
   css,
@@ -531,27 +544,34 @@ assert.match(
 );
 assert.match(
   css,
-  /\.icon\[data-icon="star\.active"\],\s*\.icon\[data-icon="star\.inactive"\]\s*\{\s*--icon-size: 1\.5em;/,
+  /\.icon\[data-icon="star\.active"\],\s*\.icon\[data-icon="star\.inactive"\]\s*\{\s*--icon-size: var\(--icon-lg-glyph-size\);/,
 );
 assert.match(
   css,
-  /\.icon\[data-icon="star\.home"\]\s*\{[\s\S]*?--icon-size: 1\.5em;[\s\S]*?--icon-offset-y: -1px;/,
+  /\.icon\[data-icon="star\.home"\]\s*\{[\s\S]*?--icon-size: var\(--icon-lg-glyph-size\);[\s\S]*?--icon-offset-y: -1px;/,
+);
+assert.match(
+  css,
+  /\.icon\[data-icon="addRow"\],\s*\.icon\[data-icon="reset"\]\s*\{\s*--icon-offset-y: -1px;/,
+);
+assert.match(
+  css,
+  /button\[data-role="history-fill"\] \.icon\[data-icon="historyFill"\]\s*\{\s*--icon-offset-y: -1px;/,
 );
 assert.doesNotMatch(css, /\.dropdown-option-action \.icon\[data-icon=/);
 assert.doesNotMatch(css, /\.home-toggle-label > \.icon/);
-for (const [name, size] of [
-  ["xs", "0.75rem"],
-  ["sm", "0.875rem"],
-  ["base", "1rem"],
-  ["lg", "1.125rem"],
-  ["xl", "1.25rem"],
-  ["2xl", "1.5rem"],
-]) {
-  assert.ok(
-    css.includes(`.icon-${name} {\n\tfont-size: ${size};`),
-    `missing icon-owned ${name} scale`,
+for (const name of ["xs", "sm", "base", "lg", "xl", "2xl"]) {
+  assert.match(
+    css,
+    new RegExp(
+      `\\.icon\\.icon-${name}\\s*\\{[\\s\\S]*?--icon-box-size: var\\(--icon-${name}-box-size\\);[\\s\\S]*?--icon-size: var\\(--icon-${name}-glyph-size\\);`,
+    ),
   );
 }
+assert.match(
+  css,
+  /\.layout-nav-title \.icon\s*\{[\s\S]*?--icon-box-size: var\(--icon-lg-box-size\);[\s\S]*?--icon-default-size: var\(--icon-lg-glyph-size\);/,
+);
 assert.match(
   css,
   /\.checkbox-icon\s*\{[\s\S]*?--icon-box-size: 1rem;[\s\S]*?--icon-size: 1rem;[\s\S]*?font-size: 1rem;/,
@@ -559,6 +579,10 @@ assert.match(
 assert.match(
   css,
   /\.nav-search-icon\s*\{[\s\S]*?--icon-offset-y: 1px;[\s\S]*?font-size: 1rem;/,
+);
+assert.match(
+  css,
+  /\.task-control-group \.icon\s*\{[\s\S]*?--icon-box-size: var\(--icon-base-box-size\);[\s\S]*?--icon-default-size: var\(--icon-base-glyph-size\);/,
 );
 assert.match(
   css,

@@ -27,7 +27,10 @@ const _presentation = (schema) => {
 };
 
 /**
- * @testable infrastructure
+ * @testable true
+ * @tests tests_js/test_036_form_builder_frontend.py::test_builder_schema_lists_use_button_surfaces_and_centered_actions
+ * @features forms
+ * @dimensions builder-list-actions action-button-centering
  */
 const _toggle = (icon, role, kind = "form", disabled = false) => {
 	const toggle = primitives.toggle({
@@ -40,6 +43,7 @@ const _toggle = (icon, role, kind = "form", disabled = false) => {
 			role: role,
 		},
 	});
+	toggle.type = "button";
 	toggle.dataset.kind = kind;
 	if (disabled) {
 		toggle.disabled = true;
@@ -56,8 +60,9 @@ const _condition = (condition, index) => {
 	elt.className = STYLES.builder.settings.item;
 	elt.dataset.index = index;
 
-	const wrapper = document.createElement("div");
-	wrapper.className = `sm:text-sm hover:underline`;
+	const wrapper = document.createElement("button");
+	wrapper.type = "button";
+	wrapper.className = STYLES.builder.settings.open;
 	wrapper.dataset.role = "open";
 
 	const target = wrapper.appendChild(document.createElement("span"));
@@ -86,13 +91,14 @@ const _option = (option, index, length) => {
 	wrapper.className = STYLES.builder.settings.item;
 	wrapper.dataset.index = index;
 
-	const name = wrapper.appendChild(document.createElement("span"));
+	const name = wrapper.appendChild(document.createElement("button"));
+	name.type = "button";
 	name.textContent = option.label;
-	name.className = `sm:text-sm hover:underline`;
+	name.className = STYLES.builder.settings.open;
 	name.dataset.role = "open";
 
 	const toggles = document.createElement("div");
-	toggles.className = `flex flex-row gap-1`;
+	toggles.className = `flex shrink-0 flex-row items-center gap-1`;
 	if (length > 1) {
 		toggles.appendChild(
 			_toggle("down", "moveDown", "form", index === length - 1),
@@ -110,23 +116,24 @@ const _option = (option, index, length) => {
  * @testable infrastructure
  */
 const _column = (column, index, length) => {
-	const wrapper = document.createElement("div");
+	const wrapper = document.createElement("li");
 	wrapper.className = STYLES.builder.settings.item;
 	wrapper.dataset.index = index;
 
 	const name = primitives.label({
 		icon: column.location || column.input || column.type,
 		label: column.name || column.title,
-		tag: "h3",
+		tag: "button",
 		role: "open",
 		styles: {
+			label: STYLES.builder.settings.open,
 			container: "flex flex-row items-center gap-1.5",
 		},
 	});
-	name.className = `sm:text-sm hover:underline`;
+	name.type = "button";
 
 	const toggles = document.createElement("div");
-	toggles.className = `flex flex-row gap-1`;
+	toggles.className = `flex shrink-0 flex-row items-center gap-1`;
 	if (length > 1) {
 		toggles.appendChild(
 			_toggle("down", "moveDown", "form", index === length - 1),
@@ -173,7 +180,7 @@ const visibility = (schema) => {
 		label: "Visibility",
 		tag: "h3",
 	});
-	const toggle = _toggle("plus", "add");
+	const toggle = _toggle("add", "add");
 	title.append(label, toggle);
 
 	if (schema.visibility) {
@@ -197,7 +204,7 @@ const status = (schema) => {
 		label: "Status",
 		tag: "h3",
 	});
-	const toggle = _toggle("plus", "add");
+	const toggle = _toggle("add", "add");
 	title.append(label, toggle);
 
 	if (schema.status) {
@@ -222,7 +229,7 @@ const options = (schema) => {
 		label: "Options",
 		tag: "h3",
 	});
-	const toggle = _toggle("plus", "add");
+	const toggle = _toggle("add", "add");
 	title.append(label, toggle);
 
 	if (schema.options) {
@@ -319,7 +326,7 @@ const columns = (schema) => {
 		label: "Columns",
 		tag: "h3",
 	});
-	const toggle = _toggle("plus", "add");
+	const toggle = _toggle("add", "add");
 	title.append(label, toggle);
 
 	if (schema.columns) {

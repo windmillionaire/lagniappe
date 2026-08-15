@@ -1,4 +1,4 @@
-"""Task-form to-do list field behavior and lifecycle rules."""
+"""Task-form todo list field behavior and lifecycle rules."""
 
 import json
 from copy import deepcopy

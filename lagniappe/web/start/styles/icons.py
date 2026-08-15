@@ -292,6 +292,10 @@ ICONS = {
 		"glyph": "history",
 		"fill": 1
 	},
+	"historyFill": {
+		"glyph": "settings_backup_restore",
+		"fill": 1
+	},
 	"home": {
 		"glyph": "home",
 		"fill": 1

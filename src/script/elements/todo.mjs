@@ -113,14 +113,22 @@ export class TodoElement extends BaseElement {
 		});
 	}
 
-	_button({ role, icon, label, kind = null }) {
+	/**
+	 * @testable true
+	 * @tests tests_js/test_032_todo_element_frontend.py::test_todo_title_actions_use_table_style_semantics
+	 * @features form-todo
+	 * @dimensions title-actions
+	 */
+	_button({ role, icon, label, kind = null, header = false }) {
 		const button = document.createElement("button");
 		button.type = "button";
 		button.dataset.role = role;
 		if (kind) button.dataset.kind = kind;
 		button.ariaLabel = label;
 		button.title = label;
-		button.className = STYLES.form.table.actionButton;
+		button.className = header
+			? STYLES.form.icon
+			: STYLES.form.table.actionButton;
 		setIcon(
 			button.appendChild(document.createElement("span")),
 			icon,
@@ -196,7 +204,7 @@ export class TodoElement extends BaseElement {
 		row.className = STYLES.form.todo.row;
 		row.dataset.role = "todo-draft-row";
 		row.appendChild(
-			this._checkbox({ text: "new to-do", checked: false }, "draft", {
+			this._checkbox({ text: "new todo", checked: false }, "draft", {
 				disabled: true,
 			}),
 		);
@@ -207,7 +215,7 @@ export class TodoElement extends BaseElement {
 		input.dataset.role = "todo-draft";
 		input.value = this._draft;
 		input.className = STYLES.form.todo.inlineInput;
-		input.placeholder = "Add a to-do…";
+		input.placeholder = "Add a todo…";
 		input.ariaLabel = `Add item to ${this.label}`;
 
 		const actions = row.appendChild(document.createElement("div"));
@@ -216,13 +224,13 @@ export class TodoElement extends BaseElement {
 			this._button({
 				role: "todo-dismiss-draft",
 				icon: "remove",
-				label: "Dismiss new to-do",
+				label: "Dismiss new todo",
 				kind: "delete",
 			}),
 			this._button({
 				role: "todo-commit-draft",
 				icon: "success",
-				label: "Add to-do",
+				label: "Add todo",
 			}),
 		);
 		return row;
@@ -242,16 +250,23 @@ export class TodoElement extends BaseElement {
 		);
 
 		if (!this.readonly) {
-			const controls = label.querySelector("[data-role='label']");
+			const controls = label;
 			if (this._editing) {
 				controls.appendChild(
 					this._button({
 						role: "todo-done",
 						icon: "success",
 						label: `Done editing ${this.label}`,
+						kind: "success",
+						header: true,
 					}),
 				);
 			} else {
+				const historyButton = super.historyFillButton(
+					this._historyValue,
+					this._historyOnFill,
+				);
+				if (historyButton) controls.appendChild(historyButton);
 				controls.appendChild(
 					this._button({
 						role: "todo-edit",
@@ -259,13 +274,10 @@ export class TodoElement extends BaseElement {
 						label: this.hasSubmission
 							? `Edit ${this.label}`
 							: `Add to ${this.label}`,
+						kind: this.hasSubmission ? null : "add",
+						header: true,
 					}),
 				);
-				const historyButton = super.historyFillButton(
-					this._historyValue,
-					this._historyOnFill,
-				);
-				if (historyButton) controls.appendChild(historyButton);
 			}
 		}
 

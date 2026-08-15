@@ -52,7 +52,7 @@ export class ComponentsPanel {
 				"ml-auto grid size-6 place-items-center rounded-md text-form-default hover:bg-white hover:outline-2 hover:outline-form-default focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-form-default";
 
 			const addIcon = addButton.appendChild(document.createElement("span"));
-			setIcon(addIcon, "plus");
+			setIcon(addIcon, "add");
 
 			components.push(component);
 		});

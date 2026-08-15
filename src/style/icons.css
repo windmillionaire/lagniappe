@@ -1,10 +1,22 @@
 .icon {
-	--icon-box-size: 1.45em;
-	--icon-default-size: 1.3em;
+	--icon-xs-box-size: 1.125rem;
+	--icon-xs-glyph-size: 1rem;
+	--icon-sm-box-size: 1.25rem;
+	--icon-sm-glyph-size: 1.125rem;
+	--icon-base-box-size: 1.5rem;
+	--icon-base-glyph-size: 1.25rem;
+	--icon-lg-box-size: 1.625rem;
+	--icon-lg-glyph-size: 1.5rem;
+	--icon-xl-box-size: 1.875rem;
+	--icon-xl-glyph-size: 1.625rem;
+	--icon-2xl-box-size: 2.25rem;
+	--icon-2xl-glyph-size: 2rem;
+	--icon-box-size: var(--icon-base-box-size);
+	--icon-default-size: var(--icon-base-glyph-size);
 
 	display: inline-grid;
 	font-family: "Material Symbols Rounded", sans-serif;
-	font-size: inherit;
+	font-size: 1rem;
 	font-style: normal;
 	font-weight: 400;
 	font-feature-settings: "liga";
@@ -30,8 +42,10 @@
 .icon-glyph {
 	display: block;
 	font-size: var(--icon-size, var(--icon-default-size));
+	inset-block-start: var(--icon-offset-y, 0);
+	inset-inline-start: var(--icon-offset-x, 0);
 	line-height: 1;
-	transform: translate(var(--icon-offset-x, 0), var(--icon-offset-y, 0));
+	position: relative;
 }
 
 .icon[data-fill="0"] {
@@ -54,30 +68,39 @@
 }
 
 .icon[data-icon="page"] {
-	--icon-size: 1.2em;
+	--icon-size: var(--icon-base-glyph-size);
 }
 
 .icon[data-icon="plus"] {
-	--icon-size: 1.25em;
+	--icon-size: var(--icon-base-glyph-size);
 }
 
 .icon[data-icon="close"],
 .icon[data-icon="x"] {
-	--icon-offset-y: 1px;
 	--icon-offset-x: 0.5px;
+	--icon-offset-y: 0.5px;
+}
+
+.icon[data-icon="addRow"],
+.icon[data-icon="reset"] {
+	--icon-offset-y: -1px;
+}
+
+button[data-role="history-fill"] .icon[data-icon="historyFill"] {
+	--icon-offset-y: -1px;
 }
 
 .icon[data-icon="help"] {
-	--icon-size: 1.2rem;
+	--icon-size: var(--icon-base-glyph-size);
 }
 
 .icon[data-icon="menu"] {
-	--icon-box-size: 1.25rem;
-	--icon-size: 1.3rem;
+	--icon-box-size: var(--icon-sm-box-size);
+	--icon-size: var(--icon-base-glyph-size);
 }
 
 .icon[data-icon="image"] {
-	--icon-size: 1.5em;
+	--icon-size: var(--icon-lg-glyph-size);
 }
 
 button[type="submit"] .icon[data-icon="generate"] {
@@ -118,27 +141,27 @@ button[type="submit"] .icon[data-icon="generate"] {
 }
 
 [lp-menu="title"] .icon[data-icon="menu"] {
-	--icon-box-size: 1.45rem;
+	--icon-box-size: var(--icon-base-box-size);
 	--icon-offset-y: 0.125rem;
 }
 
 .icon[data-icon="document"],
 .icon[data-icon="info"] {
-	--icon-size: 1.55em;
+	--icon-size: var(--icon-lg-glyph-size);
 }
 
 .icon[data-icon="filter.list"] {
-	--icon-offset-y: 0.05em;
+	--icon-offset-y: 1px;
 }
 
 /* @style entity.tabIcon */
 button.tab-icon .icon {
-	--icon-box-size: 1.55em;
-	--icon-size: 1.55em;
+	--icon-box-size: var(--icon-xl-box-size);
+	--icon-size: var(--icon-xl-glyph-size);
 }
 
 .icon[data-icon="spinner"] {
-	--icon-size: 1.1em;
+	--icon-size: var(--icon-sm-glyph-size);
 }
 
 .icon[data-icon="spinner"] .icon-glyph {
@@ -163,17 +186,17 @@ button.tab-icon .icon {
 }
 
 .icon[data-icon="user"] {
-	--icon-size: 1.4em;
+	--icon-size: var(--icon-lg-glyph-size);
 }
 
 .icon[data-icon="star.active"],
 .icon[data-icon="star.inactive"] {
-	--icon-size: 1.5em;
-	--icon-offset-y: -0.5px;
+	--icon-size: var(--icon-lg-glyph-size);
+	--icon-offset-y: -1px;
 }
 
 .icon[data-icon="star.home"] {
-	--icon-size: 1.5em;
+	--icon-size: var(--icon-lg-glyph-size);
 	--icon-offset-y: -1px;
 }
 
@@ -182,52 +205,68 @@ button.tab-icon .icon {
 	--icon-offset-y: 1px;
 }
 
-/* @style toggle.icon.taskControl */
-.task-control-icon {
+/* @style toggle.icon.taskHistory */
+.task-history-icon {
 	--icon-offset-y: 1px;
+}
+
+/* @style task.controlGroup */
+.task-control-group .icon {
+	--icon-box-size: var(--icon-base-box-size);
+	--icon-default-size: var(--icon-base-glyph-size);
+}
+
+/* @style layout.nav.title */
+.layout-nav-title .icon {
+	--icon-box-size: var(--icon-lg-box-size);
+	--icon-default-size: var(--icon-lg-glyph-size);
 }
 
 /* @style table.thead.actionIcon */
 .embedded-table-action-icon {
-	--icon-box-size: 1.5rem;
-	--icon-size: 1.35rem;
+	--icon-box-size: var(--icon-base-box-size);
+	--icon-size: var(--icon-base-glyph-size);
 	--icon-offset-x: 0.5px;
-
-	font-size: 1rem;
 }
 
 /* @style builder.settings.toggle.icon */
-.icon-xs {
-	font-size: 0.75rem;
+.icon.icon-xs {
+	--icon-box-size: var(--icon-xs-box-size);
+	--icon-size: var(--icon-xs-glyph-size);
 }
 
-.icon-sm {
-	font-size: 0.875rem;
+.icon.icon-sm {
+	--icon-box-size: var(--icon-sm-box-size);
+	--icon-size: var(--icon-sm-glyph-size);
 }
 
 /* @style badge.icon */
-.icon-base {
-	font-size: 1rem;
+.icon.icon-base {
+	--icon-box-size: var(--icon-base-box-size);
+	--icon-size: var(--icon-base-glyph-size);
 }
 
-.icon-lg {
-	font-size: 1.125rem;
+.icon.icon-lg {
+	--icon-box-size: var(--icon-lg-box-size);
+	--icon-size: var(--icon-lg-glyph-size);
 }
 
-.icon-xl {
-	font-size: 1.25rem;
+.icon.icon-xl {
+	--icon-box-size: var(--icon-xl-box-size);
+	--icon-size: var(--icon-xl-glyph-size);
 }
 
-.icon-2xl {
-	font-size: 1.5rem;
+.icon.icon-2xl {
+	--icon-box-size: var(--icon-2xl-box-size);
+	--icon-size: var(--icon-2xl-glyph-size);
 }
 
 /* @style editor.toolbar.iconContext editor.toolbar.portalIconContext */
 .editor-toolbar-icon-context .icon,
 .editor-toolbar-portal-icon-context .icon {
-	--icon-box-size: 1.45em;
-	--icon-default-size: 1.45em;
-	--icon-size: 1.45em;
+	--icon-box-size: var(--icon-base-box-size);
+	--icon-default-size: var(--icon-lg-glyph-size);
+	--icon-size: var(--icon-lg-glyph-size);
 }
 
 /* @style editor.toolbar.menuIcon */
@@ -242,8 +281,8 @@ button.tab-icon .icon {
 
 /* @style editor.toolbar.caret */
 .editor-toolbar-icon-context .editor-toolbar-caret {
-	--icon-box-size: 1.2em;
-	--icon-size: 1.2em;
+	--icon-box-size: var(--icon-sm-box-size);
+	--icon-size: var(--icon-sm-glyph-size);
 	--icon-offset-y: 1px;
 }
 

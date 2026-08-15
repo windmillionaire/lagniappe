@@ -50,7 +50,7 @@
          data-command="create"
          data-kind="{{ create_command.kind }}"
          data-name="{{ create_command.name }}">
-      {{ render_icon("plus", styles.dropdown.icon) -}}
+      {{ render_icon("add", styles.dropdown.icon) -}}
       Add New {{ create_command.title }}: {{ create_command.name }}
     </div>
   {% endif %}
@@ -129,7 +129,7 @@
               <input type="search"
                      name="q"
                      required
-                     class="{{ styles.nav.search.input }} translate-y-0.5"
+                     class="{{ styles.nav.search.input }}"
                      placeholder="Search..."
                      autocomplete="off"
                      inputmode="search"

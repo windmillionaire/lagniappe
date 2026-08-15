@@ -337,8 +337,8 @@ SCHEMA_TYPE_GUIDELINES = """
 
 #### `todo` Submission Value Guidelines
 
-- To-do lists are available only on task forms
-- A to-do list value is an object with an `items` array
+- Todo lists are available only on task forms
+- A todo list value is an object with an `items` array
 - Each item is an object with a non-empty `text` string and a `checked` boolean
 - Preserve item order; use `checked`: false for newly generated items
 - Example: `{{"items": [{{"text": "Confirm the venue", "checked": false}}]}}`

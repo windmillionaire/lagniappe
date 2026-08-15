@@ -76,7 +76,7 @@ The left sidebar showing available element types. Elements are draggable into th
 
 The center panel showing the current form layout. Each element is rendered as a `ModelElement` -- a simplified visual preview (disabled inputs, labels, badges for table columns).
 
-**`ModelElement`** is a registry of factory functions, one per element type. Each creates a styled `<div>` with the element's icon, label, and type-specific preview (input fields, radio buttons, select dropdowns, table column badges, etc.). To-do lists intentionally render only their title in the builder model. These are display-only -- the actual form elements are rendered separately for preview.
+**`ModelElement`** is a registry of factory functions, one per element type. Each creates a styled `<div>` with the element's icon, label, and type-specific preview (input fields, radio buttons, select dropdowns, table column badges, etc.). Todo lists intentionally render only their title in the builder model. These are display-only -- the actual form elements are rendered separately for preview.
 
 **Default elements** (`name`, `description` for page forms) appear in a separate panel above the model and cannot be deleted or reordered relative to custom elements.
 
@@ -108,7 +108,11 @@ of setting names, and each name maps to a `SettingsElement` factory function.
 
 Settings changes update the element schema and model preview in real-time. The
 `input` and `change` event handlers on the settings panel delegate to `_set*`
-methods that update both the schema object and the model DOM.
+methods that update both the schema object and the model DOM. Existing
+conditions, options, and columns are rendered as compact button surfaces whose
+two-pixel outline appears only on hover or keyboard focus; their adjacent add,
+reorder, and remove controls use the shared centered icon-button interaction
+style.
 
 ### FormSettings (`panels/formSettings.mjs`)
 
@@ -186,8 +190,8 @@ Static configuration for the builder:
 
 | Key | Description |
 |---|---|
-| `FORM_COMPONENTS` | Available element types for task forms, including the task-only to-do list |
-| `PAGE_COMPONENTS` | Available element types for page forms (adds bookmark; excludes html, status, signature, and to-do lists) |
+| `FORM_COMPONENTS` | Available element types for task forms, including the task-only todo list |
+| `PAGE_COMPONENTS` | Available element types for page forms (adds bookmark; excludes html, status, signature, and todo lists) |
 | `INPUTS` | Input subtypes (text, tel, number, email, date, time) |
 | `TABLE_COLUMNS` | Column types (input types + external link, checkbox) |
 | `LINKS` | Link types (external, internal) |

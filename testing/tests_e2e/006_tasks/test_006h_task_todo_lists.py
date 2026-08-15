@@ -1,4 +1,4 @@
-"""End-to-end task-form to-do list behavior."""
+"""End-to-end task-form todo list behavior."""
 
 from uuid import uuid4
 
@@ -23,7 +23,7 @@ def test_task_todo_list_editing_and_history_restore(get_user):
     parent = Pages.test_create_page_task.get(user)
     suffix = uuid4().hex
     form = Entities.FORM.create(
-        {"name": f"To-do Form {suffix}", "form-type": "task"}
+        {"name": f"Todo Form {suffix}", "form-type": "task"}
     )
     form.schema = [
         {"id": "todo-work", "title": "Checklist", "type": "todo"},
@@ -31,7 +31,7 @@ def test_task_todo_list_editing_and_history_restore(get_user):
     form.save()
     task_entity = Entities.TASK.create(
         {
-            "name": f"To-do Task {suffix}",
+            "name": f"Todo Task {suffix}",
             "page": parent.entity,
             "form": form,
         }
@@ -50,11 +50,16 @@ def test_task_todo_list_editing_and_history_restore(get_user):
         task_form = task.task_form
         todo = task_form.locator("[id^='todo-work-'].form-element")
         expect(todo).to_be_visible()
-        expect(todo.locator("[data-role='todo-edit']")).to_have_attribute(
+        add_todo = todo.locator("[data-role='todo-edit']")
+        expect(add_todo).to_have_attribute(
             "aria-label", "Add to Checklist"
         )
+        expect(add_todo).to_have_attribute("data-kind", "add")
+        title_action_classes = add_todo.get_attribute("class")
+        assert title_action_classes
+        assert "outline-offset-0" not in title_action_classes.split()
 
-        todo.locator("[data-role='todo-edit']").click()
+        add_todo.click()
         draft = todo.locator("[data-role='todo-draft']")
         expect(draft).to_be_focused()
         draft.fill("First step")
@@ -70,7 +75,10 @@ def test_task_todo_list_editing_and_history_restore(get_user):
         todo.locator("[data-role='todo-dismiss-draft']").click()
         expect(todo).to_have_attribute("data-mode", "edit")
         expect(todo.locator("[data-role='todo-draft']")).to_have_count(0)
-        todo.locator("[data-role='todo-done']").click()
+        done = todo.locator("[data-role='todo-done']")
+        expect(done).to_have_attribute("data-kind", "success")
+        expect(done).to_have_attribute("class", title_action_classes)
+        done.click()
         expect(todo).to_have_attribute("data-mode", "read")
 
         checkboxes = todo.locator("[data-role='todo-check']")
@@ -128,6 +136,8 @@ def test_task_todo_list_editing_and_history_restore(get_user):
         expect(todo.locator("li[data-index]")).to_have_count(0)
         history_fill = todo.locator("[data-role='history-fill']")
         expect(history_fill).to_be_visible()
+        expect(history_fill).to_have_attribute("class", title_action_classes)
+        assert history_fill.get_attribute("data-kind") is None
         history_fill.click()
 
         expect(todo.locator("li[data-index]")).to_have_count(2)

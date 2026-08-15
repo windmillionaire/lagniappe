@@ -129,7 +129,7 @@
             data-visible="false"
             data-attribute="tasks"
             data-has-attribute="{{ has_tasks|yesno }}"
-            class="{{ styles.toggle.container }}">{{ render_icon("plus") }}</button>
+            class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
   {% endif %}
   {% if page.allowed(Action.EDIT) and not is_public_user and render_files %}
     <button lp-show="files:FileUpload"
@@ -137,7 +137,7 @@
             data-visible="false"
             data-attribute="files"
             data-has-attribute="{{ has_files|yesno }}"
-            class="{{ styles.toggle.container }}">{{ render_icon("plus") }}</button>
+            class="{{ styles.toggle.container }}">{{ render_icon("add") }}</button>
   {% endif %}
 {% endmacro %}
 

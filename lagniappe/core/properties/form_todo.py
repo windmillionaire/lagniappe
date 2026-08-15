@@ -12,7 +12,7 @@ from .base_schema import SchemaProperty
 # @features form-todo
 # @dimensions normalization validation
 def _todo_items(value, *, allow_scalar=False):
-    """Return canonical ordered to-do items from a supported value shape."""
+    """Return canonical ordered todo items from a supported value shape."""
 
     if value in (None, ""):
         return []
@@ -21,7 +21,7 @@ def _todo_items(value, *, allow_scalar=False):
         try:
             value = json.loads(value)
         except (TypeError, json.JSONDecodeError) as error:
-            raise ValidationError("To-do list submission must be valid JSON.") from error
+            raise ValidationError("Todo list submission must be valid JSON.") from error
 
     if isinstance(value, dict):
         value = value.get("items", [])
@@ -29,21 +29,21 @@ def _todo_items(value, *, allow_scalar=False):
         value = [value]
 
     if not isinstance(value, list):
-        raise ValidationError("To-do list submission must contain an items list.")
+        raise ValidationError("Todo list submission must contain an items list.")
 
     items = []
     for item in value:
         if allow_scalar and not isinstance(item, dict):
             item = {"text": item, "checked": False}
         if not isinstance(item, dict):
-            raise ValidationError("Each to-do item must be an object.")
+            raise ValidationError("Each todo item must be an object.")
 
         text = item.get("text")
         checked = item.get("checked", False)
         if not isinstance(text, str):
-            raise ValidationError("Each to-do item must contain text.")
+            raise ValidationError("Each todo item must contain text.")
         if not isinstance(checked, bool):
-            raise ValidationError("Each to-do checked value must be a boolean.")
+            raise ValidationError("Each todo checked value must be a boolean.")
 
         text = text.strip()
         if text:

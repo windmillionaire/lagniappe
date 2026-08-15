@@ -335,7 +335,7 @@ normal intent, cache, or lifecycle work. A later submission keeps defaults
 whose values are unchanged and removes
 defaults that changed or disappeared. Reopening a task starts its submission from
 a copy of the remaining defaults; task assignment remains in place across
-completion and reopening. Task-only to-do fields are excluded from repeating
+completion and reopening. Task-only todo fields are excluded from repeating
 defaults: their completed value is retained in task history, while the reopened
 task starts with no items.
 
@@ -912,6 +912,6 @@ Properties are organized by entity type and concern:
 | `task_*` | Task-specific (dates, related, scheduling) |
 | `file_*` | File-specific (assets, entity, ingress, options, related) |
 | `user_*` | User-specific (entity, groups, permissions, related, restrictions) |
-| `form_*` | Form field types (checkbox, inputs, links, select, special, submission, table, to-do, textarea) |
+| `form_*` | Form field types (checkbox, inputs, links, select, special, submission, table, todo, textarea) |
 | `base_*` | Base classes (asset, columns, db, filters, process, property, schema, submission) |
 | Single files | `category.py`, `project.py`, `filter.py`, `home.py`, `index.py`, `schema.py` |

@@ -105,10 +105,7 @@
        data-toggle="{{ (show_settings or show_form)|yesno }}"
        data-nav="{{ t.hash }}"
        class="flex flex-col gap-4 p-4 text-base font-medium sm:px-6">
-    <div class="flex flex-row items-start justify-between gap-2 w-full">
-      {{ task_title(t, show_settings, show_form, can_move, can_combine) }}
-      {{ task_toggles(t, show_settings, show_form) }}
-    </div>
+    {{ task_title(t, show_settings, show_form, can_move, can_combine) }}
     <p class="{{ styles.message }} opacity-100"
        data-kind="error"
        data-visible="false"
@@ -148,27 +145,24 @@
         {% endif %}
       </div>
     </div>
-    <div class="{{ styles.form.header.controls }}"
-         data-role="controls"
-         data-visible="false">
-      {% if show_form %}{{ controls.form(t) }}{% endif %}
-      {% if show_settings %}{{ controls.task(t) }}{% endif %}
-      {% if t.has_history %}{{ controls.task_history(t) }}{% endif %}
-      {{ controls.close() }}
+    <div class="flex shrink-0 flex-row items-start gap-1 ml-auto">
+      {% if show_settings %}{{ controls.task_save(t.updated) }}{% endif %}
+      <div class="{{ styles.form.header.controls }} {{ styles.task.controlGroup }}"
+           data-role="controls"
+           data-visible="false">
+        {% if show_form %}{{ controls.form(t) }}{% endif %}
+        {% if show_settings %}{{ controls.task(t) }}{% endif %}
+        {% if t.has_history %}{{ controls.task_history(t) }}{% endif %}
+        {{ controls.close() }}
+      </div>
+      <nav class="{{ styles.task.controlGroup }} flex shrink-0 flex-row items-start gap-1"
+           data-role="nav-toggles"
+           data-nav="{{ t.hash }}">
+        {% if show_settings %}{{ controls.task(t) }}{% endif %}
+        {% if t.has_history %}{{ controls.task_history(t) }}{% endif %}
+        {# {% if show_form %}{{ controls.form(t) }}{% endif %} #}
+      </nav>
     </div>
-  </div>
-{% endmacro %}
-
-{% macro task_toggles(t, show_settings, show_form) %}
-  <div class="flex flex-row items-start gap-1 shrink-0 ml-auto">
-    {% if show_settings %}{{ controls.task_save(t.updated) }}{% endif %}
-    <nav class="flex flex-row items-start gap-1 shrink-0"
-         data-role="nav-toggles"
-         data-nav="{{ t.hash }}">
-      {% if show_settings %}{{ controls.task(t) }}{% endif %}
-      {% if t.has_history %}{{ controls.task_history(t) }}{% endif %}
-      {# {% if show_form %}{{ controls.form(t) }}{% endif %} #}
-    </nav>
   </div>
 {% endmacro %}
 

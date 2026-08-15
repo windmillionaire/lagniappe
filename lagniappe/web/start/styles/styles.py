@@ -36,11 +36,12 @@ STYLES = {
 			"main": "basis-1/2 justify-self-center group-data-[expanded=true]/builder:basis-2/3"
 		},
 		"settings": {
-			"item": "flex flex-row items-center justify-between group",
+			"item": "group flex flex-row items-center justify-between gap-2",
+			"open": "min-w-0 flex-1 cursor-pointer rounded-md bg-white/50 px-2 py-1 text-left sm:text-sm transition-colors duration-100 hover:bg-white hover:outline-2 hover:outline-form-default focus-visible:bg-white focus-visible:outline-2 focus-visible:outline-form-default focus-visible:outline-offset-0",
 			"section": "flex flex-col gap-1 sm:text-sm p-2 rounded-md outline-2 bg-form-bg outline-form-default",
 			"title": "sm:text-sm font-semibold flex justify-between items-center text-base-dark",
 			"toggle": {
-				"container": "grid place-items-center rounded-md hover:bg-white text-form-default transition-colors duration-100 hover:outline-kind-default focus:outline-none focus-visible:outline-kind-default focus-visible:bg-white hover:shadow-sm",
+				"container": "action-icon-button size-5 transition-colors duration-100 disabled:pointer-events-none disabled:opacity-50",
 				"icon": "icon-xs text-kind-default"
 			}
 		}
@@ -269,7 +270,7 @@ STYLES = {
 			"flipper": "inline-grid place-items-center focus:outline-none text-kind-default sm:hidden text-lg",
 			"group": "flex flex-row items-center",
 			"header": "gap-2 flex w-full flex-row items-center justify-between",
-			"title": "gap-2 flex w-full flex-row items-center justify-between pl-4 py-3 sm:px-6 sm:py-5 text-lg font-semibold",
+			"title": "layout-nav-title gap-2 flex w-full flex-row items-center justify-between pl-4 py-3 sm:px-6 sm:py-5 text-lg font-semibold",
 			"toggles": "flex flex-row items-center gap-3 pl-2 slide-left",
 			"adminToggles": "flex flex-row items-center gap-3 pl-2 slide-left",
 			"card": "flex flex-row items-center"
@@ -402,6 +403,7 @@ STYLES = {
 	},
 	"task": {
 		"actionIconContext": "task-action-icon-context",
+		"controlGroup": "task-control-group",
 		"buttons": "flex flex-col gap-3",
 		"title": "min-w-0 flex-1 leading-relaxed",
 		"complete": "order-first mt-0.5 grid size-5 shrink-0 place-items-center self-start",
@@ -423,7 +425,7 @@ STYLES = {
 		"plain": "group/toggle action-icon-button transition-colors duration-100 hover:bg-white",
 		"icon": {
 			"documentSettings": "page-document-settings-icon",
-			"taskControl": "task-control-icon",
+			"taskHistory": "task-history-icon",
 			"active": "invisible group-data-[active=false]/toggle:group-hover/toggle:visible group-data-[active=true]/toggle:group-[:not(:hover)]/toggle:visible",
 			"inactive": "invisible group-data-[active=true]/toggle:group-hover/toggle:visible group-data-[active=false]/toggle:group-[:not(:hover)]/toggle:visible",
 			"enabled": "text-kind-default invisible group-data-[active=true]/toggle:visible",

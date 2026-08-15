@@ -448,6 +448,9 @@ def test_task_history_fill_controls_cover_submission_elements(get_user):
             expect(history_fill).to_have_attribute(
                 "aria-label", "Fill from latest history"
             )
+            expect(
+                history_fill.locator("[data-icon='historyFill'] .icon-glyph")
+            ).to_be_visible()
 
         signature = task_form.locator(
             "[id^='history-signature-'].form-element"
