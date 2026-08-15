@@ -54,8 +54,10 @@ subscription has a stable client ID, type-specific fields, and an opaque
   four seconds before their 8, 16, and 30 second quiet backoff. A locally
   started operation still nudges its own descriptor immediately;
 - backs transport errors off exponentially to 60 seconds;
-- stops when the tab is hidden, the browser window is unfocused, or the view is
-  offline;
+- stops ordinary polling when the tab is hidden, the browser window is
+  unfocused, or the view is offline. A visible tab in an unfocused window keeps
+  only rendered `operation` subscriptions on their normal cadence until they
+  reconcile or ten minutes elapse, whichever comes first;
 - performs one batched `catchUp()` after visibility, focus, browser-online, or
   server-online recovery. `resume()` only restores scheduled timers.
 
@@ -124,7 +126,7 @@ selection beneath a closed parent does not subscribe.
 | Watched-form `entity` and `form-lock` | Active visible form widget only | A root form shares the root entity subscription, avoiding a duplicate entity descriptor and Datastore read. |
 | `document` | Active visible collaborative document only | Deactivation checkpoints local state, unsubscribes, and explicitly closes presence. |
 | `ingress` | Active visible import wizard while its import is running | Hidden running imports retain local running state and catch up when reopened. |
-| `operation` | From durable deferred acknowledgement until terminal reconciliation | This is the deliberate visibility exception: completion and notification delivery remain useful when the source widget is closed. |
+| `operation` | From durable deferred acknowledgement until terminal reconciliation | This is the deliberate widget-visibility exception: completion and notification delivery remain useful when the source widget is closed. Only an operation with rendered progress UI may also retain polling during a visible-window blur, bounded to ten minutes. |
 | Offline document replay | One shot during reconnect | It is never a recurring mounted-widget subscription. |
 
 Hidden form widgets retain their own last-seen fingerprint/modified baseline in
@@ -404,6 +406,16 @@ retry timing, terminal state, and bounded destination metadata. The manager
 reconciles the configured entity/widget route when terminal and then removes
 the subscription. Pending report lists do not run a second refresh timer; their
 operation marker is the sole automatic completion authority.
+
+Window blur remains a soft exception only while the browser reports the actual
+tab visible. The coordinator dynamically admits operation subscriptions whose
+progress marker is connected and rendered, while document, ingress, entity,
+form-lock, collection, and notification-only polling remain suspended. The
+original blur starts one ten-minute deadline that reconnects and newly tracked
+operations cannot extend. A terminal reconciliation removes the operation and
+ends the exception early; tab hiding, pagehide, or focus loss followed by an
+offline state still prevents requests. Focus clears the exception and performs
+the normal full catch-up.
 
 Notifications remain durable entities. Each user also has one deterministic
 aggregate Notification containing exact `ordinary_count` and

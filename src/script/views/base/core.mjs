@@ -60,6 +60,8 @@ export default class Core extends ShellView {
 		this._pollingReconcileTask = null;
 		this._pollingReconcileRequested = false;
 		this._offlineReplayTask = null;
+		this.blurred = false;
+		this.blurredAt = null;
 	}
 
 	/**
@@ -349,29 +351,45 @@ export default class Core extends ShellView {
 	 * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
 	 * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
 	 * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
+	 * @tests tests_js/test_029_core_startup.py::test_core_sync_distinguishes_visible_blur_from_hard_suspension
 	 * @features offline
 	 * @dimensions indicator browser-state server-health transitions view-reset dirty-form-preservation
 	 * @pair offline:dirty-form-preservation
 	 * @pair offline:background-replay
 	 * @pairs polling:nonblocking polling:catch-up
+	 * @pairs polling:blur polling:visibility sync:deregistration
 	 */
-	async sync({ hidden = document.hidden, force = false } = {}) {
+	async sync({
+		hidden = document.hidden,
+		blurred = false,
+		blurredAt = null,
+		force = false,
+	} = {}) {
 		const online = connectivity.online;
+		const visibleBlur = Boolean(hidden && blurred);
 
 		const wasInactive = this.hidden || !this.online || force;
-		const changed = force || hidden !== this.hidden || online !== this.online;
+		const changed =
+			force ||
+			hidden !== this.hidden ||
+			visibleBlur !== this.blurred ||
+			online !== this.online;
 		if (!changed) {
 			return;
 		}
 
+		if (visibleBlur && !this.blurred) this.blurredAt = blurredAt ?? Date.now();
+		else if (!visibleBlur) this.blurredAt = null;
 		if (online && !this.online) this.connectivityGeneration += 1;
 		this.hidden = hidden;
+		this.blurred = visibleBlur;
 		this.online = online;
 		this.offline = !online;
 
 		if (!online || hidden) {
 			this.EditWatcher?.pause();
-			this.PollingCoordinator?.pause();
+			if (visibleBlur) this.PollingCoordinator?.blur(this.blurredAt);
+			else this.PollingCoordinator?.pause();
 			await this.SyncManager?.deregister();
 		} else {
 			await Promise.all([

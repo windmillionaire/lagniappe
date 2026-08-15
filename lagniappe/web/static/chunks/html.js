@@ -1,19 +1,19 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b3ba4dd3';
-import { r as request, h as waitForAttribute, E as ENDPOINTS } from './foundation.js?v=b3ba4dd3';
-import './connectivity.js?v=b3ba4dd3';
-import { i as independentEditor, T as Toolbar } from './toolbar.js?v=b3ba4dd3';
-import { C as Condition } from './base2.js?v=b3ba4dd3';
-import './combobox.js?v=b3ba4dd3';
-import './primitives.js?v=b3ba4dd3';
-import './icons.js?v=b3ba4dd3';
-import './dropdown.js?v=b3ba4dd3';
-import './baseForm.js?v=b3ba4dd3';
-import './loader.js?v=b3ba4dd3';
-import './select2.js?v=b3ba4dd3';
-import './results.js?v=b3ba4dd3';
-import './formatting.js?v=b3ba4dd3';
-import './submitter.js?v=b3ba4dd3';
+import { STYLES } from './styles.js?v=b5d60d88';
+import { r as request, h as waitForAttribute, E as ENDPOINTS } from './foundation.js?v=b5d60d88';
+import './connectivity.js?v=b5d60d88';
+import { i as independentEditor, T as Toolbar } from './toolbar.js?v=b5d60d88';
+import { C as Condition } from './base2.js?v=b5d60d88';
+import './combobox.js?v=b5d60d88';
+import './primitives.js?v=b5d60d88';
+import './icons.js?v=b5d60d88';
+import './dropdown.js?v=b5d60d88';
+import './baseForm.js?v=b5d60d88';
+import './loader.js?v=b5d60d88';
+import './select2.js?v=b5d60d88';
+import './results.js?v=b5d60d88';
+import './formatting.js?v=b5d60d88';
+import './submitter.js?v=b5d60d88';
 
 /**
  * @testable infrastructure

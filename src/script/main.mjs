@@ -158,8 +158,9 @@ let _syncPending = null;
 
 /**
  * Treat a visible tab in an unfocused browser window as inactive. Focus runs
- * an explicit catch-up cycle, so periodic work can stop while the user is
- * working elsewhere.
+ * an explicit catch-up cycle, so ordinary periodic work can stop while the
+ * user is working elsewhere. Rendered deferred operations receive the bounded
+ * visible-blur exception downstream.
  *
  * @testable false
  * @covered-by src/script/main.mjs::syncViewOnce
@@ -192,9 +193,19 @@ function updateConnectivity(patch, { notifyController = true } = {}) {
  * @covered-by src/script/main.mjs::syncView
  * @reason pending sync option merging is private queue plumbing for the public sync runner
  */
-function queueSync({ hidden, force = false, browser } = {}) {
+function queueSync({
+	hidden,
+	blurred,
+	blurredAt,
+	force = false,
+	browser,
+} = {}) {
 	const pendingHidden =
 		hidden === undefined ? _syncPending?.hidden : Boolean(hidden);
+	const pendingBlurred =
+		blurred === undefined ? _syncPending?.blurred : Boolean(blurred);
+	const pendingBlurredAt =
+		blurredAt === undefined ? _syncPending?.blurredAt : blurredAt;
 	const pendingBrowser =
 		browser === undefined ? _syncPending?.browser : browser;
 
@@ -202,6 +213,8 @@ function queueSync({ hidden, force = false, browser } = {}) {
 		force: Boolean(_syncPending?.force || force),
 	};
 	if (pendingHidden !== undefined) _syncPending.hidden = pendingHidden;
+	if (pendingBlurred !== undefined) _syncPending.blurred = pendingBlurred;
+	if (pendingBlurredAt !== undefined) _syncPending.blurredAt = pendingBlurredAt;
 	if (pendingBrowser !== undefined) _syncPending.browser = pendingBrowser;
 }
 
@@ -211,11 +224,14 @@ function queueSync({ hidden, force = false, browser } = {}) {
  * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
  * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state
  * @tests tests_js/test_017_main_lifecycle.py::test_rapid_sync_requests_coalesce_and_retain_forced_transition
+ * @tests tests_js/test_017_main_lifecycle.py::test_window_blur_soft_suspends_visible_tab_until_focus_catchup
  * @features offline
- * @dimensions server-health transitions view-reset reconnect indicator browser-state coalescing rapid-transitions
+ * @dimensions server-health transitions view-reset reconnect indicator browser-state coalescing rapid-transitions visible-blur
  */
 async function syncViewOnce({
 	hidden = documentInactive(),
+	blurred = hidden && !document.hidden && document.hasFocus?.() === false,
+	blurredAt = blurred ? Date.now() : null,
 	force = false,
 	browser = navigator.onLine === false ? "offline" : "online",
 } = {}) {
@@ -234,7 +250,9 @@ async function syncViewOnce({
 	if (hidden) {
 		stopPolling();
 		const view = await viewPromise;
-		if (view?.sync) await view.sync({ hidden: true, force });
+		if (view?.sync) {
+			await view.sync({ hidden: true, blurred, blurredAt, force });
+		}
 		return;
 	}
 
@@ -244,7 +262,9 @@ async function syncViewOnce({
 	pollServer(online);
 
 	const view = await viewPromise;
-	if (view?.sync) await view.sync({ hidden, force });
+	if (view?.sync) {
+		await view.sync({ hidden, blurred: false, blurredAt: null, force });
+	}
 }
 
 /**
@@ -300,7 +320,10 @@ function browserConnectivityChanged(browser) {
  * @features offline sync
  * @dimensions pagehide visibility deregistration
  */
-function suspendCurrentView() {
+function suspendCurrentView({
+	blurred = false,
+	blurredAt = blurred ? Date.now() : null,
+} = {}) {
 	updateConnectivity({
 		browser: navigator.onLine === false ? "offline" : "online",
 		controller: navigator.serviceWorker?.controller
@@ -308,7 +331,7 @@ function suspendCurrentView() {
 			: "uncontrolled",
 		visibility: "hidden",
 	});
-	return syncView({ hidden: true });
+	return syncView({ hidden: true, blurred, blurredAt });
 }
 
 /**
@@ -373,9 +396,11 @@ function startServiceWorker() {
 /**
  * @testable true
  * @tests tests_js/test_017_main_lifecycle.py::test_public_page_skips_authenticated_lifecycle
+ * @tests tests_js/test_017_main_lifecycle.py::test_window_blur_soft_suspends_visible_tab_until_focus_catchup
  * @pair startup:public-boundary
  * @pair startup:deferred-lifecycle
  * @pair startup:analytics
+ * @pairs polling:blur polling:visibility polling:focus polling:catch-up
  */
 async function startAuthenticatedLifecycle() {
 	startErrorHandling();
@@ -395,8 +420,12 @@ async function startAuthenticatedLifecycle() {
 		browserConnectivityChanged("offline"),
 	);
 	window.addEventListener("online", () => browserConnectivityChanged("online"));
-	window.addEventListener("blur", suspendCurrentView);
-	window.addEventListener("focus", () => syncView());
+	window.addEventListener("blur", () =>
+		suspendCurrentView({ blurred: !document.hidden }),
+	);
+	window.addEventListener("focus", () =>
+		syncView({ hidden: false, blurred: false, blurredAt: null }),
+	);
 	window.addEventListener("pagehide", suspendCurrentView);
 	window.addEventListener("pageshow", (event) => {
 		syncView({ force: event.persisted });

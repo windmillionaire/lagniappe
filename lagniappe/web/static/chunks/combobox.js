@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b3ba4dd3';
-import { g as generateElementId, c as captureError } from './foundation.js?v=b3ba4dd3';
-import './connectivity.js?v=b3ba4dd3';
-import { p as primitives } from './primitives.js?v=b3ba4dd3';
+import { STYLES } from './styles.js?v=b5d60d88';
+import { g as generateElementId, c as captureError } from './foundation.js?v=b5d60d88';
+import './connectivity.js?v=b5d60d88';
+import { p as primitives } from './primitives.js?v=b5d60d88';
 
 /**
  * Custom positioning reference element.
@@ -1874,13 +1874,11 @@ class Combobox {
 
 				panel.dataset.positioned = "true";
 
-				document
-					.querySelectorAll("[data-combobox-id]")
-					.forEach((combobox) => {
-						if (combobox._lp_combobox && combobox._lp_combobox !== this) {
-							combobox._lp_combobox.hidePanel();
-						}
-					});
+				document.querySelectorAll("[data-combobox-id]").forEach((combobox) => {
+					if (combobox._lp_combobox && combobox._lp_combobox !== this) {
+						combobox._lp_combobox.hidePanel();
+					}
+				});
 				return true;
 			})
 			.catch((error) => {

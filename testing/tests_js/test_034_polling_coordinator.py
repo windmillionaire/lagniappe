@@ -179,6 +179,150 @@ if (timerId !== 3 || clearedTimers.join(",") !== "1,2") {
     )
 
 
+# @pair polling:blur
+# @pair polling:visibility
+# @pair polling:cadence
+# @pair deferred-jobs:polling
+def test_polling_coordinator_limits_visible_blur_to_eligible_operations(run_node):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const calls = [];
+const handled = [];
+const timers = new Map();
+let nextTimer = 0;
+let now = 1_000;
+let operationVisible = true;
+let blockResponse = false;
+let releaseResponse = null;
+const context = {
+  console,
+  crypto: { randomUUID: () => "client-visible-blur" },
+  Date: { now() { return now; } },
+  ENDPOINTS: { poll: "/l/poll" },
+  Math,
+  queueMicrotask,
+  sessionStorage: { getItem() { return null; }, setItem() {} },
+  captureError(error) { throw error; },
+  request: {
+    async post(_url, body) {
+      calls.push(body);
+      if (blockResponse) {
+        await new Promise((resolve) => { releaseResponse = resolve; });
+      }
+      return {
+        ok: true,
+        version: 1,
+        results: body.subscriptions.map((item) => ({
+          id: item.id,
+          type: item.type,
+          status: "unchanged",
+          revision: item.revision,
+          poll_after_ms: 15_000,
+        })),
+      };
+    },
+  },
+  window: {
+    addEventListener() {},
+    removeEventListener() {},
+    clearTimeout(id) { timers.delete(id); },
+    setTimeout(callback, delay) {
+      nextTimer += 1;
+      timers.set(nextTimer, { callback, delay });
+      return nextTimer;
+    },
+  },
+};
+context.globalThis = context;
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/polling.mjs", "utf8");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replace("export class PollingCoordinator", "class PollingCoordinator");
+source += "\nglobalThis.PollingCoordinator = PollingCoordinator;";
+vm.runInContext(source, context);
+
+const view = { elt: {}, hidden: false, online: true };
+const coordinator = new context.PollingCoordinator(view).init();
+coordinator.subscribe(
+  { id: "entity:ordinary", type: "entity", key: "ordinary", revision: "v1" },
+  { onResult: () => handled.push("entity:ordinary") },
+);
+coordinator.subscribe(
+  { id: "operation:visible", type: "operation", key: "visible", revision: 1 },
+  {
+    whileBlurred: () => operationVisible,
+    onResult: () => handled.push("operation:visible"),
+  },
+);
+
+(async () => {
+  view.hidden = true;
+  coordinator.blur();
+  await coordinator.trigger();
+  if (
+    calls.length !== 1 ||
+    calls[0].subscriptions.map(({ id }) => id).join(",") !== "operation:visible" ||
+    handled.join(",") !== "operation:visible"
+  ) {
+    throw new Error(`Visible blur polled ordinary work: ${JSON.stringify({ calls, handled })}`);
+  }
+
+  operationVisible = false;
+  coordinator.notificationSeedPending = true;
+  coordinator.reschedule();
+  await coordinator.trigger();
+  if (calls.length !== 1 || timers.size !== 0) {
+    throw new Error("Hidden operation or notification-only work retained blurred polling");
+  }
+  coordinator.notificationSeedPending = false;
+
+  operationVisible = true;
+  now = 601_000;
+  coordinator.reschedule();
+  await coordinator.trigger();
+  if (calls.length !== 1 || timers.size !== 0) {
+    throw new Error("The ten-minute visible-blur deadline was extended");
+  }
+
+  view.hidden = false;
+  await coordinator.resume();
+  handled.splice(0);
+  blockResponse = true;
+  const mixed = coordinator.trigger();
+  for (let attempt = 0; attempt < 10 && !releaseResponse; attempt += 1) {
+    await Promise.resolve();
+  }
+  if (!releaseResponse) throw new Error("Mixed poll did not reach the request boundary");
+  if (calls.at(-1).subscriptions.length !== 2) {
+    throw new Error("Foreground setup did not include both subscriptions");
+  }
+
+  view.hidden = true;
+  coordinator.blur();
+  releaseResponse();
+  await mixed;
+  if (handled.join(",") !== "operation:visible") {
+    throw new Error(`Blurred mixed response applied inactive work: ${handled}`);
+  }
+
+  coordinator.pause();
+  const beforeHardPause = calls.length;
+  await coordinator.trigger();
+  if (calls.length !== beforeHardPause) {
+    throw new Error("Hard suspension retained deferred polling");
+  }
+  coordinator.destroy();
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+"""
+    )
+
+
 # @pair polling:foreground
 # @pair polling:scheduled-initial
 # @pair notifications:cold-seed

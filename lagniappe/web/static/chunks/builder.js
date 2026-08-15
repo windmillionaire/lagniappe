@@ -1,21 +1,21 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { SearchBox } from './search.js?v=b3ba4dd3';
-import { EntityMenu } from './entityMenu.js?v=b3ba4dd3';
-import { w as withTransition, r as request, E as ENDPOINTS, g as generateElementId } from './foundation.js?v=b3ba4dd3';
-import { c as connectivity } from './connectivity.js?v=b3ba4dd3';
-import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b3ba4dd3';
-import { STYLES } from './styles.js?v=b3ba4dd3';
-import { s as setIcon } from './icons.js?v=b3ba4dd3';
-import { p as primitives } from './primitives.js?v=b3ba4dd3';
-import { B as BaseForm, R as Renderer } from './baseForm.js?v=b3ba4dd3';
-import { F as FacetsBox } from './facets.js?v=b3ba4dd3';
+import { SearchBox } from './search.js?v=b5d60d88';
+import { EntityMenu } from './entityMenu.js?v=b5d60d88';
+import { w as withTransition, r as request, E as ENDPOINTS, g as generateElementId } from './foundation.js?v=b5d60d88';
+import { c as connectivity } from './connectivity.js?v=b5d60d88';
+import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b5d60d88';
+import { STYLES } from './styles.js?v=b5d60d88';
+import { s as setIcon } from './icons.js?v=b5d60d88';
+import { p as primitives } from './primitives.js?v=b5d60d88';
+import { B as BaseForm, R as Renderer } from './baseForm.js?v=b5d60d88';
+import { F as FacetsBox } from './facets.js?v=b5d60d88';
 
 const CONDITION_REGISTRY = {
-	html: () => import('./html.js?v=b3ba4dd3'),
-	status: () => import('./status.js?v=b3ba4dd3'),
-	visibility: () => import('./visibility.js?v=b3ba4dd3'),
-	columns: () => import('./columns.js?v=b3ba4dd3'),
-	options: () => import('./options.js?v=b3ba4dd3'),
+	html: () => import('./html.js?v=b5d60d88'),
+	status: () => import('./status.js?v=b5d60d88'),
+	visibility: () => import('./visibility.js?v=b5d60d88'),
+	columns: () => import('./columns.js?v=b5d60d88'),
+	options: () => import('./options.js?v=b5d60d88'),
 };
 
 /**

@@ -127,6 +127,7 @@ context.loadView = (...args) => viewLoader(...args);
 context.setView = (view) => {{ viewElement = view; }};
 context.setViewLoader = (loader) => {{ viewLoader = loader; }};
 context.setFocused = (value) => {{ focused = value; }};
+context.setDocumentHidden = (value) => {{ context.document.hidden = value; }};
 context.setMode = (value) => {{ pageMode = value; }};
 context.setNavigatorOnline = (value) => {{ context.navigator.onLine = value; }};
 context.flushPaint = async () => {{
@@ -235,7 +236,12 @@ setView({
 
 await suspendCurrentView();
 
-if (syncCalls.length !== 1 || syncCalls[0].hidden !== true) {
+if (
+  syncCalls.length !== 1 ||
+  syncCalls[0].hidden !== true ||
+  syncCalls[0].blurred !== false ||
+  syncCalls[0].blurredAt !== null
+) {
   throw new Error(`View was not suspended: ${JSON.stringify(syncCalls)}`);
 }
 if (fetchCalls.length !== 0) {
@@ -249,7 +255,8 @@ if (fetchCalls.length !== 0) {
 # @pair polling:focus
 # @pair polling:visibility
 # @pair polling:catch-up
-def test_window_blur_suspends_polling_until_focus_catchup(run_node):
+# @pair offline:visible-blur
+def test_window_blur_soft_suspends_visible_tab_until_focus_catchup(run_node):
     run_main_check(
         run_node,
         """
@@ -271,7 +278,9 @@ await windowListeners.get("blur")();
 if (
   fetchCalls.length !== 0 ||
   syncCalls.length !== 1 ||
-  syncCalls[0].hidden !== true
+  syncCalls[0].hidden !== true ||
+  syncCalls[0].blurred !== true ||
+  !Number.isFinite(syncCalls[0].blurredAt)
 ) {
   throw new Error(
     `Blur did not suspend without a health request: ${JSON.stringify({ fetchCalls, syncCalls })}`,
@@ -280,12 +289,31 @@ if (
 
 fetchCalls.splice(0);
 syncCalls.splice(0);
+context.setDocumentHidden(true);
+await documentListeners.get("visibilitychange")();
+if (
+  fetchCalls.length !== 0 ||
+  syncCalls.length !== 1 ||
+  syncCalls[0].hidden !== true ||
+  syncCalls[0].blurred !== false ||
+  syncCalls[0].blurredAt !== null
+) {
+  throw new Error(
+    `A hidden tab retained visible-blur polling: ${JSON.stringify({ fetchCalls, syncCalls })}`,
+  );
+}
+
+fetchCalls.splice(0);
+syncCalls.splice(0);
+context.setDocumentHidden(false);
 context.setFocused(true);
 await windowListeners.get("focus")();
 if (
   fetchCalls.length !== 1 ||
   syncCalls.length !== 1 ||
-  syncCalls[0].hidden !== false
+  syncCalls[0].hidden !== false ||
+  syncCalls[0].blurred !== false ||
+  syncCalls[0].blurredAt !== null
 ) {
   throw new Error(
     `Focus did not run one catch-up cycle: ${JSON.stringify({ fetchCalls, syncCalls })}`,

@@ -2,20 +2,24 @@
 
 
 # @features deferred-jobs
-# @dimensions status revision polling progress timing backoff teardown decoration-opt-out
+# @dimensions status revision polling progress timing backoff teardown decoration-opt-out visible-blur rendered-visibility
 def test_deferred_operation_manager_batches_orders_and_renders_status(run_node):
     run_node(
         r"""
 const fs = require("node:fs");
 const vm = require("node:vm");
 
-function operationNode(key) {
-  const phase = { textContent: "Waiting to start" };
-  const elapsed = { textContent: "just now" };
-  return {
-    dataset: { operation: key, operationRevision: "0" },
-    phase,
-    elapsed,
+function operationNode(key, visible = true) {
+	const phase = { textContent: "Waiting to start" };
+	const elapsed = { textContent: "just now" };
+	return {
+		dataset: { operation: key, operationRevision: "0" },
+		isConnected: true,
+		visible,
+		phase,
+		elapsed,
+		closest() { return this.visible ? null : {}; },
+		getClientRects() { return this.visible ? [{}] : []; },
     querySelector(selector) {
       if (selector === "[data-role='deferred-phase']") return phase;
       if (selector === "[data-role='deferred-elapsed']") return elapsed;
@@ -25,13 +29,15 @@ function operationNode(key) {
   };
 }
 
-const nodes = [operationNode("operation-a"), operationNode("operation-b")];
+const nodes = [operationNode("operation-a"), operationNode("operation-b", false)];
 const subscriptions = new Map();
 const descriptors = new Map();
 const schedules = new Map();
 const triggers = [];
 const reconciled = [];
 const expectedCompletions = [];
+let reschedules = 0;
+const blurStarts = [];
 const coordinator = {
   subscribe(descriptor, hooks) {
     descriptors.set(descriptor.id, descriptor);
@@ -42,7 +48,9 @@ const coordinator = {
     subscriptions.set(descriptor.id, hooks);
     return () => subscriptions.delete(descriptor.id);
   },
-  async trigger(ids) { triggers.push(ids); return []; },
+	async trigger(ids) { triggers.push(ids); return []; },
+	blur(startedAt) { blurStarts.push(startedAt); },
+	reschedule() { reschedules += 1; },
 };
 const context = {
   console,
@@ -83,15 +91,33 @@ const manager = new context.DeferredOperationManager(view).init();
   if (subscriptions.size !== 2) {
     throw new Error("Visible operations did not create polling subscriptions");
   }
-  if (triggers.length !== 0 ||
-      descriptors.get("operation:operation-a")?.revision !== 0 ||
-      schedules.get("operation:operation-a")?.initial !== "scheduled") {
-    throw new Error("Server-rendered operation did not seed a delayed revision cursor");
-  }
-  manager.track("operation-local", { revision: 2 });
-  if (triggers.length !== 1 || triggers[0] !== "operation:operation-local") {
-    throw new Error("Locally started operation did not request an immediate poll");
-  }
+	if (triggers.length !== 0 ||
+			descriptors.get("operation:operation-a")?.revision !== 0 ||
+			schedules.get("operation:operation-a")?.initial !== "scheduled") {
+		throw new Error("Server-rendered operation did not seed a delayed revision cursor");
+	}
+	if (
+		subscriptions.get("operation:operation-a").whileBlurred() !== true ||
+		subscriptions.get("operation:operation-b").whileBlurred() !== false
+	) {
+		throw new Error("Blurred polling did not follow rendered operation visibility");
+	}
+	manager.track("operation-local", { revision: 2 });
+	if (triggers.length !== 1 || triggers[0] !== "operation:operation-local") {
+		throw new Error("Locally started operation did not request an immediate poll");
+	}
+	if (subscriptions.get("operation:operation-local").whileBlurred() !== false) {
+		throw new Error("A background-only operation qualified for visible blur polling");
+	}
+	view.hidden = true;
+	view.blurred = true;
+	view.blurredAt = 42;
+	manager.track("operation-a", { node: nodes[0], immediate: false });
+	view.hidden = false;
+	view.blurred = false;
+	if (reschedules !== 1 || blurStarts.join(",") !== "42") {
+		throw new Error("Existing operation visibility did not refresh scheduling");
+	}
   await manager.poll();
   if (triggers.length !== 2 || triggers[1].length !== 3) {
     throw new Error("Operation poll did not delegate a batch to the coordinator");

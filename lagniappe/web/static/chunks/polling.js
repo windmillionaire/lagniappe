@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as captureError, r as request, E as ENDPOINTS } from './foundation.js?v=b3ba4dd3';
-import './connectivity.js?v=b3ba4dd3';
+import { c as captureError, r as request, E as ENDPOINTS } from './foundation.js?v=b5d60d88';
+import './connectivity.js?v=b5d60d88';
 
 const POLL_PROTOCOL_VERSION = 1;
 const MAX_SUBSCRIPTIONS_PER_REQUEST = 64;
@@ -11,6 +11,7 @@ const MAX_CURSOR_LENGTH = 512;
 const MAX_STATE_TOKEN_LENGTH = 128;
 const MAX_REVISION = Number.MAX_SAFE_INTEGER;
 const CLIENT_ID_KEY = "lagniappe-poll-client";
+const VISIBLE_BLUR_POLLING_MS = 10 * 60 * 1000;
 const ORDINARY_INTERVALS = [15_000, 15_000, 30_000, 30_000, 60_000];
 const TYPE_INTERVALS = Object.freeze({
 	document: 2_000,
@@ -423,14 +424,16 @@ function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
  *
  * @testable true
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_batches_due_subscriptions_and_applies_results
+ * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_limits_visible_blur_to_eligible_operations
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_enqueues_reentrant_followup_without_waiting
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_schedules_modes_and_notification_seed
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_captures_and_isolates_contract_failures
  * @features polling
- * @dimensions batching cadence lifecycle coalescing acknowledgement reentrancy requested-cycle freshness
+ * @dimensions batching cadence lifecycle coalescing acknowledgement reentrancy requested-cycle freshness visible-blur deadline
  * @pairs polling:batching polling:cadence polling:lifecycle polling:coalescing polling:acknowledgement
  * @pairs polling:reentrancy polling:requested-cycle polling:freshness polling:foreground polling:scheduled-initial
  * @pairs polling:protocol polling:validation polling:diagnostics polling:revision polling:presence
+ * @pairs polling:blur polling:visibility deferred-jobs:polling
  * @pair notifications:cold-seed
  */
 class PollingCoordinator {
@@ -446,12 +449,13 @@ class PollingCoordinator {
 		this.followup = false;
 		this.queuedIds = new Set();
 		this.destroyed = false;
+		this.blurredUntil = null;
 		this.notificationSeedPending = Boolean(window.__NOTIFICATION_STATE__?.miss);
 		this._notificationState = (event) => {
 			if (!event?.detail?.miss) return;
 			this.notificationSeedPending = true;
 			if (this.activePoll) this.followup = true;
-			else this._schedule(0);
+			else this._schedule(this.view.hidden ? null : 0);
 		};
 	}
 
@@ -480,12 +484,17 @@ class PollingCoordinator {
 		{
 			onResult = null,
 			beforePoll = null,
+			whileBlurred = null,
 			mode = "periodic",
 			initial = "immediate",
 		} = {},
 	) {
 		if (this.destroyed) return () => {};
-		if (!SUBSCRIPTION_MODES.has(mode) || !INITIAL_MODES.has(initial)) {
+		if (
+			!SUBSCRIPTION_MODES.has(mode) ||
+			!INITIAL_MODES.has(initial) ||
+			(whileBlurred !== null && typeof whileBlurred !== "function")
+		) {
 			throw new TypeError("Invalid polling subscription schedule.");
 		}
 		const existing = this.subscriptions.get(descriptor?.id);
@@ -514,12 +523,13 @@ class PollingCoordinator {
 			descriptor: normalized,
 			onResult: onResult ?? existing?.onResult ?? null,
 			beforePoll: beforePoll ?? existing?.beforePoll ?? null,
+			whileBlurred: whileBlurred ?? existing?.whileBlurred ?? null,
 			mode,
 			dueAt: schedule,
 			quiet: existing?.quiet ?? 0,
 			errorCount: existing?.errorCount ?? 0,
 		});
-		this.pause();
+		this._clearTimer();
 		this._schedule(initial === "immediate" && mode === "periodic" ? 0 : null);
 		return () => this.unsubscribe(normalized.id);
 	}
@@ -527,7 +537,8 @@ class PollingCoordinator {
 	unsubscribe(id) {
 		this.subscriptions.delete(id);
 		this.queuedIds.delete(id);
-		if (!this.subscriptions.size && !this.notificationSeedPending) this.pause();
+		if (!this.subscriptions.size && !this.notificationSeedPending)
+			this._clearTimer();
 		else this._schedule();
 	}
 
@@ -613,19 +624,41 @@ class PollingCoordinator {
 		return this._poll();
 	}
 
-	pause() {
+	_clearTimer() {
 		if (this.timer) window.clearTimeout(this.timer);
 		this.timer = null;
 	}
 
+	pause() {
+		this.blurredUntil = null;
+		this._clearTimer();
+	}
+
+	blur(startedAt = Date.now()) {
+		if (this.destroyed) return;
+		if (this.blurredUntil === null) {
+			this.blurredUntil = startedAt + VISIBLE_BLUR_POLLING_MS;
+		}
+		this._clearTimer();
+		this._schedule();
+	}
+
+	reschedule() {
+		if (this.destroyed) return;
+		this._clearTimer();
+		this._schedule();
+	}
+
 	resume() {
 		if (this.destroyed) return Promise.resolve([]);
+		this.blurredUntil = null;
 		this._schedule();
 		return Promise.resolve([]);
 	}
 
 	catchUp() {
 		if (this.destroyed) return Promise.resolve([]);
+		this.blurredUntil = null;
 		return this.trigger();
 	}
 
@@ -706,6 +739,21 @@ class PollingCoordinator {
 		return TYPE_INTERVALS[type] || ORDINARY_INTERVALS[0];
 	}
 
+	_eligible(subscription) {
+		if (this.destroyed || !this.view.online) return false;
+		if (!this.view.hidden) return true;
+		if (this.blurredUntil === null || Date.now() >= this.blurredUntil) {
+			return false;
+		}
+		return subscription?.whileBlurred?.() === true;
+	}
+
+	_hasEligible(subscriptions = this.subscriptions.values()) {
+		return Array.from(subscriptions).some((subscription) =>
+			this._eligible(subscription),
+		);
+	}
+
 	_notificationRequest() {
 		const state = window.__NOTIFICATION_STATE__;
 		if (!state) return null;
@@ -743,12 +791,19 @@ class PollingCoordinator {
 	_due() {
 		const now = Date.now();
 		return Array.from(this.subscriptions.values())
-			.filter((subscription) => subscription.dueAt <= now)
+			.filter(
+				(subscription) =>
+					subscription.dueAt <= now && this._eligible(subscription),
+			)
 			.slice(0, MAX_SUBSCRIPTIONS_PER_REQUEST);
 	}
 
 	_poll() {
-		if (this.destroyed || this.view.hidden || !this.view.online) {
+		if (
+			this.destroyed ||
+			!this.view.online ||
+			(this.view.hidden && !this._hasEligible())
+		) {
 			return Promise.resolve([]);
 		}
 		if (this.activePoll) {
@@ -779,7 +834,9 @@ class PollingCoordinator {
 		const results = [];
 		try {
 			due = this._due();
-			if (!due.length && !this.notificationSeedPending) return [];
+			const notificationOnly =
+				!this.view.hidden && this.notificationSeedPending;
+			if (!due.length && !notificationOnly) return [];
 			this.activeIds = new Set(due.map(({ descriptor }) => descriptor.id));
 			for (const { descriptor } of due) {
 				this.queuedIds.delete(descriptor.id);
@@ -789,15 +846,18 @@ class PollingCoordinator {
 			);
 			for (const hook of hooks) await hook();
 			await window.__PING_PENDING__;
-			if (this.destroyed || this.view.hidden || !this.view.online) return [];
+			if (this.destroyed || !this.view.online) return [];
 			const notificationState = this._notificationRequest();
 			due = due.filter(
 				(subscription) =>
-					this.subscriptions.get(subscription.descriptor.id) === subscription,
+					this.subscriptions.get(subscription.descriptor.id) === subscription &&
+					this._eligible(subscription),
 			);
-			if (!due.length && !this.notificationSeedPending) return [];
+			if (!due.length && (this.view.hidden || !this.notificationSeedPending)) {
+				return [];
+			}
 
-			this.pause();
+			this._clearTimer();
 			const byId = new Map(
 				due.map((subscription) => [subscription.descriptor.id, subscription]),
 			);
@@ -826,7 +886,7 @@ class PollingCoordinator {
 				}
 				const cycleJitter = 0.9 + Math.random() * 0.2;
 				const scheduledAt = Date.now();
-				for (const subscription of due) {
+				for (const subscription of due.filter((item) => this._eligible(item))) {
 					subscription.dueAt =
 						subscription.mode === "foreground"
 							? Number.POSITIVE_INFINITY
@@ -849,7 +909,12 @@ class PollingCoordinator {
 			if (!Array.isArray(response.results)) {
 				throw new PollContractError("response.results", "type");
 			}
-			if (this.destroyed || this.view.hidden || !this.view.online) return [];
+			if (
+				this.destroyed ||
+				!this.view.online ||
+				(this.view.hidden && !this._hasEligible(byId.values()))
+			)
+				return [];
 			const acceptedResults = new Map();
 			const invalidIds = new Set();
 			const seenIds = new Set();
@@ -892,6 +957,7 @@ class PollingCoordinator {
 			const scheduledAt = Date.now();
 			for (const [id, subscription] of byId) {
 				if (this.subscriptions.get(id) !== subscription) continue;
+				if (!this._eligible(subscription)) continue;
 				const result = acceptedResults.get(id);
 				if (!result) {
 					if (!invalidIds.has(id)) {
@@ -954,7 +1020,9 @@ class PollingCoordinator {
 				}
 			}
 		} catch (error) {
-			if (this.destroyed || this.view.hidden || !this.view.online) return [];
+			if (this.destroyed || !this.view.online) return [];
+			due = due.filter((subscription) => this._eligible(subscription));
+			if (!due.length && this.view.hidden) return [];
 			if (error instanceof PollContractError) {
 				this._captureContract(error, "polling-response-contract");
 			} else {
@@ -995,17 +1063,24 @@ class PollingCoordinator {
 			this.destroyed ||
 			this.timer ||
 			(!this.subscriptions.size && !this.notificationSeedPending) ||
-			this.view.hidden ||
 			!this.view.online
 		)
 			return;
 		const periodicDue = Array.from(this.subscriptions.values())
-			.filter(({ mode }) => mode === "periodic")
+			.filter(
+				(subscription) =>
+					subscription.mode === "periodic" && this._eligible(subscription),
+			)
 			.map(({ dueAt }) => dueAt);
-		if (!this.notificationSeedPending && !periodicDue.length) return;
-		const nextDue = this.notificationSeedPending
-			? Date.now()
-			: Math.min(...periodicDue);
+		const notificationDue = !this.view.hidden && this.notificationSeedPending;
+		if (!notificationDue && !periodicDue.length) return;
+		const nextDue = notificationDue ? Date.now() : Math.min(...periodicDue);
+		if (
+			this.view.hidden &&
+			this.blurredUntil !== null &&
+			nextDue >= this.blurredUntil
+		)
+			return;
 		const wait = delay ?? Math.max(nextDue - Date.now(), 0);
 		this.timer = window.setTimeout(() => {
 			this.timer = null;

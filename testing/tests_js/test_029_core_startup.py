@@ -527,6 +527,117 @@ vm.runInContext(source, context);
     )
 
 
+# @pair polling:blur
+# @pair polling:visibility
+# @pair sync:deregistration
+def test_core_sync_distinguishes_visible_blur_from_hard_suspension(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const context = {
+  console,
+  connectivity: { online: true },
+  document: { hidden: false },
+  URLSearchParams,
+  window: { location: { search: "" } },
+};
+vm.createContext(context);
+
+let source = fs.readFileSync("src/script/views/base/core.mjs", "utf8");
+source = source.replace(
+  /^import [\s\S]*?(?=\/\*\*)/,
+  `
+const connectivity = globalThis.connectivity;
+const ENDPOINTS = {};
+const captureError = () => {};
+const request = {};
+const withTransition = async (callback) => await callback();
+const ViewComponent = class {};
+const collectRefreshTargets = () => [];
+const reconcileChange = () => {};
+const refreshCollectionComponents = () => {};
+const ensureDeferredOperations = () => {};
+const ensureEditWatcher = () => {};
+const ensureEntityMenu = () => {};
+const ensureModalClasses = () => {};
+const ensureNotifications = () => {};
+const ensureOfflineModal = () => {};
+const ensureOfflineQueue = () => {};
+const ensurePollingCoordinator = () => {};
+const ensureSearchBox = () => {};
+const ensureSubmissionManager = () => {};
+const ensureSyncManager = () => {};
+const initializeCoreServices = () => {};
+const ShellView = class {};
+const Task = class {};
+`,
+);
+source = source.replace("export default class Core", "class Core");
+source += "\nglobalThis.Core = Core;";
+vm.runInContext(source, context);
+
+const events = [];
+const blurStarts = [];
+const view = Object.create(context.Core.prototype);
+Object.assign(view, {
+  hidden: false,
+  blurred: false,
+  online: true,
+  connectivityGeneration: 0,
+  EditWatcher: { pause() { events.push("forms:pause"); } },
+  PollingCoordinator: {
+    blur(startedAt) {
+      blurStarts.push(startedAt);
+      events.push("polling:blur");
+    },
+    pause() { events.push("polling:pause"); },
+  },
+  SyncManager: {
+    async deregister() { events.push("documents:deregister"); },
+  },
+});
+Object.defineProperty(view, "offline", {
+  configurable: true,
+  writable: true,
+  value: false,
+});
+
+(async () => {
+  await view.sync({ hidden: true, blurred: true, blurredAt: 42 });
+  const startedAt = view.blurredAt;
+  if (
+    events.join(",") !== "forms:pause,polling:blur,documents:deregister" ||
+    view.blurred !== true ||
+    blurStarts[0] !== startedAt ||
+    startedAt !== 42
+  ) {
+    throw new Error(`Visible blur did not retain narrow polling: ${events}`);
+  }
+
+  await view.sync({ hidden: true, blurred: true, blurredAt: 99 });
+  if (events.length !== 3 || view.blurredAt !== startedAt) {
+    throw new Error("Duplicate visible blur restarted the lifecycle window");
+  }
+
+  await view.sync({ hidden: true, blurred: false });
+  if (
+    events.slice(3).join(",") !==
+      "forms:pause,polling:pause,documents:deregister" ||
+    view.blurred !== false ||
+    view.blurredAt !== null
+  ) {
+    throw new Error(`Hard suspension retained visible-blur polling: ${events}`);
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
 # @pair startup:deferred-services
 # @pair startup:component-render
 # @pair startup:nonblocking

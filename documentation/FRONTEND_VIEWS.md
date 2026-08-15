@@ -217,15 +217,20 @@ acknowledge a quiet owner operation without reading its job row; at least once
 per minute, or after a miss/mismatch, it reloads the durable job and repairs the
 projection. Redis operation and notification state use separate keys but are
 read in one pipeline when the same poll needs both.
-Polling pauses while the tab is hidden, the window is unfocused, or the view is
-offline. A server-rendered operation seeds its revision and schedules its
-first request four seconds later. Its bounded current status is rendered into
-the operation element and hydrated into the manager cache, so a matching quiet
-check can skip the job row without leaving a stale phase label. An operation
-started by this browser nudges its own descriptor immediately. Focus/visibility/connectivity runs one batched
-catch-up, keeps elapsed time moving between responses, and displays a delayed
-status/retry message instead of an indefinite silent spinner when a status
-check fails.
+Ordinary polling pauses while the tab is hidden, the window is unfocused, or
+the view is offline. If the window loses focus while the actual tab remains
+visible, a deferred operation with connected, rendered progress UI keeps its
+normal adaptive cadence until terminal reconciliation or a ten-minute cap,
+whichever comes first. Hidden/background-only operations do not qualify, and
+the exception never keeps document, form, entity, ingress, collection, health,
+or notification-only polling active. A server-rendered operation seeds its
+revision and schedules its first request four seconds later. Its bounded current
+status is rendered into the operation element and hydrated into the manager
+cache, so a matching quiet check can skip the job row without leaving a stale
+phase label. An operation started by this browser nudges its own descriptor
+immediately. Focus/visibility/connectivity runs one batched catch-up, keeps
+elapsed time moving between responses, and displays a delayed status/retry
+message instead of an indefinite silent spinner when a status check fails.
 
 The operation subscription is the authoritative completion mechanism. The
 coordinator rejects stale revisions before refreshing the form's

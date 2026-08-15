@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request } from './foundation.js?v=b3ba4dd3';
-import './connectivity.js?v=b3ba4dd3';
+import { r as request } from './foundation.js?v=b5d60d88';
+import './connectivity.js?v=b5d60d88';
 
 const LOGOUT_BUTTON_SELECTOR = "[data-action='logout'][data-route]";
 

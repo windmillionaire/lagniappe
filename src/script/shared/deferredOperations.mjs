@@ -42,12 +42,24 @@ function operationNodes(key) {
 }
 
 /**
+ * @testable false
+ * @covered-by src/script/shared/deferredOperations.mjs::DeferredOperationManager
+ * @reason rendered operation eligibility is exercised through manager subscriptions
+ */
+function operationNodeVisible(node) {
+	if (!node || node.isConnected === false) return false;
+	if (node.closest?.("[hidden], .hidden, [data-visible='false']")) return false;
+	const rects = node.getClientRects?.();
+	return rects ? rects.length > 0 : true;
+}
+
+/**
  * Reconcile every visible deferred operation through the shared poll contract.
  *
  * @testable true
  * @tests tests_js/test_023_deferred_operations.py::test_deferred_operation_manager_batches_orders_and_renders_status
  * @features deferred-jobs
- * @dimensions status revision polling progress timing backoff teardown decoration-opt-out
+ * @dimensions status revision polling progress timing backoff teardown decoration-opt-out visible-blur rendered-visibility
  */
 export class DeferredOperationManager {
 	constructor(view) {
@@ -124,9 +136,13 @@ export class DeferredOperationManager {
 			revision: resolvedRevision,
 			...(status ? { status: { ...status }, receivedAt: Date.now() } : {}),
 		});
+		const polling = this.view.PollingCoordinator;
+		if (this.view.hidden && this.view.blurred) {
+			polling?.blur(this.view.blurredAt ?? Date.now());
+		}
 		let subscribed = false;
 		if (!this.unsubscribers.has(key)) {
-			const unsubscribe = this.view.PollingCoordinator?.subscribe(
+			const unsubscribe = polling?.subscribe(
 				{
 					id: `operation:${key}`,
 					type: "operation",
@@ -136,6 +152,7 @@ export class DeferredOperationManager {
 				{
 					mode: "periodic",
 					initial: "scheduled",
+					whileBlurred: () => this.visible(key),
 					onResult: async (result) => {
 						if (result.status === "changed" && result.payload) {
 							return await this.receive(result.payload);
@@ -156,9 +173,16 @@ export class DeferredOperationManager {
 			}
 		}
 		if (immediate && subscribed) {
-			this.view.PollingCoordinator?.trigger(`operation:${key}`);
+			polling?.trigger(`operation:${key}`);
 		}
+		if (!subscribed) polling?.reschedule?.();
 		return true;
+	}
+
+	visible(key) {
+		return (
+			this.operations.has(key) && operationNodes(key).some(operationNodeVisible)
+		);
 	}
 
 	decorate(node, key) {
