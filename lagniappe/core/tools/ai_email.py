@@ -401,7 +401,8 @@ class ResendAIEmailClient:
             parsed.scheme != "https"
             or not parsed.hostname
             or not (
-                parsed.hostname == "resend.com"
+                parsed.hostname == "cdn.resend.app"
+                or parsed.hostname == "resend.com"
                 or parsed.hostname.endswith(".resend.com")
             )
         ):
@@ -729,7 +730,7 @@ def report_url(report, config=None):
         domain = CONFIG.CUSTOM_DOMAIN
     else:
         domain = config.get("applicationDomain") or config.get("customDomain")
-    return f"https://{domain}/reports/{report.urlsafe_key}"
+    return f"https://{domain}/tools/reports/{report.urlsafe_key}"
 
 
 def receiving_address(config, tool):

@@ -10,8 +10,9 @@ import { RadioElement } from "../elements/radio";
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_owner_create_adopts_public_user_and_resets_form
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_attached_to_existing_page_preserves_page_info_form
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_group_selector_accepts_multiple_groups
+ * @tests tests_js/test_044_user_widget_frontend.py::test_create_user_focuses_on_open_and_reset_without_stealing_live_field_focus
  * @features users
- * @dimensions create-form create-submit created-row attach-existing-page page-form-preserved create-form-reset submitted-form-data
+ * @dimensions create-form create-submit created-row attach-existing-page page-form-preserved create-form-reset submitted-form-data focus-preservation
  * @pairs users:group-selector users:multiple
  * @pairs users:create-form-reset users:submitted-form-data
  */
@@ -91,19 +92,25 @@ export class CreateUser extends FormElement {
 	}
 
 	async prereconcile() {
+		this._focusNameAfterReconcile =
+			this._created || this.target?.dataset.visible !== "true";
 		await super.prereconcile();
 		if (this._created) await this.prepareReset();
 	}
 
 	postreconcile() {
 		const created = this._created;
+		const focusName = this._focusNameAfterReconcile || created;
+		this._focusNameAfterReconcile = false;
 		if (created) this.commitReset();
 		super.postreconcile();
 
 		if (created) {
 			this.form?.resetSubmitButton();
 		}
-		this.nameElement.focus();
+		if (focusName && !this.target?.contains(document.activeElement)) {
+			this.nameElement.focus();
+		}
 		this.target.dataset.visible = "true";
 	}
 }

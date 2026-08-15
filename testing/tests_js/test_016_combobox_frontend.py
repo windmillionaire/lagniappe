@@ -216,6 +216,7 @@ function option(index, id) {
 
 const autoUpdateCalls = [];
 const computePositionCalls = [];
+const capturedErrors = [];
 const observers = [];
 
 const autoUpdate = (reference, panel, callback) => {
@@ -226,13 +227,14 @@ const autoUpdate = (reference, panel, callback) => {
     call.cleaned = true;
   };
 };
+let computePositionImpl = (reference, panel, options) => Promise.resolve({
+  placement: options.placement,
+  x: 101,
+  y: 202,
+});
 const computePosition = (reference, panel, options) => {
   computePositionCalls.push({ options, panel, reference });
-  return Promise.resolve({
-    placement: options.placement,
-    x: 101,
-    y: 202,
-  });
+  return computePositionImpl(reference, panel, options);
 };
 const flip = (options) => ({ name: "flip", options });
 const offset = (value) => ({ name: "offset", value });
@@ -241,6 +243,8 @@ const shift = (options) => ({ name: "shift", options });
 const document = new FakeDocument();
 const context = {
   autoUpdate,
+  captureError(error) { capturedErrors.push(error); },
+  capturedErrors,
   computePosition,
   console,
   document,
@@ -257,6 +261,7 @@ const context = {
     return element;
   },
   shift,
+  setComputePosition(implementation) { computePositionImpl = implementation; },
   STYLES: {
     dropdown: {
       icon: "dropdown-option-icon",
@@ -284,7 +289,7 @@ comboboxSource = comboboxSource.replace(
 );
 comboboxSource = comboboxSource.replace('import { STYLES } from "styles";\n', "");
 comboboxSource = comboboxSource.replace(
-  'import { generateElementId } from "../../shared";\n',
+  'import { captureError, generateElementId } from "../../shared";\n',
   "",
 );
 comboboxSource = comboboxSource.replace(
@@ -352,6 +357,7 @@ class FakeDropdown {
 
   showPanel() {
     this.panelOpen = true;
+    return Promise.resolve(true);
   }
 }
 
@@ -412,7 +418,7 @@ source += "\nglobalThis.EntityMenu = EntityMenu;";
 vm.runInContext(source, context);
 
 const menu = new context.EntityMenu({});
-menu.toggle(container);
+const toggleReady = menu.toggle(container);
 
 (async () => {
 __ASSERTION__
@@ -530,6 +536,107 @@ if (JSON.stringify(panel.style) !== JSON.stringify(positioned)) {
 
 
 # @features combobox
+# @dimensions positioning readiness
+# @pair combobox:positioning-readiness
+# @pair combobox:readiness
+# @style dropdown.panel
+def test_combobox_exposes_initial_positioning_readiness(run_node):
+    run_combobox_check(
+        run_node,
+        r"""
+const { initial, parent } = makeComboboxElements();
+const combobox = new Combobox(parent);
+combobox.init();
+combobox._createPanel();
+combobox.panel.appendChild(option(0, "first-option"));
+combobox.options = [{ id: "first" }];
+
+let resolvePosition;
+context.setComputePosition(
+  (reference, panel, options) => new Promise((resolve) => {
+    resolvePosition = () => resolve({
+      placement: options.placement,
+      x: 35,
+      y: 47,
+    });
+  }),
+);
+
+const ready = combobox.showPanel();
+if (
+  !combobox.panelOpen ||
+  initial.getAttribute("aria-expanded") !== "true" ||
+  combobox.panel.dataset.positioned !== "false" ||
+  !combobox._documentHandlersAdded
+) {
+  throw new Error("Open panel did not publish pending initial placement");
+}
+
+resolvePosition();
+if ((await ready) !== true) {
+  throw new Error("Positioned panel did not report readiness");
+}
+if (
+  !combobox.panelOpen ||
+  initial.getAttribute("aria-expanded") !== "true" ||
+  combobox.panel.dataset.positioned !== "true" ||
+  !combobox._documentHandlersAdded ||
+  combobox.panel.style.left !== "35px" ||
+  combobox.panel.style.top !== "47px"
+) {
+  throw new Error("Panel did not publish its completed initial placement");
+}
+""",
+    )
+
+
+# @features combobox
+# @dimensions positioning readiness transition-race
+# @pair combobox:positioning-readiness
+# @pair combobox:transition-race
+# @style dropdown.panel
+def test_combobox_initial_position_ignores_superseded_transition_geometry(run_node):
+    run_combobox_check(
+        run_node,
+        r"""
+const { parent } = makeComboboxElements();
+const combobox = new Combobox(parent);
+combobox.init();
+combobox._createPanel();
+combobox.panel.appendChild(option(0, "first-option"));
+combobox.options = [{ id: "first" }];
+
+const positions = [];
+context.setComputePosition(
+  (reference, panel, options) => new Promise((resolve) => {
+    positions.push((x, y) => resolve({ placement: options.placement, x, y }));
+  }),
+);
+
+const ready = combobox.showPanel();
+autoUpdateCalls[0].callback();
+if (positions.length !== 2) {
+  throw new Error(`Expected transition layout to supersede initial geometry: ${positions.length}`);
+}
+
+positions[1](35, 47);
+if ((await ready) !== true) {
+  throw new Error("Latest transition geometry did not make the panel ready");
+}
+positions[0](900, 901);
+await Promise.resolve();
+
+if (
+  combobox.panel.style.left !== "35px" ||
+  combobox.panel.style.top !== "47px"
+) {
+  throw new Error(`Stale transition geometry moved the ready panel: ${JSON.stringify(combobox.panel.style)}`);
+}
+""",
+    )
+
+
+# @features combobox
 # @dimensions aria keyboard
 # @style dropdown.panel
 def test_combobox_aria_and_keyboard_state_follow_the_open_panel(run_node):
@@ -565,8 +672,8 @@ const second = option(1, "second-option");
 combobox.panel.appendChild(first);
 combobox.panel.appendChild(second);
 combobox.options = [{ id: "first" }, { id: "second" }];
-combobox._startAutoUpdate = () => {};
-combobox.showPanel();
+combobox._startAutoUpdate = () => Promise.resolve(true);
+await combobox.showPanel();
 
 if (initial.getAttribute("aria-expanded") !== "true") {
   throw new Error("Opening the panel did not update aria-expanded");
@@ -686,14 +793,14 @@ const { parent } = makeComboboxElements();
 const combobox = new Combobox(parent);
 combobox.init();
 combobox._createPanel();
-combobox._startAutoUpdate = () => {};
+combobox._startAutoUpdate = () => Promise.resolve(true);
 
 combobox.panelOpen = true;
 combobox.panel.classList.remove("hidden");
 combobox.panel.dataset.visible = "true";
 combobox.updatePanel("   ");
 combobox.options = [{ id: "selected-but-not-rendered" }];
-combobox.showPanel();
+await combobox.showPanel();
 
 if (
   combobox.panelOpen ||
@@ -707,7 +814,7 @@ if (
 const noResults = option(0, "no-results");
 combobox.panel.appendChild(noResults);
 combobox.updatePanel('<div role="option">No Results</div>');
-combobox.showPanel();
+await combobox.showPanel();
 
 if (
   !combobox.panelOpen ||
@@ -850,17 +957,15 @@ const dropdown = new Dropdown(trigger).init({
   },
 });
 dropdown.panel = new FakeElement("div");
-dropdown._startAutoUpdate = () => {};
+dropdown._startAutoUpdate = () => Promise.resolve(true);
 const rendered = [];
 dropdown._renderOptions = () => {
   rendered.push(dropdown.items.map((item) => item.name));
   dropdown.options = dropdown.items;
 };
 
-dropdown.showPanel();
-await Promise.resolve();
-dropdown.showPanel();
-await Promise.resolve();
+await dropdown.showPanel();
+await dropdown.showPanel();
 
 if (load !== 2 || rendered.length !== 2) {
   throw new Error(`Dynamic options were not loaded and rendered twice: ${load}/${rendered.length}`);
@@ -893,7 +998,7 @@ if (selected.join(",") !== "standard") {
 
 
 # @features entity-menu
-# @dimensions title-menu title-positioning state-linking
+# @dimensions title-menu title-positioning state-linking readiness
 # @style dropdown.menu
 def test_entity_title_menu_anchors_to_the_title_bottom_left(run_node):
     script = ENTITY_MENU_HARNESS.replace(
@@ -902,6 +1007,9 @@ def test_entity_title_menu_anchors_to_the_title_bottom_left(run_node):
             r"""
             if (!configuredMenu) {
               throw new Error("Entity menu did not configure a dropdown");
+            }
+            if ((await toggleReady) !== true) {
+              throw new Error("Entity menu did not return the dropdown readiness boundary");
             }
             if (configuredMenu.positionReference !== title) {
               throw new Error("Entity menu was not anchored to its title");

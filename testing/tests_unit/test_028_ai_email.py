@@ -167,27 +167,32 @@ def test_resend_attachment_download_is_bounded_and_does_not_return_signed_url():
         def close(self):
             closed.append(True)
 
-    client = ResendAIEmailClient(
-        "re_full",
-        "re_send",
-        request=lambda *_args, **_kwargs: _HTTPResponse(
-            {"download_url": "https://inbound-cdn.resend.com/signed-secret"}
-        ),
-        download_request=lambda *_args, **_kwargs: Download(),
-    )
-    upload, size = client.download_received_attachment(
-        "email-1",
-        {"id": "attachment-1", "filename": "notes.txt", "content_type": "text/plain"},
-        max_file_bytes=20,
-        max_total_bytes=20,
-    )
-    try:
-        assert size == 11
-        assert upload.read() == b"hello world"
-        assert "signed-secret" not in repr(upload)
-    finally:
-        upload.close()
-    assert closed == [True]
+    for hostname in ("cdn.resend.app", "inbound-cdn.resend.com"):
+        client = ResendAIEmailClient(
+            "re_full",
+            "re_send",
+            request=lambda *_args, host=hostname, **_kwargs: _HTTPResponse(
+                {"download_url": f"https://{host}/signed-secret"}
+            ),
+            download_request=lambda *_args, **_kwargs: Download(),
+        )
+        upload, size = client.download_received_attachment(
+            "email-1",
+            {
+                "id": "attachment-1",
+                "filename": "notes.txt",
+                "content_type": "text/plain",
+            },
+            max_file_bytes=20,
+            max_total_bytes=20,
+        )
+        try:
+            assert size == 11
+            assert upload.read() == b"hello world"
+            assert "signed-secret" not in repr(upload)
+        finally:
+            upload.close()
+    assert closed == [True, True]
 
 
 # @features ai-email sender-auth
@@ -392,7 +397,10 @@ def test_report_feedback_links_to_report_and_remains_available_after_disable(
     payload, idempotency_key = sent[0]
     assert payload["to"] == ["Owner@example.com"]
     assert payload["reply_to"] == "ask@inbound.example.com"
-    assert "https://app.example.com/reports/email-report-one" in payload["text"]
+    assert (
+        "https://app.example.com/tools/reports/email-report-one"
+        in payload["text"]
+    )
     assert REPLY_MARKER in payload["text"]
     assert payload["headers"]["Auto-Submitted"] == "auto-generated"
     assert idempotency_key.startswith("ai-email/success/")
@@ -598,6 +606,74 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
     assert starts[0].job_type.value == "report-ask"
     assert starts[0].idempotency_key == f"ai-email/report/{'a' * 64}"
     assert feedback == [(report, "acceptance")]
+
+
+# @features ai-email deferred-jobs feedback
+# @dimensions failure diagnostics privacy terminal-delivery
+def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
+    from lagniappe.core.tools import deferred_job_adapters
+
+    user = TestEntities.get("USER", {"name": "Owner", "owner": False})
+    report = TestEntities.get(
+        "REPORT",
+        {
+            "name": "Organize: image.jpg",
+            "tool": "organize",
+            "user": user,
+            "parent": user,
+            "status": "pending",
+            "pending": True,
+        },
+    )
+    report.origin = "email"
+    saved = []
+    feedback = []
+    monkeypatch.setattr(
+        deferred_job_adapters.Entities,
+        "fetch_one",
+        lambda *_args, **_kwargs: report,
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.Entities,
+        "save",
+        lambda *entities: saved.extend(entities),
+    )
+    monkeypatch.setattr(
+        ai_email,
+        "send_report_feedback",
+        lambda submitted, kind, *, message=None: feedback.append(
+            (submitted, kind, message)
+        ),
+    )
+    context = SimpleNamespace(
+        actor=user,
+        parameters={
+            "provider_message_id": "private-provider-id",
+            "attachments": [{"id": "private-attachment-id"}],
+            "event_digest": "private-digest",
+            "_diagnostic_code": "attachment_download_failed",
+        },
+        checkpoint={},
+        input=lambda name: report if name == "report" else None,
+    )
+    error = ai_email.AIEmailProviderError(
+        "Resend returned an invalid attachment URL."
+    )
+
+    adapter = deferred_job_adapters.EmailIngestAdapter()
+    adapter.failure(context, error)
+    expected = (
+        "The email submission could not be prepared. "
+        "Diagnostic: attachment_download_failed. "
+        "Resend returned an invalid attachment URL."
+    )
+    assert report.error == expected
+    assert report in saved
+
+    adapter.cleanup(context, terminal=True)
+    adapter.external_delivery(context, succeeded=False, error=error)
+    assert feedback == [(report, "failure", expected)]
+    assert context.parameters == {"_diagnostic_message": expected}
 
 
 # @features ai-email policy

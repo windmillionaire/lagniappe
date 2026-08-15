@@ -411,14 +411,19 @@ def test_create_user_group_selector_accepts_multiple_groups(get_user):
     user_index = owner.go(SitePages.USER_INDEX)
     create_form = user_index.create_user_form
 
-    create_form.locator("input[name='name']").fill(created_user.name)
-    create_form.locator("input[name='email']").fill(created_user.email)
+    name_input = create_form.locator("input[name='name']")
+    email_input = create_form.locator("input[name='email']")
+    name_input.fill(created_user.name)
+    email_input.fill(created_user.email)
     group_select = Select(
         create_form.locator("label").filter(has_text="User Group(s)")
     )
     expect(group_select.input).to_have_attribute("data-multiple", "true")
     group_select.select_by_name(first_group.definition.name)
     group_select.select_by_name(second_group.definition.name)
+
+    expect(name_input).to_have_value(created_user.name)
+    expect(email_input).to_have_value(created_user.email)
 
     selected_groups = create_form.evaluate(
         "form => new FormData(form).getAll('group')"

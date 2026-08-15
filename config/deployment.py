@@ -153,6 +153,12 @@ def apply_deployment_settings(app_config=None, app_settings=None, updated_settin
         f"gunicorn -t {constants.GUNICORN_TIMEOUT_SECONDS} -w "
         f"{settings['DEPLOY_WORKER_COUNT']} -b :$PORT main:app"
     )
+    configured_inbound_services = target_app_config.get("inbound_services") or []
+    if isinstance(configured_inbound_services, (list, tuple)):
+        inbound_services = list(configured_inbound_services)
+    else:
+        inbound_services = [configured_inbound_services]
+
     if settings["DEPLOY_SCALING_TYPE"] == "automatic":
         target_app_config.pop("basic_scaling", None)
         target_app_config["instance_class"] = settings["DEPLOY_INSTANCE_CLASS"]
@@ -160,6 +166,10 @@ def apply_deployment_settings(app_config=None, app_settings=None, updated_settin
             "min_idle_instances": settings["DEPLOY_MIN_IDLE_INSTANCES"],
             "max_instances": settings["DEPLOY_MAX_INSTANCES"],
         }
+        for service in constants.AUTOMATIC_INBOUND_SERVICES:
+            if service not in inbound_services:
+                inbound_services.append(service)
+        target_app_config["inbound_services"] = inbound_services
     else:
         target_app_config.pop("automatic_scaling", None)
         target_app_config["instance_class"] = settings["DEPLOY_INSTANCE_CLASS"]
@@ -167,5 +177,13 @@ def apply_deployment_settings(app_config=None, app_settings=None, updated_settin
             "max_instances": settings["DEPLOY_MAX_INSTANCES"],
             "idle_timeout": settings["DEPLOY_IDLE_TIMEOUT"],
         }
+        automatic_services = set(constants.AUTOMATIC_INBOUND_SERVICES)
+        inbound_services = [
+            service for service in inbound_services if service not in automatic_services
+        ]
+        if inbound_services:
+            target_app_config["inbound_services"] = inbound_services
+        else:
+            target_app_config.pop("inbound_services", None)
 
     return target_app_config

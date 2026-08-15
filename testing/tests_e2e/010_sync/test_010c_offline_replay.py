@@ -17,6 +17,7 @@ from testing.definitions import Projects, SitePages, Users
 from testing.utility import (
     expect_offline_sync_replay,
     expect_successful_response,
+    wait_for_connectivity_replay,
     wait_for_offline_sync_records,
 )
 
@@ -176,41 +177,44 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failure
         failed_sync_attempts.append(route.request)
         route.abort()
 
-    with browser_failures.expect(
-        user,
-        kind="console",
-        console_type="error",
-        text="Failed to load resource: the server responded with a status of 503 ()",
-        source_path="/l/sync",
-    ):
-        with browser_failures.expect(
+    user.page.context.route("**/l/sync", fail_sync)
+    try:
+        with browser_failures.expect_http_error(
             user,
-            kind="console",
-            console_type="error",
-            text="Failed to load resource: the server responded with a status of 503 ()",
-            source_path="/l/poll",
+            status=503,
+            path="/l/sync",
+            max_count=2,
         ):
-            user.page.context.route("**/l/sync", fail_sync)
-            with user.page.expect_request(
-                lambda request: request.method == "POST"
-                and request.url.endswith("/l/sync")
-                and document_sync_id in (request.post_data or "")
-            ):
-                user.offline = False
-            assert len(failed_sync_attempts) == 1
-            user.page.context.unroute("**/l/sync", fail_sync)
-            wait_for_offline_sync_records(
+            with browser_failures.expect_http_error(
                 user,
-                sync_id=document_sync_id,
-                minimum=1,
-            )
+                status=503,
+                path="/l/poll",
+                count=0,
+                max_count=1,
+            ):
+                with user.page.expect_request(
+                    lambda request: request.method == "POST"
+                    and request.url.endswith("/l/sync")
+                    and document_sync_id in (request.post_data or "")
+                ):
+                    user.offline = False
+                wait_for_connectivity_replay(user)
+    finally:
+        user.page.context.unroute("**/l/sync", fail_sync)
 
-            with browser_failures.expect_offline(user):
-                _go_offline(user)
-                _reconnect_with_sync(user, document_sync_id)
+    assert len(failed_sync_attempts) == 1
+    wait_for_offline_sync_records(
+        user,
+        sync_id=document_sync_id,
+        minimum=1,
+    )
 
-            user.go(project)
-            expect(project.editor.text_entry).to_contain_text(text)
+    with browser_failures.expect_offline(user):
+        _go_offline(user)
+        _reconnect_with_sync(user, document_sync_id)
+
+    user.go(project)
+    expect(project.editor.text_entry).to_contain_text(text)
 
 
 # @features sync

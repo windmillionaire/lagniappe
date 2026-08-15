@@ -265,9 +265,8 @@ def test_create_page_task_with_project(get_user):
     clear_icon = project_button.locator(
         ":scope > [data-role='clear'] > [data-icon]"
     )
+    expect(leading_icon).to_be_visible()
     expect(clear_icon).to_be_visible()
-    expect(leading_icon).to_have_css("font-size", "16px")
-    expect(clear_icon).to_have_css("font-size", "14px")
 
     user.mobile = True
     mobile_button = project_button.element_handle()

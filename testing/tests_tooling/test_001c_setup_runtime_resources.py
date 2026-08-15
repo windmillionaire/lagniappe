@@ -2417,6 +2417,7 @@ def test_deployment_settings_apply_automatic_scaling_preserves_unowned_app_confi
     constants = types.SimpleNamespace(
         RUNTIME="python314",
         GUNICORN_TIMEOUT_SECONDS=3600,
+        AUTOMATIC_INBOUND_SERVICES=("warmup",),
         DEFAULT_DEPLOYMENT_SETTINGS={
             "DEPLOY_SCALING_TYPE": "basic",
             "DEPLOY_MAX_INSTANCES": "1",
@@ -2444,6 +2445,7 @@ def test_deployment_settings_apply_automatic_scaling_preserves_unowned_app_confi
         "entrypoint": "old",
         "instance_class": "B2",
         "basic_scaling": {"max_instances": 1, "idle_timeout": "15m"},
+        "inbound_services": ["mail"],
         "handlers": handlers,
         "service_account": "service@example.com",
         "default_expiration": "31536000s",
@@ -2468,6 +2470,21 @@ def test_deployment_settings_apply_automatic_scaling_preserves_unowned_app_confi
         "min_idle_instances": "2",
         "max_instances": "2",
     }
+    assert app_yaml["inbound_services"] == ["mail", "warmup"]
+
+    apply_deployment_settings(
+        app_yaml,
+        app_settings,
+        {
+            "DEPLOY_SCALING_TYPE": "automatic",
+            "DEPLOY_WORKER_COUNT": "3",
+            "DEPLOY_INSTANCE_CLASS": "F2",
+            "DEPLOY_MAX_INSTANCES": "2",
+            "DEPLOY_MIN_IDLE_INSTANCES": "2",
+        },
+    )
+
+    assert app_yaml["inbound_services"] == ["mail", "warmup"]
     assert "basic_scaling" not in app_yaml
     assert app_yaml["handlers"] is handlers
     assert app_yaml["service_account"] == "service@example.com"
@@ -2482,6 +2499,7 @@ def test_deployment_settings_apply_basic_scaling_preserves_unowned_app_config(
     constants = types.SimpleNamespace(
         RUNTIME="python314",
         GUNICORN_TIMEOUT_SECONDS=3600,
+        AUTOMATIC_INBOUND_SERVICES=("warmup",),
         DEFAULT_DEPLOYMENT_SETTINGS={
             "DEPLOY_SCALING_TYPE": "basic",
             "DEPLOY_MAX_INSTANCES": "1",
@@ -2508,6 +2526,7 @@ def test_deployment_settings_apply_basic_scaling_preserves_unowned_app_config(
         "entrypoint": "old",
         "instance_class": "F2",
         "automatic_scaling": {"min_idle_instances": 1, "max_instances": 4},
+        "inbound_services": ["mail", "warmup"],
         "handlers": [{"url": "/.*", "script": "auto"}],
         "unknown": "preserved",
     }
@@ -2531,7 +2550,22 @@ def test_deployment_settings_apply_basic_scaling_preserves_unowned_app_config(
         "idle_timeout": "15m",
     }
     assert "automatic_scaling" not in app_yaml
+    assert app_yaml["inbound_services"] == ["mail"]
     assert app_yaml["unknown"] == "preserved"
+
+    app_yaml["inbound_services"] = ["warmup"]
+    apply_deployment_settings(
+        app_yaml,
+        app_settings,
+        {
+            "DEPLOY_SCALING_TYPE": "basic",
+            "DEPLOY_WORKER_COUNT": "2",
+            "DEPLOY_INSTANCE_CLASS": "B2",
+            "DEPLOY_MAX_INSTANCES": "1",
+        },
+    )
+
+    assert "inbound_services" not in app_yaml
 
 
 # @features config
@@ -2632,6 +2666,7 @@ def test_upgrade_restore_deployment_settings_applies_saved_app_config(monkeypatc
     constants = types.SimpleNamespace(
         RUNTIME="python314",
         GUNICORN_TIMEOUT_SECONDS=3600,
+        AUTOMATIC_INBOUND_SERVICES=("warmup",),
         DEFAULT_DEPLOYMENT_SETTINGS={
             "DEPLOY_SCALING_TYPE": "basic",
             "DEPLOY_MAX_INSTANCES": "1",
@@ -2664,6 +2699,7 @@ def test_upgrade_restore_deployment_settings_applies_saved_app_config(monkeypatc
         "min_idle_instances": "2",
         "max_instances": "2",
     }
+    assert settings.DEPLOY["inbound_services"] == ["warmup"]
     assert "basic_scaling" not in settings.DEPLOY
 
 

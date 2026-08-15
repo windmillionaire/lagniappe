@@ -245,3 +245,16 @@ def wait_for_offline_sync_records(
         record_value=sync_id,
         timeout=timeout,
     )
+
+
+def wait_for_connectivity_replay(user):
+    """Await the latest background connectivity and replay cycles explicitly."""
+    return user.page.evaluate(
+        """
+        async () => {
+          await window.__CONNECTIVITY_READY__;
+          const view = document.querySelector("[lp-view]")?._lp_view;
+          if (view?.replayReady) await view.replayReady;
+        }
+        """
+    )

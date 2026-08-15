@@ -1,2 +1,139 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="89e40175-e07d-40fa-b0c6-160031ddd4db",e._sentryDebugIdIdentifier="sentry-dbid-89e40175-e07d-40fa-b0c6-160031ddd4db");}catch(e){}}();import{STYLES as s}from"./styles.js?v=b1cc79bd";import{s as o}from"./icons.js?v=b1cc79bd";import{C as h}from"./combobox.js?v=b1cc79bd";import"./foundation.js?v=b1cc79bd";import"./connectivity.js?v=b1cc79bd";import"./primitives.js?v=b1cc79bd";class l extends h{init(t){return this.placement=t.placement??"bottom-start",this.items=t.items||[],this.styles={...this.styles,...t.styles||{}},this.popupRole=t.popupRole||this.popupRole,this.optionRole=t.optionRole||this.optionRole,"positionReference"in t&&(this.positionReference=t.positionReference),this.matchReferenceWidth=t.matchReferenceWidth??this.matchReferenceWidth,"triggerRole"in t&&(this.triggerRole=t.triggerRole),this._loadOptions=t.loadOptions||(async()=>this.items),this.onShow=t.onShow||null,this.onHide=t.onHide||null,super.init(),this}_createDropdownButton(t){const e=document.createElement("button");if(e.className=s.dropdown.option.action,e.type="button",e.setAttribute("role",this.optionRole),t.icon){const n=document.createElement("span");n.dataset.kind=t.kind,o(n,t.icon,`${s.dropdown.icon} text-kind-default`),e.appendChild(n)}const i=document.createElement("span");return i.textContent=t.name,e.appendChild(i),e.outerHTML}_renderOptions(){if(this.items.length===0){this.updatePanel("");return}const t=this.items.map(e=>e.html||this._createDropdownButton(e)).join("");this.updatePanel(t)}showPanel(){this._loadOptions().then(t=>{t!==void 0&&(this.items=t),this._renderOptions();const e=this.panelOpen;super.showPanel(),!e&&this.panelOpen&&this.onShow?.()})}selectOption(t,e=null){const i=this.items[parseInt(t.dataset.index,10)];(typeof i?.closeOnClick=="function"?i.closeOnClick(t,e):i?.closeOnClick!==!1)&&this.hidePanel(),i.onClick&&i.onClick(t,e)}addOption(t){this.items.splice(0,0,t),this._renderOptions()}removeOptions(t){this.hidePanel(),this.items=this.items.filter(e=>!t.includes(e.id)),this._renderOptions()}updateOptions(t=[]){if(this.items=Array.isArray(t)?t:[],this._renderOptions(),!this.items.length&&this.panelOpen){this.hidePanel();return}this.panelOpen&&super.showPanel()}elementClick(t){t.stopPropagation(),t.preventDefault(),this.panelOpen?this.hidePanel():this.showPanel()}hidePanel(){super.hidePanel()&&this.onHide?.(),this.element.blur()}}export{l as Dropdown};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { STYLES } from './styles.js?v=b3ba4dd3';
+import { s as setIcon } from './icons.js?v=b3ba4dd3';
+import { C as Combobox } from './combobox.js?v=b3ba4dd3';
+import './foundation.js?v=b3ba4dd3';
+import './connectivity.js?v=b3ba4dd3';
+import './primitives.js?v=b3ba4dd3';
+
+/**
+ * @testable true
+ * @tests tests_js/test_016_combobox_frontend.py::test_dynamic_dropdown_rerenders_each_open_and_keeps_mixed_option_indexes
+ * @pair dropdown:dynamic-options
+ * @pair dropdown:rerender
+ * @pair dropdown:mixed-options
+ * @pair dropdown:callback-index
+ */
+class Dropdown extends Combobox {
+	/**
+	 * @testable true
+	 * @tests tests_js/test_016_combobox_frontend.py::test_combobox_positioning_uses_live_element_by_default_and_explicit_reference_when_configured
+	 * @features dropdown
+	 * @dimensions positioning
+	 */
+	init(menu) {
+		this.placement = menu.placement ?? "bottom-start";
+		this.items = menu.items || [];
+		this.styles = { ...this.styles, ...(menu.styles || {}) };
+		this.popupRole = menu.popupRole || this.popupRole;
+		this.optionRole = menu.optionRole || this.optionRole;
+		if ("positionReference" in menu) {
+			this.positionReference = menu.positionReference;
+		}
+		this.matchReferenceWidth =
+			menu.matchReferenceWidth ?? this.matchReferenceWidth;
+		if ("triggerRole" in menu) this.triggerRole = menu.triggerRole;
+		this._loadOptions = menu.loadOptions || (async () => this.items);
+		this.onShow = menu.onShow || null;
+		this.onHide = menu.onHide || null;
+
+		super.init();
+
+		return this;
+	}
+
+	_createDropdownButton(item) {
+		const itemButton = document.createElement("button");
+		itemButton.className = STYLES.dropdown.option.action;
+		itemButton.type = "button";
+		itemButton.setAttribute("role", this.optionRole);
+
+		if (item.icon) {
+			const icon = document.createElement("span");
+			icon.dataset.kind = item.kind;
+			setIcon(icon, item.icon, `${STYLES.dropdown.icon} text-kind-default`);
+			itemButton.appendChild(icon);
+		}
+
+		const text = document.createElement("span");
+		text.textContent = item.name;
+		itemButton.appendChild(text);
+
+		return itemButton.outerHTML;
+	}
+
+	_renderOptions() {
+		if (this.items.length === 0) {
+			this.updatePanel("");
+			return;
+		}
+
+		const html = this.items
+			.map((item) => item.html || this._createDropdownButton(item))
+			.join("");
+
+		this.updatePanel(html);
+	}
+
+	async showPanel() {
+		const items = await this._loadOptions();
+		if (items !== undefined) this.items = items;
+		this._renderOptions();
+		const wasOpen = this.panelOpen;
+		const opened = await super.showPanel();
+		if (!wasOpen && opened) this.onShow?.();
+		return opened;
+	}
+
+	selectOption(option, event = null) {
+		const item = this.items[parseInt(option.dataset.index, 10)];
+		const closeOnClick =
+			typeof item?.closeOnClick === "function"
+				? item.closeOnClick(option, event)
+				: item?.closeOnClick !== false;
+		if (closeOnClick) this.hidePanel();
+		if (item.onClick) {
+			item.onClick(option, event);
+		}
+	}
+
+	addOption(option) {
+		this.items.splice(0, 0, option);
+		this._renderOptions();
+	}
+
+	removeOptions(identifiers) {
+		this.hidePanel();
+		this.items = this.items.filter((item) => !identifiers.includes(item.id));
+		this._renderOptions();
+	}
+
+	updateOptions(options = []) {
+		this.items = Array.isArray(options) ? options : [];
+		this._renderOptions();
+
+		if (!this.items.length && this.panelOpen) {
+			this.hidePanel();
+			return;
+		}
+
+		if (this.panelOpen) {
+			void super.showPanel();
+		}
+	}
+
+	elementClick(event) {
+		event.stopPropagation();
+		event.preventDefault();
+
+		this.panelOpen ? this.hidePanel() : void this.showPanel();
+	}
+
+	hidePanel() {
+		const hidden = super.hidePanel();
+		if (hidden) this.onHide?.();
+		this.element.blur();
+	}
+}
+
+export { Dropdown };

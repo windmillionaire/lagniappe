@@ -65,6 +65,15 @@ a Redis-only projection read; a miss or Redis failure never changes the health
 result. It also stops on window blur; focus performs one health check and one
 poll catch-up before the normal long interval resumes.
 
+Native browser `online` and `offline` events publish their browser-link value to
+the in-memory connectivity state synchronously, then schedule the asynchronous
+health/view cycle. `connectivity.online` therefore remains a plain synchronous
+read and is never a rendering prerequisite. Code that explicitly needs the
+latest background cycle to finish may await `window.__CONNECTIVITY_READY__`;
+Core also exposes `replayReady` for its latest background offline-form replay.
+Neither promise participates in view initialization, component rendering, or a
+view transition.
+
 ### Startup and readiness
 
 Authenticated Core views install interaction handlers before touching storage

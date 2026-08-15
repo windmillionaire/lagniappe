@@ -49,6 +49,10 @@ export default class Core extends ShellView {
 		this.offlineQueueReady = Promise.resolve(null);
 		this.syncReady = Promise.resolve(null);
 		this.initialReplayReady = Promise.resolve(0);
+		// Latest reconnect replay. This remains an optional observation boundary;
+		// rendering and the foreground sync lifecycle never await it.
+		this.replayReady = Promise.resolve(0);
+		this.connectivityGeneration = 0;
 
 		this._pendingChanges = [];
 		this._reconcilePromise = null;
@@ -360,6 +364,7 @@ export default class Core extends ShellView {
 			return;
 		}
 
+		if (online && !this.online) this.connectivityGeneration += 1;
 		this.hidden = hidden;
 		this.online = online;
 		this.offline = !online;
@@ -402,18 +407,22 @@ export default class Core extends ShellView {
 	 * @testable true
 	 * @tests tests_js/test_028_form_state_split.py::test_visibility_sync_stages_remote_form_edits_without_waiting_for_offline_replay
 	 * @features offline polling
-	 * @dimensions background-replay nonblocking
+	 * @dimensions background-replay nonblocking settled-boundary
 	 * @pair offline:background-replay
 	 * @pair polling:nonblocking
 	 */
 	scheduleOfflineReplay() {
 		if (this._offlineReplayTask) return this._offlineReplayTask;
-		this._offlineReplayTask = import("./offlineReplay")
-			.then(({ replayOfflineQueue }) => replayOfflineQueue(this))
-			.finally(() => {
-				this._offlineReplayTask = null;
-			});
-		return this._offlineReplayTask;
+		const replay = import("./offlineReplay").then(({ replayOfflineQueue }) =>
+			replayOfflineQueue(this),
+		);
+		this._offlineReplayTask = replay;
+		this.replayReady = replay;
+		const complete = () => {
+			if (this._offlineReplayTask === replay) this._offlineReplayTask = null;
+		};
+		void replay.then(complete, complete);
+		return replay;
 	}
 
 	/**

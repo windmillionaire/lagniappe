@@ -1032,6 +1032,12 @@ def test_set_application_defaults_deep_copies_templates(monkeypatch, tmp_path):
     config.SETTINGS.APP.update(
         {
             "APP_NAME": "My App",
+            "DEPLOY_SCALING_TYPE": "automatic",
+            "DEPLOY_MAX_INSTANCES": "2",
+            "DEPLOY_IDLE_TIMEOUT": "15m",
+            "DEPLOY_WORKER_COUNT": "3",
+            "DEPLOY_INSTANCE_CLASS": "F2",
+            "DEPLOY_MIN_IDLE_INSTANCES": "1",
             "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
                 "svc@my-project-1.iam.gserviceaccount.com"
             ),
@@ -1070,6 +1076,7 @@ def test_set_application_defaults_deep_copies_templates(monkeypatch, tmp_path):
     assert app_yaml["service_account"] == (
         "svc@my-project-1.iam.gserviceaccount.com"
     )
+    assert app_yaml["inbound_services"] == ["warmup"]
     assert app_yaml["handlers"] == constants.APP_HANDLERS
     assert dev_config["gcloud_config"]["PROJECT"] == "my-project-1"
     assert dev_config["gcloud_config"]["ACCOUNT"] == "admin@example.com"
@@ -1144,6 +1151,8 @@ def test_set_application_defaults_generates_fresh_settings(monkeypatch, tmp_path
     assert settings["AGENT_ACCESS_EMAIL"] == "agent@localhost"
     assert settings["AGENT_ACCESS_NAME"] == "Agent"
     assert settings["AGENT_ACCESS_CODE"] == "url-token-32"
+    app_yaml = yaml.safe_load((tmp_path / "lagniappe.yaml").read_text())
+    assert "inbound_services" not in app_yaml
     assert token_calls == [16, 32]
     assert dev_config["gcloud_config"] == {
         "NAME": "fresh-app",

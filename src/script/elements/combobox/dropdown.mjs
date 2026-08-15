@@ -71,14 +71,14 @@ export class Dropdown extends Combobox {
 		this.updatePanel(html);
 	}
 
-	showPanel() {
-		this._loadOptions().then((items) => {
-			if (items !== undefined) this.items = items;
-			this._renderOptions();
-			const wasOpen = this.panelOpen;
-			super.showPanel();
-			if (!wasOpen && this.panelOpen) this.onShow?.();
-		});
+	async showPanel() {
+		const items = await this._loadOptions();
+		if (items !== undefined) this.items = items;
+		this._renderOptions();
+		const wasOpen = this.panelOpen;
+		const opened = await super.showPanel();
+		if (!wasOpen && opened) this.onShow?.();
+		return opened;
 	}
 
 	selectOption(option, event = null) {
@@ -114,7 +114,7 @@ export class Dropdown extends Combobox {
 		}
 
 		if (this.panelOpen) {
-			super.showPanel();
+			void super.showPanel();
 		}
 	}
 
@@ -122,7 +122,7 @@ export class Dropdown extends Combobox {
 		event.stopPropagation();
 		event.preventDefault();
 
-		this.panelOpen ? this.hidePanel() : this.showPanel();
+		this.panelOpen ? this.hidePanel() : void this.showPanel();
 	}
 
 	hidePanel() {

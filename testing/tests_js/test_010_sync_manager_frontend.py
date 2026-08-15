@@ -2,10 +2,12 @@
 
 
 # @features sync polling
-# @dimensions document collaboration offline-replay cursor-retention presence lifecycle batching active-widget visibility
+# @dimensions document collaboration offline-replay cursor-retention presence lifecycle batching active-widget visibility retry-boundary reconnect-generation
 # @pairs sync:active-widget sync:visibility sync:offline-replay
 # @pairs polling:active-widget polling:visibility polling:document
 # @pairs sync:checkpoint sync:persistence sync:dirty-state
+# @pairs offline:offline-replay offline:queue-preserved offline:reconnect-generation
+# @pairs offline:retry-boundary sync:reconnect-generation sync:retry-boundary
 def test_sync_manager_uses_polling_subscriptions(run_node):
     run_node(
         r"""
@@ -286,6 +288,23 @@ const manager = new context.SyncManager(view);
     throw new Error("Retained checkpoint was not retried before document poll");
   }
 
+  view.connectivityGeneration = 1;
+  manager._offlineReplayAttempts.set(widget.syncId, 1);
+  savePayloads.push({
+    ydoc: "blocked-same-reconnect",
+    html: "<p>Blocked same reconnect</p>",
+  });
+  const requestsBeforeBlockedReplay = requestCalls.length;
+  await manager.sendUpdates(true);
+  if (requestCalls.length !== requestsBeforeBlockedReplay) {
+    throw new Error("Failed replay was retried by catch-up in the same generation");
+  }
+  view.connectivityGeneration = 2;
+  await manager.sendUpdates(true);
+  if (requestCalls.length !== requestsBeforeBlockedReplay + 1) {
+    throw new Error("Retained replay did not become eligible in a new generation");
+  }
+
   widget.visible = false;
   component.active = null;
   await manager.reconcileSubscriptions();
@@ -424,6 +443,25 @@ const manager = new context.SyncManager(view);
         closed,
       })}`,
     );
+  }
+
+  const requestsBeforeFailedReplay = requestCalls.length;
+  replayView.connectivityGeneration = 1;
+  responseOk = false;
+  await replayManager.register();
+  if (requestCalls.length !== requestsBeforeFailedReplay + 1) {
+    throw new Error("Failed replay did not make exactly one request");
+  }
+  await replayManager.register();
+  if (requestCalls.length !== requestsBeforeFailedReplay + 1) {
+    throw new Error("Coalesced registration retried within one connectivity generation");
+  }
+
+  replayView.connectivityGeneration = 2;
+  responseOk = true;
+  await replayManager.register();
+  if (requestCalls.length !== requestsBeforeFailedReplay + 2) {
+    throw new Error("A new connectivity generation did not retry retained replay work");
   }
 })().catch((error) => {
   console.error(error);

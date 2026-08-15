@@ -1,2 +1,178 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="6419479a-f31b-4fac-9c33-5952587c7e5a",e._sentryDebugIdIdentifier="sentry-dbid-6419479a-f31b-4fac-9c33-5952587c7e5a");}catch(e){}}();import{w as i}from"../foundation.js?v=b1cc79bd";import"../connectivity.js?v=b1cc79bd";import{C as l}from"../core-foundation.js?v=b1cc79bd";const c=Object.freeze({HomeActivityList:"home-notes",HomeTaskList:"tasks",StarredList:"starred",HomePageList:"pages",HomeProjectList:"projects",HomeCategoryList:"categories",IngressList:"ingress",ToolReportList:"tool-reports"});class h extends l{constructor(t){super(t),this.hash="home",this._homePollUnsubscribers=new Map}_initPollingSubscription(){}async prefetch(){await super.prefetch(),this._syncHomePollingSubscriptions()}async reconcilePollingSubscriptions(){await super.reconcilePollingSubscriptions(),this._syncHomePollingSubscriptions()}_syncHomePollingSubscriptions(){if(!this.PollingCoordinator)return;const t=new Set;for(const e of Object.values(this.components))for(const s of Object.values(e.widgets)){const o=c[s.name];if(!o||!s.loaded)continue;const r=`home:channel:${o}`;if(t.add(r),this._homePollUnsubscribers.has(r))continue;const n=this.PollingCoordinator.subscribe({id:r,type:"channel",channel:o,revision:s.target?.dataset.pollRevision??null},{mode:"foreground",initial:"scheduled",onResult:async a=>{if(a.status==="changed")return await this._refreshHomeWidget(e,s)}});this._homePollUnsubscribers.set(r,n)}for(const[e,s]of this._homePollUnsubscribers)t.has(e)||(s?.(),this._homePollUnsubscribers.delete(e))}async _prepareHomeWidgetRefresh(t,e){if(!e?.loaded||!e.route)return null;const s=await this.load(t,e.route);if(!s||s.updated===!1)return null;const o=e.prepareRefresh?await e.prepareRefresh(s):()=>e.refresh?.(s);return()=>{typeof o=="function"&&o(),s.pollChannel&&(e.target.dataset.pollChannel=s.pollChannel),s.pollRevision&&(e.target.dataset.pollRevision=s.pollRevision)}}async _refreshHomeWidget(t,e){const s=await this._prepareHomeWidgetRefresh(t,e);return s?(await i(s,{label:`home:refresh-${e.name}`}),!0):!1}async refreshSupplementalCollections(t=[]){t.some(({type:e})=>["star","unstar"].includes(e))&&await this._refreshStarred(),t.some(({type:e})=>e==="delete")&&this._hideEmptyLists()}async _refreshStarred(){const t=this.getComponent(document.getElementById("starred"));if(!t)return;const e=t.widgets.StarredList,s=e||await t.loadWidget("StarredList");if(!s)return;const o=e?await this._prepareHomeWidgetRefresh(t,s):null;await t.prepareRender(!0),await i(()=>{o&&o(),t.active===s&&t.render(!0)},{label:"home:refresh-starred"}),this._syncHomePollingSubscriptions()}_hideEmptyLists(){for(const t of Object.values(this.components))for(const e of Object.values(t.widgets)){const s=e.target;s?.tagName==="UL"&&s.children.length===0&&(s.dataset.visible="false")}}destroy(){for(const t of this._homePollUnsubscribers.values())t?.();this._homePollUnsubscribers.clear(),super.destroy()}}export{h as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { w as withTransition } from '../foundation.js?v=b3ba4dd3';
+import '../connectivity.js?v=b3ba4dd3';
+import { C as Core } from '../core-foundation.js?v=b3ba4dd3';
+
+const HOME_CHANNELS = Object.freeze({
+	HomeActivityList: "home-notes",
+	HomeTaskList: "tasks",
+	StarredList: "starred",
+	HomePageList: "pages",
+	HomeProjectList: "projects",
+	HomeCategoryList: "categories",
+	IngressList: "ingress",
+	ToolReportList: "tool-reports",
+});
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002a_home.py::test_home_mobile_dashboard_smoke
+ * @tests tests_js/test_040_home_polling.py::test_home_polling_subscribes_loaded_widgets_and_refreshes_only_owner
+ * @features home
+ * @dimensions load layout mobile
+ * @pairs home:foreground home:mounted-scope home:targeted-refresh home:lazy-widget
+ * @pairs polling:foreground polling:mounted-scope polling:targeted-refresh polling:lazy-widget
+ */
+class Home extends Core {
+	constructor(elt) {
+		super(elt);
+		this.hash = "home";
+		this._homePollUnsubscribers = new Map();
+	}
+
+	_initPollingSubscription() {}
+
+	async prefetch() {
+		await super.prefetch();
+		this._syncHomePollingSubscriptions();
+	}
+
+	async reconcilePollingSubscriptions() {
+		await super.reconcilePollingSubscriptions();
+		this._syncHomePollingSubscriptions();
+	}
+
+	_syncHomePollingSubscriptions() {
+		if (!this.PollingCoordinator) return;
+		const loaded = new Set();
+		for (const component of Object.values(this.components)) {
+			for (const widget of Object.values(component.widgets)) {
+				const channel = HOME_CHANNELS[widget.name];
+				if (!channel || !widget.loaded) continue;
+				const id = `home:channel:${channel}`;
+				loaded.add(id);
+				if (this._homePollUnsubscribers.has(id)) continue;
+				const unsubscribe = this.PollingCoordinator.subscribe(
+					{
+						id,
+						type: "channel",
+						channel,
+						revision: widget.target?.dataset.pollRevision ?? null,
+					},
+					{
+						mode: "foreground",
+						initial: "scheduled",
+						onResult: async (result) => {
+							if (result.status !== "changed") return;
+							return await this._refreshHomeWidget(component, widget);
+						},
+					},
+				);
+				this._homePollUnsubscribers.set(id, unsubscribe);
+			}
+		}
+		for (const [id, unsubscribe] of this._homePollUnsubscribers) {
+			if (loaded.has(id)) continue;
+			unsubscribe?.();
+			this._homePollUnsubscribers.delete(id);
+		}
+	}
+
+	async _prepareHomeWidgetRefresh(component, widget) {
+		if (!widget?.loaded || !widget.route) return null;
+		const response = await this.load(component, widget.route);
+		if (!response || response.updated === false) return null;
+		const commit = widget.prepareRefresh
+			? await widget.prepareRefresh(response)
+			: () => widget.refresh?.(response);
+		return () => {
+			if (typeof commit === "function") commit();
+			if (response.pollChannel) {
+				widget.target.dataset.pollChannel = response.pollChannel;
+			}
+			if (response.pollRevision) {
+				widget.target.dataset.pollRevision = response.pollRevision;
+			}
+		};
+	}
+
+	async _refreshHomeWidget(component, widget) {
+		const commit = await this._prepareHomeWidgetRefresh(component, widget);
+		if (!commit) return false;
+		await withTransition(commit, { label: `home:refresh-${widget.name}` });
+		return true;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/home.mjs::Home._refreshStarred
+	 * @covered-by src/script/views/home.mjs::Home._hideEmptyLists
+	 * @reason polling reconciliation delegates collection work to focused home handlers
+	 */
+	async refreshSupplementalCollections(changes = []) {
+		if (changes.some(({ type }) => ["star", "unstar"].includes(type))) {
+			await this._refreshStarred();
+		}
+		if (changes.some(({ type }) => type === "delete")) this._hideEmptyLists();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_category
+	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
+	 * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
+	 * @features starred
+	 * @dimensions category project page
+	 */
+	async _refreshStarred() {
+		const starredComponent = this.getComponent(
+			document.getElementById("starred"),
+		);
+		if (!starredComponent) return;
+
+		const existingWidget = starredComponent.widgets.StarredList;
+		const widget =
+			existingWidget || (await starredComponent.loadWidget("StarredList"));
+		if (!widget) return;
+
+		const commit = existingWidget
+			? await this._prepareHomeWidgetRefresh(starredComponent, widget)
+			: null;
+		await starredComponent.prepareRender(true);
+		await withTransition(
+			() => {
+				if (commit) commit();
+				if (starredComponent.active === widget) starredComponent.render(true);
+			},
+			{ label: "home:refresh-starred" },
+		);
+		this._syncHomePollingSubscriptions();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_reload_uses_server_state_until_replay
+	 * @features offline
+	 * @dimensions server-first reload
+	 */
+	_hideEmptyLists() {
+		for (const component of Object.values(this.components)) {
+			for (const widget of Object.values(component.widgets)) {
+				const target = widget.target;
+				if (target?.tagName === "UL" && target.children.length === 0) {
+					target.dataset.visible = "false";
+				}
+			}
+		}
+	}
+
+	destroy() {
+		for (const unsubscribe of this._homePollUnsubscribers.values()) {
+			unsubscribe?.();
+		}
+		this._homePollUnsubscribers.clear();
+		super.destroy();
+	}
+}
+
+export { Home as default };

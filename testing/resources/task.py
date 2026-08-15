@@ -316,11 +316,12 @@ class Task(SiteResource):
         self.entity.save()
 
     def save(self):
+        settings_form = self.settings_form
         with expect_successful_response(
             self.user.page,
             method="PUT",
             path=f"/tasks/{self.key}/update",
             entity_key=self.key,
         ):
-            SpinnerButtons.UPDATE.click(self.element)
-        assert SpinnerButtons.UPDATE_SUCCESS.successful(self.element)
+            SpinnerButtons.UPDATE.click(settings_form)
+        assert SpinnerButtons.UPDATE_SUCCESS.successful(settings_form)

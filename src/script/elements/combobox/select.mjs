@@ -64,7 +64,7 @@ export class SelectBox extends Submitter(Combobox) {
 	elementClick(event) {
 		event.stopPropagation();
 
-		this.panelOpen ? this.hidePanel() : this.showPanel();
+		this.panelOpen ? this.hidePanel() : void this.showPanel();
 	}
 
 	addOption(option) {

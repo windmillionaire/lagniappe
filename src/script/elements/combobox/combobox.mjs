@@ -6,19 +6,21 @@ import {
 	shift,
 } from "@floating-ui/dom";
 import { STYLES } from "styles";
-import { generateElementId } from "../../shared";
+import { captureError, generateElementId } from "../../shared";
 import { primitives } from "../primitives";
 
 /**
  * @testable true
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_positioning_uses_live_element_by_default_and_explicit_reference_when_configured
+ * @tests tests_js/test_016_combobox_frontend.py::test_combobox_exposes_initial_positioning_readiness
+ * @tests tests_js/test_016_combobox_frontend.py::test_combobox_initial_position_ignores_superseded_transition_geometry
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_aria_and_keyboard_state_follow_the_open_panel
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_pointer_and_dismissal_events_preserve_trigger_focus
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_hides_empty_recent_panel_but_keeps_server_empty_result_row
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_copies_only_supported_dataset_configuration
  * @tests tests_js/test_016_combobox_frontend.py::test_combobox_positioning_stops_after_destroy
  * @features combobox
- * @dimensions positioning aria keyboard pointer dismissal empty-results dataset-configuration teardown
+ * @dimensions positioning readiness transition-race aria keyboard pointer dismissal empty-results dataset-configuration teardown
  */
 export class Combobox {
 	constructor(element) {
@@ -29,6 +31,8 @@ export class Combobox {
 		this.values = new Set();
 		this.focusedIndex = -1;
 		this.panel = null;
+		this.panelOpen = false;
+		this.panelReady = Promise.resolve(false);
 		this.popupRole = "listbox";
 		this.optionRole = "option";
 		this.triggerRole = "combobox";
@@ -186,11 +190,28 @@ export class Combobox {
 		this._cleanupAutoUpdate();
 		const reference = this.positionReference || this.element;
 		const panel = this.panel;
-		if (!panel) return;
+		if (!panel) return Promise.resolve(false);
 		let active = true;
-
+		let positionRequest = 0;
+		let readySettled = false;
+		let resolveReady;
+		let rejectReady;
+		const ready = new Promise((resolve, reject) => {
+			resolveReady = resolve;
+			rejectReady = reject;
+		});
+		const settleReady = (positioned, error = null) => {
+			if (readySettled) {
+				if (error) captureError(error, panel);
+				return;
+			}
+			readySettled = true;
+			if (error) rejectReady(error);
+			else resolveReady(positioned);
+		};
 		const cleanup = autoUpdate(reference, panel, () => {
 			if (!active || this.panel !== panel) return;
+			const request = ++positionRequest;
 			const middleware = [
 				offset(4),
 				shift({ padding: 5 }),
@@ -208,19 +229,35 @@ export class Combobox {
 			computePosition(reference, panel, {
 				placement: this.placement,
 				middleware: middleware,
-			}).then(({ x, y, placement }) => {
-				if (!active || this.panel !== panel) return;
-				Object.assign(panel.style, {
-					left: `${x}px`,
-					top: `${y}px`,
+			})
+				.then(({ x, y, placement }) => {
+					if (!active || this.panel !== panel) {
+						settleReady(false);
+						return;
+					}
+					if (request !== positionRequest) return;
+					Object.assign(panel.style, {
+						left: `${x}px`,
+						top: `${y}px`,
+					});
+					this.placement = placement;
+					settleReady(true);
+				})
+				.catch((error) => {
+					if (!active || this.panel !== panel) {
+						settleReady(false);
+						return;
+					}
+					if (request !== positionRequest) return;
+					settleReady(false, error);
 				});
-				this.placement = placement;
-			});
 		});
 		this.cleanup = () => {
 			active = false;
 			cleanup();
+			settleReady(false);
 		};
+		return ready;
 	}
 
 	_cleanupAutoUpdate() {
@@ -285,32 +322,62 @@ export class Combobox {
 			this.panel?.querySelectorAll(`[role='${this.optionRole}']`).length || 0;
 		if (renderedOptions === 0) {
 			this.hidePanel();
-			return;
+			return Promise.resolve(false);
 		}
+		if (this.panelOpen) return this.panelReady;
 
+		const panel = this.panel;
 		this.panelOpen = true;
 		this.panel.classList.remove("hidden");
 		this.panel.dataset.visible = "true";
+		this.panel.dataset.positioned = "false";
 		this.element.setAttribute("aria-expanded", "true");
 		this.element.dataset.panel = "open";
 
 		this._addPanelHandlers();
 		this._addDocumentHandlers();
-		this._startAutoUpdate();
 
-		document.querySelectorAll("[data-combobox-id]").forEach((combobox) => {
-			if (combobox._lp_combobox && combobox._lp_combobox !== this) {
-				combobox._lp_combobox.hidePanel();
-			}
-		});
+		const panelReady = Promise.resolve(this._startAutoUpdate())
+			.then((positioned) => {
+				if (
+					positioned === false ||
+					this.panelReady !== panelReady ||
+					this.panel !== panel ||
+					!this.panelOpen
+				) {
+					return false;
+				}
+
+				panel.dataset.positioned = "true";
+
+				document.querySelectorAll("[data-combobox-id]").forEach((combobox) => {
+					if (combobox._lp_combobox && combobox._lp_combobox !== this) {
+						combobox._lp_combobox.hidePanel();
+					}
+				});
+				return true;
+			})
+			.catch((error) => {
+				if (this.panelReady === panelReady && this.panel === panel) {
+					this.hidePanel();
+				}
+				captureError(error, panel);
+				return false;
+			});
+		this.panelReady = panelReady;
+		return panelReady;
 	}
 
 	hidePanel() {
 		const wasOpen = this.panelOpen;
 
 		this.panelOpen = false;
+		this.panelReady = Promise.resolve(false);
 		this.panel?.classList.add("hidden");
-		if (this.panel) this.panel.dataset.visible = "false";
+		if (this.panel) {
+			this.panel.dataset.visible = "false";
+			this.panel.dataset.positioned = "false";
+		}
 		this.element.setAttribute("aria-expanded", "false");
 		this.element.dataset.panel = "closed";
 		this.unfocusOption();

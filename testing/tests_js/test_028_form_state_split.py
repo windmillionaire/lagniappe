@@ -1578,7 +1578,10 @@ view.refresh = async (navigation, options) => {
     throw new Error(`Unexpected visibility order: ${JSON.stringify(events)}`);
   }
   resolveReplay();
-  await view._offlineReplayTask;
+  if (view.replayReady !== view._offlineReplayTask) {
+    throw new Error("Reconnect replay did not expose its public settled boundary");
+  }
+  await view.replayReady;
   if (events.at(-1) !== "refresh:undefined:undefined") {
     throw new Error(`Replayed work did not reconcile afterward: ${JSON.stringify(events)}`);
   }

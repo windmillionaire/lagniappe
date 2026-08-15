@@ -25,6 +25,7 @@ export class SyncManager {
 		this._checkpointPollFirst = new Set();
 		this._pendingParentTouches = new Set();
 		this._activating = new Set();
+		this._offlineReplayAttempts = new Map();
 		this._registerPromise = null;
 		this._sendPromise = null;
 		this._queuedSend = null;
@@ -92,6 +93,13 @@ export class SyncManager {
 			revision: source.revision ?? 0,
 			presence_digest: source.presence_digest ?? null,
 		});
+	}
+
+	_replayBlocked(syncId) {
+		return (
+			this._offlineReplayAttempts.get(syncId) ===
+			(this.view.connectivityGeneration ?? 0)
+		);
 	}
 
 	_subscribe(widget, { force = false } = {}) {
@@ -174,9 +182,21 @@ export class SyncManager {
 		}
 	}
 
+	/**
+	 * Coalesced lifecycle events may request registration more than once during
+	 * one reconnect. A failed durable replay is attempted once per connectivity
+	 * generation and remains queued for the next genuine recovery.
+	 *
+	 * @testable true
+	 * @tests tests_js/test_010_sync_manager_frontend.py::test_sync_manager_uses_polling_subscriptions
+	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_failed_offline_replay_keeps_queue_and_retries
+	 * @features sync offline
+	 * @dimensions offline-replay queue-preserved retry-boundary reconnect-generation
+	 */
 	register() {
 		if (this._registerPromise) return this._registerPromise;
-		const pending = this._register();
+		const generation = this.view.connectivityGeneration ?? 0;
+		const pending = this._register(generation);
 		this._registerPromise = pending;
 		const complete = () => {
 			if (this._registerPromise === pending) this._registerPromise = null;
@@ -185,10 +205,12 @@ export class SyncManager {
 		return pending;
 	}
 
-	async _register() {
+	async _register(generation) {
 		const { sync: allOffline } = await getAllOfflineRecords();
-		const offline = allOffline.filter(({ sync_id }) =>
-			sync_id?.endsWith(":document"),
+		const offline = allOffline.filter(
+			({ sync_id }) =>
+				sync_id?.endsWith(":document") &&
+				this._offlineReplayAttempts.get(sync_id) !== generation,
 		);
 		const obsolete = allOffline.filter(
 			({ sync_id }) => !sync_id?.endsWith(":document"),
@@ -197,7 +219,19 @@ export class SyncManager {
 			await deleteSyncRecords(obsolete.map(({ sync_id }) => sync_id));
 		}
 		for (const widget of Object.values(this.widgets)) this._subscribe(widget);
-		if (offline.length) await this._reconcile(offline);
+		if (offline.length) {
+			for (const { sync_id } of offline) {
+				this._offlineReplayAttempts.set(sync_id, generation);
+			}
+			const completed = await this._reconcile(offline);
+			if (completed) {
+				for (const { sync_id } of offline) {
+					if (this._offlineReplayAttempts.get(sync_id) === generation) {
+						this._offlineReplayAttempts.delete(sync_id);
+					}
+				}
+			}
+		}
 	}
 
 	/**
@@ -235,6 +269,9 @@ export class SyncManager {
 	}
 
 	async deregister() {
+		// Persist any edits made after a failed replay while transitioning offline;
+		// the next online generation owns the retry.
+		this._offlineReplayAttempts.clear();
 		const syncIds = [...this._subscriptions.keys()];
 		await this.sendUpdates(true, null, {
 			keepalive: true,
@@ -309,6 +346,7 @@ export class SyncManager {
 	async _reconcile(offlineRecords) {
 		const replays = [];
 		const headless = [];
+		let unresolved = false;
 		try {
 			for (const offline of offlineRecords) {
 				if (
@@ -334,14 +372,20 @@ export class SyncManager {
 						sync_id: offline.sync_id,
 						offline,
 					});
-					if (!widget) continue;
+					if (!widget) {
+						unresolved = true;
+						continue;
+					}
 					headless.push(widget);
 					await widget.init();
 					await this._waitForWidgetInitialized(widget);
 				}
 
 				const current = await this._pollOfflineState(offline);
-				if (!current) continue;
+				if (!current) {
+					unresolved = true;
+					continue;
+				}
 				widget.remote = current.payload;
 				widget.offlineRecord = offline;
 				await widget.sync();
@@ -372,7 +416,9 @@ export class SyncManager {
 					touch_parent: true,
 				});
 			}
-			if (replays.length) await this.sendUpdates(false, replays);
+			if (!replays.length) return !unresolved;
+			const response = await this.sendUpdates(false, replays);
+			return !unresolved && response?.ok === true;
 		} finally {
 			for (const widget of headless) {
 				widget.destroy();
@@ -388,6 +434,7 @@ export class SyncManager {
 		const touches = new Set(touchSyncIds);
 		const included = new Set();
 		for (const widget of Object.values(this.widgets)) {
+			if (this._replayBlocked(widget.syncId)) continue;
 			const payload = save ? widget.saveData : widget.syncData;
 			if (!payload) continue;
 			const update = { ...this._descriptor(widget), ...payload, save };
@@ -531,6 +578,7 @@ export class SyncManager {
 		this._checkpointPollFirst.clear();
 		this._pendingParentTouches.clear();
 		this._activating.clear();
+		this._offlineReplayAttempts.clear();
 		this._registerPromise = null;
 		window.removeEventListener("sync-save", this._syncSave);
 		this._initialized = false;

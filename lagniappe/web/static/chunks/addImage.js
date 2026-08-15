@@ -1,2 +1,135 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="ca608985-def5-4fd5-81a5-23a032c7c16b",e._sentryDebugIdIdentifier="sentry-dbid-ca608985-def5-4fd5-81a5-23a032c7c16b");}catch(e){}}();import{w as a,r as i}from"./foundation.js?v=b1cc79bd";import"./connectivity.js?v=b1cc79bd";import{Modal as r}from"./modal.js?v=b1cc79bd";import{B as n,u as s,U as d}from"./baseUpload.js?v=b1cc79bd";import{b as m}from"./buttons.js?v=b1cc79bd";import"./styles.js?v=b1cc79bd";import"./icons.js?v=b1cc79bd";import"./dropdown.js?v=b1cc79bd";import"./combobox.js?v=b1cc79bd";import"./primitives.js?v=b1cc79bd";import"./baseForm.js?v=b1cc79bd";import"./loader.js?v=b1cc79bd";import"./formatting.js?v=b1cc79bd";const l="Drop image here, click to upload, or tap to choose camera/files<br>All images will be sized down to 1280x720";class h extends n{constructor(t){super(),this.toolbar=t,this.name="addImage",this.inputName="add-image",this.messages={submit:"Upload Image",submitting:"Uploading Image",submitted:"Image Uploaded"},this.uploadType="image",this.target=this.toolbar.element.appendChild(document.createElement("form")),this.target.dataset.mode="upload",this.target.className='mt-4 hidden flex-col gap-4 rounded-md bg-slate-200 p-4 group-data-[open-form="addImage"]/toolbar:flex group/upload',this.target.dataset.option=this.name,this.dropzone=s.dropzone({text:l}),this.menuOptions=["remove",...this.toolbar.aiCreate?["generate"]:[],"paste"],this.uploadMenu=new d(this),this.generate=s.generateDocumentImage(),this.submitButton=m.submit({kind:"editor"}),this.submit=this.submit.bind(this)}get html(){return[this.dropzone.element,...this.toolbar.aiCreate?[this.generate.element]:[],this.submitButton]}async init(){await super.init(),this.submitButton.dataset.visible="false",this.target.addEventListener("click",t=>{t.target.closest("[data-role='cancel']")&&this.hideGenerateForm()})}showGenerateForm(){a(()=>{this.dropzone.hide(),this.reset(),this.form.toggleSubForm(this.generate),this.generate.show()})}hideGenerateForm(){a(()=>{this.form.toggleSubForm(null),this.generate.hide(),this.generate.reset(),this.dropzone.show()})}reset(){this.generate.reset(),super.reset()}async submit(t){if(!await this.prepareSubmit({route:this.toolbar.endpoints.addImage}))return;const o=new FormData(this.target);this.applyDirectUploads(o),o.append("role",t?.dataset?.role||"upload"),o.append("content",this.toolbar.editor.getText()),t&&(t.disabled=!0);const e=await i.post(this.toolbar.endpoints.addImage,o);t&&(t.disabled=!1),e.ok&&e.modal?new r(this.toolbar.builder).attach(e.modal,this):e.ok&&e.src?(this.toolbar.editor.chain().focus().setImage({src:e.src}).run(),this.toolbar.toggleForm(this.name)):e.error&&(this.form.showError(e.error),this.reset())}}export{h as addImage};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { w as withTransition, r as request } from './foundation.js?v=b3ba4dd3';
+import './connectivity.js?v=b3ba4dd3';
+import { Modal } from './modal.js?v=b3ba4dd3';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b3ba4dd3';
+import { b as buttons } from './buttons.js?v=b3ba4dd3';
+import './styles.js?v=b3ba4dd3';
+import './icons.js?v=b3ba4dd3';
+import './dropdown.js?v=b3ba4dd3';
+import './combobox.js?v=b3ba4dd3';
+import './primitives.js?v=b3ba4dd3';
+import './baseForm.js?v=b3ba4dd3';
+import './loader.js?v=b3ba4dd3';
+import './formatting.js?v=b3ba4dd3';
+
+const IMAGE_DROPZONE_TEXT =
+	"Drop image here, click to upload, or tap to choose camera/files<br>All images will be sized down to 1280x720";
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image_generate_toggle
+ * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image
+ * @features editor
+ * @dimensions image-generate-toggle image-upload image-selection
+ */
+class Image extends BaseUpload {
+	constructor(toolbar) {
+		super();
+		this.toolbar = toolbar;
+		this.name = "addImage";
+		this.inputName = "add-image";
+		this.messages = {
+			submit: "Upload Image",
+			submitting: "Uploading Image",
+			submitted: "Image Uploaded",
+		};
+		this.uploadType = "image";
+
+		this.target = this.toolbar.element.appendChild(
+			document.createElement("form"),
+		);
+		this.target.dataset.mode = "upload";
+		this.target.className = `mt-4 hidden flex-col gap-4 rounded-md bg-slate-200 p-4 group-data-[open-form="addImage"]/toolbar:flex group/upload`;
+		this.target.dataset.option = this.name;
+
+		this.dropzone = uploadElement.dropzone({ text: IMAGE_DROPZONE_TEXT });
+		this.menuOptions = [
+			"remove",
+			...(this.toolbar.aiCreate ? ["generate"] : []),
+			"paste",
+		];
+		this.uploadMenu = new UploadMenu(this);
+		this.generate = uploadElement.generateDocumentImage();
+		this.submitButton = buttons.submit({
+			kind: "editor",
+		});
+
+		this.submit = this.submit.bind(this);
+	}
+
+	get html() {
+		return [
+			this.dropzone.element,
+			...(this.toolbar.aiCreate ? [this.generate.element] : []),
+			this.submitButton,
+		];
+	}
+
+	async init() {
+		await super.init();
+
+		this.submitButton.dataset.visible = "false";
+
+		this.target.addEventListener("click", (e) => {
+			if (e.target.closest("[data-role='cancel']")) {
+				this.hideGenerateForm();
+			}
+		});
+	}
+
+	showGenerateForm() {
+		withTransition(() => {
+			this.dropzone.hide();
+			this.reset();
+			this.form.toggleSubForm(this.generate);
+			this.generate.show();
+		});
+	}
+
+	hideGenerateForm() {
+		withTransition(() => {
+			this.form.toggleSubForm(null);
+			this.generate.hide();
+			this.generate.reset();
+			this.dropzone.show();
+		});
+	}
+
+	reset() {
+		this.generate.reset();
+		super.reset();
+	}
+
+	async submit(submitter) {
+		const prepared = await this.prepareSubmit({
+			route: this.toolbar.endpoints.addImage,
+		});
+		if (!prepared) return;
+
+		const formData = new FormData(this.target);
+		this.applyDirectUploads(formData);
+		formData.append("role", submitter?.dataset?.role || "upload");
+		formData.append("content", this.toolbar.editor.getText());
+
+		if (submitter) submitter.disabled = true;
+		const response = await request.post(
+			this.toolbar.endpoints.addImage,
+			formData,
+		);
+		if (submitter) submitter.disabled = false;
+
+		if (response.ok && response.modal) {
+			const modal = new Modal(this.toolbar.builder);
+			modal.attach(response.modal, this);
+		} else if (response.ok && response.src) {
+			this.toolbar.editor.chain().focus().setImage({ src: response.src }).run();
+			this.toolbar.toggleForm(this.name);
+		} else if (response.error) {
+			this.form.showError(response.error);
+			this.reset();
+		}
+	}
+}
+
+export { Image as addImage };

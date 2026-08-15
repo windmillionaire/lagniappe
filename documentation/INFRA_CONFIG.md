@@ -509,7 +509,12 @@ with Home and `main.py` routes; the tooling contract checks both.
 Normalizes deployment settings used by setup-generated `lagniappe.yaml`,
 update restore, and runtime site-settings validation. This module is
 part of the uploaded runtime surface; setup-only Datastore restore helpers stay
-in `installer/deployment.py`.
+in `installer/deployment.py`. Automatic scaling also adds the constants-owned
+`warmup` inbound service so App Engine initializes the existing
+`/_ah/warmup` handler before routing ordinary traffic to a replacement or
+prestarted instance. Switching to basic scaling removes only that managed
+service and preserves any unrelated inbound services. Fresh setup and the
+update/upgrade restore flows all use this same generator.
 
 ### AI Settings (`ai_settings.py`, `ai_models.py`)
 

@@ -15,6 +15,7 @@ from .network import (
 )
 from .offline import (
     expect_offline_sync_replay,
+    wait_for_connectivity_replay,
     wait_for_offline_mutations,
     wait_for_offline_sync_records,
 )
@@ -32,6 +33,7 @@ __all__ = [
     "expect_reconnect_refresh",
     "multipart_form_fields",
     "scoped_browser_route",
+    "wait_for_connectivity_replay",
     "wait_for_offline_mutations",
     "wait_for_offline_sync_records",
     "TestFile",

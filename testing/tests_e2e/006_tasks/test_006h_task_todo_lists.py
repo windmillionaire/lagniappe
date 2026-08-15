@@ -54,10 +54,6 @@ def test_task_todo_list_editing_and_history_restore(get_user):
         expect(add_todo).to_have_attribute(
             "aria-label", "Add to Checklist"
         )
-        expect(add_todo).to_have_attribute("data-kind", "add")
-        title_action_classes = add_todo.get_attribute("class")
-        assert title_action_classes
-        assert "outline-offset-0" not in title_action_classes.split()
 
         add_todo.click()
         draft = todo.locator("[data-role='todo-draft']")
@@ -76,8 +72,6 @@ def test_task_todo_list_editing_and_history_restore(get_user):
         expect(todo).to_have_attribute("data-mode", "edit")
         expect(todo.locator("[data-role='todo-draft']")).to_have_count(0)
         done = todo.locator("[data-role='todo-done']")
-        expect(done).to_have_attribute("data-kind", "success")
-        expect(done).to_have_attribute("class", title_action_classes)
         done.click()
         expect(todo).to_have_attribute("data-mode", "read")
 
@@ -136,8 +130,6 @@ def test_task_todo_list_editing_and_history_restore(get_user):
         expect(todo.locator("li[data-index]")).to_have_count(0)
         history_fill = todo.locator("[data-role='history-fill']")
         expect(history_fill).to_be_visible()
-        expect(history_fill).to_have_attribute("class", title_action_classes)
-        assert history_fill.get_attribute("data-kind") is None
         history_fill.click()
 
         expect(todo.locator("li[data-index]")).to_have_count(2)

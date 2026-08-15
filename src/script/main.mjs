@@ -34,6 +34,9 @@ async function onError(event) {
 }
 
 window.__CONNECTIVITY__ = connectivity.snapshot();
+// Optional observation boundary for callers that explicitly need the latest
+// background connectivity cycle to settle. Rendering never awaits this.
+window.__CONNECTIVITY_READY__ = Promise.resolve();
 
 let __activeView = null;
 /**
@@ -189,14 +192,17 @@ function updateConnectivity(patch, { notifyController = true } = {}) {
  * @covered-by src/script/main.mjs::syncView
  * @reason pending sync option merging is private queue plumbing for the public sync runner
  */
-function queueSync({ hidden, force = false } = {}) {
+function queueSync({ hidden, force = false, browser } = {}) {
 	const pendingHidden =
 		hidden === undefined ? _syncPending?.hidden : Boolean(hidden);
+	const pendingBrowser =
+		browser === undefined ? _syncPending?.browser : browser;
 
 	_syncPending = {
 		force: Boolean(_syncPending?.force || force),
 	};
 	if (pendingHidden !== undefined) _syncPending.hidden = pendingHidden;
+	if (pendingBrowser !== undefined) _syncPending.browser = pendingBrowser;
 }
 
 /**
@@ -211,11 +217,11 @@ function queueSync({ hidden, force = false } = {}) {
 async function syncViewOnce({
 	hidden = documentInactive(),
 	force = false,
+	browser = navigator.onLine === false ? "offline" : "online",
 } = {}) {
 	const controller = navigator.serviceWorker?.controller
 		? "controlled"
 		: "uncontrolled";
-	const browser = navigator.onLine === false ? "offline" : "online";
 	updateConnectivity(
 		{
 			browser,
@@ -245,24 +251,47 @@ async function syncViewOnce({
  * @testable true
  * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
  * @tests tests_js/test_017_main_lifecycle.py::test_rapid_sync_requests_coalesce_and_retain_forced_transition
+ * @tests tests_js/test_017_main_lifecycle.py::test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary
  * @features offline
- * @dimensions server-health transitions
+ * @dimensions server-health transitions browser-state settled-boundary
  */
 async function syncView(options = {}) {
 	queueSync(options);
 	if (_sync) return _sync;
 
 	_sync = (async () => {
+		let firstError = null;
 		while (_syncPending) {
 			const nextSync = _syncPending;
 			_syncPending = null;
-			await syncViewOnce(nextSync);
+			try {
+				await syncViewOnce(nextSync);
+			} catch (error) {
+				firstError ||= error;
+			}
 		}
+		if (firstError) throw firstError;
 	})().finally(() => {
 		_sync = null;
 	});
+	window.__CONNECTIVITY_READY__ = _sync;
 
 	return _sync;
+}
+
+/**
+ * Publish native browser-link changes before scheduling health checks, view
+ * synchronization, or replay. Consumers can read connectivity synchronously;
+ * only callers that need the background cycle's completion await the result.
+ *
+ * @testable true
+ * @tests tests_js/test_017_main_lifecycle.py::test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary
+ * @features connectivity offline
+ * @dimensions browser-state transitions settled-boundary
+ */
+function browserConnectivityChanged(browser) {
+	updateConnectivity({ browser });
+	return syncView({ browser });
 }
 
 /**
@@ -362,8 +391,10 @@ async function startAuthenticatedLifecycle() {
 	document.addEventListener("visibilitychange", () => {
 		document.hidden ? suspendCurrentView() : syncView();
 	});
-	window.addEventListener("offline", () => syncView());
-	window.addEventListener("online", () => syncView());
+	window.addEventListener("offline", () =>
+		browserConnectivityChanged("offline"),
+	);
+	window.addEventListener("online", () => browserConnectivityChanged("online"));
 	window.addEventListener("blur", suspendCurrentView);
 	window.addEventListener("focus", () => syncView());
 	window.addEventListener("pagehide", suspendCurrentView);

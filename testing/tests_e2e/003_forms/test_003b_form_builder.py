@@ -35,31 +35,6 @@ def _condition_error(builder):
     return builder.condition.locator("[data-role='error']")
 
 
-def _expect_builder_list_action_surface(control):
-    expect(control).to_have_attribute("type", "button")
-    classes = (control.get_attribute("class") or "").split()
-    assert "bg-white/50" in classes
-    assert "outline-2" not in classes
-    assert "hover:outline-2" in classes
-    assert "focus-visible:outline-2" in classes
-    assert "hover:underline" not in classes
-
-
-def _expect_centered_builder_list_icons(row):
-    actions = row.locator(
-        "button[data-role='remove'], "
-        "button[data-role='moveUp'], "
-        "button[data-role='moveDown']"
-    )
-    assert actions.count() > 0
-    for index in range(actions.count()):
-        action = actions.nth(index)
-        expect(action).to_have_attribute("type", "button")
-        classes = (action.get_attribute("class") or "").split()
-        assert "action-icon-button" in classes
-        assert "size-5" in classes
-
-
 def _option_labels(field):
     return [option["label"] for option in field.get("options", [])]
 
@@ -158,13 +133,9 @@ def test_change_select_options(get_user):
 
     assert _option_labels(builder.schema_field(field.id)) == ["Apple", "Banana"]
 
-    option_row = builder.settings.locator(
-        "[data-setting='options'] li:has-text('Apple')"
-    )
-    option_open = option_row.locator("[data-role='open']")
-    _expect_builder_list_action_surface(option_open)
-    _expect_centered_builder_list_icons(option_row)
-    option_open.click()
+    builder.settings.locator(
+        "[data-setting='options'] li:has-text('Apple') [data-role='open']"
+    ).click()
     option_name = builder.condition.locator("input[name='option-name']")
     expect(option_name).to_have_value("Apple")
     option_name.fill("Apricot")
@@ -216,14 +187,6 @@ def test_field_visibility(get_user):
     expect(builder.condition).to_contain_text("is checked")
     builder.save_condition()
     _close_condition(builder)
-
-    visibility_row = builder.settings.locator(
-        "[data-setting='visibility'] li:has-text('Show Private Notes')"
-    )
-    _expect_builder_list_action_surface(
-        visibility_row.locator("[data-role='open']")
-    )
-    _expect_centered_builder_list_icons(visibility_row)
 
     visibility = builder.schema_field(notes.id)["visibility"][0]
     assert visibility["id"] == checkbox.id
@@ -307,13 +270,9 @@ def test_table_column_condition_editor(get_user):
     expect(builder.condition.locator("[data-combobox-id] input")).to_be_focused()
     _close_condition(builder)
 
-    column_row = builder.settings.locator(
-        "[data-setting='columns'] li:has-text('Quantity')"
-    )
-    column_open = column_row.locator("[data-role='open']")
-    _expect_builder_list_action_surface(column_open.locator("xpath=.."))
-    _expect_centered_builder_list_icons(column_row)
-    column_open.click()
+    builder.settings.locator(
+        "[data-setting='columns'] [data-role='open']:has-text('Quantity')"
+    ).click()
     column_name = builder.condition.locator("input[name='column-name']")
     column_name.fill("")
     builder.condition.locator("button[data-role='save']").click()

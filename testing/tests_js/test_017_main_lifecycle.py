@@ -128,6 +128,7 @@ context.setView = (view) => {{ viewElement = view; }};
 context.setViewLoader = (loader) => {{ viewLoader = loader; }};
 context.setFocused = (value) => {{ focused = value; }};
 context.setMode = (value) => {{ pageMode = value; }};
+context.setNavigatorOnline = (value) => {{ context.navigator.onLine = value; }};
 context.flushPaint = async () => {{
   await new Promise((resolve) => setTimeout(resolve, 10));
   for (let index = 0; index < 4; index += 1) await Promise.resolve();
@@ -343,6 +344,78 @@ if (syncCalls[1].force !== true || syncCalls[1].hidden !== false) {
 }
 if (fetchCalls.length !== 2) {
   throw new Error(`Expected two coalesced health checks, got ${fetchCalls.length}`);
+}
+""",
+    )
+
+
+# @features connectivity offline
+# @dimensions browser-state transitions settled-boundary error-recovery
+def test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary(
+    run_node,
+):
+    run_main_check(
+        run_node,
+        """
+initialize();
+await flushPaint();
+await context.window.__CONNECTIVITY_READY__;
+
+let rejectOfflineSync;
+setView({
+  _lp_view: {
+    async sync(options) {
+      syncCalls.push(options);
+      if (syncCalls.length === 1) {
+        await new Promise((resolve, reject) => { rejectOfflineSync = reject; });
+      }
+    },
+  },
+});
+
+context.setNavigatorOnline(false);
+const offlineCycle = windowListeners.get("offline")();
+const offlineBoundary = context.window.__CONNECTIVITY_READY__;
+if (
+  connectivityState.browser !== "offline" ||
+  context.window.__CONNECTIVITY__.browser !== "offline" ||
+  offlineBoundary === undefined
+) {
+  throw new Error("Native offline state was not published synchronously");
+}
+for (let index = 0; index < 8 && !rejectOfflineSync; index += 1) {
+  await Promise.resolve();
+}
+if (!rejectOfflineSync) {
+  throw new Error("Offline view synchronization did not start");
+}
+
+context.setNavigatorOnline(true);
+const onlineCycle = windowListeners.get("online")();
+if (
+  connectivityState.browser !== "online" ||
+  context.window.__CONNECTIVITY__.browser !== "online" ||
+  context.window.__CONNECTIVITY_READY__ !== offlineBoundary
+) {
+  throw new Error("Native online state was not synchronously queued behind the active cycle");
+}
+void offlineCycle.catch(() => {});
+void onlineCycle.catch(() => {});
+
+rejectOfflineSync(new Error("failed offline cycle"));
+let rejected = false;
+try {
+  await context.window.__CONNECTIVITY_READY__;
+} catch (error) {
+  rejected = error.message === "failed offline cycle";
+}
+if (!rejected) {
+  throw new Error("The settled connectivity boundary hid the failed cycle");
+}
+if (syncCalls.length !== 2 || connectivityState.browser !== "online") {
+  throw new Error(
+    `A failed cycle stalled the queued transition: ${JSON.stringify({ syncCalls, connectivityState })}`,
+  );
 }
 """,
     )

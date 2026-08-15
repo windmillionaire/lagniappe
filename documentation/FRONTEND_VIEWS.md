@@ -90,7 +90,9 @@ manager must await its readiness promise or call the corresponding idempotent
 
 - Runs `ShellView.init()` immediately, then installs the stable readiness
   promises `offlineQueueReady`, `syncReady`, `initialReplayReady`, and
-  `servicesReady`.
+  `servicesReady`. `replayReady` tracks only the latest reconnect-time
+  offline-form replay as an optional observation boundary; rendering never
+  awaits it.
 - At concrete view publication, starts PollingCoordinator and existing
   `[lp-prefetch]` work. SyncManager starts when a document capability exists;
   idle storage inspection starts SyncManager or OfflineQueue only for persisted
@@ -111,6 +113,11 @@ manager must await its readiness promise or call the corresponding idempotent
 - Keeps offline replay, reconnect reconciliation, polling batching, edit
   notices, deferred operations, and notification delivery behind the lazy
   service facades in `views/base/services.mjs`.
+
+`main.mjs` publishes native browser-link changes to the canonical connectivity
+object synchronously. The resulting health and view synchronization remains
+background work exposed through `window.__CONNECTIVITY_READY__` only for
+callers that deliberately need a settled lifecycle boundary.
 
 Cold controls synchronously prevent native navigation/submission when needed,
 set `aria-busy`, and coalesce repeated activation. The intended operation is

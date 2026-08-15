@@ -1,2 +1,188 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="aaee44c4-8460-481b-9e1b-e88fb8b296c3",e._sentryDebugIdIdentifier="sentry-dbid-aaee44c4-8460-481b-9e1b-e88fb8b296c3");}catch(e){}}();import{STYLES as o}from"./styles.js?v=b1cc79bd";import{BaseList as f}from"./baseList.js?v=b1cc79bd";import{r as y,w as m}from"./foundation.js?v=b1cc79bd";import"./connectivity.js?v=b1cc79bd";import{s as h}from"./icons.js?v=b1cc79bd";class p extends f{constructor(e){super(e),this._click=this._click.bind(this)}init(){this.target.addEventListener("click",this._click)}async _click(e){const t=e.target.closest("[data-action='delete-activity']");t&&await this.deleteActivity(t)}handleOfflineQueue({phase:e,queue:t,record:i}){if(e==="queued")return this._offlineQueued(i,t);if(e==="cancelled")return this._offlineCancelled(i)}_offlineQueued(e,t){if(e.kind==="note"&&e.action==="create")return t.response(this._renderNote(e,t));if(e.action==="delete")return this._removeByKey(e.target_key)}_offlineCancelled(e){if(e.action==="create")return this._removeByKey(e.client_key)}async deleteActivity(e){const t=e.dataset.key,i=e.closest("li[data-key], [lp-entity][data-key]");if(!t||!i)return;if(t.startsWith("offline:")){await(this.view.offlineQueue||await this.view.ensureOfflineQueue?.())?.cancel({action:"create",client_key:t});return}if(i.dataset.kind==="note")return;const l=`/l/activity/${t}`;if(!this.view.online){await(this.view.offlineQueue||await this.view.ensureOfflineQueue?.())?.queue({id:`delete:${t}`,kind:i.dataset.kind||"activity",action:"delete",method:"DELETE",route:l,target_key:t});return}e.disabled=!0;const r=await y.delete(l);e.disabled=!1,r?.ok&&await m(()=>this._commitRemoveItem(i),{label:"home:activity-delete"})}_renderNote(e,t){const i=t.field(e,"body"),l=t.field(e,"visibility")||"private",r=e.files?.[0]?.file,n=document.createElement("li");n.dataset.key=e.client_key,n.dataset.kind="note",n.dataset.offline="true",n.className=[o.note.item.home,"opacity-80"].join(" ");const c=document.createElement("div");if(c.className=o.note.content,n.append(c),i){const s=document.createElement("span");s.className=o.note.body,s.textContent=i,c.append(s)}if(r){const s=document.createElement("img");s.src=URL.createObjectURL(r),s.className=o.note.photo.home,s.alt="",c.append(s)}const d=document.createElement("span");d.className=o.note.meta,d.textContent=`Pending sync \xB7 ${l==="everyone"?"Everyone":"Private"}`,c.append(d);const a=document.createElement("button");a.className=o.note.discard,a.dataset.action="delete-activity",a.dataset.key=e.client_key,a.type="button",a.setAttribute("aria-label","Discard pending note"),a.title="Discard pending note",n.append(a);const u=document.createElement("span");return h(u,"close"),a.append(u),n}_itemByKey(e,t){return!e||!t?null:Array.from(e.querySelectorAll("[data-key]")).find(i=>i.dataset.key===t)}_removeByKey(e){const t=this._itemByKey(this.target,e);if(t)return m(()=>this._commitRemoveItem(t),{label:"home:activity-offline-remove"})}_commitRemoveItem(e){const t=e.closest("ul");e.remove(),t&&t.querySelectorAll("li").length===0&&(t.dataset.visible="false")}postreconcile(){const e=this._updated;super.postreconcile(),e&&(this.destroy(),this.init()),this.target.setAttribute("loaded","")}destroy(){this.target.removeEventListener("click",this._click)}}export{p as HomeActivityList};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { STYLES } from './styles.js?v=b3ba4dd3';
+import { BaseList } from './baseList.js?v=b3ba4dd3';
+import { r as request, w as withTransition } from './foundation.js?v=b3ba4dd3';
+import './connectivity.js?v=b3ba4dd3';
+import { s as setIcon } from './icons.js?v=b3ba4dd3';
+
+/**
+ * @testable infrastructure
+ */
+class HomeActivityList extends BaseList {
+	constructor(attributes) {
+		super(attributes);
+		this._click = this._click.bind(this);
+	}
+
+	init() {
+		this.target.addEventListener("click", this._click);
+	}
+
+	async _click(e) {
+		const button = e.target.closest("[data-action='delete-activity']");
+		if (!button) return;
+
+		await this.deleteActivity(button);
+	}
+
+	handleOfflineQueue({ phase, queue, record }) {
+		if (phase === "queued") return this._offlineQueued(record, queue);
+		if (phase === "cancelled") return this._offlineCancelled(record);
+	}
+
+	_offlineQueued(record, queue) {
+		if (record.kind === "note" && record.action === "create") {
+			return queue.response(this._renderNote(record, queue));
+		}
+
+		if (record.action === "delete") return this._removeByKey(record.target_key);
+	}
+
+	_offlineCancelled(record) {
+		if (record.action === "create") return this._removeByKey(record.client_key);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_delete_activity_item_from_home
+	 * @features activity notes notifications
+	 * @dimensions delete
+	 */
+	async deleteActivity(button) {
+		const key = button.dataset.key;
+		const item = button.closest("li[data-key], [lp-entity][data-key]");
+		if (!key || !item) return;
+
+		if (key.startsWith("offline:")) {
+			const queue =
+				this.view.offlineQueue || (await this.view.ensureOfflineQueue?.());
+			await queue?.cancel({
+				action: "create",
+				client_key: key,
+			});
+			return;
+		}
+		if (item.dataset.kind === "note") return;
+
+		const route = `/l/activity/${key}`;
+		if (!this.view.online) {
+			const queue =
+				this.view.offlineQueue || (await this.view.ensureOfflineQueue?.());
+			await queue?.queue({
+				id: `delete:${key}`,
+				kind: item.dataset.kind || "activity",
+				action: "delete",
+				method: "DELETE",
+				route,
+				target_key: key,
+			});
+			return;
+		}
+
+		button.disabled = true;
+		const response = await request.delete(route);
+		button.disabled = false;
+		if (response?.ok) {
+			await withTransition(() => this._commitRemoveItem(item), {
+				label: "home:activity-delete",
+			});
+		}
+	}
+
+	_renderNote(record, queue) {
+		const body = queue.field(record, "body");
+		const visibility = queue.field(record, "visibility") || "private";
+		const file = record.files?.[0]?.file;
+
+		const item = document.createElement("li");
+		item.dataset.key = record.client_key;
+		item.dataset.kind = "note";
+		item.dataset.offline = "true";
+		item.className = [STYLES.note.item.home, "opacity-80"].join(" ");
+
+		const content = document.createElement("div");
+		content.className = STYLES.note.content;
+		item.append(content);
+
+		if (body) {
+			const bodyElt = document.createElement("span");
+			bodyElt.className = STYLES.note.body;
+			bodyElt.textContent = body;
+			content.append(bodyElt);
+		}
+
+		if (file) {
+			const image = document.createElement("img");
+			image.src = URL.createObjectURL(file);
+			image.className = STYLES.note.photo.home;
+			image.alt = "";
+			content.append(image);
+		}
+
+		const meta = document.createElement("span");
+		meta.className = STYLES.note.meta;
+		meta.textContent = `Pending sync · ${visibility === "everyone" ? "Everyone" : "Private"}`;
+		content.append(meta);
+
+		const button = document.createElement("button");
+		button.className = STYLES.note.discard;
+		button.dataset.action = "delete-activity";
+		button.dataset.key = record.client_key;
+		button.type = "button";
+		button.setAttribute("aria-label", "Discard pending note");
+		button.title = "Discard pending note";
+		item.append(button);
+
+		const icon = document.createElement("span");
+		setIcon(icon, "close");
+		button.append(icon);
+
+		return item;
+	}
+
+	_itemByKey(root, key) {
+		if (!root || !key) return null;
+		return Array.from(root.querySelectorAll("[data-key]")).find((item) => {
+			return item.dataset.key === key;
+		});
+	}
+
+	_removeByKey(key) {
+		const item = this._itemByKey(this.target, key);
+		if (!item) return undefined;
+		return withTransition(() => this._commitRemoveItem(item), {
+			label: "home:activity-offline-remove",
+		});
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_reload_uses_server_state_until_replay
+	 * @features offline
+	 * @dimensions optimistic-mutation
+	 */
+	_commitRemoveItem(item) {
+		const list = item.closest("ul");
+		item.remove();
+
+		if (list && list.querySelectorAll("li").length === 0) {
+			list.dataset.visible = "false";
+		}
+	}
+
+	postreconcile() {
+		const updated = this._updated;
+		super.postreconcile();
+		if (updated) {
+			this.destroy();
+			this.init();
+		}
+		this.target.setAttribute("loaded", "");
+	}
+
+	destroy() {
+		this.target.removeEventListener("click", this._click);
+	}
+}
+
+export { HomeActivityList };

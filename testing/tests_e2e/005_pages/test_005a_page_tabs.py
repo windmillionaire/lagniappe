@@ -323,12 +323,17 @@ def test_delete_page_from_title_menu(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_delete_page)
 
-    scroll_y = user.page.evaluate("window.scrollY")
-    user.page.get_by_role("button", name="Page actions").click()
+    trigger = user.page.get_by_role("button", name="Page actions")
+    trigger.hover()
+    trigger.click()
+    expect(trigger).to_have_attribute("aria-busy", "true")
+    expect(trigger).to_have_attribute("data-combobox-id", re.compile(r".+"))
     menu = user.page.get_by_role("menu", name="Page actions")
     expect(menu).to_be_visible()
-    assert user.page.evaluate("window.scrollY") == scroll_y
-    menu.get_by_role("menuitem", name="Delete").click()
+    expect(menu).to_have_attribute("data-positioned", "true")
+    expect(trigger).not_to_have_attribute("aria-busy", "true")
+    delete_item = menu.get_by_role("menuitem", name="Delete")
+    delete_item.click()
 
     Modal(user.page).delete()
     expect(user.page).to_have_url(re.compile(r"/$"))

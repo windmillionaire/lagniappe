@@ -419,3 +419,10 @@ A family of typeahead/autocomplete components used by select, link, location, an
 All combobox classes extend `Combobox` (or `Submitter(Combobox)`) and specialize
 option loading or selection for their data source. `SearchBox` and
 `LocationBox` extend `Combobox` directly.
+
+Floating panels open normally while Floating UI computes their first
+coordinates. `panelReady` and `data-positioned` expose completion of that
+initial placement so lazy adapters can retain their busy state and focused
+tests can wait on behavior rather than timing. Superseded asynchronous
+measurements cannot overwrite newer coordinates, and later `autoUpdate`
+placements remain live.

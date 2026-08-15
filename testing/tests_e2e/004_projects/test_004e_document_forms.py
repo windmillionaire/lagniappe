@@ -288,6 +288,9 @@ def test_internal_links_normalize_paste_and_popover_navigation(get_user):
     link_form = EditorAddLink(editor, open_form=False)
     expect(link_form.input).to_have_value(click_href)
 
+    editor.text_entry.click()
+    expect(link_form.form).not_to_be_visible()
+
     click_link.click()
     popups = []
     user.page.on("popup", lambda page: popups.append(page))

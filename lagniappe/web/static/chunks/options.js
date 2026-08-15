@@ -1,2 +1,90 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="c46a7f80-ff3f-46ef-a28b-09a991ac6300",e._sentryDebugIdIdentifier="sentry-dbid-c46a7f80-ff3f-46ef-a28b-09a991ac6300");}catch(e){}}();import{p as i}from"./primitives.js?v=b1cc79bd";import{k as s}from"./foundation.js?v=b1cc79bd";import"./connectivity.js?v=b1cc79bd";import{C as o}from"./base2.js?v=b1cc79bd";import"./styles.js?v=b1cc79bd";import"./icons.js?v=b1cc79bd";import"./baseForm.js?v=b1cc79bd";import"./loader.js?v=b1cc79bd";import"./select2.js?v=b1cc79bd";import"./combobox.js?v=b1cc79bd";import"./results.js?v=b1cc79bd";import"./formatting.js?v=b1cc79bd";import"./submitter.js?v=b1cc79bd";class n extends o{constructor(t){super(t),this.key="options",this.messages={submit:"Add Option"}}init(){this.element.schema.options??=[],this.index!==-1?(this.setTitle("Edit Option"),this.messages.submit="Update Option",this.setting={...this.element.schema.options[this.index]}):(this.setTitle("Create Option"),this.messages.submit="Add Option",this.setting={}),super.init(),this.showProgress()}showProgress(){this.addOptionName(),this.setting.label&&(this.complete=!0),super.showProgress()}addOptionName(){if(this.options.has("name"))return;delete this.setting.value;const t=i.input({label:"Option Name",placeholder:"enter option name...",name:"option-name",type:"text",value:this.setting.label||null});this.options.set("name",t),this.focusTarget=t,t.addEventListener("input",e=>{this.setting.label=e.target.value,this.showProgress()})}validate(){return this.setting.label?(this.setting.value||(this.setting.value=`o${s(this.setting.label)}`),!0):(this.form.showError("Please enter an option name."),!1)}}export{n as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { p as primitives } from './primitives.js?v=b3ba4dd3';
+import { k as simpleHash } from './foundation.js?v=b3ba4dd3';
+import './connectivity.js?v=b3ba4dd3';
+import { C as Condition } from './base2.js?v=b3ba4dd3';
+import './styles.js?v=b3ba4dd3';
+import './icons.js?v=b3ba4dd3';
+import './baseForm.js?v=b3ba4dd3';
+import './loader.js?v=b3ba4dd3';
+import './select2.js?v=b3ba4dd3';
+import './combobox.js?v=b3ba4dd3';
+import './results.js?v=b3ba4dd3';
+import './formatting.js?v=b3ba4dd3';
+import './submitter.js?v=b3ba4dd3';
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
+ * @features forms
+ * @dimensions builder-select-options
+ */
+class Options extends Condition {
+	constructor(builder) {
+		super(builder);
+		this.key = "options";
+		this.messages = {
+			submit: "Add Option",
+		};
+	}
+
+	init() {
+		this.element.schema.options ??= [];
+
+		if (this.index !== -1) {
+			this.setTitle("Edit Option");
+			this.messages.submit = "Update Option";
+			this.setting = { ...this.element.schema.options[this.index] };
+		} else {
+			this.setTitle("Create Option");
+			this.messages.submit = "Add Option";
+			this.setting = {};
+		}
+
+		super.init();
+
+		this.showProgress();
+	}
+
+	showProgress() {
+		this.addOptionName();
+		if (this.setting.label) {
+			this.complete = true;
+		}
+		super.showProgress();
+	}
+
+	addOptionName() {
+		if (this.options.has("name")) return;
+		delete this.setting.value;
+
+		const optionName = primitives.input({
+			label: "Option Name",
+			placeholder: "enter option name...",
+			name: "option-name",
+			type: "text",
+			value: this.setting.label || null,
+		});
+
+		this.options.set("name", optionName);
+		this.focusTarget = optionName;
+
+		optionName.addEventListener("input", (e) => {
+			this.setting.label = e.target.value;
+			this.showProgress();
+		});
+	}
+
+	validate() {
+		if (!this.setting.label) {
+			this.form.showError("Please enter an option name.");
+			return false;
+		}
+		if (!this.setting.value) {
+			this.setting.value = `o${simpleHash(this.setting.label)}`;
+		}
+		return true;
+	}
+}
+
+export { Options as default };

@@ -35,6 +35,7 @@ from .deferred_jobs import (
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_email_ingest_adapter_starts_existing_report_job_idempotently
+# @tests tests_unit/test_028_ai_email.py::test_email_ingest_failure_surfaces_bounded_diagnostic
 # @features ai-email deferred-jobs
 # @dimensions attachments deterministic-files report-handoff acceptance
 class EmailIngestAdapter(DeferredJobAdapter):
@@ -86,6 +87,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
         report = context.input("report")
         actor = context.actor
         parameters = context.parameters
+        parameters["_diagnostic_code"] = "email_ingest_failed"
         attachments = parameters.get("attachments") or []
         if not isinstance(attachments, list):
             raise exceptions.ValidationError("Email attachment manifest is invalid.")
@@ -116,6 +118,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
                 request=Fetch.direct(),
             )
             if not isinstance(file, Entities.FILE):
+                parameters["_diagnostic_code"] = "attachment_download_failed"
                 try:
                     upload, actual_size = client.download_received_attachment(
                         parameters.get("provider_message_id"),
@@ -127,6 +130,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
                 except AIEmailRejection as error:
                     raise exceptions.ValidationError(str(error)) from error
                 try:
+                    parameters["_diagnostic_code"] = "attachment_prepare_failed"
                     enforce_file_consumer(
                         upload,
                         FileConsumer.AI_EMAIL_ATTACHMENT,
@@ -163,6 +167,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
             "create": DeferredJobType.REPORT_CREATE,
             "organize": DeferredJobType.REPORT_ORGANIZE,
         }
+        parameters["_diagnostic_code"] = "report_start_failed"
         child, _notification = DeferredJobs.start(
             DeferredJobSpec(
                 job_type=report_job_types[report.tool],
@@ -182,6 +187,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
             {"report_job": child.urlsafe_key},
             phase=DeferredJobPhase.PREPARING_INPUTS.value,
         )
+        parameters["_diagnostic_code"] = "feedback_delivery_failed"
         send_report_feedback(report, "acceptance", client=client)
         context.checkpoint_stage(
             "acceptance_sent",
@@ -197,6 +203,11 @@ class EmailIngestAdapter(DeferredJobAdapter):
         }
 
     def failure(self, context, error):
+        from lagniappe.core.tools.ai_email import (
+            AIEmailProviderError,
+            AIEmailRejection,
+        )
+
         report = context.input("report")
         if not isinstance(report, Entities.REPORT):
             return
@@ -208,9 +219,26 @@ class EmailIngestAdapter(DeferredJobAdapter):
             or current.status not in {"pending", "running"}
         ):
             return
-        current.properties.process.fail(
-            "The email submission could not be prepared. Please try again."
+        diagnostic_codes = {
+            "email_ingest_failed",
+            "attachment_download_failed",
+            "attachment_prepare_failed",
+            "report_start_failed",
+            "feedback_delivery_failed",
+        }
+        code = str(context.parameters.get("_diagnostic_code") or "")
+        if code not in diagnostic_codes:
+            code = "email_ingest_failed"
+        message = (
+            "The email submission could not be prepared. "
+            f"Diagnostic: {code}."
         )
+        if isinstance(error, AIEmailRejection):
+            message = f"{message} {error.public_message}"
+        elif isinstance(error, AIEmailProviderError):
+            message = f"{message} {str(error)[:300]}"
+        context.parameters["_diagnostic_message"] = message
+        current.properties.process.fail(message)
         Entities.save(current, context.actor)
 
     def cleanup(self, context, *, terminal):
@@ -219,6 +247,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
         context.parameters.pop("provider_message_id", None)
         context.parameters.pop("attachments", None)
         context.parameters.pop("event_digest", None)
+        context.parameters.pop("_diagnostic_code", None)
 
     def external_delivery_required(self, context):
         return bool(
@@ -233,7 +262,10 @@ class EmailIngestAdapter(DeferredJobAdapter):
         return send_report_feedback(
             context.input("report"),
             "failure",
-            message="The email submission could not be prepared. Open the report for details.",
+            message=(
+                context.parameters.get("_diagnostic_message")
+                or "The email submission could not be prepared. Open the report for details."
+            ),
         )
 
 
