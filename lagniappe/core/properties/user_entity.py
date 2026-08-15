@@ -157,3 +157,36 @@ class IsOwner(DBProperty):
     """Whether the user is a site owner (highest privilege level)."""
 
     _id = "owner"
+
+
+# @testable true
+# @tests tests_unit/test_027_messaging.py::test_messaging_entities_and_owner_toggles_are_fail_closed
+# @pair messaging:owner-opt-in
+class OwnerInboundToggle(DBProperty):
+    """Fail-closed owner opt-in for a collaboration channel."""
+
+    _truthy = {True, "true", "True", "1", 1, "on", "yes"}
+
+    # @testable true
+    # @tests tests_unit/test_027_messaging.py::test_messaging_entities_and_owner_toggles_are_fail_closed
+    # @pair messaging:owner-opt-in
+    @property
+    def value(self):
+        return self.entity.db.get(self.db_key, False) in self._truthy
+
+    @value.setter
+    def value(self, value):
+        enabled = value in self._truthy
+        self._value = enabled
+        if enabled:
+            self.entity.db[self.db_key] = True
+        else:
+            self.entity.db.pop(self.db_key, None)
+
+
+class AllowMessagesAndMentions(OwnerInboundToggle):
+    _id = "allow_messages_and_mentions"
+
+
+class AllowTaskAssignments(OwnerInboundToggle):
+    _id = "allow_task_assignments"

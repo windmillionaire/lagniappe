@@ -62,13 +62,23 @@ def _drop_index_if_exists(index):
         raise
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_017_cache_query.py::test_cache_delete_removes_page_and_user_search_projections
+# @pairs cache:delete search:user-projection
 def delete(entities):
     """Remove entities from both the hash cache and parent JSON indexes."""
     hash_map = {e.hash: e for e in entities if e and e.hash}
     existing_parents = filter_cache.get_existing_parents(hash_map.keys())
 
-    entity_keys = set([Search[e.kind].key(e) for e in entities if e])
+    entity_keys = set()
+    for entity in (entity for entity in entities if entity):
+        kinds = {entity.kind}
+        if entity.kind == "page":
+            # User-owned Pages are indexed under the virtual ``user`` kind.
+            # Delete both projections because a removed Page can no longer tell
+            # the cache which representation was previously stored.
+            kinds.add("user")
+        entity_keys.update(Search[kind].key(entity) for kind in kinds)
 
     if not entity_keys and not existing_parents:
         return

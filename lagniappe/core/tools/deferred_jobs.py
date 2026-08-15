@@ -506,6 +506,15 @@ class DeferredJobAdapter:
     def notification_target(self, context):
         return None
 
+    # @testable infrastructure
+    def external_delivery_required(self, context):
+        """Return whether this terminal job owns an external delivery step."""
+        return False
+
+    # @testable infrastructure
+    def external_delivery(self, context, *, succeeded, error=None):
+        return None
+
 
 # @testable infrastructure
 class DeferredJobRegistry:
@@ -2055,6 +2064,19 @@ class DeferredJobRegistry:
                 context.notification.pending = False
                 Entities.save(context.notification)
             delivery["notification"] = True
+            self._save_terminal_fields(job, delivery=delivery)
+
+        if (
+            inputs_available
+            and adapter.external_delivery_required(context)
+            and not delivery.get("external_email")
+        ):
+            adapter.external_delivery(
+                context,
+                succeeded=succeeded,
+                error=error or (job.error or {}).get("message"),
+            )
+            delivery["external_email"] = True
             self._save_terminal_fields(job, delivery=delivery)
 
     # @testable infrastructure

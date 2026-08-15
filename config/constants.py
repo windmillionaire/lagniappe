@@ -1,6 +1,6 @@
 SENTRY_DSN = "https://6ad2f168c5abc9f35de261d98b588633@o4511027028033536.ingest.us.sentry.io/4511218693242880"
 SENTRY_JS_DSN = "https://48fea2b31b65f353ee375b95ffcc6884@o4511027028033536.ingest.us.sentry.io/4511218663292928"
-BUILD_ID = "be0f1470"
+BUILD_ID = "b2884058"
 RUNTIME = "python314"
 DEFAULT_EXPIRATION = "31536000s"
 DEFAULT_APP_ENGINE_LOCATION = "us-central"
@@ -344,6 +344,37 @@ INDEX_YAML = {
                 {"name": "created", "direction": "desc"},
             ],
         },
+        {
+            "kind": "activity",
+            "ancestor": True,
+            "properties": [
+                {"name": "type"},
+                {"name": "notification_type"},
+                {"name": "created", "direction": "desc"},
+            ],
+        },
+        # Direct messages
+        {
+            "kind": "message_conversations",
+            "properties": [
+                {"name": "participants"},
+                {"name": "last_activity", "direction": "desc"},
+            ],
+        },
+        {
+            "kind": "message_conversations",
+            "properties": [
+                {"name": "visible_to"},
+                {"name": "last_activity", "direction": "desc"},
+            ],
+        },
+        {
+            "kind": "messages",
+            "ancestor": True,
+            "properties": [
+                {"name": "sequence", "direction": "desc"},
+            ],
+        },
         # History
         {
             "kind": "history",
@@ -550,6 +581,7 @@ APP_BLUEPRINT_ROUTE_PREFIXES = (
     "forms",
     "l",
     "manual",
+    "messages",
     "pages",
     "process",
     "projects",
@@ -558,6 +590,7 @@ APP_BLUEPRINT_ROUTE_PREFIXES = (
     "testing",
     "tools",
     "users",
+    "webhooks",
 )
 
 APP_ROOT_ROUTE_PREFIXES = (

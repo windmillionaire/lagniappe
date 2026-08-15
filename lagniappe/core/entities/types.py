@@ -13,6 +13,8 @@ from .history import TaskHistory, FormHistory, DocumentHistory
 from .home import Home
 from .ingress import Ingress
 from .model_task import ModelTask
+from .message import Message, MessageConversation
+from .mention import MentionMarker
 from .notification import Notification
 from .note import Note
 from .page import Page
@@ -49,3 +51,6 @@ class EntityType(Enum):
     FORM_HISTORY = FormHistory
     DOCUMENT_HISTORY = DocumentHistory
     REPORT = AIReport
+    MESSAGE_CONVERSATION = MessageConversation
+    MESSAGE = Message
+    MENTION_MARKER = MentionMarker

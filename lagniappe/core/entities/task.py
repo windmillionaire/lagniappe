@@ -38,6 +38,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
                 "assets",
                 "schedule",
                 "schema_version",
+                "assignment_revision",
             }
         )
 
@@ -112,7 +113,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_013_task_properties.py::test_task_update_rejects_assignee_without_restricted_task_access
     # @features task, permissions
     # @dimensions assignment restricted-access
-    def validate_assignment(self, assigned_to):
+    def validate_assignment(self, assigned_to, actor=None):
         if not assigned_to:
             return
 
@@ -123,6 +124,19 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         )
         if not assigned_user:
             raise ValidationError("Assigned page is not linked to a user.")
+
+        actor = current_context_user(actor)
+        if (
+            actor
+            and getattr(actor, "is_authenticated", False)
+            and getattr(actor, "key", None) is not None
+        ):
+            from ..tools import collaboration
+
+            if not collaboration.recipient_allowed(
+                actor, assigned_user, channel="assign"
+            ):
+                raise ValidationError("Assigned user is not eligible for tasks.")
 
         if self.restricted_access(assigned_user):
             raise ValidationError(
@@ -332,9 +346,19 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         tracking = data.get("model") or data.get("project")
         self._update_tracking(tracking)
 
+        previous_assignee_key = self.properties.assigned_to.key
         assigned_to = data.get("assigned_to")
-        self.validate_assignment(assigned_to)
+        actor = current_context_user()
+        self.validate_assignment(assigned_to, actor=actor)
         self.assigned_to = assigned_to
+        next_assignee_key = self.properties.assigned_to.key
+        if previous_assignee_key != next_assignee_key:
+            self.db["assignment_revision"] = int(
+                self.db.get("assignment_revision") or 0
+            ) + 1
+            if actor and getattr(actor, "page", None):
+                self.assigned_by = actor.page
+            self._add_assignment_notice(actor, assigned_to)
 
         if "asset_files" in data:
             self.files = data.get("asset_files")
@@ -343,6 +367,37 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             self.properties.submission.value = data.get("submission")
 
         self.updated = True
+
+    # @testable true
+    # @tests tests_unit/test_027_messaging.py::test_task_assignment_notice_uses_stable_transition_identity
+    # @pairs task-assignment:transition task-assignment:idempotency task-assignment:self-exclusion
+    def _add_assignment_notice(self, actor, assigned_to):
+        """Plan one stable notification for a non-self assignee transition."""
+        recipient = getattr(assigned_to, "user", None) if assigned_to else None
+        if (
+            not recipient
+            or not actor
+            or not getattr(actor, "is_authenticated", False)
+            or actor.key == recipient.key
+        ):
+            return
+        import hashlib
+
+        revision = int(self.db.get("assignment_revision") or 0)
+        identity = hashlib.sha256(
+            f"{self.urlsafe_key}:{revision}:{recipient.urlsafe_key}".encode()
+        ).hexdigest()
+        notification = Entities.NOTIFICATION.create(
+            {
+                "identifier": f"task-assignment-{identity}",
+                "parent": recipient,
+                "target": self,
+                "body": f"{actor.name} assigned you a task.",
+            }
+        )
+        self.add_mutation_intents(
+            MutationIntent.standard(notification, reason="task-assignment-notice")
+        )
 
     # @testable true
     # @tests tests_unit/test_013_task_properties.py::test_task_entity_lifecycle_readonly_and_save_relations

@@ -9,6 +9,7 @@ import tempfile
 from urllib.parse import urlparse
 
 from config.ai_settings import AI_SETTING_KEYS
+from config.ai_email import AIEmailConfigurationError, normalize_ai_email_config
 from config.constants import (
     DEFAULT_DEPLOYMENT_SETTINGS,
     REDIS_CA_CERT_RELATIVE_PATH,
@@ -228,8 +229,10 @@ def _require_project_resource(value, name, project_id):
 # @tests tests_tooling/test_003_config.py::test_recovery_requires_complete_current_configuration
 # @tests tests_tooling/test_003_config.py::test_recovery_validates_and_normalizes_auth_email_smtp
 # @tests tests_tooling/test_003_config.py::test_recovery_upgrades_schema_2_and_discards_legacy_messaging_config
+# @tests tests_tooling/test_003_config.py::test_recovery_accepts_and_redacts_optional_ai_email_config
 # @features config
-# @dimensions recovery-validation project-identity project-number current-schema required-settings authentication-email secrets schema-upgrade messaging-removal
+# @dimensions recovery-validation project-identity project-number current-schema required-settings authentication-email ai-email secrets schema-upgrade messaging-removal
+# @pair config:ai-email
 def validate_recovery_document(settings):
     """Validate and normalize a canonical recovery document before provider access."""
     from config.locations import (
@@ -378,6 +381,17 @@ def validate_recovery_document(settings):
             "configuration, verified sender address, and sender name."
         )
     recovered["AUTH_EMAIL_CONFIG"] = normalized_auth_email
+
+    ai_email_value = recovered.get("AI_EMAIL_CONFIG")
+    if ai_email_value not in (None, ""):
+        try:
+            recovered["AI_EMAIL_CONFIG"] = normalize_ai_email_config(
+                _mapping(ai_email_value, "AI_EMAIL_CONFIG")
+            )
+        except AIEmailConfigurationError as error:
+            raise RecoveryConfigurationError(
+                f"AI_EMAIL_CONFIG is invalid: {error}"
+            ) from error
 
     app_hostname = _hostname(recovered.get("APP_URL"), "APP_URL")
     if not (

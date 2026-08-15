@@ -17,8 +17,35 @@ class FakeEnvironment(Enum):
     PRODUCTION = "production"
 
 
+def _disabled_ai_email_config():
+    return {
+        "version": 1,
+        "provider": "resend",
+        "enabled": False,
+        "domain": "INBOUND.Example.COM.",
+        "aliases": {"ask": "ASK", "create": "create", "organize": "organize"},
+        "resend": {
+            "domainId": "domain-1",
+            "webhookId": "webhook-1",
+            "webhookSecret": "whsec_dGVzdA==",
+            "inboundApiKey": "re_full",
+            "sendingApiKey": "re_send",
+            "senderEmail": "noreply@example.com",
+            "senderName": "Lagniappe",
+        },
+        "limits": {
+            "maxBodyBytes": 65536,
+            "maxFiles": 20,
+            "maxFileBytes": 31457280,
+            "maxTotalFileBytes": 52428800,
+            "hourlyPerUser": 30,
+            "dailyPerUser": 200,
+        },
+    }
+
+
 # @features config
-# @dimensions build-id constants stale-settings
+# @dimensions build-id constants stale-settings ai-email public-projection secrets
 def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
     app_settings = {
         "CONFIG_KIND": "lagniappe-settings",
@@ -35,6 +62,7 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
         "APP_ENGINE_LOCATION": "us-central",
         "RESOURCE_REGION": "us-central1",
         "VERSION": "1.0",
+        "AI_EMAIL_CONFIG": _disabled_ai_email_config(),
     }
     fake_config = types.SimpleNamespace(
         Environment=FakeEnvironment,
@@ -72,6 +100,8 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
     assert module.CONFIG.REDIS_TLS is False
     assert module.CONFIG.REDIS_CA_CERT is None
     assert module.CONFIG.SOURCE_URL == "https://example.test/default-source"
+    assert module.CONFIG.AI_EMAIL_CONFIG["domain"] == "inbound.example.com"
+    assert module.CONFIG.AI_EMAIL_PUBLIC == {"enabled": False, "addresses": {}}
     assert module.CONFIG.LOGIN_USER_KEY == "_lagniappe_user_key"
     assert module.CONFIG.LOGIN_USER_PAGE_KEY == "_lagniappe_user_page_key"
     assert module.CONFIG.LOGIN_INVALIDATE_CACHE_KEY == "_lagniappe_invalidate_cache"

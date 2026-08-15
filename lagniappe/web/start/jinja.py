@@ -8,7 +8,7 @@ from markupsafe import Markup, escape
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions import AI, Action, Resource
-from lagniappe.core.tools import dates
+from lagniappe.core.tools import cache, dates
 
 from . import formatters, styles
 
@@ -33,6 +33,12 @@ def starred(entity):
     if entity.key in current_user.properties.starred.keys:
         return True
     return False
+
+
+# @testable infrastructure
+def owner_allows_assignments():
+    owner = cache.get_owner_projection()
+    return bool(owner and owner.get("allow_task_assignments"))
 
 
 # @testable false
@@ -165,5 +171,6 @@ def initialize(app):
             "Action": Action,
             "AI": AI,
             "Resource": Resource,
+            "owner_allows_assignments": owner_allows_assignments,
         }
     )

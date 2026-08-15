@@ -48,6 +48,7 @@
         data-can-edit-ai="{{ is_owner_viewer|yesno }}"
         data-ai-access="{{ page.user.ai_access }}"
         data-is-public="{{ page.user.is_public|yesno }}"
+        data-can-edit-owner-inbound="{{ (is_owner_viewer and is_own_page and is_owner_page)|yesno }}"
         data-group-names="{{ page.user.properties.groups.column_value or '' }}"
         data-visible="false"
         data-controls="true"
@@ -117,6 +118,35 @@
                      name="reassign-page"
                      class="{{ styles.input }}">
             </div>
+          {% endif %}
+          {% if is_owner_viewer and is_own_page and is_owner_page %}
+            <fieldset data-role="owner-inbound"
+                      data-kind="user"
+                      class="space-y-0 rounded-md border border-user-default p-3">
+              <legend class="{{ styles.label.default }} px-1">Allow managed users to</legend>
+              <label class="{{ styles.checkbox.label }}">
+                <div class="{{ styles.checkbox.container }}">
+                  <input type="checkbox"
+                         name="allow_messages_and_mentions"
+                         data-kind="user"
+                         {% if page.user.allow_messages_and_mentions %}checked{% endif %}
+                         class="{{ styles.checkbox.default }}">
+                  {{ render_icon("check", (styles.checkbox.icon)) }}
+                </div>
+                <span>Send messages and mention me</span>
+              </label>
+              <label class="{{ styles.checkbox.label }}">
+                <div class="{{ styles.checkbox.container }}">
+                  <input type="checkbox"
+                         name="allow_task_assignments"
+                         data-kind="user"
+                         {% if page.user.allow_task_assignments %}checked{% endif %}
+                         class="{{ styles.checkbox.default }}">
+                  {{ render_icon("check", (styles.checkbox.icon)) }}
+                </div>
+                <span>Assign tasks to me</span>
+              </label>
+            </fieldset>
           {% endif %}
         </div>
         {{ controls.edited_marker(url_for('pages.user_settings', key=page.urlsafe_key)) }}

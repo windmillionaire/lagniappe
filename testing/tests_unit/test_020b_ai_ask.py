@@ -188,6 +188,66 @@ def test_generate_ask_report_repairs_unusable_answers(monkeypatch):
     assert _context(calls[1], "Validation Error").strip()
 
 
+# @features ai-email ai-report
+# @dimensions ask submitted-files read-only repair
+@pytest.mark.unit
+def test_generate_ask_report_rejects_moving_email_submitted_files(monkeypatch):
+    user = _user("ask-email-file-owner")
+    submitted = TestEntities.get(
+        "FILE",
+        {
+            "hash": "email-file-one",
+            "filename": "notes.txt",
+            "mimetype": "text/plain",
+            "summary": "Meeting notes",
+        },
+    )
+    prompt = ask.ask_prompt(
+        _report(user, hash="ask-email-file-report", input_files=[submitted]),
+        user,
+    )
+    responses = [
+        {
+            "summary": "The notes describe the meeting.",
+            "confidence": 0.9,
+            "actions": [
+                {
+                    "id": "move_email_file",
+                    "type": "move_file",
+                    "display_label": "Move submitted notes",
+                    "data": {
+                        "file": "email-file-one",
+                        "from_page": "source-page",
+                        "to_page": "target-page",
+                    },
+                }
+            ],
+        },
+        {
+            "summary": "The notes describe the meeting.",
+            "confidence": 0.9,
+            "actions": [],
+        },
+    ]
+    calls = []
+
+    def generate(candidate_prompt):
+        calls.append(candidate_prompt)
+        return responses.pop(0)
+
+    monkeypatch.setattr(
+        organize.ai_model,
+        "generate_content",
+        _with_validator(generate),
+    )
+
+    response = ask.generate_ask_report(prompt)
+
+    assert response["actions"] == []
+    assert len(calls) == 2
+    assert "read-only evidence" in _context(calls[1], "Validation Error")
+
+
 # @features ai-report
 # @dimensions ask needs-review references per-action-fallback fallback
 @pytest.mark.unit

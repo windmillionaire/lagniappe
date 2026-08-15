@@ -1,5 +1,5 @@
 from .entity import Entity
-from ..properties import activity
+from ..properties import activity, messaging
 from ..tools import database
 
 
@@ -24,6 +24,11 @@ class Notification(Entity):
                 "target": activity.Target,
                 "body": activity.Body,
                 "pending": activity.Pending,
+                "notification_type": messaging.NotificationType,
+                "ordinary_count": messaging.OrdinaryCount,
+                "unread_message_count": messaging.UnreadMessageCount,
+                "aggregate_revision": messaging.AggregateRevision,
+                "aggregate_generation": messaging.AggregateGeneration,
             }
         )
         return properties
@@ -51,11 +56,18 @@ class Notification(Entity):
         parent = data.get("parent")
         target = data.get("target")
 
-        new_notification = cls(parent=parent)
+        if data.get("identifier"):
+            key = database.create_named_key(
+                "notification", data["identifier"], parent=parent
+            )
+            new_notification = cls(database.create_entity(key))
+        else:
+            new_notification = cls(parent=parent)
         new_notification.kind = cls.entity_kind
         new_notification.parent = parent
         new_notification.target = target
         new_notification.body = data.get("body")
         new_notification.pending = data.get("pending", False)
+        new_notification.notification_type = "ordinary"
 
         return new_notification

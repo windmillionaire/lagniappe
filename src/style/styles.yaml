@@ -139,8 +139,8 @@ builder:
 
 button:
   submit:
-    classes: grid grow place-items-center rounded-md bg-kind-default px-3 py-1.5 text-base font-semibold text-white shadow-sm action-button
-    intent: centered submit button with an independent leading status-icon slot
+    classes: grid w-full grow place-items-center rounded-md bg-kind-default px-3 py-1.5 text-base font-semibold text-white shadow-sm action-button
+    intent: full-width centered action button with an independent leading status-icon slot
     surfaces: [server, frontend]
     hooks: [action-button]
     css: [src/style/buttons.css]
@@ -886,7 +886,7 @@ list:
   itemHeader:
     classes: flex flex-row items-center justify-between gap-2 p-4 text-base font-medium sm:px-6
     intent: item header presentation within list
-    surfaces: [server]
+    surfaces: [server, frontend]
   links:
     container:
       classes: grid w-full grid-cols-1 grid-rows-2 border-t border-base-light/50 sm:grid-cols-2 sm:grid-rows-1 sm:divide-x sm:divide-base-light/50
@@ -1008,7 +1008,7 @@ modal:
   actions:
     alias: filters
     intent: horizontal action group in modal content
-    surfaces: [server]
+    surfaces: [server, frontend]
 
 nav:
   button:

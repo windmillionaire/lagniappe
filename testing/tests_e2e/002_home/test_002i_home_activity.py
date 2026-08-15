@@ -501,7 +501,7 @@ def test_notification_menu_deletes_and_clears(get_user):
 
     user.go(SitePages.HOME)
     user.page.wait_for_function(
-        "window.__NOTIFICATION_STATE__?.miss === false",
+        "() => window.__NOTIFICATION_STATE__?.miss === false",
         timeout=15000,
     )
     browser_state = user.page.evaluate("window.__NOTIFICATION_STATE__")
@@ -548,10 +548,12 @@ def test_notification_menu_deletes_and_clears(get_user):
     ):
         clear_all.click()
 
-    expect(panel).to_be_hidden()
-    expect(notifications).to_have_attribute("data-visible", "false")
-    expect(notifications).to_have_attribute("aria-hidden", "true")
-    expect(notifications).to_have_attribute("tabindex", "-1")
+    expect(panel).to_be_visible()
+    expect(panel.locator("[role='option']")).to_have_count(1)
+    expect(panel.locator("[data-action='message-user']")).to_be_visible()
+    expect(notifications).to_have_attribute("data-visible", "true")
+    expect(notifications).to_have_attribute("aria-hidden", "false")
+    expect(notifications).to_have_attribute("tabindex", "0")
     expect(notifications).to_have_attribute("aria-label", "Notifications: 0")
     assert Entities.fetch_one(first.urlsafe_key, request=Fetch.root()) is None
     assert Entities.fetch_one(second.urlsafe_key, request=Fetch.root()) is None

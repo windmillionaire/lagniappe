@@ -24,7 +24,7 @@
             href="/chunks/connectivity.js?v={{ CONFIG.BUILD_ID }}">
       <link rel="modulepreload"
             href="/chunks/foundation.js?v={{ CONFIG.BUILD_ID }}">
-      {% if view_entry in ['project', 'page', 'home', 'user', 'index', 'file', 'report', 'admin'] %}
+      {% if view_entry in ['project', 'page', 'home', 'user', 'index', 'file', 'report', 'admin', 'messages'] %}
         <link rel="modulepreload"
               href="/chunks/core-foundation.js?v={{ CONFIG.BUILD_ID }}">
       {% endif %}

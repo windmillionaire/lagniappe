@@ -152,6 +152,9 @@ Deleting a user normally cascades through their page. Callers that explicitly
 set `preserve_user_pages=True` delete only the user, clear the page's `user`
 relationship, and remove the reserved `USERS` model. A preserved page keeps any
 other categories; if it has none, `Uncategorized Pages` becomes its model.
+Cache cleanup removes both the Page's physical `page` search projection and its
+former virtual `user` projection. Search hydration also drops and deletes a
+legacy projection whose authoritative entity-details row is already gone.
 
 The owner-facing create-user route may adopt an existing public user instead of
 creating a duplicate. Adoption keeps the Identity Platform/user key, clears the
@@ -439,6 +442,9 @@ The `EntityType` enum maps type names to entity classes:
 | `FORM_HISTORY` | `FormHistory` | Form submission history records |
 | `DOCUMENT_HISTORY` | `DocumentHistory` | Document history records |
 | `NOTIFICATION` | `Notification` | Notification/activity records |
+| `MESSAGE_CONVERSATION` | `MessageConversation` | Internal participant state and unread cursors for a direct-message peer |
+| `MESSAGE` | `Message` | Canonical plain-text message child of one conversation |
+| `MENTION_MARKER` | `MentionMarker` | Durable document/occurrence delivery idempotency marker |
 | `REPORT` | `AIReport` | Reviewed AI report proposals and execution state |
 | `DEFERRED_JOB`, `JOB` | `DeferredJob` | Internal durable background-job envelope |
 | `DEFERRED_JOB_LOCK`, `JOB_LOCK` | `DeferredJobLock` | Deterministic target/scope ownership for active deferred work |
@@ -471,14 +477,38 @@ applying mutations. This makes a downgrade effective for already queued work.
 ETags and home polling do not reuse UI authorized under an earlier tier.
 
 Notifications are activity entities with a `parent` user, plain-text `body`,
-optional related `target`, and a `pending` flag for deferred work. Offline
+optional related `target`, and a `pending` flag for deferred work. A persisted
+`notification_type` separates ordinary rows from the deterministic per-user
+aggregate. The aggregate remains durable at zero and stores exact ordinary and
+unread-message counts plus its own revision/generation; it never appears in the
+ordinary cursor query. Offline
 mutation replay can set `offline=True` on a route request; routes that want a
 durable user-visible completion message create a `Notification` with
 `parent=current_user` and the affected target. Deferred routes create the
 notification as pending and update the same entity when the process finishes.
 Committed notification creates/content updates/deletes emit a post-commit Redis
-projection effect. They do not write the User or a notification/site
+projection effect. Ordinary create/delete/clear operations use
+`notification_service` to update the row and durable aggregate. Direct-message
+and mention transactions update their recipient aggregate in the same
+transaction as the unread state or visible Notification. They do not write the User or a notification/site
 fingerprint, and cache failure never rolls back the durable entity mutation.
+
+`MessageConversation` uses a deterministic key derived from two sorted User
+keys. It stores participant/name snapshots, per-user unread/read/clear cursors,
+visibility, sequence, and revision. A single `Message` child stores sender,
+recipient, sequence, a trimmed unindexed body of at most 1,000 characters, and
+per-user hide state. Its deterministic sender/operation key makes matching
+replays idempotent and conflicting reuse an error. All message body reads are
+participant-authorized; owner status grants no override. Permission loss keeps
+history but blocks new sends.
+
+Managed-user collaboration uses the cached `user_message_restrictions` union
+of group membership and group `VIEW`, with global Users `VIEW` unrestricted.
+The owner has fail-closed `allow_messages_and_mentions` and
+`allow_task_assignments` inbound toggles. Redis holds a disposable owner search
+projection, while mutation checks always use the already-loaded canonical
+owner row. Task assignee transitions increment `assignment_revision` and plan
+one deterministic ordinary Notification for a different non-self recipient.
 
 Deferred-job status transactions write only the durable job and
 scheduler-control records they actually change; job activity does not
@@ -646,6 +676,15 @@ background Organize process has converted every record into an attached `File`.
 The staged source remains available until that file and its manifest checkpoint
 are saved, allowing a worker retry to repeat an interrupted copy. The report's
 `input_files` relation remains the durable post-finalization state.
+
+Email-origin reports use `origin: "email"` and an index-excluded
+`inbound_manifest` containing only normalized subject/body, selected address,
+received timestamp, and safe attachment display metadata. Provider IDs,
+headers, and signed URLs remain outside the report. Email attachments are
+ordinary `File` entities with a temporary `report_user` view relationship so
+the submitting user can read report-only evidence without gaining edit or
+placement rights; normal Page/Task relationships remain authoritative if a
+reviewed Organize proposal later places a file.
 
 ## Entity Registry (`entities/__init__.py`)
 

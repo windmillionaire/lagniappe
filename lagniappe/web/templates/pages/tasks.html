@@ -299,6 +299,7 @@
 
 {% macro action_buttons(page, task=None) %}
   {% set can_assign = current_user.properties.restrictions.user_assign_restrictions %}
+  {% set can_assign_owner = owner_allows_assignments() %}
   {% set can_edit = (not task and page.allowed(Action.EDIT)) or (task and task.allowed(Action.EDIT)) %}
   {% set can_upload = can_edit and not current_user.is_public %}
   {% set assigned_to_preload = task.properties.assigned_to.column_value if task and task.assigned_to else none %}
@@ -347,7 +348,7 @@
             {% if task and task.properties.schedule.active %}data-schedule='{{ task.schedule|tojson }}'{% endif %}
             {% if task and task.due_date %}data-due-date='{{ task.properties.due_date.form_value }}'{% endif %}
             class="{{ styles.select.button }}"></button>
-    {% if can_assign or assigned_to_preload %}
+    {% if can_assign or can_assign_owner or assigned_to_preload %}
       <button type="button"
               lp-select
               data-action="selectUser"

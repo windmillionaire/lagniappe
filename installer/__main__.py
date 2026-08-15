@@ -42,6 +42,10 @@ def _parser():
     )
     commands.add_parser("ai", help="Configure AI")
     commands.add_parser(
+        "ai-email",
+        help="Configure, deploy, and activate Resend AI email submissions",
+    )
+    commands.add_parser(
         "security",
         help="Configure Redis transport security",
     )
@@ -164,6 +168,10 @@ def _dispatch(args):
         from installer.ai import configure_ai
 
         return configure_ai()
+    if command == "ai-email":
+        from installer.ai_email import configure_ai_email
+
+        return configure_ai_email()
     if command == "security":
         from installer.security import configure_security
 

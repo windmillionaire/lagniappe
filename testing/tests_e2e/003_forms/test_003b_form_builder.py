@@ -275,7 +275,7 @@ def test_table_column_condition_editor(get_user):
     ).click()
     column_name = builder.condition.locator("input[name='column-name']")
     column_name.fill("")
-    builder.save_condition()
+    builder.condition.locator("button[data-role='save']").click()
     expect(_condition_error(builder)).to_contain_text("Please enter a column name")
     column_name.fill("Amount")
     _condition_select_key(builder, "number")
@@ -332,7 +332,7 @@ def test_status_message_condition_editor(get_user):
     ).click()
     message = builder.condition.locator("input[name='status-message']")
     message.fill("")
-    builder.save_condition()
+    builder.condition.locator("button[data-role='save']").click()
     expect(_condition_error(builder)).to_contain_text(
         "Please enter a status message"
     )

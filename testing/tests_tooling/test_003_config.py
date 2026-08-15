@@ -550,7 +550,7 @@ def test_app_engine_dynamic_handler_allowlist_covers_registered_routes():
         (repository_root / "lagniappe/web/start/blueprints.py").read_text()
     )
     blueprint_prefixes = {
-        keyword.value.value.removeprefix("/")
+        keyword.value.value.removeprefix("/").split("/", 1)[0]
         for node in ast.walk(blueprint_tree)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Attribute)
@@ -744,7 +744,6 @@ def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirem
         sys.modules.pop("runner.deploy", None)
         if original_runner_deploy is not None:
             sys.modules["runner.deploy"] = original_runner_deploy
-
 
 # @features deploy
 # @dimensions deploy-surface imports gcloudignore package-boundary
@@ -1007,6 +1006,41 @@ def test_recovery_validates_and_normalizes_auth_email_smtp():
     snapshot["AUTH_EMAIL_CONFIG"]["security"] = "plaintext"
     with pytest.raises(recovery.RecoveryConfigurationError, match="AUTH_EMAIL_CONFIG"):
         recovery.validate_recovery_document(snapshot)
+
+
+# @features ai-email config
+# @dimensions recovery-validation recovery-display secrets optional-setting
+# @pair config:ai-email
+def test_recovery_accepts_and_redacts_optional_ai_email_config():
+    from config import recovery
+    from config.ai_email import AI_EMAIL_LIMITS
+
+    snapshot = _valid_recovery_document()
+    snapshot["AI_EMAIL_CONFIG"] = {
+        "version": 1,
+        "provider": "resend",
+        "enabled": False,
+        "domain": "inbound.example.com",
+        "aliases": {"ask": "ask", "create": "create", "organize": "organize"},
+        "resend": {
+            "domainId": "domain-1",
+            "webhookId": "webhook-1",
+            "webhookSecret": "whsec_secret",
+            "inboundApiKey": "re_full",
+            "sendingApiKey": "re_send",
+            "senderEmail": "noreply@example.com",
+            "senderName": "Lagniappe",
+        },
+        "limits": dict(AI_EMAIL_LIMITS),
+    }
+
+    recovered = recovery.validate_recovery_document(snapshot)
+    displayed = recovery.redact_settings_for_display(recovered)
+
+    assert recovered["AI_EMAIL_CONFIG"]["domain"] == "inbound.example.com"
+    assert displayed["AI_EMAIL_CONFIG"]["resend"]["webhookSecret"] == "[REDACTED]"
+    assert displayed["AI_EMAIL_CONFIG"]["resend"]["inboundApiKey"] == "[REDACTED]"
+    assert displayed["AI_EMAIL_CONFIG"]["resend"]["sendingApiKey"] == "[REDACTED]"
 
 
 # @features config

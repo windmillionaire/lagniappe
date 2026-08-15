@@ -63,6 +63,11 @@ def main():
     )
     _install_module("ai", "configure_ai", _entry_point("ai", behavior, status))
     _install_module(
+        "ai_email",
+        "configure_ai_email",
+        _entry_point("ai-email", behavior, status),
+    )
+    _install_module(
         "security",
         "configure_security",
         _entry_point("security", behavior, status),

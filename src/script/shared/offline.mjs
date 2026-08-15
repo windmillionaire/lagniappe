@@ -108,6 +108,7 @@ export function updateSyncRecord(record) {
 						}
 					: { ...record, timestamp };
 				if (existing && !Object.hasOwn(record, "html")) delete merged.html;
+				if (existing && !Object.hasOwn(record, "mentions")) delete merged.mentions;
 				await promisify(store.put(merged));
 				resolve();
 			} catch (e) {

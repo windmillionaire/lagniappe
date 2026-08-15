@@ -4,7 +4,7 @@ import { withTransition } from "../shared/utilities";
 import Core from "./base/core";
 
 const REPORT_FORM_SELECTOR =
-	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='undo-report-form'], [data-role='revise-report-form']";
+	"[data-role='run-report-form'], [data-role='retry-report-form'], [data-role='undo-report-form'], [data-role='recovery-undo-report-form'], [data-role='revise-report-form']";
 
 /**
  * @testable true
@@ -116,16 +116,18 @@ export default class Report extends Core {
 	}
 
 	async _initUndoReportForm(BaseForm) {
-		const target = this.elt.querySelector("[data-role='undo-report-form']");
+		const target = this.elt.querySelector(
+			"[data-role='undo-report-form'], [data-role='recovery-undo-report-form']",
+		);
 		if (!target) return;
 
 		this.UndoReportForm = new BaseForm({
 			target,
 			view: this,
 			messages: {
-				submit: "Undo Report",
-				submitting: "Undoing Report",
-				submitted: "Report Undone",
+				submit: target.dataset.submit || "Undo Report",
+				submitting: target.dataset.submitting || "Undoing Report",
+				submitted: target.dataset.submitted || "Report Undone",
 			},
 			icon: "undo",
 		});

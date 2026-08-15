@@ -1,4 +1,4 @@
-from ..mixins import RelatedEntityListMixin
+from ..mixins import RelatedEntityListMixin, RelatedEntityMixin
 from .base_db import DBProperty
 
 
@@ -29,3 +29,14 @@ class AttachedToTasks(RelatedEntityListMixin, DBProperty):
     _label = "Tasks"
     _icon = "task"
     _touch_members = False
+
+
+# @testable true
+# @tests tests_unit/test_028_ai_email.py::test_email_report_file_is_viewable_only_by_submitter_or_owner
+# @features ai-email files
+# @dimensions temporary-view-ownership
+class ReportUser(RelatedEntityMixin, DBProperty):
+    """Submitting user temporarily allowed to view a report-only email file."""
+
+    _id = "report_user"
+    _kind = "user"

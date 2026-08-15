@@ -20,7 +20,7 @@ from testing.elements import (
     Tabs,
 )
 from testing.resources import Page
-from testing.utility import expect_reconnect_refresh
+from testing.utility import expect_reconnect_refresh, expect_successful_response
 
 pytestmark = pytest.mark.e2e
 
@@ -97,6 +97,19 @@ def _post_form_status(user, path, data):
             return response.status;
         }""",
         {"path": path, "data": data},
+    )
+
+
+def _get_text(user, path):
+    return user.page.evaluate(
+        """async (path) => {
+            const response = await fetch(path, {
+                credentials: "include",
+                headers: {"X-Lagniappe-Request": "true"},
+            });
+            return {status: response.status, body: await response.text()};
+        }""",
+        path,
     )
 
 
@@ -192,7 +205,11 @@ def test_users_index_public_toggle_shows_public_users(get_user, browser_failures
 
 
 def _create_user(user, create_form, definition):
-    with user.page.expect_response("**/create"):
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/users/create",
+    ):
         SpinnerButtons.CREATE.click(create_form)
     table = Table(user)
     new_row = table.new_row(definition.name)
@@ -219,12 +236,8 @@ def test_create_user_from_index(get_user):
     user_index = owner.go(SitePages.USER_INDEX)
     create_form = user_index.create_user_form
 
-    create_form.locator("label").filter(has_text="Name").locator(
-        "input[name='name']"
-    ).fill(created_user.name)
-    create_form.locator("label").filter(has_text="Email").locator(
-        "input[name='email']"
-    ).fill(created_user.email)
+    create_form.locator("input[name='name']").fill(created_user.name)
+    create_form.locator("input[name='email']").fill(created_user.email)
     ai_options = create_form.locator("input[name='ai_access']")
     expect(ai_options).to_have_count(3)
     expect(
@@ -539,7 +552,7 @@ def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user
 
 
 # @pairs users:delete users:default-cascade users:preserve-page
-# @pairs users:category-fallback users:options
+# @pairs users:category-fallback users:options users:search-cache
 # @pair user-groups:unrelated-delete
 # @pairs pages:delete pages:default-cascade pages:preserve-page
 # @pair pages:category-fallback
@@ -622,6 +635,18 @@ def test_delete_user_can_preserve_page(get_user):
         expect(owner.locate("[lp-view]")).to_have_attribute("initialized", "")
         expect(Table(owner).get_row(cascade_user.name)).to_have_count(0)
         expect(Table(owner).get_row(created_user.name)).to_have_count(0)
+
+        for deleted_name in (cascade_user.name, created_user.name):
+            query = deleted_name.replace(" ", "%20")
+            facet = _get_text(
+                owner,
+                f"/l/search-index/user?q={query}&permission=message",
+            )
+            regular = _get_text(owner, f"/l/search-bar?q={query}")
+            assert facet["status"] == 200
+            assert regular["status"] == 200
+            assert deleted_name not in facet["body"]
+            assert deleted_name not in regular["body"]
 
         preserved_resource = Page(
             user=owner,

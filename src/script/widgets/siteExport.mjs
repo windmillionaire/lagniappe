@@ -22,6 +22,7 @@ export class SiteExport {
 	_bind() {
 		this.startButton = buttons.active({
 			existingButton: this.target.querySelector("[data-role='start-export']"),
+			icon: "download",
 			text: "Start Export",
 			processingText: "Starting Export",
 			completedText: "Export Queued",

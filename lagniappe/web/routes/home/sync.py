@@ -5,7 +5,7 @@ from flask_login import current_user
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache
+from lagniappe.core.tools import cache, mentions
 from lagniappe.core.tools.form_state import validate_sync_payload
 from lagniappe.web import responses
 from lagniappe.web.auth import logged_in
@@ -101,6 +101,12 @@ def sync():
             cache.update_document_asset(
                 update["sync_id"],
                 seed=_document_seed(entity),
+            )
+            mentions.deliver_mentions(
+                current_user,
+                entity,
+                update.get("html") or "",
+                update.get("mentions") or [],
             )
         elif update.get("touch_parent") and not has_document_payload:
             Entities.advance_document_parent(entity)

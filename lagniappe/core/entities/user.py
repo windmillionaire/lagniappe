@@ -33,6 +33,8 @@ class User(AssetMixin, UserMixin, Entity):
                 "ai_access",
                 "permissions",
                 "photo",
+                "allow_messages_and_mentions",
+                "allow_task_assignments",
             }
         )
 
@@ -88,6 +90,8 @@ class User(AssetMixin, UserMixin, Entity):
                 "restrictions": user_restrictions.Restrictions,
                 "is_public": common_entity.IsPublic,
                 "is_owner": user_entity.IsOwner,
+                "allow_messages_and_mentions": user_entity.AllowMessagesAndMentions,
+                "allow_task_assignments": user_entity.AllowTaskAssignments,
             }
         )
         return properties

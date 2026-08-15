@@ -14,6 +14,7 @@ from .documents import (
 from .notifications import (
     clear_recorded_notification_states,
     peek_notification_state,
+    publish_notification_aggregate,
     public_notification_state,
     repair_notification_state,
     seed_notification_state,
@@ -27,6 +28,13 @@ from .operations import (
     peek_operation_states,
     peek_poll_states,
     update_operation_projection,
+)
+from .owner import (
+    clear_request_owner_projection,
+    get_owner_projection,
+    normalize_owner_name,
+    owner_search_result,
+    update_owner_projection,
 )
 from .query import entity_search, kind_search, search
 from .utility import (
@@ -57,6 +65,7 @@ __all__ = [
     "update_document_asset",
     "clear_recorded_notification_states",
     "peek_notification_state",
+    "publish_notification_aggregate",
     "public_notification_state",
     "repair_notification_state",
     "seed_notification_state",
@@ -68,4 +77,9 @@ __all__ = [
     "peek_operation_states",
     "peek_poll_states",
     "update_operation_projection",
+    "clear_request_owner_projection",
+    "get_owner_projection",
+    "normalize_owner_name",
+    "owner_search_result",
+    "update_owner_projection",
 ]

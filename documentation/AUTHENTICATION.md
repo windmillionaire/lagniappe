@@ -81,6 +81,13 @@ supports a tested provider-neutral SMTP configuration and a Resend shortcut.
 New values replace the previous sender only after a successful test message.
 SMTP TLS always verifies certificates.
 
+Optional `./setup.sh ai-email` reuses the same verified Resend sender address,
+sender name, and Sending-access key for acceptance/result feedback. It creates
+only a separate Full access key for receiving administration; the two keys must
+differ. Inbound `From` matching selects an existing account but does not grant
+browser access or permission to execute a proposal: reports remain owner-scoped,
+rate-limited, and Create/Organize changes require normal sign-in and review.
+
 At runtime the server uses authenticated ADC and
 `accounts:sendOobCode` with `returnOobLink: true`. It embeds the returned code
 in Lagniappe's existing `/users/login` action URL on the configured login

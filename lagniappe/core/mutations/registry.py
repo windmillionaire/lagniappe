@@ -41,6 +41,9 @@ SAVE_PLANNERS = {
     "job": JobMutation(),
     "job_lock": STANDARD,
     "report": ReportMutation(),
+    "message_conversation": STANDARD,
+    "message": STANDARD,
+    "mention_marker": STANDARD,
 }
 
 

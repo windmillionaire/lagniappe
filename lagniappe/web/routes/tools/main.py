@@ -132,7 +132,10 @@ def _explain_organize_prompt():
 # @covered-by lagniappe/web/routes/tools/main.py::create_ask_report
 # @reason explain modal shares the real ask prompt assembly
 def _explain_ask_prompt():
-    report = SimpleNamespace(instructions=request.form.get("instructions"))
+    report = SimpleNamespace(
+        instructions=request.form.get("instructions"),
+        input_files=[],
+    )
     return responses.explain(ai.ask_prompt(report, current_user))
 
 

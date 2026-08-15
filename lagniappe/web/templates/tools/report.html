@@ -208,14 +208,14 @@
 {% endmacro %}
 
 {% block title %}
-  {{ ("Ask: " ~ report.instructions) if report.tool == "ask" and report.instructions else report.name }}
+  {{ report.name }}
 {% endblock title %}
 
 {% block content %}
   {% set has_actions = report.proposal and report.proposal.actions %}
   {% set executable_actions = report.proposal.actions|rejectattr("type", "equalto", "needs_review")|rejectattr("type", "equalto", "skip")|list if has_actions else [] %}
   {% set is_ask = report.tool == "ask" %}
-  {% set report_title = ("Ask: " ~ report.instructions) if is_ask and report.instructions else report.name %}
+  {% set report_title = report.name %}
   {% set report_icon = "ask" if report.tool == "ask" else "create" if report.tool == "create" else "organize" if report.tool == "organize" else "generate" %}
   {% set can_create_ai = current_user.access(AI.CREATE) %}
   {% set can_revise = report.proposal and report.tool in ["organize", "ask", "create"] and report.status == "ready" and (is_ask or can_create_ai) %}
@@ -267,6 +267,26 @@
     <div id="layout" class="sm:mt-4">
       <div class="{{ styles.card.primary }} overflow-hidden">
         <section class="flex flex-col gap-5 p-4 sm:p-5">
+          {% if report.origin == "email" and report.inbound_manifest %}
+            {% set inbound = report.inbound_manifest %}
+            <div data-role="email-submission"
+                 class="flex flex-col gap-3 rounded-md bg-base-bg p-3">
+              <div class="flex items-center gap-2">
+                <span class="rounded-full bg-kind-default px-2 py-0.5 text-xs font-semibold text-white">Email submission</span>
+                <span class="text-xs text-base-medium">{{ inbound.tool|title }}</span>
+              </div>
+              <div class="flex flex-col gap-1">
+                <h2 class="text-sm font-semibold text-base-dark">Subject</h2>
+                <p class="text-sm text-base-dark">{{ inbound.subject or "(no subject)" }}</p>
+              </div>
+              {% if inbound.body %}
+                <div class="flex flex-col gap-1">
+                  <h2 class="text-sm font-semibold text-base-dark">Message</h2>
+                  <p class="whitespace-pre-wrap text-sm text-base-dark">{{ inbound.body }}</p>
+                </div>
+              {% endif %}
+            </div>
+          {% endif %}
           {% if report.pending or report.error or report.status in ["running", "failed"] or (not is_ask and not report.proposal) %}
             <div data-role="report-status" class="flex flex-col gap-1">
               <h2 class="text-base font-semibold text-base-dark">Status</h2>
@@ -458,14 +478,18 @@
                      class="overflow-auto rounded-md bg-base-bg p-3 text-xs">{{ report.result|tojson(indent=2) }}</pre>
               </div>
               {% if can_undo %}
+                {% set undo_label = "Resume Undo" if report.status == "undo_failed" else "Undo Completed Actions" if report.status == "failed" else "Undo Report" %}
                 <form method="post"
                       action="{{ url_for('tools.undo_report', key=report.urlsafe_key) }}"
                       data-role="{{ 'recovery-undo-report-form' if report.status in ['failed', 'undo_failed'] else 'undo-report-form' }}"
-                      class="flex justify-end">
+                      data-submit="{{ undo_label }}"
+                      data-submitting="{{ 'Resuming Undo' if report.status == 'undo_failed' else 'Undoing Completed Actions' if report.status == 'failed' else 'Undoing Report' }}"
+                      data-submitted="Report Undone"
+                      class="flex">
                   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                   <button type="submit"
                           data-kind="delete"
-                          class="{{ styles.button.submit }} w-fit">{{ "Resume Undo" if report.status == "undo_failed" else "Undo Completed Actions" if report.status == "failed" else "Undo Report" }}</button>
+                          class="{{ styles.button.submit }}">{{ undo_label }}</button>
                 </form>
               {% endif %}
             </div>
@@ -490,7 +514,7 @@
                         placeholder="Tell the AI what to change."></textarea>
               <button type="submit"
                       data-kind="report"
-                      class="{{ styles.button.submit }} w-fit">{{ revise_button_label }}</button>
+                      class="{{ styles.button.submit }}">{{ revise_button_label }}</button>
             </form>
           {% endif %}
 
@@ -508,7 +532,7 @@
               {% endif %}
               <button type="submit"
                       data-kind="report"
-                      class="{{ styles.button.submit }} w-fit self-end">{{ "Retry Proposal" if can_retry else "" }}</button>
+                      class="{{ styles.button.submit }}">{{ "Retry Proposal" if can_retry else "" }}</button>
             </form>
           {% endif %}
         </section>

@@ -3,9 +3,9 @@ import math
 from flask import abort, g, request
 from flask_login import current_user
 
-from lagniappe.core.definitions import Action, Resource
+from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, location
+from lagniappe.core.tools import cache, collaboration, location
 from lagniappe.web.auth import logged_in
 from lagniappe.web import responses
 
@@ -95,6 +95,16 @@ def _search_restrictions(kind):
         return current_user.properties.restrictions.category_edit_restrictions
     if kind == "user" and permission == "assign":
         return current_user.properties.restrictions.user_assign_restrictions
+    if kind == "user" and permission in {"message", "mention"}:
+        if not collaboration.managed_user(current_user):
+            abort(403)
+        if permission == "mention":
+            document = Entities.fetch_one(
+                request.values.get("document"), request=Fetch.root()
+            )
+            if not document or not document.allowed(Action.VIEW, user=current_user):
+                abort(403)
+        return current_user.properties.restrictions.user_message_restrictions
     abort(400)
 
 
@@ -163,6 +173,14 @@ def index(kind):
             _search_restrictions(kind),
             current_user.properties.restrictions.belongs_to,
         )
+
+    search_results = collaboration.collaboration_user_results(
+        search_results,
+        query,
+        request.values.get("permission"),
+        current_user,
+        document_identifier=request.values.get("document"),
+    )
 
     if preloaded_hashes:
         results = [

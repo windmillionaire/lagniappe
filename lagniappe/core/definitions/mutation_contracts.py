@@ -140,6 +140,7 @@ ENTITY_MUTATION_CONTRACTS = {
                     on_target_delete=DeletePolicy.UNLINK,
                     mirrored=True,
                 ),
+                relation("report_user", "user"),
             ),
         ),
         EntityMutationContract(
@@ -328,6 +329,9 @@ ENTITY_MUTATION_CONTRACTS = {
                 relation("input_files", "file", cardinality="many"),
             ),
         ),
+        EntityMutationContract("message_conversation"),
+        EntityMutationContract("message"),
+        EntityMutationContract("mention_marker"),
     )
 }
 

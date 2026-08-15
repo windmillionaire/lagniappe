@@ -20,6 +20,7 @@ class FileConsumer(Enum):
     MIME_SAMPLE = "mime-sample"
     AI_INLINE = "ai-inline"
     AI_REPORT = "ai-report"
+    AI_EMAIL_ATTACHMENT = "ai-email-attachment"
     CSV_INGRESS = "csv-ingress"
     OOXML_EXTRACTION = "ooxml-extraction"
     TEXT_PREVIEW = "text-preview"
@@ -46,6 +47,9 @@ FILE_CONSUMER_CAPABILITIES = {
         "AI autofill attachment", 30 * MIB, True
     ),
     FileConsumer.AI_REPORT: FileConsumerCapability("AI report input", None, False),
+    FileConsumer.AI_EMAIL_ATTACHMENT: FileConsumerCapability(
+        "AI email attachment", 30 * MIB, True
+    ),
     FileConsumer.CSV_INGRESS: FileConsumerCapability("CSV import", 30 * MIB, True),
     FileConsumer.OOXML_EXTRACTION: FileConsumerCapability(
         "Office document text extraction", 30 * MIB, True

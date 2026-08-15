@@ -29,6 +29,38 @@ class UploadManifest(DBProperty):
 
 
 # @testable true
+# @tests tests_unit/test_028_ai_email.py::test_email_report_shape_preserves_safe_inbound_display_fields
+# @features ai-email ai-report
+# @dimensions origin legacy-default
+class Origin(DBProperty):
+    """How the initial report was submitted; legacy reports are web-origin."""
+
+    _id = "origin"
+
+    @property
+    def value(self):
+        return DBProperty.value.fget(self) or "web"
+
+    @value.setter
+    def value(self, value):
+        normalized = str(value or "web").strip().casefold()
+        if normalized not in {"web", "email"}:
+            raise ValueError("AI report origin must be web or email")
+        DBProperty.value.fset(self, normalized)
+
+
+# @testable true
+# @tests tests_unit/test_028_ai_email.py::test_email_report_shape_preserves_safe_inbound_display_fields
+# @features ai-email ai-report
+# @dimensions inbound-manifest privacy json
+class InboundManifest(DBProperty):
+    """Safe normalized email fields displayed with an email-origin report."""
+
+    _id = "inbound_manifest"
+    json = True
+
+
+# @testable true
 # @tests tests_unit/test_020_ai_reports.py::test_ai_report_process_state_stores_report_metadata
 # @features ai-report
 # @dimensions process-state canonical-storage

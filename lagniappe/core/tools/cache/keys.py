@@ -23,6 +23,7 @@ class Keys(Enum):
     NOTIFICATIONS = f"{CONFIG.PREFIX}NOTIFICATIONS:{{}}"
     NOTIFICATION_EPOCH = f"{CONFIG.PREFIX}NOTIFICATIONS:EPOCH:{{}}"
     OPERATION = f"{CONFIG.PREFIX}OPERATIONS:{{}}"
+    OWNER_PROJECTION = f"{CONFIG.PREFIX}OWNER_PROJECTION"
 
     # @testable infrastructure
     def key(self, entity):

@@ -85,6 +85,19 @@ def test_sync_payload_validation_is_document_only_and_bounded():
         == "Only identified document widgets may use live sync."
     )
     assert form_state.validate_sync_payload(valid) is None
+    valid["updates"][0]["mentions"] = [
+        {
+            "occurrence_id": "mention_1234",
+            "recipient": "recipient-key",
+            "display_name": "Recipient",
+        }
+    ]
+    assert form_state.validate_sync_payload(valid) is None
+    valid["updates"][0]["mentions"] = [{}]
+    assert (
+        form_state.validate_sync_payload(valid)
+        == "Document mention occurrence is invalid."
+    )
     assert (
         form_state.validate_sync_payload({"updates": []})
         == "Sync payload missing client_id."

@@ -11,6 +11,23 @@
       Starting a report does not change your workspace. Proposed changes are saved first, and the deterministic runner only executes them if you choose to continue.
     {% endcall %}
   </section>
+  {% if CONFIG.AI_EMAIL_PUBLIC.enabled %}
+    <section>
+      {{ subheading("Email Submissions") }}
+      <p class="text-sm text-base-dark">
+        Send from your exact registered email address. Email creates the same saved report as this panel and sends acceptance/result links; it does not apply proposed changes.
+      </p>
+      <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-base-medium">
+        <li>Ask: {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ask }} — text required, attachments optional.</li>
+        {% if current_user.access(AI.CREATE) %}
+          <li>Create: {{ CONFIG.AI_EMAIL_PUBLIC.addresses.create }} — text required, no attachments.</li>
+          <li>Organize: {{ CONFIG.AI_EMAIL_PUBLIC.addresses.organize }} — one or more attachments required.</li>
+        {% endif %}
+        <li>Maximum 20 files, 30 MiB each, 50 MiB total.</li>
+        <li>Reply above the marker to create a fresh report; automated/list mail is ignored.</li>
+      </ul>
+    </section>
+  {% endif %}
   <section>
     {{ subheading("Access Levels") }}
     <div class="space-y-3">

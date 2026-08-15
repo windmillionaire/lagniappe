@@ -27,6 +27,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.mixins.submitter import SubmitterMixin
 from lagniappe.core.tools import deferred_jobs
 from lagniappe.core.tools import deferred_job_adapters
+from lagniappe.core.tools import notification_service
 from lagniappe.core.tools import task_queue
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.ai import observability
@@ -360,6 +361,7 @@ def test_deferred_job_transactions_retry_aborted_contention(monkeypatch):
 # @pair deferred-jobs:transactional-start
 # @pair deferred-jobs:notification
 # @pair deferred-jobs:idempotency
+# @pair notifications:aggregate-count
 def test_deferred_job_create_is_transactionally_idempotent(monkeypatch):
     datastore = FakeDatastore(None)
     monkeypatch.setattr(
@@ -374,16 +376,41 @@ def test_deferred_job_create_is_transactionally_idempotent(monkeypatch):
         properties=None,
         exclude_from_index=frozenset(),
     )
+    notification_owner = SimpleNamespace(urlsafe_key="notification-owner")
     notification = SimpleNamespace(
         key="notification",
         db={"pending": True},
+        parent=notification_owner,
+        notification_type="ordinary",
         properties=None,
         exclude_from_index=frozenset(),
+    )
+    aggregate_repairs = []
+    aggregate_mutations = []
+    monkeypatch.setattr(
+        notification_service,
+        "ensure_notification_aggregate",
+        lambda owner: aggregate_repairs.append(owner),
+    )
+    monkeypatch.setattr(
+        notification_service,
+        "mutate_aggregate_in_transaction",
+        lambda transaction, owner, **changes: aggregate_mutations.append(
+            (transaction, owner, changes)
+        ),
     )
 
     created = database_utility.create_deferred_job_if_absent(job, notification)
 
     assert created["created"] is True
+    assert aggregate_repairs == [notification_owner]
+    assert aggregate_mutations == [
+        (
+            datastore.transaction_instance,
+            notification_owner,
+            {"ordinary_delta": 1},
+        )
+    ]
     assert datastore.transaction_instance.saved[1:] == [
         {"status": "queued"},
         {"pending": True},
@@ -406,6 +433,8 @@ def test_deferred_job_create_is_transactionally_idempotent(monkeypatch):
         "reason": "existing",
         "entity": {"status": "running"},
     }
+    assert aggregate_repairs == [notification_owner, notification_owner]
+    assert len(aggregate_mutations) == 1
     assert len(datastore.transaction_instance.saved) == 3
 
 

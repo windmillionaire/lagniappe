@@ -678,7 +678,11 @@ class SiteExportBuilder:
         if not html:
             return "<section><h2>Document</h2><p class=\"empty\">No document.</p></section>"
 
-        cleaned = self._sanitize_document_html(html, entity, current_path)
+        from .mentions import sanitize_mentions
+
+        cleaned = self._sanitize_document_html(
+            sanitize_mentions(html), entity, current_path
+        )
         return f"<section><h2>Document</h2><article class=\"document\">{cleaned}</article></section>"
 
     def _submission_section(self, title, entity, current_path):

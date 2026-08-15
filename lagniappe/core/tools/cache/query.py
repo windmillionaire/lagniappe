@@ -10,6 +10,7 @@ from lagniappe.core.definitions import Restriction
 
 from .core import cache
 from .details import hydrate_search_results
+from .keys import Search
 
 HIGHLIGHT_OPEN = "\x02lagniappe-highlight-open\x03"
 HIGHLIGHT_CLOSE = "\x02lagniappe-highlight-close\x03"
@@ -56,6 +57,24 @@ STOPWORDS = frozenset(
         "with",
     }
 )
+
+
+# @testable true
+# @tests tests_unit/test_017_cache_query.py::test_search_prunes_stale_rows_without_entity_details
+# @pairs search:stale-row cache:self-repair
+def _current_search_results(results):
+    """Hydrate results and remove projections whose entity details are gone."""
+    hydrated = hydrate_search_results(results)
+    stale = [result for result in hydrated if not result.get("details")]
+    keys = [
+        Search[result.get("kind")].value.format(result.get("id"))
+        for result in stale
+        if Search[result.get("kind")].value and result.get("id")
+    ]
+    if keys:
+        cache.delete(*keys)
+    return [result for result in hydrated if result.get("details")], len(stale)
+
 
 # @testable false
 # @covered-by lagniappe/core/tools/cache/query.py::_add_snippet
@@ -274,7 +293,7 @@ def entity_search(query_string, restrictions, belongs_to):
         formatted_results = [
             _format_result(doc, snippets=False) for doc in results.docs
         ]
-        return hydrate_search_results(formatted_results)
+        return _current_search_results(formatted_results)[0]
     else:
         return []
 
@@ -339,8 +358,7 @@ def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
         formatted_results = [
             _format_result(doc, snippets=False) for doc in results.docs
         ]
-
-    return hydrate_search_results(formatted_results)
+    return _current_search_results(formatted_results)[0]
 
 
 # @testable true
@@ -378,7 +396,7 @@ def search(user_query, required, belongs_to, kinds=None, page=1, limit=10):
         formatted_results = [
             _format_result(doc, snippets=True) for doc in results.docs
         ]
-        formatted_results = hydrate_search_results(formatted_results)
-        return formatted_results, results.total
+        formatted_results, stale_count = _current_search_results(formatted_results)
+        return formatted_results, max(0, results.total - stale_count)
     else:
         return [], 0

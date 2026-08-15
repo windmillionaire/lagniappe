@@ -127,6 +127,15 @@ class Config:
             "AI_OBSERVABILITY",
             getattr(constants, "DEFAULT_AI_OBSERVABILITY_ENABLED", False),
         )
+        from config.ai_email import ai_email_public_config, normalize_ai_email_config
+
+        try:
+            self.AI_EMAIL_CONFIG = normalize_ai_email_config(
+                getattr(self, "AI_EMAIL_CONFIG", None)
+            )
+        except ValueError as error:
+            raise RuntimeError(f"Invalid AI_EMAIL_CONFIG: {error}") from error
+        self.AI_EMAIL_PUBLIC = ai_email_public_config(self.AI_EMAIL_CONFIG)
         self.REDIS_TLS = getattr(
             self,
             "REDIS_TLS",

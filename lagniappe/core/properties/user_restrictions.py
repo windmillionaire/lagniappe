@@ -12,6 +12,7 @@ from .base_property import Property
 # @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.task
 # @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.form
 # @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.user_assign_restrictions
+# @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.can_initiate_messages
 # @covered-by lagniappe/core/properties/user_restrictions.py::Restrictions.users
 class Restrictions(Property):
     """Computed access restrictions for a user.
@@ -28,7 +29,7 @@ class Restrictions(Property):
     """
 
     _id = "restrictions"
-    _session_version = 6
+    _session_version = 8
     _session_key = "restrictions"
     _access_fields = (
         "search",
@@ -41,6 +42,7 @@ class Restrictions(Property):
         "category",
         "user_assign",
         "category_edit",
+        "user_message",
     )
     _session_required_fields = frozenset(
         {
@@ -49,6 +51,7 @@ class Restrictions(Property):
             "value",
             "belongs_to",
             "pages_by_category",
+            "can_initiate_messages",
         }
     ) | frozenset(_access_fields)
 
@@ -118,6 +121,21 @@ class Restrictions(Property):
     def user_assign_restrictions(self):
         return self._state_value("user_assign")
 
+    @property
+    def user_message_restrictions(self):
+        """Users eligible for direct messages and mention suggestions."""
+        return self._state_value("user_message")
+
+    # @testable true
+    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_session_blob_and_fingerprint
+    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_empty_list_is_loaded_state
+    # @pair messaging:compose-eligibility
+    @property
+    def can_initiate_messages(self):
+        """Session-backed capability for rendering new-message entry points."""
+        self._ensure_loaded()
+        return self._state["can_initiate_messages"]
+
     # @testable true
 # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_category_search_permission_filter_returns_editable_categories
@@ -170,6 +188,10 @@ class Restrictions(Property):
         self._permission_details = {}
         self._value_details = {}
 
+    # @testable true
+    # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_empty_list_is_loaded_state
+    # @pairs restrictions:empty-access restrictions:loaded-state
+    # @pairs permissions:empty-access permissions:loaded-state
     def _ensure_loaded(self):
         if getattr(self, "_state", None) is not None and self.is_set:
             return
@@ -234,6 +256,7 @@ class Restrictions(Property):
             isinstance(stored["value"], list)
             and isinstance(stored["belongs_to"], list)
             and isinstance(stored["pages_by_category"], dict)
+            and isinstance(stored["can_initiate_messages"], bool)
         )
 
     def _load_state(self, state):
@@ -429,6 +452,31 @@ class Restrictions(Property):
                 Action.ASSIGN,
             )
         )
+        user_message = (
+            Restriction.UNRESTRICTED
+            if self.entity.is_owner or can_view_users
+            else sorted(
+                set(belongs_to)
+                | set(
+                    self._permission_hashes(
+                        self._permission_details,
+                        "group",
+                        Action.VIEW,
+                    )
+                )
+            )
+        )
+        can_initiate_messages = bool(
+            not self.entity.is_public
+            and not Restriction.is_denied(user_message)
+        )
+        if not can_initiate_messages and self._session_enabled():
+            owner = cache.get_owner_projection()
+            can_initiate_messages = bool(
+                owner
+                and owner.get("allow_messages_and_mentions")
+                and owner.get("key") != self.entity.urlsafe_key
+            )
         category_edit = (
             Restriction.UNRESTRICTED
             if can_edit_models
@@ -459,6 +507,8 @@ class Restrictions(Property):
             "models": models,
             "page": page,
             "user_assign": user_assign,
+            "user_message": user_message,
+            "can_initiate_messages": can_initiate_messages,
             "category_edit": category_edit,
             "users": users,
             "category": category,

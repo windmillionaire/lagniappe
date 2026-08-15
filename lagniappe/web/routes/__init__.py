@@ -14,6 +14,7 @@ from .filters import filters
 from .assets import assets
 from .testing import testing
 from .analytics import analytics
+from .messages import message_internal, messages
 
 __all__ = [
     "categories",
@@ -33,4 +34,6 @@ __all__ = [
     "assets",
     "testing",
     "analytics",
+    "messages",
+    "message_internal",
 ]

@@ -1201,8 +1201,10 @@ def test_managed_certificate_waits_for_provider_then_reports_active(
         "Managed TLS certificate cert-pending for https://app.example.com "
         "in Google Cloud project project-1 using owner@example.com: PENDING"
     ) in output
-    assert "certificate cert-active active" in output
-    assert "Google's HTTPS frontend may need a little additional time" in output
+    assert "Managed TLS certificate active for https://app.example.com." in output
+    assert "It may take up to an hour before the domain opens over HTTPS." in output
+    assert "Checking the App Engine managed TLS certificate" not in output
+    assert "Google's HTTPS frontend" not in output
     assert "Retrying in 3 seconds" not in output
 
 

@@ -49,6 +49,11 @@ def validate_sync_payload(payload):
         for name in ("update", "ydoc", "html"):
             if update.get(name) is not None and not isinstance(update[name], str):
                 return f"Document {name} must be encoded text."
+        from .mentions import validate_mentions_payload
+
+        mention_error = validate_mentions_payload(update.get("mentions"))
+        if mention_error:
+            return mention_error
     return None
 
 

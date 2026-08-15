@@ -78,6 +78,7 @@ class File(AssetMixin, Entity):
                 "summary": file_entity.Summary,
                 "pages": file_related.AttachedToPages,
                 "tasks": file_related.AttachedToTasks,
+                "report_user": file_related.ReportUser,
                 "extract": file_options.Extract,
                 "summarize": file_options.Summarize,
                 "options": file_options.Options,
@@ -89,12 +90,25 @@ class File(AssetMixin, Entity):
         user = current_context_user(user)
         action = Action.EDIT if action.implies(Action.EDIT) else action
 
+        report_user = self.properties.report_user.value
+        if (
+            action is Action.VIEW
+            and user
+            and getattr(user, "is_authenticated", False)
+            and report_user
+            and report_user.key == user.key
+        ):
+            return True
+
         return super().allowed(action, user=user)
 
     @classmethod
-    def create(cls, page=None, upload=None, data=None):
-        new_file = cls()
+    def create(cls, page=None, upload=None, data=None, *, key=None, report_user=None):
+        new_file = cls(key) if key is not None else cls()
         new_file.kind = cls.entity_kind
+
+        if report_user:
+            new_file.report_user = report_user
 
         if page:
             new_file.properties.pages.add(page)

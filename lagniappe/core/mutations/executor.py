@@ -10,6 +10,7 @@ from ..definitions import (
 )
 from ..exceptions import capture
 from ..tools import cache, database
+from ..tools import notification_service
 
 
 WRITE_EFFECTS = {MutationEffectType.UPSERT, MutationEffectType.UNLINK}
@@ -88,6 +89,7 @@ def execute_post_commit(plan):
     ]
     if refresh:
         cache.update(*refresh)
+        cache.update_owner_projection(*refresh)
         complete(MutationEffectType.CACHE_REFRESH)
 
     deleted = [
@@ -118,10 +120,17 @@ def execute_post_commit(plan):
         if effect.effect is MutationEffectType.NOTIFICATION_DELETE
     ]
     if notification_upserts or notification_deletes:
-        cache.update_notification_projection(
+        aggregates = notification_service.apply_ordinary_mutations(
             upserts=notification_upserts,
             deletes=notification_deletes,
         )
+        projection_changes = {
+            "upserts": notification_upserts,
+            "deletes": notification_deletes,
+        }
+        if aggregates:
+            projection_changes["aggregates"] = aggregates
+        cache.update_notification_projection(**projection_changes)
         if notification_upserts:
             complete(MutationEffectType.NOTIFICATION_UPSERT)
         if notification_deletes:

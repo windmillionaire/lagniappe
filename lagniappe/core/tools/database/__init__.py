@@ -17,6 +17,7 @@ from .assets import (
 )
 from .utility import (
     acquire_deferred_job_scheduler_sync,
+    claim_ai_email_event,
     create_entity,
     create_key,
     create_named_key,
@@ -32,8 +33,10 @@ from .utility import (
     commit_ingress_row,
     create_deferred_job_if_absent,
     get_deferred_job_scheduler_control,
+    finish_ai_email_event,
     record_deferred_job_scheduler_sync,
     release_deferred_job_scheduler_sync,
+    release_ai_email_event,
     repair_deferred_job_scheduler_control,
     release_deferred_job_lock,
     site_fingerprint,
@@ -47,6 +50,7 @@ from .utility import (
 __all__ = [
     "get",
     "acquire_deferred_job_scheduler_sync",
+    "claim_ai_email_event",
     "delete_blobs",
     "delete_entities",
     "save",
@@ -77,8 +81,10 @@ __all__ = [
     "commit_ingress_row",
     "create_deferred_job_if_absent",
     "get_deferred_job_scheduler_control",
+    "finish_ai_email_event",
     "record_deferred_job_scheduler_sync",
     "release_deferred_job_scheduler_sync",
+    "release_ai_email_event",
     "repair_deferred_job_scheduler_control",
     "release_deferred_job_lock",
     "update_claimed_deferred_job",

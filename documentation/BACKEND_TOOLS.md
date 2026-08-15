@@ -265,6 +265,20 @@ hash fields; no browser-routing or broadcast registrations are stored.
 | `close_presence(client_id, sync_ids)` | Remove a page-scoped client from its document presence sets |
 | `clear_document(sync_id)` | Drop externally invalidated live document state |
 
+## AI Email (`tools/ai_email.py`)
+
+The AI email service owns the provider-neutral inbound boundary: Svix
+verification, Resend retrieval/download/send calls, exact stored-email and
+alias matching, message/attachment normalization, automation rules, locked
+envelopes, per-user Redis limits, deterministic report handoff, and idempotent
+feedback. It never stores raw webhook payloads, raw mail, signed attachment
+URLs, or authentication headers.
+
+`EMAIL_INGEST` performs attachment I/O outside the webhook request and starts
+the existing report job for the selected tool. The shared deferred-job terminal
+delivery hook sends one result email for the initial email-origin report only;
+browser reports, revisions, execution, and undo do not send that feedback cycle.
+
 ## AI (`tools/ai/`)
 
 Google Vertex AI integration for text generation, image generation, and structured output.

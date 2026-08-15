@@ -23,6 +23,8 @@ ACTIVE_DEFERRED_JOB_STATUSES = {"queued", "running", "retry_wait"}
 DEFERRED_JOB_SCHEDULER_CONTROL_ID = "deferred-jobs-control"
 DEFERRED_JOB_SCHEDULER_CONTROL_SCHEMA_VERSION = 2
 DEFERRED_JOB_SCHEDULER_STATES = {"enabled", "paused"}
+AI_EMAIL_EVENT_SCHEMA_VERSION = 1
+AI_EMAIL_EVENT_PREFIX = "ai-email-event:"
 
 
 # @testable true
@@ -119,6 +121,98 @@ def _retry_deferred_job_transaction(operation):
                 time.sleep(DEFERRED_JOB_TRANSACTION_RETRY_DELAYS[attempt])
 
     return retried
+
+
+# @testable true
+# @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
+# @features ai-email
+# @dimensions replay transaction lease privacy
+@_retry_deferred_job_transaction
+def claim_ai_email_event(digest, lease_token, now, *, lease_seconds=300):
+    """Claim one HMAC-digested provider event without storing its raw ID."""
+    digest = str(digest or "").strip().casefold()
+    if len(digest) != 64 or any(
+        character not in "0123456789abcdef" for character in digest
+    ):
+        raise ValueError("AI email event digest is invalid")
+    key = create_named_key("site", f"{AI_EMAIL_EVENT_PREFIX}{digest}")
+    with DATA.datastore.transaction() as transaction:
+        record = DATA.datastore.get(key, transaction=transaction)
+        if record is not None:
+            state = str(record.get("state") or "")
+            expires = record.get("lease_expires")
+            if state in {"accepted", "rejected", "ignored"}:
+                return {"claimed": False, "reason": "terminal", "state": state}
+            if (
+                state == "processing"
+                and record.get("lease_token") != lease_token
+                and isinstance(expires, datetime)
+                and expires > now
+            ):
+                return {"claimed": False, "reason": "active", "state": state}
+        else:
+            record = Entity(key=key, exclude_from_indexes=("lease_token",))
+            record["created"] = now
+        record.update(
+            {
+                "schema_version": AI_EMAIL_EVENT_SCHEMA_VERSION,
+                "state": "processing",
+                "lease_token": lease_token,
+                "lease_expires": now + timedelta(seconds=lease_seconds),
+                "modified": now,
+            }
+        )
+        transaction.put(record)
+        return {"claimed": True, "key": key}
+
+
+# @testable true
+# @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
+# @features ai-email
+# @dimensions replay terminal-compaction transaction
+@_retry_deferred_job_transaction
+def finish_ai_email_event(digest, lease_token, state, now):
+    """Compact an owned event claim to a minimal permanent tombstone."""
+    if state not in {"accepted", "rejected", "ignored"}:
+        raise ValueError("AI email event terminal state is invalid")
+    key = create_named_key("site", f"{AI_EMAIL_EVENT_PREFIX}{digest}")
+    with DATA.datastore.transaction() as transaction:
+        record = DATA.datastore.get(key, transaction=transaction)
+        if record is None or record.get("lease_token") != lease_token:
+            return False
+        created = record.get("created") or now
+        compacted = Entity(key=key)
+        compacted.update(
+            {
+                "schema_version": AI_EMAIL_EVENT_SCHEMA_VERSION,
+                "state": state,
+                "created": created,
+                "modified": now,
+                "completed": now,
+            }
+        )
+        transaction.put(compacted)
+        return True
+
+
+# @testable true
+# @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
+# @features ai-email
+# @dimensions replay transient-release transaction
+@_retry_deferred_job_transaction
+def release_ai_email_event(digest, lease_token, now):
+    """Release an owned claim so a provider retry may resume it immediately."""
+    key = create_named_key("site", f"{AI_EMAIL_EVENT_PREFIX}{digest}")
+    with DATA.datastore.transaction() as transaction:
+        record = DATA.datastore.get(key, transaction=transaction)
+        if record is None or record.get("lease_token") != lease_token:
+            return False
+        record["state"] = "retry"
+        record.pop("lease_token", None)
+        record.pop("lease_expires", None)
+        record["modified"] = now
+        transaction.put(record)
+        return True
 
 
 # @testable true
@@ -388,14 +482,24 @@ def get_deferred_job_scheduler_control():
 
 # @testable true
 # @tests tests_unit/test_023_deferred_jobs.py::test_deferred_job_create_is_transactionally_idempotent
-# @features deferred-jobs
-# @dimensions start get-or-create notification idempotency
+# @pairs deferred-jobs:start deferred-jobs:get-or-create deferred-jobs:notification deferred-jobs:idempotency
+# @pair notifications:aggregate-count
 @_retry_deferred_job_transaction
 def create_deferred_job_if_absent(job, notification=None, lock=None):
     """Atomically insert one prepared job, notification, and optional lock."""
     key = _deferred_job_key(job)
     if key is None:
         return {"created": False, "reason": "missing-key", "entity": None}
+
+    notification_owner = getattr(notification, "parent", None)
+    ordinary_notification = bool(
+        notification_owner
+        and getattr(notification, "notification_type", "ordinary") == "ordinary"
+    )
+    if ordinary_notification:
+        from .. import notification_service
+
+        notification_service.ensure_notification_aggregate(notification_owner)
 
     entities = [entity for entity in (job, notification, lock) if entity is not None]
     for entity in entities:
@@ -456,6 +560,12 @@ def create_deferred_job_if_absent(job, notification=None, lock=None):
             job.db,
             datetime.now(timezone.utc),
         )
+        if ordinary_notification:
+            notification_service.mutate_aggregate_in_transaction(
+                transaction,
+                notification_owner,
+                ordinary_delta=1,
+            )
         for entity in entities:
             transaction.put(entity.db)
         result = {

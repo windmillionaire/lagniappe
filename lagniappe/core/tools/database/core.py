@@ -61,6 +61,9 @@ class KINDS(Enum):
     site = f"{PREFIX}site"
     jobs = f"{PREFIX}jobs"
     job_locks = f"{PREFIX}job_locks"
+    message_conversations = f"{PREFIX}message_conversations"
+    messages = f"{PREFIX}messages"
+    mention_markers = f"{PREFIX}mention_markers"
 
     page = instances
     group = models
@@ -82,6 +85,9 @@ class KINDS(Enum):
     document_history = history
     job = jobs
     job_lock = job_locks
+    message_conversation = message_conversations
+    message = messages
+    mention_marker = mention_markers
 
 
 # @testable true

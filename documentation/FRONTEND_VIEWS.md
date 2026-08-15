@@ -128,7 +128,7 @@ control and navigation attributes:
 | `data-role="flipper"` | Toggles `data-flipped` on the nearest `[data-flipped]` ancestor |
 | `lp-control="help"` | Opens a help modal using `lp-help` |
 | `lp-control="star"` | Toggles star via PATCH request |
-| `lp-control="delete"` | Opens a delete confirmation modal using nearby entity context |
+| `lp-control="delete"` | Opens a delete confirmation modal using nearby entity context or an explicit delete key and modal route |
 | `lp-control="previous"` / `lp-control="next"` | Fetches paginated list content for the current widget |
 | Other `lp-control` values | Route through `renderComponent()` using `lp-show` or `lp-close` |
 | `[lp-show]` | Routes to `renderComponent()` |
@@ -156,7 +156,9 @@ entity currently being viewed.
 Delete confirmations may include named checkbox options marked with
 `data-delete-option`. `DeleteModal` sends their checked states as JSON booleans
 with the DELETE request; confirmations without options keep the existing
-bodyless request behavior.
+bodyless request behavior. Non-entity collection rows may provide
+`data-delete-key` and `data-delete-modal-route` on the delete control while
+retaining the same modal and reconciliation flow.
 
 Notes use the shared `CreateNote` widget on Home and Pages. The textarea stays
 available while the native image chooser is open, so a submission may contain
@@ -357,6 +359,33 @@ loads the list, a changed cursor marks an already-loaded list stale, and a stale
 list refreshes immediately only when the menu is open. Create/delete/clear
 responses carry the resulting state so the originating tab updates its badge
 without waiting for another poll.
+
+The authenticated Notifications control is always present. It renders `...`
+until an authoritative state arrives and then displays the exact combined
+ordinary-plus-unread-message count, including zero. Opening the menu fetches at
+most 25 ordinary rows and a continuation cursor, loads the deterministic
+aggregate separately, and never queries message history. The aggregate becomes
+one undeletable Messages link; Clear All affects only ordinary rows. Managed
+users get the shared **Message a user** modal only when their collaboration
+restrictions (or the owner's explicit inbound opt-in) provide a possible new
+recipient. That rendering capability is stored in the existing versioned
+restriction session blob; page and menu rendering do not reread the owner
+projection.
+
+`views/messages.mjs` owns the managed-user-only `/messages` shell. It pages 25
+conversations and 50 visible history rows, defaults to the newest unread peer
+and otherwise the most recent peer, and acknowledges the exact revision loaded
+with history. A read conflict refreshes instead of clearing raced unread state.
+The standard page header sits above separate conversation and history cards,
+using the same card headers as project/model-task views. New sends use
+`MessageComposer`; its New entry point is absent when the user cannot initiate
+a conversation. The composer uses the shared centered modal shell and its
+standard Close, backdrop, and Escape behavior. Existing threads expose an
+inline reply form for their exact live peer, even when current restrictions
+would prevent a new conversation. That submitted conversation remains the
+server-validated authorization boundary. Per-message delete and confirmed
+conversation clear hide only the current participant's copy. Deleted peers
+retain their name/history but do not expose a reply form.
 
 Home does not use the composite collection subscription for current clients.
 Server-rendered Notes is marked loaded and owns `home-notes`; Tasks retains its

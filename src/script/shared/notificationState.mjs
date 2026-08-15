@@ -21,11 +21,11 @@ export const renderNotificationBadge = (count) => {
 	if (countElement) countElement.textContent = String(normalized);
 	if (!button) return normalized;
 
-	const visible = normalized > 0;
-	button.dataset.visible = visible ? "true" : "false";
-	button.setAttribute("aria-hidden", visible ? "false" : "true");
+	button.dataset.visible = "true";
+	button.setAttribute("aria-hidden", "false");
+	button.setAttribute("aria-busy", "false");
 	button.setAttribute("aria-label", `Notifications: ${normalized}`);
-	button.tabIndex = visible ? 0 : -1;
+	button.tabIndex = 0;
 	return normalized;
 };
 

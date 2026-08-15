@@ -1,2 +1,150 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="febff560-c762-4814-b106-039f657ed459",e._sentryDebugIdIdentifier="sentry-dbid-febff560-c762-4814-b106-039f657ed459");}catch(e){}}();import{C as m}from"./builder.js?v=be0f1470";import{k as l}from"./foundation.js?v=be0f1470";import"./connectivity.js?v=be0f1470";import{p as o}from"./primitives.js?v=be0f1470";import{S as r}from"./select2.js?v=be0f1470";import{C as a}from"./base2.js?v=be0f1470";import"./search.js?v=be0f1470";import"./styles.js?v=be0f1470";import"./combobox.js?v=be0f1470";import"./results.js?v=be0f1470";import"./icons.js?v=be0f1470";import"./formatting.js?v=be0f1470";import"./entityMenu.js?v=be0f1470";import"./dropdown.js?v=be0f1470";import"./modal.js?v=be0f1470";import"./baseForm.js?v=be0f1470";import"./loader.js?v=be0f1470";import"./facets.js?v=be0f1470";import"./submitter.js?v=be0f1470";class h extends a{constructor(t){super(t),this.key="columns",this.messages={submit:"Add Column"}}init(){this.element.schema.columns??=[],this.index!==-1?(this.setTitle("Edit Column"),this.messages.submit="Update Column",this.setting={...this.element.schema.columns[this.index]}):(this.setTitle("Create Column"),this.setting={}),super.init(),this.addColumnType(),this.showProgress()}showProgress(){this.setting.title&&(this.complete=!0,this.addColumnName()),super.showProgress()}addColumnName(){if(this.options.has("name"))return;const t=o.input({label:"Column Name",placeholder:"enter column name...",name:"column-name",type:"text",value:this.setting.title||null});this.options.set("name",t),this.focusTarget=t,t.addEventListener("input",s=>{this.setting.title=s.target.value,this.showProgress()})}_updateSetting(t){delete this.setting.location,delete this.setting.input,delete this.setting.type,["out","in"].includes(t)?(this.setting.location=t,this.setting.type="link"):t&&t!=="checkbox"?(this.setting.input=t,this.setting.type="input"):t==="checkbox"&&(this.setting.type="checkbox")}addColumnType(){const t=o.select({label:"Column Type",kind:"form",placeholder:"select column type...",name:this.element.schema.id,options:m.TABLE_COLUMNS.map(e=>({label:e.name,value:e.type,details:{kind:"form",icon:e.type,name:e.name}}))});this.header.after(t);const s=new r(t),i=this.setting.location||this.setting.input||this.setting.type;i&&s.values.add(i),s.init(),this.destroyables.push(s),this.focusTarget=t,this.target.addEventListener("updated",e=>{const n=Object.values(e.detail.options)[0].id;this._updateSetting(n),this.addColumnName(),this.showProgress()})}validate(){return this.setting.title?this.setting.type?(this.setting.id||(this.setting.id=`column-${l(`${this.setting.title}-${this.element.schema.id}`)}`),!0):(this.form.showError("Please select a column type"),!1):(this.form.showError("Please enter a column name"),!1)}}export{h as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { C as CONFIG } from './builder.js?v=b2884058';
+import { k as simpleHash } from './foundation.js?v=b2884058';
+import './connectivity.js?v=b2884058';
+import { p as primitives } from './primitives.js?v=b2884058';
+import { S as SelectBox } from './select2.js?v=b2884058';
+import { C as Condition } from './base2.js?v=b2884058';
+import './search.js?v=b2884058';
+import './styles.js?v=b2884058';
+import './combobox.js?v=b2884058';
+import './results.js?v=b2884058';
+import './icons.js?v=b2884058';
+import './formatting.js?v=b2884058';
+import './entityMenu.js?v=b2884058';
+import './dropdown.js?v=b2884058';
+import './modal.js?v=b2884058';
+import './baseForm.js?v=b2884058';
+import './loader.js?v=b2884058';
+import './facets.js?v=b2884058';
+import './submitter.js?v=b2884058';
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_table_column_condition_editor
+ * @features forms
+ * @dimensions builder-table-column
+ */
+class Columns extends Condition {
+	constructor(builder) {
+		super(builder);
+		this.key = "columns";
+		this.messages = {
+			submit: "Add Column",
+		};
+	}
+
+	init() {
+		this.element.schema.columns ??= [];
+
+		if (this.index !== -1) {
+			this.setTitle("Edit Column");
+			this.messages.submit = "Update Column";
+			this.setting = { ...this.element.schema.columns[this.index] };
+		} else {
+			this.setTitle("Create Column");
+			this.setting = {};
+		}
+
+		super.init();
+
+		this.addColumnType();
+
+		this.showProgress();
+	}
+
+	showProgress() {
+		if (this.setting.title) {
+			this.complete = true;
+			this.addColumnName();
+		}
+		super.showProgress();
+	}
+
+	addColumnName() {
+		if (this.options.has("name")) return;
+
+		const columnName = primitives.input({
+			label: "Column Name",
+			placeholder: "enter column name...",
+			name: "column-name",
+			type: "text",
+			value: this.setting.title || null,
+		});
+		this.options.set("name", columnName);
+		this.focusTarget = columnName;
+
+		columnName.addEventListener("input", (e) => {
+			this.setting.title = e.target.value;
+			this.showProgress();
+		});
+	}
+
+	_updateSetting(value) {
+		delete this.setting.location;
+		delete this.setting.input;
+		delete this.setting.type;
+
+		if (["out", "in"].includes(value)) {
+			this.setting.location = value;
+			this.setting.type = "link";
+		} else if (value && value !== "checkbox") {
+			this.setting.input = value;
+			this.setting.type = "input";
+		} else if (value === "checkbox") {
+			this.setting.type = "checkbox";
+		}
+	}
+
+	addColumnType() {
+		const selectElt = primitives.select({
+			label: "Column Type",
+			kind: "form",
+			placeholder: "select column type...",
+			name: this.element.schema.id,
+			options: CONFIG.TABLE_COLUMNS.map((input) => ({
+				label: input.name,
+				value: input.type,
+				details: { kind: "form", icon: input.type, name: input.name },
+			})),
+		});
+
+		this.header.after(selectElt);
+		const selectBox = new SelectBox(selectElt);
+		const initial =
+			this.setting.location || this.setting.input || this.setting.type;
+		if (initial) {
+			selectBox.values.add(initial);
+		}
+		selectBox.init();
+		this.destroyables.push(selectBox);
+		this.focusTarget = selectElt;
+
+		this.target.addEventListener("updated", (e) => {
+			const options = Object.values(e.detail.options);
+			const value = options[0].id;
+			this._updateSetting(value);
+			this.addColumnName();
+			this.showProgress();
+		});
+	}
+
+	validate() {
+		if (!this.setting.title) {
+			this.form.showError("Please enter a column name");
+			return false;
+		}
+		if (!this.setting.type) {
+			this.form.showError("Please select a column type");
+			return false;
+		}
+		if (!this.setting.id) {
+			this.setting.id = `column-${simpleHash(
+				`${this.setting.title}-${this.element.schema.id}`,
+			)}`;
+		}
+		return true;
+	}
+}
+
+export { Columns as default };

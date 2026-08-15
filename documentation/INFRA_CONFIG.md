@@ -168,6 +168,30 @@ Authentication settings include `IDENTITY_PLATFORM_CONFIG`,
 installer behavior, and runtime enforcement are documented canonically in
 [AUTHENTICATION.md](AUTHENTICATION.md).
 
+`AI_EMAIL_CONFIG` is an optional, runtime-safe schema-1 object normalized by
+`config/ai_email.py`. It is intentionally absent from
+`REQUIRED_APPLICATION_SETTINGS`. The schema rejects unknown security keys,
+normalizes the dedicated receiving domain to lower-case IDNA ASCII, requires
+three unique conservative aliases, requires distinct receiving and sending API
+keys, and fixes the version-1 body/file/rate limits rather than accepting
+operator values that could weaken the envelope. The receiving key is Full
+access; the sending key and verified sender are reused from Resend-backed
+authentication email.
+
+When `enabled` is false or the object is absent, the webhook is unavailable and
+the public projection is `{enabled: false, addresses: {}}`. When enabled, the
+signed webhook accepts production `email.received` events and hands them to the
+durable report-ingest workflow. Legacy `setupProbe` and `trustedAuthservIds`
+fields from the transport-proof milestone are accepted only for a rolling
+configuration read and are dropped by normalization on the next save.
+Email-related templates must consume only `CONFIG.AI_EMAIL_PUBLIC`; provider
+IDs, webhook state, API keys, and signing secret must never be rendered.
+
+Recovery snapshots preserve a complete optional `AI_EMAIL_CONFIG` and validate
+it with the same normalizer. Recursive recovery display redaction covers the
+webhook secret and both API keys. The plaintext settings file remains
+secret-bearing as described above.
+
 `INSTALLER_EMAIL` and `DEPLOYER_EMAIL` record the Google identities selected by
 the current setup run. The built-in flow uses the active
 `GCLOUD_CONFIG.ACCOUNT` for both responsibilities, including during recovery,

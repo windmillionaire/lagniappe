@@ -121,6 +121,7 @@ def _client_cache_invalidation_requested():
 def clear_request_notification_state():
     """Start every request without a stale post-commit projection result."""
     cache.clear_recorded_notification_states()
+    cache.clear_request_owner_projection()
 
 
 # @testable true

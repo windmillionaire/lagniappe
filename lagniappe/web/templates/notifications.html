@@ -45,8 +45,45 @@
   </div>
 {% endmacro %}
 
-{% macro list(notifications) %}
+{% macro aggregate_item(aggregate) %}
+  {% if aggregate.unread_message_count %}
+    <div role="option"
+         data-key="__message_aggregate__"
+         data-action="open-messages"
+         class="{{ styles.dropdown.search.result }} text-base-default">
+      <a href="/messages" class="block whitespace-normal text-sm font-medium">
+        {{ render_icon("email", styles.dropdown.icon) }}
+        {{ aggregate.unread_message_count }} new message{{ '' if aggregate.unread_message_count == 1 else 's' }}
+      </a>
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro list(notifications, aggregate, cursor=None, can_message=False) %}
+  {% if can_message %}
+    {% set has_following_item = aggregate.unread_message_count or notifications or cursor %}
+    <button role="option"
+            type="button"
+            data-key="__message_user__"
+            data-action="message-user"
+            class="{{ styles.dropdown.option.action }}{% if has_following_item %} border-b border-base-light !rounded-none mb-1 pb-2{% endif %}">
+      {{ render_icon("email", styles.dropdown.icon) }}
+      <span>Message a user</span>
+    </button>
+  {% endif %}
+  {{ aggregate_item(aggregate) }}
   {% for notification in notifications %}{{ item(notification) }}{% endfor %}
+  {% if cursor %}
+    <button role="option"
+            type="button"
+            data-key="__load_notifications__"
+            data-cursor="{{ cursor }}"
+            data-action="load-notifications"
+            class="{{ styles.dropdown.option.action }}">
+      {{ render_icon("next", styles.dropdown.icon) }}
+      <span>Load older notifications</span>
+    </button>
+  {% endif %}
 {% endmacro %}
 
 {% macro processing_offline() %}

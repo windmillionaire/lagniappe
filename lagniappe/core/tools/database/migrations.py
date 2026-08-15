@@ -23,6 +23,7 @@ from .migration_steps import (
     MigrationChange,
     MigrationDataError,
     canonicalize_form_schema_record,
+    canonicalize_notification_record,
 )
 
 
@@ -126,6 +127,72 @@ def _run_form_schema_migration(context):
     return result
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/database/migration_steps/v0_1_messaging.py::canonicalize_notification_record
+# @reason migration runner composes the tested transform with the shared resumable scan and writer framework
+def _run_messaging_notification_migration(context):
+    """Backfill ordinary discriminators and one exact aggregate per user."""
+    result = _result("MSG-001", "Messaging notification aggregates")
+    scan_kind(
+        result,
+        context,
+        KINDS.activity,
+        lambda row: row.get("type") == "notification",
+        canonicalize_notification_record,
+    )
+    ordinary_counts = {}
+    try:
+        for row in context.query_factory(KINDS.activity).fetch_iter():
+            if (
+                row.get("type") == "notification"
+                and row.get("notification_type", "ordinary") == "ordinary"
+                and row.key.parent is not None
+            ):
+                ordinary_counts[row.key.parent] = ordinary_counts.get(
+                    row.key.parent, 0
+                ) + 1
+    except Exception as error:
+        _append_error(result, f"{KINDS.activity.value}:aggregate-count", error)
+        return result
+
+    for users in _chunks(context.query_factory(KINDS.users).fetch_iter()):
+        aggregates = []
+        for user in users:
+            result["examined"] += 1
+            key = context.datastore.key(
+                KINDS.activity.value,
+                "message-aggregate",
+                parent=user.key,
+            )
+            aggregate = context.datastore.get(key)
+            created = aggregate is None
+            if created:
+                aggregate = DatastoreEntity(key=key)
+                aggregate.update(
+                    {
+                        "type": "notification",
+                        "kind": "notification",
+                        "notification_type": "aggregate",
+                        "parent": user.key,
+                        "unread_message_count": 0,
+                        "aggregate_revision": 0,
+                        "aggregate_generation": str(uuid4()),
+                        "created": datetime.now(timezone.utc),
+                    }
+                )
+            desired = ordinary_counts.get(user.key, 0)
+            changed = created or aggregate.get("ordinary_count") != desired
+            if changed:
+                aggregate["ordinary_count"] = desired
+                aggregate["modified"] = datetime.now(timezone.utc)
+                aggregates.append((aggregate, ()))
+            else:
+                result["skipped"] += 1
+        _save_changed(result, aggregates, context.writer)
+        context.heartbeat()
+    return result
+
+
 MIGRATION_CATALOG = (
     MigrationDefinition(
         sequence=1,
@@ -134,6 +201,13 @@ MIGRATION_CATALOG = (
         label="Canonical form schemas",
         runner=_run_form_schema_migration,
         legacy_audit_keys=("2026-07-form-schema-v1",),
+    ),
+    MigrationDefinition(
+        sequence=2,
+        id="MSG-001",
+        introduced_in="0.1",
+        label="Messaging notification aggregates",
+        runner=_run_messaging_notification_migration,
     ),
 )
 

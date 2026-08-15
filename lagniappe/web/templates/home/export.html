@@ -62,14 +62,14 @@
        data-route="{{ url_for('internal.site_export_widget') }}">
     <div class="{{ styles.form.default }}">
       <section class="rounded-md border border-base-light/50 bg-white/60 p-4 shadow-sm">
-        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex flex-col gap-3">
           <div>
             <h2 class="text-base font-bold text-base-dark">HTML Archive</h2>
           </div>
           <button type="button"
                   data-role="start-export"
                   data-kind="file"
-                  class="{{ styles.button.submit }} w-fit grow-0">
+                  class="{{ styles.button.submit }}">
             <span data-role="icon" data-visible="true" aria-hidden="true">
               {{ render_icon("download") }}
             </span>

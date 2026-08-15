@@ -26,6 +26,7 @@ class DeferredJobType(Enum):
     REPORT_ORGANIZE = "report-organize"
     REPORT_ASK = "report-ask"
     REPORT_CREATE = "report-create"
+    EMAIL_INGEST = "email-ingest"
     REPORT_EXECUTION = "report-execution"
     AUTOFILL = "autofill"
     PAGE_GENERATION = "page-generation"

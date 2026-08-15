@@ -465,7 +465,7 @@ export class SyncManager {
 				if (update?.save && update.ydoc) {
 					const widget = this.widgets[acknowledgement.sync_id];
 					if (widget?.commitSavedBaseline) {
-						widget.commitSavedBaseline(update.ydoc);
+						widget.commitSavedBaseline(update.ydoc, update.mentions || []);
 					} else if (widget) {
 						widget.snapshot = update.ydoc;
 					}

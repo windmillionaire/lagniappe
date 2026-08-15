@@ -248,6 +248,25 @@ def ask_prompt(report, user):
         "permitted workspace records and web search when useful. Return JSON "
         "only. Do not execute mutations or claim actions were performed.",
     )
+    submitted_files = [
+        {
+            "id": file.hash,
+            "filename": file.filename,
+            "content_type": file.mimetype,
+            "size": file.size,
+            "summary": file.summary,
+            "url": file.url,
+        }
+        for file in (report.input_files or [])
+    ]
+    if submitted_files:
+        prompt.add_context("submitted_files", submitted_files)
+        prompt.email_submitted_file_ids = frozenset(
+            value
+            for file in report.input_files
+            for value in (file.hash, file.urlsafe_key)
+            if value
+        )
     prompt.add_instructions(
         """
 Answer the user's question directly in the top-level summary. If the question
@@ -264,6 +283,11 @@ attached automatically; only request include_original when the user explicitly
 asks to inspect the original large document, audio, or video. If the user asks
 for current or outside-world information, use web search and keep the answer
 clear about what comes from the workspace versus outside research.
+
+When submitted_files context is present, those files were attached directly to
+this Ask report. Treat their ids as valid get_file references and use their
+summaries or original content when relevant. They are read-only evidence for
+the answer; never propose moving or attaching them to workspace records.
 
 Use get_task_history when the question asks about past completions, last or
 recent occurrences, frequency, average gaps, or proof for a recurring task.
@@ -368,10 +392,26 @@ array.
 # @dimensions ask generate validate repair usable-answer live-provider
 def generate_ask_report(prompt):
     """Generate and validate a usable Ask response."""
+    submitted_file_ids = frozenset(
+        getattr(prompt, "email_submitted_file_ids", ()) or ()
+    )
+
+    def validator(response, **options):
+        response = validate_ask_response(response, **options)
+        for action in response.get("actions") or []:
+            if action.get("type") != "move_file":
+                continue
+            file_reference = (action.get("data") or {}).get("file")
+            if file_reference in submitted_file_ids:
+                raise exceptions.AIException(
+                    "Ask email attachments are read-only evidence and cannot be moved."
+                )
+        return response
+
     return generate_validated_proposal(
         prompt,
         report_label="Ask",
-        validator=validate_ask_response,
+        validator=validator,
     )
 
 

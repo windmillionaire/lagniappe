@@ -25,6 +25,8 @@ class DeleteCollector:
         self.to_delete = []
         self.survivors = []
         self.search_deletes = []
+        self._message_conversations = {}
+        self._message_users = set()
 
     # @testable infrastructure
     def delete(self, entity):
@@ -51,6 +53,7 @@ class DeleteCollector:
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_user_delete_can_preserve_page
+    # @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
     # @pairs entities:delete entities:preserve-page entities:user-unlink
     # @pairs entities:category-fallback entities:search-cache users:delete
     # @pairs users:preserve-page users:user-unlink users:category-fallback
@@ -100,7 +103,9 @@ class DeleteCollector:
     def page(self, page, *, force=False):
         if force or not page.categories:
             self.page_notes(page)
-            self.delete(self._page_user(page))
+            page_user = self._page_user(page)
+            self.user_messages(page_user)
+            self.delete(page_user)
             self.delete(page)
             self.page_tasks(page)
             self.page_files(page)
@@ -217,6 +222,58 @@ class DeleteCollector:
             if isinstance(note, self.entities.NOTE):
                 self.note(note)
 
+    # @testable true
+    # @tests tests_unit/test_027_messaging.py::test_user_delete_preserves_or_purges_message_history_by_survivor
+    # @pairs messaging:deleted-peer messaging:history-retention
+    def user_messages(self, user):
+        if not user or user.key in self._message_users:
+            return
+        self._message_users.add(user.key)
+        conversations = self.entities.fetch(
+            *database.get.message_conversation_keys(user),
+            request=Fetch.direct(),
+        )
+        for conversation in conversations:
+            if isinstance(conversation, self.entities.MESSAGE_CONVERSATION):
+                self._message_conversations[conversation.key] = conversation
+
+    # @testable true
+    # @tests tests_unit/test_027_messaging.py::test_user_delete_preserves_or_purges_message_history_by_survivor
+    # @pairs messaging:history-retention messaging:orphan-purge
+    def finalize_message_conversations(self):
+        deleting_users = {
+            entity.key
+            for entity in self.to_delete
+            if isinstance(entity, self.entities.USER)
+        }
+        for conversation in self._message_conversations.values():
+            participants = set(conversation.db.get("participants") or ())
+            existing_users = {
+                entity.key
+                for entity in self.entities.fetch(
+                    *participants,
+                    request=Fetch.direct(),
+                )
+                if isinstance(entity, self.entities.USER)
+            }
+            survivors = existing_users - deleting_users
+            if survivors:
+                conversation.db["visible_to"] = [
+                    key
+                    for key in conversation.db.get("visible_to") or ()
+                    if key in survivors
+                ]
+                self.repair(
+                    conversation,
+                    "visible_to",
+                    reason="user-delete-message-history-preservation",
+                )
+                continue
+
+            self.delete(conversation)
+            for message_key in database.get.message_keys(conversation):
+                self.delete(self.entities.MESSAGE(message_key))
+
     # @testable infrastructure
     def project_models(self, project):
         models = list(project.model_tasks)
@@ -288,6 +345,7 @@ class UserDeleteMutation(StandardDeleteMutation):
     # @testable infrastructure
     def collect(self, entity, collector):
         collector.user_notes(entity)
+        collector.user_messages(entity)
         if entity.properties.page.exists:
             if collector.preserve_user_pages:
                 collector.preserve_user_page(entity, entity.page)
@@ -376,6 +434,9 @@ DELETE_PLANNERS = {
     "job": STANDARD_DELETE,
     "job_lock": STANDARD_DELETE,
     "report": STANDARD_DELETE,
+    "message_conversation": STANDARD_DELETE,
+    "message": STANDARD_DELETE,
+    "mention_marker": STANDARD_DELETE,
 }
 
 
@@ -478,6 +539,7 @@ def plan_delete(*entities, registry, preserve_user_pages=False):
     )
     for entity in entities:
         collector.collect(entity)
+    collector.finalize_message_conversations()
 
     deleted = _unique_entities(collector.to_delete)
     delete_keys = {entity.key for entity in deleted}
@@ -504,10 +566,14 @@ def plan_delete(*entities, registry, preserve_user_pages=False):
     for entity in deleted:
         builder.delete(entity, reason="delete-cascade")
         if getattr(entity, "entity_kind", None) == "notification":
-            builder.notification_delete(
-                entity,
-                reason="notification-delete",
+            entity._notification_count_delta = (
+                -1 if entity.notification_type == "ordinary" else 0
             )
+            if entity.notification_type == "ordinary":
+                builder.notification_delete(
+                    entity,
+                    reason="notification-delete",
+                )
         if getattr(entity, "entity_kind", None) == "job":
             builder.operation_delete(
                 entity,

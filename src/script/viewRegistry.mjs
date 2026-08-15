@@ -20,6 +20,7 @@ export const VIEW_REGISTRY = Object.freeze({
 	report: { entry: "report", source: "./views/report.mjs" },
 	analytics: { entry: "analytics", source: "./views/analytics.mjs" },
 	admin: { entry: "admin", source: "./views/admin.mjs" },
+	messages: { entry: "messages", source: "./views/messages.mjs" },
 });
 
 export const VIEW_ENTRIES = Object.freeze(

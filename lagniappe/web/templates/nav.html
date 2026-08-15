@@ -148,14 +148,14 @@
             {# <a href="{{ url_for('pages.view', key=current_user.page.urlsafe_key) }}" #}
             <button class="{{ styles.nav.link }}"
                     data-role="notifications"
-                    data-visible="false"
-                    aria-hidden="true"
-                    tabindex="-1"
-                    aria-label="Notifications: 0">
+                    data-visible="true"
+                    aria-hidden="false"
+                    aria-busy="true"
+                    aria-label="Notifications loading">
               <div class="size-8 rounded-full bg-white">
                 <span class="grid size-full place-items-center text-base font-bold"
                       data-role="notification-count"
-                      aria-hidden="true">0</span>
+                      aria-hidden="true">...</span>
               </div>
               {# {%- if current_user.photo -%}
                 <img class="{{ styles.nav.user }} bg-user-light" src="{{ current_user.photo }}" alt="" width="32" height="32">

@@ -965,15 +965,14 @@ def test_failed_report_detail_offers_retry_and_partial_undo(get_user):
 
 
 # @features ai-report
-# @dimensions ask detail answer-html links no-actions completed-state
+# @dimensions ask detail answer-html links no-actions
 def test_ask_report_detail_shows_answer_without_duplicate_proposal(get_user):
     user = get_user(Users.OWNER)
     report = _ask_answer_report(user)
 
     report_page = user.go(Report.for_entity(user, report))
 
-    expect(report_page.title_element).to_have_text(f"Ask: {report.instructions}")
-    expect(report_page.title_element).not_to_have_text(report.name)
+    expect(report_page.title_element).to_have_text(report.name)
     expect(user.page.get_by_role("heading", name="Answer")).to_be_visible()
     expect(user.page.get_by_role("heading", name="Status")).not_to_be_visible()
     expect(user.page.get_by_role("heading", name="Proposal")).not_to_be_visible()

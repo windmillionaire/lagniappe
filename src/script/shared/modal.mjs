@@ -143,8 +143,10 @@ export class Modal {
  * @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_delete_task_from_row
  * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
+ * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
  * @pairs categories:delete projects:delete model-tasks:delete pages:delete
  * @pairs tasks:delete task-index:delete forms:delete users:delete users:options
+ * @pair messaging:clear-confirmation
  */
 export class DeleteModal extends Modal {
 	async init() {
@@ -153,7 +155,8 @@ export class DeleteModal extends Modal {
 			this.trigger
 				.closest("[lp-component]")
 				?._lp_component?.active?.target?.closest("[lp-entity]");
-		this.key = entity?.dataset?.key || entity?.id;
+		this.key =
+			this.trigger.dataset.deleteKey || entity?.dataset?.key || entity?.id;
 
 		if (!this.key || !this.view) {
 			captureError(
@@ -164,7 +167,9 @@ export class DeleteModal extends Modal {
 			return;
 		}
 
-		await this.load(ENDPOINTS.delete(this.key));
+		await this.load(
+			this.trigger.dataset.deleteModalRoute || ENDPOINTS.delete(this.key),
+		);
 
 		const modal = this.modal;
 		if (!modal) {

@@ -42,6 +42,7 @@ export class SiteMaintenance extends SiteSetting {
 
 		const rebuildCache = buttons.active({
 			existingButton: cacheButton,
+			icon: "database",
 			text: "Refresh Cache",
 			processingText: "Refreshing Cache",
 			completedText: "Cache Refreshed",
@@ -71,6 +72,7 @@ export class SiteMaintenance extends SiteSetting {
 
 		const applyUpdates = buttons.active({
 			existingButton: updateButton,
+			icon: "installation",
 			text: "Apply Updates",
 			processingText: "Applying Site Updates",
 			completedText: "Updates Applied",
@@ -109,9 +111,24 @@ export class SiteMaintenance extends SiteSetting {
 		const configurationButton = this.target.querySelector(
 			"[data-role='configuration']",
 		);
+		const configuration = configurationButton
+			? buttons.active({
+					existingButton: configurationButton,
+					icon: "configuration",
+					text: "Configuration",
+					processingText: "Loading Configuration",
+					completedText: "Configuration",
+					completedIcon: "configuration",
+				})
+			: null;
 		configurationButton?.addEventListener("click", async () => {
+			configuration.activate();
 			const modal = new Modal(this.view, configurationButton);
-			await modal.load(this.endpoints.siteConfiguration);
+			try {
+				await modal.load(this.endpoints.siteConfiguration);
+			} finally {
+				configuration.deactivate();
+			}
 		});
 	}
 

@@ -221,10 +221,41 @@ const navigateLink = (link) => {
 	return true;
 };
 
+/**
+ * @testable true
+ * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
+ * @pair mentions:link-popover
+ */
+const editableMentionClickGuard = (editor) =>
+	new Plugin({
+		key: new PluginKey("editableMentionClickGuard"),
+		view: (view) => {
+			/**
+			 * @testable false
+			 * @covered-by src/script/elements/editor/extensions/link.mjs::editableMentionClickGuard
+			 * @reason capture-phase suppression is exercised through the mention popover
+			 */
+			const preventNavigation = (event) => {
+				if (!editor.isEditable || event.button !== 0) return;
+				const link = linkFromEvent(editor, event);
+				if (link?.matches('[data-type="lagniappe-mention"]')) {
+					event.preventDefault();
+				}
+			};
+			view.dom.addEventListener("click", preventNavigation, true);
+			return {
+				destroy: () =>
+					view.dom.removeEventListener("click", preventNavigation, true),
+			};
+		},
+	});
+
 // @testable true
 // @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
+// @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
 // @features editor
 // @dimensions link popover click-navigation
+// @pairs mentions:link-popover mentions:unlink
 class LinkPopover {
 	constructor(editor) {
 		this.editor = editor;
@@ -251,6 +282,7 @@ class LinkPopover {
 		if (!attrs.href) return false;
 
 		this.close();
+		this.isMention = link.matches('[data-type="lagniappe-mention"]');
 		this.link = link;
 		this.range = range;
 		this.href = attrs.href;
@@ -266,8 +298,12 @@ class LinkPopover {
 	_createPanel(title) {
 		const panel = document.createElement("div");
 		panel.dataset.role = "editor-link-popover";
+		panel.dataset.linkType = this.isMention ? "mention" : "link";
 		panel.setAttribute("role", "dialog");
-		panel.setAttribute("aria-label", "Link options");
+		panel.setAttribute(
+			"aria-label",
+			this.isMention ? "Mention options" : "Link options",
+		);
 		panel.className =
 			"absolute z-101 flex flex-col gap-2 rounded-md bg-white p-3 text-sm shadow-lg outline outline-base-light/50";
 		panel.style.width = "min(22rem, calc(100vw - 1rem))";
@@ -292,11 +328,9 @@ class LinkPopover {
 		const actions = panel.appendChild(document.createElement("div"));
 		actions.className =
 			"flex flex-row flex-wrap items-center gap-1 border-t border-base-light/50 pt-2";
-		actions.append(
-			this._button("open", "Open"),
-			this._button("edit", "Edit"),
-			this._button("remove", "Remove", "text-delete-default"),
-		);
+		actions.append(this._button("open", "Open"));
+		if (!this.isMention) actions.append(this._button("edit", "Edit"));
+		actions.append(this._button("remove", "Remove", "text-delete-default"));
 
 		return panel;
 	}
@@ -438,7 +472,25 @@ class LinkPopover {
 	_removeLink() {
 		if (!this.range) return;
 
-		this.editor.chain().focus().setTextSelection(this.range).unsetLink().run();
+		if (this.isMention) {
+			const text = this.link?.textContent || "";
+			this.editor
+				.chain()
+				.focus()
+				.insertContentAt(this.range, text)
+				.setTextSelection({
+					from: this.range.from,
+					to: this.range.from + text.length,
+				})
+				.run();
+		} else {
+			this.editor
+				.chain()
+				.focus()
+				.setTextSelection(this.range)
+				.unsetLink()
+				.run();
+		}
 		this.close();
 	}
 
@@ -470,6 +522,7 @@ class LinkPopover {
 		this.link = null;
 		this.range = null;
 		this.href = null;
+		this.isMention = false;
 	}
 }
 
@@ -579,15 +632,15 @@ export const CustomLink = Link.extend({
 	addProseMirrorPlugins() {
 		return [
 			normalizeLinkMarks(this.type),
-			...(this.parent?.() ?? []),
+			editableMentionClickGuard(this.editor),
 			new Plugin({
 				key: new PluginKey("customLinkClick"),
 				props: {
 					handleClick: (_view, pos, event) => {
-						if (event.button !== 0 || event.defaultPrevented) return false;
-
 						const link = linkFromEvent(this.editor, event);
-						if (!link) return false;
+						if (event.button !== 0 || !link) return false;
+						const isMention = link.matches('[data-type="lagniappe-mention"]');
+						if (event.defaultPrevented && !isMention) return false;
 
 						event.preventDefault();
 						if (!this.editor.isEditable) {
@@ -600,6 +653,7 @@ export const CustomLink = Link.extend({
 					},
 				},
 			}),
+			...(this.parent?.() ?? []),
 		];
 	},
 

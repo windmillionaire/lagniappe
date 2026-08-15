@@ -69,6 +69,8 @@ It supports subcommands for running specific steps:
 - `oauth`: replace and verify the Google Sign-In Web client, update Identity
   Platform, and optionally redeploy
 - `ai`: configure AI
+- `ai-email`: configure or reconcile Resend AI email submissions, optionally
+  deploy, then activate the provider webhook
 - `security`: enable, refresh, or disable verified Redis Cloud TLS, then
   optionally redeploy
 - `jobs`: idempotently create or update deferred-job recovery infrastructure
@@ -594,9 +596,9 @@ response is accepted and setup continues by verifying the live configuration.
     successful app deployment intact but returns nonzero with DNS, CAA, and
     rerun guidance; the default App Engine URL remains available.
 
-    After Google attaches an active certificate, setup reports success without
-    making repeated HTTPS requests. Google's HTTPS frontend may need a little
-    additional time before the hostname opens in a browser.
+    After Google attaches an active certificate, setup prints one concise
+    confirmation, notes that HTTPS may take up to an hour to open, and does not
+    make repeated HTTPS requests.
 
     After custom-domain readiness, setup creates the deferred-job recovery
     schedule during a quiet wrapping-up phase. The schedule is installed
@@ -997,6 +999,81 @@ undoing completed provider mutations.
 Runtime verification/reset delivery and its browser/server secret boundary are
 documented in
 [AUTHENTICATION.md](AUTHENTICATION.md#authentication-email).
+
+### AI Email Submissions (`installer/ai_email.py`)
+
+`./setup.sh ai-email` configures production inbound AI reports. It requires a
+completed custom-domain installation, Resend-backed authentication email, AI
+settings, and the deferred-job runtime identity/region. It then:
+
+1. suggests `inbound.<CUSTOM_DOMAIN>` and requires a dedicated subdomain below
+   the application domain, with operator confirmation that it has no unrelated
+   MX records;
+2. opens Resend API Keys and prints the exact key name and **Full access**
+   selection for a one-time receiving-administration key, then validates that
+   key by listing domains;
+3. finds or creates one exact receiving-enabled domain without changing
+   unrelated resources;
+4. asks whether its DNS is hosted by Cloudflare. The Cloudflare path opens
+   Resend Domains and directs the operator through Resend's **Sign in to
+   Cloudflare**/automatic DNS option without printing raw records first. The
+   manual path, or an explicit fallback from the assisted path, prints the
+   exact DNS records and MX priority;
+5. triggers asynchronous verification after the DNS checkpoint and waits for
+   Resend itself to report `verified`;
+6. reuses the verified sender address, sender name, and Sending-access key
+   already established by `./setup.sh email`; it does not repeat that sending
+   domain's DNS setup or create another Sending key;
+7. finds or creates the exact
+   `https://<CUSTOM_DOMAIN>/webhooks/resend/ai-email` webhook subscribed only to
+   `email.received`, retrieves its signing secret, and leaves the webhook
+   disabled;
+8. saves the complete enabled configuration locally and explains that the next
+   action will deploy the current checkout and settings;
+9. offers to deploy, matching the other primary configuration flows. If
+   accepted, it deploys first, enables the Resend webhook only after deployment
+   succeeds, verifies the enabled provider state, and prints the three live
+   addresses plus manual smoke-test steps. No synthetic email or route-health
+   probe is run.
+
+The custom application domain and authentication-email sender are prerequisites
+owned by their existing setup flows; `ai-email` does not repeat their DNS or
+sender-name prompts. Resend displays a newly created API key only once, so this
+flow gives exact dashboard instructions and then validates the newly pasted Full
+receiving key with live provider operations. That is the only new key, and it
+must differ from authentication email's existing Sending key. The same visible
+sender and Sending key serve authentication messages and AI-email feedback.
+
+Resend domain/webhook IDs and secrets are retained so reruns reconcile rather
+than duplicate resources. A rerun offers reconcile or disable. Disable changes
+the provider webhook first, verifies that state, then saves and optionally
+deploys the disabled local configuration; it does not delete domains, DNS
+records, webhooks, or keys.
+
+After a successful deploy, setup asks for a normal registered-user smoke test:
+
+```text
+From:    <exact registered user email>
+To:      ask@<inbound-domain>
+Subject: <normal Ask request>
+```
+
+The endpoint verifies the untouched request bytes with the webhook secret and a
+five-minute Svix timestamp window, retrieves the message and attachment metadata
+through the Full access key, matches one exact stored user email, and hands the
+submission to the durable replay/ingest job. That job starts the existing Ask,
+Create, or Organize report pipeline. Acceptance and terminal feedback use the
+authentication-email sender and separate Sending key. Create and Organize only
+produce proposals; applying them still requires normal login, review, and
+execution.
+
+The implementation was
+checked against Resend's current [receiving](https://resend.com/docs/dashboard/receiving/introduction),
+[received-message](https://resend.com/docs/api-reference/emails/retrieve-received-email),
+[domain](https://resend.com/docs/api-reference/domains/create-domain),
+[webhook](https://resend.com/docs/api-reference/webhooks/get-webhook), and
+[sending/idempotency](https://resend.com/docs/dashboard/emails/idempotency-keys)
+contracts; revalidate them before expanding the feature.
 
 Recovery checks live standalone Identity Platform state. Missing, forbidden,
 mismatched, and unavailable states remain distinct and cannot silently replace

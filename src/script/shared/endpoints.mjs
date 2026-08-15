@@ -149,6 +149,14 @@ export const ENDPOINTS = {
 	activity: (key) => `/l/activity/${key}`,
 	poll: "/l/poll",
 	notifications: "/l/notifications",
+	messages: {
+		conversations: "/l/messages/conversations",
+		history: (key) => `/l/messages/conversations/${key}`,
+		send: "/l/messages",
+		read: (key) => `/l/messages/conversations/${key}/read`,
+		remove: (key) => `/l/messages/${key}`,
+		clearModal: (key) => `/l/messages/conversations/${key}/delete`,
+	},
 	help: (key) => {
 		return `/reference/section/${key}`;
 	},

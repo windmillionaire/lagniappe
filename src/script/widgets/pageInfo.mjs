@@ -538,6 +538,10 @@ export class UserSettings extends PagePermissions {
 		return this.target.querySelector("[data-role='user-groups']");
 	}
 
+	get ownerInboundElement() {
+		return this.target.querySelector("[data-role='owner-inbound']");
+	}
+
 	get userCardElement() {
 		return this.target.querySelector("[data-role='user-card']");
 	}
@@ -559,6 +563,7 @@ export class UserSettings extends PagePermissions {
 				this.userEmailElement,
 				this.userAiAccessElement,
 				this.userGroupsElement,
+				this.ownerInboundElement,
 				this.removePageElement,
 				this.pageSelectElement,
 			].filter(Boolean),
@@ -592,6 +597,15 @@ export class UserSettings extends PagePermissions {
 			Array.from(this._pageSelect.select.values).forEach((value) => {
 				data.append("reassign-page", value);
 			});
+		}
+		if (this.target.dataset.canEditOwnerInbound === "true") {
+			for (const name of [
+				"allow_messages_and_mentions",
+				"allow_task_assignments",
+			]) {
+				const toggle = card?.querySelector(`[name='${name}']`);
+				if (toggle) data.set(name, toggle.checked ? "true" : "false");
+			}
 		}
 		card?.querySelector("[name='remove-user']")?.checked &&
 			data.set("remove-user", "true");

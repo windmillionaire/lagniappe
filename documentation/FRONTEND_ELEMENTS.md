@@ -42,6 +42,26 @@ Field-specific comboboxes remain widget/element-owned and load with their
 containing form. Index tools and Manual dropdowns are further gated on mobile
 mode.
 
+## Messaging and mention controls
+
+`MessageComposer` is the shared standard-modal composer used by Notifications
+and the Messages page. Its single-value, user-kind `FacetsBox` requests
+`permission=message`; selecting a recipient focuses the user-kind body field.
+The body is required plain text capped at 1,000 characters, and one operation
+ID is retained across a failed/retried submit. Existing Messages threads use a
+separate inline reply form whose recipient and conversation pair are validated
+by the server.
+
+The collaborative editor registers the inline atom `LagniappeMention`. Typing a
+non-empty `@query` opens an accessible listbox backed by
+`permission=mention&document=<key>`; arrow keys, Enter, Escape, and pointer
+selection are owned by `MentionSuggestions`. Inserted nodes retain occurrence,
+recipient, and display-name attributes in internal document HTML. Newly
+inserted occurrences remain in the document widget's pending map and its
+coalesced offline sync record until the server accepts and persists that
+checkpoint. Read-only and public-limited editors render existing nodes but do
+not install the suggestion controller.
+
 ## FormElement (`elements/form.mjs`)
 
 The bridge between the widget system and the form rendering system. Most settings and create widgets (`TaskSettings`, `DocumentSettings`, `PageInfo`, `CreateUser`, `FileInfo`, etc.) extend `FormElement` rather than writing their own form logic.
@@ -114,8 +134,12 @@ The submit button cycles through states defined by `messages`:
 
 Submit buttons use a stable, absolutely positioned leading icon slot. Changing
 between no icon, unsaved, spinner, offline, and success states therefore does
-not recenter or resize the text. Brief success feedback is shown and hidden by
-short atomic commits rather than opacity fades.
+not recenter or resize the text. The shared action style is full width by
+default, including direct-request and modal actions; compact navigation,
+toolbar, and icon-only controls use their own styles instead of overriding the
+action style. Shared asynchronous buttons preserve direct `data-role="icon"`
+and `data-role="text"` children through every state. Brief success feedback is
+shown and hidden by short atomic commits rather than opacity fades.
 
 Any editable form with a submit button shows the cloud-exclamation icon after
 a local field change. Forms do not use live sync. A successful submit or form

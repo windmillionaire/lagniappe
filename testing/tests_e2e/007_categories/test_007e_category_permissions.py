@@ -21,7 +21,6 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
 from testing.definitions import Categories, Pages, SitePages, Users
 from testing.elements import FormElements, HeaderSearch, Table, Tools
 from testing.resources.category import Category
@@ -35,13 +34,7 @@ def _category_side_effect_state(category, *users):
     notification_keys = tuple(
         (
             user.entity.key,
-            tuple(
-                row.key
-                for row in database.get.activity(
-                    user.entity,
-                    types="notification",
-                )
-            ),
+            tuple(Entities.NOTIFICATION.keys_for_parent(user.entity)),
         )
         for user in users
     )

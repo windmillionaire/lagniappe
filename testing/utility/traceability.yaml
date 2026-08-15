@@ -23,6 +23,7 @@ test_roots:
   - testing/tests_tooling/test_001e_setup_orchestration.py
   - testing/tests_tooling/test_001f_setup_portability.py
   - testing/tests_tooling/test_001g_setup_release_readiness.py
+  - testing/tests_tooling/test_001h_setup_ai_email.py
   - testing/tests_tooling/test_003_config.py
   - testing/tests_tooling/test_005_test_server_command.py
   - testing/tests_tooling/test_007_run_py_test_command.py

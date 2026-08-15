@@ -1,2 +1,68 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="62cfac97-715a-476a-bb2d-ec067b0b9d3e",e._sentryDebugIdIdentifier="sentry-dbid-62cfac97-715a-476a-bb2d-ec067b0b9d3e");}catch(e){}}();import{F as t}from"./form2.js?v=be0f1470";import{InputElement as r}from"./input.js?v=be0f1470";import{RadioElement as i}from"./radio.js?v=be0f1470";import"./foundation.js?v=be0f1470";import"./connectivity.js?v=be0f1470";import"./baseForm.js?v=be0f1470";import"./icons.js?v=be0f1470";import"./primitives.js?v=be0f1470";import"./styles.js?v=be0f1470";import"./loader.js?v=be0f1470";import"./baseElement.js?v=be0f1470";import"./formatting.js?v=be0f1470";class m extends t{init(){this.messages={submit:"Create Form",submitting:"Creating Form",submitted:"Form Created"},super.init()}get html(){this.nameElement=new r(this,{name:"name",required:!0,type:"text",label:"Name"});const e=new i(this,{name:"form-type",required:!0,layout:"row",options:[{label:"Page",value:"page"},{label:"Task",value:"task"}]});return[this.nameElement.edit,e.edit]}postreconcile(){const e=this._created;super.postreconcile(),e&&(this.nameElement.clear(),this.success(),this.form?.resetSubmitButton()),this.nameElement.focus(),this.target.dataset.visible="true"}}export{m as CreateForm};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FormElement } from './form2.js?v=b2884058';
+import { InputElement } from './input.js?v=b2884058';
+import { RadioElement } from './radio.js?v=b2884058';
+import './foundation.js?v=b2884058';
+import './connectivity.js?v=b2884058';
+import './baseForm.js?v=b2884058';
+import './icons.js?v=b2884058';
+import './primitives.js?v=b2884058';
+import './styles.js?v=b2884058';
+import './loader.js?v=b2884058';
+import './baseElement.js?v=b2884058';
+import './formatting.js?v=b2884058';
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
+ * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
+ * @features forms
+ * @dimensions create page-form task-form
+ */
+class CreateForm extends FormElement {
+	init() {
+		this.messages = {
+			submit: "Create Form",
+			submitting: "Creating Form",
+			submitted: "Form Created",
+		};
+
+		super.init();
+	}
+
+	get html() {
+		this.nameElement = new InputElement(this, {
+			name: "name",
+			required: true,
+			type: "text",
+			label: "Name",
+		});
+
+		const formType = new RadioElement(this, {
+			name: "form-type",
+			required: true,
+			layout: "row",
+			options: [
+				{ label: "Page", value: "page" },
+				{ label: "Task", value: "task" },
+			],
+		});
+
+		return [this.nameElement.edit, formType.edit];
+	}
+
+	postreconcile() {
+		const created = this._created;
+		super.postreconcile();
+
+		if (created) {
+			this.nameElement.clear();
+			this.success();
+			this.form?.resetSubmitButton();
+		}
+		this.nameElement.focus();
+		this.target.dataset.visible = "true";
+	}
+}
+
+export { CreateForm };

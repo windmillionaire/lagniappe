@@ -250,6 +250,36 @@ def test_absent_projection_mutation_updates_epoch_without_querying(redis):
     assert redis.values[epoch_key] == "1"
 
 
+# @pairs notifications:aggregate-count notifications:redis-projection notifications:revision
+# @source lagniappe/core/tools/cache/notifications.py::publish_notification_aggregate
+def test_durable_aggregate_publish_preserves_members_and_exact_combined_count(redis):
+    owner = user()
+    existing = item("notification-a", owner)
+    notifications.seed_notification_state(
+        owner,
+        notification_keys=[existing],
+        aggregate_loader=lambda _user: {
+            "ordinary_count": 1,
+            "unread_message_count": 0,
+        },
+    )
+
+    state = notifications.publish_notification_aggregate(
+        owner,
+        {
+            "ordinary_count": 7,
+            "unread_message_count": 3,
+            "aggregate_revision": 4,
+        },
+    )
+
+    assert state["ordinary_count"] == 7
+    assert state["unread_message_count"] == 3
+    assert state["count"] == 10
+    assert state["members"] == {"notification-a"}
+    assert state["revision"] >= 4
+
+
 # @pairs notifications:authoritative-repair notifications:revision notifications:membership
 # @source lagniappe/core/tools/cache/notifications.py::seed_notification_state
 def test_notification_list_keys_repair_warm_projection(redis):

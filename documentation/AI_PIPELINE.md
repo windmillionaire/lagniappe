@@ -88,6 +88,16 @@ There are three different checkpoint systems and they should not be conflated:
 3. `report.result` is the versioned per-action execution/undo ledger used after
    a user approves a proposal.
 
+Email-origin reports add a transport handoff in front of this same pipeline.
+The signed Resend webhook claims an HMAC-only replay record, retrieves and
+normalizes the message, matches one exact stored user email, creates a
+deterministic pending `AIReport`, and starts `EMAIL_INGEST`. That adapter streams
+ordinary attachments into deterministic report-owned `File` entities and then
+starts the normal `REPORT_ASK`, `REPORT_CREATE`, or `REPORT_ORGANIZE` job. It
+does not create a second prompt or proposal implementation. Acceptance and
+terminal result email are independently idempotent; Create/Organize proposals
+still require browser review and deterministic execution.
+
 ### Main ownership boundaries
 
 | Layer | Current owner | Responsibility |
@@ -278,6 +288,12 @@ structured-final call when a response schema is configured.
 Ask preparation returns a prepared proposal/status value without mutating
 the input report. The generic runner checkpoints that value before
 `ReportAdapter.apply()` owns the durable report save.
+
+When an email-origin Ask includes ordinary attachments, preparation first uses
+the existing bounded report-file summary path with search indexing disabled.
+The prompt receives a `submitted_files` context containing safe metadata,
+summaries, and read-only `get_file` references. Those files are evidence only;
+Ask does not gain Organize placement actions.
 
 ### Organize
 

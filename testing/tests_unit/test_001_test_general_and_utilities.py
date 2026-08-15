@@ -447,6 +447,7 @@ def test_collect_entities_deletes_user_and_page_together(monkeypatch):
     monkeypatch.setattr(delete_module.DeleteCollector, "page_files", lambda *_: None)
     monkeypatch.setattr(delete_module.DeleteCollector, "page_notes", lambda *_: None)
     monkeypatch.setattr(delete_module.DeleteCollector, "user_notes", lambda *_: None)
+    monkeypatch.setattr(delete_module.DeleteCollector, "user_messages", lambda *_: None)
 
     collector = delete_module.DeleteCollector(Entities)
     collector.collect(page)
@@ -488,6 +489,7 @@ def test_collect_entities_deletes_user_and_page_together(monkeypatch):
 # @source lagniappe/core/mutations/delete.py::plan_delete
 def test_collect_user_delete_can_preserve_page(monkeypatch):
     monkeypatch.setattr(delete_module.DeleteCollector, "user_notes", lambda *_: None)
+    monkeypatch.setattr(delete_module.DeleteCollector, "user_messages", lambda *_: None)
 
     users_model = Entities.USERS(testing=True)
     users_model._key = "preserve-users-model"

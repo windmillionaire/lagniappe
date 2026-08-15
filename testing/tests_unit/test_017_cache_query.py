@@ -271,6 +271,51 @@ def test_cache_update_writes_pointer_search_rows_and_parent_free_details(monkeyp
     assert "parent" not in details
 
 
+# @pairs cache:delete search:user-projection
+# @source lagniappe/core/tools/cache/utility.py::delete
+def test_cache_delete_removes_page_and_user_search_projections(monkeypatch):
+    deleted = []
+
+    class FakePipe:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def delete(self, *keys):
+            deleted.extend(keys)
+
+        def hdel(self, *_args):
+            return None
+
+        def execute(self):
+            return None
+
+    monkeypatch.setattr(
+        utility.filter_cache,
+        "get_existing_parents",
+        lambda _hashes: {},
+    )
+    monkeypatch.setattr(
+        utility.cache,
+        "pipeline",
+        lambda: FakePipe(),
+    )
+    page = SimpleNamespace(
+        hash="deleted-user-page-hash",
+        kind="page",
+        urlsafe_key="deleted-user-page-key",
+    )
+
+    utility.delete([page])
+
+    assert set(deleted) == {
+        Search.page.key(page),
+        Search.user.key(page),
+    }
+
+
 # @features cache
 # @dimensions details-hydration parent-key string-input missing-parent
 @pytest.mark.unit
@@ -376,6 +421,38 @@ def test_search_results_are_hydrated_from_details_hashes(monkeypatch):
 
     assert total == 1
     assert str(full_results[0]["text"]) == "Page description <b>needle</b>"
+
+
+# @pairs search:stale-row cache:self-repair
+# @source lagniappe/core/tools/cache/query.py::_current_search_results
+def test_search_prunes_stale_rows_without_entity_details(monkeypatch):
+    deleted = []
+    monkeypatch.setattr(
+        query,
+        "hydrate_search_results",
+        lambda results: results,
+    )
+    monkeypatch.setattr(
+        query.cache,
+        "delete",
+        lambda *keys: deleted.extend(keys),
+    )
+    current = {
+        "id": "current-page",
+        "kind": "page",
+        "details": {"hash": "current-hash"},
+    }
+    stale = {
+        "id": "deleted-user-page",
+        "kind": "user",
+        "details": {},
+    }
+
+    results, stale_count = query._current_search_results([current, stale])
+
+    assert results == [current]
+    assert stale_count == 1
+    assert deleted == [Search.user.value.format("deleted-user-page")]
 
 
 # @features search

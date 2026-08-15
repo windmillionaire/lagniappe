@@ -4,7 +4,7 @@ from flask_login import current_user
 from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
-from lagniappe.core.tools import cache
+from lagniappe.core.tools import cache, collaboration, database, notification_service
 from lagniappe.core.tools.polling import channel_revisions, render_operation_statuses
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
 from lagniappe.web.auth import home_permission, logged_in, require_ai_access
@@ -73,27 +73,34 @@ def activity():
 @internal.route("/notifications")
 @logged_in
 def notifications():
-    notification_keys = []
-
-    # @testable infrastructure
-    def load_notification_keys(user):
-        notification_keys[:] = Entities.NOTIFICATION.keys_for_parent(user)
-        return notification_keys
+    page = database.get.notifications_page(
+        current_user,
+        start_cursor=request.args.get("cursor"),
+        limit=25,
+    )
+    notification_keys = [row.key for row in page]
+    aggregate = notification_service.repair_notification_aggregate(
+        current_user,
+    )
 
     try:
         state = cache.seed_notification_state(
             current_user,
-            keys_loader=load_notification_keys,
+            notification_keys=notification_keys,
+            aggregate_loader=lambda _user: aggregate,
             repair=True,
         )
         responses.publish_notification_state(state)
     except Exception as error:
         exceptions.capture(error, context={"operation": "notification-state-repair"})
-        if not notification_keys:
-            load_notification_keys(current_user)
     notifications = Entities.fetch(*notification_keys, request=Fetch.direct())
     g.NO_CACHE = True
-    return responses.notifications(notifications)
+    return responses.notifications(
+        notifications,
+        aggregate=notification_service.aggregate_counts(aggregate),
+        cursor=page.next_cursor,
+        can_message=collaboration.can_initiate_messages(current_user),
+    )
 
 
 # @testable true
@@ -104,8 +111,11 @@ def notifications():
 @logged_in
 def clear_notifications():
     notification_keys = Entities.NOTIFICATION.keys_for_parent(current_user)
-    notifications = Entities.fetch(*notification_keys, request=Fetch.root())
-    Entities.delete(*notifications)
+    notification_service.clear_ordinary_notifications(
+        current_user, notification_keys
+    )
+    aggregate = notification_service.get_notification_aggregate(current_user)
+    notification_service.publish_notification_aggregate(current_user, aggregate)
 
     return responses.ok()
 
@@ -182,7 +192,14 @@ def delete_activity(key):
     ):
         abort(403)
 
-    Entities.delete(activity)
+    if activity.kind == "notification":
+        if activity.notification_type != "ordinary":
+            abort(403)
+        notification_service.delete_ordinary_notification(current_user, activity.key)
+        aggregate = notification_service.get_notification_aggregate(current_user)
+        notification_service.publish_notification_aggregate(current_user, aggregate)
+    else:
+        Entities.delete(activity)
 
     return responses.ok()
 

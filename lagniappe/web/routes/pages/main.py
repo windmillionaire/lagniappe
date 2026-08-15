@@ -184,6 +184,9 @@ def _page_data(form, page=None, category=None):
         page_data["remove-user"] = form.get("remove-user") == "true"
     if "ai_access" in form:
         page_data["ai_access"] = form.get("ai_access")
+    for toggle in ("allow_messages_and_mentions", "allow_task_assignments"):
+        if toggle in form:
+            page_data[toggle] = form.get(toggle) == "true"
 
     return page_data
 

@@ -322,6 +322,16 @@ the commutative local delta but rejects the stale checkpoint; the compact record
 remains in IndexedDB for another poll-and-merge pass. The record is removed only
 after Redis accepts the merged checkpoint.
 
+New document mention occurrences travel with that same coalesced checkpoint
+and offline record. The server considers them only after the checkpoint was
+accepted and the Page/Project document asset was durably saved. It then verifies
+that each occurrence still exists in saved HTML, reloads the recipient, checks
+current mention and recipient document-`VIEW` authorization, and transactionally
+creates a deterministic `MentionMarker`, ordinary Notification, and aggregate
+increment. The marker survives Notification deletion, so replay cannot deliver
+the same occurrence twice. Public responses and site exports replace internal
+mention nodes with inert `@Display Name` text before further sanitization.
+
 After 64 retained deltas, the poll response asks an editable client for a
 checkpoint. Explicit editor blur also sends a checkpoint and HTML. Accepted
 checkpoints persist the document asset/history through a property-masked write;
@@ -386,11 +396,14 @@ reconciles the configured entity/widget route when terminal and then removes
 the subscription. Pending report lists do not run a second refresh timer; their
 operation marker is the sole automatic completion authority.
 
-Notifications remain durable entities, but badge/list invalidation is an
-expiring Redis projection. Each user has a versioned hash containing a
-generation UUID, revision, and one membership field per notification key, plus
-a separately watched epoch key. The count is derived from membership; bodies
-are never cached there. Both keys use a sliding 30-minute expiration.
+Notifications remain durable entities. Each user also has one deterministic
+aggregate Notification containing exact `ordinary_count` and
+`unread_message_count` values plus revision/generation data. Badge/list
+invalidation uses an expiring Redis projection containing those counters and
+one membership field per ordinary notification key, plus a separately watched
+epoch key. The public count is the sum of the durable counters; bodies and
+message history are never cached there. Both Redis keys use a sliding
+30-minute expiration.
 
 A cold seed watches the projection and epoch, records the epoch, performs one
 keys-only notification ancestor query, and publishes only if neither watched
@@ -399,8 +412,11 @@ epoch and force a retry. After a durable notification mutation, one post-commit
 effect upserts or removes membership and advances the revision once. If the
 projection is absent, it advances only the epoch and leaves the next poll to
 seed; Redis failure is reported but never rolls back the durable write. Opening
-`/l/notifications` performs the keys query inside the same watched repair and
-uses those keys to load the list, avoiding a second notification query.
+`/l/notifications` instead performs one bounded, newest-first ordinary query
+with a limit of 25 and an opaque cursor, reads the aggregate by deterministic
+key, and uses the returned ordinary keys for batch hydration. It performs no
+Message or MessageConversation query. Additional ordinary queries occur only
+when the user selects Load older.
 
 `/l/ping` reads the signed session user key without activating Flask-Login and
 peeks only at Redis. A warm state slides expiration and is returned in

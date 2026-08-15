@@ -177,13 +177,18 @@ class NotificationMutation(StandardMutation):
     # @pairs notifications:personal-activity notifications:mutation notifications:cache-isolation
     # @pair notifications:cache-failure-isolation
     def plan_save(self, entity, builder, *, reason, depends_on=()):
+        entity._notification_count_delta = (
+            1
+            if not entity.created and entity.notification_type == "ordinary"
+            else 0
+        )
         super().plan_save(
             entity,
             builder,
             reason=reason,
             depends_on=depends_on,
         )
-        if entity.parent:
+        if entity.parent and entity.notification_type == "ordinary":
             builder.notification_upsert(
                 entity,
                 reason="notification-list-owner",

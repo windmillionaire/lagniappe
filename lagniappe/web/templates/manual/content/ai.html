@@ -39,6 +39,39 @@
       still operates only within a narrow set of permitted records.
     </p>
   {% endcall %}
+  {% if CONFIG.AI_EMAIL_PUBLIC.enabled %}
+    {{ heading("AI Reports by Email", icon="email", kind="form") }}
+    {% call card() %}
+      <p class="text-base-medium mb-3">
+        Send from the exact email address registered to your Lagniappe account.
+        The subject and message become the report instructions. You receive an
+        acceptance email and a result email linking back to the saved report.
+      </p>
+      <ul class="text-base-medium space-y-2">
+        <li><strong>Ask:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ask }} — subject or message required; up to 20 ordinary attachments are optional.</li>
+        {% if current_user.access(AI.CREATE) %}
+          <li><strong>Create:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.create }} — subject or message required; attachments are not accepted.</li>
+          <li><strong>Organize:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.organize }} — at least one ordinary attachment is required; message text is optional.</li>
+        {% endif %}
+      </ul>
+      <p class="text-base-medium mt-3">
+        Each attachment may be up to 30 MiB, with a 50 MiB total. Replies above
+        the Lagniappe marker create a new report. Automated/list mail is ignored.
+        Resend temporarily processes received content and provides short-lived
+        attachment downloads to the server.
+      </p>
+      {% call callout("tip", False) %}
+        Email submission only creates the same saved report as the homepage.
+        Create and Organize proposals never apply themselves; sign in to review
+        and run them.
+      {% endcall %}
+      <p class="text-base-medium mt-3 text-sm">
+        The From address selects the account for a rate-limited report; email
+        sender identity is not a login. Opening the report or running any
+        proposal still requires normal authentication and permissions.
+      </p>
+    {% endcall %}
+  {% endif %}
   {{ heading("Permission-Scoped Context", icon="permissions", kind="user") }}
   {% call card() %}
     <p class="text-base-medium mb-3">

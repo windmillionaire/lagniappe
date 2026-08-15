@@ -7,6 +7,7 @@ import {
 } from "../../shared";
 import { primitives } from "../primitives";
 import { collaborativeEditor } from "./editor";
+import { MentionSuggestions } from "./extensions";
 import { Toolbar } from "./toolbar";
 
 /**
@@ -22,6 +23,7 @@ export class CollaborativeDocument {
 		Object.assign(this, attributes);
 		this.ydoc = new Y.Doc();
 		this.updateQueue = [];
+		this.pendingMentions = new Map();
 		this.syncId = this.target.getAttribute("lp-sync");
 		this.initialized = false;
 
@@ -102,6 +104,18 @@ export class CollaborativeDocument {
 			this.ydoc,
 			!this.readonly,
 		);
+		const mentionDocument = this.component?.key || this.key;
+		if (
+			!this.readonly &&
+			this.target?.dataset.publicLimited !== "true" &&
+			mentionDocument
+		) {
+			this.mentionSuggestions = new MentionSuggestions(this.editor, {
+				documentKey: mentionDocument,
+				onInsert: (mention) =>
+					this.pendingMentions.set(mention.occurrence_id, mention),
+			}).init();
+		}
 
 		this.editor.on("create", async () => {
 			await waitForAttribute(this.container, "loaded");
@@ -185,8 +199,11 @@ export class CollaborativeDocument {
 	 * @dimensions checkpoint dirty-state concurrent-edit
 	 * @pairs sync:checkpoint sync:dirty-state sync:concurrent-edit
 	 */
-	commitSavedBaseline(snapshot) {
+	commitSavedBaseline(snapshot, mentions = []) {
 		this.snapshot = snapshot;
+		for (const mention of mentions) {
+			this.pendingMentions?.delete(mention.occurrence_id);
+		}
 		if (this.updateQueue.length === 0) this._dirty = false;
 	}
 
@@ -255,7 +272,12 @@ export class CollaborativeDocument {
 			this.toolbar?.toggles?.documentHistory?.show();
 		}
 
-		return { update, ydoc, html };
+		return {
+			update,
+			ydoc,
+			html,
+			mentions: Array.from(this.pendingMentions?.values?.() || []),
+		};
 	}
 
 	/**
@@ -268,6 +290,12 @@ export class CollaborativeDocument {
 	 * @dimensions document collaboration presence lifecycle offline-replay replay-order concurrency merge author-color
 	 */
 	async sync() {
+		this.pendingMentions ||= new Map();
+		for (const mention of this.offlineRecord?.mentions || []) {
+			if (mention?.occurrence_id) {
+				this.pendingMentions.set(mention.occurrence_id, mention);
+			}
+		}
 		if (this.toolbar && this.remote?.users) {
 			const others = this.remote.users.filter(
 				(u) => u.hash !== this.remote.user?.hash,
@@ -334,6 +362,7 @@ export class CollaborativeDocument {
 
 	destroy() {
 		this._destroyed = true;
+		this.mentionSuggestions?.destroy();
 		this.editor?.destroy();
 		this.toolbar?.destroy();
 		this.ydoc?.destroy();

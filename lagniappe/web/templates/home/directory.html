@@ -2,6 +2,14 @@
   <ul data-widget="DirectoryList"
       data-visible="false"
       class="{{ styles.home.card.list }}">
+    {% if not current_user.is_public %}
+      <li lp-link data-kind="user" class="{{ styles.home.card.directory }}">
+        {{ render_icon("email", (styles.icon.default)) }}
+        <a href='{{ url_for("messages.index") }}'
+           class="{{ styles.link.title }}"
+           data-role="title">Messages</a>
+      </li>
+    {% endif %}
     <li lp-link data-kind="task" class="{{ styles.home.card.directory }}">
       {{ render_icon("tasks", (styles.icon.default)) }}
       <a href='{{ url_for("tasks.task_index") }}'

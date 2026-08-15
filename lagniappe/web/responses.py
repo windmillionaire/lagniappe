@@ -202,8 +202,13 @@ def rows(entities, parent):
 # --- Document Responses ---
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/mentions.py::sanitize_mentions
+# @reason public response delegates mention privacy normalization to the tested sanitizer
 def public_document(entity):
-    html = entity.properties.document.html
+    from lagniappe.core.tools.mentions import sanitize_mentions
+
+    html = sanitize_mentions(entity.properties.document.html)
     description = entity.description or f"Public page: {entity.name}"
     keywords = f"{entity.name}, public page"
     return (
@@ -677,9 +682,25 @@ def page_notes(notes, page):
     return template(page, notes), 200
 
 
-def notifications(notifications):
+# @testable infrastructure
+def notifications(notifications, *, aggregate, cursor=None, can_message=False):
     template = get_template_attribute("notifications.html", "list")
-    return template(notifications), 200
+    return template(notifications, aggregate, cursor, can_message), 200
+
+
+# @testable infrastructure
+def message_page(*, initial_conversation=None, can_message=False):
+    return render_template(
+        "messages/index.html",
+        initial_conversation=initial_conversation,
+        can_message=can_message,
+    ), 200
+
+
+# @testable infrastructure
+# @covered-by lagniappe/web/routes/messages/main.py::clear_modal
+def message_clear_modal(key):
+    return render_template("delete/conversation.html", key=key), 200
 
 
 # @testable false

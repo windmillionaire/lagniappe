@@ -150,6 +150,8 @@ class _ActivityQuery:
         self.ancestor_key = None
         self.ordering = None
         self.keys_only_requested = False
+        self.page_limit = None
+        self.start_cursor = None
 
     def ancestor(self, key):
         self.ancestor_key = key
@@ -164,6 +166,14 @@ class _ActivityQuery:
 
     def keys_only(self):
         self.keys_only_requested = True
+        return self
+
+    def limit(self, value):
+        self.page_limit = value
+        return self
+
+    def cursor(self, value):
+        self.start_cursor = value
         return self
 
     def fetch_all(self):
@@ -205,6 +215,36 @@ def test_activity_query_filters_requested_types(monkeypatch):
     assert activity_filter.calls == [("eq", "type", "notification")]
 
 
+# @pairs notifications:bounded-page notifications:ordinary-discriminator notifications:cursor
+# @source lagniappe/core/tools/database/get.py::notifications_page
+def test_notification_page_is_bounded_and_excludes_aggregate_rows(monkeypatch):
+    class PageResult(list):
+        next_cursor = "next-cursor"
+
+    class PageQuery(_ActivityQuery):
+        def fetch(self):
+            return PageResult(self.rows[: self.page_limit])
+
+    query = PageQuery([_RawActivity(f"notification-{index}") for index in range(30)])
+    activity_filter = _ActivityFilter()
+    monkeypatch.setattr(database_get, "datastore_key", lambda _parent: "parent-key")
+    monkeypatch.setattr(database_get, "Filter", lambda: activity_filter)
+    monkeypatch.setattr(database_get, "Query", lambda _kind: query)
+
+    result = database_get.notifications_page(object(), "cursor-a", limit=25)
+
+    assert len(result) == 25
+    assert result.next_cursor == "next-cursor"
+    assert query.ancestor_key == "parent-key"
+    assert query.page_limit == 25
+    assert query.start_cursor == "cursor-a"
+    assert query.ordering == "-created"
+    assert activity_filter.calls == [
+        ("eq", "type", "notification"),
+        ("eq", "notification_type", "ordinary"),
+    ]
+
+
 # @pairs notifications:cold-seed notifications:keys-only
 # @source lagniappe/core/tools/database/get.py::notification_keys
 def test_notification_keys_query_returns_only_ancestor_keys(monkeypatch):
@@ -224,7 +264,10 @@ def test_notification_keys_query_returns_only_ancestor_keys(monkeypatch):
     assert results == ["notification-one", "notification-two"]
     assert query.ancestor_key == "parent-key"
     assert query.keys_only_requested is True
-    assert activity_filter.calls == [("eq", "type", "notification")]
+    assert activity_filter.calls == [
+        ("eq", "type", "notification"),
+        ("eq", "notification_type", "ordinary"),
+    ]
 
 
 # @features notes permissions

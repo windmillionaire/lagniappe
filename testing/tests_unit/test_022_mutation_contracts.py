@@ -327,6 +327,12 @@ def test_notification_save_updates_projection_without_touching_user(monkeypatch)
         lambda *entities: cache_updates.extend(entities),
     )
     projection_updates = []
+    aggregate_updates = []
+    monkeypatch.setattr(
+        mutation_executor.notification_service,
+        "apply_ordinary_mutations",
+        lambda **changes: aggregate_updates.append(changes) or {},
+    )
     monkeypatch.setattr(
         mutation_executor.cache,
         "update_notification_projection",
@@ -338,6 +344,8 @@ def test_notification_save_updates_projection_without_touching_user(monkeypatch)
     assert user.modified == modified
     assert saved == [(notification, None)]
     assert user not in cache_updates
+    assert notification._notification_count_delta == 1
+    assert aggregate_updates == [{"upserts": [notification], "deletes": []}]
     assert projection_updates == [{"upserts": [notification], "deletes": []}]
     assert outcome.complete is True
 

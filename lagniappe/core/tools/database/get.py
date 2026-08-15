@@ -774,11 +774,38 @@ def notification_keys(parent):
     records = (
         Query(KINDS.activity)
         .ancestor(parent_key)
-        .filter(Filter().eq("type", "notification"))
+        .filter(
+            Filter()
+            .eq("type", "notification")
+            .eq("notification_type", "ordinary")
+        )
         .keys_only()
         .fetch_all()
     )
     return [record.key for record in records]
+
+
+# @testable true
+# @tests tests_unit/test_002j_notes.py::test_notification_page_is_bounded_and_excludes_aggregate_rows
+# @pairs notifications:bounded-page notifications:ordinary-discriminator notifications:cursor
+def notifications_page(parent, start_cursor=None, limit=25):
+    """Fetch one bounded page of ordinary notifications, newest first."""
+    parent_key = datastore_key(parent)
+    if not parent_key:
+        return _empty_results()
+    return (
+        Query(KINDS.activity)
+        .ancestor(parent_key)
+        .filter(
+            Filter()
+            .eq("type", "notification")
+            .eq("notification_type", "ordinary")
+        )
+        .order("-created")
+        .limit(limit)
+        .cursor(start_cursor)
+        .fetch()
+    )
 
 
 # @testable true
@@ -847,3 +874,40 @@ def notes_by_user(user):
 def ai_reports(user_key):
     """Fetch AI report activity records belonging to a user."""
     return activity(user_key, types=("report",))
+
+
+# --- Messaging ---
+
+
+# @testable false
+# @covered-by lagniappe/core/mutations/delete.py::DeleteCollector.user_messages
+# @reason user-deletion lookup is exercised through the delete mutation plan
+def message_conversation_keys(participant):
+    """Fetch conversation keys containing ``participant``."""
+    participant_key = datastore_key(participant)
+    if not participant_key:
+        return []
+    records = (
+        Query(KINDS.message_conversations)
+        .filter(Filter().eq("participants", participant_key))
+        .keys_only()
+        .fetch_all()
+    )
+    return [record.key for record in records]
+
+
+# @testable false
+# @covered-by lagniappe/core/mutations/delete.py::DeleteCollector.finalize_message_conversations
+# @reason orphan purging is exercised through the delete mutation plan
+def message_keys(conversation):
+    """Fetch all message keys in one conversation ancestor group."""
+    conversation_key = datastore_key(conversation)
+    if not conversation_key:
+        return []
+    records = (
+        Query(KINDS.messages)
+        .ancestor(conversation_key)
+        .keys_only()
+        .fetch_all()
+    )
+    return [record.key for record in records]

@@ -150,8 +150,9 @@ def test_restrictions(get_permissions_test_data):
                 )
 
 
-# @features restrictions permissions
-# @dimensions session-blob stale-session empty-access
+# @pairs restrictions:session-blob restrictions:stale-session restrictions:empty-access
+# @pairs permissions:session-blob permissions:stale-session permissions:empty-access
+# @pair messaging:compose-eligibility
 @pytest.mark.unit
 def test_restrictions_session_blob_and_fingerprint(monkeypatch):
     user = TestEntities.get(
@@ -168,6 +169,16 @@ def test_restrictions_session_blob_and_fingerprint(monkeypatch):
         },
     )
     monkeypatch.setattr(user_restrictions_module, "current_user", user)
+    owner_projection_calls = []
+    monkeypatch.setattr(
+        user_restrictions_module.cache,
+        "get_owner_projection",
+        lambda: owner_projection_calls.append(True)
+        or {
+            "key": "owner-key",
+            "allow_messages_and_mentions": True,
+        },
+    )
 
     with _app().test_request_context("/"):
         session["restrictions"] = ["invalid-current-blob"]
@@ -196,6 +207,9 @@ def test_restrictions_session_blob_and_fingerprint(monkeypatch):
         assert blob["version"] == restrictions._session_version
         assert blob["task"] == ["page001", "session-page"]
         assert blob["belongs_to"] == []
+        assert blob["can_initiate_messages"] is True
+        assert restrictions.can_initiate_messages is True
+        assert owner_projection_calls == [True]
         assert "fingerprint" in blob
         assert "ai_action_capabilities" not in blob
         assert "can_use_ai_tools" not in blob
@@ -211,6 +225,8 @@ def test_restrictions_session_blob_and_fingerprint(monkeypatch):
         )
 
         assert user.properties.restrictions.task == ["page001", "session-page"]
+        assert user.properties.restrictions.can_initiate_messages is True
+        assert owner_projection_calls == [True]
 
         session["restrictions"]["fingerprint"] = "stale"
         user.permissions = {**user.permissions, "cat002": "VIEW"}
@@ -253,8 +269,9 @@ def test_restrictions_builds_group_membership_from_stored_requires(monkeypatch):
             assert user.properties.restrictions.belongs_to == ["group-one"]
 
 
-# @features restrictions permissions
-# @dimensions empty-access loaded-state
+# @pairs restrictions:empty-access restrictions:loaded-state
+# @pairs permissions:empty-access permissions:loaded-state
+# @pair messaging:compose-eligibility
 @pytest.mark.unit
 def test_restrictions_empty_list_is_loaded_state():
     user = TestEntities.get(
@@ -273,6 +290,7 @@ def test_restrictions_empty_list_is_loaded_state():
         assert restrictions.task == []
         assert restrictions.form == []
         assert restrictions.users == []
+        assert restrictions.can_initiate_messages is False
 
     assert restrictions.is_set
     assert restrictions._value == []

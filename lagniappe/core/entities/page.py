@@ -306,6 +306,23 @@ class Page(AssetMixin, SubmitterMixin, Entity):
         target_user.name = data.get("name")
         if ai_access is not None:
             target_user.ai_access = ai_access
+        inbound_toggles = {
+            key: data[key]
+            for key in ("allow_messages_and_mentions", "allow_task_assignments")
+            if key in data
+        }
+        if inbound_toggles:
+            if not (
+                is_owner_viewer
+                and is_own_page
+                and target_user
+                and target_user.is_owner
+            ):
+                raise PermissionError(
+                    "Only the owner can change their inbound collaboration settings."
+                )
+            for key, value in inbound_toggles.items():
+                setattr(target_user, key, value)
         self.add_mutation_intents(
             MutationIntent.standard(target_user, reason="page-user-update")
         )

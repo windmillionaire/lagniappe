@@ -163,6 +163,7 @@ assert.throws(
 
 # @features style-build
 # @dimensions pipeline-contract
+# @style button.submit
 # @style dropdown.option.action
 # @style dropdown.option.flow
 # @style dropdown.search.result
@@ -210,6 +211,9 @@ const runtimeIcons = await import(
   `data:text/javascript,${encodeURIComponent(plugin.load(STYLE_PIPELINE.registry.icons_virtual_module))}`
 );
 assert.equal(typeof runtimeStyles.STYLES.button.submit, "string");
+assert.match(runtimeStyles.STYLES.button.submit, /\bw-full\b/);
+assert.match(runtimeStyles.STYLES.button.submit, /\bgrow\b/);
+assert.match(runtimeStyles.STYLES.button.submit, /\baction-button\b/);
 assert.deepEqual(runtimeIcons.ICONS.page, { glyph: "draft", fill: 1 });
 assert.equal(runtimeStyles.ICONS, undefined);
 assert.equal(runtimeIcons.STYLES, undefined);
@@ -230,6 +234,102 @@ assert.equal(
   runtimeStyles.STYLES.dropdown.search.result,
   runtimeStyles.STYLES.dropdown.option.flow,
 );
+""",
+        module=True,
+    )
+
+
+# @features ui-action
+# @dimensions loading-state fixed-layout
+# @style button.submit
+def test_active_action_buttons_preserve_full_width_icon_slots(run_node):
+    run_node(
+        r"""
+import assert from "node:assert/strict";
+import { rollup } from "rollup";
+import { buildStyles } from "./build/utility.mjs";
+
+const build = await rollup({
+  input: "./src/script/elements/buttons.mjs",
+  plugins: [buildStyles()],
+});
+const { output } = await build.generate({ format: "esm" });
+await build.close();
+
+class FakeClassList {
+  constructor() { this.names = new Set(); }
+  add(...names) { names.forEach((name) => this.names.add(name)); }
+}
+
+class FakeElement {
+  constructor(tagName = "span") {
+    this.tagName = tagName;
+    this.children = [];
+    this.dataset = {};
+    this.attributes = {};
+    this.classList = new FakeClassList();
+    this.className = "";
+    this.disabled = false;
+    this._textContent = "";
+  }
+  get textContent() {
+    return this._textContent || this.children.map((child) => child.textContent).join("");
+  }
+  set textContent(value) { this._textContent = String(value); }
+  appendChild(child) { this.children.push(child); return child; }
+  prepend(child) { this.children.unshift(child); }
+  replaceChildren(...children) {
+    this.children = children;
+    this._textContent = "";
+  }
+  querySelector(selector) {
+    const match = selector.match(/\[data-role='([^']+)'\]/);
+    return match
+      ? this.children.find((child) => child.dataset.role === match[1]) || null
+      : null;
+  }
+  setAttribute(name, value) { this.attributes[name] = value; }
+  removeAttribute(name) { delete this.attributes[name]; }
+}
+
+globalThis.document = {
+  createElement: (tagName) => new FakeElement(tagName),
+};
+
+const module = await import(
+  `data:text/javascript,${encodeURIComponent(output[0].code)}`
+);
+const button = new FakeElement("button");
+button.textContent = "Refresh Cache";
+const action = module.buttons.active({
+  existingButton: button,
+  icon: "database",
+  text: "Refresh Cache",
+  processingText: "Refreshing Cache",
+  completedText: "Cache Refreshed",
+  completedIcon: "check",
+});
+
+const iconSlot = button.querySelector("[data-role='icon']");
+const textSlot = button.querySelector("[data-role='text']");
+assert.ok(iconSlot);
+assert.ok(textSlot);
+assert.equal(iconSlot.children[0]?.dataset.icon, "database");
+assert.equal(textSlot.textContent, "Refresh Cache");
+
+action.activate();
+assert.equal(button.disabled, true);
+assert.equal(button.querySelector("[data-role='icon']"), iconSlot);
+assert.equal(button.querySelector("[data-role='text']"), textSlot);
+assert.equal(iconSlot.children[0]?.dataset.icon, "spinner");
+assert.equal(textSlot.textContent, "Refreshing Cache");
+
+action.deactivate();
+assert.equal(button.disabled, false);
+assert.equal(button.querySelector("[data-role='icon']"), iconSlot);
+assert.equal(button.querySelector("[data-role='text']"), textSlot);
+assert.equal(iconSlot.children[0]?.dataset.icon, "check");
+assert.equal(textSlot.textContent, "Cache Refreshed");
 """,
         module=True,
     )

@@ -235,10 +235,6 @@ def wait_for_managed_certificate(
     )
     last_status = "PENDING"
 
-    print(
-        f"Checking the App Engine managed TLS certificate for https://{domain} "
-        f"in {target}. This can take up to {wait_description}."
-    )
     for attempt, delay in enumerate(delays):
         if delay:
             sleep(delay)
@@ -309,10 +305,8 @@ def wait_for_managed_certificate(
             last_status = "ACTIVE"
             print(
                 f.success(
-                    f"Managed TLS certificate {active_id} active for "
-                    f"https://{domain} in {target}. Google's HTTPS frontend may "
-                    "need a little additional time before the hostname opens "
-                    "in a browser."
+                    f"Managed TLS certificate active for https://{domain}. "
+                    "It may take up to an hour before the domain opens over HTTPS."
                 )
             )
             return True

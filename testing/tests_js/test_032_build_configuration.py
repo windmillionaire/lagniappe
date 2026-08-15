@@ -47,7 +47,7 @@ assert.equal(viewEntryUrl("manual"), "./chunks/views/manual.js?v=development");
 assert.equal(viewEntryUrl("task"), "./chunks/views/index.js?v=development");
 assert.equal(viewEntryUrl("missing"), null);
 assert.deepEqual(Object.keys(VIEW_ENTRIES).sort(), [
-  "admin", "analytics", "builder", "file", "home", "index", "manual",
+  "admin", "analytics", "builder", "file", "home", "index", "manual", "messages",
   "page", "project", "report", "results", "user",
 ]);
 assert.equal(VIEW_REGISTRY.category.entry, VIEW_REGISTRY.form.entry);

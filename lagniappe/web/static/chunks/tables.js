@@ -1,2 +1,736 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="e735bb61-dc4e-497c-a424-665fe999257b",e._sentryDebugIdIdentifier="sentry-dbid-e735bb61-dc4e-497c-a424-665fe999257b");}catch(e){}}();import{r as u,E as b,w as d}from"./foundation.js?v=be0f1470";import"./connectivity.js?v=be0f1470";import{STYLES as n}from"./styles.js?v=be0f1470";import{p as m}from"./primitives.js?v=be0f1470";import{s as p}from"./icons.js?v=be0f1470";import{TableElement as y}from"./table.js?v=be0f1470";import"./baseElement.js?v=be0f1470";import"./checkbox.js?v=be0f1470";import"./input.js?v=be0f1470";import"./formatting.js?v=be0f1470";import"./link.js?v=be0f1470";import"./facets.js?v=be0f1470";import"./combobox.js?v=be0f1470";import"./results.js?v=be0f1470";import"./submitter.js?v=be0f1470";import"./loader.js?v=be0f1470";class g{constructor(t,e=null){const s=JSON.parse(t.dataset.preload);this.tableElt=t,this.columns=s.columns||[],this.storageKey=e,this.selected=this._loadSelected(),this.visibilityRow=this.tableElt.querySelector("[data-widget='TableVisibility']"),this.header=this.tableElt.querySelector("[data-role='column-header']"),this.actions=null,this.toggle=null,this._headerClick=this._headerClick.bind(this)}init(){this._createHeaderAction(),this.header.addEventListener("click",this._headerClick),this.columns.forEach(t=>{this._setColumnVisibility(t.field,this.selected.includes(t.field))}),this._saveSelected(),this._createController()}_loadSelected(){const t=this.columns.filter(s=>s.selected).map(s=>s.field);if(!this.storageKey)return t;const e=localStorage.getItem(this.storageKey);if(e===null)return t;try{const s=JSON.parse(e);if(!Array.isArray(s))return t;const l=new Set(this.columns.map(i=>i.field));return[...new Set(s)].filter(i=>l.has(i))}catch{return t}}_saveSelected(){this.tableElt.dataset.selected=JSON.stringify(this.selected),this.storageKey&&localStorage.setItem(this.storageKey,JSON.stringify(this.selected))}_createHeaderAction(){const t=this.header.appendChild(document.createElement("th"));t.className=n.table.thead.actionCell,t.scope="col",this.actions=t.appendChild(document.createElement("div")),this.actions.className=n.table.thead.actions,this.actions.dataset.role="embedded-table-actions",this.toggle=this.actions.appendChild(document.createElement("button")),this.toggle.type="button",this.toggle.className=n.table.thead.actionButton,this.toggle.dataset.role="embedded-table-visibility",this.toggle.setAttribute("aria-label","Choose visible columns"),this.toggle.setAttribute("aria-expanded","false"),this.toggle.title="Choose visible columns";const e=this.toggle.appendChild(document.createElement("span"));p(e,"column",n.table.thead.actionIcon)}_headerClick(t){t.target.closest("[data-role='embedded-table-visibility']")&&(t.preventDefault(),t.stopPropagation(),this._toggleController())}_toggleController(){const t=this.visibilityRow.dataset.visible==="true";return this._setControllerVisible(!t)}_setControllerVisible(t){return this.visibilityRow.dataset.visible=t?"true":"false",this.toggle?.setAttribute("aria-expanded",t?"true":"false"),t}_createController(){const t=this.visibilityRow.appendChild(document.createElement("td"));t.colSpan=this.header.querySelectorAll("th").length,t.className="p-3 border-t bg-kind-bg border-slate-300 group";const e=t.appendChild(document.createElement("div"));e.className="flex flex-col gap-3";for(const s of this.columns){const l=e.appendChild(m.checkbox({name:s.field,checked:this.selected.includes(s.field),kind:this.tableElt.dataset.kind,label:s.title}));l.dataset.role="selector"}t.addEventListener("change",s=>{if(!s.target.matches("input[type='checkbox']"))return;const[l,i]=[s.target.name,s.target.checked];this.selected=i?[...new Set([...this.selected,l])]:this.selected.filter(r=>r!==l),this._saveSelected(),this._setColumnVisibility(l,i)})}_setColumnVisibility(t,e){const s=e?"table-cell":"none";this.tableElt.querySelectorAll(`[data-column="${t}"]`).forEach(l=>{l.style.display=s})}}class f{constructor(t,e){this.view=t,this.button=e,this.row=null,this.table=null,this.destroy=this.destroy.bind(this),this.mobileQuery=window.matchMedia("(max-width: 640px)"),this.kind=null,this.submission=null,this.schema=null}async create(){const t=this.button.closest("tr"),e=Array.from(t.querySelectorAll("td")).length;this.row=document.createElement("tr"),this.row.dataset.embedded="true",this.row.dataset.visible="false",this.row.className="rounded-md border border-base-light/50 mx-4 mb-3 overflow-hidden sm:rounded-none sm:border-t sm:border-b sm:border-x-0 sm:mx-0 sm:mb-0",t.after(this.row);const s=this.row.appendChild(document.createElement("td"));s.colSpan=e;const l=t.dataset.key,i=this.button.closest("[data-column]").dataset.column;if(!this.kind||!this.submission||!this.schema){const r=await u.get(b.renderer.expandTableCell(l,i));if(!r.ok)return;Object.assign(this,r),this.kind=this.kind||"form"}this.table=new y({readonly:!0},this.schema,this.submission).embedded,this.table.dataset.embedded="true",this.table.querySelectorAll("tr, th, table").forEach(r=>{r.dataset.embedded="true"}),this.table.querySelector("tbody").classList.add(`bg-${this.kind}-bg`),s.appendChild(this.table),this.mobileQuery.addEventListener("change",this.destroy)}get visible(){return this.row.dataset.visible==="true"}async toggle(t=!1){this.table||await this.create(),await d(()=>{const e=t?!0:this.visible;this.row.dataset.visible=e?"false":"true",this.view.mobile&&this.row.closest("[data-widget='IndexTable']")&&(this.row.style.display=e?"none":"block"),this.button.dataset.open=e?"false":"true",this.button.setAttribute("aria-expanded",e?"false":"true")},{label:"embedded-table:toggle"})}destroy(){this.row.remove(),this.row=null,this.table=null,this.button.dataset.open="false",this.button.setAttribute("aria-expanded","false"),this.button._embeddedTable=null,this.mobileQuery.removeEventListener("change",this.destroy)}}class h{constructor(t){Object.assign(this,t),this.click=this._click.bind(this),this._visibility=null}init(){document.addEventListener("click",this.click),this.modified=!0,this.visible=!0}_click(t){this._clickExpandedTableCell(t)}_clickExpandedTableCell(t){const e=t.target.closest("button[data-role='expand']");return!e||!this.target.contains(e)?!1:(t.preventDefault(),t.stopPropagation(),this._expandTableCell(e),!0)}initVisibility(t,e=null){return t?(this._visibility=new g(t,e),this._visibility.init(),this._visibility):null}async _expandTableCell(t){t._embeddedTable||(t._embeddedTable=new f(this.view,t)),t._embeddedTable.toggle()}destroy(){document.removeEventListener("click",this.click)}}class w extends h{constructor(t){super(t),this.keydown=this._keydown.bind(this)}init(){super.init(),document.addEventListener("keydown",this.keydown)}get header(){return this.component.elt.querySelector("thead > tr:first-child")}get visibilityWidget(){return this.component.widgets.TableVisibility}get sortingWidget(){return this.component.widgets.TableSorting}_click(t){if(this._clickExpandedTableCell(t))return;const e=this.visibilityWidget,s=this.sortingWidget,l=e?.visible||s?.visible;if(!t.target.closest("thead")){l&&d(()=>{[e,s].forEach(i=>{i&&i.disable(),i&&i.reconcile()})});return}if(!t.target.closest("button[lp-show='table:TableVisibility']")&&this.header.contains(t.target)){const i=t.target.closest("th[data-ordering]");if(!i)return;const r=new CustomEvent("toggle-column-filter",{detail:{button:t.target.closest("button"),column:i.dataset.column},bubbles:!0});this.target.dispatchEvent(r)}}_keydown(t){if(t.key==="Escape"){const e=this.visibilityWidget,s=this.sortingWidget;if(!(e?.visible||s?.visible))return;d(()=>{[e,s].forEach(i=>{i&&i.disable(),i&&i.reconcile()})})}}destroy(){super.destroy(),document.removeEventListener("keydown",this.keydown)}}class v extends w{constructor(t){super(t),this.refreshScope="collection",this.loading=!1,this.loaded=!this.prefetched||this.target.hasAttribute("loaded"),this._empty=!1,this._updated=[],this._created=[]}async updated(t){this._updated=t.html?.querySelectorAll("tr[lp-entity]")||[];const e=t.html?.querySelector("tr[lp-load]");return this.loaded=!e,e}async created(t){this._created=t.html.querySelectorAll("tr")}get selector(){return this.component.elt.querySelector("th[data-column='selector'] button")}setEmptyRowVisibility(){const t=this.target.querySelector("tr[data-role='empty']"),e=this.target.querySelector("tr[lp-entity]");t&&(this.view.mobile?t.style.display=e?"none":"block":t.dataset.visible=e?"false":"true"),e||(this.loaded=!0,this.target.setAttribute("loaded",""))}get prefetched(){return this.target.hasAttribute("lp-prefetch")}refreshDescriptor(){return this.component.name!=="table"||!this.target.hasAttribute("loaded")||!(!!this.view.key||["forms","tasks","users"].includes(this.view.elt.dataset.index))?null:{rows:Array.from(this.target.querySelectorAll("tr[lp-entity]"),e=>({key:e.dataset.key,modified:e.dataset.modified||""}))}}_parseRefreshRow(t){if(!t)return null;const e=document.createElement("template");return e.innerHTML=t.trim(),e.content.querySelector("tr[lp-entity]")}refreshDelta(t){const e=new Map(Array.from(this.target.querySelectorAll("tr[lp-entity]"),r=>[r.dataset.key,r]));for(const r of t.remove||[])e.get(r)?.remove(),e.delete(r);const s=[];for(const r of t.upsert||[]){const a=this._parseRefreshRow(r.html);if(!a||a.dataset.key!==r.key)throw new Error("Invalid table refresh row");const c=e.get(r.key);c?c.replaceWith(a):s.push(a),e.set(r.key,a)}const l=Array.isArray(t.order)?t.order:[];for(const r of l){const a=e.get(r);if(!a)throw new Error("Table refresh order references a missing row");this.target.append(a)}s.length&&this.view.addFlash(...s);let i=this.target.querySelector("tr[data-role='empty']");if(!l.length&&!i&&t.empty){const r=document.createElement("template");r.innerHTML=t.empty.trim(),i=r.content.querySelector("tr[data-role='empty']"),i&&this.target.append(i)}this.setEmptyRowVisibility(),this.sortingWidget?.refreshRows?.()}refresh(t){if(!t?.html)return;const e=[...t.html.querySelectorAll("tr[lp-entity]")],s=new Set(e.map(i=>i.dataset.key).filter(Boolean)),l=[];for(const i of e){const r=i.dataset.key;if(!r)continue;const a=this.target.querySelector(`tr[data-key="${r}"]`);a?a.replaceWith(i):l.push(i)}if(l.length){const i=this.target.querySelector("tr[lp-entity]");i?i.before(...l):this.target.append(...l),this.view.addFlash(...l)}this.prefetched||this.target.querySelectorAll("tr[lp-entity]").forEach(i=>{s.has(i.dataset.key)||i.remove()}),this.setEmptyRowVisibility(),this.sortingWidget?.refreshRows?.()}async prereconcile(){const t=this.target.hasAttribute("loaded");if(!this.loaded||t)return;const e=await this.component.loadWidget("TableSorting");e&&await e.init(),this._finishLoading=!0}postreconcile(){const t=this.target;let e=!1;const s=this.sortingWidget?.initialized===!0;this._created.length>0&&(t.prepend(...this._created),this.view.addFlash(...this._created),this._created=[],e=!0,this.view.mobile&&t.scrollIntoView({behavior:"auto",block:"start"})),this._updated.length>0&&(t.append(...this._updated),this._updated=[],e=!0),this._finishLoading&&(this._finishLoading=!1,this.target.setAttribute("loaded",""),this.setEmptyRowVisibility(),t.dataset.visible=!0,this.loading=!1),e&&(this.setEmptyRowVisibility(),s&&this.sortingWidget.refreshRows())}}class k extends h{constructor(t){super(t),this._updated=null}get table(){return this.target.querySelector("[data-role='table']")}async updated(t){this._updated=t.html.querySelector("table")}postreconcile(){this._updated&&(this.visible=!0,this.target.dataset.visible="true",this.table.replaceChildren(this._updated),this._updated.dataset.visible="true",this.initVisibility(this._updated,`columns-${this.component.name}-history`),this._updated=null)}}class _ extends h{constructor(t){super(t),this.badges=null,this.table=null,this.tableContainer=null,this.container=null,this.filtering=this.target.dataset.kind}async updated(t){this.table=t.html.querySelector("#embedded-table")||t.html.querySelector("table"),this.filtering==="page"&&(this.badges=this.component.widgets.Filters.filters.cloneNode(!0))}get tbody(){return this.table.querySelector("tbody")}get rows(){return this.tbody.querySelectorAll("tr:not([data-role='empty'])")}get empty(){return this.tbody.querySelector("tr[data-role='empty']")}postreconcile(){this.target.children.length||this.table&&(this.container=document.createElement("div"),this.container.className="min-w-0 overflow-hidden max-w-full rounded-md outline-2 outline-kind-default bg-white",this.tableContainer=document.createElement("div"),this.tableContainer.className="table-container px-4",this.tableContainer.dataset.role="table",this.tableContainer.appendChild(this.table),this.container.appendChild(this.tableContainer),this.table.dataset.visible="true",this.initVisibility(this.table),this.filtering==="page"?this.target.replaceChildren(this.badges,this.container):this.target.replaceChildren(this.container))}reset(){this.badges&&(this.badges.remove(),this.badges=null),this.container&&(this.container.remove(),this.container=null),this.tableContainer&&(this.tableContainer=null),this.table&&(this.table=null)}}export{_ as FilterResults,v as IndexTable,k as TaskHistory};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request, E as ENDPOINTS, w as withTransition } from './foundation.js?v=b2884058';
+import './connectivity.js?v=b2884058';
+import { STYLES } from './styles.js?v=b2884058';
+import { p as primitives } from './primitives.js?v=b2884058';
+import { s as setIcon } from './icons.js?v=b2884058';
+import { TableElement } from './table.js?v=b2884058';
+import './baseElement.js?v=b2884058';
+import './checkbox.js?v=b2884058';
+import './input.js?v=b2884058';
+import './formatting.js?v=b2884058';
+import './link.js?v=b2884058';
+import './facets.js?v=b2884058';
+import './combobox.js?v=b2884058';
+import './results.js?v=b2884058';
+import './submitter.js?v=b2884058';
+import './loader.js?v=b2884058';
+
+/**
+ * @testable true
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload
+ * @pairs tasks:history
+ * @pairs table-controls:column-visibility table-controls:persistence
+ */
+class EmbeddedTableVisibility {
+	constructor(tableElt, storageKey = null) {
+		const preload = JSON.parse(tableElt.dataset.preload);
+		this.tableElt = tableElt;
+		this.columns = preload.columns || [];
+		this.storageKey = storageKey;
+		this.selected = this._loadSelected();
+		this.visibilityRow = this.tableElt.querySelector(
+			"[data-widget='TableVisibility']",
+		);
+		this.header = this.tableElt.querySelector("[data-role='column-header']");
+		this.actions = null;
+		this.toggle = null;
+		this._headerClick = this._headerClick.bind(this);
+	}
+
+	init() {
+		this._createHeaderAction();
+		this.header.addEventListener("click", this._headerClick);
+
+		this.columns.forEach((column) => {
+			this._setColumnVisibility(
+				column.field,
+				this.selected.includes(column.field),
+			);
+		});
+		this._saveSelected();
+		this._createController();
+	}
+
+	_loadSelected() {
+		const defaults = this.columns
+			.filter((column) => column.selected)
+			.map((column) => column.field);
+		if (!this.storageKey) return defaults;
+
+		const saved = localStorage.getItem(this.storageKey);
+		if (saved === null) return defaults;
+
+		try {
+			const selected = JSON.parse(saved);
+			if (!Array.isArray(selected)) return defaults;
+
+			const available = new Set(this.columns.map((column) => column.field));
+			return [...new Set(selected)].filter((field) => available.has(field));
+		} catch {
+			return defaults;
+		}
+	}
+
+	_saveSelected() {
+		this.tableElt.dataset.selected = JSON.stringify(this.selected);
+		if (this.storageKey) {
+			localStorage.setItem(this.storageKey, JSON.stringify(this.selected));
+		}
+	}
+
+	_createHeaderAction() {
+		const cell = this.header.appendChild(document.createElement("th"));
+		cell.className = STYLES.table.thead.actionCell;
+		cell.scope = "col";
+
+		this.actions = cell.appendChild(document.createElement("div"));
+		this.actions.className = STYLES.table.thead.actions;
+		this.actions.dataset.role = "embedded-table-actions";
+
+		this.toggle = this.actions.appendChild(document.createElement("button"));
+		this.toggle.type = "button";
+		this.toggle.className = STYLES.table.thead.actionButton;
+		this.toggle.dataset.role = "embedded-table-visibility";
+		this.toggle.setAttribute("aria-label", "Choose visible columns");
+		this.toggle.setAttribute("aria-expanded", "false");
+		this.toggle.title = "Choose visible columns";
+
+		const icon = this.toggle.appendChild(document.createElement("span"));
+		setIcon(icon, "column", STYLES.table.thead.actionIcon);
+	}
+
+	_headerClick(e) {
+		if (!e.target.closest("[data-role='embedded-table-visibility']")) return;
+
+		e.preventDefault();
+		e.stopPropagation();
+		this._toggleController();
+	}
+
+	_toggleController() {
+		const visible = this.visibilityRow.dataset.visible === "true";
+		return this._setControllerVisible(!visible);
+	}
+
+	_setControllerVisible(visible) {
+		this.visibilityRow.dataset.visible = visible ? "true" : "false";
+		this.toggle?.setAttribute("aria-expanded", visible ? "true" : "false");
+		return visible;
+	}
+
+	_createController() {
+		const cell = this.visibilityRow.appendChild(document.createElement("td"));
+		cell.colSpan = this.header.querySelectorAll("th").length;
+		cell.className = `p-3 border-t bg-kind-bg border-slate-300 group`;
+
+		const container = cell.appendChild(document.createElement("div"));
+		container.className = "flex flex-col gap-3";
+
+		for (const column of this.columns) {
+			const checkbox = container.appendChild(
+				primitives.checkbox({
+					name: column.field,
+					checked: this.selected.includes(column.field),
+					kind: this.tableElt.dataset.kind,
+					label: column.title,
+				}),
+			);
+
+			checkbox.dataset.role = "selector";
+		}
+
+		cell.addEventListener("change", (e) => {
+			if (!e.target.matches("input[type='checkbox']")) return;
+
+			const [column, visible] = [e.target.name, e.target.checked];
+
+			this.selected = visible
+				? [...new Set([...this.selected, column])]
+				: this.selected.filter((field) => field !== column);
+			this._saveSelected();
+
+			this._setColumnVisibility(column, visible);
+		});
+	}
+
+	_setColumnVisibility(column, visible) {
+		const display = visible ? "table-cell" : "none";
+
+		this.tableElt
+			.querySelectorAll(`[data-column="${column}"]`)
+			.forEach((col) => {
+				col.style.display = display;
+			});
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class ExpandedTableCell {
+	constructor(view, button) {
+		this.view = view;
+		this.button = button;
+		this.row = null;
+		this.table = null;
+		this.destroy = this.destroy.bind(this);
+		this.mobileQuery = window.matchMedia("(max-width: 640px)");
+		this.kind = null;
+		this.submission = null;
+		this.schema = null;
+	}
+
+	async create() {
+		const row = this.button.closest("tr");
+		const colSpan = Array.from(row.querySelectorAll("td")).length;
+
+		this.row = document.createElement("tr");
+		this.row.dataset.embedded = "true";
+		this.row.dataset.visible = "false";
+		this.row.className =
+			"rounded-md border border-base-light/50 mx-4 mb-3 overflow-hidden sm:rounded-none sm:border-t sm:border-b sm:border-x-0 sm:mx-0 sm:mb-0";
+		row.after(this.row);
+
+		const tableEmbed = this.row.appendChild(document.createElement("td"));
+		tableEmbed.colSpan = colSpan;
+
+		const key = row.dataset.key;
+		const tableId = this.button.closest("[data-column]").dataset.column;
+		if (!this.kind || !this.submission || !this.schema) {
+			const response = await request.get(
+				ENDPOINTS.renderer.expandTableCell(key, tableId),
+			);
+			if (!response.ok) return;
+			Object.assign(this, response);
+			this.kind = this.kind || "form";
+		}
+
+		this.table = new TableElement(
+			{ readonly: true },
+			this.schema,
+			this.submission,
+		).embedded;
+		this.table.dataset.embedded = "true";
+		this.table.querySelectorAll("tr, th, table").forEach((tr) => {
+			tr.dataset.embedded = "true";
+		});
+		this.table.querySelector("tbody").classList.add(`bg-${this.kind}-bg`);
+
+		tableEmbed.appendChild(this.table);
+
+		this.mobileQuery.addEventListener("change", this.destroy);
+	}
+
+	get visible() {
+		return this.row.dataset.visible === "true";
+	}
+
+	async toggle(hide = false) {
+		if (!this.table) await this.create();
+		await withTransition(
+			() => {
+				const visible = hide ? true : this.visible;
+				this.row.dataset.visible = visible ? "false" : "true";
+				if (
+					this.view.mobile &&
+					this.row.closest("[data-widget='IndexTable']")
+				) {
+					this.row.style.display = visible ? "none" : "block";
+				}
+				this.button.dataset.open = visible ? "false" : "true";
+				this.button.setAttribute("aria-expanded", visible ? "false" : "true");
+			},
+			{ label: "embedded-table:toggle" },
+		);
+	}
+
+	destroy() {
+		this.row.remove();
+		this.row = null;
+		this.table = null;
+		this.button.dataset.open = "false";
+		this.button.setAttribute("aria-expanded", "false");
+		this.button._embeddedTable = null;
+		this.mobileQuery.removeEventListener("change", this.destroy);
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_results_expands_table_submission_cell
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_expands_table_submission_cell
+ * @features embedded-table
+ * @dimensions table-cell-expand visibility
+ */
+class EmbeddedTable {
+	constructor(attributes) {
+		Object.assign(this, attributes);
+		this.click = this._click.bind(this);
+		this._visibility = null;
+	}
+
+	init() {
+		document.addEventListener("click", this.click);
+		this.modified = true;
+		this.visible = true;
+	}
+
+	_click(e) {
+		this._clickExpandedTableCell(e);
+	}
+
+	_clickExpandedTableCell(e) {
+		const expand = e.target.closest("button[data-role='expand']");
+		if (!expand || !this.target.contains(expand)) return false;
+
+		e.preventDefault();
+		e.stopPropagation();
+		this._expandTableCell(expand);
+		return true;
+	}
+
+	initVisibility(table, storageKey = null) {
+		if (!table) return null;
+
+		this._visibility = new EmbeddedTableVisibility(table, storageKey);
+		this._visibility.init();
+		return this._visibility;
+	}
+
+	async _expandTableCell(button) {
+		if (!button._embeddedTable) {
+			button._embeddedTable = new ExpandedTableCell(this.view, button);
+		}
+		button._embeddedTable.toggle();
+	}
+
+	destroy() {
+		document.removeEventListener("click", this.click);
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class BaseTable extends EmbeddedTable {
+	constructor(attributes) {
+		super(attributes);
+		this.keydown = this._keydown.bind(this);
+	}
+
+	init() {
+		super.init();
+		document.addEventListener("keydown", this.keydown);
+	}
+
+	get header() {
+		return this.component.elt.querySelector("thead > tr:first-child");
+	}
+
+	get visibilityWidget() {
+		return this.component.widgets.TableVisibility;
+	}
+
+	get sortingWidget() {
+		return this.component.widgets.TableSorting;
+	}
+
+	_click(e) {
+		if (this._clickExpandedTableCell(e)) return;
+
+		const visibility = this.visibilityWidget;
+		const sorting = this.sortingWidget;
+		const open = visibility?.visible || sorting?.visible;
+
+		if (!e.target.closest("thead")) {
+			open &&
+				withTransition(() => {
+					[visibility, sorting].forEach((widget) => {
+						if (widget) widget.disable();
+						if (widget) widget.reconcile();
+					});
+				});
+			return;
+		}
+
+		if (e.target.closest("button[lp-show='table:TableVisibility']")) {
+			return;
+		} else if (this.header.contains(e.target)) {
+			const header = e.target.closest("th[data-ordering]");
+			if (!header) return;
+
+			const event = new CustomEvent("toggle-column-filter", {
+				detail: {
+					button: e.target.closest("button"),
+					column: header.dataset.column,
+				},
+				bubbles: true,
+			});
+			this.target.dispatchEvent(event);
+		}
+	}
+
+	_keydown(e) {
+		if (e.key === "Escape") {
+			const visibility = this.visibilityWidget;
+			const sorting = this.sortingWidget;
+			const open = visibility?.visible || sorting?.visible;
+			if (!open) return;
+
+			withTransition(() => {
+				[visibility, sorting].forEach((widget) => {
+					if (widget) widget.disable();
+					if (widget) widget.reconcile();
+				});
+			});
+		}
+	}
+
+	destroy() {
+		super.destroy();
+		document.removeEventListener("keydown", this.keydown);
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class IndexTable extends BaseTable {
+	constructor(attributes) {
+		super(attributes);
+		this.refreshScope = "collection";
+		this.loading = false;
+		this.loaded = !this.prefetched || this.target.hasAttribute("loaded");
+		this._empty = false;
+		this._updated = [];
+		this._created = [];
+	}
+
+	async updated(response) {
+		this._updated = response.html?.querySelectorAll("tr[lp-entity]") || [];
+		const append = response.html?.querySelector("tr[lp-load]");
+		this.loaded = !append;
+		return append;
+	}
+
+	async created(response) {
+		this._created = response.html.querySelectorAll("tr");
+	}
+
+	get selector() {
+		return this.component.elt.querySelector(
+			"th[data-column='selector'] button",
+		);
+	}
+
+	setEmptyRowVisibility() {
+		const emptyRow = this.target.querySelector("tr[data-role='empty']");
+		const notEmpty = this.target.querySelector("tr[lp-entity]");
+		if (emptyRow) {
+			if (!this.view.mobile) {
+				emptyRow.dataset.visible = notEmpty ? "false" : "true";
+			} else {
+				emptyRow.style.display = notEmpty ? "none" : "block";
+			}
+		}
+		if (!notEmpty) {
+			this.loaded = true;
+			this.target.setAttribute("loaded", "");
+		}
+	}
+
+	get prefetched() {
+		return this.target.hasAttribute("lp-prefetch");
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
+	 * @tests tests_js/test_022_refresh_frontend.py::test_core_refresh_batches_supported_widgets_and_falls_back_per_target
+	 * @pair reconnect-refresh:manifest
+	 * @pair indexes:fingerprint-gate
+	 */
+	refreshDescriptor() {
+		if (
+			this.component.name !== "table" ||
+			!this.target.hasAttribute("loaded")
+		) {
+			return null;
+		}
+		const supported =
+			Boolean(this.view.key) ||
+			["forms", "tasks", "users"].includes(this.view.elt.dataset.index);
+		if (!supported) return null;
+
+		return {
+			rows: Array.from(
+				this.target.querySelectorAll("tr[lp-entity]"),
+				(row) => ({
+					key: row.dataset.key,
+					modified: row.dataset.modified || "",
+				}),
+			),
+		};
+	}
+
+	_parseRefreshRow(html) {
+		if (!html) return null;
+		const template = document.createElement("template");
+		template.innerHTML = html.trim();
+		return template.content.querySelector("tr[lp-entity]");
+	}
+
+	/**
+	 * @testable infrastructure
+	 * @covered-by src/script/views/base/core.mjs::Core._refreshCollectionComponents
+	 */
+	refreshDelta(delta) {
+		const existing = new Map(
+			Array.from(this.target.querySelectorAll("tr[lp-entity]"), (row) => [
+				row.dataset.key,
+				row,
+			]),
+		);
+		for (const key of delta.remove || []) {
+			existing.get(key)?.remove();
+			existing.delete(key);
+		}
+
+		const added = [];
+		for (const update of delta.upsert || []) {
+			const row = this._parseRefreshRow(update.html);
+			if (!row || row.dataset.key !== update.key) {
+				throw new Error("Invalid table refresh row");
+			}
+			const current = existing.get(update.key);
+			if (current) current.replaceWith(row);
+			else added.push(row);
+			existing.set(update.key, row);
+		}
+
+		const order = Array.isArray(delta.order) ? delta.order : [];
+		for (const key of order) {
+			const row = existing.get(key);
+			if (!row) throw new Error("Table refresh order references a missing row");
+			this.target.append(row);
+		}
+		if (added.length) this.view.addFlash(...added);
+
+		let empty = this.target.querySelector("tr[data-role='empty']");
+		if (!order.length && !empty && delta.empty) {
+			const template = document.createElement("template");
+			template.innerHTML = delta.empty.trim();
+			empty = template.content.querySelector("tr[data-role='empty']");
+			if (empty) this.target.append(empty);
+		}
+
+		this.setEmptyRowVisibility();
+		this.sortingWidget?.refreshRows?.();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_022_refresh_frontend.py::test_index_table_row_updates_rebuild_active_sort
+	 * @pairs form-index:destination-refresh form-index:sorting form-index:delete-target
+	 */
+	refresh(response) {
+		if (!response?.html) return;
+		const newRows = [...response.html.querySelectorAll("tr[lp-entity]")];
+		const newKeys = new Set(
+			newRows.map((row) => row.dataset.key).filter(Boolean),
+		);
+		const prepend = [];
+
+		for (const newRow of newRows) {
+			const key = newRow.dataset.key;
+			if (!key) continue;
+
+			const existing = this.target.querySelector(`tr[data-key="${key}"]`);
+			if (existing) existing.replaceWith(newRow);
+			else prepend.push(newRow);
+		}
+
+		if (prepend.length) {
+			const anchor = this.target.querySelector("tr[lp-entity]");
+			if (anchor) anchor.before(...prepend);
+			else this.target.append(...prepend);
+			this.view.addFlash(...prepend);
+		}
+
+		if (!this.prefetched) {
+			this.target.querySelectorAll("tr[lp-entity]").forEach((row) => {
+				if (!newKeys.has(row.dataset.key)) row.remove();
+			});
+		}
+
+		this.setEmptyRowVisibility();
+		this.sortingWidget?.refreshRows?.();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_022_refresh_frontend.py::test_index_table_row_updates_rebuild_active_sort
+	 * @features form-index
+	 * @dimensions created-row sorting
+	 */
+	async prereconcile() {
+		const loaded = this.target.hasAttribute("loaded");
+		if (!this.loaded || loaded) return;
+
+		const sorting = await this.component.loadWidget("TableSorting");
+		if (sorting) await sorting.init();
+		this._finishLoading = true;
+	}
+
+	postreconcile() {
+		const target = this.target;
+		let rowsChanged = false;
+		const sortingWasInitialized = this.sortingWidget?.initialized === true;
+
+		if (this._created.length > 0) {
+			target.prepend(...this._created);
+			this.view.addFlash(...this._created);
+			this._created = [];
+			rowsChanged = true;
+
+			if (this.view.mobile) {
+				target.scrollIntoView({ behavior: "auto", block: "start" });
+			}
+		}
+
+		if (this._updated.length > 0) {
+			target.append(...this._updated);
+			this._updated = [];
+			rowsChanged = true;
+		}
+
+		if (this._finishLoading) {
+			this._finishLoading = false;
+			this.target.setAttribute("loaded", "");
+			this.setEmptyRowVisibility();
+			target.dataset.visible = true;
+			this.loading = false;
+		}
+
+		if (rowsChanged) {
+			this.setEmptyRowVisibility();
+			if (sortingWasInitialized) this.sortingWidget.refreshRows();
+		}
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_appears_after_completion_cycle
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload
+ * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_expands_table_submission_cell
+ * @pairs tasks:history tasks:completion-cycle tasks:reload
+ * @pairs embedded-table:table-cell-expand
+ */
+class TaskHistory extends EmbeddedTable {
+	constructor(attributes) {
+		super(attributes);
+		this._updated = null;
+	}
+
+	get table() {
+		return this.target.querySelector("[data-role='table']");
+	}
+
+	async updated(response) {
+		this._updated = response.html.querySelector("table");
+	}
+
+	postreconcile() {
+		if (!this._updated) return;
+
+		this.visible = true;
+		this.target.dataset.visible = "true";
+		this.table.replaceChildren(this._updated);
+		this._updated.dataset.visible = "true";
+		this.initVisibility(
+			this._updated,
+			`columns-${this.component.name}-history`,
+		);
+		this._updated = null;
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_results_expands_table_submission_cell
+ * @pairs embedded-table:run-results embedded-table:table-cell-expand
+ * @pairs embedded-table:horizontal-scroll
+ */
+class FilterResults extends EmbeddedTable {
+	constructor(attributes) {
+		super(attributes);
+		this.badges = null;
+		this.table = null;
+		this.tableContainer = null;
+		this.container = null;
+		this.filtering = this.target.dataset.kind;
+	}
+
+	async updated(response) {
+		this.table =
+			response.html.querySelector("#embedded-table") ||
+			response.html.querySelector("table");
+		if (this.filtering === "page") {
+			this.badges = this.component.widgets.Filters.filters.cloneNode(true);
+		}
+	}
+
+	get tbody() {
+		return this.table.querySelector("tbody");
+	}
+
+	get rows() {
+		return this.tbody.querySelectorAll("tr:not([data-role='empty'])");
+	}
+
+	get empty() {
+		return this.tbody.querySelector("tr[data-role='empty']");
+	}
+
+	postreconcile() {
+		if (this.target.children.length) return;
+		if (!this.table) return;
+
+		this.container = document.createElement("div");
+		this.container.className =
+			"min-w-0 overflow-hidden max-w-full rounded-md outline-2 outline-kind-default bg-white";
+		this.tableContainer = document.createElement("div");
+		this.tableContainer.className = "table-container px-4";
+		this.tableContainer.dataset.role = "table";
+		this.tableContainer.appendChild(this.table);
+		this.container.appendChild(this.tableContainer);
+		this.table.dataset.visible = "true";
+		this.initVisibility(this.table);
+		if (this.filtering === "page") {
+			this.target.replaceChildren(this.badges, this.container);
+		} else {
+			this.target.replaceChildren(this.container);
+		}
+	}
+
+	reset() {
+		if (this.badges) {
+			this.badges.remove();
+			this.badges = null;
+		}
+		if (this.container) {
+			this.container.remove();
+			this.container = null;
+		}
+		if (this.tableContainer) {
+			this.tableContainer = null;
+		}
+		if (this.table) {
+			this.table = null;
+		}
+	}
+}
+
+export { FilterResults, IndexTable, TaskHistory };

@@ -11,8 +11,12 @@ const CLEAR_ALL_KEY = "__clear_all_notifications__";
  * @testable true
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_renders_target_and_preserves_pending_state
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_deletes_and_clears
- * @features notifications
- * @dimensions menu-open dropdown-refresh delete clear-all long-text-wrap accessible-state
+ * @tests tests_js/test_042_messaging_frontend.py::test_notification_menu_keeps_authoritative_aggregate_count
+ * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
+ * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_inbound_message_allows_reply_without_compose_permission
+ * @pairs notifications:menu-open notifications:dropdown-refresh notifications:delete
+ * @pairs notifications:clear-all notifications:long-text-wrap notifications:accessible-state
+ * @pairs notifications:exact-count notifications:bounded-page
  */
 export class Notifications {
 	constructor(view) {
@@ -143,6 +147,8 @@ export class Notifications {
 		const element = this._htmlOption(html);
 		return {
 			key: key || element?.dataset.key || null,
+			action: element?.dataset.action || null,
+			cursor: element?.dataset.cursor || null,
 			html: element?.outerHTML || html,
 			onClick: this._selectNotification,
 			closeOnClick: this._closeOnNotificationClick,
@@ -151,7 +157,12 @@ export class Notifications {
 
 	_dropdownItems() {
 		if (!this.notifications.length) return [];
-		return [this._clearAllOption(), ...this.notifications];
+		const hasOrdinary = this.notifications.some(
+			(item) => item.key && !item.key.startsWith("__"),
+		);
+		return hasOrdinary
+			? [this._clearAllOption(), ...this.notifications]
+			: this.notifications;
 	}
 
 	_clearAllOption() {
@@ -183,6 +194,18 @@ export class Notifications {
 	}
 
 	async _selectNotification(option, event) {
+		const action = option?.dataset?.action;
+		if (action === "message-user") {
+			event?.preventDefault();
+			const { ensureMessageComposer } = await import("./messageComposer");
+			ensureMessageComposer(this.view).open();
+			return;
+		}
+		if (action === "load-notifications") {
+			event?.preventDefault();
+			await this._loadOlder(option.dataset.cursor);
+			return;
+		}
 		const deleteButton = event?.target?.closest(
 			"[data-action='delete-notification']",
 		);
@@ -203,7 +226,10 @@ export class Notifications {
 	}
 
 	async _clearNotifications() {
-		if (!this.notifications.length) return;
+		if (
+			!this.notifications.some((item) => item.key && !item.key.startsWith("__"))
+		)
+			return;
 
 		this.localMutation = true;
 		const response = await request
@@ -213,8 +239,27 @@ export class Notifications {
 			});
 		if (!response?.ok) return;
 
-		this.notifications = [];
-		this.stale = false;
+		await this.refresh();
+	}
+
+	async _loadOlder(cursor) {
+		if (!cursor || !this.view.online) return;
+		const response = await request.get(ENDPOINTS.notifications, { cursor });
+		if (!response?.ok || !response.html) return;
+		const loaded = this._optionsFromHtml(response.html);
+		const older = loaded.filter(
+			(item) => item.key && !item.key.startsWith("__"),
+		);
+		const next = loaded.find((item) => item.action === "load-notifications");
+		const existing = this.notifications.filter(
+			(item) => item.action !== "load-notifications",
+		);
+		const keys = new Set(existing.map((item) => item.key));
+		for (const item of older) {
+			if (!keys.has(item.key)) existing.push(item);
+		}
+		if (next) existing.push(next);
+		this.notifications = existing;
 		this._updateDropdown();
 	}
 
@@ -250,14 +295,13 @@ export class Notifications {
 
 	_updateCount() {
 		const projected = Number(this.state?.count);
-		const count =
-			this.stale && Number.isInteger(projected)
-				? projected
-				: this.loaded
-					? this.notifications.length
-					: Number.isInteger(projected)
-						? projected
-						: 0;
+		const count = Number.isInteger(projected)
+			? projected
+			: this.loaded
+				? this.notifications.filter(
+						(item) => item.key && !item.key.startsWith("__"),
+					).length
+				: 0;
 		renderNotificationBadge(count);
 	}
 

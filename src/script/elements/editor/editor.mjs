@@ -15,6 +15,7 @@ import {
 	CustomLink,
 	EditorPaste,
 	FlashRemoteChanges,
+	LagniappeMention,
 	SelectionHighlight,
 	TabCharacter,
 } from "./extensions";
@@ -101,6 +102,7 @@ export const collaborativeEditor = (target, ydoc, editable = true) => {
 		SelectionHighlight,
 		EditorPaste,
 		TabCharacter,
+		LagniappeMention,
 	];
 
 	const editor = new Editor({

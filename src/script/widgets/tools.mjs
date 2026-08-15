@@ -47,6 +47,11 @@ export class CreateToolReport extends BaseUpload {
 		this.submitGroup = this.target.querySelector("[data-role='submit-group']");
 		this.submitButton = this.target.querySelector("[data-role='start-report']");
 		this.explainButton = this.target.querySelector("[data-role='explain']");
+		this.emailSubmissions = this.target.querySelector(
+			"[data-role='email-submissions']",
+		);
+		this.emailAddress = this.target.querySelector("[data-role='email-address']");
+		this.emailCopyButton = this.target.querySelector("[data-role='email-copy']");
 		this.activeTool = this.toolInput?.value || "organize";
 		this.context = uploadElement.contextUpload({
 			text: ORGANIZE_DROPZONE_TEXT,
@@ -73,6 +78,9 @@ export class CreateToolReport extends BaseUpload {
 		this.context.description?.addEventListener("input", () => {
 			this.toggleExplainButton();
 			this.form?.showSubmitButton();
+		});
+		this.emailCopyButton?.addEventListener("click", () => {
+			void this.copyEmailAddress();
 		});
 		this.setTool(this.activeTool, { reset: false });
 	}
@@ -116,6 +124,7 @@ export class CreateToolReport extends BaseUpload {
 			button.dataset.active =
 				button.dataset.tool === this.activeTool ? "true" : "false";
 		});
+		this.updateEmailAddress(tool);
 
 		if (config.upload) {
 			this.dropzone?.show();
@@ -131,6 +140,49 @@ export class CreateToolReport extends BaseUpload {
 
 		if (reset) this.form?.resetSubmitButton();
 		this.toggleExplainButton();
+	}
+
+	updateEmailAddress(tool) {
+		if (!this.emailSubmissions || !this.emailAddress) return;
+		const key = `address${tool.charAt(0).toUpperCase()}${tool.slice(1)}`;
+		const address = this.emailSubmissions.dataset[key];
+		if (address) this.emailAddress.textContent = address;
+	}
+
+	async copyEmailAddress() {
+		const button = this.emailCopyButton;
+		const address = this.emailAddress?.textContent?.trim();
+		if (!button || !address) return;
+		let copied = false;
+		try {
+			if (navigator.clipboard?.writeText) {
+				await navigator.clipboard.writeText(address);
+				copied = true;
+			}
+		} catch {
+			copied = false;
+		}
+		if (!copied) {
+			const textarea = document.createElement("textarea");
+			textarea.value = address;
+			textarea.setAttribute("readonly", "");
+			textarea.style.position = "fixed";
+			textarea.style.opacity = "0";
+			document.body.append(textarea);
+			textarea.select();
+			try {
+				copied = document.execCommand("copy");
+			} catch {
+				copied = false;
+			}
+			textarea.remove();
+			button.focus();
+		}
+		button.textContent = copied ? "Copied" : "Copy failed";
+		clearTimeout(this.emailCopyResetTimer);
+		this.emailCopyResetTimer = setTimeout(() => {
+			if (button.isConnected) button.textContent = "Copy";
+		}, 2000);
 	}
 
 	toggleExplainButton() {

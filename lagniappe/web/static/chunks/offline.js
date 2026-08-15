@@ -1,2 +1,281 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="4bd5d80d-42d8-4736-acdf-3251cac81185",e._sentryDebugIdIdentifier="sentry-dbid-4bd5d80d-42d8-4736-acdf-3251cac81185");}catch(e){}}();const d="offline-db",p=5,c="sync",i="mutations";function f(){return new Promise((t,r)=>{const o=indexedDB.open(d,5);o.onerror=()=>r(o.error),o.onsuccess=()=>{const n=o.result;n.onversionchange=()=>n.close(),t(n)},o.onupgradeneeded=n=>{const e=n.target.result;n.oldVersion<2&&e.objectStoreNames.contains(c)&&e.deleteObjectStore(c),e.objectStoreNames.contains(c)||e.createObjectStore(c,{keyPath:"sync_id"}),e.objectStoreNames.contains("activity")&&e.deleteObjectStore("activity"),e.objectStoreNames.contains("submit")&&e.deleteObjectStore("submit"),e.objectStoreNames.contains(i)||e.createObjectStore(i,{keyPath:"id"})}})}function u(t,r,o){return f().then(n=>new Promise((e,s)=>{const a=n.transaction(t,r);a.oncomplete=()=>n.close(),a.onerror=()=>{n.close(),s(a.error)};try{o(a,e,s)}catch(y){s(y)}}))}function l(t){return new Promise((r,o)=>{t.onsuccess=()=>r(t.result),t.onerror=()=>o(t.error)})}function S(t){const r=Date.now();return u(c,"readwrite",async(o,n,e)=>{const s=o.objectStore(c);try{const a=await l(s.get(t.sync_id)),y=a?{...a,...t,save:a.save||t.save,timestamp:r}:{...t,timestamp:r};a&&!Object.hasOwn(t,"html")&&delete y.html,await l(s.put(y)),n()}catch(a){e(a)}})}function m(t){return u([c],"readonly",async(r,o,n)=>{try{const e=await l(r.objectStore(c).get(t));o(e??null)}catch(e){n(e)}})}function b(){return u([c,i],"readonly",async(t,r,o)=>{try{const n=await l(t.objectStore(c).getAll()),e=await l(t.objectStore(i).getAll());r({sync:n,mutations:e})}catch(n){o(n)}})}function w(t){return u(c,"readwrite",async(r,o,n)=>{try{await l(r.objectStore(c).delete(t)),o()}catch(e){n(e)}})}function h(t){return t?.length?u(c,"readwrite",async(r,o,n)=>{try{const e=r.objectStore(c);await Promise.all(t.map(s=>l(e.delete(s)))),o()}catch(e){n(e)}}):Promise.resolve()}function j(t){return u(i,"readwrite",async(r,o,n)=>{try{await l(r.objectStore(i).put(t)),o()}catch(e){n(e)}})}function O(){return u(i,"readonly",async(t,r,o)=>{try{const n=await l(t.objectStore(i).getAll());r(n)}catch(n){o(n)}})}function g(t){return t?.length?u(i,"readwrite",async(r,o,n)=>{try{const e=r.objectStore(i);await Promise.all(t.map(s=>l(e.delete(s)))),o()}catch(e){n(e)}}):Promise.resolve()}export{g as deleteOfflineMutations,w as deleteSyncRecord,h as deleteSyncRecords,b as getAllOfflineRecords,O as getOfflineMutations,m as getSyncRecord,j as setOfflineMutation,S as updateSyncRecord};
 /*! Third-party licenses: /third-party-licenses.txt */
+const DB_NAME = "offline-db";
+const DB_VERSION = 5;
+const SYNC_STORE = "sync";
+const MUTATION_STORE = "mutations";
+
+/**
+ * @testable true
+ * @tests tests_js/test_028_form_state_split.py::test_offline_database_upgrade_discards_legacy_activity_records
+ * @features offline
+ * @dimensions database-upgrade legacy-record-discard mutation-store
+ */
+function openDB() {
+	return new Promise((resolve, reject) => {
+		const request = indexedDB.open(DB_NAME, DB_VERSION);
+		request.onerror = () => reject(request.error);
+		request.onsuccess = () => {
+			const db = request.result;
+			db.onversionchange = () => db.close();
+			resolve(db);
+		};
+		request.onupgradeneeded = (event) => {
+			const db = event.target.result;
+			if (event.oldVersion < 2) {
+				// The store fields were renamed sync_id (snake_case) to match the
+				// wire format; nuke old v1 stores so the keyPath matches records.
+				if (db.objectStoreNames.contains(SYNC_STORE)) {
+					db.deleteObjectStore(SYNC_STORE);
+				}
+			}
+			if (!db.objectStoreNames.contains(SYNC_STORE)) {
+				db.createObjectStore(SYNC_STORE, { keyPath: "sync_id" });
+			}
+
+			if (db.objectStoreNames.contains("activity")) {
+				db.deleteObjectStore("activity");
+			}
+			if (db.objectStoreNames.contains("submit")) {
+				db.deleteObjectStore("submit");
+			}
+			if (!db.objectStoreNames.contains(MUTATION_STORE)) {
+				db.createObjectStore(MUTATION_STORE, { keyPath: "id" });
+			}
+		};
+	});
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/offline.mjs::updateSyncRecord
+ * @covered-by src/script/shared/offline.mjs::getAllOfflineRecords
+ * @reason transaction wrapper is exercised through the offline record API
+ */
+function withTransaction(storeNames, mode, executor) {
+	return openDB().then(
+		(db) =>
+			new Promise((resolve, reject) => {
+				const tx = db.transaction(storeNames, mode);
+				tx.oncomplete = () => db.close();
+				tx.onerror = () => {
+					db.close();
+					reject(tx.error);
+				};
+				try {
+					executor(tx, resolve, reject);
+				} catch (e) {
+					reject(e);
+				}
+			}),
+	);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/offline.mjs::updateSyncRecord
+ * @covered-by src/script/shared/offline.mjs::getAllOfflineRecords
+ * @reason request promisification is private IndexedDB plumbing
+ */
+function promisify(request) {
+	return new Promise((resolve, reject) => {
+		request.onsuccess = () => resolve(request.result);
+		request.onerror = () => reject(request.error);
+	});
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
+ * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_failed_offline_replay_keeps_queue_and_retries
+ * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_replay_does_not_duplicate_after_reload
+ * @features sync
+ * @dimensions offline-replay replay-order queue-preserved dedupe reload
+ */
+function updateSyncRecord(record) {
+	const timestamp = Date.now();
+	return withTransaction(
+		SYNC_STORE,
+		"readwrite",
+		async (tx, resolve, reject) => {
+			const store = tx.objectStore(SYNC_STORE);
+			try {
+				const existing = await promisify(store.get(record.sync_id));
+				const merged = existing
+					? {
+							...existing,
+							...record,
+							save: existing.save || record.save,
+							timestamp,
+						}
+					: { ...record, timestamp };
+				if (existing && !Object.hasOwn(record, "html")) delete merged.html;
+				if (existing && !Object.hasOwn(record, "mentions")) delete merged.mentions;
+				await promisify(store.put(merged));
+				resolve();
+			} catch (e) {
+				reject(e);
+			}
+		},
+	);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/sync.mjs::SyncManager.state
+ * @reason single-record lookup is owned by the widget state sync path
+ */
+function getSyncRecord(sync_id) {
+	return withTransaction(
+		[SYNC_STORE],
+		"readonly",
+		async (tx, resolve, reject) => {
+			try {
+				const record = await promisify(tx.objectStore(SYNC_STORE).get(sync_id));
+				resolve(record ?? null);
+			} catch (e) {
+				reject(e);
+			}
+		},
+	);
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
+ * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_failed_offline_replay_keeps_queue_and_retries
+ * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_replay_does_not_duplicate_after_reload
+ * @features sync
+ * @dimensions offline-replay replay-order queue-preserved dedupe reload
+ */
+function getAllOfflineRecords() {
+	return withTransaction(
+		[SYNC_STORE, MUTATION_STORE],
+		"readonly",
+		async (tx, resolve, reject) => {
+			try {
+				const sync = await promisify(tx.objectStore(SYNC_STORE).getAll());
+				const mutations = await promisify(
+					tx.objectStore(MUTATION_STORE).getAll(),
+				);
+				resolve({ sync, mutations });
+			} catch (e) {
+				reject(e);
+			}
+		},
+	);
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/sync.mjs::SyncManager._reconcile
+ * @reason single-record deletion is owned by successful state reconciliation
+ */
+function deleteSyncRecord(sync_id) {
+	return withTransaction(
+		SYNC_STORE,
+		"readwrite",
+		async (tx, resolve, reject) => {
+			try {
+				await promisify(tx.objectStore(SYNC_STORE).delete(sync_id));
+				resolve();
+			} catch (e) {
+				reject(e);
+			}
+		},
+	);
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
+ * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_replay_does_not_duplicate_after_reload
+ * @features sync
+ * @dimensions offline-replay queue-clear dedupe
+ */
+function deleteSyncRecords(sync_ids) {
+	if (!sync_ids?.length) return Promise.resolve();
+	return withTransaction(
+		SYNC_STORE,
+		"readwrite",
+		async (tx, resolve, reject) => {
+			try {
+				const store = tx.objectStore(SYNC_STORE);
+				await Promise.all(sync_ids.map((id) => promisify(store.delete(id))));
+				resolve();
+			} catch (e) {
+				reject(e);
+			}
+		},
+	);
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_create_mutations_persist_after_reload
+ * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
+ * @pairs offline:queue-create offline:queue-submit offline:reload
+ */
+function setOfflineMutation(record) {
+	return withTransaction(
+		MUTATION_STORE,
+		"readwrite",
+		async (tx, resolve, reject) => {
+			try {
+				await promisify(tx.objectStore(MUTATION_STORE).put(record));
+				resolve();
+			} catch (e) {
+				reject(e);
+			}
+		},
+	);
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_reload_uses_server_state_until_replay
+ * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutations_replay_when_online
+ * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
+ * @features offline
+ * @dimensions durable-queue server-first replay queue-submit
+ */
+function getOfflineMutations() {
+	return withTransaction(
+		MUTATION_STORE,
+		"readonly",
+		async (tx, resolve, reject) => {
+			try {
+				const records = await promisify(
+					tx.objectStore(MUTATION_STORE).getAll(),
+				);
+				resolve(records);
+			} catch (e) {
+				reject(e);
+			}
+		},
+	);
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutations_replay_when_online
+ * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
+ * @pairs offline:replay offline:queue-clear offline:notification
+ */
+function deleteOfflineMutations(ids) {
+	if (!ids?.length) return Promise.resolve();
+	return withTransaction(
+		MUTATION_STORE,
+		"readwrite",
+		async (tx, resolve, reject) => {
+			try {
+				const store = tx.objectStore(MUTATION_STORE);
+				await Promise.all(ids.map((id) => promisify(store.delete(id))));
+				resolve();
+			} catch (e) {
+				reject(e);
+			}
+		},
+	);
+}
+
+export { deleteOfflineMutations, deleteSyncRecord, deleteSyncRecords, getAllOfflineRecords, getOfflineMutations, getSyncRecord, setOfflineMutation, updateSyncRecord };

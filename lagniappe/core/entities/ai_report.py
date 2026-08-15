@@ -19,6 +19,7 @@ class AIReport(Entity):
             {
                 "instructions",
                 "upload_manifest",
+                "inbound_manifest",
                 "process",
                 "proposal",
                 "result",
@@ -37,6 +38,8 @@ class AIReport(Entity):
                 "instructions": activity.Instructions,
                 "input_files": activity.InputFiles,
                 "upload_manifest": report_properties.UploadManifest,
+                "origin": report_properties.Origin,
+                "inbound_manifest": report_properties.InboundManifest,
                 "process": report_properties.ReportProcess,
                 "status": report_properties.Status,
                 "deferred_job": report_properties.DeferredJob,
@@ -73,11 +76,11 @@ class AIReport(Entity):
         return False
 
     @classmethod
-    def create(cls, data):
+    def create(cls, data, *, key=None):
         parent = data.get("parent") or data.get("user")
         user = data.get("user") or parent
 
-        report = cls(parent=parent)
+        report = cls(key) if key is not None else cls(parent=parent)
         report.kind = cls.entity_kind
         report.parent = parent
         report.user = user
@@ -86,6 +89,8 @@ class AIReport(Entity):
         report.instructions = data.get("instructions")
         report.input_files = data.get("input_files", [])
         report.upload_manifest = data.get("upload_manifest")
+        report.origin = data.get("origin") or "web"
+        report.inbound_manifest = data.get("inbound_manifest")
         report.status = data.get("status") or "pending"
         report.summary = data.get("summary")
         report.proposal = data.get("proposal")
