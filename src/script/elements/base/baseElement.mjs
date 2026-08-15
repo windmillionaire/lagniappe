@@ -57,6 +57,10 @@ export class BaseElement {
 		return !NON_HISTORY_FILLABLE_TYPES.has(this.schema?.type);
 	}
 
+	get historyFillPersistsDefault() {
+		return true;
+	}
+
 	get canHistoryFill() {
 		return Boolean(
 			this.renderer.historyFillEnabled &&
@@ -168,7 +172,7 @@ export class BaseElement {
 			event.preventDefault();
 			event.stopPropagation();
 			if (this.fillFromHistory(value)) {
-				onFill?.(this.schema.id);
+				if (this.historyFillPersistsDefault) onFill?.(this.schema.id);
 			}
 		});
 

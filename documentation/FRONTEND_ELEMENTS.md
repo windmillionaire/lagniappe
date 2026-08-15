@@ -286,6 +286,7 @@ Readonly rendering has two modes: sparse readonly omits empty non-static fields,
 | `location` | `LocationElement` | Google Places autocomplete via `LocationBox` combobox |
 | `signature` | `SignatureElement` | Canvas drawing pad with file upload |
 | `table` | `TableElement` | Inline editable rows with nested elements per column |
+| `todo` | `TodoElement` | Task-only ordered checklist with inline add, rename, and remove controls |
 | `html` | `HtmlElement` | Static HTML content (async loaded). Always renders (`static = true`). |
 | `status` | `StatusElement` | Conditional messages based on other field values. Always renders (`static = true`). |
 
@@ -293,9 +294,10 @@ Readonly rendering has two modes: sparse readonly omits empty non-static fields,
 
 Most elements follow the standard pattern: extend `BaseElement`, override `read` and `edit` getters, and let the base class handle `create()`, `mode` switching, and `data` collection.
 
-Three elements override `create()` entirely because they don't fit the read/edit paradigm:
+Four elements override `create()` entirely because they don't fit the read/edit paradigm:
 
 - **`TableElement`** -- manages its own row creation/editing flow
+- **`TodoElement`** -- keeps checkboxes active in normal mode and disables them while list structure/text is being edited
 - **`HtmlElement`** -- async-loads content, no edit mode
 - **`StatusElement`** -- displays conditional messages, no edit mode
 
@@ -318,6 +320,12 @@ Common properties passed via the `schema` object:
 | `multiple` | Allow multiple selection (select) |
 | `location` | `"in"` for internal link search, `"out"` for external URL |
 | `clear` | If truthy, adds a clear button |
+
+To-do values use `{items: [{text, checked}]}`. Enter or forward Tab from the
+draft commits a non-empty item and focuses a fresh draft; Shift+Tab remains an
+escape path. The latest-history control restores the most recent item texts
+with every checkbox reset to unchecked, and unlike ordinary fields does not
+persist that value as a repeating task default.
 
 ## Primitives (`elements/primitives.mjs`)
 

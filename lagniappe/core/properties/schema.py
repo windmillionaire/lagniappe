@@ -15,6 +15,7 @@ from .form_inputs import (
 from .form_checkbox import Checkbox
 from .form_select import Select, Radio
 from .form_table import Table
+from .form_todo import TodoList
 from .form_links import Link, Location, Bookmark
 from .form_special import Signature, HTML, Status
 from .form_textarea import Textarea
@@ -53,6 +54,7 @@ class SchemaFields(Enum):
     RADIO = Radio
     SELECT = Select
     TABLE = Table
+    TODO = TodoList
     LINK = Link
     LOCATION = Location
     SIGNATURE = Signature
@@ -122,6 +124,7 @@ _FIELD_TYPES = frozenset(
         "signature",
         "status",
         "table",
+        "todo",
         "textarea",
     }
 )
@@ -138,6 +141,7 @@ _FIELD_TITLES = {
     "signature": "Signature",
     "status": "Status",
     "table": "Table",
+    "todo": "To-do List",
     "textarea": "Text",
 }
 
@@ -329,8 +333,11 @@ def _canonical_field(definition, *, table_column=False, discard_invalid=False):
 # @tests tests_unit/test_004b_schema_core.py::test_schema_canonicalizer_unifies_creation_paths_without_changing_membership
 # @tests tests_unit/test_004b_schema_core.py::test_schema_canonicalizer_rejects_ambiguous_durable_shapes
 # @tests tests_unit/test_004b_schema_core.py::test_schema_canonicalizer_preserves_snapshot_membership
-# @features form-schema
-# @dimensions canonicalization versioning membership validation history-snapshot
+# @tests tests_unit/test_003g_todo_lists.py::test_todo_schema_is_task_only
+# @pairs form-schema:canonicalization form-schema:versioning
+# @pairs form-schema:membership form-schema:validation
+# @pairs form-schema:history-snapshot form-schema:form-type
+# @pair form-todo:task-only
 def canonicalize_schema(
     value,
     *,
@@ -353,6 +360,10 @@ def canonicalize_schema(
             if discard_invalid:
                 continue
             raise SchemaValidationError(f"Duplicate schema field id {field['id']!r}")
+        if form_type == "page" and field["type"] == "todo":
+            if discard_invalid:
+                continue
+            raise SchemaValidationError("To-do lists are supported only on task forms")
         field_ids.add(field["id"])
         fields.append(field)
 

@@ -172,11 +172,19 @@ class SubmitterMixin:
 
     # @testable true
     # @tests tests_unit/test_004d_submitter.py::test_save_default_field_copies_db_value_and_saves_only_submitter
-    # @features submission
-    # @dimensions repeating-default field-copy direct-save
+    # @tests tests_unit/test_003g_todo_lists.py::test_todo_list_cannot_be_saved_as_repeating_default
+    # @pairs submission:repeating-default submission:field-copy submission:direct-save
+    # @pair form-todo:repeating-default
     def save_default_field(self, field_id, submission=None):
         """Persist one field's DB value as a repeating submission default."""
         submission = submission or self.properties.submission
+        field = submission.fields.get(field_id)
+        if field is None:
+            raise ValidationError(f"Submission field {field_id!r} does not exist.")
+        if not getattr(field, "repeating_default", True):
+            raise ValidationError(
+                f"Submission field {field_id!r} cannot repeat automatically."
+            )
         submission_value = submission.db_value
         if field_id not in submission_value:
             raise ValidationError(f"Submission field {field_id!r} has no saved value.")

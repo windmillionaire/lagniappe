@@ -505,6 +505,35 @@ form:
       intent: action button presentation within form table
       surfaces: [frontend]
       css: [src/style/tables.css]
+  todo:
+    container:
+      classes: max-w-full flex min-w-0 flex-col gap-2
+      intent: container presentation within form to-do list
+      surfaces: [frontend]
+    list:
+      classes: flex min-w-0 flex-col gap-1
+      intent: ordered visual stack for to-do items
+      surfaces: [frontend]
+    row:
+      classes: flex min-h-8 min-w-0 items-center gap-2 rounded-md bg-white/60 px-2 py-1 sm:text-sm
+      intent: one to-do item and its editing actions
+      surfaces: [frontend]
+    text:
+      classes: min-w-0 flex-1 text-left text-base-dark [overflow-wrap:anywhere]
+      intent: to-do item text in normal and editable presentations
+      surfaces: [frontend]
+    completeText:
+      classes: text-base-medium line-through
+      intent: completed to-do item text treatment
+      surfaces: [frontend]
+    inlineInput:
+      classes: min-w-0 flex-1 border-b border-dashed border-base-medium bg-transparent px-1 py-0.5 text-base-dark focus:border-kind-default focus:outline-none
+      intent: lightweight inline to-do entry and rename affordance
+      surfaces: [frontend]
+    actions:
+      classes: ml-auto flex shrink-0 flex-row items-center gap-1
+      intent: compact to-do item editing actions
+      surfaces: [frontend]
   elementLabel:
     classes: flex flex-col gap-1 font-semibold sm:text-sm text-base-dark
     intent: element label presentation within form

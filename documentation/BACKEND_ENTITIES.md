@@ -335,7 +335,9 @@ normal intent, cache, or lifecycle work. A later submission keeps defaults
 whose values are unchanged and removes
 defaults that changed or disappeared. Reopening a task starts its submission from
 a copy of the remaining defaults; task assignment remains in place across
-completion and reopening.
+completion and reopening. Task-only to-do fields are excluded from repeating
+defaults: their completed value is retained in task history, while the reopened
+task starts with no items.
 
 Checkbox fields use the unset split to distinguish storage state from submitted
 state. A never-submitted or missing stored checkbox is unset and projects as
@@ -354,7 +356,8 @@ Explicit fields remain customizable and `SubmitterMixin.save_submission()`
 mirrors their submitted values into page metadata. When an attached page form
 omits them, `PageForm` renders the standalone special fields instead.
 Form-history snapshots use `snapshot=True` to apply the same shape
-normalization to historical members.
+normalization to historical members. The `todo` schema type is accepted only
+for task forms and stores ordered `{text, checked}` item objects.
 
 All typed schema assignment passes through the `Schema.value` setter, and
 durable callers should prefer `Form.set_schema()`. Builder saves, AI category
@@ -909,6 +912,6 @@ Properties are organized by entity type and concern:
 | `task_*` | Task-specific (dates, related, scheduling) |
 | `file_*` | File-specific (assets, entity, ingress, options, related) |
 | `user_*` | User-specific (entity, groups, permissions, related, restrictions) |
-| `form_*` | Form field types (checkbox, inputs, links, select, special, submission, table, textarea) |
+| `form_*` | Form field types (checkbox, inputs, links, select, special, submission, table, to-do, textarea) |
 | `base_*` | Base classes (asset, columns, db, filters, process, property, schema, submission) |
 | Single files | `category.py`, `project.py`, `filter.py`, `home.py`, `index.py`, `schema.py` |

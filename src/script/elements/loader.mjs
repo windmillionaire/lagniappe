@@ -31,6 +31,9 @@ export async function getFormElement(renderer, schema, submission) {
 		case "table":
 			module = await import(`./table`);
 			return new module.TableElement(renderer, schema, submission);
+		case "todo":
+			module = await import(`./todo`);
+			return new module.TodoElement(renderer, schema, submission);
 		case "link":
 			module = await import(`./link`);
 			return new module.LinkElement(renderer, schema, submission);

@@ -8,6 +8,7 @@ const CONFIG = {
 		{ type: "radio", label: "Radio Group" },
 		{ type: "select", label: "Select" },
 		{ type: "table", label: "Table" },
+		{ type: "todo", label: "To-do List", icon: "checklist" },
 		{ type: "signature", label: "Signature" },
 		{ type: "html", label: "Document" },
 		{ type: "status", label: "Status" },
@@ -58,6 +59,7 @@ const CONFIG = {
 		signature: { title: "Signature" },
 		status: { title: "Status" },
 		table: { title: "Table" },
+		todo: { title: "To-do List" },
 		textarea: { title: "Text" },
 	},
 	DEFAULT_SETTINGS: {
@@ -100,6 +102,7 @@ const CONFIG = {
 		signature: ["title", "required", "deleteButton"],
 		status: ["title", "status", "deleteButton"],
 		table: ["title", "columns", "visibility", "deleteButton"],
+		todo: ["title", "visibility", "deleteButton"],
 	},
 };
 

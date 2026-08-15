@@ -426,6 +426,23 @@ const textarea = (schema) => {
 /**
  * @testable infrastructure
  */
+const todo = (schema) => {
+	const element = _model(schema);
+	const display = _presentation(schema);
+
+	element.appendChild(
+		primitives.label({
+			icon: "checklist",
+			label: display.title,
+			tag: "h3",
+		}),
+	);
+	return element;
+};
+
+/**
+ * @testable infrastructure
+ */
 const table = (schema) => {
 	const element = _model(schema);
 	const display = _presentation(schema);
@@ -472,4 +489,5 @@ export const ModelElement = {
 	status,
 	textarea,
 	table,
+	todo,
 };

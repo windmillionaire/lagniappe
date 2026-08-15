@@ -151,6 +151,15 @@ STYLES = {
 			"rowActionHeader": "w-px min-w-px max-w-px p-0",
 			"actionButton": "grid size-6 place-items-center rounded-sm text-kind-default outline-offset-0 transition-colors duration-100 hover:bg-white hover:text-kind-dark hover:outline hover:outline-kind-default focus-visible:bg-white focus-visible:text-kind-dark focus-visible:outline focus-visible:outline-kind-default disabled:pointer-events-none disabled:opacity-50"
 		},
+		"todo": {
+			"container": "max-w-full flex min-w-0 flex-col gap-2",
+			"list": "flex min-w-0 flex-col gap-1",
+			"row": "flex min-h-8 min-w-0 items-center gap-2 rounded-md bg-white/60 px-2 py-1 sm:text-sm",
+			"text": "min-w-0 flex-1 text-left text-base-dark [overflow-wrap:anywhere]",
+			"completeText": "text-base-medium line-through",
+			"inlineInput": "min-w-0 flex-1 border-b border-dashed border-base-medium bg-transparent px-1 py-0.5 text-base-dark focus:border-kind-default focus:outline-none",
+			"actions": "ml-auto flex shrink-0 flex-row items-center gap-1"
+		},
 		"elementLabel": "flex flex-col gap-1 font-semibold sm:text-sm text-base-dark",
 		"submission": {
 			"default": "submission-outline flex min-h-10 w-fit flex-row items-center justify-center rounded-md bg-white/60 px-3 py-1.25 font-medium shadow-xs sm:text-sm",

@@ -80,6 +80,7 @@ A form schema is an **array of element objects**. Each element object contains:
 - `radio` - Radio button groups
 - `select` - Dropdown selections
 - `table` - Dynamic rows of data
+- `todo` - Ordered task checklist
 - `link` - Internal or external links
 - `location` - Address inputs with Google Places autocomplete
 - `signature` - Electronic signature capture
@@ -178,6 +179,7 @@ TASK_FORM_CONTENT_GUIDELINES = """
 - Use `textarea` for longer text content
 - Use `select`/`radio` for predefined choices
 - Use `table` for repeating data structures
+- Use `todo` for a simple ordered checklist of actions without table columns
 - Use `location` for any address-related fields
 - Use `signature` for consent/approval requirements
 
@@ -273,7 +275,8 @@ SCHEMA_TYPE_GUIDELINES = """
 
 - The form schema is an array of element objects
 - Each element object has a type property that specifies the type of element
-- The type property is one of the following: `input`, `textarea`, `link`, `location`, `table`, `checkbox`, `radio`, `select`, `signature`, `html`
+- The type property is one of the following: `input`, `textarea`, `link`, `location`, `table`, `todo`, `checkbox`, `radio`, `select`, `signature`, `html`
+- The `todo` type is available only in task forms
 
 - The element object has an id property that is a unique identifier for the element
 - The element object has a title property that is the display label for the element
@@ -331,6 +334,14 @@ SCHEMA_TYPE_GUIDELINES = """
   ]
 }}
 ```
+
+#### `todo` Submission Value Guidelines
+
+- To-do lists are available only on task forms
+- A to-do list value is an object with an `items` array
+- Each item is an object with a non-empty `text` string and a `checked` boolean
+- Preserve item order; use `checked`: false for newly generated items
+- Example: `{{"items": [{{"text": "Confirm the venue", "checked": false}}]}}`
 
 #### `radio`/`select` Submission Value Guidelines
 

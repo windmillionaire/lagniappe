@@ -188,6 +188,43 @@ def test_submission_table_renders_backend_field_values_and_table_rows():
     assert "ada@example.com" in html
 
 
+# @pairs export:semantic-list export:checked-state export:escaping
+# @pair form-todo:semantic-list
+@pytest.mark.unit
+def test_submission_table_renders_todo_items_semantically():
+    task = TestEntities.get(
+        "TASK",
+        {
+            "name": "Archive Checklist",
+            "hash": "archive_todo_task",
+            "page": {"name": "Archive Parent", "hash": "archive_todo_parent"},
+            "form": {"name": "Archive Form", "hash": "archive_todo_form"},
+        },
+    )
+    task.form.schema = [
+        {"id": "todo-work", "title": "Work", "type": "todo"},
+    ]
+    task.db["submission"] = json.dumps(
+        {
+            "todo-work": {
+                "items": [
+                    {"text": "Done <safely>", "checked": True},
+                    {"text": "Still open", "checked": False},
+                ]
+            }
+        }
+    )
+    builder = site_export.SiteExportBuilder("export", "html/day/export/")
+
+    html = builder._submission_table(task, "tasks/task/index.html")
+
+    assert '<ul class="todo-list">' in html
+    assert "☑" in html
+    assert "☐" in html
+    assert "Done &lt;safely&gt;" in html
+    assert "Still open" in html
+
+
 # @features export
 # @dimensions task-history
 @pytest.mark.unit

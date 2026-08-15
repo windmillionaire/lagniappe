@@ -275,8 +275,10 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_restores_default_submission_and_assignment
-    # @features task-completion
-    # @dimensions uncomplete, history, repeating-default, assignment
+    # @tests tests_unit/test_003g_todo_lists.py::test_uncomplete_archives_then_clears_todo_items
+    # @pairs task-completion:uncomplete task-completion:history
+    # @pairs task-completion:repeating-default task-completion:assignment
+    # @pair form-todo:field-reset
     def uncomplete(self, history_key=None):
         """Archive the current completion as TaskHistory and reset the task."""
         if self.completed:
@@ -290,8 +292,16 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         self.due_date = None
         self.clear_submission_assets()
         submission = self.properties.submission
+        fields = submission.fields
+        defaults = {
+            field_id: value
+            for field_id, value in self.default_submission.items()
+            if field_id not in fields
+            or getattr(fields[field_id], "restore_on_uncomplete", True)
+        }
+        self._set_default_submission(defaults)
         submission._fields = None
-        submission.value = deepcopy(self.default_submission)
+        submission.value = deepcopy(defaults)
         self.files = []
 
     @property

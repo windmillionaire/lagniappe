@@ -15,6 +15,7 @@ from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.form_special import HTML
 from lagniappe.core.properties.form_table import Table
+from lagniappe.core.properties.form_todo import TodoList
 from lagniappe.core.tools import database, utility
 from lagniappe.core.tools.database.core import KINDS
 from lagniappe.core.tools.database.filter import Filter, Query
@@ -895,6 +896,8 @@ class SiteExportBuilder:
     def _field_empty(self, field):
         if isinstance(field, Table):
             return not field.rows
+        if isinstance(field, TodoList):
+            return not field.items
 
         value = getattr(field, "form_value", None)
         if value not in (None, "", [], {}):
@@ -909,6 +912,8 @@ class SiteExportBuilder:
     def _format_field_value(self, field, current_path):
         if isinstance(field, Table):
             return self._format_table_field(field, current_path)
+        if isinstance(field, TodoList):
+            return self._format_todo_field(field)
 
         value = self._display_value(field)
         return self._format_backend_value(value, field, current_path)
@@ -965,6 +970,20 @@ class SiteExportBuilder:
                 cells.append(f"<td>{value}</td>")
             body_rows.append(f"<tr>{''.join(cells)}</tr>")
         return f"<table class=\"nested\"><thead><tr>{header}</tr></thead><tbody>{''.join(body_rows)}</tbody></table>"
+
+    # @testable true
+    # @tests tests_unit/test_019_site_export.py::test_submission_table_renders_todo_items_semantically
+    # @pairs export:semantic-list export:checked-state export:escaping
+    # @pair form-todo:semantic-list
+    def _format_todo_field(self, field):
+        items = []
+        for item in field.items:
+            marker = "☑" if item["checked"] else "☐"
+            items.append(
+                f'<li><span aria-hidden="true">{marker}</span> '
+                f'{html_escape(item["text"])}</li>'
+            )
+        return f'<ul class="todo-list">{"".join(items)}</ul>'
 
     def _submission_link(self, value, current_path):
         url = value.get("url")
@@ -1383,6 +1402,8 @@ th, td {
 thead th { background: var(--shade); font-size: 0.88rem; }
 table.submission th { width: 13rem; }
 table.nested { font-size: 0.92rem; }
+.todo-list { margin: 0; padding-left: 1.25rem; }
+.todo-list li { margin: 0.2rem 0; }
 pre {
   max-width: 100%;
   overflow-x: auto;
