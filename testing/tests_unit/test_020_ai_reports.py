@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
+from google.genai import types as genai_types
 
 from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
@@ -2400,6 +2401,11 @@ def test_report_response_schema_uses_provider_compatible_any_of_nodes():
         for schema in schemas
         for error in provider_schema_errors(schema)
     ] == []
+    for schema in schemas:
+        genai_types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_schema=schema,
+        )
 
 
 # @features ai-report
@@ -5715,6 +5721,9 @@ def test_report_task_schedule_contract_validates_supported_patterns():
     assert create_task_data["properties"]["schedule"] == (
         report_schedules.task_schedule_response_schema()
     )
+    assert create_task_data["properties"]["schedule"]["properties"]["days"][
+        "items"
+    ] == {"type": "integer"}
     assert report_schedules.validate_task_schedule(
         {"kind": "recurring", "interval": 2, "unit": "week"}
     ) == {"kind": "recurring", "interval": 2, "unit": "week"}

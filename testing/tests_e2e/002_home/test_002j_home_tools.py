@@ -936,6 +936,49 @@ def test_report_detail_runs_ready_report(get_user):
     modal.element.get_by_role("button", name="Cancel").click()
 
 
+def test_email_report_detail_collapses_message_behind_subject_and_sender(get_user):
+    user = get_user(Users.OWNER)
+    owner = _owner(user)
+    subject = f"Fwd: invoice confirmation {_suffix()}"
+    body = "Confirmation number: INV-2048"
+    report = Entities.REPORT.create(
+        {
+            "parent": owner,
+            "user": owner,
+            "name": f"Email: {subject}",
+            "tool": "organize",
+            "origin": "email",
+            "inbound_manifest": {
+                "subject": subject,
+                "body": body,
+                "tool": "organize",
+                "requested_tool": "ai",
+                "resolved_tool": "organize",
+                "alias": "ai@inbound.example.com",
+            },
+            "status": "failed",
+            "pending": False,
+            "error": "Test report status.",
+        }
+    )
+    Entities.save(report, owner)
+
+    user.go(Report.for_entity(user, report))
+    submission = user.page.locator("[data-role='email-submission']")
+    summary = submission.locator("[data-role='email-submission-summary']")
+
+    expect(summary).to_contain_text(subject)
+    expect(summary).to_contain_text(f"From {user.email}")
+    expect(submission.get_by_text(body, exact=True)).not_to_be_visible()
+
+    summary.click()
+
+    expect(submission.get_by_text(body, exact=True)).to_be_visible()
+    expect(submission.locator("[data-role='email-route']")).to_have_text(
+        "AI / Organize"
+    )
+
+
 # @features ai-report
 # @dimensions detail recovery retry failed-prefix undo deterministic-undo failure reload
 def test_failed_report_detail_offers_retry_and_partial_undo(get_user):

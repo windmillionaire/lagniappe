@@ -720,6 +720,8 @@ def _preflight_submission(message, tool, user, config):
     return instructions, ordinary
 
 
+# @testable true
+# @tests tests_unit/test_028_ai_email.py::test_create_shared_address_email_report_preserves_routing_input
 def _compact_report_name(tool, message, attachments):
     if tool == "organize":
         if len(attachments) == 1:
@@ -728,7 +730,8 @@ def _compact_report_name(tool, message, attachments):
     source = message.subject or " ".join(message.text_body.split())
     source = source[:80]
     suffix = "..." if len(message.subject or message.text_body) > 80 else ""
-    return f"{tool.title()}: {source}{suffix}"[:100]
+    prefix = "Email" if tool == "ai" else tool.title()
+    return f"{prefix}: {source}{suffix}"[:100]
 
 
 def report_url(report, config=None):

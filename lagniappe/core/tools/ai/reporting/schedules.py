@@ -26,7 +26,10 @@ def task_schedule_response_schema():
             "unit": {"type": "string", "enum": sorted(SCHEDULE_UNITS)},
             "days": {
                 "type": "array",
-                "items": {"type": "integer", "enum": list(range(7))},
+                # google.genai's Schema model currently types enum members as
+                # strings, even for integer schemas. Keep the provider shape
+                # broad and enforce the 0-6 range in validate_task_schedule().
+                "items": {"type": "integer"},
             },
             "pattern_type": {
                 "type": "string",

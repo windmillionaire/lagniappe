@@ -672,6 +672,7 @@ def test_create_shared_address_email_report_preserves_routing_input(monkeypatch)
     )
 
     assert report.tool == "ask"
+    assert report.name == "Email: Paid invoice"
     assert report.inbound_manifest["requested_tool"] == "ai"
     assert report.inbound_manifest["tool"] == "ask"
     assert report.inbound_manifest["alias"] == "ai@inbound.example.com"
