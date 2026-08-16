@@ -58,6 +58,20 @@ def _assert_single_user_settings_field_set(settings_panel):
     expect(settings_panel.locator(FormElements.EMAIL)).to_have_count(1)
 
 
+def _user_settings_field_order(settings_panel):
+    return settings_panel.locator("[data-role='user-fields'] > *").evaluate_all(
+        """(elements) => elements.map((element) => {
+            if (element.dataset.role && element.dataset.role !== "label") {
+                return element.dataset.role;
+            }
+            const input = element.matches("[name]")
+                ? element
+                : element.querySelector("[name]");
+            return input?.name || element.id;
+        })"""
+    )
+
+
 def _assert_sign_out_button_in_user_header(settings_panel):
     user_header = settings_panel.locator("[data-role='user-card'] > header")
     user_actions = user_header.locator("[data-role='user-actions']")
@@ -327,6 +341,7 @@ def _session_page_key(user):
 
 # @pairs user-settings:personal-page user-settings:readonly-email
 # @pairs user-settings:sign-out user-settings:group-selector-hidden
+# @pair user-settings:field-order
 # @pairs notification-email:user-setting notification-email:default-daily
 # @template pages/info.html::user_settings
 def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
@@ -344,6 +359,10 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
 
     settings_panel = _open_user_settings(user, user_page)
     expect(info_tab.locator(user_page.INFO_FORM)).to_have_count(1)
+    expect(settings_panel).to_have_attribute("data-title", "User Info")
+    expect(
+        settings_panel.locator("[data-role='user-card'] > header").first
+    ).to_contain_text("Settings")
 
     email_input = settings_panel.locator("input[name='email']")
     expect(email_input).to_be_visible()
@@ -360,6 +379,14 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
             "input[name='notification_email_mode'][value='DAILY']"
         )
     ).to_be_checked()
+    expect(
+        settings_panel.locator("fieldset[data-role='notification-email']")
+    ).to_be_visible()
+    assert _user_settings_field_order(settings_panel) == [
+        "name",
+        "user-email",
+        "notification-email",
+    ]
 
     settings_panel.locator(
         "input[name='notification_email_mode'][value='IMMEDIATE']"
@@ -395,6 +422,7 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
 
 # @pairs user-settings:owner-own-page user-settings:readonly-email
 # @pairs user-settings:sign-out user-settings:group-selector-hidden
+# @pair user-settings:field-order
 # @pair notification-email:default-daily
 # @template pages/info.html::user_settings
 def test_owner_settings_hides_group_selector_on_own_page(get_user):
@@ -426,6 +454,13 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
             "input[name='notification_email_mode'][value='DAILY']"
         )
     ).to_be_checked()
+    assert _user_settings_field_order(settings_panel) == [
+        "name",
+        "user-email",
+        "ai-access",
+        "notification-email",
+        "owner-inbound",
+    ]
 
     _assert_sign_out_button_in_user_header(settings_panel)
     controls = _tabs_controls(owner)
@@ -434,7 +469,9 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
 
 
 # @pairs public-users:own-page public-users:file-photo-gates
+# @pair user-settings:field-order
 # @pair notification-email:public-user
+# @pair public-users:email-consent
 # @template pages/page.html::main
 # @template pages/info.html::user_settings
 def test_public_user_own_page_hides_photo_and_file_surfaces(limited_public_user):
@@ -466,6 +503,24 @@ def test_public_user_own_page_hides_photo_and_file_surfaces(limited_public_user)
     expect(
         settings_panel.locator("input[name='notification_email_mode']")
     ).to_have_count(0)
+    consent = settings_panel.locator("input[name='allow_site_email']")
+    expect(consent).to_be_visible()
+    expect(consent).not_to_be_checked()
+    expect(
+        settings_panel.locator("[data-role='public-email-consent']")
+    ).to_contain_text(f"Allow {CONFIG.APP_NAME} to email me")
+    assert _user_settings_field_order(settings_panel) == [
+        "name",
+        "user-email",
+        "public-email-consent",
+    ]
+
+    consent.check()
+    with user.page.expect_response("**/pages/*/update"):
+        SpinnerButtons.UPDATE.click(settings_panel)
+    assert SpinnerButtons.UPDATE_SUCCESS.successful(settings_panel)
+    expect(settings_panel.locator("input[name='allow_site_email']")).to_be_checked()
+    assert Entities.USER.load(scenario.entity.email).allow_site_email is True
 
 
 # @features sync
@@ -742,6 +797,7 @@ def test_public_user_restricted_schedules_are_forbidden(
 # @pair user-settings:group-selector
 # @pair user-settings:edit-groups
 # @pair user-settings:ai-access
+# @pair user-settings:field-order
 # @pair cache:invalidation-acknowledgement
 # @pair notification-email:user-only
 # @template pages/info.html::user_settings
@@ -789,6 +845,16 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     expect(
         settings_panel.locator("input[name='notification_email_mode']")
     ).to_have_count(0)
+    user_page_group = settings_panel.locator("fieldset[data-role='user-page']")
+    expect(user_page_group).to_be_visible()
+    expect(user_page_group.locator("legend")).to_have_text("User Page")
+    assert _user_settings_field_order(settings_panel) == [
+        "name",
+        "user-email",
+        "user-groups",
+        "ai-access",
+        "user-page",
+    ]
 
     expect(settings_panel.locator("button[data-action='logout']")).to_have_count(0)
 

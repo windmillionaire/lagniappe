@@ -188,6 +188,8 @@ def _page_data(form, page=None, category=None):
         page_data["notification_email_mode"] = form.get(
             "notification_email_mode"
         )
+    if "allow_site_email" in form:
+        page_data["allow_site_email"] = form.get("allow_site_email") == "true"
     for toggle in ("allow_messages_and_mentions", "allow_task_assignments"):
         if toggle in form:
             page_data[toggle] = form.get(toggle) == "true"

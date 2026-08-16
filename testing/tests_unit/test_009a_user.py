@@ -309,6 +309,7 @@ def test_public_user_permissions_inherit_public_group_defaults_without_mutating_
 # @pairs user-settings:email-edit user-settings:ai-access user-settings:owner-own-page
 # @pairs user-settings:owner-other-page user-settings:page-preservation
 # @pairs notification-email:preference notification-email:user-only
+# @pair public-users:email-consent
 # @pair user-settings:page-reassign
 # @pair permissions:permission-recalc
 @pytest.mark.unit
@@ -394,6 +395,17 @@ def test_page_update_user_authorization_rules():
     assert other_user.name == "Other Renamed"
     assert other_user.notification_email_mode == "DAILY"
 
+    with pytest.raises(PermissionError, match="public user"):
+        other_page.update_user(
+            {
+                "name": "Forged Public Email Consent",
+                "allow_site_email": True,
+            },
+            user=other_user,
+        )
+    assert other_user.name == "Other Renamed"
+    assert other_user.allow_site_email is False
+
     other_user.properties.permissions.create.reset_mock()
     reassigned_page = Page(testing=True)
     reassigned_page._key = "reassigned-page"
@@ -447,6 +459,40 @@ def test_page_update_user_authorization_rules():
     assert public_user.name == "Public Renamed"
     assert public_user.email == "public@example.test"
     assert public_user.ai_access == "NONE"
+    assert public_user.allow_site_email is False
+
+    public_page.update_user(
+        {
+            "name": "Public Consent Enabled",
+            "allow_site_email": True,
+        },
+        user=public_user,
+    )
+    assert public_user.name == "Public Consent Enabled"
+    assert public_user.allow_site_email is True
+    assert public_user.db["allow_site_email"] is True
+
+    public_page.update_user(
+        {
+            "name": "Public Renamed",
+            "allow_site_email": False,
+        },
+        user=public_user,
+    )
+    assert public_user.name == "Public Renamed"
+    assert public_user.allow_site_email is False
+    assert "allow_site_email" not in public_user.db
+
+    with pytest.raises(PermissionError, match="public user"):
+        public_page.update_user(
+            {
+                "name": "Forged Owner Consent",
+                "allow_site_email": True,
+            },
+            user=owner,
+        )
+    assert public_user.name == "Public Renamed"
+    assert public_user.allow_site_email is False
 
     with pytest.raises(PermissionError, match="managed user"):
         public_page.update_user(

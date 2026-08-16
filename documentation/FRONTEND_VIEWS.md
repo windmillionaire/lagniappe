@@ -384,10 +384,20 @@ recipient. That rendering capability is stored in the existing versioned
 restriction session blob; page and menu rendering do not reread the owner
 projection.
 
-A managed user's own User Settings card renders the `notification_email_mode`
-radio group (`NONE`, `IMMEDIATE`, or `DAILY`) and defaults a missing value to
-the daily option. The field is absent for public users and when viewing another
-user, including owner views; the server enforces the same user-only boundary.
+The personal-page settings subpanel is titled **User Info**, and its card is
+titled **Settings**. Fields follow the same role-dependent order as their visual
+workflow: name and email first; groups before AI access in an owner's view of
+another user; AI access before email notifications on the owner's own page; and
+page removal/reassignment last in a **User Page** fieldset. Email Notifications
+uses the same bordered fieldset treatment as the owner's managed-user controls.
+
+A managed user's own settings card renders the `notification_email_mode` radio
+group (`NONE`, `IMMEDIATE`, or `DAILY`) and defaults a missing value to the daily
+option. The field is absent for public users and when viewing another user,
+including owner views; the server enforces the same user-only boundary. A public
+user instead sees **Allow {APP_NAME} to email me**, backed by the separate
+fail-closed `allow_site_email` consent. It defaults unchecked and can only be
+changed by that public user from their own personal page.
 
 `views/messages.mjs` owns the managed-user-only `/messages` shell. It pages 25
 conversations and 50 visible history rows, defaults to the newest unread peer

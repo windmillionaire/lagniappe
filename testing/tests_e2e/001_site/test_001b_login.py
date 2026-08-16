@@ -2015,10 +2015,14 @@ def test_login_auth_error_messages_are_user_safe(get_user, browser_failures):
         user,
         status=400,
         path="/v1/accounts:signInWithPassword",
-        count=0,
-        max_count=1,
     ):
-        sign_in_form.locator(Buttons.SIGNIN).click()
+        with user.page.expect_response(
+            "**/v1/accounts:signInWithPassword?**"
+        ) as response_info:
+            sign_in_form.locator(Buttons.SIGNIN).click()
+        response = response_info.value
+        assert response.status == 400
+        assert response.json()["error"]["message"] == "INVALID_LOGIN_CREDENTIALS"
         expect(error).to_contain_text("Incorrect email or password.")
         expect(error).not_to_contain_text("INVALID_LOGIN_CREDENTIALS")
         expect(error).not_to_contain_text("auth/")

@@ -499,7 +499,7 @@ export class UserSettings extends PagePermissions {
 
 	get userAiAccessElement() {
 		if (!this.canEditAi) return null;
-		return new RadioElement(
+		const field = new RadioElement(
 			this,
 			{
 				name: "ai_access",
@@ -514,6 +514,8 @@ export class UserSettings extends PagePermissions {
 			},
 			this.target.dataset.aiAccess || "NONE",
 		).edit;
+		field.dataset.role = "ai-access";
+		return field;
 	}
 
 	/**
@@ -527,7 +529,7 @@ export class UserSettings extends PagePermissions {
 	 */
 	get notificationEmailElement() {
 		if (this.target.dataset.canEditNotificationEmail !== "true") return null;
-		return new RadioElement(
+		const field = new RadioElement(
 			this,
 			{
 				name: "notification_email_mode",
@@ -542,6 +544,10 @@ export class UserSettings extends PagePermissions {
 			},
 			this.target.dataset.notificationEmailMode || "DAILY",
 		).edit;
+		field.dataset.role = "notification-email";
+		field.className = "space-y-0 rounded-md border border-user-default p-3";
+		field.querySelector("legend")?.classList.add("px-1");
+		return field;
 	}
 
 	/**
@@ -582,25 +588,44 @@ export class UserSettings extends PagePermissions {
 		return this.target.querySelector("[data-role='remove-page']");
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_own_page_hides_photo_and_file_surfaces
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
+	 * @pair user-settings:field-order
+	 */
 	get html() {
 		const card = this.userCardElement;
 		const fields = card?.querySelector("[data-role='user-fields']");
+		const publicEmailConsent = this.target.querySelector(
+			"[data-role='public-email-consent']",
+		);
+		const userPage =
+			this.removePageElement?.closest("[data-role='user-page']") ??
+			this.pageSelectElement?.closest("[data-role='user-page']");
 		fields?.replaceChildren(
 			...[
 				this.nameElement,
 				this.userEmailElement,
-				this.notificationEmailElement,
-				this.userAiAccessElement,
 				this.userGroupsElement,
+				this.userAiAccessElement,
+				this.notificationEmailElement,
+				publicEmailConsent,
 				this.ownerInboundElement,
-				this.removePageElement,
-				this.pageSelectElement,
+				userPage,
 			].filter(Boolean),
 		);
 
 		return [this.visibleTo, this.restrictAccess, card].filter(Boolean);
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_own_page_hides_photo_and_file_surfaces
+	 * @pair public-users:email-consent
+	 */
 	get formData() {
 		const data = new FormData();
 		const card = this.userCardElement;
@@ -625,6 +650,12 @@ export class UserSettings extends PagePermissions {
 			notificationEmail
 		) {
 			data.set("notification_email_mode", notificationEmail.value);
+		}
+		if (this.target.dataset.canEditPublicEmail === "true") {
+			const allowSiteEmail = card?.querySelector("[name='allow_site_email']");
+			if (allowSiteEmail) {
+				data.set("allow_site_email", allowSiteEmail.checked ? "true" : "false");
+			}
 		}
 		if (this._groupSelect) {
 			Array.from(this._groupSelect.select.values).forEach((value) => {

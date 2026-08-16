@@ -226,3 +226,12 @@ class AllowMessagesAndMentions(OwnerInboundToggle):
 
 class AllowTaskAssignments(OwnerInboundToggle):
     _id = "allow_task_assignments"
+
+
+# @testable true
+# @tests tests_unit/test_009a_user.py::test_page_update_user_authorization_rules
+# @pair public-users:email-consent
+class AllowSiteEmail(OwnerInboundToggle):
+    """Fail-closed public-user consent for email sent by the site owner."""
+
+    _id = "allow_site_email"

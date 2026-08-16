@@ -94,6 +94,7 @@ class User(AssetMixin, UserMixin, Entity):
                 "is_owner": user_entity.IsOwner,
                 "allow_messages_and_mentions": user_entity.AllowMessagesAndMentions,
                 "allow_task_assignments": user_entity.AllowTaskAssignments,
+                "allow_site_email": user_entity.AllowSiteEmail,
                 "notification_email_mode": user_entity.NotificationEmailPreference,
             }
         )

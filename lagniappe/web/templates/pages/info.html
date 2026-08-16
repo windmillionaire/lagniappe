@@ -37,7 +37,7 @@
   <form data-widget="UserSettings"
         lp-update
         data-route="{{ url_for('pages.update', key=page.urlsafe_key) }}"
-        data-title="User Settings"
+        data-title="User Info"
         data-help="user_settings"
         data-close="info:{{ close_target }}"
         data-name="{{ page.user.name }}"
@@ -49,6 +49,7 @@
         data-ai-access="{{ page.user.ai_access }}"
         data-notification-email-mode="{{ page.user.notification_email_mode }}"
         data-can-edit-notification-email="{{ (is_own_page and not page.user.is_public)|yesno }}"
+        data-can-edit-public-email="{{ (is_own_page and page.user.is_public)|yesno }}"
         data-is-public="{{ page.user.is_public|yesno }}"
         data-can-edit-owner-inbound="{{ (is_owner_viewer and is_own_page and is_owner_page)|yesno }}"
         data-group-names="{{ page.user.properties.groups.column_value or '' }}"
@@ -64,7 +65,7 @@
       <header class="flex flex-row items-center justify-between gap-2 rounded-t-md border-b-2 border-user-default px-3 py-1.5 text-lg font-semibold text-user-default">
         <div class="{{ styles.iconLabel.wrapper }}">
           {{ render_icon("user", (styles.iconLabel.icon)) }}
-          <span>User Data</span>
+          <span>Settings</span>
         </div>
         {% if is_own_page %}{{ sign_out_button() }}{% endif %}
       </header>
@@ -85,6 +86,20 @@
           {% if is_own_page and not page.user.is_public %}
             <div data-role="notification-email"></div>
           {% endif %}
+          {% if is_own_page and page.user.is_public %}
+            <label data-role="public-email-consent"
+                   class="{{ styles.checkbox.label }}">
+              <div class="{{ styles.checkbox.container }}">
+                <input type="checkbox"
+                       name="allow_site_email"
+                       data-kind="user"
+                       {% if page.user.allow_site_email %}checked{% endif %}
+                       class="{{ styles.checkbox.default }}">
+                {{ render_icon("check", (styles.checkbox.icon)) }}
+              </div>
+              <span>Allow {{ CONFIG.APP_NAME }} to email me</span>
+            </label>
+          {% endif %}
           {% if is_owner_viewer and not is_owner_page %}
             <div data-role="user-groups">
               <h3 class="{{ styles.label.sectionHeading }}">User Group(s)</h3>
@@ -99,30 +114,35 @@
                        class="{{ styles.input }}">
               </div>
             </div>
-            <div data-role="remove-page">
-              <label class="flex flex-row items-start gap-1 sm:text-sm text-base-dark font-semibold">
-                Remove user from page
-                <div class="{{ styles.checkbox.container }} mr-1 order-first">
-                  <input type="checkbox"
-                         name="remove-user"
-                         data-kind="page"
-                         class="{{ styles.checkbox.default }}">
-                  {{ render_icon("check", (styles.checkbox.icon)) }}
-                </div>
-              </label>
-            </div>
-            <div class="{{ styles.select.container }}"
-                 data-role="page-select"
-                 data-include-users="false"
-                 lp-select
-                 data-preload='{{ [page.details]|tojson }}'>
-              <h3 class="{{ styles.label.sectionHeading }}">Reassign Page</h3>
-              <input data-index="page"
-                     data-creatable="true"
-                     data-placeholder="select a page..."
-                     name="reassign-page"
-                     class="{{ styles.input }}">
-            </div>
+            <fieldset data-role="user-page"
+                      data-kind="user"
+                      class="space-y-4 rounded-md border border-user-default p-3">
+              <legend class="{{ styles.label.default }} px-1">User Page</legend>
+              <div data-role="remove-page">
+                <label class="flex flex-row items-start gap-1 sm:text-sm text-base-dark font-semibold">
+                  Remove user from page
+                  <div class="{{ styles.checkbox.container }} mr-1 order-first">
+                    <input type="checkbox"
+                           name="remove-user"
+                           data-kind="page"
+                           class="{{ styles.checkbox.default }}">
+                    {{ render_icon("check", (styles.checkbox.icon)) }}
+                  </div>
+                </label>
+              </div>
+              <div class="{{ styles.select.container }}"
+                   data-role="page-select"
+                   data-include-users="false"
+                   lp-select
+                   data-preload='{{ [page.details]|tojson }}'>
+                <h3 class="{{ styles.label.sectionHeading }}">Reassign Page</h3>
+                <input data-index="page"
+                       data-creatable="true"
+                       data-placeholder="select a page..."
+                       name="reassign-page"
+                       class="{{ styles.input }}">
+              </div>
+            </fieldset>
           {% endif %}
           {% if is_owner_viewer and is_own_page and is_owner_page %}
             <fieldset data-role="owner-inbound"

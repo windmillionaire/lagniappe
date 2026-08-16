@@ -284,6 +284,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @pairs user-settings:owner-other-page user-settings:page-preservation
     # @pairs user-settings:page-reassign user-settings:page-remove
     # @pairs notification-email:preference notification-email:user-only
+    # @pair public-users:email-consent
     # @pair cache:invalidation-acknowledgement
     # @pair permissions:permission-recalc
     def update_user(self, data, user=None):
@@ -315,11 +316,21 @@ class Page(AssetMixin, SubmitterMixin, Entity):
                 data.get("notification_email_mode")
             )
 
+        allow_site_email = None
+        if "allow_site_email" in data:
+            if not is_own_page or not target_user.is_public:
+                raise PermissionError(
+                    "Only a public user can change their own site email preference."
+                )
+            allow_site_email = bool(data.get("allow_site_email"))
+
         target_user.name = data.get("name")
         if ai_access is not None:
             target_user.ai_access = ai_access
         if notification_email_mode is not None:
             target_user.notification_email_mode = notification_email_mode
+        if allow_site_email is not None:
+            target_user.allow_site_email = allow_site_email
         inbound_toggles = {
             key: data[key]
             for key in ("allow_messages_and_mentions", "allow_task_assignments")
