@@ -83,12 +83,9 @@
               </label>
             </div>
           </div>
-          {% if is_own_page and not page.user.is_public %}
-            <div data-role="notification-email"></div>
-          {% endif %}
+          {% if is_own_page and not page.user.is_public %}<div data-role="notification-email"></div>{% endif %}
           {% if is_own_page and page.user.is_public %}
-            <label data-role="public-email-consent"
-                   class="{{ styles.checkbox.label }}">
+            <label data-role="public-email-consent" class="{{ styles.checkbox.label }}">
               <div class="{{ styles.checkbox.container }}">
                 <input type="checkbox"
                        name="allow_site_email"
@@ -116,7 +113,7 @@
             </div>
             <fieldset data-role="user-page"
                       data-kind="user"
-                      class="space-y-4 rounded-md border border-user-default p-3">
+                      class="rounded-md border border-user-default p-3">
               <legend class="{{ styles.label.default }} px-1">User Page</legend>
               <div data-role="remove-page">
                 <label class="flex flex-row items-start gap-1 sm:text-sm text-base-dark font-semibold">
@@ -130,7 +127,7 @@
                   </div>
                 </label>
               </div>
-              <div class="{{ styles.select.container }}"
+              <div class="{{ styles.select.container }} mt-4"
                    data-role="page-select"
                    data-include-users="false"
                    lp-select
@@ -193,9 +190,7 @@
         data-deferred-route="{{ url_for('pages.info', key=page.urlsafe_key) }}"
         data-destination="info:PageInfo"
         {% if page.deferred_job %}
-          data-operation="{{ page.deferred_job.key }}"
-          data-operation-revision="{{ page.deferred_job.revision|default(0, true) }}"
-          data-deferred-lock="form"
+          data-operation="{{ page.deferred_job.key }}" data-operation-revision="{{ page.deferred_job.revision|default(0, true) }}" data-deferred-lock="form"
         {% endif %}
         {% if page.description %}data-description="{{ page.description }}"{% endif %}
         {% if page.form %}data-schema='{{ page.form.schema|tojson }}'{% endif %}
@@ -209,9 +204,7 @@
              data-endpoint-disable="{{ url_for('pages.set_attribute', key=page.urlsafe_key, attribute='photo') }}">
           <div class="inline-flex min-h-10 w-fit overflow-hidden rounded-md border border-base-light/50 bg-white text-base-dark shadow-sm">
             <span class="grid w-9 place-items-center border-r border-base-light/50 bg-base-bg text-kind-default"
-                  aria-hidden="true">
-              {{ render_icon("image") }}
-            </span>
+                  aria-hidden="true">{{ render_icon("image") }}</span>
             <button type="button"
                     data-role="photo-upload"
                     title="Upload page image"
@@ -242,9 +235,7 @@
           <template data-role="photo-mobile-toggle-template">
             <button lp-show="photo:active"
                     data-kind="page"
-                    class="{{ styles.entity.tabIcon }} sm:hidden">
-              {{ render_icon("image") }}
-            </button>
+                    class="{{ styles.entity.tabIcon }} sm:hidden">{{ render_icon("image") }}</button>
           </template>
         </div>
       {% endif %}

@@ -5,7 +5,6 @@ import {
 	uint8ArrayToBase64,
 	waitForAttribute,
 } from "../../shared";
-import { primitives } from "../primitives";
 import { collaborativeEditor } from "./editor";
 import { MentionSuggestions } from "./extensions";
 import { Toolbar } from "./toolbar";
@@ -27,7 +26,6 @@ export class CollaborativeDocument {
 		this.syncId = this.target.getAttribute("lp-sync");
 		this.initialized = false;
 
-		this._loader = null;
 		this._applyingRemote = false;
 		this._destroyed = false;
 		this._dirty = false;
@@ -43,6 +41,7 @@ export class CollaborativeDocument {
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_renders_before_initial_state
 	 * @pair sync:editor-readiness
+	 * @pair sync:loader-free
 	 * @pair sync:state-only
 	 */
 	init() {
@@ -94,7 +93,6 @@ export class CollaborativeDocument {
 		this.container.className = `${STYLES.editor.container} opacity-50 pointer-events-none`;
 		if (this.readonly)
 			this.container.classList.add("border-base-light/50", "border-t");
-		this._loader = this.container.appendChild(primitives.loading());
 		this.target.replaceChildren(this.container);
 	}
 
@@ -120,7 +118,6 @@ export class CollaborativeDocument {
 		this.editor.on("create", async () => {
 			await waitForAttribute(this.container, "loaded");
 			if (this._destroyed) return;
-			this._loader?.remove();
 
 			if (!this.headless) {
 				const hadOfflineChanges = Boolean(

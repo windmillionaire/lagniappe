@@ -35,7 +35,9 @@ def starred(entity):
     return False
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_owner_assignment_opt_in_enables_managed_user_combobox
+# @pair task-assignment:owner-opt-in
 def owner_allows_assignments():
     owner = cache.get_owner_projection()
     return bool(owner and owner.get("allow_task_assignments"))

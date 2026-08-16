@@ -348,7 +348,7 @@
               data-action="selectUser"
               data-role="user-select"
               data-placeholder="assign to..."
-              {% if not can_assign %}data-readonly="true"{% endif %}
+              {% if not can_assign and not can_assign_owner %}data-readonly="true"{% endif %}
               data-index="user"
               data-permission="assign"
               data-title="Assign To"

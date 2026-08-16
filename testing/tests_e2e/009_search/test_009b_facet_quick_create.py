@@ -193,6 +193,43 @@ def test_user_assign_search_permission_filter_returns_assignable_users(get_user)
     ).not_to_be_attached()
 
 
+# @pair task-assignment:owner-opt-in
+# @template pages/tasks.html::action_buttons
+def test_owner_assignment_opt_in_enables_managed_user_combobox(get_user):
+    owner = get_user(Users.OWNER)
+    managed = get_user(Users.create_user, creator=owner)
+    original_opt_in = owner.entity.allow_task_assignments
+
+    try:
+        owner.entity.allow_task_assignments = True
+        owner.entity.save()
+
+        home = managed.go(SitePages.HOME)
+        with managed.page.expect_navigation():
+            home.user_page_button.click()
+
+        user_page = Page(user=managed, definition=managed.definition)
+        create_form = user_page.create_task_form
+        user_select = UserSelect(create_form)
+        expect(user_select.button).to_contain_text("Assign To")
+        expect(user_select.button).to_be_enabled()
+        expect(user_select.button).not_to_have_attribute("data-readonly", "true")
+
+        with managed.page.expect_response(
+            lambda response: "/l/search-index/user" in response.url
+            and "permission=assign" in response.url
+        ):
+            panel = user_select.panel(fill=owner.definition.name)
+
+        expect(panel).to_be_visible()
+        expect(
+            panel.get_by_role("option", name=owner.definition.name, exact=True)
+        ).to_be_visible()
+    finally:
+        owner.entity.allow_task_assignments = original_opt_in
+        owner.entity.save()
+
+
 # @features quick-create
 # @dimensions create-route created-option create-entity default-category
 def test_page_quick_create_uses_visible_uncategorized_pages_category(get_user):

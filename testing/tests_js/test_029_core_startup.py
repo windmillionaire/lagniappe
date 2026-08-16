@@ -792,6 +792,7 @@ def test_initial_replay_is_scheduled_after_view_readiness():
 
 
 # @pair sync:editor-readiness
+# @pair sync:loader-free
 # @pair sync:state-only
 def test_collaborative_document_renders_before_initial_state(run_node):
     run_node(
@@ -800,20 +801,34 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 
 let resolveSync;
+let loaderAppends = 0;
+const loadedAttributes = [];
 const syncReady = new Promise((resolve) => { resolveSync = resolve; });
-const context = { console };
+const context = {
+  console,
+  document: {
+    createElement() {
+      return {
+        dataset: {},
+        className: "",
+        classList: { add() {} },
+        appendChild() { loaderAppends += 1; },
+        setAttribute(name) { loadedAttributes.push(name); },
+      };
+    },
+  },
+};
 vm.createContext(context);
 
 let source = fs.readFileSync("src/script/elements/editor/collaborative.mjs", "utf8");
 source = source.replace(
   /^import [\s\S]*?(?=\/\*\*)/,
   `
-const STYLES = {};
+const STYLES = { editor: { container: "editor-container" } };
 const Y = { Doc: class {} };
 const base64ToUint8Array = () => null;
 const uint8ArrayToBase64 = () => "";
 const waitForAttribute = async () => {};
-const primitives = {};
 const collaborativeEditor = () => null;
 const Toolbar = class {};
 `,
@@ -828,18 +843,17 @@ vm.runInContext(source, context);
 (async () => {
   let stateCalls = 0;
   const shellCalls = [];
-  const loadedAttributes = [];
   const documentWidget = Object.create(context.CollaborativeDocument.prototype);
   Object.assign(documentWidget, {
     headless: false,
     remote: null,
     syncId: "page-1:document",
     view: { syncReady },
-    _initContainer() {
-      shellCalls.push("container");
-      this.container = {
-        setAttribute(name) { loadedAttributes.push(name); },
-      };
+    target: {
+      replaceChildren(container) {
+        shellCalls.push("container");
+        this.container = container;
+      },
     },
     _initEditor() { shellCalls.push("editor"); },
     _initToolbar() { shellCalls.push("toolbar"); },
@@ -851,6 +865,9 @@ vm.runInContext(source, context);
   }
   if (shellCalls.join(",") !== "container,editor,toolbar") {
     throw new Error(`Document shell did not render synchronously: ${shellCalls}`);
+  }
+  if (loaderAppends !== 0) {
+    throw new Error("Document shell rendered a visible loading placeholder");
   }
 
   let stateSettled = false;
