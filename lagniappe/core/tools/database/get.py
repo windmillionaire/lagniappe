@@ -33,7 +33,7 @@ def urlsafe_key(identifier):
 # @testable infrastructure
 def datastore_key(identifier):
     """Resolve an identifier (key, entity, or URL-safe string) to a Datastore Key."""
-    if not identifier:
+    if identifier is None:
         return None
     elif isinstance(identifier, Key):
         return identifier
@@ -480,15 +480,36 @@ _TASK_DUE_MIN = datetime(1, 1, 1, tzinfo=timezone.utc)
 
 # @testable true
 # @tests tests_unit/test_010_task_index.py::test_task_query_filter_uses_completed_status_not_active_status
+# @tests tests_unit/test_010_task_index.py::test_task_query_filter_includes_assignee_visibility_branch
 # @features task-index
-# @dimensions query-filter completed active
-def _tasks_filter(project=None, model=None, hashes=None, completed=False):
+# @dimensions query-filter completed active assignee-visibility
+def _tasks_filter(
+    project=None,
+    model=None,
+    hashes=None,
+    completed=False,
+    assigned_to=None,
+):
     f = Filter().eq("type", "task").eq("active", True).eq("completed", completed)
     if model:
         f.eq("model", datastore_key(model))
     elif project:
         f.eq("project", datastore_key(project))
-    if hashes is not None:
+
+    assigned_to_key = datastore_key(assigned_to)
+    if (
+        assigned_to_key is not None
+        and hashes is not None
+        and not Restriction.is_unrestricted(hashes)
+    ):
+        if Restriction.is_denied(hashes):
+            f.eq("assigned_to", assigned_to_key)
+        else:
+            f.any_of(
+                Filter().requires(hashes),
+                Filter().eq("assigned_to", assigned_to_key),
+            )
+    elif hashes is not None:
         f.requires(hashes)
     return f
 
@@ -497,7 +518,10 @@ def _tasks_filter(project=None, model=None, hashes=None, completed=False):
 # @reason task index query recipe is persistence-owned and covered by route/E2E workflows
 def tasks(start_cursor=None, limit=25, **kwargs):
     """Fetch paginated task instances with optional model, project, and completion filters."""
-    if Restriction.is_denied(kwargs.get("hashes")):
+    if (
+        Restriction.is_denied(kwargs.get("hashes"))
+        and kwargs.get("assigned_to") is None
+    ):
         return _empty_results()
 
     f = _tasks_filter(
@@ -505,6 +529,7 @@ def tasks(start_cursor=None, limit=25, **kwargs):
         kwargs.get("model"),
         kwargs.get("hashes"),
         kwargs.get("completed", False),
+        kwargs.get("assigned_to"),
     )
 
     q = Query(KINDS.instances).filter(f).order("-modified")
@@ -517,10 +542,14 @@ def tasks(start_cursor=None, limit=25, **kwargs):
 
 
 # @testable false
+# @covered-by lagniappe/core/entities/index.py::TaskIndex.dated_tasks
 # @reason task index query recipe is persistence-owned and covered by route/E2E workflows
 def tasks_with_due_dates(start_cursor=None, limit=25, **kwargs):
     """Paginate incomplete active tasks that have a due date, ordered soonest first."""
-    if Restriction.is_denied(kwargs.get("hashes")):
+    if (
+        Restriction.is_denied(kwargs.get("hashes"))
+        and kwargs.get("assigned_to") is None
+    ):
         return _empty_results()
 
     f = _tasks_filter(
@@ -528,6 +557,7 @@ def tasks_with_due_dates(start_cursor=None, limit=25, **kwargs):
         kwargs.get("model"),
         kwargs.get("hashes"),
         kwargs.get("completed", False),
+        kwargs.get("assigned_to"),
     )
     f.ge("due_date", _TASK_DUE_MIN)
 
@@ -541,10 +571,14 @@ def tasks_with_due_dates(start_cursor=None, limit=25, **kwargs):
 
 
 # @testable false
+# @covered-by lagniappe/core/entities/index.py::TaskIndex.undated_tasks
 # @reason task index query recipe is persistence-owned and covered by route/E2E workflows
 def tasks_without_due_dates(start_cursor=None, limit=25, **kwargs):
     """Paginate tasks with no due date, most recently modified first."""
-    if Restriction.is_denied(kwargs.get("hashes")):
+    if (
+        Restriction.is_denied(kwargs.get("hashes"))
+        and kwargs.get("assigned_to") is None
+    ):
         return _empty_results()
 
     f = _tasks_filter(
@@ -552,6 +586,7 @@ def tasks_without_due_dates(start_cursor=None, limit=25, **kwargs):
         kwargs.get("model"),
         kwargs.get("hashes"),
         kwargs.get("completed", False),
+        kwargs.get("assigned_to"),
     )
     f.is_null("due_date")
 
@@ -611,25 +646,22 @@ def user_task_count(page):
 
 
 # @testable false
+# @covered-by lagniappe/core/properties/home.py::TaskList.list
 # @reason home task query recipe is persistence-owned and covered by home/E2E workflows
-def due_tasks(hashes=Restriction.UNRESTRICTED):
+def due_tasks(hashes=Restriction.UNRESTRICTED, assigned_to=None):
     """Fetch incomplete active tasks due within the next seven days."""
-    if Restriction.is_denied(hashes):
+    if Restriction.is_denied(hashes) and assigned_to is None:
         return []
 
     today = datetime.now(timezone.utc)
     next_week = today + timedelta(days=7)
 
-    f = (
-        Filter()
-        .eq("type", "task")
-        .eq("active", True)
-        .eq("completed", False)
-        .ge("due_date", _TASK_DUE_MIN)
-        .le("due_date", next_week)
+    f = _tasks_filter(
+        hashes=hashes,
+        completed=False,
+        assigned_to=assigned_to,
     )
-    if hashes is not None:
-        f.requires(hashes)
+    f.ge("due_date", _TASK_DUE_MIN).le("due_date", next_week)
 
     return Query(KINDS.instances).filter(f).order("due_date").fetch_all()
 

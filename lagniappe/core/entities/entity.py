@@ -84,8 +84,9 @@ class EntityProperties:
 
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_entity_requires_subclass_entity_kind
+# @tests tests_unit/test_002_entity_general_properties.py::test_entity_preserves_key_from_empty_datastore_entity
 # @features entity
-# @dimensions initialization validation
+# @dimensions initialization validation empty-datastore-entity key-preservation
 class Entity:
     """Base class for all persistent entities.
 
@@ -114,10 +115,10 @@ class Entity:
     def __init__(self, *args, **kwargs):
         if not getattr(type(self), "entity_kind", None):
             raise NotImplementedError(f"{type(self).__name__} requires entity_kind")
-        identifier = args[0] if args and args[0] else None
+        identifier = args[0] if args and args[0] is not None else None
         self._db = identifier if isinstance(identifier, datastore.Entity) else {}
 
-        if identifier:
+        if identifier is not None:
             self._key = database.get.datastore_key(identifier)
         elif not kwargs.get("temporary") and not kwargs.get("testing"):
             self._key = database.create_key(self.entity_kind, kwargs.get("parent"))

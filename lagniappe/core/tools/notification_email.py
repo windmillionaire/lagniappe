@@ -29,6 +29,7 @@ DIGEST_HOUR = 8
 DIGEST_ITEM_LIMIT = 100
 DELIVERY_SCHEMA_VERSION = 1
 DOCUMENT_MENTION_EVENT = "document_mention"
+TASK_ASSIGNMENT_EVENT = "task_assignment"
 
 
 class NotificationEmailError(RuntimeError):
@@ -382,7 +383,9 @@ def _record_event(user, values, *, now=None):
 
 # @testable true
 # @tests tests_unit/test_029_notification_email.py::test_immediate_notification_is_delayed_escaped_and_delivered
+# @tests tests_unit/test_029_notification_email.py::test_task_assignment_email_uses_task_copy_without_headers
 # @pairs notification-email:notification notification-email:pending-filter
+# @pair notification-email:task-assignment
 def record_notification(notification, *, now=None):
     """Capture one final ordinary notification for email delivery."""
     if (
@@ -406,6 +409,29 @@ def record_notification(notification, *, now=None):
             if target_key is not None
             else None
         )
+    if (
+        getattr(notification, "db", {}).get("event_type") == TASK_ASSIGNMENT_EVENT
+        and isinstance(target, Entities.TASK)
+    ):
+        sender_name = str(notification.db.get("sender_name") or "A user").strip()
+        task_name = str(getattr(target, "name", None) or "task").strip()
+        values = _event_values(
+            source_type="notification",
+            source_key=notification,
+            body=f"{sender_name} assigned you the task {task_name}.",
+            title="Task assigned",
+            target_path=_target_path(target),
+            now=_utc(now),
+        )
+        values.update(
+            {
+                "event_type": TASK_ASSIGNMENT_EVENT,
+                "sender_name": sender_name,
+                "task_name": task_name,
+            }
+        )
+        return _record_event(getattr(notification, "parent", None), values, now=now)
+
     return record_notification_event(
         getattr(notification, "parent", None),
         notification,
@@ -694,8 +720,25 @@ def _document_mention_presentation(item, app_name):
     }
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/notification_email.py::deliver
+# @reason task-assignment presentation is exercised through public delivery
+def _task_assignment_presentation(item, app_name):
+    sender_name = str(item.get("sender_name") or "A user")
+    task_name = str(item.get("task_name") or "task")
+    text = f"{sender_name} assigned you the task {task_name}."
+    return {
+        "subject": f"Task assigned on {app_name}",
+        "title": "Task assigned",
+        "text": text,
+        "html": f"{escape(sender_name)} assigned you the task <i>{escape(task_name)}</i>.",
+        "standalone_headings": False,
+    }
+
+
 EVENT_PRESENTATIONS = {
     DOCUMENT_MENTION_EVENT: _document_mention_presentation,
+    TASK_ASSIGNMENT_EVENT: _task_assignment_presentation,
 }
 
 
@@ -782,7 +825,7 @@ def _send(user, row, items, *, digest=False, overflow=0):
         row.get("source_type") == "message"
         or row.get("record_type") == "message-candidate"
     ):
-        subject = f"New message from {row.get('sender_name') or 'a user'}"
+        subject = f"New messages on {app_name}"
     else:
         subject = f"New notification from {app_name}"
     text_body, html_body = _render_email(
@@ -939,6 +982,7 @@ def _deliver_digest(batch, now):
 # @testable true
 # @tests tests_unit/test_029_notification_email.py::test_immediate_notification_is_delayed_escaped_and_delivered
 # @tests tests_unit/test_029_notification_email.py::test_document_mention_email_uses_concise_copy_and_document_tab
+# @tests tests_unit/test_029_notification_email.py::test_task_assignment_email_uses_task_copy_without_headers
 # @tests tests_unit/test_029_notification_email.py::test_immediate_messages_wait_for_conversation_quiet
 # @tests tests_unit/test_029_notification_email.py::test_daily_digest_uses_next_local_eight_and_batches
 # @pairs notification-email:immediate notification-email:message notification-email:digest
@@ -946,6 +990,7 @@ def _deliver_digest(batch, now):
 # @pairs notification-email:read-suppression notification-email:idempotency
 # @pair notification-email:item-cap
 # @pair notification-email:document-mention
+# @pair notification-email:task-assignment
 def deliver(delivery_identifier, *, now=None):
     """Deliver, suppress, or reschedule one opaque queued delivery."""
     now = _utc(now)

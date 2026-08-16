@@ -368,6 +368,105 @@ def test_document_mention_email_uses_concise_copy_and_document_tab(monkeypatch):
     )
 
 
+# @source lagniappe/core/tools/notification_email.py::record_notification
+# @source lagniappe/core/tools/notification_email.py::deliver
+# @pair notification-email:task-assignment
+def test_task_assignment_email_uses_task_copy_without_headers(monkeypatch):
+    now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
+    store = MemoryDatastore()
+    monkeypatch.setattr(notification_email.DATA, "_datastore_client", store)
+    task_recorder(monkeypatch)
+    monkeypatch.setattr(notification_email.CONFIG, "APP_NAME", "Test Lagniappe")
+    monkeypatch.setattr(
+        notification_email.CONFIG,
+        "GOOGLE_LOGIN_URI",
+        "https://lagniappe.example.test/login",
+    )
+    monkeypatch.setattr(
+        notification_email,
+        "_target_path",
+        lambda _target: "/tasks/assigned-task",
+    )
+    recipient = user_row("recipient", now)
+    source_key = store.key(
+        KINDS.activity.value,
+        "task-assignment",
+        parent=recipient.key,
+    )
+    source = DatastoreEntity(key=source_key)
+    source.update({"type": "notification", "notification_type": "ordinary"})
+    store.put(source)
+    task_row = DatastoreEntity(key=store.key(KINDS.instances.value, "assigned-task"))
+    task_row.update(
+        {
+            "type": "task",
+            "kind": "task",
+            "name": "Review <Launch>",
+            "active": True,
+            "completed": False,
+        }
+    )
+    task = Entities.TASK(task_row)
+    notification = SimpleNamespace(
+        key=source_key,
+        parent=recipient,
+        body="Alice & Bob assigned you a task.",
+        db={
+            "event_type": notification_email.TASK_ASSIGNMENT_EVENT,
+            "sender_name": "Alice & Bob",
+        },
+        properties=SimpleNamespace(
+            target=SimpleNamespace(is_set=True, value=task),
+        ),
+        notification_type="ordinary",
+        pending=False,
+    )
+
+    delivery = notification_email.record_notification(notification, now=now)
+
+    assert delivery["event_type"] == notification_email.TASK_ASSIGNMENT_EVENT
+    assert delivery["sender_name"] == "Alice & Bob"
+    assert delivery["task_name"] == "Review <Launch>"
+    assert delivery["target_path"] == "/tasks/assigned-task"
+
+    sent = []
+    monkeypatch.setattr(
+        notification_email.Entities,
+        "fetch_one",
+        lambda *_args, **_kwargs: recipient,
+    )
+    monkeypatch.setattr(
+        notification_email,
+        "recently_active",
+        lambda *_args, **_kwargs: False,
+    )
+    monkeypatch.setattr(
+        notification_email.auth_email,
+        "send_email",
+        lambda *args, **kwargs: sent.append((args, kwargs)) or True,
+    )
+
+    result = notification_email.deliver(
+        delivery.key.to_legacy_urlsafe().decode(),
+        now=now + timedelta(minutes=5),
+    )
+
+    assert result == {"state": "sent"}
+    _, subject, text_body, html_body = sent[0][0]
+    assert subject == "Task assigned on Test Lagniappe"
+    assert text_body == (
+        "Alice & Bob assigned you the task Review <Launch>.\n"
+        "https://lagniappe.example.test/tasks/assigned-task"
+    )
+    assert "<h1" not in html_body
+    assert "<h2" not in html_body
+    assert (
+        "Alice &amp; Bob assigned you the task <i>Review &lt;Launch&gt;</i>."
+        in html_body
+    )
+    assert 'href="https://lagniappe.example.test/tasks/assigned-task"' in html_body
+
+
 # @source lagniappe/core/tools/notification_email.py::record_message
 # @source lagniappe/core/tools/notification_email.py::deliver
 # @pairs notification-email:message notification-email:quiet-window notification-email:latest-only
@@ -376,6 +475,7 @@ def test_immediate_messages_wait_for_conversation_quiet(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
     store = MemoryDatastore()
     monkeypatch.setattr(notification_email.DATA, "_datastore_client", store)
+    monkeypatch.setattr(notification_email.CONFIG, "APP_NAME", "Test Lagniappe")
     tasks = task_recorder(monkeypatch)
     recipient = user_row("recipient", now)
     sender = user_row("sender", now)
@@ -445,6 +545,7 @@ def test_immediate_messages_wait_for_conversation_quiet(monkeypatch):
     )
 
     assert result == {"state": "sent"}
+    assert sent[0][0][1] == "New messages on Test Lagniappe"
     assert "latest" in sent[0][0][2]
     assert "first" not in sent[0][0][2]
 

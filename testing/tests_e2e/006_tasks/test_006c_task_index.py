@@ -74,6 +74,32 @@ def test_task_index_allows_own_page_only_users(get_user):
     ).to_be_visible()
 
 
+# @pairs task-index:assignee-visibility home:assignee-visibility
+# @pair tasks:inaccessible-backing-page
+# @template table.html::rows
+# @template home/tasks.html::task
+def test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index(get_user):
+    """Live queries include an assignee's dated and undated restricted tasks.
+
+    Waiting for the task-index table to finish loading executes both pagination
+    streams. Together with the home list, this crosses every assigned-task
+    composite-index query shape against the managed Datastore.
+    """
+    owner = get_user(Users.OWNER)
+    due_task = Tasks.test_assigned_due_permission_task.get(owner)
+    undated_task = Tasks.test_assigned_permission_task.get(owner)
+
+    assignee = get_user(Users.create_user)
+    home = assignee.go(SitePages.HOME)
+    expect(home.task_list.get_item(due_task)).to_be_visible()
+    expect(home.task_list.get_item(undated_task)).not_to_be_attached()
+
+    task_index = assignee.go(SitePages.TASK_INDEX)
+    expect(assignee.locate(task_index.TABLE_BODY)).to_have_attribute("loaded", "")
+    expect(_row_for(assignee, due_task)).to_be_visible()
+    expect(_row_for(assignee, undated_task)).to_be_visible()
+
+
 # @features task-index
 # @dimensions columns
 def test_tasks_table_columns(get_user):

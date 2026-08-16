@@ -524,7 +524,15 @@ def test_notification_menu_deletes_and_clears(get_user):
     clear_all = panel.locator("[data-action='clear-notifications']")
     expect(clear_all).to_be_visible()
     expect(clear_all).to_have_css("border-radius", "0px")
+    expect(clear_all).to_have_css("margin-top", "-4px")
+    expect(clear_all).to_have_css("margin-bottom", "0px")
+    expect(clear_all).to_have_css("border-top-width", "1px")
+    expect(clear_all).to_have_css("border-bottom-width", "1px")
+    expect(clear_all).to_have_class(re.compile(r"(?:^|\s)bg-base-bg(?:\s|$)"))
     expect(panel.locator("[role='option']").first).to_have_attribute(
+        "data-action", "message-user"
+    )
+    expect(panel.locator("[role='option']").nth(1)).to_have_attribute(
         "data-action", "clear-notifications"
     )
 

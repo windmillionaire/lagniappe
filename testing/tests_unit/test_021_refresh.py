@@ -29,6 +29,7 @@ def _user_restrictions():
 def _viewer():
     return SimpleNamespace(
         is_authenticated=True,
+        page=SimpleNamespace(key="viewer-page"),
         properties=SimpleNamespace(restrictions=_user_restrictions()),
         has_permission=lambda *_args: True,
     )
@@ -97,11 +98,13 @@ def test_task_index_refresh_roots_uses_both_ordered_query_streams():
         limit=None,
         project=None,
         hashes=Restriction.UNRESTRICTED,
+        assigned_to=parent.user.page,
     )
     undated_query.assert_called_once_with(
         limit=None,
         project=None,
         hashes=Restriction.UNRESTRICTED,
+        assigned_to=parent.user.page,
     )
     fetch.assert_called_once_with("dated", "undated", request=Fetch.root())
 

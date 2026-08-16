@@ -66,6 +66,7 @@ def activity():
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_renders_target_and_preserves_pending_state
 # @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
+# @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_assigned_to
 # @pair notifications:dropdown-refresh
 # @pair notifications:target-link
 # @pair offline:dropdown-refresh
@@ -93,7 +94,15 @@ def notifications():
         responses.publish_notification_state(state)
     except Exception as error:
         exceptions.capture(error, context={"operation": "notification-state-repair"})
-    notifications = Entities.fetch(*notification_keys, request=Fetch.direct())
+    target_keys = [row.get("target") for row in page if row.get("target")]
+    loaded = Entities.fetch(
+        *notification_keys,
+        *target_keys,
+        request=Fetch.direct(),
+    )
+    notifications = [
+        entity for entity in loaded if isinstance(entity, Entities.NOTIFICATION)
+    ]
     g.NO_CACHE = True
     return responses.notifications(
         notifications,

@@ -573,6 +573,13 @@ assigned_permission_task = TaskDefinition(
     assigned_to=Users.create_user,
 )
 
+assigned_due_permission_task = TaskDefinition(
+    name="Assigned Due Permission Task",
+    origin=Pages.test_create_page_task,
+    due_date=DueDates.personal_task_due_today,
+    assigned_to=Users.create_user,
+)
+
 mobile_index_task = TaskDefinition(
     name="Mobile Index Task",
     origin=Pages.test_create_page_task,

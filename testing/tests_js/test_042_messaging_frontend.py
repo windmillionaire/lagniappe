@@ -325,10 +325,29 @@ menu.view = { name: "view" };
 menu.state = { count: 54 };
 menu.loaded = true;
 menu.stale = false;
-menu.notifications = Array.from({ length: 25 }, (_, index) => ({ key: `n-${index}` }));
+menu.notifications = [
+  ...Array.from({ length: 25 }, (_, index) => ({ key: `n-${index}` })),
+  { key: "__message_user__", action: "message-user" },
+];
 menu._updateCount();
 if (rendered.at(-1) !== 54) {
   throw new Error(`bounded menu replaced exact count: ${rendered.at(-1)}`);
+}
+const dropdownItems = menu._dropdownItems();
+if (
+  dropdownItems[0]?.action !== "message-user" ||
+  dropdownItems[1]?.key !== "__clear_all_notifications__" ||
+  dropdownItems[2]?.key !== "n-0"
+) {
+  throw new Error(`unexpected notification action order: ${JSON.stringify(dropdownItems)}`);
+}
+for (const style of ["-mt-1", "border-y", "bg-base-bg"]) {
+  if (!dropdownItems[1].html.includes(style)) {
+    throw new Error(`clear action is missing ${style}: ${dropdownItems[1].html}`);
+  }
+}
+if (dropdownItems[1].html.includes("mb-1")) {
+  throw new Error(`clear action retained a bottom gap: ${dropdownItems[1].html}`);
 }
 let prevented = false;
 await menu._selectNotification(

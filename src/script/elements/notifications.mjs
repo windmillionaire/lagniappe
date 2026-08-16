@@ -157,12 +157,20 @@ export class Notifications {
 
 	_dropdownItems() {
 		if (!this.notifications.length) return [];
+		const messageUser = this.notifications.find(
+			(item) => item.action === "message-user",
+		);
+		const remaining = messageUser
+			? this.notifications.filter((item) => item !== messageUser)
+			: this.notifications;
 		const hasOrdinary = this.notifications.some(
 			(item) => item.key && !item.key.startsWith("__"),
 		);
-		return hasOrdinary
-			? [this._clearAllOption(), ...this.notifications]
-			: this.notifications;
+		if (!hasOrdinary)
+			return messageUser ? [messageUser, ...remaining] : remaining;
+		return messageUser
+			? [messageUser, this._clearAllOption(), ...remaining]
+			: [this._clearAllOption(), ...remaining];
 	}
 
 	_clearAllOption() {
@@ -172,7 +180,7 @@ export class Notifications {
 				<button role="option"
 					type="button"
 					data-action="clear-notifications"
-					class="${STYLES.dropdown.option.action} border-b border-base-light !rounded-none mb-1 pb-2 text-delete-default">
+					class="${STYLES.dropdown.option.action} -mt-1 border-y border-base-light !rounded-none bg-base-bg text-delete-default">
 					${createIcon("trash.inactive", STYLES.dropdown.icon).outerHTML}
 					<span>Clear all notifications</span>
 				</button>

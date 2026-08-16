@@ -293,7 +293,11 @@ to the request boundary without running the export builder. See
 Index routes use the access decorator appropriate to the collection. Forms and
 users require their corresponding global permission. The task index only
 requires authentication because `TaskIndex` applies the current user's task
-restrictions to both its initial and lazy-row queries:
+restrictions to both its initial and lazy-row queries. For a restricted user,
+each query keeps the ordinary `requires` branch and ORs it with the user's
+personal Page in `assigned_to`; assigned work therefore remains visible even
+when its originating Page is otherwise unavailable. The home due-task list
+uses the same single-query visibility rule:
 
 ```python
 @tasks.route("/index", methods=["GET"])

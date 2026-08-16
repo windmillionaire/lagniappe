@@ -368,7 +368,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
             ) + 1
             if actor and getattr(actor, "page", None):
                 self.assigned_by = actor.page
-            self._add_assignment_notice(actor, assigned_to)
+            self._add_assignment_notice(actor, self.assigned_to)
 
         if "asset_files" in data:
             self.files = data.get("asset_files")
@@ -380,10 +380,12 @@ class Task(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_027_messaging.py::test_task_assignment_notice_uses_stable_transition_identity
+    # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_assigned_to
     # @pairs task-assignment:transition task-assignment:idempotency task-assignment:self-exclusion
-    def _add_assignment_notice(self, actor, assigned_to):
+    # @pair notifications:assignee-target
+    def _add_assignment_notice(self, actor, assigned_page):
         """Plan one stable notification for a non-self assignee transition."""
-        recipient = getattr(assigned_to, "user", None) if assigned_to else None
+        recipient = getattr(assigned_page, "user", None) if assigned_page else None
         if (
             not recipient
             or not actor
@@ -403,6 +405,8 @@ class Task(AssetMixin, SubmitterMixin, Entity):
                 "parent": recipient,
                 "target": self,
                 "body": f"{actor.name} assigned you a task.",
+                "event_type": "task_assignment",
+                "sender_name": actor.name,
             }
         )
         self.add_mutation_intents(

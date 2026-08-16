@@ -220,7 +220,12 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
     section = home_properties.TaskList()
     visible_tasks = section.list
 
-    assert due_requests == [{"hashes": ("task-a", "task-b")}]
+    assert due_requests == [
+        {
+            "hashes": ("task-a", "task-b"),
+            "assigned_to": "user-page",
+        }
+    ]
     assert load_requests == [
         (
             *stored_tasks,

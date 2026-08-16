@@ -139,6 +139,7 @@ class PageList(HomeProperty):
 # @testable true
 # @tests tests_unit/test_002i_home_properties.py::test_home_task_list_restrictions_visibility_and_count
 # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_home_task_list_shows_view_only_page_tasks_without_controls
+# @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
 # @features home
 # @dimensions tasks count permissions task-list view-only
 class TaskList(HomeProperty):
@@ -151,7 +152,10 @@ class TaskList(HomeProperty):
             return super().list
 
         hashes = current_user.properties.restrictions.task
-        tasks = database.get.due_tasks(hashes=hashes)
+        tasks = database.get.due_tasks(
+            hashes=hashes,
+            assigned_to=current_user.page,
+        )
         task_pages = [
             page_key
             for task in tasks

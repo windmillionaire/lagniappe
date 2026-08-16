@@ -853,6 +853,8 @@ def test_task_assignment_notice_uses_stable_transition_identity(monkeypatch):
     assert captured[0]["parent"] is recipient
     assert captured[0]["target"] is task
     assert captured[0]["body"] == "Alice assigned you a task."
+    assert captured[0]["event_type"] == "task_assignment"
+    assert captured[0]["sender_name"] == "Alice"
 
     captured.clear()
     actor.page.properties.user._value = actor

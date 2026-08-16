@@ -77,6 +77,7 @@ class TaskIndex(Index):
 
     # @testable true
     # @tests tests_unit/test_010_task_index.py::test_task_index_paginates_dated_then_undated_tasks_with_restrictions
+    # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
     # @features task-index
     # @dimensions restrictions
     def __init__(self, *args, **kwargs):
@@ -86,6 +87,7 @@ class TaskIndex(Index):
             self.entity if isinstance(self.entity, Entities.PROJECT) else None
         )
         self._restrictions = self.user.properties.restrictions.task
+        self._assigned_to = self.user.page if self._project is None else None
 
     def _get_properties(self):
         return {
@@ -98,6 +100,7 @@ class TaskIndex(Index):
 
     # @testable true
     # @tests tests_unit/test_010_task_index.py::test_task_index_paginates_dated_then_undated_tasks_with_restrictions
+    # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
     # @features task-index
     # @dimensions pagination undated restrictions
     def undated_tasks(self):
@@ -106,6 +109,7 @@ class TaskIndex(Index):
             limit=self.limit,
             project=self._project,
             hashes=self._restrictions,
+            assigned_to=self._assigned_to,
         )
         self.cursor = db.next_cursor
         self.append = (
@@ -122,6 +126,7 @@ class TaskIndex(Index):
 
     # @testable true
     # @tests tests_unit/test_010_task_index.py::test_task_index_paginates_dated_then_undated_tasks_with_restrictions
+    # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
     # @features task-index
     # @dimensions pagination dated undated restrictions
     def dated_tasks(self):
@@ -130,6 +135,7 @@ class TaskIndex(Index):
             limit=self.limit,
             project=self._project,
             hashes=self._restrictions,
+            assigned_to=self._assigned_to,
         )
         if not db.results:
             return self.undated_tasks()
@@ -176,11 +182,13 @@ class TaskIndex(Index):
             limit=None,
             project=self._project,
             hashes=self._restrictions,
+            assigned_to=self._assigned_to,
         )
         undated = database.get.tasks_without_due_dates(
             limit=None,
             project=self._project,
             hashes=self._restrictions,
+            assigned_to=self._assigned_to,
         )
         roots = Entities.fetch(
             *dated.results,

@@ -1,6 +1,6 @@
 SENTRY_DSN = "https://6ad2f168c5abc9f35de261d98b588633@o4511027028033536.ingest.us.sentry.io/4511218693242880"
 SENTRY_JS_DSN = "https://48fea2b31b65f353ee375b95ffcc6884@o4511027028033536.ingest.us.sentry.io/4511218663292928"
-BUILD_ID = "bca90836"
+BUILD_ID = "b5d236c9"
 RUNTIME = "python314"
 DEFAULT_EXPIRATION = "31536000s"
 DEFAULT_APP_ENGINE_LOCATION = "us-central"
@@ -159,6 +159,21 @@ INDEX_YAML = {
         {
             "kind": "instances",
             "properties": [
+                {"name": "assigned_to"},
+                {"name": "due_date"},
+            ],
+        },
+        {
+            "kind": "instances",
+            "properties": [
+                {"name": "assigned_to"},
+                {"name": "due_date"},
+                {"name": "modified", "direction": "desc"},
+            ],
+        },
+        {
+            "kind": "instances",
+            "properties": [
                 {"name": "completed"},
                 {"name": "due_date"},
             ],
@@ -241,6 +256,25 @@ INDEX_YAML = {
                 {"name": "active"},
                 {"name": "type"},
                 {"name": "requires"},
+                {"name": "due_date"},
+                {"name": "modified", "direction": "desc"},
+            ],
+        },
+        {
+            "kind": "instances",
+            "properties": [
+                {"name": "active"},
+                {"name": "type"},
+                {"name": "assigned_to"},
+                {"name": "due_date", "direction": "asc"},
+            ],
+        },
+        {
+            "kind": "instances",
+            "properties": [
+                {"name": "active"},
+                {"name": "type"},
+                {"name": "assigned_to"},
                 {"name": "due_date"},
                 {"name": "modified", "direction": "desc"},
             ],

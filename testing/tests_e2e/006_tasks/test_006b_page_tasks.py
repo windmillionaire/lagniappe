@@ -323,10 +323,11 @@ def test_create_page_task_with_model_task(get_user):
     Badges.MODEL_TASK.visible(task.element, model_beta)
 
 
-# @features tasks
-# @dimensions create assignee badge
+# @pairs tasks:create tasks:assignee
+# @pair notifications:assignee-target
+# @template notifications.html::item
 def test_create_page_task_with_assigned_to(get_user):
-    """Assigning a user adds an assignee badge on the task row."""
+    """Assigning a user adds a badge and a linked recipient notification."""
     user = get_user(Users.OWNER)
 
     task = Tasks.test_create_page_task_with_assigned_to.get(user, create=False)
@@ -341,6 +342,21 @@ def test_create_page_task_with_assigned_to(get_user):
     task.key = _submit_create_task_form(user, page, task, create_form)
 
     assert Badges.USER.visible(task.element, assignee)
+
+    assigned_user = get_user(Users.create_user)
+    assigned_user.go(task)
+    notifications = assigned_user.locate("[data-role='notifications']")
+    notifications.click()
+    panel = assigned_user.page.locator("[role='listbox'][data-visible='true']")
+    assignment = (
+        panel.locator("[role='option']")
+        .filter(has_text=f"{user.entity.name} assigned you a task.")
+        .filter(has_text=task.definition.name)
+    )
+    expect(assignment).to_be_visible()
+    expect(assignment.locator("[data-role='target']")).to_have_attribute(
+        "href", f"/tasks/{task.key}"
+    )
 
 
 # @features tasks

@@ -138,6 +138,9 @@ class Tasks(ResourceEnumMixin, Enum):
     )
     test_home_view_only_page_task = Task(definition=td.home_view_only_page_task)
     test_assigned_permission_task = Task(definition=td.assigned_permission_task)
+    test_assigned_due_permission_task = Task(
+        definition=td.assigned_due_permission_task
+    )
     test_mobile_index_task = Task(definition=td.mobile_index_task)
     test_history_task = Task(definition=td.history_task)
     test_history_form_task = Task(definition=td.history_form_task)

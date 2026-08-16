@@ -29,6 +29,41 @@ def test_task_query_filter_uses_completed_status_not_active_status():
     assert completed == {"type": "task", "active": True, "completed": True}
 
 
+# @features task-index
+# @dimensions query-filter assignee-visibility
+@pytest.mark.unit
+def test_task_query_filter_includes_assignee_visibility_branch():
+    assignee = TestEntities.get(
+        "PAGE",
+        {"name": "Assigned User Page", "hash": "assigned-task-page"},
+    )
+
+    restricted = database_get._tasks_filter(
+        hashes=["visible-task"],
+        assigned_to=assignee,
+    )
+
+    assert len(restricted._or_groups) == 2
+    assert restricted._or_groups[0]._requires == ["visible-task"]
+    assigned_condition = restricted._or_groups[1]._conditions[0]
+    assert assigned_condition.property_name == "assigned_to"
+    assert assigned_condition.value == assignee.key
+
+    denied = database_get._tasks_filter(hashes=[], assigned_to=assignee)
+    conditions = {
+        condition.property_name: condition.value for condition in denied._conditions
+    }
+    assert conditions["assigned_to"] == assignee.key
+    assert denied._or_groups == []
+
+    unrestricted = database_get._tasks_filter(
+        hashes=database_get.Restriction.UNRESTRICTED,
+        assigned_to=assignee,
+    )
+    assert unrestricted._or_groups == []
+    assert unrestricted._requires is None
+
+
 # @features home task-index
 # @dimensions due-tasks restrictions unrestricted
 @pytest.mark.unit
@@ -427,6 +462,7 @@ def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
         limit=2,
         project=project,
         hashes=["cat010"],
+        assigned_to=None,
     )
     undated_query.assert_not_called()
     load.assert_called_once_with("dated-key", request=Fetch.direct())
@@ -463,12 +499,14 @@ def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
         limit=2,
         project=project,
         hashes=["cat010"],
+        assigned_to=None,
     )
     undated_query.assert_called_once_with(
         start_cursor="cursor-1",
         limit=2,
         project=project,
         hashes=["cat010"],
+        assigned_to=None,
     )
     load.assert_called_once_with("undated-key", request=Fetch.direct())
     assert tasks == [undated_task]

@@ -6,6 +6,8 @@ from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 import pytest
+from google.cloud.datastore import Entity as DatastoreEntity
+from google.cloud.datastore import Key
 
 from lagniappe.core.definitions import MutationIntent, Ordering
 from lagniappe.core.entities import Entities
@@ -315,6 +317,23 @@ def test_save_entities_updates_and_persists_user_before_owned_page():
 def test_entity_requires_subclass_entity_kind():
     with pytest.raises(NotImplementedError, match="requires entity_kind"):
         _MissingKindEntity(testing=True)
+
+
+# @features entity
+# @dimensions initialization empty-datastore-entity key-preservation
+def test_entity_preserves_key_from_empty_datastore_entity():
+    raw = DatastoreEntity(
+        key=Key(
+            "instances",
+            "empty-record",
+            project="entity-constructor-test",
+        )
+    )
+
+    entity = _KeylessEntity(raw, testing=True)
+
+    assert entity.db is raw
+    assert entity.key == raw.key
 
 
 # @features property

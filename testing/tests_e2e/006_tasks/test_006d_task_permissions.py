@@ -195,10 +195,9 @@ def test_page_task_viewer_sees_empty_form_structure_without_edit_controls(get_us
     expect(readonly_field.locator("input")).to_have_count(0)
 
 
-# @features tasks
-# @dimensions assignee permission-gates
+# @pairs tasks:assignee tasks:permission-gates
 def test_assigned_user_can_work_their_assigned_task(get_user):
-    """A task assigned to a user is actionable for that assignee."""
+    """An assignee can work a task whose Page is otherwise unavailable."""
     owner = get_user(Users.OWNER)
     assignee = get_user(Users.create_user)
     Tasks.test_filter_by_assigned_user.get(owner)

@@ -13,6 +13,7 @@ class Notification(Entity):
     def exclude_from_index(self):
         exclude = {
             "body",
+            "sender_name",
         }
         return frozenset(exclude)
 
@@ -69,5 +70,9 @@ class Notification(Entity):
         new_notification.body = data.get("body")
         new_notification.pending = data.get("pending", False)
         new_notification.notification_type = "ordinary"
+        if data.get("event_type"):
+            new_notification.db["event_type"] = str(data["event_type"])
+        if data.get("sender_name"):
+            new_notification.db["sender_name"] = str(data["sender_name"])
 
         return new_notification

@@ -495,6 +495,9 @@ projection effect. Ordinary create/delete/clear operations use
 and mention transactions update their recipient aggregate in the same
 transaction as the unread state or visible Notification. They do not write the User or a notification/site
 fingerprint, and cache failure never rolls back the durable entity mutation.
+The notification menu promotes stored target keys to explicit fetch roots, so
+each target's direct relations are available for permission checks and display
+without a nested fetch. This includes a task's backing page.
 
 Managed users also have a user-owned `notification_email_mode` preference with
 stored values `NONE`, `IMMEDIATE`, and `DAILY`. Missing values resolve to
@@ -513,7 +516,9 @@ messages use one candidate per conversation, wait until five minutes after the
 latest inbound message, and suppress delivery after a read, clear, hide,
 reply, or recent-site-activity signal. The activity hint is a throttled Redis
 write from existing requests, not a browser heartbeat, and cache failure makes
-the hint unavailable rather than blocking delivery.
+the hint unavailable rather than blocking delivery. Immediate message email
+uses the conversation-safe `New messages on {App Name}` subject while the body
+identifies the sender for each rendered message.
 
 Daily events are grouped for the recipient's next local 8:00 AM and include
 events even when they were seen on site. A digest renders the first 100 items
@@ -522,7 +527,9 @@ uses simple multipart text/HTML through the configured SMTP sender and a
 stable `Message-ID`; the HTML contains the notification/message body and a
 direct application link with no external assets. Document-mention email uses a
 concise mention-specific subject and body, emphasizes the document name, and
-opens the entity's `document` tab directly. One-off OIDC Cloud Tasks call
+opens the entity's `document` tab directly. Task-assignment email likewise uses
+a concise `Task assigned on {App Name}` subject, names the assigner and task,
+and omits the generic notification headings. One-off OIDC Cloud Tasks call
 `/process/notification-email`; notification email does not add a recurring
 scheduler or keep the basic-scaled service awake. Sent/suppressed rows are
 compacted to small idempotency tombstones.
