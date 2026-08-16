@@ -341,7 +341,7 @@ if (
 ) {
   throw new Error(`unexpected notification action order: ${JSON.stringify(dropdownItems)}`);
 }
-for (const style of ["-mt-1", "border-y", "bg-base-bg"]) {
+for (const style of ["-mt-1", "border-b", "bg-base-bg"]) {
   if (!dropdownItems[1].html.includes(style)) {
     throw new Error(`clear action is missing ${style}: ${dropdownItems[1].html}`);
   }

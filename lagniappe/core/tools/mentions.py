@@ -139,6 +139,7 @@ def _deliver_occurrence(actor, recipient, document, occurrence_id, display_name)
 
 # @testable true
 # @tests tests_unit/test_027_messaging.py::test_mentions_validate_saved_occurrences_dedupe_and_sanitize
+# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
 # @pairs mentions:saved-occurrence mentions:permission mentions:idempotency
 # @pair mentions:document-view
 def deliver_mentions(actor, document, html, occurrences):

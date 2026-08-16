@@ -7,6 +7,7 @@ import pytest
 from playwright.sync_api import expect
 
 from config import SETTINGS
+from lagniappe.core.definitions import Action
 from testing.definitions import Groups, Projects, SitePages, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.elements.combobox import Dropdown
@@ -116,12 +117,19 @@ def _fetch(user, path, method="GET", data=None):
 # @pairs mentions:floating-menu mentions:empty-results mentions:profile-link
 # @pairs mentions:node-attributes mentions:mouse
 # @pairs mentions:link-popover mentions:unlink
+# @pairs mentions:recipient-search mentions:document-view
 # @source src/script/elements/editor/extensions/mention.mjs::LagniappeMention
 # @source src/script/elements/editor/extensions/mention.mjs::MentionSuggestions
+# @source lagniappe/core/tools/collaboration.py::collaboration_user_results
+# @source lagniappe/core/tools/mentions.py::deliver_mentions
 def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
     owner = get_user(Users.OWNER)
     recipient = get_user(Users.admin, creator=owner)
+    inaccessible_recipient = get_user(
+        _restricted_definition("Mention No Access"), creator=owner
+    )
     project = Projects.test_sync_document_contract.get(owner)
+    assert not project.entity.allowed(Action.VIEW, user=inaccessible_recipient.entity)
     owner.go(project)
     editor = project.editor
     editor.clear_text()
@@ -141,6 +149,41 @@ def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
     expect(popup).to_have_attribute("data-visible", "true")
     expect(popup).to_have_attribute("data-kind", "user")
     expect(popup.get_by_role("option", name="No Results")).to_be_visible()
+
+    editor.clear_text()
+    expect(popup).to_be_hidden()
+    inaccessible_page_key = inaccessible_recipient.entity.page.urlsafe_key
+    with owner.page.expect_response(
+        lambda response: (
+            "/l/search-index/user?" in response.url
+            and "permission=mention" in response.url
+            and response.request.method == "GET"
+        )
+    ) as inaccessible_response:
+        editor.type_text(f"@{inaccessible_recipient.name}")
+    assert inaccessible_response.value.status == 200
+
+    inaccessible_option = popup.locator(
+        f"[role='option'][data-id='{inaccessible_page_key}']"
+    )
+    expect(inaccessible_option).to_be_visible()
+    inaccessible_option.click()
+    expect(
+        editor.text_entry.locator(
+            "a[data-type='lagniappe-mention']"
+            f"[data-profile-page='{inaccessible_page_key}']"
+        )
+    ).to_be_visible()
+    editor.blur()
+
+    inaccessible_recipient.go(SitePages.HOME)
+    expect(
+        inaccessible_recipient.locate("[data-role='notifications']")
+    ).to_have_attribute(
+        "aria-label",
+        "Notifications: 0",
+        timeout=15000,
+    )
 
     editor.clear_text()
     expect(popup).to_be_hidden()

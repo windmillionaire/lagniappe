@@ -100,9 +100,11 @@ def mention_recipient_allowed(actor, recipient, document):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_collaboration_search_filters_self_owner_and_document_access
+# @tests tests_unit/test_027_messaging.py::test_collaboration_search_excludes_self_owner_and_stale_rows
+# @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
 # @pairs messaging:self-exclusion messaging:recipient-key messaging:owner-search
-# @pairs mentions:document-view owner-projection:normalization owner-projection:deduplication
+# @pair mentions:recipient-search
+# @pairs owner-projection:normalization owner-projection:deduplication
 def collaboration_user_results(
     results,
     query,
@@ -135,15 +137,6 @@ def collaboration_user_results(
         if isinstance(entity, Entities.PAGE) and entity.user
     }
     filtered = [result for result in filtered if result.get("id") in selectable]
-    if permission == "mention":
-        document = Entities.fetch_one(document_identifier, request=Fetch.root())
-        filtered = [
-            result
-            for result in filtered
-            if (page := selectable.get(result.get("id")))
-            and document
-            and document.allowed(Action.VIEW, user=page.user)
-        ]
     for result in filtered:
         page = selectable.get(result.get("id"))
         if page and page.user:

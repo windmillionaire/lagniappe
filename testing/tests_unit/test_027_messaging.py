@@ -534,8 +534,10 @@ def test_mentions_validate_saved_occurrences_dedupe_and_sanitize(monkeypatch):
 
     document.can_view = False
     deliveries.clear()
+    email_deliveries.clear()
     assert mentions.deliver_mentions(actor, document, html, [occurrence]) == 0
     assert deliveries == []
+    assert email_deliveries == []
 
 
 # @pairs mentions:delivery-ledger mentions:idempotency notifications:aggregate-count
@@ -613,9 +615,10 @@ def test_owner_projection_normalizes_and_round_trips(monkeypatch):
 
 
 # @pairs messaging:owner-search messaging:self-exclusion messaging:recipient-key
-# @pairs mentions:document-view owner-projection:normalization owner-projection:deduplication
+# @pair mentions:recipient-search
+# @pairs owner-projection:normalization owner-projection:deduplication
 # @source lagniappe/core/tools/collaboration.py::collaboration_user_results
-def test_collaboration_search_filters_self_owner_and_document_access(monkeypatch):
+def test_collaboration_search_excludes_self_owner_and_stale_rows(monkeypatch):
     class SearchPage:
         def __init__(self, identifier, user):
             self.urlsafe_key = identifier
@@ -661,9 +664,6 @@ def test_collaboration_search_filters_self_owner_and_document_access(monkeypatch
             "details": {"hash": "deleted-hash"},
         },
     ]
-    document = SimpleNamespace(
-        allowed=lambda _action, user: user is allowed_user
-    )
     monkeypatch.setattr(collaboration.cache, "get_owner_projection", lambda: projection)
     monkeypatch.setattr(collaboration.Entities, "PAGE", SearchPage)
     monkeypatch.setattr(
@@ -673,10 +673,6 @@ def test_collaboration_search_filters_self_owner_and_document_access(monkeypatch
             pages[identifier] for identifier in identifiers if identifier in pages
         ],
     )
-    monkeypatch.setattr(
-        collaboration.Entities, "fetch_one", lambda *_args, **_kwargs: document
-    )
-
     message_results = collaboration.collaboration_user_results(
         [dict(row) for row in rows], "SÉ ex", "message", actor
     )
@@ -699,6 +695,7 @@ def test_collaboration_search_filters_self_owner_and_document_access(monkeypatch
     assert message_results[0]["details"]["recipient_key"] == allowed_user.urlsafe_key
     assert [row["id"] for row in mention_results] == [
         "allowed-page",
+        "denied-page",
         "owner-page",
     ]
     assert [row["id"] for row in blank_results] == [

@@ -479,9 +479,19 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
     expect(report_option.locator("[data-role='report-summary']")).to_have_text(
         report_summary
     )
-    expect(report_option.locator("[data-action='delete-notification']")).to_have_css(
-        "float", "right"
+    delete_notification = report_option.locator(
+        "[data-action='delete-notification']"
     )
+    expect(delete_notification).to_have_css("position", "static")
+    title_box = report_target.bounding_box()
+    delete_box = delete_notification.bounding_box()
+    assert title_box and delete_box
+    assert abs(
+        title_box["y"]
+        + title_box["height"] / 2
+        - delete_box["y"]
+        - delete_box["height"] / 2
+    ) <= 2
 
 
 # @features notifications

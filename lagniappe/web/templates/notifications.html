@@ -9,19 +9,21 @@
   {% set report_summary = target_entity.summary if is_report and not notification.pending else none %}
   <div role="option"
        data-key="{{ notification.urlsafe_key }}"
-       class="{{ styles.dropdown.search.result }} text-base-default">
-    <button class="{{ styles.toggle.container }} float-right mb-1 ml-2 shrink-0"
-            data-kind="delete"
-            data-active="false"
-            data-action="delete-notification"
-            data-key="{{ notification.urlsafe_key }}"
-            type="button"
-            aria-label="Delete notification"
-            title="Delete notification">
-      {{ render_icon("trash.active", styles.toggle.icon.active) }}
-      {{ render_icon("trash.inactive", styles.toggle.icon.inactive) }}
-    </button>
-    <div class="whitespace-normal break-words text-sm leading-snug [overflow-wrap:anywhere]">
+       class="{{ styles.dropdown.search.result }} relative text-base-default">
+    <div class="absolute right-2 top-1 flex items-center">
+      <button class="{{ styles.toggle.container }} shrink-0"
+              data-kind="delete"
+              data-active="false"
+              data-action="delete-notification"
+              data-key="{{ notification.urlsafe_key }}"
+              type="button"
+              aria-label="Delete notification"
+              title="Delete notification">
+        {{ render_icon("trash.active", styles.toggle.icon.active) }}
+        {{ render_icon("trash.inactive", styles.toggle.icon.inactive) }}
+      </button>
+    </div>
+    <div class="whitespace-normal break-words pr-8 text-sm leading-snug [overflow-wrap:anywhere]">
       {% if notification.pending %}{{ render_icon("spinner", "mr-1") }}{% endif %}
       {% if target %}
         <a href="{{ url(target) }}"
