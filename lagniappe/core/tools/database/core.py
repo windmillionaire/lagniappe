@@ -64,6 +64,7 @@ class KINDS(Enum):
     message_conversations = f"{PREFIX}message_conversations"
     messages = f"{PREFIX}messages"
     mention_markers = f"{PREFIX}mention_markers"
+    email_deliveries = f"{PREFIX}email_deliveries"
 
     page = instances
     group = models
@@ -88,6 +89,7 @@ class KINDS(Enum):
     message_conversation = message_conversations
     message = messages
     mention_marker = mention_markers
+    email_delivery = email_deliveries
 
 
 # @testable true

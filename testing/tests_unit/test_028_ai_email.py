@@ -614,9 +614,9 @@ def test_report_feedback_links_to_report_and_remains_available_after_disable(
     assert idempotency_key.startswith("ai-email/success/")
 
 
-# @features ai-email feedback
-# @dimensions terminal-delivery email-origin browser-origin revision-suppression
-def test_report_terminal_feedback_is_only_for_initial_email_origin_reports():
+# @source lagniappe/core/tools/deferred_jobs.py::DeferredJobAdapter.external_delivery_required
+# @pairs ai-email:generic-delivery ai-email:terminal-delivery
+def test_report_terminal_feedback_uses_generic_notification_delivery():
     from lagniappe.core.tools.deferred_job_adapters import ReportAdapter
 
     adapter = ReportAdapter()
@@ -635,7 +635,7 @@ def test_report_terminal_feedback_is_only_for_initial_email_origin_reports():
             parameters=parameters,
         )
 
-    assert adapter.external_delivery_required(context(email_report, {}))
+    assert not adapter.external_delivery_required(context(email_report, {}))
     assert not adapter.external_delivery_required(
         context(email_report, {"mode": "revise"})
     )

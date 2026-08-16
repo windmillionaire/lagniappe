@@ -384,6 +384,11 @@ recipient. That rendering capability is stored in the existing versioned
 restriction session blob; page and menu rendering do not reread the owner
 projection.
 
+A managed user's own User Settings card renders the `notification_email_mode`
+radio group (`NONE`, `IMMEDIATE`, or `DAILY`) and defaults a missing value to
+the daily option. The field is absent for public users and when viewing another
+user, including owner views; the server enforces the same user-only boundary.
+
 `views/messages.mjs` owns the managed-user-only `/messages` shell. It pages 25
 conversations and 50 visible history rows, defaults to the newest unread peer
 and otherwise the most recent peer, and acknowledges the exact revision loaded

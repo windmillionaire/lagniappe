@@ -11,7 +11,7 @@ from datetime import timedelta
 import json
 from urllib.parse import urlsplit
 
-from flask import Flask, g, session
+from flask import Flask, g, request, session
 from flask_wtf.csrf import CSRFProtect
 
 from lagniappe import CONFIG
@@ -122,6 +122,20 @@ def clear_request_notification_state():
     """Start every request without a stale post-commit projection result."""
     cache.clear_recorded_notification_states()
     cache.clear_request_owner_projection()
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/notification_email.py::record_site_activity
+# @reason Flask response-hook wiring delegates to the tested coarse activity service
+@app.after_request
+def record_authenticated_site_activity(response):
+    """Keep a coarse Redis activity hint without adding browser requests."""
+    user_key = session.get(CONFIG.LOGIN_USER_KEY) if session.get("_user_id") else None
+    if user_key and request.endpoint != "static":
+        from lagniappe.core.tools import notification_email
+
+        notification_email.record_site_activity(user_key)
+    return response
 
 
 # @testable true

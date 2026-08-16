@@ -9,7 +9,7 @@ from google.cloud.datastore import Entity as DatastoreEntity
 
 from ..definitions import Fetch
 from ..entities import Entities
-from . import collaboration, database, notification_service
+from . import collaboration, database, notification_email, notification_service
 from .database.core import DATA
 
 
@@ -194,5 +194,20 @@ def deliver_mentions(actor, document, html, occurrences):
             notification_service.publish_notification_aggregate(
                 recipient, aggregate
             )
+        if created:
+            try:
+                identity = _marker_identity(document, candidate["occurrence_id"])
+                notification_email.record_notification_event(
+                    recipient,
+                    notification_service.ordinary_notification_key(
+                        recipient, f"document-mention-{identity}"
+                    ),
+                    body=f"{actor.name} mentioned you in {document.name}.",
+                    target=document,
+                )
+            except Exception as error:
+                from ..exceptions import capture
+
+                capture(error, context={"operation": "mention-email-capture"})
         delivered += int(created)
     return delivered

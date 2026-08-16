@@ -6,7 +6,7 @@ from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import dates, filters, task_queue
+from lagniappe.core.tools import dates, filters, notification_email, task_queue
 from lagniappe.core.tools.notifications import create_process_notification
 from lagniappe.core.tools.deferred_jobs import (
     DeferredJobInfrastructureError,
@@ -119,6 +119,35 @@ def deferred_job_reconcile():
     if payload != {"reconcile": True}:
         return jsonify({"success": False, "error": "Invalid reconcile payload."}), 400
     return jsonify({"success": True, **DeferredJobs.reconcile()}), 200
+
+
+# @testable false
+# @manual true
+# @reason requires Cloud Tasks OIDC authentication and SMTP provider delivery
+# @features notification-email
+# @dimensions process-route delayed-delivery
+@process.route("/notification-email", methods=["POST"])
+def notification_email_delivery():
+    """Deliver one opaque event-driven notification email task."""
+    payload = authenticate_task(request)
+    if payload is None:
+        return make_response("Unauthorized", 401)
+    if set(payload) != {"delivery_key"} or not payload.get("delivery_key"):
+        return jsonify({"success": False, "error": "Invalid email payload."}), 400
+    try:
+        result = notification_email.deliver(payload["delivery_key"])
+    except notification_email.NotificationEmailError as error:
+        return jsonify({"success": False, "error": str(error)}), 503
+    except Exception as error:
+        exceptions.capture(
+            error,
+            context={
+                "operation": "notification-email-delivery",
+                "delivery_key": payload["delivery_key"],
+            },
+        )
+        return jsonify({"success": False, "error": str(error)}), 503
+    return jsonify({"success": True, **result}), 200
 
 
 # @testable true

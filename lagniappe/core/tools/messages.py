@@ -8,9 +8,9 @@ from google.cloud.datastore import Entity as DatastoreEntity
 from ..definitions import Fetch
 from ..entities import Entities
 from ..exceptions import ValidationError
-from . import collaboration, database, notification_service
+from . import collaboration, database, notification_email, notification_service
 from .database.core import DATA, KINDS
-from .database.filter import Filter, Query, Results
+from .database.filter import Filter, Query
 
 
 CONVERSATION_PAGE_SIZE = 25
@@ -326,6 +326,13 @@ def send_message(
     )
     if aggregate is not None:
         notification_service.publish_notification_aggregate(recipient, aggregate)
+    if created:
+        try:
+            notification_email.record_message(message, conversation, recipient)
+        except Exception as error:
+            from ..exceptions import capture
+
+            capture(error, context={"operation": "message-email-capture"})
     return {
         "message": serialize_message(message, actor),
         "conversation": serialize_conversation(conversation, actor),

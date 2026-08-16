@@ -47,6 +47,8 @@
         data-can-edit-groups="{{ is_owner_viewer|yesno }}"
         data-can-edit-ai="{{ is_owner_viewer|yesno }}"
         data-ai-access="{{ page.user.ai_access }}"
+        data-notification-email-mode="{{ page.user.notification_email_mode }}"
+        data-can-edit-notification-email="{{ (is_own_page and not page.user.is_public)|yesno }}"
         data-is-public="{{ page.user.is_public|yesno }}"
         data-can-edit-owner-inbound="{{ (is_owner_viewer and is_own_page and is_owner_page)|yesno }}"
         data-group-names="{{ page.user.properties.groups.column_value or '' }}"
@@ -80,6 +82,9 @@
               </label>
             </div>
           </div>
+          {% if is_own_page and not page.user.is_public %}
+            <div data-role="notification-email"></div>
+          {% endif %}
           {% if is_owner_viewer and not is_owner_page %}
             <div data-role="user-groups">
               <h3 class="{{ styles.label.sectionHeading }}">User Group(s)</h3>

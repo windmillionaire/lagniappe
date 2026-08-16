@@ -1,6 +1,6 @@
 SENTRY_DSN = "https://6ad2f168c5abc9f35de261d98b588633@o4511027028033536.ingest.us.sentry.io/4511218693242880"
 SENTRY_JS_DSN = "https://48fea2b31b65f353ee375b95ffcc6884@o4511027028033536.ingest.us.sentry.io/4511218663292928"
-BUILD_ID = "be15830c"
+BUILD_ID = "ba53d151"
 RUNTIME = "python314"
 DEFAULT_EXPIRATION = "31536000s"
 DEFAULT_APP_ENGINE_LOCATION = "us-central"
@@ -374,6 +374,18 @@ INDEX_YAML = {
             "ancestor": True,
             "properties": [
                 {"name": "sequence", "direction": "desc"},
+            ],
+        },
+        # Notification email digest events
+        {
+            "kind": "email_deliveries",
+            "properties": [
+                {"name": "recipient"},
+                {"name": "record_type"},
+                {"name": "mode"},
+                {"name": "bucket"},
+                {"name": "state"},
+                {"name": "created"},
             ],
         },
         # History

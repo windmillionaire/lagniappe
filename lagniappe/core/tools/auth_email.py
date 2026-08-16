@@ -133,6 +133,35 @@ def send_auth_email(
     tls_context=None,
 ):
     """Send one authentication message through the configured SMTP service."""
+    return send_email(
+        recipient,
+        subject,
+        text_body,
+        html_body,
+        config=config,
+        smtp_factory=smtp_factory,
+        smtp_ssl_factory=smtp_ssl_factory,
+        tls_context=tls_context,
+    )
+
+
+# @testable true
+# @tests tests_unit/test_025_identity_platform.py::test_send_auth_email_supports_generic_smtp_transports
+# @features login
+# @dimensions authentication-email smtp tls
+def send_email(
+    recipient,
+    subject,
+    text_body,
+    html_body,
+    *,
+    config=None,
+    smtp_factory=smtplib.SMTP,
+    smtp_ssl_factory=smtplib.SMTP_SSL,
+    tls_context=None,
+    message_id=None,
+):
+    """Send one multipart application email through the configured SMTP service."""
     if config is None:
         from lagniappe import CONFIG
 
@@ -148,6 +177,8 @@ def send_auth_email(
         (smtp_config["senderName"], smtp_config["senderEmail"])
     )
     message["Subject"] = str(subject or "").strip()
+    if message_id:
+        message["Message-ID"] = str(message_id)
     message.set_content(str(text_body or ""))
     message.add_alternative(str(html_body or ""), subtype="html")
 

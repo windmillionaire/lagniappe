@@ -325,8 +325,9 @@ def _session_page_key(user):
     return serializer.loads(cookie["value"])[CONFIG.LOGIN_USER_PAGE_KEY]
 
 
-# @features user-settings
-# @dimensions personal-page readonly-email sign-out group-selector-hidden
+# @pairs user-settings:personal-page user-settings:readonly-email
+# @pairs user-settings:sign-out user-settings:group-selector-hidden
+# @pairs notification-email:user-setting notification-email:default-daily
 # @template pages/info.html::user_settings
 def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
     """A signed-in user can open settings from their personal page."""
@@ -350,6 +351,23 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
 
     expect(settings_panel.locator("[data-role='user-groups']")).to_have_count(0)
     expect(settings_panel.locator("input[name='ai_access']")).to_have_count(0)
+    notification_options = settings_panel.locator(
+        "input[name='notification_email_mode']"
+    )
+    expect(notification_options).to_have_count(3)
+    expect(
+        settings_panel.locator(
+            "input[name='notification_email_mode'][value='DAILY']"
+        )
+    ).to_be_checked()
+
+    settings_panel.locator(
+        "input[name='notification_email_mode'][value='IMMEDIATE']"
+    ).check()
+    with user.page.expect_response("**/pages/*/update"):
+        SpinnerButtons.UPDATE.click(settings_panel)
+    assert SpinnerButtons.UPDATE_SUCCESS.successful(settings_panel)
+    assert Entities.USER.load(user.email).notification_email_mode == "IMMEDIATE"
 
     update_path = f"/pages/{user.entity.page.urlsafe_key}/update"
     with browser_failures.expect_http_error(user, status=403, path=update_path):
@@ -375,8 +393,9 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
     )
 
 
-# @features user-settings
-# @dimensions owner-own-page readonly-email sign-out group-selector-hidden
+# @pairs user-settings:owner-own-page user-settings:readonly-email
+# @pairs user-settings:sign-out user-settings:group-selector-hidden
+# @pair notification-email:default-daily
 # @template pages/info.html::user_settings
 def test_owner_settings_hides_group_selector_on_own_page(get_user):
     owner = get_user(Users.OWNER)
@@ -399,6 +418,14 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
     expect(settings_panel.locator("[data-role='user-groups']")).to_have_count(0)
     expect(settings_panel).to_have_attribute("data-can-edit-ai", "true")
     expect(settings_panel.locator("input[name='ai_access']")).to_have_count(3)
+    expect(
+        settings_panel.locator("input[name='notification_email_mode']")
+    ).to_have_count(3)
+    expect(
+        settings_panel.locator(
+            "input[name='notification_email_mode'][value='DAILY']"
+        )
+    ).to_be_checked()
 
     _assert_sign_out_button_in_user_header(settings_panel)
     controls = _tabs_controls(owner)
@@ -406,9 +433,10 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
     expect(controls.locator(Buttons.LP_CLOSE)).to_be_visible()
 
 
-# @features public-users
-# @dimensions own-page file-photo-gates
+# @pairs public-users:own-page public-users:file-photo-gates
+# @pair notification-email:public-user
 # @template pages/page.html::main
+# @template pages/info.html::user_settings
 def test_public_user_own_page_hides_photo_and_file_surfaces(limited_public_user):
     scenario = limited_public_user
     user = scenario.user
@@ -432,6 +460,11 @@ def test_public_user_own_page_hides_photo_and_file_surfaces(limited_public_user)
     ).to_have_count(0)
     expect(
         info_form.locator("[data-role='attribute'][data-attribute='photo']")
+    ).to_have_count(0)
+
+    settings_panel = _open_user_settings(user, page)
+    expect(
+        settings_panel.locator("input[name='notification_email_mode']")
     ).to_have_count(0)
 
 
@@ -710,6 +743,7 @@ def test_public_user_restricted_schedules_are_forbidden(
 # @pair user-settings:edit-groups
 # @pair user-settings:ai-access
 # @pair cache:invalidation-acknowledgement
+# @pair notification-email:user-only
 # @template pages/info.html::user_settings
 def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     owner = get_user(Users.OWNER)
@@ -752,6 +786,9 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     expect(
         settings_panel.locator("input[name='ai_access'][value='NONE']")
     ).to_be_checked()
+    expect(
+        settings_panel.locator("input[name='notification_email_mode']")
+    ).to_have_count(0)
 
     expect(settings_panel.locator("button[data-action='logout']")).to_have_count(0)
 

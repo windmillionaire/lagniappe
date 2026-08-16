@@ -253,6 +253,16 @@ Basic-scaled App Engine services support requests longer than an hour; the
 shared Cloud Tasks HTTP target still bounds a single deferred delivery attempt
 to 30 minutes.
 
+Notification email reuses `AUTH_EMAIL_CONFIG` for provider-neutral multipart
+SMTP delivery. Event capture creates a durable `email_deliveries` record and a
+single delayed Cloud Task targeting `/process/notification-email`; immediate
+mail uses a five-minute delay and daily digest mail targets the next 8:00 AM in
+the user's timezone. These tasks are event-driven and do not require Cloud
+Scheduler. Enqueue failure is deliberately nonfatal to the originating
+notification or message, and there is no periodic notification-email recovery
+scan. Redis stores only a ten-minute best-effort authenticated-activity hint
+used to suppress immediate mail.
+
 Agent access is configured in app settings with `AGENT_ACCESS_ENABLED`,
 `AGENT_ACCESS_EMAIL`, `AGENT_ACCESS_NAME`, and `AGENT_ACCESS_CODE`. Setup adds
 these keys disabled by default and preserves non-empty user-edited values on
@@ -327,7 +337,9 @@ cancellation rather than recreating or failing its deleted domain record.
 
 The reconciler depends on the generated `jobs(status, modified asc)` and
 `jobs(dispatch_state, modified asc)` Datastore indexes and an OIDC-authenticated
-Cloud Scheduler job. Provisioning and IAM ownership are documented in
+Cloud Scheduler job. Daily notification email additionally depends on
+`email_deliveries(recipient, record_type, mode, bucket, state, created asc)`.
+Provisioning and IAM ownership are documented in
 [INFRA_SETUP.md](INFRA_SETUP.md).
 
 When `AI_OBSERVABILITY` is enabled, each live deferred generation updates its

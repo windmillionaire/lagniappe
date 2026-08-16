@@ -1,4 +1,4 @@
-from ..definitions import AI, Ordering
+from ..definitions import AI, NotificationEmailMode, Ordering
 from ..mixins import ColumnMixin, DateMixin
 from .base_db import DBProperty
 from .base_asset import AssetProperty
@@ -147,6 +147,42 @@ class AIAccess(DBProperty):
         DBProperty.value.fset(self, name)
         if previous != name:
             self.entity.invalidate_cache = True
+
+
+# @testable true
+# @tests tests_unit/test_029_notification_email.py::test_notification_email_preference_defaults_and_eligibility
+# @pairs notification-email:preference notification-email:eligibility
+class NotificationEmailPreference(DBProperty):
+    """Canonical per-user notification email mode."""
+
+    _id = "notification_email_mode"
+
+    @property
+    def value(self):
+        if getattr(self.entity, "is_public", False):
+            return NotificationEmailMode.NONE.name
+        stored = DBProperty.value.fget(self)
+        if stored is None:
+            return NotificationEmailMode.DAILY.name
+        try:
+            return NotificationEmailMode.name_for(stored)
+        except ValueError:
+            return NotificationEmailMode.NONE.name
+
+    @value.setter
+    def value(self, value):
+        name = NotificationEmailMode.name_for(value)
+        if (
+            getattr(self.entity, "is_public", False)
+            and name != NotificationEmailMode.NONE.name
+        ):
+            raise ValueError("Public users cannot receive notification email.")
+        previous = self.value
+        DBProperty.value.fset(self, name)
+        if name == NotificationEmailMode.NONE.name and previous != name:
+            self.entity.db["notification_email_opt_out_epoch"] = int(
+                self.entity.db.get("notification_email_opt_out_epoch") or 0
+            ) + 1
 
 
 # @testable true

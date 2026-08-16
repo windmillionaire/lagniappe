@@ -617,7 +617,9 @@ def deferred_tool_report(report, notification, job=None):
         {
             "deferred": True,
             "operation": getattr(job, "urlsafe_key", None),
-            "notification": notification_item(notification),
+            "notification": (
+                notification_item(notification) if notification is not None else None
+            ),
             "html": template(report),
         }
     )

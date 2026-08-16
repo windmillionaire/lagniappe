@@ -464,27 +464,6 @@ class ReportAdapter(DeferredJobAdapter):
             return f"{label} report {'revision ' if revision else ''}is ready."
         return f"{label} report failed. {str(error or '').strip()}".strip()
 
-    def external_delivery_required(self, context):
-        report = context.input("report")
-        return bool(
-            isinstance(report, Entities.REPORT)
-            and report.origin == "email"
-            and context.parameters.get("mode") != "revise"
-        )
-
-    def external_delivery(self, context, *, succeeded, error=None):
-        from lagniappe.core.tools.ai_email import send_report_feedback
-
-        message = None
-        if not succeeded:
-            message = "The report could not be completed. Open it for details."
-        return send_report_feedback(
-            context.input("report"),
-            "success" if succeeded else "failure",
-            message=message,
-        )
-
-
 # @testable true
 # @tests tests_unit/test_023_deferred_jobs.py::test_organize_retry_uses_priority_for_every_generation_stage
 # @tests tests_unit/test_023_deferred_jobs.py::test_organize_prepare_stops_before_report_save_after_cancellation
@@ -690,6 +669,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
     queued_message = "Saving report changes..."
     retry_message = "Saving is taking longer than expected; retrying safely..."
     active_message = "Still saving report changes..."
+    notification_policy = "none"
 
     def checkpoint_ready(self, _context):
         """The report's action ledger is the execution checkpoint."""
@@ -1261,7 +1241,7 @@ class SiteExportAdapter(DeferredJobAdapter):
 
 # @testable infrastructure
 class FileAdapter(DeferredJobAdapter):
-    completion_notification_only = True
+    notification_policy = "completion"
 
     # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_file_adapter_drift_tracks_the_original_asset

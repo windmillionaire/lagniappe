@@ -280,20 +280,34 @@ def create_ordinary_notification(user, *, identifier, body, target=None):
     """Idempotently create an ordinary notification and count it atomically."""
     ensure_notification_aggregate(user)
     key = ordinary_notification_key(user, identifier)
+    created = False
     with DATA.datastore.transaction() as transaction:
-        existing = DATA.datastore.get(key, transaction=transaction)
-        if existing is not None:
-            from ..definitions import Fetch
-            from ..entities import Entities
-
-            return Entities.fetch_one(existing, request=Fetch.direct()), False
-        row = prepare_ordinary_notification(key, user, body=body, target=target)
-        mutate_aggregate_in_transaction(transaction, user, ordinary_delta=1)
-        transaction.put(row)
+        row = DATA.datastore.get(key, transaction=transaction)
+        if row is None:
+            row = prepare_ordinary_notification(key, user, body=body, target=target)
+            mutate_aggregate_in_transaction(transaction, user, ordinary_delta=1)
+            transaction.put(row)
+            created = True
     from ..definitions import Fetch
     from ..entities import Entities
 
-    return Entities.fetch_one(row, request=Fetch.direct()), True
+    notification = Entities.fetch_one(row, request=Fetch.direct())
+    if created:
+        try:
+            from . import notification_email
+
+            notification_email.record_notification_event(
+                user,
+                row.key,
+                body=row.get("body") or body,
+                target=notification.target or target,
+                now=row.get("created"),
+            )
+        except Exception as error:
+            from ..exceptions import capture
+
+            capture(error, context={"operation": "notification-email-capture"})
+    return notification, created
 
 
 # @testable true

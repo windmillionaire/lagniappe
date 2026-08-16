@@ -1,2 +1,101 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="0c33e5b4-a152-46a0-956d-0bc2f7c9f23f",e._sentryDebugIdIdentifier="sentry-dbid-0c33e5b4-a152-46a0-956d-0bc2f7c9f23f");}catch(e){}}();import{r as c}from"./foundation.js?v=be15830c";import"./connectivity.js?v=be15830c";let n=null;function f(){return l()}async function m(){const e=Intl.DateTimeFormat().resolvedOptions().timeZone,t=sessionStorage.getItem("timezone_sent"),o=sessionStorage.getItem("userHash"),u=t!==e||!o,r=await g({enableHighAccuracy:!1,maximumAge:36e5,timeout:8e3}),i=r?{latitude:r.coords.latitude,longitude:r.coords.longitude}:null,s={};if(u&&(s.timezone=e),i&&(s.location=i),Object.keys(s).length===0)return{retry:!1,synced:!1};const a=await c.post("/l/update-session",s,{keepalive:!0});return a?.ok?(u&&sessionStorage.setItem("timezone_sent",e),a.userHash&&sessionStorage.setItem("userHash",a.userHash),{retry:!1,synced:!!i}):{retry:!0,synced:!1}}function g(e){return new Promise(t=>{if(!("geolocation"in navigator)){t(null);return}navigator.geolocation.getCurrentPosition(o=>t(o),()=>t(null),e)})}function l(){if(n)return n;const e=m().then(({retry:t,synced:o})=>(t&&n===e&&(n=null),o),t=>{throw n===e&&(n=null),t});return n=e,e}export{f as updateUserData,l as updateUserLocation};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request } from './foundation.js?v=ba53d151';
+import './connectivity.js?v=ba53d151';
+
+let userLocationUpdate = null;
+
+/**
+ * @testable true
+ * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_posts_location_on_page_load_and_deduplicates
+ * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_still_posts_timezone_when_location_is_unavailable
+ * @pairs location:page-load location:session-update timezone:session-update
+ */
+function updateUserData() {
+	return updateUserLocation();
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/user.mjs::updateUserLocation
+ * @reason one request keeps concurrent location and timezone writes in the same session response
+ */
+async function _syncUserData() {
+	const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	const sentThisSession = sessionStorage.getItem("timezone_sent");
+	const userHash = sessionStorage.getItem("userHash");
+	const timezoneChanged = sentThisSession !== currentTimezone || !userHash;
+	const position = await _getCurrentPosition({
+		enableHighAccuracy: false,
+		maximumAge: 3600000, // up to 1 hour old
+		timeout: 8000,
+	});
+	const location = position
+		? {
+				latitude: position.coords.latitude,
+				longitude: position.coords.longitude,
+			}
+		: null;
+	const payload = {};
+	if (timezoneChanged) payload.timezone = currentTimezone;
+	if (location) payload.location = location;
+	if (Object.keys(payload).length === 0) {
+		return { retry: false, synced: false };
+	}
+
+	const response = await request.post("/l/update-session", payload, {
+		keepalive: true,
+	});
+	if (!response?.ok) return { retry: true, synced: false };
+
+	if (timezoneChanged) {
+		sessionStorage.setItem("timezone_sent", currentTimezone);
+	}
+	if (response.userHash) sessionStorage.setItem("userHash", response.userHash);
+	return { retry: false, synced: Boolean(location) };
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/user.mjs::updateUserLocation
+ * @reason geolocation lookup is private location-update plumbing
+ */
+function _getCurrentPosition(options) {
+	return new Promise((resolve) => {
+		if (!("geolocation" in navigator)) {
+			resolve(null);
+			return;
+		}
+		navigator.geolocation.getCurrentPosition(
+			(pos) => resolve(pos),
+			() => resolve(null),
+			options,
+		);
+	});
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_posts_location_on_page_load_and_deduplicates
+ * @tests tests_js/test_020_shared_utilities.py::test_user_location_sync_retries_failed_session_update
+ * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_still_posts_timezone_when_location_is_unavailable
+ * @pairs location:geolocation location:page-load location:session-update
+ * @pairs location:deduplication location:retry location:unavailable
+ */
+function updateUserLocation() {
+	if (userLocationUpdate) return userLocationUpdate;
+
+	const update = _syncUserData().then(
+		({ retry, synced }) => {
+			if (retry && userLocationUpdate === update) userLocationUpdate = null;
+			return synced;
+		},
+		(error) => {
+			if (userLocationUpdate === update) userLocationUpdate = null;
+			throw error;
+		},
+	);
+	userLocationUpdate = update;
+	return update;
+}
+
+export { updateUserData, updateUserLocation };

@@ -496,6 +496,35 @@ and mention transactions update their recipient aggregate in the same
 transaction as the unread state or visible Notification. They do not write the User or a notification/site
 fingerprint, and cache failure never rolls back the durable entity mutation.
 
+Managed users also have a user-owned `notification_email_mode` preference with
+stored values `NONE`, `IMMEDIATE`, and `DAILY`. Missing values resolve to
+`DAILY`; public users always resolve to `NONE`, and users without a
+`last_login` are ineligible. Selecting `NONE` advances an opt-out generation so
+already queued deliveries are suppressed at send time. Owners cannot change
+another user's preference.
+
+Final ordinary notifications, document mentions, and direct messages capture
+compact durable `email_deliveries` rows after their primary transaction. Email
+is supplementary: record or Cloud Tasks enqueue failures are reported but do
+not roll back the notification/message. Immediate notification email is due
+after five minutes and is suppressed when the recipient has made any
+authenticated application request in the preceding ten minutes. Immediate
+messages use one candidate per conversation, wait until five minutes after the
+latest inbound message, and suppress delivery after a read, clear, hide,
+reply, or recent-site-activity signal. The activity hint is a throttled Redis
+write from existing requests, not a browser heartbeat, and cache failure makes
+the hint unavailable rather than blocking delivery.
+
+Daily events are grouped for the recipient's next local 8:00 AM and include
+events even when they were seen on site. A digest renders the first 100 items
+in full and links to Notifications and Messages when more remain. Delivery
+uses simple multipart text/HTML through the configured SMTP sender and a
+stable `Message-ID`; the HTML contains the notification/message body and a
+direct application link with no external assets. One-off OIDC Cloud Tasks call
+`/process/notification-email`; notification email does not add a recurring
+scheduler or keep the basic-scaled service awake. Sent/suppressed rows are
+compacted to small idempotency tombstones.
+
 `MessageConversation` uses a deterministic key derived from two sorted User
 keys. It stores participant/name snapshots, per-user unread/read/clear cursors,
 visibility, sequence, and revision. A single `Message` child stores sender,
@@ -672,6 +701,13 @@ The shared cohort covers report generation/revision, reviewed report execution,
 page/task autofill, page generation, site export, file OCR, and file summary.
 Ingress, scheduled task uncompletion, and cache maintenance retain their
 specialized orchestration.
+
+Reviewed report execution retains its own internal deferred-job record and
+updates the report's inline running/complete/failed state, but its notification
+policy is `none`: it neither creates nor completes an inbox notification. Ask,
+Organize, and Create generation/revision jobs retain their normal final
+notification, which is also the generic terminal email path for email-origin
+reports.
 
 AI reports may temporarily persist a JSON `upload_manifest` containing signed
 direct-upload records. It is excluded from indexes and cleared after the

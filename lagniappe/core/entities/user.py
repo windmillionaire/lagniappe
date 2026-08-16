@@ -35,6 +35,8 @@ class User(AssetMixin, UserMixin, Entity):
                 "photo",
                 "allow_messages_and_mentions",
                 "allow_task_assignments",
+                "notification_email_mode",
+                "notification_email_opt_out_epoch",
             }
         )
 
@@ -92,6 +94,7 @@ class User(AssetMixin, UserMixin, Entity):
                 "is_owner": user_entity.IsOwner,
                 "allow_messages_and_mentions": user_entity.AllowMessagesAndMentions,
                 "allow_task_assignments": user_entity.AllowTaskAssignments,
+                "notification_email_mode": user_entity.NotificationEmailPreference,
             }
         )
         return properties

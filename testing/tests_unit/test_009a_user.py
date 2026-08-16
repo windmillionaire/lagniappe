@@ -308,6 +308,7 @@ def test_public_user_permissions_inherit_public_group_defaults_without_mutating_
 
 # @pairs user-settings:email-edit user-settings:ai-access user-settings:owner-own-page
 # @pairs user-settings:owner-other-page user-settings:page-preservation
+# @pairs notification-email:preference notification-email:user-only
 # @pair user-settings:page-reassign
 # @pair permissions:permission-recalc
 @pytest.mark.unit
@@ -335,6 +336,7 @@ def test_page_update_user_authorization_rules():
             "email": "owner-hacked@example.test",
             "groups": [],
             "ai_access": "NONE",
+            "notification_email_mode": "IMMEDIATE",
         },
         user=owner,
     )
@@ -343,6 +345,7 @@ def test_page_update_user_authorization_rules():
     assert owner.email == "owner@example.test"
     assert owner.groups == [group]
     assert owner.ai_access == "NONE"
+    assert owner.notification_email_mode == "IMMEDIATE"
 
     other_page = Page(testing=True)
     other_page._key = "other-page"
@@ -370,6 +373,26 @@ def test_page_update_user_authorization_rules():
     assert other_user.groups == [group]
     assert other_user.ai_access == "ASK"
     assert other_user.page is other_page
+
+    other_page.update_user(
+        {
+            "name": other_user.name,
+            "notification_email_mode": "DAILY",
+        },
+        user=other_user,
+    )
+    assert other_user.notification_email_mode == "DAILY"
+
+    with pytest.raises(PermissionError, match="their own notification email"):
+        other_page.update_user(
+            {
+                "name": "Forged Other Name",
+                "notification_email_mode": "NONE",
+            },
+            user=owner,
+        )
+    assert other_user.name == "Other Renamed"
+    assert other_user.notification_email_mode == "DAILY"
 
     other_user.properties.permissions.create.reset_mock()
     reassigned_page = Page(testing=True)
@@ -424,6 +447,17 @@ def test_page_update_user_authorization_rules():
     assert public_user.name == "Public Renamed"
     assert public_user.email == "public@example.test"
     assert public_user.ai_access == "NONE"
+
+    with pytest.raises(PermissionError, match="managed user"):
+        public_page.update_user(
+            {
+                "name": "Forged Public Preference",
+                "notification_email_mode": "IMMEDIATE",
+            },
+            user=public_user,
+        )
+    assert public_user.name == "Public Renamed"
+    assert public_user.notification_email_mode == "NONE"
 
     with pytest.raises(PermissionError, match="Only the owner"):
         public_page.update_user(

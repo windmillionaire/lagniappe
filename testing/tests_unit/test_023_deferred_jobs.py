@@ -2132,6 +2132,7 @@ def test_organize_prepare_stops_before_report_save_after_cancellation(monkeypatc
 # @pair ai-report:deterministic-run
 def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
     adapter = deferred_job_adapters.ReportExecutionAdapter()
+    assert adapter.notification_policy == "none"
 
     class FakeUser:
         entity_kind = "user"

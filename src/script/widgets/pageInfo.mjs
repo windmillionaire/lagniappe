@@ -520,6 +520,34 @@ export class UserSettings extends PagePermissions {
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_own_page_hides_photo_and_file_surfaces
+	 * @pairs notification-email:user-setting notification-email:default-daily
+	 * @pairs notification-email:user-only notification-email:public-user
+	 */
+	get notificationEmailElement() {
+		if (this.target.dataset.canEditNotificationEmail !== "true") return null;
+		return new RadioElement(
+			this,
+			{
+				name: "notification_email_mode",
+				label: "Email Notifications",
+				required: true,
+				layout: "column",
+				options: [
+					{ label: "No email", value: "NONE" },
+					{ label: "Email after five minutes", value: "IMMEDIATE" },
+					{ label: "Daily digest at 8:00 AM local time", value: "DAILY" },
+				],
+			},
+			this.target.dataset.notificationEmailMode || "DAILY",
+		).edit;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
 	 * @features user-settings
 	 * @dimensions personal-page owner-own-page sign-out
 	 */
@@ -561,6 +589,7 @@ export class UserSettings extends PagePermissions {
 			...[
 				this.nameElement,
 				this.userEmailElement,
+				this.notificationEmailElement,
 				this.userAiAccessElement,
 				this.userGroupsElement,
 				this.ownerInboundElement,
@@ -587,6 +616,15 @@ export class UserSettings extends PagePermissions {
 		const aiAccess = card?.querySelector("[name='ai_access']:checked");
 		if (this.canEditAi && aiAccess) {
 			data.set("ai_access", aiAccess.value);
+		}
+		const notificationEmail = card?.querySelector(
+			"[name='notification_email_mode']:checked",
+		);
+		if (
+			this.target.dataset.canEditNotificationEmail === "true" &&
+			notificationEmail
+		) {
+			data.set("notification_email_mode", notificationEmail.value);
 		}
 		if (this._groupSelect) {
 			Array.from(this._groupSelect.select.values).forEach((value) => {

@@ -1,2 +1,74 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="c1f2ce8e-fc6a-4378-a947-628005fe4475",e._sentryDebugIdIdentifier="sentry-dbid-c1f2ce8e-fc6a-4378-a947-628005fe4475");}catch(e){}}();import{STYLES as n}from"./styles.js?v=be15830c";import{B as r}from"./baseElement.js?v=be15830c";import{p as l}from"./primitives.js?v=be15830c";import"./icons.js?v=be15830c";class m extends r{constructor(e,i,a){super(e,i,a),this.messageElement=null,this.statusInput=null,this.static=!0}update(){const e=[],i=[];(Array.isArray(this.schema.status)?this.schema.status:[]).forEach(t=>{if(!t?.id||!t.text)return;const s=this.renderer.elements.get(`${t.id}-${this.renderer.id}`);s&&s.active(t.value)&&(e.push(t.text),i.push(s.schema.id))}),this.messageElement.replaceChildren(),e.length>0?(e.forEach((t,s)=>{s>0&&this.messageElement.appendChild(document.createElement("br")),this.messageElement.appendChild(document.createTextNode(t))}),this.elt.dataset.visible="true",this.statusInput.value=JSON.stringify(i)):(this.elt.dataset.visible="false",this.statusInput.value=null)}create(){if(this._elt)return this._elt;const e=document.createElement("div");return e.dataset.kind="status",e.className=n.message,e.dataset.visible="false",this.messageElement=e.appendChild(document.createElement("span")),this.statusInput=e.appendChild(l.input({name:this.schema.id,type:"hidden"})),e}}export{m as StatusElement};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { STYLES } from './styles.js?v=ba53d151';
+import { B as BaseElement } from './baseElement.js?v=ba53d151';
+import { p as primitives } from './primitives.js?v=ba53d151';
+import './icons.js?v=ba53d151';
+
+/**
+ * @testable infrastructure
+ */
+class StatusElement extends BaseElement {
+	constructor(renderer, schema, submission) {
+		super(renderer, schema, submission);
+		this.messageElement = null;
+		this.statusInput = null;
+		this.static = true;
+	}
+
+	update() {
+		const messages = [];
+		const activeElementIds = [];
+		const statuses = Array.isArray(this.schema.status)
+			? this.schema.status
+			: [];
+
+		statuses.forEach((status) => {
+			if (!status?.id || !status.text) return;
+
+			const element = this.renderer.elements.get(
+				`${status.id}-${this.renderer.id}`,
+			);
+			if (!element) return;
+
+			if (element.active(status.value)) {
+				messages.push(status.text);
+				activeElementIds.push(element.schema.id);
+			}
+		});
+
+		this.messageElement.replaceChildren();
+		if (messages.length > 0) {
+			messages.forEach((message, index) => {
+				if (index > 0)
+					this.messageElement.appendChild(document.createElement("br"));
+				this.messageElement.appendChild(document.createTextNode(message));
+			});
+			this.elt.dataset.visible = "true";
+			this.statusInput.value = JSON.stringify(activeElementIds);
+		} else {
+			this.elt.dataset.visible = "false";
+			this.statusInput.value = null;
+		}
+	}
+
+	create() {
+		if (this._elt) return this._elt;
+
+		const elt = document.createElement("div");
+		elt.dataset.kind = "status";
+		elt.className = STYLES.message;
+		elt.dataset.visible = "false";
+
+		this.messageElement = elt.appendChild(document.createElement("span"));
+		this.statusInput = elt.appendChild(
+			primitives.input({
+				name: this.schema.id,
+				type: "hidden",
+			}),
+		);
+
+		return elt;
+	}
+}
+
+export { StatusElement };

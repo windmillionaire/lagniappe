@@ -1078,11 +1078,14 @@ Create, or Organize report pipeline. Attachment-only mail sent to `ai@` selects
 Organize when available; other messages are classified by the configured
 utility model from subject/body and safe attachment metadata. The resolved
 workflow is persisted before attachment download so retries do not reclassify
-it. The explicit workflow aliases remain available. Acceptance and
-terminal feedback use the
-authentication-email sender and separate Sending key. Create and Organize only
-produce proposals; applying them still requires normal login, review, and
-execution.
+it. The explicit workflow aliases remain available. Acceptance receipts and
+failures that occur before a report job is handed off retain the dedicated
+AI-email reply path. Once Ask, Create, or Organize owns the report, terminal
+success/failure is an ordinary notification and follows that user's generic
+notification-email preference; the AI-email flow does not send a second
+terminal email. All of these messages reuse the authentication-email sender
+and Sending key. Create and Organize only produce proposals; applying them
+still requires normal login, review, and execution.
 
 The implementation was
 checked against Resend's current [receiving](https://resend.com/docs/dashboard/receiving/introduction),

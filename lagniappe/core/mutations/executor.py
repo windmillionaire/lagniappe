@@ -131,6 +131,21 @@ def execute_post_commit(plan):
         if aggregates:
             projection_changes["aggregates"] = aggregates
         cache.update_notification_projection(**projection_changes)
+        from ..tools import notification_email
+
+        for notification in notification_upserts:
+            try:
+                notification_email.record_notification(notification)
+            except Exception as error:
+                capture(
+                    error,
+                    context={
+                        "operation": "notification-email-capture",
+                        "notification_key": getattr(
+                            notification, "urlsafe_key", None
+                        ),
+                    },
+                )
         if notification_upserts:
             complete(MutationEffectType.NOTIFICATION_UPSERT)
         if notification_deletes:

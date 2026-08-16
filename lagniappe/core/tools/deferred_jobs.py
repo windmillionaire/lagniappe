@@ -397,7 +397,7 @@ class DeferredJobAdapter:
     )
     success_message = "Work is ready."
     failure_prefix = "Work failed."
-    completion_notification_only = False
+    notification_policy = "pending"
 
     # @testable infrastructure
     def authorization(self, spec):
@@ -506,7 +506,9 @@ class DeferredJobAdapter:
     def notification_target(self, context):
         return None
 
-    # @testable infrastructure
+    # @testable true
+    # @tests tests_unit/test_028_ai_email.py::test_report_terminal_feedback_uses_generic_notification_delivery
+    # @pairs ai-email:generic-delivery ai-email:terminal-delivery
     def external_delivery_required(self, context):
         """Return whether this terminal job owns an external delivery step."""
         return False
@@ -703,7 +705,7 @@ class DeferredJobRegistry:
             return existing, existing.notification
 
         notification = None
-        if not adapter.completion_notification_only:
+        if adapter.notification_policy == "pending":
             notification = Entities.NOTIFICATION.create(
                 {
                     "parent": spec.actor,
@@ -2033,12 +2035,21 @@ class DeferredJobRegistry:
             )
 
         if not delivery.get("notification"):
-            if not inputs_available:
+            if adapter.notification_policy == "none":
+                if context.notification is not None:
+                    Entities.delete(context.notification)
+                    context.notification = None
+                    job.notification = None
+                    self._save_terminal_fields(job, notification=None)
+            elif not inputs_available:
                 if context.notification is not None:
                     context.notification.body = MISSING_INPUT_MESSAGE
                     context.notification.pending = False
                     Entities.save(context.notification)
-            elif context.notification is None and adapter.completion_notification_only:
+            elif (
+                context.notification is None
+                and adapter.notification_policy == "completion"
+            ):
                 context.notification = Entities.NOTIFICATION.create(
                     {
                         "parent": context.actor,

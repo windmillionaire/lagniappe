@@ -1,6 +1,6 @@
 from flask import url_for
 
-from ..definitions import Action, Fetch, MutationIntent
+from ..definitions import Action, Fetch, MutationIntent, NotificationEmailMode
 from ..entities import Entities
 from ..mixins import AssetMixin, SubmitterMixin
 from ..properties import (
@@ -283,6 +283,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @pairs user-settings:email-edit user-settings:ai-access user-settings:owner-own-page
     # @pairs user-settings:owner-other-page user-settings:page-preservation
     # @pairs user-settings:page-reassign user-settings:page-remove
+    # @pairs notification-email:preference notification-email:user-only
     # @pair cache:invalidation-acknowledgement
     # @pair permissions:permission-recalc
     def update_user(self, data, user=None):
@@ -303,9 +304,22 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
             ai_access = AI.name_for(data.get("ai_access"))
 
+        notification_email_mode = None
+        if "notification_email_mode" in data:
+            if not is_own_page or target_user.is_public:
+                raise PermissionError(
+                    "Only a managed user can change their own notification email "
+                    "preference."
+                )
+            notification_email_mode = NotificationEmailMode.name_for(
+                data.get("notification_email_mode")
+            )
+
         target_user.name = data.get("name")
         if ai_access is not None:
             target_user.ai_access = ai_access
+        if notification_email_mode is not None:
+            target_user.notification_email_mode = notification_email_mode
         inbound_toggles = {
             key: data[key]
             for key in ("allow_messages_and_mentions", "allow_task_assignments")
