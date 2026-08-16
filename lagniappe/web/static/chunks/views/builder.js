@@ -1,18 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="1b0157b9-7322-4837-8d1d-3fbdec1b579d",e._sentryDebugIdIdentifier="sentry-dbid-1b0157b9-7322-4837-8d1d-3fbdec1b579d");}catch(e){}}();import"../search.js?v=be15830c";import"../entityMenu.js?v=be15830c";import"../foundation.js?v=be15830c";import"../connectivity.js?v=be15830c";import"../modal.js?v=be15830c";import{F as h}from"../builder.js?v=be15830c";import"../styles.js?v=be15830c";import"../combobox.js?v=be15830c";import"../primitives.js?v=be15830c";import"../icons.js?v=be15830c";import"../results.js?v=be15830c";import"../formatting.js?v=be15830c";import"../dropdown.js?v=be15830c";import"../baseForm.js?v=be15830c";import"../loader.js?v=be15830c";import"../facets.js?v=be15830c";import"../submitter.js?v=be15830c";export{h as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../search.js?v=ba9311bf';
-import '../entityMenu.js?v=ba9311bf';
-import '../foundation.js?v=ba9311bf';
-import '../connectivity.js?v=ba9311bf';
-import '../modal.js?v=ba9311bf';
-export { F as default } from '../builder.js?v=ba9311bf';
-import '../styles.js?v=ba9311bf';
-import '../combobox.js?v=ba9311bf';
-import '../primitives.js?v=ba9311bf';
-import '../icons.js?v=ba9311bf';
-import '../results.js?v=ba9311bf';
-import '../formatting.js?v=ba9311bf';
-import '../dropdown.js?v=ba9311bf';
-import '../baseForm.js?v=ba9311bf';
-import '../loader.js?v=ba9311bf';
-import '../facets.js?v=ba9311bf';
-import '../submitter.js?v=ba9311bf';
