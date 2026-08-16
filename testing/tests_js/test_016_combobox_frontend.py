@@ -436,6 +436,74 @@ def run_combobox_check(run_node, assertion: str):
     run_node(script)
 
 
+# @pairs location:session-update location:request-ordering
+def test_location_combobox_waits_for_session_sync_before_search(run_node):
+    script = r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const calls = [];
+let releaseLocation;
+const locationReady = new Promise((resolve) => { releaseLocation = resolve; });
+class Combobox {
+  constructor(element) {
+    this.element = element;
+    this.name = "location";
+    this.options = [];
+  }
+  _createPanel() { this.panel = { innerHTML: "" }; }
+  updatePanel() {}
+  showPanel() { calls.push("panel"); }
+}
+const context = {
+  Combobox,
+  debounce: (callback) => callback,
+  ENDPOINTS: { location: "/l/search-location" },
+  request: {
+    async get() {
+      calls.push("request");
+      return { ok: false };
+    },
+  },
+  setIcon() {},
+  STYLES: { dropdown: { search: { result: "result" }, icon: "icon" } },
+  updateUserLocation() {
+    calls.push("location");
+    return locationReady;
+  },
+  URLSearchParams,
+};
+
+vm.createContext(context);
+let source = fs.readFileSync("src/script/elements/combobox/location.mjs", "utf8");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replace("export class LocationBox", "class LocationBox");
+source += "\nglobalThis.LocationBox = LocationBox;";
+vm.runInContext(source, context);
+
+(async () => {
+  const box = new context.LocationBox({});
+  box.currentQuery = "coffee";
+  box._appendManualOption = () => {};
+  const search = box._search("coffee");
+  await Promise.resolve();
+  if (calls.join(",") !== "location") {
+    throw new Error(`Places search did not wait for location: ${calls}`);
+  }
+
+  releaseLocation(true);
+  await search;
+  if (calls.join(",") !== "location,request,panel") {
+    throw new Error(`Places search ordering changed: ${calls}`);
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+"""
+    run_node(script)
+
+
 # @pair combobox:positioning
 # @pair dropdown:positioning
 # @styles dropdown.panel dropdown.menu

@@ -1074,10 +1074,11 @@ The endpoint verifies the untouched request bytes with the webhook secret and a
 five-minute Svix timestamp window, retrieves the message and attachment metadata
 through the Full access key, matches one exact stored user email, and hands the
 submission to the durable replay/ingest job. That job starts the existing Ask,
-Create, or Organize report pipeline. Mail sent to `ai@` is first classified by
-the configured utility model from subject/body and safe attachment metadata;
-the resolved workflow is persisted before attachment download so retries do not
-reclassify it. The explicit workflow aliases remain available. Acceptance and
+Create, or Organize report pipeline. Attachment-only mail sent to `ai@` selects
+Organize when available; other messages are classified by the configured
+utility model from subject/body and safe attachment metadata. The resolved
+workflow is persisted before attachment download so retries do not reclassify
+it. The explicit workflow aliases remain available. Acceptance and
 terminal feedback use the
 authentication-email sender and separate Sending key. Create and Organize only
 produce proposals; applying them still requires normal login, review, and

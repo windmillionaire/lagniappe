@@ -152,9 +152,9 @@ and `page`; users and model tasks are intentionally excluded.
 
 ### LocationBox (`location.mjs`)
 
-Used by the `LocationElement` for Google Places autocomplete. On init, requests the user's geolocation via `updateUserLocation()`.
+Used by the `LocationElement` for Google Places autocomplete. Authenticated page startup requests the user's geolocation; clicking the control starts or joins that same per-page update as a fallback.
 
-**`_input(event)`** shows recent locations when empty, searches the server (`/l/search-location`) when typing.
+**`_input(event)`** searches the server (`/l/search-location`) after three characters. The search awaits the shared location update before its request so the server session can bias the first Places result set.
 
 ### SearchBox (`search.mjs`)
 

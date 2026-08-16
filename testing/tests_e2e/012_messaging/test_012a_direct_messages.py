@@ -9,6 +9,7 @@ from playwright.sync_api import expect
 from config import SETTINGS
 from testing.definitions import Groups, Projects, SitePages, Users
 from testing.definitions.user_definitions import UserDefinition
+from testing.elements.combobox import Dropdown
 
 
 pytestmark = pytest.mark.e2e
@@ -303,6 +304,9 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     expect(
         delete_modal.get_by_role("heading", name="Clear Conversation")
     ).to_be_visible()
+    expect(delete_modal).to_contain_text(
+        f"clear your conversation with {sender.name} from your message history"
+    )
     clear_button = delete_modal.locator("[data-role='delete']")
     expect(clear_button.locator("#spinner[data-role='icon']")).to_have_count(1)
     with recipient.page.expect_response(
@@ -341,14 +345,50 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
 def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
     owner = get_user(Users.OWNER)
     user = get_user(_managed_definition("Mobile"), creator=owner, has_touch=True)
-    view = _go_messages(user)
+    peer = get_user(_managed_definition("Mobile Peer"), creator=owner)
+    other_peer = get_user(_managed_definition("Other Mobile Peer"), creator=owner)
+
     user.mobile = True
+    empty_view = _go_messages(user)
+    expect(empty_view.locator("[data-role='conversation-selector']")).to_be_hidden()
+    expect(empty_view.locator("[data-action='compose-message']")).to_be_visible()
+
+    _send_from_modal(user, peer, f"Mobile selector {uuid4().hex}")
+    view = empty_view
 
     selector = view.locator("[data-role='conversation-selector']")
     expect(selector).to_be_visible()
+    expect(selector).to_have_attribute("role", "combobox")
+    expect(selector).to_have_attribute("aria-expanded", "false")
+    expect(selector).to_contain_text(peer.name)
+    expect(view.locator("select[data-role='conversation-selector']")).to_have_count(0)
+
+    _send_from_modal(user, other_peer, f"Other mobile selector {uuid4().hex}")
+    Dropdown(selector).select_by_name(peer.name)
+    expect(selector).to_contain_text(peer.name)
+    view = _go_messages(user)
+    selector = view.locator("[data-role='conversation-selector']")
+    expect(selector).to_contain_text(peer.name)
     expect(view.locator("[data-role='conversation-list']")).to_be_hidden()
+    expect(view.locator("[data-role='message-header']")).to_be_hidden()
     expect(view.locator("[data-role='message-reply']")).to_have_count(1)
-    expect(view.locator("[data-role='message-reply']")).to_be_hidden()
+    expect(view.locator("[data-role='message-reply']")).to_be_visible()
+
+    clear_control = view.get_by_role(
+        "button", name=f"Clear conversation with {peer.name}"
+    )
+    expect(clear_control).to_be_visible()
+    clear_control.click()
+    delete_modal = user.locate("#modal")
+    expect(delete_modal).to_be_visible()
+    expect(
+        delete_modal.get_by_role("heading", name="Clear Conversation")
+    ).to_be_visible()
+    expect(delete_modal).to_contain_text(
+        f"clear your conversation with {peer.name} from your message history"
+    )
+    delete_modal.get_by_role("button", name="Cancel").click()
+    expect(delete_modal).not_to_be_attached()
 
 
 # @pairs messaging:compose-eligibility messaging:reply-permission

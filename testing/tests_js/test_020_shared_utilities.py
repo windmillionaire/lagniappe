@@ -3,6 +3,83 @@
 import textwrap
 
 
+USER_HARNESS = r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+function makeStorage() {
+  const values = new Map();
+  return {
+    getItem: (key) => values.get(key) ?? null,
+    removeItem: (key) => values.delete(key),
+    setItem: (key, value) => values.set(key, value),
+    values,
+  };
+}
+
+const geolocationCalls = [];
+const posts = [];
+const localStorage = makeStorage();
+const sessionStorage = makeStorage();
+let coords = { latitude: 37.7749, longitude: -122.4194 };
+let geolocationImplementation = (success) => success({ coords });
+let postImplementation = async () => ({ ok: true, userHash: "user-hash" });
+const context = {
+  console,
+  geolocationCalls,
+  Intl: {
+    DateTimeFormat() {
+      return { resolvedOptions: () => ({ timeZone: "America/Los_Angeles" }) };
+    },
+  },
+  localStorage,
+  navigator: {
+    geolocation: {
+      getCurrentPosition(success, error, options) {
+        geolocationCalls.push(options);
+        geolocationImplementation(success, error);
+      },
+    },
+  },
+  posts,
+  request: {
+    async post(...args) {
+      posts.push(args);
+      return postImplementation(...args);
+    },
+  },
+  sessionStorage,
+  setGeolocationImplementation(value) { geolocationImplementation = value; },
+  setPostImplementation(value) { postImplementation = value; },
+};
+
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/user.mjs", "utf8");
+source = source.replace(
+  'import { request } from "./request";',
+  "const request = globalThis.request;",
+);
+source = source.replaceAll("export async function ", "async function ");
+source = source.replaceAll("export function ", "function ");
+source += "\nglobalThis.updateUserData = updateUserData; globalThis.updateUserLocation = updateUserLocation;";
+vm.runInContext(source, context);
+
+(async () => {
+__ASSERTION__
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+"""
+
+
+def run_user_check(run_node, assertion: str):
+    script = USER_HARNESS.replace(
+        "__ASSERTION__", textwrap.indent(assertion.strip(), "  ")
+    )
+    run_node(script)
+
+
 def run_utility_check(run_node, assertion: str):
     script = f"""
 const fs = require("node:fs");
@@ -93,62 +170,99 @@ if (context.areEqual({ values: [1, 2] }, { values: [2, 1] })) {
     )
 
 
-# @pairs location:geolocation location:distance-threshold location:session-update
-def test_user_location_updates_only_for_initial_or_distant_positions(run_node):
-    script = """
-const fs = require("node:fs");
-const vm = require("node:vm");
-
-const values = new Map();
-const posts = [];
-let coords = { latitude: 37.7749, longitude: -122.4194 };
-const storage = {
-  getItem: (key) => values.get(key) ?? null,
-  setItem: (key, value) => values.set(key, value),
-  removeItem: (key) => values.delete(key),
-};
-const context = {
-  console,
-  localStorage: storage,
-  navigator: {
-    geolocation: {
-      getCurrentPosition: (success) => success({ coords }),
-    },
-  },
-  request: {
-    post: async (...args) => posts.push(args),
-  },
-  sessionStorage: storage,
-};
-
-vm.createContext(context);
-let source = fs.readFileSync("src/script/shared/user.mjs", "utf8");
-source = source.replace(
-  'import { request } from "./request";',
-  "const request = globalThis.request;",
+# @pairs location:geolocation location:page-load location:session-update
+# @pairs location:deduplication timezone:session-update
+def test_user_data_sync_posts_location_on_page_load_and_deduplicates(run_node):
+    run_user_check(
+        run_node,
+        """
+localStorage.values.set(
+  "location",
+  JSON.stringify({ latitude: 37.77, longitude: -122.42 }),
 );
-source = source.replaceAll("export async function ", "async function ");
-source += "\\nglobalThis.updateUserLocation = updateUserLocation;";
-vm.runInContext(source, context);
 
-(async () => {
-  await context.updateUserLocation();
-  if (posts.length !== 1) throw new Error("initial location was not posted");
+const startup = context.updateUserData();
+const combobox = context.updateUserLocation();
+if (startup !== combobox) {
+  throw new Error("Startup and combobox did not share one location update");
+}
+if ((await startup) !== true) {
+  throw new Error("Successful location update was not reported");
+}
+if (geolocationCalls.length !== 1 || posts.length !== 1) {
+  throw new Error(`Location update was not deduplicated: ${geolocationCalls.length}/${posts.length}`);
+}
 
-  coords = { latitude: 37.78, longitude: -122.42 };
-  await context.updateUserLocation();
-  if (posts.length !== 1) throw new Error("nearby location triggered a post");
+const [url, body, options] = posts[0];
+if (
+  url !== "/l/update-session" ||
+  body.timezone !== "America/Los_Angeles" ||
+  body.location.latitude !== 37.7749 ||
+  body.location.longitude !== -122.4194 ||
+  options.keepalive !== true
+) {
+  throw new Error(`Unexpected user-data update: ${JSON.stringify(posts[0])}`);
+}
+if (
+  sessionStorage.getItem("timezone_sent") !== "America/Los_Angeles" ||
+  sessionStorage.getItem("userHash") !== "user-hash"
+) {
+  throw new Error("Successful user-data update was not cached for the session");
+}
+""",
+    )
 
-  coords = { latitude: 34.0522, longitude: -118.2437 };
-  await context.updateUserLocation();
-  if (posts.length !== 2) throw new Error("distant location was not posted");
-  const body = posts[1][1];
-  if (body.location.latitude !== coords.latitude) {
-    throw new Error("posted location did not match geolocation");
-  }
-})().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
-"""
-    run_node(script)
+
+# @pairs location:session-update location:retry timezone:session-update
+def test_user_location_sync_retries_failed_session_update(run_node):
+    run_user_check(
+        run_node,
+        """
+let attempts = 0;
+context.setPostImplementation(async () => ({
+  ok: ++attempts > 1,
+  userHash: "retry-user",
+}));
+
+if ((await context.updateUserLocation()) !== false) {
+  throw new Error("Failed location update was reported as successful");
+}
+if (sessionStorage.getItem("timezone_sent") !== null) {
+  throw new Error("Failed session update cached the timezone");
+}
+if ((await context.updateUserLocation()) !== true) {
+  throw new Error("Location update did not retry successfully");
+}
+if (geolocationCalls.length !== 2 || posts.length !== 2) {
+  throw new Error(`Failed update was not retried: ${geolocationCalls.length}/${posts.length}`);
+}
+""",
+    )
+
+
+# @pairs location:unavailable timezone:session-update
+def test_user_data_sync_still_posts_timezone_when_location_is_unavailable(run_node):
+    run_user_check(
+        run_node,
+        """
+context.setGeolocationImplementation((success, error) => error({ code: 1 }));
+
+if ((await context.updateUserData()) !== false) {
+  throw new Error("Unavailable location was reported as synchronized");
+}
+if (posts.length !== 1) {
+  throw new Error(`Timezone fallback sent ${posts.length} requests`);
+}
+const body = posts[0][1];
+if (body.timezone !== "America/Los_Angeles" || "location" in body) {
+  throw new Error(`Unavailable location corrupted timezone update: ${JSON.stringify(body)}`);
+}
+if (sessionStorage.getItem("timezone_sent") !== "America/Los_Angeles") {
+  throw new Error("Timezone fallback was not cached after success");
+}
+await context.updateUserLocation();
+if (geolocationCalls.length !== 1 || posts.length !== 1) {
+  throw new Error("Unavailable geolocation was retried repeatedly on one page");
+}
+""",
+    )

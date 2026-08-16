@@ -49,15 +49,17 @@
       </p>
       <ul class="text-base-medium space-y-2">
         <li><strong>AI (recommended):</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ai }} — questions, requests, and attachments are routed automatically.</li>
-        <li><strong>Ask:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ask }} — subject or message required; up to 20 ordinary attachments are optional.</li>
+        <li><strong>Ask:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ask }} — subject or message required; up to 20 attachments are optional.</li>
         {% if current_user.access(AI.CREATE) %}
           <li><strong>Create:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.create }} — subject or message required; attachments are not accepted.</li>
-          <li><strong>Organize:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.organize }} — at least one ordinary attachment is required; message text is optional.</li>
+          <li><strong>Organize:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.organize }} — at least one attachment is required; message text is optional.</li>
         {% endif %}
       </ul>
       <p class="text-base-medium mt-3">
-        Each attachment may be up to 30 MiB, with a 50 MiB total. Replies above
-        the Lagniappe marker create a new report. Automated/list mail is ignored.
+        Each attachment may be up to 30 MiB, with a 50 MiB total. Pasted or
+        inline-only files are accepted; recognizable signature and quoted-reply
+        images are ignored. Replies above the Lagniappe marker create a new
+        report. Automated/list mail is ignored.
         Resend temporarily processes received content and provides short-lived
         attachment downloads to the server.
       </p>

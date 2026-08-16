@@ -699,8 +699,12 @@ def message_page(*, initial_conversation=None, can_message=False):
 
 # @testable infrastructure
 # @covered-by lagniappe/web/routes/messages/main.py::clear_modal
-def message_clear_modal(key):
-    return render_template("delete/conversation.html", key=key), 200
+def message_clear_modal(key, *, peer_name):
+    return render_template(
+        "delete/conversation.html",
+        key=key,
+        peer_name=peer_name,
+    ), 200
 
 
 # @testable false

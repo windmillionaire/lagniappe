@@ -1,2 +1,101 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="4462d519-a97c-430a-ab2b-5464747312b6",e._sentryDebugIdIdentifier="sentry-dbid-4462d519-a97c-430a-ab2b-5464747312b6");}catch(e){}}();import{r as c}from"./foundation.js?v=bb036cdb";import"./connectivity.js?v=bb036cdb";async function m(){const t=Intl.DateTimeFormat().resolvedOptions().timeZone,e=sessionStorage.getItem("timezone_sent"),o=sessionStorage.getItem("userHash");if(e===t&&o)return;sessionStorage.setItem("timezone_sent",t);const n=await c.post("/l/update-session",{timezone:t},{keepalive:!0});n?.ok?n.userHash&&sessionStorage.setItem("userHash",n.userHash):sessionStorage.removeItem("timezone_sent")}function g(t){return new Promise(e=>{if(!("geolocation"in navigator)){e(null);return}navigator.geolocation.getCurrentPosition(o=>e(o),()=>e(null),t)})}async function u(t){localStorage.setItem("location",JSON.stringify(t)),await c.post("/l/update-session",{location:t},{keepalive:!0})}function p(t,e){const o=d=>d*Math.PI/180,s=o(t.latitude),i=o(e.latitude),l=o(e.latitude-t.latitude),a=o(e.longitude-t.longitude)*Math.cos((s+i)/2),r=l;return Math.sqrt(a*a+r*r)*6371}async function f(){const e=localStorage.getItem("location"),o=e?JSON.parse(e):null,n=await g({enableHighAccuracy:!1,maximumAge:36e5,timeout:8e3});if(!n)return;const s={latitude:n.coords.latitude,longitude:n.coords.longitude};if(!o){await u(s);return}p(o,s)>50&&await u(s)}export{m as updateUserData,f as updateUserLocation};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request } from './foundation.js?v=ba9311bf';
+import './connectivity.js?v=ba9311bf';
+
+let userLocationUpdate = null;
+
+/**
+ * @testable true
+ * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_posts_location_on_page_load_and_deduplicates
+ * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_still_posts_timezone_when_location_is_unavailable
+ * @pairs location:page-load location:session-update timezone:session-update
+ */
+function updateUserData() {
+	return updateUserLocation();
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/user.mjs::updateUserLocation
+ * @reason one request keeps concurrent location and timezone writes in the same session response
+ */
+async function _syncUserData() {
+	const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	const sentThisSession = sessionStorage.getItem("timezone_sent");
+	const userHash = sessionStorage.getItem("userHash");
+	const timezoneChanged = sentThisSession !== currentTimezone || !userHash;
+	const position = await _getCurrentPosition({
+		enableHighAccuracy: false,
+		maximumAge: 3600000, // up to 1 hour old
+		timeout: 8000,
+	});
+	const location = position
+		? {
+				latitude: position.coords.latitude,
+				longitude: position.coords.longitude,
+			}
+		: null;
+	const payload = {};
+	if (timezoneChanged) payload.timezone = currentTimezone;
+	if (location) payload.location = location;
+	if (Object.keys(payload).length === 0) {
+		return { retry: false, synced: false };
+	}
+
+	const response = await request.post("/l/update-session", payload, {
+		keepalive: true,
+	});
+	if (!response?.ok) return { retry: true, synced: false };
+
+	if (timezoneChanged) {
+		sessionStorage.setItem("timezone_sent", currentTimezone);
+	}
+	if (response.userHash) sessionStorage.setItem("userHash", response.userHash);
+	return { retry: false, synced: Boolean(location) };
+}
+
+/**
+ * @testable false
+ * @covered-by src/script/shared/user.mjs::updateUserLocation
+ * @reason geolocation lookup is private location-update plumbing
+ */
+function _getCurrentPosition(options) {
+	return new Promise((resolve) => {
+		if (!("geolocation" in navigator)) {
+			resolve(null);
+			return;
+		}
+		navigator.geolocation.getCurrentPosition(
+			(pos) => resolve(pos),
+			() => resolve(null),
+			options,
+		);
+	});
+}
+
+/**
+ * @testable true
+ * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_posts_location_on_page_load_and_deduplicates
+ * @tests tests_js/test_020_shared_utilities.py::test_user_location_sync_retries_failed_session_update
+ * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_still_posts_timezone_when_location_is_unavailable
+ * @tests tests_js/test_016_combobox_frontend.py::test_location_combobox_waits_for_session_sync_before_search
+ * @pairs location:geolocation location:page-load location:session-update location:request-ordering
+ */
+function updateUserLocation() {
+	if (userLocationUpdate) return userLocationUpdate;
+
+	const update = _syncUserData().then(
+		({ retry, synced }) => {
+			if (retry && userLocationUpdate === update) userLocationUpdate = null;
+			return synced;
+		},
+		(error) => {
+			if (userLocationUpdate === update) userLocationUpdate = null;
+			throw error;
+		},
+	);
+	userLocationUpdate = update;
+	return update;
+}
+
+export { updateUserData, updateUserLocation };

@@ -1,6 +1,6 @@
 """Signed inbound-email boundary and handoff to saved AI report workflows."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import base64
 import binascii
@@ -38,6 +38,14 @@ _AUTH_PARAMETER_PATTERN = re.compile(
     r"(?i)\b(header\.from|header\.d|smtp\.mailfrom)\s*=\s*"
     r'(?:"([^"\r\n]+)"|([^\s;()]+))'
 )
+_INLINE_IMAGE_MARKER_PATTERN = re.compile(
+    r"\[\s*image\s*:\s*([^\]\r\n]+?)\s*\]", re.IGNORECASE
+)
+_IGNORED_INLINE_CONTAINER_PATTERN = re.compile(
+    r"(?:^|[\s_-])(?:gmail[-_]?signature|apple[-_]?signature|signature|"
+    r"gmail[-_]?quote|yahoo[-_]?quoted|quoted|moz[-_]?cite)(?:$|[\s_-])",
+    re.IGNORECASE,
+)
 
 
 class AIEmailWebhookError(ValueError):
@@ -72,6 +80,7 @@ class InboundAttachment:
     size: int
     content_disposition: str | None = None
     content_id: str | None = None
+    include_inline: bool = False
 
     # @testable true
     # @tests tests_unit/test_028_ai_email.py::test_inbound_attachment_disposition_overrides_content_id
@@ -82,6 +91,11 @@ class InboundAttachment:
         if self.content_disposition:
             return self.content_disposition == "inline"
         return bool(self.content_id)
+
+    @property
+    def submitted(self):
+        """Return whether this part should enter the report attachment pipeline."""
+        return not self.inline or self.include_inline
 
     def job_record(self):
         return {
@@ -535,6 +549,105 @@ def normalize_message_body(text, html=None):
     return re.sub(r"\n{4,}", "\n\n\n", normalized)
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::_select_inline_attachments
+# @reason private canonicalization exercised by inline attachment selection
+def _attachment_reference_key(value):
+    return secure_filename(str(value or "")).casefold()
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::_select_inline_attachments
+# @reason private canonicalization exercised by inline attachment selection
+def _content_id_key(value):
+    key = str(value or "").strip()
+    if key[:4].casefold() == "cid:":
+        key = key[4:]
+    return key.strip("<> ").casefold()
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::_select_inline_attachments
+# @reason private HTML classification exercised by inline attachment selection
+def _ignored_inline_image(image):
+    for node in (image, *image.parents):
+        if getattr(node, "name", None) == "blockquote":
+            return True
+        if not hasattr(node, "attrs"):
+            continue
+        attributes = []
+        for name in ("id", "class", "data-smartmail"):
+            value = node.attrs.get(name)
+            if isinstance(value, (list, tuple)):
+                attributes.extend(str(item) for item in value)
+            elif value:
+                attributes.append(str(value))
+        if _IGNORED_INLINE_CONTAINER_PATTERN.search(" ".join(attributes)):
+            return True
+    return False
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::_select_inline_attachments
+# @reason private HTML matching exercised by inline attachment selection
+def _matching_inline_images(attachment, html):
+    raw_html = str(html or "")
+    marker_index = raw_html.find(REPLY_MARKER)
+    if marker_index >= 0:
+        raw_html = raw_html[:marker_index]
+    if not raw_html.strip():
+        return ()
+
+    filename = _attachment_reference_key(attachment.filename)
+    content_id = _content_id_key(attachment.content_id)
+    matches = []
+    soup = BeautifulSoup(raw_html, "html.parser")
+    for image in soup.find_all("img"):
+        source = str(image.get("src") or "").strip()
+        source_id = (
+            _content_id_key(source) if source.casefold().startswith("cid:") else ""
+        )
+        alternate = _attachment_reference_key(image.get("alt"))
+        if (content_id and source_id == content_id) or (
+            filename and alternate == filename
+        ):
+            matches.append(image)
+    return tuple(matches)
+
+
+# @testable true
+# @tests tests_unit/test_028_ai_email.py::test_inline_attachment_selection_keeps_user_content_and_filters_signature_art
+# @features ai-email
+# @dimensions attachments inline image-only signature quoted-content routing
+def _select_inline_attachments(attachments, body, html):
+    """Select intentional inline content while filtering signature and reply art."""
+    ordinary = tuple(item for item in attachments if not item.inline)
+    inline = tuple(item for item in attachments if item.inline)
+    if not inline:
+        return frozenset()
+
+    marker_filenames = {
+        _attachment_reference_key(match)
+        for match in _INLINE_IMAGE_MARKER_PATTERN.findall(body or "")
+    }
+    meaningful_body = _INLINE_IMAGE_MARKER_PATTERN.sub("", body or "").strip()
+    image_only_message = not meaningful_body and not ordinary
+    selected = set()
+    for attachment in inline:
+        matching_images = _matching_inline_images(attachment, html)
+        if any(not _ignored_inline_image(image) for image in matching_images):
+            selected.add(attachment.id)
+            continue
+        if matching_images:
+            continue
+        if _attachment_reference_key(attachment.filename) in marker_filenames:
+            selected.add(attachment.id)
+            continue
+        if image_only_message:
+            selected.add(attachment.id)
+    return frozenset(selected)
+
+
 def _recognized_tool(recipients, config):
     if not isinstance(recipients, (list, tuple)):
         raise AIEmailRejection("route_invalid", "AI email recipient is invalid.")
@@ -589,6 +702,11 @@ def _normalize_attachment(value):
     )
 
 
+# @testable true
+# @tests tests_unit/test_028_ai_email.py::test_inbound_message_normalization_routes_alias_and_strips_reply_marker
+# @tests tests_unit/test_028_ai_email.py::test_inline_attachment_selection_keeps_user_content_and_filters_signature_art
+# @features ai-email
+# @dimensions attachments inline
 def normalize_resend_message(message, attachments, config):
     """Validate a Resend response and return only provider-neutral fields."""
     if not isinstance(message, dict):
@@ -605,6 +723,15 @@ def normalize_resend_message(message, attachments, config):
     if not isinstance(headers, dict):
         headers = {}
     normalized_attachments = tuple(_normalize_attachment(item) for item in attachments)
+    selected_inline = _select_inline_attachments(
+        normalized_attachments,
+        body,
+        message.get("html"),
+    )
+    normalized_attachments = tuple(
+        replace(item, include_inline=item.id in selected_inline)
+        for item in normalized_attachments
+    )
     received_at = _normalize_subject(message.get("created_at"))[:64]
     return InboundMessage(
         provider_message_id=email_id,
@@ -648,6 +775,7 @@ def _instructions(subject, body):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_submission_contract_keeps_create_and_organize_report_only
+# @tests tests_unit/test_028_ai_email.py::test_inline_attachment_selection_keeps_user_content_and_filters_signature_art
 # @features ai-email
 # @dimensions access attachment-contract body-contract rate-limit
 def _preflight_submission(message, tool, user, config):
@@ -663,31 +791,31 @@ def _preflight_submission(message, tool, user, config):
             f"Your account does not currently have access to {tool.title()} reports.",
         )
 
-    ordinary = tuple(item for item in message.attachments if not item.inline)
+    submitted = tuple(item for item in message.attachments if item.submitted)
     limits = config["limits"]
-    if len(ordinary) > limits["maxFiles"]:
+    if len(submitted) > limits["maxFiles"]:
         raise AIEmailRejection(
             "attachment_contract",
             f"A maximum of {limits['maxFiles']} attachments may be submitted.",
         )
-    if any(item.size <= 0 for item in ordinary):
+    if any(item.size <= 0 for item in submitted):
         raise AIEmailRejection(
             "attachment_contract", "Empty attachments cannot be submitted by email."
         )
-    if any(item.size > limits["maxFileBytes"] for item in ordinary):
+    if any(item.size > limits["maxFileBytes"] for item in submitted):
         raise AIEmailRejection(
             "attachment_contract", "Each attachment must be no larger than 30 MiB."
         )
-    if sum(item.size for item in ordinary) > limits["maxTotalFileBytes"]:
+    if sum(item.size for item in submitted) > limits["maxTotalFileBytes"]:
         raise AIEmailRejection(
             "attachment_contract", "Attachments may total no more than 50 MiB."
         )
-    if tool == "create" and ordinary:
+    if tool == "create" and submitted:
         raise AIEmailRejection(
             "attachment_contract",
             "Create email does not accept attachments. Send files to the Organize address.",
         )
-    if tool == "organize" and not ordinary:
+    if tool == "organize" and not submitted:
         raise AIEmailRejection(
             "attachment_contract", "Organize email requires at least one attachment."
         )
@@ -697,7 +825,7 @@ def _preflight_submission(message, tool, user, config):
         raise AIEmailRejection(
             "body_required", f"{tool.title()} email requires a subject or message body."
         )
-    if tool == "ai" and not (message.subject or message.text_body or ordinary):
+    if tool == "ai" and not (message.subject or message.text_body or submitted):
         raise AIEmailRejection(
             "body_required", "AI email requires a subject, message body, or attachment."
         )
@@ -717,7 +845,7 @@ def _preflight_submission(message, tool, user, config):
                 "rate_limited",
                 f"AI email submission limit reached. Try again in about {minutes} minute(s).",
             )
-    return instructions, ordinary
+    return instructions, submitted
 
 
 # @testable true

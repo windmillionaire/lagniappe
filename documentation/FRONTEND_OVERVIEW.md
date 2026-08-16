@@ -15,7 +15,7 @@ shared infrastructure such as analytics. On DOM ready it:
 4. Registers global `error` and `unhandledrejection` listeners that route to Sentry via `captureError`.
 5. Registers `visibilitychange`, `focus`/`blur`, `pagehide`/`pageshow`, and `online`/`offline` listeners for server health, view sync, and sync deregistration/registration. `ConnectivityState` retains separate browser, server, visibility, and service-worker-controller signals. Hiding a view suspends it directly without an unnecessary `/l/ping`; a visible tab in a blurred window may retain only rendered deferred-operation polling for up to ten minutes. Foreground transitions perform one health check and one polling catch-up.
 6. Registers the service worker (`sw.js`) and publishes versioned connectivity state to its cache policy. The worker does not carry application update events.
-7. Calls `updateUserData()` to sync the user's timezone and location to the server, except when `<meta name="mode" content="public">` marks a public page.
+7. Calls `updateUserData()` to request the user's browser location and sync it with their timezone in one session update, except when `<meta name="mode" content="public">` marks a public page. Location controls join the same in-flight update so their first Places query cannot overtake it.
 
 `getView()` finds the `[lp-view]` element, reads its `data-kind` attribute,
 dynamically imports the matching view module from the `VIEWS` registry,
@@ -97,7 +97,7 @@ point; internal implementation modules are noted below. Modules:
 | `offline.mjs` | IndexedDB primitives for document sync records and explicit offline mutation records. |
 | `offlineQueue.mjs` | `OfflineQueue` -- serializes explicit `lp-offline` mutation commands, restores optimistic overlays, replays commands, and hands conflicts to `EditWatcher`. |
 | `protocol.mjs` | Connectivity worker-message validation and construction. Server state does not cross the service-worker boundary. |
-| `user.mjs` | `updateUserData()` and `updateUserLocation()` -- sync browser timezone/geolocation to the server session, with caching and distance-threshold checks. |
+| `user.mjs` | `updateUserData()` and `updateUserLocation()` -- share one retryable, per-page browser geolocation/session update. Timezone and location use one request so concurrent client-side session-cookie writes cannot overwrite one another. |
 | `utilities.mjs` | `withTransition()` (View Transitions API wrapper with debug mode), `debounce()`, `waitForAttribute()` (MutationObserver-based attribute wait), `simpleHash()`, `generateElementId()`, `areEqual()` (deep JSON comparison), `base64ToUint8Array()`, `uint8ArrayToBase64()`. |
 
 ## Style System

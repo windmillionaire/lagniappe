@@ -92,11 +92,14 @@ Email-origin reports add a transport handoff in front of this same pipeline.
 The signed Resend webhook claims an HMAC-only replay record, retrieves and
 normalizes the message, matches one exact stored user email, creates a
 deterministic pending `AIReport`, and starts `EMAIL_INGEST`. That adapter streams
-ordinary attachments into deterministic report-owned `File` entities and then
+ordinary attachments and intentional inline content into deterministic
+report-owned `File` entities and then
 starts the normal `REPORT_ASK`, `REPORT_CREATE`, or `REPORT_ORGANIZE` job. For
-the shared `ai@` alias, a no-tools/no-search utility-model classifier selects an
-eligible workflow from subject/body and safe attachment metadata before any
-download; the result is persisted in `inbound_manifest` for retry stability.
+the shared `ai@` alias, attachment-only messages deterministically select
+Organize when it is available; otherwise a no-tools/no-search utility-model
+classifier selects an eligible workflow from subject/body and safe attachment
+metadata before any download. The result is persisted in `inbound_manifest` for
+retry stability.
 Explicit aliases bypass classification. This does not create a second proposal
 implementation. Acceptance and
 terminal result email are independently idempotent; Create/Organize proposals
@@ -297,7 +300,8 @@ Ask preparation returns a prepared proposal/status value without mutating
 the input report. The generic runner checkpoints that value before
 `ReportAdapter.apply()` owns the durable report save.
 
-When an email-origin Ask includes ordinary attachments, preparation first uses
+When an email-origin Ask includes ordinary attachments or intentional inline
+content, preparation first uses
 the existing bounded report-file summary path with search indexing disabled.
 The prompt receives a `submitted_files` context containing safe metadata,
 summaries, and read-only `get_file` references. Those files are evidence only;

@@ -19,6 +19,15 @@ export default class Messages extends Core {
 		this.selector = this.elt.querySelector(
 			"[data-role='conversation-selector']",
 		);
+		this.selectorLabel = this.selector.querySelector(
+			"[data-role='conversation-selector-label']",
+		);
+		this.mobileClearConversation = this.elt.querySelector(
+			"[data-role='mobile-clear-conversation']",
+		);
+		this.mobileClearConversationContainer = this.elt.querySelector(
+			"[data-role='mobile-clear-conversation-container']",
+		);
 		this.history = this.elt.querySelector("[data-role='message-history']");
 		this.header = this.elt.querySelector("[data-role='message-header']");
 		this.loadConversationsButton = this.elt.querySelector(
@@ -38,6 +47,13 @@ export default class Messages extends Core {
 		this.conversationCursor = null;
 		this.messageCursor = null;
 		this.conversations = new Map();
+		this.conversationStorageKey = `messages-${this.elt.dataset.currentUser}-active`;
+		const initialConversation = this.elt.dataset.initialConversation;
+		const storedConversation = localStorage.getItem(
+			this.conversationStorageKey,
+		);
+		this.preferredConversation =
+			initialConversation || storedConversation || null;
 
 		const composeButton = this.elt.querySelector(
 			"[data-action='compose-message']",
@@ -55,9 +71,27 @@ export default class Messages extends Core {
 			const button = event.target.closest("[data-conversation]");
 			if (button) void this.openConversation(button.dataset.conversation);
 		});
-		this.selector.addEventListener("change", () => {
-			if (this.selector.value) void this.openConversation(this.selector.value);
-		});
+		this._conversationSelectorClick = (event) => {
+			if (!this.mobile || this.conversationDropdown) return;
+			event.preventDefault();
+			event.stopPropagation();
+			void this.runColdAction(
+				this.selector,
+				() => this._ensureConversationDropdown(),
+				(dropdown) => dropdown?.showPanel?.(),
+				this.selector,
+			);
+		};
+		this.selector.addEventListener("click", this._conversationSelectorClick);
+		this._messagesMobileResize = () => {
+			if (this.mobile) {
+				void this._ensureConversationDropdown();
+			} else {
+				this.conversationDropdown?.destroy?.();
+				this.conversationDropdown = null;
+			}
+		};
+		this.elt.addEventListener("mobile-resize", this._messagesMobileResize);
 		this.history.addEventListener("click", (event) => {
 			const button = event.target.closest("[data-action='delete-message']");
 			if (button) void this.deleteMessage(button.dataset.message);
@@ -73,15 +107,68 @@ export default class Messages extends Core {
 			(event) => void this.sendReply(event),
 		);
 		await this.loadConversations();
-		const initial = this.elt.dataset.initialConversation;
-		const preferred =
-			initial ||
+		const candidates = [
+			initialConversation,
+			storedConversation,
 			Array.from(this.conversations.values()).find(
 				(conversation) => conversation.unread,
-			)?.id ||
-			this.conversations.values().next().value?.id;
-		if (preferred) await this.openConversation(preferred);
+			)?.id || this.conversations.values().next().value?.id,
+		].filter((key, index, values) => key && values.indexOf(key) === index);
+		this.preferredConversation = candidates[0] || null;
+		this.renderConversationSelector();
+		if (this.mobile && candidates.length) {
+			await this._ensureConversationDropdown();
+		}
+		let opened = false;
+		for (const candidate of candidates) {
+			this.preferredConversation = candidate;
+			this.renderConversationSelector();
+			if (await this.openConversation(candidate)) {
+				opened = true;
+				break;
+			}
+			if (candidate === storedConversation) {
+				localStorage.removeItem(this.conversationStorageKey);
+			}
+		}
+		if (candidates.length && !opened) {
+			this.rememberConversation(null);
+			this.renderConversationSelector();
+		}
 		return this;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/messages.mjs::Messages
+	 * @reason private responsive dropdown setup is exercised through the view contract
+	 */
+	async _ensureConversationDropdown() {
+		if (this.conversationDropdown || this._conversationDropdownPromise) {
+			return this.conversationDropdown || this._conversationDropdownPromise;
+		}
+		this._conversationDropdownPromise = import("../elements/combobox/dropdown")
+			.then(({ Dropdown }) => {
+				if (this._destroyed || !this.mobile) return null;
+				this.conversationDropdown = new Dropdown(this.selector).init({
+					items: [],
+					matchReferenceWidth: true,
+				});
+				this.renderConversationSelector();
+				return this.conversationDropdown;
+			})
+			.catch((error) => {
+				this.reportStartupError(
+					error,
+					this.selector,
+					"messages-conversation-dropdown",
+				);
+				return null;
+			})
+			.finally(() => {
+				this._conversationDropdownPromise = null;
+			});
+		return this._conversationDropdownPromise;
 	}
 
 	/** @testable infrastructure */
@@ -150,30 +237,17 @@ export default class Messages extends Core {
 				);
 				clear.title = `Clear conversation with ${conversation.peer.name}`;
 				clear.append(
-					createIcon("trash.active", STYLES.toggle.icon.active),
-					createIcon("trash.inactive", STYLES.toggle.icon.inactive),
+					createIcon("trash.active", `${STYLES.toggle.icon.active} icon-lg`),
+					createIcon(
+						"trash.inactive",
+						`${STYLES.toggle.icon.inactive} icon-lg`,
+					),
 				);
 				row.append(button, clear);
 				return row;
 			}),
 		);
-		this.selector.replaceChildren(
-			...[
-				Object.assign(document.createElement("option"), {
-					value: "",
-					textContent: "Choose a conversation",
-				}),
-				...conversations.map((conversation) =>
-					Object.assign(document.createElement("option"), {
-						value: conversation.id,
-						textContent: `${conversation.peer.name}${
-							conversation.unread ? ` (${conversation.unread} unread)` : ""
-						}`,
-					}),
-				),
-			],
-		);
-		this.selector.value = this.current?.id || "";
+		this.renderConversationSelector();
 		this.loadConversationsButton.classList.toggle(
 			"hidden",
 			!this.conversationCursor,
@@ -181,17 +255,74 @@ export default class Messages extends Core {
 	}
 
 	/** @testable infrastructure */
+	renderConversationSelector() {
+		const selected =
+			this.current ||
+			this.conversations.get(this.preferredConversation) ||
+			null;
+		const selectedName = selected?.peer?.name || "";
+		this.selectorLabel.textContent = selectedName;
+		this.selector.classList.toggle("hidden", !selectedName);
+		this.selector.setAttribute(
+			"aria-label",
+			selectedName ? `Conversation: ${selectedName}` : "Conversation",
+		);
+		const activeConversation = this.current || null;
+		this.mobileClearConversationContainer.dataset.visible = activeConversation
+			? "true"
+			: "false";
+		this.mobileClearConversation.disabled = !activeConversation;
+		if (activeConversation) {
+			this.mobileClearConversation.dataset.deleteKey = activeConversation.id;
+			this.mobileClearConversation.dataset.deleteModalRoute =
+				ENDPOINTS.messages.clearModal(activeConversation.id);
+			const clearLabel = `Clear conversation with ${activeConversation.peer.name}`;
+			this.mobileClearConversation.setAttribute("aria-label", clearLabel);
+			this.mobileClearConversation.title = clearLabel;
+		} else {
+			delete this.mobileClearConversation.dataset.deleteKey;
+			delete this.mobileClearConversation.dataset.deleteModalRoute;
+			this.mobileClearConversation.setAttribute(
+				"aria-label",
+				"Clear conversation",
+			);
+			this.mobileClearConversation.title = "Clear conversation";
+		}
+		this.conversationDropdown?.updateOptions(
+			Array.from(this.conversations.values()).map((conversation) => ({
+				name: `${conversation.peer.name}${
+					conversation.unread ? ` (${conversation.unread} unread)` : ""
+				}`,
+				onClick: () => this.openConversation(conversation.id),
+			})),
+		);
+	}
+
+	/** @testable infrastructure */
+	rememberConversation(key) {
+		this.preferredConversation = key || null;
+		if (!this.conversationStorageKey) return;
+		if (key) localStorage.setItem(this.conversationStorageKey, key);
+		else localStorage.removeItem(this.conversationStorageKey);
+	}
+
+	/** @testable infrastructure */
 	async openConversation(key) {
 		const response = await request.get(ENDPOINTS.messages.history(key));
-		if (!response?.ok) return;
+		if (!response?.ok) return false;
 		this.current = response.conversation;
+		this.rememberConversation(this.current.id);
 		this.replyOperationId = this.operationId?.() || crypto.randomUUID();
 		this.conversations.set(this.current.id, this.current);
 		this.messageCursor = response.cursor || null;
 		this.renderHeader();
 		this.renderMessages(response.messages || []);
 		this.renderConversations();
+		if (this.mobile && !this.conversationDropdown) {
+			await this._ensureConversationDropdown();
+		}
 		if (this.current.unread) await this.markRead();
+		return true;
 	}
 
 	/** @testable infrastructure */
@@ -334,14 +465,28 @@ export default class Messages extends Core {
 			return super.reconcileChange(change);
 		}
 		this.conversations.delete(change.key);
+		let replacement = null;
 		if (this.current?.id === change.key) {
 			this.current = null;
 			this.messageCursor = null;
 			this.history.replaceChildren();
 			this.header.textContent = "Choose a conversation";
 			this.renderReply();
+			replacement = this.conversations.values().next().value?.id || null;
+			this.rememberConversation(replacement);
 		}
 		this.renderConversations();
-		return Promise.resolve();
+		return replacement ? this.openConversation(replacement) : Promise.resolve();
+	}
+
+	destroy() {
+		this.selector?.removeEventListener(
+			"click",
+			this._conversationSelectorClick,
+		);
+		this.elt.removeEventListener("mobile-resize", this._messagesMobileResize);
+		this.conversationDropdown?.destroy?.();
+		this.conversationDropdown = null;
+		super.destroy();
 	}
 }

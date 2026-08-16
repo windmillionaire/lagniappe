@@ -322,6 +322,107 @@ def test_inbound_attachment_disposition_overrides_content_id():
     ).inline
 
 
+# @features ai-email
+# @dimensions attachments inline image-only signature quoted-content routing
+def test_inline_attachment_selection_keeps_user_content_and_filters_signature_art(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        "lagniappe.core.tools.cache.rate_limit.check_limit",
+        lambda *_args: {"allowed": True, "retry_after": 0},
+    )
+    message, _tool = normalize_resend_message(
+        {
+            "id": "email-inline",
+            "from": "Owner@example.com",
+            "to": ["ai@inbound.example.com"],
+            "subject": "",
+            "text": "[image: 2020_UCV_school_portrait.jpg]",
+            "html": (
+                '<img src="cid:photo-content" '
+                'alt="2020_UCV_school_portrait.jpg">'
+                '<div class="gmail_signature">'
+                '<img src="cid:signature-content" alt="logo.png">'
+                "</div>"
+                '<blockquote><img src="cid:quoted-content" '
+                'alt="quoted.png"></blockquote>'
+            ),
+            "headers": {},
+        },
+        [
+            {
+                "id": "photo",
+                "filename": "2020_UCV_school_portrait.jpg",
+                "content_type": "image/jpeg",
+                "content_disposition": "inline",
+                "content_id": "photo-content",
+                "size": 77_546,
+            },
+            {
+                "id": "signature",
+                "filename": "logo.png",
+                "content_type": "image/png",
+                "content_disposition": "inline",
+                "content_id": "signature-content",
+                "size": 2_048,
+            },
+            {
+                "id": "quoted",
+                "filename": "quoted.png",
+                "content_type": "image/png",
+                "content_disposition": "inline",
+                "content_id": "quoted-content",
+                "size": 3_048,
+            },
+        ],
+        _config(),
+    )
+
+    user = SimpleNamespace(access=lambda _required: True, urlsafe_key="user-one")
+    _instructions, attachments = ai_email._preflight_submission(
+        message, "ai", user, _config()
+    )
+
+    assert [attachment.id for attachment in attachments] == ["photo"]
+    assert (
+        ai_tools.route_ai_email(
+            message.subject,
+            message.text_body,
+            [attachment.job_record() for attachment in attachments],
+            ("ask", "create", "organize"),
+        )["workflow"]
+        == "organize"
+    )
+
+    image_only, _tool = normalize_resend_message(
+        {
+            "id": "email-image-only",
+            "from": "Owner@example.com",
+            "to": ["ai@inbound.example.com"],
+            "subject": "",
+            "text": "",
+            "html": "",
+            "headers": {},
+        },
+        [
+            {
+                "id": "photo-only",
+                "filename": "camera-photo.jpg",
+                "content_type": "image/jpeg",
+                "content_disposition": "inline",
+                "content_id": "photo-only-content",
+                "size": 77_546,
+            }
+        ],
+        _config(),
+    )
+    _instructions, attachments = ai_email._preflight_submission(
+        image_only, "ai", user, _config()
+    )
+
+    assert [attachment.id for attachment in attachments] == ["photo-only"]
+
+
 # @features ai-email ai-report
 # @dimensions origin legacy-default inbound-manifest privacy
 def test_email_report_shape_preserves_safe_inbound_display_fields():
@@ -414,6 +515,37 @@ def test_ai_email_router_normalizes_attachment_create_to_organize():
         "workflow": "organize",
         "confidence": 0.8,
         "reason": "Attachment-backed creation uses Organize.",
+    }
+
+
+# @features ai-email
+# @dimensions routing inline attachment-only deterministic
+def test_ai_email_router_routes_attachment_only_message_to_organize(monkeypatch):
+    monkeypatch.setattr(
+        ai_tools.ai_model,
+        "generate_content",
+        lambda *_args, **_kwargs: pytest.fail(
+            "Attachment-only routing should not require a model call"
+        ),
+    )
+
+    result = ai_tools.route_ai_email(
+        "",
+        "[image: 2020_UCV_school_portrait.jpg]",
+        [
+            {
+                "filename": "2020_UCV_school_portrait.jpg",
+                "content_type": "image/jpeg",
+                "size": 77_546,
+            }
+        ],
+        ("ask", "create", "organize"),
+    )
+
+    assert result == {
+        "workflow": "organize",
+        "confidence": 1.0,
+        "reason": "Attachment-only email uses Organize.",
     }
 
 

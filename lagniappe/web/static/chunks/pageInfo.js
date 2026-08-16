@@ -1,2 +1,647 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="1de6605a-0dbf-4618-b748-84c1da624b6f",e._sentryDebugIdIdentifier="sentry-dbid-1de6605a-0dbf-4618-b748-84c1da624b6f");}catch(e){}}();import{F as h}from"./form2.js?v=bb036cdb";import{InputElement as m}from"./input.js?v=bb036cdb";import{RadioElement as p}from"./radio.js?v=bb036cdb";import{s as l}from"./sections.js?v=bb036cdb";import{S as c}from"./sectionToggle.js?v=bb036cdb";import{TextareaElement as g}from"./textarea.js?v=bb036cdb";import{r as f,c as E,w as S}from"./foundation.js?v=bb036cdb";import"./connectivity.js?v=bb036cdb";import{PagePermissions as y}from"./pagePermissions.js?v=bb036cdb";import"./baseForm.js?v=bb036cdb";import"./icons.js?v=bb036cdb";import"./primitives.js?v=bb036cdb";import"./styles.js?v=bb036cdb";import"./loader.js?v=bb036cdb";import"./baseElement.js?v=bb036cdb";import"./formatting.js?v=bb036cdb";import"./baseUpload.js?v=bb036cdb";import"./buttons.js?v=bb036cdb";import"./dropdown.js?v=bb036cdb";import"./combobox.js?v=bb036cdb";import"./facets.js?v=bb036cdb";import"./results.js?v=bb036cdb";import"./submitter.js?v=bb036cdb";class u extends h{constructor(e){super(e),this.formSelect=null}get submitGroup(){return this.target.querySelector("[data-role='submit-group']")}get nameElement(){return this.schema?.find(e=>e.id==="name")?null:new m({kind:"page",readonly:this.readonly},{input:"text",id:"name",title:"Name",placeholder:"name this page..."},this.target.dataset.name||"").elt}get descriptionElement(){return this.schema?.find(e=>e.id==="description")?null:new g({kind:"page",readonly:this.readonly},{input:"textarea",id:"description",title:"Description",placeholder:"describe this page..."},this.target.dataset.description||"").elt}get formSelectElement(){return this._facetElement('[data-action="select-form"]')}get relatedFormsElement(){const e=this.target.querySelector('[data-role="related-forms"]');if(!e||this.readonly)return e;const t=new AbortController,r=t.signal,s=(i=null)=>{e.querySelectorAll("[data-role='related-form']").forEach(a=>{a.dataset.selected=(!!(i&&a.dataset.formId===i)).toString()})};return e.querySelectorAll("[data-role='related-form']").forEach(i=>{i.addEventListener("click",a=>{a.preventDefault(),a.stopPropagation();const n=this._relatedFormDetails(i);!n?.id||!this.formSelect||(this.formSelect.select?.values?.clear(),this.formSelect.addOption(n),s(n.id))},{signal:r})}),this.target.addEventListener("updated",i=>{if(i.detail?.name!=="form")return;const a=Object.values(i.detail.options||{})[0];s(a?.id||null)},{signal:r}),this.target.addEventListener("change",i=>{i.target?.name==="form"&&s(i.target.value||null)},{signal:r}),s(this.formSelect?.details?.id||null),this.destroyables.push({destroy:()=>t.abort()}),e}get attributesElement(){return l.attributes(this)}get photoPromptElement(){return l.photoPrompt(this)}get categoriesElement(){return this._facetElement('[data-role="categories"]')}get autofillElement(){return l.autofill(this)}get prepend(){return[this.photoPromptElement,this.nameElement,this.descriptionElement]}get append(){return[this.formSelectElement,this.attributesElement,this.categoriesElement,this.autofillElement]}_facetElement(e){const t=this.target.querySelector(e);if(!t)return null;const r=c.facet(this,t);return r.init(),this.destroyables.push(r),t.matches('[data-action="select-form"]')&&(this.formSelect=r),r.elt}_relatedFormDetails(e){try{return JSON.parse(e.dataset.details||"{}")}catch{return{}}}}class _ extends u{constructor(e){super(e),this.messages={submit:"Update Page",submitting:"Updating Page",submitted:"Page Updated",queued:"Queued Sync"},this._changeForm=this._changeForm.bind(this)}async init(){await super.init(),this.target.addEventListener("updated",this._changeForm)}async prepareReset(e={}){const t=e.afterInit;await super.prepareReset({...e,afterInit:async r=>{await t?.(r),r.target.addEventListener("updated",r._changeForm)}})}async reset(){await this.prepareReset(),this.commitReset()}offline({data:e,method:t,route:r}){return{id:`update:page:${this.key}`,action:"update",kind:"page",method:t,route:r,target_key:this.key,data:e}}handleOfflineQueue({phase:e,record:t}){if(!(t?.kind!=="page"||t.target_key!==this.key))if(e==="queued")this.form?.queued(),this.setEntityMetadata();else{if(e==="conflict")return this._offlineConflict={record:t,response:t.conflictResponse},this.stageOfflineConflict();e==="replayed"&&(this.form?.success(),this.setEntityMetadata())}}async _changeForm(e){if(!e.target.closest("[data-role='form-select']"))return;e.stopPropagation();const t=this.initialTarget.querySelector("[data-action='select-form']"),r=JSON.parse(t?.dataset.preload||"{}"),s=Object.values(e.detail?.options||{})[0];if(!s?.id||s.id===r?.id)return;this.target.classList.add("opacity-50","pointer-events-none");const i=this.target.dataset.route,a=new URLSearchParams;a.set("form",s.id);const n=await f.get(i,a);if(!this.view.successfulResponse(n,this.component)){this.target.classList.remove("opacity-50","pointer-events-none"),E(new Error("Failed to replace form"),this.target,{requestedForm:s});return}this.schema=n.schema,this.submission=n.submission;const d=this.initialTarget.querySelector('[data-action="select-form"]');d.dataset.preload=JSON.stringify(s),await this.prepareReset(),await S(()=>{this.commitReset(),this.target.dataset.visible="true"},{label:"page-info:change-form"})}postreconcile(){super.postreconcile(),this.setEntityMetadata()}}class b extends u{constructor(e){super(e),this.messages={submit:"Create Page",submitting:"Creating Page",submitted:"Page Created"}}get html(){return[this.nameElement,this.descriptionElement,this.formSelectElement,this.relatedFormsElement,this.attributesElement,this.categoriesElement,this.autofillElement]}get prepend(){return[]}get append(){return[]}async prereconcile(){await super.prereconcile(),this._created&&await this.prepareReset()}postreconcile(){const e=this._created;e&&this.commitReset(),super.postreconcile(),e&&this.form?.resetSubmitButton();const t=this.target.querySelector("input[name='name']");this.visible&&t&&t.focus()}}class v extends y{constructor(e){super(e),this.messages={submit:"Update User Settings",submitting:"Updating User Settings",submitted:"User Settings Updated"},this._groupSelect=null}async reset(){this.destroy(),await this.init()}updated(e){const t=e.html?.querySelector(`[data-widget='${this.name}']`);t&&(this.initialTarget=t,this._updated=!0)}async init(){await super.init(),this._initGroups(),this._initPageSelect(),this._initRemovePage(),this.commitRevisionBaseline()}_initGroups(){const e=this.target.querySelector("[data-role='user-groups'] [name='group']");!e||!this.canEditGroups||(this._groupSelect=c.facet(this,e.closest("[lp-select]")),this._groupSelect.init(),this.destroyables.push(this._groupSelect))}_initPageSelect(){const e=this.target.querySelector("[data-role='page-select'] [name='reassign-page']");e&&(this._pageSelect=c.facet(this,e.closest("[lp-select]")),this._pageSelect.init(),this.destroyables.push(this._pageSelect))}_initRemovePage(){const e=this.target.querySelector("[data-role='remove-page'] input[name='remove-user']");e&&e.addEventListener("change",t=>{t.target.checked&&this._pageSelect&&this._pageSelect.select.clear()})}get canEditGroups(){return this.target.dataset.canEditGroups==="true"}get canEditAi(){return this.target.dataset.canEditAi==="true"}get canEditName(){return this.target.dataset.canEditName==="true"}get nameElement(){const e=this.target.dataset.name||"",t=!this.readonly&&this.canEditName,r=new m({kind:"user",readonly:!t,mode:t?"edit":null},{input:"text",id:"name",title:"Name",placeholder:"name this user..."},e).elt;if(!r)return null;const s=r.matches("input")?r:r.querySelector("input");return s&&(s.value=e),r}get userEmailElement(){return this.target.querySelector("[data-role='user-email']")}get userAiAccessElement(){return this.canEditAi?new p(this,{name:"ai_access",label:"AI Access",required:!0,layout:"row",options:[{label:"None",value:"NONE"},{label:"Ask",value:"ASK"},{label:"Create",value:"CREATE"}]},this.target.dataset.aiAccess||"NONE").edit:null}get userActionsElement(){return this.target.querySelector("[data-role='user-actions']")}get userGroupsElement(){return this.target.querySelector("[data-role='user-groups']")}get ownerInboundElement(){return this.target.querySelector("[data-role='owner-inbound']")}get userCardElement(){return this.target.querySelector("[data-role='user-card']")}get pageSelectElement(){return this.target.querySelector("[data-role='page-select']")}get removePageElement(){return this.target.querySelector("[data-role='remove-page']")}get html(){const e=this.userCardElement;return e?.querySelector("[data-role='user-fields']")?.replaceChildren(...[this.nameElement,this.userEmailElement,this.userAiAccessElement,this.userGroupsElement,this.ownerInboundElement,this.removePageElement,this.pageSelectElement].filter(Boolean)),[this.visibleTo,this.restrictAccess,e].filter(Boolean)}get formData(){const e=new FormData,t=this.userCardElement,r=t?.querySelector("[name='name']"),s=t?.querySelector("[name='email']");(r?.value||this.target.dataset.name)&&e.set("name",r?.value||this.target.dataset.name),s&&!s.disabled&&e.set("email",s.value);const i=t?.querySelector("[name='ai_access']:checked");if(this.canEditAi&&i&&e.set("ai_access",i.value),this._groupSelect&&Array.from(this._groupSelect.select.values).forEach(a=>{e.append("group",a)}),this._pageSelect&&Array.from(this._pageSelect.select.values).forEach(a=>{e.append("reassign-page",a)}),this.target.dataset.canEditOwnerInbound==="true")for(const a of["allow_messages_and_mentions","allow_task_assignments"]){const n=t?.querySelector(`[name='${a}']`);n&&e.set(a,n.checked?"true":"false")}return t?.querySelector("[name='remove-user']")?.checked&&e.set("remove-user","true"),e.set("role","user-settings"),e}postreconcile(){this._updated&&(this._updated=!1,this.commitReset(),this.target.dataset.visible="true",this.setEntityMetadata(),this._success&&(this.form?.success(),this._success=!1))}}export{b as CreatePage,u as PageForm,_ as PageInfo,v as UserSettings};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FormElement } from './form2.js?v=ba9311bf';
+import { InputElement } from './input.js?v=ba9311bf';
+import { RadioElement } from './radio.js?v=ba9311bf';
+import { s as sections } from './sections.js?v=ba9311bf';
+import { S as SectionToggle } from './sectionToggle.js?v=ba9311bf';
+import { TextareaElement } from './textarea.js?v=ba9311bf';
+import { r as request, c as captureError, w as withTransition } from './foundation.js?v=ba9311bf';
+import './connectivity.js?v=ba9311bf';
+import { PagePermissions } from './pagePermissions.js?v=ba9311bf';
+import './baseForm.js?v=ba9311bf';
+import './icons.js?v=ba9311bf';
+import './primitives.js?v=ba9311bf';
+import './styles.js?v=ba9311bf';
+import './loader.js?v=ba9311bf';
+import './baseElement.js?v=ba9311bf';
+import './formatting.js?v=ba9311bf';
+import './baseUpload.js?v=ba9311bf';
+import './buttons.js?v=ba9311bf';
+import './dropdown.js?v=ba9311bf';
+import './combobox.js?v=ba9311bf';
+import './facets.js?v=ba9311bf';
+import './results.js?v=ba9311bf';
+import './submitter.js?v=ba9311bf';
+
+/**
+ * @testable infrastructure
+ */
+class PageForm extends FormElement {
+	constructor(attributes) {
+		super(attributes);
+		this.formSelect = null;
+	}
+
+	get submitGroup() {
+		return this.target.querySelector("[data-role='submit-group']");
+	}
+
+	get nameElement() {
+		if (this.schema?.find((elt) => elt.id === "name")) return null;
+
+		return new InputElement(
+			{ kind: "page", readonly: this.readonly },
+			{
+				input: "text",
+				id: "name",
+				title: "Name",
+				placeholder: "name this page...",
+			},
+			this.target.dataset.name || "",
+		).elt;
+	}
+
+	get descriptionElement() {
+		if (this.schema?.find((elt) => elt.id === "description")) return null;
+
+		return new TextareaElement(
+			{ kind: "page", readonly: this.readonly },
+			{
+				input: "textarea",
+				id: "description",
+				title: "Description",
+				placeholder: "describe this page...",
+			},
+			this.target.dataset.description || "",
+		).elt;
+	}
+
+	get formSelectElement() {
+		return this._facetElement('[data-action="select-form"]');
+	}
+
+	get relatedFormsElement() {
+		const section = this.target.querySelector('[data-role="related-forms"]');
+		if (!section || this.readonly) return section;
+
+		const controller = new AbortController();
+		const signal = controller.signal;
+
+		const setSelected = (formId = null) => {
+			section
+				.querySelectorAll("[data-role='related-form']")
+				.forEach((badge) => {
+					badge.dataset.selected = Boolean(
+						formId && badge.dataset.formId === formId,
+					).toString();
+				});
+		};
+
+		section.querySelectorAll("[data-role='related-form']").forEach((badge) => {
+			badge.addEventListener(
+				"click",
+				(e) => {
+					e.preventDefault();
+					e.stopPropagation();
+
+					const details = this._relatedFormDetails(badge);
+					if (!details?.id || !this.formSelect) return;
+
+					this.formSelect.select?.values?.clear();
+					this.formSelect.addOption(details);
+					setSelected(details.id);
+				},
+				{ signal },
+			);
+		});
+
+		this.target.addEventListener(
+			"updated",
+			(e) => {
+				if (e.detail?.name !== "form") return;
+
+				const details = Object.values(e.detail.options || {})[0];
+				setSelected(details?.id || null);
+			},
+			{ signal },
+		);
+		this.target.addEventListener(
+			"change",
+			(e) => {
+				if (e.target?.name !== "form") return;
+
+				setSelected(e.target.value || null);
+			},
+			{ signal },
+		);
+
+		setSelected(this.formSelect?.details?.id || null);
+
+		this.destroyables.push({
+			destroy: () => controller.abort(),
+		});
+
+		return section;
+	}
+
+	get attributesElement() {
+		return sections.attributes(this);
+	}
+
+	get photoPromptElement() {
+		return sections.photoPrompt(this);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_category_to_page
+	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_remove_category_from_page
+	 * @features pages
+	 * @dimensions category-add category-remove
+	 */
+	get categoriesElement() {
+		return this._facetElement('[data-role="categories"]');
+	}
+
+	get autofillElement() {
+		return sections.autofill(this);
+	}
+
+	get prepend() {
+		return [this.photoPromptElement, this.nameElement, this.descriptionElement];
+	}
+
+	get append() {
+		return [
+			this.formSelectElement,
+			this.attributesElement,
+			this.categoriesElement,
+			this.autofillElement,
+		];
+	}
+
+	_facetElement(selector) {
+		const target = this.target.querySelector(selector);
+		if (!target) return null;
+
+		const control = SectionToggle.facet(this, target);
+		control.init();
+		this.destroyables.push(control);
+		if (target.matches('[data-action="select-form"]')) {
+			this.formSelect = control;
+		}
+		return control.elt;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/pageInfo.mjs::CreatePage
+	 * @reason related-form badge parsing is private CreatePage UI plumbing
+	 */
+	_relatedFormDetails(badge) {
+		try {
+			return JSON.parse(badge.dataset.details || "{}");
+		} catch {
+			return {};
+		}
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
+ * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
+ * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
+ * @pairs pages:readonly pages:permission-gates pages:lp-offline
+ */
+class PageInfo extends PageForm {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: `Update Page`,
+			submitting: `Updating Page`,
+			submitted: `Page Updated`,
+			queued: "Queued Sync",
+		};
+		this._changeForm = this._changeForm.bind(this);
+	}
+
+	async init() {
+		await super.init();
+		this.target.addEventListener("updated", this._changeForm);
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/widgets/pageInfo.mjs::PageInfo
+	 * @reason detached page-info resets retain the form-selection listener
+	 */
+	async prepareReset(options = {}) {
+		const afterInit = options.afterInit;
+		await super.prepareReset({
+			...options,
+			afterInit: async (widget) => {
+				await afterInit?.(widget);
+				widget.target.addEventListener("updated", widget._changeForm);
+			},
+		});
+	}
+
+	async reset() {
+		await this.prepareReset();
+		this.commitReset();
+	}
+
+	offline({ data, method, route }) {
+		return {
+			id: `update:page:${this.key}`,
+			action: "update",
+			kind: "page",
+			method,
+			route,
+			target_key: this.key,
+			data,
+		};
+	}
+
+	handleOfflineQueue({ phase, record }) {
+		if (record?.kind !== "page" || record.target_key !== this.key) return;
+		if (phase === "queued") {
+			this.form?.queued();
+			this.setEntityMetadata();
+		} else if (phase === "conflict") {
+			this._offlineConflict = {
+				record,
+				response: record.conflictResponse,
+			};
+			return this.stageOfflineConflict();
+		} else if (phase === "replayed") {
+			this.form?.success();
+			this.setEntityMetadata();
+		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_switch_page_form
+	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_clear_page_info_form_selector_keeps_widget_stable
+	 * @features pages
+	 * @dimensions form-switch form-clear info-form
+	 */
+	async _changeForm(e) {
+		if (!e.target.closest("[data-role='form-select']")) return;
+
+		e.stopPropagation();
+
+		const formSelect = this.initialTarget.querySelector(
+			"[data-action='select-form']",
+		);
+		const preloadedForm = JSON.parse(formSelect?.dataset.preload || "{}");
+
+		const selectedForm = Object.values(e.detail?.options || {})[0];
+
+		if (!selectedForm?.id) return;
+		if (selectedForm.id === preloadedForm?.id) return;
+
+		this.target.classList.add("opacity-50", "pointer-events-none");
+		const route = this.target.dataset.route;
+		const params = new URLSearchParams();
+		params.set("form", selectedForm.id);
+
+		const response = await request.get(route, params);
+		if (!this.view.successfulResponse(response, this.component)) {
+			this.target.classList.remove("opacity-50", "pointer-events-none");
+			captureError(new Error("Failed to replace form"), this.target, {
+				requestedForm: selectedForm,
+			});
+			return;
+		}
+		this.schema = response.schema;
+		this.submission = response.submission;
+
+		const nextFormSelect = this.initialTarget.querySelector(
+			'[data-action="select-form"]',
+		);
+		nextFormSelect.dataset.preload = JSON.stringify(selectedForm);
+		await this.prepareReset();
+		await withTransition(
+			() => {
+				this.commitReset();
+				this.target.dataset.visible = "true";
+			},
+			{ label: "page-info:change-form" },
+		);
+	}
+
+	postreconcile() {
+		super.postreconcile();
+		this.setEntityMetadata();
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_from_category_index
+ * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
+ * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_related_form_badge_selects_form
+ * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filters_hide_create_page_tool
+ * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
+ * @features pages
+ * @dimensions create category-index related-forms mobile-tools tool-switch
+ */
+class CreatePage extends PageForm {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Create Page",
+			submitting: "Creating Page",
+			submitted: "Page Created",
+		};
+	}
+
+	get html() {
+		return [
+			this.nameElement,
+			this.descriptionElement,
+			this.formSelectElement,
+			this.relatedFormsElement,
+			this.attributesElement,
+			this.categoriesElement,
+			this.autofillElement,
+		];
+	}
+
+	get prepend() {
+		return [];
+	}
+
+	get append() {
+		return [];
+	}
+
+	async prereconcile() {
+		await super.prereconcile();
+		if (this._created) await this.prepareReset();
+	}
+
+	postreconcile() {
+		const created = this._created;
+		if (created) this.commitReset();
+		super.postreconcile();
+
+		if (created) {
+			this.form?.resetSubmitButton();
+		}
+		const nameElement = this.target.querySelector("input[name='name']");
+		if (this.visible && nameElement) nameElement.focus();
+	}
+}
+
+/**
+ * @testable infrastructure
+ */
+class UserSettings extends PagePermissions {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Update User Settings",
+			submitting: "Updating User Settings",
+			submitted: "User Settings Updated",
+		};
+		this._groupSelect = null;
+	}
+
+	async reset() {
+		this.destroy();
+		await this.init();
+	}
+
+	updated(response) {
+		const updatedTarget = response.html?.querySelector(
+			`[data-widget='${this.name}']`,
+		);
+		if (updatedTarget) {
+			this.initialTarget = updatedTarget;
+			this._updated = true;
+		}
+	}
+
+	async init() {
+		await super.init();
+		this._initGroups();
+		this._initPageSelect();
+		this._initRemovePage();
+		this.commitRevisionBaseline();
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
+	 * @features user-settings
+	 * @dimensions owner-other-page group-selector edit-groups
+	 */
+	_initGroups() {
+		const groupInput = this.target.querySelector(
+			"[data-role='user-groups'] [name='group']",
+		);
+		if (!groupInput || !this.canEditGroups) return;
+
+		this._groupSelect = SectionToggle.facet(
+			this,
+			groupInput.closest("[lp-select]"),
+		);
+		this._groupSelect.init();
+		this.destroyables.push(this._groupSelect);
+	}
+
+	_initPageSelect() {
+		const pageInput = this.target.querySelector(
+			"[data-role='page-select'] [name='reassign-page']",
+		);
+		if (!pageInput) return;
+
+		this._pageSelect = SectionToggle.facet(
+			this,
+			pageInput.closest("[lp-select]"),
+		);
+		this._pageSelect.init();
+		this.destroyables.push(this._pageSelect);
+	}
+
+	_initRemovePage() {
+		const removePageInput = this.target.querySelector(
+			"[data-role='remove-page'] input[name='remove-user']",
+		);
+		if (!removePageInput) return;
+		removePageInput.addEventListener("change", (e) => {
+			if (e.target.checked && this._pageSelect) {
+				this._pageSelect.select.clear();
+			}
+		});
+	}
+
+	get canEditGroups() {
+		return this.target.dataset.canEditGroups === "true";
+	}
+
+	get canEditAi() {
+		return this.target.dataset.canEditAi === "true";
+	}
+
+	get canEditName() {
+		return this.target.dataset.canEditName === "true";
+	}
+
+	get nameElement() {
+		const name = this.target.dataset.name || "";
+		const canEdit = !this.readonly && this.canEditName;
+		const field = new InputElement(
+			{ kind: "user", readonly: !canEdit, mode: canEdit ? "edit" : null },
+			{
+				input: "text",
+				id: "name",
+				title: "Name",
+				placeholder: "name this user...",
+			},
+			name,
+		).elt;
+		if (!field) return null;
+		const input = field.matches("input") ? field : field.querySelector("input");
+		if (input) input.value = name;
+		return field;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
+	 * @features user-settings
+	 * @dimensions personal-page owner-own-page owner-other-page readonly-email editable-email
+	 */
+	get userEmailElement() {
+		return this.target.querySelector("[data-role='user-email']");
+	}
+
+	get userAiAccessElement() {
+		if (!this.canEditAi) return null;
+		return new RadioElement(
+			this,
+			{
+				name: "ai_access",
+				label: "AI Access",
+				required: true,
+				layout: "row",
+				options: [
+					{ label: "None", value: "NONE" },
+					{ label: "Ask", value: "ASK" },
+					{ label: "Create", value: "CREATE" },
+				],
+			},
+			this.target.dataset.aiAccess || "NONE",
+		).edit;
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
+	 * @features user-settings
+	 * @dimensions personal-page owner-own-page sign-out
+	 */
+	get userActionsElement() {
+		return this.target.querySelector("[data-role='user-actions']");
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
+	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
+	 * @features user-settings
+	 * @dimensions personal-page owner-own-page group-selector-hidden
+	 */
+	get userGroupsElement() {
+		return this.target.querySelector("[data-role='user-groups']");
+	}
+
+	get ownerInboundElement() {
+		return this.target.querySelector("[data-role='owner-inbound']");
+	}
+
+	get userCardElement() {
+		return this.target.querySelector("[data-role='user-card']");
+	}
+
+	get pageSelectElement() {
+		return this.target.querySelector("[data-role='page-select']");
+	}
+
+	get removePageElement() {
+		return this.target.querySelector("[data-role='remove-page']");
+	}
+
+	get html() {
+		const card = this.userCardElement;
+		const fields = card?.querySelector("[data-role='user-fields']");
+		fields?.replaceChildren(
+			...[
+				this.nameElement,
+				this.userEmailElement,
+				this.userAiAccessElement,
+				this.userGroupsElement,
+				this.ownerInboundElement,
+				this.removePageElement,
+				this.pageSelectElement,
+			].filter(Boolean),
+		);
+
+		return [this.visibleTo, this.restrictAccess, card].filter(Boolean);
+	}
+
+	get formData() {
+		const data = new FormData();
+		const card = this.userCardElement;
+		const name = card?.querySelector("[name='name']");
+		const email = card?.querySelector("[name='email']");
+
+		if (name?.value || this.target.dataset.name) {
+			data.set("name", name?.value || this.target.dataset.name);
+		}
+		if (email && !email.disabled) {
+			data.set("email", email.value);
+		}
+		const aiAccess = card?.querySelector("[name='ai_access']:checked");
+		if (this.canEditAi && aiAccess) {
+			data.set("ai_access", aiAccess.value);
+		}
+		if (this._groupSelect) {
+			Array.from(this._groupSelect.select.values).forEach((value) => {
+				data.append("group", value);
+			});
+		}
+		if (this._pageSelect) {
+			Array.from(this._pageSelect.select.values).forEach((value) => {
+				data.append("reassign-page", value);
+			});
+		}
+		if (this.target.dataset.canEditOwnerInbound === "true") {
+			for (const name of [
+				"allow_messages_and_mentions",
+				"allow_task_assignments",
+			]) {
+				const toggle = card?.querySelector(`[name='${name}']`);
+				if (toggle) data.set(name, toggle.checked ? "true" : "false");
+			}
+		}
+		card?.querySelector("[name='remove-user']")?.checked &&
+			data.set("remove-user", "true");
+		data.set("role", "user-settings");
+		return data;
+	}
+
+	postreconcile() {
+		const updated = this._updated;
+		if (!updated) return;
+
+		this._updated = false;
+		this.commitReset();
+		this.target.dataset.visible = "true";
+		this.setEntityMetadata();
+		if (this._success) {
+			this.form?.success();
+			this._success = false;
+		}
+	}
+}
+
+export { CreatePage, PageForm, PageInfo, UserSettings };

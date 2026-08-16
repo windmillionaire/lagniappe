@@ -354,6 +354,7 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 
 const calls = [];
+const stored = new Map();
 const context = {
   console,
   Core: class { reconcileChange() { calls.push(["core-reconcile"]); } },
@@ -361,6 +362,7 @@ const context = {
   STYLES: { list: { itemHeader: "item-header" } },
   ENDPOINTS: {
     messages: {
+      clearModal: (key) => "/clear/" + key,
       read: (key) => `/read/${key}`,
       send: "/messages",
     },
@@ -384,6 +386,11 @@ const context = {
   },
   FormData,
   crypto: { randomUUID: () => "fallback-operation" },
+  localStorage: {
+    getItem: (key) => stored.get(key) || null,
+    setItem: (key, value) => stored.set(key, value),
+    removeItem: (key) => stored.delete(key),
+  },
   document: {},
 };
 context.globalThis = context;
@@ -457,8 +464,78 @@ if (!source.includes("sendReply(") || !calls.some((call) => call[0] === "focus-r
 if (view.replySubmit.disabled || view.replySpinner.dataset.visible !== "false") {
   throw new Error("reply submit state was not restored");
 }
-if (!source.includes("conversation-selector")) {
-  throw new Error("messages view does not control a responsive peer selector");
+view.current = {
+  id: "conversation-a",
+  peer: { name: "Peer" },
+};
+view.conversations = new Map([
+  ["conversation-a", view.current],
+  [
+    "conversation-b",
+    { id: "conversation-b", peer: { name: "Unread Peer" }, unread: 2 },
+  ],
+]);
+view.selectorLabel = { textContent: "" };
+view.selector = {
+  classList: {
+    toggle: (name, force) => calls.push(["selector-class", name, force]),
+  },
+  setAttribute: (name, value) => calls.push(["selector-attribute", name, value]),
+};
+view.mobileClearConversation = {
+  dataset: {},
+  disabled: true,
+  setAttribute: (name, value) => calls.push(["clear-attribute", name, value]),
+  title: "",
+};
+view.mobileClearConversationContainer = {
+  dataset: { visible: "false" },
+};
+view.conversationDropdown = {
+  updateOptions: (items) => calls.push(["dropdown-items", items]),
+};
+view.renderConversationSelector();
+const dropdownItems = calls.find((call) => call[0] === "dropdown-items")?.[1];
+if (
+  view.selectorLabel.textContent !== "Peer" ||
+  dropdownItems?.[0]?.name !== "Peer" ||
+  dropdownItems?.[1]?.name !== "Unread Peer (2 unread)" ||
+  view.mobileClearConversation.disabled ||
+  view.mobileClearConversation.dataset.deleteModalRoute !==
+    "/clear/conversation-a" ||
+  view.mobileClearConversationContainer.dataset.visible !== "true"
+) {
+  throw new Error("messages view did not render its responsive conversation controls");
+}
+dropdownItems[1].onClick();
+if (!calls.some((call) => call[0] === "open" && call[1] === "conversation-b")) {
+  throw new Error("messages dropdown did not open the selected conversation");
+}
+view.conversationStorageKey = "messages-user-a-active";
+view.rememberConversation("conversation-b");
+if (
+  view.preferredConversation !== "conversation-b" ||
+  stored.get("messages-user-a-active") !== "conversation-b"
+) {
+  throw new Error("messages view did not persist the selected conversation");
+}
+view.current = null;
+view.preferredConversation = null;
+view.conversations.clear();
+view.renderConversationSelector();
+if (
+  view.selectorLabel.textContent !== "" ||
+  !view.mobileClearConversation.disabled ||
+  !calls.some(
+    (call) =>
+      call[0] === "selector-class" && call[1] === "hidden" && call[2] === true,
+  ) ||
+  view.mobileClearConversationContainer.dataset.visible !== "false"
+) {
+  throw new Error("empty messages view did not hide its unselected dropdown");
+}
+if (!source.includes('../elements/combobox/dropdown')) {
+  throw new Error("messages view does not use the shared dropdown combobox");
 }
 })().catch((error) => { console.error(error); process.exit(1); });
 """,

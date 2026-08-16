@@ -1,2 +1,77 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="0d29f4a1-8dc6-48a8-bc45-7fd6862fa828",e._sentryDebugIdIdentifier="sentry-dbid-0d29f4a1-8dc6-48a8-bc45-7fd6862fa828");}catch(e){}}();import{a as t}from"./base2.js?v=bb036cdb";import"./styles.js?v=bb036cdb";import"./baseForm.js?v=bb036cdb";import"./foundation.js?v=bb036cdb";import"./connectivity.js?v=bb036cdb";import"./icons.js?v=bb036cdb";import"./primitives.js?v=bb036cdb";import"./loader.js?v=bb036cdb";import"./select2.js?v=bb036cdb";import"./combobox.js?v=bb036cdb";import"./results.js?v=bb036cdb";import"./formatting.js?v=bb036cdb";import"./submitter.js?v=bb036cdb";class e extends t{constructor(i){super(i),this.key="visibility",this.targetSelectTitle="Show this element when",this.messages={submit:"Add Visibility Condition"}}init(){this.element.schema.visibility??=[],this.index!==-1?(this.setTitle("Edit Visibility Condition"),this.messages.submit="Update Visibility Condition",this.setting={...this.element.schema.visibility[this.index]}):(this.setTitle("Create Visibility Condition"),this.setting={}),super.init(),this.builder.getEligibleConditionTargets().length===0?this.form.showError("Visibility cannot be set using available components. Please add a radio button, checkbox, or select menu to the form before setting the visibility of this element."):super.addTargetSelect(),this.showProgress()}showProgress(){const i=this.builder.elements.get(this.setting.id);i&&(i.schema.type==="checkbox"?(this.addCheckboxTarget(),this.complete=!0):(this.addChooseValue(),this.setting.value&&(this.complete=!0)),super.showProgress())}}export{e as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { a as ConditionTarget } from './base2.js?v=ba9311bf';
+import './styles.js?v=ba9311bf';
+import './baseForm.js?v=ba9311bf';
+import './foundation.js?v=ba9311bf';
+import './connectivity.js?v=ba9311bf';
+import './icons.js?v=ba9311bf';
+import './primitives.js?v=ba9311bf';
+import './loader.js?v=ba9311bf';
+import './select2.js?v=ba9311bf';
+import './combobox.js?v=ba9311bf';
+import './results.js?v=ba9311bf';
+import './formatting.js?v=ba9311bf';
+import './submitter.js?v=ba9311bf';
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility_select_multiple_values
+ * @features forms
+ * @dimensions builder-field-visibility select-or-values
+ */
+class Visibility extends ConditionTarget {
+	constructor(builder) {
+		super(builder);
+		this.key = "visibility";
+		this.targetSelectTitle = "Show this element when";
+		this.messages = {
+			submit: "Add Visibility Condition",
+		};
+	}
+
+	init() {
+		this.element.schema.visibility ??= [];
+
+		if (this.index !== -1) {
+			this.setTitle("Edit Visibility Condition");
+			this.messages.submit = "Update Visibility Condition";
+			this.setting = { ...this.element.schema.visibility[this.index] };
+		} else {
+			this.setTitle("Create Visibility Condition");
+			this.setting = {};
+		}
+
+		super.init();
+
+		const targets = this.builder.getEligibleConditionTargets();
+		if (targets.length === 0) {
+			this.form.showError(
+				"Visibility cannot be set using available components. " +
+					"Please add a radio button, checkbox, or select menu to the form before " +
+					"setting the visibility of this element.",
+			);
+		} else {
+			super.addTargetSelect();
+		}
+
+		this.showProgress();
+	}
+
+	showProgress() {
+		const target = this.builder.elements.get(this.setting.id);
+		if (!target) return;
+
+		if (target.schema.type === "checkbox") {
+			this.addCheckboxTarget();
+			this.complete = true;
+		} else {
+			this.addChooseValue();
+			if (this.setting.value) this.complete = true;
+		}
+
+		super.showProgress();
+	}
+}
+
+export { Visibility as default };

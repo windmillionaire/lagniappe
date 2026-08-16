@@ -1,2 +1,110 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="0e27bcf8-04a4-4c10-ad10-56d57028ad65",e._sentryDebugIdIdentifier="sentry-dbid-0e27bcf8-04a4-4c10-ad10-56d57028ad65");}catch(e){}}();import{p as s}from"./primitives.js?v=bb036cdb";import{a as i}from"./base2.js?v=bb036cdb";import"./styles.js?v=bb036cdb";import"./icons.js?v=bb036cdb";import"./baseForm.js?v=bb036cdb";import"./foundation.js?v=bb036cdb";import"./connectivity.js?v=bb036cdb";import"./loader.js?v=bb036cdb";import"./select2.js?v=bb036cdb";import"./combobox.js?v=bb036cdb";import"./results.js?v=bb036cdb";import"./formatting.js?v=bb036cdb";import"./submitter.js?v=bb036cdb";class a extends i{constructor(t){super(t),this.key="status",this.messages={submit:"Add Status Message"},this.targetSelectTitle="Show this status message when"}init(){this.element.schema.status??=[],this.index!==-1?(this.setTitle("Edit Status Message"),this.messages.submit="Update Status Message",this.setting={...this.element.schema.status[this.index]}):(this.setTitle("Create Status Message"),this.setting={}),super.init(),this.builder.getEligibleConditionTargets().length===0?this.form.showError("Status messages cannot be set using available components. Please add a radio button, checkbox, or select menu to the form before setting a status message."):super.addTargetSelect(),this.showProgress()}showProgress(){const t=this.builder.elements.get(this.setting.id);t&&(this.setting.text&&(this.complete=!0),t.schema.type==="checkbox"?(this.addCheckboxTarget(),this.addStatusText()):(this.addChooseValue(),this.setting.value&&this.addStatusText()),super.showProgress())}addStatusText(){if(this.options.has("text"))return;const t=s.input({label:"Status Message",placeholder:"enter status message...",name:"status-message",type:"text",value:this.setting.text||null});this.options.set("text",t),this.focusTarget=t,t.addEventListener("input",e=>{this.setting.text=e.target.value,this.showProgress()})}validate(){return super.validate()?this.setting.text?!0:(this.form.showError("Please enter a status message."),!1):!1}}export{a as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { p as primitives } from './primitives.js?v=ba9311bf';
+import { a as ConditionTarget } from './base2.js?v=ba9311bf';
+import './styles.js?v=ba9311bf';
+import './icons.js?v=ba9311bf';
+import './baseForm.js?v=ba9311bf';
+import './foundation.js?v=ba9311bf';
+import './connectivity.js?v=ba9311bf';
+import './loader.js?v=ba9311bf';
+import './select2.js?v=ba9311bf';
+import './combobox.js?v=ba9311bf';
+import './results.js?v=ba9311bf';
+import './formatting.js?v=ba9311bf';
+import './submitter.js?v=ba9311bf';
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_status_message_condition_editor
+ * @features forms
+ * @dimensions builder-status-message
+ */
+class Status extends ConditionTarget {
+	constructor(builder) {
+		super(builder);
+		this.key = "status";
+		this.messages = {
+			submit: "Add Status Message",
+		};
+		this.targetSelectTitle = "Show this status message when";
+	}
+
+	init() {
+		this.element.schema.status ??= [];
+
+		if (this.index !== -1) {
+			this.setTitle("Edit Status Message");
+			this.messages.submit = "Update Status Message";
+			this.setting = { ...this.element.schema.status[this.index] };
+		} else {
+			this.setTitle("Create Status Message");
+			this.setting = {};
+		}
+
+		super.init();
+
+		const targets = this.builder.getEligibleConditionTargets();
+		if (targets.length === 0) {
+			this.form.showError(
+				"Status messages cannot be set using available components. " +
+					"Please add a radio button, checkbox, or select menu to the form before " +
+					"setting a status message.",
+			);
+		} else {
+			super.addTargetSelect();
+		}
+
+		this.showProgress();
+	}
+
+	showProgress() {
+		const target = this.builder.elements.get(this.setting.id);
+		if (!target) return;
+
+		if (this.setting.text) {
+			this.complete = true;
+		}
+
+		if (target.schema.type === "checkbox") {
+			this.addCheckboxTarget();
+			this.addStatusText();
+		} else {
+			this.addChooseValue();
+			if (this.setting.value) this.addStatusText();
+		}
+
+		super.showProgress();
+	}
+
+	addStatusText() {
+		if (this.options.has("text")) return;
+
+		const statusText = primitives.input({
+			label: "Status Message",
+			placeholder: "enter status message...",
+			name: "status-message",
+			type: "text",
+			value: this.setting.text || null,
+		});
+		this.options.set("text", statusText);
+		this.focusTarget = statusText;
+
+		statusText.addEventListener("input", (e) => {
+			this.setting.text = e.target.value;
+			this.showProgress();
+		});
+	}
+
+	validate() {
+		if (!super.validate()) return false;
+
+		if (!this.setting.text) {
+			this.form.showError("Please enter a status message.");
+			return false;
+		}
+
+		return true;
+	}
+}
+
+export { Status as default };

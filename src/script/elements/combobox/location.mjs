@@ -4,7 +4,9 @@ import { setIcon } from "../../shared/icons";
 import { Combobox } from "./combobox";
 
 /**
- * @testable infrastructure
+ * @testable true
+ * @tests tests_js/test_016_combobox_frontend.py::test_location_combobox_waits_for_session_sync_before_search
+ * @pairs location:session-update location:request-ordering
  */
 export class LocationBox extends Combobox {
 	constructor(element, { name = null, onSelect = null } = {}) {
@@ -45,11 +47,14 @@ export class LocationBox extends Combobox {
 	}
 
 	elementClick(event) {
-		updateUserLocation();
+		void updateUserLocation();
 		super.elementClick(event, false);
 	}
 
 	async _search(query) {
+		await updateUserLocation();
+		if (query !== this.currentQuery) return;
+
 		const params = new URLSearchParams();
 		params.set("q", query);
 		const response = await request.get(this.endpoint, params);

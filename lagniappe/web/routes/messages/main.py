@@ -64,10 +64,13 @@ def clear_modal(key):
     _managed_only()
     g.NO_CACHE = True
     try:
-        message_service.get_conversation(current_user, key)
+        conversation = message_service.get_conversation(current_user, key)
     except PermissionError:
         return responses.json_response({"error": "Conversation not found."}, 404)
-    return responses.message_clear_modal(key)
+    peer_name = message_service.serialize_conversation(
+        conversation, current_user
+    )["peer"]["name"]
+    return responses.message_clear_modal(key, peer_name=peer_name)
 
 
 # @testable infrastructure
