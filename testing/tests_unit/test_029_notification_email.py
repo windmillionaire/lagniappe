@@ -186,6 +186,7 @@ def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
         ),
         now=now,
     )
+
     replay = notification_email.record_notification_event(
         recipient,
         source_key,
@@ -197,6 +198,43 @@ def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
     assert replay.key == delivery.key
     assert delivery["due_at"] == now + timedelta(minutes=5)
     assert tasks[0]["task_id"] == tasks[1]["task_id"]
+
+    class UnloadedTargetNotification(SimpleNamespace):
+        @property
+        def target(self):
+            raise AssertionError("record_notification accessed an unloaded target")
+
+    unloaded_source_key = store.key(
+        KINDS.activity.value,
+        "unloaded-target-notice",
+        parent=recipient.key,
+    )
+    unloaded_target_key = store.key("page", "unloaded-target")
+    unloaded_target = SimpleNamespace(url="/pages/unloaded-target")
+
+    def fetch_unloaded_target(identifier, **_kwargs):
+        assert identifier == unloaded_target_key
+        return unloaded_target
+
+    monkeypatch.setattr(
+        notification_email.Entities,
+        "fetch_one",
+        fetch_unloaded_target,
+    )
+    unloaded_delivery = notification_email.record_notification(
+        UnloadedTargetNotification(
+            key=unloaded_source_key,
+            parent=recipient,
+            body="Target was not hydrated",
+            properties=SimpleNamespace(
+                target=SimpleNamespace(is_set=False, key=unloaded_target_key)
+            ),
+            notification_type="ordinary",
+            pending=False,
+        ),
+        now=now,
+    )
+    assert unloaded_delivery["target_path"] == unloaded_target.url
 
     sent = []
     monkeypatch.setattr(

@@ -390,11 +390,26 @@ def record_notification(notification, *, now=None):
         or getattr(notification, "pending", False)
     ):
         return None
+    target_property = getattr(getattr(notification, "properties", None), "target", None)
+    if target_property is None:
+        target = getattr(notification, "target", None)
+    elif getattr(target_property, "is_set", False):
+        target = target_property.value
+    else:
+        # Mutation plans may carry a persisted notification without hydrating
+        # its target. Email capture is supplementary and must not turn that
+        # missing projection into an unloaded-relation failure.
+        target_key = getattr(target_property, "key", None)
+        target = (
+            Entities.fetch_one(target_key, request=Fetch.direct())
+            if target_key is not None
+            else None
+        )
     return record_notification_event(
         getattr(notification, "parent", None),
         notification,
         body=getattr(notification, "body", ""),
-        target=getattr(notification, "target", None),
+        target=target,
         now=now,
     )
 

@@ -8,15 +8,9 @@ from .guidelines import (
 )
 from .reporting.contracts import (
     READ_ONLY_CONTEXT_TOOLS,
-    allowed_report_actions,
-    permission_filtered_output_contract,
-    report_proposal_response_schema,
-    report_action_permission_context,
-    report_action_permission_instructions,
 )
 from .reporting.proposals import (
     generate_validated_proposal,
-    validate_proposal,
 )
 from .prompt import Prompt
 
@@ -26,27 +20,6 @@ ASK_READ_ONLY_CONTEXT_TOOLS = (
     "get_task_history",
     "get_filter_schema",
     "query_workspace_filter",
-)
-ASK_ACTION_TYPES = frozenset(
-    {
-        "create_form",
-        "create_category",
-        "create_project",
-        "create_model_task",
-        "create_page",
-        "create_task",
-        "add_form_to_page",
-        "add_category",
-        "move_page",
-        "move_task",
-        "move_file",
-        "rename_entity",
-        "update_form_schema",
-        "update_submission_fields",
-        "delete_page",
-        "skip",
-        "needs_review",
-    }
 )
 
 ASK_SOURCE_GUIDELINES = """
@@ -64,9 +37,8 @@ Use sources in this order:
 
 Tool results are evidence. Do not cite or link internal entities unless prompt
 context or a tool result provided the hash token, url, or name. If sources
-conflict or the evidence is not strong enough for a direct answer, say what is
-uncertain and use needs_review only when a human decision or follow-up
-workspace action is actually useful.
+conflict or the evidence is not strong enough for a direct answer, clearly say
+what is uncertain.
 """
 
 ASK_PREFLIGHT_CHECKS = """
@@ -77,25 +49,10 @@ ASK_PREFLIGHT_CHECKS = """
   answer_html. Use the corresponding human name and URL when available; if no
   human name is available, describe the entity generically rather than showing
   its hash token.
-- Describe follow-up actions as proposed changes that would or could happen,
-  never as guaranteed future changes.
 - If links, lists, or emphasis would help, include answer_html with clean
   semantic HTML and only use links backed by tool results or web search.
-- Keep actions empty when the answer does not need workspace follow-up.
-- If actions are included, make sure they are useful follow-up work, not merely
-  a way to answer the question.
-- Do not propose file attachment actions; Ask can read and link files, but it
-  does not organize uploaded files into the workspace.
-- Treat delete_page as a manual cleanup suggestion; after execution, the report
-  result will show normal delete controls rather than letting the runner delete
-  pages.
-- Make sure every existing entity hash token used in an action came from prompt
-  context or a read-only tool result.
-- Make sure every action `type` exactly matches one value in the Report Action
-  Permissions allowed_actions list; do not invent aliases or shortened names.
-- Make sure every action reference points to an earlier action in the same
-  proposal.
-- Do not invent due_date values; only use exact dates supplied by the user.
+- Always return an empty actions array. Ask reads and answers; Create and
+  Organize own workspace changes.
 - Distinguish workspace evidence from outside-world information when both are
   used.
 """
@@ -117,80 +74,38 @@ Answer rules:
 - Put the direct answer in `summary`.
 - When the answer includes links, lists, or emphasis, also include
   `answer_html` using clean semantic HTML.
-- Hash tokens are internal references for tool calls and action data. Never
+- Hash tokens are internal references for tool calls. Never
   display them in `summary` or `answer_html`; use human names and URLs instead.
-- Describe unexecuted follow-up actions conditionally (for example, "would
-  move"), not as guaranteed future changes.
 - Use links in `answer_html` when a tool result provides a `url` and `name`,
   or when citing an external source found by web search.
-- If no workspace change is useful, return an empty `actions` array.
-- If follow-up work is useful, include ordered actions using the report action
-  shapes below.
-
-Allowed action types:
-- create_form
-- create_category
-- create_project
-- create_model_task
-- create_page
-- create_task
-- add_form_to_page
-- add_category
-- move_page
-- move_task
-- move_file
-- rename_entity
-- update_form_schema
-- update_submission_fields
-- delete_page
-- skip
-- needs_review
-
-Reference rules:
-- Use action references only for entities created earlier in the same actions
-  list.
-- Reference earlier actions with "$action_id", "action:action_id",
-  {"action": "action_id"}, or a data key ending in "_action".
-- Use existing Lagniappe entity hash tokens only when a read-only tool returned
-  that hash.
-- Use get_page_file_list to discover existing files attached to a page. For
-  move_file, copy the returned file hash into data.file, include exactly one
-  source page/task reference and exactly one target page/task reference, and
-  include display_name or file_name when known so the proposal is readable.
-- Ask follow-up actions do not attach files. Link to files in answer_html when
-  tool results provide URLs.
-- Do not create a form with an empty schema. If you cannot identify at least
-  one useful structured field, omit the create_form action or use needs_review.
-
-Common data shapes:
-- create_form: {"name": string, "form_type": "page"|"task", "schema": [field_object, ...]}
-- create_category: {"name": string, "description": string, "form": entity_or_action_ref}
-- create_project: {"name": string, "description": string}
-- create_model_task: {"name": string, "project": entity_or_action_ref, "form": entity_or_action_ref}
-- create_page: {"name": string, "description": string, "category": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "document": html_string}
-- create_task: {"name": string, "description": string, "page": entity_or_action_ref, "project": entity_or_action_ref, "model": entity_or_action_ref, "form": entity_or_action_ref, "submission": object, "due_date": "YYYY-MM-DD"}
-- add_form_to_page: {"page": entity_ref, "form": entity_or_action_ref}
-- add_category: {"page": entity_ref, "category": entity_ref}
-- move_page: {"page": entity_ref, "category": entity_ref}
-- move_task: {"task": entity_ref, "to_page": entity_ref}
-- move_file: {"file": entity_ref, "from_page": entity_ref, "from_task": entity_ref, "to_page": entity_ref, "to_task": entity_ref}
-- rename_entity: {"entity": entity_ref, "name": string}
-- update_form_schema: {"form": entity_ref, "operations": [{"op": "add_field", "field": object} or {"op": "add_select_option", "schema_id": string, "option": {"value": string, "label": string}}]}
-- update_submission_fields: {"updates": [{"page": entity_ref, "schema_id": string, "new_value": any} or {"task": entity_ref, "schema_id": string, "new_value": any}]}
-- delete_page: {"page": entity_ref}
-- skip: {"note": string}
-- needs_review: {"note": string, "questions": [string]}
+- Always return `actions` as an empty array. If the user requests workspace
+  changes, answer what can be established and direct them to Create or Organize.
 """
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/ai/ask.py::ask_prompt
-# @covered-by lagniappe/core/tools/ai/ask.py::revise_ask_prompt
-# @reason action filtering is observed through public Ask prompt builders
-def _ask_allowed_actions(user):
-    return tuple(
-        action for action in allowed_report_actions(user) if action in ASK_ACTION_TYPES
-    )
+# @testable true
+# @tests tests_unit/test_020b_ai_ask.py::test_ask_prompt_prioritizes_answers_and_exposes_read_tools
+# @features ai-report
+# @dimensions ask structured-output answer-only provider-validation
+def ask_response_schema():
+    """Return Ask's answer-only provider envelope."""
+    properties = {
+        "summary": {"type": "string"},
+        "answer_html": {"type": "string"},
+        "confidence": {"type": "number"},
+        "actions": {
+            "type": "array",
+            "items": {"type": "object"},
+            "maxItems": 0,
+        },
+    }
+    return {
+        "type": "object",
+        "properties": properties,
+        "required": ["summary", "confidence", "actions"],
+        "propertyOrdering": list(properties),
+        "additionalProperties": False,
+    }
 
 
 # @testable false
@@ -198,37 +113,18 @@ def _ask_allowed_actions(user):
 # @covered-by lagniappe/core/tools/ai/ask.py::revise_ask_prompt
 # @reason shared prompt composition is verified through public prompt builders
 def _ask_prompt_base(report, user, intro, extra_contexts=()):
-    allowed_actions = _ask_allowed_actions(user)
     prompt = Prompt(intro, user=user, type="ask report")
     prompt.enable_search()
     prompt.enable_tools(*ASK_READ_ONLY_CONTEXT_TOOLS)
     prompt.set_max_tool_iterations(ASK_MAX_TOOL_ITERATIONS)
-    prompt.set_allowed_actions(allowed_actions)
-    prompt.set_response_schema(
-        report_proposal_response_schema(
-            allowed_actions,
-            allow_answer_html=True,
-        )
-    )
-    prompt.add_output_contract(
-        "JSON",
-        permission_filtered_output_contract(ASK_OUTPUT_REQUIREMENTS, allowed_actions),
-    )
+    prompt.set_allowed_actions(())
+    prompt.set_response_schema(ask_response_schema())
+    prompt.add_output_contract("JSON", ASK_OUTPUT_REQUIREMENTS)
     prompt.add_context("user_question", report.instructions or "")
-    prompt.add_context(
-        "report_action_permissions",
-        report_action_permission_context(user, allowed_actions),
-    )
     for key, value, quote in extra_contexts:
         prompt.add_context(key, value, quote=quote)
     prompt.add_workspace_concepts(LAGNIAPPE_WORKSPACE_CONCEPTS)
     prompt.add_instructions(ASK_SOURCE_GUIDELINES)
-    prompt.add_instructions(
-        report_action_permission_instructions(),
-        section_title="Report action permissions",
-        role="action_permissions",
-        unique=True,
-    )
     prompt.add_instructions(HTML_GENERATION_RULES)
     return prompt
 
@@ -238,7 +134,7 @@ def _ask_prompt_base(report, user, intro, extra_contexts=()):
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
 # @features ai-report
-# @dimensions ask prompt search tool-context actions workspace-tools structured-filter
+# @dimensions ask prompt search tool-context answer-only workspace-tools structured-filter
 def ask_prompt(report, user):
     """Build the AI prompt used to answer an Ask report."""
     prompt = _ask_prompt_base(
@@ -246,7 +142,7 @@ def ask_prompt(report, user):
         user,
         "You are the Lagniappe Ask tool. Answer the user's question using "
         "permitted workspace records and web search when useful. Return JSON "
-        "only. Do not execute mutations or claim actions were performed.",
+        "only. Ask is read-only; always return an empty actions array.",
     )
     submitted_files = [
         {
@@ -261,17 +157,11 @@ def ask_prompt(report, user):
     ]
     if submitted_files:
         prompt.add_context("submitted_files", submitted_files)
-        prompt.email_submitted_file_ids = frozenset(
-            value
-            for file in report.input_files
-            for value in (file.hash, file.urlsafe_key)
-            if value
-        )
     prompt.add_instructions(
         """
-Answer the user's question directly in the top-level summary. If the question
-can be answered without changing the workspace, return an empty actions array.
-When the answer mentions pages, tasks, files, or external sources with URLs,
+Answer the user's question directly in the top-level summary and always return
+an empty actions array. When the answer mentions pages, tasks, files, or
+external sources with URLs,
 include `answer_html` with appropriate anchor tags so the report detail can
 show clickable links.
 
@@ -287,7 +177,7 @@ clear about what comes from the workspace versus outside research.
 When submitted_files context is present, those files were attached directly to
 this Ask report. Treat their ids as valid get_file references and use their
 summaries or original content when relevant. They are read-only evidence for
-the answer; never propose moving or attaching them to workspace records.
+the answer.
 
 Use get_task_history when the question asks about past completions, last or
 recent occurrences, frequency, average gaps, or proof for a recurring task.
@@ -311,35 +201,9 @@ specific entity may answer the question. Tool results are evidence; do not cite
 or link internal entities unless a tool result or prompt context provided the
 hash token, url, or name.
 
-Use get_schema only when a follow-up action needs a submission object for a
-specific form, page, task, or model task. Use get_form_instances when a
-follow-up action should patch exact submission fields across pages or tasks
-that share a form.
-
-If the answer naturally implies follow-up work, you may include deterministic
-proposal actions using the action shape described in the output format. Prefer
-creating a task on an existing relevant page, project, or model task. Do not
-include or invent due_date values unless the user explicitly provides an
-exact date. Ask follow-up actions should not attach files or record completed
-evidence; use the file-organization workflow when uploaded files need to be
-saved or classified.
-
-When a follow-up edit changes existing workspace data, use exact reviewed
-actions: add_category, move_page, move_task, move_file, rename_entity,
-update_submission_fields, or update_form_schema.
-For batch submission updates, list every affected page/task id, schema_id, and
-new_value explicitly; never ask the runner to infer "all matching" records.
-Call get_guidelines("schema_evolution") before proposing update_form_schema.
-
-Use delete_page only as a manual cleanup suggestion for specific existing pages,
-usually after move_file actions relocate the useful files elsewhere. The runner
-will not delete pages automatically; the report result shows normal delete
-controls so the user gets the usual confirmation, permissions, and cascade
-behavior.
-
-Use needs_review when the safe answer depends on ambiguous identity matches,
-conflicting records, missing evidence, or a human decision. Never create actions
-just to answer a question; actions are only for useful follow-up.
+When the user asks for workspace changes, answer any factual part of the
+question and explain that Create handles new work while Organize handles
+changes to existing workspace content. Do not design or return those changes.
         """,
         section_title="Ask report task",
     )
@@ -352,14 +216,13 @@ just to answer a question; actions are only for useful follow-up.
 # @features ai-report
 # @dimensions ask revision feedback proposal context
 def revise_ask_prompt(report, user, feedback):
-    """Build the AI prompt used to revise an Ask report answer or proposal."""
+    """Build the AI prompt used to revise an Ask report answer."""
     prompt = _ask_prompt_base(
         report,
         user,
-        "You are the Lagniappe Ask revision tool. Revise the saved answer and "
-        "optional action proposal using the user's feedback. Return a complete "
-        "JSON-only replacement response. Do not execute actions or claim "
-        "actions have been performed.",
+        "You are the Lagniappe Ask revision tool. Revise the saved answer "
+        "using the user's feedback. Return a complete JSON-only replacement "
+        "response with an empty actions array.",
         extra_contexts=(
             ("user_feedback", feedback or "None provided.", True),
             ("current_response_json", report.proposal or {}, True),
@@ -370,11 +233,7 @@ def revise_ask_prompt(report, user, feedback):
 The user reviewed the current Ask response and provided feedback. Update the
 answer so it follows the feedback while preserving correct parts of the
 existing response. Return a complete replacement response using the Ask report
-shape; do not return patches or partial actions.
-
-If follow-up work remains useful, include deterministic proposal actions. If
-the revised answer no longer needs workspace changes, return an empty actions
-array.
+shape; do not return a patch. Keep actions empty.
         """,
         section_title="Ask report revision task",
         role="revision_task",
@@ -392,26 +251,10 @@ array.
 # @dimensions ask generate validate repair usable-answer live-provider
 def generate_ask_report(prompt):
     """Generate and validate a usable Ask response."""
-    submitted_file_ids = frozenset(
-        getattr(prompt, "email_submitted_file_ids", ()) or ()
-    )
-
-    def validator(response, **options):
-        response = validate_ask_response(response, **options)
-        for action in response.get("actions") or []:
-            if action.get("type") != "move_file":
-                continue
-            file_reference = (action.get("data") or {}).get("file")
-            if file_reference in submitted_file_ids:
-                raise exceptions.AIException(
-                    "Ask email attachments are read-only evidence and cannot be moved."
-                )
-        return response
-
     return generate_validated_proposal(
         prompt,
         report_label="Ask",
-        validator=validator,
+        validator=validate_ask_response,
     )
 
 
@@ -419,19 +262,27 @@ def generate_ask_report(prompt):
 # @tests tests_unit/test_020b_ai_ask.py::test_validate_ask_response_requires_a_usable_answer[summary]
 # @tests tests_unit/test_020b_ai_ask.py::test_validate_ask_response_requires_a_usable_answer[confidence]
 # @tests tests_unit/test_020b_ai_ask.py::test_validate_ask_response_requires_a_usable_answer[answer-html]
+# @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_discards_workspace_actions
 # @features ai-report
-# @dimensions ask validation usable-answer
+# @dimensions ask validation usable-answer answer-only action-discard
 def validate_ask_response(
     response,
     allowed_actions=None,
     allow_pending_submissions=True,
 ):
-    """Validate answer fields and deterministic actions in an Ask response."""
-    response = validate_proposal(
-        response,
-        allowed_actions=allowed_actions,
-        allow_pending_submissions=allow_pending_submissions,
-    )
+    """Validate answer fields and deterministically discard workspace actions."""
+    if not isinstance(response, dict):
+        raise exceptions.AIException("Ask response must be a JSON object.")
+    response = {**response, "actions": []}
+    issues = response.get("issues")
+    if issues is None:
+        response["issues"] = []
+    elif not isinstance(issues, list) or any(
+        not isinstance(issue, str) for issue in issues
+    ):
+        raise exceptions.AIException(
+            "Ask response issues must be a list of strings when present."
+        )
 
     summary = response.get("summary")
     if not isinstance(summary, str) or not summary.strip():

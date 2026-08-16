@@ -269,12 +269,10 @@ def _missing_entity_pair_action_reference(action):
 # @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_reviews_ambiguous_missing_add_form_reference
 # @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_reviews_unresolved_references_after_failed_repair
 # @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_downgrades_missing_category_without_sentry_capture
-# @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_reviews_invalid_actions_after_failed_repair
 # @pair ai-report:needs-review
 # @pair ai-report:references
 # @pair ai-report:page-form
 # @pair ai-report:per-action-fallback
-# @pair ai-report:ask
 def _review_unresolved_action_references(
     proposal,
     allowed_actions,
@@ -375,12 +373,9 @@ def _review_unresolved_action_references(
 
 # @testable true
 # @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_downgrades_malformed_action_after_failed_repair
-# @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_preserves_valid_actions_after_malformed_repair
 # @pair ai-report:needs-review
 # @pair ai-report:per-action-fallback
 # @pair ai-report:malformed-data
-# @pair ai-report:canonical-target
-# @pair ai-report:ask
 def _review_invalid_action_shapes(
     proposal,
     allowed_actions,
@@ -576,8 +571,6 @@ def _report_needs_review_proposal(
 # @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_reviews_unresolved_references_after_failed_repair
 # @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_downgrades_malformed_action_after_failed_repair
 # @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_downgrades_missing_category_without_sentry_capture
-# @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_reviews_invalid_actions_after_failed_repair
-# @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_preserves_valid_actions_after_malformed_repair
 # @pair ai-report:fallback
 # @pair ai-report:per-action-fallback
 def _report_validation_fallback(
@@ -792,7 +785,7 @@ def generate_validated_proposal(
 # @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_repairs_invalid_action_type_once
 # @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_reviews_files_missing_after_repair
 # @tests tests_unit/test_020_ai_reports.py::test_generate_organize_plan_leaves_form_submission_for_completion
-# @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_reviews_invalid_actions_after_failed_repair
+# @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_repairs_unusable_answers
 # @pair ai-report:ask
 # @pair ai-report:validate
 # @pair ai-report:repair
@@ -951,6 +944,7 @@ def _organize_prompt_report_file_refs(prompt):
 # @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_repairs_invalid_action_data_shape
 # @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_repairs_missing_add_category_target
 # @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_repairs_empty_form_schema_without_capture
+# @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_repairs_unusable_answers
 # @pair ai-report:repair
 # @pair ai-report:file-placement
 # @pair ai-report:references
@@ -993,9 +987,10 @@ def _proposal_repair_prompt(source_prompt, proposal, error, report_label):
         )
     prompt.set_allowed_actions(allowed_actions)
     prompt.set_response_schema(
-        report_proposal_response_schema(
+        getattr(source_prompt, "response_schema", None)
+        if report_label == "Ask"
+        else report_proposal_response_schema(
             allowed_actions,
-            allow_answer_html=report_label == "Ask",
             require_issues=report_label == "Organize",
             include_submission_fields=report_label != "Organize",
         )

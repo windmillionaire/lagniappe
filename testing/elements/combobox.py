@@ -31,9 +31,13 @@ class Combobox:
             # Playwright's click already waits for actionability. If a proven
             # pointer-transition race remains, hover here before clicking.
             self.click()
+        self.expect_open(panel)
+        return panel
+
+    @staticmethod
+    def expect_open(panel):
         expect(panel).to_be_visible()
         expect(panel).to_have_attribute("data-positioned", "true")
-        return panel
 
     def click(self):
         self.element.click()
@@ -53,6 +57,19 @@ class Select(Combobox):
     def input(self, value):
         self._input = value
 
+    def open(self):
+        panel = self.panel
+        if not panel.is_visible():
+            self.click()
+
+        # Search-backed facet boxes intentionally keep an empty panel hidden
+        # until a query returns results. Static SelectBox controls can become
+        # visible immediately and should still cross the positioning boundary
+        # here.
+        if self.input.get_attribute("inputmode") == "none":
+            self.expect_open(panel)
+        return panel
+
     @property
     def placeholder(self):
         return self.input.get_attribute("placeholder")
@@ -71,7 +88,7 @@ class Select(Combobox):
         if mode != "none":
             expect(self.input).to_be_focused()
             self.input.fill(name)
-        expect(panel).to_be_visible()
+        self.expect_open(panel)
 
         option = panel.get_by_role("option", name=name, exact=True)
         expect(option).to_be_visible()
@@ -88,7 +105,7 @@ class Select(Combobox):
         if query is not None and self.input.get_attribute("inputmode") != "none":
             expect(self.input).to_be_focused()
             self.input.fill(query)
-        expect(panel).to_be_visible()
+        self.expect_open(panel)
 
         option = panel.locator(f"[role='option'][data-id='{key}']")
         expect(option).to_be_visible()

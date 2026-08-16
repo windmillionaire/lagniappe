@@ -23,6 +23,18 @@ from testing.resources import Project
 from testing.utility import expect_poll_result, expect_successful_response
 
 
+def _wait_for_services_ready(user):
+    user.page.evaluate(
+        """
+        async () => {
+            const view = document.querySelector("[lp-view]")?._lp_view;
+            if (!view) throw new Error("The current view was not published.");
+            await view.servicesReady;
+        }
+        """
+    )
+
+
 # @features projects
 # @dimensions info-form update metadata-sync
 # @template projects/project.html::view_header
@@ -96,10 +108,18 @@ def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revisio
     expect(info_form.locator("textarea[name='description']")).to_have_value(
         project.definition.description
     )
+    _wait_for_services_ready(owner)
 
-    with browser_failures.expect_offline(owner):
-        owner.offline = True
-        expect(owner.locate("[data-role='offline']")).to_be_visible()
+    with browser_failures.expect_http_error(
+        owner,
+        status=503,
+        path="/l/poll",
+        count=0,
+        max_count=1,
+    ):
+        with browser_failures.expect_offline(owner):
+            owner.offline = True
+            expect(owner.locate("[data-role='offline']")).to_be_visible()
 
     timestamp_only = Entities.fetch_one(project.key, request=Fetch.direct())
     timestamp_only.properties.modified.update()
@@ -176,9 +196,17 @@ def test_project_revision_notice_only_resets_changed_form(
     owner.page.wait_for_function(
         "() => !document.fonts || document.fonts.status === 'loaded'"
     )
-    with browser_failures.expect_offline(owner):
-        owner.offline = True
-        expect(owner.locate("[data-role='offline']")).to_be_visible()
+    _wait_for_services_ready(owner)
+    with browser_failures.expect_http_error(
+        owner,
+        status=503,
+        path="/l/poll",
+        count=0,
+        max_count=1,
+    ):
+        with browser_failures.expect_offline(owner):
+            owner.offline = True
+            expect(owner.locate("[data-role='offline']")).to_be_visible()
 
     remote_name = f"Remote revision {uuid4().hex[:8]}"
     collaborator.go(project)

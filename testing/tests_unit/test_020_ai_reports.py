@@ -2239,13 +2239,19 @@ def test_report_prompts_attach_provider_json_schema():
 
     organize_schema = organize_prompt.response_schema
     organize_actions = _response_action_schemas(organize_prompt)
-    ask_actions = _response_action_schemas(ask_prompt)
     create_actions = _response_action_schemas(create_prompt)
     all_actions = _response_action_schemas(
         SimpleNamespace(
             response_schema=organize.report_proposal_response_schema(
                 organize.ACTION_ORDER,
                 include_submission_fields=False,
+            )
+        )
+    )
+    full_actions = _response_action_schemas(
+        SimpleNamespace(
+            response_schema=organize.report_proposal_response_schema(
+                organize.ACTION_ORDER,
             )
         )
     )
@@ -2308,7 +2314,7 @@ def test_report_prompts_attach_provider_json_schema():
         "value",
         "label",
     ]
-    update_data = ask_actions["update_submission_fields"]["properties"]["data"]
+    update_data = full_actions["update_submission_fields"]["properties"]["data"]
     update_schema = update_data["properties"]["updates"]["items"]
     assert update_schema["required"] == ["schema_id", "new_value"]
     assert update_schema["properties"]["page"] == {"type": "string"}
@@ -2353,7 +2359,12 @@ def test_report_prompts_attach_provider_json_schema():
     ask_schema = ask_prompt.response_schema
     assert "answer_html" in ask_schema["properties"]
     assert "issues" not in ask_schema["required"]
-    assert tuple(ask_actions) == ask_prompt.allowed_actions
+    assert ask_prompt.allowed_actions == ()
+    assert ask_schema["properties"]["actions"] == {
+        "type": "array",
+        "items": {"type": "object"},
+        "maxItems": 0,
+    }
 
     assert "move_page" not in create_actions
     assert tuple(create_actions) == create_prompt.allowed_actions
@@ -2447,18 +2458,7 @@ def test_report_prompts_filter_actions_by_user_permissions():
         "skip",
         "needs_review",
     )
-    assert ask_prompt.allowed_actions == (
-        "create_page",
-        "create_task",
-        "add_form_to_page",
-        "add_category",
-        "move_page",
-        "move_file",
-        "rename_entity",
-        "update_submission_fields",
-        "skip",
-        "needs_review",
-    )
+    assert ask_prompt.allowed_actions == ()
     assert create_prompt.allowed_actions == (
         "create_page",
         "create_task",

@@ -1,6 +1,5 @@
 """Focused contracts for the Ask report pipeline."""
 
-import copy
 import json
 
 import pytest
@@ -61,7 +60,7 @@ def _json_context(prompt, label):
 
 
 # @features ai-report
-# @dimensions ask prompt search tool-context actions
+# @dimensions ask prompt search tool-context answer-only structured-output provider-validation
 @pytest.mark.unit
 def test_ask_prompt_prioritizes_answers_and_exposes_read_tools():
     user = _user()
@@ -77,8 +76,7 @@ def test_ask_prompt_prioritizes_answers_and_exposes_read_tools():
         "get_filter_schema",
         "query_workspace_filter",
     }.issubset(prompt.tools)
-    assert "attach_file_to_page" not in prompt.allowed_actions
-    assert "attach_file_to_task" not in prompt.allowed_actions
+    assert prompt.allowed_actions == ()
     assert _context(prompt, "User Question") == (
         "```\nHas Leo been vaccinated for pertussis?\n```"
     )
@@ -90,13 +88,26 @@ def test_ask_prompt_prioritizes_answers_and_exposes_read_tools():
     assert prompt.response_schema["properties"]["answer_html"] == {
         "type": "string"
     }
-    permissions = _json_context(prompt, "Report Action Permissions")
-    assert permissions["capabilities"]["can_attach_files_to_pages"] is False
-    assert permissions["capabilities"]["can_attach_files_to_tasks"] is False
+    assert set(prompt.response_schema["properties"]) == {
+        "summary",
+        "answer_html",
+        "confidence",
+        "actions",
+    }
+    assert prompt.response_schema["properties"]["actions"] == {
+        "type": "array",
+        "items": {"type": "object"},
+        "maxItems": 0,
+    }
+    assert "schedule" not in json.dumps(prompt.response_schema)
+    assert not any(
+        block["label"] == "Report Action Permissions"
+        for block in prompt.context_blocks
+    )
     assert prompt.audit()["duplicate_headings"] == []
     assert prompt.files == []
     assert "Never\n  display them in `summary` or `answer_html`" in prompt.build()
-    assert "never as guaranteed future changes" in prompt.build()
+    assert "Create handles new work" in prompt.build()
 
 
 # @features ai-report
@@ -188,52 +199,27 @@ def test_generate_ask_report_repairs_unusable_answers(monkeypatch):
     assert _context(calls[1], "Validation Error").strip()
 
 
-# @features ai-email ai-report
-# @dimensions ask submitted-files read-only repair
+# @features ai-report
+# @dimensions ask answer-only action-discard
 @pytest.mark.unit
-def test_generate_ask_report_rejects_moving_email_submitted_files(monkeypatch):
-    user = _user("ask-email-file-owner")
-    submitted = TestEntities.get(
-        "FILE",
-        {
-            "hash": "email-file-one",
-            "filename": "notes.txt",
-            "mimetype": "text/plain",
-            "summary": "Meeting notes",
-        },
-    )
-    prompt = ask.ask_prompt(
-        _report(user, hash="ask-email-file-report", input_files=[submitted]),
-        user,
-    )
-    responses = [
-        {
-            "summary": "The notes describe the meeting.",
+def test_generate_ask_report_discards_workspace_actions(monkeypatch):
+    user = _user("ask-answer-only-owner")
+    prompt = ask.ask_prompt(_report(user, hash="ask-answer-only-report"), user)
+    calls = []
+
+    def generate(candidate_prompt):
+        calls.append(candidate_prompt)
+        return {
+            "summary": "The records identify the next follow-up.",
+            "answer_html": "<p>The records identify the next follow-up.</p>",
             "confidence": 0.9,
             "actions": [
                 {
-                    "id": "move_email_file",
-                    "type": "move_file",
-                    "display_label": "Move submitted notes",
-                    "data": {
-                        "file": "email-file-one",
-                        "from_page": "source-page",
-                        "to_page": "target-page",
-                    },
+                    "type": "create_task",
+                    "data": {"name": "Follow up"},
                 }
             ],
-        },
-        {
-            "summary": "The notes describe the meeting.",
-            "confidence": 0.9,
-            "actions": [],
-        },
-    ]
-    calls = []
-
-    def generate(candidate_prompt):
-        calls.append(candidate_prompt)
-        return responses.pop(0)
+        }
 
     monkeypatch.setattr(
         organize.ai_model,
@@ -243,162 +229,9 @@ def test_generate_ask_report_rejects_moving_email_submitted_files(monkeypatch):
 
     response = ask.generate_ask_report(prompt)
 
+    assert response["summary"] == "The records identify the next follow-up."
     assert response["actions"] == []
-    assert len(calls) == 2
-    assert "read-only evidence" in _context(calls[1], "Validation Error")
-
-
-# @features ai-report
-# @dimensions ask needs-review references per-action-fallback fallback
-@pytest.mark.unit
-def test_generate_ask_report_reviews_invalid_actions_after_failed_repair(
-    monkeypatch,
-):
-    user = _user("ask-action-fallback-owner")
-    prompt = ask.revise_ask_prompt(
-        _report(user, hash="ask-action-fallback-report"),
-        user,
-        "The Eyes task should be on Lucy's Eyes page.",
-    )
-    invalid = {
-        "summary": "The page and task should be reorganized.",
-        "answer_html": "<p>The task belongs on Lucy's Eyes page.</p>",
-        "confidence": 0.9,
-        "actions": [
-            {
-                "id": "add_site_to_medical",
-                "type": "add_category",
-                "display_label": "Add Site for Sore Eyes to Medical",
-                "data": {
-                    "page": "site-for-sore-eyes-page",
-                    "category_name": "Medical",
-                },
-            },
-            {
-                "id": "move_specialist_consultation",
-                "type": "move_task",
-                "display_label": "Move Specialist Consultation",
-                "data": {
-                    "task_name": "Specialist Consultation",
-                    "page": "lucy-eyes-page",
-                },
-            },
-        ],
-    }
-    calls = []
-    captured = []
-
-    def generate(candidate_prompt):
-        calls.append(candidate_prompt)
-        return copy.deepcopy(invalid)
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(generate),
-    )
-    monkeypatch.setattr(
-        organize.exceptions,
-        "capture",
-        lambda error, context=None, level="error": captured.append(
-            {"error": error, "context": context, "level": level}
-        ),
-    )
-
-    response = ask.generate_ask_report(prompt)
-
-    assert response["summary"] == (
-        "Some suggested workspace changes need review before they can be applied."
-    )
-    assert response["answer_html"].endswith(invalid["answer_html"])
-    assert "Action review required" in response["answer_html"]
-    assert "suggestions only" in response["answer_html"]
-    assert [action["type"] for action in response["actions"]] == [
-        "needs_review",
-        "needs_review",
-    ]
-    assert response["actions"][0]["id"] == "add_site_to_medical"
-    assert response["actions"][0]["data"]["questions"] == [
-        "Which existing or proposed category should this action use?"
-    ]
-    assert "suggested change" in response["actions"][0]["data"]["note"]
-    assert response["actions"][1]["id"] == "move_specialist_consultation"
-    assert response["actions"][1]["data"]["questions"] == [
-        "Which existing or proposed task should this action use?"
-    ]
-    assert "workspace reference was unclear" in response["issues"][-1]
-    assert len(calls) == 2
-    assert "Keep internal entity hash tokens" in calls[1].build()
-    assert captured == []
-
-
-# @features ai-report
-# @dimensions ask per-action-fallback malformed-data canonical-target
-@pytest.mark.unit
-def test_generate_ask_report_preserves_valid_actions_after_malformed_repair(
-    monkeypatch,
-):
-    user = _user("ask-shape-fallback-owner")
-    prompt = ask.revise_ask_prompt(
-        _report(user, hash="ask-shape-fallback-report"),
-        user,
-        "Rename Orthodontics to Teeth and consolidate its tasks.",
-    )
-    invalid = {
-        "summary": "The dental records can be consolidated.",
-        "answer_html": "<p>Consolidate the dental records under Teeth.</p>",
-        "confidence": 0.9,
-        "actions": [
-            {
-                "id": "rename_page",
-                "type": "update_submission_fields",
-                "display_label": "Rename Orthodontics page to Teeth",
-                "data": {"updates": [{}]},
-            },
-            {
-                "id": "move_invisalign",
-                "type": "move_task",
-                "display_label": "Move Invisalign task to Teeth",
-                "data": {
-                    "task": "invisalign-task",
-                    "to_page": "orthodontics-page",
-                },
-            },
-            {
-                "id": "delete_redundant_page",
-                "type": "delete_page",
-                "display_label": "Delete redundant orthodontic page",
-                "data": {"page": "redundant-page"},
-            },
-        ],
-    }
-    calls = []
-
-    def generate(candidate_prompt):
-        calls.append(candidate_prompt)
-        return copy.deepcopy(invalid)
-
-    monkeypatch.setattr(
-        organize.ai_model,
-        "generate_content",
-        _with_validator(generate),
-    )
-    monkeypatch.setattr(organize.exceptions, "capture", lambda *args, **kwargs: None)
-
-    response = ask.generate_ask_report(prompt)
-
-    assert [action["type"] for action in response["actions"]] == [
-        "needs_review",
-        "move_task",
-        "delete_page",
-    ]
-    assert response["actions"][0]["id"] == "rename_page"
-    assert response["actions"][1]["data"]["to_page"] == (
-        "orthodontics-page"
-    )
-    assert "action data was incomplete" in response["issues"][-1]
-    assert "Action review required" in response["answer_html"]
-    assert len(calls) == 2
+    assert len(calls) == 1
 
 
 # @features ai-report
