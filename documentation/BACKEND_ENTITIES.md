@@ -520,7 +520,9 @@ events even when they were seen on site. A digest renders the first 100 items
 in full and links to Notifications and Messages when more remain. Delivery
 uses simple multipart text/HTML through the configured SMTP sender and a
 stable `Message-ID`; the HTML contains the notification/message body and a
-direct application link with no external assets. One-off OIDC Cloud Tasks call
+direct application link with no external assets. Document-mention email uses a
+concise mention-specific subject and body, emphasizes the document name, and
+opens the entity's `document` tab directly. One-off OIDC Cloud Tasks call
 `/process/notification-email`; notification email does not add a recurring
 scheduler or keep the basic-scaled service awake. Sent/suppressed rows are
 compacted to small idempotency tombstones.

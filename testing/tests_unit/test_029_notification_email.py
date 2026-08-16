@@ -166,14 +166,20 @@ def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
     source.update({"type": "notification", "notification_type": "ordinary"})
     store.put(source)
 
-    assert notification_email.record_notification(
-        SimpleNamespace(notification_type="aggregate", pending=False),
-        now=now,
-    ) is None
-    assert notification_email.record_notification(
-        SimpleNamespace(notification_type="ordinary", pending=True),
-        now=now,
-    ) is None
+    assert (
+        notification_email.record_notification(
+            SimpleNamespace(notification_type="aggregate", pending=False),
+            now=now,
+        )
+        is None
+    )
+    assert (
+        notification_email.record_notification(
+            SimpleNamespace(notification_type="ordinary", pending=True),
+            now=now,
+        )
+        is None
+    )
 
     delivery = notification_email.record_notification(
         SimpleNamespace(
@@ -242,7 +248,9 @@ def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
         "fetch_one",
         lambda *_args, **_kwargs: recipient,
     )
-    monkeypatch.setattr(notification_email, "recently_active", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        notification_email, "recently_active", lambda *_args, **_kwargs: False
+    )
     monkeypatch.setattr(
         notification_email.auth_email,
         "send_email",
@@ -286,6 +294,80 @@ def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
     assert len(sent) == 1
 
 
+# @source lagniappe/core/tools/notification_email.py::record_document_mention
+# @source lagniappe/core/tools/notification_email.py::deliver
+# @pair notification-email:document-mention
+def test_document_mention_email_uses_concise_copy_and_document_tab(monkeypatch):
+    now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
+    store = MemoryDatastore()
+    monkeypatch.setattr(notification_email.DATA, "_datastore_client", store)
+    task_recorder(monkeypatch)
+    monkeypatch.setattr(notification_email.CONFIG, "APP_NAME", "Test Lagniappe")
+    monkeypatch.setattr(
+        notification_email.CONFIG,
+        "GOOGLE_LOGIN_URI",
+        "https://lagniappe.example.test/login",
+    )
+    recipient = user_row("recipient", now)
+    source_key = store.key(
+        KINDS.activity.value,
+        "document-mention",
+        parent=recipient.key,
+    )
+    source = DatastoreEntity(key=source_key)
+    source.update({"type": "notification", "notification_type": "ordinary"})
+    store.put(source)
+    document = SimpleNamespace(name="Roadmap & Launch", url="/pages/roadmap")
+
+    delivery = notification_email.record_document_mention(
+        recipient,
+        source_key,
+        document=document,
+        now=now,
+    )
+
+    assert delivery["body"] == "You were mentioned in the Roadmap & Launch document."
+    assert delivery["target_path"] == "/pages/roadmap?tab=document"
+
+    sent = []
+    monkeypatch.setattr(
+        notification_email.Entities,
+        "fetch_one",
+        lambda *_args, **_kwargs: recipient,
+    )
+    monkeypatch.setattr(
+        notification_email,
+        "recently_active",
+        lambda *_args, **_kwargs: False,
+    )
+    monkeypatch.setattr(
+        notification_email.auth_email,
+        "send_email",
+        lambda *args, **kwargs: sent.append((args, kwargs)) or True,
+    )
+
+    result = notification_email.deliver(
+        delivery.key.to_legacy_urlsafe().decode(),
+        now=now + timedelta(minutes=5),
+    )
+
+    assert result == {"state": "sent"}
+    _, subject, text_body, html_body = sent[0][0]
+    assert subject == "Test Lagniappe document mention"
+    assert text_body == (
+        "You were mentioned in the Roadmap & Launch document.\n"
+        "https://lagniappe.example.test/pages/roadmap?tab=document"
+    )
+    assert "<h1" not in html_body
+    assert "<h2" not in html_body
+    assert (
+        "You were mentioned in the <i>Roadmap &amp; Launch</i> document." in html_body
+    )
+    assert (
+        'href="https://lagniappe.example.test/pages/roadmap?tab=document"' in html_body
+    )
+
+
 # @source lagniappe/core/tools/notification_email.py::record_message
 # @source lagniappe/core/tools/notification_email.py::deliver
 # @pairs notification-email:message notification-email:quiet-window notification-email:latest-only
@@ -311,7 +393,9 @@ def test_immediate_messages_wait_for_conversation_quiet(monkeypatch):
             }
         )
         store.put(conversation)
-        key = store.key(KINDS.messages.value, f"message-{sequence}", parent=conversation_key)
+        key = store.key(
+            KINDS.messages.value, f"message-{sequence}", parent=conversation_key
+        )
         message = DatastoreEntity(key=key)
         message.update(
             {
@@ -346,7 +430,9 @@ def test_immediate_messages_wait_for_conversation_quiet(monkeypatch):
         "fetch_one",
         lambda *_args, **_kwargs: recipient,
     )
-    monkeypatch.setattr(notification_email, "recently_active", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        notification_email, "recently_active", lambda *_args, **_kwargs: False
+    )
     monkeypatch.setattr(
         notification_email.auth_email,
         "send_email",
@@ -386,6 +472,55 @@ def test_immediate_messages_wait_for_conversation_quiet(monkeypatch):
     ) == {"state": "sent"}
     assert "later message" in sent[1][0][2]
     assert sent[0][1]["message_id"] != sent[1][1]["message_id"]
+
+
+# @source lagniappe/core/tools/notification_email.py::_digest_events
+# @pairs notification-email:digest-query notification-email:recipient-scope
+def test_daily_digest_query_retains_recipient_and_bucket_scope(monkeypatch):
+    captured = {}
+
+    class RecordingFilter:
+        def __init__(self):
+            self.conditions = []
+
+        def eq(self, name, value):
+            self.conditions.append((name, value))
+            return self
+
+    class RecordingQuery:
+        def __init__(self, kind):
+            captured["kind"] = kind
+            captured["filters"] = []
+
+        def filter(self, source_filter):
+            captured["filters"].append(source_filter.conditions)
+            return self
+
+        def order(self, *properties):
+            captured["order"] = properties
+            return self
+
+        def fetch_all(self):
+            return ["digest-event"]
+
+    monkeypatch.setattr(notification_email, "Filter", RecordingFilter)
+    monkeypatch.setattr(notification_email, "Query", RecordingQuery)
+    batch = {"recipient": "recipient-key", "bucket": "20260816T150000Z"}
+
+    assert notification_email._digest_events(batch) == ["digest-event"]
+    assert captured == {
+        "kind": KINDS.email_deliveries,
+        "filters": [
+            [
+                ("recipient", "recipient-key"),
+                ("record_type", "event"),
+                ("mode", notification_email.NotificationEmailMode.DAILY.name),
+                ("bucket", "20260816T150000Z"),
+                ("state", "pending"),
+            ]
+        ],
+        "order": ("created",),
+    }
 
 
 # @source lagniappe/core/tools/notification_email.py::record_notification_event
@@ -445,7 +580,9 @@ def test_daily_digest_uses_next_local_eight_and_batches(monkeypatch):
                     KINDS.activity.value,
                     f"extra-source-{index}",
                     parent=recipient.key,
-                ).to_legacy_urlsafe().decode(),
+                )
+                .to_legacy_urlsafe()
+                .decode(),
             }
         )
         store.put(row)

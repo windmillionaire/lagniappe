@@ -28,6 +28,7 @@ DELIVERY_LEASE_SECONDS = 5 * 60
 DIGEST_HOUR = 8
 DIGEST_ITEM_LIMIT = 100
 DELIVERY_SCHEMA_VERSION = 1
+DOCUMENT_MENTION_EVENT = "document_mention"
 
 
 class NotificationEmailError(RuntimeError):
@@ -434,6 +435,29 @@ def record_notification_event(user, source_key, *, body, target=None, now=None):
 
 
 # @testable true
+# @tests tests_unit/test_029_notification_email.py::test_document_mention_email_uses_concise_copy_and_document_tab
+# @pair notification-email:document-mention
+def record_document_mention(user, source_key, *, document, now=None):
+    """Capture a document mention with its dedicated email presentation."""
+    document_name = str(getattr(document, "name", None) or "document").strip()
+    values = _event_values(
+        source_type="notification",
+        source_key=source_key,
+        body=f"You were mentioned in the {document_name} document.",
+        title="Document mention",
+        target_path=f"{_target_path(document)}?tab=document",
+        now=_utc(now),
+    )
+    values.update(
+        {
+            "event_type": DOCUMENT_MENTION_EVENT,
+            "document_name": document_name,
+        }
+    )
+    return _record_event(user, values, now=now)
+
+
+# @testable true
 # @tests tests_unit/test_029_notification_email.py::test_immediate_messages_wait_for_conversation_quiet
 # @pairs notification-email:message notification-email:quiet-window notification-email:latest-only
 def record_message(message, conversation, recipient, *, now=None):
@@ -594,8 +618,7 @@ def _release(row, token, now):
 # @reason send-time opt-out enforcement is exercised through public delivery
 def _valid_for_user(row, user):
     return bool(
-        eligible_user(user)
-        and int(row.get("preference_epoch") or 0) == _epoch(user)
+        eligible_user(user) and int(row.get("preference_epoch") or 0) == _epoch(user)
     )
 
 
@@ -612,8 +635,7 @@ def _message_still_actionable(row, user):
     return bool(
         int(conversation.get("sequence") or 0) == sequence
         and conversation.get("last_sender") != user.key
-        and int((conversation.get("read_through") or {}).get(user_id) or 0)
-        < sequence
+        and int((conversation.get("read_through") or {}).get(user_id) or 0) < sequence
         and int((conversation.get("cleared_through") or {}).get(user_id) or 0)
         < sequence
         and user.key not in set(message.get("hidden_for") or ())
@@ -647,20 +669,77 @@ def _message_id(row):
 
 # @testable false
 # @covered-by lagniappe/core/tools/notification_email.py::deliver
+# @reason type-specific presentation selection is exercised through public delivery
+def _generic_presentation(item, _app_name):
+    return {
+        "subject": None,
+        "title": str(item.get("title") or "Notification"),
+        "text": str(item.get("body") or ""),
+        "html": escape(str(item.get("body") or "")),
+        "standalone_headings": True,
+    }
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/notification_email.py::deliver
+# @reason document mention presentation is exercised through public delivery
+def _document_mention_presentation(item, app_name):
+    document_name = str(item.get("document_name") or "document")
+    return {
+        "subject": f"{app_name} document mention",
+        "title": "Document mention",
+        "text": f"You were mentioned in the {document_name} document.",
+        "html": f"You were mentioned in the <i>{escape(document_name)}</i> document.",
+        "standalone_headings": False,
+    }
+
+
+EVENT_PRESENTATIONS = {
+    DOCUMENT_MENTION_EVENT: _document_mention_presentation,
+}
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/notification_email.py::deliver
+# @reason type-specific presentation dispatch is exercised through public delivery
+def _presentation(item, app_name):
+    renderer = EVENT_PRESENTATIONS.get(item.get("event_type"), _generic_presentation)
+    return renderer(item, app_name)
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/notification_email.py::deliver
 # @reason multipart rendering is exercised through public delivery
 def _render_email(subject, items, *, digest=False, overflow=0):
     app_name = str(getattr(CONFIG, "APP_NAME", "Lagniappe") or "Lagniappe")
-    text_lines = [subject, ""]
+    presentations = [_presentation(item, app_name) for item in items]
+    concise = bool(
+        not digest
+        and len(presentations) == 1
+        and not presentations[0]["standalone_headings"]
+    )
+    text_lines = [] if concise else [subject, ""]
     html_items = []
-    for item in items:
-        title = str(item.get("title") or "Notification")
-        body = str(item.get("body") or "")
+    for item, presentation in zip(items, presentations, strict=True):
         url = _absolute_url(item.get("target_path"))
-        text_lines.extend((title, body, url, ""))
+        text_lines.extend(
+            (presentation["text"], url, "")
+            if concise
+            else (presentation["title"], presentation["text"], url, "")
+        )
+        title_html = (
+            ""
+            if concise
+            else (
+                '<h2 style="font-size:16px;margin:0 0 6px">'
+                f"{escape(presentation['title'])}</h2>"
+            )
+        )
         html_items.append(
             '<section style="margin:0 0 18px">'
-            f'<h2 style="font-size:16px;margin:0 0 6px">{escape(title)}</h2>'
-            f'<div style="white-space:pre-wrap;margin:0 0 6px">{escape(body)}</div>'
+            f"{title_html}"
+            '<div style="white-space:pre-wrap;margin:0 0 6px">'
+            f"{presentation['html']}</div>"
             f'<a href="{escape(url, quote=True)}">Open in {escape(app_name)}</a>'
             "</section>"
         )
@@ -674,10 +753,15 @@ def _render_email(subject, items, *, digest=False, overflow=0):
             f'<a href="{escape(_absolute_url("/messages"), quote=True)}">Messages</a></p>'
         )
     heading = "Daily digest" if digest else subject
+    heading_html = (
+        ""
+        if concise
+        else f'<h1 style="font-size:20px;margin:0 0 18px">{escape(heading)}</h1>'
+    )
     html = (
         '<div style="font-family:system-ui,-apple-system,sans-serif;'
         'font-size:15px;line-height:1.45;color:#222;max-width:680px">'
-        f'<h1 style="font-size:20px;margin:0 0 18px">{escape(heading)}</h1>'
+        f"{heading_html}"
         f"{''.join(html_items)}"
         "</div>"
     )
@@ -689,8 +773,11 @@ def _render_email(subject, items, *, digest=False, overflow=0):
 # @reason SMTP composition is exercised through public delivery
 def _send(user, row, items, *, digest=False, overflow=0):
     app_name = str(getattr(CONFIG, "APP_NAME", "Lagniappe") or "Lagniappe")
+    presentation = _presentation(row, app_name)
     if digest:
         subject = f"{app_name} daily digest"
+    elif presentation["subject"]:
+        subject = presentation["subject"]
     elif (
         row.get("source_type") == "message"
         or row.get("record_type") == "message-candidate"
@@ -762,17 +849,20 @@ def _deliver_immediate(row, now):
         raise
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/notification_email.py::deliver
-# @reason digest query shape is owned by public delivery
+# @testable true
+# @tests tests_unit/test_029_notification_email.py::test_daily_digest_query_retains_recipient_and_bucket_scope
+# @pairs notification-email:digest-query notification-email:recipient-scope
 def _digest_events(batch):
     return list(
         Query(KINDS.email_deliveries)
-        .filter(Filter().eq("recipient", batch.get("recipient")))
-        .filter(Filter().eq("record_type", "event"))
-        .filter(Filter().eq("mode", NotificationEmailMode.DAILY.name))
-        .filter(Filter().eq("bucket", batch.get("bucket")))
-        .filter(Filter().eq("state", "pending"))
+        .filter(
+            Filter()
+            .eq("recipient", batch.get("recipient"))
+            .eq("record_type", "event")
+            .eq("mode", NotificationEmailMode.DAILY.name)
+            .eq("bucket", batch.get("bucket"))
+            .eq("state", "pending")
+        )
         .order("created")
         .fetch_all()
     )
@@ -848,12 +938,14 @@ def _deliver_digest(batch, now):
 
 # @testable true
 # @tests tests_unit/test_029_notification_email.py::test_immediate_notification_is_delayed_escaped_and_delivered
+# @tests tests_unit/test_029_notification_email.py::test_document_mention_email_uses_concise_copy_and_document_tab
 # @tests tests_unit/test_029_notification_email.py::test_immediate_messages_wait_for_conversation_quiet
 # @tests tests_unit/test_029_notification_email.py::test_daily_digest_uses_next_local_eight_and_batches
 # @pairs notification-email:immediate notification-email:message notification-email:digest
 # @pairs notification-email:html notification-email:presence-suppression
 # @pairs notification-email:read-suppression notification-email:idempotency
 # @pair notification-email:item-cap
+# @pair notification-email:document-mention
 def deliver(delivery_identifier, *, now=None):
     """Deliver, suppress, or reschedule one opaque queued delivery."""
     now = _utc(now)
@@ -877,6 +969,7 @@ __all__ = [
     "NotificationEmailError",
     "deliver",
     "eligible_user",
+    "record_document_mention",
     "record_message",
     "record_notification",
     "record_notification_event",

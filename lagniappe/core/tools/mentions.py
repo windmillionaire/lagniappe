@@ -197,13 +197,12 @@ def deliver_mentions(actor, document, html, occurrences):
         if created:
             try:
                 identity = _marker_identity(document, candidate["occurrence_id"])
-                notification_email.record_notification_event(
+                notification_email.record_document_mention(
                     recipient,
                     notification_service.ordinary_notification_key(
                         recipient, f"document-mention-{identity}"
                     ),
-                    body=f"{actor.name} mentioned you in {document.name}.",
-                    target=document,
+                    document=document,
                 )
             except Exception as error:
                 from ..exceptions import capture

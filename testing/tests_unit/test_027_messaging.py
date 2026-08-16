@@ -508,6 +508,17 @@ def test_mentions_validate_saved_occurrences_dedupe_and_sanitize(monkeypatch):
         "_deliver_occurrence",
         lambda *args: deliveries.append(args) or (True, None),
     )
+    monkeypatch.setattr(
+        mentions.notification_service,
+        "ordinary_notification_key",
+        lambda *_args: "document-mention-notification-key",
+    )
+    email_deliveries = []
+    monkeypatch.setattr(
+        mentions.notification_email,
+        "record_document_mention",
+        lambda *args, **kwargs: email_deliveries.append((args, kwargs)),
+    )
 
     delivered = mentions.deliver_mentions(
         actor,
@@ -517,6 +528,9 @@ def test_mentions_validate_saved_occurrences_dedupe_and_sanitize(monkeypatch):
     )
     assert delivered == 1
     assert len(deliveries) == 1
+    assert email_deliveries[0][0][0] is recipient
+    assert email_deliveries[0][0][1] == "document-mention-notification-key"
+    assert email_deliveries[0][1] == {"document": document}
 
     document.can_view = False
     deliveries.clear()
