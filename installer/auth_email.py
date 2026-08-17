@@ -488,7 +488,7 @@ def _configure_dmarc_for_sender(sender_email):
             "receiving mail systems how to handle messages that fail. Setup "
             "starts with the non-disruptive p=none policy; it enables DMARC "
             "authentication without asking receivers to quarantine or reject "
-            "mail."
+            "mail. This step is recommended but optional."
         )
     )
 
@@ -500,13 +500,16 @@ def _configure_dmarc_for_sender(sender_email):
         use_cloudflare = (
             input(
                 "Publish or verify this sender-domain DMARC record through "
-                "Cloudflare? [Y/n] (x to exit): "
+                "Cloudflare? [Y/n] (s to skip; x to exit): "
             )
             .strip()
             .casefold()
         )
         if use_cloudflare == "x":
             raise SetupCancelled("Authentication-email DMARC setup cancelled.")
+        if use_cloudflare == "s":
+            print("Skipped optional DMARC setup.")
+            return False
         if use_cloudflare != "n":
             api_token = get_cloudflare_api_token()
             zone = get_cloudflare_zone(sender_domain, api_token)
@@ -524,12 +527,18 @@ def _configure_dmarc_for_sender(sender_email):
     print(f"  Name:  {record_name}")
     print(f"  Value: {DMARC_DEFAULT_POLICY}")
     confirmed = (
-        input("Have you added or verified this DMARC record? [y/N] (x to exit): ")
+        input(
+            "Have you added or verified this DMARC record? [y/N] "
+            "(s to skip; x to exit): "
+        )
         .strip()
         .casefold()
     )
     if confirmed == "x":
         raise SetupCancelled("Authentication-email DMARC setup cancelled.")
+    if confirmed == "s":
+        print("Skipped optional DMARC setup.")
+        return False
     if confirmed != "y":
         raise SetupCancelled(
             "DMARC setup is incomplete. The previous email settings remain active."

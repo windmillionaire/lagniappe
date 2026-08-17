@@ -297,6 +297,13 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsy
         return True
 
     monkeypatch.setattr(auth_email, "test_smtp_delivery", test_delivery)
+    monkeypatch.setattr(
+        auth_email,
+        "_configure_dmarc_for_sender",
+        lambda _sender: pytest.fail(
+            "Gmail App Password setup must not invoke DMARC configuration"
+        ),
+    )
     answers = iter(
         [
             "",
@@ -460,6 +467,22 @@ def test_auth_email_dmarc_setup_supports_cloudflare_and_manual_dns(
     assert "Type:  TXT" in output
     assert "Name:  _dmarc.example.test" in output
     assert f"Value: {domain_setup.DMARC_DEFAULT_POLICY}" in output
+
+    settings.APP = {"CLOUDFLARE_ZONE_ID": "zone-1"}
+    monkeypatch.setattr(
+        domain_setup,
+        "get_cloudflare_api_token",
+        lambda: pytest.fail("skip must not request a Cloudflare token"),
+    )
+    monkeypatch.setattr("builtins.input", lambda _prompt: "s")
+    assert not auth_email._configure_dmarc_for_sender(
+        "noreply@mail.example.test"
+    )
+    assert "Skipped optional DMARC setup" in capsys.readouterr().out
+
+    settings.APP = {}
+    assert not auth_email._configure_dmarc_for_sender("noreply@example.test")
+    assert "Skipped optional DMARC setup" in capsys.readouterr().out
 
 
 # @features setup

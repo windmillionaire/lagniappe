@@ -87,11 +87,14 @@ The custom-domain path also makes DMARC part of email setup. SPF authenticates
 the provider's envelope sender, DKIM signs the message, and DMARC requires at
 least one of those identities to align with the visible `From` domain. After a
 successful SMTP test, setup creates or verifies `_dmarc.<sender-domain>` through
-Cloudflare when selected, or prints the exact TXT record for manual DNS. A new
-record starts at `v=DMARC1; p=none;`, which enables DMARC authentication without
-asking receivers to quarantine or reject failures. An existing valid
+Cloudflare when selected, or prints the exact TXT record for manual DNS. The
+operator may enter `s` to skip this optional step without blocking email setup.
+A new record starts at `v=DMARC1; p=none;`, which enables DMARC authentication
+without asking receivers to quarantine or reject failures. An existing valid
 `none`, `quarantine`, or `reject` policy on the sender domain—or an applicable
-parent-zone policy—is retained.
+parent-zone policy—is retained. The Gmail/App Password bootstrap path does not
+offer DMARC because Google or the Workspace domain owner controls that sender's
+DNS policy.
 
 Optional `./setup.sh ai-email` reuses the same verified Resend sender address,
 sender name, and Sending-access key for acceptance/result feedback. It creates

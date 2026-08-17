@@ -537,7 +537,7 @@ The full installation runs these steps in order:
    mapping to automatic Google-managed TLS when necessary, verifies that the
    returned mapping actually has automatic certificate management, reconciles
    or prints its DNS records, tests an operator-selected SMTP provider directly,
-   and creates or confirms a DMARC TXT policy for the visible sender domain.
+   and offers an optional DMARC TXT policy for the visible sender domain.
    Discovery requires the exact
    `apps/PROJECT/domainMappings/HOSTNAME` resource to appear in both the
    project-scoped mapping list and describe results; an empty list creates the
@@ -990,8 +990,9 @@ username `resend`) and asks for a test recipient. The application domain and
 Resend sending domain may differ (for example, `example.com` and
 `mail.example.com`).
 
-After the SMTP test succeeds and before replacing the saved sender, setup makes
-DMARC an explicit checkpoint for both Resend and generic SMTP. It targets the
+After the SMTP test succeeds and before replacing the saved sender, setup offers
+DMARC as an optional checkpoint for both Resend and generic SMTP. Entering `s`
+skips it without blocking the new email configuration. It targets the
 visible sender domain with `TXT _dmarc.<sender-domain>`. A new policy is
 `v=DMARC1; p=none;`: this completes DMARC authentication while leaving receiver
 disposition unchanged during initial monitoring. When the installation records
@@ -1000,7 +1001,8 @@ scoped token; it preserves any single valid existing `none`, `quarantine`, or
 `reject` policy, including an applicable parent-zone policy, rather than
 weakening it with a new subdomain override. Otherwise it prints the exact record
 and requires operator confirmation. Multiple or malformed DMARC policies stop
-the Cloudflare path instead of being overwritten.
+the Cloudflare path instead of being overwritten. The zero-domain Gmail/App
+Password bootstrap never enters this custom-domain DMARC flow.
 
 For another provider, setup collects the provider name, host, port, STARTTLS or
 implicit SSL/TLS mode, username, password or API key, sender address, sender
