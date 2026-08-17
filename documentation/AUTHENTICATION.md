@@ -79,7 +79,9 @@ Without a custom domain, setup can bootstrap a Gmail or Google Workspace
 mailbox with a Google App Password over STARTTLS. With a custom domain, setup
 supports a tested provider-neutral SMTP configuration and a Resend shortcut.
 New values replace the previous sender only after a successful test message.
-SMTP TLS always verifies certificates.
+SMTP TLS always verifies certificates. On a Resend rerun, setup automatically
+reuses the saved Sending key when the verified sending domain is unchanged; a
+different domain requires a new domain-scoped key.
 
 The custom-domain path also makes DMARC part of email setup. SPF authenticates
 the provider's envelope sender, DKIM signs the message, and DMARC requires at

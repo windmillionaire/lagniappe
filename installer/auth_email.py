@@ -539,6 +539,7 @@ def _configure_dmarc_for_sender(sender_email):
 
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_provider_auth_email_uses_resend_cloudflare_shortcut
+# @tests tests_tooling/test_001b_setup_providers.py::test_resend_auth_email_rerun_reuses_saved_sending_key_without_prompt
 # @features setup
 # @dimensions authentication-email smtp resend cloudflare-dns interactive-input settings-save
 def _setup_resend_auth_email(current, custom_domain):
@@ -580,25 +581,15 @@ def _setup_resend_auth_email(current, custom_domain):
     if domain_ready.casefold() == "x":
         raise SetupCancelled("Resend domain setup is incomplete.")
 
-    print(
-        wrap_text(
-            "\nCreate an API key named 'Lagniappe' with Sending access. "
-            "Restrict it to the verified sending domain when Resend offers "
-            "that choice. The key is shown only once."
-        )
-    )
-    print(f"Opening Resend API keys:\n  {RESEND_API_KEYS_URL}")
-    try:
-        webbrowser.open_new_tab(RESEND_API_KEYS_URL)
-    except webbrowser.Error:
-        pass
-
     from .domain.validation import validate_domain
 
     current_is_resend = (
         str(current.get("service") or "").strip().casefold() == "resend"
     )
     current_sender = str(current.get("senderEmail") or "").strip()
+    current_sending_key = (
+        str(current.get("password") or "") if current_is_resend else ""
+    )
     verified_domain_default = (
         current_sender.rsplit("@", 1)[-1]
         if current_is_resend and "@" in current_sender
@@ -622,7 +613,37 @@ def _setup_resend_auth_email(current, custom_domain):
             print(f.error("Enter the exact valid domain verified by Resend."))
             continue
         verified_domain_default = verified_domain
-        api_key = _prompt("Resend API key (input is visible)")
+        current_sender_domain = (
+            current_sender.rsplit("@", 1)[-1].strip().lower()
+            if "@" in current_sender
+            else ""
+        )
+        using_saved_key = bool(
+            current_sending_key
+            and verified_domain == current_sender_domain
+        )
+        if using_saved_key:
+            api_key = current_sending_key
+            print(
+                wrap_text(
+                    "A Resend Sending key is already saved for this verified "
+                    "domain. Setup will reuse it without prompting."
+                )
+            )
+        else:
+            print(
+                wrap_text(
+                    "\nCreate an API key named 'Lagniappe' with Sending access. "
+                    "Restrict it to the verified sending domain when Resend offers "
+                    "that choice. The key is shown only once."
+                )
+            )
+            print(f"Opening Resend API keys:\n  {RESEND_API_KEYS_URL}")
+            try:
+                webbrowser.open_new_tab(RESEND_API_KEYS_URL)
+            except webbrowser.Error:
+                pass
+            api_key = _prompt("Resend API key (input is visible)")
         default_sender = (
             current_sender
             if current_is_resend
@@ -695,6 +716,8 @@ def _setup_resend_auth_email(current, custom_domain):
             retry = input("Try Resend setup again? [Y/n]: ").strip().casefold()
             if retry == "n":
                 raise
+            if using_saved_key:
+                current_sending_key = ""
             continue
 
         _configure_dmarc_for_sender(sender_email)

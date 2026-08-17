@@ -549,6 +549,90 @@ def test_provider_auth_email_uses_resend_cloudflare_shortcut(monkeypatch):
 
 
 # @features setup
+# @dimensions authentication-email smtp resend interactive-input settings-save
+def test_resend_auth_email_rerun_reuses_saved_sending_key_without_prompt(
+    monkeypatch,
+    capsys,
+):
+    from installer import auth_email
+
+    saves = []
+    settings = types.SimpleNamespace(
+        APP={
+            "ADMIN_EMAIL": "owner@example.test",
+            "APP_NAME": "Demo",
+            "CUSTOM_DOMAIN": "app.example.test",
+            "AUTH_EMAIL_CONFIG": {
+                "provider": "smtp",
+                "service": "Resend",
+                "host": "smtp.resend.com",
+                "port": 465,
+                "security": "ssl",
+                "username": "resend",
+                "password": "re_saved_sending_key",
+                "senderEmail": "noreply@mail.app.example.test",
+                "senderName": "Demo",
+            },
+        },
+        save=lambda: saves.append(True),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(SETTINGS=settings),
+    )
+    formatter = types.SimpleNamespace(
+        initialize=lambda: types.SimpleNamespace(
+            error=lambda message: message,
+            warning=lambda message: message,
+            success=lambda message: message,
+            info=lambda message: message,
+        )
+    )
+    monkeypatch.setattr(auth_email, "FORMATTER", formatter)
+    opened_urls = []
+    monkeypatch.setattr(
+        auth_email.webbrowser,
+        "open_new_tab",
+        lambda url: opened_urls.append(url) or True,
+    )
+    deliveries = []
+    monkeypatch.setattr(
+        auth_email,
+        "test_smtp_delivery",
+        lambda config, recipient: deliveries.append(
+            (config.copy(), recipient)
+        )
+        or True,
+    )
+    monkeypatch.setattr(
+        auth_email,
+        "_configure_dmarc_for_sender",
+        lambda _sender: True,
+    )
+    prompts = []
+    answers = iter(["", "", "", "", "", ""])
+
+    def answer(prompt):
+        prompts.append(prompt)
+        return next(answers)
+
+    monkeypatch.setattr("builtins.input", answer)
+
+    assert auth_email._setup_provider_auth_email()
+    saved = settings.APP["AUTH_EMAIL_CONFIG"]
+    assert saved["password"] == "re_saved_sending_key"
+    assert saved["senderEmail"] == "noreply@mail.app.example.test"
+    assert deliveries == [(saved, "owner@example.test")]
+    assert all("Resend API key" not in prompt for prompt in prompts)
+    assert opened_urls == [auth_email.RESEND_DOMAINS_URL]
+    assert "reuse it without prompting" in (
+        " ".join(capsys.readouterr().out.split())
+    )
+    assert saves == [True]
+
+
+# @features setup
 # @dimensions authentication-email smtp custom-domain interactive-input settings-save
 def test_provider_auth_email_saves_only_after_successful_smtp_test(monkeypatch):
     from installer import auth_email

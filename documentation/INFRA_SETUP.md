@@ -979,13 +979,16 @@ application domain. Both the fresh custom-domain branch and the later
 `./setup.sh email` command offer Resend first. When the saved application-domain
 configuration identifies Cloudflare, setup opens Resend's Domain Connect path;
 Resend owns that short-lived Cloudflare authorization and publishes its
-email-specific DNS records. Setup then opens Resend's API-key page and supplies
+email-specific DNS records. The operator copies the exact verified sending
+domain shown by Resend; setup derives `noreply@SENDING_DOMAIN` and requires the
+sender to match that domain. On first configuration—or when that domain
+changes—setup opens Resend's API-key page and asks for a domain-restricted
+Sending key. A rerun for the unchanged domain reuses the Sending key already in
+`AUTH_EMAIL_CONFIG` without opening the key page or prompting for it. Setup uses
 the documented fixed SMTP values (`smtp.resend.com`, implicit TLS port `465`,
-username `resend`). The operator copies the exact verified sending domain
-shown by Resend; setup derives `noreply@SENDING_DOMAIN`, requires the sender to
-match that domain, and then asks for the Sending access API key and test
-recipient. The application domain and Resend sending domain may differ (for
-example, `example.com` and `mail.example.com`).
+username `resend`) and asks for a test recipient. The application domain and
+Resend sending domain may differ (for example, `example.com` and
+`mail.example.com`).
 
 After the SMTP test succeeds and before replacing the saved sender, setup makes
 DMARC an explicit checkpoint for both Resend and generic SMTP. It targets the
