@@ -17,6 +17,7 @@ const CLEAR_ALL_KEY = "__clear_all_notifications__";
  * @pairs notifications:menu-open notifications:dropdown-refresh notifications:delete
  * @pairs notifications:clear-all notifications:long-text-wrap notifications:accessible-state
  * @pairs notifications:exact-count notifications:bounded-page
+ * @pair notifications:message-ordering
  */
 export class Notifications {
 	constructor(view) {
@@ -160,17 +161,18 @@ export class Notifications {
 		const messageUser = this.notifications.find(
 			(item) => item.action === "message-user",
 		);
-		const remaining = messageUser
-			? this.notifications.filter((item) => item !== messageUser)
-			: this.notifications;
+		const messageAggregate = this.notifications.find(
+			(item) => item.action === "open-messages",
+		);
+		const leading = [messageUser, messageAggregate].filter(Boolean);
+		const remaining = this.notifications.filter(
+			(item) => !leading.includes(item),
+		);
 		const hasOrdinary = this.notifications.some(
 			(item) => item.key && !item.key.startsWith("__"),
 		);
-		if (!hasOrdinary)
-			return messageUser ? [messageUser, ...remaining] : remaining;
-		return messageUser
-			? [messageUser, this._clearAllOption(), ...remaining]
-			: [this._clearAllOption(), ...remaining];
+		if (!hasOrdinary) return [...leading, ...remaining];
+		return [...leading, this._clearAllOption(), ...remaining];
 	}
 
 	_clearAllOption() {

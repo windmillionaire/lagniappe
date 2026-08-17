@@ -2,8 +2,8 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from testing.definitions import Tasks, Users
-from testing.elements import DateSelect
+from testing.definitions import SitePages, Tasks, Users
+from testing.elements import DateSelect, UserSelect
 from testing.utility.local_time import (
     local_date_from_utc_datetime,
     local_date_iso,
@@ -57,12 +57,23 @@ def _add_weekly_schedule(task):
     _save_settings(task)
 
 
-# @features task-scheduling
-# @dimensions due-date add
+# @pairs task-scheduling:due-date task-scheduling:add
+# @pairs task-assignment:assignee-preservation task-assignment:home-list
+# @source src/script/elements/sectionToggle.mjs::FacetControl
 def test_page_task_add_due_date(get_user):
     user = get_user(Users.OWNER)
     task = Tasks.test_page_task_add_due_date.get(user)
+    assignee = Users.create_user.get(user)
     user.go(task)
+
+    UserSelect(task.settings_form).select(assignee)
+    _save_settings(task)
+    assert _fresh_task(task).properties.assigned_to.key == assignee.entity.page.key
+    settings_form = task.settings_form
+    expect(UserSelect(settings_form).button).to_contain_text(assignee.definition.name)
+    expect(settings_form.locator("select[name='assigned_to']")).to_have_value(
+        assignee.entity.page.urlsafe_key
+    )
 
     due_date = local_date_plus_days_iso(4)
     schedule_form = _open_schedule_form(task)
@@ -71,6 +82,12 @@ def test_page_task_add_due_date(get_user):
 
     expect(task.element.locator(DUE_DATE_BADGE)).to_be_visible()
     _assert_due_date(task, due_date)
+    assert _fresh_task(task).properties.assigned_to.key == assignee.entity.page.key
+
+    assigned_user = get_user(Users.create_user)
+    assigned_home = assigned_user.go(SitePages.HOME)
+    assigned_home.task_list
+    expect(assigned_user.locate(f"[data-key='{task.key}']")).to_be_visible()
 
 
 # @features task-scheduling

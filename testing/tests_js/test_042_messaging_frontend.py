@@ -283,6 +283,7 @@ if (!source.includes("STYLES.button.submit") || !source.includes("data-role=\"ic
 
 
 # @pairs notifications:exact-count notifications:bounded-page
+# @pair notifications:message-ordering
 # @source src/script/elements/notifications.mjs::Notifications
 def test_notification_menu_keeps_authoritative_aggregate_count(run_node):
     run_node(
@@ -328,6 +329,7 @@ menu.stale = false;
 menu.notifications = [
   ...Array.from({ length: 25 }, (_, index) => ({ key: `n-${index}` })),
   { key: "__message_user__", action: "message-user" },
+  { key: "__message_aggregate__", action: "open-messages" },
 ];
 menu._updateCount();
 if (rendered.at(-1) !== 54) {
@@ -336,18 +338,19 @@ if (rendered.at(-1) !== 54) {
 const dropdownItems = menu._dropdownItems();
 if (
   dropdownItems[0]?.action !== "message-user" ||
-  dropdownItems[1]?.key !== "__clear_all_notifications__" ||
-  dropdownItems[2]?.key !== "n-0"
+  dropdownItems[1]?.action !== "open-messages" ||
+  dropdownItems[2]?.key !== "__clear_all_notifications__" ||
+  dropdownItems[3]?.key !== "n-0"
 ) {
   throw new Error(`unexpected notification action order: ${JSON.stringify(dropdownItems)}`);
 }
 for (const style of ["-mt-1", "border-b", "bg-base-bg"]) {
-  if (!dropdownItems[1].html.includes(style)) {
-    throw new Error(`clear action is missing ${style}: ${dropdownItems[1].html}`);
+  if (!dropdownItems[2].html.includes(style)) {
+    throw new Error(`clear action is missing ${style}: ${dropdownItems[2].html}`);
   }
 }
-if (dropdownItems[1].html.includes("mb-1")) {
-  throw new Error(`clear action retained a bottom gap: ${dropdownItems[1].html}`);
+if (dropdownItems[2].html.includes("mb-1")) {
+  throw new Error(`clear action retained a bottom gap: ${dropdownItems[2].html}`);
 }
 let prevented = false;
 await menu._selectNotification(
