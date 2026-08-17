@@ -81,12 +81,28 @@ supports a tested provider-neutral SMTP configuration and a Resend shortcut.
 New values replace the previous sender only after a successful test message.
 SMTP TLS always verifies certificates.
 
+The custom-domain path also makes DMARC part of email setup. SPF authenticates
+the provider's envelope sender, DKIM signs the message, and DMARC requires at
+least one of those identities to align with the visible `From` domain. After a
+successful SMTP test, setup creates or verifies `_dmarc.<sender-domain>` through
+Cloudflare when selected, or prints the exact TXT record for manual DNS. A new
+record starts at `v=DMARC1; p=none;`, which enables DMARC authentication without
+asking receivers to quarantine or reject failures. An existing valid
+`none`, `quarantine`, or `reject` policy on the sender domain—or an applicable
+parent-zone policy—is retained.
+
 Optional `./setup.sh ai-email` reuses the same verified Resend sender address,
 sender name, and Sending-access key for acceptance/result feedback. It creates
 only a separate Full access key for receiving administration; the two keys must
-differ. Inbound `From` matching selects an existing account but does not grant
-browser access or permission to execute a proposal: reports remain owner-scoped,
-rate-limited, and Create/Organize changes require normal sign-in and review.
+differ. That receiving key is saved in `AI_EMAIL_CONFIG` and reused without a
+key prompt on later reconciliation runs; the live Resend operations still
+validate it. More importantly, the deployed runtime needs that key after each
+signed webhook event to retrieve the complete received message, list attachment
+metadata, and obtain each attachment download URL. The separate Sending key is
+used only for outbound feedback. Inbound `From` matching selects an existing
+account but does not grant browser access or permission to execute a proposal:
+reports remain owner-scoped, rate-limited, and Create/Organize changes require
+normal sign-in and review.
 
 At runtime the server uses authenticated ADC and
 `accounts:sendOobCode` with `returnOobLink: true`. It embeds the returned code

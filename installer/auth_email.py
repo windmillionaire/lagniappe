@@ -466,6 +466,78 @@ def _prompt_port(default=587):
 
 
 # @testable true
+# @tests tests_tooling/test_001b_setup_providers.py::test_auth_email_dmarc_setup_supports_cloudflare_and_manual_dns
+# @features setup
+# @dimensions authentication-email dmarc cloudflare-dns manual-dns
+def _configure_dmarc_for_sender(sender_email):
+    """Publish or confirm a DMARC policy for the visible sender domain."""
+    from config import SETTINGS
+    from .domain import (
+        DMARC_DEFAULT_POLICY,
+        ensure_cloudflare_dmarc_record,
+        get_cloudflare_api_token,
+        get_cloudflare_zone,
+    )
+
+    sender_domain = str(sender_email).rsplit("@", 1)[-1].strip().lower()
+    record_name = f"_dmarc.{sender_domain}"
+    print(
+        "\n"
+        + wrap_text(
+            "DMARC ties the visible From domain to SPF or DKIM and tells "
+            "receiving mail systems how to handle messages that fail. Setup "
+            "starts with the non-disruptive p=none policy; it enables DMARC "
+            "authentication without asking receivers to quarantine or reject "
+            "mail."
+        )
+    )
+
+    cloudflare_configured = bool(
+        SETTINGS.APP.get("CLOUDFLARE_ZONE_ID")
+        or SETTINGS.APP.get("CLOUDFLARE_ACCOUNT_ID")
+    )
+    if cloudflare_configured:
+        use_cloudflare = (
+            input(
+                "Publish or verify this sender-domain DMARC record through "
+                "Cloudflare? [Y/n] (x to exit): "
+            )
+            .strip()
+            .casefold()
+        )
+        if use_cloudflare == "x":
+            raise SetupCancelled("Authentication-email DMARC setup cancelled.")
+        if use_cloudflare != "n":
+            api_token = get_cloudflare_api_token()
+            zone = get_cloudflare_zone(sender_domain, api_token)
+            result = ensure_cloudflare_dmarc_record(
+                sender_domain,
+                zone,
+                api_token,
+            )
+            verb = "Created" if result["action"] == "created" else "Verified"
+            print(f"{verb} Cloudflare TXT {result['name']}: {result['content']}")
+            return True
+
+    print("\nAdd this DNS record at the provider for the sender domain:")
+    print("  Type:  TXT")
+    print(f"  Name:  {record_name}")
+    print(f"  Value: {DMARC_DEFAULT_POLICY}")
+    confirmed = (
+        input("Have you added or verified this DMARC record? [y/N] (x to exit): ")
+        .strip()
+        .casefold()
+    )
+    if confirmed == "x":
+        raise SetupCancelled("Authentication-email DMARC setup cancelled.")
+    if confirmed != "y":
+        raise SetupCancelled(
+            "DMARC setup is incomplete. The previous email settings remain active."
+        )
+    return True
+
+
+# @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_provider_auth_email_uses_resend_cloudflare_shortcut
 # @features setup
 # @dimensions authentication-email smtp resend cloudflare-dns interactive-input settings-save
@@ -484,8 +556,9 @@ def _setup_resend_auth_email(current, custom_domain):
             wrap_text(
                 "This installation already uses Cloudflare DNS. Resend can "
                 "publish its SPF, DKIM, and return-path records through the "
-                "'Sign in to Cloudflare' button; no additional Cloudflare "
-                "token needs to be entered here."
+                "'Sign in to Cloudflare' button. After the SMTP test, setup "
+                "will separately publish or verify the sender domain's DMARC "
+                "record."
             )
         )
     else:
@@ -624,6 +697,7 @@ def _setup_resend_auth_email(current, custom_domain):
                 raise
             continue
 
+        _configure_dmarc_for_sender(sender_email)
         SETTINGS.APP["AUTH_EMAIL_CONFIG"] = candidate
         SETTINGS.save()
         print(
@@ -734,6 +808,7 @@ def _setup_provider_auth_email():
                 raise
             continue
 
+        _configure_dmarc_for_sender(sender_email)
         SETTINGS.APP["AUTH_EMAIL_CONFIG"] = candidate
         SETTINGS.save()
         print(

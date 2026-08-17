@@ -36,6 +36,7 @@ from .deferred_jobs import (
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_email_ingest_adapter_starts_existing_report_job_idempotently
 # @tests tests_unit/test_028_ai_email.py::test_email_ingest_failure_surfaces_bounded_diagnostic
+# @tests tests_unit/test_023_deferred_jobs.py::test_email_ingest_notification_is_created_only_for_failure
 # @features ai-email deferred-jobs
 # @dimensions report-handoff acceptance
 class EmailIngestAdapter(DeferredJobAdapter):
@@ -45,6 +46,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
     queued_message = "Preparing email submission..."
     success_message = "Email submission accepted."
     failure_prefix = "Email submission failed."
+    notification_policy = "failure"
 
     def authorization(self, spec):
         authorization = super().authorization(spec)
@@ -308,6 +310,10 @@ class EmailIngestAdapter(DeferredJobAdapter):
             and (context.checkpoint or {}).get("stage")
             not in {"report_job_started", "acceptance_sent"}
         )
+
+    def notification_target(self, context):
+        report = context.input("report")
+        return report if isinstance(report, Entities.REPORT) else None
 
     def external_delivery(self, context, *, succeeded, error=None):
         from lagniappe.core.tools.ai_email import send_report_feedback

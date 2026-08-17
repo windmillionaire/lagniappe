@@ -96,8 +96,11 @@ def _absolute_url(path):
 
 # @testable false
 # @covered-by lagniappe/core/tools/notification_email.py::record_notification_event
+# @covered-by lagniappe/core/tools/notification_email.py::record_notification
 # @reason target resolution is exercised through notification event capture
 def _target_path(target):
+    if isinstance(target, Entities.REPORT):
+        return f"/tools/reports/{target.urlsafe_key}"
     if target is not None:
         try:
             path = target.url
@@ -340,6 +343,40 @@ def _event_values(*, source_type, source_key, body, title, target_path, now):
 
 
 # @testable false
+# @covered-by lagniappe/core/tools/notification_email.py::record_notification
+# @reason target-specific digest copy is exercised through notification capture and delivery
+def _notification_copy(target, body):
+    title = "Notification"
+    body = str(body or "").strip()
+    target_name = str(getattr(target, "name", None) or "").strip()
+
+    if isinstance(target, Entities.REPORT) and target.tool in {"ask", "organize"}:
+        label = target.tool.title()
+        title = target_name or f"{label} report"
+        if body in {
+            f"{label} report is ready.",
+            f"{label} report revision is ready.",
+        }:
+            body = ""
+    elif isinstance(target, (Entities.PAGE, Entities.TASK)):
+        label = "Task" if isinstance(target, Entities.TASK) else "Page"
+        completed = f"{label} autofill is ready."
+        if body == completed or body.startswith("Autofill failed."):
+            title = f"Autofill: {target_name or label}"
+            if body == completed:
+                body = ""
+    elif isinstance(target, Entities.FILE):
+        name = target_name or "file"
+        completed = f"File summary complete for {name}"
+        if body == completed or body.startswith("File summary failed"):
+            title = f"Summarize: {name}"
+            if body == completed:
+                body = ""
+
+    return title, body
+
+
+# @testable false
 # @covered-by lagniappe/core/tools/notification_email.py::record_notification_event
 # @covered-by lagniappe/core/tools/notification_email.py::record_message
 # @reason shared event persistence is owned by the typed public capture APIs
@@ -384,8 +421,10 @@ def _record_event(user, values, *, now=None):
 # @testable true
 # @tests tests_unit/test_029_notification_email.py::test_immediate_notification_is_delayed_escaped_and_delivered
 # @tests tests_unit/test_029_notification_email.py::test_task_assignment_email_uses_task_copy_without_headers
+# @tests tests_unit/test_029_notification_email.py::test_daily_digest_groups_messages_and_uses_named_completion_links
 # @pairs notification-email:notification notification-email:pending-filter
 # @pair notification-email:task-assignment
+# @pairs notification-email:target-title notification-email:target-link
 def record_notification(notification, *, now=None):
     """Capture one final ordinary notification for email delivery."""
     if (
@@ -432,18 +471,25 @@ def record_notification(notification, *, now=None):
         )
         return _record_event(getattr(notification, "parent", None), values, now=now)
 
-    return record_notification_event(
-        getattr(notification, "parent", None),
-        notification,
-        body=getattr(notification, "body", ""),
-        target=target,
-        now=now,
+    title, body = _notification_copy(
+        target,
+        getattr(notification, "body", ""),
     )
+    values = _event_values(
+        source_type="notification",
+        source_key=notification,
+        body=body,
+        title=title,
+        target_path=_target_path(target),
+        now=_utc(now),
+    )
+    return _record_event(getattr(notification, "parent", None), values, now=now)
 
 
 # @testable true
 # @tests tests_unit/test_029_notification_email.py::test_immediate_notification_is_delayed_escaped_and_delivered
 # @tests tests_unit/test_029_notification_email.py::test_daily_digest_uses_next_local_eight_and_batches
+# @tests tests_unit/test_029_notification_email.py::test_daily_digest_groups_messages_and_uses_named_completion_links
 # @pairs notification-email:immediate notification-email:digest notification-email:idempotency
 # @pairs notification-email:timezone notification-email:full-roundup
 # @pair notification-email:future-only-switch
@@ -485,6 +531,7 @@ def record_document_mention(user, source_key, *, document, now=None):
 
 # @testable true
 # @tests tests_unit/test_029_notification_email.py::test_immediate_messages_wait_for_conversation_quiet
+# @tests tests_unit/test_029_notification_email.py::test_daily_digest_groups_messages_and_uses_named_completion_links
 # @pairs notification-email:message notification-email:quiet-window notification-email:latest-only
 def record_message(message, conversation, recipient, *, now=None):
     """Capture a newly-created inbound direct message."""
@@ -752,24 +799,57 @@ def _presentation(item, app_name):
 
 # @testable false
 # @covered-by lagniappe/core/tools/notification_email.py::deliver
+# @reason digest message grouping is exercised through public batch delivery
+def _group_digest_messages(items):
+    grouped = []
+    by_sender = {}
+    for item in items:
+        if item.get("source_type") != "message":
+            grouped.append(item)
+            continue
+        sender = item.get("sender")
+        sender_name = str(item.get("sender_name") or "a user")
+        sender_id = (
+            _encoded_key(sender) if sender is not None else sender_name.casefold()
+        )
+        existing = by_sender.get(sender_id)
+        if existing is None:
+            existing = dict(item)
+            existing["title"] = f"Messages from {sender_name}"
+            grouped.append(existing)
+            by_sender[sender_id] = existing
+            continue
+        bodies = [existing.get("body"), item.get("body")]
+        existing["body"] = "\n\n".join(
+            str(body).strip() for body in bodies if str(body or "").strip()
+        )
+    return grouped
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/notification_email.py::deliver
 # @reason multipart rendering is exercised through public delivery
 def _render_email(subject, items, *, digest=False, overflow=0):
     app_name = str(getattr(CONFIG, "APP_NAME", "Lagniappe") or "Lagniappe")
+    if digest:
+        items = _group_digest_messages(items)
     presentations = [_presentation(item, app_name) for item in items]
     concise = bool(
         not digest
         and len(presentations) == 1
         and not presentations[0]["standalone_headings"]
     )
-    text_lines = [] if concise else [subject, ""]
+    text_lines = [] if concise or digest else [subject, ""]
     html_items = []
     for item, presentation in zip(items, presentations, strict=True):
         url = _absolute_url(item.get("target_path"))
-        text_lines.extend(
-            (presentation["text"], url, "")
-            if concise
-            else (presentation["title"], presentation["text"], url, "")
-        )
+        if concise:
+            text_lines.extend((presentation["text"], url, ""))
+        else:
+            text_lines.append(presentation["title"])
+            if presentation["text"]:
+                text_lines.append(presentation["text"])
+            text_lines.extend((url, ""))
         title_html = (
             ""
             if concise
@@ -778,11 +858,16 @@ def _render_email(subject, items, *, digest=False, overflow=0):
                 f"{escape(presentation['title'])}</h2>"
             )
         )
+        body_html = (
+            '<div style="white-space:pre-wrap;margin:0 0 6px">'
+            f"{presentation['html']}</div>"
+            if presentation["html"]
+            else ""
+        )
         html_items.append(
             '<section style="margin:0 0 18px">'
             f"{title_html}"
-            '<div style="white-space:pre-wrap;margin:0 0 6px">'
-            f"{presentation['html']}</div>"
+            f"{body_html}"
             f'<a href="{escape(url, quote=True)}">Open in {escape(app_name)}</a>'
             "</section>"
         )
@@ -795,11 +880,10 @@ def _render_email(subject, items, *, digest=False, overflow=0):
             f'<a href="{escape(_absolute_url("/"), quote=True)}">Notifications</a> · '
             f'<a href="{escape(_absolute_url("/messages"), quote=True)}">Messages</a></p>'
         )
-    heading = "Daily digest" if digest else subject
     heading_html = (
         ""
-        if concise
-        else f'<h1 style="font-size:20px;margin:0 0 18px">{escape(heading)}</h1>'
+        if concise or digest
+        else f'<h1 style="font-size:20px;margin:0 0 18px">{escape(subject)}</h1>'
     )
     html = (
         '<div style="font-family:system-ui,-apple-system,sans-serif;'
@@ -985,12 +1069,14 @@ def _deliver_digest(batch, now):
 # @tests tests_unit/test_029_notification_email.py::test_task_assignment_email_uses_task_copy_without_headers
 # @tests tests_unit/test_029_notification_email.py::test_immediate_messages_wait_for_conversation_quiet
 # @tests tests_unit/test_029_notification_email.py::test_daily_digest_uses_next_local_eight_and_batches
+# @tests tests_unit/test_029_notification_email.py::test_daily_digest_groups_messages_and_uses_named_completion_links
 # @pairs notification-email:immediate notification-email:message notification-email:digest
 # @pairs notification-email:html notification-email:presence-suppression
 # @pairs notification-email:read-suppression notification-email:idempotency
 # @pair notification-email:item-cap
 # @pair notification-email:document-mention
 # @pair notification-email:task-assignment
+# @pair notification-email:message-grouping
 def deliver(delivery_identifier, *, now=None):
     """Deliver, suppress, or reschedule one opaque queued delivery."""
     now = _utc(now)

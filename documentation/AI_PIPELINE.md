@@ -136,6 +136,9 @@ site export allocate their domain record immediately before this
 transaction, outside the durable job/notification transaction. The durable job
 contains entity references and bounded parameters rather than fully rendered
 prompts or file bytes. File processing creates only a terminal notification.
+Email ingestion creates no pending or success notification; it creates a linked
+terminal notification only when ingestion fails, while the child report job
+retains its ordinary report-completion notification.
 Production then schedules the shared `process.deferred_job_process` endpoint at
 `POST /process/jobs`; its Cloud Task payload contains only the job key. An
 explicitly disabled queue fails and compensates immediately. A transient

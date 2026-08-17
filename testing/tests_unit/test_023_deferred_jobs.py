@@ -33,6 +33,7 @@ from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.files import extract as file_extract
+from testing.utility.test_entities import TestEntities
 
 
 pytestmark = pytest.mark.unit
@@ -1982,6 +1983,82 @@ def test_runner_persists_terminal_domain_failure_without_provider_retry(monkeypa
             },
         )
     ]
+
+
+# @source lagniappe/core/tools/deferred_jobs.py::DeferredJobRegistry._finish_terminal_delivery
+# @source lagniappe/core/tools/deferred_job_adapters.py::EmailIngestAdapter
+# @pair deferred-jobs:failure-only-notification
+def test_email_ingest_notification_is_created_only_for_failure(monkeypatch):
+    registry = deferred_jobs.DeferredJobRegistry()
+    adapter = deferred_job_adapters.EmailIngestAdapter()
+    actor = SimpleNamespace(urlsafe_key="email-actor")
+    report_parent = TestEntities.get(
+        "USER",
+        {"name": "Email report owner", "hash": "email-report-owner"},
+    )
+    report = TestEntities.get(
+        "REPORT",
+        {
+            "name": "Ask: Received email",
+            "tool": "ask",
+            "parent": report_parent,
+        },
+    )
+    created = []
+    saved = []
+
+    def create_notification(data):
+        created.append(data)
+        return SimpleNamespace(**data)
+
+    monkeypatch.setattr(Entities.NOTIFICATION, "create", create_notification)
+    monkeypatch.setattr(Entities, "save", lambda *entities: saved.extend(entities))
+
+    def finish(status, error=None):
+        job = SimpleNamespace(
+            status=status,
+            delivery={
+                "cleanup": True,
+                "notification": False,
+                "external_email": True,
+            },
+            error={"message": str(error)} if error else {},
+            lease_token=None,
+            notification=None,
+        )
+        context = SimpleNamespace(
+            actor=actor,
+            job=job,
+            notification=None,
+            parameters={},
+            checkpoint={},
+            input=lambda name: report if name == "report" else None,
+        )
+        registry._finish_terminal_delivery(
+            job,
+            adapter,
+            context=context,
+            error=error,
+        )
+        return job, context
+
+    assert adapter.notification_policy == "failure"
+    succeeded_job, succeeded_context = finish(DeferredJobStatus.SUCCEEDED.value)
+    assert succeeded_context.notification is None
+    assert succeeded_job.notification is None
+    assert succeeded_job.delivery["notification"] is True
+    assert created == []
+
+    failure = RuntimeError("provider unavailable")
+    failed_job, failed_context = finish(DeferredJobStatus.FAILED.value, failure)
+    assert failed_context.notification is failed_job.notification
+    assert failed_context.notification.body == (
+        "Email submission failed. provider unavailable"
+    )
+    assert failed_context.notification.target is report
+    assert failed_context.notification.pending is False
+    assert failed_context.notification in saved
+    assert failed_job.delivery["notification"] is True
 
 
 # @pair deferred-jobs:cancellation

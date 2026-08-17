@@ -522,6 +522,94 @@ def test_ai_email_setup_saves_deploys_then_enables_webhook(
     assert "Send a normal email from a registered user's exact email address" in output
 
 
+# @features ai-email
+# @dimensions setup secrets provider-verification
+def test_ai_email_rerun_reuses_saved_inbound_api_key_without_prompt(
+    monkeypatch,
+    capsys,
+):
+    import builtins
+    import types
+
+    import config
+    from installer import ai_email
+
+    existing = _valid_config()
+    existing["enabled"] = True
+    existing["domain"] = "inbound.app.example.com"
+    settings = types.SimpleNamespace(
+        APP={
+            "APP_NAME": "Lagniappe",
+            "ADMIN_EMAIL": "owner@example.com",
+            "AUTH_EMAIL_CONFIG": {
+                "provider": "smtp",
+                "service": "Resend",
+                "password": "re_send",
+                "senderEmail": "noreply@example.com",
+                "senderName": "Lagniappe",
+            },
+            "AI_EMAIL_CONFIG": existing,
+            "AI_MODEL": "gemini-test",
+            "CUSTOM_DOMAIN": "app.example.com",
+            "RESOURCE_REGION": "us-central1",
+            "RUNTIME_SERVICE_ACCOUNT_EMAIL": "runtime@example.test",
+        },
+        save=lambda: None,
+    )
+    monkeypatch.setattr(config, "SETTINGS", settings)
+
+    class Client:
+        def __init__(self, api_key):
+            assert api_key == "re_full"
+
+    monkeypatch.setattr(ai_email, "ResendSetupClient", Client)
+    monkeypatch.setattr(
+        ai_email,
+        "reconcile_receiving_domain",
+        lambda client, domain: {
+            "id": "domain-1",
+            "name": domain,
+            "status": "verified",
+            "capabilities": {"receiving": "enabled"},
+        },
+    )
+    monkeypatch.setattr(
+        ai_email,
+        "reconcile_webhook",
+        lambda client, endpoint: {
+            "id": "webhook-1",
+            "endpoint": endpoint,
+            "events": ["email.received"],
+            "status": "disabled",
+            "signing_secret": "whsec_dGVzdC1zZWNyZXQ=",
+        },
+    )
+    prompts = []
+    responses = iter(
+        [
+            "",  # reconcile
+            "",  # keep inbound domain
+            "y",  # domain remains dedicated
+        ]
+    )
+
+    def answer(prompt=""):
+        prompts.append(prompt)
+        return next(responses)
+
+    monkeypatch.setattr(builtins, "input", answer)
+
+    candidate = ai_email.configure_ai_email(
+        prepare_installation=False,
+        deploy=False,
+    )
+
+    assert candidate["resend"]["inboundApiKey"] == "re_full"
+    assert all("API key" not in prompt for prompt in prompts)
+    output = " ".join(capsys.readouterr().out.split())
+    assert "reuse it for provider reconciliation without prompting" in output
+
+
 # @features ai-email setup
 # @dimensions setup disable disabled-first provider-state deploy secrets
 def test_ai_email_disable_turns_off_provider_before_saving_and_deploying(

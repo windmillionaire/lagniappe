@@ -626,7 +626,21 @@ class DeferredJobRegistry:
             Entities.DEFERRED_JOB(transition["entity"]),
             operation="failed_start_projection",
         )
-        if notification is not None:
+        if notification is None and adapter.notification_policy == "failure":
+            notification = Entities.NOTIFICATION.create(
+                {
+                    "parent": context.actor,
+                    "target": adapter.notification_target(context),
+                    "body": adapter.terminal_message(
+                        context,
+                        succeeded=False,
+                        error=notification_error,
+                    ),
+                    "pending": False,
+                }
+            )
+            Entities.save(notification)
+        elif notification is not None:
             notification.body = adapter.terminal_message(
                 context,
                 succeeded=False,
@@ -1995,7 +2009,9 @@ class DeferredJobRegistry:
 
     # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_reconciler_completes_terminal_delivery_when_input_was_deleted
+    # @tests tests_unit/test_023_deferred_jobs.py::test_email_ingest_notification_is_created_only_for_failure
     # @pair deferred-jobs:orphaned-input
+    # @pair deferred-jobs:failure-only-notification
     def _finish_terminal_delivery(
         self,
         job,
@@ -2046,9 +2062,9 @@ class DeferredJobRegistry:
                     context.notification.body = MISSING_INPUT_MESSAGE
                     context.notification.pending = False
                     Entities.save(context.notification)
-            elif (
-                context.notification is None
-                and adapter.notification_policy == "completion"
+            elif context.notification is None and (
+                adapter.notification_policy == "completion"
+                or (adapter.notification_policy == "failure" and not succeeded)
             ):
                 context.notification = Entities.NOTIFICATION.create(
                     {

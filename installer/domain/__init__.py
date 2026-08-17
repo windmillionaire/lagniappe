@@ -11,6 +11,8 @@ from .instructions import explain_domain_setup
 
 # Cloudflare configuration
 from .cloudflare import (
+    DMARC_DEFAULT_POLICY,
+    ensure_cloudflare_dmarc_record,
     get_cloudflare_api_token,
     get_cloudflare_zone,
     reconcile_cloudflare_dns_records,

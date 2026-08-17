@@ -398,6 +398,71 @@ def test_setup_auth_email_uses_custom_domain_provider_path(monkeypatch):
 
 
 # @features setup
+# @dimensions authentication-email dmarc cloudflare-dns manual-dns
+def test_auth_email_dmarc_setup_supports_cloudflare_and_manual_dns(
+    monkeypatch,
+    capsys,
+):
+    from installer import auth_email
+    from installer import domain as domain_setup
+
+    settings = types.SimpleNamespace(
+        APP={"CLOUDFLARE_ZONE_ID": "zone-1"},
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(SETTINGS=settings),
+    )
+    calls = []
+    monkeypatch.setattr(
+        domain_setup,
+        "get_cloudflare_api_token",
+        lambda: "scoped-token",
+    )
+    monkeypatch.setattr(
+        domain_setup,
+        "get_cloudflare_zone",
+        lambda domain, token: (
+            calls.append(("zone", domain, token))
+            or {"id": "zone-1", "name": "example.test"}
+        ),
+    )
+    monkeypatch.setattr(
+        domain_setup,
+        "ensure_cloudflare_dmarc_record",
+        lambda domain, zone, token: (
+            calls.append(("dmarc", domain, zone["id"], token))
+            or {
+                "action": "created",
+                "id": "record-1",
+                "name": "_dmarc.mail.example.test",
+                "content": domain_setup.DMARC_DEFAULT_POLICY,
+            }
+        ),
+    )
+    answers = iter([""])
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
+
+    assert auth_email._configure_dmarc_for_sender("noreply@mail.example.test")
+    assert calls == [
+        ("zone", "mail.example.test", "scoped-token"),
+        ("dmarc", "mail.example.test", "zone-1", "scoped-token"),
+    ]
+    assert "Created Cloudflare TXT _dmarc.mail.example.test" in (
+        capsys.readouterr().out
+    )
+
+    settings.APP = {}
+    monkeypatch.setattr("builtins.input", lambda _prompt: "y")
+    assert auth_email._configure_dmarc_for_sender("noreply@example.test")
+    output = capsys.readouterr().out
+    assert "Type:  TXT" in output
+    assert "Name:  _dmarc.example.test" in output
+    assert f"Value: {domain_setup.DMARC_DEFAULT_POLICY}" in output
+
+
+# @features setup
 # @dimensions authentication-email smtp resend cloudflare-dns interactive-input settings-save
 def test_provider_auth_email_uses_resend_cloudflare_shortcut(monkeypatch):
     from installer import auth_email
@@ -441,6 +506,12 @@ def test_provider_auth_email_uses_resend_cloudflare_shortcut(monkeypatch):
         )
         or True,
     )
+    dmarc_domains = []
+    monkeypatch.setattr(
+        auth_email,
+        "_configure_dmarc_for_sender",
+        lambda sender: dmarc_domains.append(sender) or True,
+    )
     answers = iter(
         [
             "",
@@ -473,6 +544,7 @@ def test_provider_auth_email_uses_resend_cloudflare_shortcut(monkeypatch):
         auth_email.RESEND_DOMAINS_URL,
         auth_email.RESEND_API_KEYS_URL,
     ]
+    assert dmarc_domains == ["noreply@mail.app.example.test"]
     assert saves == [True]
 
 
@@ -513,6 +585,12 @@ def test_provider_auth_email_saves_only_after_successful_smtp_test(monkeypatch):
         )
         or True,
     )
+    dmarc_domains = []
+    monkeypatch.setattr(
+        auth_email,
+        "_configure_dmarc_for_sender",
+        lambda sender: dmarc_domains.append(sender) or True,
+    )
     answers = iter(
         [
             "n",
@@ -544,6 +622,7 @@ def test_provider_auth_email_saves_only_after_successful_smtp_test(monkeypatch):
     assert deliveries == [
         (settings.APP["AUTH_EMAIL_CONFIG"], "owner@example.test")
     ]
+    assert dmarc_domains == ["noreply@example.test"]
     assert saves == [True]
 
 
@@ -1204,3 +1283,103 @@ def test_cloudflare_dns_only_reconciliation(monkeypatch):
         for call in calls
         for marker in ("firewall", "bot", "rulesets", "settings")
     )
+
+
+# @features setup
+# @dimensions authentication-email cloudflare-dns dmarc idempotence
+def test_cloudflare_dmarc_reconciliation_creates_or_reuses_valid_policy(
+    monkeypatch,
+):
+    from installer.domain import cloudflare
+
+    calls = []
+    journal = []
+    existing_policies = {}
+
+    def fake_request(method, path, token, *, params=None, json_data=None):
+        calls.append(
+            {
+                "method": method,
+                "path": path,
+                "token": token,
+                "params": params,
+                "json": json_data,
+            }
+        )
+        if method == "GET":
+            return {
+                "result": (
+                    [existing_policies[params["name"]]]
+                    if params["name"] in existing_policies
+                    else []
+                ),
+            }
+        if method == "POST":
+            return {"result": {"id": "created-dmarc"}}
+        raise AssertionError((method, path))
+
+    monkeypatch.setattr(cloudflare, "_cloudflare_request", fake_request)
+    monkeypatch.setattr(
+        cloudflare,
+        "record_mutation",
+        lambda step, **entry: journal.append({"step": step, **entry}),
+    )
+    zone = {"id": "zone-1", "name": "example.test"}
+    created = cloudflare.ensure_cloudflare_dmarc_record(
+        "mail.example.test",
+        zone,
+        "scoped-token",
+    )
+    assert created == {
+        "action": "created",
+        "id": "created-dmarc",
+        "name": "_dmarc.mail.example.test",
+        "content": cloudflare.DMARC_DEFAULT_POLICY,
+    }
+    post = calls[-1]
+    assert post["method"] == "POST"
+    assert post["json"] == {
+        "type": "TXT",
+        "name": "_dmarc.mail.example.test",
+        "content": "v=DMARC1; p=none;",
+        "ttl": 1,
+        "comment": cloudflare.CLOUDFLARE_EMAIL_RECORD_COMMENT,
+    }
+
+    existing_policies["_dmarc.mail.example.test"] = {
+        "id": "existing-dmarc",
+        "type": "TXT",
+        "name": "_dmarc.mail.example.test",
+        "content": "v=DMARC1; p=reject; rua=mailto:dmarc@example.test;",
+    }
+    reused = cloudflare.ensure_cloudflare_dmarc_record(
+        "mail.example.test",
+        zone,
+        "scoped-token",
+    )
+    assert reused["action"] == "existing"
+    assert reused["id"] == "existing-dmarc"
+    assert reused["content"].startswith("v=DMARC1; p=reject")
+    existing_policies.clear()
+    existing_policies["_dmarc.example.test"] = {
+        "id": "inherited-dmarc",
+        "type": "TXT",
+        "name": "_dmarc.example.test",
+        "content": "v=DMARC1; p=quarantine;",
+    }
+    inherited = cloudflare.ensure_cloudflare_dmarc_record(
+        "mail.example.test",
+        zone,
+        "scoped-token",
+    )
+    assert inherited == {
+        "action": "inherited",
+        "id": "inherited-dmarc",
+        "name": "_dmarc.example.test",
+        "content": "v=DMARC1; p=quarantine;",
+    }
+    assert [entry["action"] for entry in journal] == [
+        "created",
+        "existing",
+        "inherited",
+    ]

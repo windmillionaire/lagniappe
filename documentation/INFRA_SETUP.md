@@ -536,8 +536,9 @@ The full installation runs these steps in order:
    setup creates or discovers the App Engine mapping, reconciles an existing
    mapping to automatic Google-managed TLS when necessary, verifies that the
    returned mapping actually has automatic certificate management, reconciles
-   or prints its DNS records, and tests an operator-selected SMTP provider
-   directly. Discovery requires the exact
+   or prints its DNS records, tests an operator-selected SMTP provider directly,
+   and creates or confirms a DMARC TXT policy for the visible sender domain.
+   Discovery requires the exact
    `apps/PROJECT/domainMappings/HOSTNAME` resource to appear in both the
    project-scoped mapping list and describe results; an empty list creates the
    mapping and can never be reported as an existing mapping. Every
@@ -986,25 +987,37 @@ match that domain, and then asks for the Sending access API key and test
 recipient. The application domain and Resend sending domain may differ (for
 example, `example.com` and `mail.example.com`).
 
+After the SMTP test succeeds and before replacing the saved sender, setup makes
+DMARC an explicit checkpoint for both Resend and generic SMTP. It targets the
+visible sender domain with `TXT _dmarc.<sender-domain>`. A new policy is
+`v=DMARC1; p=none;`: this completes DMARC authentication while leaving receiver
+disposition unchanged during initial monitoring. When the installation records
+Cloudflare DNS, setup offers to create or verify that exact record with a fresh
+scoped token; it preserves any single valid existing `none`, `quarantine`, or
+`reject` policy, including an applicable parent-zone policy, rather than
+weakening it with a new subdomain override. Otherwise it prints the exact record
+and requires operator confirmation. Multiple or malformed DMARC policies stop
+the Cloudflare path instead of being overwritten.
+
 For another provider, setup collects the provider name, host, port, STARTTLS or
 implicit SSL/TLS mode, username, password or API key, sender address, sender
 name, and a test recipient. The operator verifies the sending domain and
 publishes the provider's SPF and DKIM records first. New settings are saved only
 after the test message succeeds; a failed test leaves the previous sender
 unchanged. The later command requires `CUSTOM_DOMAIN` and can deploy the saved
-settings immediately. The scoped Cloudflare user API token used by the App
-Engine domain flow is never persisted, and Cloudflare never receives or exposes
-the email-service credential. Setup prints the direct Cloudflare **My Profile >
-API Tokens** URL and walks through **Create Token > Edit zone DNS > Use
-template**. Under **Zone Resources**, it restricts access with **Include >
+settings immediately. Scoped Cloudflare user API tokens used by the App Engine
+domain or email-DMARC flows are never persisted, and Cloudflare never receives
+or exposes the email-service credential. Setup prints the direct Cloudflare **My
+Profile > API Tokens** URL and walks through **Create Token > Edit zone DNS >
+Use template**. Under **Zone Resources**, it restricts access with **Include >
 Specific zone > the selected domain**. In the profile token's **Permissions**
 section, the template supplies **Zone > DNS > Edit**; setup directs the operator
 to use **+ Add more** for **Zone > Zone > Read**, which Cloudflare requires for
 the zone-list lookup. The summary must show both **DNS:Edit** and **Zone:Read**
 for the selected domain, while **Zone > Zone > Edit** remains off. The token
 remains active at Cloudflare until the operator deletes it after setup. Setup
-uses one visible token prompt, where `x` cancels the current setup run without
-undoing completed provider mutations.
+uses one visible token prompt per DNS flow, where `x` cancels the current setup
+run without undoing completed provider mutations.
 
 Runtime verification/reset delivery and its browser/server secret boundary are
 documented in
@@ -1021,9 +1034,11 @@ identity/region. The flow then:
 1. suggests `inbound.<CUSTOM_DOMAIN>` and requires a dedicated subdomain below
    the application domain, with operator confirmation that it has no unrelated
    MX records;
-2. opens Resend API Keys and prints the exact key name and **Full access**
-   selection for a one-time receiving-administration key, then validates that
-   key by listing domains;
+2. on first configuration, opens Resend API Keys and prints the exact key name
+   and **Full access** selection for a one-time receiving-administration key,
+   then validates that key by listing domains; reconciliation reruns reuse the
+   saved inbound key without prompting and validate it through the same live
+   provider operations;
 3. finds or creates one exact receiving-enabled domain without changing
    unrelated resources;
 4. asks whether its DNS is hosted by Cloudflare. The Cloudflare path opens
@@ -1056,11 +1071,14 @@ receiving key with live provider operations. That is the only new key, and it
 must differ from authentication email's existing Sending key. The same visible
 sender and Sending key serve authentication messages and AI-email feedback.
 
-Resend domain/webhook IDs and secrets are retained so reruns reconcile rather
-than duplicate resources. A rerun offers reconcile or disable. Disable changes
-the provider webhook first, verifies that state, then saves and optionally
-deploys the disabled local configuration; it does not delete domains, DNS
-records, webhooks, or keys.
+Resend domain/webhook IDs and secrets, including the inbound Full-access API
+key, are retained primarily because the deployed webhook workflow needs that
+key to retrieve each complete received message and its attachments. Reruns also
+reuse it so they can reconcile rather than duplicate resources or ask for a key
+that Resend cannot display again. A rerun offers reconcile or disable. Disable
+changes the provider webhook first, verifies that state, then saves and
+optionally deploys the disabled local configuration; it does not delete domains,
+DNS records, webhooks, or keys.
 
 After a successful deploy, setup asks for a normal registered-user smoke test:
 

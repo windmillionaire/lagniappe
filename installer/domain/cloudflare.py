@@ -17,6 +17,10 @@ CLOUDFLARE_API_ROOT = "https://api.cloudflare.com/client/v4"
 CLOUDFLARE_API_TOKEN_URL = "https://dash.cloudflare.com/profile/api-tokens"
 CLOUDFLARE_API_TIMEOUT = 10
 CLOUDFLARE_RECORD_COMMENT = "Managed by Lagniappe App Engine domain setup"
+CLOUDFLARE_EMAIL_RECORD_COMMENT = (
+    "Managed by Lagniappe authentication email setup"
+)
+DMARC_DEFAULT_POLICY = "v=DMARC1; p=none;"
 
 
 # @testable false
@@ -183,6 +187,139 @@ def get_cloudflare_zone(domain, api_token):
             f"The Cloudflare token cannot access a DNS zone for {domain}."
         )
     return max(matches, key=lambda zone: len(str(zone.get("name") or "")))
+
+
+# @testable false
+# @covered-by installer/domain/cloudflare.py::ensure_cloudflare_dmarc_record
+# @reason policy parsing is exercised through exact DMARC reconciliation
+def _valid_dmarc_policy(content):
+    items = [item.strip() for item in str(content or "").split(";") if item.strip()]
+    if not items:
+        return False
+    tags = {}
+    for item in items:
+        name, separator, value = item.partition("=")
+        normalized_name = name.strip().casefold()
+        if not separator or not normalized_name or normalized_name in tags:
+            return False
+        tags[normalized_name] = value.strip().casefold()
+    return (
+        items[0].partition("=")[0].strip().casefold() == "v"
+        and tags.get("v") == "dmarc1"
+        and tags.get("p") in {"none", "quarantine", "reject"}
+    )
+
+
+# @testable true
+# @tests tests_tooling/test_001b_setup_providers.py::test_cloudflare_dmarc_reconciliation_creates_or_reuses_valid_policy
+# @features setup
+# @dimensions authentication-email cloudflare-dns dmarc idempotence
+def ensure_cloudflare_dmarc_record(domain, zone, api_token):
+    """Create a monitoring DMARC policy unless one already exists."""
+    zone_id = str(zone.get("id") or "")
+    zone_name = str(zone.get("name") or "").rstrip(".").casefold()
+    normalized_domain = str(domain or "").rstrip(".").casefold()
+    if not zone_id or not zone_name:
+        raise ProviderError("Cloudflare returned an invalid zone.")
+    if not (
+        normalized_domain == zone_name or normalized_domain.endswith(f".{zone_name}")
+    ):
+        raise ProviderError(
+            f"The sender domain {domain} is not inside Cloudflare zone {zone_name}."
+        )
+
+    record_name = f"_dmarc.{normalized_domain}"
+    policy_names = [record_name]
+    if normalized_domain != zone_name:
+        policy_names.append(f"_dmarc.{zone_name}")
+
+    for policy_index, policy_name in enumerate(policy_names):
+        payload = _cloudflare_request(
+            "GET",
+            f"/zones/{zone_id}/dns_records",
+            api_token,
+            params={"type": "TXT", "name": policy_name, "per_page": 100},
+        )
+        current = [
+            record
+            for record in payload.get("result") or []
+            if isinstance(record, dict)
+        ]
+        policies = [
+            record
+            for record in current
+            if _valid_dmarc_policy(record.get("content"))
+        ]
+        if len(policies) > 1:
+            raise ProviderError(
+                f"Cloudflare has multiple DMARC policies at {policy_name}; "
+                "keep exactly one before continuing."
+            )
+        if policies:
+            existing = policies[0]
+            record_id = str(existing.get("id") or "")
+            if not record_id:
+                raise ProviderError(
+                    f"Cloudflare did not return an ID for TXT {policy_name}."
+                )
+            action = "existing" if policy_index == 0 else "inherited"
+            record_mutation(
+                "authentication-email-dns",
+                action=action,
+                resource="Cloudflare DMARC record",
+                identifier=record_id,
+            )
+            return {
+                "action": action,
+                "id": record_id,
+                "name": policy_name,
+                "content": str(existing.get("content") or "").strip(),
+            }
+
+        malformed = [
+            record
+            for record in current
+            if str(record.get("content") or "")
+            .strip()
+            .casefold()
+            .startswith("v=dmarc1")
+        ]
+        if malformed:
+            raise ProviderError(
+                f"Cloudflare has an invalid DMARC policy at {policy_name}; "
+                "correct or remove it before continuing."
+            )
+
+    result = (
+        _cloudflare_request(
+            "POST",
+            f"/zones/{zone_id}/dns_records",
+            api_token,
+            json_data={
+                "type": "TXT",
+                "name": record_name,
+                "content": DMARC_DEFAULT_POLICY,
+                "ttl": 1,
+                "comment": CLOUDFLARE_EMAIL_RECORD_COMMENT,
+            },
+        ).get("result")
+        or {}
+    )
+    record_id = str(result.get("id") or "")
+    if not record_id:
+        raise ProviderError(f"Cloudflare did not return an ID for TXT {record_name}.")
+    record_mutation(
+        "authentication-email-dns",
+        action="created",
+        resource="Cloudflare DMARC record",
+        identifier=record_id,
+    )
+    return {
+        "action": "created",
+        "id": record_id,
+        "name": record_name,
+        "content": DMARC_DEFAULT_POLICY,
+    }
 
 
 # @testable false

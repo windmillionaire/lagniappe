@@ -487,8 +487,11 @@ unread-message counts plus its own revision/generation; it never appears in the
 ordinary cursor query. Offline
 mutation replay can set `offline=True` on a route request; routes that want a
 durable user-visible completion message create a `Notification` with
-`parent=current_user` and the affected target. Deferred routes create the
+`parent=current_user` and the affected target. Most deferred routes create the
 notification as pending and update the same entity when the process finishes.
+Completion-only file jobs create it at the end, reviewed report execution uses
+none, and email ingestion uses a failure-only policy so its successful handoff
+does not create an inbox or notification-email event.
 Committed notification creates/content updates/deletes emit a post-commit Redis
 projection effect. Ordinary create/delete/clear operations use
 `notification_service` to update the row and durable aggregate. Direct-message
@@ -521,12 +524,17 @@ uses the conversation-safe `New messages on {App Name}` subject while the body
 identifies the sender for each rendered message.
 
 Daily events are grouped for the recipient's next local 8:00 AM and include
-events even when they were seen on site. A digest renders the first 100 items
-in full and links to Notifications and Messages when more remain. Delivery
-uses simple multipart text/HTML through the configured SMTP sender and a
-stable `Message-ID`; the HTML contains the notification/message body and a
-direct application link with no external assets. Document-mention email uses a
-concise mention-specific subject and body, emphasizes the document name, and
+events even when they were seen on site. A digest renders the first 100 events,
+combines messages from the same sender under one conversation link, and links
+to Notifications and Messages when more remain. It starts directly with the
+first event rather than repeating a digest heading. Successful Ask/Organize,
+autofill, and file-summary completions use their saved target names and direct
+links without redundant ready copy; report links resolve to the report detail
+route rather than the home fallback. Delivery uses simple multipart text/HTML
+through the configured SMTP sender and a stable `Message-ID`; the HTML contains
+plain event content and direct application links with no external assets.
+Document-mention email uses a concise mention-specific subject and body,
+emphasizes the document name, and
 opens the entity's `document` tab directly. Task-assignment email likewise uses
 a concise `Task assigned on {App Name}` subject, names the assigner and task,
 and omits the generic notification headings. One-off OIDC Cloud Tasks call

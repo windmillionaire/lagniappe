@@ -218,6 +218,7 @@ def _open_resend_page(label, url):
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_resend_setup_guides_full_receiving_key_creation
+# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_rerun_reuses_saved_inbound_api_key_without_prompt
 # @features ai-email
 # @dimensions setup resend browser instructions authorization secrets
 def guide_resend_receiving_key(*, existing=False):
@@ -226,11 +227,11 @@ def guide_resend_receiving_key(*, existing=False):
     if existing:
         print(
             wrap_text(
-                "A Full access receiving key is already saved. Press Enter at "
-                "the key prompt to reuse it. To rotate it, follow the same steps "
-                "below and paste the replacement key."
+                "A Full access receiving key is already saved. Setup will reuse "
+                "it for provider reconciliation without prompting for it again."
             )
         )
+        return
     print(wrap_text("1. Sign in to Resend and open API Keys."))
     print(wrap_text("2. Click 'Create API Key'."))
     print("   - Name: Lagniappe AI Email Receiving")
@@ -679,6 +680,7 @@ def activate_ai_email(candidate=None):
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_setup_requires_custom_domain_and_supporting_services
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_setup_saves_deploys_then_enables_webhook
+# @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_rerun_reuses_saved_inbound_api_key_without_prompt
 # @features ai-email
 # @dimensions setup prerequisites provider-verification deployment-guidance deploy disabled-first manual-smoke-test
 def configure_ai_email(*, prepare_installation=True, deploy=True):
@@ -743,12 +745,10 @@ def configure_ai_email(*, prepare_installation=True, deploy=True):
         )
 
     existing_resend = (existing or {}).get("resend") or {}
-    guide_resend_receiving_key(
-        existing=bool(existing_resend.get("inboundApiKey")),
-    )
-    inbound_key = _prompt_secret(
-        "Resend Full access API key (input is visible)",
-        existing_resend.get("inboundApiKey"),
+    saved_inbound_key = str(existing_resend.get("inboundApiKey") or "")
+    guide_resend_receiving_key(existing=bool(saved_inbound_key))
+    inbound_key = saved_inbound_key or _prompt_secret(
+        "Resend Full access API key (input is visible)"
     )
     client = ResendSetupClient(inbound_key)
     domain_state = reconcile_receiving_domain(client, domain)

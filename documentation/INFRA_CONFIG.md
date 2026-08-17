@@ -176,8 +176,10 @@ four unique conservative aliases (`ai`, `ask`, `create`, and `organize`),
 requires distinct receiving and sending API
 keys, and fixes the version-1 body/file/rate limits rather than accepting
 operator values that could weaken the envelope. The receiving key is Full
-access; the sending key and verified sender are reused from Resend-backed
-authentication email.
+access because the runtime uses it to retrieve received-message content and
+attachment metadata/download URLs after a signed webhook event. The sending key
+and verified sender are reused from Resend-backed authentication email and are
+used for outbound feedback only.
 
 The schema version remains 1. A schema-1 configuration saved before the shared
 address was added normalizes a missing `aliases.ai` to `ai`; the next installer
@@ -261,7 +263,11 @@ the user's timezone. These tasks are event-driven and do not require Cloud
 Scheduler. Enqueue failure is deliberately nonfatal to the originating
 notification or message, and there is no periodic notification-email recovery
 scan. Redis stores only a ten-minute best-effort authenticated-activity hint
-used to suppress immediate mail.
+used to suppress immediate mail. Daily digests group messages by sender into a
+single linked section, omit a redundant body heading, and use saved report,
+autofill-target, and summarized-file names for completion links. Successful
+email ingestion does not create an app or notification-email event; ingestion
+failures still create a linked error notification.
 
 Agent access is configured in app settings with `AGENT_ACCESS_ENABLED`,
 `AGENT_ACCESS_EMAIL`, `AGENT_ACCESS_NAME`, and `AGENT_ACCESS_CODE`. Setup adds
