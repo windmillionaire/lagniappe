@@ -11,6 +11,7 @@ from lagniappe.core.definitions import Action
 from testing.definitions import Groups, Projects, SitePages, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.elements.combobox import Dropdown
+from testing.utility import expect_poll_result
 
 
 pytestmark = pytest.mark.e2e
@@ -238,6 +239,7 @@ def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
 # @pairs messaging:compose-modal messaging:conversation-page messaging:history-page
 # @pairs messaging:read-race messaging:unread-count messaging:per-copy-delete
 # @pairs messaging:clear-horizon messaging:new-after-clear messaging:permission
+# @pairs messaging:polling-revision messaging:active-polling
 # @pairs notifications:aggregate-count notifications:exact-count
 # @source lagniappe/core/tools/messages.py::send_message
 # @source lagniappe/core/tools/messages.py::conversations
@@ -248,6 +250,7 @@ def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
 # @source lagniappe/core/tools/collaboration.py::recipient_allowed
 # @source src/script/elements/messageComposer.mjs::MessageComposer
 # @source src/script/elements/notifications.mjs::Notifications
+# @source src/script/views/messages.mjs::Messages
 def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     get_user,
     browser_failures,
@@ -306,6 +309,36 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     expect(recipient.locate("[data-role='notifications']")).to_have_attribute(
         "aria-label", f"Notifications: {starting_count}", timeout=15000
     )
+
+    poll_subscription = "view:channel:messages"
+    with expect_poll_result(
+        recipient.page,
+        subscription_id=poll_subscription,
+        status="changed",
+    ):
+        recipient.page.evaluate(
+            """subscription =>
+                document.querySelector("[lp-view]")._lp_view
+                    .PollingCoordinator.trigger(subscription)
+            """,
+            poll_subscription,
+        )
+
+    live_body = f"Live message {uuid4().hex}"
+    _send_from_modal(sender, recipient, live_body)
+    with expect_poll_result(
+        recipient.page,
+        subscription_id=poll_subscription,
+        status="changed",
+    ):
+        recipient.page.evaluate(
+            """subscription =>
+                document.querySelector("[lp-view]")._lp_view
+                    .PollingCoordinator.trigger(subscription)
+            """,
+            poll_subscription,
+        )
+    expect(history).to_contain_text(live_body)
 
     message = history.locator(f"[data-message='{message_id}']")
     with recipient.page.expect_response(

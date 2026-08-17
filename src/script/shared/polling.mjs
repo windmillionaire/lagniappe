@@ -36,6 +36,7 @@ const POLL_CHANNELS = new Set([
 	"forms",
 	"users",
 	"ingress",
+	"messages",
 	"home",
 	"home-notes",
 	"starred",
@@ -428,6 +429,7 @@ function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_enqueues_reentrant_followup_without_waiting
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_schedules_modes_and_notification_seed
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_captures_and_isolates_contract_failures
+ * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_temporarily_boosts_a_subscription
  * @features polling
  * @dimensions batching cadence lifecycle coalescing acknowledgement reentrancy requested-cycle freshness visible-blur deadline
  * @pairs polling:batching polling:cadence polling:lifecycle polling:coalescing polling:acknowledgement
@@ -435,6 +437,7 @@ function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
  * @pairs polling:protocol polling:validation polling:diagnostics polling:revision polling:presence
  * @pairs polling:blur polling:visibility deferred-jobs:polling
  * @pair notifications:cold-seed
+ * @pair messaging:active-polling
  */
 export class PollingCoordinator {
 	constructor(view) {
@@ -560,6 +563,37 @@ export class PollingCoordinator {
 				subscription_type: subscription.descriptor.type,
 			});
 		}
+	}
+
+	boost(
+		id,
+		{ durationMs = 60_000, pollAfterMs = TYPE_INTERVALS.document } = {},
+	) {
+		const subscription = this.subscriptions.get(id);
+		if (!subscription) return false;
+		if (
+			!Number.isSafeInteger(durationMs) ||
+			durationMs <= 0 ||
+			!Number.isSafeInteger(pollAfterMs) ||
+			pollAfterMs < 250
+		) {
+			throw new TypeError("Invalid polling boost schedule.");
+		}
+		const now = Date.now();
+		subscription.boostedUntil = Math.max(
+			subscription.boostedUntil || 0,
+			now + durationMs,
+		);
+		subscription.boostedInterval = pollAfterMs;
+		subscription.quiet = 0;
+		const awaitingActiveResult =
+			this.activeIds.has(id) && subscription.dueAt <= now;
+		if (!awaitingActiveResult) {
+			subscription.dueAt = Math.min(subscription.dueAt, now + pollAfterMs);
+			this._clearTimer();
+			this._schedule();
+		}
+		return true;
 	}
 
 	acknowledge(id, revision) {
@@ -720,6 +754,12 @@ export class PollingCoordinator {
 		subscription.errorCount = 0;
 		if (result?.status === "changed") subscription.quiet = 0;
 		else subscription.quiet += 1;
+		if (
+			subscription.boostedUntil > Date.now() &&
+			subscription.boostedInterval
+		) {
+			return subscription.boostedInterval;
+		}
 
 		if (subscription.descriptor.type === "operation") {
 			const steps = [4_000, 8_000, 16_000, 30_000];

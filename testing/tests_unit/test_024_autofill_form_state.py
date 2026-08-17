@@ -139,6 +139,7 @@ def test_form_field_membership_uses_the_attached_schema():
 
 
 # @pairs polling:channel polling:revision polling:permissions polling:mounted-scope polling:batching
+# @pair messaging:polling-revision
 def test_channel_revisions_batch_only_requested_site_fingerprints():
     user = SimpleNamespace(
         fingerprint="unchanged-user-fingerprint",
@@ -151,16 +152,21 @@ def test_channel_revisions_batch_only_requested_site_fingerprints():
         return {path: f"site:{path}" for path in paths}
 
     revisions = polling.channel_revisions(
-        ("home-notes", "tasks", "starred", "tasks"),
+        ("home-notes", "tasks", "messages", "starred", "tasks"),
         user,
         fingerprint_loader=load,
+        notification_state={
+            "generation": "messages-a",
+            "message_revision": 4,
+        },
     )
 
-    assert set(revisions) == {"home-notes", "tasks", "starred"}
+    assert set(revisions) == {"home-notes", "tasks", "messages", "starred"}
     assert loads == [("/", "/tasks/index")]
 
     starred_before = revisions["starred"]
     home_before = revisions["home-notes"]
+    messages_before = revisions["messages"]
     user.fingerprint = "changed-user-fingerprint"
     changed = polling.channel_revisions(
         ("home-notes", "starred"),
@@ -169,6 +175,31 @@ def test_channel_revisions_batch_only_requested_site_fingerprints():
     )
     assert changed["starred"] != starred_before
     assert changed["home-notes"] == home_before
+
+    load_count = len(loads)
+    ordinary_changed = polling.channel_revisions(
+        ("messages",),
+        user,
+        fingerprint_loader=load,
+        notification_state={
+            "generation": "messages-a",
+            "revision": 99,
+            "message_revision": 4,
+        },
+    )
+    assert ordinary_changed["messages"] == messages_before
+    message_changed = polling.channel_revisions(
+        ("messages",),
+        user,
+        fingerprint_loader=load,
+        notification_state={
+            "generation": "messages-a",
+            "revision": 99,
+            "message_revision": 5,
+        },
+    )
+    assert message_changed["messages"] != messages_before
+    assert len(loads) == load_count
 
 
 # @pairs deferred-jobs:server-render deferred-jobs:status polling:batching

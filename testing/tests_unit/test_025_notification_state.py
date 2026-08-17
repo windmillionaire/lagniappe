@@ -261,6 +261,7 @@ def test_durable_aggregate_publish_preserves_members_and_exact_combined_count(re
         aggregate_loader=lambda _user: {
             "ordinary_count": 1,
             "unread_message_count": 0,
+            "message_revision": 2,
         },
     )
 
@@ -270,11 +271,13 @@ def test_durable_aggregate_publish_preserves_members_and_exact_combined_count(re
             "ordinary_count": 7,
             "unread_message_count": 3,
             "aggregate_revision": 4,
+            "message_revision": 5,
         },
     )
 
     assert state["ordinary_count"] == 7
     assert state["unread_message_count"] == 3
+    assert state["message_revision"] == 5
     assert state["count"] == 10
     assert state["members"] == {"notification-a"}
     assert state["revision"] >= 4

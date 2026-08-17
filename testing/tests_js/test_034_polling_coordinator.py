@@ -179,6 +179,75 @@ if (timerId !== 3 || clearedTimers.join(",") !== "1,2") {
     )
 
 
+# @pair polling:cadence
+# @pair messaging:active-polling
+# @source src/script/shared/polling.mjs::PollingCoordinator
+def test_polling_coordinator_temporarily_boosts_a_subscription(run_node):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+let now = 1_000;
+const timers = [];
+const context = {
+  console,
+  crypto: { randomUUID: () => "client-boost" },
+  Date: { now: () => now },
+  ENDPOINTS: { poll: "/l/poll" },
+  Math,
+  queueMicrotask,
+  sessionStorage: { getItem() { return null; }, setItem() {} },
+  captureError(error) { throw error; },
+  request: { async post() { return { ok: true, version: 1, results: [] }; } },
+  window: {
+    addEventListener() {},
+    removeEventListener() {},
+    clearTimeout() {},
+    setTimeout(_callback, delay) { timers.push(delay); return timers.length; },
+  },
+};
+context.globalThis = context;
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/polling.mjs", "utf8");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replace("export class PollingCoordinator", "class PollingCoordinator");
+source += "\nglobalThis.PollingCoordinator = PollingCoordinator;";
+vm.runInContext(source, context);
+
+const coordinator = new context.PollingCoordinator({
+  elt: {}, hidden: false, online: true,
+}).init();
+coordinator.subscribe(
+  {
+    id: "view:channel:messages",
+    type: "channel",
+    channel: "messages",
+    revision: null,
+  },
+  { initial: "scheduled" },
+);
+const subscription = coordinator.subscriptions.get("view:channel:messages");
+if (!coordinator.boost("view:channel:messages", {
+  durationMs: 60_000,
+  pollAfterMs: 2_000,
+})) {
+  throw new Error("polling boost did not find the message subscription");
+}
+if (
+  subscription.dueAt !== now + 2_000 ||
+  coordinator._interval(subscription, { status: "unchanged" }) !== 2_000
+) {
+  throw new Error("active message polling did not use the boosted interval");
+}
+now += 60_001;
+if (coordinator._interval(subscription, { status: "unchanged" }) < 15_000) {
+  throw new Error("message polling did not return to the adaptive cadence");
+}
+"""
+    )
+
+
 # @pair polling:blur
 # @pair polling:visibility
 # @pair polling:cadence

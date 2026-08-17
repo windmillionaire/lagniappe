@@ -36,6 +36,7 @@ annotated_source_roots:
   - config/redis.py
   - config/recovery.py
   - config/deployment.py
+  - config/ai_email.py
   - config/ai_models.py
   - config/ai_settings.py
   - run.py

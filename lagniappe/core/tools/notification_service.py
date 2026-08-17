@@ -61,6 +61,7 @@ def _new_aggregate(key, *, ordinary_count=0, unread_message_count=0):
             "ordinary_count": max(0, int(ordinary_count)),
             "unread_message_count": max(0, int(unread_message_count)),
             "aggregate_revision": 0,
+            "message_revision": 0,
             "aggregate_generation": str(uuid.uuid4()),
             "created": now,
             "modified": now,
@@ -81,6 +82,7 @@ def aggregate_counts(row):
         "unread_message_count": messages,
         "count": ordinary + messages,
         "revision": int(row.get("aggregate_revision") or 0),
+        "message_revision": int(row.get("message_revision") or 0),
         "generation": row.get("aggregate_generation"),
     }
 
@@ -168,6 +170,8 @@ def _mutate_aggregate(row, *, ordinary_delta=0, message_delta=0):
         0, int(row.get("unread_message_count") or 0) + int(message_delta)
     )
     row["aggregate_revision"] = int(row.get("aggregate_revision") or 0) + 1
+    if int(message_delta) > 0:
+        row["message_revision"] = int(row.get("message_revision") or 0) + 1
     row["aggregate_generation"] = row.get("aggregate_generation") or str(uuid.uuid4())
     row["modified"] = datetime.now(timezone.utc)
     return row

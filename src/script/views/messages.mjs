@@ -4,15 +4,47 @@ import { ENDPOINTS, request } from "../shared";
 import { createIcon } from "../shared/icons";
 import Core from "./base/core";
 
+const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
+
 /**
  * @testable true
  * @tests tests_js/test_042_messaging_frontend.py::test_messages_view_refreshes_read_races_and_uses_delete_modal
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_messages_page_uses_mobile_peer_selector_with_inline_reply
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_inbound_message_allows_reply_without_compose_permission
+ * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
  * @pairs messaging:read-race messaging:clear-confirmation messaging:inline-reply
  * @pairs messaging:responsive-peer-selector messaging:reply-permission
+ * @pairs messaging:polling-revision messaging:active-polling
  */
 export default class Messages extends Core {
+	_initPollingSubscription() {
+		if (!this.PollingCoordinator) return;
+		this.PollingCoordinator.subscribe(
+			{
+				id: MESSAGE_POLL_SUBSCRIPTION,
+				type: "channel",
+				channel: "messages",
+				revision: null,
+			},
+			{
+				mode: "periodic",
+				initial: "scheduled",
+				onResult: async (result) => {
+					if (result.status !== "changed") return;
+					await this.refresh();
+				},
+			},
+		);
+	}
+
+	/** @testable infrastructure */
+	_boostMessagePolling() {
+		this.PollingCoordinator?.boost?.(MESSAGE_POLL_SUBSCRIPTION, {
+			durationMs: 60_000,
+			pollAfterMs: 2_000,
+		});
+	}
+
 	async init() {
 		await super.init();
 		this.list = this.elt.querySelector("[data-role='conversation-list']");
@@ -61,6 +93,7 @@ export default class Messages extends Core {
 		if (composeButton) {
 			this.composer = ensureMessageComposer(this, {
 				onSent: async (response) => {
+					this._boostMessagePolling();
 					await this.loadConversations();
 					await this.openConversation(response.conversation.id);
 				},
@@ -136,6 +169,46 @@ export default class Messages extends Core {
 			this.renderConversationSelector();
 		}
 		return this;
+	}
+
+	/** @testable infrastructure */
+	async refresh() {
+		if (this._messageRefresh) return this._messageRefresh;
+		const pending = this._refreshMessages().finally(() => {
+			if (this._messageRefresh === pending) this._messageRefresh = null;
+		});
+		this._messageRefresh = pending;
+		return pending;
+	}
+
+	/** @testable infrastructure */
+	async _refreshMessages() {
+		const active = this.current?.id || this.preferredConversation;
+		await this.loadConversations();
+		if (
+			Array.from(this.conversations.values()).some(
+				(conversation) => conversation.unread,
+			)
+		) {
+			this._boostMessagePolling();
+		}
+		const candidate =
+			(active && this.conversations.has(active) ? active : null) ||
+			Array.from(this.conversations.values()).find(
+				(conversation) => conversation.unread,
+			)?.id ||
+			this.conversations.values().next().value?.id ||
+			null;
+		if (candidate) return this.openConversation(candidate);
+
+		this.current = null;
+		this.messageCursor = null;
+		this.history.replaceChildren();
+		this.header.textContent = "Choose a conversation";
+		this.renderReply();
+		this.rememberConversation(null);
+		this.renderConversationSelector();
+		return false;
 	}
 
 	/**
@@ -376,6 +449,7 @@ export default class Messages extends Core {
 			this.replyError.classList.remove("hidden");
 			return;
 		}
+		this._boostMessagePolling();
 		this.replyTextarea.value = "";
 		await this.loadConversations();
 		await this.openConversation(response.conversation.id);

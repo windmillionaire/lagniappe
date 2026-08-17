@@ -225,9 +225,6 @@ def poll():
         else ({}, set())
     )
 
-    channels = [descriptor["channel"] for descriptor in grouped["channel"]]
-    channel_revisions = _channel_revisions(channels, current_user)
-
     if notification_polled:
         try:
             if prefetched_operation_states is None:
@@ -240,6 +237,17 @@ def poll():
                 error,
                 context={"operation": "poll_notification_state"},
             )
+
+    channels = [descriptor["channel"] for descriptor in grouped["channel"]]
+    channel_revisions = _channel_revisions(
+        channels,
+        current_user,
+        **(
+            {"notification_state": notification_state}
+            if notification_polled
+            else {}
+        ),
+    )
 
     results = []
     for descriptor in descriptors:

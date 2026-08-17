@@ -182,7 +182,7 @@ export class Notifications {
 				<button role="option"
 					type="button"
 					data-action="clear-notifications"
-					class="${STYLES.dropdown.option.action} -mt-1 border-b border-base-light !rounded-none bg-base-bg text-delete-default">
+					class="${STYLES.dropdown.option.action} border-y border-base-light !rounded-none bg-base-bg text-delete-default">
 					${createIcon("trash.inactive", STYLES.dropdown.icon).outerHTML}
 					<span>Clear all notifications</span>
 				</button>

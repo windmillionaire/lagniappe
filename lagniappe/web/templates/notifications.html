@@ -63,12 +63,11 @@
 
 {% macro list(notifications, aggregate, cursor=None, can_message=False) %}
   {% if can_message %}
-    {% set has_following_item = aggregate.unread_message_count or notifications or cursor %}
     <button role="option"
             type="button"
             data-key="__message_user__"
             data-action="message-user"
-            class="{{ styles.dropdown.option.action }}{% if has_following_item %} border-b border-base-light !rounded-none mb-1 pb-2{% endif %}">
+            class="{{ styles.dropdown.option.action }}">
       {{ render_icon("email", styles.dropdown.icon) }}
       <span>Message a user</span>
     </button>

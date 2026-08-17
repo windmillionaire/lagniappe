@@ -344,13 +344,15 @@ if (
 ) {
   throw new Error(`unexpected notification action order: ${JSON.stringify(dropdownItems)}`);
 }
-for (const style of ["-mt-1", "border-b", "bg-base-bg"]) {
+for (const style of ["border-y", "!rounded-none", "bg-base-bg"]) {
   if (!dropdownItems[2].html.includes(style)) {
     throw new Error(`clear action is missing ${style}: ${dropdownItems[2].html}`);
   }
 }
-if (dropdownItems[2].html.includes("mb-1")) {
-  throw new Error(`clear action retained a bottom gap: ${dropdownItems[2].html}`);
+for (const style of ["-mt-1", "mb-1"]) {
+  if (dropdownItems[2].html.includes(style)) {
+    throw new Error(`clear action retained ${style}: ${dropdownItems[2].html}`);
+  }
 }
 let prevented = false;
 await menu._selectNotification(
@@ -367,6 +369,7 @@ if (!prevented || actions[0]?.[0] !== "compose" || actions[0]?.[1] !== menu.view
 
 # @pairs messaging:read-race messaging:clear-confirmation messaging:inline-reply
 # @pair messaging:responsive-peer-selector
+# @pairs messaging:polling-revision messaging:active-polling
 # @source src/script/views/messages.mjs::Messages
 def test_messages_view_refreshes_read_races_and_uses_delete_modal(run_node):
     run_node(
@@ -423,6 +426,53 @@ source = source.replace("export default class Messages", "class Messages");
 source += "\nglobalThis.Messages = Messages;";
 vm.runInContext(source, context);
 
+let pollDescriptor = null;
+let pollHooks = null;
+const pollingView = Object.create(context.Messages.prototype);
+pollingView.PollingCoordinator = {
+  subscribe(descriptor, hooks) {
+    pollDescriptor = descriptor;
+    pollHooks = hooks;
+  },
+  boost(id, options) {
+    calls.push(["boost", id, options.durationMs, options.pollAfterMs]);
+  },
+};
+pollingView.current = { id: "conversation-live" };
+pollingView.preferredConversation = "conversation-live";
+pollingView.conversations = new Map([
+  ["conversation-live", pollingView.current],
+  ["conversation-other", { id: "conversation-other", unread: 1 }],
+]);
+pollingView.loadConversations = async () => calls.push(["poll-conversations"]);
+pollingView.openConversation = async (key) => calls.push(["poll-history", key]);
+pollingView._initPollingSubscription();
+if (
+  pollDescriptor?.id !== "view:channel:messages" ||
+  pollDescriptor?.channel !== "messages" ||
+  pollHooks?.mode !== "periodic" ||
+  pollHooks?.initial !== "scheduled"
+) {
+  throw new Error(`messages polling was not registered: ${JSON.stringify(pollDescriptor)}`);
+}
+await pollHooks.onResult({ status: "unchanged" });
+if (calls.some((call) => call[0] === "poll-history")) {
+  throw new Error("unchanged message polling refreshed the active history");
+}
+await pollHooks.onResult({ status: "changed" });
+if (
+  !calls.some((call) => call[0] === "poll-conversations") ||
+  !calls.some(
+    (call) => call[0] === "poll-history" && call[1] === "conversation-live",
+  ) ||
+  !calls.some(
+    (call) =>
+      call[0] === "boost" && call[2] === 60000 && call[3] === 2000,
+  )
+) {
+  throw new Error(`changed message polling did not refresh and boost: ${JSON.stringify(calls)}`);
+}
+
 const view = Object.create(context.Messages.prototype);
 view.current = { id: "conversation-a", revision: 7 };
 view.conversations = new Map([["conversation-a", view.current]]);
@@ -433,7 +483,8 @@ view.history = { replaceChildren: () => calls.push(["empty"]) };
 view.header = { textContent: "" };
 
 await view.markRead();
-if (JSON.stringify(calls.slice(0, 2)) !== JSON.stringify([
+const readIndex = calls.findIndex((call) => call[0] === "read");
+if (JSON.stringify(calls.slice(readIndex, readIndex + 2)) !== JSON.stringify([
   ["read", "/read/conversation-a", "7"],
   ["refresh", "conversation-a"],
 ])) throw new Error(`read race did not refresh: ${JSON.stringify(calls)}`);
@@ -468,6 +519,7 @@ view.replyError = {
   textContent: "",
   classList: { add: () => {}, remove: () => {} },
 };
+view.PollingCoordinator = pollingView.PollingCoordinator;
 view.loadConversations = async () => calls.push(["reload-conversations"]);
 view.openConversation = async (key) => calls.push(["open", key]);
 await view.sendReply({ preventDefault: () => calls.push(["prevent-reply"]) });
@@ -485,6 +537,13 @@ if (!source.includes("sendReply(") || !calls.some((call) => call[0] === "focus-r
 }
 if (view.replySubmit.disabled || view.replySpinner.dataset.visible !== "false") {
   throw new Error("reply submit state was not restored");
+}
+if (
+  calls.filter(
+    (call) => call[0] === "boost" && call[1] === "view:channel:messages",
+  ).length < 2
+) {
+  throw new Error("a locally sent reply did not boost message polling");
 }
 view.current = {
   id: "conversation-a",

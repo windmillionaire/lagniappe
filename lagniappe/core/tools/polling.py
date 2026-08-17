@@ -26,6 +26,7 @@ CHANNEL_REVISION_PATHS = {
     "forms": ("/forms/index",),
     "users": ("/users/index",),
     "ingress": ("/ingress/index",),
+    "messages": (),
     "starred": (),
     "tool-reports": ("/reports/index",),
 }
@@ -48,6 +49,7 @@ def channel_revision(
     *,
     site_fingerprint=None,
     site_fingerprints=None,
+    notification_state=None,
 ):
     """Return an opaque durable revision scoped to the supplied viewer."""
     site_fingerprint = site_fingerprint or database.site_fingerprint
@@ -72,6 +74,14 @@ def channel_revision(
             "channel": channel,
             "durable": durable_revisions,
             "personal": (entity_revision if channel in PERSONAL_CHANNELS else None),
+            "messages": (
+                {
+                    "generation": (notification_state or {}).get("generation"),
+                    "revision": (notification_state or {}).get("message_revision", 0),
+                }
+                if channel == "messages"
+                else None
+            ),
             "permissions": permissions,
         },
         separators=(",", ":"),
@@ -80,10 +90,21 @@ def channel_revision(
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
+_NOTIFICATION_STATE_UNSET = object()
+
+
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
 # @pairs polling:channel polling:batching polling:mounted-scope
-def channel_revisions(channels, user, *, fingerprint_loader=None):
+# @pair messaging:polling-revision
+def channel_revisions(
+    channels,
+    user,
+    *,
+    fingerprint_loader=None,
+    notification_state=_NOTIFICATION_STATE_UNSET,
+    notification_loader=None,
+):
     """Resolve requested channel cursors through one site-fingerprint batch."""
     channels = tuple(dict.fromkeys(channels))
     paths = tuple(
@@ -91,11 +112,26 @@ def channel_revisions(channels, user, *, fingerprint_loader=None):
     )
     fingerprint_loader = fingerprint_loader or database.site_fingerprints
     fingerprints = fingerprint_loader(paths) if paths else {}
+    if "messages" in channels and notification_state is _NOTIFICATION_STATE_UNSET:
+        notification_loader = notification_loader or cache.peek_notification_state
+        try:
+            notification_state = notification_loader(user)
+        except Exception as error:
+            notification_state = None
+            exceptions.capture(
+                error,
+                context={"operation": "poll_message_revision"},
+            )
     return {
         channel: channel_revision(
             channel,
             user,
             site_fingerprints=fingerprints,
+            notification_state=(
+                notification_state
+                if notification_state is not _NOTIFICATION_STATE_UNSET
+                else None
+            ),
         )
         for channel in channels
     }

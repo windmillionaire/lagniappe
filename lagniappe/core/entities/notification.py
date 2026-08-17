@@ -29,6 +29,7 @@ class Notification(Entity):
                 "ordinary_count": messaging.OrdinaryCount,
                 "unread_message_count": messaging.UnreadMessageCount,
                 "aggregate_revision": messaging.AggregateRevision,
+                "message_revision": messaging.MessageRevision,
                 "aggregate_generation": messaging.AggregateGeneration,
             }
         )

@@ -77,6 +77,7 @@ def _project(raw):
         return None
     try:
         revision = int(values.get("revision") or 0)
+        message_revision = int(values.get("message_revision") or 0)
         ordinary_count = int(values.get("ordinary_count") or 0)
         unread_message_count = int(values.get("unread_message_count") or 0)
     except (TypeError, ValueError):
@@ -91,6 +92,7 @@ def _project(raw):
     return {
         "generation": generation,
         "revision": revision,
+        "message_revision": max(0, message_revision),
         "ordinary_count": max(0, ordinary_count),
         "unread_message_count": max(0, unread_message_count),
         "count": max(0, ordinary_count) + max(0, unread_message_count),
@@ -171,6 +173,7 @@ def _write_mapping(
     *,
     ordinary_count=None,
     unread_message_count=0,
+    message_revision=0,
 ):
     if ordinary_count is None:
         ordinary_count = len(members)
@@ -178,6 +181,7 @@ def _write_mapping(
         "schema": NOTIFICATION_SCHEMA_VERSION,
         "generation": generation,
         "revision": str(int(revision)),
+        "message_revision": str(max(0, int(message_revision))),
         "ordinary_count": str(max(0, int(ordinary_count))),
         "unread_message_count": str(max(0, int(unread_message_count))),
         **{f"{MEMBER_PREFIX}{member}": "1" for member in sorted(members)},
@@ -243,6 +247,11 @@ def seed_notification_state(
                     if aggregate is not None
                     else 0
                 )
+                message_revision = (
+                    int(aggregate.get("message_revision") or 0)
+                    if aggregate is not None
+                    else 0
+                )
 
                 changed = bool(current and members != current["members"])
                 generation = current["generation"] if current else str(uuid.uuid4())
@@ -267,6 +276,7 @@ def seed_notification_state(
                         members,
                         ordinary_count=ordinary_count,
                         unread_message_count=unread_message_count,
+                        message_revision=message_revision,
                     ),
                 )
                 pipe.expire(state_key, NOTIFICATION_TTL_SECONDS)
@@ -275,6 +285,7 @@ def seed_notification_state(
                 return {
                     "generation": generation,
                     "revision": revision,
+                    "message_revision": message_revision,
                     "ordinary_count": ordinary_count,
                     "unread_message_count": unread_message_count,
                     "count": ordinary_count + unread_message_count,
@@ -347,6 +358,11 @@ def update_notification_projection(*, upserts=(), deletes=(), aggregates=None):
                             if aggregate is not None
                             else current.get("unread_message_count", 0)
                         )
+                        message_revision = (
+                            int(aggregate.get("message_revision") or 0)
+                            if aggregate is not None
+                            else current.get("message_revision", 0)
+                        )
                         pipe.delete(state_key)
                         pipe.hset(
                             state_key,
@@ -356,12 +372,14 @@ def update_notification_projection(*, upserts=(), deletes=(), aggregates=None):
                                 members,
                                 ordinary_count=ordinary_count,
                                 unread_message_count=unread_message_count,
+                                message_revision=message_revision,
                             ),
                         )
                         pipe.expire(state_key, NOTIFICATION_TTL_SECONDS)
                         state = {
                             "generation": current["generation"],
                             "revision": revision,
+                            "message_revision": message_revision,
                             "ordinary_count": ordinary_count,
                             "unread_message_count": unread_message_count,
                             "count": ordinary_count + unread_message_count,
@@ -406,6 +424,7 @@ def publish_notification_aggregate(user, aggregate):
                 unread_message_count = int(
                     aggregate.get("unread_message_count") or 0
                 )
+                message_revision = int(aggregate.get("message_revision") or 0)
                 pipe.multi()
                 pipe.set(epoch_key, str(revision))
                 pipe.delete(state_key)
@@ -417,6 +436,7 @@ def publish_notification_aggregate(user, aggregate):
                         members,
                         ordinary_count=ordinary_count,
                         unread_message_count=unread_message_count,
+                        message_revision=message_revision,
                     ),
                 )
                 pipe.expire(state_key, NOTIFICATION_TTL_SECONDS)
@@ -425,6 +445,7 @@ def publish_notification_aggregate(user, aggregate):
                 state = {
                     "generation": generation,
                     "revision": revision,
+                    "message_revision": message_revision,
                     "ordinary_count": ordinary_count,
                     "unread_message_count": unread_message_count,
                     "count": ordinary_count + unread_message_count,

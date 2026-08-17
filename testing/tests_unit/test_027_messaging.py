@@ -90,6 +90,7 @@ def managed_user(identifier, name, *, owner_user=False, public=False):
 # @pairs mentions:entity-contract mentions:idempotency mentions:index-exclusion
 # @pairs notifications:discriminator notifications:aggregate-count
 # @pairs notifications:revision notifications:generation
+# @pair messaging:polling-revision
 # @source lagniappe/core/entities/message.py::MessageConversation
 # @source lagniappe/core/entities/message.py::Message
 # @source lagniappe/core/entities/mention.py::MentionMarker
@@ -97,6 +98,7 @@ def managed_user(identifier, name, *, owner_user=False, public=False):
 # @source lagniappe/core/properties/messaging.py::OrdinaryCount.value
 # @source lagniappe/core/properties/messaging.py::UnreadMessageCount.value
 # @source lagniappe/core/properties/messaging.py::AggregateRevision.value
+# @source lagniappe/core/properties/messaging.py::MessageRevision.value
 # @source lagniappe/core/properties/messaging.py::AggregateGeneration.value
 # @source lagniappe/core/properties/user_entity.py::OwnerInboundToggle.value
 def test_messaging_entities_and_owner_toggles_are_fail_closed():
@@ -129,10 +131,12 @@ def test_messaging_entities_and_owner_toggles_are_fail_closed():
     notification.ordinary_count = 3
     notification.unread_message_count = 2
     notification.aggregate_revision = 7
+    notification.message_revision = 5
     notification.aggregate_generation = "generation-a"
     assert notification.ordinary_count == 3
     assert notification.unread_message_count == 2
     assert notification.aggregate_revision == 7
+    assert notification.message_revision == 5
     assert notification.aggregate_generation == "generation-a"
 
 
@@ -267,6 +271,7 @@ def test_message_transactions_are_idempotent_and_keep_exact_unread_counts(monkey
     recipient_id = messages._participant_id(recipient)
     assert conversation["unread_counts"][recipient_id] == 1
     assert notification_service.aggregate_counts(recipient_aggregate)["count"] == 1
+    assert recipient_aggregate["message_revision"] == 1
 
     monkeypatch.setattr(
         messages.collaboration,
@@ -302,6 +307,7 @@ def test_message_transactions_are_idempotent_and_keep_exact_unread_counts(monkey
     aggregate = store.get(notification_service.aggregate_key(recipient))
     assert read["unread_counts"][recipient_id] == 0
     assert aggregate["unread_message_count"] == 0
+    assert aggregate["message_revision"] == 1
 
     second, conversation, _aggregate, created = messages._send_transaction(
         actor, recipient, "second", "op-2"
@@ -311,6 +317,7 @@ def test_message_transactions_are_idempotent_and_keep_exact_unread_counts(monkey
     aggregate = store.get(notification_service.aggregate_key(recipient))
     assert recipient.key in store.get(second.key)["hidden_for"]
     assert aggregate["unread_message_count"] == 0
+    assert aggregate["message_revision"] == 2
 
     messages._send_transaction(actor, recipient, "third", "op-3")
     messages.clear_conversation(recipient, conversation_key)
@@ -772,6 +779,7 @@ def test_ordinary_notification_service_mutates_aggregate_once(monkeypatch):
     projected = notification_service.apply_ordinary_mutations(upserts=[mutation])
     assert projected[user.urlsafe_key]["ordinary_count"] == 1
     assert projected[user.urlsafe_key]["aggregate_revision"] == revision + 1
+    assert projected[user.urlsafe_key]["message_revision"] == 0
 
     repair_user = managed_user("repair-user", "Repair User")
     repaired = notification_service.repair_notification_aggregate(

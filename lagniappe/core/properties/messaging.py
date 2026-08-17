@@ -153,6 +153,24 @@ class AggregateRevision(DBProperty):
 
 # @testable true
 # @tests tests_unit/test_027_messaging.py::test_messaging_entities_and_owner_toggles_are_fail_closed
+# @pair messaging:polling-revision
+class MessageRevision(DBProperty):
+    _id = "message_revision"
+
+    # @testable true
+    # @tests tests_unit/test_027_messaging.py::test_messaging_entities_and_owner_toggles_are_fail_closed
+    # @pair messaging:polling-revision
+    @property
+    def value(self):
+        return int(super().value or 0)
+
+    @value.setter
+    def value(self, value):
+        DBProperty.value.fset(self, value)
+
+
+# @testable true
+# @tests tests_unit/test_027_messaging.py::test_messaging_entities_and_owner_toggles_are_fail_closed
 # @pair notifications:generation
 class AggregateGeneration(DBProperty):
     _id = "aggregate_generation"
