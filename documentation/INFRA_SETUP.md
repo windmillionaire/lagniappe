@@ -368,6 +368,28 @@ private key or
 Backup and restore remain privileged operator commands executed by the saved
 human gcloud CLI identity; they do not load human ADC into the application.
 
+### Optional Hosted E2E Infrastructure
+
+Hosted E2E is provisioned separately from ordinary installation because it is
+a maintainer/operator test facility, not an application runtime requirement.
+After development setup has created the test-prefixed buckets, a trusted
+operator may run:
+
+```text
+venv/bin/python run.py hosted-e2e setup --github-repository OWNER/REPOSITORY
+```
+
+The idempotent command creates dedicated runtime and CI-invoker service
+accounts, a WIF provider constrained to the repository/workflow/environment,
+an Artifact Registry repository, separate Secret Manager settings/Redis-CA
+mounts, seven-day artifact bucket, and inert App Engine `e2e-anchor` version.
+Runtime project
+roles mirror the existing suite's provider surface; Storage access is scoped to
+the test bucket family and artifact bucket. CI receives only permission to
+impersonate the invoker and run/inspect the exact job. See
+[TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md) before provisioning or changing
+these resources.
+
 ## Dependency Files
 
 `requirements-installer.txt` pins bootstrap-only installer clients and console

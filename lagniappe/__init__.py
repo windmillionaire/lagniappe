@@ -25,6 +25,7 @@ def _env_flag(name, default=False):
 
 # @testable true
 # @tests tests_unit/test_016_config.py::test_config_prefers_tracked_build_id_over_app_settings
+# @tests tests_unit/test_016_config.py::test_config_requires_hosted_build_id_to_match_built_source
 # @tests tests_unit/test_016_config.py::test_config_honors_ai_observability_setting
 # @tests tests_unit/test_016_config.py::test_config_honors_configured_source_url
 # @pair config:build-id
@@ -104,7 +105,17 @@ class Config:
         self.RUNTIME_SERVICE_ACCOUNT_EMAIL = runtime_email.casefold()
         self.INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL = internal_caller_email.casefold()
         self._google_credentials = None
-        self.BUILD_ID = getattr(constants, "BUILD_ID", None) or self.VERSION
+        tracked_build_id = getattr(constants, "BUILD_ID", None) or self.VERSION
+        hosted_build_id = (
+            getattr(self, "HOSTED_E2E_BUILD_ID", None)
+            if self.testing and getattr(self, "HOSTED_E2E", False)
+            else None
+        )
+        if hosted_build_id and hosted_build_id != tracked_build_id:
+            raise RuntimeError(
+                "Hosted E2E build ID does not match the built source tree."
+            )
+        self.BUILD_ID = tracked_build_id
 
         self.AI_DEBUG = _env_flag("AI_DEBUG", False)
         self.AI_DEBUG_LOG = (os.environ.get("AI_DEBUG_LOG") or "").strip() or None
@@ -185,6 +196,31 @@ class Config:
     @property
     def testing(self):
         return self.ENV == Environment.TESTING
+
+    @property
+    # @testable true
+    # @tests tests_unit/test_016_config.py::test_hosted_e2e_overrides_require_exact_runtime_identity
+    # @features hosted-e2e
+    # @dimensions configuration role
+    def hosted_e2e(self):
+        """Return whether this is a validated Google-hosted test process."""
+        return self.testing and bool(getattr(self, "HOSTED_E2E", False))
+
+    @property
+    # @testable true
+    # @tests tests_unit/test_016_config.py::test_hosted_e2e_server_rejects_wrong_app_engine_version
+    # @features hosted-e2e
+    # @dimensions configuration role
+    def hosted_e2e_server(self):
+        return self.hosted_e2e and getattr(self, "HOSTED_E2E_ROLE", None) == "server"
+
+    @property
+    # @testable true
+    # @tests tests_unit/test_016_config.py::test_hosted_e2e_overrides_require_exact_runtime_identity
+    # @features hosted-e2e
+    # @dimensions configuration role
+    def hosted_e2e_runner(self):
+        return self.hosted_e2e and getattr(self, "HOSTED_E2E_ROLE", None) == "runner"
 
     @property
     def production(self):

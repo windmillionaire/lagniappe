@@ -34,6 +34,7 @@ BEHAVIOR_SUFFIXES = {
 BEHAVIOR_EXCLUDED_PREFIXES = (
     ".git/",
     ".github/",
+    "config/files/",
     "documentation/",
     "lagniappe/web/static/",
     "node_modules/",
@@ -50,13 +51,21 @@ def utc_now() -> str:
 def _git(
     repo_root: Path, *args: str, check: bool = False, text: bool = False
 ) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        ["git", *args],
-        cwd=repo_root,
-        check=check,
-        capture_output=True,
-        text=text,
-    )
+    command = ["git", *args]
+    try:
+        return subprocess.run(
+            command,
+            cwd=repo_root,
+            check=check,
+            capture_output=True,
+            text=text,
+        )
+    except OSError as error:
+        if check:
+            raise
+        empty = "" if text else b""
+        detail = str(error) if text else str(error).encode()
+        return subprocess.CompletedProcess(command, 127, empty, detail)
 
 
 def git_head(repo_root: Path) -> str | None:
@@ -251,6 +260,14 @@ def behavior_file_fingerprint(path: Path) -> str:
     """Hash behavior-bearing content while ignoring annotation-only comments."""
     content = path.read_bytes()
     if path.suffix == ".py":
+        if path.name == "constants.py" and path.parent.name == "config":
+            # BUILD_ID is random output from the production asset build. It is
+            # recorded in hosted provenance but is not a source-tree change.
+            content = re.sub(
+                rb"(?m)^BUILD_ID\s*=.*(?:\r?\n|$)",
+                b"",
+                content,
+            )
         content = _python_behavior_bytes(content)
     elif path.suffix in {".js", ".mjs"}:
         try:
@@ -276,6 +293,15 @@ def behavior_path_fingerprints(repo_root: Path) -> dict[str, str]:
             value.decode(errors="surrogateescape")
             for value in untracked.stdout.split(b"\0")
             if value
+        )
+
+    # Source archives and test-runner images intentionally omit .git. Fall back
+    # to the uploaded tree so hosted evidence has the same provenance contract.
+    if not paths:
+        paths.update(
+            path.relative_to(repo_root).as_posix()
+            for path in repo_root.rglob("*")
+            if path.is_file()
         )
 
     fingerprints: dict[str, str] = {}

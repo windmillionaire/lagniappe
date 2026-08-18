@@ -30,6 +30,7 @@ See Also:
 """
 
 from contextlib import contextmanager
+from dataclasses import dataclass
 import fcntl
 import logging
 import os
@@ -95,6 +96,77 @@ window.__NAVIGATION_TRANSITION_READY__ = new Promise((resolve) => {
 """
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class E2ERuntime:
+    """Browser-facing state shared by every context in one pytest session."""
+
+    run_id: str
+    browser_cookies: tuple[dict, ...] = ()
+
+
+def _validate_hosted_e2e_health():
+    """Validate the exact hosted deployment before touching shared test data."""
+    import requests
+
+    from lagniappe import CONFIG
+
+    health_response = requests.get(
+        f"{CONFIG.BASE_URL}/testing/health",
+        timeout=30,
+    )
+    health_response.raise_for_status()
+    expected_health = {
+        "ready": True,
+        "service": CONFIG.HOSTED_E2E_SERVICE,
+        "version": CONFIG.HOSTED_E2E_VERSION,
+        "source": CONFIG.HOSTED_E2E_SOURCE,
+        "source_snapshot": CONFIG.HOSTED_E2E_SOURCE_SNAPSHOT,
+        "build_id": CONFIG.HOSTED_E2E_BUILD_ID,
+    }
+    if health_response.json() != expected_health:
+        raise RuntimeError(
+            "Hosted E2E health metadata does not match this job execution."
+        )
+
+
+def _hosted_e2e_browser_cookie(run_id):
+    """Exchange one Google OIDC token for the deployment's browser cookie."""
+    import requests
+    from google.auth.transport import requests as google_requests
+    from google.oauth2 import id_token
+
+    from lagniappe import CONFIG
+    from lagniappe.core.tools.hosted_e2e_auth import HOSTED_E2E_COOKIE
+
+    token = id_token.fetch_id_token(google_requests.Request(), CONFIG.BASE_URL)
+    session_response = requests.post(
+        f"{CONFIG.BASE_URL}/testing/session",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "run_id": run_id,
+            "version": CONFIG.HOSTED_E2E_VERSION,
+            "source": CONFIG.HOSTED_E2E_SOURCE,
+        },
+        timeout=30,
+    )
+    if session_response.status_code != 204:
+        raise RuntimeError(
+            "Hosted E2E browser bootstrap was rejected "
+            f"(HTTP {session_response.status_code})."
+        )
+    value = session_response.cookies.get(HOSTED_E2E_COOKIE)
+    if not value:
+        raise RuntimeError("Hosted E2E bootstrap did not return its browser cookie.")
+    return {
+        "name": HOSTED_E2E_COOKIE,
+        "value": value,
+        "url": CONFIG.BASE_URL,
+        "httpOnly": True,
+        "secure": True,
+        "sameSite": "Strict",
+    }
 
 
 def pytest_addoption(parser):
@@ -174,27 +246,54 @@ def setup_test_server():
     """
     with _e2e_session_lock():
         process = None
+        lease = None
+        lease_acquired = False
         try:
+            from lagniappe import CONFIG
+            from lagniappe.core.tools.e2e_lease import E2ELease
+
+            if CONFIG.hosted_e2e_runner:
+                # A stale/delayed job must fail before it can clean shared data.
+                _validate_hosted_e2e_health()
+
+            lease = E2ELease()
+            lease.__enter__()
+            lease_acquired = True
+
             # Recover from interrupted runs whose fixture finalizers never ran.
             cleanup_test_data()
 
             # Clean up previous test artifacts
             prepare_test_artifacts()
 
-            process = run_test_server()
+            browser_cookies = ()
+            if CONFIG.hosted_e2e_runner:
+                browser_cookies = (_hosted_e2e_browser_cookie(lease.run_id),)
+            else:
+                process = run_test_server()
 
             from lagniappe.core.entities import Entities
 
             Entities.initialize()
 
-            yield
+            yield E2ERuntime(
+                run_id=lease.run_id,
+                browser_cookies=browser_cookies,
+            )
         finally:
-            # Cleanup test data from database and cache
-            cleanup_test_data()
-
-            # Graceful shutdown with fallback to forceful termination
-            if process is not None:
-                terminate_test_server_process(process)
+            try:
+                if lease_acquired:
+                    # Only the lease owner may delete shared test-prefixed data.
+                    lease.assert_active()
+                    cleanup_test_data()
+            finally:
+                try:
+                    # Graceful shutdown with fallback to forceful termination.
+                    if process is not None:
+                        terminate_test_server_process(process)
+                finally:
+                    if lease_acquired:
+                        lease.__exit__(None, None, None)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -315,7 +414,7 @@ def browser_failures(request):
 
 
 @pytest.fixture
-def get_user(browser, request, browser_failures):
+def get_user(browser, request, browser_failures, setup_test_server):
     """
     Factory fixture for getting authenticated User resources with isolated contexts.
 
@@ -402,6 +501,7 @@ def get_user(browser, request, browser_failures):
         if not user.storage_state and user.email:
             user.login(
                 browser,
+                cookies=setup_test_server.browser_cookies,
                 monitor_context=lambda context: browser_failures.monitor_context(
                     context,
                     label=user.name,
@@ -421,6 +521,8 @@ def get_user(browser, request, browser_failures):
             viewport={"width": 1280, "height": 720},
             has_touch=has_touch,
         )
+        if setup_test_server.browser_cookies:
+            context.add_cookies(list(setup_test_server.browser_cookies))
         context.add_init_script(script=PAGE_REVEAL_TRANSITION_OBSERVER)
         contexts.append(context)
         browser_failures.monitor_context(

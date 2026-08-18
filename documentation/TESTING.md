@@ -86,6 +86,35 @@ lock and cleans stale test data before starting the server, so overlapping
 pytest invocations should fail early with a clear message and interrupted runs
 should be less likely to poison the next run.
 
+### Hosted E2E
+
+The opt-in hosted runner deploys one zero-traffic App Engine `e2e` version and
+executes this same pytest/Playwright suite from a Cloud Run job. This keeps the
+direct Datastore/Storage/Redis helpers close to their providers and lets either
+a trusted local command or secret-free GitHub WIF invocation start the same
+job. A Redis lease serializes hosted and local E2E access to the fixed `test-`
+namespace. `create` consumes an already committed production build and exports
+that exact commit for both hosted artifacts; it does not run the frontend build.
+
+```bash
+venv/bin/python run.py hosted-e2e setup --github-repository OWNER/REPOSITORY
+venv/bin/python run.py hosted-e2e create
+venv/bin/python run.py hosted-e2e execute --suite pilot
+venv/bin/python run.py hosted-e2e execute --suite full
+venv/bin/python run.py hosted-e2e results --latest
+venv/bin/python run.py hosted-e2e status
+venv/bin/python run.py hosted-e2e teardown
+```
+
+Local `execute` automatically merges the remote run into
+`testing/evidence/latest.json`; a CI-triggered run is imported later with
+`results --latest` from the same candidate commit. Evidence import is a manual
+release step and the reviewed manifest becomes an ordinary follow-up commit;
+the workflow has no repository write permission. See
+[TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md) for the production-build order,
+security model, one-time setup, GitHub variables, lifecycle, artifact behavior,
+and failure recovery.
+
 ### Browser failure guard
 
 E2E teardown fails on an unaccounted console error, uncaught `pageerror`, or
@@ -357,6 +386,8 @@ Generated artifacts belong under `reports/`:
 - Curated browser review folders: `reports/browser_reviews/`
 - Managed browser test-server runtime/seed files: `reports/test-server.*`,
   `reports/test-server-load.json`
+- Hosted lifecycle state and downloaded result bundles:
+  `reports/hosted-e2e/`
 - Traceability reports: `reports/traceability*.md`
 - Template contract reports: `reports/template-contracts*.md`
 - Rollup bundle visualizers: `reports/`
@@ -384,7 +415,9 @@ no GCP, Redis, or deployment credentials. The maintainer runs the necessary
 tests on configured infrastructure and commits the updated evidence manifest
 before opening the release pull request. Hosted CI runs Biome, Ruff,
 repository-wide traceability, changed-source traceability, and the release-tree
-check against the exact base commit.
+check against the exact base commit. The separate manually dispatched Hosted
+E2E workflow uses keyless WIF only to invoke an already-created Cloud Run job;
+it receives none of the application's settings or provider credentials.
 
 ## Placement Rules
 

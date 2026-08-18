@@ -48,6 +48,14 @@ request is squash-merged into `main`. The main-only workflow requires the
 committed metadata to identify a production build; a later development build
 cannot pass the release gate.
 
+Hosted E2E follows the same immutable-build boundary. After the canonical
+production output and candidate source are committed,
+`venv/bin/python run.py hosted-e2e create` validates the committed build
+metadata and deploys both hosted artifacts from an export of that exact commit.
+It never runs another build or replaces the reviewed random build ID. Hosted
+evidence is imported manually and may be committed afterward without changing
+the tested semantic source tree.
+
 When `SENTRY_AUTH_TOKEN` is configured, production JavaScript source maps are
 generated as hidden Rollup outputs, uploaded to Sentry, then deleted from
 `lagniappe/web/static/`. Without a token, JavaScript source maps and the upload

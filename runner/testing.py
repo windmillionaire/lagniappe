@@ -16,6 +16,7 @@ from urllib.parse import urlparse
 
 from runner.context import GCLOUD_CLI, NPM_CLI
 from config import APP_DIR, Directory, Environment, File, SETTINGS
+from config.constants import DEFAULT_TEST_PREFIX
 from runner.gcloud import activate_repository_gcloud
 from runner.process import run_command
 
@@ -24,6 +25,20 @@ from runner.process import run_command
 _DEFAULT_PLAYWRIGHT_BROWSERS = Path.home() / ".cache/ms-playwright"
 if _DEFAULT_PLAYWRIGHT_BROWSERS.is_dir():
     os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(_DEFAULT_PLAYWRIGHT_BROWSERS)
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
+# @features testing hosted-e2e
+# @dimensions provider-auth frontend-build
+def hosted_e2e_enabled():
+    """Return whether this process is the managed hosted-E2E runner."""
+    return os.environ.get("LAGNIAPPE_HOSTED_E2E", "").strip().casefold() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 # Patterns to filter from test server output (static files, etc.)
@@ -398,6 +413,8 @@ def _filter_server_output(pipe, stream):
 
 def _configure_test_gcloud():
     os.environ["FLASK_ENV"] = Environment.TESTING.value
+    if hosted_e2e_enabled():
+        return
     activate_repository_gcloud(
         ensure_adc=True,
         allow_runtime_adc=True,
@@ -475,10 +492,25 @@ def terminate_test_server_process(process, timeout=15):
         process.wait()
 
 
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_cleanup_scope_requires_the_reserved_test_prefix
+# @features testing hosted-e2e
+# @dimensions cleanup prefix fail-closed
+def _require_test_cleanup_scope(config):
+    if not config.testing or config.PREFIX != DEFAULT_TEST_PREFIX:
+        raise RuntimeError(
+            "Refusing test cleanup outside the reserved test- data prefix."
+        )
+
+
+# @testable infrastructure
 def cleanup_test_data():
     os.environ["FLASK_ENV"] = Environment.TESTING.value
     _configure_test_gcloud()
 
+    from lagniappe import CONFIG
+
+    _require_test_cleanup_scope(CONFIG)
     from lagniappe.core.tools import database, cache
 
     database.cleanup_test_data()

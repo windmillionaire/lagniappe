@@ -28,6 +28,7 @@ test_roots:
   - testing/tests_tooling/test_005_test_server_command.py
   - testing/tests_tooling/test_007_run_py_test_command.py
   - testing/tests_tooling/test_008_data_recovery.py
+  - testing/tests_tooling/test_009_hosted_e2e.py
   - testing/tests_tooling/test_icons.py
 
 annotated_source_roots:
@@ -50,6 +51,8 @@ annotated_source_roots:
   - runner/process.py
   - runner/testing.py
   - runner/upgrade.py
+  - runner/hosted_e2e.py
+  - config/hosted_e2e.py
   - lagniappe/__init__.py
   - lagniappe/core/exceptions
   - lagniappe/web/__init__.py

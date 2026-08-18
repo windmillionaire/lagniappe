@@ -1,0 +1,64 @@
+name: Hosted E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      suite:
+        description: E2E scope to run
+        required: true
+        default: pilot
+        type: choice
+        options:
+          - pilot
+          - full
+
+permissions:
+  id-token: write
+
+concurrency:
+  group: hosted-e2e
+  cancel-in-progress: false
+
+jobs:
+  execute:
+    name: Execute hosted suite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 130
+    environment: hosted-e2e
+
+    steps:
+      - name: Authenticate without a stored key
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_E2E_INVOKER_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          version: ">= 498.0.0"
+
+      - name: Require a job built from this commit
+        env:
+          E2E_JOB: lagniappe-e2e
+          E2E_REGION: ${{ vars.GCP_RESOURCE_REGION }}
+          EXPECTED_SOURCE: ${{ github.sha }}
+        run: |
+          job_json="$(gcloud run jobs describe "$E2E_JOB" --region "$E2E_REGION" --format=json)"
+          configured_source="$(jq -er '[.. | objects | select(.name? == "LAGNIAPPE_HOSTED_E2E_SOURCE") | .value][0]' <<<"$job_json")"
+          if [[ "$configured_source" != "$EXPECTED_SOURCE" ]]; then
+            echo "The hosted job targets $configured_source, not $EXPECTED_SOURCE."
+            exit 1
+          fi
+
+      - name: Run the existing E2E suite
+        env:
+          E2E_JOB: lagniappe-e2e
+          E2E_REGION: ${{ vars.GCP_RESOURCE_REGION }}
+          E2E_SUITE: ${{ inputs.suite }}
+        run: >-
+          gcloud run jobs execute "$E2E_JOB"
+          --region "$E2E_REGION"
+          --args=--suite,"$E2E_SUITE"
+          --wait

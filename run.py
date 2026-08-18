@@ -37,10 +37,28 @@ def includes_e2e_tests(test_args: list[str]) -> bool:
     )
 
 
+# @testable false
+# @covered-by run.py::configure_test_environment
+# @covered-by run.py::run_tests
+# @reason pure environment flag shared by the two test-runner launch boundaries
+def hosted_e2e_enabled() -> bool:
+    return os.environ.get("LAGNIAPPE_HOSTED_E2E", "").strip().casefold() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_configure_test_environment_prepares_frontend_only_for_e2e
+# @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
+# @features testing hosted-e2e
+# @dimensions cli-routing frontend-build
 def configure_test_environment(test_args: list[str]) -> None:
     """Set test env vars before pytest imports the app package."""
     os.environ["FLASK_ENV"] = "testing"
-    if includes_e2e_tests(test_args):
+    if includes_e2e_tests(test_args) and not hosted_e2e_enabled():
         from runner.testing import ensure_test_frontend_bundle
 
         ensure_test_frontend_bundle()
@@ -245,6 +263,11 @@ def _run_pytest_subprocess(command: list[str]) -> int:
             signal.signal(signum, handler)
 
 
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_e2e_aligns_adc_before_pytest
+# @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
+# @features testing hosted-e2e
+# @dimensions cli-routing provider-auth
 def run_tests(test_args: list[str]) -> int:
     """Run pytest through the repo wrapper.
 
@@ -265,15 +288,16 @@ def run_tests(test_args: list[str]) -> int:
 
     configure_test_environment(pytest_args)
     e2e_tests = includes_e2e_tests(pytest_args)
-    try:
-        activate_repository_gcloud(
-            ensure_adc=e2e_tests,
-            allow_runtime_adc=e2e_tests,
-            allow_adc_login=False,
-        )
-    except RuntimeError as error:
-        print(f"Test startup stopped: {error}")
-        return 1
+    if not hosted_e2e_enabled():
+        try:
+            activate_repository_gcloud(
+                ensure_adc=e2e_tests,
+                allow_runtime_adc=e2e_tests,
+                allow_adc_login=False,
+            )
+        except RuntimeError as error:
+            print(f"Test startup stopped: {error}")
+            return 1
     command_variable = "LAGNIAPPE_TEST_COMMAND"
     previous_command = os.environ.get(command_variable)
     os.environ[command_variable] = json.dumps(
@@ -897,6 +921,10 @@ if __name__ == "__main__":
         sys.exit(run_restore_command(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "release-check":
         sys.exit(run_release_check_command(sys.argv[2:]))
+    if len(sys.argv) > 1 and sys.argv[1] == "hosted-e2e":
+        from runner.hosted_e2e import run_hosted_e2e_command
+
+        sys.exit(run_hosted_e2e_command(sys.argv[2:]))
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -909,6 +937,7 @@ if __name__ == "__main__":
             "indexes",
             "deploy",
             "icons",
+            "hosted-e2e",
             "mutation-contracts",
             "release-check",
             "restore",

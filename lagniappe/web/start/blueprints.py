@@ -51,4 +51,5 @@ def initialize(app, csrf):
 
         app.register_blueprint(analytics, url_prefix="/analytics")
     csrf.exempt(process)
+    csrf.exempt(testing)
     csrf.exempt(webhooks)

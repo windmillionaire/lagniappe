@@ -526,6 +526,19 @@ def test_behavior_fingerprint_ignores_python_and_javascript_comments(tmp_path):
     )
 
 
+def test_behavior_fingerprint_ignores_generated_build_id(tmp_path):
+    constants_path = tmp_path / "config/constants.py"
+    constants_path.parent.mkdir(parents=True)
+    constants_path.write_text('BUILD_ID = "b0000000"\nVALUE = 1\n')
+    before = traceability_common.behavior_file_fingerprint(constants_path)
+
+    constants_path.write_text('BUILD_ID = "b1234567"\nVALUE = 1\n')
+    assert traceability_common.behavior_file_fingerprint(constants_path) == before
+
+    constants_path.write_text('BUILD_ID = "b1234567"\nVALUE = 2\n')
+    assert traceability_common.behavior_file_fingerprint(constants_path) != before
+
+
 def test_behavior_snapshot_fingerprints_style_records_independently(tmp_path):
     styles = tmp_path / "src/style/styles.yaml"
     styles.parent.mkdir(parents=True)
@@ -665,6 +678,7 @@ def test_configure_test_environment_prepares_frontend_only_for_e2e(monkeypatch):
     config_module.__path__ = ["config"]
     testing_module = types.ModuleType("runner.testing")
     testing_module.ensure_test_frontend_bundle = lambda: calls.append("bundle")
+    testing_module.hosted_e2e_enabled = lambda: False
     monkeypatch.setitem(sys.modules, "config", config_module)
     monkeypatch.setitem(sys.modules, "runner.testing", testing_module)
 
@@ -677,6 +691,50 @@ def test_configure_test_environment_prepares_frontend_only_for_e2e(monkeypatch):
     run.configure_test_environment([])
 
     assert calls == ["bundle", "bundle"]
+
+
+# @features testing hosted-e2e
+# @dimensions cli-routing provider-auth frontend-build
+def test_hosted_e2e_runner_skips_local_build_and_gcloud_activation(monkeypatch):
+    calls = []
+    from runner import testing as testing_module
+
+    monkeypatch.setenv("LAGNIAPPE_HOSTED_E2E", "true")
+    monkeypatch.setattr(
+        testing_module,
+        "ensure_test_frontend_bundle",
+        lambda: calls.append("bundle"),
+    )
+    monkeypatch.setattr(
+        run,
+        "activate_repository_gcloud",
+        lambda **kwargs: calls.append(("gcloud", kwargs)),
+    )
+    monkeypatch.setattr(
+        run,
+        "_run_pytest_subprocess",
+        lambda command: calls.append(("pytest", command)) or 0,
+    )
+
+    assert run.run_tests(["e2e"]) == 0
+    assert [name for name, *_rest in calls] == ["pytest"]
+
+
+# @features testing hosted-e2e
+# @dimensions cleanup prefix fail-closed
+def test_cleanup_scope_requires_the_reserved_test_prefix():
+    from runner import testing as testing_module
+
+    testing_module._require_test_cleanup_scope(
+        types.SimpleNamespace(testing=True, PREFIX="test-")
+    )
+    for config in (
+        types.SimpleNamespace(testing=False, PREFIX="test-"),
+        types.SimpleNamespace(testing=True, PREFIX=""),
+        types.SimpleNamespace(testing=True, PREFIX="production-"),
+    ):
+        with pytest.raises(RuntimeError, match="reserved test- data prefix"):
+            testing_module._require_test_cleanup_scope(config)
 
 
 def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, capsys):

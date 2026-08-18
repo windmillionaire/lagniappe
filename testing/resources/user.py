@@ -147,11 +147,13 @@ class User(SiteResource):
     def locate(self, selector):
         return self.page.locator(selector)
 
-    def login(self, browser, monitor_context=None):
+    def login(self, browser, monitor_context=None, cookies=()):
         if self.storage_state:
             return
 
         context = browser.new_context()
+        if cookies:
+            context.add_cookies(list(cookies))
         if monitor_context is not None:
             monitor_context(context)
         login_page = context.new_page()

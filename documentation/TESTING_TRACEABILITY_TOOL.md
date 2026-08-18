@@ -63,8 +63,11 @@ result records a semantic snapshot, and
 remains current only while its test file plus the source and template paths
 connected through traceability metadata are behaviorally unchanged. Python
 comments and docstrings, JavaScript comments, documentation, and report
-artifacts do not invalidate behavioral evidence. Changing a referenced
-implementation or template does.
+artifacts do not invalidate behavioral evidence. The random production
+`BUILD_ID` assignment in `config/constants.py` is also normalized because it
+identifies generated assets rather than a source change; hosted provenance
+records the concrete deployed build ID separately. Changing any other
+referenced implementation or template does invalidate evidence.
 
 The manifest is excluded from its own behavior snapshot, so recording a test
 result does not immediately make that result stale. GitHub workflow files are

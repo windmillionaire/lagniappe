@@ -587,6 +587,31 @@ critique. It stores raw evidence and the curated HTML report together under
 
 **`update_test_indexes()`** creates test-prefixed versions of Datastore indexes (e.g. `kind` → `test-kind`), deploys them, then restores the original index file.
 
+### Hosted Testing (`runner/hosted_e2e.py`)
+
+`venv/bin/python run.py hosted-e2e` owns the opt-in hosted lifecycle. A trusted
+local `create` requires a clean committed candidate whose generated metadata
+identifies a production build. It exports that exact commit without rebuilding,
+uses the export for both the App Engine source and Cloud Run image, deploys a
+temporary all-dynamic descriptor with `--no-promote`, and never edits the
+canonical `lagniappe.yaml`. The all-dynamic handler is deliberate: Flask's
+hosted request gate must authorize static assets as well as routes.
+
+The runner image excludes all `config/files/` content and mounts the canonical
+settings plus the optional managed Redis CA certificate from separate Secret
+Manager secrets at execution time. Hosted pytest skips the local frontend
+preflight and gcloud/ADC activation because the image already contains its
+built assets and the job supplies metadata credentials. The validated hosted
+overrides restore the reserved `test-` prefix and fixed test owner identity;
+the ignored local development-settings file is never uploaded. The existing
+fixtures, direct backend calls, cleanup, strict relation checks, and evidence
+plugin are otherwise unchanged. Local `execute` and
+`.github/workflows/hosted-e2e.yml` invoke the same Cloud Run job.
+
+The stable infrastructure, request/identity boundary, teardown behavior, and
+evidence import contract are documented in
+[TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md).
+
 ### Material Symbols
 
 Material Symbols Rounded is self-hosted as an official Google Fonts subset.

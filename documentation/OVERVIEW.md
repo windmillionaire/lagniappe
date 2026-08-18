@@ -55,6 +55,7 @@ Build, configuration, installation, and test workflows.
 | [MANUAL_LOGIN_FLOW_CHECK.md](../MANUAL_LOGIN_FLOW_CHECK.md) | Fresh-production login QA for live Google OAuth, Identity Platform, authentication email, redirects, account states, and browser password-manager behavior. |
 | [DATA_MIGRATIONS.md](DATA_MIGRATIONS.md) | Authoring, testing, releasing, running, auditing, and retiring persisted-data migrations. |
 | [TESTING.md](TESTING.md) | Test suites, commands, fixtures, managed test server, traceability tools. |
+| [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md) | Keyless hosted E2E architecture, setup, lifecycle, request gate, artifacts, and evidence import. |
 | [TESTING_WRITING_TESTS.md](TESTING_WRITING_TESTS.md) | Practical guide for adding or reviewing tests. |
 | [TESTING_TEST_REVIEW.md](TESTING_TEST_REVIEW.md) | Agent workflow for reviewing annotated or bare tests. |
 | [TODO_E2E_HARDENING.md](TODO_E2E_HARDENING.md) | Prioritized backlog for isolating E2E state, replacing private test controls, and strengthening browser evidence. |
@@ -97,4 +98,5 @@ Build, configuration, installation, and test workflows.
 | Add or run a data migration | [DATA_MIGRATIONS](DATA_MIGRATIONS.md) | `lagniappe/core/tools/database/migrations.py`, `lagniappe/web/routes/home/site.py` |
 | Change entity saves, relation writes, or delete cascades | [BACKEND_ENTITIES](BACKEND_ENTITIES.md) | `lagniappe/core/entities/__init__.py`, `lagniappe/core/mixins/related.py`, `lagniappe/core/tools/database/utility.py` |
 | Write tests | [TESTING](TESTING.md), [TESTING_WRITING_TESTS](TESTING_WRITING_TESTS.md) | `testing/tests_e2e/`, `testing/tests_js/`, `testing/tests_unit/`, `testing/definitions/` |
+| Run E2E near hosted providers | [TESTING_HOSTED_E2E](TESTING_HOSTED_E2E.md) | `runner/hosted_e2e.py`, `.github/workflows/hosted-e2e.yml` |
 | Understand the config system | [INFRA_CONFIG](INFRA_CONFIG.md) | `config/__init__.py`, `config/constants.py` |

@@ -505,9 +505,15 @@ class Settings:
             }
         )
         app_settings.update(self.TEST_CONFIG)
-        server_name = app_settings["SERVER_NAME"]
-        server_port = app_settings["SERVER_PORT"]
-        app_settings["BASE_URL"] = f"http://{server_name}:{server_port}"
+        from .hosted_e2e import hosted_e2e_settings_overrides
+
+        hosted_overrides = hosted_e2e_settings_overrides(app_settings)
+        if hosted_overrides:
+            app_settings.update(hosted_overrides)
+        else:
+            server_name = app_settings["SERVER_NAME"]
+            server_port = app_settings["SERVER_PORT"]
+            app_settings["BASE_URL"] = f"http://{server_name}:{server_port}"
 
         self._TEST_SETTINGS = app_settings
 

@@ -11,6 +11,7 @@ from lagniappe.core.tools.cache import details as cache_details
 from lagniappe.core.tools.cache import query, utility
 from lagniappe.core.tools.cache.core import Cache, CacheJSON
 from lagniappe.core.tools.cache.keys import SEARCH_SCORE_FIELD, Keys, Search
+from lagniappe.core.tools import e2e_lease
 
 
 # @features cache
@@ -736,3 +737,105 @@ def test_cleanup_test_data_reraises_unexpected_drop_index_errors(monkeypatch):
 
     with pytest.raises(ResponseError, match="Redis is unavailable"):
         utility.cleanup_test_data()
+
+
+class _LeaseRedis:
+    def __init__(self):
+        self.values = {}
+
+    def set(self, key, value, *, nx=False, ex=None):
+        if nx and key in self.values:
+            return False
+        self.values[key] = str(value)
+        return True
+
+    def get(self, key):
+        return self.values.get(key)
+
+    def eval(self, script, count, key, run_id, *arguments):
+        assert count == 1
+        if self.values.get(key) != run_id:
+            return 0
+        if "expire" in script:
+            return 1
+        del self.values[key]
+        return 1
+
+
+# @features hosted-e2e
+# @dimensions lease prefix-isolation
+def test_e2e_lease_key_is_outside_test_cleanup_prefix(monkeypatch):
+    monkeypatch.setattr(
+        e2e_lease,
+        "CONFIG",
+        SimpleNamespace(GOOGLE_CLOUD_PROJECT="project-1", PREFIX="test-"),
+    )
+
+    key = e2e_lease.e2e_lease_key()
+
+    assert key.startswith("lagniappe:e2e:lease:")
+    assert not key.startswith("test-")
+
+
+# @features hosted-e2e
+# @dimensions lease concurrency expiry ownership authentication replay heartbeat deployment-binding
+def test_e2e_lease_acquire_heartbeat_and_owner_release(monkeypatch):
+    monkeypatch.setattr(
+        e2e_lease,
+        "CONFIG",
+        SimpleNamespace(GOOGLE_CLOUD_PROJECT="project-1", PREFIX="test-"),
+    )
+    client = _LeaseRedis()
+    owner = "owner_abcdefghijklmnopqrstuvwxyz"
+    contender = "contender_abcdefghijklmnopqrstuv"
+
+    assert e2e_lease.acquire_e2e_lease(owner, client=client)
+    assert not e2e_lease.acquire_e2e_lease(contender, client=client)
+    assert e2e_lease.heartbeat_e2e_lease(owner, client=client)
+    version = "e2e-abcdef1234567890"
+    source = "b" * 40
+    assert e2e_lease.bind_e2e_deployment(
+        owner,
+        version,
+        source,
+        client=client,
+    )
+    assert e2e_lease.e2e_deployment_lease_active(
+        version,
+        source,
+        run_id=owner,
+        client=client,
+    )
+    assert not e2e_lease.e2e_deployment_lease_active(
+        version,
+        source,
+        run_id=contender,
+        client=client,
+    )
+    digest = "a" * 64
+    assert e2e_lease.consume_e2e_bootstrap_token(digest, owner, client=client)
+    assert not e2e_lease.consume_e2e_bootstrap_token(digest, owner, client=client)
+    assert not e2e_lease.release_e2e_lease(contender, client=client)
+    assert e2e_lease.e2e_lease_active(owner, client=client)
+    assert e2e_lease.release_e2e_lease(owner, client=client)
+    assert e2e_lease.current_e2e_lease(client=client) is None
+    assert not e2e_lease.e2e_deployment_lease_active(
+        version,
+        source,
+        client=client,
+    )
+    assert e2e_lease.acquire_e2e_lease(contender, client=client)
+    assert e2e_lease.consume_e2e_bootstrap_token(
+        digest,
+        contender,
+        client=client,
+    )
+    assert e2e_lease.release_e2e_lease(contender, client=client)
+
+    with e2e_lease.E2ELease(
+        owner,
+        client=client,
+        heartbeat_seconds=100,
+    ) as lease:
+        lease.assert_active()
+    assert e2e_lease.current_e2e_lease(client=client) is None
