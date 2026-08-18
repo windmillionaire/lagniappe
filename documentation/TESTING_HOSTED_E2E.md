@@ -91,14 +91,15 @@ complete source plus generated release output before creating hosted resources:
 ```bash
 npm ci
 npm run build
-git add -- \
-  config/constants.py \
-  lagniappe/web/static \
-  lagniappe/web/start/styles/icons.py \
-  lagniappe/web/start/styles/styles.py
-# Stage the rest of the reviewed release candidate, then commit it.
+# Commit the complete reviewed candidate with the normal Git "commit all"
+# workflow, including the generated production output.
 venv/bin/python run.py hosted-e2e create
 ```
+
+Hosted E2E does not prescribe a separate manual staging workflow. Git may stage
+files internally as part of the operator's normal commit-all action. The
+important boundary is that the complete reviewed source and generated build
+are committed, and the authored worktree is clean, before `create` runs.
 
 `create` does not edit or replace the canonical `lagniappe.yaml`. It writes an
 owner-only temporary descriptor, deploys with `--no-promote`, validates the

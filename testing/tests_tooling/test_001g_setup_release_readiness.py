@@ -157,7 +157,8 @@ def test_doctor_reports_keyless_identity_drift():
     assert doctor._keyless_identity_issues(
         {
             "CONFIG_KIND": "lagniappe-settings",
-            "CONFIG_SCHEMA_VERSION": 3,
+            # Settings YAML quotes environment-style scalar values.
+            "CONFIG_SCHEMA_VERSION": "3",
             "GOOGLE_CLOUD_PROJECT": "demo-project",
             "RUNTIME_SERVICE_ACCOUNT_EMAIL": runtime_email,
             "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": runtime_email,
