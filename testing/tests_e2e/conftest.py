@@ -41,6 +41,7 @@ from config import SETTINGS
 from runner.testing import (
     _e2e_session_lock_path,
     cleanup_test_data,
+    initialize_test_data,
     prepare_test_artifacts,
     run_test_server,
     terminate_test_server_process,
@@ -262,6 +263,12 @@ def setup_test_server():
 
             # Recover from interrupted runs whose fixture finalizers never ran.
             cleanup_test_data()
+
+            # A local Flask process starts after cleanup and seeds persistence as
+            # part of startup. The hosted app is already running, so replay that
+            # same persistence initialization from the regional runner.
+            if CONFIG.hosted_e2e_runner:
+                initialize_test_data()
 
             # Clean up previous test artifacts
             prepare_test_artifacts()

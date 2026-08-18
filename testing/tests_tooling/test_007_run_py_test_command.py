@@ -737,6 +737,28 @@ def test_cleanup_scope_requires_the_reserved_test_prefix():
             testing_module._require_test_cleanup_scope(config)
 
 
+# @features testing hosted-e2e
+# @dimensions initialization database cache migrations
+def test_initialize_test_services_replays_server_persistence_startup():
+    from runner import testing as testing_module
+
+    calls = []
+    database = types.SimpleNamespace(
+        initialize=lambda: calls.append("database") or True
+    )
+    cache = types.SimpleNamespace(initialize=lambda: calls.append("cache"))
+    migrations = types.SimpleNamespace(
+        initialize_fresh_install=lambda fresh: calls.append(("migrations", fresh))
+    )
+
+    assert testing_module._initialize_test_services(
+        database,
+        cache,
+        migrations,
+    ) is True
+    assert calls == ["cache", "database", ("migrations", True)]
+
+
 def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, capsys):
     calls = []
     events = []

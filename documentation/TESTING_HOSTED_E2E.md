@@ -127,7 +127,12 @@ Both commands execute the same `lagniappe-e2e` Cloud Run job used by CI. The
 hosted runner skips local Flask startup, local frontend rebuilding, and local
 gcloud activation inside pytest. Direct Datastore/Storage/Redis fixture calls
 therefore execute from the regional job while browser HTTP calls use the exact
-App Engine version URL.
+App Engine version URL. After acquiring the shared lease, the runner removes
+stranded test-prefixed data and replays the persistence portion of application
+startup: Redis indexes, reserved Datastore models, and the fresh-install
+migration baseline. This matches the local ordering, where the Flask test
+server starts and seeds persistence only after cleanup; the already-running
+hosted version does not need to be restarted.
 
 Inspect state or tear down the runnable resources with:
 

@@ -517,6 +517,35 @@ def cleanup_test_data():
     cache.cleanup_test_data()
 
 
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_initialize_test_services_replays_server_persistence_startup
+# @features testing hosted-e2e
+# @dimensions initialization database cache migrations
+def _initialize_test_services(database, cache, migrations):
+    """Replay the persistence portion of application startup after cleanup."""
+    cache.initialize()
+    fresh_install = database.initialize()
+    migrations.initialize_fresh_install(fresh_install)
+    return fresh_install
+
+
+# @testable infrastructure
+# @features testing hosted-e2e
+# @dimensions initialization cleanup
+def initialize_test_data():
+    """Seed clean test persistence without starting another Flask process."""
+    os.environ["FLASK_ENV"] = Environment.TESTING.value
+    _configure_test_gcloud()
+
+    from lagniappe import CONFIG
+
+    _require_test_cleanup_scope(CONFIG)
+    from lagniappe.core.tools import cache, database
+    from lagniappe.core.tools.database import migrations
+
+    return _initialize_test_services(database, cache, migrations)
+
+
 # @testable false
 # @covered-by runner/testing.py::teardown_managed_test_server
 # @reason tolerant PID parsing is exercised through managed-server teardown
