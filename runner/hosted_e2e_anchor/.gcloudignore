@@ -1,0 +1,7 @@
+# Keep the stable anchor upload deterministic and prevent gcloud from creating
+# an untracked ignore file during first-time setup.
+.gcloudignore
+.git
+.gitignore
+__pycache__/
+*.py[cod]

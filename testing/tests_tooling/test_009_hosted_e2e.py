@@ -278,6 +278,8 @@ def test_hosted_image_upload_boundary_excludes_local_credentials_and_results():
     ignore_lines = {line for line in all_lines if not line.startswith("#")}
 
     assert not any(line.startswith("#!include:") for line in all_lines)
+    assert "testing/" not in ignore_lines
+    assert "/testing/" not in ignore_lines
     assert {
         ".git",
         ".env",
@@ -289,6 +291,20 @@ def test_hosted_image_upload_boundary_excludes_local_credentials_and_results():
         "*credentials*.json",
         "*service-account*.json",
     } <= ignore_lines
+
+
+def test_hosted_anchor_declares_its_upload_boundary():
+    ignore_lines = {
+        line.strip()
+        for line in (hosted_e2e.ANCHOR_ROOT / ".gcloudignore")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line.strip() and not line.startswith("#")
+    }
+
+    assert {".gcloudignore", ".git", ".gitignore", "__pycache__/", "*.py[cod]"} <= (
+        ignore_lines
+    )
 
 
 def test_hosted_workflow_is_manual_and_repository_read_only():
