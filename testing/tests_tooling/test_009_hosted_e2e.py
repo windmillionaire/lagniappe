@@ -173,19 +173,28 @@ def test_hosted_anchor_redeploys_only_when_its_contract_is_stale(
 ):
     calls = []
     descriptors = []
+    events = []
 
     def gcloud(*arguments, **options):
         calls.append((arguments, options))
         if arguments[:2] == ("app", "deploy"):
+            events.append("deploy")
             descriptors.append(
                 yaml.safe_load(arguments[2].read_text(encoding="utf-8"))
             )
+        elif arguments[:3] == ("app", "services", "set-traffic"):
+            events.append("traffic")
         return subprocess.CompletedProcess(
             ["gcloud"], returncode=0, stdout="", stderr=""
         )
 
     monkeypatch.setattr(hosted_e2e, "ANCHOR_ROOT", tmp_path)
     monkeypatch.setattr(hosted_e2e, "_gcloud", gcloud)
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_verify_soft_routing_guard",
+        lambda _infrastructure: events.append("guard"),
+    )
     monkeypatch.setattr(
         hosted_e2e,
         "_describe",
@@ -198,9 +207,11 @@ def test_hosted_anchor_redeploys_only_when_its_contract_is_stale(
         "HOSTED_E2E_ANCHOR_REVISION": hosted_e2e.ANCHOR_REVISION
     }
     assert calls[-1][0][:4] == ("app", "services", "set-traffic", "e2e")
+    assert events == ["deploy", "traffic", "guard"]
 
     calls.clear()
     descriptors.clear()
+    events.clear()
     monkeypatch.setattr(
         hosted_e2e,
         "_describe",
@@ -215,6 +226,15 @@ def test_hosted_anchor_redeploys_only_when_its_contract_is_stale(
 
     assert descriptors == []
     assert calls[-1][0][:4] == ("app", "services", "set-traffic", "e2e")
+    assert events == ["traffic", "guard"]
+
+    calls.clear()
+    events.clear()
+    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: None)
+
+    hosted_e2e._ensure_anchor(_infrastructure())
+
+    assert events == ["guard", "deploy", "traffic", "guard"]
 
 
 # @features hosted-e2e

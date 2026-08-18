@@ -595,6 +595,8 @@ def _ensure_anchor(infrastructure):
         ]
     )
     existing_variables = (existing or {}).get("envVariables") or {}
+    if existing is None:
+        _verify_soft_routing_guard(infrastructure)
     if existing_variables.get("HOSTED_E2E_ANCHOR_REVISION") != ANCHOR_REVISION:
         descriptor = {
             "runtime": "python314",
@@ -630,6 +632,7 @@ def _ensure_anchor(infrastructure):
         "--migrate",
         "--quiet",
     )
+    _verify_soft_routing_guard(infrastructure)
 
 
 # @testable infrastructure
@@ -743,7 +746,6 @@ def setup(github_repository=None):
         )
 
     _gcloud("services", "enable", *HOSTED_APIS, f"--project={infrastructure.project}")
-    _verify_soft_routing_guard(infrastructure)
     _ensure_service_account(infrastructure, RUNTIME_ACCOUNT, "Lagniappe E2E runtime")
     _ensure_service_account(infrastructure, INVOKER_ACCOUNT, "Lagniappe E2E CI invoker")
 
