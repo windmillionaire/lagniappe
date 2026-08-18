@@ -383,6 +383,30 @@ def test_hosted_image_upload_boundary_excludes_local_credentials_and_results():
     } <= ignore_lines
 
 
+def test_hosted_runner_installs_complete_e2e_collection_dependencies():
+    development_requirements = {
+        line.strip()
+        for line in (hosted_e2e.APP_DIR / "requirements-dev.txt")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line.strip().startswith("-r ")
+    }
+    dockerfile = " ".join(
+        (hosted_e2e.CONTAINER_ROOT / "Dockerfile")
+        .read_text(encoding="utf-8")
+        .split()
+    )
+
+    assert {
+        "-r requirements.txt",
+        "-r requirements-installer.txt",
+    } <= development_requirements
+    assert (
+        "COPY requirements.txt requirements-dev.txt requirements-installer.txt ./"
+        in dockerfile
+    )
+
+
 def test_hosted_anchor_declares_its_upload_boundary():
     ignore_lines = {
         line.strip()

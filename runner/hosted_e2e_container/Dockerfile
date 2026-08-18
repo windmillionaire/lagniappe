@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /workspace
 
-COPY requirements.txt requirements-dev.txt ./
+COPY requirements.txt requirements-dev.txt requirements-installer.txt ./
 RUN python -m venv venv \
     && venv/bin/pip install --no-cache-dir -r requirements-dev.txt \
     && venv/bin/python -m playwright install --with-deps chromium

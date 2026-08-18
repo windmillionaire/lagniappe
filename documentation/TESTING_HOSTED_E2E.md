@@ -32,6 +32,12 @@ bucket uses uniform access with public access prevention. The App Engine
 version receives the normal settings only through the trusted local App Engine
 deploy, the same boundary used by a production deploy.
 
+The runner installs the complete development-test dependency set, including
+the pinned provider clients required to collect the opt-in live-provider E2E
+module. Those provider tests remain marker-excluded from the ordinary full E2E
+suite; installing their clients grants no provider authority beyond the
+runner service account's IAM roles.
+
 The version URL is not an open testing site. Only `/testing/health` and the
 bootstrap exchange are initially reachable. The exchange requires a Google ID
 token for the exact version origin, the configured runtime identity, the exact
