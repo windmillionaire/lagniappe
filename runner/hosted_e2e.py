@@ -15,6 +15,7 @@ import re
 import secrets
 import shutil
 import tempfile
+import time
 
 import yaml
 
@@ -70,6 +71,7 @@ BUILD_ID_RE = re.compile(r"^b[0-9a-f]{7}$")
 BUILD_METADATA_PATH = Path("lagniappe/web/static/build.json")
 BUILD_CONSTANTS_PATH = Path("config/constants.py")
 BUILD_SERVICE_WORKER_PATH = Path("lagniappe/web/static/sw.js")
+CLOUD_BUILD_IDENTITY_RETRY_DELAYS = (2, 4, 8, 16)
 
 
 # @testable infrastructure
@@ -180,19 +182,36 @@ def _project_number(project):
     return value
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_cloud_build_identity_waits_for_first_setup_propagation
+# @features hosted-e2e
+# @dimensions first-setup api-propagation build-identity
 def _cloud_build_service_account(infrastructure):
-    result = _gcloud(
-        "builds",
-        "get-default-service-account",
-        f"--project={infrastructure.project}",
-    )
-    value = result.stdout.strip().rsplit("/", 1)[-1]
-    if not value.endswith(".iam.gserviceaccount.com"):
-        raise HostedE2EError(
-            "Google Cloud did not return the default Cloud Build identity."
+    """Return the build identity after bounded first-enable propagation."""
+    supported_accounts = {
+        f"{infrastructure.project_number}@cloudbuild.gserviceaccount.com",
+        (
+            f"{infrastructure.project_number}-compute@"
+            "developer.gserviceaccount.com"
+        ),
+    }
+    for attempt in range(len(CLOUD_BUILD_IDENTITY_RETRY_DELAYS) + 1):
+        result = _gcloud(
+            "builds",
+            "get-default-service-account",
+            f"--project={infrastructure.project}",
+            "--format=value(serviceAccountEmail)",
+            check=False,
         )
-    return value
+        value = result.stdout.strip().rsplit("/", 1)[-1]
+        if result.returncode == 0 and value in supported_accounts:
+            return value
+        if attempt < len(CLOUD_BUILD_IDENTITY_RETRY_DELAYS):
+            time.sleep(CLOUD_BUILD_IDENTITY_RETRY_DELAYS[attempt])
+    raise HostedE2EError(
+        "Google Cloud did not return the default Cloud Build identity after "
+        "waiting for first-time API propagation."
+    )
 
 
 # @testable infrastructure

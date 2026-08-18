@@ -79,6 +79,44 @@ def test_provider_describe_distinguishes_absence_from_operational_errors(monkeyp
 
 
 # @features hosted-e2e
+# @dimensions first-setup api-propagation build-identity
+def test_cloud_build_identity_waits_for_first_setup_propagation(monkeypatch):
+    results = iter(
+        (
+            subprocess.CompletedProcess(
+                ["gcloud"], returncode=0, stdout="", stderr=""
+            ),
+            subprocess.CompletedProcess(
+                ["gcloud"],
+                returncode=0,
+                stdout=(
+                    "projects/1234/serviceAccounts/"
+                    "1234-compute@developer.gserviceaccount.com\n"
+                ),
+                stderr="",
+            ),
+        )
+    )
+    calls = []
+    delays = []
+
+    def gcloud(*arguments, **options):
+        calls.append((arguments, options))
+        return next(results)
+
+    monkeypatch.setattr(hosted_e2e, "_gcloud", gcloud)
+    monkeypatch.setattr(hosted_e2e.time, "sleep", delays.append)
+
+    assert hosted_e2e._cloud_build_service_account(_infrastructure()) == (
+        "1234-compute@developer.gserviceaccount.com"
+    )
+    assert delays == [2]
+    assert len(calls) == 2
+    assert calls[0][0][-1] == "--format=value(serviceAccountEmail)"
+    assert calls[0][1] == {"check": False}
+
+
+# @features hosted-e2e
 # @dimensions soft-routing deletion-safety production-preflight
 def test_soft_routing_guard_preflight_requires_marker(monkeypatch):
     class Response:
