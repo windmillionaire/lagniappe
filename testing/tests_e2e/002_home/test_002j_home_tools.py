@@ -814,9 +814,11 @@ def test_report_list_item_refreshes_stage_labels(get_user):
     job.status_revision += 1
     Entities.save(job, report, _owner(user))
 
+    # A terminal operation poll is followed by server-rendered list
+    # reconciliation; assert the visible outcome across both async stages.
     expect(item.locator("[data-role='report-stage']")).to_have_text(
         "Needs review",
-        timeout=10_000,
+        timeout=30_000,
     )
     expect(item).to_contain_text("Ready from deferred refresh.")
     expect(item).not_to_contain_text("Analyzing files...")

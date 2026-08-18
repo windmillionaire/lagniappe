@@ -369,6 +369,7 @@ if (!prevented || actions[0]?.[0] !== "compose" || actions[0]?.[1] !== menu.view
 
 # @pairs messaging:read-race messaging:clear-confirmation messaging:inline-reply
 # @pair messaging:responsive-peer-selector
+# @pair messaging:selection-race
 # @pairs messaging:polling-revision messaging:active-polling
 # @source src/script/views/messages.mjs::Messages
 def test_messages_view_refreshes_read_races_and_uses_delete_modal(run_node):
@@ -380,6 +381,7 @@ const vm = require("node:vm");
 
 const calls = [];
 const stored = new Map();
+let resolveHistory;
 const context = {
   console,
   Core: class { reconcileChange() { calls.push(["core-reconcile"]); } },
@@ -389,10 +391,15 @@ const context = {
     messages: {
       clearModal: (key) => "/clear/" + key,
       read: (key) => `/read/${key}`,
+      history: (key) => `/history/${key}`,
       send: "/messages",
     },
   },
   request: {
+    async get(endpoint) {
+      calls.push(["history-request", endpoint]);
+      return new Promise((resolve) => { resolveHistory = resolve; });
+    },
     async post(endpoint, data) {
       if (endpoint === "/messages") {
         calls.push([
@@ -521,7 +528,7 @@ view.replyError = {
 };
 view.PollingCoordinator = pollingView.PollingCoordinator;
 view.loadConversations = async () => calls.push(["reload-conversations"]);
-view.openConversation = async (key) => calls.push(["open", key]);
+view.openConversation = async (key, options) => calls.push(["open", key, options]);
 await view.sendReply({ preventDefault: () => calls.push(["prevent-reply"]) });
 const reply = calls.find((call) => call[0] === "reply");
 if (JSON.stringify(reply) !== JSON.stringify([
@@ -549,6 +556,7 @@ view.current = {
   id: "conversation-a",
   peer: { name: "Peer" },
 };
+view.conversationSelectionRevision = 0;
 view.conversations = new Map([
   ["conversation-a", view.current],
   [
@@ -589,8 +597,31 @@ if (
   throw new Error("messages view did not render its responsive conversation controls");
 }
 dropdownItems[1].onClick();
-if (!calls.some((call) => call[0] === "open" && call[1] === "conversation-b")) {
+if (!calls.some(
+  (call) => call[0] === "open" &&
+    call[1] === "conversation-b" &&
+    call[2]?.selectionRevision === 1,
+)) {
   throw new Error("messages dropdown did not open the selected conversation");
+}
+if (view.conversationSelectionRevision !== 1) {
+  throw new Error("messages dropdown did not record the user selection");
+}
+
+const staleView = Object.create(context.Messages.prototype);
+staleView.current = null;
+staleView.conversationSelectionRevision = 0;
+const staleOpen = staleView.openConversation("conversation-stale", {
+  selectionRevision: 0,
+});
+staleView.conversationSelectionRevision = 1;
+resolveHistory({
+  ok: true,
+  conversation: { id: "conversation-stale", peer: { name: "Stale Peer" } },
+  messages: [],
+});
+if ((await staleOpen) !== false || staleView.current !== null) {
+  throw new Error("stale automatic conversation selection replaced the user choice");
 }
 view.conversationStorageKey = "messages-user-a-active";
 view.rememberConversation("conversation-b");

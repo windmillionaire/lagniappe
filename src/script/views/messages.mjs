@@ -14,6 +14,7 @@ const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
  * @pairs messaging:read-race messaging:clear-confirmation messaging:inline-reply
  * @pairs messaging:responsive-peer-selector messaging:reply-permission
+ * @pair messaging:selection-race
  * @pairs messaging:polling-revision messaging:active-polling
  */
 export default class Messages extends Core {
@@ -76,6 +77,7 @@ export default class Messages extends Core {
 		this.replySubmit = this.replyForm.querySelector("button[type='submit']");
 		this.replySpinner = this.replySubmit.querySelector("[data-role='icon']");
 		this.current = null;
+		this.conversationSelectionRevision = 0;
 		this.conversationCursor = null;
 		this.messageCursor = null;
 		this.conversations = new Map();
@@ -93,16 +95,25 @@ export default class Messages extends Core {
 		if (composeButton) {
 			this.composer = ensureMessageComposer(this, {
 				onSent: async (response) => {
+					const selectionRevision = this.conversationSelectionRevision;
 					this._boostMessagePolling();
 					await this.loadConversations();
-					await this.openConversation(response.conversation.id);
+					if (selectionRevision !== this.conversationSelectionRevision) return;
+					await this.openConversation(response.conversation.id, {
+						selectionRevision,
+					});
 				},
 			});
 			composeButton.addEventListener("click", () => this.composer.open());
 		}
 		this.list.addEventListener("click", (event) => {
 			const button = event.target.closest("[data-conversation]");
-			if (button) void this.openConversation(button.dataset.conversation);
+			if (button) {
+				const selectionRevision = ++this.conversationSelectionRevision;
+				void this.openConversation(button.dataset.conversation, {
+					selectionRevision,
+				});
+			}
 		});
 		this._conversationSelectorClick = (event) => {
 			if (!this.mobile || this.conversationDropdown) return;
@@ -366,7 +377,12 @@ export default class Messages extends Core {
 				name: `${conversation.peer.name}${
 					conversation.unread ? ` (${conversation.unread} unread)` : ""
 				}`,
-				onClick: () => this.openConversation(conversation.id),
+				onClick: () => {
+					const selectionRevision = ++this.conversationSelectionRevision;
+					return this.openConversation(conversation.id, {
+						selectionRevision,
+					});
+				},
 			})),
 		);
 	}
@@ -380,9 +396,15 @@ export default class Messages extends Core {
 	}
 
 	/** @testable infrastructure */
-	async openConversation(key) {
+	async openConversation(key, { selectionRevision = null } = {}) {
 		const response = await request.get(ENDPOINTS.messages.history(key));
 		if (!response?.ok) return false;
+		if (
+			selectionRevision !== null &&
+			selectionRevision !== this.conversationSelectionRevision
+		) {
+			return false;
+		}
 		this.current = response.conversation;
 		this.rememberConversation(this.current.id);
 		this.replyOperationId = this.operationId?.() || crypto.randomUUID();
@@ -424,6 +446,7 @@ export default class Messages extends Core {
 	async sendReply(event) {
 		event.preventDefault();
 		if (!this.current?.peer?.replyable || this.replySubmit.disabled) return;
+		const selectionRevision = this.conversationSelectionRevision;
 		const conversation = this.current.id;
 		const data = new FormData();
 		data.set("recipient", this.current.peer.id);
@@ -452,8 +475,12 @@ export default class Messages extends Core {
 		this._boostMessagePolling();
 		this.replyTextarea.value = "";
 		await this.loadConversations();
-		await this.openConversation(response.conversation.id);
-		this.replyTextarea.focus();
+		if (selectionRevision === this.conversationSelectionRevision) {
+			await this.openConversation(response.conversation.id, {
+				selectionRevision,
+			});
+			this.replyTextarea.focus();
+		}
 	}
 
 	/** @testable infrastructure */

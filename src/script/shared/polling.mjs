@@ -434,6 +434,7 @@ function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
  * @dimensions batching cadence lifecycle coalescing acknowledgement reentrancy requested-cycle freshness visible-blur deadline
  * @pairs polling:batching polling:cadence polling:lifecycle polling:coalescing polling:acknowledgement
  * @pairs polling:reentrancy polling:requested-cycle polling:freshness polling:foreground polling:scheduled-initial
+ * @pair polling:terminal-operation-order
  * @pairs polling:protocol polling:validation polling:diagnostics polling:revision polling:presence
  * @pairs polling:blur polling:visibility deferred-jobs:polling
  * @pair notifications:cold-seed
@@ -995,7 +996,19 @@ export class PollingCoordinator {
 
 			const cycleJitter = 0.9 + Math.random() * 0.2;
 			const scheduledAt = Date.now();
-			for (const [id, subscription] of byId) {
+			const resultPriority = ([id]) => {
+				const result = acceptedResults.get(id);
+				return result?.type === "operation" &&
+					result.status === "changed" &&
+					result.payload?.terminal
+					? 0
+					: 1;
+			};
+			const orderedSubscriptions = Array.from(byId);
+			orderedSubscriptions.sort(
+				(left, right) => resultPriority(left) - resultPriority(right),
+			);
+			for (const [id, subscription] of orderedSubscriptions) {
 				if (this.subscriptions.get(id) !== subscription) continue;
 				if (!this._eligible(subscription)) continue;
 				const result = acceptedResults.get(id);

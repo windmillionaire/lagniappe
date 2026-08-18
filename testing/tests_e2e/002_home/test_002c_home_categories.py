@@ -43,6 +43,7 @@ from testing.elements import (
     Attributes,
     SpinnerButtons,
 )
+from testing.utility import expect_successful_response
 
 
 def _create_category(user, home, definition):
@@ -66,19 +67,21 @@ def _create_category(user, home, definition):
         category_form = definition.form.get(user)
         FormSelect(create_form).select(category_form)
 
-    with user.page.expect_response("**/create") as response_info:
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/categories/create",
+        timeout=90000 if definition.description_for_ai else None,
+    ) as response_info:
         SpinnerButtons.CREATE.click(create_form)
 
     expect(create_form).not_to_be_visible()
     new_category_key = home.entity_key_from_response(response_info.value)
     category_list = home.category_list
-    if definition.description_for_ai:
-        new_category = category_list.new_ai_generated_item(flash=False)
-    else:
-        new_category = category_list.list.locator(f"li[data-key='{new_category_key}']")
-        expect(new_category).to_be_visible()
+    new_category = category_list.list.locator(f"li[data-key='{new_category_key}']")
+    expect(new_category).to_be_visible()
 
-    return new_category.get_attribute("data-key")
+    return new_category_key
 
 
 # @features categories
@@ -204,7 +207,8 @@ def test_create_category_ai_mode(get_user, results):
     Verify category creation in AI mode.
 
     Uses AI to generate category name and description from a prompt.
-    Marked slow due to AI generation time (30s timeout).
+    The provider-backed create request gets the same 90-second budget as the
+    other live AI generation stories.
     """
     user = get_user(Users.OWNER)
     category = Categories.test_create_category_ai_mode.get(user, create=False)

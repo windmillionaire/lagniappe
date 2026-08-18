@@ -112,8 +112,10 @@ with browser_failures.expect(
 ```
 
 For a native offline transition, use the convenience scope. It requires the
-one failed `HEAD /l/ping` request and its browser console error, so an offline
-test cannot silently stop exercising the connection boundary:
+failed `HEAD /l/ping` request, so an offline test cannot silently stop
+exercising the connection boundary. Chromium's duplicate
+`ERR_INTERNET_DISCONNECTED` console diagnostic is recorded but ignored because
+its delivery can lag behind the path-bearing network event:
 
 ```python
 with browser_failures.expect_offline(user):

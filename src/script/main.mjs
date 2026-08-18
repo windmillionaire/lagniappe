@@ -38,6 +38,53 @@ window.__CONNECTIVITY__ = connectivity.snapshot();
 // background connectivity cycle to settle. Rendering never awaits this.
 window.__CONNECTIVITY_READY__ = Promise.resolve();
 
+/**
+ * @testable true
+ * @tests tests_js/test_017_main_lifecycle.py::test_cross_document_transition_publishes_settled_readiness
+ * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
+ * @features startup view-transition
+ * @dimensions navigation settled-boundary
+ * @pairs view-transition:navigation startup:settled-boundary
+ */
+function publishNavigationTransitionReadiness() {
+	// A parser-time observer can publish the exact `pagereveal` boundary before
+	// this deferred module evaluates. Preserve it when available.
+	if (window.__NAVIGATION_TRANSITION_READY__) return;
+	window.__NAVIGATION_TRANSITION_SETTLED__ = false;
+	window.__NAVIGATION_TRANSITION_READY__ = new Promise((resolve) => {
+		/**
+		 * @testable false
+		 * @covered-by src/script/main.mjs::publishNavigationTransitionReadiness
+		 * @reason recursive browser-state sampling is owned by the published readiness boundary
+		 */
+		const publishWhenInactive = () => {
+			const transition = document.activeViewTransition;
+			if (transition) {
+				Promise.resolve(transition.finished)
+					.catch(() => undefined)
+					.then(() => requestAnimationFrame(publishWhenInactive));
+				return;
+			}
+			window.__NAVIGATION_TRANSITION_SETTLED__ = true;
+			resolve();
+		};
+
+		if (document.activeViewTransition) {
+			publishWhenInactive();
+			return;
+		}
+
+		// Cross-document transitions begin after `pagereveal` and the first
+		// rendered frame. Sample after that paint so an initially absent active
+		// transition cannot be mistaken for a settled navigation.
+		requestAnimationFrame(() => requestAnimationFrame(publishWhenInactive));
+	});
+}
+
+// Product startup remains independent; browser tests can await visual
+// completion after the destination view publishes structural readiness.
+publishNavigationTransitionReadiness();
+
 let __activeView = null;
 /**
  * @testable true

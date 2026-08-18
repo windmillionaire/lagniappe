@@ -32,7 +32,7 @@ class Report(SiteResource):
         return f"tools/reports/{self.key}"
 
     def initialize_view(self):
-        expect(self.user.locate(self.VIEW)).to_have_attribute("initialized", "")
+        super().initialize_view()
 
     @property
     def title_element(self):

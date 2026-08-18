@@ -2,7 +2,7 @@
 
 
 # @features deferred-jobs
-# @dimensions status revision polling progress timing backoff teardown decoration-opt-out visible-blur rendered-visibility
+# @dimensions status revision polling progress timing backoff teardown decoration-opt-out visible-blur rendered-visibility lazy-watcher terminal-ownership
 def test_deferred_operation_manager_batches_orders_and_renders_status(run_node):
     run_node(
         r"""
@@ -36,6 +36,7 @@ const schedules = new Map();
 const triggers = [];
 const reconciled = [];
 const expectedCompletions = [];
+let ensureEditWatcherCalls = 0;
 let reschedules = 0;
 const blurStarts = [];
 const coordinator = {
@@ -76,12 +77,18 @@ source = source.replace(
 source += "\nglobalThis.DeferredOperationManager = DeferredOperationManager;";
 vm.runInContext(source, context);
 
+const editWatcher = {
+  expectDeferredCompletion(key, operation) {
+    expectedCompletions.push({ key, operation });
+  },
+};
 const view = {
   PollingCoordinator: coordinator,
-  EditWatcher: {
-    expectDeferredCompletion(key, operation) {
-      expectedCompletions.push({ key, operation });
-    },
+  EditWatcher: null,
+  async ensureEditWatcher() {
+    ensureEditWatcherCalls += 1;
+    this.EditWatcher = editWatcher;
+    return editWatcher;
   },
   async reconcileChange(change) { reconciled.push(change); },
 };
@@ -160,10 +167,11 @@ const manager = new context.DeferredOperationManager(view).init();
     throw new Error("Terminal operation was not reconciled and retired");
   }
   if (
+    ensureEditWatcherCalls !== 1 ||
     expectedCompletions[0]?.key !== "report-b" ||
     expectedCompletions[0]?.operation !== "operation-b"
   ) {
-    throw new Error("Terminal operation ownership was not forwarded to form reconciliation");
+    throw new Error("Terminal operation did not await ownership reconciliation");
   }
   if (manager.nudge("operation-a", 2) !== false) {
     throw new Error("An out-of-order operation revision was accepted");

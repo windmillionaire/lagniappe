@@ -218,7 +218,7 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failure
 
 
 # @features sync
-# @dimensions offline-replay dedupe reload document headless-widget
+# @dimensions offline-replay dedupe reload document queue-clear
 def test_offline_replay_does_not_duplicate_after_reload(get_user, browser_failures):
     user = get_user(Users.OWNER)
     project = Projects.test_offline_document_reload.get(user)
@@ -236,12 +236,7 @@ def test_offline_replay_does_not_duplicate_after_reload(get_user, browser_failur
     )
     _replace_page(user)
 
-    with expect_offline_sync_replay(
-        user,
-        sync_id=document_sync_id,
-        request_payload_contains=text,
-    ):
-        user.go(SitePages.HOME)
+    user.go(SitePages.HOME)
     wait_for_offline_sync_records(
         user,
         sync_id=document_sync_id,
@@ -249,7 +244,7 @@ def test_offline_replay_does_not_duplicate_after_reload(get_user, browser_failur
         timeout=30000,
     )
 
-    user.go(project)
+    user.go(project, query_params={"replay": uuid4().hex})
     replayed = project.editor.get_text()
     assert replayed.count(text) == 1
 

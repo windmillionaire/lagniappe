@@ -54,6 +54,46 @@ os.environ["FLASK_ENV"] = "testing"
 DEFAULT_TIMEOUT = 15000  # 15 seconds - standard test operations
 AI_TIMEOUT = 30000  # 30 seconds - for @pytest.mark.ai tests
 
+PAGE_REVEAL_TRANSITION_OBSERVER = """
+window.__WAIT_FOR_VIEW_TRANSITIONS__ = () => new Promise((resolve) => {
+  let inactiveFrames = 0;
+  const publishAfterStablePaint = () => {
+    const transitionAnimation = document.getAnimations().some((animation) =>
+      animation.playState !== "finished" &&
+      animation.effect?.pseudoElement?.startsWith("::view-transition")
+    );
+    if (document.activeViewTransition || transitionAnimation) {
+      inactiveFrames = 0;
+    } else {
+      inactiveFrames += 1;
+    }
+    if (inactiveFrames >= 2) {
+      resolve();
+      return;
+    }
+    requestAnimationFrame(publishAfterStablePaint);
+  };
+  requestAnimationFrame(publishAfterStablePaint);
+});
+window.__NAVIGATION_TRANSITION_SETTLED__ = false;
+window.__NAVIGATION_TRANSITION_READY__ = new Promise((resolve) => {
+  addEventListener("pagereveal", (event) => {
+    Promise.resolve(event.viewTransition?.finished)
+      .catch(() => undefined)
+      .then(async () => {
+        // `pagereveal` precedes the first rendered frame. Start sampling after
+        // that paint, when Chromium exposes the transition and its animations.
+        await new Promise((painted) =>
+          requestAnimationFrame(() => requestAnimationFrame(painted))
+        );
+        await window.__WAIT_FOR_VIEW_TRANSITIONS__();
+        window.__NAVIGATION_TRANSITION_SETTLED__ = true;
+        resolve();
+      });
+  }, { once: true });
+});
+"""
+
 logger = logging.getLogger(__name__)
 
 
@@ -381,6 +421,7 @@ def get_user(browser, request, browser_failures):
             viewport={"width": 1280, "height": 720},
             has_touch=has_touch,
         )
+        context.add_init_script(script=PAGE_REVEAL_TRANSITION_OBSERVER)
         contexts.append(context)
         browser_failures.monitor_context(
             context,

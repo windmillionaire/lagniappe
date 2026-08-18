@@ -29,6 +29,7 @@ from testing.elements import (
     SpinnerButtons,
     Tabs,
 )
+from testing.utility import expect_successful_response
 
 
 # @features editor
@@ -221,7 +222,13 @@ def test_internal_links_normalize_paste_and_popover_navigation(get_user):
     expect(internal_link).not_to_have_attribute("target", re.compile(r".+"))
     expect(internal_link).not_to_have_attribute("rel", re.compile(r".+"))
 
-    editor.blur()
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/l/sync",
+        request_payload_contains=(internal_text, internal_href),
+    ):
+        editor.text_entry.blur()
     user.go(project)
     editor = project.editor
     internal_link = editor.get_element("a")
@@ -269,7 +276,13 @@ def test_internal_links_normalize_paste_and_popover_navigation(get_user):
     expect(click_link).to_have_attribute("href", click_href)
     expect(click_link).not_to_have_attribute("target", re.compile(r".+"))
 
-    editor.blur()
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/l/sync",
+        request_payload_contains=(click_text, click_href),
+    ):
+        editor.text_entry.blur()
     user.go(project)
     editor = project.editor
     click_link = editor.get_element("a")

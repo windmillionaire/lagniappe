@@ -46,6 +46,7 @@ from testing.elements import (
     Tabs,
     SpinnerButtons,
 )
+from testing.utility import expect_successful_response
 
 pytestmark = pytest.mark.e2e
 
@@ -140,7 +141,8 @@ def test_create_project_ai_mode(get_user, results):
     Verify project creation in AI mode.
 
     Uses AI to generate project name and description from a prompt.
-    Marked slow due to AI generation time (30s timeout).
+    The provider-backed create request gets the same 90-second budget as the
+    other live AI generation stories.
     """
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -156,14 +158,20 @@ def test_create_project_ai_mode(get_user, results):
     Modal(user.page).open(create_form.locator(Buttons.EXPLAIN)).close()
     expect(create_form).to_be_visible()
 
-    with user.page.expect_response("**/create"):
+    with expect_successful_response(
+        user.page,
+        method="POST",
+        path="/projects/create",
+        timeout=90000,
+    ) as response_info:
         SpinnerButtons.CREATE.click(create_form)
 
     expect(create_form).not_to_be_visible()
+    project.key = home.entity_key_from_response(response_info.value)
     project_list = home.project_list
-    new_project = project_list.new_ai_generated_item(flash=False)
+    new_project = project_list.get_item(project)
+    expect(new_project).to_be_visible()
 
-    project.key = new_project.get_attribute("data-key")
     results.record("project", project.entity.db)
 
 

@@ -21,6 +21,7 @@ from testing.utility.organize_submission_eval import load_cases
 
 
 pytestmark = [pytest.mark.e2e, pytest.mark.ai]
+ASK_JOB_ATTEMPT_LIMIT = 2
 RECEIPT_CASE = next(case for case in load_cases() if case["name"] == "receipt-fields")
 MEDICAL_CASE = next(
     case for case in load_cases() if case["name"] == "medical-role-separation"
@@ -82,16 +83,43 @@ def _start_ask_report(user, question):
 
 
 def _run_ask_job(report, job, ai_results):
+    """Run Ask with one bounded, production-classified provider retry."""
     ai_model.initialize()
-    with web_app.test_request_context("/"):
-        result = DeferredJobs.run(job.urlsafe_key)
-    saved_job = Entities.fetch_one(job.urlsafe_key, request=Fetch.direct())
+    attempt_records = []
+    current_job = job
+    result = None
+    for _ in range(ASK_JOB_ATTEMPT_LIMIT):
+        run_at = (
+            current_job.next_attempt_at
+            if current_job.status == DeferredJobStatus.RETRY_WAIT.value
+            else None
+        )
+        with web_app.test_request_context("/"):
+            result = DeferredJobs.run(job.urlsafe_key, now=run_at)
+        current_job = Entities.fetch_one(job.urlsafe_key, request=Fetch.direct())
+        error = current_job.error or {}
+        attempt_records.append(
+            {
+                "attempt": current_job.attempt,
+                "status": current_job.status,
+                "error": {
+                    key: error[key]
+                    for key in ("type", "retryable", "attempt")
+                    if error.get(key) is not None
+                },
+            }
+        )
+        if current_job.status != DeferredJobStatus.RETRY_WAIT.value:
+            break
+
+    saved_job = current_job
     saved_report = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
     response = saved_report.proposal
     ai_results.record("validated_ask_response", response)
     ai_results.record("deferred_job_checkpoint", saved_job.checkpoint)
-    assert result.success is True
-    assert saved_job.status == DeferredJobStatus.SUCCEEDED.value
+    ai_results.record("deferred_job_attempts", attempt_records)
+    assert saved_job.status == DeferredJobStatus.SUCCEEDED.value, attempt_records
+    assert result is not None and result.success is True
     assert saved_job.checkpoint == {
         "proposal": response,
         "status": saved_report.status,

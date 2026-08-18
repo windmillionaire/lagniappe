@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from contextlib import AbstractContextManager, contextmanager
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
@@ -163,7 +163,7 @@ class BrowserFailureCollector:
         max_ping_count: int | None = None,
     ):
         """Account for the health check deliberately rejected by browser offline mode."""
-        with self.expect(
+        expectation = self.expect(
             user,
             kind="requestfailed",
             count=ping_count,
@@ -171,16 +171,22 @@ class BrowserFailureCollector:
             method="HEAD",
             path="/l/ping",
             failure="net::ERR_INTERNET_DISCONNECTED",
-        ):
-            with self.expect(
-                user,
-                kind="console",
-                count=ping_count,
-                max_count=max_ping_count,
-                console_type="error",
-                text="Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
-                source_path="/l/ping",
-            ):
+        )
+        native_failure = (
+            user.page.expect_event(
+                "requestfailed",
+                predicate=lambda request: (
+                    request.method == "HEAD"
+                    and urlsplit(request.url).path == "/l/ping"
+                    and str(request.failure) == "net::ERR_INTERNET_DISCONNECTED"
+                ),
+                timeout=5_000,
+            )
+            if ping_count > 0
+            else nullcontext()
+        )
+        with expectation:
+            with native_failure:
                 yield
 
     def assert_clean(self) -> None:
@@ -265,6 +271,15 @@ class BrowserFailureCollector:
                 },
             )
         )
+        if (
+            message.text
+            == "Failed to load resource: net::ERR_INTERNET_DISCONNECTED"
+            and self.events[-1].details["source_path"] == "/l/ping"
+        ):
+            # Chromium duplicates an offline request failure in the console.
+            # Delivery can lag behind the scoped requestfailed event, so the
+            # path-bearing network event remains the authoritative assertion.
+            self.events[-1].ignored_reason = "browser-offline-resource-diagnostic"
 
     def _capture_pageerror(self, page: Any, error: BaseException) -> None:
         self._record(

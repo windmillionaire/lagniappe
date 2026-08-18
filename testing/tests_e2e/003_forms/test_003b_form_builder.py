@@ -43,7 +43,7 @@ def _save_select_option(builder, label):
     builder.condition.locator("button[data-role='save']").click()
     expect(
         builder.settings.locator("[data-setting='options']")
-    ).to_contain_text(label)
+    ).to_contain_text(label, timeout=15_000)
 
 
 def _custom_schema(builder):
@@ -230,7 +230,7 @@ def test_field_visibility_select_multiple_values(get_user):
     for option in ["Red", "Blue", "Green"]:
         builder.open_condition("options")
         builder.condition.locator("input[name='option-name']").fill(option)
-        builder.save_condition()
+        _save_select_option(builder, option)
         _close_condition(builder)
 
     assert _option_labels(builder.schema_field(color.id)) == ["Red", "Blue", "Green"]

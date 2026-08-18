@@ -34,6 +34,15 @@ then records `lagniappe:view-ready`. Optional/private service completion records
 behavior but does not install private polling, offline, sync, notification, or
 authenticated lifecycle work.
 
+During module startup, `main.mjs` also publishes the browser's active
+cross-document view transition. It adopts an earlier parser-time `pagereveal`
+observer when present, or samples after the first painted frame as a fallback,
+and exposes
+`window.__NAVIGATION_TRANSITION_READY__` and the corresponding
+`window.__NAVIGATION_TRANSITION_SETTLED__` state for observers that need visual
+completion. Product initialization does not await this boundary, so the
+structural `initialized` contract remains unchanged.
+
 ## Core (`views/base/core.mjs`)
 
 Component-capable base class for Home, entity/detail views, indexes, Report, and
@@ -106,10 +115,12 @@ manager must await its readiness promise or call the corresponding idempotent
   coordinator becomes ready. Entity/form-lock checks are periodic with their
   first request after 15 seconds; index collections are foreground-only and do
   not install a timer. Documents await `syncReady` and poll immediately while
-  active. Offline forms render authoritative server state without touching
-  queue readiness. Initial replay waits for view readiness; successful writes
-  trigger an immediate poll when their form is mounted, using normal
-  EditWatcher reconciliation.
+  active. Terminal operation results are delivered before entity changes from
+  the same poll batch so owned deferred form updates are classified before
+  EditWatcher reconciliation. Offline forms render authoritative server state
+  without touching queue readiness. Initial replay waits for view readiness;
+  successful writes trigger an immediate poll when their form is mounted,
+  using normal EditWatcher reconciliation.
 - Keeps offline replay, reconnect reconciliation, polling batching, edit
   notices, deferred operations, and notification delivery behind the lazy
   service facades in `views/base/services.mjs`.
@@ -412,7 +423,10 @@ inline reply form for their exact live peer, even when current restrictions
 would prevent a new conversation. That submitted conversation remains the
 server-validated authorization boundary. Per-message delete and confirmed
 conversation clear hide only the current participant's copy. Deleted peers
-retain their name/history but do not expose a reply form.
+retain their name/history but do not expose a reply form. Post-send and
+post-reply refreshes auto-open their conversation only while no newer explicit
+peer selection has occurred, so a slower automatic history response cannot
+replace the conversation the user just chose.
 
 Home does not use the composite collection subscription for current clients.
 Server-rendered Notes is marked loaded and owns `home-notes`; Tasks retains its

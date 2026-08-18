@@ -3,7 +3,17 @@
 import textwrap
 
 
-def run_main_check(run_node, assertion: str):
+def run_main_check(
+    run_node,
+    assertion: str,
+    *,
+    active_navigation_transition=False,
+):
+    active_transition = (
+        "{ finished: navigationTransitionFinished }"
+        if active_navigation_transition
+        else "undefined"
+    )
     script = f"""
 const fs = require("node:fs");
 const vm = require("node:vm");
@@ -21,6 +31,10 @@ const capturedErrors = [];
 let viewElement = null;
 let focused = true;
 let pageMode = "production";
+let resolveNavigationTransition;
+const navigationTransitionFinished = new Promise((resolve) => {{
+  resolveNavigationTransition = resolve;
+}});
 
 const connectivityState = {{
   browser: "online",
@@ -79,6 +93,7 @@ const context = {{
     }}
   }},
   document: {{
+    activeViewTransition: {active_transition},
     activeElement: null,
     body: {{}},
     hidden: false,
@@ -102,6 +117,7 @@ const context = {{
     serviceWorker,
   }},
   parseServiceWorkerMessage,
+  requestAnimationFrame(callback) {{ return setTimeout(callback, 0); }},
   setTimeout,
   syncCalls,
   documentListeners,
@@ -130,6 +146,10 @@ context.setFocused = (value) => {{ focused = value; }};
 context.setDocumentHidden = (value) => {{ context.document.hidden = value; }};
 context.setMode = (value) => {{ pageMode = value; }};
 context.setNavigatorOnline = (value) => {{ context.navigator.onLine = value; }};
+context.resolveNavigationTransition = () => {{
+  context.document.activeViewTransition = undefined;
+  resolveNavigationTransition();
+}};
 context.flushPaint = async () => {{
   await new Promise((resolve) => setTimeout(resolve, 10));
   for (let index = 0; index < 4; index += 1) await Promise.resolve();
@@ -184,6 +204,37 @@ const flushPaint = context.flushPaint;
 """
 
     run_node(script)
+
+
+# @pairs view-transition:navigation startup:settled-boundary
+def test_cross_document_transition_publishes_settled_readiness(run_node):
+    run_main_check(
+        run_node,
+        """
+if (context.window.__NAVIGATION_TRANSITION_SETTLED__ !== false) {
+  throw new Error("Active navigation transition was published as settled");
+}
+
+let boundaryResolved = false;
+context.window.__NAVIGATION_TRANSITION_READY__.then(() => {
+  boundaryResolved = true;
+});
+await Promise.resolve();
+if (boundaryResolved) {
+  throw new Error("Navigation readiness resolved before the transition finished");
+}
+
+context.resolveNavigationTransition();
+await context.window.__NAVIGATION_TRANSITION_READY__;
+if (
+  !boundaryResolved ||
+  context.window.__NAVIGATION_TRANSITION_SETTLED__ !== true
+) {
+  throw new Error("Navigation readiness was not published after transition completion");
+}
+""",
+        active_navigation_transition=True,
+    )
 
 
 # @features startup

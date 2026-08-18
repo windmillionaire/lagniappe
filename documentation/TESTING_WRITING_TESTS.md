@@ -66,6 +66,15 @@ Prefer durable selectors from helpers: `data-widget`, `data-role`, `lp-*`, and
 resource/element constants. A raw selector in a test is fine only when it is
 local to one assertion and would make a helper worse.
 
+Resource `initialize_view()` owns the destination view's structural
+`initialized` marker, and `User.go()` calls it automatically. E2E contexts also
+register a parser-time `pagereveal` observer because deferred modules are not
+guaranteed to see that event. A test that must interact immediately after
+deferred entity startup can call the resource's
+`wait_for_interaction_readiness()` to await `lagniappe:services-ready` and the
+active transition layer. After a direct `page.expect_navigation()` navigation,
+call `initialize_view()` before that interaction-specific readiness boundary.
+
 Keep E2E pytest runs sequential. The managed browser test server and test data
 prefix are shared, so parallel E2E invocations can tear down each other's data
 and server state. When checking multiple focused files or nodeids, pass them to
@@ -145,14 +154,15 @@ error state.
 
 For native connectivity transitions, prefer `browser_failures.expect_offline(user)`
 around the `user.offline = True` action and its offline assertions. It expects
-the exact `HEAD /l/ping` disconnect and console error produced by the browser.
-An offline reload that deliberately performs both the connectivity transition
-and a new-page health check may use `ping_count=2`. If the same story also has a
-document lifecycle that can legitimately schedule one additional health check,
-use the bounded `ping_count=2, max_ping_count=3` form. Keep the upper bound so a
-retry loop still fails. Scope any expected 503 for an offline analytics or asset
-request separately by its exact path; do not fold those responses into the ping
-allowance.
+the exact `HEAD /l/ping` disconnect produced by the browser. Chromium's delayed
+console copy of that same ping failure is diagnostic rather than a second
+completion boundary. An offline reload that deliberately performs both the
+connectivity transition and a new-page health check may use `ping_count=2`. If
+the same story also has a document lifecycle that can legitimately schedule one
+additional health check, use the bounded `ping_count=2, max_ping_count=3` form.
+Keep the upper bound so a retry loop still fails. Scope any expected 503 for an
+offline analytics or asset request separately by its exact path; do not fold
+those responses into the ping allowance.
 
 If an unrelated request is already in flight when a deliberate offline
 transition begins, it may fail zero or a small bounded number of times. Express

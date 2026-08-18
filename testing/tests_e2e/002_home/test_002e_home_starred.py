@@ -178,6 +178,7 @@ def test_star_project(get_user):
 
 # @features starred
 # @dimensions page accessible-state title-menu
+# @pair view-transition:navigation
 # @template menus.html::star
 @pytest.mark.e2e
 def test_star_page(get_user):
@@ -200,6 +201,7 @@ def test_star_page(get_user):
 
     # Navigate to page and star it from the title menu.
     user.go(page)
+    page.wait_for_interaction_readiness()
     _toggle_title_star(user, "Page actions", "Star")
     _title_star_action(user, "Page actions", "Unstar")
 
@@ -212,6 +214,8 @@ def test_star_page(get_user):
     # Unstar from page view
     with user.page.expect_navigation():
         starred_page.click()
+    page.initialize_view()
+    page.wait_for_interaction_readiness()
     _toggle_title_star(user, "Page actions", "Unstar")
     _title_star_action(user, "Page actions", "Star")
 

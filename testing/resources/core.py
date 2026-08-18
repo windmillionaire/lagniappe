@@ -37,6 +37,20 @@ class SiteResource:
                 "initialized", "", timeout=VIEW_INITIALIZATION_TIMEOUT
             )
 
+    def wait_for_interaction_readiness(self):
+        """Wait for deferred view startup and its visual transition to settle."""
+        self.user.page.wait_for_function(
+            "() => window.__NAVIGATION_TRANSITION_SETTLED__ === true",
+            timeout=VIEW_INITIALIZATION_TIMEOUT,
+        )
+        self.user.page.wait_for_function(
+            """() => performance
+                .getEntriesByName("lagniappe:services-ready", "mark").length > 0""",
+            timeout=VIEW_INITIALIZATION_TIMEOUT,
+        )
+        self.user.page.evaluate("() => window.__WAIT_FOR_VIEW_TRANSITIONS__()")
+        return self
+
     def reload(self, wait_until="load"):
         self.user.page.reload(wait_until=wait_until)
         self.initialize_view()

@@ -2,7 +2,7 @@
 
 
 # @features polling
-# @dimensions batching cadence lifecycle coalescing acknowledgement
+# @dimensions batching cadence lifecycle coalescing acknowledgement terminal-operation-order
 def test_polling_coordinator_batches_due_subscriptions_and_applies_results(run_node):
     run_node(
         r"""
@@ -44,11 +44,15 @@ const context = {
         results: body.subscriptions.map((item, index) => ({
           id: item.id,
           type: item.type,
-          status: item.id === "retry:three" || index === 0 ? "changed" : "unchanged",
+          status: item.id === "retry:three" || index === 0 || item.type === "operation"
+            ? "changed"
+            : "unchanged",
           revision: item.type === "operation" ? index + 10 : `revision-${index + 10}`,
           poll_after_ms: 15000,
-          ...(item.id === "retry:three" || index === 0
-            ? { payload: { refresh: true } }
+          ...(item.id === "retry:three" || index === 0 || item.type === "operation"
+            ? { payload: item.type === "operation"
+                ? { key: item.key, revision: index + 10, terminal: true }
+                : { refresh: true } }
             : {}),
         })),
       };
@@ -100,6 +104,7 @@ if (timerId !== 3 || clearedTimers.join(",") !== "1,2") {
     throw new Error(`Shared beforePoll hook ran ${beforePolls} times`);
   }
   if (handled.length !== 2 ||
+      handled.map(({ id }) => id).join(",") !== "operation:two,entity:one" ||
       coordinator.get("entity:one").revision !== "revision-10" ||
       coordinator.get("operation:two").revision !== 11 ||
       coordinator.get("retry:three").revision !== "retry-old") {

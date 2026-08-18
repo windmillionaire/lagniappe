@@ -73,6 +73,11 @@ def _send_from_modal(user, recipient, body):
         dialog.get_by_role("button", name="Send", exact=True).click()
     response = response_info.value
     assert response.status == 201
+    expect(dialog).to_be_hidden()
+    expect(user.locate("[data-role='message-history']")).to_contain_text(
+        body,
+        timeout=15000,
+    )
     return response.json()
 
 
@@ -417,6 +422,7 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
 
 
 # @pairs messaging:responsive-peer-selector messaging:inline-reply
+# @pair messaging:selection-race
 # @source src/script/views/messages.mjs::Messages
 def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
     owner = get_user(Users.OWNER)
@@ -429,7 +435,8 @@ def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
     expect(empty_view.locator("[data-role='conversation-selector']")).to_be_hidden()
     expect(empty_view.locator("[data-action='compose-message']")).to_be_visible()
 
-    _send_from_modal(user, peer, f"Mobile selector {uuid4().hex}")
+    peer_body = f"Mobile selector {uuid4().hex}"
+    _send_from_modal(user, peer, peer_body)
     view = empty_view
 
     selector = view.locator("[data-role='conversation-selector']")
@@ -441,6 +448,10 @@ def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
 
     _send_from_modal(user, other_peer, f"Other mobile selector {uuid4().hex}")
     Dropdown(selector).select_by_name(peer.name)
+    expect(view.locator("[data-role='message-history']")).to_contain_text(
+        peer_body,
+        timeout=15000,
+    )
     expect(selector).to_contain_text(peer.name)
     view = _go_messages(user)
     selector = view.locator("[data-role='conversation-selector']")

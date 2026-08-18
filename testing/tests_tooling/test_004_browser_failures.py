@@ -1,5 +1,6 @@
 """Tests for the E2E browser-failure collection support."""
 
+from contextlib import contextmanager
 import json
 from types import SimpleNamespace
 
@@ -34,12 +35,35 @@ class FakePage:
         self.context = context
         self.url = url
         self.listeners = {}
+        self.delayed_events = []
+        self.emitted_events = []
 
     def on(self, event, callback):
         self.listeners[event] = callback
 
     def emit(self, event, value):
+        self.emitted_events.append((event, value))
         self.listeners[event](value)
+
+    @contextmanager
+    def expect_event(self, event, *, predicate, timeout):
+        del timeout
+        start = len(self.emitted_events)
+        yield
+        matches = [
+            value
+            for name, value in self.emitted_events[start:]
+            if name == event and predicate(value)
+        ]
+        if not matches:
+            for index, (name, value) in enumerate(self.delayed_events):
+                if name == event and predicate(value):
+                    self.delayed_events.pop(index)
+                    self.emit(name, value)
+                    matches.append(value)
+                    break
+        if not matches:
+            raise AssertionError(f"Expected browser event {event!r}")
 
 
 def _user(page):
@@ -128,31 +152,37 @@ def test_expected_request_failure_requires_exact_context_bound_count():
         collector.assert_clean()
 
 
-def test_offline_scope_requires_the_native_ping_failure_and_console_error():
+def test_offline_scope_uses_native_ping_failure_and_ignores_late_console_copy():
     collector = BrowserFailureCollector()
     context = FakeContext()
     collector.monitor_context(context, label="Owner")
     page = context.new_page()
 
     with collector.expect_offline(_user(page)):
-        page.emit(
-            "requestfailed",
-            SimpleNamespace(
-                method="HEAD",
-                url="http://test.local/l/ping",
-                failure="net::ERR_INTERNET_DISCONNECTED",
-            ),
-        )
-        page.emit(
-            "console",
-            SimpleNamespace(
-                type="error",
-                text="Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
-                location={"url": "http://test.local/l/ping", "lineNumber": 0},
-            ),
+        page.delayed_events.append(
+            (
+                "requestfailed",
+                SimpleNamespace(
+                    method="HEAD",
+                    url="http://test.local/l/ping",
+                    failure="net::ERR_INTERNET_DISCONNECTED",
+                ),
+            )
         )
 
+    page.emit(
+        "console",
+        SimpleNamespace(
+            type="error",
+            text="Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+            location={"url": "http://test.local/l/ping", "lineNumber": 0},
+        ),
+    )
+
     collector.assert_clean()
+    assert collector.events[-1].ignored_reason == (
+        "browser-offline-resource-diagnostic"
+    )
 
 
 def test_offline_scope_accepts_an_exact_reload_ping_count():

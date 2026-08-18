@@ -38,6 +38,9 @@ Usage:
 from playwright.sync_api import expect
 
 
+DELETE_COMPLETION_TIMEOUT = 30000
+
+
 class Buttons:
     """
     CSS selectors for common button elements.
@@ -206,18 +209,20 @@ class Modal:
         close_button.click()
         expect(self.element).to_be_hidden()
 
-    def delete(self):
+    def delete(self, timeout=DELETE_COMPLETION_TIMEOUT):
         """
         Click Delete button, wait for spinner, then modal hide.
 
         Used for delete confirmations. Verifies the loading spinner
-        appears during the delete operation.
+        appears during the delete operation. Deletions may synchronously
+        traverse substantial related data, so their completion has a longer
+        timeout than ordinary modal interactions.
         """
         delete_button = self.element.locator(Buttons.DELETE)
         expect(delete_button).to_be_visible()
         delete_button.click()
         expect(delete_button.locator("[data-icon='spinner']")).to_be_visible()
-        expect(self.element).to_be_hidden()
+        expect(self.element).to_be_hidden(timeout=timeout)
 
     def click(self, name):
         """
