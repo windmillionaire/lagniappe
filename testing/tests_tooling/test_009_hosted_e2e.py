@@ -6,6 +6,7 @@ import pytest
 import yaml
 
 from runner import hosted_e2e
+from runner.hosted_e2e_anchor import main as hosted_e2e_anchor
 from runner.hosted_e2e import (
     HostedE2EError,
     HostedE2EInfrastructure,
@@ -143,8 +144,77 @@ def test_soft_routing_guard_preflight_requires_marker(monkeypatch):
     assert calls[0][1] == {"allow_redirects": False, "timeout": 30}
 
     Response.headers = {}
-    with pytest.raises(HostedE2EError, match="Deploy the current application"):
+    with pytest.raises(HostedE2EError, match="rerun hosted-E2E setup"):
         _verify_soft_routing_guard(_infrastructure())
+
+
+# @features hosted-e2e
+# @dimensions anchor soft-routing deletion-safety
+def test_hosted_anchor_marks_every_rejection():
+    response = {}
+
+    def start_response(status, headers):
+        response["status"] = status
+        response["headers"] = dict(headers)
+
+    body = b"".join(hosted_e2e_anchor.app({}, start_response))
+
+    assert response["status"] == "404 Not Found"
+    assert response["headers"]["X-Lagniappe-Hosted-E2E-Guard"] == "active"
+    assert response["headers"]["X-Lagniappe-Hosted-E2E-Anchor"] == "active"
+    assert body == b"Not Found\n"
+
+
+# @features hosted-e2e
+# @dimensions anchor reconciliation soft-routing deletion-safety
+def test_hosted_anchor_redeploys_only_when_its_contract_is_stale(
+    tmp_path,
+    monkeypatch,
+):
+    calls = []
+    descriptors = []
+
+    def gcloud(*arguments, **options):
+        calls.append((arguments, options))
+        if arguments[:2] == ("app", "deploy"):
+            descriptors.append(
+                yaml.safe_load(arguments[2].read_text(encoding="utf-8"))
+            )
+        return subprocess.CompletedProcess(
+            ["gcloud"], returncode=0, stdout="", stderr=""
+        )
+
+    monkeypatch.setattr(hosted_e2e, "ANCHOR_ROOT", tmp_path)
+    monkeypatch.setattr(hosted_e2e, "_gcloud", gcloud)
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_describe",
+        lambda _arguments: {"envVariables": {}},
+    )
+
+    hosted_e2e._ensure_anchor(_infrastructure())
+
+    assert descriptors[0]["env_variables"] == {
+        "HOSTED_E2E_ANCHOR_REVISION": hosted_e2e.ANCHOR_REVISION
+    }
+    assert calls[-1][0][:4] == ("app", "services", "set-traffic", "e2e")
+
+    calls.clear()
+    descriptors.clear()
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_describe",
+        lambda _arguments: {
+            "envVariables": {
+                "HOSTED_E2E_ANCHOR_REVISION": hosted_e2e.ANCHOR_REVISION
+            }
+        },
+    )
+
+    hosted_e2e._ensure_anchor(_infrastructure())
+
+    assert descriptors == []
+    assert calls[-1][0][:4] == ("app", "services", "set-traffic", "e2e")
 
 
 # @features hosted-e2e

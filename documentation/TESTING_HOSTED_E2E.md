@@ -9,7 +9,8 @@ local E2E run.
 The operator deploys one exact, zero-traffic App Engine version and a matching
 Cloud Run job from a clean commit. A local command or the manual GitHub
 workflow then invokes that same job. Teardown deletes the runnable version and
-job; an inert `e2e-anchor` version remains as the service's traffic owner.
+job; an inert, revisioned `e2e-anchor` version remains as the service's traffic
+owner and returns the same rejection marker for soft-routed stale hostnames.
 
 ## Security Boundary
 

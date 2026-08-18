@@ -39,6 +39,7 @@ from runner.process import run_command
 STATE_SCHEMA_VERSION = 1
 SERVICE = "e2e"
 ANCHOR_VERSION = "e2e-anchor"
+ANCHOR_REVISION = "2"
 JOB = "lagniappe-e2e"
 RUNTIME_ACCOUNT = "lagniappe-e2e-runtime"
 INVOKER_ACCOUNT = "lagniappe-e2e-invoker"
@@ -578,7 +579,10 @@ def _ensure_artifact_bucket(infrastructure):
         lifecycle_path.unlink(missing_ok=True)
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_anchor_redeploys_only_when_its_contract_is_stale
+# @features hosted-e2e
+# @dimensions anchor reconciliation soft-routing deletion-safety
 def _ensure_anchor(infrastructure):
     existing = _describe(
         [
@@ -590,12 +594,14 @@ def _ensure_anchor(infrastructure):
             f"--project={infrastructure.project}",
         ]
     )
-    if existing is None:
+    existing_variables = (existing or {}).get("envVariables") or {}
+    if existing_variables.get("HOSTED_E2E_ANCHOR_REVISION") != ANCHOR_REVISION:
         descriptor = {
             "runtime": "python314",
             "service": SERVICE,
             "service_account": infrastructure.runtime_email,
             "entrypoint": "gunicorn -b :$PORT main:app",
+            "env_variables": {"HOSTED_E2E_ANCHOR_REVISION": ANCHOR_REVISION},
             "instance_class": "F1",
             "automatic_scaling": {"max_instances": 1, "min_idle_instances": 0},
             "handlers": [{"url": "/.*", "script": "auto", "secure": "always"}],
@@ -921,9 +927,9 @@ def _verify_soft_routing_guard(infrastructure):
         or response.headers.get("X-Lagniappe-Hosted-E2E-Guard") != "active"
     ):
         raise HostedE2EError(
-            "The production App Engine service does not expose the hosted-E2E "
-            "soft-routing guard. Deploy the current application normally before "
-            "running hosted-E2E setup or create."
+            "Neither the production App Engine service nor the E2E anchor "
+            "exposes the hosted-E2E soft-routing guard. Deploy the current "
+            "application normally, then rerun hosted-E2E setup."
         )
 
 

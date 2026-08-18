@@ -52,6 +52,7 @@ annotated_source_roots:
   - runner/testing.py
   - runner/upgrade.py
   - runner/hosted_e2e.py
+  - runner/hosted_e2e_anchor/main.py
   - config/hosted_e2e.py
   - lagniappe/__init__.py
   - lagniappe/core/exceptions

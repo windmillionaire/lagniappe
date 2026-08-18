@@ -1,6 +1,10 @@
 """Inert traffic-owning version for the App Engine E2E service."""
 
 
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_anchor_marks_every_rejection
+# @features hosted-e2e
+# @dimensions anchor soft-routing deletion-safety
 def app(environ, start_response):
     body = b"Not Found\n"
     start_response(
@@ -10,6 +14,8 @@ def app(environ, start_response):
             ("Content-Length", str(len(body))),
             ("Cache-Control", "no-store"),
             ("X-Robots-Tag", "noindex, nofollow"),
+            ("X-Lagniappe-Hosted-E2E-Guard", "active"),
+            ("X-Lagniappe-Hosted-E2E-Anchor", "active"),
         ],
     )
     return [body]
