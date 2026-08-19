@@ -459,7 +459,7 @@ def test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr(
 
 # @features hosted-e2e
 # @dimensions cli-routing suite-scope evidence-import
-def test_hosted_execute_command_defaults_to_all_without_import(monkeypatch):
+def test_hosted_execute_command_defaults_to_all_and_imports(monkeypatch):
     calls = []
     monkeypatch.setattr(
         hosted_e2e,
@@ -469,7 +469,13 @@ def test_hosted_execute_command_defaults_to_all_without_import(monkeypatch):
     )
 
     assert hosted_e2e.run_hosted_e2e_command(["execute"]) == 0
-    assert calls == [{"suite": "all", "targets": (), "import_results": False}]
+    assert hosted_e2e.run_hosted_e2e_command(
+        ["execute", "--no-import-results"]
+    ) == 0
+    assert calls == [
+        {"suite": "all", "targets": (), "import_results": True},
+        {"suite": "all", "targets": (), "import_results": False},
+    ]
 
 
 # @features hosted-e2e traceability
@@ -560,6 +566,65 @@ def test_remote_evidence_merges_tests_and_snapshot_provenance():
     ]
 
 
+# @features hosted-e2e traceability
+# @dimensions evidence merge provenance source-integrity ci-import
+def test_hosted_result_directory_import_requires_the_exact_source(
+    tmp_path,
+    monkeypatch,
+):
+    source = "a" * 40
+    source_file = tmp_path / "source.py"
+    source_file.write_text("VALUE = 1\n", encoding="utf-8")
+    snapshot, paths = behavior_snapshot(tmp_path)
+    result_dir = tmp_path / "reports/result"
+    result_dir.mkdir(parents=True)
+    manifest = {
+        "schema_version": 1,
+        "kind": "hosted-e2e-result",
+        "execution": "lagniappe-e2e-result1",
+        "exit_status": 1,
+        "source": source,
+        "source_snapshot": snapshot,
+        "suite": "all",
+    }
+    traceability_common.write_json(result_dir / "manifest.json", manifest)
+    traceability_common.write_json(
+        result_dir / "evidence.json",
+        _evidence(
+            snapshot,
+            paths,
+            "tests_e2e/test_remote.py::test_remote",
+            outcome="failed",
+        ),
+    )
+    monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_git",
+        lambda *_arguments, **_options: subprocess.CompletedProcess(
+            ["git"], 0, stdout=f"{source}\n", stderr=""
+        ),
+    )
+
+    imported = hosted_e2e.import_result_directory(
+        result_dir,
+        expected_execution="lagniappe-e2e-result1",
+    )
+
+    assert imported == manifest
+    evidence = traceability_common.load_json(
+        tmp_path / traceability_common.LATEST_TEST_RUN
+    )
+    assert evidence["tests"]["tests_e2e/test_remote.py::test_remote"][
+        "outcome"
+    ] == "failed"
+
+    manifest["source"] = "b" * 40
+    traceability_common.write_json(result_dir / "manifest.json", manifest)
+    with pytest.raises(HostedE2EError, match="does not match"):
+        hosted_e2e.import_result_directory(result_dir)
+
+
 def test_source_archive_snapshot_falls_back_when_git_is_not_installed(
     tmp_path,
     monkeypatch,
@@ -602,6 +667,7 @@ def test_hosted_image_upload_boundary_excludes_local_credentials_and_results():
         "venv/",
         "*credentials*.json",
         "*service-account*.json",
+        "gha-creds-*.json",
     } <= ignore_lines
 
 
@@ -654,13 +720,14 @@ def test_hosted_anchor_declares_its_upload_boundary():
     )
 
 
-def test_hosted_workflow_is_manual_and_repository_read_only():
-    """The dispatch workflow invokes only; evidence import stays local."""
+def test_hosted_workflow_is_manual_and_returns_exact_evidence_to_its_branch():
+    """The dispatch imports only its exact execution into an unmoved branch."""
     workflow_path = (
         hosted_e2e.APP_DIR / ".github/workflows/hosted-e2e.yml"
     )
     workflow_text = workflow_path.read_text(encoding="utf-8")
     workflow = yaml.load(workflow_text, Loader=yaml.BaseLoader)
+    gitignore = (hosted_e2e.APP_DIR / ".gitignore").read_text(encoding="utf-8")
 
     assert workflow["on"] == {
         "workflow_dispatch": {
@@ -675,15 +742,53 @@ def test_hosted_workflow_is_manual_and_repository_read_only():
             }
         }
     }
-    assert workflow["permissions"] == {"id-token": "write"}
+    assert workflow["permissions"] == {
+        "contents": "write",
+        "id-token": "write",
+    }
     assert workflow["jobs"]["execute"]["environment"] == "hosted-e2e"
     assert "google-github-actions/auth" in workflow_text
     assert "gcloud run jobs describe" in workflow_text
     assert "gcloud run jobs execute" in workflow_text
-    assert "actions/checkout" not in workflow_text
-    assert "contents:" not in workflow_text
-    assert "git push" not in workflow_text
-    assert "hosted-e2e results" not in workflow_text
+    assert "actions/checkout" in workflow_text
+    assert "gcloud storage cp" in workflow_text
+    assert "hosted-e2e import-results" in workflow_text
+    assert "--execution \"$EXECUTION\"" in workflow_text
+    assert 'remote_head="$(git rev-parse FETCH_HEAD)"' in workflow_text
+    assert '"$remote_head" != "$EXPECTED_SOURCE"' in workflow_text
+    assert 'git commit -am "Updated hosted test evidence"' in workflow_text
+    assert 'git push origin "HEAD:$BRANCH"' in workflow_text
+    assert "gha-creds-*.json" in gitignore
+
+
+# @features hosted-e2e
+# @dimensions identity least-privilege artifact-download
+def test_ci_invoker_can_only_read_the_result_bucket(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_gcloud",
+        lambda *arguments, **options: calls.append((arguments, options)),
+    )
+    infrastructure = _infrastructure()
+    invoker = f"serviceAccount:{infrastructure.invoker_email}"
+
+    hosted_e2e._grant_ci_result_access(infrastructure, invoker)
+
+    assert calls == [
+        (
+            (
+                "storage",
+                "buckets",
+                "add-iam-policy-binding",
+                f"gs://{infrastructure.artifact_bucket}",
+                f"--member={invoker}",
+                "--role=roles/storage.objectViewer",
+                "--quiet",
+            ),
+            {},
+        )
+    ]
 
 
 # @features hosted-e2e

@@ -101,7 +101,6 @@ artifacts; it does not run the frontend build.
 venv/bin/python run.py hosted-e2e setup --github-repository OWNER/REPOSITORY
 venv/bin/python run.py hosted-e2e create
 venv/bin/python run.py hosted-e2e execute
-venv/bin/python run.py hosted-e2e results --latest
 venv/bin/python run.py hosted-e2e status
 venv/bin/python run.py hosted-e2e teardown
 ```
@@ -109,11 +108,10 @@ venv/bin/python run.py hosted-e2e teardown
 The default `all` scope runs every complete suite, including the opt-in setup
 drift and live-provider contracts while still excluding `unfinished`;
 E2E-only `full` and trusted local focused dispatch remain available. Execution
-does not change local evidence. A local or CI-triggered run is imported
-explicitly with
-`results --latest` from the same candidate commit. Evidence import is a manual
-release step and the reviewed manifest becomes an ordinary follow-up commit;
-the workflow has no repository write permission. See
+automatically downloads and merges its exact result into local evidence. The
+GitHub workflow performs the same merge and safely commits only that evidence
+back to an unmoved tested branch. `results --latest` remains a recovery and
+inspection command. See
 [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md) for the production-build order,
 security model, one-time setup, GitHub variables, lifecycle, artifact behavior,
 and failure recovery.

@@ -158,6 +158,7 @@ def test_gcloudignore_uploads_only_canonical_runtime_config():
     assert "/installer/" in ignore
     assert "/runner/" in ignore
     assert "/setup/" not in ignore
+    assert "**/gha-creds-*.json" in ignore
     for local_only in (
         "lagniappe_dev.yaml",
         "lagniappe_generation.json",

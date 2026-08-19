@@ -584,6 +584,23 @@ def _ensure_artifact_bucket(infrastructure):
 
 
 # @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_ci_invoker_can_only_read_the_result_bucket
+# @features hosted-e2e
+# @dimensions identity least-privilege artifact-download
+def _grant_ci_result_access(infrastructure, invoker_member):
+    """Let the CI invoker read only the dedicated hosted-result bucket."""
+    _gcloud(
+        "storage",
+        "buckets",
+        "add-iam-policy-binding",
+        f"gs://{infrastructure.artifact_bucket}",
+        f"--member={invoker_member}",
+        "--role=roles/storage.objectViewer",
+        "--quiet",
+    )
+
+
+# @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_anchor_redeploys_only_when_its_contract_is_stale
 # @features hosted-e2e
 # @dimensions anchor reconciliation soft-routing deletion-safety
@@ -838,6 +855,7 @@ def setup(github_repository=None):
     )
 
     _ensure_artifact_bucket(infrastructure)
+    _grant_ci_result_access(infrastructure, invoker_member)
     for bucket_name in (*_test_bucket_names(), infrastructure.artifact_bucket):
         for role in RUNTIME_BUCKET_ROLES:
             _gcloud(
@@ -1628,8 +1646,8 @@ def _execution_name(payload, *output):
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
 # @features hosted-e2e
 # @dimensions focused-execution cloud-run override local-dispatch target-validation argument-injection
-def execute(*, suite="all", targets=(), import_results=False):
-    """Execute the same Cloud Run job used by CI and optionally import evidence."""
+def execute(*, suite="all", targets=(), import_results=True):
+    """Execute the shared Cloud Run job and normally import its evidence."""
     from testing.utility.hosted_e2e_job import validate_focused_targets
 
     targets = tuple(targets or ())
@@ -1754,6 +1772,51 @@ def merge_remote_evidence(local, remote):
 
 
 # @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_result_directory_import_requires_the_exact_source
+# @features hosted-e2e traceability
+# @dimensions evidence merge provenance source-integrity ci-import
+def import_result_directory(directory, *, expected_execution=None):
+    """Validate and merge an already-downloaded hosted result directory."""
+    from testing.utility.traceability_common import (
+        LATEST_TEST_RUN,
+        behavior_snapshot,
+        load_json,
+        write_json,
+    )
+
+    directory = Path(directory)
+    manifest = load_json(directory / "manifest.json")
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("schema_version") != 1
+        or manifest.get("kind") != "hosted-e2e-result"
+    ):
+        raise HostedE2EError("Hosted result manifest has an unsupported schema.")
+    execution = manifest.get("execution") if isinstance(manifest, dict) else None
+    if not isinstance(execution, str) or not EXECUTION_RE.fullmatch(execution):
+        raise HostedE2EError("Hosted result manifest has no valid execution name.")
+    if expected_execution is not None and execution != expected_execution:
+        raise HostedE2EError("Hosted result manifest does not match its execution.")
+
+    source = _git("rev-parse", "HEAD").stdout.strip().casefold()
+    source_snapshot, _source_paths = behavior_snapshot(APP_DIR)
+    if (
+        manifest.get("source") != source
+        or manifest.get("source_snapshot") != source_snapshot
+    ):
+        raise HostedE2EError(
+            "Hosted result source does not match the local semantic tree; "
+            f"artifacts remain at {directory} but evidence was not merged."
+        )
+
+    remote = load_json(directory / "evidence.json")
+    evidence_path = APP_DIR / LATEST_TEST_RUN
+    merged = merge_remote_evidence(load_json(evidence_path), remote)
+    write_json(evidence_path, merged)
+    return manifest
+
+
+# @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_results_can_skip_large_report_archive
 # @features hosted-e2e traceability
 # @dimensions artifact-download selective-download progress
@@ -1775,8 +1838,6 @@ def results(
         raise HostedE2EError("A valid Cloud Run execution name is required.")
 
     from google.cloud import storage
-    from testing.utility.traceability_common import LATEST_TEST_RUN, load_json, write_json
-
     destination = STATE_ROOT / "results" / execution
     destination.mkdir(parents=True, exist_ok=True)
     print(f"Downloading hosted test artifacts to {destination}", flush=True)
@@ -1802,24 +1863,10 @@ def results(
     if not manifest or manifest.get("execution") != execution:
         raise HostedE2EError("Hosted result manifest does not match its execution.")
     if merge:
-        source = _git("rev-parse", "HEAD").stdout.strip().casefold()
-        from testing.utility.traceability_common import behavior_snapshot
-
-        source_snapshot, _source_paths = behavior_snapshot(APP_DIR)
-        if (
-            manifest.get("source") != source
-            or manifest.get("source_snapshot") != source_snapshot
-        ):
-            raise HostedE2EError(
-                "Hosted result source does not match the local semantic tree; "
-                f"artifacts were downloaded to {destination} but evidence was "
-                "not merged."
-            )
-    if merge:
-        evidence_path = APP_DIR / LATEST_TEST_RUN
-        remote = load_json(downloaded["evidence.json"])
-        merged = merge_remote_evidence(load_json(evidence_path), remote)
-        write_json(evidence_path, merged)
+        return import_result_directory(
+            destination,
+            expected_execution=execution,
+        )
     return manifest
 
 
@@ -2024,7 +2071,7 @@ def status():
 
 
 # @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_command_defaults_to_all_without_import
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_command_defaults_to_all_and_imports
 # @features hosted-e2e
 # @dimensions cli-routing suite-scope evidence-import
 def run_hosted_e2e_command(arguments):
@@ -2049,9 +2096,9 @@ def run_hosted_e2e_command(arguments):
         help="Run one existing E2E file/nodeid; repeat for additional targets.",
     )
     execute_parser.add_argument(
-        "--import-results",
+        "--no-import-results",
         action="store_true",
-        help="Download and merge this execution immediately instead of during release.",
+        help="Leave this execution in Cloud Storage without importing it locally.",
     )
     results_parser = commands.add_parser("results", help="Download and import job artifacts.")
     result_selector = results_parser.add_mutually_exclusive_group()
@@ -2063,6 +2110,12 @@ def run_hosted_e2e_command(arguments):
         action="store_true",
         help="Download manifest, evidence, and JUnit XML without reports.tar.gz.",
     )
+    import_parser = commands.add_parser(
+        "import-results",
+        help="Merge an already-downloaded result bundle into local evidence.",
+    )
+    import_parser.add_argument("--directory", required=True, type=Path)
+    import_parser.add_argument("--execution")
     commands.add_parser("status", help="Show local and provider lifecycle state.")
     teardown_parser = commands.add_parser("teardown", help="Delete the ephemeral version and job.")
     teardown_parser.add_argument("--force", action="store_true")
@@ -2084,10 +2137,17 @@ def run_hosted_e2e_command(arguments):
             payload = execute(
                 suite=suite,
                 targets=args.targets or (),
-                import_results=args.import_results,
+                import_results=not args.no_import_results,
             )
             print(json.dumps(payload, indent=2, sort_keys=True))
             return int(payload.get("exit_status") or 0)
+        elif args.action == "import-results":
+            payload = import_result_directory(
+                args.directory,
+                expected_execution=args.execution,
+            )
+            print(json.dumps(payload, indent=2, sort_keys=True))
+            return 0
         elif args.action == "results":
             payload = results(
                 execution=args.execution,

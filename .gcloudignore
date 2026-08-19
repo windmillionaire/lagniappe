@@ -42,6 +42,7 @@ venv/
 **/*.backup
 **/*~
 **/*_settings.yaml
+**/gha-creds-*.json
 
 # Setup state is local-only. Upload only the canonical runtime settings and
 # Redis trust material from config/files/.

@@ -23,7 +23,8 @@ provider condition is restricted to:
 - the configured `OWNER/REPOSITORY`;
 - `.github/workflows/hosted-e2e.yml`;
 - the `hosted-e2e` GitHub environment; and
-- view and execute-with-overrides permissions on the exact Cloud Run job.
+- view and execute-with-overrides permissions on the exact Cloud Run job; and
+- object-viewer access on the dedicated seven-day result bucket.
 
 The Cloud Run job runs as a separate E2E runtime service account. Secret
 Manager mounts `lagniappe_settings.yaml` and, when configured, the managed
@@ -220,11 +221,19 @@ setup drift and live-provider contracts, in its single job. The E2E-only
 `full` choice remains available for diagnosis. The
 workflow reads the configured source from the job and refuses to execute if it
 differs from `github.sha`. It uses WIF only to describe and invoke that exact
-job; it has no project-wide Cloud Run viewer role and cannot read either
-mounted secret or download result objects. The container entry point also
+job and to download that execution's bundle from the dedicated result bucket;
+it has no project-wide Cloud Run viewer role and cannot read either mounted
+secret or application/test data buckets. The container entry point also
 accepts the separately validated `focused` scope used by the trusted local
 command, but the workflow has no focused input or arbitrary target field.
-It does not check out, rebuild, commit, or create a branch in the repository.
+The workflow checks out the exact candidate but does not rebuild it or create a
+branch. After the run, it validates and merges the downloaded evidence, checks
+that no tracked file except `testing/evidence/latest.json` changed, and uses a
+normal `git commit -am` plus non-force push to return that evidence to the
+dispatch branch. It rejects tag dispatches and refuses to push if the remote
+branch moved away from the tested commit while the suite was running. Branch
+protection must permit the workflow's GitHub token to make this evidence-only
+follow-up commit.
 
 Local and GitHub dispatches are consequently two front doors to the same job,
 not separate test implementations.
@@ -241,42 +250,40 @@ Every job uploads the following under
 
 A focused manifest also records the exact selected nodeids.
 
-Execution never changes local evidence by default, regardless of whether it is
-started locally or by GitHub. It records the execution name in lifecycle state
-and returns the provider exit status. Pass `--import-results` only when an
-immediate local import is intentionally desired; the normal release flow keeps
-execution and evidence review separate.
-
-A CI-triggered run deliberately does not update the repository. From a checkout
-still at the exact candidate commit used by `create`, import its result during
-the release flow:
+Local execution downloads its exact bundle and merges evidence by default:
 
 ```bash
-venv/bin/python run.py hosted-e2e results --latest
+venv/bin/python run.py hosted-e2e execute
 ```
 
-This explicit command downloads the execution under
+The download is stored under
 `reports/hosted-e2e/results/EXECUTION/` and merges its per-test outcomes and
 semantic snapshots into `testing/evidence/latest.json`. Existing unselected
 test evidence is preserved, just as it is after a focused local pytest run.
 The merged provenance records the hosted execution, job, service, commit,
-version, and selected suite. Use `--download-only` to inspect artifacts without
-changing evidence, and `--skip-report-archive` when only the manifest, evidence,
-and JUnit XML are needed. Downloads print their destination and per-file byte
-progress; the report archive remains available for a later selective download.
+version, and selected suite. Use `execute --no-import-results` for an
+exceptional dispatch that should leave its result only in Cloud Storage. The
+existing `results --latest`, `--download-only`, and `--skip-report-archive`
+options remain available for recovery and selective inspection. Downloads
+print their destination and per-file byte progress.
+
+GitHub performs the same validation and merge from its downloaded directory,
+then commits the resulting evidence to the exact tested branch before it
+reports the suite outcome. Failed runs are therefore preserved too. The final
+workflow step still fails when the hosted manifest failed, so committing the
+diagnostic evidence cannot turn a red suite green.
 
 The import merges only when both the result commit and semantic source-tree
 snapshot equal the local checkout. A different source is still available with
 `--download-only` but cannot contaminate the tracked evidence manifest. A
 failed suite also imports its failed outcomes and tracebacks, so `latest.json`
 truthfully represents the latest selected run.
-Review it before committing for the same reasons as local evidence. The merge
-is ordinary follow-up release work: commit the reviewed
-`testing/evidence/latest.json` on the existing `next/*` or `hotfix/*` branch.
-No CI evidence branch or repository write permission is required. Because that
-evidence-only commit changes `HEAD`, import first; the semantic snapshot remains
-valid after the evidence commit even though the hosted execution records its
-candidate commit as provenance.
+Locally, review and commit that ordinary follow-up change on the existing
+`next/*` or `hotfix/*` branch. In GitHub, the workflow performs that
+evidence-only commit automatically. Evidence and reports are excluded from the
+semantic source snapshot, so the follow-up commit does not invalidate the
+tested snapshot even though provenance retains the exact pre-evidence candidate
+commit.
 
 ## Failure Recovery
 

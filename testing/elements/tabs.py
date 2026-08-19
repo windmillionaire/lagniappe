@@ -269,5 +269,8 @@ class MobileNav:
         button.click()
 
         section = self.user.locate(f"#{section_id}")
-        expect(button).to_have_attribute("data-selected", "true")
+        # The selected attribute is implementation state.  Waiting for the
+        # requested section to paint proves that lazy activation and mobile
+        # layout reconciliation both finished, including slower hosted loads.
+        expect(section).to_be_visible(timeout=15000)
         return section

@@ -53,8 +53,9 @@ production output and candidate source are committed,
 `venv/bin/python run.py hosted-e2e create` validates the committed build
 metadata and deploys both hosted artifacts from an export of that exact commit.
 It never runs another build or replaces the reviewed random build ID. Hosted
-evidence is imported manually and may be committed afterward without changing
-the tested semantic source tree.
+evidence is imported automatically after execution and may be committed
+afterward without changing the tested semantic source tree; the GitHub dispatch
+does that evidence-only follow-up commit itself after guarding the branch head.
 
 When `SENTRY_AUTH_TOKEN` is configured, production JavaScript source maps are
 generated as hidden Rollup outputs, uploaded to Sentry, then deleted from

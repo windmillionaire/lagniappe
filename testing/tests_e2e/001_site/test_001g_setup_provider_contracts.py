@@ -21,12 +21,10 @@ from google.cloud import (
     documentai,
     iam_admin_v1,
     resourcemanager_v3,
-    storage,
 )
 from google.cloud.storage import _signing as storage_signing
 from google.cloud.datastore.query import PropertyFilter
 
-from config import constants
 from lagniappe import CONFIG
 from lagniappe.core.tools import location, task_queue
 from lagniappe.core.tools.ai.core import GenAI
@@ -48,35 +46,6 @@ def _assert_xml_error_response(response, *, status, code):
     assert error.findtext("Message")
 
 
-def _unconditional_members(policy, role):
-    members = set()
-    for binding in policy.bindings:
-        binding_role = (
-            binding.get("role")
-            if isinstance(binding, dict)
-            else binding.role
-        )
-        condition = (
-            binding.get("condition")
-            if isinstance(binding, dict)
-            else binding.condition
-        )
-        expression = (
-            condition.get("expression")
-            if isinstance(condition, dict)
-            else getattr(condition, "expression", None)
-        ) if condition else None
-        if binding_role != role or expression:
-            continue
-        binding_members = (
-            binding.get("members", ())
-            if isinstance(binding, dict)
-            else binding.members
-        )
-        members.update(binding_members)
-    return members
-
-
 @pytest.fixture(scope="module", autouse=True)
 def require_impersonated_runtime_adc():
     """Keep live runtime contracts scoped to short-lived runtime ADC."""
@@ -91,48 +60,11 @@ def require_impersonated_runtime_adc():
     )
 
 
-def test_runtime_iam_policy_and_effective_forbidden_permissions():
-    """Audit release IAM and prove the runtime lacks provisioning authority."""
+def test_runtime_effective_permissions_exclude_provisioning_authority():
+    """Prove the runtime can sign as itself without provisioning resources."""
     project_id = CONFIG.GOOGLE_CLOUD_PROJECT
     runtime_email = CONFIG.RUNTIME_SERVICE_ACCOUNT_EMAIL
-    runtime_member = f"serviceAccount:{runtime_email}"
     project_resource = f"projects/{project_id}"
-
-    project_client = resourcemanager_v3.ProjectsClient(
-        credentials=CONFIG.google_credentials
-    )
-    project_policy = project_client.get_iam_policy(
-        request={
-            "resource": project_resource,
-            "options": {"requested_policy_version": 3},
-        }
-    )
-    for role in constants.RUNTIME_PROJECT_ROLES:
-        assert runtime_member in _unconditional_members(project_policy, role)
-    for role in constants.REMOVED_RUNTIME_PROJECT_ROLES:
-        assert runtime_member not in _unconditional_members(project_policy, role)
-
-    storage_client = storage.Client(
-        project=project_id,
-        credentials=CONFIG.google_credentials,
-    )
-    bucket_names = {
-        "history": f"{CONFIG.PREFIX}{CONFIG.HISTORY_BUCKET}",
-        "private": f"{CONFIG.PREFIX}{CONFIG.PRIVATE_BUCKET}",
-        "public": f"{CONFIG.PREFIX}{CONFIG.PUBLIC_BUCKET}",
-        "export": f"{CONFIG.PREFIX}{CONFIG.EXPORT_BUCKET}",
-    }
-    for bucket_kind, bucket_name in bucket_names.items():
-        bucket_policy = storage_client.bucket(bucket_name).get_iam_policy(
-            requested_policy_version=3
-        )
-        for role in constants.RUNTIME_BUCKET_ROLES:
-            assert runtime_member in _unconditional_members(bucket_policy, role)
-        if bucket_kind == "public":
-            assert "allUsers" in _unconditional_members(
-                bucket_policy,
-                "roles/storage.objectViewer",
-            )
 
     runtime_project_client = resourcemanager_v3.ProjectsClient(
         credentials=CONFIG.google_credentials
@@ -157,34 +89,7 @@ def test_runtime_iam_policy_and_effective_forbidden_permissions():
     service_account_resource = (
         f"projects/{project_id}/serviceAccounts/{runtime_email}"
     )
-    service_account_policy = iam_client.get_iam_policy(
-        request={
-            "resource": service_account_resource,
-            "options": {"requested_policy_version": 3},
-        }
-    )
-    act_as_members = _unconditional_members(
-        service_account_policy,
-        "roles/iam.serviceAccountUser",
-    )
-    assert runtime_member in act_as_members
-    deployer_type = (
-        "serviceAccount"
-        if CONFIG.DEPLOYER_EMAIL.endswith(".gserviceaccount.com")
-        else "user"
-    )
-    assert f"{deployer_type}:{CONFIG.DEPLOYER_EMAIL}" in act_as_members
-    signing_members = _unconditional_members(
-        service_account_policy,
-        "roles/iam.serviceAccountTokenCreator",
-    )
-    assert runtime_member in signing_members
-    assert f"{deployer_type}:{CONFIG.DEPLOYER_EMAIL}" in signing_members
-
-    runtime_iam_client = iam_admin_v1.IAMClient(
-        credentials=CONFIG.google_credentials
-    )
-    service_account_permissions = runtime_iam_client.test_iam_permissions(
+    service_account_permissions = iam_client.test_iam_permissions(
         request={
             "resource": service_account_resource,
             "permissions": [

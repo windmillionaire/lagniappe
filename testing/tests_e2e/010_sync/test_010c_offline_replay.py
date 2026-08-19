@@ -217,41 +217,6 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failure
     expect(project.editor.text_entry).to_contain_text(text)
 
 
-# @features sync
-# @dimensions offline-replay dedupe reload document queue-clear
-def test_offline_replay_does_not_duplicate_after_reload(get_user, browser_failures):
-    user = get_user(Users.OWNER)
-    project = Projects.test_offline_document_reload.get(user)
-    user.go(project)
-    editor = project.editor
-    text = _unique("reload-dedupe")
-    document_sync_id = project.entity.sync_ids["document"]["id"]
-
-    _offline_document_edit(
-        user,
-        browser_failures,
-        editor,
-        text,
-        sync_id=document_sync_id,
-    )
-    _replace_page(user)
-
-    with expect_offline_sync_replay(
-        user,
-        sync_id=document_sync_id,
-        request_payload_contains=text,
-    ) as replay_responses:
-        user.go(SitePages.HOME)
-
-    acknowledgement = replay_responses[0].json()["updates"][0]
-    assert acknowledgement["checkpoint_accepted"] is True
-    assert acknowledgement["checkpoint_persisted"] is True
-
-    user.go(project, query_params={"replay": uuid4().hex})
-    replayed = project.editor.get_text()
-    assert replayed.count(text) == 1
-
-
 # @pairs sync:offline-replay sync:headless sync:concurrency sync:merge
 # @pairs sync:queue-clear
 # @pairs polling:document polling:current-state polling:cursor

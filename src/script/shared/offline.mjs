@@ -86,9 +86,8 @@ function promisify(request) {
  * @testable true
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_failed_offline_replay_keeps_queue_and_retries
- * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_replay_does_not_duplicate_after_reload
  * @features sync
- * @dimensions offline-replay replay-order queue-preserved dedupe reload
+ * @dimensions offline-replay replay-order queue-preserved
  */
 export function updateSyncRecord(record) {
 	const timestamp = Date.now();
@@ -143,9 +142,8 @@ export function getSyncRecord(sync_id) {
  * @testable true
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_failed_offline_replay_keeps_queue_and_retries
- * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_replay_does_not_duplicate_after_reload
  * @features sync
- * @dimensions offline-replay replay-order queue-preserved dedupe reload
+ * @dimensions offline-replay replay-order queue-preserved
  */
 export function getAllOfflineRecords() {
 	return withTransaction(
@@ -188,9 +186,8 @@ export function deleteSyncRecord(sync_id) {
 /**
  * @testable true
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
- * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_replay_does_not_duplicate_after_reload
  * @features sync
- * @dimensions offline-replay queue-clear dedupe
+ * @dimensions offline-replay queue-clear
  */
 export function deleteSyncRecords(sync_ids) {
 	if (!sync_ids?.length) return Promise.resolve();

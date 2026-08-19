@@ -386,7 +386,8 @@ mounts, seven-day artifact bucket, and inert App Engine `e2e-anchor` version.
 Runtime project
 roles mirror the existing suite's provider surface; Storage access is scoped to
 the test bucket family and artifact bucket. CI receives only permission to
-impersonate the invoker and run/inspect the exact job. See
+impersonate the invoker, run/inspect the exact job, and view objects in the
+dedicated result bucket so it can return evidence to the tested branch. See
 [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md) before provisioning or changing
 these resources.
 

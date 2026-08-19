@@ -13,6 +13,7 @@ on:
           - full
 
 permissions:
+  contents: write
   id-token: write
 
 concurrency:
@@ -27,6 +28,21 @@ jobs:
     environment: hosted-e2e
 
     steps:
+      - name: Check out the exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Require a writable branch dispatch
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+        run: |
+          if [[ "$REF_TYPE" != "branch" ]]; then
+            echo "Hosted evidence can only be returned to a branch dispatch."
+            exit 1
+          fi
+
       - name: Authenticate without a stored key
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
@@ -40,6 +56,7 @@ jobs:
           version: ">= 498.0.0"
 
       - name: Require a job built from this commit
+        id: preflight
         env:
           E2E_JOB: lagniappe-e2e
           E2E_REGION: ${{ vars.GCP_RESOURCE_REGION }}
@@ -47,18 +64,114 @@ jobs:
         run: |
           job_json="$(gcloud run jobs describe "$E2E_JOB" --region "$E2E_REGION" --format=json)"
           configured_source="$(jq -er '[.. | objects | select(.name? == "LAGNIAPPE_HOSTED_E2E_SOURCE") | .value][0]' <<<"$job_json")"
+          artifact_bucket="$(jq -er '[.. | objects | select(.name? == "LAGNIAPPE_HOSTED_E2E_ARTIFACT_BUCKET") | .value][0]' <<<"$job_json")"
           if [[ "$configured_source" != "$EXPECTED_SOURCE" ]]; then
             echo "The hosted job targets $configured_source, not $EXPECTED_SOURCE."
             exit 1
           fi
+          if [[ ! "$artifact_bucket" =~ ^[a-z0-9][a-z0-9._-]+$ ]]; then
+            echo "The hosted job has an invalid artifact bucket."
+            exit 1
+          fi
+          echo "artifact_bucket=$artifact_bucket" >> "$GITHUB_OUTPUT"
 
       - name: Run the hosted test suite
+        id: run
         env:
           E2E_JOB: lagniappe-e2e
           E2E_REGION: ${{ vars.GCP_RESOURCE_REGION }}
           E2E_SUITE: ${{ inputs.suite }}
         run: |
-          gcloud run jobs execute "$E2E_JOB" \
+          run_log="$RUNNER_TEMP/hosted-e2e-gcloud.log"
+          set +e
+          execution_json="$(gcloud run jobs execute "$E2E_JOB" \
             --region "$E2E_REGION" \
             "--args=--suite=$E2E_SUITE" \
-            --wait
+            --wait \
+            --format=json 2>"$run_log")"
+          provider_status=$?
+          set -e
+          execution="$(jq -er '.metadata.name // .name' <<<"$execution_json" 2>/dev/null || true)"
+          execution="${execution##*/}"
+          if [[ ! "$execution" =~ ^[a-z][a-z0-9-]{0,62}$ ]]; then
+            execution="$(grep -Eo 'lagniappe-e2e-[a-z0-9-]*[a-z0-9]' "$run_log" | tail -1 || true)"
+          fi
+          cat "$run_log"
+          if [[ ! "$execution" =~ ^lagniappe-e2e-[a-z0-9-]*[a-z0-9]$ ]]; then
+            echo "Cloud Run did not identify the hosted execution."
+            if [[ "$provider_status" == "0" ]]; then
+              provider_status=2
+            fi
+            exit "$provider_status"
+          fi
+          echo "execution=$execution" >> "$GITHUB_OUTPUT"
+          echo "provider_status=$provider_status" >> "$GITHUB_OUTPUT"
+
+      - name: Download the exact result bundle
+        env:
+          ARTIFACT_BUCKET: ${{ steps.preflight.outputs.artifact_bucket }}
+          EXECUTION: ${{ steps.run.outputs.execution }}
+        run: |
+          result_dir="$RUNNER_TEMP/hosted-e2e/$EXECUTION"
+          mkdir -p "$result_dir"
+          for artifact in manifest.json evidence.json junit.xml reports.tar.gz; do
+            gcloud storage cp \
+              "gs://$ARTIFACT_BUCKET/executions/$EXECUTION/$artifact" \
+              "$result_dir/$artifact"
+          done
+          echo "RESULT_DIR=$result_dir" >> "$GITHUB_ENV"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Merge hosted evidence
+        env:
+          EXECUTION: ${{ steps.run.outputs.execution }}
+        run: |
+          python -m venv venv
+          venv/bin/python -m pip install --disable-pip-version-check PyYAML==6.0.3
+          venv/bin/python run.py hosted-e2e import-results \
+            --directory "$RESULT_DIR" \
+            --execution "$EXECUTION"
+
+      - name: Commit evidence to the tested branch
+        env:
+          BRANCH: ${{ github.ref_name }}
+          EXPECTED_SOURCE: ${{ github.sha }}
+        run: |
+          while IFS= read -r path; do
+            if [[ -n "$path" && "$path" != "testing/evidence/latest.json" ]]; then
+              echo "Evidence import unexpectedly changed $path."
+              exit 1
+            fi
+          done < <(git diff --name-only)
+          if git diff --quiet -- testing/evidence/latest.json; then
+            echo "Hosted evidence already matches this result."
+            exit 0
+          fi
+          git fetch origin "$BRANCH"
+          remote_head="$(git rev-parse FETCH_HEAD)"
+          if [[ "$remote_head" != "$EXPECTED_SOURCE" ]]; then
+            echo "The branch moved to $remote_head while $EXPECTED_SOURCE was tested."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Updated hosted test evidence"
+          git push origin "HEAD:$BRANCH"
+
+      - name: Report the hosted suite result
+        env:
+          PROVIDER_STATUS: ${{ steps.run.outputs.provider_status }}
+        run: |
+          suite_status="$(jq -er '.exit_status' "$RESULT_DIR/manifest.json")"
+          if [[ "$suite_status" != "0" ]]; then
+            echo "The hosted suite failed with status $suite_status."
+            exit "$suite_status"
+          fi
+          if [[ "$PROVIDER_STATUS" != "0" ]]; then
+            echo "Cloud Run returned status $PROVIDER_STATUS despite a passing manifest."
+            exit "$PROVIDER_STATUS"
+          fi

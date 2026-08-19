@@ -22,6 +22,7 @@ export class ImportData {
 		this.pollAfterMs = null;
 		this.importRequestStarted = false;
 		this._unsubscribeImport = null;
+		this._stageUpdate = Promise.resolve();
 
 		this._parser = new DOMParser();
 		this._refreshProgress = this._refreshProgress.bind(this);
@@ -48,7 +49,7 @@ export class ImportData {
 
 		if (button.dataset.role === "next") {
 			formatting.working(button, "Processing...");
-			this._next();
+			await this._next();
 		} else if (button.dataset.role === "import") {
 			formatting.working(button, "Starting Import...");
 			this._startImport();
@@ -76,8 +77,9 @@ export class ImportData {
 	 * @testable true
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
+	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_next_waits_for_pending_stage_update
 	 * @features ingress
-	 * @dimensions choose-type
+	 * @dimensions choose-type stage-update serialization
 	 */
 	async _change(e) {
 		const form = e.target.closest("form");
@@ -94,7 +96,10 @@ export class ImportData {
 			});
 
 		const updates = new FormData(form);
-		request.patch(this.endpoints.update(this.key), updates);
+		const submit = () =>
+			request.patch(this.endpoints.update(this.key), updates);
+		this._stageUpdate = this._stageUpdate.then(submit, submit);
+		return this._stageUpdate;
 	}
 
 	/**
@@ -393,7 +398,16 @@ export class ImportData {
 		});
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_next_waits_for_pending_stage_update
+	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
+	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
+	 * @features ingress
+	 * @dimensions next-action stage-update serialization
+	 */
 	async _next() {
+		await this._stageUpdate;
 		const form = this.stageSettings.target;
 		const updates = form ? new FormData(form) : new FormData();
 		updates.append("stage", this.stage);

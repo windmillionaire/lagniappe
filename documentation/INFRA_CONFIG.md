@@ -626,8 +626,9 @@ context; hosted repository-health checks therefore see the canonical deploy
 contract without broadening the runner upload boundary.
 Create records an asynchronous Cloud Build ID and completed provisioning phases
 so the same clean commit can resume an interrupted build/deploy safely. Result
-download and evidence merge are explicit release-flow operations rather than
-an automatic side effect of execution.
+download and evidence merge happen automatically after a local execution. The
+manual GitHub workflow performs the same exact-source import and makes an
+evidence-only commit only if its dispatch branch has not moved.
 
 The stable infrastructure, request/identity boundary, teardown behavior, and
 evidence import contract are documented in

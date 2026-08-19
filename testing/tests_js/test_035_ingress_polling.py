@@ -1,4 +1,98 @@
-"""Node-backed checks for ingress polling ownership."""
+"""Node-backed checks for ingress polling ownership and stage actions."""
+
+
+# @features ingress
+# @dimensions stage-update serialization next-action
+def test_ingress_next_waits_for_pending_stage_update(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+let finishPatch;
+let patchFinished = false;
+const calls = [];
+const context = {
+  buttons: {},
+  console,
+  DOMParser: class {},
+  FacetsBox: class {},
+  FormData: class {
+    constructor(form) { this.form = form; }
+    append() {}
+  },
+  formatting: {},
+  Modal: class {},
+  primitives: {},
+  request: {
+    patch() {
+      calls.push("patch:start");
+      return new Promise((resolve) => {
+        finishPatch = () => {
+          patchFinished = true;
+          calls.push("patch:finish");
+          resolve({ ok: true });
+        };
+      });
+    },
+    async put() {
+      calls.push(`next:${patchFinished}`);
+      return { stage: "ASSIGN_COLUMNS" };
+    },
+  },
+  SelectBox: class {},
+  withTransition(callback) { return callback(); },
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/widgets/ingress.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class ImportData", "class ImportData");
+source += "\nglobalThis.ImportData = ImportData;";
+vm.runInContext(source, context);
+
+(async () => {
+const form = {};
+const stage = { querySelectorAll() { return []; } };
+const progress = {};
+const target = {
+  dataset: { stage: "CHOOSE_FORM" },
+  querySelector(selector) {
+    if (selector === "[data-role='stage']") return stage;
+    if (selector === "[data-role='progress']") return progress;
+    return null;
+  },
+};
+const widget = new context.ImportData({
+  endpoints: {
+    update() { return "/update"; },
+    next() { return "/next"; },
+  },
+  key: "ingress-key",
+  target,
+});
+widget.stageSettings = { target: form };
+widget._setStage = () => true;
+
+const change = widget._change({
+  target: { closest(selector) { return selector === "form" ? form : null; } },
+});
+const next = widget._next();
+await Promise.resolve();
+if (calls.includes("next:false")) {
+  throw new Error("Next raced the pending stage update");
+}
+
+finishPatch();
+await Promise.all([change, next]);
+if (calls.join(",") !== "patch:start,patch:finish,next:true") {
+  throw new Error(`Stage actions were not serialized: ${calls.join(",")}`);
+}
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
 
 
 # @pairs ingress:active-widget ingress:visibility ingress:subscription-lifecycle ingress:catch-up

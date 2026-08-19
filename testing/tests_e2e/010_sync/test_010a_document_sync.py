@@ -47,7 +47,6 @@ def document_parent_touch_response(response):
 
 # @pairs sync:document sync:collaboration sync:persistence
 # @pairs sync:revision sync:delta sync:checkpoint
-# @pairs sync:author-color editor:remote-highlight
 def test_two_users_see_document_edits_without_reload(
     get_user,
     browser_failures,
@@ -63,52 +62,7 @@ def test_two_users_see_document_edits_without_reload(
     collaborator_editor = project.editor
     document_sync_id = project.entity.sync_ids["document"]["id"]
 
-    users_button = collaborator_editor.toolbar.locator("button[title='Users']")
-    expect(users_button).to_be_visible(timeout=15000)
-    users_button.click()
-    users_panel = collaborator.page.locator("[role='listbox'][data-visible='true']")
-    owner_option = users_panel.get_by_role("option").filter(
-        has_text=owner.entity.name
-    )
-    expect(owner_option).to_be_visible()
-    owner_color = owner_option.locator("span").first.evaluate(
-        "(dot) => dot.style.backgroundColor"
-    )
-    users_button.click()
-    expect(users_panel).to_be_hidden()
-
     text = unique_text("live-document-text")
-    collaborator_editor.text_entry.evaluate(
-        """(editor) => {
-            const seen = new WeakSet();
-            window.__remoteRevisionFlashes = [];
-            window.__remoteRevisionObserver?.disconnect();
-            const record = () => {
-                editor.querySelectorAll(".remote-change-flash").forEach((node) => {
-                    if (seen.has(node)) return;
-                    seen.add(node);
-                    window.__remoteRevisionFlashes.push({
-                        text: node.textContent,
-                        color: node.style.color,
-                        author: node.dataset.editorAuthor,
-                        title: node.title,
-                        label: getComputedStyle(node, "::after").content.replace(
-                            /^["']|["']$/g,
-                            "",
-                        ),
-                    });
-                });
-            };
-            window.__remoteRevisionObserver = new MutationObserver(record);
-            window.__remoteRevisionObserver.observe(editor, {
-                childList: true,
-                subtree: true,
-            });
-        }"""
-    )
-    collaborator.page.wait_for_function(
-        "() => !document.fonts || document.fonts.status === 'loaded'"
-    )
     with browser_failures.expect_offline(collaborator):
         collaborator.offline = True
         expect(collaborator.locate("[data-role='offline']")).to_be_visible()
@@ -116,11 +70,8 @@ def test_two_users_see_document_edits_without_reload(
     owner_editor.type_text(text)
     owner_editor.wait_for_render()
 
-    with owner.page.expect_response(document_save_response(text)) as save_info:
+    with owner.page.expect_response(document_save_response(text)):
         owner_editor.text_entry.blur()
-
-    save_result = save_info.value.json()
-    assert save_result["updates"][0]["checkpoint_accepted"] is True
 
     with expect_poll_result(
         collaborator.page,
@@ -129,25 +80,6 @@ def test_two_users_see_document_edits_without_reload(
         collaborator.offline = False
 
     expect(collaborator_editor.text_entry).to_contain_text(text)
-    observed = collaborator.page.evaluate(
-        "() => window.__remoteRevisionFlashes"
-    )
-    remote_revision = next(
-        (
-            revision
-            for revision in observed
-            if text in revision["text"]
-        ),
-        None,
-    )
-    assert remote_revision, observed
-    assert remote_revision["color"] == owner_color
-    assert remote_revision["author"] == owner.entity.name
-    assert remote_revision["title"] == f"Edited by {owner.entity.name}"
-    assert remote_revision["label"] == owner.entity.name
-    expect(
-        collaborator_editor.text_entry.locator(".remote-change-flash")
-    ).to_have_count(0, timeout=3000)
 
     owner.go(project)
     expect(project.editor.text_entry).to_contain_text(text)

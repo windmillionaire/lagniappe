@@ -287,7 +287,6 @@ function _headlessKind(sync_id) {
 
 /**
  * @testable true
- * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_replay_does_not_duplicate_after_reload
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
  * @features sync
  * @dimensions headless-widget document offline-replay concurrency

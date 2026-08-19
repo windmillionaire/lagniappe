@@ -32,6 +32,7 @@ index.yaml
 *.pfx
 *credentials*.json
 *service-account*.json
+gha-creds-*.json
 
 # AI
 .cursorignore
