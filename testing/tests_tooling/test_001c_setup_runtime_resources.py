@@ -3690,7 +3690,7 @@ def test_setup_settings_mutation_flows(monkeypatch, capsys):
     assert provider_calls == [
         ("1234-demo.apps.googleusercontent.com", "oauth-secret")
     ]
-    admin_output = capsys.readouterr().out
+    admin_output = " ".join(capsys.readouterr().out.split())
     assert "Lagniappe runtime does" in admin_output
     assert "not need" in admin_output
     assert "delete the local JSON or move it to secure storage" in admin_output

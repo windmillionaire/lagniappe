@@ -605,9 +605,9 @@ Trusted local diagnosis may dispatch a bounded list of existing
 `testing/tests_e2e/` files or nodeids through `hosted-e2e execute --target`.
 The Cloud Run entry point validates that boundary again before constructing the
 pytest command. A plain execute and the GitHub workflow's default `all` choice
-run the normal unit, JavaScript, tooling, and E2E aliases in one job. The
-workflow retains only the fixed all/pilot/full choices; deliberately opt-in
-provider/setup markers remain excluded.
+run the unit, JavaScript, tooling, and E2E aliases in one job, including the
+setup drift and live-provider contracts while excluding unfinished tests. The
+workflow retains only the fixed all/full choices.
 
 The runner image excludes all `config/files/` content and mounts the canonical
 settings plus the optional managed Redis CA certificate from separate Secret

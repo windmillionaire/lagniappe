@@ -34,11 +34,11 @@ version receives the normal settings only through the trusted local App Engine
 deploy, the same boundary used by a production deploy.
 
 The runner installs the complete Python and Node development-test dependency
-sets, including the pinned provider clients required to collect the opt-in
-live-provider E2E module. The `setup_drift` and `setup_provider` probes remain
-marker-excluded from the normal `all` scope because they are deliberately
-operator-invoked contracts; installing their clients grants no provider
-authority beyond the runner service account's IAM roles.
+sets, including the pinned provider clients required for the live-provider E2E
+module. The default hosted `all` scope includes the `setup_drift` and
+`setup_provider` probes. These exercise only the authority available through
+the runner's configured runtime identity and keep their normal test-prefixed
+cleanup contracts.
 
 The version URL is not an open testing site. Only `/testing/health` and the
 bootstrap exchange are initially reachable. The exchange requires a Google ID
@@ -147,10 +147,11 @@ With the candidate environment ready, a plain execute runs every normal suite:
 venv/bin/python run.py hosted-e2e execute
 ```
 
-Use `--suite pilot` for the short infrastructure/login probe or `--suite full`
-for E2E alone. The default `all` scope expands to `unit`, `js`, `tooling`, and
-`e2e` in one pytest session. Explicit opt-in provider/setup markers remain
-outside it.
+Use `--suite full` for E2E alone. The default `all` scope expands to `unit`,
+`js`, `tooling`, and `e2e` in one pytest session. It overrides only the ordinary
+opt-in exclusions and therefore also runs the read-only setup drift probes and
+live provider contracts. Tests marked `unfinished` remain excluded. Ordinary
+local suite commands retain the marker exclusions from `testing/pytest.ini`.
 
 For trusted local diagnosis, run one or more real E2E files/nodeids without
 repeating the complete suite:
@@ -163,8 +164,8 @@ venv/bin/python run.py hosted-e2e execute \
 Repeat `--target` to run several cases in one leased pytest session. The job
 accepts only bounded, existing Python files beneath `testing/tests_e2e/`; it
 rejects pytest options, traversal, control characters, and argument-delimiter
-ambiguity. The GitHub workflow deliberately continues to expose only the
-fixed `all`, `pilot`, and `full` scopes.
+ambiguity. The GitHub workflow deliberately continues to expose only the fixed
+`all` and `full` scopes.
 
 Both commands execute the same `lagniappe-e2e` Cloud Run job used by CI. The
 hosted runner skips local Flask startup, local frontend rebuilding, and local
@@ -203,8 +204,9 @@ provider, and seven-day artifact bucket remain for reuse.
 ## Running From GitHub
 
 Dispatch `.github/workflows/hosted-e2e.yml` at the same Git ref used by
-`create`; its default `all` choice runs every normal suite in its single job.
-The diagnostic `pilot` and E2E-only `full` choices remain available. The
+`create`; its default `all` choice runs every complete suite, including the
+setup drift and live-provider contracts, in its single job. The E2E-only
+`full` choice remains available for diagnosis. The
 workflow reads the configured source from the job and refuses to execute if it
 differs from `github.sha`. It uses WIF only to describe and invoke that exact
 job; it has no project-wide Cloud Run viewer role and cannot read either

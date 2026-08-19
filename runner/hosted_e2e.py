@@ -1605,7 +1605,7 @@ def execute(*, suite="all", targets=(), import_results=False):
         raise HostedE2EError(
             "Focused targets require the hosted E2E focused suite."
         )
-    elif suite not in {"all", "pilot", "full"}:
+    elif suite not in {"all", "full"}:
         raise HostedE2EError(f"Unsupported hosted E2E suite {suite!r}.")
 
     _activate(adc=import_results)
@@ -2004,7 +2004,7 @@ def run_hosted_e2e_command(arguments):
     )
     execute_parser = commands.add_parser("execute", help="Run the Cloud Run E2E job.")
     execute_scope = execute_parser.add_mutually_exclusive_group()
-    execute_scope.add_argument("--suite", choices=("all", "pilot", "full"))
+    execute_scope.add_argument("--suite", choices=("all", "full"))
     execute_scope.add_argument(
         "--target",
         action="append",

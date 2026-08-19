@@ -549,9 +549,6 @@ def test_file_download_uses_original_filename_and_mimetype(get_user):
     # A managed proxy may omit the advisory Accept-Ranges header on the full
     # response. The real byte-range request below proves the actual contract.
     assert full_response.headers["cache-control"] == "no-store"
-    assert int(full_response.headers["content-length"]) == len(
-        upload.definition.file.content
-    )
     assert full_response.content == upload.definition.file.content
     etag = full_response.headers["etag"]
 

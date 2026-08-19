@@ -1965,10 +1965,10 @@ def test_set_application_defaults_refreshes_adc_login_after_quota_failure(monkey
         "Failed to set ADC quota project" in message for message in spinner.messages
     )
     assert any("quota project mismatch" in message for message in spinner.messages)
-    assert any(
+    messages = " ".join(" ".join(spinner.messages).split())
+    assert (
         "gcloud auth application-default login owner@example.com --project=project-1"
-        in message
-        for message in spinner.messages
+        in messages
     )
 
 
@@ -2008,10 +2008,10 @@ def test_set_application_defaults_exits_when_adc_login_refresh_fails(monkeypatch
     )
     assert any("Opening browser" in message for message in spinner.messages)
     assert any("ADC login did not complete" in message for message in spinner.messages)
-    assert any(
+    messages = " ".join(" ".join(spinner.messages).split())
+    assert (
         "gcloud auth application-default login owner@example.com --project=project-1"
-        in message
-        for message in spinner.messages
+        in messages
     )
 
 

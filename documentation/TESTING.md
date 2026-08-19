@@ -106,9 +106,11 @@ venv/bin/python run.py hosted-e2e status
 venv/bin/python run.py hosted-e2e teardown
 ```
 
-The default `all` scope runs every ordinary suite; `pilot`, E2E-only `full`, and
-trusted local focused dispatch remain available. Execution does not change
-local evidence. A local or CI-triggered run is imported explicitly with
+The default `all` scope runs every complete suite, including the opt-in setup
+drift and live-provider contracts while still excluding `unfinished`;
+E2E-only `full` and trusted local focused dispatch remain available. Execution
+does not change local evidence. A local or CI-triggered run is imported
+explicitly with
 `results --latest` from the same candidate commit. Evidence import is a manual
 release step and the reviewed manifest becomes an ordinary follow-up commit;
 the workflow has no repository write permission. See

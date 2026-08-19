@@ -27,6 +27,7 @@ class PermissionsForm:
             form if form is not None else user.locate(f"form[data-key='{group.key}']")
         )
         expect(self.form).to_be_visible()
+        expect(self.form).to_have_attribute("initialized", "")
         expect(self.form).to_have_attribute("rendered", "")
         self.group = group
         self.user = user

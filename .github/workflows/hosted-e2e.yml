@@ -10,7 +10,6 @@ on:
         type: choice
         options:
           - all
-          - pilot
           - full
 
 permissions:

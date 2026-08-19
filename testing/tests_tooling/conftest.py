@@ -1,9 +1,20 @@
 """Tooling test safeguards."""
 
 import builtins
+import os
 from pathlib import Path
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def tooling_tests_use_local_runner_environment(monkeypatch):
+    """Keep local runner contracts independent of a hosted job's envelope."""
+    for name in tuple(os.environ):
+        if name == "LAGNIAPPE_HOSTED_E2E" or name.startswith(
+            "LAGNIAPPE_HOSTED_E2E_"
+        ):
+            monkeypatch.delenv(name, raising=False)
 
 
 @pytest.fixture(autouse=True)

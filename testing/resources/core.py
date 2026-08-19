@@ -88,7 +88,7 @@ class SiteResource:
 
     @property
     def url(self):
-        return f"{self._url_prefix}/{self.url_suffix}"
+        return f"{self._url_prefix.rstrip('/')}/{self.url_suffix.lstrip('/')}"
 
     @property
     def title(self):

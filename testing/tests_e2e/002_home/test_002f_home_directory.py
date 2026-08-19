@@ -174,8 +174,12 @@ def test_analytics_dashboard_owner_filter_and_retention_clear(
         "Retention Recent", datetime.now(timezone.utc) - timedelta(days=1)
     )
 
-    with visitor.page.expect_response("**/analytics/track"):
-        visitor.go(SitePages.HOME)
+    # Activity details intentionally show only the four most active visitors.
+    # Establish this visitor as a visible member of that bounded summary even
+    # after the earlier full-suite home stories have produced their own events.
+    for _visit in range(5):
+        with visitor.page.expect_response("**/analytics/track"):
+            visitor.go(SitePages.HOME)
     analytics_url = f"{SETTINGS.test_config['BASE_URL']}/analytics/"
     with browser_failures.expect_http_error(
         visitor,

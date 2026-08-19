@@ -39,7 +39,7 @@ from playwright.sync_api import expect
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from testing.utility import expect_successful_response
-from testing.utility.local_time import local_date_iso
+from testing.utility.local_time import local_date_iso, local_date_plus_days_iso
 from ..elements import DateSelect, SpinnerButtons
 from .core import SiteResource
 
@@ -53,6 +53,9 @@ def _resolve_due_date(due_date_enum):
 
     if definition.due_date:
         return definition.due_date
+
+    if definition.days_from_today is not None:
+        return local_date_plus_days_iso(definition.days_from_today)
 
     from testing.definitions.due_date_definitions import DueDateOptions
 

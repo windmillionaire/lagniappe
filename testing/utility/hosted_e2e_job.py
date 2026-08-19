@@ -19,12 +19,6 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 REPORT_ROOT = REPOSITORY_ROOT / "reports"
 HOSTED_REPORT_ROOT = REPORT_ROOT / "hosted-e2e"
 EVIDENCE_PATH = REPOSITORY_ROOT / "testing/evidence/latest.json"
-PILOT_TARGETS = (
-    "testing/tests_e2e/001_site/test_001a_environment.py::test_database_setup",
-    "testing/tests_e2e/001_site/test_001a_environment.py::test_cache_setup",
-    "testing/tests_e2e/001_site/test_001a_environment.py::test_storage_setup",
-    "testing/tests_e2e/001_site/test_001b_login.py::test_user_login_success",
-)
 MAX_FOCUSED_TARGETS = 50
 
 
@@ -86,21 +80,25 @@ def validate_focused_targets(targets) -> tuple[str, ...]:
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract
 # @features hosted-e2e
 # @dimensions focused-execution target-validation argument-injection
 def _pytest_command(suite: str, targets=()) -> list[str]:
     if suite == "all":
         if targets:
             raise RuntimeError("All hosted tests do not accept focused targets.")
-        pytest_targets = ["unit", "js", "tooling", "e2e"]
+        pytest_targets = [
+            "unit",
+            "js",
+            "tooling",
+            "e2e",
+            "-m",
+            "not unfinished",
+        ]
     elif suite == "full":
         if targets:
             raise RuntimeError("Full hosted E2E does not accept focused targets.")
         pytest_targets = ["e2e"]
-    elif suite == "pilot":
-        if targets:
-            raise RuntimeError("Pilot hosted E2E does not accept focused targets.")
-        pytest_targets = list(PILOT_TARGETS)
     elif suite == "focused":
         pytest_targets = list(validate_focused_targets(targets))
     else:
@@ -212,7 +210,7 @@ def main(arguments=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--suite",
-        choices=("all", "pilot", "full", "focused"),
+        choices=("all", "full", "focused"),
         default="all",
     )
     parser.add_argument("--target", action="append", default=[])

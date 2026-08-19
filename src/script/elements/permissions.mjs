@@ -84,6 +84,7 @@ const addSpecificPermission = (config, entry = {}) => {
  * @testable true
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
+ * @tests tests_e2e/008_users/test_008b_user_groups.py::test_rename_group
  * @tests tests_js/test_028_form_state_split.py::test_permissions_form_does_not_rebuild_for_visibility_only_reconciliation
  * @tests tests_js/test_028_form_state_split.py::test_permissions_form_serializes_overlapping_section_rebuilds
  * @tests tests_js/test_028_form_state_split.py::test_permissions_form_preserves_unsaved_values_during_background_update
@@ -114,6 +115,8 @@ export class PermissionsForm extends FormElement {
 		await this.form.init();
 		this.setVisibility();
 		this.commitRevisionBaseline();
+		this.initialized = true;
+		this.target.setAttribute("initialized", "");
 	}
 
 	async updated(response) {

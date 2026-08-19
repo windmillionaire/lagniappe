@@ -317,7 +317,7 @@ def test_hosted_result_stamps_remote_provenance(tmp_path, monkeypatch):
         "source_snapshot": "b" * 64,
         "build_id": "b1234567",
         "version": "e2e-abcdef1234567890",
-        "suite": "pilot",
+        "suite": "all",
     }
 
     hosted_e2e_job._stamp_evidence(manifest)
@@ -352,7 +352,7 @@ def test_hosted_focused_targets_require_existing_e2e_nodeids():
             hosted_e2e_job.validate_focused_targets([invalid])
 
 
-def test_hosted_all_scope_runs_every_normal_suite():
+def test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract():
     command = hosted_e2e_job._pytest_command("all")
 
     assert command[command.index("--strict") + 1 : -1] == [
@@ -360,6 +360,8 @@ def test_hosted_all_scope_runs_every_normal_suite():
         "js",
         "tooling",
         "e2e",
+        "-m",
+        "not unfinished",
     ]
     with pytest.raises(RuntimeError):
         hosted_e2e_job._pytest_command("all", ["testing/tests_unit/"])
@@ -587,6 +589,7 @@ def test_hosted_image_upload_boundary_excludes_local_credentials_and_results():
     ignore_lines = {line for line in all_lines if not line.startswith("#")}
 
     assert not any(line.startswith("#!include:") for line in all_lines)
+    assert ".gcloudignore" not in ignore_lines
     assert "testing/" not in ignore_lines
     assert "/testing/" not in ignore_lines
     assert {
@@ -663,7 +666,7 @@ def test_hosted_workflow_is_manual_and_repository_read_only():
                     "required": "true",
                     "default": "all",
                     "type": "choice",
-                    "options": ["all", "pilot", "full"],
+                    "options": ["all", "full"],
                 }
             }
         }
