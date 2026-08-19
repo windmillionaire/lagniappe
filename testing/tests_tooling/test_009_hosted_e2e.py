@@ -1103,7 +1103,7 @@ def test_hosted_app_resume_requires_exact_deployment_metadata(monkeypatch):
 
 
 # @features hosted-e2e
-# @dimensions authentication static-assets performance zero-traffic deployment-binding
+# @dimensions authentication static-assets performance zero-traffic deployment-binding deterministic-topology
 def test_hosted_descriptor_preserves_native_static_handlers():
     infrastructure = _infrastructure()
 
@@ -1144,7 +1144,13 @@ def test_hosted_descriptor_preserves_native_static_handlers():
         "secure": "always",
         "redirect_http_response_code": 301,
     }
-    assert descriptor["automatic_scaling"]["min_idle_instances"] == 0
+    assert descriptor["entrypoint"] == "gunicorn -t 3600 -w 4 -b :$PORT main:app"
+    assert descriptor["instance_class"] == "B2"
+    assert descriptor["basic_scaling"] == {
+        "max_instances": 1,
+        "idle_timeout": "15m",
+    }
+    assert "automatic_scaling" not in descriptor
     assert descriptor["env_variables"]["LAGNIAPPE_HOSTED_E2E_ROLE"] == "server"
     assert descriptor["env_variables"][
         "LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT"

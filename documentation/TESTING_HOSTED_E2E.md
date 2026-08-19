@@ -138,8 +138,13 @@ the operator checkout therefore cannot change either artifact. The App Engine
 export receives the canonical runtime settings through the same trusted local
 deployment boundary; the runner image still excludes them and receives its
 settings only from Secret Manager. Both artifacts and browser assets use the
-committed build ID. The version permits zero idle instances and receives no
-service traffic.
+committed build ID. The version receives no service traffic and uses one
+basic-scaled `B2` instance with four Gunicorn workers. This keeps multi-worker
+request behavior without allowing App Engine to introduce an unwarmed second
+instance in the middle of a suite. The create-time health validation absorbs
+the initial cold start; if the instance expires after its 15-minute idle
+timeout, execution's health validation warms it again before the data lease or
+pytest session begins.
 Because gcloud treats the active root `.gcloudignore` as upload metadata, the
 runner-image build carries an exact derived copy from the committed export and
 restores it inside the container. Repository-health tests therefore inspect the

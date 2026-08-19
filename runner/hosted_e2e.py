@@ -973,7 +973,7 @@ def _verify_soft_routing_guard(infrastructure):
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_descriptor_preserves_native_static_handlers
 # @features hosted-e2e
-# @dimensions authentication static-assets performance zero-traffic deployment-binding
+# @dimensions authentication static-assets performance zero-traffic deployment-binding deterministic-topology
 def _hosted_app_descriptor(
     infrastructure,
     *,
@@ -1020,9 +1020,9 @@ def _hosted_app_descriptor(
         "runtime": "python314",
         "service": SERVICE,
         "service_account": infrastructure.runtime_email,
-        "entrypoint": "gunicorn -t 3600 -w 3 -b :$PORT main:app",
-        "instance_class": "F2",
-        "automatic_scaling": {"max_instances": 2, "min_idle_instances": 0},
+        "entrypoint": "gunicorn -t 3600 -w 4 -b :$PORT main:app",
+        "instance_class": "B2",
+        "basic_scaling": {"max_instances": 1, "idle_timeout": "15m"},
         # Static build artifacts contain no application or test data. Keep them
         # on App Engine's native static path so isolated browser contexts do not
         # serialize thousands of chunk requests through the Gunicorn workers.

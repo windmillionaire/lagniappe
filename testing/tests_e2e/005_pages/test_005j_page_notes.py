@@ -39,6 +39,18 @@ def _page_note(user, body):
     ).first
 
 
+def _go_with_page_notes(user, page):
+    notes_path = f"/pages/{page.key}/notes"
+    with user.page.expect_response(
+        lambda response: response.ok
+        and response.request.method == "GET"
+        and urlsplit(response.url).path == notes_path,
+        timeout=5000,
+    ):
+        user.go(page)
+    return page
+
+
 def _open_note_composer(user):
     user.page.get_by_role("button", name="Page actions").click()
     menu = user.page.get_by_role("menu", name="Page actions")
@@ -79,8 +91,8 @@ def test_page_notes_visibility_and_title_menu(get_user, browser_failures):
     _save_page_note(page, owner, private_body)
 
     viewer = get_user(Users.page_acl_one_visible)
-    viewer.go(page)
-    expect(_page_note(viewer, shared_body)).to_be_visible(timeout=15000)
+    _go_with_page_notes(viewer, page)
+    expect(_page_note(viewer, shared_body)).to_be_visible()
     expect(_page_note(viewer, shared_body).locator(Buttons.LP_DELETE)).not_to_be_attached()
     expect(_page_note(viewer, private_body)).not_to_be_attached()
     viewer.page.get_by_role("button", name="Page actions").click()
@@ -90,9 +102,9 @@ def test_page_notes_visibility_and_title_menu(get_user, browser_failures):
     expect(viewer_menu.get_by_role("menuitem", name="Add note")).not_to_be_attached()
     expect(viewer_menu.get_by_role("menuitem", name="Delete")).not_to_be_attached()
 
-    owner.go(page)
-    expect(_page_note(owner, shared_body)).to_be_visible(timeout=15000)
-    expect(_page_note(owner, private_body)).to_be_visible(timeout=15000)
+    _go_with_page_notes(owner, page)
+    expect(_page_note(owner, shared_body)).to_be_visible()
+    expect(_page_note(owner, private_body)).to_be_visible()
 
     composer = _open_note_composer(owner)
     header = owner.locate("[data-nav='view']")
@@ -129,14 +141,12 @@ def test_page_notes_visibility_and_title_menu(get_user, browser_failures):
 # @style note.section
 def test_page_note_text_photo_and_delete_modal(get_user, browser_failures):
     owner = get_user(Users.OWNER)
-    page = owner.go(Pages.test_create_page)
+    page = Pages.test_create_page.get(owner)
+    _go_with_page_notes(owner, page)
     body = _unique("Page text and photo note")
     notes_section = owner.locate("#page-notes")
-    note_list = notes_section.locator("[data-widget='BaseList']")
-    # The empty section is already hidden before its asynchronous collection
-    # arrives.  Wait for that protocol milestone before asserting the visible
-    # empty-state story, especially on a cold hosted instance.
-    expect(note_list).to_have_attribute("loaded", "", timeout=15000)
+    # The successful collection response is the boundary that distinguishes
+    # the rendered empty state from the initially hidden placeholder.
     expect(notes_section).to_be_hidden()
 
     composer = _open_note_composer(owner)

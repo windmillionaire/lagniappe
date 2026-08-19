@@ -620,6 +620,11 @@ the ignored local development-settings file is never uploaded. The existing
 fixtures, direct backend calls, cleanup, strict relation checks, and evidence
 plugin are otherwise unchanged. Local `execute` and
 `.github/workflows/hosted-e2e.yml` invoke the same Cloud Run job.
+The temporary App Engine version is a single basic-scaled `B2` instance with
+four Gunicorn workers. Its health validation completes the one allowed cold
+start before pytest begins, while the worker pool still exercises concurrent
+application processes without an automatic scale-out loading request during a
+test.
 The image build also restores the committed root `.gcloudignore` from an exact
 derived copy because gcloud omits its active ignore metadata from the submitted
 context; hosted repository-health checks therefore see the canonical deploy
