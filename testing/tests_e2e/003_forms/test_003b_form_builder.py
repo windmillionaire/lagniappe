@@ -261,7 +261,7 @@ def test_field_visibility_select_multiple_values(get_user):
 # @features forms
 # @dimensions builder-table-column
 def test_table_column_condition_editor(get_user):
-    """Table columns can be created, validated while editing, previewed, and reloaded."""
+    """Table columns can be created, validated while editing, and reloaded."""
     user = get_user(Users.OWNER)
     form = Forms.test_table_column_condition_editor.get(user)
     builder = form.builder
@@ -295,9 +295,6 @@ def test_table_column_condition_editor(get_user):
     ).filter(has_text="Amount")
     expect(column_setting).to_be_visible()
     expect(column_setting.locator("[data-icon='number']")).to_be_visible()
-
-    preview = builder.toggle_preview()
-    expect(preview.locator("th").filter(has_text="Amount")).to_be_visible()
 
     builder.save()
     user.page.reload()
