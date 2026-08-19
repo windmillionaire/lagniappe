@@ -424,9 +424,15 @@ would prevent a new conversation. That submitted conversation remains the
 server-validated authorization boundary. Per-message delete and confirmed
 conversation clear hide only the current participant's copy. Deleted peers
 retain their name/history but do not expose a reply form. Post-send and
-post-reply refreshes auto-open their conversation only while no newer explicit
-peer selection has occurred, so a slower automatic history response cannot
-replace the conversation the user just chose.
+post-reply refreshes always update the conversation list. A modal send opens
+its conversation only when the page had no active conversation, refreshes the
+history when it targeted the active peer, and otherwise preserves the current
+thread. Incoming polling likewise refreshes the current thread and unread list
+state without selecting another peer. Only a desktop conversation row or
+mobile peer option changes an established selection. Selection revisions reject
+older history responses, and list revisions reject older list responses, so a
+slower automatic response cannot replace the conversation or list state chosen
+by a newer user action.
 
 Home does not use the composite collection subscription for current clients.
 Server-rendered Notes is marked loaded and owns `home-notes`; Tasks retains its

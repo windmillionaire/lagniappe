@@ -369,7 +369,8 @@ if (!prevented || actions[0]?.[0] !== "compose" || actions[0]?.[1] !== menu.view
 
 # @pairs messaging:read-race messaging:clear-confirmation messaging:inline-reply
 # @pair messaging:responsive-peer-selector
-# @pair messaging:selection-race
+# @pairs messaging:selection-race messaging:preserve-selection
+# @pair messaging:list-race
 # @pairs messaging:polling-revision messaging:active-polling
 # @source src/script/views/messages.mjs::Messages
 def test_messages_view_refreshes_read_races_and_uses_delete_modal(run_node):
@@ -480,8 +481,97 @@ if (
   throw new Error(`changed message polling did not refresh and boost: ${JSON.stringify(calls)}`);
 }
 
+const raceView = Object.create(context.Messages.prototype);
+raceView.current = { id: "conversation-a", peer: { name: "Peer A" } };
+raceView.preferredConversation = "conversation-a";
+raceView.conversationSelectionRevision = 0;
+raceView.conversations = new Map([
+  ["conversation-a", raceView.current],
+  ["conversation-b", { id: "conversation-b", peer: { name: "Peer B" } }],
+]);
+raceView.PollingCoordinator = pollingView.PollingCoordinator;
+let pendingLoads = [];
+let raceOpens = [];
+raceView.loadConversations = () => new Promise((resolve) => pendingLoads.push(resolve));
+raceView.openConversation = async (key, options) => {
+  raceOpens.push([key, options]);
+  raceView.current = raceView.conversations.get(key);
+  raceView.preferredConversation = key;
+  return true;
+};
+
+const sentToOtherConversation = raceView.handleMessageSent({
+  conversation: { id: "conversation-b" },
+});
+const pollWhileSending = raceView._refreshMessages();
+pendingLoads.shift()();
+await sentToOtherConversation;
+pendingLoads.shift()();
+await pollWhileSending;
+if (
+  raceOpens.length !== 1 ||
+  raceOpens[0][0] !== "conversation-a" ||
+  raceView.preferredConversation !== "conversation-a"
+) {
+  throw new Error(`composing to another peer changed the active conversation: ${JSON.stringify(raceOpens)}`);
+}
+
+raceView.current = raceView.conversations.get("conversation-a");
+raceView.preferredConversation = "conversation-a";
+raceView.conversationSelectionRevision = 0;
+pendingLoads = [];
+raceOpens = [];
+const sentToActiveConversation = raceView.handleMessageSent({
+  conversation: { id: "conversation-a" },
+});
+pendingLoads.shift()();
+await sentToActiveConversation;
+if (raceOpens.length !== 1 || raceOpens[0][0] !== "conversation-a") {
+  throw new Error(`composing to the active peer did not refresh its history: ${JSON.stringify(raceOpens)}`);
+}
+
+raceView.current = null;
+raceView.preferredConversation = null;
+raceView.conversationSelectionRevision = 0;
+pendingLoads = [];
+raceOpens = [];
+const firstSentConversation = raceView.handleMessageSent({
+  conversation: { id: "conversation-b" },
+});
+const firstConversationPoll = raceView._refreshMessages();
+pendingLoads.shift()();
+await firstSentConversation;
+pendingLoads.shift()();
+await firstConversationPoll;
+if (
+  raceOpens.length !== 2 ||
+  raceOpens.some(
+    ([key, options]) =>
+      key !== "conversation-b" || options?.selectionRevision !== 1,
+  )
+) {
+  throw new Error(`the first sent conversation did not become active: ${JSON.stringify(raceOpens)}`);
+}
+
+raceView.current = raceView.conversations.get("conversation-a");
+raceView.preferredConversation = "conversation-a";
+raceView.conversationSelectionRevision = 0;
+pendingLoads = [];
+raceOpens = [];
+const stalePoll = raceView._refreshMessages();
+const explicitRevision = raceView._beginConversationSelection("conversation-b");
+pendingLoads.shift()();
+await stalePoll;
+await raceView.openConversation("conversation-b", {
+  selectionRevision: explicitRevision,
+});
+if (raceOpens.length !== 1 || raceOpens[0][0] !== "conversation-b") {
+  throw new Error(`an older poll replaced an explicit peer selection: ${JSON.stringify(raceOpens)}`);
+}
+
 const view = Object.create(context.Messages.prototype);
 view.current = { id: "conversation-a", revision: 7 };
+view.conversationSelectionRevision = 0;
 view.conversations = new Map([["conversation-a", view.current]]);
 view.openConversation = async (key) => calls.push(["refresh", key]);
 view.renderConversations = () => calls.push(["render"]);
@@ -623,6 +713,38 @@ resolveHistory({
 if ((await staleOpen) !== false || staleView.current !== null) {
   throw new Error("stale automatic conversation selection replaced the user choice");
 }
+
+const listView = Object.create(context.Messages.prototype);
+listView.conversationListRevision = 0;
+listView.conversationCursor = null;
+listView.conversations = new Map();
+const listRenders = [];
+listView.renderConversations = () => listRenders.push([...listView.conversations.keys()]);
+const listResolvers = [];
+context.request.get = async () =>
+  new Promise((resolve) => listResolvers.push(resolve));
+const olderList = listView.loadConversations();
+const newerList = listView.loadConversations();
+listResolvers[1]({
+  ok: true,
+  conversations: [{ id: "conversation-new" }],
+  cursor: null,
+});
+await newerList;
+listResolvers[0]({
+  ok: true,
+  conversations: [{ id: "conversation-old" }],
+  cursor: null,
+});
+await olderList;
+if (
+  JSON.stringify([...listView.conversations.keys()]) !==
+    JSON.stringify(["conversation-new"]) ||
+  JSON.stringify(listRenders) !== JSON.stringify([["conversation-new"]])
+) {
+  throw new Error(`an older conversation list replaced a newer one: ${JSON.stringify(listRenders)}`);
+}
+
 view.conversationStorageKey = "messages-user-a-active";
 view.rememberConversation("conversation-b");
 if (

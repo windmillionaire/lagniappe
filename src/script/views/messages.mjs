@@ -14,7 +14,8 @@ const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
  * @pairs messaging:read-race messaging:clear-confirmation messaging:inline-reply
  * @pairs messaging:responsive-peer-selector messaging:reply-permission
- * @pair messaging:selection-race
+ * @pairs messaging:selection-race messaging:preserve-selection
+ * @pairs messaging:list-race messaging:unread-peer
  * @pairs messaging:polling-revision messaging:active-polling
  */
 export default class Messages extends Core {
@@ -78,6 +79,7 @@ export default class Messages extends Core {
 		this.replySpinner = this.replySubmit.querySelector("[data-role='icon']");
 		this.current = null;
 		this.conversationSelectionRevision = 0;
+		this.conversationListRevision = 0;
 		this.conversationCursor = null;
 		this.messageCursor = null;
 		this.conversations = new Map();
@@ -94,22 +96,16 @@ export default class Messages extends Core {
 		);
 		if (composeButton) {
 			this.composer = ensureMessageComposer(this, {
-				onSent: async (response) => {
-					const selectionRevision = this.conversationSelectionRevision;
-					this._boostMessagePolling();
-					await this.loadConversations();
-					if (selectionRevision !== this.conversationSelectionRevision) return;
-					await this.openConversation(response.conversation.id, {
-						selectionRevision,
-					});
-				},
+				onSent: (response) => this.handleMessageSent(response),
 			});
 			composeButton.addEventListener("click", () => this.composer.open());
 		}
 		this.list.addEventListener("click", (event) => {
 			const button = event.target.closest("[data-conversation]");
 			if (button) {
-				const selectionRevision = ++this.conversationSelectionRevision;
+				const selectionRevision = this._beginConversationSelection(
+					button.dataset.conversation,
+				);
 				void this.openConversation(button.dataset.conversation, {
 					selectionRevision,
 				});
@@ -194,8 +190,10 @@ export default class Messages extends Core {
 
 	/** @testable infrastructure */
 	async _refreshMessages() {
-		const active = this.current?.id || this.preferredConversation;
+		const selectionRevision = this.conversationSelectionRevision;
+		const active = this.preferredConversation || this.current?.id;
 		await this.loadConversations();
+		if (selectionRevision !== this.conversationSelectionRevision) return false;
 		if (
 			Array.from(this.conversations.values()).some(
 				(conversation) => conversation.unread,
@@ -210,7 +208,9 @@ export default class Messages extends Core {
 			)?.id ||
 			this.conversations.values().next().value?.id ||
 			null;
-		if (candidate) return this.openConversation(candidate);
+		if (candidate) {
+			return this.openConversation(candidate, { selectionRevision });
+		}
 
 		this.current = null;
 		this.messageCursor = null;
@@ -220,6 +220,26 @@ export default class Messages extends Core {
 		this.rememberConversation(null);
 		this.renderConversationSelector();
 		return false;
+	}
+
+	/** @testable infrastructure */
+	_beginConversationSelection(key) {
+		this.preferredConversation = key || null;
+		return ++this.conversationSelectionRevision;
+	}
+
+	/** @testable infrastructure */
+	async handleMessageSent(response) {
+		const conversation = response.conversation.id;
+		const active = this.current?.id || null;
+		const selectionRevision = active
+			? this.conversationSelectionRevision
+			: this._beginConversationSelection(conversation);
+		this._boostMessagePolling();
+		await this.loadConversations();
+		if (selectionRevision !== this.conversationSelectionRevision) return false;
+		if (active && active !== conversation) return true;
+		return this.openConversation(conversation, { selectionRevision });
 	}
 
 	/**
@@ -257,6 +277,7 @@ export default class Messages extends Core {
 
 	/** @testable infrastructure */
 	async loadConversations({ append = false } = {}) {
+		const listRevision = ++this.conversationListRevision;
 		const params =
 			append && this.conversationCursor
 				? { cursor: this.conversationCursor }
@@ -266,6 +287,7 @@ export default class Messages extends Core {
 			params,
 		);
 		if (!response?.ok) return;
+		if (listRevision !== this.conversationListRevision) return;
 		if (!append) this.conversations.clear();
 		for (const conversation of response.conversations || []) {
 			this.conversations.set(conversation.id, conversation);
@@ -378,7 +400,9 @@ export default class Messages extends Core {
 					conversation.unread ? ` (${conversation.unread} unread)` : ""
 				}`,
 				onClick: () => {
-					const selectionRevision = ++this.conversationSelectionRevision;
+					const selectionRevision = this._beginConversationSelection(
+						conversation.id,
+					);
 					return this.openConversation(conversation.id, {
 						selectionRevision,
 					});
@@ -416,7 +440,12 @@ export default class Messages extends Core {
 		if (this.mobile && !this.conversationDropdown) {
 			await this._ensureConversationDropdown();
 		}
-		if (this.current.unread) await this.markRead();
+		if (this.current.unread) {
+			await this.markRead({
+				selectionRevision:
+					selectionRevision ?? this.conversationSelectionRevision,
+			});
+		}
 		return true;
 	}
 
@@ -522,13 +551,21 @@ export default class Messages extends Core {
 	/** @testable infrastructure */
 	async loadHistory({ prepend = false } = {}) {
 		if (!this.current) return;
+		const conversation = this.current.id;
+		const selectionRevision = this.conversationSelectionRevision;
 		const params =
 			prepend && this.messageCursor ? { cursor: this.messageCursor } : null;
 		const response = await request.get(
-			ENDPOINTS.messages.history(this.current.id),
+			ENDPOINTS.messages.history(conversation),
 			params,
 		);
 		if (!response?.ok) return;
+		if (
+			selectionRevision !== this.conversationSelectionRevision ||
+			this.current?.id !== conversation
+		) {
+			return;
+		}
 		this.messageCursor = response.cursor || null;
 		this.renderMessages(response.messages || [], { prepend });
 	}
@@ -538,15 +575,30 @@ export default class Messages extends Core {
 	 * @covered-by src/script/views/messages.mjs::Messages
 	 * @reason stale revision refresh is exercised through the view contract
 	 */
-	async markRead() {
+	async markRead({
+		selectionRevision = this.conversationSelectionRevision,
+	} = {}) {
+		const conversation = this.current;
+		if (!conversation) return;
 		const data = new FormData();
-		data.set("revision", String(this.current.revision));
+		data.set("revision", String(conversation.revision));
 		const response = await request.post(
-			ENDPOINTS.messages.read(this.current.id),
+			ENDPOINTS.messages.read(conversation.id),
 			data,
 		);
+		if (
+			selectionRevision !== this.conversationSelectionRevision ||
+			this.current?.id !== conversation.id
+		) {
+			if (response?.conversation) {
+				this.conversations.set(conversation.id, response.conversation);
+			}
+			return;
+		}
 		if (!response?.ok) {
-			if (response?.conversation) await this.openConversation(this.current.id);
+			if (response?.conversation) {
+				await this.openConversation(conversation.id, { selectionRevision });
+			}
 			return;
 		}
 		this.current = response.conversation;
@@ -567,6 +619,7 @@ export default class Messages extends Core {
 		}
 		this.conversations.delete(change.key);
 		let replacement = null;
+		let selectionRevision = null;
 		if (this.current?.id === change.key) {
 			this.current = null;
 			this.messageCursor = null;
@@ -574,10 +627,13 @@ export default class Messages extends Core {
 			this.header.textContent = "Choose a conversation";
 			this.renderReply();
 			replacement = this.conversations.values().next().value?.id || null;
+			selectionRevision = this._beginConversationSelection(replacement);
 			this.rememberConversation(replacement);
 		}
 		this.renderConversations();
-		return replacement ? this.openConversation(replacement) : Promise.resolve();
+		return replacement
+			? this.openConversation(replacement, { selectionRevision })
+			: Promise.resolve();
 	}
 
 	destroy() {

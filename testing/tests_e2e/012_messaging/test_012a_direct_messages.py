@@ -74,10 +74,6 @@ def _send_from_modal(user, recipient, body):
     response = response_info.value
     assert response.status == 201
     expect(dialog).to_be_hidden()
-    expect(user.locate("[data-role='message-history']")).to_contain_text(
-        body,
-        timeout=15000,
-    )
     return response.json()
 
 
@@ -422,7 +418,8 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
 
 
 # @pairs messaging:responsive-peer-selector messaging:inline-reply
-# @pair messaging:selection-race
+# @pairs messaging:selection-race messaging:preserve-selection
+# @pair messaging:unread-peer
 # @source src/script/views/messages.mjs::Messages
 def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
     owner = get_user(Users.OWNER)
@@ -439,6 +436,8 @@ def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
     _send_from_modal(user, peer, peer_body)
     view = empty_view
 
+    expect(view.locator("[data-role='message-history']")).to_contain_text(peer_body)
+
     selector = view.locator("[data-role='conversation-selector']")
     expect(selector).to_be_visible()
     expect(selector).to_have_attribute("role", "combobox")
@@ -446,13 +445,39 @@ def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
     expect(selector).to_contain_text(peer.name)
     expect(view.locator("select[data-role='conversation-selector']")).to_have_count(0)
 
-    _send_from_modal(user, other_peer, f"Other mobile selector {uuid4().hex}")
+    other_body = f"Other mobile selector {uuid4().hex}"
+    _send_from_modal(user, other_peer, other_body)
+    expect(selector).to_contain_text(peer.name)
+    expect(view.locator("[data-role='message-history']")).to_contain_text(peer_body)
+    expect(view.locator("[data-role='message-history']")).not_to_contain_text(
+        other_body
+    )
+
+    Dropdown(selector).select_by_name(other_peer.name)
+    expect(view.locator("[data-role='message-history']")).to_contain_text(other_body)
+    expect(selector).to_contain_text(other_peer.name)
     Dropdown(selector).select_by_name(peer.name)
     expect(view.locator("[data-role='message-history']")).to_contain_text(
         peer_body,
         timeout=15000,
     )
     expect(selector).to_contain_text(peer.name)
+
+    _go_messages(other_peer)
+    incoming_other = f"Incoming other peer {uuid4().hex}"
+    _send_from_modal(other_peer, user, incoming_other)
+    expect(selector).to_contain_text(peer.name)
+    expect(view.locator("[data-role='message-history']")).to_contain_text(peer_body)
+    expect(view.locator("[data-role='message-history']")).not_to_contain_text(
+        incoming_other
+    )
+    selector_dropdown = Dropdown(selector)
+    selector_panel = selector_dropdown.open()
+    other_option = selector_panel.get_by_role("option").filter(has_text=other_peer.name)
+    expect(other_option).to_contain_text("1 unread", timeout=15000)
+    selector.press("Escape")
+    expect(selector_panel).to_be_hidden()
+
     view = _go_messages(user)
     selector = view.locator("[data-role='conversation-selector']")
     expect(selector).to_contain_text(peer.name)
