@@ -1,6 +1,7 @@
 """Tooling tests for setup runtime, package, and resource helpers."""
 
 import builtins
+from contextlib import nullcontext
 import importlib.util
 import json
 from pathlib import Path
@@ -134,9 +135,25 @@ def _load_config_constants():
     return module
 
 
+def _isolate_cli_routing_prerequisites(monkeypatch):
+    """Keep command-routing tests independent of the host setup envelope."""
+    import installer as setup_pkg
+    from installer import package_install, state
+
+    monkeypatch.setattr(setup_pkg, "verify_setup_runtime", lambda: None)
+    monkeypatch.setattr(package_install, "ensure_pip_is_available", lambda: None)
+    monkeypatch.setattr(package_install, "ensure_setup_dependencies", lambda: None)
+    monkeypatch.setattr(
+        state,
+        "setup_operation",
+        lambda *_args, **_kwargs: nullcontext(),
+    )
+
+
 def test_deferred_jobs_cli_verifies_installation_before_provisioning(monkeypatch):
     from runner import gcloud as runner_gcloud
 
+    _isolate_cli_routing_prerequisites(monkeypatch)
     events = []
     verify_module = types.ModuleType("installer.verify")
     verify_module.prepare_existing_installation = lambda: events.append("verify")
@@ -164,6 +181,7 @@ def test_deferred_jobs_cli_verifies_installation_before_provisioning(monkeypatch
 def test_security_cli_routes_to_security_configuration(monkeypatch):
     from runner import gcloud as runner_gcloud
 
+    _isolate_cli_routing_prerequisites(monkeypatch)
     events = []
     security_module = types.ModuleType("installer.security")
     security_module.configure_security = lambda: events.append("security") or 0
@@ -186,6 +204,7 @@ def test_security_cli_routes_to_security_configuration(monkeypatch):
 def test_development_cli_routes_to_development_setup(monkeypatch):
     from runner import gcloud as runner_gcloud
 
+    _isolate_cli_routing_prerequisites(monkeypatch)
     events = []
     development_module = types.ModuleType("installer.development")
     development_module.setup_development = lambda: events.append("development") or 0

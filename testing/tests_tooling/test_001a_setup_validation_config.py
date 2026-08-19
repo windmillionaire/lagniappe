@@ -1717,6 +1717,10 @@ def test_verify_application_config_reports_invalid_redis_tls(monkeypatch, capsys
 def _configure_adc_quota_test(monkeypatch, spinner):
     from installer import create_config
 
+    # The runner image intentionally does not install the gcloud CLI. These
+    # tests exercise the rendered recovery command, not binary discovery.
+    monkeypatch.setattr(create_config, "GCLOUD_CLI", "gcloud")
+
     monkeypatch.setitem(
         sys.modules,
         "config",

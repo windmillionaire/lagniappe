@@ -81,6 +81,17 @@ class Select(Combobox):
         if getattr(self, "_input", None):
             self._input.blur()
 
+    def _choose_option(self, panel, option):
+        """Choose through the combobox keyboard contract after positioning."""
+        option_id = option.get_attribute("id")
+        option_count = panel.get_by_role("option").count()
+        for _index in range(option_count):
+            if self.input.get_attribute("aria-activedescendant") == option_id:
+                break
+            self.input.press("ArrowDown")
+        expect(self.input).to_have_attribute("aria-activedescendant", option_id)
+        self.input.press("Enter")
+
     def select_by_name(self, name):
         panel = self.open()
 
@@ -92,7 +103,7 @@ class Select(Combobox):
 
         option = panel.get_by_role("option", name=name, exact=True)
         expect(option).to_be_visible()
-        option.click()
+        self._choose_option(panel, option)
 
         if not self._multiple:
             expect(panel).to_be_hidden()
@@ -109,7 +120,7 @@ class Select(Combobox):
 
         option = panel.locator(f"[role='option'][data-id='{key}']")
         expect(option).to_be_visible()
-        option.click()
+        self._choose_option(panel, option)
 
         if not self._multiple:
             expect(panel).to_be_hidden()

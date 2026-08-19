@@ -88,6 +88,7 @@ const addSpecificPermission = (config, entry = {}) => {
  * @tests tests_js/test_028_form_state_split.py::test_permissions_form_does_not_rebuild_for_visibility_only_reconciliation
  * @tests tests_js/test_028_form_state_split.py::test_permissions_form_serializes_overlapping_section_rebuilds
  * @tests tests_js/test_028_form_state_split.py::test_permissions_form_preserves_unsaved_values_during_background_update
+ * @tests tests_js/test_028_form_state_split.py::test_permissions_form_waits_for_authoritative_sections_before_initializing
  * @features user-groups
  * @dimensions permission-update general-permissions entity-permissions selection-render responsive-layout single-reconciliation unsaved-preservation background-update rebuild-serialization
  */
@@ -115,8 +116,10 @@ export class PermissionsForm extends FormElement {
 		await this.form.init();
 		this.setVisibility();
 		this.commitRevisionBaseline();
-		this.initialized = true;
-		this.target.setAttribute("initialized", "");
+		if (this.sections.size > 0) {
+			this.initialized = true;
+			this.target.setAttribute("initialized", "");
+		}
 	}
 
 	async updated(response) {
@@ -156,7 +159,7 @@ export class PermissionsForm extends FormElement {
 				);
 				await this.prepareReset({
 					nextTarget: this.target.cloneNode(true),
-					staged: { sections },
+					staged: { sections, initialized: false },
 					beforeInit: (widget) => {
 						widget.setSections();
 					},
@@ -164,6 +167,8 @@ export class PermissionsForm extends FormElement {
 						widget.setVisibility();
 						widget.target.addEventListener("updated", widget._update);
 						widget.target.addEventListener("change", widget._change);
+						widget.initialized = true;
+						widget.target.setAttribute("initialized", "");
 					},
 				});
 			}

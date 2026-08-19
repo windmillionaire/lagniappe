@@ -121,9 +121,23 @@ def compile_filter_definitions(parent, conditions, user):
             else None
         )
         if not entry:
+            matching_sources = sorted(
+                {
+                    f"hash:{candidate.source.hash}"
+                    for candidate in catalog.values()
+                    if candidate.field.filter_key == field_name
+                }
+            )
+            source_hint = ""
+            if len(matching_sources) == 1:
+                source_hint = (
+                    f" Field {field_name!r} requires source_id "
+                    f"{matching_sources[0]!r}."
+                )
             raise exceptions.ValidationError(
                 f"Filter condition {index} uses an unavailable field. "
                 "Call get_filter_schema for the current field list."
+                f"{source_hint}"
             )
 
         if entry.source.kind == "form" and entry.source.hash not in form_scopes:

@@ -40,7 +40,12 @@ def _option_labels(field):
 
 
 def _save_select_option(builder, label):
+    success = builder.condition.locator(
+        "[data-role='title'] [data-kind='success']"
+    )
+    expect(success).not_to_be_attached()
     builder.condition.locator("button[data-role='save']").click()
+    expect(success).to_be_visible()
     expect(
         builder.settings.locator("[data-setting='options']")
     ).to_contain_text(label, timeout=15_000)

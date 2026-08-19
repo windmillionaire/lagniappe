@@ -595,11 +595,12 @@ identifies a production build. It exports that exact commit without rebuilding,
 uses the export for both the App Engine source and Cloud Run image, deploys a
 temporary descriptor with `--no-promote`, and never edits the canonical
 `lagniappe.yaml`. The descriptor retains the canonical App Engine static
-handlers, including their production cache and MIME contracts, while its
-registered application and testing routes remain dynamic and pass through
-Flask's hosted request gate. This avoids serializing every isolated browser
-context's public build-asset requests through the test version's Gunicorn
-workers.
+handlers for concrete assets, including their production cache and MIME
+contracts, while its registered application/testing routes and terminal
+unknown-route fallback remain dynamic and pass through Flask's hosted request
+gate. This avoids serializing every isolated browser context's public
+build-asset requests through the test version's Gunicorn workers while keeping
+Flask error-status coverage real.
 
 Trusted local diagnosis may dispatch a bounded list of existing
 `testing/tests_e2e/` files or nodeids through `hosted-e2e execute --target`.
@@ -619,6 +620,10 @@ the ignored local development-settings file is never uploaded. The existing
 fixtures, direct backend calls, cleanup, strict relation checks, and evidence
 plugin are otherwise unchanged. Local `execute` and
 `.github/workflows/hosted-e2e.yml` invoke the same Cloud Run job.
+The image build also restores the committed root `.gcloudignore` from an exact
+derived copy because gcloud omits its active ignore metadata from the submitted
+context; hosted repository-health checks therefore see the canonical deploy
+contract without broadening the runner upload boundary.
 Create records an asynchronous Cloud Build ID and completed provisioning phases
 so the same clean commit can resume an interrupted build/deploy safely. Result
 download and evidence merge are explicit release-flow operations rather than

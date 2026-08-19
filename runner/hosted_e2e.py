@@ -55,6 +55,7 @@ STATE_PATH = STATE_ROOT / "state.json"
 SETUP_PATH = STATE_ROOT / "setup.json"
 CONTAINER_RELATIVE_ROOT = Path("runner/hosted_e2e_container")
 CONTAINER_ROOT = APP_DIR / CONTAINER_RELATIVE_ROOT
+RUNNER_GCLOUDIGNORE_COPY = "root.gcloudignore"
 ANCHOR_ROOT = APP_DIR / "runner/hosted_e2e_anchor"
 APP_SETTINGS_RELATIVE_PATH = Path("config/files/lagniappe_settings.yaml")
 REDIS_CA_RELATIVE_PATH = Path("config/files/redis_ca.pem")
@@ -734,6 +735,39 @@ def _ensure_workload_identity(infrastructure, github_repository):
     )
 
 
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_runtime_identity_roles_include_deployer_signing
+# @features hosted-e2e
+# @dimensions identity runtime-impersonation
+def _grant_runtime_identity_roles(infrastructure, runtime_member, deployer_member):
+    """Grant only the runtime impersonation roles required by hosted tests."""
+    for role in (
+        "roles/iam.serviceAccountTokenCreator",
+        "roles/iam.serviceAccountUser",
+    ):
+        _service_account_role(
+            infrastructure.runtime_email,
+            runtime_member,
+            role,
+        )
+        if deployer_member:
+            _service_account_role(
+                infrastructure.runtime_email,
+                deployer_member,
+                role,
+            )
+
+    cloud_run_agent = (
+        f"service-{infrastructure.project_number}@serverless-robot-prod."
+        "iam.gserviceaccount.com"
+    )
+    _service_account_role(
+        infrastructure.runtime_email,
+        f"serviceAccount:{cloud_run_agent}",
+        "roles/iam.serviceAccountTokenCreator",
+    )
+
+
 # @testable infrastructure
 def setup(github_repository=None):
     """Provision stable least-privilege resources and the inert service anchor."""
@@ -764,31 +798,11 @@ def setup(github_repository=None):
         "roles/run.jobsExecutorWithOverrides",
     ):
         _remove_project_role(infrastructure, invoker_member, role)
-    _service_account_role(
-        infrastructure.runtime_email,
-        runtime_member,
-        "roles/iam.serviceAccountTokenCreator",
-    )
-    _service_account_role(
-        infrastructure.runtime_email,
-        runtime_member,
-        "roles/iam.serviceAccountUser",
-    )
     deployer_member = _deployer_member()
-    if deployer_member:
-        _service_account_role(
-            infrastructure.runtime_email,
-            deployer_member,
-            "roles/iam.serviceAccountUser",
-        )
-    cloud_run_agent = (
-        f"service-{infrastructure.project_number}@serverless-robot-prod."
-        "iam.gserviceaccount.com"
-    )
-    _service_account_role(
-        infrastructure.runtime_email,
-        f"serviceAccount:{cloud_run_agent}",
-        "roles/iam.serviceAccountTokenCreator",
+    _grant_runtime_identity_roles(
+        infrastructure,
+        runtime_member,
+        deployer_member,
     )
 
     if _describe(
@@ -953,6 +967,22 @@ def _hosted_app_descriptor(
     session_key,
 ):
     """Return a test descriptor with production-equivalent static delivery."""
+    handlers = copy.deepcopy(APP_HANDLERS)
+    if not handlers or not str(handlers[-1].get("static_files") or "").endswith(
+        "/404.html"
+    ):
+        raise HostedE2EError(
+            "The canonical App Engine descriptor has no terminal 404 handler."
+        )
+    # Production's static catch-all returns its 404 document with HTTP 200.
+    # Hosted E2E must send unknown routes through Flask so the suite verifies
+    # the application's actual error handler and status contract.
+    handlers[-1] = {
+        "url": "/(.*)$",
+        "script": "auto",
+        "secure": "always",
+        "redirect_http_response_code": 301,
+    }
     environment = {
         "FLASK_ENV": "testing",
         "LAGNIAPPE_HOSTED_E2E": "true",
@@ -980,7 +1010,7 @@ def _hosted_app_descriptor(
         # serialize thousands of chunk requests through the Gunicorn workers.
         # Every registered application/testing route remains a dynamic handler
         # and is therefore protected by the hosted request gate in Flask.
-        "handlers": copy.deepcopy(APP_HANDLERS),
+        "handlers": handlers,
         "env_variables": environment,
     }
 
@@ -1027,6 +1057,13 @@ def _change_test_bucket_cors(infrastructure, origin, *, present):
 def _build_runner_image(infrastructure, source, source_root):
     """Start a resumable image build from the exported committed tree."""
     container_root = Path(source_root) / CONTAINER_RELATIVE_ROOT
+    canonical_ignore = Path(source_root) / ".gcloudignore"
+    if not canonical_ignore.is_file():
+        raise HostedE2EError("The committed source has no canonical .gcloudignore.")
+    shutil.copyfile(
+        canonical_ignore,
+        container_root / RUNNER_GCLOUDIGNORE_COPY,
+    )
     image = f"{infrastructure.image_base}:{source}"
     result = _gcloud(
         "builds",

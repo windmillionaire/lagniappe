@@ -53,6 +53,9 @@ artifacts; those files contain no application settings, credentials, or test
 data and are served exactly as they are by a normal deployment. Someone who
 learned the short-lived random version hostname could therefore fetch its
 compiled frontend, but could not reach dynamic application data or test APIs.
+The descriptor replaces production's terminal static `404.html` catch-all with
+a dynamic handler, so unknown-route tests reach Flask and retain their real
+HTTP status.
 App-internal `/process` callbacks retain their separate exact Cloud Tasks OIDC
 validation.
 
@@ -83,6 +86,10 @@ seven-day result bucket, two Secret Manager mount targets, Workload Identity
 pool/provider, bucket-scoped access, and inert App Engine anchor. It prints and
 records the non-secret resource identifiers in
 `reports/hosted-e2e/setup.json`.
+On the exact E2E runtime account, setup also reconciles the narrowly scoped
+act-as and token-signing grants needed by that runtime and the trusted deployer;
+the live IAM contract verifies those grants without giving the runtime
+project-wide provisioning authority.
 
 Create a protected GitHub environment named `hosted-e2e` and add these
 environment variables from the setup output:
@@ -132,6 +139,10 @@ deployment boundary; the runner image still excludes them and receives its
 settings only from Secret Manager. Both artifacts and browser assets use the
 committed build ID. The version permits zero idle instances and receives no
 service traffic.
+Because gcloud treats the active root `.gcloudignore` as upload metadata, the
+runner-image build carries an exact derived copy from the committed export and
+restores it inside the container. Repository-health tests therefore inspect the
+same canonical deploy boundary in local and hosted runs.
 
 The runner submits its image build asynchronously and records the provider's
 Cloud Build ID before waiting. It also records completed provisioning phases.

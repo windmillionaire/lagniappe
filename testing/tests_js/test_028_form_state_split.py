@@ -1726,6 +1726,94 @@ widget.commitReset = () => {
 
 
 # @features user-groups
+# @dimensions initialization authoritative-sections input-preservation
+def test_permissions_form_waits_for_authoritative_sections_before_initializing(
+    run_node,
+):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+class FakeBaseForm {
+  async init() {}
+}
+const context = {
+  BaseForm: FakeBaseForm,
+  FacetsBox: class {},
+  FormElement: class {},
+  STYLES: {},
+  console,
+  primitives: {},
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class PermissionsForm", "class PermissionsForm");
+source += "\nglobalThis.PermissionsForm = PermissionsForm;";
+vm.runInContext(source, context);
+
+const attributes = new Set();
+const target = {
+  inert: false,
+  addEventListener() {},
+  setAttribute(name) { attributes.add(name); },
+};
+const widget = Object.create(context.PermissionsForm.prototype);
+widget.sections = new Map();
+widget.target = target;
+widget.initialized = false;
+widget.setVisibility = () => {};
+widget.commitRevisionBaseline = () => {};
+Object.defineProperty(widget, "html", { get: () => [{}] });
+
+(async () => {
+  await widget.init();
+  if (widget.initialized || attributes.has("initialized")) {
+    throw new Error("Cold permission form initialized before its sections loaded");
+  }
+
+  const stagedAttributes = new Set();
+  const stagedTarget = {
+    addEventListener() {},
+    setAttribute(name) { stagedAttributes.add(name); },
+  };
+  widget._rebuildSections = true;
+  widget._sectionReconcile = null;
+  widget._preparedReset = null;
+  widget.sections = new Map([["models", { config: {} }]]);
+  widget.target = {
+    inert: true,
+    cloneNode() { return stagedTarget; },
+  };
+  widget.discardPreparedReset = () => {};
+  widget.prepareReset = async (options) => {
+    const staged = {
+      target: stagedTarget,
+      initialized: false,
+      _update() {},
+      _change() {},
+      setSections() {},
+      setVisibility() {},
+    };
+    options.beforeInit(staged);
+    options.afterInit(staged);
+    widget._preparedReset = true;
+  };
+
+  await widget.prereconcile();
+  if (!stagedAttributes.has("initialized")) {
+    throw new Error("Authoritative permission form was not published as initialized");
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
+# @features user-groups
 # @dimensions rebuild-serialization single-reconciliation
 def test_permissions_form_serializes_overlapping_section_rebuilds(run_node):
     run_node(

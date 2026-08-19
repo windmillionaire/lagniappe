@@ -320,12 +320,29 @@ def test_compile_filter_definitions_rejects_unknown_fields_comparators_and_value
     monkeypatch,
 ):
     user = object()
-    project, model, _form, _hidden_form = _workspace_filter_fixture()
+    project, model, form, _hidden_form = _workspace_filter_fixture()
 
     with pytest.raises(exceptions.ValidationError, match="unavailable field"):
         ai_query.compile_filter_definitions(
             project,
             [{"field": "imaginary", "comparator": "eq", "values": ["x"]}],
+            user,
+        )
+
+    with pytest.raises(
+        exceptions.ValidationError,
+        match=rf"input-total.*hash:{form.hash}",
+    ):
+        ai_query.compile_filter_definitions(
+            project,
+            [
+                {
+                    "source_id": "wrong-source",
+                    "field": "input-total",
+                    "comparator": "gt",
+                    "values": ["100"],
+                }
+            ],
             user,
         )
 

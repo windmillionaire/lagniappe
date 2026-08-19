@@ -44,23 +44,23 @@ def _canvas_has_ink(canvas):
             const width = element.width;
             const height = element.height;
             if (!context || !width || !height) return false;
-            const step = Math.max(1, Math.floor(Math.min(width, height) / 60));
-            for (let y = 0; y < height; y += step) {
-                for (let x = 0; x < width; x += step) {
-                    const [red, green, blue, alpha] = context.getImageData(
-                        x,
-                        y,
-                        1,
-                        1,
-                    ).data;
-                    if (alpha > 0 && (red < 245 || green < 245 || blue < 245)) {
-                        return true;
-                    }
+            const pixels = context.getImageData(0, 0, width, height).data;
+            for (let offset = 0; offset < pixels.length; offset += 4) {
+                const red = pixels[offset];
+                const green = pixels[offset + 1];
+                const blue = pixels[offset + 2];
+                const alpha = pixels[offset + 3];
+                if (alpha > 0 && (red < 245 || green < 245 || blue < 245)) {
+                    return true;
                 }
             }
             return false;
         }"""
     )
+
+
+def _opaque_etag(value):
+    return value.removeprefix("W/")
 
 
 def _select_file_page_link(info_form, file, page):
@@ -347,6 +347,9 @@ def test_page_uploaded_pdf_toolbar_navigates_pages(get_user):
     expect(first_page).to_be_visible()
     expect(first_page).not_to_have_attribute("width", "0")
     expect(first_page).not_to_have_attribute("height", "0")
+    expect(first_page.locator("xpath=..")).to_have_attribute(
+        "data-rendered", "true"
+    )
     assert _canvas_has_ink(first_page)
     expect(toolbar).to_be_visible()
     expect(page_count).to_have_text("/ 2")
@@ -566,7 +569,10 @@ def test_file_download_uses_original_filename_and_mimetype(get_user):
     assert range_response.headers["content-type"].startswith("text/plain")
     assert range_response.headers["accept-ranges"] == "bytes"
     assert range_response.headers["cache-control"] == "no-store"
-    assert range_response.headers["etag"] == etag
+    # App Engine may weaken a compressible full response's ETag while leaving
+    # the uncompressed byte-range response strong. The opaque validator must
+    # remain identical across both representations.
+    assert _opaque_etag(range_response.headers["etag"]) == _opaque_etag(etag)
     assert range_response.headers["content-range"] == (
         f"bytes 0-3/{len(upload.definition.file.content)}"
     )

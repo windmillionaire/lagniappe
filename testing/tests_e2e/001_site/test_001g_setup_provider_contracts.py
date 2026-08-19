@@ -98,7 +98,9 @@ def test_runtime_iam_policy_and_effective_forbidden_permissions():
     runtime_member = f"serviceAccount:{runtime_email}"
     project_resource = f"projects/{project_id}"
 
-    project_client = resourcemanager_v3.ProjectsClient()
+    project_client = resourcemanager_v3.ProjectsClient(
+        credentials=CONFIG.google_credentials
+    )
     project_policy = project_client.get_iam_policy(
         request={
             "resource": project_resource,
@@ -110,7 +112,10 @@ def test_runtime_iam_policy_and_effective_forbidden_permissions():
     for role in constants.REMOVED_RUNTIME_PROJECT_ROLES:
         assert runtime_member not in _unconditional_members(project_policy, role)
 
-    storage_client = storage.Client(project=project_id)
+    storage_client = storage.Client(
+        project=project_id,
+        credentials=CONFIG.google_credentials,
+    )
     bucket_names = {
         "history": f"{CONFIG.PREFIX}{CONFIG.HISTORY_BUCKET}",
         "private": f"{CONFIG.PREFIX}{CONFIG.PRIVATE_BUCKET}",
@@ -148,7 +153,7 @@ def test_runtime_iam_policy_and_effective_forbidden_permissions():
     )
     assert forbidden_project_permissions.isdisjoint(effective.permissions)
 
-    iam_client = iam_admin_v1.IAMClient()
+    iam_client = iam_admin_v1.IAMClient(credentials=CONFIG.google_credentials)
     service_account_resource = (
         f"projects/{project_id}/serviceAccounts/{runtime_email}"
     )

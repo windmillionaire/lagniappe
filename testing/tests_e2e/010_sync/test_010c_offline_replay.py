@@ -236,13 +236,16 @@ def test_offline_replay_does_not_duplicate_after_reload(get_user, browser_failur
     )
     _replace_page(user)
 
-    user.go(SitePages.HOME)
-    wait_for_offline_sync_records(
+    with expect_offline_sync_replay(
         user,
         sync_id=document_sync_id,
-        exact=0,
-        timeout=30000,
-    )
+        request_payload_contains=text,
+    ) as replay_responses:
+        user.go(SitePages.HOME)
+
+    acknowledgement = replay_responses[0].json()["updates"][0]
+    assert acknowledgement["checkpoint_accepted"] is True
+    assert acknowledgement["checkpoint_persisted"] is True
 
     user.go(project, query_params={"replay": uuid4().hex})
     replayed = project.editor.get_text()

@@ -26,5 +26,6 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 COPY . .
+COPY runner/hosted_e2e_container/root.gcloudignore .gcloudignore
 
 ENTRYPOINT ["/workspace/venv/bin/python", "-m", "testing.utility.hosted_e2e_job"]

@@ -634,6 +634,10 @@ def test_hosted_runner_installs_complete_test_collection_dependencies():
     )
     assert "COPY package.json package-lock.json ./" in dockerfile
     assert "RUN npm ci" in dockerfile
+    assert (
+        "COPY runner/hosted_e2e_container/root.gcloudignore .gcloudignore"
+        in dockerfile
+    )
 
 
 def test_hosted_anchor_declares_its_upload_boundary():
@@ -801,6 +805,10 @@ def test_committed_source_export_ignores_generated_worktree_churn(tmp_path):
 def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
     container_root = tmp_path / hosted_e2e.CONTAINER_RELATIVE_ROOT
     container_root.mkdir(parents=True)
+    (tmp_path / ".gcloudignore").write_text(
+        "/testing/\n!/config/files/lagniappe_settings.yaml\n",
+        encoding="utf-8",
+    )
     (container_root / "cloudbuild.yaml").write_text("steps: []\n", encoding="utf-8")
     (container_root / "gcloudignore").write_text("config/files/\n", encoding="utf-8")
     calls = []
@@ -836,6 +844,11 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
     assert "--async" in arguments
     assert "--format=json" in arguments
     assert options == {"timeout": 600}
+    assert (
+        container_root / hosted_e2e.RUNNER_GCLOUDIGNORE_COPY
+    ).read_text(encoding="utf-8") == (
+        tmp_path / ".gcloudignore"
+    ).read_text(encoding="utf-8")
 
 
 # @features hosted-e2e
@@ -1003,7 +1016,7 @@ def test_hosted_descriptor_preserves_native_static_handlers():
         session_key="s" * 48,
     )
 
-    assert descriptor["handlers"] == hosted_e2e.APP_HANDLERS
+    assert descriptor["handlers"][:-1] == hosted_e2e.APP_HANDLERS[:-1]
     assert descriptor["handlers"] is not hosted_e2e.APP_HANDLERS
 
     chunk_handler = next(
@@ -1021,7 +1034,12 @@ def test_hosted_descriptor_preserves_native_static_handlers():
     assert testing_handler["script"] == "auto"
     assert descriptor["handlers"][-2]["url"] == "/$"
     assert descriptor["handlers"][-2]["script"] == "auto"
-    assert descriptor["handlers"][-1]["static_files"].endswith("/404.html")
+    assert descriptor["handlers"][-1] == {
+        "url": "/(.*)$",
+        "script": "auto",
+        "secure": "always",
+        "redirect_http_response_code": 301,
+    }
     assert descriptor["automatic_scaling"]["min_idle_instances"] == 0
     assert descriptor["env_variables"]["LAGNIAPPE_HOSTED_E2E_ROLE"] == "server"
     assert descriptor["env_variables"][
@@ -1031,6 +1049,58 @@ def test_hosted_descriptor_preserves_native_static_handlers():
         "b1234567"
     )
     assert descriptor["service_account"] == infrastructure.runtime_email
+
+
+# @features hosted-e2e
+# @dimensions identity runtime-impersonation
+def test_hosted_runtime_identity_roles_include_deployer_signing(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_service_account_role",
+        lambda account, member, role: calls.append((account, member, role)),
+    )
+    infrastructure = _infrastructure()
+    runtime_member = f"serviceAccount:{infrastructure.runtime_email}"
+    deployer_member = "user:operator@example.test"
+
+    hosted_e2e._grant_runtime_identity_roles(
+        infrastructure,
+        runtime_member,
+        deployer_member,
+    )
+
+    cloud_run_agent = (
+        f"serviceAccount:service-{infrastructure.project_number}"
+        "@serverless-robot-prod.iam.gserviceaccount.com"
+    )
+    assert calls == [
+        (
+            infrastructure.runtime_email,
+            runtime_member,
+            "roles/iam.serviceAccountTokenCreator",
+        ),
+        (
+            infrastructure.runtime_email,
+            deployer_member,
+            "roles/iam.serviceAccountTokenCreator",
+        ),
+        (
+            infrastructure.runtime_email,
+            runtime_member,
+            "roles/iam.serviceAccountUser",
+        ),
+        (
+            infrastructure.runtime_email,
+            deployer_member,
+            "roles/iam.serviceAccountUser",
+        ),
+        (
+            infrastructure.runtime_email,
+            cloud_run_agent,
+            "roles/iam.serviceAccountTokenCreator",
+        ),
+    ]
 
 
 # @features hosted-e2e
