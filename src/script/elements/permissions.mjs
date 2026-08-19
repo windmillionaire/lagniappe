@@ -89,8 +89,9 @@ const addSpecificPermission = (config, entry = {}) => {
  * @tests tests_js/test_028_form_state_split.py::test_permissions_form_serializes_overlapping_section_rebuilds
  * @tests tests_js/test_028_form_state_split.py::test_permissions_form_preserves_unsaved_values_during_background_update
  * @tests tests_js/test_028_form_state_split.py::test_permissions_form_waits_for_authoritative_sections_before_initializing
+ * @tests tests_js/test_028_form_state_split.py::test_permissions_form_ignores_validated_cached_response_after_initialization
  * @features user-groups
- * @dimensions permission-update general-permissions entity-permissions selection-render responsive-layout single-reconciliation unsaved-preservation background-update rebuild-serialization
+ * @dimensions permission-update general-permissions entity-permissions selection-render responsive-layout single-reconciliation unsaved-preservation background-update rebuild-serialization conditional-response
  */
 export class PermissionsForm extends FormElement {
 	constructor(attributes) {
@@ -123,6 +124,10 @@ export class PermissionsForm extends FormElement {
 	}
 
 	async updated(response) {
+		// A validated cached response can initialize a cold permission form, but
+		// it cannot add information after authoritative sections are rendered.
+		if (response.updated === false && this.initialized) return;
+
 		// A polling/revision response may finish after the user has started
 		// editing. The edit watcher owns presenting that conflict; rebuilding here
 		// would silently replace the live controls before they can be submitted.

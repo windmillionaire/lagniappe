@@ -1939,6 +1939,77 @@ widget.setSections = () => events.push("setSections");
     )
 
 
+# @features user-groups
+# @dimensions conditional-response
+def test_permissions_form_ignores_validated_cached_response_after_initialization(
+    run_node,
+):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const context = {
+  BaseForm: class {},
+  FacetsBox: class {},
+  FormElement: class {},
+  STYLES: {},
+  console,
+  primitives: {},
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/elements/permissions.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class PermissionsForm", "class PermissionsForm");
+source += "\nglobalThis.PermissionsForm = PermissionsForm;";
+vm.runInContext(source, context);
+
+const existing = { config: { permission: { level: "VIEW" } } };
+const widget = Object.create(context.PermissionsForm.prototype);
+widget.initialized = true;
+widget.unsavedState = false;
+widget.sections = new Map([["models", existing]]);
+widget._rebuildSections = false;
+widget.target = { inert: false };
+
+(async () => {
+  await widget.updated({
+    updated: false,
+    sections: {
+      models: { permission: { level: "NONE" } },
+    },
+  });
+
+  if (widget.sections.get("models") !== existing) {
+    throw new Error("Validated cached response replaced initialized permissions");
+  }
+  if (widget._rebuildSections || widget.target.inert) {
+    throw new Error("Validated cached response scheduled an initialized rebuild");
+  }
+
+  const cold = Object.create(context.PermissionsForm.prototype);
+  cold.initialized = false;
+  cold.unsavedState = false;
+  cold.sections = new Map();
+  cold._rebuildSections = false;
+  cold.target = { inert: false };
+  await cold.updated({
+    updated: false,
+    sections: {
+      models: { permission: { level: "VIEW" } },
+    },
+  });
+  if (!cold._rebuildSections || !cold.target.inert || !cold.sections.has("models")) {
+    throw new Error("Validated cache could not initialize a cold permission form");
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
 # @features tasks reconnect-refresh forms offline
 # @dimensions active-row dirty-row queued-row staged-review replacement removal preservation
 # @pair tasks:active-form-preservation

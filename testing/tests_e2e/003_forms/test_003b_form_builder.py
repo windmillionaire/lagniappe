@@ -25,12 +25,6 @@ def _condition_select(builder, name, index=0):
     )
 
 
-def _condition_select_key(builder, key, index=0):
-    Select(builder.condition.locator("[data-combobox-id]").nth(index)).select_by_key(
-        key
-    )
-
-
 def _condition_error(builder):
     return builder.condition.locator("[data-role='error']")
 
@@ -290,25 +284,30 @@ def test_table_column_condition_editor(get_user):
     builder.condition.locator("button[data-role='save']").click()
     expect(_condition_error(builder)).to_contain_text("Please enter a column name")
     column_name.fill("Amount")
-    _condition_select_key(builder, "number")
+    column_type = Select(builder.condition.locator("[data-combobox-id]"))
+    column_type.select_by_key("number")
+    expect(column_type.input).to_have_attribute("placeholder", "Number")
     builder.save_condition()
     _close_condition(builder)
 
-    columns = builder.schema_field(table.id)["columns"]
-    assert columns[0]["title"] == "Amount"
-    assert columns[0]["input"] == "number"
-    assert columns[0]["type"] == "input"
+    column_setting = builder.settings.locator(
+        "[data-setting='columns'] [data-role='open']"
+    ).filter(has_text="Amount")
+    expect(column_setting).to_be_visible()
+    expect(column_setting.locator("[data-icon='number']")).to_be_visible()
 
     preview = builder.toggle_preview()
-    expect(preview.locator("th").filter(has_text="Amount")).to_be_attached()
+    expect(preview.locator("th").filter(has_text="Amount")).to_be_visible()
 
     builder.save()
     user.page.reload()
     builder = Builder(user)
     builder.select_field(table)
-    expect(builder.settings.locator("[data-setting='columns']")).to_contain_text(
-        "Amount"
-    )
+    saved_column = builder.settings.locator(
+        "[data-setting='columns'] [data-role='open']"
+    ).filter(has_text="Amount")
+    expect(saved_column).to_be_visible()
+    expect(saved_column.locator("[data-icon='number']")).to_be_visible()
 
 
 # @features forms

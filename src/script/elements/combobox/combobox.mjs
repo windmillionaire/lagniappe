@@ -47,7 +47,7 @@ export class Combobox {
 		this._documentClick = this._documentClick.bind(this);
 		this._documentKeydown = this._documentKeydown.bind(this);
 
-		this._panelPointerOver = this._panelPointerOver.bind(this);
+		this._panelPointerMove = this._panelPointerMove.bind(this);
 		this._panelPointerDown = this._panelPointerDown.bind(this);
 		this._optionClick = this._optionClick.bind(this);
 		this._handleIntersection = this._handleIntersection.bind(this);
@@ -155,7 +155,7 @@ export class Combobox {
 	_addPanelHandlers() {
 		if (this._panelHandlersAdded) return;
 
-		this.panel.addEventListener("pointerover", this._panelPointerOver);
+		this.panel.addEventListener("pointermove", this._panelPointerMove);
 		this.panel.addEventListener("pointerdown", this._panelPointerDown);
 		this.panel.addEventListener("click", this._optionClick);
 		this._panelHandlersAdded = true;
@@ -164,7 +164,7 @@ export class Combobox {
 	_removePanelHandlers() {
 		if (!this._panelHandlersAdded) return;
 
-		this.panel.removeEventListener("pointerover", this._panelPointerOver);
+		this.panel.removeEventListener("pointermove", this._panelPointerMove);
 		this.panel.removeEventListener("pointerdown", this._panelPointerDown);
 		this.panel.removeEventListener("click", this._optionClick);
 		this._panelHandlersAdded = false;
@@ -483,7 +483,7 @@ export class Combobox {
 		}
 	}
 
-	_panelPointerOver(event) {
+	_panelPointerMove(event) {
 		const option = event.target.closest(`[role="${this.optionRole}"]`);
 		if (!option) return;
 

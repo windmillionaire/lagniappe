@@ -201,19 +201,14 @@ export class PublicPermissions extends PermissionsForm {
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_rename_group
+ * @tests tests_js/test_044_user_widget_frontend.py::test_group_permissions_tracks_rename_draft_after_target_rebuild
  * @features user-groups
- * @dimensions permission-update general-permissions entity-permissions rename
+ * @dimensions permission-update general-permissions entity-permissions rename reset-rebinding
  */
 export class GroupPermissions extends PermissionsForm {
 	constructor(attributes) {
 		super(attributes);
 		this._draftName = null;
-		this.target.addEventListener("input", (event) => {
-			if (event.target.matches("input[name='name']")) {
-				this._draftName = event.target.value;
-				this.target.dataset.name = event.target.value;
-			}
-		});
 	}
 
 	get formData() {
@@ -233,8 +228,15 @@ export class GroupPermissions extends PermissionsForm {
 			},
 			this.target.dataset.name || "",
 		);
+		const nameEdit = name.edit;
+		nameEdit.addEventListener("input", (event) => {
+			if (event.target.matches("input[name='name']")) {
+				this._draftName = event.target.value;
+				this.target.dataset.name = event.target.value;
+			}
+		});
 
-		return [name.edit, ...super.html];
+		return [nameEdit, ...super.html];
 	}
 
 	init() {

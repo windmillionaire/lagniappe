@@ -152,3 +152,100 @@ function createWidget(visible) {
 });
 '''
     )
+
+
+# @features user-groups
+# @dimensions rename reset-rebinding
+def test_group_permissions_tracks_rename_draft_after_target_rebuild(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+class FakeEdit {
+  constructor() {
+    this.listeners = new Map();
+  }
+
+  addEventListener(type, listener) {
+    this.listeners.set(type, listener);
+  }
+
+  input(value) {
+    this.listeners.get("input")?.({
+      target: {
+        matches(selector) { return selector === "input[name='name']"; },
+        value,
+      },
+    });
+  }
+}
+
+class InputElement {
+  constructor(_widget, _schema, submission) {
+    this.edit = new FakeEdit();
+    this.submission = submission;
+  }
+}
+
+class PermissionsForm {
+  constructor(attributes = {}) {
+    Object.assign(this, attributes);
+  }
+
+  get formData() {
+    return new Map();
+  }
+
+  get html() {
+    return [];
+  }
+
+  updated(response) {
+    this.lastResponse = response;
+  }
+}
+
+const context = {
+  console,
+  FacetedSearchElement: class {},
+  FormElement: class {},
+  InputElement,
+  PermissionsForm,
+  RadioElement: class {},
+};
+vm.createContext(context);
+
+let source = fs.readFileSync("src/script/widgets/user.mjs", "utf8");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replaceAll("export class ", "class ");
+source += "\nglobalThis.GroupPermissions = GroupPermissions;";
+vm.runInContext(source, context);
+
+const widget = new context.GroupPermissions({
+  target: { dataset: { name: "Original Group" } },
+});
+const firstName = widget.html[0];
+firstName.input("First Draft");
+if (
+  widget._draftName !== "First Draft" ||
+  widget.target.dataset.name !== "First Draft"
+) {
+  throw new Error("Initial group-name control did not track its draft");
+}
+
+widget.target = { dataset: { name: "First Draft" } };
+const rebuiltName = widget.html[0];
+rebuiltName.input("Rebuilt Draft");
+if (
+  widget._draftName !== "Rebuilt Draft" ||
+  widget.target.dataset.name !== "Rebuilt Draft"
+) {
+  throw new Error("Rebuilt group-name control lost its draft listener");
+}
+
+if (widget.formData.get("name") !== "Rebuilt Draft") {
+  throw new Error("Rebuilt group rename was not retained for submission");
+}
+'''
+    )

@@ -809,7 +809,15 @@ combobox.panel.appendChild(first);
 combobox.options = [{ id: "first" }];
 combobox.panelOpen = true;
 
-combobox._panelPointerOver(interactionEvent({ target: child }));
+combobox._addPanelHandlers();
+if (
+  !combobox.panel.listeners.get("pointermove")?.has(combobox._panelPointerMove) ||
+  combobox.panel.listeners.has("pointerover")
+) {
+  throw new Error("Combobox hover tracking did not require real pointer movement");
+}
+
+combobox._panelPointerMove(interactionEvent({ target: child }));
 if (
   combobox.focusedIndex !== 0 ||
   initial.getAttribute("aria-activedescendant") !== first.id
