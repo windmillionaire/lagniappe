@@ -48,6 +48,8 @@ def validate_focused_targets(targets) -> tuple[str, ...]:
         raise RuntimeError(
             f"Focused hosted E2E accepts at most {MAX_FOCUSED_TARGETS} targets."
         )
+    if len(set(normalized)) != len(normalized):
+        raise RuntimeError("Focused hosted E2E targets must be unique.")
 
     e2e_root = (REPOSITORY_ROOT / "testing/tests_e2e").resolve()
     for target in normalized:

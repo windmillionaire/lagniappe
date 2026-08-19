@@ -1410,9 +1410,12 @@ def execute(*, suite="pilot", targets=(), import_results=True):
     _activate(adc=import_results)
     infrastructure = _infrastructure()
     state = _state_ready(infrastructure)
-    job_arguments = ["--suite", suite]
+    # Cloud Run's execution override uses gcloud's UpdateAction parser, which
+    # rejects repeated list entries such as separate ``--target`` tokens.
+    # ``argparse`` accepts the equivalent equals form inside the container.
+    job_arguments = [f"--suite={suite}"]
     for target in targets:
-        job_arguments.extend(("--target", target))
+        job_arguments.append(f"--target={target}")
     result = _gcloud(
         "run",
         "jobs",

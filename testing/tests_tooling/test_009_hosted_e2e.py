@@ -319,6 +319,8 @@ def test_hosted_focused_targets_require_existing_e2e_nodeids():
 
     assert hosted_e2e_job.validate_focused_targets([target]) == (target,)
     assert target in hosted_e2e_job._pytest_command("focused", [target])
+    with pytest.raises(RuntimeError):
+        hosted_e2e_job.validate_focused_targets([target, target])
 
     invalid_targets = (
         "--collect-only",
@@ -339,6 +341,10 @@ def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
     target = (
         "testing/tests_e2e/001_site/test_001a_environment.py::"
         "test_database_setup"
+    )
+    second_target = (
+        "testing/tests_e2e/001_site/test_001a_environment.py::"
+        "test_cache_setup"
     )
     calls = []
     writes = []
@@ -368,13 +374,16 @@ def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
 
     result = hosted_e2e.execute(
         suite="focused",
-        targets=[target],
+        targets=[target, second_target],
         import_results=False,
     )
 
     assert result == {"execution": "lagniappe-e2e-focus1", "exit_status": 0}
-    assert f"--args=--suite,focused,--target,{target}" in calls[0][0]
-    assert writes[0][1]["last_targets"] == [target]
+    assert (
+        f"--args=--suite=focused,--target={target},--target={second_target}"
+        in calls[0][0]
+    )
+    assert writes[0][1]["last_targets"] == [target, second_target]
 
 
 # @features hosted-e2e traceability
