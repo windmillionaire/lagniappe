@@ -309,6 +309,74 @@ def test_hosted_result_stamps_remote_provenance(tmp_path, monkeypatch):
     assert evidence["provenance"]["hosted_e2e"] == manifest
 
 
+# @features hosted-e2e
+# @dimensions focused-execution target-validation argument-injection
+def test_hosted_focused_targets_require_existing_e2e_nodeids():
+    target = (
+        "testing/tests_e2e/001_site/test_001a_environment.py::"
+        "test_database_setup"
+    )
+
+    assert hosted_e2e_job.validate_focused_targets([target]) == (target,)
+    assert target in hosted_e2e_job._pytest_command("focused", [target])
+
+    invalid_targets = (
+        "--collect-only",
+        "testing/tests_unit/test_001_entities.py",
+        "testing/tests_e2e/../tests_unit/test_001_entities.py",
+        "testing/tests_e2e/001_site/missing.py::test_missing",
+        f"{target},--collect-only",
+        "testing/tests_e2e/001_site/test_001a_environment.py::",
+    )
+    for invalid in invalid_targets:
+        with pytest.raises(RuntimeError):
+            hosted_e2e_job.validate_focused_targets([invalid])
+
+
+# @features hosted-e2e
+# @dimensions focused-execution cloud-run override local-dispatch
+def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
+    target = (
+        "testing/tests_e2e/001_site/test_001a_environment.py::"
+        "test_database_setup"
+    )
+    calls = []
+    writes = []
+    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
+    monkeypatch.setattr(hosted_e2e, "_infrastructure", _infrastructure)
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_state_ready",
+        lambda _infrastructure: {"status": "ready"},
+    )
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_write_json",
+        lambda path, payload, **options: writes.append((path, payload, options)),
+    )
+
+    def gcloud(*arguments, **options):
+        calls.append((arguments, options))
+        return subprocess.CompletedProcess(
+            ["gcloud"],
+            returncode=0,
+            stdout='{"metadata": {"name": "lagniappe-e2e-focus1"}}',
+            stderr="",
+        )
+
+    monkeypatch.setattr(hosted_e2e, "_gcloud", gcloud)
+
+    result = hosted_e2e.execute(
+        suite="focused",
+        targets=[target],
+        import_results=False,
+    )
+
+    assert result == {"execution": "lagniappe-e2e-focus1", "exit_status": 0}
+    assert f"--args=--suite,focused,--target,{target}" in calls[0][0]
+    assert writes[0][1]["last_targets"] == [target]
+
+
 # @features hosted-e2e traceability
 # @dimensions evidence merge provenance
 def test_remote_evidence_merges_tests_and_snapshot_provenance():
@@ -596,8 +664,8 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
 
 
 # @features hosted-e2e
-# @dimensions authentication static-assets zero-traffic deployment-binding
-def test_hosted_descriptor_routes_all_assets_through_the_cookie_gate():
+# @dimensions authentication static-assets performance zero-traffic deployment-binding
+def test_hosted_descriptor_preserves_native_static_handlers():
     infrastructure = _infrastructure()
 
     descriptor = _hosted_app_descriptor(
@@ -613,9 +681,25 @@ def test_hosted_descriptor_routes_all_assets_through_the_cookie_gate():
         session_key="s" * 48,
     )
 
-    assert descriptor["handlers"] == [
-        {"url": "/.*", "script": "auto", "secure": "always"}
-    ]
+    assert descriptor["handlers"] == hosted_e2e.APP_HANDLERS
+    assert descriptor["handlers"] is not hosted_e2e.APP_HANDLERS
+
+    chunk_handler = next(
+        handler
+        for handler in descriptor["handlers"]
+        if handler["url"] == "/chunks/(.*\\.js)$"
+    )
+    assert chunk_handler["static_files"] == "lagniappe/web/static/chunks/\\1"
+
+    testing_handler = next(
+        handler
+        for handler in descriptor["handlers"]
+        if handler["url"] == "/testing(/.*)?$"
+    )
+    assert testing_handler["script"] == "auto"
+    assert descriptor["handlers"][-2]["url"] == "/$"
+    assert descriptor["handlers"][-2]["script"] == "auto"
+    assert descriptor["handlers"][-1]["static_files"].endswith("/404.html")
     assert descriptor["automatic_scaling"]["min_idle_instances"] == 0
     assert descriptor["env_variables"]["LAGNIAPPE_HOSTED_E2E_ROLE"] == "server"
     assert descriptor["env_variables"][

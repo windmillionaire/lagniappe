@@ -21,6 +21,7 @@ import yaml
 
 from config import APP_DIR, File, SETTINGS, _atomic_write_text
 from config.constants import (
+    APP_HANDLERS,
     DEFAULT_TEST_PREFIX,
     RUNTIME_BUCKET_ROLES,
     RUNTIME_PROJECT_ROLES,
@@ -936,9 +937,9 @@ def _verify_soft_routing_guard(infrastructure):
 
 
 # @testable true
-# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_descriptor_routes_all_assets_through_the_cookie_gate
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_descriptor_preserves_native_static_handlers
 # @features hosted-e2e
-# @dimensions authentication static-assets zero-traffic deployment-binding
+# @dimensions authentication static-assets performance zero-traffic deployment-binding
 def _hosted_app_descriptor(
     infrastructure,
     *,
@@ -949,7 +950,7 @@ def _hosted_app_descriptor(
     base_url,
     session_key,
 ):
-    """Return an all-dynamic descriptor so Flask gates even static assets."""
+    """Return a test descriptor with production-equivalent static delivery."""
     environment = {
         "FLASK_ENV": "testing",
         "LAGNIAPPE_HOSTED_E2E": "true",
@@ -972,7 +973,12 @@ def _hosted_app_descriptor(
         "entrypoint": "gunicorn -t 3600 -w 3 -b :$PORT main:app",
         "instance_class": "F2",
         "automatic_scaling": {"max_instances": 2, "min_idle_instances": 0},
-        "handlers": [{"url": "/.*", "script": "auto", "secure": "always"}],
+        # Static build artifacts contain no application or test data. Keep them
+        # on App Engine's native static path so isolated browser contexts do not
+        # serialize thousands of chunk requests through the Gunicorn workers.
+        # Every registered application/testing route remains a dynamic handler
+        # and is therefore protected by the hosted request gate in Flask.
+        "handlers": copy.deepcopy(APP_HANDLERS),
         "env_variables": environment,
     }
 
@@ -1379,12 +1385,34 @@ def _execution_name(payload):
     return name if isinstance(name, str) and EXECUTION_RE.fullmatch(name) else None
 
 
-# @testable infrastructure
-def execute(*, suite="pilot", import_results=True):
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_dispatches_validated_focused_targets
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
+# @features hosted-e2e
+# @dimensions focused-execution cloud-run override local-dispatch target-validation argument-injection
+def execute(*, suite="pilot", targets=(), import_results=True):
     """Execute the same Cloud Run job used by CI and optionally import evidence."""
+    from testing.utility.hosted_e2e_job import validate_focused_targets
+
+    targets = tuple(targets or ())
+    if suite == "focused":
+        try:
+            targets = validate_focused_targets(targets)
+        except RuntimeError as error:
+            raise HostedE2EError(str(error)) from error
+    elif targets:
+        raise HostedE2EError(
+            "Focused targets require the hosted E2E focused suite."
+        )
+    elif suite not in {"pilot", "full"}:
+        raise HostedE2EError(f"Unsupported hosted E2E suite {suite!r}.")
+
     _activate(adc=import_results)
     infrastructure = _infrastructure()
     state = _state_ready(infrastructure)
+    job_arguments = ["--suite", suite]
+    for target in targets:
+        job_arguments.extend(("--target", target))
     result = _gcloud(
         "run",
         "jobs",
@@ -1392,7 +1420,7 @@ def execute(*, suite="pilot", import_results=True):
         infrastructure.job,
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
-        f"--args=--suite,{suite}",
+        f"--args={','.join(job_arguments)}",
         "--wait",
         "--format=json",
         check=False,
@@ -1406,6 +1434,7 @@ def execute(*, suite="pilot", import_results=True):
         )
     state["last_execution"] = execution
     state["last_suite"] = suite
+    state["last_targets"] = list(targets)
     _write_json(STATE_PATH, state, owner_only=True)
     if not import_results:
         return {"execution": execution, "exit_status": result.returncode}
@@ -1746,7 +1775,14 @@ def run_hosted_e2e_command(arguments):
         help="Deploy the committed production build as a matching app version and job.",
     )
     execute_parser = commands.add_parser("execute", help="Run the Cloud Run E2E job.")
-    execute_parser.add_argument("--suite", choices=("pilot", "full"), default="pilot")
+    execute_scope = execute_parser.add_mutually_exclusive_group()
+    execute_scope.add_argument("--suite", choices=("pilot", "full"))
+    execute_scope.add_argument(
+        "--target",
+        action="append",
+        dest="targets",
+        help="Run one existing E2E file/nodeid; repeat for additional targets.",
+    )
     execute_parser.add_argument("--no-results", action="store_true")
     results_parser = commands.add_parser("results", help="Download and import job artifacts.")
     result_selector = results_parser.add_mutually_exclusive_group()
@@ -1770,7 +1806,12 @@ def run_hosted_e2e_command(arguments):
             payload = create()
             print(f"Hosted E2E version ready: {payload['base_url']}")
         elif args.action == "execute":
-            payload = execute(suite=args.suite, import_results=not args.no_results)
+            suite = args.suite or ("focused" if args.targets else "pilot")
+            payload = execute(
+                suite=suite,
+                targets=args.targets or (),
+                import_results=not args.no_results,
+            )
             print(json.dumps(payload, indent=2, sort_keys=True))
             return int(payload.get("exit_status") or 0)
         elif args.action == "results":

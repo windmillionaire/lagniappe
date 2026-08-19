@@ -593,9 +593,18 @@ critique. It stores raw evidence and the curated HTML report together under
 local `create` requires a clean committed candidate whose generated metadata
 identifies a production build. It exports that exact commit without rebuilding,
 uses the export for both the App Engine source and Cloud Run image, deploys a
-temporary all-dynamic descriptor with `--no-promote`, and never edits the
-canonical `lagniappe.yaml`. The all-dynamic handler is deliberate: Flask's
-hosted request gate must authorize static assets as well as routes.
+temporary descriptor with `--no-promote`, and never edits the canonical
+`lagniappe.yaml`. The descriptor retains the canonical App Engine static
+handlers, including their production cache and MIME contracts, while its
+registered application and testing routes remain dynamic and pass through
+Flask's hosted request gate. This avoids serializing every isolated browser
+context's public build-asset requests through the test version's Gunicorn
+workers.
+
+Trusted local diagnosis may dispatch a bounded list of existing
+`testing/tests_e2e/` files or nodeids through `hosted-e2e execute --target`.
+The Cloud Run entry point validates that boundary again before constructing the
+pytest command. The GitHub workflow retains only the fixed pilot/full choices.
 
 The runner image excludes all `config/files/` content and mounts the canonical
 settings plus the optional managed Redis CA certificate from separate Secret

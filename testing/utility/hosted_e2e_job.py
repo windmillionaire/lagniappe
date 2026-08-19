@@ -25,6 +25,7 @@ PILOT_TARGETS = (
     "testing/tests_e2e/001_site/test_001a_environment.py::test_storage_setup",
     "testing/tests_e2e/001_site/test_001b_login.py::test_user_login_success",
 )
+MAX_FOCUSED_TARGETS = 50
 
 
 def _required_environment(name: str) -> str:
@@ -34,20 +35,88 @@ def _required_environment(name: str) -> str:
     return value
 
 
-def _pytest_command(suite: str) -> list[str]:
-    targets = ["e2e"] if suite == "full" else list(PILOT_TARGETS)
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
+# @features hosted-e2e
+# @dimensions focused-execution target-validation argument-injection
+def validate_focused_targets(targets) -> tuple[str, ...]:
+    """Return bounded existing E2E paths/nodeids safe for job arg overrides."""
+    normalized = tuple(str(target).strip() for target in targets or ())
+    if not normalized:
+        raise RuntimeError("Focused hosted E2E requires at least one --target.")
+    if len(normalized) > MAX_FOCUSED_TARGETS:
+        raise RuntimeError(
+            f"Focused hosted E2E accepts at most {MAX_FOCUSED_TARGETS} targets."
+        )
+
+    e2e_root = (REPOSITORY_ROOT / "testing/tests_e2e").resolve()
+    for target in normalized:
+        if not target or len(target) > 512:
+            raise RuntimeError("Focused hosted E2E received an invalid target.")
+        if any(character in target for character in (",", "\x00", "\r", "\n")):
+            raise RuntimeError(
+                "Focused hosted E2E targets cannot contain commas or control characters."
+            )
+        path_text, separator, selector = target.partition("::")
+        if not path_text.startswith("testing/tests_e2e/"):
+            raise RuntimeError(
+                "Focused hosted E2E targets must be real testing/tests_e2e paths."
+            )
+        relative_path = Path(path_text)
+        if relative_path.is_absolute() or ".." in relative_path.parts:
+            raise RuntimeError("Focused hosted E2E targets cannot traverse directories.")
+        target_path = (REPOSITORY_ROOT / relative_path).resolve()
+        if (
+            not target_path.is_relative_to(e2e_root)
+            or target_path.suffix != ".py"
+            or not target_path.is_file()
+        ):
+            raise RuntimeError(
+                "Focused hosted E2E targets must name existing E2E Python files."
+            )
+        if separator and (
+            not selector
+            or any(not component for component in selector.split("::"))
+        ):
+            raise RuntimeError("Focused hosted E2E received an invalid nodeid selector.")
+    return normalized
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
+# @features hosted-e2e
+# @dimensions focused-execution target-validation argument-injection
+def _pytest_command(suite: str, targets=()) -> list[str]:
+    if suite == "full":
+        if targets:
+            raise RuntimeError("Full hosted E2E does not accept focused targets.")
+        pytest_targets = ["e2e"]
+    elif suite == "pilot":
+        if targets:
+            raise RuntimeError("Pilot hosted E2E does not accept focused targets.")
+        pytest_targets = list(PILOT_TARGETS)
+    elif suite == "focused":
+        pytest_targets = list(validate_focused_targets(targets))
+    else:
+        raise RuntimeError(f"Unsupported hosted E2E suite {suite!r}.")
     return [
         sys.executable,
         str(REPOSITORY_ROOT / "run.py"),
         "test",
         "--strict",
-        *targets,
+        *pytest_targets,
         f"--junitxml={HOSTED_REPORT_ROOT / 'junit.xml'}",
     ]
 
 
-def _artifact_manifest(*, suite: str, exit_status: int, execution: str) -> dict:
-    return {
+def _artifact_manifest(
+    *,
+    suite: str,
+    exit_status: int,
+    execution: str,
+    targets=(),
+) -> dict:
+    manifest = {
         "schema_version": 1,
         "kind": "hosted-e2e-result",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -64,6 +133,9 @@ def _artifact_manifest(*, suite: str, exit_status: int, execution: str) -> dict:
         "suite": suite,
         "exit_status": int(exit_status),
     }
+    if targets:
+        manifest["targets"] = list(targets)
+    return manifest
 
 
 def _archive_reports(destination: Path) -> None:
@@ -94,6 +166,8 @@ def _stamp_evidence(manifest: dict) -> None:
             "suite",
         )
     }
+    if manifest.get("targets"):
+        provenance["hosted_e2e"]["targets"] = list(manifest["targets"])
     evidence["provenance"] = provenance
     write_json(EVIDENCE_PATH, evidence)
 
@@ -130,16 +204,31 @@ def _upload_artifacts(manifest: dict) -> None:
 
 def main(arguments=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--suite", choices=("pilot", "full"), default="pilot")
+    parser.add_argument(
+        "--suite",
+        choices=("pilot", "full", "focused"),
+        default="pilot",
+    )
+    parser.add_argument("--target", action="append", default=[])
     args = parser.parse_args(arguments)
+
+    targets = (
+        validate_focused_targets(args.target)
+        if args.suite == "focused"
+        else tuple(args.target)
+    )
 
     execution = _required_environment("CLOUD_RUN_EXECUTION")
     HOSTED_REPORT_ROOT.mkdir(parents=True, exist_ok=True)
-    result = subprocess.run(_pytest_command(args.suite), cwd=REPOSITORY_ROOT)
+    result = subprocess.run(
+        _pytest_command(args.suite, targets),
+        cwd=REPOSITORY_ROOT,
+    )
     manifest = _artifact_manifest(
         suite=args.suite,
         exit_status=result.returncode,
         execution=execution,
+        targets=targets,
     )
     try:
         _stamp_evidence(manifest)

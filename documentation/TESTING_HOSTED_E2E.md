@@ -44,9 +44,15 @@ token for the exact version origin, the configured runtime identity, the exact
 source/version metadata, and ownership of the shared Redis lease. That token
 can be exchanged only once for the lease-owning run. The server then issues an
 HTTP-only, Secure, SameSite=Strict `__Host-` cookie bound to the run, source,
-and version. The test descriptor sends static assets through Flask as well, so
-the request gate covers them. App-internal `/process` callbacks retain their
-separate exact Cloud Tasks OIDC validation.
+and version. Registered application and testing routes pass through Flask's
+request gate. The test descriptor retains the normal App Engine static
+handlers for compiled JavaScript, CSS, fonts, images, and other public build
+artifacts; those files contain no application settings, credentials, or test
+data and are served exactly as they are by a normal deployment. Someone who
+learned the short-lived random version hostname could therefore fetch its
+compiled frontend, but could not reach dynamic application data or test APIs.
+App-internal `/process` callbacks retain their separate exact Cloud Tasks OIDC
+validation.
 
 App Engine can soft-route a request for a deleted version hostname to the
 default service. The normal application's Flask request boundary therefore
@@ -111,7 +117,10 @@ are committed, and the authored worktree is clean, before `create` runs.
 `create` does not edit or replace the canonical `lagniappe.yaml`. It writes an
 owner-only temporary descriptor, deploys with `--no-promote`, validates the
 exact version's health metadata, updates the Cloud Run job, and removes the
-descriptor. It never rebuilds frontend assets. Instead it requires the commit's
+descriptor. The temporary descriptor copies the canonical static handler
+contract while substituting the test service, runtime identity, scaling, and
+fail-closed hosted environment. It never rebuilds frontend assets. Instead it
+requires the commit's
 `build.json`, service worker, and `config/constants.py` to identify one
 production build, exports that exact Git commit, and uses the export for both
 the App Engine version and runner image. Incidental generated-static churn in
@@ -128,6 +137,20 @@ Run the short infrastructure/login pilot first, then the full suite:
 venv/bin/python run.py hosted-e2e execute --suite pilot
 venv/bin/python run.py hosted-e2e execute --suite full
 ```
+
+For trusted local diagnosis, run one or more real E2E files/nodeids without
+repeating the complete suite:
+
+```bash
+venv/bin/python run.py hosted-e2e execute \
+  --target testing/tests_e2e/002_home/test_002d_home_tasks.py::test_create_personal_task_due_today
+```
+
+Repeat `--target` to run several cases in one leased pytest session. The job
+accepts only bounded, existing Python files beneath `testing/tests_e2e/`; it
+rejects pytest options, traversal, control characters, and argument-delimiter
+ambiguity. The GitHub workflow deliberately continues to expose only the
+fixed `pilot` and `full` scopes.
 
 Both commands execute the same `lagniappe-e2e` Cloud Run job used by CI. The
 hosted runner skips local Flask startup, local frontend rebuilding, and local
@@ -171,7 +194,9 @@ from the job and refuses to execute if it differs from `github.sha`. It uses WIF
 only to describe and invoke that exact job; it has no project-wide Cloud Run
 viewer role and cannot read either mounted secret or download result objects.
 The workflow uses its job-scoped override permission to select `pilot` or
-`full`; the container entry point rejects other command-line suite values.
+`full`. The container entry point also accepts the separately validated
+`focused` scope used by the trusted local command, but the workflow has no
+focused input or arbitrary target field.
 It does not check out, rebuild, commit, or create a branch in the repository.
 
 Local and GitHub dispatches are consequently two front doors to the same job,
@@ -186,6 +211,8 @@ Every job uploads the following under
 - `evidence.json`, produced by the normal pytest traceability plugin;
 - `junit.xml`; and
 - `reports.tar.gz`, containing E2E failure/report output.
+
+A focused manifest also records the exact selected nodeids.
 
 A local `hosted-e2e execute` downloads that execution under
 `reports/hosted-e2e/results/EXECUTION/` and automatically merges its per-test
