@@ -98,5 +98,5 @@ Build, configuration, installation, and test workflows.
 | Add or run a data migration | [DATA_MIGRATIONS](DATA_MIGRATIONS.md) | `lagniappe/core/tools/database/migrations.py`, `lagniappe/web/routes/home/site.py` |
 | Change entity saves, relation writes, or delete cascades | [BACKEND_ENTITIES](BACKEND_ENTITIES.md) | `lagniappe/core/entities/__init__.py`, `lagniappe/core/mixins/related.py`, `lagniappe/core/tools/database/utility.py` |
 | Write tests | [TESTING](TESTING.md), [TESTING_WRITING_TESTS](TESTING_WRITING_TESTS.md) | `testing/tests_e2e/`, `testing/tests_js/`, `testing/tests_unit/`, `testing/definitions/` |
-| Run E2E near hosted providers | [TESTING_HOSTED_E2E](TESTING_HOSTED_E2E.md) | `runner/hosted_e2e.py`, `.github/workflows/hosted-e2e.yml` |
+| Run tests in the hosted environment | [TESTING_HOSTED_E2E](TESTING_HOSTED_E2E.md) | `runner/hosted_e2e.py`, `.github/workflows/hosted-e2e.yml` |
 | Understand the config system | [INFRA_CONFIG](INFRA_CONFIG.md) | `config/__init__.py`, `config/constants.py` |

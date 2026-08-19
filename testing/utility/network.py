@@ -8,7 +8,7 @@ from email.parser import BytesParser
 from email.policy import default
 import json
 from typing import Any
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, urlsplit, urlunsplit
 
 
 # @testable true
@@ -32,6 +32,46 @@ def assert_lagniappe_error_response(response: Any, *, status: int) -> None:
         response_text = response_text()
     assert f"Error {status}" in response_text
     assert "x-lagniappe-entity-revisions" not in response.headers
+
+
+# @testable true
+# @tests tests_tooling/test_004_network_waits.py::test_manual_mutation_headers_use_the_browser_origin
+# @features e2e
+# @dimensions manual-http csrf same-origin
+def manual_mutation_headers(page_url: str, csrf_token: str) -> dict[str, str]:
+    """Return browser-equivalent same-origin headers for a direct mutation."""
+
+    parsed = urlsplit(page_url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ValueError("Manual mutation headers require an HTTP(S) page URL.")
+    if not csrf_token:
+        raise ValueError("Manual mutation headers require a CSRF token.")
+    return {
+        "Origin": f"{parsed.scheme}://{parsed.netloc}",
+        "Referer": urlunsplit(
+            (parsed.scheme, parsed.netloc, parsed.path or "/", parsed.query, "")
+        ),
+        "X-CSRFToken": csrf_token,
+        "X-Lagniappe-Request": "true",
+    }
+
+
+# @testable true
+# @tests tests_tooling/test_004_network_waits.py::test_semantically_equal_etags_allow_proxy_weakening
+# @features e2e
+# @dimensions manual-http etag proxy-normalization
+def assert_same_etag(actual: str | None, expected: str | None) -> None:
+    """Assert equal opaque ETag values while allowing proxy-valid weakening."""
+
+    def normalize(value: str | None) -> str:
+        assert isinstance(value, str) and value, "Expected a nonempty ETag header"
+        normalized = value.removeprefix("W/")
+        assert normalized.startswith('"') and normalized.endswith('"'), (
+            f"Expected a quoted ETag; received {value!r}"
+        )
+        return normalized
+
+    assert normalize(actual) == normalize(expected)
 
 
 # @testable true

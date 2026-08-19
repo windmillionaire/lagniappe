@@ -44,6 +44,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache, database, notification_service
 
 from testing.definitions import SitePages, Users
+from testing.utility import assert_same_etag
 
 pytestmark = pytest.mark.e2e
 
@@ -295,7 +296,7 @@ def test_authenticated_home_response_headers_include_etag(get_user):
         timeout=10,
     )
     assert conditional.status_code == 304
-    assert conditional.headers["etag"] == headers["etag"]
+    assert_same_etag(conditional.headers.get("etag"), headers["etag"])
     assert conditional.headers["cache-control"] == "private, no-cache"
     assert conditional.content == b""
 
@@ -307,7 +308,7 @@ def test_authenticated_home_response_headers_include_etag(get_user):
         timeout=10,
     )
     assert uncached.status_code == 200
-    assert uncached.headers["etag"] == headers["etag"]
+    assert_same_etag(uncached.headers.get("etag"), headers["etag"])
     assert uncached.headers["content-type"].startswith("text/html")
     assert '<div lp-view data-kind="home"' in uncached.text
 

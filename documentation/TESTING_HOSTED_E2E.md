@@ -1,10 +1,11 @@
-# Hosted E2E
+# Hosted Tests
 
-Hosted E2E is an opt-in way to run the existing pytest/Playwright suite close
-to Datastore, Cloud Storage, App Engine, and Redis without copying application
-secrets into GitHub Actions. It uses the same tests, resources, direct backend
-helpers, fixed `test-` data prefix, cleanup, and traceability-result plugin as a
-local E2E run.
+Hosted testing is an opt-in way to run the normal unit, JavaScript, tooling,
+and pytest/Playwright E2E suites in one Cloud Run job without copying
+application secrets into GitHub Actions. E2E work runs close to Datastore,
+Cloud Storage, App Engine, and Redis and uses the same resources, direct
+backend helpers, fixed `test-` data prefix, cleanup, and traceability-result
+plugin as a local run.
 
 The operator deploys one exact, zero-traffic App Engine version and a matching
 Cloud Run job from a clean commit. A local command or the manual GitHub
@@ -32,11 +33,12 @@ bucket uses uniform access with public access prevention. The App Engine
 version receives the normal settings only through the trusted local App Engine
 deploy, the same boundary used by a production deploy.
 
-The runner installs the complete development-test dependency set, including
-the pinned provider clients required to collect the opt-in live-provider E2E
-module. Those provider tests remain marker-excluded from the ordinary full E2E
-suite; installing their clients grants no provider authority beyond the
-runner service account's IAM roles.
+The runner installs the complete Python and Node development-test dependency
+sets, including the pinned provider clients required to collect the opt-in
+live-provider E2E module. The `setup_drift` and `setup_provider` probes remain
+marker-excluded from the normal `all` scope because they are deliberately
+operator-invoked contracts; installing their clients grants no provider
+authority beyond the runner service account's IAM roles.
 
 The version URL is not an open testing site. Only `/testing/health` and the
 bootstrap exchange are initially reachable. The exchange requires a Google ID
@@ -131,12 +133,24 @@ settings only from Secret Manager. Both artifacts and browser assets use the
 committed build ID. The version permits zero idle instances and receives no
 service traffic.
 
-Run the short infrastructure/login pilot first, then the full suite:
+The runner submits its image build asynchronously and records the provider's
+Cloud Build ID before waiting. It also records completed provisioning phases.
+If the local process is interrupted, rerunning `create` from the same clean
+commit resumes that exact lifecycle: it waits for the recorded build,
+recognizes an exact already-deployed version, and safely repeats idempotent
+reconciliation. A different commit is rejected until the interrupted
+lifecycle is torn down.
+
+With the candidate environment ready, a plain execute runs every normal suite:
 
 ```bash
-venv/bin/python run.py hosted-e2e execute --suite pilot
-venv/bin/python run.py hosted-e2e execute --suite full
+venv/bin/python run.py hosted-e2e execute
 ```
+
+Use `--suite pilot` for the short infrastructure/login probe or `--suite full`
+for E2E alone. The default `all` scope expands to `unit`, `js`, `tooling`, and
+`e2e` in one pytest session. Explicit opt-in provider/setup markers remain
+outside it.
 
 For trusted local diagnosis, run one or more real E2E files/nodeids without
 repeating the complete suite:
@@ -150,7 +164,7 @@ Repeat `--target` to run several cases in one leased pytest session. The job
 accepts only bounded, existing Python files beneath `testing/tests_e2e/`; it
 rejects pytest options, traversal, control characters, and argument-delimiter
 ambiguity. The GitHub workflow deliberately continues to expose only the
-fixed `pilot` and `full` scopes.
+fixed `all`, `pilot`, and `full` scopes.
 
 Both commands execute the same `lagniappe-e2e` Cloud Run job used by CI. The
 hosted runner skips local Flask startup, local frontend rebuilding, and local
@@ -189,14 +203,14 @@ provider, and seven-day artifact bucket remain for reuse.
 ## Running From GitHub
 
 Dispatch `.github/workflows/hosted-e2e.yml` at the same Git ref used by
-`create`, selecting `pilot` or `full`. The workflow reads the configured source
-from the job and refuses to execute if it differs from `github.sha`. It uses WIF
-only to describe and invoke that exact job; it has no project-wide Cloud Run
-viewer role and cannot read either mounted secret or download result objects.
-The workflow uses its job-scoped override permission to select `pilot` or
-`full`. The container entry point also accepts the separately validated
-`focused` scope used by the trusted local command, but the workflow has no
-focused input or arbitrary target field.
+`create`; its default `all` choice runs every normal suite in its single job.
+The diagnostic `pilot` and E2E-only `full` choices remain available. The
+workflow reads the configured source from the job and refuses to execute if it
+differs from `github.sha`. It uses WIF only to describe and invoke that exact
+job; it has no project-wide Cloud Run viewer role and cannot read either
+mounted secret or download result objects. The container entry point also
+accepts the separately validated `focused` scope used by the trusted local
+command, but the workflow has no focused input or arbitrary target field.
 It does not check out, rebuild, commit, or create a branch in the repository.
 
 Local and GitHub dispatches are consequently two front doors to the same job,
@@ -214,12 +228,11 @@ Every job uploads the following under
 
 A focused manifest also records the exact selected nodeids.
 
-A local `hosted-e2e execute` downloads that execution under
-`reports/hosted-e2e/results/EXECUTION/` and automatically merges its per-test
-outcomes and semantic snapshots into `testing/evidence/latest.json`. Existing
-unselected test evidence is preserved, just as it is after a focused local
-pytest run. The merged provenance records the hosted execution, job, service,
-commit, version, and selected suite.
+Execution never changes local evidence by default, regardless of whether it is
+started locally or by GitHub. It records the execution name in lifecycle state
+and returns the provider exit status. Pass `--import-results` only when an
+immediate local import is intentionally desired; the normal release flow keeps
+execution and evidence review separate.
 
 A CI-triggered run deliberately does not update the repository. From a checkout
 still at the exact candidate commit used by `create`, import its result during
@@ -228,6 +241,16 @@ the release flow:
 ```bash
 venv/bin/python run.py hosted-e2e results --latest
 ```
+
+This explicit command downloads the execution under
+`reports/hosted-e2e/results/EXECUTION/` and merges its per-test outcomes and
+semantic snapshots into `testing/evidence/latest.json`. Existing unselected
+test evidence is preserved, just as it is after a focused local pytest run.
+The merged provenance records the hosted execution, job, service, commit,
+version, and selected suite. Use `--download-only` to inspect artifacts without
+changing evidence, and `--skip-report-archive` when only the manifest, evidence,
+and JUnit XML are needed. Downloads print their destination and per-file byte
+progress; the report archive remains available for a later selective download.
 
 The import merges only when both the result commit and semantic source-tree
 snapshot equal the local checkout. A different source is still available with
@@ -248,10 +271,11 @@ candidate commit as provenance.
 lifecycle without storing credentials. If create or execution is interrupted:
 
 1. Run `hosted-e2e status`.
-2. Use `hosted-e2e results --latest` if an execution reached artifact upload.
-3. Run `hosted-e2e teardown` to remove any partial runnable version/job and CORS
-   origin.
-4. Return to a clean commit and run `create` again.
+2. If `create` was interrupted, return to the same clean commit and rerun
+   `hosted-e2e create`; the recorded Cloud Build/version phases resume.
+3. Use `hosted-e2e results --latest` if an execution reached artifact upload.
+4. Run `hosted-e2e teardown` when abandoning that lifecycle or moving to a
+   different commit, then create the new candidate.
 
 Do not run local E2E, hosted E2E, `test-server`, or browser-review sessions
 against the shared test data concurrently.

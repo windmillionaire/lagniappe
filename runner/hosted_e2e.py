@@ -74,6 +74,11 @@ BUILD_METADATA_PATH = Path("lagniappe/web/static/build.json")
 BUILD_CONSTANTS_PATH = Path("config/constants.py")
 BUILD_SERVICE_WORKER_PATH = Path("lagniappe/web/static/sw.js")
 CLOUD_BUILD_IDENTITY_RETRY_DELAYS = (2, 4, 8, 16)
+CLOUD_BUILD_ID_RE = re.compile(
+    r"^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$",
+    re.IGNORECASE,
+)
+CLOUD_BUILD_PENDING_STATUSES = {"STATUS_UNKNOWN", "QUEUED", "WORKING", "PENDING"}
 
 
 # @testable infrastructure
@@ -186,17 +191,14 @@ def _project_number(project):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_cloud_build_identity_waits_for_first_setup_propagation
+# @tests tests_tooling/test_009_hosted_e2e.py::test_cloud_build_identity_rejects_legacy_cloud_build_account
 # @features hosted-e2e
 # @dimensions first-setup api-propagation build-identity
 def _cloud_build_service_account(infrastructure):
     """Return the build identity after bounded first-enable propagation."""
-    supported_accounts = {
-        f"{infrastructure.project_number}@cloudbuild.gserviceaccount.com",
-        (
-            f"{infrastructure.project_number}-compute@"
-            "developer.gserviceaccount.com"
-        ),
-    }
+    expected_account = (
+        f"{infrastructure.project_number}-compute@developer.gserviceaccount.com"
+    )
     for attempt in range(len(CLOUD_BUILD_IDENTITY_RETRY_DELAYS) + 1):
         result = _gcloud(
             "builds",
@@ -206,13 +208,13 @@ def _cloud_build_service_account(infrastructure):
             check=False,
         )
         value = result.stdout.strip().rsplit("/", 1)[-1]
-        if result.returncode == 0 and value in supported_accounts:
+        if result.returncode == 0 and value == expected_account:
             return value
         if attempt < len(CLOUD_BUILD_IDENTITY_RETRY_DELAYS):
             time.sleep(CLOUD_BUILD_IDENTITY_RETRY_DELAYS[attempt])
     raise HostedE2EError(
-        "Google Cloud did not return the default Cloud Build identity after "
-        "waiting for first-time API propagation."
+        "Google Cloud did not return the Compute Engine default Cloud Build "
+        "identity after waiting for first-time API propagation."
     )
 
 
@@ -1023,10 +1025,10 @@ def _change_test_bucket_cors(infrastructure, origin, *, present):
 # @features hosted-e2e
 # @dimensions image-boundary deployment-source
 def _build_runner_image(infrastructure, source, source_root):
-    """Build the runner image from the already-exported committed tree."""
+    """Start a resumable image build from the exported committed tree."""
     container_root = Path(source_root) / CONTAINER_RELATIVE_ROOT
     image = f"{infrastructure.image_base}:{source}"
-    _gcloud(
+    result = _gcloud(
         "builds",
         "submit",
         source_root,
@@ -1034,11 +1036,64 @@ def _build_runner_image(infrastructure, source, source_root):
         f"--ignore-file={container_root / 'gcloudignore'}",
         f"--substitutions=_IMAGE={image}",
         f"--project={infrastructure.project}",
+        "--async",
+        "--format=json",
         "--quiet",
-        timeout=3600,
-        capture_output=False,
+        timeout=600,
     )
-    return image
+    payload = _json_result(result, "Cloud Build submission")
+    cloud_build_id = str(payload.get("id") or "").strip()
+    if not CLOUD_BUILD_ID_RE.fullmatch(cloud_build_id):
+        raise HostedE2EError("Cloud Build did not return a valid build ID.")
+    return image, cloud_build_id
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_runner_image_build_waits_for_recorded_cloud_build
+# @features hosted-e2e
+# @dimensions build-resume provider-status failure-recovery
+def _wait_runner_image_build(
+    infrastructure,
+    cloud_build_id,
+    *,
+    timeout=3600,
+    poll_interval=5,
+):
+    """Wait for one recorded Cloud Build, reporting provider state changes."""
+    if not CLOUD_BUILD_ID_RE.fullmatch(str(cloud_build_id or "")):
+        raise HostedE2EError("Hosted E2E state contains an invalid Cloud Build ID.")
+    deadline = time.monotonic() + timeout
+    previous_status = None
+    while True:
+        payload = _describe(
+            [
+                "builds",
+                "describe",
+                cloud_build_id,
+                f"--project={infrastructure.project}",
+            ]
+        )
+        if payload is None:
+            raise HostedE2EError(
+                f"Recorded Cloud Build {cloud_build_id} no longer exists."
+            )
+        status = str(payload.get("status") or "STATUS_UNKNOWN").upper()
+        if status != previous_status:
+            print(f"Cloud Build {cloud_build_id}: {status}", flush=True)
+            previous_status = status
+        if status == "SUCCESS":
+            return payload
+        if status not in CLOUD_BUILD_PENDING_STATUSES:
+            detail = str(payload.get("statusDetail") or "").strip()
+            suffix = f" ({detail})" if detail else ""
+            raise HostedE2EError(
+                f"Cloud Build {cloud_build_id} ended with {status}{suffix}."
+            )
+        if time.monotonic() >= deadline:
+            raise HostedE2EError(
+                f"Cloud Build {cloud_build_id} did not finish within {timeout} seconds."
+            )
+        time.sleep(poll_interval)
 
 
 # @testable false
@@ -1241,6 +1296,101 @@ def _update_job(infrastructure, state):
         )
 
 
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_create_resumes_only_the_same_committed_lifecycle
+# @features hosted-e2e
+# @dimensions lifecycle resume source-integrity failure-recovery
+def _resumable_create_state(
+    previous,
+    infrastructure,
+    *,
+    source,
+    source_snapshot,
+    build_id,
+):
+    """Return interrupted exact-source state, or reject an unsafe replacement."""
+    if not previous or previous.get("status") == "torn-down":
+        return None
+    if previous.get("schema_version") != STATE_SCHEMA_VERSION:
+        raise HostedE2EError("The previous hosted E2E lifecycle state is invalid.")
+    if previous.get("status") not in {"creating", "failed"}:
+        raise HostedE2EError(
+            "The previous hosted E2E lifecycle has not been torn down; "
+            "inspect its status and tear it down first."
+        )
+    _validate_state_infrastructure(previous, infrastructure)
+    expected = {
+        "source": source,
+        "source_snapshot": source_snapshot,
+        "build_id": build_id,
+    }
+    mismatches = [
+        name for name, value in expected.items() if previous.get(name) != value
+    ]
+    if mismatches:
+        raise HostedE2EError(
+            "The interrupted hosted E2E lifecycle belongs to a different "
+            f"committed build ({', '.join(mismatches)}); tear it down first."
+        )
+    version = str(previous.get("version") or "")
+    if not VERSION_RE.fullmatch(version):
+        raise HostedE2EError("The interrupted lifecycle has an invalid version.")
+    if previous.get("base_url") != _version_url(infrastructure, version):
+        raise HostedE2EError("The interrupted lifecycle has an invalid version URL.")
+    expected_image = f"{infrastructure.image_base}:{source}"
+    if previous.get("image") not in {None, expected_image}:
+        raise HostedE2EError("The interrupted lifecycle has an unexpected image.")
+    cloud_build_id = previous.get("cloud_build_id")
+    if previous.get("image_ready") and cloud_build_id is None:
+        raise HostedE2EError(
+            "The interrupted lifecycle completed its image without recording "
+            "a Cloud Build ID."
+        )
+    if cloud_build_id is not None and not CLOUD_BUILD_ID_RE.fullmatch(
+        str(cloud_build_id)
+    ):
+        raise HostedE2EError(
+            "The interrupted lifecycle has an invalid Cloud Build ID."
+        )
+    return dict(previous)
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_app_resume_requires_exact_deployment_metadata
+# @features hosted-e2e
+# @dimensions lifecycle resume deployment-source failure-recovery
+def _hosted_app_version_present(infrastructure, state):
+    """Report whether the state-owned version already has exact metadata."""
+    existing = _describe(
+        [
+            "app",
+            "versions",
+            "describe",
+            state["version"],
+            f"--service={SERVICE}",
+            f"--project={infrastructure.project}",
+        ]
+    )
+    if existing is None:
+        return False
+    variables = existing.get("envVariables") or {}
+    expected = {
+        "LAGNIAPPE_HOSTED_E2E_VERSION": state["version"],
+        "LAGNIAPPE_HOSTED_E2E_SOURCE": state["source"],
+        "LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT": state["source_snapshot"],
+        "LAGNIAPPE_HOSTED_E2E_BUILD_ID": state["build_id"],
+    }
+    mismatches = [
+        name for name, value in expected.items() if variables.get(name) != value
+    ]
+    if mismatches:
+        raise HostedE2EError(
+            "The state-owned App Engine version has unexpected deployment "
+            f"metadata ({', '.join(mismatches)})."
+        )
+    return True
+
+
 # @testable infrastructure
 def create():
     """Deploy one committed production build as a test app and runner."""
@@ -1257,84 +1407,114 @@ def create():
     _validate_state_infrastructure(setup_state, infrastructure)
     _verify_soft_routing_guard(infrastructure)
     previous = _load_json(STATE_PATH)
-    if previous and previous.get("status") != "torn-down":
-        raise HostedE2EError(
-            "The previous hosted E2E lifecycle has not been torn down; "
-            "inspect its status and tear it down first."
-        )
-
-    version = "e2e-" + secrets.token_hex(8)
-    base_url = _version_url(infrastructure, version)
-    state = {
-        "schema_version": STATE_SCHEMA_VERSION,
-        "status": "creating",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "project": infrastructure.project,
-        "region": infrastructure.region,
-        "service": SERVICE,
-        "job": infrastructure.job,
-        "version": version,
-        "source": source,
-        "source_snapshot": source_snapshot,
-        "build_id": build_id,
-        "base_url": base_url,
-        "artifact_bucket": infrastructure.artifact_bucket,
-    }
+    state = _resumable_create_state(
+        previous,
+        infrastructure,
+        source=source,
+        source_snapshot=source_snapshot,
+        build_id=build_id,
+    )
+    if state is None:
+        version = "e2e-" + secrets.token_hex(8)
+        base_url = _version_url(infrastructure, version)
+        state = {
+            "schema_version": STATE_SCHEMA_VERSION,
+            "status": "creating",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "project": infrastructure.project,
+            "region": infrastructure.region,
+            "service": SERVICE,
+            "job": infrastructure.job,
+            "version": version,
+            "source": source,
+            "source_snapshot": source_snapshot,
+            "build_id": build_id,
+            "base_url": base_url,
+            "artifact_bucket": infrastructure.artifact_bucket,
+            "image": f"{infrastructure.image_base}:{source}",
+        }
+    else:
+        state["status"] = "creating"
+        state["resumed_at"] = datetime.now(timezone.utc).isoformat()
+        state.setdefault("image", f"{infrastructure.image_base}:{source}")
     STATE_ROOT.mkdir(parents=True, exist_ok=True)
     _write_json(STATE_PATH, state, owner_only=True)
 
-    cors_added = False
-    deployed = False
     try:
         with _committed_source_tree(source) as source_root:
-            image = _build_runner_image(infrastructure, source, source_root)
-            state["image"] = image
-            _write_json(STATE_PATH, state, owner_only=True)
-            _sync_settings_secret(infrastructure)
-            _change_test_bucket_cors(infrastructure, base_url, present=True)
-            cors_added = True
+            if not state.get("image_ready"):
+                cloud_build_id = state.get("cloud_build_id")
+                if cloud_build_id is None:
+                    image, cloud_build_id = _build_runner_image(
+                        infrastructure,
+                        source,
+                        source_root,
+                    )
+                    state["image"] = image
+                    state["cloud_build_id"] = cloud_build_id
+                    _write_json(STATE_PATH, state, owner_only=True)
+                _wait_runner_image_build(infrastructure, cloud_build_id)
+                state["image_ready"] = True
+                _write_json(STATE_PATH, state, owner_only=True)
 
-            _stage_app_runtime_files(source_root)
-            descriptor = _hosted_app_descriptor(
+            if not state.get("settings_synced"):
+                _sync_settings_secret(infrastructure)
+                state["settings_synced"] = True
+                _write_json(STATE_PATH, state, owner_only=True)
+
+            _change_test_bucket_cors(
                 infrastructure,
-                version=version,
-                source=source,
-                source_snapshot=source_snapshot,
-                build_id=build_id,
-                base_url=base_url,
-                session_key=secrets.token_urlsafe(48),
+                state["base_url"],
+                present=True,
             )
-            descriptor_path = source_root / ".hosted-e2e-app.yaml"
-            _atomic_write_text(
-                descriptor_path,
-                yaml.safe_dump(descriptor, sort_keys=False),
-                owner_only=True,
-            )
-            try:
-                _gcloud(
-                    "app",
-                    "deploy",
-                    descriptor_path,
-                    f"--version={version}",
-                    "--no-promote",
-                    "--quiet",
-                    f"--project={infrastructure.project}",
-                    timeout=2400,
-                    capture_output=False,
+            state["cors_added"] = True
+            _write_json(STATE_PATH, state, owner_only=True)
+
+            if _hosted_app_version_present(infrastructure, state):
+                state["app_deployed"] = True
+                _write_json(STATE_PATH, state, owner_only=True)
+            else:
+                _stage_app_runtime_files(source_root)
+                descriptor = _hosted_app_descriptor(
+                    infrastructure,
+                    version=state["version"],
+                    source=source,
+                    source_snapshot=source_snapshot,
+                    build_id=build_id,
+                    base_url=state["base_url"],
+                    session_key=secrets.token_urlsafe(48),
                 )
-                deployed = True
-            finally:
-                descriptor_path.unlink(missing_ok=True)
+                descriptor_path = source_root / ".hosted-e2e-app.yaml"
+                _atomic_write_text(
+                    descriptor_path,
+                    yaml.safe_dump(descriptor, sort_keys=False),
+                    owner_only=True,
+                )
+                try:
+                    _gcloud(
+                        "app",
+                        "deploy",
+                        descriptor_path,
+                        f"--version={state['version']}",
+                        "--no-promote",
+                        "--quiet",
+                        f"--project={infrastructure.project}",
+                        timeout=2400,
+                        capture_output=False,
+                    )
+                    state["app_deployed"] = True
+                    _write_json(STATE_PATH, state, owner_only=True)
+                finally:
+                    descriptor_path.unlink(missing_ok=True)
 
         _wait_hosted_health(state)
-        state["status"] = "ready"
         _update_job(infrastructure, state)
+        state["job_updated"] = True
+        state["status"] = "ready"
         _write_json(STATE_PATH, state, owner_only=True)
         return state
     except Exception:
         state["status"] = "failed"
-        state["app_deployed"] = deployed
-        state["cors_added"] = cors_added
         _write_json(STATE_PATH, state, owner_only=True)
         raise
 
@@ -1376,13 +1556,26 @@ def _state_ready(infrastructure):
     return state
 
 
-# @testable infrastructure
-def _execution_name(payload):
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr
+# @features hosted-e2e
+# @dimensions execution-name failure-recovery
+def _execution_name(payload, *output):
     metadata = payload.get("metadata") if isinstance(payload, dict) else None
     name = metadata.get("name") if isinstance(metadata, dict) else None
     if isinstance(name, str) and "/" in name:
         name = name.rsplit("/", 1)[-1]
-    return name if isinstance(name, str) and EXECUTION_RE.fullmatch(name) else None
+    if isinstance(name, str) and EXECUTION_RE.fullmatch(name):
+        return name
+    for value in output:
+        candidates = re.findall(
+            r"\blagniappe-e2e-[a-z0-9-]*[a-z0-9]\b",
+            value or "",
+        )
+        for candidate in candidates:
+            if EXECUTION_RE.fullmatch(candidate):
+                return candidate
+    return None
 
 
 # @testable true
@@ -1390,7 +1583,7 @@ def _execution_name(payload):
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
 # @features hosted-e2e
 # @dimensions focused-execution cloud-run override local-dispatch target-validation argument-injection
-def execute(*, suite="pilot", targets=(), import_results=True):
+def execute(*, suite="all", targets=(), import_results=False):
     """Execute the same Cloud Run job used by CI and optionally import evidence."""
     from testing.utility.hosted_e2e_job import validate_focused_targets
 
@@ -1404,7 +1597,7 @@ def execute(*, suite="pilot", targets=(), import_results=True):
         raise HostedE2EError(
             "Focused targets require the hosted E2E focused suite."
         )
-    elif suite not in {"pilot", "full"}:
+    elif suite not in {"all", "pilot", "full"}:
         raise HostedE2EError(f"Unsupported hosted E2E suite {suite!r}.")
 
     _activate(adc=import_results)
@@ -1429,8 +1622,14 @@ def execute(*, suite="pilot", targets=(), import_results=True):
         check=False,
         timeout=9000,
     )
-    payload = _json_result(result, "Cloud Run execution") if result.stdout.strip() else {}
-    execution = _execution_name(payload)
+    payload = {}
+    if result.stdout.strip():
+        try:
+            payload = _json_result(result, "Cloud Run execution")
+        except HostedE2EError:
+            if result.returncode == 0:
+                raise
+    execution = _execution_name(payload, result.stdout, result.stderr)
     if execution is None:
         raise HostedE2EError(
             result.stderr.strip() or "Cloud Run did not identify the job execution."
@@ -1509,8 +1708,17 @@ def merge_remote_evidence(local, remote):
     }
 
 
-# @testable infrastructure
-def results(*, execution=None, latest=False, merge=True):
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_results_can_skip_large_report_archive
+# @features hosted-e2e traceability
+# @dimensions artifact-download selective-download progress
+def results(
+    *,
+    execution=None,
+    latest=False,
+    merge=True,
+    include_report_archive=True,
+):
     """Download one result bundle and merge its outcomes into evidence.json."""
     _activate(adc=True)
     infrastructure = _infrastructure()
@@ -1526,17 +1734,23 @@ def results(*, execution=None, latest=False, merge=True):
 
     destination = STATE_ROOT / "results" / execution
     destination.mkdir(parents=True, exist_ok=True)
+    print(f"Downloading hosted test artifacts to {destination}", flush=True)
     client = storage.Client(project=infrastructure.project)
     bucket = client.bucket(infrastructure.artifact_bucket)
     downloaded = {}
-    for name in ("manifest.json", "evidence.json", "junit.xml", "reports.tar.gz"):
+    artifact_names = ["manifest.json", "evidence.json", "junit.xml"]
+    if include_report_archive:
+        artifact_names.append("reports.tar.gz")
+    for name in artifact_names:
         blob = bucket.blob(f"executions/{execution}/{name}")
         if not blob.exists(client=client):
             if name in {"manifest.json", "evidence.json"}:
                 raise HostedE2EError(f"Hosted result is missing required {name}.")
             continue
         path = destination / name
+        print(f"  downloading {name}...", end="", flush=True)
         blob.download_to_filename(path)
+        print(f" {path.stat().st_size:,} bytes", flush=True)
         downloaded[name] = path
 
     manifest = _load_json(downloaded["manifest.json"])
@@ -1764,11 +1978,14 @@ def status():
     }
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_command_defaults_to_all_without_import
+# @features hosted-e2e
+# @dimensions cli-routing suite-scope evidence-import
 def run_hosted_e2e_command(arguments):
     parser = argparse.ArgumentParser(
         prog="run.py hosted-e2e",
-        description="Run the existing E2E suite in an isolated Google-hosted environment.",
+        description="Run repository tests in an isolated Google-hosted environment.",
     )
     commands = parser.add_subparsers(dest="action", required=True)
     setup_parser = commands.add_parser("setup", help="Provision stable hosted-E2E resources.")
@@ -1779,19 +1996,28 @@ def run_hosted_e2e_command(arguments):
     )
     execute_parser = commands.add_parser("execute", help="Run the Cloud Run E2E job.")
     execute_scope = execute_parser.add_mutually_exclusive_group()
-    execute_scope.add_argument("--suite", choices=("pilot", "full"))
+    execute_scope.add_argument("--suite", choices=("all", "pilot", "full"))
     execute_scope.add_argument(
         "--target",
         action="append",
         dest="targets",
         help="Run one existing E2E file/nodeid; repeat for additional targets.",
     )
-    execute_parser.add_argument("--no-results", action="store_true")
+    execute_parser.add_argument(
+        "--import-results",
+        action="store_true",
+        help="Download and merge this execution immediately instead of during release.",
+    )
     results_parser = commands.add_parser("results", help="Download and import job artifacts.")
     result_selector = results_parser.add_mutually_exclusive_group()
     result_selector.add_argument("--execution")
     result_selector.add_argument("--latest", action="store_true")
     results_parser.add_argument("--download-only", action="store_true")
+    results_parser.add_argument(
+        "--skip-report-archive",
+        action="store_true",
+        help="Download manifest, evidence, and JUnit XML without reports.tar.gz.",
+    )
     commands.add_parser("status", help="Show local and provider lifecycle state.")
     teardown_parser = commands.add_parser("teardown", help="Delete the ephemeral version and job.")
     teardown_parser.add_argument("--force", action="store_true")
@@ -1809,11 +2035,11 @@ def run_hosted_e2e_command(arguments):
             payload = create()
             print(f"Hosted E2E version ready: {payload['base_url']}")
         elif args.action == "execute":
-            suite = args.suite or ("focused" if args.targets else "pilot")
+            suite = args.suite or ("focused" if args.targets else "all")
             payload = execute(
                 suite=suite,
                 targets=args.targets or (),
-                import_results=not args.no_results,
+                import_results=args.import_results,
             )
             print(json.dumps(payload, indent=2, sort_keys=True))
             return int(payload.get("exit_status") or 0)
@@ -1822,6 +2048,7 @@ def run_hosted_e2e_command(arguments):
                 execution=args.execution,
                 latest=args.latest,
                 merge=not args.download_only,
+                include_report_archive=not args.skip_report_archive,
             )
             print(json.dumps(payload, indent=2, sort_keys=True))
             return int(payload.get("exit_status") or 0)

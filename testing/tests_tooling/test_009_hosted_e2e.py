@@ -1,5 +1,6 @@
 """Offline contracts for the hosted-E2E lifecycle and evidence bridge."""
 
+import json
 import subprocess
 
 import pytest
@@ -115,6 +116,22 @@ def test_cloud_build_identity_waits_for_first_setup_propagation(monkeypatch):
     assert len(calls) == 2
     assert calls[0][0][-1] == "--format=value(serviceAccountEmail)"
     assert calls[0][1] == {"check": False}
+
+
+# @features hosted-e2e
+# @dimensions first-setup api-propagation build-identity
+def test_cloud_build_identity_rejects_legacy_cloud_build_account(monkeypatch):
+    legacy = subprocess.CompletedProcess(
+        ["gcloud"],
+        returncode=0,
+        stdout="1234@cloudbuild.gserviceaccount.com\n",
+        stderr="",
+    )
+    monkeypatch.setattr(hosted_e2e, "_gcloud", lambda *_args, **_options: legacy)
+    monkeypatch.setattr(hosted_e2e.time, "sleep", lambda _delay: None)
+
+    with pytest.raises(HostedE2EError, match="Compute Engine default"):
+        hosted_e2e._cloud_build_service_account(_infrastructure())
 
 
 # @features hosted-e2e
@@ -335,6 +352,19 @@ def test_hosted_focused_targets_require_existing_e2e_nodeids():
             hosted_e2e_job.validate_focused_targets([invalid])
 
 
+def test_hosted_all_scope_runs_every_normal_suite():
+    command = hosted_e2e_job._pytest_command("all")
+
+    assert command[command.index("--strict") + 1 : -1] == [
+        "unit",
+        "js",
+        "tooling",
+        "e2e",
+    ]
+    with pytest.raises(RuntimeError):
+        hosted_e2e_job._pytest_command("all", ["testing/tests_unit/"])
+
+
 # @features hosted-e2e
 # @dimensions focused-execution cloud-run override local-dispatch
 def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
@@ -384,6 +414,118 @@ def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
         in calls[0][0]
     )
     assert writes[0][1]["last_targets"] == [target, second_target]
+
+
+# @features hosted-e2e
+# @dimensions execution-name failure-recovery
+def test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr(
+    monkeypatch,
+):
+    writes = []
+    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
+    monkeypatch.setattr(hosted_e2e, "_infrastructure", _infrastructure)
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_state_ready",
+        lambda _infrastructure: {"status": "ready"},
+    )
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_write_json",
+        lambda path, payload, **options: writes.append((path, payload, options)),
+    )
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_gcloud",
+        lambda *_arguments, **_options: subprocess.CompletedProcess(
+            ["gcloud"],
+            returncode=1,
+            stdout="",
+            stderr=(
+                "Execution lagniappe-e2e-failed1 finished with a failed task.\n"
+                "Run gcloud run jobs executions describe lagniappe-e2e-failed1.\n"
+            ),
+        ),
+    )
+
+    result = hosted_e2e.execute(suite="all", import_results=False)
+
+    assert result == {"execution": "lagniappe-e2e-failed1", "exit_status": 1}
+    assert writes[0][1]["last_execution"] == "lagniappe-e2e-failed1"
+    assert writes[0][1]["last_suite"] == "all"
+
+
+# @features hosted-e2e
+# @dimensions cli-routing suite-scope evidence-import
+def test_hosted_execute_command_defaults_to_all_without_import(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        hosted_e2e,
+        "execute",
+        lambda **options: calls.append(options)
+        or {"execution": "lagniappe-e2e-alltest", "exit_status": 0},
+    )
+
+    assert hosted_e2e.run_hosted_e2e_command(["execute"]) == 0
+    assert calls == [{"suite": "all", "targets": (), "import_results": False}]
+
+
+# @features hosted-e2e traceability
+# @dimensions artifact-download selective-download progress
+def test_hosted_results_can_skip_large_report_archive(tmp_path, monkeypatch, capsys):
+    execution = "lagniappe-e2e-result1"
+    requested = []
+    files = {
+        "manifest.json": json.dumps(
+            {"execution": execution, "exit_status": 0, "suite": "all"}
+        ).encode(),
+        "evidence.json": b"{}\n",
+        "junit.xml": b"<testsuites/>\n",
+        "reports.tar.gz": b"large report archive",
+    }
+
+    class Blob:
+        def __init__(self, name):
+            self.name = name
+
+        def exists(self, *, client):
+            return self.name.rsplit("/", 1)[-1] in files
+
+        def download_to_filename(self, path):
+            name = self.name.rsplit("/", 1)[-1]
+            requested.append(name)
+            path.write_bytes(files[name])
+
+    class Bucket:
+        def blob(self, name):
+            return Blob(name)
+
+    class Client:
+        def __init__(self, *, project):
+            assert project == "project-1"
+
+        def bucket(self, name):
+            assert name == "lagniappe-e2e-artifacts-example"
+            return Bucket()
+
+    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
+    monkeypatch.setattr(hosted_e2e, "_infrastructure", _infrastructure)
+    monkeypatch.setattr(hosted_e2e, "STATE_ROOT", tmp_path)
+    monkeypatch.setattr(hosted_e2e, "STATE_PATH", tmp_path / "state.json")
+    monkeypatch.setattr("google.cloud.storage.Client", Client)
+
+    manifest = hosted_e2e.results(
+        execution=execution,
+        merge=False,
+        include_report_archive=False,
+    )
+
+    assert manifest["suite"] == "all"
+    assert requested == ["manifest.json", "evidence.json", "junit.xml"]
+    assert not (tmp_path / "results" / execution / "reports.tar.gz").exists()
+    output = capsys.readouterr().out
+    assert str(tmp_path / "results" / execution) in output
+    assert "downloading manifest.json" in output
 
 
 # @features hosted-e2e traceability
@@ -460,7 +602,7 @@ def test_hosted_image_upload_boundary_excludes_local_credentials_and_results():
     } <= ignore_lines
 
 
-def test_hosted_runner_installs_complete_e2e_collection_dependencies():
+def test_hosted_runner_installs_complete_test_collection_dependencies():
     development_requirements = {
         line.strip()
         for line in (hosted_e2e.APP_DIR / "requirements-dev.txt")
@@ -482,6 +624,10 @@ def test_hosted_runner_installs_complete_e2e_collection_dependencies():
         "COPY requirements.txt requirements-dev.txt requirements-installer.txt ./"
         in dockerfile
     )
+    assert "FROM node:24-bookworm-slim AS node-runtime" in dockerfile
+    assert "apt-get install --yes --no-install-recommends git" in dockerfile
+    assert "COPY package.json package-lock.json ./" in dockerfile
+    assert "RUN npm ci" in dockerfile
 
 
 def test_hosted_anchor_declares_its_upload_boundary():
@@ -510,11 +656,11 @@ def test_hosted_workflow_is_manual_and_repository_read_only():
         "workflow_dispatch": {
             "inputs": {
                 "suite": {
-                    "description": "E2E scope to run",
+                    "description": "Hosted test scope to run",
                     "required": "true",
-                    "default": "pilot",
+                    "default": "all",
                     "type": "choice",
-                    "options": ["pilot", "full"],
+                    "options": ["all", "pilot", "full"],
                 }
             }
         }
@@ -652,24 +798,173 @@ def test_runner_image_uses_the_exported_commit(tmp_path, monkeypatch):
     (container_root / "cloudbuild.yaml").write_text("steps: []\n", encoding="utf-8")
     (container_root / "gcloudignore").write_text("config/files/\n", encoding="utf-8")
     calls = []
+    cloud_build_id = "12345678-1234-1234-1234-123456789abc"
+
+    def gcloud(*arguments, **options):
+        calls.append((arguments, options))
+        return subprocess.CompletedProcess(
+            ["gcloud"],
+            returncode=0,
+            stdout=f'{{"id": "{cloud_build_id}"}}',
+            stderr="",
+        )
+
     monkeypatch.setattr(
         hosted_e2e,
         "_gcloud",
-        lambda *arguments, **options: calls.append((arguments, options)),
+        gcloud,
     )
 
-    image = hosted_e2e._build_runner_image(
+    image, returned_build_id = hosted_e2e._build_runner_image(
         _infrastructure(),
         "a" * 40,
         tmp_path,
     )
 
     assert image.endswith(":" + "a" * 40)
+    assert returned_build_id == cloud_build_id
     arguments, options = calls[0]
     assert arguments[:3] == ("builds", "submit", tmp_path)
     assert f"--config={container_root / 'cloudbuild.yaml'}" in arguments
     assert f"--ignore-file={container_root / 'gcloudignore'}" in arguments
-    assert options == {"timeout": 3600, "capture_output": False}
+    assert "--async" in arguments
+    assert "--format=json" in arguments
+    assert options == {"timeout": 600}
+
+
+# @features hosted-e2e
+# @dimensions build-resume provider-status failure-recovery
+def test_runner_image_build_waits_for_recorded_cloud_build(monkeypatch):
+    cloud_build_id = "12345678-1234-1234-1234-123456789abc"
+    descriptions = iter(({"status": "QUEUED"}, {"status": "SUCCESS"}))
+    calls = []
+    delays = []
+
+    def describe(arguments):
+        calls.append(arguments)
+        return next(descriptions)
+
+    monkeypatch.setattr(hosted_e2e, "_describe", describe)
+    monkeypatch.setattr(hosted_e2e.time, "monotonic", lambda: 0)
+    monkeypatch.setattr(hosted_e2e.time, "sleep", delays.append)
+
+    result = hosted_e2e._wait_runner_image_build(
+        _infrastructure(),
+        cloud_build_id,
+        poll_interval=0.01,
+    )
+
+    assert result == {"status": "SUCCESS"}
+    assert calls[0][:3] == ["builds", "describe", cloud_build_id]
+    assert delays == [0.01]
+
+
+# @features hosted-e2e
+# @dimensions lifecycle resume source-integrity failure-recovery
+def test_hosted_create_resumes_only_the_same_committed_lifecycle(monkeypatch):
+    infrastructure = _infrastructure()
+    source = "a" * 40
+    snapshot = "b" * 64
+    version = "e2e-abcdef1234567890"
+    base_url = "https://version.example.test"
+    state = {
+        "schema_version": hosted_e2e.STATE_SCHEMA_VERSION,
+        "status": "failed",
+        "project": infrastructure.project,
+        "region": infrastructure.region,
+        "service": infrastructure.service,
+        "job": infrastructure.job,
+        "artifact_bucket": infrastructure.artifact_bucket,
+        "version": version,
+        "base_url": base_url,
+        "source": source,
+        "source_snapshot": snapshot,
+        "build_id": "b1234567",
+        "image": f"{infrastructure.image_base}:{source}",
+        "cloud_build_id": "12345678-1234-1234-1234-123456789abc",
+    }
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_version_url",
+        lambda _infrastructure, _version: base_url,
+    )
+
+    resumed = hosted_e2e._resumable_create_state(
+        state,
+        infrastructure,
+        source=source,
+        source_snapshot=snapshot,
+        build_id="b1234567",
+    )
+
+    assert resumed == state
+    assert resumed is not state
+
+    mismatched = dict(state, source="c" * 40)
+    with pytest.raises(HostedE2EError, match="different committed build"):
+        hosted_e2e._resumable_create_state(
+            mismatched,
+            infrastructure,
+            source=source,
+            source_snapshot=snapshot,
+            build_id="b1234567",
+        )
+    with pytest.raises(HostedE2EError, match="has not been torn down"):
+        hosted_e2e._resumable_create_state(
+            dict(state, status="ready"),
+            infrastructure,
+            source=source,
+            source_snapshot=snapshot,
+            build_id="b1234567",
+        )
+    missing_build_id = dict(state, image_ready=True)
+    missing_build_id.pop("cloud_build_id")
+    with pytest.raises(HostedE2EError, match="without recording"):
+        hosted_e2e._resumable_create_state(
+            missing_build_id,
+            infrastructure,
+            source=source,
+            source_snapshot=snapshot,
+            build_id="b1234567",
+        )
+
+
+# @features hosted-e2e
+# @dimensions lifecycle resume deployment-source failure-recovery
+def test_hosted_app_resume_requires_exact_deployment_metadata(monkeypatch):
+    infrastructure = _infrastructure()
+    state = {
+        "version": "e2e-abcdef1234567890",
+        "source": "a" * 40,
+        "source_snapshot": "b" * 64,
+        "build_id": "b1234567",
+    }
+    variables = {
+        "LAGNIAPPE_HOSTED_E2E_VERSION": state["version"],
+        "LAGNIAPPE_HOSTED_E2E_SOURCE": state["source"],
+        "LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT": state["source_snapshot"],
+        "LAGNIAPPE_HOSTED_E2E_BUILD_ID": state["build_id"],
+    }
+
+    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: None)
+    assert not hosted_e2e._hosted_app_version_present(infrastructure, state)
+
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_describe",
+        lambda _arguments: {"envVariables": variables},
+    )
+    assert hosted_e2e._hosted_app_version_present(infrastructure, state)
+
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_describe",
+        lambda _arguments: {
+            "envVariables": dict(variables, LAGNIAPPE_HOSTED_E2E_SOURCE="c" * 40)
+        },
+    )
+    with pytest.raises(HostedE2EError, match="unexpected deployment metadata"):
+        hosted_e2e._hosted_app_version_present(infrastructure, state)
 
 
 # @features hosted-e2e

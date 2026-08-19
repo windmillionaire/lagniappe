@@ -1,4 +1,4 @@
-"""Cloud Run job entry point for the existing E2E pytest suite."""
+"""Cloud Run job entry point for the repository test suites."""
 
 from __future__ import annotations
 
@@ -89,7 +89,11 @@ def validate_focused_targets(targets) -> tuple[str, ...]:
 # @features hosted-e2e
 # @dimensions focused-execution target-validation argument-injection
 def _pytest_command(suite: str, targets=()) -> list[str]:
-    if suite == "full":
+    if suite == "all":
+        if targets:
+            raise RuntimeError("All hosted tests do not accept focused targets.")
+        pytest_targets = ["unit", "js", "tooling", "e2e"]
+    elif suite == "full":
         if targets:
             raise RuntimeError("Full hosted E2E does not accept focused targets.")
         pytest_targets = ["e2e"]
@@ -208,8 +212,8 @@ def main(arguments=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--suite",
-        choices=("pilot", "full", "focused"),
-        default="pilot",
+        choices=("all", "pilot", "full", "focused"),
+        default="all",
     )
     parser.add_argument("--target", action="append", default=[])
     args = parser.parse_args(arguments)

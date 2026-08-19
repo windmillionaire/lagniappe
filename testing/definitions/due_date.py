@@ -15,14 +15,17 @@ class DueDates(Enum):
         option=DueDateOptions.TODAY,
     )
     personal_task_due_in_four_days = DueDateDefinition(
-        due_date=local_date_plus_days_iso(4),
+        days_from_today=4,
     )
 
     def set(self, form):
-        if self.value.due_date:
+        due_date = self.value.due_date
+        if self.value.days_from_today is not None:
+            due_date = local_date_plus_days_iso(self.value.days_from_today)
+        if due_date:
             due_date_input = form.locator('[name="due-date"]')
             expect(due_date_input).to_be_visible()
-            due_date_input.fill(self.value.due_date)
+            due_date_input.fill(due_date)
 
         if self.value.option:
             self.value.option.set(form)

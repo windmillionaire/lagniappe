@@ -1,14 +1,15 @@
-name: Hosted E2E
+name: Hosted tests
 
 on:
   workflow_dispatch:
     inputs:
       suite:
-        description: E2E scope to run
+        description: Hosted test scope to run
         required: true
-        default: pilot
+        default: all
         type: choice
         options:
+          - all
           - pilot
           - full
 
@@ -52,13 +53,13 @@ jobs:
             exit 1
           fi
 
-      - name: Run the existing E2E suite
+      - name: Run the hosted test suite
         env:
           E2E_JOB: lagniappe-e2e
           E2E_REGION: ${{ vars.GCP_RESOURCE_REGION }}
           E2E_SUITE: ${{ inputs.suite }}
-        run: >-
-          gcloud run jobs execute "$E2E_JOB"
-          --region "$E2E_REGION"
-          --args=--suite,"$E2E_SUITE"
-          --wait
+        run: |
+          gcloud run jobs execute "$E2E_JOB" \
+            --region "$E2E_REGION" \
+            "--args=--suite=$E2E_SUITE" \
+            --wait

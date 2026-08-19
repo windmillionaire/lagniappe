@@ -20,7 +20,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
 from testing.definitions import Tasks, Users
 from testing.resources import Task
-from testing.utility import assert_lagniappe_error_response
+from testing.utility import assert_lagniappe_error_response, assert_same_etag
 
 pytestmark = pytest.mark.e2e
 
@@ -89,7 +89,7 @@ def test_task_route_is_forbidden_without_model_or_page_permission(
         timeout=10,
     )
     assert_lagniappe_error_response(response, status=403)
-    assert response.headers["etag"] == f'"{blocked_fingerprint}"'
+    assert_same_etag(response.headers.get("etag"), f'"{blocked_fingerprint}"')
     assert task.entity.name not in response.text
     assert _task_side_effect_state(task, owner, blocked) == state_before
 

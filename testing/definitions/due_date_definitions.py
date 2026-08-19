@@ -65,6 +65,7 @@ class DueDateScheduleDay(Enum):
 class DueDateDefinition:
     option: Optional[DueDateOptions] = None
     due_date: Optional[str] = None
+    days_from_today: Optional[int] = None
     unit: Optional[DueDateUnit] = None
     interval: Optional[int] = None
     schedule_type: Optional[DueDateScheduleType] = None

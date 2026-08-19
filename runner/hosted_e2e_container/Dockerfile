@@ -1,3 +1,5 @@
+FROM node:24-bookworm-slim AS node-runtime
+
 FROM python:3.14-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
@@ -6,10 +8,22 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /workspace
 
+COPY --from=node-runtime /usr/local/bin/node /usr/local/bin/node
+COPY --from=node-runtime /usr/local/bin/npm /usr/local/bin/npm
+COPY --from=node-runtime /usr/local/bin/npx /usr/local/bin/npx
+COPY --from=node-runtime /usr/local/lib/node_modules /usr/local/lib/node_modules
+
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends git \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt requirements-dev.txt requirements-installer.txt ./
 RUN python -m venv venv \
     && venv/bin/pip install --no-cache-dir -r requirements-dev.txt \
     && venv/bin/python -m playwright install --with-deps chromium
+
+COPY package.json package-lock.json ./
+RUN npm ci
 
 COPY . .
 

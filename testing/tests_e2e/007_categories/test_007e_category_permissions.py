@@ -24,7 +24,7 @@ from lagniappe.core.entities import Entities
 from testing.definitions import Categories, Pages, SitePages, Users
 from testing.elements import FormElements, HeaderSearch, Table, Tools
 from testing.resources.category import Category
-from testing.utility import assert_lagniappe_error_response
+from testing.utility import assert_lagniappe_error_response, manual_mutation_headers
 
 pytestmark = pytest.mark.e2e
 
@@ -190,10 +190,10 @@ def test_category_viewer_opens_readonly_settings(get_user):
             **{attribute.name: "true" for attribute in category.entity.attributes},
         },
         cookies=cookies,
-        headers={
-            "X-CSRFToken": subject.locate("#token").input_value(),
-            "X-Lagniappe-Request": "true",
-        },
+        headers=manual_mutation_headers(
+            subject.page.url,
+            subject.locate("#token").input_value(),
+        ),
         allow_redirects=False,
         timeout=10,
     )

@@ -9,7 +9,9 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
 from testing.utility.network import (
     assert_lagniappe_error_response,
+    assert_same_etag,
     expect_successful_response,
+    manual_mutation_headers,
     multipart_form_fields,
     scoped_browser_route,
 )
@@ -147,6 +149,34 @@ def test_lagniappe_error_response_contract():
         text=lambda: "<h1>Error 400</h1>",
     )
     assert_lagniappe_error_response(playwright_response, status=400)
+
+
+def test_manual_mutation_headers_use_the_browser_origin():
+    assert manual_mutation_headers(
+        "https://version.example.test/categories/example?tab=info#settings",
+        "csrf-token",
+    ) == {
+        "Origin": "https://version.example.test",
+        "Referer": "https://version.example.test/categories/example?tab=info",
+        "X-CSRFToken": "csrf-token",
+        "X-Lagniappe-Request": "true",
+    }
+
+    with pytest.raises(ValueError):
+        manual_mutation_headers("not-a-url", "csrf-token")
+    with pytest.raises(ValueError):
+        manual_mutation_headers("https://version.example.test/", "")
+
+
+def test_semantically_equal_etags_allow_proxy_weakening():
+    assert_same_etag('"fingerprint"', '"fingerprint"')
+    assert_same_etag('W/"fingerprint"', '"fingerprint"')
+    assert_same_etag('"fingerprint"', 'W/"fingerprint"')
+
+    with pytest.raises(AssertionError):
+        assert_same_etag('W/"different"', '"fingerprint"')
+    with pytest.raises(AssertionError):
+        assert_same_etag("fingerprint", '"fingerprint"')
 
 
 def test_scoped_browser_route_always_removes_handler():

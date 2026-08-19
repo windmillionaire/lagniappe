@@ -18,6 +18,7 @@ from testing.resources import Task
 from testing.utility import (
     TestFile as _TestFile,
     assert_lagniappe_error_response,
+    manual_mutation_headers,
     wait_for_offline_mutations,
 )
 from testing.utility.local_time import local_date_from_utc_datetime
@@ -287,10 +288,10 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
         f"{SETTINGS.test_config['BASE_URL']}/l/activity/notes",
         data={"body": forbidden_body, "visibility": "everyone"},
         cookies=cookies,
-        headers={
-            "X-CSRFToken": user.locate("#token").input_value(),
-            "X-Lagniappe-Request": "true",
-        },
+        headers=manual_mutation_headers(
+            user.page.url,
+            user.locate("#token").input_value(),
+        ),
         allow_redirects=False,
         timeout=10,
     )

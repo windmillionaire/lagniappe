@@ -86,28 +86,29 @@ lock and cleans stale test data before starting the server, so overlapping
 pytest invocations should fail early with a clear message and interrupted runs
 should be less likely to poison the next run.
 
-### Hosted E2E
+### Hosted Tests
 
 The opt-in hosted runner deploys one zero-traffic App Engine `e2e` version and
-executes this same pytest/Playwright suite from a Cloud Run job. This keeps the
-direct Datastore/Storage/Redis helpers close to their providers and lets either
-a trusted local command or secret-free GitHub WIF invocation start the same
-job. A Redis lease serializes hosted and local E2E access to the fixed `test-`
-namespace. `create` consumes an already committed production build and exports
-that exact commit for both hosted artifacts; it does not run the frontend build.
+can execute the normal unit, JavaScript, tooling, and pytest/Playwright E2E
+suites in one Cloud Run job. This keeps direct Datastore/Storage/Redis helpers
+close to their providers and lets either a trusted local command or secret-free
+GitHub WIF invocation start the same job. A Redis lease serializes hosted and
+local E2E access to the fixed `test-` namespace. `create` consumes an already
+committed production build and exports that exact commit for both hosted
+artifacts; it does not run the frontend build.
 
 ```bash
 venv/bin/python run.py hosted-e2e setup --github-repository OWNER/REPOSITORY
 venv/bin/python run.py hosted-e2e create
-venv/bin/python run.py hosted-e2e execute --suite pilot
-venv/bin/python run.py hosted-e2e execute --suite full
+venv/bin/python run.py hosted-e2e execute
 venv/bin/python run.py hosted-e2e results --latest
 venv/bin/python run.py hosted-e2e status
 venv/bin/python run.py hosted-e2e teardown
 ```
 
-Local `execute` automatically merges the remote run into
-`testing/evidence/latest.json`; a CI-triggered run is imported later with
+The default `all` scope runs every ordinary suite; `pilot`, E2E-only `full`, and
+trusted local focused dispatch remain available. Execution does not change
+local evidence. A local or CI-triggered run is imported explicitly with
 `results --latest` from the same candidate commit. Evidence import is a manual
 release step and the reviewed manifest becomes an ordinary follow-up commit;
 the workflow has no repository write permission. See

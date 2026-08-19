@@ -604,7 +604,10 @@ workers.
 Trusted local diagnosis may dispatch a bounded list of existing
 `testing/tests_e2e/` files or nodeids through `hosted-e2e execute --target`.
 The Cloud Run entry point validates that boundary again before constructing the
-pytest command. The GitHub workflow retains only the fixed pilot/full choices.
+pytest command. A plain execute and the GitHub workflow's default `all` choice
+run the normal unit, JavaScript, tooling, and E2E aliases in one job. The
+workflow retains only the fixed all/pilot/full choices; deliberately opt-in
+provider/setup markers remain excluded.
 
 The runner image excludes all `config/files/` content and mounts the canonical
 settings plus the optional managed Redis CA certificate from separate Secret
@@ -616,6 +619,10 @@ the ignored local development-settings file is never uploaded. The existing
 fixtures, direct backend calls, cleanup, strict relation checks, and evidence
 plugin are otherwise unchanged. Local `execute` and
 `.github/workflows/hosted-e2e.yml` invoke the same Cloud Run job.
+Create records an asynchronous Cloud Build ID and completed provisioning phases
+so the same clean commit can resume an interrupted build/deploy safely. Result
+download and evidence merge are explicit release-flow operations rather than
+an automatic side effect of execution.
 
 The stable infrastructure, request/identity boundary, teardown behavior, and
 evidence import contract are documented in
