@@ -1084,8 +1084,16 @@ def _wait_runner_image_build(
         if status == "SUCCESS":
             return payload
         if status not in CLOUD_BUILD_PENDING_STATUSES:
-            detail = str(payload.get("statusDetail") or "").strip()
+            failure_info = payload.get("failureInfo") or {}
+            detail = str(
+                payload.get("statusDetail")
+                or failure_info.get("detail")
+                or ""
+            ).strip()
             suffix = f" ({detail})" if detail else ""
+            log_url = str(payload.get("logUrl") or "").strip()
+            if log_url:
+                suffix += f" Logs: {log_url}"
             raise HostedE2EError(
                 f"Cloud Build {cloud_build_id} ended with {status}{suffix}."
             )

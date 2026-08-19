@@ -626,6 +626,9 @@ def test_hosted_runner_installs_complete_test_collection_dependencies():
     )
     assert "FROM node:24-bookworm-slim AS node-runtime" in dockerfile
     assert "apt-get install --yes --no-install-recommends git" in dockerfile
+    assert "ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm" in (
+        dockerfile
+    )
     assert "COPY package.json package-lock.json ./" in dockerfile
     assert "RUN npm ci" in dockerfile
 
@@ -857,6 +860,18 @@ def test_runner_image_build_waits_for_recorded_cloud_build(monkeypatch):
     assert result == {"status": "SUCCESS"}
     assert calls[0][:3] == ["builds", "describe", cloud_build_id]
     assert delays == [0.01]
+
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_describe",
+        lambda _arguments: {
+            "status": "FAILURE",
+            "failureInfo": {"detail": "Docker step failed"},
+            "logUrl": "https://console.example.test/build",
+        },
+    )
+    with pytest.raises(HostedE2EError, match="Docker step failed.*Logs: https"):
+        hosted_e2e._wait_runner_image_build(_infrastructure(), cloud_build_id)
 
 
 # @features hosted-e2e
