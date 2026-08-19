@@ -121,6 +121,15 @@ jobs:
           done
           echo "RESULT_DIR=$result_dir" >> "$GITHUB_ENV"
 
+      - name: Remove the transient WIF credential
+        run: |
+          credentials_file="${GOOGLE_APPLICATION_CREDENTIALS:-}"
+          if [[ "$credentials_file" != "$GITHUB_WORKSPACE"/gha-creds-*.json ]]; then
+            echo "The WIF credential path was missing or outside the checkout."
+            exit 1
+          fi
+          rm -f -- "$credentials_file"
+
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:

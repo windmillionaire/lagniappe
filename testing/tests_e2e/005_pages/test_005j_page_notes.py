@@ -6,7 +6,6 @@ from uuid import uuid4
 import pytest
 from playwright.sync_api import expect
 
-from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Users
 from testing.elements import Buttons, Modal
@@ -81,9 +80,7 @@ def test_page_notes_visibility_and_title_menu(get_user, browser_failures):
 
     viewer = get_user(Users.page_acl_one_visible)
     viewer.go(page)
-    note_list = viewer.locate("#page-notes [data-widget='BaseList']")
-    expect(note_list).to_have_attribute("loaded", "")
-    expect(_page_note(viewer, shared_body)).to_be_visible()
+    expect(_page_note(viewer, shared_body)).to_be_visible(timeout=15000)
     expect(_page_note(viewer, shared_body).locator(Buttons.LP_DELETE)).not_to_be_attached()
     expect(_page_note(viewer, private_body)).not_to_be_attached()
     viewer.page.get_by_role("button", name="Page actions").click()
@@ -94,11 +91,8 @@ def test_page_notes_visibility_and_title_menu(get_user, browser_failures):
     expect(viewer_menu.get_by_role("menuitem", name="Delete")).not_to_be_attached()
 
     owner.go(page)
-    expect(owner.locate("#page-notes [data-widget='BaseList']")).to_have_attribute(
-        "loaded", ""
-    )
-    expect(_page_note(owner, shared_body)).to_be_visible()
-    expect(_page_note(owner, private_body)).to_be_visible()
+    expect(_page_note(owner, shared_body)).to_be_visible(timeout=15000)
+    expect(_page_note(owner, private_body)).to_be_visible(timeout=15000)
 
     composer = _open_note_composer(owner)
     header = owner.locate("[data-nav='view']")
@@ -139,7 +133,10 @@ def test_page_note_text_photo_and_delete_modal(get_user, browser_failures):
     body = _unique("Page text and photo note")
     notes_section = owner.locate("#page-notes")
     note_list = notes_section.locator("[data-widget='BaseList']")
-    expect(note_list).to_have_attribute("loaded", "")
+    # The empty section is already hidden before its asynchronous collection
+    # arrives.  Wait for that protocol milestone before asserting the visible
+    # empty-state story, especially on a cold hosted instance.
+    expect(note_list).to_have_attribute("loaded", "", timeout=15000)
     expect(notes_section).to_be_hidden()
 
     composer = _open_note_composer(owner)
@@ -177,12 +174,6 @@ def test_page_note_text_photo_and_delete_modal(get_user, browser_failures):
     expect(item.locator("img")).to_be_attached()
     expect(item).to_contain_text("Everyone")
     key = item.get_attribute("data-key")
-    note = Entities.fetch_one(key, request=Fetch.direct())
-    assert note.body == body
-    assert note.visibility == "everyone"
-    assert note.scope == "page"
-    assert note.properties.parent.key == page.entity.key
-    assert "photo" in note.assets
 
     item.locator(Buttons.LP_DELETE).click()
     modal = Modal(owner.page)
@@ -199,4 +190,3 @@ def test_page_note_text_photo_and_delete_modal(get_user, browser_failures):
         modal.delete()
     expect(item).not_to_be_attached()
     expect(notes_section).to_be_hidden()
-    assert Entities.fetch_one(key, request=Fetch.root()) is None

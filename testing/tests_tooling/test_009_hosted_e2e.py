@@ -727,7 +727,6 @@ def test_hosted_workflow_is_manual_and_returns_exact_evidence_to_its_branch():
     )
     workflow_text = workflow_path.read_text(encoding="utf-8")
     workflow = yaml.load(workflow_text, Loader=yaml.BaseLoader)
-    gitignore = (hosted_e2e.APP_DIR / ".gitignore").read_text(encoding="utf-8")
 
     assert workflow["on"] == {
         "workflow_dispatch": {
@@ -758,7 +757,7 @@ def test_hosted_workflow_is_manual_and_returns_exact_evidence_to_its_branch():
     assert '"$remote_head" != "$EXPECTED_SOURCE"' in workflow_text
     assert 'git commit -am "Updated hosted test evidence"' in workflow_text
     assert 'git push origin "HEAD:$BRANCH"' in workflow_text
-    assert "gha-creds-*.json" in gitignore
+    assert 'rm -f -- "$credentials_file"' in workflow_text
 
 
 # @features hosted-e2e
