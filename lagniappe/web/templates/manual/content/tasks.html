@@ -62,10 +62,11 @@
   {{ heading("Assignment") }}
   {% call card() %}
     <p class="text-base-medium">
-      Tasks can be assigned to users. Assignment controls routing and
-      accountability; visibility still comes from the page, form, and project
-      permissions. An unassigned task remains visible to users who can see its
-      page.
+      Tasks can be assigned to users. An assignee can view and edit the assigned
+      task even without access to its origin page, so work can be delegated
+      without exposing the rest of that page. Assignment does not reveal the
+      origin page or unrelated tasks, and restrictions on the task's form still
+      apply. An unassigned task remains visible to users who can see its page.
     </p>
   {% endcall %}
 
@@ -90,7 +91,7 @@
       <li>If you only need disposable checklist items, this model may feel a touch heavier than you need.</li>
       <li>For boards, sprints, dependencies, burndown charts, or time tracking, a dedicated project-management tool is a better home.</li>
       <li>Task history pays off most when forms and completion habits are designed with a little intention up front.</li>
-      <li>Assigning a task does not on its own grant access; the assignee still needs to be able to see the page or task context.</li>
+      <li>Assignment grants access to work that task, not to browse its origin page; any restricted form still requires its normal permission.</li>
     </ul>
   {% endcall %}
 

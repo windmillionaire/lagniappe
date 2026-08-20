@@ -507,3 +507,69 @@ def test_public_manual_loads_without_login_or_auth_bootstrap(get_user):
     )
     assert "/users/login" not in anonymous.page.url
     assert auth_bootstrap_paths == []
+
+
+# @features manual
+# @dimensions anonymous-access direct-section ajax-section ai-email address-redaction no-auth-bootstrap
+@pytest.mark.e2e
+def test_ai_manual_keeps_account_addresses_authenticated(get_user):
+    anonymous = get_user(Users.ANONYMOUS)
+    base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
+    auth_bootstrap_paths = []
+
+    def track_auth_bootstrap(request):
+        path = urlparse(request.url).path
+        if path in {"/l/update-session", "/l/poll", "/l/sync"}:
+            auth_bootstrap_paths.append(path)
+
+    anonymous.page.on("request", track_auth_bootstrap)
+    response = anonymous.page.goto(
+        f"{base_url}/manual/ai",
+        wait_until="load",
+    )
+
+    assert response.ok
+    content = anonymous.locate("[data-role='manual-content']")
+    expect(content).to_contain_text("AI Reports by Email")
+    public_description = content.locator("[data-role='public-ai-email-description']")
+    expect(public_description).to_be_visible()
+    expect(public_description).to_contain_text(
+        "Registered users can email questions, requests, or attachments"
+    )
+    expect(content.locator("[data-role='ai-email-account-details']")).to_have_count(0)
+    assert "@" not in public_description.inner_text()
+
+    ajax = anonymous.page.evaluate(
+        """async () => {
+            const response = await fetch("/manual/section/ai");
+            return {
+                ok: response.ok,
+                status: response.status,
+                text: await response.text(),
+            };
+        }"""
+    )
+    assert ajax["ok"] is True
+    assert ajax["status"] == 200
+    assert 'data-role="public-ai-email-description"' in ajax["text"]
+    assert 'data-role="ai-email-account-details"' not in ajax["text"]
+    assert "@" not in ajax["text"]
+    assert auth_bootstrap_paths == []
+
+    owner = get_user(Users.OWNER)
+    response = owner.page.goto(
+        f"{base_url}/manual/ai",
+        wait_until="load",
+    )
+
+    assert response.ok
+    content = owner.locate("[data-role='manual-content']")
+    account_details = content.locator("[data-role='ai-email-account-details']")
+    expect(account_details).to_be_visible()
+    expect(account_details).to_contain_text("AI (recommended)")
+    expect(account_details).to_contain_text("Create")
+    expect(account_details).to_contain_text("Organize")
+    expect(content.locator("[data-role='public-ai-email-description']")).to_have_count(
+        0
+    )
+    assert "@" in account_details.inner_text()

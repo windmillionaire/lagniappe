@@ -420,8 +420,9 @@ def logged_in(f):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
+# @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_manual_keeps_account_addresses_authenticated
 # @features manual
-# @dimensions section-navigation
+# @dimensions section-navigation anonymous-access no-auth-bootstrap
 def manual_permission():
     """Permission for the user manual. Public if CONFIG.PUBLIC_MANUAL is set."""
 

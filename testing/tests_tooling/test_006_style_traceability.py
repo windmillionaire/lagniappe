@@ -431,6 +431,45 @@ panel.className = "grid gap-2";
     assert [style["id"] for style in query["styles"]] == ["button.submit"]
 
 
+def test_style_hooks_accept_compound_class_selectors(tmp_path):
+    write_file(
+        tmp_path / "src/style/styles.yaml",
+        """
+badge:
+  icon:
+    classes: icon-base text-kind-default
+    intent: icon presentation within badge
+    surfaces: [server]
+    hooks: [icon-base]
+    css: [src/style/icons.css]
+""",
+    )
+    write_file(
+        tmp_path / "src/style/icons.css",
+        """
+/* @style badge.icon */
+.icon.icon-base {
+  inline-size: 1.5rem;
+}
+""",
+    )
+    write_file(
+        tmp_path / "lagniappe/web/templates/badge.html",
+        '<span class="icon {{ styles.badge.icon }}"></span>\n',
+    )
+    (tmp_path / "src/script").mkdir(parents=True)
+
+    manifest = style_traceability.build_manifest(tmp_path)
+
+    selector = next(
+        item for item in manifest.css_selectors if item.selector == ".icon.icon-base"
+    )
+    assert selector.owners == ["badge.icon"]
+    assert not any(
+        issue["kind"] == "style-hook-without-rule" for issue in manifest.issues
+    )
+
+
 def test_style_traceability_uses_shared_report_envelope_and_stable_findings(tmp_path):
     write_file(
         tmp_path / "src/style/styles.yaml",

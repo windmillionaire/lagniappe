@@ -42,37 +42,59 @@
   {% if CONFIG.AI_EMAIL_PUBLIC.enabled %}
     {{ heading("AI Reports by Email", icon="email", kind="form") }}
     {% call card() %}
-      <p class="text-base-medium mb-3">
-        Send from the exact email address registered to your Lagniappe account.
-        The subject and message become the report instructions. You receive an
-        acceptance email and a result email linking back to the saved report.
-      </p>
-      <ul class="text-base-medium space-y-2">
-        <li><strong>AI (recommended):</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ai }} — questions, requests, and attachments are routed automatically.</li>
-        <li><strong>Ask:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ask }} — subject or message required; up to 20 attachments are optional.</li>
-        {% if current_user.access(AI.CREATE) %}
-          <li><strong>Create:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.create }} — subject or message required; attachments are not accepted.</li>
-          <li><strong>Organize:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.organize }} — at least one attachment is required; message text is optional.</li>
-        {% endif %}
-      </ul>
-      <p class="text-base-medium mt-3">
-        Each attachment may be up to 30 MiB, with a 50 MiB total. Pasted or
-        inline-only files are accepted; recognizable signature and quoted-reply
-        images are ignored. Replies above the Lagniappe marker create a new
-        report. Automated/list mail is ignored.
-        Resend temporarily processes received content and provides short-lived
-        attachment downloads to the server.
-      </p>
-      {% call callout("tip", False) %}
-        Email submission only creates the same saved report as the homepage.
-        Create and Organize proposals never apply themselves; sign in to review
-        and run them.
-      {% endcall %}
-      <p class="text-base-medium mt-3 text-sm">
-        The From address selects the account for a rate-limited report; email
-        sender identity is not a login. Opening the report or running any
-        proposal still requires normal authentication and permissions.
-      </p>
+      {% if current_user.is_authenticated %}
+        <div data-role="ai-email-account-details">
+          <p class="text-base-medium mb-3">
+            Send from the exact email address registered to your Lagniappe account.
+            The subject and message become the report instructions. You receive an
+            acceptance email and a result email linking back to the saved report.
+          </p>
+          <ul class="text-base-medium space-y-2">
+            <li><strong>AI (recommended):</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ai }} — questions, requests, and attachments are routed automatically.</li>
+            <li><strong>Ask:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ask }} — subject or message required; up to 20 attachments are optional.</li>
+            {% if current_user.access(AI.CREATE) %}
+              <li><strong>Create:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.create }} — subject or message required; attachments are not accepted.</li>
+              <li><strong>Organize:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.organize }} — at least one attachment is required; message text is optional.</li>
+            {% endif %}
+          </ul>
+          <p class="text-base-medium mt-3">
+            Each attachment may be up to 30 MiB, with a 50 MiB total. Pasted or
+            inline-only files are accepted; recognizable signature and quoted-reply
+            images are ignored. Replies above the Lagniappe marker create a new
+            report. Automated/list mail is ignored.
+            Resend temporarily processes received content and provides short-lived
+            attachment downloads to the server.
+          </p>
+          {% call callout("tip", False) %}
+            Email submission only creates the same saved report as the homepage.
+            Create and Organize proposals never apply themselves; sign in to review
+            and run them.
+          {% endcall %}
+          <p class="text-base-medium mt-3 text-sm">
+            The From address selects the account for a rate-limited report; email
+            sender identity is not a login. Opening the report or running any
+            proposal still requires normal authentication and permissions.
+          </p>
+        </div>
+      {% else %}
+        <div data-role="public-ai-email-description">
+          <p class="text-base-medium mb-3">
+            Registered users can email questions, requests, or attachments to
+            Lagniappe. The app routes each message to Ask, Create, or Organize,
+            saves the result as an AI report, and emails a link back.
+          </p>
+          <ul class="text-base-medium space-y-2">
+            <li><strong>Ask</strong> answers questions using permitted workspace context.</li>
+            <li><strong>Create</strong> drafts proposed workspace content from a request.</li>
+            <li><strong>Organize</strong> analyzes attached files into a proposed set of workspace changes.</li>
+          </ul>
+          <p class="text-base-medium mt-3">
+            Proposed changes never apply themselves. The recipient must sign in
+            with normal permissions to review and run them. Live inbound
+            addresses are shown only to signed-in users of this installation.
+          </p>
+        </div>
+      {% endif %}
     {% endcall %}
   {% endif %}
   {{ heading("Permission-Scoped Context", icon="permissions", kind="user") }}

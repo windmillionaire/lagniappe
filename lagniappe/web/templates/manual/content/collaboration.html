@@ -45,6 +45,43 @@
     </p>
   {% endcall %}
 
+  {{ heading("Direct Messages and Mentions", icon="email", kind="user") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Lagniappe includes lightweight direct messages for short conversations
+      between users. The Messages view keeps each conversation together and
+      shows unread activity without replacing a different conversation you are
+      currently reading.
+    </p>
+    <p class="text-base-medium">
+      In a collaborative document, type <strong>@</strong> and choose a user to
+      mention them. The mention links to that user's page and creates a
+      notification, subject to the same document permissions and recipient
+      preferences as the rest of the workspace.
+    </p>
+  {% endcall %}
+
+  {{ heading("Notifications and Email", icon="email", kind="task") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Direct messages, document mentions, and task assignments create in-app
+      notifications. The notification menu keeps an unread count and links back
+      to the relevant conversation, document, or task.
+    </p>
+    <p class="text-base-medium mb-3">
+      On your own personal page, <strong>User Settings</strong> controls whether
+      notification email is disabled, sent after five minutes, or collected in
+      a daily digest at 8:00 AM local time. This preference changes email
+      delivery, not the in-app notification.
+    </p>
+    {% call callout("note", False) %}
+      The site owner chooses on their own personal page whether managed users
+      may send them messages or mentions and whether managed users may assign
+      tasks to them. These owner opt-ins do not widen anyone's access to other
+      records.
+    {% endcall %}
+  {% endcall %}
+
   {{ heading("Offline and Installable") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
@@ -82,7 +119,7 @@
       <li>Live editing and presence work best for a handful of people on a record, not large simultaneous crowds.</li>
       <li>Offline edits are held on the device that made them; they replay from that device when it reconnects.</li>
       <li>Visibility still comes from permissions -- collaboration never widens who can see a document or form.</li>
-      <li>This is shared editing of ordinary records, not a full real-time design canvas or a chat tool.</li>
+      <li>Direct messages are intentionally lightweight and polling-based, not a full Slack-style real-time chat product.</li>
     </ul>
   {% endcall %}
 

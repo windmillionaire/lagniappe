@@ -1180,7 +1180,7 @@ def _registry_issues(
         selectors_by_path[item.path].append(item)
 
     def selector_has_hook(selector: str, hook: str) -> bool:
-        pattern = rf"(?<![A-Za-z0-9_-])\.{re.escape(hook)}(?![A-Za-z0-9_-])"
+        pattern = rf"\.{re.escape(hook)}(?![A-Za-z0-9_-])"
         return re.search(pattern, selector) is not None
 
     for style in styles.values():
