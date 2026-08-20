@@ -221,15 +221,20 @@ provider, and seven-day artifact bucket remain for reuse.
 ## Running From GitHub
 
 `.github/workflows/hosted-e2e.yml` supports a trusted manual dispatch and the
-required release-pull-request path. Both require the exact Git ref previously
-used by `create`; the default `all` scope runs every complete suite, including
-setup drift and live-provider contracts. The E2E-only `full` choice remains
-available for manual diagnosis. GitHub never accepts a focused target.
+required release-pull-request path. Opening or reopening a release pull request
+starts its candidate run; later maintainer pushes to its `next/**` or
+`hotfix/**` branch start replacement candidate runs. Both require the exact Git
+ref previously used by `create`; the default `all` scope runs every complete
+suite, including setup drift and live-provider contracts. The E2E-only `full`
+choice remains available for manual diagnosis. GitHub never accepts a focused
+target.
 
 On an ordinary candidate commit, the workflow uses the pull request's exact
-head SHA, never GitHub's synthetic merge ref. It reads the configured source
-from the Cloud Run job and refuses to execute if it differs from that candidate
-SHA.
+head SHA, never GitHub's synthetic merge ref. A branch-push request first finds
+exactly one open same-repository pull request from that branch to `main`; a
+release branch without such a pull request finishes without entering the
+hosted environment. It reads the configured source from the Cloud Run job and
+refuses to execute if it differs from that candidate SHA.
 It uses WIF only to describe and invoke that exact job and to download that
 execution's bundle from the dedicated result bucket; it has no project-wide
 Cloud Run viewer role and cannot read either mounted secret or
@@ -252,16 +257,21 @@ branch. It rejects tag dispatches and refuses to push if the remote branch moved
 away from the tested commit while the suite was running. Failed evidence is
 retained by the same path before the candidate run reports red.
 
-GitHub [intentionally does not create another pull-request or push workflow
-run](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs)
-from a commit made with `GITHUB_TOKEN`. After a release candidate verifies its
-non-force evidence push, it therefore uses the same token's scoped
-`actions: write` permission to request a `workflow_dispatch` continuation on
-that exact branch. `workflow_dispatch` is the supported recursive-run
-exception; no PAT or GitHub App secret is needed. The dispatch carries the pull
-request number and expected candidate parent, but trusts neither: the new run
-queries the open release pull request and independently verifies its base,
-branch, and current head.
+GitHub treats pull-request `opened`, `synchronize`, and `reopened` events caused
+by `GITHUB_TOKEN` as
+[approval-required workflow runs](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow#triggering-a-workflow-from-a-workflow).
+The workflow therefore does not subscribe to `synchronize`: opening or
+reopening the pull request supplies the initial candidate event, while later
+maintainer changes arrive through the release-branch `push` trigger. GitHub
+does not create a `push` workflow from the workflow token's own evidence commit,
+so that commit neither recurses nor leaves an approval banner on the pull
+request. After a release candidate verifies its non-force evidence push, it
+uses the same token's scoped `actions: write` permission to request a
+`workflow_dispatch` continuation on that exact branch. `workflow_dispatch` is
+the supported recursive-run exception; no PAT or GitHub App secret is needed.
+The dispatch carries the pull request number and expected candidate parent, but
+trusts neither: the new run queries the open release pull request and
+independently verifies its base, branch, and current head.
 
 The continuation proves that the evidence head has exactly one parent, only the
 evidence file changed, and the hosted source and semantic snapshot name that
@@ -277,8 +287,9 @@ rollup even when it targets the same commit. If evidence already matches and no
 follow-up commit is needed, the same status is published after the candidate
 pull-request checks finish.
 
-Permissions are job-scoped. Only the execution job enters the protected
-`hosted-e2e` environment and receives `contents: write`, `actions: write`, and
+Permissions are job-scoped. The request resolver receives only
+`pull-requests: read`. Only the execution job enters the protected `hosted-e2e`
+environment and receives `contents: write`, `actions: write`, and
 `id-token: write`; the continuation needs only `contents: read` and
 `pull-requests: read`, followed by an isolated attestation job with only
 `statuses: write`. The evidence child therefore does not require a second

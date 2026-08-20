@@ -633,12 +633,17 @@ Create records an asynchronous Cloud Build ID and completed provisioning phases
 so the same clean commit can resume an interrupted build/deploy safely. Result
 download and evidence merge happen automatically after a local execution. The
 manual GitHub workflow performs the same exact-source import and makes an
-evidence-only commit only if its dispatch branch has not moved. On a release
-pull request, the candidate run then explicitly requests a
-`workflow_dispatch` continuation on that exact child; an ordinary
-workflow-token push cannot trigger it. The continuation proves the open pull
-request and parent source/snapshot and runs release checks without repeating
-the hosted suites. Only after those checks pass, a status-only job with scoped
+evidence-only commit only if its dispatch branch has not moved. Opening or
+reopening a release pull request starts its candidate run; later maintainer
+changes use `push` on `next/**` or `hotfix/**` after a read-only resolver proves
+that the branch is the exact head of one open same-repository pull request to
+`main`. The workflow deliberately does not subscribe to pull-request
+`synchronize`, because GitHub holds a workflow-token update at an approval
+boundary. The evidence push cannot recursively trigger the branch-push path.
+The candidate run instead explicitly requests a `workflow_dispatch`
+continuation on that exact child. The continuation proves the open pull request
+and parent source/snapshot and runs release checks without repeating the hosted
+suites. Only after those checks pass, a status-only job with scoped
 `statuses: write` publishes the required current-head commit status that GitHub
 can enforce on the pull request; dispatch-job checks alone are not part of the
 pull-request status rollup.

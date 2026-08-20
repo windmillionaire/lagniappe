@@ -1766,12 +1766,17 @@ def test_main_release_workflow_contract():
 
     assert workflow["name"] == "Hosted release validation"
     assert workflow["on"]["pull_request"]["branches"] == ["main"]
-    assert list(workflow["jobs"]) == ["execute", "quality", "attest"]
+    assert workflow["on"]["pull_request"]["types"] == ["opened", "reopened"]
+    assert workflow["on"]["push"]["branches"] == ["next/**", "hotfix/**"]
+    assert list(workflow["jobs"]) == ["request", "execute", "quality", "attest"]
+    assert workflow["jobs"]["request"]["permissions"] == {
+        "pull-requests": "read"
+    }
     assert "Source quality and traceability" in workflow["jobs"]["quality"]["name"]
     assert "Manual dispatch guard" in workflow["jobs"]["quality"]["name"]
     assert workflow["jobs"]["attest"]["permissions"] == {"statuses": "write"}
     assert workflow["jobs"]["attest"]["needs"] == "quality"
-    assert '"next/**"' not in workflow_text
+    assert '"next/**"' in workflow_text
     assert "next/*|hotfix/*" in workflow_text
     assert "npm run check" in workflow_text
     assert "ruff check ." in workflow_text

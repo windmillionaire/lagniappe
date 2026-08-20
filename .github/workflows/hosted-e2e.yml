@@ -6,8 +6,11 @@ on:
       - main
     types:
       - opened
-      - synchronize
       - reopened
+  push:
+    branches:
+      - "next/**"
+      - "hotfix/**"
   workflow_dispatch:
     inputs:
       mode:
@@ -46,23 +49,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  execute:
-    if: ${{ github.event_name == 'pull_request' || inputs.mode == 'manual' }}
-    name: ${{ github.event_name == 'pull_request' && 'Prepare hosted release evidence' || 'Execute hosted suite' }}
+  request:
+    name: Resolve hosted release request
     runs-on: ubuntu-24.04
-    timeout-minutes: 130
-    environment: hosted-e2e
     permissions:
-      contents: write
-      actions: write
-      id-token: write
+      pull-requests: read
     outputs:
+      execute: ${{ steps.context.outputs.execute }}
       base_sha: ${{ steps.context.outputs.base_sha }}
       branch: ${{ steps.context.outputs.branch }}
       candidate_sha: ${{ steps.context.outputs.candidate_sha }}
-      evidence_changed: ${{ steps.evidence.outputs.changed }}
-      evidence_sha: ${{ steps.evidence.outputs.evidence_sha }}
       pull_request: ${{ steps.context.outputs.pull_request }}
+      suite: ${{ steps.context.outputs.suite }}
 
     steps:
       - name: Resolve the exact execution context
@@ -71,6 +69,7 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
           EVENT_NAME: ${{ github.event_name }}
           EVENT_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
           HEAD_BRANCH: ${{ github.head_ref }}
           HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
@@ -82,48 +81,117 @@ jobs:
           REQUESTED_MODE: ${{ inputs.mode }}
           REQUESTED_SUITE: ${{ inputs.suite }}
         run: |
+          execute=false
+          base_sha=""
+          branch=""
+          candidate_sha=""
+          pull_request=""
+          suite="all"
+
           if [[ "$EVENT_NAME" == "pull_request" ]]; then
             if [[ "$HEAD_REPOSITORY" != "$REPOSITORY" || "$BASE_REF" != "main" ]]; then
               echo "Release validation requires a same-repository pull request to main."
               exit 1
             fi
-            case "$HEAD_BRANCH" in
-              next/*|hotfix/*) ;;
-              *)
-                echo "Pull requests to main must come from next/* or hotfix/*."
-                exit 1
-                ;;
-            esac
             branch="$HEAD_BRANCH"
             candidate_sha="$PR_HEAD_SHA"
             base_sha="$PR_BASE_SHA"
             pull_request="$PR_NUMBER"
-            suite="all"
-          else
-            if [[ "$REQUESTED_MODE" != "manual" || "$REF_TYPE" != "branch" ]]; then
+            execute=true
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            if [[ "$REF_TYPE" != "branch" ]]; then
+              echo "Release branch validation requires an exact branch push."
+              exit 1
+            fi
+            branch="$REF_NAME"
+            owner="${REPOSITORY%%/*}"
+            pulls_json="$(gh api --method GET "repos/$REPOSITORY/pulls" \
+              -f state=open \
+              -f base=main \
+              -f "head=$owner:$branch" \
+              -f per_page=2)"
+            pull_count="$(jq -er 'length' <<<"$pulls_json")"
+            if [[ "$pull_count" == "0" ]]; then
+              echo "No open pull request to main uses $branch; skipping hosted validation."
+            elif [[ "$pull_count" != "1" ]]; then
+              echo "Release branch $branch has $pull_count open pull requests to main."
+              exit 1
+            else
+              head_repository="$(jq -er '.[0].head.repo.full_name' <<<"$pulls_json")"
+              head_branch="$(jq -er '.[0].head.ref' <<<"$pulls_json")"
+              candidate_sha="$(jq -er '.[0].head.sha' <<<"$pulls_json")"
+              base_ref="$(jq -er '.[0].base.ref' <<<"$pulls_json")"
+              base_sha="$(jq -er '.[0].base.sha' <<<"$pulls_json")"
+              pull_request="$(jq -er '.[0].number' <<<"$pulls_json")"
+              if [[ "$head_repository" != "$REPOSITORY" || "$head_branch" != "$branch" || "$base_ref" != "main" ]]; then
+                echo "The release branch no longer identifies the expected same-repository pull request."
+                exit 1
+              fi
+              if [[ "$candidate_sha" != "$EVENT_SHA" ]]; then
+                echo "The release pull request head is $candidate_sha, not pushed commit $EVENT_SHA."
+                exit 1
+              fi
+              execute=true
+            fi
+          elif [[ "$REQUESTED_MODE" == "manual" ]]; then
+            if [[ "$REF_TYPE" != "branch" ]]; then
               echo "Manual hosted evidence requires a branch dispatch."
               exit 1
             fi
             branch="$REF_NAME"
             candidate_sha="$EVENT_SHA"
-            base_sha=""
-            pull_request=""
             suite="$REQUESTED_SUITE"
-          fi
-          if [[ ! "$candidate_sha" =~ ^[0-9a-f]{40}$ ]]; then
-            echo "The hosted candidate is not an exact commit SHA."
+            execute=true
+          elif [[ "$REQUESTED_MODE" != "continuation" ]]; then
+            echo "Unsupported hosted release request."
             exit 1
           fi
+
+          if [[ "$execute" == "true" ]]; then
+            case "$EVENT_NAME:$branch" in
+              pull_request:next/*|pull_request:hotfix/*|push:next/*|push:hotfix/*|workflow_dispatch:*) ;;
+              *)
+                echo "Hosted release validation requires a release branch."
+                exit 1
+                ;;
+            esac
+            if [[ ! "$candidate_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "The hosted candidate is not an exact commit SHA."
+              exit 1
+            fi
+          fi
+
+          echo "execute=$execute" >> "$GITHUB_OUTPUT"
           echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
           echo "branch=$branch" >> "$GITHUB_OUTPUT"
           echo "candidate_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
           echo "pull_request=$pull_request" >> "$GITHUB_OUTPUT"
           echo "suite=$suite" >> "$GITHUB_OUTPUT"
 
+  execute:
+    needs: request
+    if: ${{ needs.request.outputs.execute == 'true' }}
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Execute hosted suite' || 'Prepare hosted release evidence' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 130
+    environment: hosted-e2e
+    permissions:
+      contents: write
+      actions: write
+      id-token: write
+    outputs:
+      base_sha: ${{ needs.request.outputs.base_sha }}
+      branch: ${{ needs.request.outputs.branch }}
+      candidate_sha: ${{ needs.request.outputs.candidate_sha }}
+      evidence_changed: ${{ steps.evidence.outputs.changed }}
+      evidence_sha: ${{ steps.evidence.outputs.evidence_sha }}
+      pull_request: ${{ needs.request.outputs.pull_request }}
+
+    steps:
       - name: Check out the exact candidate
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.context.outputs.candidate_sha }}
+          ref: ${{ needs.request.outputs.candidate_sha }}
           fetch-depth: 0
 
       - name: Authenticate without a stored key
@@ -143,7 +211,7 @@ jobs:
         env:
           E2E_JOB: lagniappe-e2e
           E2E_REGION: ${{ vars.GCP_RESOURCE_REGION }}
-          EXPECTED_SOURCE: ${{ steps.context.outputs.candidate_sha }}
+          EXPECTED_SOURCE: ${{ needs.request.outputs.candidate_sha }}
         run: |
           job_json="$(gcloud run jobs describe "$E2E_JOB" --region "$E2E_REGION" --format=json)"
           configured_source="$(jq -er '[.. | objects | select(.name? == "LAGNIAPPE_HOSTED_E2E_SOURCE") | .value][0]' <<<"$job_json")"
@@ -163,7 +231,7 @@ jobs:
         env:
           E2E_JOB: lagniappe-e2e
           E2E_REGION: ${{ vars.GCP_RESOURCE_REGION }}
-          E2E_SUITE: ${{ steps.context.outputs.suite }}
+          E2E_SUITE: ${{ needs.request.outputs.suite }}
         run: |
           execution_json="$(gcloud run jobs execute "$E2E_JOB" \
             --region "$E2E_REGION" \
@@ -237,8 +305,8 @@ jobs:
       - name: Commit evidence to the tested branch
         id: evidence
         env:
-          BRANCH: ${{ steps.context.outputs.branch }}
-          EXPECTED_SOURCE: ${{ steps.context.outputs.candidate_sha }}
+          BRANCH: ${{ needs.request.outputs.branch }}
+          EXPECTED_SOURCE: ${{ needs.request.outputs.candidate_sha }}
         run: |
           while IFS= read -r path; do
             if [[ -n "$path" && "$path" != "testing/evidence/latest.json" ]]; then
@@ -273,13 +341,13 @@ jobs:
           echo "evidence_sha=$evidence_sha" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch validation on the evidence child
-        if: ${{ github.event_name == 'pull_request' && steps.evidence.outputs.changed == 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.evidence.outputs.changed == 'true' }}
         env:
-          BRANCH: ${{ steps.context.outputs.branch }}
-          CANDIDATE_SHA: ${{ steps.context.outputs.candidate_sha }}
+          BRANCH: ${{ needs.request.outputs.branch }}
+          CANDIDATE_SHA: ${{ needs.request.outputs.candidate_sha }}
           EVIDENCE_SHA: ${{ steps.evidence.outputs.evidence_sha }}
           GH_TOKEN: ${{ github.token }}
-          PULL_REQUEST: ${{ steps.context.outputs.pull_request }}
+          PULL_REQUEST: ${{ needs.request.outputs.pull_request }}
         run: |
           git fetch --no-tags origin "refs/heads/$BRANCH"
           remote_head="$(git rev-parse FETCH_HEAD)"
@@ -310,12 +378,15 @@ jobs:
           fi
 
   quality:
-    needs: execute
+    needs:
+      - request
+      - execute
     if: >-
       ${{
         always() &&
         (
-          (github.event_name == 'pull_request' &&
+          ((github.event_name == 'pull_request' || github.event_name == 'push') &&
+           needs.request.outputs.execute == 'true' &&
            needs.execute.outputs.evidence_changed != 'true') ||
           (github.event_name == 'workflow_dispatch' &&
            inputs.mode == 'continuation')
@@ -324,6 +395,8 @@ jobs:
     name: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'manual' && 'Manual dispatch guard' || 'Source quality and traceability' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    outputs:
+      evidence_sha: ${{ steps.context.outputs.evidence_sha }}
     permissions:
       contents: read
       pull-requests: read
@@ -344,27 +417,25 @@ jobs:
           PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
+          REQUEST_BASE_SHA: ${{ needs.request.outputs.base_sha }}
+          REQUEST_BRANCH: ${{ needs.request.outputs.branch }}
+          REQUEST_CANDIDATE: ${{ needs.request.outputs.candidate_sha }}
+          REQUEST_EXECUTE: ${{ needs.request.outputs.execute }}
+          REQUEST_PR: ${{ needs.request.outputs.pull_request }}
           REF_NAME: ${{ github.ref_name }}
           REF_TYPE: ${{ github.ref_type }}
           REPOSITORY: ${{ github.repository }}
         run: |
-          if [[ "$EVENT_NAME" == "pull_request" ]]; then
-            if [[ "$HEAD_REPOSITORY" != "$REPOSITORY" || "$BASE_REF" != "main" ]]; then
-              echo "Release validation requires a same-repository pull request to main."
+          if [[ "$EVENT_NAME" == "pull_request" || "$EVENT_NAME" == "push" ]]; then
+            if [[ "$REQUEST_EXECUTE" != "true" ]]; then
+              echo "The candidate event did not resolve an open release pull request."
               exit 1
             fi
-            case "$HEAD_BRANCH" in
-              next/*|hotfix/*) ;;
-              *)
-                echo "Pull requests to main must come from next/* or hotfix/*."
-                exit 1
-                ;;
-            esac
-            branch="$HEAD_BRANCH"
-            candidate_sha="$PR_HEAD_SHA"
-            evidence_sha="$PR_HEAD_SHA"
-            base_sha="$PR_BASE_SHA"
-            pull_request="$PR_NUMBER"
+            branch="$REQUEST_BRANCH"
+            candidate_sha="$REQUEST_CANDIDATE"
+            evidence_sha="$REQUEST_CANDIDATE"
+            base_sha="$REQUEST_BASE_SHA"
+            pull_request="$REQUEST_PR"
           else
             if [[ "$REF_TYPE" != "branch" || ! "$DISPATCH_PR" =~ ^[1-9][0-9]*$ ]]; then
               echo "The release continuation requires an exact branch and pull request."
@@ -424,7 +495,7 @@ jobs:
           persist-credentials: false
 
       - name: Require successful candidate execution
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         env:
           EXECUTE_RESULT: ${{ needs.execute.result }}
         run: |
@@ -490,7 +561,7 @@ jobs:
     steps:
       - name: Publish required current-head status
         env:
-          EVIDENCE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.evidence_sha }}
+          EVIDENCE_SHA: ${{ needs.quality.outputs.evidence_sha }}
           GH_TOKEN: ${{ github.token }}
           REPOSITORY: ${{ github.repository }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}

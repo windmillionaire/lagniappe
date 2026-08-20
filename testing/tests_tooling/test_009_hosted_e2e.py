@@ -985,16 +985,21 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
 
     assert workflow["on"]["pull_request"] == {
         "branches": ["main"],
-        "types": ["opened", "synchronize", "reopened"],
+        "types": ["opened", "reopened"],
+    }
+    assert workflow["on"]["push"] == {
+        "branches": ["next/**", "hotfix/**"],
     }
     dispatch = workflow["on"]["workflow_dispatch"]["inputs"]
     assert dispatch["mode"]["options"] == ["manual", "continuation"]
     assert dispatch["suite"]["options"] == ["all", "full"]
     assert {"pull_request", "candidate_sha", "evidence_sha"} <= set(dispatch)
+    request = workflow["jobs"]["request"]
     execute = workflow["jobs"]["execute"]
     quality = workflow["jobs"]["quality"]
     attest = workflow["jobs"]["attest"]
     assert workflow["permissions"] == {}
+    assert request["permissions"] == {"pull-requests": "read"}
     assert execute["permissions"] == {
         "contents": "write",
         "actions": "write",
@@ -1005,22 +1010,29 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
         "pull-requests": "read",
     }
     assert attest["permissions"] == {"statuses": "write"}
+    assert request["name"] == "Resolve hosted release request"
+    assert execute["needs"] == "request"
     assert execute["environment"] == "hosted-e2e"
     assert "environment" not in quality
     assert "Prepare hosted release evidence" in execute["name"]
     assert "Execute hosted suite" in execute["name"]
     assert "Source quality and traceability" in quality["name"]
     assert "Manual dispatch guard" in quality["name"]
-    assert quality["needs"] == "execute"
+    assert quality["needs"] == ["request", "execute"]
+    assert "github.event_name == 'push'" in quality["if"]
+    assert "needs.request.outputs.execute == 'true'" in quality["if"]
     assert "evidence_changed != 'true'" in quality["if"]
     assert "inputs.mode == 'continuation'" in quality["if"]
     assert attest["needs"] == "quality"
     assert "needs.quality.result == 'success'" in attest["if"]
     assert "Publish current-head release status" in attest["name"]
-    assert "ref: ${{ steps.context.outputs.candidate_sha }}" in workflow_text
+    assert "ref: ${{ needs.request.outputs.candidate_sha }}" in workflow_text
     assert "ref: ${{ steps.context.outputs.evidence_sha }}" in workflow_text
     assert "PR_HEAD_SHA" in workflow_text
     assert "next/*|hotfix/*" in workflow_text
+    assert '"head=$owner:$branch"' in workflow_text
+    assert "No open pull request to main" in workflow_text
+    assert "synchronize" not in workflow["on"]["pull_request"]["types"]
     assert "google-github-actions/auth" in workflow_text
     assert "gcloud run jobs describe" in workflow_text
     assert "gcloud run jobs execute" in workflow_text
@@ -1034,6 +1046,7 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert 'rm -f -- "$credentials_file"' in workflow_text
     assert 'statuses/$EVIDENCE_SHA' in workflow_text
     assert "Exact hosted evidence and release gates passed" in workflow_text
+    assert "EVIDENCE_SHA: ${{ needs.quality.outputs.evidence_sha }}" in workflow_text
 
     quality_text = yaml.dump(quality, sort_keys=False)
     assert "gh api" in quality_text
