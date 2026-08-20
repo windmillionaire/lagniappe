@@ -1,0 +1,131 @@
+{% from 'cell.html' import cell, table_header_class %}
+{% from 'controls.html' import delete, filter as filter_toggle, column_visibility %}
+
+{% macro empty_row_filter(parent) %}
+  <tr class="text-kind-default font-semibold italic"
+      data-kind="{{ parent.table.kind }}"
+      data-visible="true"
+      data-role="empty">
+    <td colspan="{{ parent.table.columns|length }}"
+        class="text-center py-4 text-lg">No matching {{ parent.table.kind }}s found</td>
+  </tr>
+{% endmacro %}
+
+{% macro empty_row_index(parent) %}
+  <tr class="text-kind-default font-semibold italic"
+      data-kind="{{ parent.table.kind }}"
+      data-visible="false"
+      data-role="empty">
+    <td colspan="{{ parent.table.columns|length }}"
+        class="text-center py-4 text-lg">No {{ parent.table.kind }}s created yet</td>
+  </tr>
+{% endmacro %}
+
+{% macro table(entities, parent) %}
+  <table lp-component
+         {% if entities is undefined and not parent.is_filter %}lp-prefetch{% endif %}
+         id="{{ 'table' if not parent.table.embedded else 'embedded-table' }}"
+         data-kind="{{ parent.table.kind }}"
+         data-preload='{{ parent.table.preload|tojson }}'
+         data-default="{{ 'IndexTable' if not parent.table.embedded else 'EmbeddedTable' }}"
+         data-persistent="true"
+         data-filter="{{ parent.is_filter|yesno }}"
+         data-visible="false"
+         class="{{ styles.table.default if not parent.table.embedded else styles.table.embedded }}">
+    <thead class="{{ styles.table.thead.default if not parent.table.embedded else styles.table.thead.embedded }}">
+      <tr data-role="column-header">
+        {% for col in parent.table.columns %}
+          <th class="{{ table_header_class(col) }}"
+              scope="col"
+              {% if col.ordering %}data-ordering="{{ col.ordering }}"{% endif %}
+              data-column="{{ col.field }}"
+              data-sorting="false">
+            <span data-role="title" class="{{ styles.table.filters.title }}">{{ col.title }}</span>
+            {% if col.ordering %}
+              <button class="{{ styles.table.filters.icon.container }}"
+                      data-visible="false"
+                      data-toggle="filter"
+                      aria-label="Sort or filter {{ col.title }}"
+                      title="Sort or filter {{ col.title }}">
+                {{ render_icon("filter.active", styles.table.filters.icon.active) }}
+                {{ render_icon("filter.inactive", styles.table.filters.icon.inactive) }}
+              </button>
+            {% endif %}
+          </th>
+        {% endfor %}
+        {% if not parent.table.embedded %}
+          <th scope="col"
+              class="{{ styles.table.cell.action }}"
+              data-column="selector">
+            <button class="{{ styles.toggle.container }} inline-grid"
+                    lp-show="table:TableVisibility"
+                    data-toggle="true"
+                    data-kind="{{ parent.table.kind }}"
+                    aria-label="Choose visible columns"
+                    title="Choose visible columns">
+              {{ render_icon("column") }}
+            </button>
+          </th>
+        {% endif %}
+      </tr>
+      <tr data-widget="TableVisibility" data-visible="false"></tr>
+      <tr data-widget="TableSorting" data-visible="false"></tr>
+    </thead>
+    {{ rows(entities, parent) }}
+  </table>
+{% endmacro %}
+
+{% macro rows(entities, parent) %}
+  {% set entities = entities if entities is iterable else [] %}
+  <tbody class="{{ styles.table.body }}"
+         {% if entities is undefined and not parent.is_filter %}lp-prefetch{% endif %}
+         {% if parent.route %}data-route="{{ parent.route }}"{% endif %}
+         data-persistent="true"
+         data-widget="{{ 'IndexTable' if not parent.table.embedded else 'EmbeddedTable' }}">
+    {% if not entities and parent.is_filter %}
+      {{ empty_row_filter(parent) }}
+    {% elif not entities %}
+      {{ empty_row_index(parent) }}
+    {% endif %}
+    {% for e in entities %}{{ row(e, parent) }}{% endfor %}
+    {% if parent.append and not parent.is_filter %}
+      <tr lp-load data-route="{{ parent.append }}" class="hidden"></tr>
+    {% endif %}
+  </tbody>
+{% endmacro %}
+
+{% macro row(e, parent) %}
+  <tr data-key="{{ e.urlsafe_key }}"
+      lp-entity
+      data-fingerprint="{{ e.fingerprint }}"
+      data-modified="{{ e.modified.isoformat() }}"
+      lp-link
+      {% if not parent.table.embedded %}class="cursor-pointer"{% endif %}
+      {% if parent.table.kind == 'user' %}data-public="{{ e.is_public|yesno }}"{% endif %}
+      data-readonly="{{ e.readonly|yesno }}">
+    {% for column in parent.table.fields.values() %}{{ cell(column, e, parent) }}{% endfor %}
+    {% if not parent.table.embedded %}
+      <td class="{{ styles.table.cell.action }}" data-column="delete">
+        {% if e.allowed(Action.DELETE) %}{{ delete(label='Delete ' ~ e.name) }}{% endif %}
+      </td>
+    {% endif %}
+  </tr>
+{% endmacro %}
+
+{% macro mobile_toggles(columns) %}
+  <div id="mobile-controls"
+       data-widget="MobileTableControls"
+       data-visible="false"
+       class="{{ styles.index.mobile.controls }}">
+    {% for column in columns %}
+      <div class="{{ styles.index.mobile.row }}"
+           data-column="{{ column.field }}">
+        <span class="text-base">{{ column.title }}</span>
+        <div class="flex flex-row items-center gap-2">
+          {{ filter_toggle('Sort or filter ' ~ column.title, visible=false) }}
+          {{ column_visibility('Toggle ' ~ column.title ~ ' column') }}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% endmacro %}

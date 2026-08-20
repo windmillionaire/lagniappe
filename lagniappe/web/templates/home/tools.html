@@ -1,0 +1,217 @@
+{% import 'controls.html' as controls %}
+{% from "common.html" import explain_prompt %}
+
+{% macro tool_switcher() %}
+  <div class="{{ styles.form.submit.buttons }}" data-role="tool-switcher">
+    {% if current_user.access(AI.CREATE) %}
+      <button class="{{ styles.home.generate }}"
+              data-tool="organize"
+              data-route="{{ url_for('tools.create_organize_report') }}"
+              data-placeholder="Optional guidance for organizing these files..."
+              data-upload="true"
+              data-explain="organize"
+              data-active="true"
+              type="button">
+        {{ render_icon("organize") }}
+        <span>Organize</span>
+      </button>
+    {% endif %}
+    <button class="{{ styles.home.generate }}"
+            data-tool="ask"
+            data-route="{{ url_for('tools.create_ask_report') }}"
+            data-placeholder="Ask a question about your workspace..."
+            data-upload="false"
+            data-explain="ask"
+            data-active="{{ (not current_user.access(AI.CREATE))|yesno }}"
+            type="button">
+      {{ render_icon("ask") }}
+      <span>Ask</span>
+    </button>
+    {% if current_user.access(AI.CREATE) %}
+      <button class="{{ styles.home.generate }}"
+              data-tool="create"
+              data-route="{{ url_for('tools.create_create_report') }}"
+              data-placeholder="Describe what you want Lagniappe to create..."
+              data-upload="false"
+              data-explain="create"
+              data-active="false"
+              type="button">
+        {{ render_icon("create") }}
+        <span>Create</span>
+      </button>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro create_report() %}
+  {% set default_tool = "organize" if current_user.access(AI.CREATE) else "ask" %}
+  <form lp-create
+        lp-deferred
+        data-widget="CreateToolReport"
+        data-kind="default"
+        data-route="{{ url_for('tools.create_organize_report') if default_tool == 'organize' else url_for('tools.create_ask_report') }}"
+        data-destination="tools:ToolReportList"
+        data-deferred-status="false"
+        data-visible="false"
+        class="{{ styles.home.form }}">
+    <input type="hidden" name="tool" value="{{ default_tool }}" data-role="tool-input" />
+    <div data-role="header" class="{{ styles.form.header.container }}">
+      <h2 class="{{ styles.form.header.title }}"
+          data-kind="default"
+          data-role="title">AI Tools</h2>
+      <div class="{{ styles.form.header.controls }}" data-role="controls">
+        {{ controls.help("ai_tools") }}
+        {{ controls.close("tools") }}
+      </div>
+    </div>
+    {{ tool_switcher() }}
+    {% if CONFIG.AI_EMAIL_PUBLIC.enabled %}
+      {% set addresses = CONFIG.AI_EMAIL_PUBLIC.addresses %}
+      <div data-role="email-submissions"
+           data-address-ai="{{ addresses.ai }}"
+           data-address-ask="{{ addresses.ask }}"
+           {% if current_user.access(AI.CREATE) %}
+             data-address-create="{{ addresses.create }}"
+             data-address-organize="{{ addresses.organize }}"
+           {% endif %}
+           class="flex flex-col gap-1 rounded-md bg-base-bg p-3 text-sm">
+        <span class="font-semibold text-base-dark">Email submissions</span>
+        <div class="flex min-w-0 items-center gap-2">
+          <code data-role="email-address" class="min-w-0 flex-1 truncate">{{ addresses.ai }}</code>
+          <button type="button"
+                  data-role="email-copy"
+                  class="shrink-0 rounded-md bg-kind-default px-3 py-1.5 text-sm font-semibold text-white shadow-sm"
+                  aria-label="Copy AI email address">Copy</button>
+        </div>
+        <p class="text-xs text-base-medium">Send questions, requests, or files here; Lagniappe selects the report workflow. Proposed changes still require review.</p>
+      </div>
+    {% endif %}
+    <div class="{{ styles.form.submit.group }} -mt-2 flex flex-col gap-2"
+         data-role="submit-group">
+      {{ explain_prompt(default_tool) }}
+      <button type="submit"
+              data-kind="default"
+              data-role="start-report"
+              class="{{ styles.button.submit }}">Start</button>
+    </div>
+  </form>
+{% endmacro %}
+
+{% macro report_list(reports) %}
+  <ul data-widget="ToolReportList"
+      data-visible="false"
+      data-if-empty="CreateToolReport"
+      class="{{ styles.home.ingress.list }}">
+    {%- for report in reports.list -%}
+      {{ report_item(report) }}
+    {%- endfor -%}
+  </ul>
+{% endmacro %}
+
+{% macro report_stage_label(report) -%}
+  {%- set proposal_tool = report.tool in ["organize", "create"] -%}
+  {%- set proposal_actions = report.proposal.actions if report.proposal and report.proposal.actions else [] -%}
+  {%- set executable_actions = proposal_actions|rejectattr("type", "equalto", "needs_review")|rejectattr("type", "equalto", "skip")|list -%}
+  {%- if proposal_tool -%}
+    {%- if report.status == "ready" -%}
+      {%- if proposal_actions and not executable_actions -%}
+        Needs review
+      {%- else -%}
+        Proposal ready
+      {%- endif -%}
+    {%- elif report.status == "running" -%}
+      Proposal executing
+    {%- elif report.status == "complete" -%}
+      Proposal executed
+    {%- elif report.status == "undoing" -%}
+      Undoing proposal
+    {%- elif report.status == "undone" -%}
+      Proposal undone
+    {%- elif report.status == "undo_failed" -%}
+      Proposal undo failed
+    {%- elif report.status == "failed" -%}
+      Proposal failed
+    {%- elif report.status == "revising" -%}
+      Proposal revising
+    {%- elif report.pending -%}
+      Proposal pending
+    {%- endif -%}
+  {%- elif report.tool == "ask" -%}
+    {%- if report.status in ["ready", "complete"] and report.proposal -%}
+      Answer ready
+    {%- elif report.status == "failed" -%}
+      Answer failed
+    {%- elif report.status == "revising" -%}
+      Answer revising
+    {%- elif report.pending -%}
+      Answer pending
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro report_item(report) %}
+  {% set stage_label = report_stage_label(report)|trim %}
+  {% set operation_key = report.deferred_job.key if report.deferred_job else none %}
+  {% set operation_status = report._operation_status|default(none) %}
+  <li lp-entity
+      lp-link
+      data-key="{{ report.urlsafe_key }}"
+      data-fingerprint="{{ report.fingerprint }}"
+      data-name="{{ report.name }}"
+      data-kind="report"
+      data-status="{{ report.status }}"
+      data-pending="{{ report.pending|yesno }}"
+      {% if operation_key %}
+        data-operation="{{ operation_key }}"
+        data-operation-revision="{{ operation_status.revision if operation_status else report.deferred_job.revision|default(0, true) }}"
+        {% if operation_status %}
+          data-operation-status="{{ operation_status.status }}"
+          data-operation-phase="{{ operation_status.phase }}"
+          data-operation-phase-label="{{ operation_status.phase_label }}"
+          data-operation-elapsed="{{ operation_status.elapsed_seconds }}"
+          data-operation-recovering="{{ operation_status.recovering|yesno }}"
+          data-operation-terminal="{{ operation_status.terminal|yesno }}"
+          {% if operation_status.error %}data-operation-error="{{ operation_status.error }}"{% endif %}
+        {% endif %}
+      {% endif %}
+      class="{{ styles.home.ingress.item }}">
+    <div class="{{ styles.home.card.item }}">
+      <div class="flex min-w-0 flex-col gap-0.5">
+        <a class="{{ styles.link.title }}"
+           data-kind="report"
+           data-role="title"
+           href="{{ url_for('tools.report', key=report.urlsafe_key) }}">{{ report.name }}</a>
+        {% if stage_label %}
+          <p data-role="report-stage"
+             class="text-xs font-semibold text-base-medium">{{ stage_label }}</p>
+        {% endif %}
+        {% if report.pending and operation_key %}
+          <p class="text-xs text-base-medium" aria-live="polite">
+            <span data-role="deferred-phase">
+              {%- if operation_status -%}
+                {%- if operation_status.error -%}
+                  {{ operation_status.phase_label }}: {{ operation_status.error }}
+                {%- elif operation_status.recovering -%}
+                  {{ operation_status.phase_label }}. Automatic recovery is active.
+                {%- else -%}
+                  {{ operation_status.phase_label }}
+                {%- endif -%}
+              {%- else -%}
+                Waiting to start
+              {%- endif -%}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span data-role="deferred-elapsed">just now</span>
+          </p>
+        {% endif %}
+      </div>
+      <div class="{{ styles.home.card.actions }} translate-y-0.5">{{ controls.delete(label='Delete ' ~ report.name) }}</div>
+    </div>
+    <div class="{{ styles.home.ingress.details }}">
+      <p>
+        {% if report.pending %}{{ render_icon("spinner", "mr-1") }}{% endif %}
+        <span class="font-normal">{{ report.note }}</span>
+      </p>
+    </div>
+  </li>
+{% endmacro %}

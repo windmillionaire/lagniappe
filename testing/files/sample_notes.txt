@@ -1,0 +1,4 @@
+Page upload text fixture
+
+This file is uploaded from a page, not through the ingress import flow.
+It should render in the file Text Content tab using the original text asset.

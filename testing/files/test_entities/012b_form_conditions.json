@@ -1,0 +1,618 @@
+{
+	"test_form_string_filters": {
+		"entities": [
+			[
+				"FORM",
+				{
+					"name": "String Fields Form",
+					"hash": "formstr",
+					"schema": "text_input_only",
+					"fields": [
+						{
+							"id": "input-textab12",
+							"value": ["hello"],
+							"comparator": "SUBSTRING",
+							"expected_description": [
+								"formstr",
+								"input-textab12",
+								"string",
+								"substring",
+								"hello"
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "contains",
+								"status": "SUBSTRING",
+								"value": "hello",
+								"field_label": "Text Field"
+							}
+						},
+						{
+							"id": "input-textab12",
+							"value": ["Exact Match"],
+							"comparator": "EQUALS",
+							"expected_description": [
+								"formstr",
+								"input-textab12",
+								"string",
+								"eq",
+								"Exact Match"
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "matches",
+								"status": "EQUALS",
+								"value": "Exact Match",
+								"field_label": "Text Field"
+							}
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_form_boolean_filters": {
+		"entities": [
+			[
+				"FORM",
+				{
+					"name": "Boolean Fields Form",
+					"hash": "formbool",
+					"schema": "checkbox_only",
+					"fields": [
+						{
+							"id": "checkbox-ab12",
+							"value": ["IS_TRUE"],
+							"expected_description": [
+								"formbool",
+								"checkbox-ab12",
+								"boolean",
+								"is_true"
+							],
+							"expected_details": {
+								"type": "boolean",
+								"text": "checked",
+								"status": "IS_TRUE"
+							}
+						},
+						{
+							"id": "checkbox-ab12",
+							"value": ["IS_FALSE"],
+							"expected_description": [
+								"formbool",
+								"checkbox-ab12",
+								"boolean",
+								"is_false"
+							],
+							"expected_details": {
+								"type": "boolean",
+								"text": "not checked",
+								"status": "IS_FALSE"
+							}
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_form_timestamp_filters": {
+		"entities": [
+			[
+				"FORM",
+				{
+					"name": "Date Fields Form",
+					"hash": "formdate",
+					"schema": "date_time_inputs",
+					"fields": [
+						{
+							"id": "input-dateab12",
+							"value": ["2025-06-15"],
+							"comparator": "LESS_THAN",
+							"expected_description": [
+								"formdate",
+								"input-dateab12",
+								"timestamp",
+								"lt",
+								"DYNAMIC_TIMESTAMP"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is before",
+								"status": "LESS_THAN",
+								"field_label": "Date Field"
+							}
+						},
+						{
+							"id": "input-dateab12",
+							"value": ["2025-06-15"],
+							"comparator": "EQUALS",
+							"expected_description": [
+								"formdate",
+								"input-dateab12",
+								"timestamp",
+								"eq",
+								"DYNAMIC_TIMESTAMP"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is on",
+								"status": "EQUALS",
+								"field_label": "Date Field"
+							}
+						},
+						{
+							"id": "input-dateab12",
+							"value": ["2025-06-15"],
+							"comparator": "GREATER_THAN",
+							"expected_description": [
+								"formdate",
+								"input-dateab12",
+								"timestamp",
+								"gt",
+								"DYNAMIC_TIMESTAMP"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is after",
+								"status": "GREATER_THAN",
+								"field_label": "Date Field"
+							}
+						},
+						{
+							"id": "input-dateab12",
+							"value": ["2025-06-08", "2025-06-22"],
+							"comparator": "BETWEEN",
+							"expected_description": [
+								"formdate",
+								"input-dateab12",
+								"timestamp",
+								"between",
+								["DYNAMIC_TIMESTAMP_START", "DYNAMIC_TIMESTAMP_END"]
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is between",
+								"status": "BETWEEN",
+								"field_label": "Date Field"
+							}
+						},
+						{
+							"id": "input-timecd34",
+							"value": ["14:30"],
+							"comparator": "LESS_THAN",
+							"expected_description": [
+								"formdate",
+								"input-timecd34",
+								"timestamp",
+								"lt",
+								"DYNAMIC_TIMESTAMP"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is before",
+								"status": "LESS_THAN",
+								"field_label": "Time Field"
+							}
+						},
+						{
+							"id": "input-timecd34",
+							"value": ["09:00"],
+							"comparator": "EQUALS",
+							"expected_description": [
+								"formdate",
+								"input-timecd34",
+								"timestamp",
+								"eq",
+								"DYNAMIC_TIMESTAMP"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is at",
+								"status": "EQUALS",
+								"field_label": "Time Field"
+							}
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_form_internal_link_filters": {
+		"entities": [
+			[
+				"FORM",
+				{
+					"name": "Internal Link Form",
+					"hash": "formlink",
+					"schema": "submission_integration_links",
+					"fields": [
+						{
+							"id": "top_link",
+							"value": ["target1"],
+							"expected_description": [
+								"formlink",
+								"top_link",
+								"string",
+								"eq",
+								"target1",
+								true
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "matches",
+								"status": "EQUALS",
+								"value": "target1",
+								"field_label": "Top link"
+							}
+						},
+						{
+							"id": "top_link",
+							"value": ["target1", "target2"],
+							"expected_description": [
+								"formlink",
+								"top_link",
+								"string",
+								"in",
+								["target1", "target2"],
+								true
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "is in",
+								"status": "IN",
+								"value": ["target1", "target2"],
+								"field_label": "Top link"
+							}
+						}
+					]
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Target One",
+					"hash": "target1"
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Target Two",
+					"hash": "target2"
+				}
+			]
+		]
+	},
+	"test_form_number_filters": {
+		"entities": [
+			[
+				"FORM",
+				{
+					"name": "Number Fields Form",
+					"hash": "formnum",
+					"schema": "number_input_only",
+					"fields": [
+						{
+							"id": "input-numab12",
+							"value": ["42"],
+							"comparator": "EQUALS",
+							"expected_description": [
+								"formnum",
+								"input-numab12",
+								"number",
+								"eq",
+								42.0
+							],
+							"expected_details": {
+								"type": "number",
+								"text": "equals",
+								"status": "EQUALS",
+								"value": 42.0,
+								"field_label": "Number Field"
+							}
+						},
+						{
+							"id": "input-numab12",
+							"value": ["100"],
+							"comparator": "LESS_THAN",
+							"expected_description": [
+								"formnum",
+								"input-numab12",
+								"number",
+								"lt",
+								100.0
+							],
+							"expected_details": {
+								"type": "number",
+								"text": "is less than",
+								"status": "LESS_THAN",
+								"value": 100.0,
+								"field_label": "Number Field"
+							}
+						},
+						{
+							"id": "input-numab12",
+							"value": ["50"],
+							"comparator": "GREATER_THAN",
+							"expected_description": [
+								"formnum",
+								"input-numab12",
+								"number",
+								"gt",
+								50.0
+							],
+							"expected_details": {
+								"type": "number",
+								"text": "is greater than",
+								"status": "GREATER_THAN",
+								"value": 50.0,
+								"field_label": "Number Field"
+							}
+						},
+						{
+							"id": "input-numab12",
+							"value": ["10", "100"],
+							"comparator": "BETWEEN",
+							"expected_description": [
+								"formnum",
+								"input-numab12",
+								"number",
+								"between",
+								[10.0, 100.0]
+							],
+							"expected_details": {
+								"type": "number",
+								"text": "is between",
+								"status": "BETWEEN",
+								"value": [10.0, 100.0],
+								"field_label": "Number Field"
+							}
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_form_categorical_filters": {
+		"entities": [
+			[
+				"FORM",
+				{
+					"name": "Categorical Fields Form",
+					"hash": "formcat",
+					"schema": "radio_only",
+					"fields": [
+						{
+							"id": "radio-ab12",
+							"value": ["opt1"],
+							"expected_description": [
+								"formcat",
+								"radio-ab12",
+								"list",
+								"contains",
+								"opt1"
+							],
+							"expected_details": {
+								"type": "list",
+								"text": "is",
+								"status": "CONTAINS",
+								"value": "Option One",
+								"field_label": "Radio Field"
+							}
+						},
+						{
+							"id": "radio-ab12",
+							"value": ["opt1", "opt2"],
+							"expected_description": [
+								"formcat",
+								"radio-ab12",
+								"list",
+								"contains_any",
+								["opt1", "opt2"]
+							],
+							"expected_details": {
+								"type": "list",
+								"text": "is any of",
+								"status": "CONTAINS_ANY",
+								"or": ["Option One", "Option Two"],
+								"field_label": "Radio Field"
+							}
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_form_status_filters": {
+		"entities": [
+			[
+				"FORM",
+				{
+					"name": "Status Checkbox Form",
+					"hash": "formstatuschk",
+					"schema": "status_only",
+					"fields": [
+						{
+							"id": "status-ab12",
+							"value": ["checkbox-trigger"],
+							"expected_description": [
+								"formstatuschk",
+								"status-ab12",
+								"list",
+								"contains",
+								"checkbox-trigger"
+							],
+							"expected_details": {
+								"type": "list",
+								"text": "is",
+								"status": "CONTAINS",
+								"value": "Completed",
+								"field_label": "Status"
+							}
+						}
+					]
+				}
+			],
+			[
+				"FORM",
+				{
+					"name": "Status Radio Form",
+					"hash": "formstatusradio",
+					"schema": "status_radio",
+					"fields": [
+						{
+							"id": "status-radio-ab12",
+							"value": ["checkbox-complete"],
+							"expected_description": [
+								"formstatusradio",
+								"status-radio-ab12",
+								"list",
+								"contains",
+								"checkbox-complete"
+							],
+							"expected_details": {
+								"type": "list",
+								"text": "is",
+								"status": "CONTAINS",
+								"value": "Completed",
+								"field_label": "Approval Status"
+							}
+						},
+						{
+							"id": "status-radio-ab12",
+							"value": ["approved"],
+							"expected_description": [
+								"formstatusradio",
+								"status-radio-ab12",
+								"list",
+								"contains",
+								"approved"
+							],
+							"expected_details": {
+								"type": "list",
+								"text": "is",
+								"status": "CONTAINS",
+								"value": "Approved",
+								"field_label": "Approval Status"
+							}
+						},
+						{
+							"id": "status-radio-ab12",
+							"value": ["approved", "rejected"],
+							"expected_description": [
+								"formstatusradio",
+								"status-radio-ab12",
+								"list",
+								"contains_any",
+								["approved", "rejected"]
+							],
+							"expected_details": {
+								"type": "list",
+								"text": "is any of",
+								"status": "CONTAINS_ANY",
+								"or": ["Approved", "Rejected"],
+								"field_label": "Approval Status"
+							}
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_form_select_filters": {
+		"entities": [
+			[
+				"FORM",
+				{
+					"name": "Select Single Form",
+					"hash": "formselsingle",
+					"schema": "select_single_only",
+					"fields": [
+						{
+							"id": "select-single-ab12",
+							"value": ["small"],
+							"expected_description": [
+								"formselsingle",
+								"select-single-ab12",
+								"list",
+								"contains",
+								"small"
+							],
+							"expected_details": {
+								"type": "list",
+								"text": "is",
+								"status": "CONTAINS",
+								"value": "Small",
+								"field_label": "Single Select"
+							}
+						},
+						{
+							"id": "select-single-ab12",
+							"value": ["small", "medium"],
+							"expected_description": [
+								"formselsingle",
+								"select-single-ab12",
+								"list",
+								"contains_any",
+								["medium", "small"]
+							],
+							"expected_details": {
+								"type": "list",
+								"text": "is any of",
+								"status": "CONTAINS_ANY",
+								"or": ["Medium", "Small"],
+								"field_label": "Single Select"
+							}
+						}
+					]
+				}
+			],
+			[
+				"FORM",
+				{
+					"name": "Select Multiple Form",
+					"hash": "formselmulti",
+					"schema": "select_only",
+					"fields": [
+						{
+							"id": "select-ab12",
+							"value": ["red"],
+							"expected_description": [
+								"formselmulti",
+								"select-ab12",
+								"list",
+								"contains",
+								"red"
+							],
+							"expected_details": {
+								"type": "list",
+								"text": "is",
+								"status": "CONTAINS",
+								"value": "Red",
+								"field_label": "Select Field"
+							}
+						},
+						{
+							"id": "select-ab12",
+							"value": ["red", "green"],
+							"expected_description": [
+								"formselmulti",
+								"select-ab12",
+								"list",
+								"contains_any",
+								["green", "red"]
+							],
+							"expected_details": {
+								"type": "list",
+								"text": "is any of",
+								"status": "CONTAINS_ANY",
+								"or": ["Green", "Red"],
+								"field_label": "Select Field"
+							}
+						}
+					]
+				}
+			]
+		]
+	}
+}

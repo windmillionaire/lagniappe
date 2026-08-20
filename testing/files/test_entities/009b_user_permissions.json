@@ -1,0 +1,338 @@
+{
+	"test_global_resources": {
+		"entities": [
+			[
+				"USER",
+				{
+					"name": "Owner User",
+					"hash": "owner01",
+					"page": { "name": "Owner Page", "hash": "powner1" },
+					"owner": true,
+					"expected": [
+						true,
+						true,
+						true,
+						true,
+						true,
+						true,
+						true,
+						true,
+						true,
+						true
+					]
+				}
+			],
+
+			[
+				"USER",
+				{
+					"name": "User with ALL permissions",
+					"hash": "user01",
+					"page": { "name": "User Page", "hash": "puser1" },
+					"permissions": { "models": "ALL", "forms": "ALL", "users": "ALL" },
+					"expected": [
+						false,
+						false,
+						false,
+						true,
+						true,
+						true,
+						true,
+						true,
+						true,
+						true
+					]
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with VIEW on models only",
+					"hash": "user02",
+					"page": { "name": "User Page 2", "hash": "puser2" },
+					"permissions": { "models": "VIEW" },
+					"expected": [
+						false,
+						false,
+						false,
+						true,
+						false,
+						false,
+						false,
+						false,
+						false,
+						false
+					]
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with EDIT on models",
+					"hash": "user03",
+					"page": { "name": "User Page 3", "hash": "puser3" },
+					"permissions": { "models": "EDIT" },
+					"expected": [
+						false,
+						false,
+						false,
+						true,
+						true,
+						false,
+						false,
+						false,
+						false,
+						false
+					]
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with only own page permission",
+					"hash": "user04",
+					"page": { "name": "User Page 4", "hash": "puser4" },
+					"permissions": { "puser4": "EDIT" },
+					"expected": [
+						false,
+						false,
+						false,
+						false,
+						false,
+						false,
+						false,
+						false,
+						false,
+						false
+					]
+				}
+			]
+		],
+		"resources": [
+			["SITE", "ALL"],
+			["USER_GROUPS", "ALL"],
+			["INGRESS", "ALL"],
+			["MODELS", "VIEW"],
+			["MODELS", "EDIT"],
+			["MODELS", "DELETE"],
+			["MODELS", "CREATE"],
+			["FORMS", "VIEW"],
+			["USERS", "VIEW"],
+			["USERS", "ASSIGN"]
+		]
+	},
+
+	"test_entity_permissions": {
+		"entities": [
+			[
+				"USER",
+				{
+					"name": "User with general models VIEW",
+					"hash": "user01",
+					"page": { "name": "User Page", "hash": "puser1" },
+					"permissions": { "models": "VIEW", "puser1": "EDIT" },
+					"expected": [true, false, true, false]
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with page permission only",
+					"hash": "user02",
+					"page": { "name": "User Page 2", "hash": "puser2" },
+					"permissions": { "page001": "EDIT", "puser2": "EDIT" },
+					"expected": [true, true, false, false]
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with category permission",
+					"hash": "user03",
+					"page": { "name": "User Page 3", "hash": "puser3" },
+					"permissions": { "cat001": "VIEW", "puser3": "EDIT" },
+					"expected": [true, false, true, false]
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with only own page permission",
+					"hash": "user04",
+					"page": { "name": "User Page 4", "hash": "puser4" },
+					"permissions": { "puser4": "EDIT" },
+					"expected": [false, false, false, false]
+				}
+			]
+		],
+		"resources": [
+			[
+				[
+					"PAGE",
+					{
+						"name": "Target Page",
+						"hash": "page001",
+						"model": { "name": "Category", "hash": "cat001" }
+					}
+				],
+				"VIEW"
+			],
+			[
+				[
+					"PAGE",
+					{
+						"name": "Target Page",
+						"hash": "page001",
+						"model": { "name": "Category", "hash": "cat001" }
+					}
+				],
+				"EDIT"
+			],
+			[["CATEGORY", { "name": "Category", "hash": "cat001" }], "VIEW"],
+			[["CATEGORY", { "name": "Category", "hash": "cat001" }], "EDIT"]
+		]
+	},
+
+	"test_combine_groups": {
+		"entities": [
+			[
+				"USER",
+				{
+					"name": "User in two groups - models",
+					"hash": "user01",
+					"page": { "name": "User Page", "hash": "puser1" },
+					"permissions": { "puser1": "EDIT" },
+					"groups": [
+						{
+							"name": "Group A",
+							"hash": "grpA",
+							"permissions": { "models": "VIEW" }
+						},
+						{
+							"name": "Group B",
+							"hash": "grpB",
+							"permissions": { "models": "EDIT" }
+						}
+					],
+					"expected": {
+						"before": [false, false, false, false, false, false],
+						"after": [true, true, true, false, true, true]
+					}
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User in two groups - specific entity",
+					"hash": "user02",
+					"page": { "name": "User Page 2", "hash": "puser2" },
+					"permissions": { "puser2": "EDIT" },
+					"groups": [
+						{
+							"name": "Group C",
+							"hash": "grpC",
+							"permissions": { "cat001": "VIEW" }
+						},
+						{
+							"name": "Group D",
+							"hash": "grpD",
+							"permissions": { "cat001": "DELETE" }
+						}
+					],
+					"expected": {
+						"before": [false, false, false, false, false, false],
+						"after": [false, false, true, true, true, true]
+					}
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with page permission joins group with category",
+					"hash": "user03",
+					"page": { "name": "User Page 3", "hash": "puser3" },
+					"permissions": { "puser3": "EDIT", "page001": "EDIT" },
+					"groups": [
+						{
+							"name": "Group E",
+							"hash": "grpE",
+							"permissions": { "cat001": "VIEW" }
+						}
+					],
+					"expected": {
+						"before": [false, false, false, false, true, true],
+						"after": [false, false, true, false, true, false]
+					}
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with models:VIEW joins group with only page permission",
+					"hash": "user04",
+					"page": { "name": "User Page 4", "hash": "puser4" },
+					"permissions": { "puser4": "EDIT", "models": "VIEW" },
+					"groups": [
+						{
+							"name": "Group F",
+							"hash": "grpF",
+							"permissions": { "cat001": "RESTRICTED", "page001": "VIEW" }
+						}
+					],
+					"expected": {
+						"before": [true, false, true, false, true, false],
+						"after": [false, false, false, false, true, false]
+					}
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with category access joins group with models access",
+					"hash": "user05",
+					"page": { "name": "User Page 5", "hash": "puser5" },
+					"permissions": { "puser5": "EDIT", "cat001": "VIEW" },
+					"groups": [
+						{
+							"name": "Group G",
+							"hash": "grpG",
+							"permissions": { "models": "VIEW" }
+						}
+					],
+					"expected": {
+						"before": [false, false, true, false, true, false],
+						"after": [true, false, true, false, true, false]
+					}
+				}
+			]
+		],
+		"resources": [
+			["MODELS", "VIEW"],
+			["MODELS", "EDIT"],
+			[["CATEGORY", { "name": "Category", "hash": "cat001" }], "VIEW"],
+			[["CATEGORY", { "name": "Category", "hash": "cat001" }], "DELETE"],
+			[
+				[
+					"PAGE",
+					{
+						"name": "Page under category",
+						"hash": "page001",
+						"model": { "name": "Category", "hash": "cat001" }
+					}
+				],
+				"VIEW"
+			],
+			[
+				[
+					"PAGE",
+					{
+						"name": "Page under category",
+						"hash": "page001",
+						"model": { "name": "Category", "hash": "cat001" }
+					}
+				],
+				"EDIT"
+			]
+		]
+	}
+}

@@ -1,0 +1,219 @@
+{% from 'common.html' import format_name %}
+
+{% macro badge_or(details) %}
+  <div class="flex flex-row items-center gap-1">
+    {%- for option in details.or -%}
+      {%- if option is string -%}
+        <span class="text-kind-default">{{ option }}</span>
+      {%- else -%}
+        {{ format_name(option, parent=False, link=True) }}
+      {%- endif -%}
+      {%- if not loop.last -%}<span class="text-base-medium italic font-semibold">or</span>{%- endif -%}
+    {%- endfor -%}
+  </div>
+{% endmacro %}
+
+{% macro timestamp_between(details) %}
+  <div class="flex flex-row items-center gap-1">
+    {%- for date in details.value -%}
+      {%- if details.field and details.field.input_type == "time" -%}
+        <span class="text-kind-default">{{ date|format_time }}</span>
+      {%- else -%}
+        <span class="text-kind-default">{{ date|format_date }}</span>
+      {%- endif -%}
+      {%- if not loop.last -%}<span class="text-base-medium italic font-semibold">and</span>{%- endif -%}
+    {%- endfor -%}
+  </div>
+{% endmacro %}
+
+{% macro number_between(details) %}
+  <div class="flex flex-row items-center gap-1">
+    {%- for number in details.value -%}
+      <span class="text-kind-default">{{ number|format_number }}</span>
+      {%- if not loop.last -%}<span class="text-base-medium italic font-semibold">and</span>{%- endif -%}
+    {%- endfor -%}
+  </div>
+{% endmacro %}
+
+{% macro number_equals(details) %}
+  <span class="text-kind-default">{{ details.value|format_number }}</span>
+{% endmacro %}
+
+{% macro timestamp_equals(details) %}
+  {%- set field = details.field if details.field else details -%}
+  {%- if field.input_type == "time" -%}
+    <span class="text-kind-default">{{ field.column_value|format_time }}</span>
+  {%- else -%}
+    <span class="text-kind-default">{{ field.column_value|format_date }}</span>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro filter_string(details) %}
+  <span class="text-kind-default">{{ details.value }}</span>
+{% endmacro %}
+
+{% macro filter_boolean(details, label) %}
+  <div class="flex flex-row items-center gap-1">
+    <span class="text-kind-default">{{- label -}}:</span>
+    {%- if details.status == "IS_TRUE" -%}
+      <span data-kind="success" class="text-kind-default">True</span>
+    {%- elif details.status == "IS_FALSE" -%}
+      <span data-kind="error" class="text-kind-default">False</span>
+    {%- endif -%}
+  </div>
+{% endmacro %}
+
+{% macro entity_badge(details, icon=details.kind, label=None) %}
+  <div class="{{ styles.badge.default }}"
+       data-kind="{{ details.kind }}"
+       {% if label %}
+         role="group"
+         aria-label="{{ label }} {{ details.name }}"
+         title="{{ label }}: {{ details.name }}"
+       {% endif %}>
+    {{ render_icon((icon), (styles.badge.icon)) }}
+    {{- format_name(details, parent=False) -}}
+  </div>
+{% endmacro %}
+
+{% macro site_owner() %}
+  <div class="{{ styles.badge.default }}" data-kind="user">
+    {{ render_icon("siteOwner", (styles.badge.icon)) }}
+    Site Owner
+  </div>
+{% endmacro %}
+
+{% macro badge(details) %}
+  {%- set field = details.field or details -%}
+  {%- set kind = details.kind if details.kind else field.filter_kind -%}
+  {%- set icon = details.icon if details.icon else field.icon -%}
+  {%- set label = details.label if details.label else field.filter_label -%}
+  <div {% if kind %}data-kind="{{ kind }}"{% endif %}
+       class="{{ styles.badge.default }}">
+    {{ render_icon((icon or kind), (styles.badge.icon)) }}
+    <div class="flex flex-row items-center flex-wrap">
+      {%- if details.form -%}
+        <span class="text-form-default pr-1">[{{- details.form -}}]</span>
+      {%- endif -%}
+      {%- if label and details.type != "boolean" -%}
+        <span class="text-kind-default pr-1">{{- label -}}</span>
+        {%- if details.text -%}
+          <span class="text-base-medium pr-1">{{- details.text -}}</span>
+        {%- endif -%}
+      {%- endif -%}
+      {%- if details.completed -%}
+        <span data-kind="success" class="text-kind-default">{{- details.completed_on|format_date -}}</span>
+      {%- elif details.or -%}
+        {{- badge_or(details) -}}
+      {%- elif details.entity -%}
+        {{- format_name(details.entity, parent=False, link=True, icon=False) -}}
+      {%- elif details.value is iterable and details.type == "timestamp" -%}
+        {{- timestamp_between(details) -}}
+      {%- elif details.value and details.type == "timestamp" -%}
+        {{- timestamp_equals(details) -}}
+      {%- elif details.value is iterable and details.type == "number" -%}
+        {{- number_between(details) -}}
+      {%- elif details.value and details.type == "number" -%}
+        {{- number_equals(details) -}}
+      {%- elif details.value and details.type in ["string", "list"] -%}
+        {{- filter_string(details) -}}
+      {%- elif details.type == "boolean" -%}
+        {{- filter_boolean(details, label) -}}
+      {%- else -%}
+        {{- format_name(details, parent=False, link=True, icon=False) -}}
+      {%- endif -%}
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro due_date_badge(task) %}
+  {% set date = task.properties.due_date.column_value %}
+  {% set times_skipped = task.properties.schedule.skipped %}
+  {%- if date is in_future -%}
+    <div class="{{ styles.badge.default }}"
+         data-kind="success"
+         data-role="change-due-date"
+         role="group"
+         aria-label="Due date {{ date|format_date }}"
+         title="Due date: {{ date|format_date }}">
+      {{ render_icon("todo.ok", (styles.badge.icon)) }}{{ date|format_date }}
+    </div>
+  {%- elif date is in_past -%}
+    <div class="{{ styles.badge.default }}"
+         data-kind="error"
+         data-role="change-due-date"
+         role="group"
+         aria-label="Due date {{ date|format_date }}, overdue"
+         title="Due date: {{ date|format_date }} (overdue)">
+      {{ render_icon("todo.overdue", (styles.badge.icon)) }}
+      <span>{{ date|format_date }}</span>
+      {% if times_skipped == 1 %}
+        <span class="italic">(skipped once)</span>
+      {% elif times_skipped == 2 %}
+        <span class="italic">(skipped twice)</span>
+      {% elif times_skipped > 2 %}
+        <span class="italic">(skipped {{ times_skipped }} times)</span>
+      {% endif %}
+    </div>
+  {%- else -%}
+    <div class="{{ styles.badge.default }}"
+         data-role="change-due-date"
+         role="group"
+         aria-label="Due date today"
+         title="Due date: Today">
+      {{ render_icon("todo.today", (styles.badge.icon)) }}Today
+    </div>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro scheduling_badge(task) %}
+  {%- if task.schedule.recurring -%}
+    {% set recurring = task.schedule.recurring %}
+    <div class="{{ styles.badge.default }}"
+         data-kind="file"
+         data-role="schedule"
+         role="group"
+         aria-label="Schedule {{ recurring.interval }} {{ recurring.unit }}{% if recurring.interval|int > 1 %}s{% endif %} after completion"
+         title="Schedule: {{ recurring.interval }} {{ recurring.unit }}{% if recurring.interval|int > 1 %}s{% endif %} after completion">
+      {{ render_icon("recurring", (styles.badge.icon), "task") }}
+      <span class="text-base-light">
+        {{- recurring.interval }} {{ recurring.unit -}}{%- if recurring.interval|int > 1 -%}s{%- endif %}
+        after completion
+      </span>
+    </div>
+  {%- elif task.schedule.scheduled -%}
+    {% set scheduled = task.schedule.scheduled %}
+    <div class="{{ styles.badge.default }}"
+         data-kind="file"
+         data-role="schedule"
+         role="group"
+         aria-label="Schedule {{ scheduled.user_prompt or scheduled.mode }}"
+         title="Schedule: {{ scheduled.user_prompt or scheduled.mode }}">
+      {{ render_icon("recurring", (styles.badge.icon), "task") }}
+      <span class="text-base-light">{{ scheduled.user_prompt or scheduled.mode }}</span>
+    </div>
+  {%- elif task.schedule.periodic -%}
+    {% set periodic = task.schedule.periodic %}
+    <div class="{{ styles.badge.default }}"
+         data-kind="file"
+         data-role="schedule"
+         role="group"
+         aria-label="Schedule {{ periodic.user_prompt or periodic.description }}"
+         title="Schedule: {{ periodic.user_prompt or periodic.description }}">
+      {{ render_icon("recurring", (styles.badge.icon), "task") }}
+      <span class="text-base-light">{{ periodic.user_prompt or periodic.description }}</span>
+    </div>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro completed_on_badge(task) %}
+  {% set date = task.properties.completed_on.column_value %}
+  <div class="{{ styles.badge.default }}"
+       data-kind="success"
+       role="group"
+       aria-label="Completed on {{ date|format_date }}"
+       title="Completed on: {{ date|format_date }}">
+    {{ render_icon("completed", (styles.badge.icon)) }}
+    <span>{{ date|format_date }}</span>
+  </div>
+{% endmacro %}

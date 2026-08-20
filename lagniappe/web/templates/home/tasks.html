@@ -1,0 +1,87 @@
+{% from "common.html" import format_name, due_date_badge %}
+{% import 'controls.html' as controls %}
+
+{% macro create() %}
+  <form lp-create
+        lp-offline
+        data-widget="CreateUserTask"
+        data-route="{{ url_for('tasks.personal', key=current_user.page.urlsafe_key) }}"
+        data-destination="tasks:HomeTaskList"
+        data-visible="false"
+        class="{{ styles.home.form }}">
+    <div data-role="header" class="{{ styles.form.header.container }}">
+      <h2 class="{{ styles.form.header.title }}" data-role="title">New Task</h2>
+      <div class="{{ styles.form.header.controls }}" data-role="controls">
+        {{ controls.help("personal_task") }}
+        {{ controls.close("tasks") }}
+      </div>
+    </div>
+    <div class="{{ styles.task.buttons }} {{ styles.task.actionIconContext }}"
+         data-role="action-buttons">
+      <button data-action="schedule"
+              data-title="Schedule"
+              class="{{ styles.select.button }}"></button>
+    </div>
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}
+
+{% macro list(tasks) %}
+  <ul data-widget="HomeTaskList"
+      data-route='{{ url_for("internal.get", kind="tasks") }}'
+      data-visible="false"
+      data-if-empty="CreateUserTask"
+      class="{{ styles.home.card.list }}">
+    {% for t in tasks.list %}{{ task(t) }}{% endfor %}
+  </ul>
+{% endmacro %}
+
+{% macro skipped(times_skipped) %}
+  {%- if times_skipped == 1 -%}
+    <span class="{{ styles.task.home.skipped }}">(skipped once)</span>
+  {%- elif times_skipped == 2 -%}
+    <span class="{{ styles.task.home.skipped }}">(skipped twice)</span>
+  {%- elif times_skipped > 2 -%}
+    <span class="{{ styles.task.home.skipped }}">(skipped {{ times_skipped }} times)</span>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro task(t) %}
+  {% set times_skipped = t.properties.schedule.skipped %}
+  {% set can_edit = t.allowed(Action.EDIT) %}
+  <li lp-entity
+      lp-link
+      data-key="{{ t.urlsafe_key }}"
+      data-fingerprint="{{ t.fingerprint }}"
+      data-name="{{ t.name }}"
+      data-modified="{{ t.column('modified').column_value }}"
+      data-due-date="{{ t.properties.due_date.column_value|format_date_as_input_string }}"
+      class="{{ styles.task.home.item }}">
+    <div class="{{ styles.task.home.header }}" data-role="header">
+      <div data-role="details" class="{{ styles.task.home.details }}">
+        <div class="{{ styles.task.home.title }}">
+          {% if can_edit %}
+            <div class="{{ styles.task.home.complete }}">
+              <input type="checkbox"
+                     data-role="complete"
+                     class="{{ styles.checkbox.default }}">
+              {{ render_icon("check", (styles.checkbox.icon)) }}
+            </div>
+          {% endif %}
+          {{- format_name(t.details) -}}
+        </div>
+        {% if can_edit %}
+        <button type="button"
+                data-role="change-due-date"
+                class="{{ styles.task.home.snooze }}">
+          {{ render_icon("snooze") }}
+        </button>
+        {% endif %}
+      </div>
+      {%- if times_skipped > 0 -%}
+        {{- skipped(times_skipped) -}}
+      {%- endif -%}
+    </div>
+    <p class="{{ styles.task.home.notification }}" data-role="notification"></p>
+  </li>
+{% endmacro %}

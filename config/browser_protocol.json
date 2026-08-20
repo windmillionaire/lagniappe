@@ -1,0 +1,14 @@
+{
+  "id": "lagniappe-browser",
+  "version": 3,
+  "messages": {
+    "CONNECTIVITY": "connectivity-state"
+  },
+  "events": {},
+  "connectivity": {
+    "browser": ["online", "offline"],
+    "server": ["unknown", "online", "offline"],
+    "visibility": ["visible", "hidden"],
+    "controller": ["controlled", "uncontrolled"]
+  }
+}

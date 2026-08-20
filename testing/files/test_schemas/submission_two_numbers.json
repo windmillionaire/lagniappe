@@ -1,0 +1,14 @@
+[
+	{
+		"id": "num_a",
+		"type": "input",
+		"input": "number",
+		"title": "A"
+	},
+	{
+		"id": "num_b",
+		"type": "input",
+		"input": "number",
+		"title": "B"
+	}
+]

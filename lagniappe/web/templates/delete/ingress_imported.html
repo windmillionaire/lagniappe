@@ -1,0 +1,20 @@
+{% extends "layouts/delete.html" %}
+
+{% block name -%}
+  Delete Imported Records
+{%- endblock name %}
+
+{% block description -%}
+  <p class="text-delete-default text-sm">
+    Are you sure you want to delete all pages and tasks created by this import?
+    The import file will be kept, and rows with warnings or errors that did not create a page or task will remain in the results.
+  </p>
+{%- endblock description %}
+
+{% block button -%}
+  {{ delete_action(
+    url_for('files.ingress_delete_imported', key=file.urlsafe_key),
+    "Delete Imported Records",
+    role="delete-imported",
+  ) }}
+{%- endblock button %}

@@ -1,0 +1,187 @@
+{% from "manual/macros.html" import heading, subheading, card, callout, code, concept, nav_buttons, link %}
+<div class="space-y-6">
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Lagniappe can use Google Vertex AI for optional generation, extraction, and
+      summarization features. AI runs only when a user invokes an AI action.
+    </p>
+    <p class="text-base-medium">
+      The goal is not to sprinkle AI everywhere, but to use it where the app
+      already knows the relevant form schema, document, file, page, task, and
+      permission context.
+    </p>
+  {% endcall %}
+  {{ heading("What AI Can Do", icon="generate", kind="form") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li>Generate draft form schemas from descriptions.</li>
+      <li>Autofill page or task forms from existing context, files, images, or user instructions.</li>
+      <li>Generate editable document text.</li>
+      <li>Generate page or document images.</li>
+      <li>Summarize uploaded files for review or search.</li>
+      <li>Create draft categories, projects, model tasks, pages, and schedules.</li>
+      <li>Use permission-checked internal search tools when a prompt is configured to allow them.</li>
+      <li>Answer questions using only the records, files, and tasks the current user can access.</li>
+      <li>Suggest workspace-native actions, such as adding pages, tasks, files, forms, or projects in the right place.</li>
+    </ul>
+  {% endcall %}
+  {{ heading("Per-User AI Access", icon="user", kind="user") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      The site owner chooses a separate AI level for each user. None disables
+      AI features, Ask allows workspace questions and saved answers, and Create
+      also enables generation, autofill, summarization, Organize, Create, and
+      proposal execution. Create includes Ask.
+    </p>
+    <p class="text-base-medium">
+      This setting is independent from user groups and permissions, so a user
+      can have broad workspace permissions without AI access, or AI access that
+      still operates only within a narrow set of permitted records.
+    </p>
+  {% endcall %}
+  {% if CONFIG.AI_EMAIL_PUBLIC.enabled %}
+    {{ heading("AI Reports by Email", icon="email", kind="form") }}
+    {% call card() %}
+      {% if current_user.is_authenticated %}
+        <div data-role="ai-email-account-details">
+          <p class="text-base-medium mb-3">
+            Send from the exact email address registered to your Lagniappe account.
+            The subject and message become the report instructions. You receive an
+            acceptance email and a result email linking back to the saved report.
+          </p>
+          <ul class="text-base-medium space-y-2">
+            <li><strong>AI (recommended):</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ai }} — questions, requests, and attachments are routed automatically.</li>
+            <li><strong>Ask:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ask }} — subject or message required; up to 20 attachments are optional.</li>
+            {% if current_user.access(AI.CREATE) %}
+              <li><strong>Create:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.create }} — subject or message required; attachments are not accepted.</li>
+              <li><strong>Organize:</strong> {{ CONFIG.AI_EMAIL_PUBLIC.addresses.organize }} — at least one attachment is required; message text is optional.</li>
+            {% endif %}
+          </ul>
+          <p class="text-base-medium mt-3">
+            Each attachment may be up to 30 MiB, with a 50 MiB total. Pasted or
+            inline-only files are accepted; recognizable signature and quoted-reply
+            images are ignored. Replies above the Lagniappe marker create a new
+            report. Automated/list mail is ignored.
+            Resend temporarily processes received content and provides short-lived
+            attachment downloads to the server.
+          </p>
+          {% call callout("tip", False) %}
+            Email submission only creates the same saved report as the homepage.
+            Create and Organize proposals never apply themselves; sign in to review
+            and run them.
+          {% endcall %}
+          <p class="text-base-medium mt-3 text-sm">
+            The From address selects the account for a rate-limited report; email
+            sender identity is not a login. Opening the report or running any
+            proposal still requires normal authentication and permissions.
+          </p>
+        </div>
+      {% else %}
+        <div data-role="public-ai-email-description">
+          <p class="text-base-medium mb-3">
+            Registered users can email questions, requests, or attachments to
+            Lagniappe. The app routes each message to Ask, Create, or Organize,
+            saves the result as an AI report, and emails a link back.
+          </p>
+          <ul class="text-base-medium space-y-2">
+            <li><strong>Ask</strong> answers questions using permitted workspace context.</li>
+            <li><strong>Create</strong> drafts proposed workspace content from a request.</li>
+            <li><strong>Organize</strong> analyzes attached files into a proposed set of workspace changes.</li>
+          </ul>
+          <p class="text-base-medium mt-3">
+            Proposed changes never apply themselves. The recipient must sign in
+            with normal permissions to review and run them. Live inbound
+            addresses are shown only to signed-in users of this installation.
+          </p>
+        </div>
+      {% endif %}
+    {% endcall %}
+  {% endif %}
+  {{ heading("Permission-Scoped Context", icon="permissions", kind="user") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      AI tools use the same permission boundaries as the rest of Lagniappe.
+      When a user asks a question or starts an AI workflow, the app assembles
+      context through server-side permission checks instead of handing the AI
+      an owner-level view of the workspace.
+    </p>
+    <p class="text-base-medium mb-3">
+      For example, if someone is invited only to an old house category, they
+      can ask about electricians, repairs, files, or tasks in that category.
+      Other houses, other categories, and records they cannot view are left out
+      of search results and AI tool responses.
+    </p>
+    {% call callout("tip", False) %}
+      Think of AI as another reader acting on behalf of the current user, not
+      as a separate administrator. If the user cannot see a record in Lagniappe,
+      the AI should not receive that record as context.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("Privacy Model") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      AI requests go through your own Google Cloud project's Vertex AI
+      configuration. That is a meaningfully different posture from pasting
+      private data into a consumer chatbot account, though it is still a cloud
+      AI service: prompts, files, and generated output are sent to Google for
+      processing under your cloud terms and settings.
+    </p>
+    <p class="text-base-medium mb-3">
+      The training boundary is the important difference. Consumer AI products
+      may use conversations to improve or train their services depending on
+      the product, plan, and account settings. Google Cloud's managed Gemini
+      model terms say Google will not use customer data to train or fine-tune
+      AI/ML models without prior permission or instruction. That is stronger
+      than relying on a consumer account toggle, but it is not the same as
+      local-only processing.
+    </p>
+    <p class="text-base-medium mb-3">
+      If zero data retention matters for your installation, choose those
+      settings intentionally. Google's guidance calls out several retention
+      paths to review, including abuse-monitoring exceptions, request-response
+      logging, cached data, and grounding features that may keep limited logs:
+      {{ link("https://docs.cloud.google.com/gemini-enterprise-agent-platform/resources/zero-data-retention", "Gemini Enterprise Agent Platform zero data retention") }}.
+      Lagniappe setup can help disable Vertex AI caching, but that is one
+      control rather than a blanket guarantee for every AI feature or future
+      provider setting.
+    </p>
+    {% call callout("tip", False) %}
+      Permissions help avoid accidental oversharing into AI calls. As with any
+      AI output, a quick human look at generated text and extracted values is
+      a good habit before relying on them.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("Cost") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      AI usage is pay-per-use through your cloud project. Text operations are
+      usually small. Image generation and large file analysis cost more, and
+      provider pricing can shift over time.
+    </p>
+    <p class="text-base-medium mb-3">
+      Budget alerts in Google Cloud are an easy safety net. If you turn on
+      search grounding, file processing, image generation, or generate pages
+      in volume, it is worth glancing at usage a little more often.
+    </p>
+    <p class="text-base-medium">You can adjust AI settings at any time with:</p>
+    {{ code("./setup.sh ai") }}
+  {% endcall %}
+  {{ heading("Good to Know") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      AI is a helpful collaborator rather than an oracle. A few things to
+      keep in mind when reviewing its output:
+    </p>
+    <ul class="text-base-medium space-y-2">
+      <li>Generated schemas can look reasonable and still need a tweak or two.</li>
+      <li>Autofill may skip a value, or fill one in that you would rather leave blank.</li>
+      <li>File summaries occasionally miss a detail that matters.</li>
+      <li>Search-grounded answers can lean on the web rather than your own policy or records.</li>
+      <li>Model names, pricing, and retention settings live with the provider and can change.</li>
+    </ul>
+  {% endcall %}
+  {{ nav_buttons(
+  prev={"key": "personalization", "name": "Personalization", "kind": "project"},
+  next={"key": "under-the-hood", "name": "Under the Hood", "kind": "page"}
+  ) }}
+</div>

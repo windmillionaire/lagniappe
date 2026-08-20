@@ -1,0 +1,76 @@
+{% from "common.html" import format_name %}
+{% import 'controls.html' as controls %}
+
+{% macro create() %}
+  <form lp-create
+        data-widget="CreatePage"
+        data-route="{{ url_for('pages.create_from_home') }}"
+        data-destination="pages:HomePageList"
+        data-visible="false"
+        data-kind="page"
+        class="{{ styles.home.form }}">
+    <div data-role="header" class="{{ styles.form.header.container }}">
+      <h2 class="{{ styles.form.header.title }}" data-role="title">New Page</h2>
+      <div class="{{ styles.form.header.controls }}" data-role="controls">
+        {{ controls.help("create_page") }}
+        {{ controls.close("pages") }}
+      </div>
+    </div>
+    <div class="{{ styles.select.container }}"
+         data-role="categories"
+         lp-select>
+      <h3 class="{{ styles.label.sectionHeading }}">Category</h3>
+      <input data-index="category"
+             data-permission="edit"
+             data-creatable="{{ Resource.MODELS.allowed(Action.CREATE)|yesno }}"
+             data-placeholder="{{ 'choose or create a category...' if Resource.MODELS.allowed(Action.CREATE) else 'choose a category...' }}"
+             name="category"
+             class="{{ styles.input }}">
+    </div>
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}
+
+{% macro list(pages) %}
+  {% set can_create_pages = current_user.properties.restrictions.category_edit_restrictions %}
+  <ul data-widget="HomePageList"
+      data-route='{{ url_for("internal.get", kind="pages") }}'
+      data-visible="false"
+      data-if-empty="{{ 'CreatePage' if can_create_pages else '' }}"
+      class="{{ styles.home.card.list }}">
+    {% for p in pages.list %}{{ page(p) }}{% endfor %}
+    {% if pages.cursor or pages.back %}
+      <div class="{{ styles.home.pagination.container }}">
+        {% if pages.back %}
+          <button class="{{ styles.home.pagination.button }} bg-page-bg/50"
+                  lp-control="previous"
+                  data-route='{{ url_for("internal.get", kind="pages", cursor=None) }}'>
+            {{ render_icon("start") }}
+          </button>
+        {% endif %}
+        {% if pages.cursor %}
+          <button class="{{ styles.home.pagination.button }} bg-page-bg/50"
+                  lp-control="next"
+                  data-route='{{ url_for("internal.get", kind="pages", cursor=pages.cursor) }}'>
+            {{ render_icon("next") }}
+          </button>
+        {% endif %}
+      </div>
+    {% endif %}
+  </ul>
+{% endmacro %}
+
+{% macro page(p) %}
+  <li lp-entity
+      lp-link
+      data-key="{{ p.urlsafe_key }}"
+      data-fingerprint="{{ p.fingerprint }}"
+      class="group/item cursor-pointer">
+    <div class="{{ styles.home.card.item }}" data-role="header">
+      <div>{{ format_name(p.details) }}</div>
+      <div class="{{ styles.home.card.actions }}">
+        {{ controls.star(is_starred(p)) }}
+      </div>
+    </div>
+  </li>
+{% endmacro %}

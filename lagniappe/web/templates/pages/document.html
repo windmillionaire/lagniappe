@@ -1,0 +1,40 @@
+{% import 'controls.html' as controls %}
+
+{% macro document_settings(page) %}
+  <form data-widget="DocumentSettings"
+        lp-update
+        data-title="Document Settings"
+        data-help="document_settings"
+        data-close="document:CollaborativeDocument"
+        data-visible="false"
+        data-controls="true"
+        {% if page.is_public %}data-url="{{ url_for('pages.public', public_id=page.public_id) }}"{% endif %}
+        data-route="{{ url_for('pages.visibility', key=page.urlsafe_key) }}"
+        class="{{ styles.form.default }} mt-4 sm:mt-0">
+    {{ controls.edited_marker(url_for('pages.document_settings', key=page.urlsafe_key)) }}
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}
+
+{% macro document_tab(page, active=True) %}
+  <div lp-component
+       id="document"
+       data-title="Document"
+       data-default="CollaborativeDocument"
+       data-kind="page"
+       data-visible="false"
+       data-tab="true"
+       data-attribute="document"
+       data-has-attribute="{{ active|yesno }}"
+       data-parent-nav="tabs">
+    {% if page.allowed(Action.PUBLISH) %}{{ document_settings(page) }}{% endif %}
+    <div data-widget="CollaborativeDocument"
+         data-fullscreen="false"
+         data-readonly="{{ page.readonly|yesno }}"
+         data-public-limited="{{ current_user.is_public|yesno }}"
+         data-ai-create="{{ current_user.access(AI.CREATE)|yesno }}"
+         lp-sync="{{ page.sync_ids.document.id }}"
+         {% if page.sync_ids.document.fingerprint %}lp-fingerprint="{{ page.sync_ids.document.fingerprint }}"{% endif %}
+         {% if page.db.get('document_history') %}data-history="true"{% endif %}></div>
+  </div>
+{% endmacro %}

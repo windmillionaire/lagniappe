@@ -1,0 +1,22 @@
+{
+  "background_color": "#FFFFFF",
+  "description": "a Lagniappe instance",
+  "display": "standalone",
+  "icons": [
+    {
+      "sizes": "192x192",
+      "src": "/images/logo-192x192.png?v=103",
+      "type": "image/png"
+    },
+    {
+      "purpose": "any maskable",
+      "sizes": "512x512",
+      "src": "/images/logo-512x512.png?v=103",
+      "type": "image/png"
+    }
+  ],
+  "name": "Lagniappe",
+  "scope": "/",
+  "short_name": "Lagniappe",
+  "start_url": "/"
+}

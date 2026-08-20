@@ -1,0 +1,43 @@
+# Python
+*.py[cod]
+__pycache__/
+venv/
+.pytest_cache/
+
+# JS
+node_modules/
+bundle-stats*.html
+
+# Generated reports
+reports/*
+!reports/code_review/
+reports/code_review/*
+!reports/code_review/*.md
+
+# Node
+.npmrc
+
+# Configuration files
+config/files/
+lagniappe.yaml
+index.yaml
+
+# Environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*credentials*.json
+*service-account*.json
+gha-creds-*.json
+
+# AI
+.cursorignore
+.agents/
+.codex/
+
+# Local planning notes
+todo/

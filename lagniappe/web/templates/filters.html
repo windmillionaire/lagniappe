@@ -1,0 +1,206 @@
+{% from 'badge.html' import badge %}
+{% from 'table.html' import table %}
+{% import 'controls.html' as controls %}
+
+{% macro filter_condition(field) %}
+  <h3 class="text-base font-semibold italic text-kind-default"
+      data-field-type="{{ field.field_type.value }}">{{ field.filter_label }}</h3>
+  {% if field.field_type.value == "list" or field.multiple %}
+    {{ list_condition(field) }}
+  {% elif field.field_type.value == "boolean" %}
+    {{ boolean_condition(field) }}
+  {% elif field.field_type.value == "string" %}
+    {{ string_condition(field) }}
+  {% elif field.field_type.value in ["timestamp", "number"] %}
+    {{ range_condition(field) }}
+  {% endif %}
+  <button type="button"
+          data-role="add-filter"
+          class="{{ styles.button.submit }}">Add Filter</button>
+{% endmacro %}
+
+{% macro filter_badge(settings, definition) %}
+  {{- badge(settings) -}}
+  {%- if definition -%}
+    <input type="hidden" name="definition" value='{{ definition|tojson }}'>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro filtered_conditions(filter) %}
+  <div class="flex flex-row items-center flex-wrap gap-2 mt-3"
+       data-role="filtered-conditions">
+    {% for condition in filter.conditions %}{{ filter_badge(condition.details) }}{% endfor %}
+  </div>
+{% endmacro %}
+
+{% macro select_condition(field) %}
+  <div class="grid grid-cols-1" data-type="select" lp-select>
+    <select data-kind='{{ field.kind }}'
+            data-multiple='{{ field.multiple|tojson }}'
+            data-placeholder='{{ field.placeholder }}'
+            name="{{ field.filter_key }}_value"
+            class="{{ styles.select.default }}">
+      {% for key, value in field.choices.items() %}<option value="{{ key }}">{{ value }}</option>{% endfor %}
+    </select>
+  </div>
+{% endmacro %}
+
+{% macro facets_condition(field) %}
+  <div class="grid grid-cols-1" data-type="select" lp-select>
+    <input type="text"
+           data-index='{{ field.index }}'
+           data-kind='{{ field.kind }}'
+           data-multiple='{{ field.multiple|tojson }}'
+           data-placeholder='{{ field.placeholder }}'
+           {% if field.form_type %}data-form-type='{{ field.form_type }}'{% endif %}
+           name="{{ field.filter_key }}_value"
+           class="{{ styles.select.default }}">
+  </div>
+{% endmacro %}
+
+{% macro list_condition(field) %}
+  {% if field.choices %}
+    {{ select_condition(field) }}
+  {% else %}
+    {{ facets_condition(field) }}
+  {% endif %}
+{% endmacro %}
+
+{% macro boolean_condition(field) %}
+  <fieldset class="{{ styles.radio.fieldset.row }}">
+    {% for option in field.field_options %}
+      <label class="{{ styles.radio.label }}">
+        <input type="radio"
+               name="{{ field.filter_key }}_value"
+               value="{{ option.name }}"
+               {% if option.name == field.default %}checked{% endif %}
+               class="{{ styles.radio.default }}">
+        {{ option.value }}
+      </label>
+    {% endfor %}
+  </fieldset>
+{% endmacro %}
+
+{% macro string_condition(field) %}
+  <fieldset class="{{ styles.radio.fieldset.row }}">
+    {% for option in field.field_options if option.name not in ["IN", "NOT_IN"] %}
+      <label class="{{ styles.radio.label }}">
+        <input type="radio"
+               name="{{ field.filter_key }}_comparator"
+               value="{{ option.name }}"
+               {% if option.name == field.default %}checked{% endif %}
+               class="{{ styles.radio.default }}">
+        {{ option.value }}
+      </label>
+    {% endfor %}
+  </fieldset>
+  <div>
+    <input type="text"
+           autocomplete="off"
+           data-1p-ignore
+           name="{{ field.filter_key }}_value"
+           class="{{ styles.input }}">
+  </div>
+{% endmacro %}
+
+{% macro range_condition(field) %}
+  {% set input_type = 'date' if field.field_type.value == 'timestamp' else 'number' %}
+  <fieldset class="{{ styles.radio.fieldset.row }}">
+    {% for option in field.field_options %}
+      <label class="{{ styles.radio.label }}">
+        <input type="radio"
+               name="{{ field.filter_key }}_comparator"
+               value="{{ option.name }}"
+               {% if option.name == field.default %}checked{% endif %}
+               class="{{ styles.radio.default }}">
+        <span class="whitespace-nowrap">{{ option.value }}</span>
+      </label>
+    {% endfor %}
+  </fieldset>
+  <div data-role="single" class="flex flex-col gap-2">
+    <label class="{{ styles.label.column }}">
+      Value
+      <input type="{{ input_type }}"
+             name="{{ field.filter_key }}_value"
+             class="{{ styles.input }}">
+    </label>
+  </div>
+  <div data-role="range"
+       data-visible="false"
+       class="flex flex-col sm:flex-row gap-4 w-full">
+    <label class="{{ styles.label.column }} grow">
+      From
+      <input type="{{ input_type }}"
+             name="{{ field.filter_key }}_value_from"
+             class="{{ styles.input }}">
+    </label>
+    <label class="{{ styles.label.column }} grow">
+      To
+      <input type="{{ input_type }}"
+             name="{{ field.filter_key }}_value_to"
+             class="{{ styles.input }}">
+    </label>
+  </div>
+{% endmacro %}
+
+{% macro filter_item(f) %}
+  <li lp-entity
+      class="flex flex-row items-baseline justify-between gap-4 p-4 rounded-md bg-base-bg"
+      data-key="{{ f.urlsafe_key }}"
+      data-fingerprint="{{ f.fingerprint }}">
+    <div class="flex flex-wrap gap-4">
+      {%- for c in f.conditions -%}
+        {{- filter_badge(c.details) -}}
+      {%- endfor -%}
+    </div>
+    <div class="flex flex-row items-center gap-2">
+      {{ controls.run(f) }}
+      {% if f.allowed(Action.EDIT) %}{{ controls.delete() }}{% endif %}
+    </div>
+  </li>
+{% endmacro %}
+
+{% macro filter_form(entity) %}
+  <div data-role="conditions" class="flex flex-col gap-4"></div>
+  <div data-role="form-conditions"
+       data-visible="false"
+       class="flex flex-col gap-4"></div>
+  <div data-role="options"
+       data-visible="false"
+       class="flex flex-col p-3 rounded-md outline-2 bg-base-bg outline-kind-default gap-4"></div>
+  <div data-role="feedback"
+       data-visible="false"
+       data-kind="note"
+       class="{{ styles.message }}"></div>
+  <div data-role="error"
+       data-visible="false"
+       data-kind="error"
+       class="{{ styles.message }}"></div>
+  <div data-role="filters"
+       data-visible="false"
+       class="flex flex-row items-center flex-wrap gap-4"></div>
+  {{ filter_buttons(entity) }}
+{% endmacro %}
+
+{% macro filter_buttons(entity) %}
+  <div class="{{ styles.filters }}" data-role="buttons">
+    {% if entity.allowed(Action.EDIT) %}
+      <button type="button"
+              data-role="save"
+              data-kind="save"
+              data-route="{{ url_for('filters.save', key=entity.urlsafe_key) }}"
+              data-destination='saved'
+              class="{{ styles.button.submit }} flex-1">Save</button>
+    {% endif %}
+    <button type="button"
+            data-role="run"
+            data-replace="results"
+            data-kind="{{ 'task' if entity.kind == 'project' else 'page' }}"
+            data-route="{{ url_for('filters.test', key=entity.urlsafe_key) }}"
+            class="{{ styles.button.submit }} flex-1">Run</button>
+    <button type="button"
+            data-kind="default"
+            data-role="reset"
+            class="{{ styles.button.submit }} flex-1">Reset</button>
+  </div>
+{% endmacro %}

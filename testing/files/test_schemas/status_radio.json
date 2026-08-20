@@ -1,0 +1,39 @@
+[
+	{
+		"id": "checkbox-complete",
+		"type": "checkbox",
+		"title": "Complete"
+	},
+	{
+		"id": "radio-trigger",
+		"type": "radio",
+		"title": "Approval",
+		"options": [
+			{ "value": "pending", "label": "Pending" },
+			{ "value": "approved", "label": "Approved" },
+			{ "value": "rejected", "label": "Rejected" }
+		]
+	},
+	{
+		"id": "status-radio-ab12",
+		"type": "status",
+		"title": "Approval Status",
+		"status": [
+			{
+				"id": "checkbox-complete",
+				"value": true,
+				"text": "Completed"
+			},
+			{
+				"id": "radio-trigger",
+				"value": "approved",
+				"text": "Approved"
+			},
+			{
+				"id": "radio-trigger",
+				"value": "rejected",
+				"text": "Rejected"
+			}
+		]
+	}
+]

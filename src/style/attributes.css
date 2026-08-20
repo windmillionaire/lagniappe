@@ -1,0 +1,71 @@
+/* ==========================================================================
+   ATTRIBUTE BUTTON
+   Visibility based on selected state and interaction
+   data-just-selected suppresses hover effects until mouseout
+   ========================================================================== */
+
+/* @style attributes.button attributes.form */
+[data-role="attribute"],
+[data-role="related-form"] {
+	& > [data-role="text"] {
+		align-items: center;
+		display: inline-flex;
+		line-height: 1;
+	}
+}
+
+/* @style attributes.button attributes.iconStack */
+[data-role="attribute"] {
+	&
+		> [data-role="attribute-icons"]
+		> :is([data-role="icon"], [data-role="remove"], [data-role="add"]) {
+		display: grid;
+		grid-area: 1 / 1;
+		line-height: 1;
+		place-items: center;
+		visibility: hidden;
+	}
+
+	&:hover,
+	&:focus-visible {
+		outline-style: solid;
+		outline-color: var(--kind-default);
+		outline-width: 2px;
+		outline-offset: 2px;
+	}
+
+	/* Selected: show icon, hide on interaction and show remove */
+	&[data-selected="true"] > [data-role="attribute-icons"] > [data-role="icon"] {
+		visibility: visible;
+	}
+	&[data-selected="true"]:not([data-just-selected="true"]):is(
+			:hover,
+			:focus-visible
+		) {
+		outline-color: var(--color-delete-default);
+		& > [data-role="attribute-icons"] > [data-role="icon"] {
+			visibility: hidden;
+		}
+		& > [data-role="attribute-icons"] > [data-role="remove"] {
+			visibility: visible;
+		}
+		& > [data-role="text"] {
+			opacity: 0.5;
+		}
+	}
+
+	/* Unselected: show add */
+	&[data-selected="false"] > [data-role="attribute-icons"] > [data-role="add"] {
+		visibility: visible;
+	}
+
+	/* Text opacity: faded when unselected+idle or selected+interacting */
+	&[data-selected="false"]:not(:hover, :focus-visible) > [data-role="text"] {
+		opacity: 0.5;
+	}
+}
+
+/* @style attributes.form */
+[data-role="related-form"] > [data-role="icon"] {
+	display: grid;
+}

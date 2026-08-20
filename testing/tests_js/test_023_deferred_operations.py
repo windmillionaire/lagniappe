@@ -1,0 +1,189 @@
+"""Node-backed checks for deferred-operation poll subscriptions."""
+
+
+# @features deferred-jobs
+# @dimensions status revision polling progress timing backoff teardown decoration-opt-out visible-blur rendered-visibility lazy-watcher terminal-ownership
+def test_deferred_operation_manager_batches_orders_and_renders_status(run_node):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+function operationNode(key, visible = true) {
+	const phase = { textContent: "Waiting to start" };
+	const elapsed = { textContent: "just now" };
+	return {
+		dataset: { operation: key, operationRevision: "0" },
+		isConnected: true,
+		visible,
+		phase,
+		elapsed,
+		closest() { return this.visible ? null : {}; },
+		getClientRects() { return this.visible ? [{}] : []; },
+    querySelector(selector) {
+      if (selector === "[data-role='deferred-phase']") return phase;
+      if (selector === "[data-role='deferred-elapsed']") return elapsed;
+      return null;
+    },
+    querySelectorAll() { return []; },
+  };
+}
+
+const nodes = [operationNode("operation-a"), operationNode("operation-b", false)];
+const subscriptions = new Map();
+const descriptors = new Map();
+const schedules = new Map();
+const triggers = [];
+const reconciled = [];
+const expectedCompletions = [];
+let ensureEditWatcherCalls = 0;
+let reschedules = 0;
+const blurStarts = [];
+const coordinator = {
+  subscribe(descriptor, hooks) {
+    descriptors.set(descriptor.id, descriptor);
+    schedules.set(descriptor.id, {
+      mode: hooks.mode,
+      initial: hooks.initial,
+    });
+    subscriptions.set(descriptor.id, hooks);
+    return () => subscriptions.delete(descriptor.id);
+  },
+	async trigger(ids) { triggers.push(ids); return []; },
+	blur(startedAt) { blurStarts.push(startedAt); },
+	reschedule() { reschedules += 1; },
+};
+const context = {
+  console,
+  CustomEvent: class {
+    constructor(type, options) { this.type = type; this.detail = options.detail; }
+  },
+  createIcon() { return {}; },
+  withTransition(callback) { return callback(); },
+  document: {
+    querySelectorAll(selector) {
+      return selector === "[data-operation]" ? nodes : [];
+    },
+  },
+  window: { dispatchEvent() {} },
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/deferredOperations.mjs", "utf8");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replace(
+  "export class DeferredOperationManager",
+  "class DeferredOperationManager",
+);
+source += "\nglobalThis.DeferredOperationManager = DeferredOperationManager;";
+vm.runInContext(source, context);
+
+const editWatcher = {
+  expectDeferredCompletion(key, operation) {
+    expectedCompletions.push({ key, operation });
+  },
+};
+const view = {
+  PollingCoordinator: coordinator,
+  EditWatcher: null,
+  async ensureEditWatcher() {
+    ensureEditWatcherCalls += 1;
+    this.EditWatcher = editWatcher;
+    return editWatcher;
+  },
+  async reconcileChange(change) { reconciled.push(change); },
+};
+const manager = new context.DeferredOperationManager(view).init();
+
+(async () => {
+  if (subscriptions.size !== 2) {
+    throw new Error("Visible operations did not create polling subscriptions");
+  }
+	if (triggers.length !== 0 ||
+			descriptors.get("operation:operation-a")?.revision !== 0 ||
+			schedules.get("operation:operation-a")?.initial !== "scheduled") {
+		throw new Error("Server-rendered operation did not seed a delayed revision cursor");
+	}
+	if (
+		subscriptions.get("operation:operation-a").whileBlurred() !== true ||
+		subscriptions.get("operation:operation-b").whileBlurred() !== false
+	) {
+		throw new Error("Blurred polling did not follow rendered operation visibility");
+	}
+	manager.track("operation-local", { revision: 2 });
+	if (triggers.length !== 1 || triggers[0] !== "operation:operation-local") {
+		throw new Error("Locally started operation did not request an immediate poll");
+	}
+	if (subscriptions.get("operation:operation-local").whileBlurred() !== false) {
+		throw new Error("A background-only operation qualified for visible blur polling");
+	}
+	view.hidden = true;
+	view.blurred = true;
+	view.blurredAt = 42;
+	manager.track("operation-a", { node: nodes[0], immediate: false });
+	view.hidden = false;
+	view.blurred = false;
+	if (reschedules !== 1 || blurStarts.join(",") !== "42") {
+		throw new Error("Existing operation visibility did not refresh scheduling");
+	}
+  await manager.poll();
+  if (triggers.length !== 2 || triggers[1].length !== 3) {
+    throw new Error("Operation poll did not delegate a batch to the coordinator");
+  }
+
+  await subscriptions.get("operation:operation-a").onResult({
+    status: "changed",
+    payload: {
+      key: "operation-a",
+      status: "running",
+      phase: "generating",
+      phase_label: "Generating",
+      elapsed_seconds: 75,
+      revision: 3,
+      terminal: false,
+    },
+  });
+  if (nodes[0].phase.textContent !== "Generating" ||
+      nodes[0].elapsed.textContent !== "1 min") {
+    throw new Error("Active operation status was not rendered");
+  }
+
+  await subscriptions.get("operation:operation-b").onResult({
+    status: "changed",
+    payload: {
+      key: "operation-b",
+      status: "succeeded",
+      phase: "complete",
+      phase_label: "Complete",
+      elapsed_seconds: 12,
+      revision: 2,
+      terminal: true,
+      entity_key: "report-b",
+      source_widget: "CreateToolReport",
+      destination: "tools:ToolReportList",
+    },
+  });
+  if (manager.operations.has("operation-b") ||
+      reconciled[0]?.key !== "report-b") {
+    throw new Error("Terminal operation was not reconciled and retired");
+  }
+  if (
+    ensureEditWatcherCalls !== 1 ||
+    expectedCompletions[0]?.key !== "report-b" ||
+    expectedCompletions[0]?.operation !== "operation-b"
+  ) {
+    throw new Error("Terminal operation did not await ownership reconciliation");
+  }
+  if (manager.nudge("operation-a", 2) !== false) {
+    throw new Error("An out-of-order operation revision was accepted");
+  }
+
+  manager.destroy();
+  if (manager.operations.size || subscriptions.size) {
+    throw new Error("Destroy did not clear operation state");
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+"""
+    )

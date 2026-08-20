@@ -1,0 +1,34 @@
+{
+	"test_form_type": {
+		"entities": [
+			["FORM", { "name": "Page Form", "form_type": "page" }],
+			["FORM", { "name": "Task Form", "form_type": "task" }]
+		]
+	},
+	"test_form_schema": {
+		"entities": [
+			["FORM", { "name": "Basic Inputs Form", "schema": "basic_inputs" }],
+			["FORM", { "name": "Selection Types Form", "schema": "selection_types" }],
+			["FORM", { "name": "Complex Types Form", "schema": "complex_types" }]
+		]
+	},
+	"test_form_table_fields": {
+		"entities": [
+			["FORM", { "name": "Has Table", "schema": "complex_types" }],
+			["FORM", { "name": "No Table", "schema": "basic_inputs" }]
+		]
+	},
+	"test_form_html_fields": {
+		"entities": [
+			["FORM", { "name": "Has HTML", "schema": "complex_types" }],
+			["FORM", { "name": "No HTML", "schema": "selection_types" }]
+		]
+	},
+	"test_form_filters": {
+		"entities": [
+			["FORM", { "name": "Basic Inputs Form", "schema": "basic_inputs" }],
+			["FORM", { "name": "Selection Types Form", "schema": "selection_types" }],
+			["FORM", { "name": "Complex Types Form", "schema": "complex_types" }]
+		]
+	}
+}

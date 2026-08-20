@@ -1,0 +1,131 @@
+{
+	"test_category_attributes": {
+		"entities": [
+			[
+				"CATEGORY",
+				{
+					"name": "All Attributes",
+					"attributes": [
+						"tasks",
+						"document",
+						"photo",
+						"notes",
+						"files"
+					]
+				}
+			],
+			[
+				"CATEGORY",
+				{
+					"name": "Tasks Only",
+					"attributes": ["tasks"]
+				}
+			],
+			[
+				"CATEGORY",
+				{
+					"name": "Document Only",
+					"attributes": ["document"]
+				}
+			],
+			[
+				"CATEGORY",
+				{
+					"name": "Photo Notes Files",
+					"attributes": ["photo", "notes", "files"]
+				}
+			],
+			["CATEGORY", { "name": "No Attributes", "attributes": [] }],
+			["CATEGORY", { "name": "Default Attributes" }]
+		]
+	},
+	"test_category_filters": {
+		"entities": [
+			[
+				"CATEGORY",
+				{
+					"name": "Category With Form",
+					"form": {
+						"name": "Category Form",
+						"hash": "catform1",
+						"schema": "basic_inputs"
+					}
+				}
+			],
+			["CATEGORY", { "name": "Category Without Form" }],
+			[
+				"PAGE",
+				{
+					"name": "Page With Everything",
+					"description": "A detailed description",
+					"public": true,
+					"assets": { "image": { "type": "image", "path": "test.jpg" } }
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "The Simple Page",
+					"description": "Basic page"
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Public Page",
+					"public": true
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page With Image",
+					"assets": { "image": { "type": "image", "path": "photo.png" } }
+				}
+			],
+			["PAGE", { "name": "Minimal Page" }],
+			[
+				"PAGE",
+				{
+					"name": "Page With Different Form",
+					"form": {
+						"name": "Different Form",
+						"hash": "diffform1",
+						"schema": "selection_types"
+					}
+				}
+			]
+		]
+	},
+	"test_category_schema": {
+		"entities": [
+			[
+				"CATEGORY",
+				{
+					"name": "Category With Schema",
+					"form": {
+						"name": "List Form",
+						"hash": "schform1",
+						"schema": "basic_inputs"
+					}
+				}
+			],
+			["CATEGORY", { "name": "Category Without Form" }]
+		]
+	},
+	"test_category_filters_related_forms": {
+		"entities": [
+			[
+				"CATEGORY",
+				{
+					"name": "Primary Plus Related",
+					"form": {
+						"name": "Primary Form",
+						"hash": "primform1",
+						"schema": "basic_inputs"
+					}
+				}
+			]
+		]
+	}
+}

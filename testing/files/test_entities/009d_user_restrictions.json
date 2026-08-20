@@ -1,0 +1,178 @@
+{
+	"test_restrictions": {
+		"entities": [
+			[
+				"USER",
+				{
+					"name": "Owner user",
+					"hash": "owner01",
+					"page": { "name": "Owner Page", "hash": "powner" },
+					"owner": true,
+					"permissions": {},
+					"expected": {
+						"restrictions": ["forms", "models", "users"],
+						"search": false,
+						"can_assign": true,
+						"user_assign": false,
+						"can_create_pages": true,
+						"category_edit": false,
+						"task": false,
+						"page": ["models"],
+						"form": false,
+						"users": false
+					}
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with all general permissions",
+					"hash": "user01",
+					"page": { "name": "User Page 1", "hash": "puser1" },
+					"permissions": {
+						"models": "VIEW",
+						"forms": "VIEW",
+						"users": "VIEW",
+						"puser1": "EDIT"
+					},
+					"expected": {
+						"restrictions": ["forms", "models", "puser1", "users"],
+						"search": ["forms", "models", "puser1", "users"],
+						"can_assign": false,
+						"user_assign": [],
+						"can_create_pages": false,
+						"category_edit": [],
+						"task": ["models"],
+						"page": ["models"],
+						"form": false,
+						"users": false
+					}
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with only specific permissions",
+					"hash": "user02",
+					"page": { "name": "User Page 2", "hash": "puser2" },
+					"permissions": {
+						"cat001": "VIEW",
+						"page001": "EDIT",
+						"puser2": "EDIT"
+					},
+					"expected": {
+						"restrictions": ["cat001", "page001", "puser2"],
+						"search": ["cat001", "page001", "puser2"],
+						"can_assign": false,
+						"user_assign": [],
+						"can_create_pages": false,
+						"category_edit": [],
+						"task": ["cat001", "page001", "puser2"],
+						"page": ["cat001", "page001", "puser2"],
+						"form": ["cat001", "page001", "puser2"],
+						"users": ["cat001", "page001", "puser2"]
+					}
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with forms VIEW but specific models",
+					"hash": "user03",
+					"page": { "name": "User Page 3", "hash": "puser3" },
+					"permissions": {
+						"forms": "VIEW",
+						"cat001": "EDIT",
+						"puser3": "EDIT"
+					},
+					"expected": {
+						"restrictions": ["cat001", "forms", "puser3"],
+						"search": ["cat001", "forms", "puser3"],
+						"can_assign": false,
+						"user_assign": [],
+						"can_create_pages": true,
+						"category_edit": ["cat001"],
+						"task": ["cat001", "puser3"],
+						"page": ["cat001", "forms", "puser3"],
+						"form": false,
+						"users": ["cat001", "forms", "puser3"]
+					}
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with USERS ASSIGN permission",
+					"hash": "user04",
+					"page": { "name": "User Page 4", "hash": "puser4" },
+					"permissions": {
+						"users": "ASSIGN",
+						"puser4": "EDIT"
+					},
+					"expected": {
+						"restrictions": ["puser4", "users"],
+						"search": ["puser4", "users"],
+						"can_assign": true,
+						"user_assign": false,
+						"can_create_pages": false,
+						"category_edit": [],
+						"task": ["puser4"],
+						"page": ["puser4", "users"],
+						"form": ["puser4", "users"],
+						"users": false
+					}
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with group ASSIGN permission",
+					"hash": "user05",
+					"page": { "name": "User Page 5", "hash": "puser5" },
+					"permissions": {
+						"grp001": "ASSIGN",
+						"puser5": "EDIT"
+					},
+					"expected": {
+						"restrictions": ["grp001", "puser5"],
+						"search": ["grp001", "puser5"],
+						"can_assign": true,
+						"user_assign": ["grp001"],
+						"can_create_pages": false,
+						"category_edit": [],
+						"task": ["puser5"],
+						"page": ["grp001", "puser5"],
+						"form": ["grp001", "puser5"],
+						"users": ["grp001", "puser5"]
+					}
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User with RESTRICTED parent (should be excluded)",
+					"hash": "user06",
+					"page": { "name": "User Page 6", "hash": "puser6" },
+					"permissions": {
+						"cat001": "RESTRICTED",
+						"page001": "VIEW",
+						"puser6": "EDIT"
+					},
+					"expected": {
+						"restrictions": ["page001", "puser6"],
+						"search": ["page001", "puser6"],
+						"can_assign": false,
+						"user_assign": [],
+						"can_create_pages": false,
+						"category_edit": [],
+						"task": ["page001", "puser6"],
+						"page": ["page001", "puser6"],
+						"form": ["page001", "puser6"],
+						"users": ["page001", "puser6"]
+					}
+				}
+			]
+		],
+		"resources": []
+	}
+}

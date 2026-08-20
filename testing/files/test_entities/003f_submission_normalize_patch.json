@@ -1,0 +1,100 @@
+{
+	"test_normalize_skips_keys_not_in_schema": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Normalize skip unknown keys",
+					"hash": "np1",
+					"form": {
+						"name": "Form",
+						"hash": "nf1",
+						"schema": "normalize_alpha_only"
+					},
+					"normalize_case": {
+						"values": { "alpha": "ok", "beta": "ignored" },
+						"expected": { "alpha": ["ok"] }
+					}
+				}
+			]
+		]
+	},
+	"test_normalize_multipart_keys_merge_under_field_id": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Normalize multipart merge",
+					"hash": "np2",
+					"form": {
+						"name": "Form",
+						"hash": "nf2",
+						"schema": "normalize_site_multipart"
+					},
+					"normalize_case": {
+						"values": { "site:part_a": "x", "site:part_b": "y" },
+						"expected": { "site": { "part_a": "x", "part_b": "y" } }
+					}
+				}
+			]
+		]
+	},
+	"test_normalize_drops_falsy_entries_in_lists": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Normalize list falsy drop",
+					"hash": "np3",
+					"form": {
+						"name": "Form",
+						"hash": "nf3",
+						"schema": "normalize_tags_multi"
+					},
+					"normalize_case": {
+						"values": { "tags": ["a", "", "b"] },
+						"expected": { "tags": ["a", "b"] }
+					}
+				}
+			]
+		]
+	},
+	"test_patch_submission_merges_single_field": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Patch merge title",
+					"hash": "pp1",
+					"form": {
+						"name": "Form",
+						"hash": "pf1",
+						"schema": "patch_title_slug"
+					},
+					"initial_submission": { "title": "Hello", "slug": "hello" },
+					"patch_payload": { "title": "Hello world" },
+					"expected_submission": { "title": "Hello world", "slug": "hello" }
+				}
+			]
+		]
+	},
+	"test_patch_submission_accepts_json_string": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Patch JSON string payload",
+					"hash": "pp2",
+					"form": {
+						"name": "Form",
+						"hash": "pf2",
+						"schema": "patch_note_only"
+					},
+					"initial_submission": { "note": "first" },
+					"patch_payload_json": "{\"note\": \"second\"}",
+					"expected_submission": { "note": "second" }
+				}
+			]
+		]
+	}
+}

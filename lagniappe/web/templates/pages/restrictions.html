@@ -1,0 +1,70 @@
+{% import 'badge.html' as badge %}
+
+{% macro restrict_access(page) %}
+  <div data-role="restrict-access"
+       class="outline-2 outline-user-default rounded-md shadow-sm bg-white"
+       data-kind="user"
+       type="button">
+    <div class="{{ styles.iconLabel.wrapper }} rounded-t-md px-3 py-1.5 text-lg font-semibold border-b-2 border-user-default">
+      {{ render_icon("group", (styles.iconLabel.icon) ~ " text-user-default") }}
+      <span class="text-user-default">Restrict Access</span>
+    </div>
+    <div class="flex flex-col gap-3 p-3">
+      <p class="text-sm text-base-dark italic"
+         data-role="restricted-description">
+        If a page is restricted to the site owner or a specific group, only the site owner and users in that
+        group can view it. This will override any category access other groups may have.
+      </p>
+      {{ specific_access(page, 'owner') }}
+      <input data-index="group"
+             data-role="restrict-group-input"
+             data-kind="user"
+             data-placeholder="add group restriction..."
+             name="group"
+             class="{{ styles.input }}">
+    </div>
+    {{ restricted_group_list(page) }}
+  </div>
+{% endmacro %}
+
+{% macro restricted_group_list(page) %}
+  <ul class="empty:hidden" data-role="restricted-group-list">
+    {%- for group in page.groups -%}
+      <li class="{{ styles.form.restriction }}">
+        <span class="text-base font-semibold text-user-default truncate">{{ group.name }}</span>
+        <button class="{{ styles.toggle.plain }}"
+                data-role="remove-restriction"
+                data-key="{{ group.urlsafe_key }}"
+                data-kind="delete"
+                type="button">
+          {{ render_icon("x") }}
+        </button>
+      </li>
+    {%- endfor -%}
+  </ul>
+{% endmacro %}
+
+{% macro visible_to(page) %}
+  <div data-role="visible-to" class="flex flex-col gap-2">
+    <h2 class="text-lg font-semibold text-user-default">This page is visible to</h2>
+    <div class="flex flex-row flex-wrap items-center gap-2" data-role="badges">
+      {{ badge.site_owner() }}
+      {% for group in page.groups %}{{ badge.entity_badge(group.details) }}{% endfor %}
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro specific_access(page, type) %}
+  <label class="{{ styles.checkbox.label }}">
+    <div class="{{ styles.checkbox.container }}">
+      <input type="checkbox"
+             data-role="specific-access"
+             data-kind="user"
+             name="{{ type }}"
+             {{ 'checked' if page.restricted_to and type in page.restricted_to else '' }}
+             class="{{ styles.checkbox.default }}">
+      {{ render_icon("check", (styles.checkbox.icon)) }}
+    </div>
+    <span>Restrict to site {{ type }}</span>
+  </label>
+{% endmacro %}

@@ -1,0 +1,211 @@
+"""
+Permission tests for task visibility and task-row edit controls.
+
+Verified against:
+- lagniappe/web/templates/pages/tasks.html
+- lagniappe/web/routes/tasks/main.py
+- lagniappe/core/entities/task.py
+"""
+
+import hashlib
+
+import pytest
+import requests
+from playwright.sync_api import expect
+
+from config import SETTINGS
+from lagniappe import CONFIG
+from lagniappe.core.definitions import Fetch
+from lagniappe.core.entities import Entities
+from lagniappe.core.tools import database
+from testing.definitions import Tasks, Users
+from testing.resources import Task
+from testing.utility import assert_lagniappe_error_response, assert_same_etag
+
+pytestmark = pytest.mark.e2e
+
+
+def _task_side_effect_state(task, *users):
+    persisted = Entities.fetch_one(task.key, request=Fetch.direct())
+    history_keys = tuple(
+        row.key for row in database.get.task_history(persisted)
+    )
+    notification_keys = tuple(
+        (
+            user.entity.key,
+            tuple(
+                row.key
+                for row in database.get.activity(
+                    user.entity,
+                    types="notification",
+                )
+            ),
+        )
+        for user in users
+    )
+    return (
+        persisted.fingerprint,
+        persisted.modified,
+        history_keys,
+        notification_keys,
+    )
+
+
+# @pairs permissions:etag permissions:authorization-before-cache
+# @pairs permissions:resource-gates cache:permissions
+def test_task_route_is_forbidden_without_model_or_page_permission(
+    get_user, browser_failures
+):
+    """A signed-in user with no model/page access cannot follow a task URL."""
+    owner = get_user(Users.OWNER)
+    task = Tasks.test_create_page_task.get(owner)
+
+    blocked = get_user(Users.user_no_access)
+    state_before = _task_side_effect_state(task, owner, blocked)
+    with browser_failures.expect_http_error(blocked, status=403, path=task.url):
+        blocked.navigate(task.url)
+        expect(blocked.page).to_have_title("Error 403")
+
+    blocked_fingerprint = hashlib.md5(
+        (
+            f"{task.entity.fingerprint}-{CONFIG.BUILD_ID}-"
+            f"{blocked.entity.authorization_fingerprint}"
+        ).encode("utf-8")
+    ).hexdigest()
+    task_url = (
+        task.url
+        if task.url.startswith("http")
+        else f"{SETTINGS.test_config['BASE_URL']}{task.url}"
+    )
+    cookies = {
+        cookie["name"]: cookie["value"]
+        for cookie in blocked.page.context.cookies()
+    }
+    response = requests.get(
+        task_url,
+        headers={"If-None-Match": f'"{blocked_fingerprint}"'},
+        cookies=cookies,
+        allow_redirects=False,
+        timeout=10,
+    )
+    assert_lagniappe_error_response(response, status=403)
+    assert_same_etag(response.headers.get("etag"), f'"{blocked_fingerprint}"')
+    assert task.entity.name not in response.text
+    assert _task_side_effect_state(task, owner, blocked) == state_before
+
+
+# @pairs tasks:history task-combine:authorization
+def test_task_history_routes_are_forbidden_without_permission(get_user):
+    """History/combine fragments enforce the task permission boundary."""
+    owner = get_user(Users.OWNER)
+    task = Tasks.test_create_page_task.get(owner)
+
+    blocked = get_user(Users.user_no_access)
+    state_before = _task_side_effect_state(task, owner, blocked)
+    cookies = {
+        cookie["name"]: cookie["value"]
+        for cookie in blocked.page.context.cookies()
+    }
+    base_url = SETTINGS.test_config["BASE_URL"]
+
+    for suffix in ("history", "history/latest-submission", "combine"):
+        response = requests.get(
+            f"{base_url}/tasks/{task.key}/{suffix}",
+            cookies=cookies,
+            allow_redirects=False,
+            timeout=10,
+        )
+        assert_lagniappe_error_response(response, status=403)
+        assert task.entity.name not in response.text
+
+    assert _task_side_effect_state(task, owner, blocked) == state_before
+
+
+# @pairs tasks:readonly tasks:permission-gates
+def test_page_task_viewer_sees_task_without_edit_controls(get_user):
+    """A page-level viewer reads a task row but cannot complete, edit, or delete it."""
+    owner = get_user(Users.OWNER)
+    task = Tasks.test_view_only_page_task.get(owner)
+
+    viewer = get_user(Users.page_acl_one_visible)
+    viewer.go(task)
+
+    task_row = viewer.locate(f"[data-key='{task.key}']")
+    expect(task_row).to_be_visible()
+    complete_checkbox = task_row.locator(Task.COMPLETE_TASK_CHECKBOX)
+    expect(complete_checkbox).to_be_visible()
+    expect(complete_checkbox).to_be_disabled()
+    expect(task_row.locator(Task.SETTINGS_FORM)).not_to_be_attached()
+    expect(task_row.locator("button[lp-control='delete']")).not_to_be_attached()
+    expect(
+        task_row.get_by_role("menuitem", name="Combine with Task")
+    ).not_to_be_attached()
+
+
+# @pairs tasks:completed-only tasks:empty-state
+# @template pages/tasks.html::task_list
+def test_completed_only_task_list_hides_empty_marker(get_user):
+    """A completed task prevents the page-task empty marker from appearing."""
+    owner = get_user(Users.OWNER)
+    task = Tasks.test_completed_only_page_task.get(owner)
+    if not task.entity.completed:
+        task.mark_completed()
+
+    viewer = get_user(Users.page_acl_one_visible)
+    viewer.go(task)
+
+    task_list = viewer.locate("[data-widget='PageTaskList']")
+    expect(task_list).to_have_attribute("loaded", "")
+    expect(task_list.locator(f"[data-key='{task.key}']")).to_be_visible()
+    expect(task_list.locator("[data-role='empty']")).not_to_be_visible()
+
+
+# @features tasks
+# @dimensions readonly attached-form empty-fields permission-gates
+# @template pages/tasks.html::task
+# @template pages/tasks.html::task_form
+def test_page_task_viewer_sees_empty_form_structure_without_edit_controls(get_user):
+    """A page-level viewer sees active task form structure without edit controls."""
+    owner = get_user(Users.OWNER)
+    task = Tasks.test_view_only_page_task_with_empty_form.get(owner)
+
+    viewer = get_user(Users.page_acl_one_visible)
+    viewer.go(task)
+
+    task_row = viewer.locate(f"[data-key='{task.key}']")
+    expect(task_row).to_be_visible()
+    expect(task_row).to_have_attribute("data-completed", "false")
+    expect(task_row).to_have_attribute("data-readonly", "true")
+
+    task_form = task.task_form
+    expect(task_form).to_be_visible()
+    expect(task_form.locator("[data-role='show-autofill']")).to_have_count(0)
+    expect(task_form.locator("button[type='submit']")).to_have_count(0)
+    complete_checkbox = task_row.locator(Task.COMPLETE_TASK_CHECKBOX)
+    expect(complete_checkbox).to_be_visible()
+    expect(complete_checkbox).to_be_disabled()
+    expect(task_row.locator(Task.SETTINGS_FORM)).not_to_be_attached()
+    expect(task_row.locator("button[lp-control='delete']")).not_to_be_attached()
+
+    readonly_field = task_form.locator("[id^='input-textab12'].form-element")
+    expect(readonly_field).to_be_visible()
+    expect(readonly_field).to_have_attribute("data-mode", "read")
+    expect(readonly_field).to_contain_text("Text Field")
+    expect(readonly_field).to_contain_text("Not provided")
+    expect(readonly_field.locator("input")).to_have_count(0)
+
+
+# @pairs tasks:assignee tasks:permission-gates
+def test_assigned_user_can_work_their_assigned_task(get_user):
+    """An assignee can work a task whose Page is otherwise unavailable."""
+    owner = get_user(Users.OWNER)
+    assignee = get_user(Users.create_user)
+    Tasks.test_filter_by_assigned_user.get(owner)
+    task = Tasks.test_assigned_permission_task.get(owner)
+
+    assignee.go(task)
+
+    task_row = assignee.locate(f"[data-key='{task.key}']")
+    expect(task_row).to_be_visible()
+    expect(task_row.locator(Task.COMPLETE_TASK_CHECKBOX)).to_be_visible()
+    expect(task_row.locator(Task.SETTINGS_FORM)).to_be_visible()

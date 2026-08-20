@@ -1,0 +1,32 @@
+{% extends "layouts/login.html" %}
+
+{% macro agent_login_form(error) %}
+  <form data-route="{{ url_for('users.login_agent') }}"
+        class="{{ styles.form.login }}">
+    <h1 data-role="message"
+        class="{{ styles.login.heading }}">Agent access</h1>
+    <div data-role="error"
+         class="{{ styles.login.error|replace(' hidden', '') if error else styles.login.error }}">{{ error }}</div>
+    <div class="space-y-4">
+      <label class="{{ styles.label.column }}">
+        Access code
+        <input type="password"
+               name="code"
+               required
+               autocomplete="one-time-code"
+               data-kind="user"
+               class="{{ styles.input }}">
+      </label>
+      <button data-role="agent-login"
+              data-kind="user"
+              class="{{ styles.button.submit }} w-full">
+        <span data-role="icon" data-visible="false" aria-hidden="true"></span>
+        <span data-role="text">Sign in</span>
+      </button>
+    </div>
+  </form>
+{% endmacro %}
+
+{% block content %}
+  {{ agent_login_form(error) }}
+{% endblock content %}

@@ -1,0 +1,48 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Tasks") %}
+  <section>
+    {{ subheading("What Tasks Do") }}
+    <p class="text-sm text-base-dark">
+      Tasks track work that needs to be done. A task starts on a page, can be assigned to someone, and can optionally include a form, due date, files, project links, or history.
+    </p>
+    {% call callout("tip") %}
+      Create tasks from the page where the work belongs. That page controls who can edit the task, while links and assignments can make it visible elsewhere.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Main Controls") }}
+    <div class="space-y-3">
+      {% call feature("Name and Description", icon="task", kind="task") %}
+        Give the task a clear action name and add details when someone else may need context.
+      {% endcall %}
+      {% call feature("Due Date and Schedule", icon="dueDate", kind="task") %}
+        Set a due date for reminders, or make the task recurring when it repeats after completion.
+      {% endcall %}
+      {% call feature("Assignment", icon="assignedTo", kind="user") %}
+        Assigning a task gives that user access to work it, even if they do not edit the origin page.
+      {% endcall %}
+      {% call feature("Forms and Files", icon="form", kind="form") %}
+        Attach a form for structured data or upload/link files that support the task.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Typical Flow") }}
+    {% call step(1, "Create the task") %}
+      <p class="text-sm text-base-medium">Start with the task name, then add a description or due date if needed.</p>
+    {% endcall %}
+    {% call step(2, "Add context") %}
+      <p class="text-sm text-base-medium">Link a project, model task, assignee, category, form, or file when it helps the work land in the right place.</p>
+    {% endcall %}
+    {% call step(3, "Track progress") %}
+      <p class="text-sm text-base-medium">Update the task, fill any attached form, and mark it complete when the work is done.</p>
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Permissions in One Breath") }}
+    {% call callout("info") %}
+      Users who can edit the origin page can edit the task. Assigned users can edit their assigned task. Linked pages provide visibility without automatically granting edit access.
+    {% endcall %}
+  </section>
+{% endcall %}

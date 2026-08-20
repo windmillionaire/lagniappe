@@ -1,0 +1,14 @@
+{% extends "layouts/error.html" %}
+
+{% block title %}
+  Error 403
+{% endblock title %}
+
+{% block message %}
+  {% set default_message = "You don't have the permission to access the requested resource. It is either read-protected or not readable by the server." %}
+  {% if description and description != default_message %}
+    {{ description }}
+  {% else %}
+    You do not have access to this page. If you think that is a mistake, ask the site owner to update your permissions.
+  {% endif %}
+{% endblock message %}

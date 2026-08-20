@@ -1,0 +1,362 @@
+{
+	"test_category_string_filters": {
+		"entities": [
+			[
+				"CATEGORY",
+				{
+					"name": "Test Category",
+					"hash": "cattest1",
+					"fields": [
+						{
+							"id": "name",
+							"value": ["test"],
+							"comparator": "SUBSTRING",
+							"expected_description": [
+								"cattest1",
+								"name",
+								"string",
+								"substring",
+								"test"
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "contains",
+								"value": "test",
+								"field_label": "Page Name"
+							}
+						},
+						{
+							"id": "name",
+							"value": ["Exact Name"],
+							"comparator": "EQUALS",
+							"expected_description": [
+								"cattest1",
+								"name",
+								"string",
+								"eq",
+								"Exact Name"
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "matches",
+								"value": "Exact Name",
+								"field_label": "Page Name"
+							}
+						},
+						{
+							"id": "description",
+							"value": ["test description"],
+							"comparator": "SUBSTRING",
+							"expected_description": [
+								"cattest1",
+								"description",
+								"string",
+								"substring",
+								"test description"
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "contains",
+								"value": "test description",
+								"field_label": "Description"
+							}
+						},
+						{
+							"id": "description",
+							"value": ["Exact Description"],
+							"comparator": "EQUALS",
+							"expected_description": [
+								"cattest1",
+								"description",
+								"string",
+								"eq",
+								"Exact Description"
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "matches",
+								"value": "Exact Description",
+								"field_label": "Description"
+							}
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_category_boolean_filters": {
+		"entities": [
+			[
+				"CATEGORY",
+				{
+					"name": "Test Category",
+					"hash": "cattest2",
+					"fields": [
+						{
+							"id": "has_document",
+							"value": ["IS_TRUE"],
+							"expected_description": [
+								"cattest2",
+								"has_document",
+								"boolean",
+								"is_true"
+							],
+							"expected_details": {
+								"type": "boolean",
+								"status": "IS_TRUE",
+								"text": "document"
+							}
+						},
+						{
+							"id": "has_document",
+							"value": ["IS_FALSE"],
+							"expected_description": [
+								"cattest2",
+								"has_document",
+								"boolean",
+								"is_false"
+							],
+							"expected_details": {
+								"type": "boolean",
+								"status": "IS_FALSE",
+								"text": "no document"
+							}
+						},
+						{
+							"id": "has_image",
+							"value": ["IS_TRUE"],
+							"expected_description": [
+								"cattest2",
+								"has_image",
+								"boolean",
+								"is_true"
+							],
+							"expected_details": {
+								"type": "boolean",
+								"status": "IS_TRUE",
+								"text": "image"
+							}
+						},
+						{
+							"id": "has_image",
+							"value": ["IS_FALSE"],
+							"expected_description": [
+								"cattest2",
+								"has_image",
+								"boolean",
+								"is_false"
+							],
+							"expected_details": {
+								"type": "boolean",
+								"status": "IS_FALSE",
+								"text": "no image"
+							}
+						},
+						{
+							"id": "is_public",
+							"value": ["IS_TRUE"],
+							"expected_description": [
+								"cattest2",
+								"is_public",
+								"boolean",
+								"is_true"
+							],
+							"expected_details": {
+								"type": "boolean",
+								"status": "IS_TRUE",
+								"text": "public"
+							}
+						},
+						{
+							"id": "is_public",
+							"value": ["IS_FALSE"],
+							"expected_description": [
+								"cattest2",
+								"is_public",
+								"boolean",
+								"is_false"
+							],
+							"expected_details": {
+								"type": "boolean",
+								"status": "IS_FALSE",
+								"text": "not public"
+							}
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_category_timestamp_filters": {
+		"entities": [
+			[
+				"CATEGORY",
+				{
+					"name": "Test Category",
+					"hash": "cattest3",
+					"fields": [
+						{
+							"id": "modified",
+							"value": ["2025-06-15"],
+							"comparator": "LESS_THAN",
+							"expected_description": [
+								"cattest3",
+								"modified",
+								"timestamp",
+								"lt"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is before",
+								"status": "LESS_THAN"
+							}
+						},
+						{
+							"id": "modified",
+							"value": ["2025-06-15"],
+							"comparator": "LESS_EQUAL",
+							"expected_description": [
+								"cattest3",
+								"modified",
+								"timestamp",
+								"lte"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is on or before",
+								"status": "LESS_EQUAL"
+							}
+						},
+						{
+							"id": "modified",
+							"value": ["2025-06-15"],
+							"comparator": "EQUALS",
+							"expected_description": [
+								"cattest3",
+								"modified",
+								"timestamp",
+								"eq"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is on",
+								"status": "EQUALS"
+							}
+						},
+						{
+							"id": "modified",
+							"value": ["2025-06-15"],
+							"comparator": "GREATER_EQUAL",
+							"expected_description": [
+								"cattest3",
+								"modified",
+								"timestamp",
+								"gte"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is on or after",
+								"status": "GREATER_EQUAL"
+							}
+						},
+						{
+							"id": "modified",
+							"value": ["2025-06-15"],
+							"comparator": "GREATER_THAN",
+							"expected_description": [
+								"cattest3",
+								"modified",
+								"timestamp",
+								"gt"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is after",
+								"status": "GREATER_THAN"
+							}
+						},
+						{
+							"id": "modified",
+							"value": ["2025-06-01", "2025-06-30"],
+							"comparator": "BETWEEN",
+							"expected_description": [
+								"cattest3",
+								"modified",
+								"timestamp",
+								"between"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is between",
+								"status": "BETWEEN"
+							}
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_category_entity_filters": {
+		"entities": [
+			[
+				"CATEGORY",
+				{
+					"name": "Main Category",
+					"hash": "catmain",
+					"fields": [
+						{
+							"id": "categories",
+							"value": ["catfilter1"],
+							"expected_description": [
+								"catmain",
+								"categories",
+								"list",
+								"contains",
+								"catfilter1",
+								true
+							],
+							"expected_details": {
+								"type": "list",
+								"text": "is",
+								"value": "catfilter1",
+								"entity": [{ "hash": "catfilter1" }]
+							}
+						},
+						{
+							"id": "categories",
+							"value": ["catfilter1", "catfilter2"],
+							"expected_description": [
+								"catmain",
+								"categories",
+								"list",
+								"contains_any",
+								["catfilter1", "catfilter2"],
+								true
+							],
+							"expected_details": {
+								"type": "list",
+								"text": "is any of",
+								"value": ["catfilter1", "catfilter2"],
+								"or": [{ "hash": "catfilter1" }, { "hash": "catfilter2" }]
+							}
+						}
+					]
+				}
+			],
+			[
+				"CATEGORY",
+				{
+					"name": "Filter Category 1",
+					"hash": "catfilter1"
+				}
+			],
+			[
+				"CATEGORY",
+				{
+					"name": "Filter Category 2",
+					"hash": "catfilter2"
+				}
+			]
+		]
+	}
+}

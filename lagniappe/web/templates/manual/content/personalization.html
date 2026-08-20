@@ -1,0 +1,160 @@
+{% from "manual/macros.html" import heading, subheading, card, callout, code, step, link, nav_buttons %}
+<div class="space-y-6">
+  {% call card() %}
+    <p class="text-base-medium">
+      After installation, most personalization happens from the owner-only
+      <strong>Admin</strong> page in <strong>Settings</strong>: site images,
+      deployment preferences, and
+      links out to the service-provider dashboards. A custom domain still uses
+      the setup script because it has to coordinate App Engine, DNS, and auth
+      settings.
+    </p>
+  {% endcall %}
+  {{ heading("Site Image", icon="personalization", kind="project") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Uploading a site image generates favicons, Apple Touch icons, and PWA
+      manifest icons. Upload the image from the <strong>Admin</strong> page under
+      <strong>Settings</strong>, then <strong>Site Image</strong>. The app
+      stores a preview of the generated images right away, but the generated
+      static files still need to be restored into the deployed app.
+    </p>
+    {{ code("./setup.sh update") }}
+  {% endcall %}
+  {{ heading("Deployment Settings") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      The <strong>Admin</strong> page also has a <strong>Settings</strong>,
+      <strong>Deployment</strong> section for the App Engine settings Lagniappe
+      writes into its deployment files. The default uses basic scaling, which
+      lets a quiet app idle down. If you would rather keep the app warm and
+      avoid most cold starts, you can switch to automatic scaling, usually at a
+      higher cost.
+    </p>
+    <p class="text-base-medium mb-3">
+      This section also controls instance class, worker count, and instance
+      counts, without hand-editing YAML for ordinary changes. Saving deployment
+      settings in the app does not redeploy immediately; it saves the choices
+      with the instance. To apply them to the local deployment files and deploy,
+      run:
+    </p>
+    {{ code("./setup.sh update") }}
+    {% call callout("warning", False) %}
+      Deployment settings affect cost and performance. Change one thing at a
+      time, deploy, then check App Engine logs, response times, and billing
+      before making another change.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("Custom Domain") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      A custom domain is a first-class setup option. The script creates or
+      discovers the App Engine domain mapping first, then uses the exact DNS
+      records returned by Google. You can add those records manually at any
+      DNS provider or let setup reconcile them through Cloudflare.
+    </p>
+    {{ code("./setup.sh url") }}
+    <p class="text-base-medium mb-3">
+      Cloudflare automation requires a temporary token limited to Zone Read
+      and DNS Edit for the selected zone. It is strictly a DNS convenience:
+      records are created with proxying disabled, and setup does not configure
+      Cloudflare WAF, bot, cache, or zone-security features. You can configure
+      those independently later if you want them.
+    </p>
+    <p class="text-base-medium">
+      DNS and SSL changes take a little while to propagate, so it is worth
+      keeping the default App Engine URL handy until the custom domain is
+      confirmed working.
+    </p>
+  {% endcall %}
+  {{ heading("Authentication Email") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Initial setup offers this custom-domain and SMTP path directly. If you
+      install without a domain, it uses a Gmail or Google Workspace mailbox so
+      the app can still send verification and password-reset links. Once the
+      custom domain above is configured, you can replace that mailbox with any
+      service that provides authenticated SMTP, including Resend, Postmark,
+      Mailgun, Mailjet, SMTP2GO, Amazon SES, or another provider.
+    </p>
+    <p class="text-base-medium mb-3">
+      Resend has a guided shortcut. Setup opens its Domains page, where
+      Cloudflare users can choose <strong>Sign in to Cloudflare</strong> and
+      let Resend publish its email DNS records. Setup then opens the API Keys
+      page and supplies Resend's fixed SMTP host, port, encryption, and
+      username automatically. Create a Sending access key restricted to the
+      verified domain, paste that one-time key, and copy the exact sending
+      domain shown by Resend. For example, a key restricted to
+      <code>mail.example.com</code> must send from an address such as
+      <code>noreply@mail.example.com</code>, not
+      <code>noreply@example.com</code>.
+    </p>
+    <p class="text-base-medium mb-3">
+      For another provider, first verify a sending domain and publish the SPF
+      and DKIM records it supplies. Then enter the SMTP host, port, encryption
+      mode, username, password or API key, sender address, and sender name.
+      The sender address must be on a domain the provider has approved.
+    </p>
+    <p class="text-base-medium text-sm mb-2">
+      On macOS or Linux, run:
+    </p>
+    {{ code("./setup.sh email") }}
+    <p class="text-base-medium text-sm my-2">
+      In Windows PowerShell, run:
+    </p>
+    {{ code(".\\setup.cmd email") }}
+    <p class="text-base-medium mt-3">
+      The command supports STARTTLS and implicit SSL/TLS, sends a real test
+      message before changing the saved configuration, and offers to deploy
+      the new settings. If validation fails, the current email service remains
+      active. The SMTP credential is stored in the private settings file, so
+      protect that file like any other application secret.
+    </p>
+    {% call callout("note", False) %}
+      Delivery remains standard SMTP. The Resend shortcut only fills its
+      documented fixed SMTP values; other providers use the values shown in
+      their SMTP dashboards.
+    {% endcall %}
+  {% endcall %}
+  {{ heading("AI Email Submissions", icon="email", kind="form") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      AI email lets registered users send questions, creation requests, and
+      attachments to one Lagniappe address. It requires a custom application
+      URL and authentication email configured through <strong>Resend</strong>;
+      the receiving flow uses a dedicated inbound subdomain and reuses the
+      verified Resend sender for replies.
+    </p>
+    <p class="text-base-medium mb-3">
+      The main installer offers AI email when those prerequisites are ready.
+      To add or reconcile it later, run:
+    </p>
+    {{ code("./setup.sh ai-email") }}
+  {% endcall %}
+  {{ heading("Updates") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Use update when settings saved inside the app need to be applied to the
+      deployment files:
+    </p>
+    {{ code("./setup.sh update") }}
+    <p class="text-base-medium mb-3">
+      For an ordinary unmodified installation, use
+      <code>./setup.sh upgrade</code> instead to fetch the latest source from
+      <code>origin/main</code>, reconcile configuration, and optionally deploy.
+      The upgrade warns before replacing tracked local changes. If you maintain
+      a fork, merge the release yourself and use <code>-update</code> so setup
+      does not replace your worktree.
+    </p>
+    {% call callout("tip", False) %}
+      If you start editing the application code itself, you are effectively
+      maintaining a small fork. New releases then feel more like a software
+      deployment than an app-store tap, which is mostly a matter of merging
+      changes back in.
+    {% endcall %}
+  {% endcall %}
+  {{ nav_buttons(
+  prev={"key": "security", "name": "Security", "kind": "user"},
+  next={"key": "ai", "name": "AI Integration", "kind": "form"}
+  ) }}
+</div>

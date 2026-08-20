@@ -1,0 +1,39 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("User Groups") %}
+  <section>
+    {{ subheading("What This Panel Does") }}
+    <p class="text-sm text-base-dark">
+      User Groups is the owner-only workspace for creating groups and editing group permissions. Each button in the selector opens either the Public permissions panel, a new group form, or the permissions form for an existing group.
+    </p>
+    {% call callout("tip") %}
+      Groups let you maintain one permission set for many users, which is usually easier than editing each user individually.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Panel Actions") }}
+    <div class="space-y-3">
+      {% call feature("New Group", icon="add", kind="user") %}
+        Create a named group, then immediately configure its permissions.
+      {% endcall %}
+      {% call feature("Public", icon="group", kind="user") %}
+        Set the limited default access for signed-in people who are not regular managed users yet.
+      {% endcall %}
+      {% call feature("Existing Groups", icon="permissions", kind="project") %}
+        Open a group to rename it, update its permissions, or remove it if it is no longer needed.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Suggested Workflow") }}
+    {% call step(1, "Create role-based groups") %}
+      <p class="text-sm text-base-medium">Examples: Owners, Editors, Staff, Clients, Volunteers, or Reviewers.</p>
+    {% endcall %}
+    {% call step(2, "Grant permissions") %}
+      <p class="text-sm text-base-medium">Set broad permissions only when the role really needs access across the whole site.</p>
+    {% endcall %}
+    {% call step(3, "Assign users") %}
+      <p class="text-sm text-base-medium">Add users to groups from the Create User panel or from the user's settings page.</p>
+    {% endcall %}
+  </section>
+{% endcall %}

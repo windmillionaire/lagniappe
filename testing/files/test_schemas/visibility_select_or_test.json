@@ -1,0 +1,37 @@
+[
+	{
+		"id": "select-colorab12",
+		"type": "select",
+		"title": "Color",
+		"options": [
+			{ "value": "red", "label": "Red" },
+			{ "value": "blue", "label": "Blue" },
+			{ "value": "green", "label": "Green" },
+			{ "value": "yellow", "label": "Yellow" },
+			{ "value": "purple", "label": "Purple" },
+			{ "value": "orange", "label": "Orange" }
+		]
+	},
+	{
+		"id": "input-color-notes",
+		"type": "input",
+		"input": "text",
+		"title": "Color Notes",
+		"visibility": [
+			{
+				"id": "select-colorab12",
+				"name": "Color",
+				"type": "select",
+				"value": "red",
+				"label": "Red"
+			},
+			{
+				"id": "select-colorab12",
+				"name": "Color",
+				"type": "select",
+				"value": "blue",
+				"label": "Blue"
+			}
+		]
+	}
+]

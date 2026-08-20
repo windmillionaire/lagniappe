@@ -1,0 +1,4 @@
+name;email;status;score
+Alice;alice@test.com;active;85
+Bob;bob@test.com;inactive;72
+Carol;carol@test.com;active;91

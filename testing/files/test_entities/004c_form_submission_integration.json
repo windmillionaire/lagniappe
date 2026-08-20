@@ -1,0 +1,44 @@
+{
+	"test_submission_fields_stale_when_db_submission_changes": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Stale fields page",
+					"hash": "stale_pg1",
+					"form": {
+						"name": "F",
+						"hash": "stale_f1",
+						"schema": "integration_one_text"
+					},
+					"initial_submission_json": { "note": "first" },
+					"mutated_submission_json": { "note": "second" },
+					"expected_stale_note": "first"
+				}
+			]
+		]
+	},
+	"test_submission_links_internal_top_level_and_table_row": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Links collection page",
+					"hash": "links_pg1",
+					"form": {
+						"name": "F",
+						"hash": "links_f1",
+						"schema": "submission_integration_links"
+					},
+					"submission_json": {
+						"top_link": "target_a",
+						"with_rows": {
+							"rows": [{ "row_rel": "target_b" }]
+						}
+					},
+					"expected_link_hashes": ["target_a", "target_b"]
+				}
+			]
+		]
+	}
+}

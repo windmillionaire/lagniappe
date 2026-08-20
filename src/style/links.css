@@ -1,0 +1,34 @@
+/* ==========================================================================
+   LINKS
+   ========================================================================== */
+
+/* @style link.default link.emphasized */
+.link-default {
+	color: var(--kind-default);
+	&:focus {
+		outline: none;
+	}
+	&:hover,
+	&:focus-visible {
+		text-decoration-line: underline;
+		color: var(--kind-dark);
+		text-decoration-color: var(--kind-dark);
+	}
+}
+
+/* @style link.title */
+.link-title {
+	color: var(--kind-default);
+	max-width: 100%;
+	overflow-wrap: break-word;
+	&:focus {
+		outline: none;
+	}
+	&:hover,
+	&:focus-visible,
+	.group\/item:hover:not(:has(a:hover)) & {
+		text-decoration-line: underline;
+		color: var(--kind-dark);
+		text-decoration-color: var(--kind-dark);
+	}
+}

@@ -1,0 +1,209 @@
+{
+	"test_display_name": {
+		"entities": [
+			[
+				"FILE",
+				{
+					"filename": "document.pdf",
+					"name": "My Document",
+					"expected": {
+						"name": "My Document"
+					}
+				}
+			],
+			[
+				"FILE",
+				{
+					"filename": "report_2024.xlsx",
+					"expected": {
+						"name": "report_2024"
+					}
+				}
+			],
+			[
+				"FILE",
+				{
+					"filename": "image.with.dots.png",
+					"expected": {
+						"name": "image.with.dots"
+					}
+				}
+			]
+		]
+	},
+
+	"test_filename_mimetype_encoding": {
+		"entities": [
+			[
+				"FILE",
+				{
+					"filename": "document.pdf",
+					"mimetype": "application/pdf",
+					"encoding": "utf-8",
+					"expected": {
+						"filename": "document.pdf",
+						"mimetype": "application/pdf",
+						"encoding": "utf-8"
+					}
+				}
+			],
+			[
+				"FILE",
+				{
+					"filename": "data.csv",
+					"mimetype": "text/csv",
+					"encoding": "iso-8859-1",
+					"expected": {
+						"filename": "data.csv",
+						"mimetype": "text/csv",
+						"encoding": "iso-8859-1"
+					}
+				}
+			]
+		]
+	},
+
+	"test_summary": {
+		"entities": [
+			[
+				"FILE",
+				{
+					"summary": "This is a summary of the document.",
+					"summarize_search": false,
+					"expected": {
+						"summary": "This is a summary of the document.",
+						"cache_value": null
+					}
+				}
+			],
+			[
+				"FILE",
+				{
+					"summary": "Indexed summary content.",
+					"summarize_search": true,
+					"expected": {
+						"summary": "Indexed summary content.",
+						"cache_value": "Indexed summary content."
+					}
+				}
+			]
+		]
+	},
+
+	"test_as_html": {
+		"entities": [
+			[
+				"FILE",
+				{
+					"has_text": true,
+					"text_content": "# Markdown Content",
+					"expected": {
+						"html": "<h1>Markdown Content</h1>"
+					}
+				}
+			],
+			[
+				"FILE",
+				{
+					"has_text": false,
+					"expected": {
+						"html": null
+					}
+				}
+			]
+		]
+	},
+
+	"test_extract_process": {
+		"entities": [
+			[
+				"FILE",
+				{
+					"enabled": true,
+					"search": true,
+					"expected": {
+						"enabled": true,
+						"search": true
+					}
+				}
+			],
+			[
+				"FILE",
+				{
+					"enabled": true,
+					"search": false,
+					"update_status": {
+						"complete": true,
+						"text": "Extracted text content"
+					},
+					"expected": {
+						"enabled": true,
+						"search": false,
+						"complete": true,
+						"status": "Text extracted successfully."
+					}
+				}
+			]
+		]
+	},
+
+	"test_summarize_process": {
+		"entities": [
+			[
+				"FILE",
+				{
+					"enabled": true,
+					"search": true,
+					"expected": {
+						"enabled": true,
+						"search": true
+					}
+				}
+			],
+			[
+				"FILE",
+				{
+					"enabled": true,
+					"search": false,
+					"update_status": {
+						"complete": true,
+						"summary": "AI generated summary"
+					},
+					"expected": {
+						"enabled": true,
+						"search": false,
+						"complete": true,
+						"summary": "AI generated summary"
+					}
+				}
+			]
+		]
+	},
+
+	"test_options": {
+		"entities": [
+			[
+				"FILE",
+				{
+					"extract_enabled": true,
+					"summarize_enabled": true,
+					"expected": {
+						"has_extract": true,
+						"has_summarize": true
+					}
+				}
+			],
+			[
+				"FILE",
+				{
+					"extract_enabled": false,
+					"summarize_enabled": false,
+					"expected": {
+						"has_extract": true,
+						"has_summarize": true
+					}
+				}
+			]
+		]
+	}
+}

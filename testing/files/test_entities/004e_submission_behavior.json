@@ -1,0 +1,124 @@
+{
+	"test_submission_db_value_omits_unset_number_field": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Db value drop empty number",
+					"hash": "dbv1",
+					"form": {
+						"name": "F",
+						"hash": "fdbv1",
+						"schema": "submission_two_numbers"
+					}
+				}
+			]
+		]
+	},
+	"test_submission_search_value_merges_table_column_labels": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Search merge page",
+					"hash": "sch1",
+					"form": {
+						"name": "F",
+						"hash": "fsch1",
+						"schema": "submission_headline_table"
+					},
+					"form_submission": {
+						"headline": "Top story",
+						"items": "{\"rows\": [{\"row_note\": \"Row one\"}]}"
+					},
+					"expected": {
+						"headline": {
+							"value": "Top story",
+							"form_value": "Top story",
+							"filter_value": "Top story",
+							"ai_value": "Top story",
+							"search_value": { "Headline": "Top story" }
+						},
+						"items": {
+							"value": { "rows": [{ "row_note": "Row one" }] },
+							"form_value": {
+								"rows": [{ "row_note": "Row one" }]
+							},
+							"column_value": { "num_rows": 1 },
+							"ai_value": {
+								"Items": [{ "Note": "Row one" }]
+							},
+							"filter_value": { "row_note": ["Row one"] }
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_email_form_accepts_non_matching_string": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Email form no regex",
+					"hash": "em1",
+					"form": {
+						"name": "F",
+						"hash": "fem1",
+						"schema": "email_input_only"
+					},
+					"form_submission": { "input-emlab12": "not-an-email" },
+					"expected": {
+						"input-emlab12": {
+							"value": "not-an-email",
+							"form_value": "not-an-email",
+							"filter_value": "not-an-email",
+							"ai_value": "not-an-email"
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_number_form_accepts_zero": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Number zero page",
+					"hash": "nz1",
+					"form": {
+						"name": "F",
+						"hash": "fnz1",
+						"schema": "number_input_only"
+					},
+					"form_submission": { "input-numab12": "0" },
+					"expected": {
+						"input-numab12": {
+							"value": 0.0,
+							"form_value": 0.0,
+							"filter_value": 0.0,
+							"ai_value": 0.0
+						}
+					}
+				}
+			]
+		]
+	},
+	"test_submission_time_form_invalid_format_raises": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Bad time page",
+					"hash": "bt1",
+					"form": {
+						"name": "F",
+						"hash": "fbt1",
+						"schema": "time_input_only"
+					}
+				}
+			]
+		]
+	}
+}

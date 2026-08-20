@@ -1,0 +1,41 @@
+{% macro delete_action(route, label, role="delete", disabled=false) -%}
+  <button data-role="{{ role }}"
+          data-route="{{ route }}"
+          data-kind="delete"
+          class="{{ styles.button.submit }}"{% if disabled %} disabled{% endif %}>
+    <span id="spinner" data-role="icon" data-visible="false" aria-hidden="true">
+      {{ render_icon("spinner") }}
+    </span>
+    <span data-role="text">{{ label }}</span>
+  </button>
+{%- endmacro %}
+
+<div id="modal" class="{{ styles.modal.wrapper }}">
+  <div class="{{ styles.modal.content }} max-w-sm" id="modal-content">
+    <div class="{{ styles.modal.header }}">
+      <h2 class="text-xl font-bold text-base-dark">
+        {{ render_icon("error", "text-delete-default mr-2") }}
+
+        {% block name %}
+        {% endblock name %}
+      </h2>
+      <button lp-control="close" class="{{ styles.button.close }}">Cancel</button>
+    </div>
+    <div class="p-6">
+      <div class="space-y-6">
+        <section>
+          <div class="bg-delete-bg border border-delete-light rounded-lg p-4 mb-4">
+
+            {% block description %}
+            {% endblock description %}
+          </div>
+        </section>
+        <div class="{{ styles.modal.actions }}">
+
+          {% block button %}
+          {% endblock button %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

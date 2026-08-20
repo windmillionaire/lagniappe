@@ -1,0 +1,451 @@
+{
+	"test_project_string_filters": {
+		"entities": [
+			[
+				"PROJECT",
+				{
+					"name": "Test Project",
+					"hash": "projtest1",
+					"fields": [
+						{
+							"id": "name",
+							"value": ["test"],
+							"comparator": "SUBSTRING",
+							"expected_description": [
+								"projtest1",
+								"name",
+								"string",
+								"substring",
+								"test"
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "contains",
+								"status": "SUBSTRING",
+								"value": "test",
+								"field_label": "Task Name"
+							}
+						},
+						{
+							"id": "name",
+							"value": ["Exact Task Name"],
+							"comparator": "EQUALS",
+							"expected_description": [
+								"projtest1",
+								"name",
+								"string",
+								"eq",
+								"Exact Task Name"
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "matches",
+								"status": "EQUALS",
+								"value": "Exact Task Name",
+								"field_label": "Task Name"
+							}
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_project_boolean_filters": {
+		"entities": [
+			[
+				"PROJECT",
+				{
+					"name": "Test Project",
+					"hash": "projtest2",
+					"fields": [
+						{
+							"id": "completed",
+							"value": ["IS_TRUE"],
+							"expected_description": [
+								"projtest2",
+								"completed",
+								"boolean",
+								"is_true"
+							],
+							"expected_details": {
+								"type": "boolean",
+								"text": "completed",
+								"status": "IS_TRUE"
+							}
+						},
+						{
+							"id": "completed",
+							"value": ["IS_FALSE"],
+							"expected_description": [
+								"projtest2",
+								"completed",
+								"boolean",
+								"is_false"
+							],
+							"expected_details": {
+								"type": "boolean",
+								"text": "in progress",
+								"status": "IS_FALSE"
+							}
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_project_timestamp_filters": {
+		"entities": [
+			[
+				"PROJECT",
+				{
+					"name": "Test Project",
+					"hash": "projtest3",
+					"fields": [
+						{
+							"id": "due_date",
+							"value": ["2025-06-15"],
+							"comparator": "LESS_THAN",
+							"expected_description": [
+								"projtest3",
+								"due_date",
+								"timestamp",
+								"lt",
+								"DYNAMIC_TIMESTAMP"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is before",
+								"status": "LESS_THAN",
+								"field_label": "Due Date"
+							}
+						},
+						{
+							"id": "due_date",
+							"value": ["2025-06-15"],
+							"comparator": "LESS_EQUAL",
+							"expected_description": [
+								"projtest3",
+								"due_date",
+								"timestamp",
+								"lte",
+								"DYNAMIC_TIMESTAMP"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is on or before",
+								"status": "LESS_EQUAL",
+								"field_label": "Due Date"
+							}
+						},
+						{
+							"id": "due_date",
+							"value": ["2025-06-15"],
+							"comparator": "EQUALS",
+							"expected_description": [
+								"projtest3",
+								"due_date",
+								"timestamp",
+								"eq",
+								"DYNAMIC_TIMESTAMP"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is on",
+								"status": "EQUALS",
+								"field_label": "Due Date"
+							}
+						},
+						{
+							"id": "due_date",
+							"value": ["2025-06-15"],
+							"comparator": "GREATER_EQUAL",
+							"expected_description": [
+								"projtest3",
+								"due_date",
+								"timestamp",
+								"gte",
+								"DYNAMIC_TIMESTAMP"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is on or after",
+								"status": "GREATER_EQUAL",
+								"field_label": "Due Date"
+							}
+						},
+						{
+							"id": "due_date",
+							"value": ["2025-06-15"],
+							"comparator": "GREATER_THAN",
+							"expected_description": [
+								"projtest3",
+								"due_date",
+								"timestamp",
+								"gt",
+								"DYNAMIC_TIMESTAMP"
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is after",
+								"status": "GREATER_THAN",
+								"field_label": "Due Date"
+							}
+						},
+						{
+							"id": "due_date",
+							"value": ["2025-06-08", "2025-06-22"],
+							"comparator": "BETWEEN",
+							"expected_description": [
+								"projtest3",
+								"due_date",
+								"timestamp",
+								"between",
+								["DYNAMIC_TIMESTAMP_START", "DYNAMIC_TIMESTAMP_END"]
+							],
+							"expected_details": {
+								"type": "timestamp",
+								"text": "is between",
+								"status": "BETWEEN",
+								"field_label": "Due Date"
+							}
+						}
+					]
+				}
+			]
+		]
+	},
+	"test_project_entity_filters": {
+		"entities": [
+			[
+				"PROJECT",
+				{
+					"name": "Main Project",
+					"hash": "projmain",
+					"fields": [
+						{
+							"id": "categories",
+							"value": ["catA"],
+							"expected_description": [
+								"projmain",
+								"categories",
+								"list",
+								"contains",
+								"catA",
+								true
+							],
+							"expected_details": {
+								"type": "list",
+								"status": "CONTAINS",
+								"value": "catA",
+								"field_label": "In Categories",
+								"entity": [
+									{
+										"kind": "category",
+										"hash": "catA",
+										"id": "catA"
+									}
+								]
+							}
+						},
+						{
+							"id": "categories",
+							"value": ["catA", "catB"],
+							"expected_description": [
+								"projmain",
+								"categories",
+								"list",
+								"contains_any",
+								["catA", "catB"],
+								true
+							],
+							"expected_details": {
+								"type": "list",
+								"text": "is any of",
+								"status": "CONTAINS_ANY",
+								"value": ["catA", "catB"],
+								"field_label": "In Categories",
+								"or": [
+									{
+										"kind": "category",
+										"hash": "catA",
+										"id": "catA"
+									},
+									{
+										"kind": "category",
+										"hash": "catB",
+										"id": "catB"
+									}
+								]
+							}
+						},
+						{
+							"id": "assigned_to",
+							"value": ["user1"],
+							"expected_description": [
+								"projmain",
+								"assigned_to",
+								"string",
+								"eq",
+								"user1",
+								true
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "is",
+								"status": "EQUALS",
+								"value": "user1",
+								"field_label": "Assigned To",
+								"entity": [
+									{
+										"kind": "page",
+										"hash": "user1",
+										"id": "user1"
+									}
+								]
+							}
+						},
+						{
+							"id": "assigned_to",
+							"value": ["user1", "user2"],
+							"expected_description": [
+								"projmain",
+								"assigned_to",
+								"string",
+								"in",
+								["user1", "user2"],
+								true
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "is one of",
+								"status": "IN",
+								"value": ["user1", "user2"],
+								"field_label": "Assigned To",
+								"or": [
+									{
+										"kind": "page",
+										"hash": "user1",
+										"id": "user1"
+									},
+									{
+										"kind": "page",
+										"hash": "user2",
+										"id": "user2"
+									}
+								]
+							}
+						}
+					]
+				}
+			],
+			[
+				"CATEGORY",
+				{
+					"name": "Category A",
+					"hash": "catA"
+				}
+			],
+			[
+				"CATEGORY",
+				{
+					"name": "Category B",
+					"hash": "catB"
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "User One",
+					"hash": "user1"
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "User Two",
+					"hash": "user2"
+				}
+			]
+		]
+	},
+	"test_project_model_filters": {
+		"entities": [
+			[
+				"PROJECT",
+				{
+					"name": "Project With Models",
+					"hash": "projmodels",
+					"model_tasks": [
+						{
+							"name": "Review Stage",
+							"hash": "model1"
+						},
+						{
+							"name": "Approval Stage",
+							"hash": "model2"
+						}
+					],
+					"fields": [
+						{
+							"id": "model1",
+							"value": ["model1"],
+							"expected_description": [
+								"projmodels",
+								"model",
+								"string",
+								"eq",
+								"model1",
+								true
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "is",
+								"status": "EQUALS",
+								"value": "model1",
+								"field_label": "Review Stage",
+								"entity": [
+									{
+										"kind": "model_task",
+										"hash": "model1",
+										"id": "model1"
+									}
+								]
+							}
+						},
+						{
+							"id": "model1",
+							"value": ["model1", "model2"],
+							"expected_description": [
+								"projmodels",
+								"model",
+								"string",
+								"in",
+								["model1", "model2"],
+								true
+							],
+							"expected_details": {
+								"type": "string",
+								"text": "is one of",
+								"status": "IN",
+								"value": ["model1", "model2"],
+								"field_label": "Review Stage",
+								"or": [
+									{
+										"kind": "model_task",
+										"hash": "model1",
+										"id": "model1"
+									},
+									{
+										"kind": "model_task",
+										"hash": "model2",
+										"id": "model2"
+									}
+								]
+							}
+						}
+					]
+				}
+			]
+		]
+	}
+}

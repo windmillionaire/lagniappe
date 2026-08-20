@@ -1,0 +1,37 @@
+{% from "manual/macros.html" import subheading, card, callout %}
+{% from "reference/macros.html" import modal, detail %}
+{% call modal("Document Settings") %}
+  <section>
+    {{ subheading("Visibility Options") }}
+    {% call detail("Public Documents", kind="page") %}
+      When a document is set to public, it becomes accessible to anyone with the URL,
+      even without logging in. This is useful for sharing recipes, blog posts, tutorials,
+      or any content you want to share with friends or the world.
+    {% endcall %}
+    <div class="mt-3">
+      {% call detail("Private Documents", kind="default") %}
+        Private documents can only be viewed by users with appropriate permissions.
+        This is the default setting and recommended for personal notes, drafts, or
+        anything you want to keep private.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Important Considerations") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Images embedded in public documents also become publicly accessible</li>
+      <li>Only the document content becomes public - other page information remains private</li>
+      <li>If you make a public document private, the URL will stop working</li>
+      <li>You can change visibility at any time, but consider who may have already bookmarked public links</li>
+    </ul>
+  </section>
+  <section>
+    {{ subheading("Best Practices") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Review your content carefully before making it public</li>
+      <li>Keep drafts and works-in-progress private until they're ready</li>
+      <li>Be mindful of embedded images and their privacy settings</li>
+      <li>Remember that public documents can be found by search engines</li>
+    </ul>
+  </section>
+{% endcall %}

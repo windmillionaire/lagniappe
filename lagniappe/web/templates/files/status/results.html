@@ -1,0 +1,67 @@
+{% from 'common.html' import format_name %}
+{% import 'controls.html' as controls %}
+
+{% macro results_header(title, description, file) %}
+  {% set imported_count = file.results|selectattr("entity")|list|length %}
+  <div>
+    <h2 class="text-lg font-bold">{{ title }}</h2>
+    <p class="text-sm text-base-medium italic mt-2">{{ description }}</p>
+    {% if imported_count %}
+      <button type="button"
+              data-role="delete-imported"
+              data-kind="delete"
+              class="{{ styles.button.submit }} mt-4">
+        {{ render_icon("trash.active", "mr-1") }}
+        <span>Delete All</span>
+      </button>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro completed_result(result) %}
+  <li class="py-4"
+      {% if result.entity %}data-key="{{ result.entity.id }}"{% endif %}>
+    <div class="font-semibold text-base">
+      {% if result.entity %}
+        <div class="flex flex-row justify-between w-full">
+          <div class="flex flex-row items-center gap-1">{{ format_name(result.entity, icon=True) }}</div>
+          {{ controls.delete() }}
+        </div>
+      {% endif %}
+      {% for warning in result.warnings %}
+        <pre class="text-sm text-note-default whitespace-pre-wrap">{{ warning }}</pre>
+      {% endfor %}
+      {% if result.history %}
+        <pre class="text-sm text-task-light whitespace-pre-wrap">History Recorded: {{ result.history[-1] }}</pre>
+      {% endif %}
+      {% if result.errors %}
+        {% for error in result.errors %}<p class="italic text-delete-default">{{ error }}</p>{% endfor %}
+        <p class="text-sm text-base-medium mt-2">
+          <pre class="text-sm text-base-medium whitespace-pre-wrap">{{ result.row }}</pre>
+        </p>
+      {% endif %}
+    </div>
+  </li>
+{% endmacro %}
+
+{% macro importing(file) %}
+  {{ results_header(
+    "Importing",
+    "The data is being imported. This may take a few minutes. You can navigate away from this page and check back later to see the results.",
+    file
+  ) }}
+  <ul data-role="completed" loaded class="{{ styles.list.container }}">
+    {% for result in file.results %}{{ completed_result(result) }}{% endfor %}
+  </ul>
+{% endmacro %}
+
+{% macro completed(file) %}
+  {{ results_header(
+    "Import Complete",
+    "All data has been imported successfully. Please review any warnings or errors in the list below. This list will be saved unless you delete this import file. Please note that if you re-import this file, duplicate entities will be created.",
+    file
+  ) }}
+  <ul data-role="completed" loaded class="{{ styles.list.container }}">
+    {% for result in file.results %}{{ completed_result(result) }}{% endfor %}
+  </ul>
+{% endmacro %}

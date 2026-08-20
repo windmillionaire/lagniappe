@@ -1,0 +1,148 @@
+/* ==========================================================================
+   DROPDOWN OPTIONS
+   ========================================================================== */
+
+/* @style dropdown.option.action dropdown.option.flow dropdown.search.link dropdown.search.more */
+.dropdown-option {
+	border-radius: var(--radius-sm);
+	font-size: 0.875rem;
+	line-height: 1.5;
+	padding: 0.375rem 0.5rem;
+	text-align: left;
+	width: 100%;
+}
+
+/* @style dropdown.option.action dropdown.option.flow dropdown.search.link dropdown.search.more */
+.dropdown-option:hover,
+.dropdown-option[aria-selected="true"] {
+	background-color: var(--color-base-bg);
+}
+
+/* @style dropdown.option.flow dropdown.search.link dropdown.search.more */
+.dropdown-option-flow {
+	display: block;
+	line-height: 1.5;
+}
+
+/* @style dropdown.option.flow dropdown.search.link dropdown.search.result */
+.dropdown-option-flow > p:first-child > span:last-child {
+	vertical-align: middle;
+}
+
+/* @style dropdown.option.action */
+.dropdown-option-action {
+	align-items: center;
+	display: flex;
+	flex-direction: row;
+	gap: 0.25rem;
+	justify-content: flex-start;
+}
+
+/* @style dropdown.option.multiple */
+.dropdown-option-multiple {
+	padding-inline-end: 2.25rem;
+	position: relative;
+}
+
+/* @style dropdown.option.multiple */
+.dropdown-option-multiple > [data-role="option-checkbox"] {
+	inset-inline-end: 0.5rem;
+	position: absolute;
+	top: 50%;
+	transform: translateY(-50%);
+}
+
+/* @style dropdown.icon */
+.dropdown-option-flow .dropdown-option-icon {
+	margin-inline-end: 0.25rem;
+}
+
+/* ==========================================================================
+   MANUAL CONTENT
+   ========================================================================== */
+
+/* @style manual.content */
+[data-role="manual-content"] :not(pre) > code {
+	padding: 0.0625rem 0.3125rem;
+	border: 1px solid color-mix(in oklch, var(--color-base-light) 55%, white);
+	border-radius: 0.25rem;
+	background-color: var(--color-base-bg);
+	color: var(--color-base-default);
+	font-family: var(--font-mono);
+	font-size: 0.88em;
+	font-weight: 500;
+	line-height: 1.35;
+	white-space: normal;
+	overflow-wrap: anywhere;
+	box-decoration-break: clone;
+	-webkit-box-decoration-break: clone;
+}
+
+/* @style manual.content */
+[data-role="manual-content"] :not(pre) > code::before,
+[data-role="manual-content"] :not(pre) > code::after {
+	content: none;
+}
+
+/* ==========================================================================
+   BADGES
+   ========================================================================== */
+
+/* @style task.home.group */
+.due-date {
+	&[data-due="past"] {
+		background-color: var(--color-delete-bg);
+		color: var(--color-delete-default);
+	}
+	&[data-due="future"] {
+		background-color: var(--color-project-bg);
+		color: var(--color-project-default);
+	}
+	&[data-due="today"] {
+		background-color: var(--color-note-bg);
+		color: var(--color-note-default);
+	}
+}
+
+/* @style badge.default */
+.lp-badge {
+	max-inline-size: 100%;
+	min-inline-size: 0;
+}
+
+/* @style badge.default */
+.lp-badge > :not(i) {
+	min-inline-size: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+/* @style badge.default */
+.lp-badge :is(a, span) {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* @style badge.default */
+.lp-badge .link-title {
+	overflow-wrap: normal;
+}
+
+/* ==========================================================================
+   LIST ITEMS
+   ========================================================================== */
+
+/* @style note.section */
+.page-note-section:not(:has(> [data-visible="true"])) {
+	display: none;
+}
+
+/* @style list.container */
+li[lp-component][data-open="false"] {
+	@media (min-width: 640px) {
+		[lp-nav][data-toggle="true"]:hover {
+			background-color: var(--kind-bg);
+		}
+	}
+}

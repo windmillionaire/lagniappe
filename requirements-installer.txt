@@ -1,0 +1,6 @@
+yaspin==3.4.0
+colorama==0.4.6
+certifi==2026.7.22
+google-cloud-iam==2.24.1
+google-cloud-resource-manager==1.18.0
+google-cloud-appengine-admin==1.18.0

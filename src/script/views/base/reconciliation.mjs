@@ -1,0 +1,241 @@
+import { captureError } from "../../shared/errors";
+import { request } from "../../shared/request";
+import { clearRecentSearchResults } from "../../shared/utilities";
+
+const COLLECTION_ONLY_CHANGE_TYPES = new Set(["delete", "star", "unstar"]);
+const FORM_ALREADY_RECONCILED_CHANGE_TYPES = new Set([
+	...COLLECTION_ONLY_CHANGE_TYPES,
+	"entity-poll",
+]);
+
+/**
+ * @testable false
+ * @covered-by src/script/views/base/reconciliation.mjs::reconcileChange
+ * @reason destination loading is a private stage of change reconciliation
+ */
+const loadChangeDestination = async (view, destination) => {
+	if (!destination) return null;
+	const [componentId, widgetName] = destination.split(":");
+	if (!componentId || !widgetName) return null;
+	const component = view.getComponent(document.getElementById(componentId));
+	return component ? await component.loadWidget(widgetName) : null;
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/views/base/reconciliation.mjs::reconcileChange
+ * @reason mounted-owner discovery is a private stage of change reconciliation
+ */
+const loadMountedCollectionOwners = async (view, keys) => {
+	const requested = new Set(keys);
+	const targets = new Set();
+	for (const entity of view.elt.querySelectorAll("[lp-entity][data-key]")) {
+		if (!requested.has(entity.dataset.key)) continue;
+		const target = entity.parentElement?.closest?.("[data-widget]");
+		if (target?.dataset.widget && !target.matches?.("form"))
+			targets.add(target);
+	}
+	await Promise.all(
+		Array.from(targets, async (target) => {
+			await view.getComponent(target)?.loadWidget(target.dataset.widget);
+		}),
+	);
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/views/base/reconciliation.mjs::reconcileChange
+ * @reason DOM removal is committed through the enclosing reconciliation contract
+ */
+const removeDeletedEntity = (view, key) => {
+	for (const element of view.elt.querySelectorAll("[data-key]")) {
+		if (element.dataset.key !== key) continue;
+		element._lp_component?.destroy?.();
+		element.remove();
+	}
+};
+
+/**
+ * @testable infrastructure
+ * @covered-by src/script/views/base/core.mjs::Core.reconcileChange
+ */
+export const reconcileChange = (view, change = {}) => {
+	view._pendingChanges.push({ ...change });
+	if (view._reconcilePromise) return view._reconcilePromise;
+
+	view._reconcilePromise = (async () => {
+		try {
+			do {
+				const changes = view._pendingChanges.splice(0);
+				const fingerprint = view.elt.dataset.fingerprint || null;
+				const destinationKeys = [];
+				for (const item of changes) {
+					if (item.type === "delete") clearRecentSearchResults();
+					if (["star", "unstar"].includes(item.type)) {
+						view._applyStarState(item);
+					}
+					const destination = await loadChangeDestination(
+						view,
+						item.destination,
+					);
+					if (
+						destination?.key &&
+						!COLLECTION_ONLY_CHANGE_TYPES.has(item.type)
+					) {
+						destinationKeys.push(destination.key);
+					}
+				}
+				const keys = [
+					...new Set(changes.map(({ key }) => key).filter(Boolean)),
+				];
+				if (keys.length) await loadMountedCollectionOwners(view, keys);
+				const deletedKeys = changes
+					.filter(({ key, type }) => type === "delete" && key)
+					.map(({ key }) => key);
+				const formKeys = [
+					...new Set([
+						...changes
+							.filter(
+								({ type }) => !FORM_ALREADY_RECONCILED_CHANGE_TYPES.has(type),
+							)
+							.map(({ key }) => key)
+							.filter(Boolean),
+						...destinationKeys,
+					]),
+				];
+				if (formKeys.length) {
+					const watcher = await view.ensureEditWatcher();
+					if (view.PollingCoordinator?.activePoll) watcher?.enqueue(formKeys);
+					else await watcher?.invalidate(formKeys);
+				}
+				await view.refreshCollections(false, {
+					fingerprint,
+					beforeCommit: () => {
+						deletedKeys.forEach((key) => {
+							removeDeletedEntity(view, key);
+						});
+					},
+				});
+				await view.refreshSupplementalCollections(changes);
+				for (const item of changes) await view.afterReconcileChange(item);
+			} while (view._pendingChanges.length);
+		} finally {
+			view._reconcilePromise = null;
+		}
+	})();
+	return view._reconcilePromise;
+};
+
+/**
+ * @testable false
+ * @covered-by src/script/views/base/reconciliation.mjs::refreshCollectionComponents
+ * @reason target collection is owned by the batched refresh contract
+ */
+export const collectRefreshTargets = (_view, components) => {
+	const targets = new Map();
+	for (const component of components) {
+		if (component.elt && !component.elt.isConnected) continue;
+		for (const widget of Object.values(component.widgets)) {
+			if (widget.refreshScope !== "collection") continue;
+			if (!widget.refreshDescriptor || !widget.refreshDelta) continue;
+			try {
+				const descriptor = widget.refreshDescriptor();
+				if (!descriptor) continue;
+				const id = component.name;
+				if (!id || targets.has(id)) continue;
+				targets.set(id, { descriptor: { ...descriptor, id }, widget });
+			} catch (error) {
+				captureError(error);
+			}
+		}
+	}
+	return targets;
+};
+
+/**
+ * @testable infrastructure
+ * @covered-by src/script/views/base/core.mjs::Core._refreshCollectionComponents
+ */
+export const refreshCollectionComponents = async (
+	view,
+	components,
+	{
+		fingerprint = view.elt.dataset.fingerprint || null,
+		deferCommit = false,
+	} = {},
+) => {
+	const targets = collectRefreshTargets(view, components);
+	const reconciled = new Set();
+	const commits = [];
+	let refreshedFingerprint = null;
+	if (targets.size) {
+		const response = await request.post("/l/refresh", {
+			view: {
+				key: view.key || null,
+				hash: view.hash || null,
+				index: view.elt.dataset.index || null,
+				mode: view.elt.dataset.userMode || null,
+				fingerprint,
+			},
+			targets: Array.from(targets.values(), ({ descriptor }) => descriptor),
+		});
+		if (response?.reload) {
+			window.location.reload();
+			return;
+		}
+		if (response?.ok && Array.isArray(response.targets)) {
+			refreshedFingerprint = response.fingerprint || null;
+			if (!response.targets.length && refreshedFingerprint) {
+				for (const { widget } of targets.values()) reconciled.add(widget);
+			}
+			const results = new Map(
+				response.targets.map((target) => [target.id, target]),
+			);
+			for (const [id, { widget }] of targets) {
+				const result = results.get(id);
+				if (!result || result.fallback) continue;
+				try {
+					if (deferCommit && widget.prepareRefreshDelta) {
+						commits.push(await widget.prepareRefreshDelta(result));
+					} else if (deferCommit) {
+						commits.push(() => {
+							const pending = widget.refreshDelta(result);
+							if (pending?.then) void pending.catch(captureError);
+						});
+					} else {
+						await widget.refreshDelta(result);
+					}
+					reconciled.add(widget);
+				} catch (error) {
+					captureError(error);
+				}
+			}
+		}
+	}
+	if (deferCommit) {
+		const prepared = await Promise.all(
+			components.map(async (component) => {
+				if (component.elt && !component.elt.isConnected) return [];
+				return await component.prepareCollectionRefresh(reconciled);
+			}),
+		);
+		commits.push(...prepared.flat());
+		return () => {
+			commits.filter(Boolean).forEach((commit) => {
+				commit();
+			});
+			if (refreshedFingerprint) {
+				view.elt.dataset.fingerprint = refreshedFingerprint;
+			}
+		};
+	}
+
+	await Promise.all(
+		components.map(async (component) => {
+			if (component.elt && !component.elt.isConnected) return;
+			await component.refreshCollections(reconciled);
+		}),
+	);
+	if (refreshedFingerprint) view.elt.dataset.fingerprint = refreshedFingerprint;
+	return null;
+};

@@ -1,0 +1,18 @@
+{% import 'controls.html' as controls %}
+
+{% macro create_form() %}
+  <form lp-create
+        data-widget="CreateForm"
+        data-route="{{ url_for('forms.create') }}"
+        data-destination="table:IndexTable"
+        data-nav="true"
+        data-controls="true"
+        data-close="tools"
+        data-help="create_form"
+        data-title="Create a Form"
+        data-visible="false"
+        data-kind="form"
+        class="{{ styles.form.tools }}">
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}

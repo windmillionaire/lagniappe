@@ -1,0 +1,51 @@
+{% from "manual/macros.html" import subheading, callout %}
+{% from "reference/macros.html" import modal, feature %}
+{% call modal("Form Settings") %}
+  <section>
+    {{ subheading("What This Panel Does") }}
+    <p class="text-sm text-base-dark">
+      The Settings panel configures the selected form component. Click a field in the form area to edit its label, behavior, options, visibility rules, and other component-specific details.
+    </p>
+    {% call callout("tip") %}
+      Clear labels and a few thoughtful settings usually matter more than lots of fields.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("Common Settings") }}
+    <div class="space-y-3">
+      {% call feature("Title", icon="h3", kind="form") %}
+        The label users see. Make it specific enough that someone knows what to enter.
+      {% endcall %}
+      {% call feature("Placeholder", icon="text", kind="default") %}
+        Hint text shown before a user types. Use it for examples, not required instructions.
+      {% endcall %}
+      {% call feature("Required", icon="error", kind="task") %}
+        On task forms, required fields can block task completion until the required information is filled.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Component-Specific Settings") }}
+    <div class="space-y-3">
+      {% call feature("Input Type", icon="input", kind="form") %}
+        Pick text, email, phone, number, date, or time so the field validates and displays appropriately.
+      {% endcall %}
+      {% call feature("Options", icon="select", kind="form") %}
+        Radio and select fields need clear choices. Use stable option names if you will filter on them.
+      {% endcall %}
+      {% call feature("Visibility", icon="public", kind="page") %}
+        Show or hide a field based on another checkbox, radio, or select value.
+      {% endcall %}
+      {% call feature("Status Messages", icon="status", kind="task") %}
+        Task forms can show helpful messages when signatures, required fields, or confirmations are missing.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Worth Remembering") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Preview often, especially after changing required or visibility settings.</li>
+      <li>Delete a component from this panel if it no longer belongs in the form.</li>
+    </ul>
+  </section>
+{% endcall %}

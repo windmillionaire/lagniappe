@@ -1,0 +1,193 @@
+{% set view_entry = "file" %}
+{% extends "layouts/base.html" %}
+{% from 'files/info.html' import info_tab %}
+{% from 'files/preview.html' import preview_tab %}
+{% from 'files/text.html' import text_tab %}
+{% from 'files/ingress.html' import ingress_tab %}
+{% import 'badge.html' as badges %}
+{% import 'controls.html' as controls %}
+{% import 'menus.html' as menus %}
+{% set has_preview_tab = file.kind != "ingress" and file.preview %}
+{% set has_text_tab = file.kind != "ingress" and file.properties.text.markup %}
+{% if file.kind == "ingress" %}
+  {% set default_tab = "ingress" %}
+{% elif has_preview_tab %}
+  {% set default_tab = "preview" %}
+{% elif has_text_tab %}
+  {% set default_tab = "text" %}
+{% else %}
+  {% set default_tab = "info" %}
+{% endif %}
+
+{% macro view_header(file) %}
+  <nav class="{{ styles.layout.view.title }}" data-nav="view">
+    <div>
+      <span data-menu-anchor class="{{ styles.entity.name.anchor }}">
+        {% if file.preview %}
+          <a href="{{ file.preview }}"
+             data-kind="file"
+             class="{{ styles.link.default }}">
+            <span data-role="title">{{- file.name -}}</span>
+          </a>
+        {% else %}
+          <span data-role="title">{{- file.name -}}</span>
+        {% endif %}
+        {% call menus.title("File actions") %}
+          {{ menus.star(is_starred(file)) }}
+          {% if file.allowed(Action.DELETE) %}{{ menus.delete("/") }}{% endif %}
+        {% endcall %}
+      </span>
+    </div>
+    <div class="{{ styles.layout.nav.group }}" data-role="actions">
+      <a href="{{ url_for('files.download', key=file.urlsafe_key) }}"
+         data-kind="file"
+         class="{{ styles.toggle.container }}">
+        {{ render_icon("download") }}
+      </a>
+    </div>
+  </nav>
+{% endmacro %}
+
+{% macro toggles(nav) %}
+  <nav class="{{ styles.layout.nav.toggles }}"
+       data-nav="{{ nav }}"
+       data-persistent="true"
+       data-standalone="true">
+    {% if file.kind == "ingress" %}
+      <button lp-show="ingress:active"
+              data-kind="file"
+              class="{{ styles.entity.tabIcon }}">
+        {{ render_icon("import") }}
+      </button>
+    {% else %}
+      {% if has_preview_tab %}
+        <button lp-show="preview:active"
+                data-kind="file"
+                class="{{ styles.entity.tabIcon }}">
+          {{ render_icon("document") }}
+        </button>
+      {% endif %}
+      {% if has_text_tab %}
+        <button lp-show="text:active"
+                data-kind="file"
+                class="{{ styles.entity.tabIcon }}">
+          {{ render_icon("document") }}
+        </button>
+      {% endif %}
+    {% endif %}
+    <button lp-show="info:active"
+            data-kind="file"
+            class="{{ styles.entity.tabIcon }}">
+      {{ render_icon("info") }}
+    </button>
+  </nav>
+{% endmacro %}
+
+{% macro extract_reload_notice() %}
+  <div data-role="extract-reload"
+       data-visible="false"
+       aria-live="polite"
+       class="{{ styles.message }} mx-4 mt-4 flex flex-col gap-2 sm:mx-0 sm:flex-row sm:items-center sm:justify-between">
+    <span>Text extraction complete.</span>
+    <button type="button"
+            data-role="extract-reload-button"
+            data-kind="file"
+            class="font-semibold text-kind-default hover:text-kind-dark focus-visible:outline-none focus-visible:underline">
+      Reload to view text
+    </button>
+  </div>
+{% endmacro %}
+
+{% macro linked_badges(file) %}
+  {% set linked_pages = file.pages if file.properties.get("pages") else [] %}
+  {% set linked_tasks = file.linked_tasks if file.properties.get("tasks") else [] %}
+  {% if linked_pages or linked_tasks %}
+    <div class="flex flex-row flex-wrap items-center gap-2 mt-3"
+         data-role="linked-entities">
+      {% for page in linked_pages %}{{ badges.entity_badge(page.reference_details) }}{% endfor %}
+      {% for task in linked_tasks %}{{ badges.entity_badge(task.reference_details) }}{% endfor %}
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro mobile_nav(file) %}
+  <div lp-nav
+       class="{{ styles.layout.nav.mobile }} mt-4"
+       data-visible="false"
+       data-nav="mobile">
+    <div class="{{ styles.layout.nav.title }}" data-role="header">
+      <span class="text-kind-dark" data-kind="file" data-role="title"></span>
+      {{ controls.page_controls() }}
+    </div>
+    <div class="{{ styles.layout.nav.group }}" data-flipped="false">
+      <button data-role="flipper"
+              class="{{ styles.layout.nav.flipper }} text-xl">
+        {{ render_icon("flipper.left") }}
+      </button>
+      {{ toggles('mobile') }}
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro main() %}
+  <div lp-view
+       lp-entity
+       data-key="{{ file.urlsafe_key }}"
+       data-fingerprint="{{ file.fingerprint }}"
+       data-hash="{{ file.hash }}"
+       data-kind="file"
+       data-default-tab="{{ default_tab }}"
+       class="group/view {{ 'max-w-7xl mx-auto' if file.kind == 'ingress' else 'max-w-5xl mx-auto' }}"
+       data-readonly="{{ (file.readonly or current_user.is_public)|yesno }}">
+    <div class="{{ styles.layout.view.header }}">
+      {{ view_header(file) }}
+      <div data-role="description"
+           class="{{ styles.entity.description }} hidden sm:flex">
+        {%- if file.summary -%}
+          <span>{{- file.summary -}}</span>
+        {%- endif -%}
+      </div>
+      {{ linked_badges(file) }}
+    </div>
+    {{ mobile_nav(file) }}
+    {{ extract_reload_notice() }}
+    <div id="layout" data-visible="false" class="sm:mt-4">
+      <div id="tabs"
+           lp-component
+           class="{{ styles.card.primary }} overflow-hidden">
+        <div lp-nav class="{{ styles.layout.nav.title }}" data-nav="tabs">
+          <div data-role="header" class="{{ styles.layout.nav.header }}">
+            <span class="text-kind-dark" data-kind="file" data-role="title"></span>
+            {{ controls.page_controls() }}
+          </div>
+          {{ toggles('tabs') }}
+        </div>
+        {% if file.kind == "ingress" %}
+          {{ ingress_tab(file) }}
+        {% else %}
+          {% if has_preview_tab %}{{ preview_tab(file) }}{% endif %}
+          {% if has_text_tab %}{{ text_tab(file) }}{% endif %}
+        {% endif %}
+        {{ info_tab(file) }}
+      </div>
+    </div>
+  </div>
+{% endmacro %}
+
+{% block title %}
+  {{ file.name }}
+{% endblock title %}
+
+{% block extras %}
+  {% if file.mimetype == 'application/pdf' %}
+    <meta name="pdf-worker-src"
+          content="/pdf.worker.min.mjs?v={{ CONFIG.BUILD_ID }}">
+    <meta name="pdf-wasm-url" content="/pdfjs/wasm/">
+    <link rel="modulepreload"
+          href="/pdf.worker.min.mjs?v={{ CONFIG.BUILD_ID }}">
+  {% endif %}
+{% endblock extras %}
+
+{% block content %}
+  {{ main() }}
+{% endblock content %}

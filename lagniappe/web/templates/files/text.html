@@ -1,0 +1,16 @@
+{% macro text_tab(file) %}
+  <div id="text"
+       lp-component
+       data-title="Text Content"
+       data-default="TextContent"
+       data-tab="true"
+       data-visible="false"
+       data-kind="file">
+    <div data-widget="TextContent"
+         data-title="Text Content"
+         data-visible="false"
+         class="p-4 sm:p-6 border-t border-base-light/50 h-screen overflow-y-auto html-content">
+      {{ file.properties.text.markup|default('', true)|safe }}
+    </div>
+  </div>
+{% endmacro %}

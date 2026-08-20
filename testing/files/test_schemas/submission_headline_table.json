@@ -1,0 +1,21 @@
+[
+	{
+		"id": "headline",
+		"type": "input",
+		"input": "text",
+		"title": "Headline"
+	},
+	{
+		"id": "items",
+		"type": "table",
+		"title": "Items",
+		"columns": [
+			{
+				"id": "row_note",
+				"type": "input",
+				"input": "text",
+				"title": "Note"
+			}
+		]
+	}
+]

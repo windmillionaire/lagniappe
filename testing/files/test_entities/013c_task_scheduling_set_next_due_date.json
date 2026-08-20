@@ -1,0 +1,283 @@
+{
+	"test_next_due_date_recurring": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Every 1 day",
+					"hash": "rec_next001",
+					"page": { "name": "Parent Page", "hash": "page001" },
+					"schedule": { "unit": "day", "interval": 1 },
+					"expected": { "delta": { "days": 1 } }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 3 days",
+					"hash": "rec_next002",
+					"page": { "name": "Parent Page", "hash": "page002" },
+					"schedule": { "unit": "day", "interval": 3 },
+					"expected": { "delta": { "days": 3 } }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 1 week",
+					"hash": "rec_next003",
+					"page": { "name": "Parent Page", "hash": "page003" },
+					"schedule": { "unit": "week", "interval": 1 },
+					"expected": { "delta": { "weeks": 1 } }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 2 weeks",
+					"hash": "rec_next004",
+					"page": { "name": "Parent Page", "hash": "page004" },
+					"schedule": { "unit": "week", "interval": 2 },
+					"expected": { "delta": { "weeks": 2 } }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 1 month",
+					"hash": "rec_next005",
+					"page": { "name": "Parent Page", "hash": "page005" },
+					"schedule": { "unit": "month", "interval": 1 },
+					"expected": { "delta": { "months": 1 } }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 3 months",
+					"hash": "rec_next006",
+					"page": { "name": "Parent Page", "hash": "page006" },
+					"schedule": { "unit": "month", "interval": 3 },
+					"expected": { "delta": { "months": 3 } }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 1 year",
+					"hash": "rec_next007",
+					"page": { "name": "Parent Page", "hash": "page007" },
+					"schedule": { "unit": "year", "interval": 1 },
+					"expected": { "delta": { "years": 1 } }
+				}
+			]
+		]
+	},
+	"test_next_due_date_scheduled": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Daily - due today - next is tomorrow",
+					"hash": "sch_next001",
+					"page": { "name": "Parent Page", "hash": "page001" },
+					"schedule": { "mode": "daily" },
+					"days_ago": 0,
+					"expected": { "days_from_today": 1 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Daily - due 5 days ago - next is tomorrow",
+					"hash": "sch_next002",
+					"page": { "name": "Parent Page", "hash": "page002" },
+					"schedule": { "mode": "daily" },
+					"days_ago": 5,
+					"expected": { "days_from_today": 1 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Weekly Mon/Wed/Fri - today is Wed - next is Fri",
+					"hash": "sch_next003",
+					"page": { "name": "Parent Page", "hash": "page003" },
+					"schedule": { "mode": "weekly", "days": [0, 2, 4] },
+					"days_ago": 0,
+					"expected": { "days_from_today": 2 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Weekly Mon/Wed/Fri - due 2 weeks ago - next is Fri",
+					"hash": "sch_next004",
+					"page": { "name": "Parent Page", "hash": "page004" },
+					"schedule": { "mode": "weekly", "days": [0, 2, 4] },
+					"days_ago": 14,
+					"expected": { "days_from_today": 2 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Weekly Saturday only - today is Wed - next is Saturday",
+					"hash": "sch_next005",
+					"page": { "name": "Parent Page", "hash": "page005" },
+					"schedule": { "mode": "weekly", "days": [5] },
+					"days_ago": 0,
+					"expected": { "days_from_today": 3 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Monthly 15th - today is June 18 - next is July 15",
+					"hash": "sch_next006",
+					"page": { "name": "Parent Page", "hash": "page006" },
+					"schedule": { "mode": "monthly", "type": "specific_day", "day": 15 },
+					"days_ago": 3,
+					"expected": { "expected_date": "2025-07-15" }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Monthly last day - today is June 18 - next is June 30",
+					"hash": "sch_next007",
+					"page": { "name": "Parent Page", "hash": "page007" },
+					"schedule": { "mode": "monthly", "type": "last_day" },
+					"days_ago": 0,
+					"expected": { "expected_date": "2025-06-30" }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Monthly first Monday - today is June 18 - next is July 7",
+					"hash": "sch_next008",
+					"page": { "name": "Parent Page", "hash": "page008" },
+					"schedule": {
+						"mode": "monthly",
+						"type": "ordinal_weekday",
+						"ordinal": 1,
+						"weekday": 0
+					},
+					"days_ago": 0,
+					"expected": { "expected_date": "2025-07-07" }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Yearly Dec 25 - today is June 18 - next is Dec 25",
+					"hash": "sch_next009",
+					"page": { "name": "Parent Page", "hash": "page009" },
+					"schedule": {
+						"mode": "yearly",
+						"type": "specific_day",
+						"month": 12,
+						"day": 25
+					},
+					"days_ago": 0,
+					"expected": { "expected_date": "2025-12-25" }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "With postponed_from earlier than due_date - uses postponed_from",
+					"hash": "sch_next010",
+					"page": { "name": "Parent Page", "hash": "page010" },
+					"schedule": { "mode": "daily" },
+					"days_ago": 0,
+					"postponed_from_days_ago": 3,
+					"expected": { "days_from_today": 1 }
+				}
+			]
+		]
+	},
+	"test_next_due_date_periodic": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Every 1 day - due today - next is tomorrow",
+					"hash": "per_next001",
+					"page": { "name": "Parent Page", "hash": "page001" },
+					"schedule": { "unit": "day", "interval": 1 },
+					"days_ago": 0,
+					"expected": { "days_from_today": 1 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 1 day - due yesterday - next is tomorrow (loops past today)",
+					"hash": "per_next002",
+					"page": { "name": "Parent Page", "hash": "page002" },
+					"schedule": { "unit": "day", "interval": 1 },
+					"days_ago": 1,
+					"expected": { "days_from_today": 1 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 2 weeks - due 1 week ago - next is 1 week from now",
+					"hash": "per_next003",
+					"page": { "name": "Parent Page", "hash": "page003" },
+					"schedule": { "unit": "week", "interval": 2 },
+					"days_ago": 7,
+					"expected": { "days_from_today": 7 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 1 week - due 4 weeks ago - next is 3 days from now",
+					"hash": "per_next004",
+					"page": { "name": "Parent Page", "hash": "page004" },
+					"schedule": { "unit": "week", "interval": 1 },
+					"days_ago": 25,
+					"expected": { "days_from_today": 3 }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 1 month - due today - next is 1 month from now",
+					"hash": "per_next005",
+					"page": { "name": "Parent Page", "hash": "page005" },
+					"schedule": { "unit": "month", "interval": 1 },
+					"days_ago": 0,
+					"expected": { "expected_date": "2025-07-18" }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Every 3 months - due 2 months ago - next is 1 month from now",
+					"hash": "per_next006",
+					"page": { "name": "Parent Page", "hash": "page006" },
+					"schedule": { "unit": "month", "interval": 3 },
+					"months_ago": 2,
+					"expected": { "expected_date": "2025-07-18" }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "With postponed_from earlier - uses earlier date",
+					"hash": "per_next007",
+					"page": { "name": "Parent Page", "hash": "page007" },
+					"schedule": { "unit": "day", "interval": 1 },
+					"days_ago": 0,
+					"postponed_from_days_ago": 5,
+					"expected": { "days_from_today": 1 }
+				}
+			]
+		]
+	}
+}

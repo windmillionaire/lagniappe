@@ -1,0 +1,58 @@
+{% macro image(page) %}
+  <form data-widget="PagePhoto"
+        data-title="Image"
+        data-ai-create="{{ current_user.access(AI.CREATE)|yesno }}"
+        data-visible="true"
+        data-persistent="true"
+        data-nav="true"
+        data-controls="false">
+    {{ dropzone(page) }}
+  </form>
+{% endmacro %}
+
+{% macro card(page, active=True, enabled=True, readonly=false) %}
+  <div id="photo"
+       lp-component
+       data-title="Image"
+       data-visible="{{ active|yesno }}"
+       data-tab="true"
+       data-default="PagePhoto"
+       data-persistent="{{ active|yesno }}"
+       data-readonly="{{ readonly|yesno }}"
+       data-attribute="photo"
+       data-has-attribute="{{ enabled|yesno }}"
+       data-kind="page"
+       class="{{ styles.card.image }} p-4 sm:p-0">
+    {{ image(page) }}
+  </div>
+{% endmacro %}
+
+{% macro dropzone(page) %}
+  <div data-role="dropzone" class="rounded-lg relative">
+    <div data-role="existing-image"
+         data-visible="{{ page.image|yesno }}"
+         class="cursor-default">
+      {% if page.image %}
+        <img src="{{ page.image.url }}"
+             alt="{{ page.name }} image"
+             class="rounded-lg"
+             width="auto"
+             height="auto">
+      {% endif %}
+    </div>
+    <div data-role="new-image"
+         data-visible="{{ (not page.image)|yesno }}"
+         class="{{ styles.upload.image.container }}">
+      <div class="{{ styles.upload.image.text }}">
+        <p class="{{ styles.upload.image.icon }}">
+          {{ render_icon("image") }}
+        </p>
+        <p class="text-center italic" data-role="feedback">
+          drop image here
+          <br>
+          or click to upload
+        </p>
+      </div>
+    </div>
+  </div>
+{% endmacro %}

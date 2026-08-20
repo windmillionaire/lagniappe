@@ -1,0 +1,1 @@
+(function(){"use strict";(function(){var e=document.querySelector('meta[name="prefetch"]');e&&(window._prefetch={},Object.entries(JSON.parse(e.content)).forEach(function([t,n]){window._prefetch[t]=fetch(n,{credentials:"same-origin"})}))})()})();

@@ -1,0 +1,187 @@
+{% from "common.html" import name_separator, url %}
+
+{% macro result(r) %}
+  {% set is_completed_task = r.kind == 'task' and r.details.completed is sameas true %}
+  {% set icon_id = 'selected' if is_completed_task else 'unselected' if r.kind == 'task' else r.kind %}
+  <p>
+    <span class="text-kind-default"
+          data-kind="{{ r.kind }}">{{ render_icon((icon_id), styles.dropdown.icon) }}</span>
+    {#- Dropdown icon spacing is explicit; do not add a whitespace text node. -#}
+    <span class="{{ styles.entity.name.wrapper }}">
+      {%- if r.details.get("parent") -%}
+        <span class="font-semibold text-kind-default {{ styles.entity.name.parent }}"
+              data-kind="{{ r.details.parent.kind }}">{{- r.details.parent.name -}}{{- name_separator() -}}</span>
+        <wbr>
+      {%- endif -%}
+      <span class="font-semibold text-kind-default" data-kind="{{ r.kind }}">{{ r.name }}</span>
+    </span>
+  </p>
+  {%- if r.form_field -%}
+    <p class="italic font-normal text-base-default">
+      <span class="font-semibold text-form-default">{{ r.form_field }}:</span>
+      {{ r.form_value }}
+    </p>
+  {%- endif -%}
+  {% if r.text %}<p class="italic font-normal text-base-default">{{ r.text }}</p>{% endif %}
+{% endmacro %}
+
+{% macro index_result(r) %}
+  {% set is_completed_task = r.kind == 'task' and r.details.completed is sameas true %}
+  {% set icon_id = 'selected' if is_completed_task else 'unselected' if r.kind == 'task' else r.kind %}
+  <p>
+    <span class="text-kind-default"
+          data-kind="{{ r.kind }}">{{ render_icon((icon_id), styles.dropdown.icon) }}</span>
+    {#- Dropdown icon spacing is explicit; do not add a whitespace text node. -#}
+    <span class="{{ styles.entity.name.wrapper }}">
+      {%- if r.details.get("parent") -%}
+        <span class="font-semibold text-kind-default {{ styles.entity.name.parent }}"
+              data-kind="{{ r.details.parent.kind }}">{{- r.details.parent.name -}}{{- name_separator() -}}</span>
+        <wbr>
+      {%- endif -%}
+      <span class="font-medium text-kind-default" data-kind="{{ r.kind }}">{{ r.name }}</span>
+    </span>
+  </p>
+{% endmacro %}
+
+{% macro index_results(results, total, create_command=None) %}
+  {% if create_command %}
+    <div role="option"
+         class="{{ styles.dropdown.search.more }} cursor-pointer"
+         data-command="create"
+         data-kind="{{ create_command.kind }}"
+         data-name="{{ create_command.name }}">
+      {{ render_icon("add", styles.dropdown.icon) -}}
+      Add New {{ create_command.title }}: {{ create_command.name }}
+    </div>
+  {% endif %}
+  {% for r in results %}
+    <div role="option"
+         class="{{ styles.dropdown.search.result }}"
+         data-details='{{ r.details|tojson }}'
+         data-id="{{ r.id }}"
+         data-name="{{ r.name }}"
+         data-kind="{{ r.kind }}">{{ index_result(r) }}</div>
+  {% endfor %}
+  {%- if total == 0 and not create_command -%}
+    <div role="option"
+         class="{{ styles.dropdown.search.more }} pointer-events-none">No Results</div>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro location_results(results, total) %}
+  {% for r in results %}
+    <div role="option"
+         class="{{ styles.dropdown.search.result }}"
+         data-details='{{ r|tojson }}'
+         data-id="{{ r.id }}"
+         data-name="{{ r.name }}">
+      <p>
+        <span class="text-base-default">{{ render_icon("location", styles.dropdown.icon) }}</span>
+        {#- Dropdown icon spacing is explicit; do not add a whitespace text node. -#}
+        <span class="font-medium text-base-default">{{ r.name }}</span>
+      </p>
+    </div>
+  {% endfor %}
+  {%- if total == 0 -%}
+    <div role="option"
+         class="{{ styles.dropdown.search.more }} pointer-events-none">No Results</div>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro search_results(query, results, total) %}
+  {%- for r in results -%}
+    <div role="option"
+         data-result='{{ r|tojson }}'
+         class="{{ styles.dropdown.search.link }}"
+         data-url="{{ url(r.details) }}">{{ result(r) }}</div>
+  {%- endfor -%}
+  {%- if total > 10 -%}
+    <div role="option"
+         class="{{ styles.dropdown.search.more }} cursor-pointer"
+         data-url="{{ url_for('internal.search_page', q=query) }}">
+      {{ render_icon("next", styles.dropdown.icon) -}}
+      All Results
+    </div>
+  {%- elif total == 0 -%}
+    <div role="option"
+         class="{{ styles.dropdown.search.more }} pointer-events-none">No Results</div>
+  {%- endif -%}
+{% endmacro %}
+
+{% macro navbar(public=False) %}
+  <nav class="main-nav {{ styles.nav.bar.wrapper }}">
+    <div class="{{ styles.nav.bar.contents }} {{ 'max-w-7xl' if not public else 'max-w-5xl' }}">
+      <a class="{{ styles.nav.link }}" href="{{ url_for('home.home_page') }}">
+        <img class="h-8 w-8"
+             src="/images/favicon-32x32.png?v={{ CONFIG.BUILD_ID }}"
+             alt="logo"
+             width="32"
+             height="32">
+      </a>
+      {%- if not public -%}
+        <div class="flex items-center justify-end gap-4">
+          <form class="w-48 sm:w-64"
+                action="{{ url_for('internal.search_page') }}"
+                method="get"
+                lp-search>
+            <div class="relative flex items-center">
+              {{ render_icon("search", (styles.nav.search.icon)) }}
+              <input type="search"
+                     name="q"
+                     required
+                     class="{{ styles.nav.search.input }}"
+                     placeholder="Search..."
+                     autocomplete="off"
+                     inputmode="search"
+                     enterkeyhint="search"
+                     data-1p-ignore
+                     aria-label="Search">
+            </div>
+          </form>
+          <div data-role="offline"
+               class="size-8"
+               data-visible="false"
+               aria-hidden="true">
+            <span class="grid place-items-center size-full">{{ render_icon("offline", "icon-2xl text-white") }}</span>
+          </div>
+          {%- if current_user.is_authenticated -%}
+            {# <a href="{{ url_for('pages.view', key=current_user.page.urlsafe_key) }}" #}
+            <button class="{{ styles.nav.link }}"
+                    data-role="notifications"
+                    data-visible="true"
+                    aria-hidden="false"
+                    aria-busy="true"
+                    aria-label="Notifications loading">
+              <div class="size-8 rounded-full bg-white">
+                <span class="grid size-full place-items-center text-base font-bold"
+                      data-role="notification-count"
+                      aria-hidden="true">...</span>
+              </div>
+              {# {%- if current_user.photo -%}
+                <img class="{{ styles.nav.user }} bg-user-light" src="{{ current_user.photo }}" alt="" width="32" height="32">
+              {%- else -%}
+                <div class="{{ styles.nav.user }} bg-white">
+                  {{ render_icon("user") }}
+                </div>
+              {%- endif -%} #}
+            </button>
+          {%- endif -%}
+        </div>
+      {%- endif -%}
+    </div>
+  </nav>
+{% endmacro %}
+
+{% macro notification(message) %}
+  <div id="notification-banner"
+       class="fixed top-0 left-0 right-0 z-50 notification-enter">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-3">
+      <div class="bg-note-bg border border-note-dark rounded-md shadow-md p-4">
+        <div class="{{ styles.iconLabel.wrapper }} text-sm text-slate-900">
+          {{ render_icon("info", (styles.iconLabel.icon) ~ " icon-lg text-note-default") }}
+          <span>{{ message }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endmacro %}

@@ -1,0 +1,37 @@
+{
+	"test_task_index": {
+		"entities": [
+			[
+				"TASK",
+				{
+					"name": "Task with all fields",
+					"hash": "task001",
+					"page": { "name": "Parent Page", "hash": "page001" },
+					"description": "A complete task with description",
+					"assigned_to": {
+						"name": "Test User",
+						"hash": "user001",
+						"page": { "name": "Assignee Page", "hash": "apage01" }
+					}
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Minimal task",
+					"hash": "task002",
+					"page": { "name": "Parent Page", "hash": "page002" }
+				}
+			],
+			[
+				"TASK",
+				{
+					"name": "Completed task",
+					"hash": "task003",
+					"page": { "name": "Parent Page", "hash": "page003" },
+					"completed": true
+				}
+			]
+		]
+	}
+}

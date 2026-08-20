@@ -1,0 +1,102 @@
+{% from "manual/macros.html" import heading, subheading, card, callout, concept, nav_buttons %}
+<div class="space-y-6">
+  {% call card() %}
+    <p class="text-base-medium text-lg leading-relaxed mb-3">
+      Tasks in Lagniappe live on the page they are about. A task can be a simple
+      reminder, but the system is strongest when tasks repeat, collect structured
+      information, and leave behind history.
+    </p>
+    <p class="text-base-medium">
+      It is less a kanban-first project manager and more an operational log:
+      what needs doing, what it belongs to, who did it, and what happened each
+      time.
+    </p>
+  {% endcall %}
+
+  {{ heading("Tasks Live on Pages", icon="page", kind="page") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      A task is attached to a page: a property, person, vehicle, client,
+      appliance, website, or whatever else you track. Opening the page shows the
+      document, structured data, files, notes, and tasks in one place.
+    </p>
+    {% call callout("tip", False) %}
+      The page is the thing. The task is work related to that thing. Projects can
+      aggregate tasks later, but tasks do not lose their page context.
+    {% endcall %}
+  {% endcall %}
+
+  {{ heading("Completion and History", icon="tasks", kind="task") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Completing a task records who completed it and when. If the task has a form,
+      the entered values are part of the completion record.
+    </p>
+    <p class="text-base-medium mb-3">
+      When a completed task is reset for the next cycle, the previous completion
+      becomes a read-only history entry and the task is ready to be filled out
+      again.
+    </p>
+    <p class="text-base-medium">
+      This works well for maintenance logs, inspections, recurring reports,
+      medical or pet visits, document renewals, and other work where the record
+      matters as much as the reminder.
+    </p>
+  {% endcall %}
+
+  {{ heading("Scheduling") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">Tasks can have manual due dates or recurring schedules:</p>
+    <ul class="text-base-medium space-y-2 mb-3">
+      <li><strong>Recurring:</strong> every N days, weeks, months, or years.</li>
+      <li><strong>Scheduled:</strong> calendar rules such as weekdays, month days, or yearly dates.</li>
+      <li><strong>AI-generated:</strong> natural language converted into a structured schedule.</li>
+    </ul>
+    <p class="text-base-medium">
+      Scheduled tasks can automatically set the next due date and reset after
+      completion. You can also postpone tasks without deleting the original due
+      date context.
+    </p>
+  {% endcall %}
+
+  {{ heading("Assignment") }}
+  {% call card() %}
+    <p class="text-base-medium">
+      Tasks can be assigned to users. An assignee can view and edit the assigned
+      task even without access to its origin page, so work can be delegated
+      without exposing the rest of that page. Assignment does not reveal the
+      origin page or unrelated tasks, and restrictions on the task's form still
+      apply. An unassigned task remains visible to users who can see its page.
+    </p>
+  {% endcall %}
+
+  {{ heading("Projects and Templates", icon="project", kind="project") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Projects track a type of work across many pages. A project can define task
+      templates, and each template can have its own form. Tasks created from a
+      template still live on their pages, but the project gives you a cross-page
+      view.
+    </p>
+    <p class="text-base-medium">
+      Example: an "Annual Maintenance" project can show HVAC, roof, and pest
+      tasks across every property while each task stays attached to the property
+      page where it belongs.
+    </p>
+  {% endcall %}
+
+  {{ heading("Good to Know") }}
+  {% call card() %}
+    <ul class="text-base-medium space-y-2">
+      <li>If you only need disposable checklist items, this model may feel a touch heavier than you need.</li>
+      <li>For boards, sprints, dependencies, burndown charts, or time tracking, a dedicated project-management tool is a better home.</li>
+      <li>Task history pays off most when forms and completion habits are designed with a little intention up front.</li>
+      <li>Assignment grants access to work that task, not to browse its origin page; any restricted form still requires its normal permission.</li>
+    </ul>
+  {% endcall %}
+
+  {{ nav_buttons(
+    prev={"key": "forms", "name": "Forms", "kind": "form"},
+    next={"key": "permissions", "name": "Permissions", "kind": "user"}
+  ) }}
+</div>

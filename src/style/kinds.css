@@ -1,0 +1,201 @@
+[data-kind="form"] {
+	--kind-bg: var(--color-form-bg);
+	--kind-light: var(--color-form-light);
+	--kind-default: var(--color-form-default);
+	--kind-dark: var(--color-form-dark);
+}
+
+[data-kind="project"],
+[data-kind="save"],
+[data-kind="visible"],
+[data-kind="saved"],
+[data-kind="success"],
+[data-kind="add"] {
+	--kind-bg: var(--color-project-bg);
+	--kind-light: var(--color-project-light);
+	--kind-default: var(--color-project-default);
+	--kind-dark: var(--color-project-dark);
+}
+
+[data-kind="page"],
+[data-kind="help"] {
+	--kind-bg: var(--color-page-bg);
+	--kind-light: var(--color-page-light);
+	--kind-default: var(--color-page-default);
+	--kind-dark: var(--color-page-dark);
+}
+
+[data-kind="category"] {
+	--kind-bg: var(--color-category-bg);
+	--kind-light: var(--color-category-light);
+	--kind-default: var(--color-category-default);
+	--kind-dark: var(--color-category-dark);
+}
+
+[data-kind="task"],
+[data-kind="model"],
+[data-kind="model-task"] {
+	--kind-bg: var(--color-task-bg);
+	--kind-light: var(--color-task-light);
+	--kind-default: var(--color-task-default);
+	--kind-dark: var(--color-task-dark);
+}
+
+[data-kind="user"] {
+	--kind-bg: var(--color-user-bg);
+	--kind-light: var(--color-user-light);
+	--kind-default: var(--color-user-default);
+	--kind-dark: var(--color-user-dark);
+}
+
+[data-kind="note"],
+[data-kind="status"],
+[data-kind="starred"] {
+	--kind-bg: var(--color-note-bg);
+	--kind-light: var(--color-note-light);
+	--kind-default: var(--color-note-default);
+	--kind-dark: var(--color-note-dark);
+}
+
+[data-kind="file"],
+[data-kind="cancel"],
+[data-kind="default"],
+[data-kind="report"] {
+	--kind-bg: var(--color-file-bg);
+	--kind-light: var(--color-file-light);
+	--kind-default: var(--color-file-default);
+	--kind-dark: var(--color-file-dark);
+}
+
+[data-kind="delete"],
+[data-kind="reset"],
+[data-kind="error"],
+[data-kind="invisible"],
+[data-kind="unsaved"],
+[data-kind="close"] {
+	--kind-bg: var(--color-delete-bg);
+	--kind-light: var(--color-delete-light);
+	--kind-default: var(--color-delete-default);
+	--kind-dark: var(--color-delete-dark);
+}
+
+.text-project {
+	color: var(--color-project-default);
+	&:hover,
+	&:focus-visible {
+		color: var(--color-project-dark);
+	}
+}
+.text-success {
+	color: var(--color-project-default);
+	&:hover,
+	&:focus-visible {
+		color: var(--color-project-dark);
+	}
+}
+.text-failure {
+	color: var(--color-delete-default);
+	&:hover,
+	&:focus-visible {
+		color: var(--color-delete-dark);
+	}
+}
+.text-page {
+	color: var(--color-page-default);
+	&:hover,
+	&:focus-visible {
+		color: var(--color-page-dark);
+	}
+}
+.text-form {
+	color: var(--color-form-default);
+	&:hover,
+	&:focus-visible {
+		color: var(--color-form-dark);
+	}
+}
+.text-category {
+	color: var(--color-category-default);
+	&:hover,
+	&:focus-visible {
+		color: var(--color-category-dark);
+	}
+}
+.text-task {
+	color: var(--color-task-default);
+	&:hover,
+	&:focus-visible {
+		color: var(--color-task-dark);
+	}
+}
+.text-user {
+	color: var(--color-user-default);
+	&:hover,
+	&:focus-visible {
+		color: var(--color-user-dark);
+	}
+}
+.text-note {
+	color: var(--color-note-default);
+	&:hover,
+	&:focus-visible {
+		color: var(--color-note-dark);
+	}
+}
+.text-file {
+	color: var(--color-file-default);
+	&:hover,
+	&:focus-visible {
+		color: var(--color-file-dark);
+	}
+}
+.text-model {
+	color: var(--color-task-default);
+	&:hover,
+	&:focus-visible {
+		color: var(--color-task-dark);
+	}
+}
+
+/* @style editor.container */
+.html-content a[href="/projects"],
+.html-content a[href^="/projects/"] {
+	--html-link-default: var(--color-project-default);
+	--html-link-dark: var(--color-project-dark);
+}
+
+/* @style editor.container */
+.html-content a[href="/pages"],
+.html-content a[href^="/pages/"] {
+	--html-link-default: var(--color-page-default);
+	--html-link-dark: var(--color-page-dark);
+}
+
+/* @style editor.container */
+.html-content a[href="/categories"],
+.html-content a[href^="/categories/"] {
+	--html-link-default: var(--color-category-default);
+	--html-link-dark: var(--color-category-dark);
+}
+
+/* @style editor.container */
+.html-content a[href="/tasks"],
+.html-content a[href^="/tasks/"] {
+	--html-link-default: var(--color-task-default);
+	--html-link-dark: var(--color-task-dark);
+}
+
+/* @style editor.container */
+.html-content a[href="/files"],
+.html-content a[href^="/files/"] {
+	--html-link-default: var(--color-file-default);
+	--html-link-dark: var(--color-file-dark);
+}
+
+.divide-y-kind-bg {
+	> * + * {
+		border-top-color: var(--kind-bg);
+		border-top-width: 1px;
+		border-top-style: solid;
+	}
+}

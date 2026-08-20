@@ -1,0 +1,109 @@
+{% set view_entry = "messages" %}
+{% extends "layouts/base.html" %}
+
+{% block title %}Messages{% endblock title %}
+
+{% block content %}
+  <div lp-view
+       data-kind="messages"
+       data-current-user="{{ current_user.urlsafe_key }}"
+       {% if initial_conversation %}data-initial-conversation="{{ initial_conversation }}"{% endif %}
+       class="group/view mx-auto max-w-7xl">
+    <div class="{{ styles.layout.view.header }}">
+      <nav class="{{ styles.layout.view.title }}" data-role="page-header">
+        <span data-role="title">Messages</span>
+      </nav>
+    </div>
+    <div id="layout" class="{{ styles.entity.cards }} sm:mt-4">
+      <aside data-kind="user"
+             class="{{ styles.card.secondary }} overflow-hidden">
+        <div class="{{ styles.layout.nav.mobile }} mt-4 h-16 py-3 font-semibold md:mt-0 md:h-auto md:border-0 md:bg-white md:px-6 md:py-5">
+          <span data-role="title" class="hidden md:inline">Conversations</span>
+          <button type="button"
+                  data-role="conversation-selector"
+                  data-kind="user"
+                  aria-label="Conversation"
+                  class="{{ styles.select.button }} form-input ml-4 hidden min-w-0 flex-1 justify-between md:hidden">
+            <span data-role="conversation-selector-label" class="truncate"></span>
+            {{ render_icon("menu", "shrink-0") }}
+          </button>
+          {% if can_message %}
+            <button type="button"
+                    data-action="compose-message"
+                    data-kind="user"
+                    aria-label="New message"
+                    title="New message"
+                    class="{{ styles.toggle.container }} ml-auto">{{ render_icon("add", "icon-lg") }}</button>
+          {% endif %}
+          <span data-role="mobile-clear-conversation-container"
+                data-visible="false"
+                class="leading-none sm:hidden">
+            <button type="button"
+                    data-role="mobile-clear-conversation"
+                    data-kind="delete"
+                    data-controls="delete"
+                    data-active="false"
+                    lp-control="delete"
+                    lp-delete
+                    disabled
+                    aria-label="Clear conversation"
+                    title="Clear conversation"
+                    class="{{ styles.toggle.container }}">
+              {{ render_icon("trash.active", styles.toggle.icon.active ~ " icon-lg") }}
+              {{ render_icon("trash.inactive", styles.toggle.icon.inactive ~ " icon-lg") }}
+            </button>
+          </span>
+        </div>
+        <div data-role="conversation-list"
+             class="{{ styles.list.container }} hidden md:block"></div>
+        <button type="button"
+                data-action="load-conversations"
+                class="hidden w-full p-3 text-sm font-medium text-user-default">
+          Load older conversations
+        </button>
+      </aside>
+      <section data-kind="user"
+               class="{{ styles.card.primary }} -mt-px flex min-h-[32rem] flex-col overflow-hidden md:mt-0">
+        <div class="hidden md:block">
+          <div data-role="message-header" class="{{ styles.layout.nav.title }}">
+            <span class="font-medium">Choose a conversation</span>
+          </div>
+        </div>
+        <div data-role="message-history"
+             class="flex flex-1 flex-col gap-3 overflow-y-auto border-t border-base-light/50 p-4 sm:p-6"
+             aria-live="polite"></div>
+        <button type="button"
+                data-action="load-messages"
+                class="hidden self-center p-2 text-sm font-medium text-user-default">
+          Load older messages
+        </button>
+        <form data-role="message-reply"
+              data-kind="user"
+              class="hidden space-y-3 border-t border-base-light/50 p-4 sm:p-6">
+          <label for="message-reply-body" class="sr-only">Reply</label>
+          <textarea id="message-reply-body"
+                    name="body"
+                    data-kind="user"
+                    maxlength="1000"
+                    required
+                    disabled
+                    rows="4"
+                    class="{{ styles.textarea }} resize-y"></textarea>
+          <p data-role="message-reply-error"
+             class="hidden text-sm text-delete-default"></p>
+          <div class="{{ styles.modal.actions }}">
+            <button type="submit"
+                    data-kind="user"
+                    disabled
+                    class="{{ styles.button.submit }} hover:bg-kind-dark hover:outline-2 hover:outline-offset-2 hover:outline-kind-dark focus-visible:bg-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-dark">
+              <span data-role="icon" data-visible="false" aria-hidden="true">
+                {{ render_icon("spinner") }}
+              </span>
+              <span data-role="text">Reply</span>
+            </button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </div>
+{% endblock content %}

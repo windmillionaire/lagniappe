@@ -1,0 +1,411 @@
+{% from 'common.html' import autofill %}
+{% import 'controls.html' as controls %}
+{% import 'badge.html' as badges %}
+{% import 'menus.html' as menus %}
+
+{% macro task_tab(page, active=True) %}
+  <div id="tasks"
+       lp-component
+       data-title="Tasks"
+       data-default="PageTaskList"
+       data-tab="true"
+       data-visible="false"
+       data-kind="task"
+       data-attribute="tasks"
+       data-has-attribute="{{ active|yesno }}"
+       data-parent-nav="tabs">
+    {% if page.allowed(Action.EDIT) %}
+      <form lp-create
+            data-widget="CreateTask"
+            data-title="New Task"
+            data-visible="false"
+            data-controls="true"
+            data-close="tasks:PageTaskList"
+            data-help="tasks"
+            data-destination="tasks:PageTaskList"
+            data-route="{{ url_for('tasks.create', key=page.urlsafe_key) }}"
+            class="{{ styles.form.default }} mt-4 sm:mt-0">
+        {{ action_buttons(page) }}
+        <button type="submit" class="{{ styles.button.submit }}"></button>
+      </form>
+    {% endif %}
+    <div data-widget="PageTaskList"
+         lp-load
+         data-title="Tasks"
+         data-visible="true"
+         data-persistent="true"
+         {% if page.allowed(Action.EDIT) %}data-if-empty="CreateTask"{% endif %}
+         data-route="{{ url_for('pages.tasks', key=page.urlsafe_key) }}"
+         class="{{ styles.list.container }}"></div>
+  </div>
+{% endmacro %}
+
+{% macro task_list(page) %}
+  <ul data-role="active-tasks"
+      class="divide-y divide-base-light/50"
+      data-visible="false">
+    {%- for t in page.tasks %}
+      {{ task(t, page) }}
+    {% endfor -%}
+    {% if not page.tasks %}{{ task_empty(page) }}{% endif %}
+  </ul>
+  <div data-role="completed-header"
+       class="flex flex-row items-center gap-2 border-y border-base-light/50 px-4 py-3 -mt-px bg-base-bg"
+       data-visible="false">
+    {{ controls.expand() }}
+    <span class="text-base-dark font-semibold">Completed Tasks</span>
+  </div>
+  <ul data-role="completed-tasks"
+      class="divide-y divide-base-light/50"
+      data-visible="false">
+    {% for t in page.completed %}{{ task(t, page) }}{% endfor %}
+  </ul>
+{% endmacro %}
+
+{% macro task_empty(page) %}
+  <li class="text-kind-default font-semibold italic text-center py-4 text-lg"
+      data-role="empty">No tasks have been created for this page</li>
+{% endmacro %}
+
+{% macro task(t, page) %}
+  {% set completed = t.completed %}
+  {% set form_readonly = t.readonly or completed %}
+  {% set show_settings = not form_readonly %}
+  {% set show_form = t.form and ((not completed) or t.submission) %}
+  {% set can_move = t.allowed(Action.EDIT) %}
+  {% set can_combine = t.allowed(Action.DELETE) %}
+  <li id="{{ t.hash }}"
+      data-key="{{ t.urlsafe_key }}"
+      lp-entity
+      lp-component
+      data-fingerprint="{{ t.fingerprint }}"
+      data-modified="{{ t.modified.isoformat() }}"
+      data-persistent="true"
+      data-completed="{{ completed|yesno }}"
+      data-default="{{ 'TaskForm' if show_form else 'TaskSettings' if show_settings else '' }}"
+      {% if t.readonly %}data-readonly="true"{% endif %}
+      data-content-readonly="{{ form_readonly|yesno }}"
+      data-kind="task"
+      data-title="{{ t.name }}"
+      data-route="{{ url_for('tasks.update', key=t.urlsafe_key) }}"
+      data-open="false"
+      class="group scroll-mt-20">
+    {{ task_nav(t, page, show_settings, show_form, can_move, can_combine) }}
+    {% if show_settings %}{{ settings_form(t, page) }}{% endif %}
+    {% if can_move %}{{ move_form(t) }}{% endif %}
+    {% if can_combine %}{{ combine_form(t) }}{% endif %}
+    {% if show_form %}{{ task_form(t, page) }}{% endif %}
+    {% if t.has_history %}{{ task_history(t, show_form, show_settings) }}{% endif %}
+  </li>
+{% endmacro %}
+
+{% macro task_nav(t, page, show_settings, show_form, can_move=False, can_combine=False) %}
+  <div lp-nav
+       lp-show="{{ t.hash }}:active"
+       data-toggle="{{ (show_settings or show_form)|yesno }}"
+       data-nav="{{ t.hash }}"
+       class="flex flex-col gap-4 p-4 text-base font-medium sm:px-6">
+    {{ task_title(t, show_settings, show_form, can_move, can_combine) }}
+    <p class="{{ styles.message }} opacity-100"
+       data-kind="error"
+       data-visible="false"
+       data-role="error"></p>
+    <p class="text-sm italic px-3 py-2 ring ring-inset font-semibold w-fit rounded-md text-base-default ring-task-default/20 bg-base-bg"
+       data-visible="{{ t.description|yesno }}">{{ t.description or '' }}</p>
+    {{- task_details(t, page) -}}
+  </div>
+{% endmacro %}
+
+{% macro task_title(t, show_settings, show_form, can_move=False, can_combine=False) %}
+  <div data-role="header"
+       class="gap-2 flex w-full flex-row items-start justify-between">
+    <div class="flex min-w-0 flex-1 flex-row items-start gap-2">
+      <div class="{{ styles.task.complete }} {{ 'opacity-50' if t.readonly }}">
+        <input type="checkbox"
+               data-role="complete-toggle"
+               {% if t.completed %}checked{% endif %}
+               {% if t.readonly %}disabled{% endif %}
+               class="{{ styles.checkbox.default }} {{ 'outline-none' if t.readonly }}">
+        {{ render_icon("check", (styles.checkbox.icon)) }}
+      </div>
+      <div data-menu-anchor class="{{ styles.task.title }}">
+        <span class="text-base-dark" data-role="title">{{ t.name }}</span>
+        {% if can_move or can_combine or t.allowed(Action.DELETE) %}
+          {% call menus.title("Task actions", "ml-1") %}
+            {% if can_move %}
+              {{ menus.show("Move to Page", "page", t.hash ~ ":TaskMove", "page") }}
+            {% endif %}
+            {% if can_combine %}
+              {{ menus.show("Combine with Task", "history", t.hash ~ ":TaskCombine", "task") }}
+            {% endif %}
+            {% if t.allowed(Action.DELETE) %}
+              {{ menus.delete() }}
+            {% endif %}
+          {% endcall %}
+        {% endif %}
+      </div>
+    </div>
+    <div class="flex shrink-0 flex-row items-start gap-1 ml-auto">
+      {% if show_settings %}{{ controls.task_save(t.updated) }}{% endif %}
+      <div class="{{ styles.form.header.controls }} {{ styles.task.controlGroup }}"
+           data-role="controls"
+           data-visible="false">
+        {% if show_form %}{{ controls.form(t) }}{% endif %}
+        {% if show_settings %}{{ controls.task(t) }}{% endif %}
+        {% if t.has_history %}{{ controls.task_history(t) }}{% endif %}
+        {{ controls.close() }}
+      </div>
+      <nav class="{{ styles.task.controlGroup }} flex shrink-0 flex-row items-start gap-1"
+           data-role="nav-toggles"
+           data-nav="{{ t.hash }}">
+        {% if show_settings %}{{ controls.task(t) }}{% endif %}
+        {% if t.has_history %}{{ controls.task_history(t) }}{% endif %}
+        {# {% if show_form %}{{ controls.form(t) }}{% endif %} #}
+      </nav>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro task_history(t, show_form, show_settings) %}
+  <div data-widget="TaskHistory"
+       lp-load
+       data-kind="task"
+       data-visible="false"
+       data-nav="false"
+       data-controls="true"
+       data-close="{{ t.hash }}"
+       {% if show_form %}data-form="{{ t.hash }}:TaskForm"{% endif %}
+       {% if show_settings %}data-task="{{ t.hash }}:TaskSettings"{% endif %}
+       data-route="{{ url_for('tasks.history', key=t.urlsafe_key) }}"
+       class="min-w-0 overflow-hidden max-w-full mx-4 mb-4 rounded-md outline-2 outline-task-default">
+    <div class="table-container px-4" data-role="table"></div>
+  </div>
+{% endmacro %}
+
+{% macro task_form(t, page) %}
+  <form data-widget="TaskForm"
+        lp-update
+        lp-offline
+        lp-deferred
+        data-kind="form"
+        data-readonly="{{ (t.readonly or t.completed)|yesno }}"
+        data-completed="{{ t.completed|yesno }}"
+        data-visible="false"
+        data-nav="false"
+        data-controls="true"
+        data-task="{{ t.hash }}:TaskSettings"
+        data-history="{{ t.hash }}:TaskHistory"
+        data-deferred-route="{{ url_for('tasks.get', key=t.urlsafe_key) }}"
+        data-destination="{{ t.hash }}:TaskForm"
+        data-schema='{{ t.form.schema|tojson }}'
+        data-submission='{{ t.properties.submission.form_value|tojson }}'
+        data-close="{{ t.hash }}"
+        class="{{ styles.form.default }}">
+    {% if t.allowed(Action.EDIT) and not t.completed %}
+      {{ autofill(enabled=current_user.access(AI.CREATE)) }}
+    {% endif %}
+    {{ controls.edited_marker(url_for('tasks.get', key=t.urlsafe_key)) }}
+  </form>
+{% endmacro %}
+
+{% macro settings_form(t, page) %}
+  <form data-widget="TaskSettings"
+        lp-update
+        data-name="{{ t.name or '' }}"
+        data-description="{{ t.description or '' }}"
+        data-form="{{ t.hash }}:TaskForm"
+        data-history="{{ t.hash }}:TaskHistory"
+        data-visible="false"
+        data-nav="false"
+        data-controls="true"
+        data-help="tasks"
+        data-close="{{ t.hash }}"
+        class="{{ styles.form.default }}">
+    {{ action_buttons(page, task=t) }}
+    {{ controls.edited_marker(url_for('tasks.settings', key=t.urlsafe_key)) }}
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}
+
+{% macro move_form(task) %}
+  <form data-widget="TaskMove"
+        lp-update
+        data-route="{{ url_for('tasks.move', key=task.urlsafe_key) }}"
+        data-visible="false"
+        data-nav="false"
+        data-controls="true"
+        data-close="{{ task.hash }}"
+        class="{{ styles.form.default }}">
+    {{ move_page_select(task) }}
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}
+
+{% macro move_page_select(task) %}
+  {% set page_preload = [task.page.reference_details] if task.page else [] %}
+  <div class="{{ styles.select.container }}"
+       data-role="page-select"
+       lp-select
+       data-preload='{{ page_preload|tojson }}'>
+    <h3 class="{{ styles.label.sectionHeading }}">Move to Page</h3>
+    <input data-index="page"
+           data-creatable="true"
+           data-placeholder="select a page..."
+           name="page"
+           class="{{ styles.input }}">
+  </div>
+{% endmacro %}
+
+{% macro combine_form(task, compatible=none) %}
+  <form data-widget="TaskCombine"
+        lp-update
+        lp-load
+        data-route="{{ url_for('tasks.combine', key=task.urlsafe_key) }}"
+        data-visible="false"
+        data-nav="false"
+        data-controls="true"
+        data-close="{{ task.hash }}"
+        class="{{ styles.form.default }}">
+    {% if compatible is not none %}
+      <h3 class="{{ styles.label.sectionHeading }}">Combine with Task</h3>
+      {% if compatible %}
+        <div data-role="combine-task-options" class="flex flex-col gap-1">
+          {% for candidate in compatible %}
+            <label class="{{ styles.checkbox.label }}">
+              <div class="{{ styles.checkbox.container }}">
+                <input type="checkbox"
+                       name="task"
+                       value="{{ candidate.urlsafe_key }}"
+                       class="{{ styles.checkbox.default }}">
+                {{ render_icon("check", (styles.checkbox.icon)) }}
+              </div>
+              <span>{{ candidate.name }}</span>
+            </label>
+          {% endfor %}
+        </div>
+        <button type="submit" class="{{ styles.button.submit }}"></button>
+      {% else %}
+        <p data-role="empty" class="{{ styles.message }} italic">No compatible tasks are available.</p>
+      {% endif %}
+    {% endif %}
+  </form>
+{% endmacro %}
+
+{% macro action_buttons(page, task=None) %}
+  {% set can_assign = current_user.properties.restrictions.user_assign_restrictions %}
+  {% set can_assign_owner = owner_allows_assignments() %}
+  {% set can_edit = (not task and page.allowed(Action.EDIT)) or (task and task.allowed(Action.EDIT)) %}
+  {% set can_upload = can_edit and not current_user.is_public %}
+  {% set assigned_to_preload = task.properties.assigned_to.column_value if task and task.assigned_to else none %}
+  <div class="flex flex-row flex-wrap gap-2 w-full empty:hidden {{ styles.task.actionIconContext }}"
+       data-role="action-buttons">
+    {% if Resource.PROJECTS.allowed(Action.RESTRICTED) %}
+      <button type="button"
+              lp-select
+              data-kind="project"
+              data-action="selectProject"
+              data-role="project-select"
+              data-placeholder="link a project..."
+              data-index="project"
+              data-creatable="true"
+              data-title="Link Project"
+              {% if task and task.model %}
+                {% set model_preload = task.properties.model.column_value %}
+                {% if model_preload %}data-preload='{{ model_preload|tojson }}'{% endif %}
+              {% elif task and task.project %}
+              {% set project_preload = task.properties.project.column_value %}
+              {% if project_preload %}data-preload='{{ project_preload|tojson }}'{% endif %}
+              {% endif %}
+              class="{{ styles.select.button }} w-full"></button>
+    {% endif %}
+    {% if Resource.FORMS.allowed(Action.VIEW) %}
+      <button type="button"
+              lp-select
+              data-kind="form"
+              data-action="selectForm"
+              data-role="form-select"
+              data-placeholder="attach a form..."
+              data-index="form"
+              data-creatable="true"
+              data-form-type="task"
+              data-title="Attach Form"
+              {% if task and task.form %}data-preload='{{ task.form.details|tojson }}'{% endif %}
+              class="{{ styles.select.button }}"></button>
+    {% endif %}
+    <button type="button"
+            data-kind="task"
+            data-action="schedule"
+            data-role="date-select"
+            data-title="Schedule"
+            data-ai-enabled="{{ current_user.access(AI.CREATE)|yesno }}"
+            data-kind="task"
+            {% if task and task.properties.schedule.active %}data-schedule='{{ task.schedule|tojson }}'{% endif %}
+            {% if task and task.due_date %}data-due-date='{{ task.properties.due_date.form_value }}'{% endif %}
+            class="{{ styles.select.button }}"></button>
+    {% if can_assign or can_assign_owner or assigned_to_preload %}
+      <button type="button"
+              lp-select
+              data-action="selectUser"
+              data-role="user-select"
+              data-placeholder="assign to..."
+              {% if not can_assign and not can_assign_owner %}data-readonly="true"{% endif %}
+              data-index="user"
+              data-permission="assign"
+              data-title="Assign To"
+              data-name="assigned_to"
+              data-kind="user"
+              {% if assigned_to_preload %}data-preload='{{ assigned_to_preload|tojson }}'{% endif %}
+              class="{{ styles.select.button }}"></button>
+    {% endif %}
+    {% if can_upload %}
+      <button type="button"
+              data-action="uploadFile"
+              data-role="file-select"
+              data-title="Attach File/Photo"
+              data-kind="file"
+              {% if task %}data-preload='{{ task.properties.files.preload|tojson }}'{% endif %}
+              class="{{ styles.select.button }}"></button>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro task_details(t, page) %}
+  <div class="flex flex-row items-center gap-2 flex-wrap empty:hidden">
+    {%- if t.due_date -%}
+      {{ badges.due_date_badge(t) }}
+    {%- endif -%}
+    {%- if t.completed_on -%}
+      {{- badges.completed_on_badge(t) -}}
+    {%- endif -%}
+    {%- if t.schedule -%}
+      {{ badges.scheduling_badge(t) }}
+    {%- endif -%}
+    {%- if t.project -%}
+      {% set project = t.properties.project.column_value %}
+      {{- badges.entity_badge(project, label="Tracked by project") if project else '' -}}
+    {%- endif -%}
+    {%- if t.model -%}
+      {% set model = t.properties.model.column_value %}
+      {{- badges.entity_badge(model, label="Tracked by model task") if model else '' -}}
+    {%- endif -%}
+    {%- if not t.completed and t.assigned_to -%}
+      {% set assigned_to = t.properties.assigned_to.column_value %}
+      {{- badges.entity_badge(assigned_to, icon="assignedTo", label="Assigned to") if assigned_to else '' -}}
+    {%- endif -%}
+    {%- if not t.completed and t.assigned_by -%}
+      {% set assigned_by = t.properties.assigned_by.column_value %}
+      {{- badges.entity_badge(assigned_by, icon="assignedBy", label="Assigned by") if assigned_by else '' -}}
+    {%- endif -%}
+    {%- if t.completed and t.completed_by -%}
+      {% set completed_by = t.properties.completed_by.column_value %}
+      {{- badges.entity_badge(completed_by, icon="completedBy", label="Completed by") if completed_by else '' -}}
+    {%- endif -%}
+    {%- if t.page and page.key != t.page.key -%}
+      {% set task_page = t.properties.page.column_value %}
+      {{- badges.entity_badge(task_page, label="Linked to page") if task_page else '' -}}
+    {%- endif -%}
+    {%- for file in t.properties.files.column_value -%}
+      {{ badges.entity_badge(file, label="File attached") }}
+    {%- endfor -%}
+  </div>
+{% endmacro %}

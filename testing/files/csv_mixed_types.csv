@@ -1,0 +1,9 @@
+name,email,phone,hire_date,website,active,category
+Alice,alice@example.com,555-123-4567,01/15/2023,https://alice.com,yes,Engineering
+Bob,bob@example.com,555-234-5678,02/20/2023,https://bob.io,no,Marketing
+Carol,carol@example.com,555-345-6789,03/25/2023,https://carol.net,true,Engineering
+David,david@example.com,555-456-7890,04/30/2023,https://david.org,false,Sales
+Eva,eva@example.com,555-567-8901,05/10/2023,https://eva.co,1,Engineering
+Frank,frank@example.com,555-678-9012,06/15/2023,https://frank.dev,0,Marketing
+Grace,grace@example.com,555-789-0123,07/20/2023,https://grace.app,y,Engineering
+Henry,henry@example.com,555-890-1234,08/25/2023,https://henry.site,n,Sales

@@ -1,0 +1,23 @@
+{
+	"test_form_index_table": {
+		"entities": [
+			[
+				"FORM",
+				{
+					"name": "Contact Form",
+					"form_type": "page",
+					"categories": [{ "name": "Contacts" }, { "name": "People" }]
+				}
+			],
+			[
+				"FORM",
+				{
+					"name": "Review Task",
+					"form_type": "task",
+					"projects": [{ "name": "Review Project", "hash": "prj_review" }]
+				}
+			],
+			["FORM", { "name": "Empty Form", "form_type": "category" }]
+		]
+	}
+}

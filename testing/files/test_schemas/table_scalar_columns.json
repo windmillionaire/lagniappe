@@ -1,0 +1,33 @@
+[
+	{
+		"id": "type_grid",
+		"type": "table",
+		"title": "Type grid",
+		"columns": [
+			{
+				"id": "cx_label",
+				"type": "input",
+				"input": "text",
+				"title": "Label"
+			},
+			{
+				"id": "cx_time",
+				"type": "input",
+				"input": "time",
+				"title": "At time"
+			},
+			{
+				"id": "cx_amt",
+				"type": "input",
+				"input": "number",
+				"title": "Amount"
+			},
+			{
+				"id": "cx_phone",
+				"type": "input",
+				"input": "tel",
+				"title": "Phone"
+			}
+		]
+	}
+]

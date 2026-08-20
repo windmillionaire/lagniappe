@@ -1,0 +1,118 @@
+[
+  {
+    "name": "medical-role-separation",
+    "context": {
+      "report_intent": "Record Lucy's completed pediatric visit.",
+      "proposal_summary": "Record the visit on Lucy's page with the Doctor Visit form.",
+      "evidence_files": [
+        {
+          "file_ref": "medical-summary",
+          "filename": "lucy-visit.pdf",
+          "mimetype": "application/pdf",
+          "summary": "Patient Lucy Chen was seen by Dr. Maria Rivera at Stanford Children's Health on 2024-08-20 for a sports physical. The result was cleared without restrictions. The facility address is 725 Welch Road, Palo Alto, California."
+        }
+      ],
+      "forms": [
+        {
+          "form_ref": "doctor-visit-form",
+          "name": "Doctor Visit",
+          "type": "task",
+          "schema": [
+            {"id": "input-provider", "type": "input", "input": "text", "title": "Provider"},
+            {"id": "input-visit-date", "type": "input", "input": "date", "title": "Visit Date"},
+            {"id": "textarea-result", "type": "textarea", "title": "Result"}
+          ]
+        }
+      ],
+      "records": [
+        {
+          "action_id": "lucy-visit",
+          "type": "task",
+          "name": "Sports Physical",
+          "page_name": "Lucy Chen",
+          "completed_on": "2024-08-20",
+          "form_ref": "doctor-visit-form",
+          "supporting_file_refs": ["medical-summary"]
+        }
+      ]
+    },
+    "expected": {
+      "lucy-visit": {
+        "input-provider": "Dr. Maria Rivera",
+        "input-visit-date": "2024-08-20"
+      }
+    },
+    "forbidden": [
+      {"action_id": "lucy-visit", "field_id": "input-provider", "value": "Lucy Chen"}
+    ]
+  },
+  {
+    "name": "receipt-fields",
+    "context": {
+      "report_intent": "Save this home repair receipt.",
+      "proposal_summary": "Create one receipt page and attach its source.",
+      "evidence_files": [
+        {
+          "file_ref": "receipt",
+          "filename": "hardware-receipt.pdf",
+          "mimetype": "application/pdf",
+          "summary": "Receipt issued by Acme Hardware to Caleb Jones on 2026-07-10 for plumbing supplies. Subtotal was $38.50, tax was $3.50, and total paid was $42.00 by Visa ending 4242."
+        }
+      ],
+      "forms": [
+        {
+          "form_ref": "receipt-form",
+          "name": "Receipt",
+          "type": "page",
+          "schema": [
+            {"id": "input-merchant", "type": "input", "input": "text", "title": "Merchant"},
+            {"id": "input-date", "type": "input", "input": "date", "title": "Purchase Date"},
+            {"id": "input-total", "type": "input", "input": "number", "title": "Total"}
+          ]
+        }
+      ],
+      "records": [
+        {
+          "action_id": "receipt-page",
+          "type": "page",
+          "name": "Acme Hardware Receipt",
+          "category_name": "Receipts",
+          "form_ref": "receipt-form",
+          "supporting_file_refs": ["receipt"]
+        }
+      ]
+    },
+    "expected": {
+      "receipt-page": {
+        "input-merchant": "Acme Hardware",
+        "input-date": "2026-07-10",
+        "input-total": "42.00"
+      }
+    },
+    "forbidden": []
+  },
+  {
+    "name": "mixed-target-isolation",
+    "context": {
+      "report_intent": "Organize the unrelated receipt and dental visit.",
+      "proposal_summary": "Create separate records with exact supporting files.",
+      "evidence_files": [
+        {"file_ref": "dental", "filename": "dental.pdf", "summary": "Patient Alex Lee saw dentist Dr. Shah on 2025-02-03 for a cleaning."},
+        {"file_ref": "receipt", "filename": "receipt.pdf", "summary": "Northside Market receipt dated 2025-02-04 totaled $18.75."}
+      ],
+      "forms": [
+        {"form_ref": "visit", "name": "Dental Visit", "type": "task", "schema": [{"id": "input-dentist", "type": "input", "input": "text", "title": "Dentist"}]},
+        {"form_ref": "receipt", "name": "Receipt", "type": "page", "schema": [{"id": "input-merchant", "type": "input", "input": "text", "title": "Merchant"}]}
+      ],
+      "records": [
+        {"action_id": "dental-task", "type": "task", "name": "Dental Cleaning", "page_name": "Alex Lee", "form_ref": "visit", "supporting_file_refs": ["dental"]},
+        {"action_id": "receipt-page", "type": "page", "name": "Northside Market Receipt", "form_ref": "receipt", "supporting_file_refs": ["receipt"]}
+      ]
+    },
+    "expected": {
+      "dental-task": {"input-dentist": "Dr. Shah"},
+      "receipt-page": {"input-merchant": "Northside Market"}
+    },
+    "forbidden": []
+  }
+]

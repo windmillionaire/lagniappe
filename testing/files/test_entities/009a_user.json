@@ -1,0 +1,94 @@
+{
+	"test_user_email": {
+		"entities": [
+			[
+				"USER",
+				{
+					"name": "User with email",
+					"hash": "user001",
+					"email": "test@example.com",
+					"page": { "name": "User Page", "hash": "page001" }
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User without email",
+					"hash": "user002",
+					"email": null,
+					"page": { "name": "User Page 2", "hash": "page002" }
+				}
+			]
+		]
+	},
+	"test_user_last_login": {
+		"entities": [
+			[
+				"USER",
+				{
+					"name": "User last login",
+					"hash": "user003",
+					"timezone": "America/Chicago",
+					"page": { "name": "User Page", "hash": "page003" }
+				}
+			],
+			[
+				"USER",
+				{
+					"name": "User last login UTC",
+					"hash": "user004",
+					"timezone": "UTC",
+					"page": { "name": "User Page", "hash": "page004" }
+				}
+			]
+		]
+	},
+	"test_user_invalidate_cache": {
+		"entities": [
+			[
+				"USER",
+				{
+					"name": "User cache test",
+					"hash": "user005",
+					"page": { "name": "User Page", "hash": "page005" }
+				}
+			]
+		]
+	},
+	"test_user_is_public": {
+		"entities": [
+			[
+				"USER",
+				{
+					"name": "Public user test",
+					"hash": "user006",
+					"page": { "name": "User Page", "hash": "page006" }
+				}
+			]
+		]
+	},
+	"test_user_is_owner": {
+		"entities": [
+			[
+				"USER",
+				{
+					"name": "Owner user test",
+					"hash": "user007",
+					"page": { "name": "User Page", "hash": "page007" }
+				}
+			]
+		]
+	},
+	"test_user_is_admin": {
+		"entities": [
+			[
+				"USER",
+				{
+					"name": "Admin user test",
+					"hash": "user008",
+					"page": { "name": "User Page", "hash": "page008" }
+				}
+			]
+		]
+	}
+}

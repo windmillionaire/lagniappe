@@ -1,0 +1,45 @@
+{
+	"test_category_index": {
+		"entities": [
+			[
+				"CATEGORY",
+				{
+					"name": "Test Category",
+					"hash": "testcat",
+					"form": {
+						"name": "Category Form",
+						"hash": "catform"
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page With All Fields",
+					"hash": "page001",
+					"description": "A full description",
+					"form": {
+						"name": "Page Form",
+						"hash": "pgform1"
+					},
+					"assets": { "image": { "type": "image", "path": "test.jpg" } }
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Minimal Page",
+					"hash": "page002"
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page With Description Only",
+					"hash": "page003",
+					"description": "Just a description, no form or image"
+				}
+			]
+		]
+	}
+}

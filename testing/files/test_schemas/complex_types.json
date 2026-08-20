@@ -1,0 +1,58 @@
+[
+	{
+		"id": "table-contactsab",
+		"type": "table",
+		"title": "Contacts",
+		"columns": [
+			{
+				"id": "row-namecd12",
+				"type": "input",
+				"input": "text",
+				"title": "Name"
+			},
+			{
+				"id": "row-emailef34",
+				"type": "input",
+				"input": "email",
+				"title": "Email"
+			},
+			{
+				"id": "row-primarygh",
+				"type": "checkbox",
+				"title": "Primary"
+			}
+		]
+	},
+	{
+		"id": "link-externalij",
+		"type": "link",
+		"title": "Website",
+		"location": "out"
+	},
+	{
+		"id": "link-internalkl",
+		"type": "link",
+		"title": "Related Page",
+		"location": "in"
+	},
+	{
+		"id": "location-addrmn",
+		"type": "location",
+		"title": "Address"
+	},
+	{
+		"id": "signature-signop",
+		"type": "signature",
+		"title": "Signature"
+	},
+	{
+		"id": "html-instructqr",
+		"type": "html",
+		"title": "Instructions"
+	},
+	{
+		"id": "bookmark-refst12",
+		"type": "bookmark",
+		"title": "Reference"
+	}
+]

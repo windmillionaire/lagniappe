@@ -1,0 +1,137 @@
+{% import 'controls.html' as controls %}
+
+{% macro create_user() %}
+  <form lp-create
+        data-widget="CreateUser"
+        data-route="{{ url_for('users.create') }}"
+        data-destination="table:IndexTable"
+        data-visible="false"
+        data-title="Create a User"
+        data-close="tools"
+        data-help="create_user"
+        data-can-edit-ai="{{ current_user.is_owner|yesno }}"
+        data-nav="true"
+        data-controls="true"
+        class="{{ styles.form.tools }}">
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}
+
+{% macro public_permissions(group) %}
+  <form data-widget="PublicPermissions"
+        lp-entity
+        lp-update
+        lp-load
+        data-key="{{ group.urlsafe_key }}"
+        data-fingerprint="{{ group.fingerprint }}"
+        data-route="{{ url_for('users.public_permissions') }}"
+        data-help="public_permissions"
+        data-title="Public Permissions"
+        data-reset="user-groups:nav"
+        data-visible="false"
+        data-nav="false"
+        data-controls="true"
+        class="{{ styles.form.tools }}">
+    {{ controls.edited_marker(url_for('users.public_permissions')) }}
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}
+
+{% macro create_user_group() %}
+  <form data-widget="CreateUserGroup"
+        lp-create
+        data-route="{{ url_for('users.create_group') }}"
+        data-destination="user-groups"
+        data-help="create_user_group"
+        data-reset="user-groups:nav"
+        data-visible="false"
+        data-nav="false"
+        data-controls="true"
+        class="{{ styles.form.tools }}">
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}
+
+{% macro group_permissions(group) %}
+  <form data-widget="GroupPermissions/{{ group.hash }}"
+        lp-entity
+        lp-update
+        lp-load
+        data-key="{{ group.urlsafe_key }}"
+        data-fingerprint="{{ group.fingerprint }}"
+        data-route="{{ url_for('users.group_permissions', key=group.urlsafe_key) }}"
+        data-name="{{ group.name }}"
+        data-reset="user-groups:nav"
+        data-title="{{ group.name }} Permissions"
+        data-visible="false"
+        data-nav="false"
+        data-controls="true"
+        data-help="permissions"
+        class="{{ styles.form.tools }}">
+    {{ controls.edited_marker(url_for('users.group_permissions', key=group.urlsafe_key)) }}
+    <button type="submit" class="{{ styles.button.submit }}"></button>
+  </form>
+{% endmacro %}
+
+{% macro group_nav(groups) %}
+  <div class="{{ styles.index.tools.selector.container }}"
+       data-role="group-selectors">
+    {% if Resource.USER_GROUPS.allowed(Action.CREATE) %}
+      <button class="{{ styles.index.tools.selector.show }}"
+              lp-show="user-groups:CreateUserGroup">
+        {{ render_icon("add") }}
+        <span>New Group</span>
+      </button>
+    {% endif %}
+    {% if Resource.SITE.allowed(Action.PERMISSIONS) %}
+      <button class="{{ styles.index.tools.selector.show }}"
+              lp-show="user-groups:PublicPermissions">
+        {{ render_icon("public") }}
+        <span>Public</span>
+      </button>
+    {% endif %}
+    {%- for g in groups %}
+      {{ group_selector(g) }}
+    {% endfor -%}
+  </div>
+{% endmacro %}
+
+{% macro group_selector(group) %}
+  <button class="{{ styles.index.tools.selector.show }}"
+          data-key="{{ group.urlsafe_key }}"
+          lp-show="user-groups:GroupPermissions/{{ group.hash }}">
+    {{ render_icon("group") }}
+    <span data-role="group-name">{{ group.name }}</span>
+  </button>
+{% endmacro %}
+
+{% macro user_groups(groups, public_group) %}
+  <div id="user-groups"
+       lp-component
+       data-visible="false"
+       data-nav="user-groups"
+       data-title="User Groups"
+       class="{{ styles.form.tools }}">
+    <div lp-nav
+         class="{{ styles.form.header.container }}"
+         data-nav="user-groups">
+      <h2 class="{{ styles.form.header.title }}" data-role="title"></h2>
+      <div class="{{ styles.form.header.controls }}" data-role="controls">
+        {{ controls.help("user_groups") }}
+        {{ controls.close("tools") }}
+        {{ controls.reset() }}
+        {{ controls.delete() }}
+      </div>
+    </div>
+    <nav class="flex flex-col gap-6"
+         data-standalone="true"
+         data-nav="user-groups"
+         data-close="tools"
+         data-controls="true">
+      <div class="flex flex-col gap-6 group/form">{{ group_nav(groups) }}</div>
+    </nav>
+    {{ public_permissions(public_group) }}
+    {{ create_user_group() }}
+    {% for g in groups %}{{ group_permissions(g) }}{% endfor %}
+  </div>
+{% endmacro %}

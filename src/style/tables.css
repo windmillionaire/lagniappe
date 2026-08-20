@@ -1,0 +1,328 @@
+/* ==========================================================================
+   TABLE STYLES
+   ========================================================================== */
+
+/* @style form.table.form */
+.table-container {
+	width: 0;
+	min-width: 100%;
+	overflow-x: auto;
+	&:not([data-embedded="true"]) {
+		border: 1px solid color-mix(in oklch, var(--kind-light) 50%, transparent);
+		border-radius: var(--radius-md);
+	}
+}
+
+/* @style form.table.form */
+.table-container table,
+.table-container form {
+	contain: layout;
+}
+
+/* @style form.table.rowActions */
+.table-row-actions {
+	width: max-content;
+	touch-action: pan-x pan-y;
+}
+
+/* @style form.table.rowActions */
+.table-row-actions[hidden] {
+	display: none;
+}
+
+/* @style form.table.rowActions */
+.table-row-actions button {
+	flex: 0 0 auto;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td {
+	pointer-events: none;
+	background-color: color-mix(in oklch, var(--color-delete-bg) 45%, white);
+	opacity: 0.65;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td[data-editable="true"] {
+	pointer-events: auto;
+	background-color: color-mix(in oklch, var(--color-project-bg) 75%, white);
+	opacity: 1;
+	&:hover {
+		background-color: white;
+	}
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"]
+	td[data-editable="true"]
+	a:is(:hover, :focus-visible) {
+	text-decoration-line: none;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td[data-edit-state="editing"] {
+	background-color: white;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td[data-edit-state="saving"] {
+	background-color: var(--color-note-bg);
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td[data-edit-state="saved"] {
+	background-color: var(--color-project-bg);
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td[data-edit-state="error"] {
+	background-color: var(--color-delete-bg);
+}
+
+/* @style form.table.actionButton */
+button[lp-show="table:TableEditor"][data-editing="true"] {
+	border-radius: var(--radius-md);
+	background-color: var(--kind-bg);
+	outline: 2px solid var(--kind-default);
+	outline-offset: 2px;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td [data-editing="true"] {
+	display: block;
+	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
+	gap: 0;
+	color: inherit;
+	font: inherit;
+	font-weight: inherit;
+	line-height: inherit;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td [data-editing="true"][data-type="checkbox"] {
+	display: inline-grid;
+	width: 1.25rem;
+	min-width: 0;
+	vertical-align: middle;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"]
+	td
+	[data-editing="true"]:is(
+		input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+		textarea,
+		select
+	),
+tbody[data-editing="true"]
+	td
+	[data-editing="true"]
+	input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+tbody[data-editing="true"] td [data-editing="true"] textarea,
+tbody[data-editing="true"] td [data-editing="true"] select {
+	height: 1.4em;
+	min-height: 0;
+	width: 100%;
+	min-width: 0;
+	max-width: 100%;
+	box-sizing: border-box;
+	border: 0;
+	border-radius: 0;
+	background-color: transparent;
+	padding: 0;
+	font: inherit;
+	font-weight: inherit;
+	line-height: inherit;
+	box-shadow: none;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td [data-editing="true"]:is(textarea),
+tbody[data-editing="true"] td [data-editing="true"] textarea {
+	height: 1.4em;
+	min-height: 1.4em;
+	resize: vertical;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"]
+	td
+	[data-editing="true"]:is(input, textarea, select):hover,
+/* @style form.table.form */
+	tbody[data-editing="true"]
+	td
+	[data-editing="true"]:is(input, textarea, select):focus,
+/* @style form.table.form */
+	tbody[data-editing="true"]
+	td
+	[data-editing="true"]:is(input, textarea, select):focus-visible,
+tbody[data-editing="true"] td [data-editing="true"] input:hover,
+tbody[data-editing="true"] td [data-editing="true"] input:focus,
+tbody[data-editing="true"] td [data-editing="true"] input:focus-visible,
+tbody[data-editing="true"] td [data-editing="true"] textarea:hover,
+tbody[data-editing="true"] td [data-editing="true"] textarea:focus,
+tbody[data-editing="true"] td [data-editing="true"] textarea:focus-visible,
+tbody[data-editing="true"] td [data-editing="true"] select:hover,
+tbody[data-editing="true"] td [data-editing="true"] select:focus,
+tbody[data-editing="true"] td [data-editing="true"] select:focus-visible {
+	outline: 0;
+	box-shadow: none;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"]
+	td
+	[data-editing="true"]
+	input[type="checkbox"]:hover,
+tbody[data-editing="true"]
+	td
+	[data-editing="true"]
+	input[type="checkbox"]:focus,
+tbody[data-editing="true"]
+	td
+	[data-editing="true"]
+	input[type="checkbox"]:focus-visible {
+	border: 0;
+	outline: 0.5px solid var(--color-base-light);
+	outline-offset: 0;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"]
+	td
+	[data-editing="true"]
+	input[type="checkbox"]:checked:hover,
+tbody[data-editing="true"]
+	td
+	[data-editing="true"]
+	input[type="checkbox"]:checked:focus,
+tbody[data-editing="true"]
+	td
+	[data-editing="true"]
+	input[type="checkbox"]:checked:focus-visible {
+	outline: 0;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td [data-role="quick-edit-result"] {
+	min-width: 0;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td [data-role="quick-edit-value"] {
+	display: flex;
+	min-width: 0;
+	align-items: baseline;
+	gap: 0.35rem;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td [data-role="quick-edit-saved"] {
+	flex: none;
+	font-size: 0.8rem;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td [data-role="quick-edit-content"] {
+	min-width: 0;
+}
+
+/* @style form.table.form */
+tbody[data-editing="true"] td [data-role="quick-edit-error"] {
+	margin-top: 0.25rem;
+	margin-right: 0.5rem;
+	font-size: 0.75rem;
+	font-style: italic;
+	font-weight: 600;
+	line-height: 1rem;
+	color: var(--color-delete-default);
+	white-space: normal;
+}
+
+/* @style table.default table.embedded */
+@media (max-width: 768px) {
+	table[id="table"]:not([data-embedded]) {
+		&,
+		& > thead,
+		& > tbody,
+		& > tbody > tr:not([data-role]),
+		& > thead th,
+		& > tbody > tr > td {
+			display: block;
+		}
+
+		& > thead {
+			display: none;
+		}
+
+		& > tbody {
+			border-top: none;
+		}
+
+		& > tbody > tr[data-key] {
+			display: flex;
+			flex-direction: column;
+			padding: 0;
+			margin: 0 1rem 0.75rem 1rem;
+			background-color: white;
+			border: 2px solid var(--kind-default);
+			border-radius: 0.375rem;
+			overflow: hidden;
+
+			&[data-visible="false"] {
+				display: none;
+			}
+		}
+
+		& > tbody > tr > td[data-column] {
+			display: flex;
+			flex-direction: column;
+			gap: 0.25rem;
+			padding: 0.5rem 0.75rem;
+			width: 100%;
+			max-width: 100%;
+			font-size: 0.875rem;
+
+			&[data-sort-value]:not([data-column="name"]) {
+				border-top: 1px solid var(--kind-light);
+			}
+
+			&:not([data-sort-value]) {
+				display: none;
+			}
+
+			&::before {
+				content: attr(data-label);
+				font-weight: 600;
+				font-size: 0.6875rem;
+				text-transform: uppercase;
+				letter-spacing: 0.05em;
+				color: var(--kind-dark);
+			}
+		}
+
+		& > tbody > tr > td[data-column="name"] {
+			font-size: 1rem;
+			font-weight: 600;
+			order: -1;
+			color: var(--kind-dark);
+			background-color: var(--kind-bg);
+			padding: 0.625rem 0.75rem;
+
+			&::before {
+				display: none;
+			}
+
+			& + td[data-column][data-sort-value] {
+				border-top: 1px solid var(--kind-default);
+			}
+		}
+
+		& > tbody > tr > td[data-column="delete"] {
+			display: none;
+		}
+	}
+}

@@ -1,0 +1,80 @@
+{% from "manual/macros.html" import subheading, callout %}
+{% from "reference/macros.html" import modal, detail %}
+{% call modal("Creating Users") %}
+  <section>
+    {{ subheading("What This Does") }}
+    <p class="text-sm text-base-dark">
+      Creating a user gives someone access to your Lagniappe instance. Each user gets their own personal page
+      where they can store notes, tasks, and files. You can control what else they can access through user groups and permissions.
+    </p>
+  </section>
+  <section>
+    {{ subheading("Page Attachment") }}
+    {% call detail("Create New Page (Default)", kind="page") %}
+      If you leave "Attach to Existing Page" empty, a new personal page will be created automatically for this user.
+      This is the typical choice for new users.
+    {% endcall %}
+    <div class="mt-3">
+      {% call detail("Attach to Existing Page", kind="default") %}
+        If a page already exists for this person (maybe you created it before adding their user account),
+        you can connect it here instead of creating a new one.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("AI Access") }}
+    <p class="text-sm text-base-dark mb-3">
+      The owner can choose an AI access level independently from user groups and permissions.
+      New users default to None.
+    </p>
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li><strong>None</strong> hides AI tools and prevents AI-backed actions.</li>
+      <li><strong>Ask</strong> allows workspace questions and saved Ask reports.</li>
+      <li><strong>Create</strong> also allows generation, autofill, summarization, Organize, Create, and proposal execution.</li>
+    </ul>
+    {% call callout("tip") %}
+      AI access does not add permission to any page, category, project, form, or file. The user must have both the required AI level and the normal resource permission.
+    {% endcall %}
+  </section>
+  <section>
+    {{ subheading("User Groups & Permissions") }}
+    <div class="space-y-4">
+      <div>
+        <h4 class="font-medium text-base-dark mb-2">How Groups Work</h4>
+        <p class="text-sm text-base-dark">
+          User groups are collections of permissions that make it easy to give multiple users the same access levels.
+          You can add a user to multiple groups, and they'll get the highest permission level from any group for each resource.
+        </p>
+      </div>
+      {% call callout("warning") %}
+        <strong>Permission Combining:</strong>
+        If you add someone to multiple groups, their permissions will combine. For example, if one group gives them
+        "View" access to recipes and another gives "Edit" access, they'll end up with "Edit" access (the higher permission).
+      {% endcall %}
+      <div>
+        <h4 class="font-medium text-base-dark mb-2">Default Access (No Groups)</h4>
+        <p class="text-sm text-base-dark">
+          Users without any groups can still access their own personal page and the homepage. This gives them a place
+          to store their own notes and files while keeping everything else private.
+        </p>
+      </div>
+    </div>
+  </section>
+  <section>
+    {{ subheading("After Creation") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Users can always sign in with Identity Platform email and password. If the installation enables Google sign-in, they can also use the Google account matching the email on their user record.</li>
+      <li>Their personal page will be automatically created and accessible</li>
+      <li>You can adjust their permissions later by visiting their page as an administrator</li>
+      <li>The owner can adjust their AI access later in User Settings</li>
+      <li>They can be added to or removed from user groups at any time</li>
+    </ul>
+  </section>
+  <section>
+    {{ subheading("Best Practices") }}
+    <ul class="list-disc pl-5 space-y-2 text-sm text-base-dark">
+      <li>Create user groups first if you plan to give multiple people similar access</li>
+      <li>Start with minimal permissions and add more as needed</li>
+    </ul>
+  </section>
+{% endcall %}

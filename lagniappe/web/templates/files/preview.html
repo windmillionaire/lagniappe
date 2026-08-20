@@ -1,0 +1,62 @@
+{% macro preview_tab(file) %}
+  {% set file_asset = file.properties.file.value %}
+  <div id="preview"
+       lp-component
+       data-title="Preview"
+       data-visible="false"
+       data-tab="true"
+       data-default="{{ 'PDFPreview' if file.mimetype == 'application/pdf' else 'FilePreview' }}"
+       data-kind="file">
+    {% if file.mimetype == 'application/pdf' %}
+      <div data-widget="PDFPreview"
+           data-visible="false"
+           data-url="{{ file.preview }}"
+           data-size="{{ file_asset.size if file_asset and file_asset.size is not none else '' }}"
+           data-filename="{{ file.filename }}"
+           class="relative flex h-[75vh] max-h-[calc(100dvh-10rem)] min-h-96 flex-col overflow-hidden bg-base-light/20">
+        <div data-role="pdf-status"
+             data-visible="false"
+             class="absolute inset-0 z-10 flex items-center justify-center bg-base-light/20 p-6"></div>
+        <div data-role="pdf-pages"
+             data-visible="false"
+             class="relative min-h-0 flex-1 overflow-y-auto bg-base-light/20 px-4 py-6 sm:px-6"></div>
+        <div data-role="pdf-fallback" data-visible="false" class="p-4">
+          <a href="{{ file.preview }}"
+             data-kind="file"
+             class="inline-flex items-center gap-2 rounded-md border border-kind-light bg-white px-3 py-2 text-sm font-semibold text-kind-default shadow-sm hover:text-kind-dark focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-kind-default">
+            {{ render_icon("file") }}
+            Open PDF
+          </a>
+        </div>
+      </div>
+    {% else %}
+      <div class="p-4 sm:p-6 border-t border-base-light/50 overflow-y-auto">
+        {% if file.mimetype.startswith('video/') %}
+          <video data-widget="FilePreview"
+                 data-visible="false"
+                 src="{{ file.preview }}"
+                 type="{{ file.mimetype }}"
+                 controls
+                 preload="metadata"
+                 class="rounded-md w-full">
+          </video>
+        {% elif file.mimetype.startswith('audio/') %}
+          <audio data-widget="FilePreview"
+                 data-visible="false"
+                 src="{{ file.preview }}"
+                 type="{{ file.mimetype }}"
+                 controls
+                 preload="metadata"
+                 class="rounded-md w-full">
+          </audio>
+        {% else %}
+          <img data-widget="FilePreview"
+               data-visible="false"
+               src="{{ file.preview }}"
+               alt="{{ file.filename }}"
+               class="rounded-md mx-auto max-h-[75vh] max-w-full">
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+{% endmacro %}

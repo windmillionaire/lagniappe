@@ -1,0 +1,21 @@
+[
+	{
+		"id": "top_link",
+		"type": "link",
+		"title": "Top link",
+		"location": "in"
+	},
+	{
+		"id": "with_rows",
+		"type": "table",
+		"title": "With rows",
+		"columns": [
+			{
+				"id": "row_rel",
+				"type": "link",
+				"title": "Related",
+				"location": "in"
+			}
+		]
+	}
+]

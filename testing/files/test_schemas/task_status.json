@@ -1,0 +1,31 @@
+[
+  {
+    "id": "status-reorder",
+    "type": "checkbox",
+    "title": "Needs Reorder"
+  },
+  {
+    "id": "status-approved-by",
+    "type": "input",
+    "input": "text",
+    "title": "Approved By",
+    "visibility": [
+      {
+        "id": "status-reorder",
+        "value": true
+      }
+    ]
+  },
+  {
+    "id": "status-field",
+    "type": "status",
+    "title": "Medication Status",
+    "status": [
+      {
+        "id": "status-reorder",
+        "value": true,
+        "text": "Reorder Needed"
+      }
+    ]
+  }
+]

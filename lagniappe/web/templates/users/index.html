@@ -1,0 +1,112 @@
+{% set view_entry = "user" %}
+{% extends "layouts/base.html" %}
+{% import 'controls.html' as controls %}
+{% from 'table.html' import table, mobile_toggles %}
+{% from 'users/tools.html' import create_user, user_groups %}
+
+{% macro public_users_toggle(display) %}
+  {% if index.public_users_enabled %}
+    {% set public_mode = index.mode == 'public' %}
+    <button class="{{ styles.nav.button }} {{ styles.toggle.plain }} {{ display }} inline-grid"
+            type="button"
+            data-role="public-users-toggle"
+            data-active="{{ public_mode|yesno }}"
+            data-route-public="{{ url_for('users.rows', mode='public') }}"
+            data-route-regular="{{ url_for('users.rows') }}"
+            aria-label="{{ 'Show regular users' if public_mode else 'Show public users' }}"
+            title="{{ 'Show regular users' if public_mode else 'Show public users' }}">
+      {{ render_icon("public", styles.toggle.icon.disabled) }}
+      {{ render_icon("users", styles.toggle.icon.enabled) }}
+    </button>
+  {% endif %}
+{% endmacro %}
+
+{% macro view_header() %}
+  <nav class="{{ styles.layout.view.title }} {{ styles.index.header.iconContext }}">
+    <span data-role="title">User Index</span>
+    <div data-role="actions">
+      <button class="{{ styles.nav.mobileButton }}"
+              lp-show="table:MobileTableControls"
+              data-toggle="true">{{ render_icon("column") }}</button>
+      {{ public_users_toggle('mobile') }}
+      {% if Resource.USERS.allowed(Action.CREATE) or Resource.USER_GROUPS.allowed(Action.VIEW) %}
+        <button class="{{ styles.nav.desktopButton }}"
+                lp-show="table:TableEditor"
+                data-toggle="true">{{ render_icon("tableEdit") }}</button>
+        {{ public_users_toggle('desktop') }}
+        <button class="{{ styles.nav.desktopButton }}"
+                lp-show="tools:default"
+                data-toggle="true">{{ render_icon("indexTools") }}</button>
+        <button class="{{ styles.nav.mobileButton }}"
+                data-role="tools-dropdown"
+                data-kind="user">{{ render_icon("columns") }}</button>
+      {% endif %}
+    </div>
+  </nav>
+{% endmacro %}
+
+{% macro tools_section() %}
+  <div id="tools"
+       lp-component
+       data-default="CreateUser"
+       data-visible="false"
+       class="group/tools mt-4">
+    <div class="{{ styles.index.tools.container }}">
+      <div class="{{ styles.index.tools.main }}">
+        <div lp-nav
+             class="{{ styles.form.header.container }} group/form mb-6"
+             data-nav="tools">
+          <div data-role="header" class="{{ styles.layout.nav.header }}">
+            <h2 class="{{ styles.form.header.title }}" data-role="title"></h2>
+            <div class="{{ styles.form.header.controls }}" data-role="controls">
+              {{ controls.help() }}
+              {{ controls.close() }}
+            </div>
+          </div>
+        </div>
+        {{ create_user() }}
+        {% if Resource.USER_GROUPS.allowed(Action.VIEW) %}{{ user_groups(index.groups, index.public_group) }}{% endif %}
+      </div>
+      <nav class="{{ styles.index.tools.navigation }}"
+           data-persistent="true"
+           data-nav="tools">
+        {% if Resource.USERS.allowed(Action.CREATE) %}
+          <button class="{{ styles.index.tools.toggle }}"
+                  data-role="create-user-toggle"
+                  lp-show="tools:CreateUser">New User</button>
+        {% endif %}
+        {% if Resource.USER_GROUPS.allowed(Action.VIEW) %}
+          <button class="{{ styles.index.tools.toggle }}" lp-show="user-groups:nav">User Groups</button>
+        {% endif %}
+      </nav>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro view() %}
+  <div lp-view
+       data-kind="user"
+       data-index="users"
+       data-fingerprint="{{ fingerprint }}"
+       data-poll-channel="{{ poll_channel }}"
+       data-poll-revision="{{ poll_revision }}"
+       data-user-mode="{{ index.mode }}"
+       class="group/view">
+    <div class="{{ styles.layout.view.header }}">
+      {{ view_header() }}
+      {% if Resource.USERS.allowed(Action.CREATE) or Resource.USER_GROUPS.allowed(Action.VIEW) %}
+        {{ tools_section() }}
+      {% endif %}
+      {{ mobile_toggles(index.table.columns) }}
+    </div>
+    {{ table(users, index) }}
+  </div>
+{% endmacro %}
+
+{% block title %}
+  User Index
+{% endblock title %}
+
+{% block content %}
+  {{ view() }}
+{% endblock content %}

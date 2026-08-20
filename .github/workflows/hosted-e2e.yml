@@ -1,0 +1,578 @@
+name: Hosted release validation
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+  push:
+    branches:
+      - "next/**"
+      - "hotfix/**"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Manual hosted run or validated release continuation
+        required: true
+        default: manual
+        type: choice
+        options:
+          - manual
+          - continuation
+      suite:
+        description: Hosted test scope for a manual run
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - full
+      pull_request:
+        description: Release PR number supplied by the candidate run
+        required: false
+        type: string
+      candidate_sha:
+        description: Tested parent supplied by the candidate run
+        required: false
+        type: string
+      evidence_sha:
+        description: Evidence child supplied by the candidate run
+        required: false
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: hosted-e2e
+  cancel-in-progress: false
+
+jobs:
+  request:
+    name: Resolve hosted release request
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: read
+    outputs:
+      execute: ${{ steps.context.outputs.execute }}
+      base_sha: ${{ steps.context.outputs.base_sha }}
+      branch: ${{ steps.context.outputs.branch }}
+      candidate_sha: ${{ steps.context.outputs.candidate_sha }}
+      pull_request: ${{ steps.context.outputs.pull_request }}
+      suite: ${{ steps.context.outputs.suite }}
+
+    steps:
+      - name: Resolve the exact execution context
+        id: context
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REPOSITORY: ${{ github.repository }}
+          REQUESTED_MODE: ${{ inputs.mode }}
+          REQUESTED_SUITE: ${{ inputs.suite }}
+        run: |
+          execute=false
+          base_sha=""
+          branch=""
+          candidate_sha=""
+          pull_request=""
+          suite="all"
+
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            if [[ "$HEAD_REPOSITORY" != "$REPOSITORY" || "$BASE_REF" != "main" ]]; then
+              echo "Release validation requires a same-repository pull request to main."
+              exit 1
+            fi
+            branch="$HEAD_BRANCH"
+            candidate_sha="$PR_HEAD_SHA"
+            base_sha="$PR_BASE_SHA"
+            pull_request="$PR_NUMBER"
+            execute=true
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            if [[ "$REF_TYPE" != "branch" ]]; then
+              echo "Release branch validation requires an exact branch push."
+              exit 1
+            fi
+            branch="$REF_NAME"
+            owner="${REPOSITORY%%/*}"
+            pulls_json="$(gh api --method GET "repos/$REPOSITORY/pulls" \
+              -f state=open \
+              -f base=main \
+              -f "head=$owner:$branch" \
+              -f per_page=2)"
+            pull_count="$(jq -er 'length' <<<"$pulls_json")"
+            if [[ "$pull_count" == "0" ]]; then
+              echo "No open pull request to main uses $branch; skipping hosted validation."
+            elif [[ "$pull_count" != "1" ]]; then
+              echo "Release branch $branch has $pull_count open pull requests to main."
+              exit 1
+            else
+              head_repository="$(jq -er '.[0].head.repo.full_name' <<<"$pulls_json")"
+              head_branch="$(jq -er '.[0].head.ref' <<<"$pulls_json")"
+              candidate_sha="$(jq -er '.[0].head.sha' <<<"$pulls_json")"
+              base_ref="$(jq -er '.[0].base.ref' <<<"$pulls_json")"
+              base_sha="$(jq -er '.[0].base.sha' <<<"$pulls_json")"
+              pull_request="$(jq -er '.[0].number' <<<"$pulls_json")"
+              if [[ "$head_repository" != "$REPOSITORY" || "$head_branch" != "$branch" || "$base_ref" != "main" ]]; then
+                echo "The release branch no longer identifies the expected same-repository pull request."
+                exit 1
+              fi
+              if [[ "$candidate_sha" != "$EVENT_SHA" ]]; then
+                echo "The release pull request head is $candidate_sha, not pushed commit $EVENT_SHA."
+                exit 1
+              fi
+              execute=true
+            fi
+          elif [[ "$REQUESTED_MODE" == "manual" ]]; then
+            if [[ "$REF_TYPE" != "branch" ]]; then
+              echo "Manual hosted evidence requires a branch dispatch."
+              exit 1
+            fi
+            branch="$REF_NAME"
+            candidate_sha="$EVENT_SHA"
+            suite="$REQUESTED_SUITE"
+            execute=true
+          elif [[ "$REQUESTED_MODE" != "continuation" ]]; then
+            echo "Unsupported hosted release request."
+            exit 1
+          fi
+
+          if [[ "$execute" == "true" ]]; then
+            case "$EVENT_NAME:$branch" in
+              pull_request:next/*|pull_request:hotfix/*|push:next/*|push:hotfix/*|workflow_dispatch:*) ;;
+              *)
+                echo "Hosted release validation requires a release branch."
+                exit 1
+                ;;
+            esac
+            if [[ ! "$candidate_sha" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "The hosted candidate is not an exact commit SHA."
+              exit 1
+            fi
+          fi
+
+          echo "execute=$execute" >> "$GITHUB_OUTPUT"
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "candidate_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
+          echo "pull_request=$pull_request" >> "$GITHUB_OUTPUT"
+          echo "suite=$suite" >> "$GITHUB_OUTPUT"
+
+  execute:
+    needs: request
+    if: ${{ needs.request.outputs.execute == 'true' }}
+    name: ${{ github.event_name == 'workflow_dispatch' && 'Execute hosted suite' || 'Prepare hosted release evidence' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 130
+    environment: hosted-e2e
+    permissions:
+      contents: write
+      actions: write
+      id-token: write
+    outputs:
+      base_sha: ${{ needs.request.outputs.base_sha }}
+      branch: ${{ needs.request.outputs.branch }}
+      candidate_sha: ${{ needs.request.outputs.candidate_sha }}
+      evidence_changed: ${{ steps.evidence.outputs.changed }}
+      evidence_sha: ${{ steps.evidence.outputs.evidence_sha }}
+      pull_request: ${{ needs.request.outputs.pull_request }}
+
+    steps:
+      - name: Check out the exact candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.request.outputs.candidate_sha }}
+          fetch-depth: 0
+
+      - name: Authenticate without a stored key
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_E2E_INVOKER_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+          version: ">= 498.0.0"
+
+      - name: Require a job built from this commit
+        id: preflight
+        env:
+          E2E_JOB: lagniappe-e2e
+          E2E_REGION: ${{ vars.GCP_RESOURCE_REGION }}
+          EXPECTED_SOURCE: ${{ needs.request.outputs.candidate_sha }}
+        run: |
+          job_json="$(gcloud run jobs describe "$E2E_JOB" --region "$E2E_REGION" --format=json)"
+          configured_source="$(jq -er '[.. | objects | select(.name? == "LAGNIAPPE_HOSTED_E2E_SOURCE") | .value][0]' <<<"$job_json")"
+          artifact_bucket="$(jq -er '[.. | objects | select(.name? == "LAGNIAPPE_HOSTED_E2E_ARTIFACT_BUCKET") | .value][0]' <<<"$job_json")"
+          if [[ "$configured_source" != "$EXPECTED_SOURCE" ]]; then
+            echo "The hosted job targets $configured_source, not $EXPECTED_SOURCE."
+            exit 1
+          fi
+          if [[ ! "$artifact_bucket" =~ ^[a-z0-9][a-z0-9._-]+$ ]]; then
+            echo "The hosted job has an invalid artifact bucket."
+            exit 1
+          fi
+          echo "artifact_bucket=$artifact_bucket" >> "$GITHUB_OUTPUT"
+
+      - name: Run the hosted test suite
+        id: run
+        env:
+          E2E_JOB: lagniappe-e2e
+          E2E_REGION: ${{ vars.GCP_RESOURCE_REGION }}
+          E2E_SUITE: ${{ needs.request.outputs.suite }}
+        run: |
+          execution_json="$(gcloud run jobs execute "$E2E_JOB" \
+            --region "$E2E_REGION" \
+            "--args=--suite=$E2E_SUITE" \
+            --async \
+            --format=json)"
+          execution="$(jq -er '.metadata.name // .name' <<<"$execution_json" 2>/dev/null || true)"
+          execution="${execution##*/}"
+          if [[ ! "$execution" =~ ^lagniappe-e2e-[a-z0-9-]*[a-z0-9]$ ]]; then
+            echo "Cloud Run did not identify the hosted execution."
+            exit 2
+          fi
+          echo "execution=$execution" >> "$GITHUB_OUTPUT"
+
+      - name: Download the exact result bundle
+        env:
+          ARTIFACT_BUCKET: ${{ steps.preflight.outputs.artifact_bucket }}
+          EXECUTION: ${{ steps.run.outputs.execution }}
+        run: |
+          result_dir="$RUNNER_TEMP/hosted-e2e/$EXECUTION"
+          mkdir -p "$result_dir"
+          echo "RESULT_DIR=$result_dir" >> "$GITHUB_ENV"
+          manifest_uri="gs://$ARTIFACT_BUCKET/executions/$EXECUTION/manifest.json"
+          manifest_ready=false
+          for ((attempt=1; attempt<=720; attempt++)); do
+            if gcloud storage cp \
+              "$manifest_uri" \
+              "$result_dir/manifest.json" >/dev/null 2>&1; then
+              manifest_ready=true
+              break
+            fi
+            if (( attempt == 1 || attempt % 30 == 0 )); then
+              echo "Waiting for hosted execution $EXECUTION to publish its completion manifest."
+            fi
+            sleep 10
+          done
+          if [[ "$manifest_ready" != "true" ]]; then
+            echo "Hosted execution $EXECUTION did not publish a manifest before its task timeout."
+            exit 1
+          fi
+          for artifact in evidence.json junit.xml reports.tar.gz; do
+            gcloud storage cp \
+              "gs://$ARTIFACT_BUCKET/executions/$EXECUTION/$artifact" \
+              "$result_dir/$artifact"
+          done
+
+      - name: Remove the transient WIF credential
+        run: |
+          credentials_file="${GOOGLE_APPLICATION_CREDENTIALS:-}"
+          if [[ "$credentials_file" != "$GITHUB_WORKSPACE"/gha-creds-*.json ]]; then
+            echo "The WIF credential path was missing or outside the checkout."
+            exit 1
+          fi
+          rm -f -- "$credentials_file"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+
+      - name: Merge hosted evidence
+        env:
+          EXECUTION: ${{ steps.run.outputs.execution }}
+        run: |
+          python -m venv venv
+          venv/bin/python -m pip install --disable-pip-version-check PyYAML==6.0.3
+          venv/bin/python run.py hosted-e2e import-results \
+            --directory "$RESULT_DIR" \
+            --execution "$EXECUTION"
+
+      - name: Commit evidence to the tested branch
+        id: evidence
+        env:
+          BRANCH: ${{ needs.request.outputs.branch }}
+          EXPECTED_SOURCE: ${{ needs.request.outputs.candidate_sha }}
+        run: |
+          while IFS= read -r path; do
+            if [[ -n "$path" && "$path" != "testing/evidence/latest.json" ]]; then
+              echo "Evidence import unexpectedly changed $path."
+              exit 1
+            fi
+          done < <(git diff --name-only)
+          if git diff --quiet -- testing/evidence/latest.json; then
+            echo "Hosted evidence already matches this result."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "evidence_sha=$EXPECTED_SOURCE" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch --no-tags origin "refs/heads/$BRANCH"
+          remote_head="$(git rev-parse FETCH_HEAD)"
+          if [[ "$remote_head" != "$EXPECTED_SOURCE" ]]; then
+            echo "The branch moved to $remote_head while $EXPECTED_SOURCE was tested."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "Updated hosted test evidence"
+          evidence_sha="$(git rev-parse HEAD)"
+          git push origin "HEAD:refs/heads/$BRANCH"
+          git fetch --no-tags origin "refs/heads/$BRANCH"
+          pushed_head="$(git rev-parse FETCH_HEAD)"
+          if [[ "$pushed_head" != "$evidence_sha" ]]; then
+            echo "The branch moved after the evidence push."
+            exit 1
+          fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "evidence_sha=$evidence_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch validation on the evidence child
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.evidence.outputs.changed == 'true' }}
+        env:
+          BRANCH: ${{ needs.request.outputs.branch }}
+          CANDIDATE_SHA: ${{ needs.request.outputs.candidate_sha }}
+          EVIDENCE_SHA: ${{ steps.evidence.outputs.evidence_sha }}
+          GH_TOKEN: ${{ github.token }}
+          PULL_REQUEST: ${{ needs.request.outputs.pull_request }}
+        run: |
+          git fetch --no-tags origin "refs/heads/$BRANCH"
+          remote_head="$(git rev-parse FETCH_HEAD)"
+          if [[ "$remote_head" != "$EVIDENCE_SHA" ]]; then
+            echo "The branch moved to $remote_head before continuation dispatch."
+            exit 1
+          fi
+          gh workflow run hosted-e2e.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$BRANCH" \
+            -f mode=continuation \
+            -f suite=all \
+            -f pull_request="$PULL_REQUEST" \
+            -f candidate_sha="$CANDIDATE_SHA" \
+            -f evidence_sha="$EVIDENCE_SHA"
+
+      - name: Report the hosted suite result
+        if: ${{ always() && steps.run.outputs.execution != '' }}
+        run: |
+          if [[ ! -f "$RESULT_DIR/manifest.json" ]]; then
+            echo "The hosted result manifest was not downloaded."
+            exit 1
+          fi
+          suite_status="$(jq -er '.exit_status' "$RESULT_DIR/manifest.json")"
+          if [[ "$suite_status" != "0" ]]; then
+            echo "The hosted suite failed with status $suite_status."
+            exit "$suite_status"
+          fi
+
+  quality:
+    needs:
+      - request
+      - execute
+    if: >-
+      ${{
+        always() &&
+        (
+          ((github.event_name == 'pull_request' || github.event_name == 'push') &&
+           needs.request.outputs.execute == 'true' &&
+           needs.execute.outputs.evidence_changed != 'true') ||
+          (github.event_name == 'workflow_dispatch' &&
+           inputs.mode == 'continuation')
+        )
+      }}
+    name: ${{ github.event_name == 'workflow_dispatch' && inputs.mode == 'manual' && 'Manual dispatch guard' || 'Source quality and traceability' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    outputs:
+      evidence_sha: ${{ steps.context.outputs.evidence_sha }}
+    permissions:
+      contents: read
+      pull-requests: read
+
+    steps:
+      - name: Resolve and verify the release head
+        id: context
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          DISPATCH_CANDIDATE: ${{ inputs.candidate_sha }}
+          DISPATCH_EVIDENCE: ${{ inputs.evidence_sha }}
+          DISPATCH_PR: ${{ inputs.pull_request }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          HEAD_BRANCH: ${{ github.head_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REQUEST_BASE_SHA: ${{ needs.request.outputs.base_sha }}
+          REQUEST_BRANCH: ${{ needs.request.outputs.branch }}
+          REQUEST_CANDIDATE: ${{ needs.request.outputs.candidate_sha }}
+          REQUEST_EXECUTE: ${{ needs.request.outputs.execute }}
+          REQUEST_PR: ${{ needs.request.outputs.pull_request }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" || "$EVENT_NAME" == "push" ]]; then
+            if [[ "$REQUEST_EXECUTE" != "true" ]]; then
+              echo "The candidate event did not resolve an open release pull request."
+              exit 1
+            fi
+            branch="$REQUEST_BRANCH"
+            candidate_sha="$REQUEST_CANDIDATE"
+            evidence_sha="$REQUEST_CANDIDATE"
+            base_sha="$REQUEST_BASE_SHA"
+            pull_request="$REQUEST_PR"
+          else
+            if [[ "$REF_TYPE" != "branch" || ! "$DISPATCH_PR" =~ ^[1-9][0-9]*$ ]]; then
+              echo "The release continuation requires an exact branch and pull request."
+              exit 1
+            fi
+            if [[ ! "$DISPATCH_CANDIDATE" =~ ^[0-9a-f]{40}$ || ! "$DISPATCH_EVIDENCE" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "The release continuation requires exact commit SHAs."
+              exit 1
+            fi
+            if [[ "$DISPATCH_CANDIDATE" == "$DISPATCH_EVIDENCE" || "$EVENT_SHA" != "$DISPATCH_EVIDENCE" ]]; then
+              echo "The continuation dispatch does not identify its evidence child."
+              exit 1
+            fi
+            pr_json="$(gh api "repos/$REPOSITORY/pulls/$DISPATCH_PR")"
+            state="$(jq -er '.state' <<<"$pr_json")"
+            base_ref="$(jq -er '.base.ref' <<<"$pr_json")"
+            base_sha="$(jq -er '.base.sha' <<<"$pr_json")"
+            branch="$(jq -er '.head.ref' <<<"$pr_json")"
+            head_repository="$(jq -er '.head.repo.full_name' <<<"$pr_json")"
+            head_sha="$(jq -er '.head.sha' <<<"$pr_json")"
+            if [[ "$state" != "open" || "$base_ref" != "main" || "$head_repository" != "$REPOSITORY" ]]; then
+              echo "The continuation no longer identifies an open same-repository release PR."
+              exit 1
+            fi
+            case "$branch" in
+              next/*|hotfix/*) ;;
+              *)
+                echo "The continuation branch is not a release branch."
+                exit 1
+                ;;
+            esac
+            if [[ "$branch" != "$REF_NAME" || "$head_sha" != "$DISPATCH_EVIDENCE" ]]; then
+              echo "The release branch moved before continuation validation."
+              exit 1
+            fi
+            candidate_sha="$DISPATCH_CANDIDATE"
+            evidence_sha="$DISPATCH_EVIDENCE"
+            pull_request="$DISPATCH_PR"
+          fi
+          for revision in "$candidate_sha" "$evidence_sha" "$base_sha"; do
+            if [[ ! "$revision" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Release validation requires exact commit SHAs."
+              exit 1
+            fi
+          done
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "candidate_sha=$candidate_sha" >> "$GITHUB_OUTPUT"
+          echo "evidence_sha=$evidence_sha" >> "$GITHUB_OUTPUT"
+          echo "pull_request=$pull_request" >> "$GITHUB_OUTPUT"
+
+      - name: Check out the verified release head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.context.outputs.evidence_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require successful candidate execution
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        env:
+          EXECUTE_RESULT: ${{ needs.execute.result }}
+        run: |
+          if [[ "$EXECUTE_RESULT" != "success" ]]; then
+            echo "The hosted candidate execution did not complete successfully."
+            exit 1
+          fi
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.14"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+
+      - name: Create the project environment
+        run: |
+          python -m venv venv
+          venv/bin/python -m pip install --disable-pip-version-check -r requirements-dev.txt
+
+      - name: Validate exact hosted release evidence
+        env:
+          BASE_SHA: ${{ steps.context.outputs.base_sha }}
+          CANDIDATE_SHA: ${{ steps.context.outputs.candidate_sha }}
+          EVIDENCE_SHA: ${{ steps.context.outputs.evidence_sha }}
+        run: >-
+          venv/bin/python run.py hosted-e2e validate-release-evidence
+          --base "$BASE_SHA"
+          --candidate "$CANDIDATE_SHA"
+          --evidence "$EVIDENCE_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install locked frontend dependencies
+        run: npm ci
+
+      - name: Check authored frontend source
+        run: npm run check
+
+      - name: Check Python source
+        run: venv/bin/python -m ruff check .
+
+      - name: Check complete release tree
+        env:
+          RELEASE_BASE_REF: ${{ steps.context.outputs.base_sha }}
+        run: venv/bin/python run.py release-check --base "$RELEASE_BASE_REF"
+
+  attest:
+    needs: quality
+    if: ${{ always() && needs.quality.result == 'success' }}
+    name: Publish current-head release status
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      statuses: write
+
+    steps:
+      - name: Publish required current-head status
+        env:
+          EVIDENCE_SHA: ${{ needs.quality.outputs.evidence_sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          STATUS_CONTEXT: Source quality and traceability
+        run: |
+          if [[ ! "$EVIDENCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "The validated release status requires an exact evidence SHA."
+            exit 1
+          fi
+          gh api --method POST "repos/$REPOSITORY/statuses/$EVIDENCE_SHA" \
+            -f state=success \
+            -f context="$STATUS_CONTEXT" \
+            -f description="Exact hosted evidence and release gates passed" \
+            -f target_url="$RUN_URL"

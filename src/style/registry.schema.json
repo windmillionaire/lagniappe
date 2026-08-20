@@ -1,0 +1,18 @@
+{
+	"schema_version": 1,
+	"id_segment_pattern": "^[a-z][A-Za-z0-9]*$",
+	"record_fields": [
+		"alias",
+		"classes",
+		"intent",
+		"surfaces",
+		"markers",
+		"hooks",
+		"css",
+		"exceptions"
+	],
+	"required_metadata": ["intent", "surfaces"],
+	"surfaces": ["server", "frontend"],
+	"exception_fields": ["diagnostic", "target", "reason"],
+	"exception_diagnostics": ["duplicate-style-value"]
+}

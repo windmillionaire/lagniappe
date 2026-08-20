@@ -1,0 +1,200 @@
+{% macro form(task) %}
+  <button class="{{ styles.toggle.container }}"
+          lp-control="form"
+          data-controls="show"
+          lp-show="{{ task.hash }}:TaskForm"
+          type="button"
+          data-kind="form"
+          aria-label="Open task form"
+          title="Open task form">
+    {{ render_icon("form") }}
+  </button>
+{% endmacro %}
+
+{% macro task(task=None) %}
+  <button class="{{ styles.toggle.container }}"
+          lp-control="task"
+          data-controls="show"
+          {% if task is not none %}lp-show="{{ task.hash }}:TaskSettings"{% endif %}
+          type="button"
+          data-kind="task"
+          aria-label="Task settings"
+          title="Task settings">
+    {{ render_icon("settings.page") }}
+  </button>
+{% endmacro %}
+
+{% macro task_history(task) %}
+  <button class="{{ styles.toggle.container }}"
+          lp-control="history"
+          data-controls="show"
+          type="button"
+          lp-show="{{ task.hash }}:TaskHistory"
+          data-kind="task"
+          aria-label="Task history"
+          title="Task history">
+    {{ render_icon("history", styles.toggle.icon.taskHistory) }}
+  </button>
+{% endmacro %}
+
+{% macro task_save(updated) %}
+  <button class="{{ styles.toggle.container }} -translate-x-1"
+          data-saved="{{ updated|yesno }}"
+          data-visible="{{ updated|yesno }}"
+          data-role="save-toggle"
+          type="button"
+          aria-label="{{ 'Saved' if updated else 'Unsaved changes' }}"
+          title="{{ 'Saved' if updated else 'Unsaved changes' }}">
+    {{ render_icon("builder.saved", "icon-lg text-kind-default invisible group-data-[saved=true]/toggle:visible", "saved") }}
+    {{ render_icon("builder.unsaved", "icon-lg text-kind-default invisible group-data-[saved=false]/toggle:visible", "unsaved") }}
+  </button>
+{% endmacro %}
+
+{% macro star(starred) %}
+  <button class="{{ styles.toggle.container }}"
+          lp-control="star"
+          data-kind="starred"
+          data-active="{{ starred|yesno }}"
+          aria-label="{{ 'Unstar' if starred else 'Star' }}"
+          title="{{ 'Unstar' if starred else 'Star' }}">
+    {{ render_icon("star.active", styles.toggle.icon.active) }}
+    {{ render_icon("star.inactive", styles.toggle.icon.inactive) }}
+  </button>
+{% endmacro %}
+
+{% macro column_visibility(label="Toggle column visibility") %}
+  <button class="{{ styles.toggle.container }} hover:outline-2 hover:outline-kind-default"
+          data-active="false"
+          data-toggle="visibility"
+          aria-label="{{ label }}"
+          title="{{ label }}">
+    {{ render_icon("selected", styles.toggle.icon.enabled, "invisible") }}
+    {{ render_icon("unselected", styles.toggle.icon.disabled, "visible") }}
+  </button>
+{% endmacro %}
+
+{% macro filter(label="Sort or filter column", visible=true) %}
+  <button class="{{ styles.toggle.container }} hover:outline-2 hover:outline-kind-default"
+          data-active="false"
+          data-visible="{{ visible|yesno }}"
+          data-toggle="filter"
+          aria-label="{{ label }}"
+          title="{{ label }}">
+    {{ render_icon("filter.active", styles.toggle.icon.disabled) }}
+    {{ render_icon("filter.inactive", styles.toggle.icon.enabled) }}
+  </button>
+{% endmacro %}
+
+{% macro delete(label="Delete") %}
+  <button class="{{ styles.toggle.container }}"
+          lp-control="delete"
+          data-controls="delete"
+          lp-delete
+          data-kind="delete"
+          data-active="false"
+          type="button"
+          aria-label="{{ label }}"
+          title="{{ label }}">
+    {{ render_icon("trash.active", styles.toggle.icon.active) }}
+    {{ render_icon("trash.inactive", styles.toggle.icon.inactive) }}
+  </button>
+{% endmacro %}
+
+{% macro expand() %}
+  <button class="{{ styles.toggle.container }}"
+          data-kind="base"
+          data-open="false"
+          data-visible="true"
+          data-role="expand"
+          type="button"
+          aria-expanded="false"
+          aria-label="Expand"
+          title="Expand">
+    {{ render_icon("expand") }}
+  </button>
+{% endmacro %}
+
+{% macro run(filter) %}
+  <a class="{{ styles.toggle.container }} underline:none"
+     href="{{ url_for('filters.run', key=filter.urlsafe_key) }}"
+     data-active="false"
+     aria-label="Run saved filter"
+     title="Run saved filter">
+    {{ render_icon("run.active", styles.toggle.icon.active) }}
+    {{ render_icon("run.inactive", styles.toggle.icon.inactive) }}
+  </a>
+{% endmacro %}
+
+{% macro close(target=None, visible=True) %}
+  <button class="{{ styles.toggle.container }}"
+          lp-control="close"
+          data-controls="close"
+          lp-close="{{ target or '' }}"
+          type="button"
+          data-kind="close"
+          data-visible="{{ visible|yesno }}"
+          aria-label="Close"
+          title="Close">
+    {{ render_icon("close") }}
+  </button>
+{% endmacro %}
+
+{% macro help(route=None) %}
+  <button class="{{ styles.toggle.container }}"
+          lp-control="help"
+          data-controls="help"
+          lp-help="{{ route }}"
+          type="button"
+          data-kind="help"
+          aria-label="Help"
+          title="Help">
+    {{ render_icon("help") }}
+  </button>
+{% endmacro %}
+
+{% macro filter_list(target="tools:SavedFilters") %}
+  <button class="{{ styles.toggle.container }}"
+          lp-control="filters"
+          lp-show="{{ target }}"
+          data-controls="show"
+          type="button"
+          aria-label="Saved filters"
+          title="Saved filters">
+    {{ render_icon("filter.list") }}
+  </button>
+{% endmacro %}
+
+{% macro reset() %}
+  <button class="{{ styles.toggle.container }}"
+          lp-control="reset"
+          data-controls="show"
+          type="button"
+          aria-label="Reset"
+          title="Reset">
+    {{ render_icon("reset") }}
+  </button>
+{% endmacro %}
+
+{% macro edited_marker(route) %}
+  <div lp-edited-marker
+       data-edited-route="{{ route }}"
+       data-visible="false"
+       aria-live="polite"
+       class="{{ styles.message }} flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+    <span data-role="edited-message">This form changed elsewhere.</span>
+    <button type="button"
+            data-role="edited-reset"
+            class="font-semibold text-kind-default hover:text-kind-dark focus-visible:outline-none focus-visible:underline">
+      Review update
+    </button>
+  </div>
+{% endmacro %}
+
+{% macro page_controls(visible=False) %}
+  <div class="{{ styles.form.header.controls }}"
+       data-visible="{{ visible|yesno }}"
+       data-role="controls">
+    {{ help() }}
+    {{ close() }}
+  </div>
+{% endmacro %}

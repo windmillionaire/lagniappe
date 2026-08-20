@@ -1,0 +1,334 @@
+{% set view_entry = "home" %}
+{% extends "layouts/base.html" %}
+{% import 'home/pages.html' as pages %}
+{% import 'home/projects.html' as project %}
+{% import 'home/categories.html' as category %}
+{% import 'home/tools.html' as tools %}
+{% import 'home/tasks.html' as tasks %}
+{% import 'home/starred.html' as starred %}
+{% import 'home/notes.html' as notes %}
+{% import 'home/directory.html' as directory %}
+
+{% macro links() %}
+  <div class="{{ styles.home.section }}">
+    <a href='{{ url_for("pages.view", key=current_user.page.urlsafe_key) }}'
+       data-kind="user"
+       class="{{ styles.home.toggle }}">
+      <span class="{{ styles.home.toggleLabel }}">
+        {{ render_icon("user", styles.icon.default, kind="user") }}
+        <span>My Page</span>
+      </span>
+      <div data-visible="false" data-role="user-task-count"></div>
+    </a>
+    <div id="starred"
+         lp-component
+         data-open="false"
+         data-kind="starred"
+         data-persistent="true"
+         class="{{ styles.home.component }}">
+      <button type="button"
+              lp-show="starred:StarredList"
+              data-toggle="true"
+              class="{{ styles.home.listToggle }}">
+        <span class="{{ styles.home.toggleLabel }}">
+          {{ render_icon("star.home", styles.icon.default) }}
+          <span>{{ home.starred.label }}</span>
+        </span>
+        <div class="{{ styles.home.count }} group-data-[loading=true]/list-toggle:hidden"
+             data-role="starred-count">{{ home.starred.count }}</div>
+        <span class="{{ styles.home.loading }}"
+              aria-live="polite"
+              data-role="list-loading"
+              data-indicator="StarredList">
+          {{ render_icon("spinner") }}
+          <span class="sr-only">Loading</span>
+        </span>
+      </button>
+      <ul lp-load
+          data-widget="StarredList"
+          data-visible="false"
+          data-route='{{ url_for("internal.get", kind="starred") }}'>
+      </ul>
+    </div>
+    <div id="directory"
+         loaded
+         lp-component
+         data-open="false"
+         data-kind="page"
+         data-persistent="true"
+         class="{{ styles.home.component }}">
+      <button type="button"
+              lp-show="directory:DirectoryList"
+              data-toggle="true"
+              class="{{ styles.home.toggle }}">
+        <span class="{{ styles.home.toggleLabel }}">
+          {{ render_icon("directory", styles.icon.default) }}
+          <span>Directory</span>
+        </span>
+      </button>
+      {{ directory.list() }}
+    </div>
+    <a href='{{ url_for("manual.index") }}'
+       data-kind="page"
+       class="{{ styles.home.toggle }}">
+      <span class="{{ styles.home.toggleLabel }}">
+        {{ render_icon("manual", styles.icon.default) }}
+        <span>Manual</span>
+      </span>
+    </a>
+    {% if current_user.access(AI.ASK) %}
+      <div id="tools"
+           lp-component
+           data-open="false"
+           data-kind="default"
+           data-persistent="true"
+           class="{{ styles.home.component }}">
+        <div class="flex flex-row gap-4">
+          <button type="button"
+                  lp-show="tools:ToolReportList"
+                  data-toggle="true"
+                  class="{{ styles.home.listToggle }}">
+            <span class="{{ styles.home.toggleLabel }}">
+              {{ render_icon("generate", styles.icon.default) }}
+              <span>{{ home.tools.label }}</span>
+            </span>
+            <span class="{{ styles.home.loading }}"
+                  aria-live="polite"
+                  data-role="list-loading"
+                  data-indicator="ToolReportList">
+              {{ render_icon("spinner") }}
+              <span class="sr-only">Loading</span>
+            </span>
+          </button>
+          <button type="button"
+                  lp-show="tools:CreateToolReport"
+                  data-toggle="true"
+                  aria-label="Create tool report"
+                  title="Create tool report"
+                  class="{{ styles.home.create }}">{{ render_icon("plus", styles.icon.default) }}</button>
+        </div>
+        {{ tools.create_report() }}
+        <ul lp-load
+            data-widget="ToolReportList"
+            data-route='{{ url_for("internal.get", kind="tools") }}'
+            data-if-empty="CreateToolReport"
+            data-visible="false">
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro create() %}
+  {% set can_create_pages = current_user.properties.restrictions.category_edit_restrictions %}
+  <div class="{{ styles.home.section }}">
+    <div id="pages"
+         lp-component
+         data-open="false"
+         data-persistent="true"
+         data-kind="page"
+         class="{{ styles.home.component }}">
+      <div class="flex flex-row gap-4">
+        <button type="button"
+                lp-show="pages:HomePageList"
+                data-toggle="true"
+                class="{{ styles.home.listToggle }}">
+          <span class="{{ styles.home.toggleLabel }}">
+            {{ render_icon("page", styles.icon.default) }}
+            <span>{{ home.pages.label }}</span>
+          </span>
+          <span class="{{ styles.home.loading }}"
+                aria-live="polite"
+                data-role="list-loading"
+                data-indicator="HomePageList">
+            {{ render_icon("spinner") }}
+            <span class="sr-only">Loading</span>
+          </span>
+        </button>
+        {% if can_create_pages %}
+          <button type="button"
+                  lp-show="pages:CreatePage"
+                  data-toggle="true"
+                  aria-label="Create page"
+                  title="Create page"
+                  class="{{ styles.home.create }}">{{ render_icon("plus", styles.icon.default) }}</button>
+        {% endif %}
+      </div>
+      {% if can_create_pages %}{{ pages.create() }}{% endif %}
+      <ul lp-load
+          data-widget="HomePageList"
+          data-route='{{ url_for("internal.get", kind="pages") }}'
+          data-if-empty="{{ 'CreatePage' if can_create_pages else '' }}"
+          data-visible="false">
+      </ul>
+    </div>
+    <div id="notes"
+         lp-component
+         lp-prefetch
+         data-open="false"
+         data-persistent="true"
+         data-kind="note"
+         class="{{ styles.home.component }}">
+      <div class="flex flex-row gap-4">
+        <button type="button"
+                lp-show="notes:HomeActivityList"
+                data-toggle="true"
+                class="{{ styles.home.listToggle }}">
+          <span class="{{ styles.home.toggleLabel }}">
+            {{ render_icon("notes", styles.icon.default) }}
+            <span>Notes</span>
+          </span>
+          <span class="{{ styles.home.loading }}"
+                aria-live="polite"
+                data-role="list-loading"
+                data-indicator="HomeActivityList">
+            {{ render_icon("spinner") }}
+            <span class="sr-only">Loading</span>
+          </span>
+        </button>
+        <button type="button"
+                lp-show="notes:CreateNote"
+                data-toggle="true"
+                aria-label="Add note"
+                title="Add note"
+                class="{{ styles.home.create }}">{{ render_icon("plus", styles.icon.default) }}</button>
+      </div>
+      {{ notes.add_note_form() }}
+      {{ notes.list(home.notes, poll_revisions['home-notes']) }}
+    </div>
+    <div id="tasks"
+         lp-component
+         lp-prefetch
+         data-open="false"
+         data-persistent="true"
+         data-kind="task"
+         class="{{ styles.home.component }}">
+      <div class="flex flex-row gap-4">
+        <button type="button"
+                lp-show="tasks:HomeTaskList"
+                data-toggle="true"
+                aria-busy="true"
+                disabled
+                class="{{ styles.home.toggle }}">
+          <span class="{{ styles.home.toggleLabel }}">
+            {{ render_icon("tasks", styles.icon.default) }}
+            <span>{{ home.tasks.label }}</span>
+          </span>
+          <div class="{{ styles.home.count }}"
+               aria-live="polite"
+               data-role="task-count">...</div>
+        </button>
+        <button type="button"
+                lp-show="tasks:CreateUserTask"
+                data-toggle="true"
+                aria-label="Create task"
+                title="Create task"
+                class="{{ styles.home.create }}">{{ render_icon("plus", styles.icon.default) }}</button>
+      </div>
+      {{ tasks.create() }}
+      <ul lp-prefetch
+          data-widget="HomeTaskList"
+          data-route='{{ url_for("internal.get", kind="tasks") }}'
+          data-if-empty="CreateUserTask"
+          data-poll-channel="tasks"
+          data-poll-revision="{{ poll_revisions['tasks'] }}"
+          data-visible="false">
+      </ul>
+    </div>
+    <div id="projects"
+         lp-component
+         data-open="false"
+         data-persistent="true"
+         data-kind="project"
+         class="{{ styles.home.component }}">
+      <div class="flex flex-row gap-4">
+        <button type="button"
+                lp-show="projects:HomeProjectList"
+                data-toggle="true"
+                class="{{ styles.home.listToggle }}">
+          <span class="{{ styles.home.toggleLabel }}">
+            {{ render_icon("project", styles.icon.default) }}
+            <span>{{ home.projects.label }}</span>
+          </span>
+          <span class="{{ styles.home.loading }}"
+                aria-live="polite"
+                data-role="list-loading"
+                data-indicator="HomeProjectList">
+            {{ render_icon("spinner") }}
+            <span class="sr-only">Loading</span>
+          </span>
+        </button>
+        {% if Resource.PROJECT.allowed(Action.CREATE) %}
+          <button type="button"
+                  lp-show="projects:CreateProject"
+                  data-toggle="true"
+                  aria-label="Create project"
+                  title="Create project"
+                  class="{{ styles.home.create }}">{{ render_icon("plus", styles.icon.default) }}</button>
+        {% endif %}
+      </div>
+      {% if Resource.PROJECT.allowed(Action.CREATE) %}{{ project.create(home.projects.attributes) }}{% endif %}
+      <ul lp-load
+          data-widget="HomeProjectList"
+          data-route='{{ url_for("internal.get", kind="projects") }}'
+          data-if-empty="{{ 'CreateProject' if Resource.PROJECT.allowed(Action.CREATE) else '' }}"
+          data-visible="false">
+      </ul>
+    </div>
+    <div id="categories"
+         lp-component
+         data-open="false"
+         data-persistent="true"
+         data-kind="category"
+         class="{{ styles.home.component }}">
+      <div class="flex flex-row gap-4">
+        <button type="button"
+                lp-show="categories:HomeCategoryList"
+                data-toggle="true"
+                class="{{ styles.home.listToggle }}">
+          <span class="{{ styles.home.toggleLabel }}">
+            {{ render_icon("category", styles.icon.default) }}
+            <span>{{ home.categories.label }}</span>
+          </span>
+          <span class="{{ styles.home.loading }}"
+                aria-live="polite"
+                data-role="list-loading"
+                data-indicator="HomeCategoryList">
+            {{ render_icon("spinner") }}
+            <span class="sr-only">Loading</span>
+          </span>
+        </button>
+        {% if Resource.CATEGORY.allowed(Action.CREATE) %}
+          <button type="button"
+                  lp-show="categories:CreateCategory"
+                  data-toggle="true"
+                  aria-label="Create category"
+                  title="Create category"
+                  class="{{ styles.home.create }}">{{ render_icon("plus", styles.icon.default) }}</button>
+        {% endif %}
+      </div>
+      {% if Resource.CATEGORY.allowed(Action.CREATE) %}{{ category.create(home.categories.attributes) }}{% endif %}
+      <ul lp-load
+          data-widget="HomeCategoryList"
+          data-route='{{ url_for("internal.get", kind="categories") }}'
+          data-if-empty="{{ 'CreateCategory' if Resource.CATEGORY.allowed(Action.CREATE) else '' }}"
+          data-visible="false">
+      </ul>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro main() %}
+  <div lp-view data-kind="home" class="{{ styles.home.view }}">
+    <div class="{{ styles.home.column }}">{{ create() }}</div>
+    <div class="{{ styles.home.column }}">{{ links() }}</div>
+  </div>
+{% endmacro %}
+
+{% block title %}
+  Home
+{% endblock title %}
+
+{% block content %}
+  {{ main() }}
+{% endblock content %}

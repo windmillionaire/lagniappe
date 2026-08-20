@@ -1,0 +1,14 @@
+[
+	{
+		"id": "select-ab12",
+		"type": "select",
+		"title": "Select Field",
+		"multiple": true,
+		"separator": ",",
+		"options": [
+			{ "value": "red", "label": "Red" },
+			{ "value": "green", "label": "Green" },
+			{ "value": "blue", "label": "Blue" }
+		]
+	}
+]

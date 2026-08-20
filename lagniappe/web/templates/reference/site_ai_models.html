@@ -1,0 +1,25 @@
+{% from "manual/macros.html" import callout, subheading %}
+{% from "reference/macros.html" import modal %}
+{% call modal("AI Models") %}
+  <p class="text-sm text-base-dark">
+    AI model settings choose which Gemini models Lagniappe uses for high-value generation, low-cost utility tasks, and image generation. The app keeps the global endpoint because it is the best pay-as-you-go option for reducing regional quota pressure.
+  </p>
+  {% call callout("warning") %}
+    Saving these settings does not redeploy immediately. They take effect the next time you run <code>./setup.sh update</code> and deploy the app.
+  {% endcall %}
+  {{ subheading("Primary") }}
+  <p class="text-sm text-base-dark">
+    The primary model handles Organize, Create, Ask, page, category, and form-schema generation, form autofill, document text, and tool-backed prompts. Choose capability over cost here unless you have tested your workflows on a cheaper model.
+  </p>
+  {{ subheading("Utility") }}
+  <p class="text-sm text-base-dark">
+    The utility model handles short parsing and summarization tasks: scheduling, image aspect ratio choice, and file summaries. Flash-Lite is usually a reasonable cost-saving default for this tier.
+  </p>
+  {{ subheading("Image") }}
+  <p class="text-sm text-base-dark">
+    The image model is used for generated page visuals. Image pricing and availability change separately from text models, so use the pricing link when comparing options.
+  </p>
+  {% call callout("tip") %}
+    If a saved model is not in the discovered list, Lagniappe keeps it as a current custom model so existing installations are not stranded by catalog changes.
+  {% endcall %}
+{% endcall %}

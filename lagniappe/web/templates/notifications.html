@@ -1,0 +1,97 @@
+{% from "common.html" import url %}
+
+{% macro item(notification) %}
+  {% set target = notification.properties.target.column_value %}
+  {% set target_entity = notification.properties.target.value %}
+  {% set is_report = target and target.kind == "report" %}
+  {% set report_tool = target_entity.tool|capitalize if is_report and target_entity.tool else none %}
+  {% set report_name = target.name.split(":", 1) if report_tool and target.name.startswith(report_tool ~ ":") else [] %}
+  {% set report_summary = target_entity.summary if is_report and not notification.pending else none %}
+  <div role="option"
+       data-key="{{ notification.urlsafe_key }}"
+       class="{{ styles.dropdown.search.result }} relative text-base-default">
+    <div class="absolute right-2 top-1 flex items-center">
+      <button class="{{ styles.toggle.container }} shrink-0"
+              data-kind="delete"
+              data-active="false"
+              data-action="delete-notification"
+              data-key="{{ notification.urlsafe_key }}"
+              type="button"
+              aria-label="Delete notification"
+              title="Delete notification">
+        {{ render_icon("trash.active", styles.toggle.icon.active) }}
+        {{ render_icon("trash.inactive", styles.toggle.icon.inactive) }}
+      </button>
+    </div>
+    <div class="whitespace-normal break-words pr-8 text-sm leading-snug [overflow-wrap:anywhere]">
+      {% if notification.pending %}{{ render_icon("spinner", "mr-1") }}{% endif %}
+      {% if target %}
+        <a href="{{ url(target) }}"
+           data-role="target"
+           data-kind="{{ target.kind }}"
+           class="{{ styles.link.title }}">
+          {%- if report_name|length == 2 -%}
+            <span data-role="report-tool" class="font-normal">{{ report_name[0] }}</span>
+            <span data-role="report-title">{{ report_name[1]|trim }}</span>
+          {%- else -%}
+            {{- target.name -}}
+          {%- endif -%}
+        </a>{% if not is_report %}:{% endif %}
+      {% endif %}
+      <span class="{{ 'block' if is_report }}" data-role="notification-body">{{ notification.body }}</span>
+      {% if report_summary and report_summary != notification.body %}
+        <span class="mt-0.5 block line-clamp-2 text-base-medium"
+              data-role="report-summary">{{ report_summary }}</span>
+      {% endif %}
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro aggregate_item(aggregate) %}
+  {% if aggregate.unread_message_count %}
+    <div role="option"
+         data-key="__message_aggregate__"
+         data-action="open-messages"
+         class="{{ styles.dropdown.search.result }} text-base-default">
+      <a href="/messages" class="block whitespace-normal text-sm font-medium">
+        {{ render_icon("email", styles.dropdown.icon) }}
+        {{ aggregate.unread_message_count }} new message{{ '' if aggregate.unread_message_count == 1 else 's' }}
+      </a>
+    </div>
+  {% endif %}
+{% endmacro %}
+
+{% macro list(notifications, aggregate, cursor=None, can_message=False) %}
+  {% if can_message %}
+    <button role="option"
+            type="button"
+            data-key="__message_user__"
+            data-action="message-user"
+            class="{{ styles.dropdown.option.action }}">
+      {{ render_icon("email", styles.dropdown.icon) }}
+      <span>Message a user</span>
+    </button>
+  {% endif %}
+  {{ aggregate_item(aggregate) }}
+  {% for notification in notifications %}{{ item(notification) }}{% endfor %}
+  {% if cursor %}
+    <button role="option"
+            type="button"
+            data-key="__load_notifications__"
+            data-cursor="{{ cursor }}"
+            data-action="load-notifications"
+            class="{{ styles.dropdown.option.action }}">
+      {{ render_icon("next", styles.dropdown.icon) }}
+      <span>Load older notifications</span>
+    </button>
+  {% endif %}
+{% endmacro %}
+
+{% macro processing_offline() %}
+  <div role="option"
+       class="{{ styles.dropdown.option.action }} text-base-default font-medium"
+       id="offline-processing">
+    {{ render_icon("spinner") }}
+    Processing offline...
+  </div>
+{% endmacro %}

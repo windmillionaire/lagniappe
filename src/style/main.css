@@ -1,0 +1,189 @@
+@import "tailwindcss";
+@import "./fonts.css";
+@import "./editor.css";
+@import "./kinds.css";
+@import "./base.css";
+@import "./interaction.css";
+@import "./media.css";
+@import "./motion.css";
+@import "./navigation.css";
+@import "./tables.css";
+@import "./forms.css";
+@import "./state.css";
+@import "./attributes.css";
+@import "./buttons.css";
+@import "./links.css";
+@import "./content.css";
+
+@source "./styles.yaml";
+
+@theme {
+	--font-sans: "Source Sans 3", sans-serif;
+	--font-serif: Bitter, serif;
+	--font-mono: ui-monospace, monospace;
+
+	/* Projects */
+	--color-project-bg: oklch(0.96 0.025 155);
+	--color-project-light: oklch(0.8 0.1 155);
+	--color-project-default: oklch(0.45 0.14 155);
+	--color-project-dark: oklch(0.35 0.11 155);
+
+	/* Pages */
+	--color-page-bg: oklch(0.95 0.02 240);
+	--color-page-light: oklch(0.78 0.08 240);
+	--color-page-default: oklch(0.45 0.14 240);
+	--color-page-dark: oklch(0.35 0.11 240);
+
+	/* Forms */
+	--color-form-bg: oklch(0.95 0.025 42);
+	--color-form-light: oklch(0.78 0.07 42);
+	--color-form-default: oklch(0.48 0.11 40);
+	--color-form-dark: oklch(0.38 0.09 40);
+
+	/* Categories */
+	--color-category-bg: oklch(0.95 0.02 293);
+	--color-category-light: oklch(0.78 0.08 293);
+	--color-category-default: oklch(0.45 0.14 293);
+	--color-category-dark: oklch(0.35 0.11 293);
+
+	/* Delete */
+	--color-delete-bg: oklch(0.95 0.025 25);
+	--color-delete-light: oklch(0.78 0.09 25);
+	--color-delete-default: oklch(0.48 0.18 25);
+	--color-delete-dark: oklch(0.38 0.14 25);
+
+	/* Tasks */
+	--color-task-bg: oklch(0.95 0.05 35);
+	--color-task-light: oklch(0.78 0.12 35);
+	--color-task-default: oklch(0.52 0.19 35);
+	--color-task-dark: oklch(0.42 0.16 35);
+
+	/* Users */
+	--color-user-bg: oklch(0.96 0.03 190);
+	--color-user-light: oklch(0.78 0.08 190);
+	--color-user-default: oklch(0.55 0.12 190);
+	--color-user-dark: oklch(0.4 0.1 190);
+
+	/* Notes */
+	--color-note-bg: oklch(0.96 0.05 92);
+	--color-note-light: oklch(0.85 0.14 92);
+	--color-note-default: oklch(0.72 0.16 90);
+	--color-note-dark: oklch(0.58 0.14 88);
+
+	/* Files */
+	--color-file-bg: oklch(0.96 0.01 255);
+	--color-file-light: oklch(0.8 0.02 255);
+	--color-file-default: oklch(0.48 0.03 255);
+	--color-file-dark: oklch(0.36 0.03 255);
+
+	/* Default */
+	--color-base-bg: oklch(0.96 0.005 260);
+	--color-base-light: oklch(0.68 0.01 260);
+	--color-base-medium: oklch(0.52 0.015 260);
+	--color-base-default: oklch(0.28 0.02 260);
+	--color-base-dark: oklch(0.18 0.02 260);
+}
+
+/* Kind-based utilities using the active semantic kind variables. */
+
+/* Background utilities */
+
+@utility bg-kind-bg {
+	background-color: var(--kind-bg);
+}
+
+@utility bg-kind-light {
+	background-color: var(--kind-light);
+}
+
+@utility bg-kind-default {
+	background-color: var(--kind-default);
+}
+
+@utility bg-kind-dark {
+	background-color: var(--kind-dark);
+}
+
+/* Text utilities */
+
+@utility text-kind-default {
+	color: var(--kind-default);
+}
+
+@utility text-kind-dark {
+	color: var(--kind-dark);
+}
+
+/* Outline utilities */
+
+@utility outline-kind-light {
+	outline-color: var(--kind-light);
+}
+
+@utility outline-kind-default {
+	outline-color: var(--kind-default);
+	outline-style: solid;
+	outline-width: 2px;
+}
+
+@utility outline-kind-dark {
+	outline-color: var(--kind-dark);
+}
+
+/* Ring utilities */
+
+@utility ring-kind-bg {
+	--tw-ring-color: var(--kind-bg);
+}
+
+@utility ring-kind-light {
+	--tw-ring-color: var(--kind-light);
+}
+
+@utility ring-kind-default {
+	--tw-ring-color: var(--kind-default);
+}
+
+@utility ring-kind-dark {
+	--tw-ring-color: var(--kind-dark);
+}
+
+/* Border utilities */
+
+@utility border-kind-bg {
+	border-color: var(--kind-bg);
+}
+
+@utility border-kind-light {
+	border-color: var(--kind-light);
+}
+
+@utility border-kind-default {
+	border-color: var(--kind-default);
+}
+
+@utility border-kind-dark {
+	border-color: var(--kind-dark);
+}
+
+@utility divide-x-kind-bg {
+	:where(& > :not(:last-child)) {
+		--tw-divide-x-reverse: 0;
+		border-inline-style: var(--tw-border-style);
+		border-inline-start-width: calc(1px * var(--tw-divide-x-reverse));
+		border-inline-end-width: calc(1px * calc(1 - var(--tw-divide-x-reverse)));
+		border-inline-start-color: var(--kind-bg);
+		border-inline-end-color: var(--kind-bg);
+	}
+}
+
+@utility divide-y-kind-light {
+	:where(& > :not(:last-child)) {
+		--tw-divide-y-reverse: 0;
+		border-bottom-style: var(--tw-border-style);
+		border-top-style: var(--tw-border-style);
+		border-top-width: calc(1px * var(--tw-divide-y-reverse));
+		border-bottom-width: calc(1px * calc(1 - var(--tw-divide-y-reverse)));
+		border-bottom-color: var(--kind-light);
+	}
+}

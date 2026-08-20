@@ -1,0 +1,111 @@
+{% import 'controls.html' as controls %}
+
+{% macro visibility_selector(allow_everyone=true) %}
+  <fieldset class="flex flex-col gap-2">
+    <legend class="text-sm font-semibold text-note-dark">Who can see this?</legend>
+    <div class="grid grid-cols-1 gap-2 {{ 'sm:grid-cols-2' if allow_everyone else '' }}">
+      {% if allow_everyone %}
+        <label class="flex cursor-pointer items-center gap-2 rounded-md bg-white/70 px-3 py-2 text-sm font-medium text-base-dark outline outline-note-light has-checked:bg-white has-checked:outline-2 has-checked:outline-note-default">
+          <input type="radio"
+                 name="visibility"
+                 value="everyone"
+                 class="accent-note-dark">
+          <span class="inline-flex items-center gap-1">
+            {{ render_icon("group", "text-note-dark") }}
+            <span>Show for everyone</span>
+          </span>
+        </label>
+      {% endif %}
+      <label class="flex cursor-pointer items-center gap-2 rounded-md bg-white/70 px-3 py-2 text-sm font-medium text-base-dark outline outline-note-light has-checked:bg-white has-checked:outline-2 has-checked:outline-note-default">
+        <input type="radio"
+               name="visibility"
+               value="private"
+               class="accent-note-dark"
+               checked>
+        <span class="inline-flex items-center gap-1">
+          {{ render_icon("private", "text-note-dark") }}
+          <span>Only I can see this</span>
+        </span>
+      </label>
+    </div>
+  </fieldset>
+{% endmacro %}
+
+{% macro composer(route, destination, close_target, surface="home", offline=false) %}
+  <form lp-create
+        {% if offline %}lp-offline{% endif %}
+        data-widget="CreateNote"
+        data-route="{{ route }}"
+        data-destination="{{ destination }}"
+        data-surface="{{ surface }}"
+        data-visible="false"
+        class="{{ styles.note.form[surface] }}">
+    <div data-role="header" class="{{ styles.form.header.container }}">
+      <h2 class="{{ styles.form.header.title }}" data-role="title">New Note</h2>
+      <div class="{{ styles.form.header.controls }}" data-role="controls">{{ controls.close(close_target) }}</div>
+    </div>
+    <textarea name="body"
+              rows="{{ 5 if surface == 'page' else 3 }}"
+              class="{{ styles.textarea }} {{ styles.note.textarea[surface] }}"
+              placeholder="Write a note..."></textarea>
+    <div class="flex flex-col gap-3">
+      <div class="flex flex-wrap items-center gap-3">
+        <button type="button"
+                data-action="add-photo"
+                class="inline-flex items-center gap-1 text-sm font-semibold text-note-dark">
+          {{ render_icon("image") }}
+          <span>Add photo</span>
+        </button>
+        <span class="text-xs text-base-medium">You can add text, a photo, or both.</span>
+      </div>
+      <div data-role="photo-selection"
+           data-visible="false"
+           class="hidden items-center gap-3 rounded-md border border-note-light bg-white/70 p-2 data-[visible=true]:flex">
+        <img data-role="photo-preview"
+             src=""
+             alt="Selected note photo preview"
+             class="size-16 rounded-md object-cover">
+        <span data-role="photo-name" class="min-w-0 flex-1 truncate text-sm text-base-dark"></span>
+        <button type="button"
+                data-action="remove-photo"
+                class="rounded-md px-2 py-1 text-sm font-semibold text-delete-default hover:bg-white">
+          Remove
+        </button>
+      </div>
+      <input type="file"
+             name="note-file"
+             accept="image/*"
+             class="hidden"
+             data-role="photo-input">
+    </div>
+    {{ visibility_selector(surface != "home" or Resource.SITE.allowed(Action.EDIT)) }}
+    <button type="submit" class="{{ styles.button.submit }}">
+      <span data-role="text">Add Note</span>
+    </button>
+  </form>
+{% endmacro %}
+
+{% macro note_item(note, surface="home") %}
+  {% set photo = note.properties.get("photo").value if note.properties.get("photo") else none %}
+  <li data-key="{{ note.urlsafe_key }}"
+      data-kind="note"
+      data-scope="{{ note.scope }}"
+      data-visibility="{{ note.visibility }}"
+      data-fingerprint="{{ note.fingerprint }}"
+      lp-entity
+      class="{{ styles.note.item[surface] }}">
+    <div class="{{ styles.note.content }}">
+      {% if note.body %}<p class="{{ styles.note.body }}">{{ note.body }}</p>{% endif %}
+      {% if photo %}<img src="{{ photo.url }}" class="{{ styles.note.photo[surface] }}" alt="">{% endif %}
+      <div class="{{ styles.note.meta }}">
+        {% if note.user %}<span class="font-semibold text-note-dark">{{ note.user.name }}</span>{% endif %}
+        {% if note.created %}<span>{{ note.created|format_date }}</span>{% endif %}
+        <span class="inline-flex items-center gap-1">
+          {{ render_icon("public" if note.visibility == 'everyone' else "private") }}
+          {{ "Everyone" if note.visibility == "everyone" else "Private" }}
+        </span>
+      </div>
+    </div>
+    {% if note.allowed(Action.DELETE) %}{{ controls.delete("Delete note") }}{% endif %}
+  </li>
+{% endmacro %}

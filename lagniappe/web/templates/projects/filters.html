@@ -1,0 +1,44 @@
+{% from 'filters.html' import filter_form, filter_item %}
+
+{% macro saved_filters(project, filters=None) %}
+  <ul lp-load
+      data-widget="SavedFilters"
+      data-role="saved-filters"
+      data-route='{{ url_for("filters.get", key=project.urlsafe_key) }}'
+      data-visible="true"
+      data-persistent="true"
+      data-kind="task"
+      class="flex flex-col gap-2 mx-2 mb-2">
+    {%- if filters -%}
+      {%- for filter in filters %}{{ filter_item(filter) }}
+      {% endfor -%}
+    {%- endif -%}
+  </ul>
+{% endmacro %}
+
+{% macro task_filters(project) %}
+  <div id="filters"
+       lp-component
+       data-visible="false"
+       data-tab="true"
+       data-title="Task Filters"
+       data-default="Filters"
+       class="pt-4 sm:pt-0">
+    <form data-widget="Filters"
+          data-conditions='{{ project.properties.filters.preload|tojson }}'
+          data-readonly="false"
+          data-title="Task Filters"
+          data-visible="true"
+          data-persistent="true"
+          class="{{ styles.form.default }}">
+      {{ filter_form(project) }}
+    </form>
+    <div data-reset="filters:Filters"
+         data-title="Matching Tasks"
+         data-widget="FilterResults"
+         data-visible="false"
+         data-kind="task"
+         class="flex flex-col gap-4 mx-2 mb-2"></div>
+    {{ saved_filters(project) }}
+  </div>
+{% endmacro %}

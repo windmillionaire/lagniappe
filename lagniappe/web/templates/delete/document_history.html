@@ -1,0 +1,38 @@
+{% from "layouts/delete.html" import delete_action with context %}
+
+{% macro confirmation(entity, unpinned_count) %}
+  <div id="modal" class="{{ styles.modal.wrapper }}">
+    <div class="{{ styles.modal.content }} max-w-sm" id="modal-content">
+      <div class="{{ styles.modal.header }}">
+        <h2 class="text-xl font-bold text-base-dark">
+          {{ render_icon("error", "text-delete-default mr-2") }}
+          Clear Unpinned Versions
+        </h2>
+        <button lp-control="close"
+                data-controls="close"
+                lp-close=""
+                class="{{ styles.button.close }}">Cancel</button>
+      </div>
+      <div class="p-6">
+        <div class="space-y-6">
+          <section>
+            <div class="bg-delete-bg border border-delete-light rounded-lg p-4 mb-4">
+              <p class="text-delete-default text-sm">
+                Are you sure you want to clear {{ unpinned_count }} unpinned
+                {{ "version" if unpinned_count == 1 else "versions" }}?
+                Pinned versions and the current document will not be changed.
+              </p>
+            </div>
+          </section>
+          <div class="{{ styles.modal.actions }}">
+            {{ delete_action(
+              url_for('assets.unpinned_document_history', key=entity.urlsafe_key),
+              "Clear " ~ unpinned_count ~ " Unpinned " ~ ("Version" if unpinned_count == 1 else "Versions"),
+              disabled=not unpinned_count,
+            ) }}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endmacro %}

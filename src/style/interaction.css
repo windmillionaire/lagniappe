@@ -1,0 +1,75 @@
+/* ==========================================================================
+   INTERACTIVE ELEMENTS
+   Touch and selection handling for buttons, inputs, links
+   ========================================================================== */
+
+button,
+input,
+select,
+textarea,
+a,
+[role="button"],
+[tabindex] {
+	touch-action: manipulation;
+}
+
+button,
+[role="button"] {
+	-webkit-touch-callout: none;
+	-webkit-user-select: none;
+	user-select: none;
+}
+
+/* @style home.generate */
+.home-generate-button {
+	container-type: inline-size;
+}
+
+/* @style home.generate */
+.home-generate-button > span:not(.icon) {
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+@container (max-width: 7.5rem) {
+	/* @style home.generate */
+	.home-generate-button > span:not(.icon) {
+		display: none;
+	}
+}
+
+/* @style index.tools.selector.show */
+.loader {
+	position: relative;
+	&::before {
+		content: "";
+		position: absolute;
+		inset: 0;
+		border: 2px solid currentColor;
+		border-radius: inherit;
+		pointer-events: none;
+	}
+	&:disabled {
+		pointer-events: none;
+		animation: loader-pulse 1.5s ease-in-out infinite;
+	}
+	&:focus-visible:not(:disabled),
+	&:hover:not(:disabled) {
+		color: var(--kind-dark);
+	}
+}
+
+@keyframes loader-pulse {
+	0%,
+	100% {
+		color: var(--kind-dark);
+	}
+	33% {
+		color: var(--kind-default);
+	}
+	66% {
+		color: var(--kind-light);
+	}
+}

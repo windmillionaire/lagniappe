@@ -1,0 +1,43 @@
+[
+	{
+		"id": "textarea-notesab",
+		"type": "textarea",
+		"title": "Notes"
+	},
+	{
+		"id": "checkbox-activecd",
+		"type": "checkbox",
+		"title": "Is Active"
+	},
+	{
+		"id": "radio-priorityef",
+		"type": "radio",
+		"title": "Priority",
+		"options": [
+			{ "label": "Low", "value": "low" },
+			{ "label": "Medium", "value": "medium" },
+			{ "label": "High", "value": "high" }
+		]
+	},
+	{
+		"id": "select-statusgh",
+		"type": "select",
+		"title": "Status",
+		"options": [
+			{ "label": "Draft", "value": "draft" },
+			{ "label": "Published", "value": "published" },
+			{ "label": "Archived", "value": "archived" }
+		]
+	},
+	{
+		"id": "select-tagsij12",
+		"type": "select",
+		"title": "Tags",
+		"multiple": true,
+		"options": [
+			{ "label": "Featured", "value": "featured" },
+			{ "label": "New", "value": "new" },
+			{ "label": "Sale", "value": "sale" }
+		]
+	}
+]

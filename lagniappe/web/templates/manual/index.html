@@ -1,0 +1,71 @@
+{% set view_entry = "manual" %}
+{% extends "layouts/base.html" %}
+{% from "common.html" import home %}
+
+{% macro breadcrumbs() %}
+  <nav class="flex" data-role="breadcrumbs">
+    <ol role="list" class="flex items-center space-x-2">
+      <li class="flex items-center">
+        <span data-role="title"
+              class="text-lg font-semibold text-page-default"
+              aria-current="page">Manual</span>
+      </li>
+    </ol>
+  </nav>
+{% endmacro %}
+
+{% macro nav_column(sections) %}
+  <nav class="hidden sm:block">
+    <ul class="space-y-3">
+      {% for section in sections %}
+        <li>
+          <button data-section="{{ section.key }}"
+                  class="{{ styles.manual.navButton }}">
+            {{ render_icon((section.icon), "text-kind-default", section.kind) }}
+            <span>{{ section.name }}</span>
+          </button>
+        </li>
+      {% endfor %}
+    </ul>
+  </nav>
+{% endmacro %}
+
+{% macro mobile_nav(sections) %}
+  <div class="sm:hidden flex flex-col mb-4">
+    <button id="manual-nav-button"
+            data-sections='{{ sections | tojson }}'
+            class="mt-4 flex flex-row items-center rounded-md px-3 py-1.5 font-semibold shadow-sm outline gap-2 w-full focus-visible:outline-2 hover:outline-2 bg-white hover:bg-page-bg outline-base-light text-base-dark focus-visible:outline-page-default hover:outline-page-default justify-between">
+      <span class="flex items-center">
+        {{ render_icon("columns", "mr-2") }}
+        Navigate to section...
+      </span>
+      {{ render_icon("menu") }}
+    </button>
+  </div>
+{% endmacro %}
+
+{% macro main() %}
+  <div id="manual-page"
+       lp-view
+       data-kind="manual"
+       data-readonly="{{ public_page|yesno }}"
+       class="{{ styles.layout.contentView }}">
+    {{ mobile_nav(sections) }}
+    <div class="flex flex-col sm:flex-row max-w-7xl mx-auto sm:mt-6"
+         lp-component
+         data-init="initManual">
+      <div class="hidden sm:block sm:w-64 shrink-0">{{ nav_column(sections) }}</div>
+      <div class="flex-1 min-w-0 sm:ml-6">
+        <div data-role="manual-content" class="{{ styles.manual.content }}">{{ content|safe }}</div>
+      </div>
+    </div>
+  </div>
+{% endmacro %}
+
+{% block title %}
+  Manual
+{% endblock title %}
+
+{% block content %}
+  {{ main() }}
+{% endblock content %}

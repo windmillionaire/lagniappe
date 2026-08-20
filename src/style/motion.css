@@ -1,0 +1,45 @@
+/* ==========================================================================
+   VIEW TRANSITIONS
+   Instant transitions - still batches DOM updates to prevent reflow jank,
+   but no visible animation/cross-fade
+   ========================================================================== */
+
+::view-transition-old(root),
+::view-transition-new(root) {
+	animation: none;
+	mix-blend-mode: normal;
+}
+
+.main-nav {
+	view-transition-name: lp-main-navigation;
+}
+
+::view-transition-old(lp-main-navigation),
+::view-transition-new(lp-main-navigation) {
+	animation: none;
+	mix-blend-mode: normal;
+}
+
+@view-transition {
+	navigation: auto;
+}
+
+/* ==========================================================================
+   KEYFRAME ANIMATIONS
+   ========================================================================== */
+
+@keyframes flash {
+	0% {
+		background-color: inherit;
+	}
+	50% {
+		background-color: #fef3c7;
+	}
+	100% {
+		background-color: inherit;
+	}
+}
+
+.flash {
+	animation: flash 600ms ease-out;
+}

@@ -1,0 +1,35 @@
+{% from 'common.html' import url %}
+{% extends "layouts/delete.html" %}
+
+{% block name -%}
+  Delete Form
+{%- endblock name %}
+
+{% macro instance_link(detail) -%}
+  <a href="{{ url(detail) }}"
+     data-kind="{{ detail.kind }}"
+     class="font-semibold text-kind-default hover:underline"
+     data-role="title">{{ detail.name }}</a>
+{%- endmacro %}
+
+{% block description -%}
+  {% if not num_instances %}
+    <p class="text-delete-default text-sm">
+      Are you sure you want to delete this form? If it is attached to any tasks or pages,
+      the submission data generated using it will become inaccessible.
+    </p>
+  {% else %}
+    <p class="text-delete-default text-sm">
+      Are you sure you want to delete this form? It is currently attached to
+      {% for detail in details -%}
+        {{- (' ' if loop.first else (', ' if not loop.last or num_remaining else ' and ')) -}}
+        {{- instance_link(detail) -}}
+      {%- endfor -%}
+      {%- if num_remaining %}, and {{ num_remaining }} more{% endif -%}.
+    </p>
+  {% endif %}
+{% endblock description %}
+
+{% block button -%}
+  {{ delete_action(url_for('forms.delete', key=entity.urlsafe_key), "Delete " ~ entity.name) }}
+{%- endblock button %}

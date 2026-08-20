@@ -1,0 +1,129 @@
+/* ==========================================================================
+   BUTTONS
+   ========================================================================== */
+
+/* @style button.submit */
+.action-button {
+	--action-button-icon-slot-size: 1.5rem;
+
+	background-color: var(--kind-default);
+	color: white;
+	max-width: 100%;
+	min-width: 0;
+	overflow: hidden;
+	position: relative;
+	&:has(> [data-role="icon"][data-visible="true"]) {
+		padding-inline: 2.5rem;
+	}
+	& > [data-role="icon"] {
+		block-size: var(--action-button-icon-slot-size);
+		display: grid;
+		inline-size: var(--action-button-icon-slot-size);
+		left: 0.75rem;
+		line-height: 1;
+		pointer-events: none;
+		place-items: center;
+		position: absolute;
+		top: 50%;
+		transform: translateY(-50%);
+	}
+	& > [data-role="icon"][data-visible="false"] {
+		display: none;
+	}
+	& > [data-role="text"] {
+		display: block;
+		max-width: 100%;
+		min-width: 0;
+		overflow: hidden;
+		text-align: center;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	@media (min-width: 640px) {
+		&:hover,
+		&:focus {
+			background-color: var(--kind-dark);
+			outline-style: solid;
+			outline-color: var(--kind-dark);
+			outline-width: 2px;
+			outline-offset: 2px;
+		}
+	}
+}
+
+/* @style nav.button nav.mobileButton nav.desktopButton toggle.container toggle.plain */
+.action-icon-button {
+	color: var(--kind-default);
+	display: inline-grid;
+	place-items: center;
+	border-radius: var(--radius-md);
+	padding: 0;
+	translate: var(--action-offset-x, 0) var(--action-offset-y, 0);
+	vertical-align: middle;
+	&:focus {
+		outline: none;
+	}
+	&:focus-visible {
+		color: var(--kind-dark);
+		background-color: white;
+		outline-style: solid;
+		outline-color: var(--kind-dark);
+		outline-width: 2px;
+	}
+	@media (hover: hover) {
+		&:hover {
+			color: var(--kind-dark);
+			background-color: white;
+			outline-style: solid;
+			outline-color: var(--kind-dark);
+			outline-width: 2px;
+		}
+	}
+	&[data-visible="false"] {
+		display: none;
+	}
+}
+
+/* @style nav.button */
+.action-icon-button[data-role="menu-trigger"] {
+	--action-offset-y: -0.125rem;
+}
+
+/* @style nav.button nav.mobileButton nav.desktopButton toggle.container toggle.plain */
+.action-icon-button .icon {
+	grid-area: 1 / 1;
+}
+
+/* @style task.home.snooze */
+.home-task-snooze {
+	outline: none;
+	position: relative;
+}
+
+/* @style task.home.snooze */
+.home-task-snooze:is(:hover, :focus-visible)::after {
+	border-radius: inherit;
+	content: "";
+	inset: 0;
+	outline: 2px solid currentColor;
+	pointer-events: none;
+	position: absolute;
+	transform: translateX(-1px);
+}
+
+/* @style checkbox.default */
+.form-input[type="checkbox"]:not(:checked) + .icon {
+	opacity: 0;
+}
+
+/* @style toggle.container toggle.plain */
+button[data-role="expand"] > .icon {
+	grid-area: 1 / 1;
+	transform-origin: center;
+	transition: transform 100ms ease-in-out;
+}
+
+/* @style toggle.container toggle.plain */
+button[data-role="expand"][data-open="true"] > .icon {
+	transform: rotate(90deg);
+}

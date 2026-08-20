@@ -1,0 +1,138 @@
+{% set view_entry = "index" %}
+{% extends "layouts/base.html" %}
+{% import 'controls.html' as controls %}
+{% import 'menus.html' as menus %}
+{% from 'filters.html' import filtered_conditions %}
+{% from 'table.html' import table, mobile_toggles %}
+{% import 'categories/tools.html' as tools %}
+
+{% macro view_header(category) %}
+  <nav class="{{ styles.layout.view.title }} {{ styles.index.header.iconContext }}" data-nav="view">
+    <div>
+      {% if filtered %}
+        <a href="{{ filtered.parent_filters_url }}"
+           data-role="title"
+           class="text-kind-default {{ styles.link.title }}"
+           data-kind="category">{{ category.name }}</a>
+      {% else %}
+        <span data-menu-anchor class="{{ styles.entity.name.anchor }}">
+          <span data-role="title" class="text-kind-default" data-kind="category">{{ category.name }}</span>
+          {% call menus.title("Category actions") %}
+            {{ menus.star(is_starred(category)) }}
+            {% if category.allowed(Action.DELETE) %}{{ menus.delete("/") }}{% endif %}
+          {% endcall %}
+        </span>
+      {% endif %}
+    </div>
+    <div data-role="actions">
+      <button class="{{ styles.nav.mobileButton }}"
+              lp-show="table:MobileTableControls"
+              data-toggle="true"
+              aria-label="Table controls"
+              title="Table controls">{{ render_icon("column") }}</button>
+      {% if not filtered %}
+        {% if category.allowed(Action.EDIT) %}
+          <button class="{{ styles.nav.desktopButton }}"
+                  lp-show="table:TableEditor"
+                  data-toggle="true"
+                  aria-label="Edit table"
+                  title="Edit table">{{ render_icon("tableEdit") }}</button>
+        {% endif %}
+        {% if category.allowed(Action.EDIT) or category.allowed(Action.VIEW) %}
+          <button class="{{ styles.nav.desktopButton }}"
+                  lp-show="tools:default"
+                  data-toggle="true"
+                  aria-label="Category tools"
+                  title="Category tools">{{ render_icon("indexTools") }}</button>
+          <button class="{{ styles.nav.mobileButton }}"
+                  data-role="tools-dropdown"
+                  data-kind="category"
+                  aria-label="Category tools"
+                  title="Category tools">{{ render_icon("columns") }}</button>
+        {% endif %}
+      {% endif %}
+    </div>
+  </nav>
+{% endmacro %}
+
+{% macro tools_section(category) %}
+  <div id="tools"
+       lp-component
+       data-default="{{ 'CreatePage' if category.allowed(Action.EDIT) else 'CategoryInfo' }}"
+       data-visible="false"
+       class="group/tools mt-4">
+    <div class="{{ styles.index.tools.container }}">
+      <div class="{{ styles.index.tools.main }}">
+        <div lp-nav
+             class="{{ styles.form.header.container }} group/form mb-6"
+             data-nav="tools">
+          <div data-role="header" class="{{ styles.layout.nav.header }}">
+            <h2 class="{{ styles.form.header.title }}" data-role="title"></h2>
+            <div class="{{ styles.form.header.controls }}" data-role="controls">
+              {{ controls.filter_list() }}
+              {{ controls.help() }}
+              {{ controls.reset() }}
+              {{ controls.close() }}
+            </div>
+          </div>
+        </div>
+        {% if category.allowed(Action.EDIT) %}
+          {{ tools.create_page(category) }}
+          {% if current_user.access(AI.CREATE) %}{{ tools.generate_pages(category) }}{% endif %}
+        {% endif %}
+        {% if category.allowed(Action.VIEW) %}{{ tools.category_info(category) }}{% endif %}
+        {{ tools.page_filters(category) }}
+        {{ tools.saved_filters(category) }}
+      </div>
+      <nav class="{{ styles.index.tools.navigation }}"
+           data-persistent="true"
+           data-nav="tools">
+        {% if category.allowed(Action.EDIT) %}
+          <button class="{{ styles.index.tools.toggle }}" lp-show="tools:CreatePage">New Page</button>
+          {% if current_user.access(AI.CREATE) %}
+            <button class="{{ styles.index.tools.toggle }}" lp-show="tools:GeneratePages">
+              {{ render_icon("generate") }}<span>Generate Pages</span>
+            </button>
+          {% endif %}
+        {% endif %}
+        {% if category.allowed(Action.VIEW) %}
+          <button class="{{ styles.index.tools.toggle }}" lp-show="tools:CategoryInfo">Category Settings</button>
+        {% endif %}
+        <button class="{{ styles.index.tools.toggle }}" lp-show="filters:Filters">Filter Pages</button>
+        <button class="{{ styles.index.tools.toggle }}" lp-show="tools:SavedFilters">Saved Filters</button>
+      </nav>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro view() %}
+  {% set category = index.entity if index else filtered.parent %}
+  <div lp-view
+       lp-entity
+       data-kind="category"
+       data-index="category"
+       data-key="{{ filtered.urlsafe_key if filtered and not filtered.temporary else category.urlsafe_key }}"
+       data-fingerprint="{{ filtered.fingerprint if filtered and not filtered.temporary else category.fingerprint }}"
+       data-poll-channel="{{ poll_channel }}"
+       data-poll-revision="{{ poll_revision }}"
+       data-hash="{{ filtered.hash if filtered else category.hash }}"
+       class="group/view">
+    <div class="{{ styles.layout.view.header }}">
+      {{ view_header(category) }}
+      {% if not filtered %}
+        {% if category.allowed(Action.EDIT) or category.allowed(Action.VIEW) %}{{ tools_section(category) }}{% endif %}
+      {% endif %}
+      {{ mobile_toggles((index or filtered).table.columns) }}
+    </div>
+    {% if filtered %}{{ filtered_conditions(filtered) }}{% endif %}
+    {{ table(pages, index or filtered) }}
+  </div>
+{% endmacro %}
+
+{% block title %}
+  {{ index.entity.name if index else filtered.parent.name }}
+{% endblock title %}
+
+{% block content %}
+  {{ view() }}
+{% endblock content %}

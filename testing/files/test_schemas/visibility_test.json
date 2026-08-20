@@ -1,0 +1,19 @@
+[
+	{
+		"id": "checkbox-toggleab12",
+		"type": "checkbox",
+		"title": "Show Conditional Field"
+	},
+	{
+		"id": "input-conditionalab",
+		"type": "input",
+		"input": "text",
+		"title": "Conditional Field",
+		"visibility": [
+			{
+				"id": "checkbox-toggleab12",
+				"type": "checkbox"
+			}
+		]
+	}
+]

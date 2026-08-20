@@ -1,0 +1,12 @@
+[
+	{
+		"id": "radio-ab12",
+		"type": "radio",
+		"title": "Radio Field",
+		"options": [
+			{ "value": "opt1", "label": "Option One" },
+			{ "value": "opt2", "label": "Option Two" },
+			{ "value": "opt3", "label": "Option Three" }
+		]
+	}
+]

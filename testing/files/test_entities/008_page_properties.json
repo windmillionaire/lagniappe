@@ -1,0 +1,170 @@
+{
+	"test_page_details": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Basic Page",
+					"hash": "basic01"
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page With Model",
+					"hash": "model01",
+					"model": {
+						"name": "Test Category",
+						"hash": "cat001"
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "User Page",
+					"hash": "user001",
+					"user": { "name": "Test User", "hash": "usr001" },
+					"model": {
+						"name": "Users",
+						"hash": "users1",
+						"reserved": true
+					}
+				}
+			]
+		]
+	},
+	"test_page_document": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Page With Document",
+					"hash": "doc001",
+					"assets": { "document": true },
+					"document": "This is the page document content for testing."
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page Without Document",
+					"hash": "doc002"
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "No Feature Document Page",
+					"hash": "doc003",
+					"assets": { "document": true },
+					"document": "Document text for a page with limited features.",
+					"attributes": ["tasks", "document"]
+				}
+			]
+		]
+	},
+	"test_page_attributes": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Page With Own Attributes",
+					"hash": "attr01",
+					"attributes": ["tasks", "document"]
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page Inherits From Model",
+					"hash": "attr02",
+					"model": {
+						"name": "Category With Attrs",
+						"hash": "catattr",
+						"attributes": ["document", "photo", "files"]
+					}
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page No Attributes",
+					"hash": "attr03"
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Page Overrides Model",
+					"hash": "attr04",
+					"attributes": ["tasks", "notes"],
+					"model": {
+						"name": "Category With Different Attrs",
+						"hash": "catdiff",
+						"attributes": ["document", "photo", "files"]
+					}
+				}
+			]
+		]
+	},
+	"test_page_public": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Public Page",
+					"hash": "pub001",
+					"public": true
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Private Page",
+					"hash": "pub002",
+					"public": false
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Default Page",
+					"hash": "pub003"
+				}
+			]
+		]
+	},
+	"test_page_to_cache_public_user": {
+		"entities": [
+			[
+				"PAGE",
+				{
+					"name": "Public Profile Page",
+					"hash": "tcache01",
+					"user": {
+						"name": "Public User",
+						"hash": "usrpub1",
+						"public": true
+					},
+					"model": {
+						"name": "Users",
+						"hash": "users1",
+						"reserved": true
+					},
+					"assets": { "document": true },
+					"document": "Would cache if not a public user page."
+				}
+			],
+			[
+				"PAGE",
+				{
+					"name": "Normal Cached Page",
+					"hash": "tcache02",
+					"assets": { "document": true },
+					"document": "Appears in search cache when indexed."
+				}
+			]
+		]
+	}
+}

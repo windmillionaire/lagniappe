@@ -1,0 +1,13 @@
+{% extends "layouts/delete.html" %}
+
+{% block name -%}
+  Clear Conversation
+{%- endblock name %}
+
+{% block description -%}
+  <p class="text-delete-default text-sm">Are you sure you want to clear your conversation with <span class="font-semibold">{{ peer_name }}</span> from your message history?</p>
+{%- endblock description %}
+
+{% block button -%}
+  {{ delete_action(url_for('message_internal.clear', key=key), "Clear Conversation") }}
+{%- endblock button %}

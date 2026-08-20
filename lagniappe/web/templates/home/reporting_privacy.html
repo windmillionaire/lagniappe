@@ -1,0 +1,202 @@
+{% extends "layouts/stripped.html" %}
+
+{% block title %}
+  Error-Reporting Privacy Notice
+{% endblock title %}
+
+{% block content %}
+  <article class="max-w-5xl mx-auto bg-white rounded-lg py-6 sm:py-8">
+    <header class="mb-8">
+      <h1 class="text-3xl font-semibold text-base-dark mb-2">Lagniappe Maintainer Error-Reporting Privacy Notice</h1>
+      <p class="text-base-medium">
+        Applies to: Lagniappe 0.1.0
+        <br>
+        Effective date: July 27, 2026
+        <br>
+        Contact: Caleb Wright,
+        <a class="underline"
+           href="mailto:privacy@lagniappe.site">privacy@lagniappe.site</a>
+      </p>
+    </header>
+    <div class="space-y-8 text-base-medium">
+      <section>
+        <h2 class="text-xl font-semibold text-base-dark my-3">Scope</h2>
+        <p class="mb-3">
+          Lagniappe is self-hosted. Normal workspace activity and content stay
+          with the services selected by the operator of each Lagniappe instance.
+        </p>
+        <p>
+          This notice applies only when an instance operator chooses to send
+          privacy-reduced error reports to the default Sentry project operated
+          by the Lagniappe maintainer. It does not apply when an operator
+          disables error reporting or supplies a Sentry DSN that the operator
+          owns. An operator using their own DSN is responsible for that
+          reporting destination and its privacy terms.
+        </p>
+      </section>
+      <section>
+        <h2 class="text-xl font-semibold text-base-dark my-3">Choice and control</h2>
+        <p class="mb-3">
+          Maintainer error reporting is off by default. Setup explains the
+          reporting boundary and asks the operator to opt in. Using Lagniappe
+          does not require error reporting.
+        </p>
+        <p class="mb-3">
+          The operator can disable reporting at any time by setting
+          <code>CAPTURE_ERRORS</code> to <code>False</code> and redeploying the
+          instance. Disabling reporting stops new reports; it does not recall
+          reports already delivered to Sentry.
+        </p>
+        <p>
+          The operator is responsible for deciding whether reporting is
+          appropriate for the instance and for informing its users when
+          required.
+        </p>
+      </section>
+      <section>
+        <h2 class="text-xl font-semibold text-base-dark my-3">Who handles reports</h2>
+        <p class="mb-3">
+          Caleb Wright, the Lagniappe maintainer, determines how reports sent
+          to the default maintainer destination are used. Sentry, operated by
+          Functional Software, Inc., acts as the maintainer's service provider
+          and data processor for report contents.
+        </p>
+        <p>
+          Sentry may use subprocessors and process data in locations described
+          in its
+          <a class="underline" href="https://sentry.io/legal/dpa/">Data Processing Addendum</a>,
+          <a class="underline" href="https://sentry.io/legal/subprocessors/">subprocessor list</a>,
+          and
+          <a class="underline" href="https://sentry.io/privacy/">Privacy Policy</a>.
+        </p>
+      </section>
+      <section>
+        <h2 class="text-xl font-semibold text-base-dark my-3">Why reports are used</h2>
+        <ul class="list-disc pl-5 space-y-2">
+          <li>To find, reproduce, diagnose, and fix errors.</li>
+          <li>To investigate reliability and performance problems.</li>
+          <li>To distinguish repeated failures from isolated failures.</li>
+          <li>To verify that a fix works in later Lagniappe releases.</li>
+        </ul>
+        <p class="mt-3">
+          Reports are not used for advertising, user profiling, or selling
+          personal information.
+        </p>
+      </section>
+      <section>
+        <h2 class="text-xl font-semibold text-base-dark my-3">Diagnostic data that may be reported</h2>
+        <p class="mb-3">Depending on where and how a failure occurs, a report may contain:</p>
+        <ul class="list-disc pl-5 space-y-2">
+          <li>Error types, error messages, stack traces, source locations, timestamps, release information, and environment information.</li>
+          <li>Route templates, endpoint names, HTTP methods, route-parameter names, query field names and counts, request content type, and bounded request-size metadata.</li>
+          <li>A short allowlist of diagnostic HTTP headers.</li>
+          <li>Browser, operating-system, runtime, device, application, trace, transaction, span, performance, and profiling information.</li>
+          <li>Page paths and bounded interface context such as element tags, identifiers, classes, or data attributes.</li>
+          <li>Metadata added by enabled third-party integrations before Lagniappe's final filtering step.</li>
+        </ul>
+        <p class="mt-3">
+          Sentry necessarily receives network information, including the
+          source IP address used to deliver a report, even when Lagniappe does
+          not deliberately attach an IP address or user identity to the event.
+        </p>
+      </section>
+      <section>
+        <h2 class="text-xl font-semibold text-base-dark my-3">Data Lagniappe filters before sending</h2>
+        <p class="mb-3">
+          Lagniappe disables Sentry's default collection of personally
+          identifiable information and applies additional filtering intended
+          to remove or reduce:
+        </p>
+        <ul class="list-disc pl-5 space-y-2">
+          <li>Form and JSON values, request and response bodies, and query values.</li>
+          <li>Uploaded filenames, file contents, full URLs, and referrers.</li>
+          <li>Authorization values, cookies, arbitrary headers, and Sentry user identity context.</li>
+          <li>Recognized passwords, access tokens, API keys, private keys, and similar credentials.</li>
+          <li>Oversized strings, collections, and deeply nested diagnostic context.</li>
+        </ul>
+        <p class="mt-3">
+          Filtering reduces exposure but cannot guarantee anonymity. In
+          particular, unstructured error messages, stack traces, page paths,
+          element identifiers, classes, data attributes, integration metadata,
+          or unexpected third-party context can contain information that
+          identifies an instance, user, record, or other person. Operators
+          should not enable maintainer reporting when even privacy-reduced
+          diagnostics must not leave the instance.
+        </p>
+      </section>
+      <section>
+        <h2 class="text-xl font-semibold text-base-dark my-3">Sharing and access</h2>
+        <p class="mb-3">
+          Reports are available to the Lagniappe maintainer and to Sentry and
+          its subprocessors as needed to provide and secure the Sentry service.
+          Reports may also be disclosed when required by law or necessary to
+          protect rights, security, or the integrity of the service.
+        </p>
+        <p>
+          Reports are not intentionally published. If a report leads to a
+          public issue, code change, test, or release note, the maintainer will
+          use the minimum diagnostic detail needed and will not intentionally
+          copy personal information or credentials into the public record.
+        </p>
+      </section>
+      <section>
+        <h2 class="text-xl font-semibold text-base-dark my-3">Retention and deletion</h2>
+        <p class="mb-3">
+          The maintainer relies on the automated retention period applied to
+          the maintainer's Sentry account and does not keep a separate archive
+          of raw reports. The applicable Sentry retention period may change
+          with Sentry's service terms, plan, or account configuration. Reports
+          and issue data may be deleted earlier when they are no longer useful
+          or when a valid deletion request can be matched to them. The current
+          account retention setting is available on request from the contact
+          listed in this notice.
+        </p>
+        <p class="mb-3">
+          Sentry may retain limited service, security, backup, or legally
+          required data according to its own terms and deletion processes.
+          Diagnostic facts that no longer identify a person or instance may
+          remain in source-code changes, tests, release notes, or issue history.
+        </p>
+        <p class="mb-3">
+          To request access to or deletion of a report, email
+          <a class="underline"
+             href="mailto:privacy@lagniappe.site">privacy@lagniappe.site</a>
+          with the approximate date and time of the event and any Sentry event
+          identifier shown to you. You may also include the instance hostname
+          if you are comfortable doing so. Do not send passwords, tokens,
+          private keys, workspace content, or other sensitive data with the
+          request.
+        </p>
+        <p>
+          Because Lagniappe removes deliberate user identity fields and
+          different installations can produce similar errors, the maintainer
+          may be unable to identify a particular person's or instance's report
+          without enough matching information. Sentry may also require
+          deletion of an entire grouped issue rather than one immutable event.
+        </p>
+      </section>
+      <section>
+        <h2 class="text-xl font-semibold text-base-dark my-3">Security</h2>
+        <p>
+          Lagniappe sends reports to Sentry over HTTPS. Access to the
+          maintainer project is restricted through the maintainer's Sentry
+          account. No filtering, transmission, or storage system can guarantee
+          complete security.
+        </p>
+      </section>
+      <section>
+        <h2 class="text-xl font-semibold text-base-dark my-3">Changes to this notice</h2>
+        <p class="mb-3">
+          Changes will be recorded in the repository history. The effective
+          date and applicable Lagniappe version at the top of this notice will
+          be updated when the notice materially changes.
+        </p>
+        <p>
+          Questions or privacy requests may be sent to Caleb Wright at
+          <a class="underline"
+             href="mailto:privacy@lagniappe.site">privacy@lagniappe.site</a>.
+        </p>
+      </section>
+    </div>
+  </article>
+{% endblock content %}

@@ -1,0 +1,12 @@
+{% from "reference/macros.html" import modal %}
+{% call modal("Initial Prompt") %}
+  <section>
+    <p class="text-sm text-base-medium mb-3">
+      This is the starting prompt. AI may retrieve additional permitted workspace
+      context or search results while it works.
+    </p>
+    <div class="bg-base-dark text-project-light p-4 rounded-lg font-mono text-xs overflow-x-auto whitespace-pre-wrap">
+      {{- prompt -}}
+    </div>
+  </section>
+{% endcall %}

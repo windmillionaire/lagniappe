@@ -1,0 +1,268 @@
+{% import 'controls.html' as controls %}
+
+{% macro site_settings_section(section, widget, title, help, summary='', open=false) %}
+  <section data-role="site-settings-section"
+           data-section="{{ section }}"
+           data-open="{{ open|yesno }}"
+           class="rounded-md border border-base-light/50 bg-white/60 shadow-sm scroll-mt-24">
+    <header class="flex flex-row items-center justify-between gap-3 px-3 py-2 sm:px-4">
+      <div class="min-w-0">
+        <h2 class="text-base font-bold text-base-dark">{{ title }}</h2>
+        <p data-role="section-summary" class="truncate text-xs text-base-medium">{{ summary }}</p>
+      </div>
+      <div class="flex shrink-0 flex-row items-center gap-2">
+        {{ controls.help(help) }}
+        {{ controls.expand() }}
+      </div>
+    </header>
+    <div data-role="section-body"
+         data-widget="{{ widget }}"
+         data-persistent="true"
+         data-visible="{{ open|yesno }}"
+         class="flex flex-col gap-4 border-t border-base-light/50 px-3 py-4 sm:px-4">{{ caller() }}</div>
+  </section>
+{% endmacro %}
+
+{% macro site_settings(close_target='PageInfo', close_component='info', controls=true) %}
+  <div data-widget="SiteSettings"
+       data-title="Site Settings"
+       data-help="site_settings"
+       data-close="{{ close_component }}:{{ close_target }}"
+       data-visible="false"
+       data-controls="{{ controls|yesno }}"
+       lp-load
+       data-route="{{ url_for('internal.site_settings') }}">
+    <div class="{{ styles.form.default }}">
+      {% call site_settings_section('maintenance', 'SiteMaintenance', 'Maintenance', 'site_maintenance', 'Cache, updates, and configuration', true) %}
+        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          <button data-role="rebuild-cache"
+                  data-kind="delete"
+                  class="{{ styles.button.submit }}">
+            <span data-role="icon" data-visible="true" aria-hidden="true">
+              {{ render_icon("database") }}
+            </span>
+            <span data-role="text">Refresh Cache</span>
+          </button>
+          <button data-role="site-update"
+                  data-kind="page"
+                  class="{{ styles.button.submit }}">
+            <span data-role="icon" data-visible="true" aria-hidden="true">
+              {{ render_icon("installation") }}
+            </span>
+            <span data-role="text">Apply Updates</span>
+          </button>
+          <button data-role="configuration"
+                  data-kind="default"
+                  type="button"
+                  class="{{ styles.button.submit }}">
+            <span data-role="icon" data-visible="true" aria-hidden="true">
+              {{ render_icon("configuration") }}
+            </span>
+            <span data-role="text">Configuration</span>
+          </button>
+        </div>
+        <div data-role="migration-status"
+             data-visible="false"
+             class="rounded-md border border-base-light/70 bg-white/80 p-3 text-sm text-base-dark">
+          <strong data-role="migration-status-title" class="block"></strong>
+          <p data-role="migration-status-summary" class="mt-1 text-base-medium"></p>
+          <ul data-role="migration-status-results"
+              class="mt-2 space-y-1 empty:hidden">
+          </ul>
+          <ul data-role="migration-status-repairs"
+              data-visible="false"
+              class="mt-2 space-y-1 text-base-medium empty:hidden">
+          </ul>
+          <ul data-role="migration-status-errors"
+              data-visible="false"
+              class="mt-2 space-y-1 text-delete-dark empty:hidden">
+          </ul>
+        </div>
+      {% endcall %}
+      {% call site_settings_section('deployment', 'SiteDeployment', 'Deployment', 'site_deployment', 'App Engine scaling and workers') %}
+        <form data-role="deployment-settings" class="flex flex-col gap-4">
+          <div class="grid grid-cols-1 gap-3 text-sm text-base-dark lg:grid-cols-2">
+            <div class="rounded-md border border-task-light/70 bg-task-bg p-3 text-task-dark">
+              <strong class="block text-sm">Cost warning</strong>
+              Basic scaling is the default and can idle down. Automatic scaling keeps instances warm, which avoids most cold starts but can cost quite a bit more.
+            </div>
+            <div class="rounded-md border border-base-light/70 bg-white/80 p-3 text-base-medium">
+              These settings are saved for the next setup update or upgrade. They do not redeploy the app immediately.
+            </div>
+          </div>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label class="{{ styles.label.column }}">
+              <span>Scaling</span>
+              <div class="{{ styles.select.wrapper }}"
+                   data-role="deployment-select"
+                   lp-select>
+                <select name="DEPLOY_SCALING_TYPE"
+                        data-placeholder="Choose scaling"
+                        class="{{ styles.select.default }}">
+                  <option value="basic">Basic</option>
+                  <option value="automatic">Automatic</option>
+                </select>
+                {{ render_icon("dropdown", styles.select.icon) }}
+              </div>
+              <span class="text-xs font-normal text-base-medium">Basic can idle down and may cold start. Automatic stays warm.</span>
+            </label>
+            <label class="{{ styles.label.column }}">
+              <span>Instance Class</span>
+              <div class="{{ styles.select.wrapper }}"
+                   data-role="deployment-select"
+                   lp-select>
+                <select name="DEPLOY_INSTANCE_CLASS"
+                        data-placeholder="Choose instance class"
+                        class="{{ styles.select.default }}">
+                  <option value="F1" data-scaling="automatic">F1</option>
+                  <option value="F2" data-scaling="automatic">F2</option>
+                  <option value="F4" data-scaling="automatic">F4</option>
+                  <option value="F4_1G" data-scaling="automatic">F4_1G</option>
+                  <option value="B1" data-scaling="basic">B1</option>
+                  <option value="B2" data-scaling="basic">B2</option>
+                  <option value="B4" data-scaling="basic">B4</option>
+                  <option value="B4_1G" data-scaling="basic">B4_1G</option>
+                  <option value="B8" data-scaling="basic">B8</option>
+                </select>
+                {{ render_icon("dropdown", styles.select.icon) }}
+              </div>
+              <span class="text-xs font-normal text-base-medium">
+                Larger classes add memory and CPU; F classes pair with automatic, B classes with basic.
+              </span>
+            </label>
+            <label class="{{ styles.label.column }}">
+              <span>Workers</span>
+              <input name="DEPLOY_WORKER_COUNT"
+                     type="number"
+                     min="1"
+                     max="20"
+                     step="1"
+                     class="{{ styles.input }}">
+              <span class="text-xs font-normal text-base-medium">Reduce workers if App Engine reports memory pressure.</span>
+            </label>
+            <div class="{{ styles.label.column }}">
+              <span>Instances</span>
+              <label data-role="basic-instance-count" class="flex flex-col gap-1">
+                <span class="text-xs font-normal text-base-medium">Max</span>
+                <input name="DEPLOY_MAX_INSTANCES"
+                       type="number"
+                       min="1"
+                       max="20"
+                       step="1"
+                       class="{{ styles.input }}">
+              </label>
+              <div data-role="automatic-instance-counts" class="grid grid-cols-2 gap-2">
+                <label class="flex min-w-0 flex-col gap-1">
+                  <span class="text-xs font-normal text-base-medium">Min Idle</span>
+                  <input name="DEPLOY_MIN_IDLE_INSTANCES"
+                         type="number"
+                         min="0"
+                         max="20"
+                         step="1"
+                         class="{{ styles.input }}">
+                </label>
+                <label class="flex min-w-0 flex-col gap-1">
+                  <span class="text-xs font-normal text-base-medium">Max</span>
+                  <input name="DEPLOY_MAX_INSTANCES"
+                         type="number"
+                         min="1"
+                         max="20"
+                         step="1"
+                         class="{{ styles.input }}">
+                </label>
+              </div>
+              <span class="text-xs font-normal text-base-medium">
+                Automatic separates warm idle instances from the maximum. Basic uses the maximum.
+              </span>
+              <input name="DEPLOY_IDLE_TIMEOUT" type="hidden">
+            </div>
+          </div>
+          <p data-role="deployment-error"
+             data-visible="false"
+             class="text-sm font-semibold text-delete-default"></p>
+          <button type="submit" data-kind="page" class="{{ styles.button.submit }}">Save Deployment Settings</button>
+        </form>
+      {% endcall %}
+      {% call site_settings_section('ai-models', 'SiteAiModels', 'AI Models', 'site_ai_models', 'Primary, utility, and image models') %}
+        <form data-role="ai-settings" class="flex flex-col gap-4">
+          <div class="grid grid-cols-1 gap-3 text-sm text-base-dark lg:grid-cols-2">
+            <div class="rounded-md border border-form-light/70 bg-form-bg p-3 text-form-dark">
+              <strong class="block text-sm">Primary model</strong>
+              Use this for reports, workspace changes, page and form-schema generation, document text, autofill, and any tool-backed request.
+            </div>
+            <div class="rounded-md border border-base-light/70 bg-white/80 p-3 text-base-medium">
+              Utility handles short parsing, aspect ratio choice, and file summaries. Image is used for generated page visuals.
+            </div>
+          </div>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <label class="{{ styles.label.column }}">
+              <span>Primary Model</span>
+              <div class="{{ styles.select.wrapper }}" data-role="ai-select" lp-select>
+                <select name="AI_MODEL"
+                        data-option-kind="text"
+                        data-placeholder="Choose primary model"
+                        class="{{ styles.select.default }}"></select>
+                {{ render_icon("dropdown", styles.select.icon) }}
+              </div>
+              <span class="text-xs font-normal text-base-medium">Best model for Create, Organize, Ask, page and form-schema generation, autofill, and rich document work.</span>
+            </label>
+            <label class="{{ styles.label.column }}">
+              <span>Utility Model</span>
+              <div class="{{ styles.select.wrapper }}" data-role="ai-select" lp-select>
+                <select name="AI_UTILITY_MODEL"
+                        data-option-kind="text"
+                        data-placeholder="Choose utility model"
+                        class="{{ styles.select.default }}"></select>
+                {{ render_icon("dropdown", styles.select.icon) }}
+              </div>
+              <span class="text-xs font-normal text-base-medium">Cheaper model for short structured tasks where deep reasoning should not matter.</span>
+            </label>
+            <label class="{{ styles.label.column }}">
+              <span>Image Model</span>
+              <div class="{{ styles.select.wrapper }}" data-role="ai-select" lp-select>
+                <select name="AI_IMAGE_MODEL"
+                        data-option-kind="image"
+                        data-placeholder="Choose image model"
+                        class="{{ styles.select.default }}"></select>
+                {{ render_icon("dropdown", styles.select.icon) }}
+              </div>
+              <span class="text-xs font-normal text-base-medium">Used when generating page photos and other visual assets.</span>
+            </label>
+            <div class="{{ styles.label.column }}">
+              <span>Endpoint</span>
+              <input name="AI_LOCATION"
+                     type="text"
+                     readonly
+                     value="global"
+                     class="{{ styles.input }}">
+              <span class="text-xs font-normal text-base-medium">Global endpoint is kept on to reduce pay-as-you-go 429 pressure.</span>
+            </div>
+          </div>
+          <a data-role="ai-pricing-link"
+             href="https://cloud.google.com/gemini-enterprise-agent-platform/generative-ai/pricing"
+             target="_blank"
+             rel="noopener noreferrer"
+             class="inline-flex w-fit grow-0 flex-row items-center justify-center gap-2 rounded-md border border-base-light/50 bg-white px-3 py-1.5 text-base font-semibold text-base-dark shadow-sm hover:bg-kind-bg hover:text-kind-default">
+            {{ render_icon("link") }}
+            <span>Pricing</span>
+          </a>
+          <p data-role="ai-error"
+             data-visible="false"
+             class="text-sm font-semibold text-delete-default"></p>
+          <button type="submit" data-kind="page" class="{{ styles.button.submit }}">Save AI Model Settings</button>
+        </form>
+      {% endcall %}
+      {% call site_settings_section('service-providers', 'SiteServiceProviders', 'Service Providers', 'site_service_providers', 'External service dashboards') %}
+        <div data-role="service-providers" class="flex flex-col gap-4"></div>
+      {% endcall %}
+      {% call site_settings_section('site-image', 'SiteImage', 'Site Image', 'site_image', 'Icons and manifest images') %}
+        <div data-role="site-image" class="flex flex-col gap-4"></div>
+        <form data-role="upload-site-image"
+              data-help="site_image"
+              class="w-full flex flex-col gap-4">
+          <button type="submit" data-kind="page" class="{{ styles.button.submit }}"></button>
+        </form>
+      {% endcall %}
+    </div>
+  </div>
+{% endmacro %}

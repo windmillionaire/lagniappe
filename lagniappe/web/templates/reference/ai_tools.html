@@ -1,0 +1,78 @@
+{% from "manual/macros.html" import subheading, callout, step %}
+{% from "reference/macros.html" import modal, feature %}
+
+{% call modal("AI Tools") %}
+  <section>
+    {{ subheading("What This Panel Does") }}
+    <p class="text-sm text-base-dark">
+      AI Tools creates saved reports from uploaded context, workspace questions, or creation requests. A report can answer directly, explain what it found, and, when useful, propose changes you can inspect before running.
+    </p>
+    {% call callout("tip") %}
+      Starting a report does not change your workspace. Proposed changes are saved first, and the deterministic runner only executes them if you choose to continue.
+    {% endcall %}
+  </section>
+  {% if CONFIG.AI_EMAIL_PUBLIC.enabled %}
+    <section>
+      {{ subheading("Email Submissions") }}
+      <p class="text-sm text-base-dark">
+        Send from your exact registered email address. Email creates the same saved report as this panel and sends acceptance/result links; it does not apply proposed changes.
+      </p>
+      <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-base-medium">
+        <li>AI: {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ai }} — recommended; automatically selects Ask, Create, or Organize.</li>
+        <li>Ask: {{ CONFIG.AI_EMAIL_PUBLIC.addresses.ask }} — text required, attachments optional.</li>
+        {% if current_user.access(AI.CREATE) %}
+          <li>Create: {{ CONFIG.AI_EMAIL_PUBLIC.addresses.create }} — text required, no attachments.</li>
+          <li>Organize: {{ CONFIG.AI_EMAIL_PUBLIC.addresses.organize }} — one or more attachments required.</li>
+        {% endif %}
+        <li>Maximum 20 files, 30 MiB each, 50 MiB total.</li>
+        <li>Reply above the marker to create a fresh report; automated/list mail is ignored.</li>
+      </ul>
+    </section>
+  {% endif %}
+  <section>
+    {{ subheading("Access Levels") }}
+    <div class="space-y-3">
+      {% call feature("Ask Access", icon="ask", kind="user") %}
+        Shows the Ask tool and allows saved questions and answers. Existing Organize or Create reports remain readable after a user is reduced from Create to Ask, but their higher-level actions stay unavailable.
+      {% endcall %}
+      {% call feature("Create Access", icon="create", kind="user") %}
+        Includes Ask and adds Organize, Create, generation, autofill, summarization, revision of creation proposals, and proposal execution.
+      {% endcall %}
+      {% call feature("Normal Permissions Still Apply", icon="permissions", kind="user") %}
+        AI access is per user and separate from groups. A user needs both the required AI level and permission to the records involved.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Available Tools") }}
+    <div class="space-y-3">
+      {% call feature("Organize", icon="organize", kind="default") %}
+        Drop files, paste screenshots, or add instructions when you want Lagniappe to decide how something should be saved. Organize can propose pages, tasks, forms, categories, projects, model tasks, file attachments, and evidence-backed updates to existing page or task submissions.
+      {% endcall %}
+      {% call feature("Ask", icon="ask", kind="default") %}
+        Ask a question about your workspace. Ask can search permitted pages, tasks, projects, categories, forms, and files, then answer with links and cite the workspace context it used. If the answer naturally implies follow-up work, it can also propose actions.
+      {% endcall %}
+      {% call feature("Create", icon="create", kind="default") %}
+        Describe what you want Lagniappe to create. Create can draft workspace structure, one-time reminders, and recurring tasks as a saved proposal that you can revise, skip, or run manually.
+      {% endcall %}
+      {% call feature("Permissioned Context", icon="permissions", kind="user") %}
+        AI tools use the same permissions as the current user. They should only see and propose work with records the user is allowed to access.
+      {% endcall %}
+    </div>
+  </section>
+  <section>
+    {{ subheading("Report Flow") }}
+    {% call step(1, "Choose a tool") %}
+      <p class="text-sm text-base-medium">Use Organize for files and screenshots, Ask for a direct workspace question, or Create for new workspace content.</p>
+    {% endcall %}
+    {% call step(2, "Add context") %}
+      <p class="text-sm text-base-medium">Upload files for Organize, or type the question or creation request you want the AI to consider.</p>
+    {% endcall %}
+    {% call step(3, "Review the prompt if helpful") %}
+      <p class="text-sm text-base-medium">Use Initial Prompt to review the starting instructions and currently available context. AI may retrieve more permitted workspace context or search results while it works.</p>
+    {% endcall %}
+    {% call step(4, "Review the report") %}
+      <p class="text-sm text-base-medium">Lagniappe saves the result in the Tools list so you can inspect the answer or proposal before taking action.</p>
+    {% endcall %}
+  </section>
+{% endcall %}

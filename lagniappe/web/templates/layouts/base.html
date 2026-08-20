@@ -1,0 +1,62 @@
+{% from 'nav.html' import navbar with context %}
+{% set default_page_mode = CONFIG.testing and 'testing' or 'production' %}
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="description" content="Private application, not for indexing">
+    <meta name="keywords" content="private, internal, non-indexed">
+    <meta name="mode" content="{{ page_mode|default(default_page_mode) }}">
+    <meta name="analytics" content="{{ CONFIG.ANALYTICS|yesno }}">
+    <link rel="icon"
+          type="image/png"
+          sizes="32x32"
+          href="/images/favicon-32x32.png?v={{ CONFIG.BUILD_ID }}">
+    <link rel="manifest" href="/manifest.json?v={{ CONFIG.BUILD_ID }}">
+    <link rel="stylesheet" href="/style.css?v={{ CONFIG.BUILD_ID }}">
+    {% if view_entry %}
+      <link rel="modulepreload"
+            href="/chunks/views/{{ view_entry }}.js?v={{ CONFIG.BUILD_ID }}">
+      <link rel="modulepreload"
+            href="/chunks/connectivity.js?v={{ CONFIG.BUILD_ID }}">
+      <link rel="modulepreload"
+            href="/chunks/foundation.js?v={{ CONFIG.BUILD_ID }}">
+      {% if view_entry in ['project', 'page', 'home', 'user', 'index', 'file', 'report', 'admin', 'messages'] %}
+        <link rel="modulepreload"
+              href="/chunks/core-foundation.js?v={{ CONFIG.BUILD_ID }}">
+      {% endif %}
+      {% if view_entry in ['project', 'page', 'file', 'admin'] %}
+        <link rel="modulepreload"
+              href="/chunks/entity-foundation.js?v={{ CONFIG.BUILD_ID }}">
+      {% endif %}
+      {% if view_entry == 'index' %}
+        <link rel="modulepreload"
+              href="/chunks/index-foundation.js?v={{ CONFIG.BUILD_ID }}">
+      {% endif %}
+    {% endif %}
+    {% if CONFIG.capture_errors %}
+      <meta name="sentry-dsn" content="{{ CONFIG.SENTRY_JS_DSN }}">
+      <script type="module" src="/sentry.js?v={{ CONFIG.BUILD_ID }}"></script>
+    {% endif %}
+    <script type="module" src="/script.js?v={{ CONFIG.BUILD_ID }}"></script>
+    {% block extras %}
+    {% endblock extras %}
+    <title>
+
+      {% block title %}
+      {% endblock title %}
+    </title>
+  </head>
+  <body class="{{ styles.layout.body }}">
+    <input id="token" type="hidden" value="{{ csrf_token() }}" />
+    {{ navbar(public=public_page|default(false)) }}
+    <main class="{{ styles.layout.main }}">
+
+      {% block content %}
+      {% endblock content %}
+    </main>
+  </body>
+</html>

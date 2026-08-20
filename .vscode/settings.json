@@ -1,0 +1,27 @@
+{
+    "python.defaultInterpreterPath": "${workspaceFolder}/venv/bin/python",
+    "python.testing.pytestArgs": [
+        "-c",
+        "testing/pytest.ini",
+        "testing"
+    ],
+    "python.testing.autoTestDiscoverOnSaveEnabled": false,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.analysis.exclude": [
+        "lagniappe/web/static",
+        "node_modules",
+        "reports"
+    ],
+    "terminal.integrated.env.linux": {
+        "PLAYWRIGHT_BROWSERS_PATH": "${env:HOME}/.cache/ms-playwright"
+    },
+    "files.watcherExclude": {
+        "**/lagniappe/web/static/**": true,
+        "**/.pytest_cache/**": true,
+        "**/__pycache__/**": true
+    },
+    "search.exclude": {
+        "**/lagniappe/web/static": true
+    }
+}

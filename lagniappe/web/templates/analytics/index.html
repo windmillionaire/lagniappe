@@ -1,0 +1,347 @@
+{% set view_entry = "analytics" %}
+{% extends "layouts/base.html" %}
+{% import 'controls.html' as controls %}
+
+{% macro stat(label, value, kind="page") %}
+  <div class="rounded-md border border-base-light/50 bg-base-bg px-4 py-3 shadow-sm"
+       data-role="analytics-stat"
+       data-kind="{{ kind }}">
+    <div class="text-sm font-semibold text-base-medium">{{ label }}</div>
+    <div class="mt-1 text-2xl font-bold text-kind-default">{{ value }}</div>
+  </div>
+{% endmacro %}
+
+{% macro period_nav() %}
+  <nav class="{{ styles.attributes.container }}"
+       aria-label="Analytics period">
+    {% for value, label in periods.items() %}
+      <a href="{{ url_for('analytics.index', period=value) }}"
+         class="{{ styles.attributes.button }}"
+         data-kind="{{ 'success' if value == period else 'page' }}"
+         data-selected="{{ (value == period)|yesno }}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+{% endmacro %}
+
+{% macro retention_controls(dataset, label, endpoint) %}
+  <section class="flex flex-col gap-3 rounded-md border border-base-light/50 px-3 py-2"
+           data-role="analytics-retention"
+           data-dataset="{{ dataset }}"
+           data-open="false">
+    <header class="flex flex-row items-center justify-between gap-4">
+      <h2 class="flex flex-row items-center gap-2 font-semibold text-base-dark">
+        <button class="{{ styles.toggle.container }}"
+                data-kind="delete"
+                data-open="false"
+                data-role="analytics-retention-toggle"
+                aria-expanded="false"
+                aria-controls="analytics-retention-panel-{{ dataset }}"
+                type="button"
+                aria-label="Retention controls"
+                title="Retention controls">
+          {{ render_icon("expand", "invisible group-data-[open=false]/toggle:visible") }}
+          {{ render_icon("contract", "invisible group-data-[open=true]/toggle:visible") }}
+        </button>
+        <span>{{ label }}</span>
+      </h2>
+    </header>
+    <div id="analytics-retention-panel-{{ dataset }}"
+         class="flex flex-col gap-3"
+         data-role="analytics-retention-panel"
+         data-dataset="{{ dataset }}"
+         data-visible="false">
+      <p class="text-sm text-base-medium">Choose how old records must be before they are deleted, or delete every record.</p>
+      <div class="{{ styles.attributes.container }}">
+        {% for value, option in retention_options.items() %}
+          <button type="button"
+                  class="{{ styles.attributes.button }}"
+                  data-kind="{{ 'delete' if value == 'all' else 'page' }}"
+                  data-role="analytics-clear"
+                  data-retention="{{ value }}"
+                  data-route="{{ url_for(endpoint, retention=value) }}">
+            <span>{{ option.label }}</span>
+          </button>
+        {% endfor %}
+      </div>
+      <div class="text-sm font-semibold text-kind-default"
+           data-role="analytics-clear-status"
+           data-visible="false"></div>
+    </div>
+  </section>
+{% endmacro %}
+
+{% macro job_id(value, role) %}
+  {% if value %}
+    <details class="max-w-64 font-mono text-xs text-base-medium"
+             data-role="{{ role }}"
+             data-job-id="{{ value }}">
+      <summary class="cursor-pointer whitespace-nowrap"
+               title="Show full job ID">…{{ value[-12:] }}</summary>
+      <code class="mt-1 block break-all font-mono text-xs">{{ value }}</code>
+    </details>
+  {% else %}
+    <span class="text-base-medium" data-role="{{ role }}">Unmatched</span>
+  {% endif %}
+{% endmacro %}
+
+{% macro ai_groups() %}
+  <section class="flex flex-col gap-4" data-role="ai-observability-groups">
+    {% for group in ai_dashboard.groups %}
+      <div class="flex flex-col gap-2">
+        <h3 class="font-semibold text-base-dark">By {{ group.label }}</h3>
+        {% if group.rows %}
+          <div class="overflow-x-auto rounded-md border border-base-light/50">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-base-light/20 text-base-medium">
+                <tr>
+                  <th class="px-3 py-2">Value</th>
+                  <th class="px-3 py-2 text-right">Generations</th>
+                  <th class="px-3 py-2 text-right">Success</th>
+                  <th class="px-3 py-2 text-right">Requests</th>
+                  <th class="px-3 py-2 text-right">Tokens</th>
+                  <th class="px-3 py-2">Validation / Repair</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-base-light/50">
+                {% for row in group.rows %}
+                  <tr>
+                    <td class="px-3 py-2 font-semibold text-base-dark">{{ row.value }}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{{ row.count }}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{{ row.success_rate }}%</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{{ row.requests }}</td>
+                    <td class="px-3 py-2 text-right tabular-nums">{{ row.tokens }}</td>
+                    <td class="px-3 py-2 text-base-medium">
+                      {% for outcome in row.outcomes %}
+                        <span class="mr-2 whitespace-nowrap">{{ outcome.name }}: {{ outcome.count }}</span>
+                      {% endfor %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </section>
+{% endmacro %}
+
+{% macro ai_observability() %}
+  <section class="flex flex-col gap-5" data-role="ai-observability">
+    <div>
+      <h2 class="text-xl font-semibold text-base-dark">AI Generations</h2>
+      <p class="text-sm text-base-medium">Privacy-bounded summaries of application-visible text generation calls.</p>
+    </div>
+    {{ retention_controls('ai', 'Delete AI Generation Records', 'analytics.clear_ai_records') }}
+    <section class="grid grid-cols-2 gap-3 lg:grid-cols-6" data-role="ai-observability-summary">
+      {{ stat("Generations", ai_dashboard.generation_count) }}
+      {{ stat("Success Rate", ai_dashboard.success_rate ~ "%", "success") }}
+      {{ stat("Provider Requests", ai_dashboard.provider_requests) }}
+      {{ stat("Tool Rounds / Calls", ai_dashboard.tool_rounds ~ " / " ~ ai_dashboard.tool_calls) }}
+      {{ stat("Total Tokens", ai_dashboard.token_total) }}
+      {{ stat("Quota Errors", ai_dashboard.quota_errors, "delete") }}
+    </section>
+    <section class="grid grid-cols-2 gap-3 lg:grid-cols-4" data-role="ai-observability-details">
+      {{ stat("Requests / Generation", ai_dashboard.requests_per_generation) }}
+      {{ stat("Calls / Round", ai_dashboard.calls_per_round) }}
+      {{ stat("Sequential Round Rate", ai_dashboard.sequential_round_rate ~ "%") }}
+      {{ stat("Exact Cache Hits", ai_dashboard.cache_hits) }}
+      {{ stat("Average Duration", ai_dashboard.average_duration_ms ~ " ms") }}
+      {{ stat("Provider Result Chars", ai_dashboard.provider_result_chars) }}
+      {{ stat("Validated Result Chars", ai_dashboard.validated_result_chars) }}
+      {{ stat("Original Files", ai_dashboard.original_file_count, "file") }}
+    </section>
+    {% if ai_dashboard.tools %}
+      <section class="flex flex-col gap-2" data-role="ai-observability-tools">
+        <h3 class="font-semibold text-base-dark">Known Tool Usage</h3>
+        <div class="{{ styles.attributes.container }}">
+          {% for tool in ai_dashboard.tools %}
+            <span class="{{ styles.attributes.button }}" data-kind="page">{{ tool.name }}: {{ tool.count }}</span>
+          {% endfor %}
+        </div>
+      </section>
+    {% endif %}
+    {{ ai_groups() }}
+    <section class="flex flex-col gap-2" data-role="deferred-operations">
+      <div>
+        <h3 class="font-semibold text-base-dark">Deferred Operations</h3>
+        <p class="text-sm text-base-medium">Latest durable jobs, including active recovery state.</p>
+      </div>
+      <div class="overflow-x-auto rounded-md border border-base-light/50">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-base-light/20 text-base-medium">
+            <tr>
+              <th class="px-3 py-2">Workflow</th>
+              <th class="px-3 py-2">Job ID</th>
+              <th class="px-3 py-2">User</th>
+              <th class="px-3 py-2">State</th>
+              <th class="px-3 py-2">Phase</th>
+              <th class="px-3 py-2 text-right">Attempt</th>
+              <th class="px-3 py-2 text-right">Elapsed</th>
+              <th class="px-3 py-2">Output</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-base-light/50">
+            {% for operation in deferred_operations %}
+              <tr data-operation-status="{{ operation.status }}">
+                <td class="px-3 py-2 font-semibold text-base-dark">{{ operation.type }}</td>
+                <td class="px-3 py-2">{{ job_id(operation.key, "deferred-operation-id") }}</td>
+                <td class="px-3 py-2 text-base-medium">{{ operation.actor }}</td>
+                <td class="px-3 py-2">
+                  {{ operation.status|replace('_', ' ')|title }}
+                  {% if operation.recovering %}<span class="text-kind-default"> · recovering</span>{% endif %}
+                </td>
+                <td class="px-3 py-2 text-base-medium">{{ operation.phase_label }}</td>
+                <td class="px-3 py-2 text-right tabular-nums">{{ operation.attempt }}</td>
+                <td class="px-3 py-2 text-right tabular-nums">{{ operation.elapsed_seconds }}s</td>
+                <td class="px-3 py-2">
+                  <a class="font-semibold text-base-default"
+                     data-role="deferred-operation-json"
+                     href="{{ url_for('analytics.operation_diagnostic', job_id=operation.key) }}"
+                     target="_blank"
+                     rel="noopener">JSON</a>
+                </td>
+              </tr>
+            {% else %}
+              <tr><td class="px-3 py-2 text-base-medium" colspan="8">No deferred operations recorded.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section class="flex flex-col gap-2" data-role="ai-inflight">
+      <div>
+        <h3 class="font-semibold text-base-dark">In-flight AI Generations</h3>
+        <p class="text-sm text-base-medium">Provider calls that started but have not written a terminal summary.</p>
+      </div>
+      <div class="overflow-x-auto rounded-md border border-base-light/50">
+        <table class="w-full text-left text-sm">
+          <thead class="bg-base-light/20 text-base-medium">
+            <tr>
+              <th class="px-3 py-2">Workflow / Stage</th>
+              <th class="px-3 py-2">Job ID</th>
+              <th class="px-3 py-2">Provider Stage</th>
+              <th class="px-3 py-2">State</th>
+              <th class="px-3 py-2">Model</th>
+              <th class="px-3 py-2 text-right">Requests</th>
+              <th class="px-3 py-2 text-right">Last Update</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-base-light/50">
+            {% for generation in ai_inflight %}
+              <tr>
+                <td class="px-3 py-2 font-semibold text-base-dark">{{ generation.workflow }} / {{ generation.stage }}</td>
+                <td class="px-3 py-2">{{ job_id(generation.job_key, "ai-generation-job-id") }}</td>
+                <td class="px-3 py-2 text-base-medium">{{ generation.provider_stage|replace('_', ' ')|title }}</td>
+                <td class="px-3 py-2 {% if generation.stale %}text-kind-default{% else %}text-base-medium{% endif %}">
+                  {{ "Stale" if generation.stale else "Active" }}
+                </td>
+                <td class="px-3 py-2 text-base-medium">{{ generation.model }}</td>
+                <td class="px-3 py-2 text-right tabular-nums">{{ generation.requests }}</td>
+                <td class="px-3 py-2 text-right tabular-nums">{{ generation.age_seconds }}s ago</td>
+              </tr>
+            {% else %}
+              <tr><td class="px-3 py-2 text-base-medium" colspan="7">No AI generations are currently in flight.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% if ai_dashboard.limited %}
+      <div class="text-sm text-base-medium">Showing the latest {{ query_limit }} AI generation summaries for this period.</div>
+    {% endif %}
+  </section>
+{% endmacro %}
+
+{% macro top_pages() %}
+  <section class="flex flex-col gap-3" data-role="analytics-top-pages">
+    <h2 class="text-lg font-semibold text-base-dark">Top Pages</h2>
+    {% if dashboard.top_pages %}
+      <ol class="divide-y divide-base-light/50 rounded-md border border-base-light/50">
+        {% for page in dashboard.top_pages %}
+          <li class="flex flex-row items-center justify-between gap-4 px-3 py-2">
+            <div class="min-w-0">
+              <div class="truncate font-semibold text-base-dark">{{ page.title }}</div>
+              <div class="truncate text-sm text-base-medium">{{ page.path }}</div>
+            </div>
+            <span class="shrink-0 text-lg font-bold tabular-nums text-page-default">{{ page.count }}</span>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <div class="rounded-md border border-base-light/50 px-3 py-2 text-base-medium">No page views in this period.</div>
+    {% endif %}
+  </section>
+{% endmacro %}
+
+{% macro route_groups() %}
+  <section class="flex flex-col gap-3" data-role="analytics-route-groups">
+    <h2 class="text-lg font-semibold text-base-dark">Activity</h2>
+    {% if dashboard.groups %}
+      <div class="divide-y divide-base-light/50 rounded-md border border-base-light/50">
+        {% for group in dashboard.groups %}
+          <section data-role="analytics-prefix"
+                   data-prefix="{{ group.prefix }}"
+                   data-kind="{{ group.kind }}"
+                   data-open="false"
+                   data-route="{{ url_for('analytics.events', prefix=group.prefix, period=period) }}">
+            <header class="flex flex-row items-center justify-between gap-4 px-3 py-2">
+              <div class="flex min-w-0 flex-row items-center gap-3">
+                {{ controls.expand() }}
+                <h3 class="{{ styles.iconLabel.wrapper }} font-semibold text-base-dark">
+                  {{ render_icon(group.icon, (styles.iconLabel.icon) ~ " " ~ (styles.icon.default)) }}
+                  <span>{{ group.label }}</span>
+                </h3>
+              </div>
+              <span class="shrink-0 text-lg font-bold tabular-nums text-kind-default">{{ group.count }}</span>
+            </header>
+            <div data-role="analytics-events"
+                 data-visible="false"
+                 class="border-t border-base-light/50"
+                 aria-live="polite">
+              <div class="px-3 py-2 text-sm text-base-medium">
+                {{ render_icon("spinner") }} Loading events...
+              </div>
+            </div>
+          </section>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="rounded-md border border-base-light/50 px-3 py-2 text-base-medium">No activity in this period.</div>
+    {% endif %}
+  </section>
+{% endmacro %}
+
+{% block title %}
+  Analytics
+{% endblock title %}
+
+{% block content %}
+  <div lp-view
+       data-kind="analytics"
+       class="{{ styles.layout.contentView }} flex flex-col gap-6 py-4 sm:py-6 lg:py-8">
+    <nav class="{{ styles.layout.view.title }}" data-role="page-header">
+      <span data-role="title">Analytics</span>
+    </nav>
+    {{ period_nav() }}
+    {% if analytics_enabled %}
+      {{ retention_controls('activity', 'Delete Activity Records', 'analytics.clear_records') }}
+      <section class="grid grid-cols-2 gap-3 lg:grid-cols-5"
+               data-role="analytics-summary">
+        {{ stat("Total Events", dashboard.total) }}
+        {{ stat("Page Views", dashboard.page_views, "page") }}
+        {{ stat("Public Views", dashboard.public_views, "public") }}
+        {{ stat("Logins", dashboard.logins, "user") }}
+        {{ stat("Known Users", dashboard.known_users, "user") }}
+      </section>
+      {{ top_pages() }}
+      {{ route_groups() }}
+      {% if dashboard.total >= query_limit %}
+        <div class="text-sm text-base-medium">Showing the latest {{ query_limit }} events for this period.</div>
+      {% endif %}
+    {% endif %}
+    {% if ai_observability_enabled %}
+      {{ ai_observability() }}
+    {% endif %}
+  </div>
+{% endblock content %}
