@@ -56,6 +56,11 @@ It never runs another build or replaces the reviewed random build ID. Hosted
 evidence is imported automatically after execution and may be committed
 afterward without changing the tested semantic source tree; the GitHub dispatch
 does that evidence-only follow-up commit itself after guarding the branch head.
+On a release pull request, the candidate run explicitly dispatches the same
+required workflow on that exact evidence-only child because GitHub suppresses
+ordinary workflow-token push triggers. The continuation validates the child
+against its exact parent and runs source/build/traceability gates without
+rebuilding assets or rerunning the hosted suites.
 
 When `SENTRY_AUTH_TOKEN` is configured, production JavaScript source maps are
 generated as hidden Rollup outputs, uploaded to Sentry, then deleted from

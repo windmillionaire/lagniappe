@@ -633,7 +633,12 @@ Create records an asynchronous Cloud Build ID and completed provisioning phases
 so the same clean commit can resume an interrupted build/deploy safely. Result
 download and evidence merge happen automatically after a local execution. The
 manual GitHub workflow performs the same exact-source import and makes an
-evidence-only commit only if its dispatch branch has not moved.
+evidence-only commit only if its dispatch branch has not moved. On a release
+pull request, the candidate run then explicitly requests a
+`workflow_dispatch` continuation on that exact child; an ordinary
+workflow-token push cannot trigger it. The continuation proves the open pull
+request and parent source/snapshot and runs release checks without repeating
+the hosted suites.
 
 The stable infrastructure, request/identity boundary, teardown behavior, and
 evidence import contract are documented in

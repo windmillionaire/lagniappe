@@ -411,14 +411,19 @@ results. Review the file before committing it: failed results may contain
 diagnostic tracebacks, which must not include credentials, private data, or
 other sensitive output.
 
-The main release workflow intentionally runs no application tests and receives
-no GCP, Redis, or deployment credentials. The maintainer runs the necessary
-tests on configured infrastructure and commits the updated evidence manifest
-before opening the release pull request. Hosted CI runs Biome, Ruff,
-repository-wide traceability, changed-source traceability, and the release-tree
-check against the exact base commit. The separate manually dispatched Hosted
-E2E workflow uses keyless WIF only to invoke an already-created Cloud Run job;
-it receives none of the application's settings or provider credentials.
+The release pull request has one required **Source quality and traceability**
+job. Its candidate phase uses keyless WIF to invoke the exact pre-created hosted
+job with scope `all`, which runs unit, JavaScript, tooling, E2E, setup-drift,
+and live-provider contracts. GitHub receives none of the application's settings
+or provider credentials. It downloads and validates the exact result, then
+makes only the evidence follow-up commit. Because a `GITHUB_TOKEN` push does
+not itself trigger CI, the candidate run explicitly dispatches the same
+workflow on the exact evidence child. That current-head continuation validates
+the open pull request and parent result, then runs Biome, Ruff,
+repository-wide and changed-source traceability, and the release-tree check
+without rerunning the suites. Manual GitHub dispatch and trusted local
+execution remain available for diagnosis but do not replace the
+release-pull-request gate.
 
 ## Placement Rules
 

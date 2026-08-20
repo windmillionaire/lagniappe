@@ -220,28 +220,58 @@ provider, and seven-day artifact bucket remain for reuse.
 
 ## Running From GitHub
 
-Dispatch `.github/workflows/hosted-e2e.yml` at the same Git ref used by
-`create`; its default `all` choice runs every complete suite, including the
-setup drift and live-provider contracts, in its single job. The E2E-only
-`full` choice remains available for diagnosis. The
-workflow reads the configured source from the job and refuses to execute if it
-differs from `github.sha`. It uses WIF only to describe and invoke that exact
-job and to download that execution's bundle from the dedicated result bucket;
-it has no project-wide Cloud Run viewer role and cannot read either mounted
-secret or application/test data buckets. The container entry point also
-accepts the separately validated `focused` scope used by the trusted local
-command, but the workflow has no focused input or arbitrary target field.
-The workflow checks out the exact candidate but does not rebuild it or create a
-branch. After the run, it validates and merges the downloaded evidence, checks
-that no tracked file except `testing/evidence/latest.json` changed, and uses a
-normal `git commit -am` plus non-force push to return that evidence to the
-dispatch branch. It rejects tag dispatches and refuses to push if the remote
-branch moved away from the tested commit while the suite was running. Branch
-protection must permit the workflow's GitHub token to make this evidence-only
-follow-up commit.
+`.github/workflows/hosted-e2e.yml` supports a trusted manual dispatch and the
+required release-pull-request path. Both require the exact Git ref previously
+used by `create`; the default `all` scope runs every complete suite, including
+setup drift and live-provider contracts. The E2E-only `full` choice remains
+available for manual diagnosis. GitHub never accepts a focused target.
 
-Local and GitHub dispatches are consequently two front doors to the same job,
-not separate test implementations.
+On an ordinary candidate commit, the workflow uses the pull request's exact
+head SHA, never GitHub's synthetic merge ref. It reads the configured source
+from the Cloud Run job and refuses to execute if it differs from that candidate
+SHA.
+It uses WIF only to describe and invoke that exact job and to download that
+execution's bundle from the dedicated result bucket; it has no project-wide
+Cloud Run viewer role and cannot read either mounted secret or
+application/test data buckets. The container entry point separately accepts
+the validated `focused` scope used by the trusted local command, but no GitHub
+event exposes an arbitrary target field.
+
+The workflow checks out the exact candidate and never rebuilds it. After the
+run, it validates and merges the downloaded evidence, checks that no tracked
+file except `testing/evidence/latest.json` changed, and uses a normal
+`git commit -am` plus non-force push to return that evidence to the unchanged
+branch. It rejects tag dispatches and refuses to push if the remote branch moved
+away from the tested commit while the suite was running. Failed evidence is
+retained by the same path before the candidate run reports red.
+
+GitHub [intentionally does not create another pull-request or push workflow
+run](https://docs.github.com/en/actions/concepts/security/github_token#when-github_token-triggers-workflow-runs)
+from a commit made with `GITHUB_TOKEN`. After a release candidate verifies its
+non-force evidence push, it therefore uses the same token's scoped
+`actions: write` permission to request a `workflow_dispatch` continuation on
+that exact branch. `workflow_dispatch` is the supported recursive-run
+exception; no PAT or GitHub App secret is needed. The dispatch carries the pull
+request number and expected candidate parent, but trusts neither: the new run
+queries the open release pull request and independently verifies its base,
+branch, and current head.
+
+The continuation proves that the evidence head has exactly one parent, only the
+evidence file changed, and the hosted source and semantic snapshot name that
+parent candidate. It then runs authored-source lint, repository and
+changed-source traceability, and the release-tree check without rerunning any
+test suite. The required **Source quality and traceability** status therefore
+lands on the current evidence commit while visibly retaining the exact parent
+execution. If evidence already matches and no follow-up commit is needed, those
+checks finish in the candidate pull-request run. The workflow requests only
+`contents: write` for the evidence commit, `actions: write` for the exact
+continuation dispatch, `pull-requests: read` for validation, and
+`id-token: write` for WIF.
+
+Local execution, manual GitHub dispatch, and the release-pull-request gate are
+front doors to the same Cloud Run job, not separate test implementations. A
+manual or local result remains useful for diagnosis but does not replace the
+required release-pull-request status.
 
 ## Evidence And Reports
 
@@ -274,9 +304,9 @@ print their destination and per-file byte progress.
 
 GitHub performs the same validation and merge from its downloaded directory,
 then commits the resulting evidence to the exact tested branch before it
-reports the suite outcome. Failed runs are therefore preserved too. The final
-workflow step still fails when the hosted manifest failed, so committing the
-diagnostic evidence cannot turn a red suite green.
+reports the suite outcome. Failed runs are therefore preserved too. The
+evidence continuation validates the recorded outcome as well as provenance, so
+committing diagnostic evidence cannot turn a red suite green.
 
 The import merges only when both the result commit and semantic source-tree
 snapshot equal the local checkout. A different source is still available with
@@ -285,8 +315,9 @@ failed suite also imports its failed outcomes and tracebacks, so `latest.json`
 truthfully represents the latest selected run.
 Locally, review and commit that ordinary follow-up change on the existing
 `next/*` or `hotfix/*` branch. In GitHub, the workflow performs that
-evidence-only commit automatically. Evidence and reports are excluded from the
-semantic source snapshot, so the follow-up commit does not invalidate the
+evidence-only commit automatically and the required pull-request continuation
+validates it without another suite run. Evidence and reports are excluded from
+the semantic source snapshot, so the follow-up commit does not invalidate the
 tested snapshot even though provenance retains the exact pre-evidence candidate
 commit.
 
