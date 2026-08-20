@@ -90,7 +90,7 @@ Build, configuration, installation, and test workflows.
 | Work on durable background jobs | [AI_PIPELINE](AI_PIPELINE.md), [BACKEND_ENTITIES](BACKEND_ENTITIES.md), [BACKEND_TOOLS](BACKEND_TOOLS.md) | `lagniappe/core/tools/deferred_jobs.py`, `lagniappe/core/tools/task_queue.py`, `lagniappe/web/routes/process/` |
 | Author a template | [FRONTEND_NAVIGATION](FRONTEND_NAVIGATION.md), [BACKEND_WEB](BACKEND_WEB.md) | `lagniappe/web/templates/` |
 | Build the frontend | [INFRA_BUILD](INFRA_BUILD.md) | `build/rollup.config.mjs`, `build/utility.mjs` |
-| Prepare a release | [INFRA_BUILD](INFRA_BUILD.md), [INFRA_CONFIG](INFRA_CONFIG.md) | `.github/workflows/release.yml`, `run.py` |
+| Prepare a release | [INFRA_BUILD](INFRA_BUILD.md), [INFRA_CONFIG](INFRA_CONFIG.md) | `.github/workflows/hosted-e2e.yml`, `run.py` |
 | Deploy the app | [INFRA_CONFIG](INFRA_CONFIG.md) | `runner/deploy.py` |
 | Set up a new instance | [INFRA_SETUP](INFRA_SETUP.md) | `setup.sh`, `setup.cmd`, `installer/` |
 | QA login on a fresh production install | [AUTHENTICATION](AUTHENTICATION.md), [MANUAL_LOGIN_FLOW_CHECK](../MANUAL_LOGIN_FLOW_CHECK.md) | `lagniappe/web/routes/users/login.py`, `src/script/login.mjs` |

@@ -263,10 +263,15 @@ changed-source traceability, and the release-tree check without rerunning any
 test suite. The required **Source quality and traceability** status therefore
 lands on the current evidence commit while visibly retaining the exact parent
 execution. If evidence already matches and no follow-up commit is needed, those
-checks finish in the candidate pull-request run. The workflow requests only
-`contents: write` for the evidence commit, `actions: write` for the exact
-continuation dispatch, `pull-requests: read` for validation, and
-`id-token: write` for WIF.
+checks finish in the candidate pull-request run.
+
+Permissions are job-scoped. Only the execution job enters the protected
+`hosted-e2e` environment and receives `contents: write`, `actions: write`, and
+`id-token: write`; the continuation needs only `contents: read` and
+`pull-requests: read`. The evidence child therefore does not require a second
+environment approval and cannot mint a GCP identity or modify the branch.
+Manual dispatches also use a distinct check name, so their skipped release
+guard cannot satisfy the required pull-request status.
 
 Local execution, manual GitHub dispatch, and the release-pull-request gate are
 front doors to the same Cloud Run job, not separate test implementations. A

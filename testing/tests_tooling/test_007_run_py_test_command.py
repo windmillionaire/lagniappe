@@ -1757,16 +1757,18 @@ def _write_release_candidate(
 
 
 def test_main_release_workflow_contract():
-    workflow_path = Path(run.__file__).parent / ".github/workflows/release.yml"
+    repository = Path(run.__file__).parent
+    assert not (repository / ".github/workflows/release.yml").exists()
+
+    workflow_path = repository / ".github/workflows/hosted-e2e.yml"
     workflow_text = workflow_path.read_text(encoding="utf-8")
     workflow = yaml.load(workflow_text, Loader=yaml.BaseLoader)
 
-    assert workflow["name"] == "Main release"
-    assert workflow["on"] == {"pull_request": {"branches": ["main"]}}
-    assert workflow["permissions"] == {"contents": "read"}
-    assert list(workflow["jobs"]) == ["quality"]
-    assert workflow["jobs"]["quality"]["name"] == "Source quality and traceability"
-    assert "workflow_dispatch" not in workflow_text
+    assert workflow["name"] == "Hosted release validation"
+    assert workflow["on"]["pull_request"]["branches"] == ["main"]
+    assert list(workflow["jobs"]) == ["execute", "quality"]
+    assert "Source quality and traceability" in workflow["jobs"]["quality"]["name"]
+    assert "Manual dispatch guard" in workflow["jobs"]["quality"]["name"]
     assert '"next/**"' not in workflow_text
     assert "next/*|hotfix/*" in workflow_text
     assert "npm run check" in workflow_text

@@ -135,11 +135,12 @@ def _gcloud(*arguments, check=True, timeout=600, capture_output=True):
 
 
 # @testable infrastructure
-def _git(*arguments, check=True):
+def _git(*arguments, check=True, repo_root=None):
     result = run_command(
         [GIT_CLI, *map(str, arguments)],
         check=False,
         timeout=60,
+        cwd=repo_root or APP_DIR,
     )
     if check and result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip()
@@ -1817,6 +1818,118 @@ def import_result_directory(directory, *, expected_execution=None):
 
 
 # @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_release_evidence_validation_requires_exact_candidate_parent_and_snapshot
+# @tests tests_tooling/test_009_hosted_e2e.py::test_release_evidence_validation_rejects_failed_or_focused_results
+# @pairs hosted-e2e:source-integrity hosted-e2e:branch-movement
+# @pairs hosted-e2e:failure-retention hosted-e2e:suite-scope
+# @pairs hosted-e2e:target-validation traceability:evidence release:continuation
+def validate_release_evidence(
+    candidate,
+    evidence,
+    *,
+    base,
+    repo_root=APP_DIR,
+):
+    """Validate passing hosted evidence for an exact release commit chain."""
+    from testing.utility.traceability_common import (
+        LATEST_TEST_RUN,
+        TEST_RUN_SCHEMA_VERSION,
+        behavior_snapshot,
+        load_json,
+    )
+
+    repo_root = Path(repo_root)
+    revisions = {"base": base, "candidate": candidate, "evidence": evidence}
+    for label, revision in revisions.items():
+        if not isinstance(revision, str) or not re.fullmatch(r"[0-9a-f]{40}", revision):
+            raise HostedE2EError(f"The release {label} is not an exact commit SHA.")
+
+    head = _git("rev-parse", "HEAD", repo_root=repo_root).stdout.strip().casefold()
+    if head != evidence:
+        raise HostedE2EError(
+            f"The checked-out release head is {head}, not evidence commit {evidence}."
+        )
+
+    ancestry = _git(
+        "merge-base",
+        "--is-ancestor",
+        base,
+        candidate,
+        check=False,
+        repo_root=repo_root,
+    )
+    if ancestry.returncode != 0:
+        raise HostedE2EError(
+            "The release candidate is not descended from the pull-request base."
+        )
+
+    mode = "candidate"
+    if evidence != candidate:
+        mode = "continuation"
+        parents = _git(
+            "show",
+            "--no-patch",
+            "--format=%P",
+            evidence,
+            repo_root=repo_root,
+        ).stdout.strip().casefold().split()
+        if parents != [candidate]:
+            raise HostedE2EError(
+                "The evidence continuation must have the exact candidate as its only parent."
+            )
+        changed = _git(
+            "diff-tree",
+            "--no-commit-id",
+            "--name-status",
+            "-r",
+            "--no-renames",
+            candidate,
+            evidence,
+            repo_root=repo_root,
+        ).stdout.splitlines()
+        if changed != [f"M\t{LATEST_TEST_RUN.as_posix()}"]:
+            raise HostedE2EError(
+                "The evidence continuation must modify only testing/evidence/latest.json."
+            )
+
+    payload = load_json(repo_root / LATEST_TEST_RUN)
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema_version") != TEST_RUN_SCHEMA_VERSION
+        or payload.get("kind") != "test-run"
+    ):
+        raise HostedE2EError("Release evidence has an unsupported schema.")
+    provenance = payload.get("provenance")
+    hosted = provenance.get("hosted_e2e") if isinstance(provenance, dict) else None
+    if not isinstance(hosted, dict):
+        raise HostedE2EError("Release evidence has no hosted-E2E provenance.")
+
+    source_snapshot, _source_paths = behavior_snapshot(repo_root)
+    if hosted.get("source") != candidate:
+        raise HostedE2EError(
+            "Release evidence does not name the exact candidate source."
+        )
+    if hosted.get("source_snapshot") != source_snapshot:
+        raise HostedE2EError(
+            "Release evidence does not match the current semantic source tree."
+        )
+    if hosted.get("suite") != "all" or "targets" in hosted:
+        raise HostedE2EError(
+            "Release evidence must come from the complete hosted all suite."
+        )
+    if type(payload.get("exit_status")) is not int or payload["exit_status"] != 0:
+        raise HostedE2EError("The hosted release suite did not pass.")
+
+    return {
+        "base": base,
+        "candidate": candidate,
+        "evidence": evidence,
+        "mode": mode,
+        "source_snapshot": source_snapshot,
+    }
+
+
+# @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_results_can_skip_large_report_archive
 # @features hosted-e2e traceability
 # @dimensions artifact-download selective-download progress
@@ -2072,6 +2185,7 @@ def status():
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_command_defaults_to_all_and_imports
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_release_evidence_command_routes_validation
 # @features hosted-e2e
 # @dimensions cli-routing suite-scope evidence-import
 def run_hosted_e2e_command(arguments):
@@ -2116,6 +2230,13 @@ def run_hosted_e2e_command(arguments):
     )
     import_parser.add_argument("--directory", required=True, type=Path)
     import_parser.add_argument("--execution")
+    validate_parser = commands.add_parser(
+        "validate-release-evidence",
+        help="Validate hosted evidence for a release candidate or continuation.",
+    )
+    validate_parser.add_argument("--candidate", required=True)
+    validate_parser.add_argument("--evidence", required=True)
+    validate_parser.add_argument("--base", required=True)
     commands.add_parser("status", help="Show local and provider lifecycle state.")
     teardown_parser = commands.add_parser("teardown", help="Delete the ephemeral version and job.")
     teardown_parser.add_argument("--force", action="store_true")
@@ -2157,6 +2278,14 @@ def run_hosted_e2e_command(arguments):
             )
             print(json.dumps(payload, indent=2, sort_keys=True))
             return int(payload.get("exit_status") or 0)
+        elif args.action == "validate-release-evidence":
+            payload = validate_release_evidence(
+                args.candidate,
+                args.evidence,
+                base=args.base,
+            )
+            print(json.dumps(payload, indent=2, sort_keys=True))
+            return 0
         elif args.action == "status":
             print(json.dumps(status(), indent=2, sort_keys=True))
         elif args.action == "teardown":
@@ -2182,4 +2311,5 @@ __all__ = [
     "setup",
     "status",
     "teardown",
+    "validate_release_evidence",
 ]

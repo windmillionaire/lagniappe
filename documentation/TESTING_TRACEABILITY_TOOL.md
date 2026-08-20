@@ -72,10 +72,10 @@ referenced implementation or template does invalidate evidence.
 The manifest is excluded from its own behavior snapshot, so recording a test
 result does not immediately make that result stale. GitHub workflow files are
 also excluded because they do not change application behavior. Main release CI
-does not execute the application test suites or use private infrastructure. It
-checks the tracked evidence against the changed source and templates; the
-maintainer completes application and installer testing before opening the
-release pull request.
+invokes the pre-created hosted `all` job through keyless WIF, then writes only
+its validated evidence follow-up commit. The current-head continuation checks
+that tracked evidence against the changed source and templates without
+rerunning the suites or receiving access to private application infrastructure.
 
 Test-evidence provenance records the command, generation time, and
 content-derived behavior snapshot. It intentionally omits Git commit and

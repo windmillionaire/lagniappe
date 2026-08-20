@@ -298,6 +298,168 @@ def _evidence(snapshot, paths, test_name, outcome="passed"):
     }
 
 
+def _release_evidence_repository(
+    repo,
+    *,
+    exit_status=0,
+    suite="all",
+    targets=None,
+    extra_change=False,
+):
+    _git(repo, "init")
+    _git(repo, "config", "user.name", "Hosted Release Test")
+    _git(repo, "config", "user.email", "hosted-release@example.test")
+    source = repo / "source.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    evidence_path = repo / traceability_common.LATEST_TEST_RUN
+    traceability_common.write_json(evidence_path, {})
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "Base")
+    base = _git(repo, "rev-parse", "HEAD").stdout.strip()
+
+    source.write_text("VALUE = 2\n", encoding="utf-8")
+    _git(repo, "commit", "-am", "Candidate")
+    candidate = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    snapshot, paths = behavior_snapshot(repo)
+    payload = _evidence(
+        snapshot,
+        paths,
+        "testing/tests_unit/test_release.py::test_release",
+    )
+    payload["exit_status"] = exit_status
+    payload["provenance"]["hosted_e2e"] = {
+        "execution": "lagniappe-e2e-release1",
+        "job": "lagniappe-e2e",
+        "service": "e2e",
+        "source": candidate,
+        "source_snapshot": snapshot,
+        "build_id": "b1234567",
+        "version": "e2e-abcdef1234567890",
+        "suite": suite,
+    }
+    if targets is not None:
+        payload["provenance"]["hosted_e2e"]["targets"] = targets
+    traceability_common.write_json(evidence_path, payload)
+    if extra_change:
+        (repo / "unexpected.txt").write_text("changed\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "Evidence")
+    evidence = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    return base, candidate, evidence
+
+
+# @pairs hosted-e2e:source-integrity hosted-e2e:branch-movement
+# @pairs traceability:evidence release:continuation
+def test_release_evidence_validation_requires_exact_candidate_parent_and_snapshot(
+    tmp_path,
+):
+    repo = tmp_path / "valid"
+    repo.mkdir()
+    base, candidate, evidence = _release_evidence_repository(repo)
+
+    result = hosted_e2e.validate_release_evidence(
+        candidate,
+        evidence,
+        base=base,
+        repo_root=repo,
+    )
+
+    assert result["mode"] == "continuation"
+    assert result["candidate"] == candidate
+    assert result["evidence"] == evidence
+
+    _git(repo, "switch", "--detach", base)
+    (repo / "base-moved.txt").write_text("advanced base\n", encoding="utf-8")
+    _git(repo, "add", "base-moved.txt")
+    _git(repo, "commit", "-m", "Advance base elsewhere")
+    advanced_base = _git(repo, "rev-parse", "HEAD").stdout.strip()
+    _git(repo, "switch", "--detach", evidence)
+    with pytest.raises(HostedE2EError, match="not descended"):
+        hosted_e2e.validate_release_evidence(
+            candidate,
+            evidence,
+            base=advanced_base,
+            repo_root=repo,
+        )
+
+    with pytest.raises(HostedE2EError, match="exact candidate as its only parent"):
+        hosted_e2e.validate_release_evidence(
+            base,
+            evidence,
+            base=base,
+            repo_root=repo,
+        )
+
+    source = repo / "source.py"
+    source.write_text("VALUE = 3\n", encoding="utf-8")
+    with pytest.raises(HostedE2EError, match="semantic source tree"):
+        hosted_e2e.validate_release_evidence(
+            candidate,
+            evidence,
+            base=base,
+            repo_root=repo,
+        )
+    source.write_text("VALUE = 2\n", encoding="utf-8")
+
+    (repo / "moved.txt").write_text("new head\n", encoding="utf-8")
+    _git(repo, "add", "moved.txt")
+    _git(repo, "commit", "-m", "Move branch")
+    with pytest.raises(HostedE2EError, match="checked-out release head"):
+        hosted_e2e.validate_release_evidence(
+            candidate,
+            evidence,
+            base=base,
+            repo_root=repo,
+        )
+
+    extra_repo = tmp_path / "extra"
+    extra_repo.mkdir()
+    extra_base, extra_candidate, extra_evidence = _release_evidence_repository(
+        extra_repo,
+        extra_change=True,
+    )
+    with pytest.raises(HostedE2EError, match="modify only"):
+        hosted_e2e.validate_release_evidence(
+            extra_candidate,
+            extra_evidence,
+            base=extra_base,
+            repo_root=extra_repo,
+        )
+
+
+# @pairs hosted-e2e:failure-retention hosted-e2e:suite-scope
+# @pair hosted-e2e:target-validation
+def test_release_evidence_validation_rejects_failed_or_focused_results(tmp_path):
+    failed_repo = tmp_path / "failed"
+    failed_repo.mkdir()
+    base, candidate, evidence = _release_evidence_repository(
+        failed_repo,
+        exit_status=1,
+    )
+    with pytest.raises(HostedE2EError, match="did not pass"):
+        hosted_e2e.validate_release_evidence(
+            candidate,
+            evidence,
+            base=base,
+            repo_root=failed_repo,
+        )
+
+    focused_repo = tmp_path / "focused"
+    focused_repo.mkdir()
+    base, candidate, evidence = _release_evidence_repository(
+        focused_repo,
+        suite="focused",
+        targets=["testing/tests_e2e/test_example.py::test_example"],
+    )
+    with pytest.raises(HostedE2EError, match="complete hosted all suite"):
+        hosted_e2e.validate_release_evidence(
+            candidate,
+            evidence,
+            base=base,
+            repo_root=focused_repo,
+        )
+
+
 def test_hosted_result_stamps_remote_provenance(tmp_path, monkeypatch):
     evidence_path = tmp_path / "latest.json"
     traceability_common.write_json(
@@ -476,6 +638,40 @@ def test_hosted_execute_command_defaults_to_all_and_imports(monkeypatch):
         {"suite": "all", "targets": (), "import_results": True},
         {"suite": "all", "targets": (), "import_results": False},
     ]
+
+
+# @pair hosted-e2e:cli-routing
+def test_hosted_release_evidence_command_routes_validation(monkeypatch, capsys):
+    candidate = "a" * 40
+    evidence = "b" * 40
+    base = "c" * 40
+    calls = []
+    monkeypatch.setattr(
+        hosted_e2e,
+        "validate_release_evidence",
+        lambda *arguments, **options: calls.append((arguments, options))
+        or {
+            "base": base,
+            "candidate": candidate,
+            "evidence": evidence,
+            "mode": "continuation",
+        },
+    )
+
+    assert hosted_e2e.run_hosted_e2e_command(
+        [
+            "validate-release-evidence",
+            "--base",
+            base,
+            "--candidate",
+            candidate,
+            "--evidence",
+            evidence,
+        ]
+    ) == 0
+
+    assert calls == [((candidate, evidence), {"base": base})]
+    assert json.loads(capsys.readouterr().out)["mode"] == "continuation"
 
 
 # @features hosted-e2e traceability
@@ -720,44 +916,93 @@ def test_hosted_anchor_declares_its_upload_boundary():
     )
 
 
-def test_hosted_workflow_is_manual_and_returns_exact_evidence_to_its_branch():
-    """The dispatch imports only its exact execution into an unmoved branch."""
-    workflow_path = (
-        hosted_e2e.APP_DIR / ".github/workflows/hosted-e2e.yml"
-    )
+def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
+    """One workflow owns hosted candidates and the current-head release gate."""
+    workflow_path = hosted_e2e.APP_DIR / ".github/workflows/hosted-e2e.yml"
     workflow_text = workflow_path.read_text(encoding="utf-8")
     workflow = yaml.load(workflow_text, Loader=yaml.BaseLoader)
 
-    assert workflow["on"] == {
-        "workflow_dispatch": {
-            "inputs": {
-                "suite": {
-                    "description": "Hosted test scope to run",
-                    "required": "true",
-                    "default": "all",
-                    "type": "choice",
-                    "options": ["all", "full"],
-                }
-            }
-        }
+    assert workflow["on"]["pull_request"] == {
+        "branches": ["main"],
+        "types": ["opened", "synchronize", "reopened"],
     }
-    assert workflow["permissions"] == {
+    dispatch = workflow["on"]["workflow_dispatch"]["inputs"]
+    assert dispatch["mode"]["options"] == ["manual", "continuation"]
+    assert dispatch["suite"]["options"] == ["all", "full"]
+    assert {"pull_request", "candidate_sha", "evidence_sha"} <= set(dispatch)
+    execute = workflow["jobs"]["execute"]
+    quality = workflow["jobs"]["quality"]
+    assert workflow["permissions"] == {}
+    assert execute["permissions"] == {
         "contents": "write",
+        "actions": "write",
         "id-token": "write",
     }
-    assert workflow["jobs"]["execute"]["environment"] == "hosted-e2e"
+    assert quality["permissions"] == {
+        "contents": "read",
+        "pull-requests": "read",
+    }
+    assert execute["environment"] == "hosted-e2e"
+    assert "environment" not in quality
+    assert "Prepare hosted release evidence" in execute["name"]
+    assert "Execute hosted suite" in execute["name"]
+    assert "Source quality and traceability" in quality["name"]
+    assert "Manual dispatch guard" in quality["name"]
+    assert quality["needs"] == "execute"
+    assert "evidence_changed != 'true'" in quality["if"]
+    assert "inputs.mode == 'continuation'" in quality["if"]
+    assert "ref: ${{ steps.context.outputs.candidate_sha }}" in workflow_text
+    assert "ref: ${{ steps.context.outputs.evidence_sha }}" in workflow_text
+    assert "PR_HEAD_SHA" in workflow_text
+    assert "next/*|hotfix/*" in workflow_text
     assert "google-github-actions/auth" in workflow_text
     assert "gcloud run jobs describe" in workflow_text
     assert "gcloud run jobs execute" in workflow_text
-    assert "actions/checkout" in workflow_text
     assert "gcloud storage cp" in workflow_text
     assert "hosted-e2e import-results" in workflow_text
     assert "--execution \"$EXECUTION\"" in workflow_text
+    assert 'rm -f -- "$credentials_file"' in workflow_text
+
+    quality_text = yaml.dump(quality, sort_keys=False)
+    assert "gh api" in quality_text
+    assert "validate-release-evidence" in quality_text
+    assert "npm run check" in quality_text
+    assert "ruff check ." in quality_text
+    assert quality_text.count("run.py traceability") == 2
+    assert "release-check --base" in quality_text
+    assert "gcloud" not in quality_text
+    assert "run.py test" not in quality_text
+
+
+def test_hosted_workflow_retains_results_before_reporting_and_guards_movement():
+    """Failed evidence is returned before red, without overwriting a moved ref."""
+    workflow_path = hosted_e2e.APP_DIR / ".github/workflows/hosted-e2e.yml"
+    workflow_text = workflow_path.read_text(encoding="utf-8")
+    workflow = yaml.load(workflow_text, Loader=yaml.BaseLoader)
+    steps = workflow["jobs"]["execute"]["steps"]
+    positions = {step["name"]: index for index, step in enumerate(steps)}
+
+    assert positions["Merge hosted evidence"] < positions[
+        "Commit evidence to the tested branch"
+    ]
+    assert positions["Commit evidence to the tested branch"] < positions[
+        "Dispatch validation on the evidence child"
+    ]
+    assert positions["Dispatch validation on the evidence child"] < positions[
+        "Report the hosted suite result"
+    ]
+    report = steps[positions["Report the hosted suite result"]]
+    assert "always()" in report["if"]
+    assert "manifest.json" in report["run"]
+    assert "gh workflow run hosted-e2e.yml" in workflow_text
+    assert "-f mode=continuation" in workflow_text
     assert 'remote_head="$(git rev-parse FETCH_HEAD)"' in workflow_text
     assert '"$remote_head" != "$EXPECTED_SOURCE"' in workflow_text
+    assert '"$remote_head" != "$EVIDENCE_SHA"' in workflow_text
     assert 'git commit -am "Updated hosted test evidence"' in workflow_text
-    assert 'git push origin "HEAD:$BRANCH"' in workflow_text
-    assert 'rm -f -- "$credentials_file"' in workflow_text
+    assert 'git push origin "HEAD:refs/heads/$BRANCH"' in workflow_text
+    assert "git push --force" not in workflow_text
+    assert '"$head_sha" != "$DISPATCH_EVIDENCE"' in workflow_text
 
 
 # @features hosted-e2e
