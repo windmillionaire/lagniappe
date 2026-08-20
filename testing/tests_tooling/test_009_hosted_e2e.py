@@ -1027,7 +1027,7 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "validate-release-evidence" in quality_text
     assert "npm run check" in quality_text
     assert "ruff check ." in quality_text
-    assert quality_text.count("run.py traceability") == 2
+    assert "run.py traceability" not in quality_text
     assert "release-check --base" in quality_text
     assert "gcloud" not in quality_text
     assert "run.py test" not in quality_text

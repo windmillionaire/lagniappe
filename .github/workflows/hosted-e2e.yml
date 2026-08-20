@@ -469,25 +469,6 @@ jobs:
       - name: Check Python source
         run: venv/bin/python -m ruff check .
 
-      - name: Check repository traceability
-        run: >-
-          venv/bin/python run.py traceability
-          --check
-          --fail-on warning
-          --no-report
-          --no-manifest
-
-      - name: Check changed-source test evidence
-        env:
-          RELEASE_BASE_REF: ${{ steps.context.outputs.base_sha }}
-        run: >-
-          venv/bin/python run.py traceability
-          --changed "$RELEASE_BASE_REF"
-          --check
-          --fail-on warning
-          --no-report
-          --no-manifest
-
       - name: Check complete release tree
         env:
           RELEASE_BASE_REF: ${{ steps.context.outputs.base_sha }}

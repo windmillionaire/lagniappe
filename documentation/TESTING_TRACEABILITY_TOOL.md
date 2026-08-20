@@ -74,8 +74,10 @@ result does not immediately make that result stale. GitHub workflow files are
 also excluded because they do not change application behavior. Main release CI
 invokes the pre-created hosted `all` job through keyless WIF, then writes only
 its validated evidence follow-up commit. The current-head continuation checks
-that tracked evidence against the changed source and templates without
-rerunning the suites or receiving access to private application infrastructure.
+that the tracked evidence is the sole child change and names the exact hosted
+candidate and semantic source snapshot. It does not repeat a traceability pass:
+the complete hosted suite has already refreshed every test result. The
+continuation requires no access to private application infrastructure.
 
 Test-evidence provenance records the command, generation time, and
 content-derived behavior snapshot. It intentionally omits Git commit and

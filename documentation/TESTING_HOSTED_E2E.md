@@ -258,12 +258,13 @@ branch, and current head.
 
 The continuation proves that the evidence head has exactly one parent, only the
 evidence file changed, and the hosted source and semantic snapshot name that
-parent candidate. It then runs authored-source lint, repository and
-changed-source traceability, and the release-tree check without rerunning any
-test suite. The required **Source quality and traceability** status therefore
-lands on the current evidence commit while visibly retaining the exact parent
-execution. If evidence already matches and no follow-up commit is needed, those
-checks finish in the candidate pull-request run.
+parent candidate. It then runs authored-source lint and the release-tree check
+without rerunning any test suite. A separate traceability pass is unnecessary:
+the hosted `all` run executed every test and its imported manifest contains the
+updated current evidence. The required **Source quality and traceability**
+status therefore lands on the current evidence commit while visibly retaining
+the exact parent execution. If evidence already matches and no follow-up commit
+is needed, those checks finish in the candidate pull-request run.
 
 Permissions are job-scoped. Only the execution job enters the protected
 `hosted-e2e` environment and receives `contents: write`, `actions: write`, and

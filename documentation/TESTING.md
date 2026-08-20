@@ -419,11 +419,12 @@ or provider credentials. It downloads and validates the exact result, then
 makes only the evidence follow-up commit. Because a `GITHUB_TOKEN` push does
 not itself trigger CI, the candidate run explicitly dispatches the same
 workflow on the exact evidence child. That current-head continuation validates
-the open pull request and parent result, then runs Biome, Ruff,
-repository-wide and changed-source traceability, and the release-tree check
-without rerunning the suites. Manual GitHub dispatch and trusted local
-execution remain available for diagnosis but do not replace the
-release-pull-request gate.
+the open pull request and parent result, then runs Biome, Ruff, and the
+release-tree check without rerunning the suites. The complete hosted run has
+already refreshed the tracked evidence for every test, so the continuation
+does not repeat an evidence-driven traceability pass. Manual GitHub dispatch
+and trusted local execution remain available for diagnosis but do not replace
+the release-pull-request gate.
 
 ## Placement Rules
 

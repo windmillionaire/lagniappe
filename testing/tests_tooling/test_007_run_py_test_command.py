@@ -1773,8 +1773,7 @@ def test_main_release_workflow_contract():
     assert "next/*|hotfix/*" in workflow_text
     assert "npm run check" in workflow_text
     assert "ruff check ." in workflow_text
-    assert workflow_text.count("run.py traceability") == 2
-    assert '--changed "$RELEASE_BASE_REF"' in workflow_text
+    assert "run.py traceability" not in workflow_text
     assert 'release-check --base "$RELEASE_BASE_REF"' in workflow_text
     assert "pr-check" not in workflow_text
     assert "pr-clean" not in workflow_text

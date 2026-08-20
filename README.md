@@ -8,8 +8,6 @@ Lagniappe runs on Google Cloud, in your personal or business account, as a proje
 
 By default it scales to zero, so the server can sleep when unused instead of racking up charges, and since App Engine is billed by uptime rather than by request, it isn't possible to be surprised by a big bill for unexpected traffic (unless, again, you configure it that way, which you can do in the app's [deployment settings](https://lagniappe.site/manual/personalization)). This doesn't eliminate ALL of the potential big-bill-surprises, if you use AI very heavily or store a ton of data you may well accumulate surprises, but normal usage is pretty well protected from large monetary oscillations.
 
-You may wonder why this repo seems massively overbuilt for the use case that I've laid out above. The reasons are two: it's just plain easier to overbuild now, and that I really do believe that do-it-right-the-first-time is a better value than show-people-what-you're-working-with-and-fix-it-later. So the repo reflects those values.
-
 See the [release history](documentation/releases/) for version notes.
 
 ## Installation
