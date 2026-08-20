@@ -38,3 +38,6 @@ gha-creds-*.json
 .cursorignore
 .agents/
 .codex/
+
+# Local planning notes
+todo/
