@@ -28,6 +28,7 @@ from testing.elements import (
     Table,
     Tabs,
 )
+from testing.utility import expect_successful_response
 from testing.utility.test_file import TestFile as UploadTestFile
 
 pytestmark = pytest.mark.e2e
@@ -359,17 +360,13 @@ def test_remove_category_from_page(get_user):
     if original.definition.name in category_select.placeholder:
         category_select.select_by_name(original.definition.name)
 
-    with user.page.expect_response("**/update"):
+    with expect_successful_response(
+        user.page,
+        method="PUT",
+        path=f"/pages/{page.key}/update",
+        entity_key=page.key,
+    ):
         SpinnerButtons.UPDATE.click(info_form)
-
-    category_select = Select(info_form.locator("[data-role='categories']"))
-    expect(category_select.input).not_to_have_attribute(
-        "placeholder", re.compile(re.escape(original.definition.name))
-    )
-    for category in added:
-        expect(category_select.input).to_have_attribute(
-            "placeholder", re.compile(re.escape(category.definition.name))
-        )
 
     user.go(original)
     expect(Table(user).get_row(page.definition.name)).not_to_be_attached()
