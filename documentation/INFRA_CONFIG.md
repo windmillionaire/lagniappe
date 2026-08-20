@@ -638,7 +638,10 @@ pull request, the candidate run then explicitly requests a
 `workflow_dispatch` continuation on that exact child; an ordinary
 workflow-token push cannot trigger it. The continuation proves the open pull
 request and parent source/snapshot and runs release checks without repeating
-the hosted suites.
+the hosted suites. Only after those checks pass, a status-only job with scoped
+`statuses: write` publishes the required current-head commit status that GitHub
+can enforce on the pull request; dispatch-job checks alone are not part of the
+pull-request status rollup.
 GitHub starts the job asynchronously and waits on the result bucket's
 last-uploaded `manifest.json` completion marker rather than requiring
 project-wide permission to inspect Cloud Run execution resources.

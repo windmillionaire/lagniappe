@@ -993,6 +993,7 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert {"pull_request", "candidate_sha", "evidence_sha"} <= set(dispatch)
     execute = workflow["jobs"]["execute"]
     quality = workflow["jobs"]["quality"]
+    attest = workflow["jobs"]["attest"]
     assert workflow["permissions"] == {}
     assert execute["permissions"] == {
         "contents": "write",
@@ -1003,6 +1004,7 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
         "contents": "read",
         "pull-requests": "read",
     }
+    assert attest["permissions"] == {"statuses": "write"}
     assert execute["environment"] == "hosted-e2e"
     assert "environment" not in quality
     assert "Prepare hosted release evidence" in execute["name"]
@@ -1012,6 +1014,9 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert quality["needs"] == "execute"
     assert "evidence_changed != 'true'" in quality["if"]
     assert "inputs.mode == 'continuation'" in quality["if"]
+    assert attest["needs"] == "quality"
+    assert "needs.quality.result == 'success'" in attest["if"]
+    assert "Publish current-head release status" in attest["name"]
     assert "ref: ${{ steps.context.outputs.candidate_sha }}" in workflow_text
     assert "ref: ${{ steps.context.outputs.evidence_sha }}" in workflow_text
     assert "PR_HEAD_SHA" in workflow_text
@@ -1027,6 +1032,8 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "hosted-e2e import-results" in workflow_text
     assert "--execution \"$EXECUTION\"" in workflow_text
     assert 'rm -f -- "$credentials_file"' in workflow_text
+    assert 'statuses/$EVIDENCE_SHA' in workflow_text
+    assert "Exact hosted evidence and release gates passed" in workflow_text
 
     quality_text = yaml.dump(quality, sort_keys=False)
     assert "gh api" in quality_text

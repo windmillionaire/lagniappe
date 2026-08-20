@@ -477,3 +477,31 @@ jobs:
         env:
           RELEASE_BASE_REF: ${{ steps.context.outputs.base_sha }}
         run: venv/bin/python run.py release-check --base "$RELEASE_BASE_REF"
+
+  attest:
+    needs: quality
+    if: ${{ always() && needs.quality.result == 'success' }}
+    name: Publish current-head release status
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      statuses: write
+
+    steps:
+      - name: Publish required current-head status
+        env:
+          EVIDENCE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || inputs.evidence_sha }}
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          STATUS_CONTEXT: Source quality and traceability
+        run: |
+          if [[ ! "$EVIDENCE_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "The validated release status requires an exact evidence SHA."
+            exit 1
+          fi
+          gh api --method POST "repos/$REPOSITORY/statuses/$EVIDENCE_SHA" \
+            -f state=success \
+            -f context="$STATUS_CONTEXT" \
+            -f description="Exact hosted evidence and release gates passed" \
+            -f target_url="$RUN_URL"

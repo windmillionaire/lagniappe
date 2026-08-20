@@ -269,14 +269,19 @@ parent candidate. It then runs authored-source lint and the release-tree check
 without rerunning any test suite. A separate traceability pass is unnecessary:
 the hosted `all` run executed every test and its imported manifest contains the
 updated current evidence. The required **Source quality and traceability**
-status therefore lands on the current evidence commit while visibly retaining
-the exact parent execution. If evidence already matches and no follow-up commit
-is needed, those checks finish in the candidate pull-request run.
+commit status is then published by a final status-only job on the exact current
+evidence head while linking back to the validating run and visibly retaining
+the exact parent execution. This explicit status is necessary because a
+`workflow_dispatch` job check is not associated with the pull request's status
+rollup even when it targets the same commit. If evidence already matches and no
+follow-up commit is needed, the same status is published after the candidate
+pull-request checks finish.
 
 Permissions are job-scoped. Only the execution job enters the protected
 `hosted-e2e` environment and receives `contents: write`, `actions: write`, and
 `id-token: write`; the continuation needs only `contents: read` and
-`pull-requests: read`. The evidence child therefore does not require a second
+`pull-requests: read`, followed by an isolated attestation job with only
+`statuses: write`. The evidence child therefore does not require a second
 environment approval and cannot mint a GCP identity or modify the branch.
 Manual dispatches also use a distinct check name, so their skipped release
 guard cannot satisfy the required pull-request status.
