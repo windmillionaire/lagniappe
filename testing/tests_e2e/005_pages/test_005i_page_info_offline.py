@@ -92,9 +92,12 @@ def test_page_info_lp_offline_submit_replays_and_notifies(get_user, browser_fail
     notifications.click()
     option = owner.page.locator(
         "[role='listbox'][data-visible='true'] [role='option']"
-    ).filter(has_text="Offline page update synced.")
+    ).filter(has_text=updated_name)
     expect(option).to_be_visible()
     expect(option.locator("[data-role='target']")).to_contain_text(updated_name)
+    expect(option.locator("[data-role='notification-body']")).to_have_text(
+        "Offline page update synced."
+    )
 
     with owner.page.expect_response("**/l/activity/*"):
         option.locator("[data-action='delete-notification']").click()

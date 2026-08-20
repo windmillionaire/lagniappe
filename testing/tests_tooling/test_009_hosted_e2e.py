@@ -1,7 +1,9 @@
 """Offline contracts for the hosted-E2E lifecycle and evidence bridge."""
 
+from datetime import datetime, timezone
 import json
 import subprocess
+import sys
 
 import pytest
 import yaml
@@ -480,12 +482,41 @@ def test_hosted_result_stamps_remote_provenance(tmp_path, monkeypatch):
         "build_id": "b1234567",
         "version": "e2e-abcdef1234567890",
         "suite": "all",
+        "suite_started_at": "2026-08-20T01:00:00+00:00",
+        "suite_finished_at": "2026-08-20T01:30:00+00:00",
     }
 
     hosted_e2e_job._stamp_evidence(manifest)
 
     evidence = traceability_common.load_json(evidence_path)
     assert evidence["provenance"]["hosted_e2e"] == manifest
+
+
+def test_hosted_manifest_records_exact_suite_window(monkeypatch):
+    environment = {
+        "CLOUD_RUN_JOB": "lagniappe-e2e",
+        "GOOGLE_CLOUD_PROJECT": "project-1",
+        "LAGNIAPPE_HOSTED_E2E_SERVICE": "e2e",
+        "LAGNIAPPE_HOSTED_E2E_VERSION": "e2e-abcdef1234567890",
+        "LAGNIAPPE_HOSTED_E2E_SOURCE": "a" * 40,
+        "LAGNIAPPE_HOSTED_E2E_SOURCE_SNAPSHOT": "b" * 64,
+        "LAGNIAPPE_HOSTED_E2E_BUILD_ID": "b1234567",
+    }
+    for name, value in environment.items():
+        monkeypatch.setenv(name, value)
+    started_at = datetime(2026, 8, 20, 1, 0, tzinfo=timezone.utc)
+    finished_at = datetime(2026, 8, 20, 1, 30, tzinfo=timezone.utc)
+
+    manifest = hosted_e2e_job._artifact_manifest(
+        suite="all",
+        exit_status=1,
+        execution="lagniappe-e2e-example",
+        started_at=started_at,
+        finished_at=finished_at,
+    )
+
+    assert manifest["suite_started_at"] == "2026-08-20T01:00:00+00:00"
+    assert manifest["suite_finished_at"] == "2026-08-20T01:30:00+00:00"
 
 
 # @features hosted-e2e
@@ -760,6 +791,34 @@ def test_remote_evidence_merges_tests_and_snapshot_provenance():
         {"snapshot": "local-snapshot", "tests": 1},
         {"snapshot": "remote-snapshot", "tests": 1},
     ]
+
+
+# @features hosted-e2e
+# @dimensions ci-import
+def test_traceability_common_import_does_not_require_playwright():
+    script = """
+import builtins
+
+real_import = builtins.__import__
+
+def guarded_import(name, *args, **kwargs):
+    if name == "playwright" or name.startswith("playwright."):
+        raise ModuleNotFoundError("playwright is intentionally unavailable")
+    return real_import(name, *args, **kwargs)
+
+builtins.__import__ = guarded_import
+from testing.utility.traceability_common import TEST_RUN_SCHEMA_VERSION
+print(TEST_RUN_SCHEMA_VERSION)
+"""
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=hosted_e2e.APP_DIR,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == str(TEST_RUN_SCHEMA_VERSION)
 
 
 # @features hosted-e2e traceability

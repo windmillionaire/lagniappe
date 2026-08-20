@@ -537,7 +537,7 @@ def test_ai_manual_keeps_account_addresses_authenticated(get_user):
         "Registered users can email questions, requests, or attachments"
     )
     expect(content.locator("[data-role='ai-email-account-details']")).to_have_count(0)
-    assert "@" not in public_description.inner_text()
+    expect(public_description).not_to_contain_text("@")
 
     ajax = anonymous.page.evaluate(
         """async () => {
@@ -572,4 +572,4 @@ def test_ai_manual_keeps_account_addresses_authenticated(get_user):
     expect(content.locator("[data-role='public-ai-email-description']")).to_have_count(
         0
     )
-    assert "@" in account_details.inner_text()
+    expect(account_details).to_contain_text("@")

@@ -290,6 +290,25 @@ Every job uploads the following under
 
 A focused manifest also records the exact selected nodeids.
 
+The manifest records `suite_started_at` and `suite_finished_at` in UTC alongside
+the exact App Engine service and version. After a failure, an authenticated
+operator can use those values to query Cloud Logging directly without granting
+the Cloud Run job any log-reader permission or making log collection another
+failure mode. A suitable Logs Explorer filter is:
+
+```text
+resource.type="gae_app"
+resource.labels.module_id="e2e"
+resource.labels.version_id="VERSION_FROM_MANIFEST"
+log_id("appengine.googleapis.com/request_log")
+timestamp>="SUITE_STARTED_AT"
+timestamp<="SUITE_FINISHED_AT"
+```
+
+Narrow the timestamps around the failure artifact before exporting or sharing
+results; App Engine request records can include request paths, IP addresses,
+user agents, and other operator-only diagnostic fields.
+
 Local execution downloads its exact bundle and merges evidence by default:
 
 ```bash

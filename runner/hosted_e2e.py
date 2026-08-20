@@ -1774,6 +1774,7 @@ def merge_remote_evidence(local, remote):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_result_directory_import_requires_the_exact_source
+# @tests tests_tooling/test_009_hosted_e2e.py::test_traceability_common_import_does_not_require_playwright
 # @features hosted-e2e traceability
 # @dimensions evidence merge provenance source-integrity ci-import
 def import_result_directory(directory, *, expected_execution=None):

@@ -118,12 +118,16 @@ def _artifact_manifest(
     suite: str,
     exit_status: int,
     execution: str,
+    started_at: datetime,
+    finished_at: datetime,
     targets=(),
 ) -> dict:
     manifest = {
         "schema_version": 1,
         "kind": "hosted-e2e-result",
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "suite_started_at": started_at.astimezone(timezone.utc).isoformat(),
+        "suite_finished_at": finished_at.astimezone(timezone.utc).isoformat(),
         "execution": execution,
         "job": _required_environment("CLOUD_RUN_JOB"),
         "project": _required_environment("GOOGLE_CLOUD_PROJECT"),
@@ -168,6 +172,8 @@ def _stamp_evidence(manifest: dict) -> None:
             "build_id",
             "version",
             "suite",
+            "suite_started_at",
+            "suite_finished_at",
         )
     }
     if manifest.get("targets"):
@@ -224,14 +230,18 @@ def main(arguments=None) -> int:
 
     execution = _required_environment("CLOUD_RUN_EXECUTION")
     HOSTED_REPORT_ROOT.mkdir(parents=True, exist_ok=True)
+    started_at = datetime.now(timezone.utc)
     result = subprocess.run(
         _pytest_command(args.suite, targets),
         cwd=REPOSITORY_ROOT,
     )
+    finished_at = datetime.now(timezone.utc)
     manifest = _artifact_manifest(
         suite=args.suite,
         exit_status=result.returncode,
         execution=execution,
+        started_at=started_at,
+        finished_at=finished_at,
         targets=targets,
     )
     try:

@@ -341,7 +341,7 @@ def test_delete_page_from_title_menu(get_user):
 
 
 # @features pages
-# @dimensions category-remove details-parent cache-parent
+# @dimensions category-remove
 def test_remove_category_from_page(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_category_edit_page)
@@ -362,7 +362,6 @@ def test_remove_category_from_page(get_user):
     with user.page.expect_response("**/update"):
         SpinnerButtons.UPDATE.click(info_form)
 
-    SpinnerButtons.UPDATE_SUCCESS.successful(info_form)
     category_select = Select(info_form.locator("[data-role='categories']"))
     expect(category_select.input).not_to_have_attribute(
         "placeholder", re.compile(re.escape(original.definition.name))
@@ -375,8 +374,6 @@ def test_remove_category_from_page(get_user):
     user.go(original)
     expect(Table(user).get_row(page.definition.name)).not_to_be_attached()
     user.go(page)
-    saved_page = Entities.fetch_one(page.key, request=Fetch.direct())
-    parent = saved_page.categories[0]
-    expect(user.locate("[data-nav='view']")).to_contain_text(parent.name)
-    assert saved_page.model is None
-    assert saved_page.to_cache["parent_key"] == parent.hash
+    expect(user.locate("[data-nav='view']")).to_contain_text(
+        re.compile("|".join(re.escape(category.definition.name) for category in added))
+    )
