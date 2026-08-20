@@ -1631,14 +1631,16 @@ def _execution_name(payload, *output):
         name = name.rsplit("/", 1)[-1]
     if isinstance(name, str) and EXECUTION_RE.fullmatch(name):
         return name
+    patterns = (
+        r"\bexecutions/(?P<name>lagniappe-e2e-[a-z0-9-]*[a-z0-9])\b",
+        r"\bExecution\s+\[?(?P<name>lagniappe-e2e-[a-z0-9-]*[a-z0-9])\]?",
+        r"\bexecutions\s+describe\s+(?P<name>lagniappe-e2e-[a-z0-9-]*[a-z0-9])\b",
+    )
     for value in output:
-        candidates = re.findall(
-            r"\blagniappe-e2e-[a-z0-9-]*[a-z0-9]\b",
-            value or "",
-        )
-        for candidate in candidates:
-            if EXECUTION_RE.fullmatch(candidate):
-                return candidate
+        for pattern in patterns:
+            match = re.search(pattern, value or "")
+            if match and EXECUTION_RE.fullmatch(match.group("name")):
+                return match.group("name")
     return None
 
 

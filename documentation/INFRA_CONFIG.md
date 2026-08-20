@@ -639,6 +639,9 @@ pull request, the candidate run then explicitly requests a
 workflow-token push cannot trigger it. The continuation proves the open pull
 request and parent source/snapshot and runs release checks without repeating
 the hosted suites.
+GitHub starts the job asynchronously and waits on the result bucket's
+last-uploaded `manifest.json` completion marker rather than requiring
+project-wide permission to inspect Cloud Run execution resources.
 
 The stable infrastructure, request/identity boundary, teardown behavior, and
 evidence import contract are documented in

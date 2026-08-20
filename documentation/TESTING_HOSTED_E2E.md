@@ -237,6 +237,13 @@ application/test data buckets. The container entry point separately accepts
 the validated `focused` scope used by the trusted local command, but no GitHub
 event exposes an arbitrary target field.
 
+GitHub starts the execution asynchronously and waits for its `manifest.json`
+in the result bucket. The runner uploads that file last, so it is the atomic
+completion marker for the other three artifacts. This avoids granting
+project-wide execution-view permission merely so `gcloud --wait` can poll the
+legacy Cloud Run execution resource; a job that never reaches artifact upload
+instead fails at the job's bounded task timeout.
+
 The workflow checks out the exact candidate and never rebuilds it. After the
 run, it validates and merges the downloaded evidence, checks that no tracked
 file except `testing/evidence/latest.json` changed, and uses a normal

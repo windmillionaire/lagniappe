@@ -637,6 +637,8 @@ def test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr(
             returncode=1,
             stdout="",
             stderr=(
+                "This command is authenticated as lagniappe-e2e-invoker@"
+                "example.test.\n"
                 "Execution lagniappe-e2e-failed1 finished with a failed task.\n"
                 "Run gcloud run jobs executions describe lagniappe-e2e-failed1.\n"
             ),
@@ -1017,7 +1019,11 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert "google-github-actions/auth" in workflow_text
     assert "gcloud run jobs describe" in workflow_text
     assert "gcloud run jobs execute" in workflow_text
+    assert "--async" in workflow_text
+    assert "--wait" not in workflow_text
     assert "gcloud storage cp" in workflow_text
+    assert "attempt<=720" in workflow_text
+    assert "completion manifest" in workflow_text
     assert "hosted-e2e import-results" in workflow_text
     assert "--execution \"$EXECUTION\"" in workflow_text
     assert 'rm -f -- "$credentials_file"' in workflow_text

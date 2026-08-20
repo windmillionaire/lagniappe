@@ -165,30 +165,18 @@ jobs:
           E2E_REGION: ${{ vars.GCP_RESOURCE_REGION }}
           E2E_SUITE: ${{ steps.context.outputs.suite }}
         run: |
-          run_log="$RUNNER_TEMP/hosted-e2e-gcloud.log"
-          set +e
           execution_json="$(gcloud run jobs execute "$E2E_JOB" \
             --region "$E2E_REGION" \
             "--args=--suite=$E2E_SUITE" \
-            --wait \
-            --format=json 2>"$run_log")"
-          provider_status=$?
-          set -e
+            --async \
+            --format=json)"
           execution="$(jq -er '.metadata.name // .name' <<<"$execution_json" 2>/dev/null || true)"
           execution="${execution##*/}"
-          if [[ ! "$execution" =~ ^[a-z][a-z0-9-]{0,62}$ ]]; then
-            execution="$(grep -Eo 'lagniappe-e2e-[a-z0-9-]*[a-z0-9]' "$run_log" | tail -1 || true)"
-          fi
-          cat "$run_log"
           if [[ ! "$execution" =~ ^lagniappe-e2e-[a-z0-9-]*[a-z0-9]$ ]]; then
             echo "Cloud Run did not identify the hosted execution."
-            if [[ "$provider_status" == "0" ]]; then
-              provider_status=2
-            fi
-            exit "$provider_status"
+            exit 2
           fi
           echo "execution=$execution" >> "$GITHUB_OUTPUT"
-          echo "provider_status=$provider_status" >> "$GITHUB_OUTPUT"
 
       - name: Download the exact result bundle
         env:
@@ -197,12 +185,30 @@ jobs:
         run: |
           result_dir="$RUNNER_TEMP/hosted-e2e/$EXECUTION"
           mkdir -p "$result_dir"
-          for artifact in manifest.json evidence.json junit.xml reports.tar.gz; do
+          echo "RESULT_DIR=$result_dir" >> "$GITHUB_ENV"
+          manifest_uri="gs://$ARTIFACT_BUCKET/executions/$EXECUTION/manifest.json"
+          manifest_ready=false
+          for ((attempt=1; attempt<=720; attempt++)); do
+            if gcloud storage cp \
+              "$manifest_uri" \
+              "$result_dir/manifest.json" >/dev/null 2>&1; then
+              manifest_ready=true
+              break
+            fi
+            if (( attempt == 1 || attempt % 30 == 0 )); then
+              echo "Waiting for hosted execution $EXECUTION to publish its completion manifest."
+            fi
+            sleep 10
+          done
+          if [[ "$manifest_ready" != "true" ]]; then
+            echo "Hosted execution $EXECUTION did not publish a manifest before its task timeout."
+            exit 1
+          fi
+          for artifact in evidence.json junit.xml reports.tar.gz; do
             gcloud storage cp \
               "gs://$ARTIFACT_BUCKET/executions/$EXECUTION/$artifact" \
               "$result_dir/$artifact"
           done
-          echo "RESULT_DIR=$result_dir" >> "$GITHUB_ENV"
 
       - name: Remove the transient WIF credential
         run: |
@@ -292,17 +298,15 @@ jobs:
 
       - name: Report the hosted suite result
         if: ${{ always() && steps.run.outputs.execution != '' }}
-        env:
-          PROVIDER_STATUS: ${{ steps.run.outputs.provider_status }}
         run: |
+          if [[ ! -f "$RESULT_DIR/manifest.json" ]]; then
+            echo "The hosted result manifest was not downloaded."
+            exit 1
+          fi
           suite_status="$(jq -er '.exit_status' "$RESULT_DIR/manifest.json")"
           if [[ "$suite_status" != "0" ]]; then
             echo "The hosted suite failed with status $suite_status."
             exit "$suite_status"
-          fi
-          if [[ "$PROVIDER_STATUS" != "0" ]]; then
-            echo "Cloud Run returned status $PROVIDER_STATUS despite a passing manifest."
-            exit "$PROVIDER_STATUS"
           fi
 
   quality:
