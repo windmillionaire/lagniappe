@@ -5622,6 +5622,7 @@ def test_run_report_uses_category_form_from_stored_key_for_page_submission(
 
 # @pairs ai-report:deterministic-run ai-report:task-attachment ai-report:created-task
 # @pairs ai-report:submission-completion ai-report:persistence
+# @pairs tasks:task-attachment files:task-attachment
 @pytest.mark.unit
 def test_run_report_attach_file_to_task_targets_created_task(monkeypatch, get_schema):
     _patch_fake_keys(monkeypatch)

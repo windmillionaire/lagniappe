@@ -645,9 +645,10 @@ def user_task_count(page):
     return Query(KINDS.instances).filter(f).count()
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/home.py::TaskList.list
-# @reason home task query recipe is persistence-owned and covered by home/E2E workflows
+# @testable true
+# @tests tests_unit/test_010_task_index.py::test_due_tasks_does_not_add_requires_filter_for_unrestricted
+# @features home task-index
+# @dimensions due-tasks restrictions unrestricted
 def due_tasks(hashes=Restriction.UNRESTRICTED, assigned_to=None):
     """Fetch incomplete active tasks due within the next seven days."""
     if Restriction.is_denied(hashes) and assigned_to is None:

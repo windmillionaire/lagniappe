@@ -474,8 +474,7 @@ def test_tools_create_form_has_expected_controls(get_user):
     expect(form.get_by_role("button", name="Start")).to_be_visible()
 
 
-# @features ai-access
-# @dimensions authentication route-gate
+# @pairs ai-access:authentication ai-access:route-gate
 # @pair cache:invalidation-acknowledgement
 # @template home/home.html::main
 # @template home/tools.html::create_report

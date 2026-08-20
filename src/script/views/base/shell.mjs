@@ -12,6 +12,11 @@ export const markPerformance = (name) => {
 	performance.mark(name);
 };
 
+/**
+ * @testable false
+ * @covered-by src/script/views/base/services.mjs::initializeCoreServices
+ * @reason idle scheduling is an implementation detail of deferred service startup
+ */
 export const whenIdle = () =>
 	new Promise((resolve) => {
 		if (typeof globalThis.requestIdleCallback === "function") {

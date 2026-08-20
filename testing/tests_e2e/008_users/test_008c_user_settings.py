@@ -1024,8 +1024,8 @@ def test_owner_can_reassign_and_remove_user_from_page(get_user):
     assert _session_page_key(created_user) == replacement_page.urlsafe_key
 
 
-# @features user-settings
-# @dimensions submit-boundary attached-form categories restrictions
+# @pairs user-settings:submit-boundary user-settings:attached-form
+# @pairs user-settings:categories user-settings:restrictions
 # @pair cache:invalidation-acknowledgement
 def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     owner = get_user(Users.OWNER)
@@ -1180,7 +1180,8 @@ def test_site_settings_is_owner_only(get_user, browser_failures):
 # @features admin
 # @dimensions site-settings sections configuration-modal environment-variables service-providers external-links
 # @pairs admin:configuration-display admin:recovery-export admin:secrets admin:web-headers
-# @pair admin:configuration-modal
+# @pairs admin:site-settings admin:sections admin:configuration-modal
+# @pairs admin:environment-variables admin:service-providers admin:external-links
 # @template home/admin.html::main
 # @template home/site_settings.html::site_settings
 def test_site_settings_sections_expand_help_and_configuration(get_user):

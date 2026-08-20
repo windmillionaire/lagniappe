@@ -284,7 +284,7 @@ export class CollaborativeDocument {
 	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
 	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
 	 * @features sync
-	 * @dimensions document collaboration presence lifecycle offline-replay replay-order concurrency merge author-color
+	 * @dimensions document collaboration presence lifecycle offline-replay replay-order concurrency merge
 	 */
 	async sync() {
 		this.pendingMentions ||= new Map();

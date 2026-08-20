@@ -80,6 +80,86 @@ const createRoot = () => {
     )
 
 
+# @pairs manual:command-copy manual:clipboard-fallback
+def test_manual_copy_command_falls_back_when_clipboard_is_unavailable(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+let copied = null;
+let textarea = null;
+const context = {
+  clearTimeout() {},
+  console,
+  document: {
+    body: { append(node) { textarea = node; } },
+    createElement() {
+      return {
+        remove() { this.removed = true; },
+        select() { this.selected = true; },
+        setAttribute() {},
+        style: {},
+        value: "",
+      };
+    },
+    execCommand(command) {
+      copied = command;
+      return true;
+    },
+  },
+  ENDPOINTS: { manual: {} },
+  navigator: {
+    clipboard: { async writeText() { throw new Error("denied"); } },
+  },
+  request: {},
+  setTimeout() { return 1; },
+};
+context.globalThis = context;
+vm.createContext(context);
+
+let source = fs.readFileSync("src/script/views/manual.mjs", "utf8");
+source = source.replace(
+  /^import [\s\S]*?(?=\/\*\*)/,
+  "const ShellView = class {};\n",
+);
+source = source.replace("export default class Manual", "class Manual");
+source += "\nglobalThis.Manual = Manual;";
+vm.runInContext(source, context);
+
+const shell = {
+  querySelector() { return { textContent: "gcloud auth login" }; },
+};
+const attributes = new Map();
+const button = {
+  closest() { return shell; },
+  focus() { this.focused = true; },
+  isConnected: true,
+  setAttribute(name, value) { attributes.set(name, value); },
+  textContent: "Copy",
+};
+const manual = Object.create(context.Manual.prototype);
+manual.copyResetTimers = new Map();
+
+(async () => {
+  await manual.copyCommand(button);
+  if (copied !== "copy" || textarea?.value !== "gcloud auth login") {
+    throw new Error("Clipboard fallback did not copy the command");
+  }
+  if (!textarea.selected || !textarea.removed || !button.focused) {
+    throw new Error("Clipboard fallback did not clean up and restore focus");
+  }
+  if (button.textContent !== "Copied!" || attributes.get("aria-label") !== "Command copied") {
+    throw new Error("Clipboard fallback did not publish success");
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
 # @pair table-controls:eager-column-state
 # @pair table-controls:lazy-checkbox-panel
 # @pair table-controls:persistence

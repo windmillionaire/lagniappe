@@ -237,7 +237,7 @@ def test_resend_setup_guides_full_receiving_key_creation(monkeypatch, capsys):
 
 
 # @features ai-email setup resend
-# @dimensions setup resend instructions authorization secrets reuse authentication-email
+# @dimensions setup resend instructions sending-domain authorization secrets reuse authentication-email
 def test_resend_setup_explains_when_authentication_email_can_be_reused(
     monkeypatch,
     capsys,

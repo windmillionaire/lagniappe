@@ -254,8 +254,8 @@ def guide_resend_receiving_key(*, existing=False):
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_resend_setup_explains_when_authentication_email_can_be_reused
-# @features ai-email
-# @dimensions setup resend instructions sending-domain authorization secrets reuse
+# @features ai-email setup resend
+# @dimensions setup resend instructions sending-domain authorization secrets reuse authentication-email
 def guide_resend_sending_identity(sending_domain, *, reusable_sender=None):
     """Confirm reuse of the Resend identity established by authentication email."""
     print("\nConfigure the Resend feedback-sending identity:")

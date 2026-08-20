@@ -125,7 +125,7 @@ def _retry_deferred_job_transaction(operation):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
-# @features ai-email
+# @features ai-email webhook
 # @dimensions replay transaction lease privacy
 @_retry_deferred_job_transaction
 def claim_ai_email_event(digest, lease_token, now, *, lease_seconds=300):
@@ -168,7 +168,7 @@ def claim_ai_email_event(digest, lease_token, now, *, lease_seconds=300):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
-# @features ai-email
+# @features ai-email webhook
 # @dimensions replay terminal-compaction transaction
 @_retry_deferred_job_transaction
 def finish_ai_email_event(digest, lease_token, state, now):
@@ -197,7 +197,7 @@ def finish_ai_email_event(digest, lease_token, state, now):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
-# @features ai-email
+# @features ai-email webhook
 # @dimensions replay transient-release transaction
 @_retry_deferred_job_transaction
 def release_ai_email_event(digest, lease_token, now):

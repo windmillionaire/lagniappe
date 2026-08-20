@@ -218,7 +218,7 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failure
 
 
 # @pairs sync:offline-replay sync:headless sync:concurrency sync:merge
-# @pairs sync:queue-clear
+# @pairs sync:queue-clear sync:document sync:headless-widget
 # @pairs polling:document polling:current-state polling:cursor
 def test_headless_offline_replay_merges_concurrent_remote_edits(
     get_user, browser_failures

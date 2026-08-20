@@ -217,8 +217,7 @@ def test_import_wizard_importing_stage_streams_results_and_completes(get_user):
     expect(results).to_contain_text("Beta Follow Up")
 
 
-# @features ingress
-# @dimensions non-csv validation
+# @pairs ingress:non-csv ingress:validation
 # @pair request-errors:plain-validation
 def test_import_wizard_rejects_non_csv_upload(get_user, browser_failures):
     user = get_user(Users.OWNER)

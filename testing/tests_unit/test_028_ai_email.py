@@ -643,7 +643,7 @@ def test_report_terminal_feedback_uses_generic_notification_delivery():
 
 
 # @features ai-email webhook
-# @dimensions replay transaction lease privacy terminal-compaction
+# @dimensions replay transient-release transaction lease privacy terminal-compaction
 def test_ai_email_event_claim_is_durable_and_replay_safe(monkeypatch):
     from lagniappe.core.tools.database import utility
 
@@ -683,7 +683,11 @@ def test_ai_email_event_claim_is_durable_and_replay_safe(monkeypatch):
     assert utility.claim_ai_email_event(digest, "lease-one", now)["claimed"]
     active = utility.claim_ai_email_event(digest, "lease-two", now + timedelta(seconds=1))
     assert active == {"claimed": False, "reason": "active", "state": "processing"}
-    assert utility.finish_ai_email_event(digest, "lease-one", "accepted", now)
+    assert not utility.release_ai_email_event(digest, "wrong-lease", now)
+    assert utility.release_ai_email_event(digest, "lease-one", now)
+    resumed = utility.claim_ai_email_event(digest, "lease-two", now)
+    assert resumed["claimed"]
+    assert utility.finish_ai_email_event(digest, "lease-two", "accepted", now)
     terminal = utility.claim_ai_email_event(digest, "lease-three", now)
     assert terminal == {"claimed": False, "reason": "terminal", "state": "accepted"}
     only_row = next(iter(store.rows.values()))

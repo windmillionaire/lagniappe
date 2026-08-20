@@ -40,6 +40,10 @@ export const viewEntryUrl = (kind) => {
 	return entry ? `./chunks/views/${entry}.js?v=${BUILD_ID}` : null;
 };
 
+/**
+ * @testable infrastructure
+ * @covered-by src/script/viewRegistry.mjs::viewEntryUrl
+ */
 export const loadView = (kind) => {
 	const url = viewEntryUrl(kind);
 	if (!url) return null;

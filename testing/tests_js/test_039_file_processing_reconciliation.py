@@ -93,7 +93,7 @@ const response = {
 
 
 # @features file
-# @dimensions extract reload text-tab
+# @dimensions extract reload text-tab authoritative-remount
 def test_file_view_shows_extract_reload_only_for_matching_unmounted_text(run_node):
     run_node(
         r'''

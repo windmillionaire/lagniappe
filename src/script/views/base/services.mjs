@@ -1,5 +1,10 @@
 import { markPerformance, whenIdle } from "./shell";
 
+/**
+ * @testable false
+ * @covered-by src/script/views/base/services.mjs::initializeCoreServices
+ * @reason single-flight service loading is owned by core service initialization
+ */
 const loadOnce = (view, promiseKey, handleKey, loader) => {
 	if (view[handleKey]) return Promise.resolve(view[handleKey]);
 	if (view[promiseKey]) return view[promiseKey];
@@ -22,6 +27,7 @@ const loadOnce = (view, promiseKey, handleKey, loader) => {
 	return pending;
 };
 
+/** @testable infrastructure */
 export const ensureOfflineQueue = (view) =>
 	loadOnce(view, "_offlineQueuePromise", "offlineQueue", async () => {
 		const { OfflineQueue } = await import("../../shared/offlineQueue");
@@ -31,6 +37,7 @@ export const ensureOfflineQueue = (view) =>
 		return queue;
 	});
 
+/** @testable infrastructure */
 export const ensurePollingCoordinator = (view) =>
 	loadOnce(view, "_pollingPromise", "PollingCoordinator", async () => {
 		const { PollingCoordinator } = await import("../../shared/polling");
@@ -41,6 +48,7 @@ export const ensurePollingCoordinator = (view) =>
 		return coordinator;
 	});
 
+/** @testable infrastructure */
 export const ensureSyncManager = (view) =>
 	loadOnce(view, "_syncPromise", "SyncManager", async () => {
 		await ensurePollingCoordinator(view);
@@ -51,6 +59,7 @@ export const ensureSyncManager = (view) =>
 		return manager;
 	});
 
+/** @testable infrastructure */
 export const ensureEditWatcher = (view) =>
 	loadOnce(view, "_editWatcherPromise", "EditWatcher", async () => {
 		await ensurePollingCoordinator(view);
@@ -61,6 +70,7 @@ export const ensureEditWatcher = (view) =>
 		return watcher;
 	});
 
+/** @testable infrastructure */
 export const ensureDeferredOperations = (view) =>
 	loadOnce(
 		view,
@@ -89,6 +99,7 @@ export const ensureNotifications = (view) =>
 		return notifications;
 	});
 
+/** @testable infrastructure */
 export const ensureSearchBox = (view) =>
 	loadOnce(view, "_searchPromise", "SearchBox", async () => {
 		const search = document.querySelector("[lp-search]");
@@ -100,6 +111,7 @@ export const ensureSearchBox = (view) =>
 		return box;
 	});
 
+/** @testable infrastructure */
 export const ensureEntityMenu = (view) =>
 	loadOnce(view, "_entityMenuPromise", "EntityMenu", async () => {
 		const { EntityMenu } = await import("../../elements/entityMenu");
@@ -107,6 +119,7 @@ export const ensureEntityMenu = (view) =>
 		return new EntityMenu(view);
 	});
 
+/** @testable infrastructure */
 export const ensureSubmissionManager = (view) =>
 	loadOnce(view, "_submissionPromise", "SubmissionManager", async () => {
 		const { SubmissionManager } = await import("./submission");
@@ -114,6 +127,7 @@ export const ensureSubmissionManager = (view) =>
 		return new SubmissionManager(view);
 	});
 
+/** @testable infrastructure */
 export const ensureOfflineModal = (view) =>
 	loadOnce(view, "_offlineModalPromise", "offlineModal", async () => {
 		if (!view.offlineIndicator) return null;
@@ -124,6 +138,7 @@ export const ensureOfflineModal = (view) =>
 		return modal;
 	});
 
+/** @testable infrastructure */
 export const ensureModalClasses = (view) =>
 	loadOnce(view, "_modalClassesPromise", "ModalClasses", async () => {
 		const { DeleteModal, HelpModal, Modal } = await import(
@@ -140,6 +155,11 @@ export const ensureModalClasses = (view) =>
 const hasSyncCapability = (view) =>
 	Boolean(view.elt.querySelector("[lp-sync]"));
 
+/**
+ * @testable false
+ * @covered-by src/script/views/base/services.mjs::initializeCoreServices
+ * @reason startup failure aggregation is owned by core service initialization
+ */
 const settleServices = async (view, promises, context) => {
 	const results = await Promise.allSettled(promises);
 	for (const result of results) {

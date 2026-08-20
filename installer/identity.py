@@ -32,9 +32,9 @@ IDENTITY_INITIALIZATION_DELAYS = (2, 4, 8, 15, 20, 30, 30)
 
 
 # @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_config_contract
+# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
 # @features setup
-# @dimensions identity-platform provider-discovery permissions
+# @dimensions identity-platform provider-state
 def get_identity_platform_config(session, project_id, headers):
     """Read the live project-level Identity Platform configuration."""
     url = (
@@ -51,7 +51,7 @@ def get_identity_platform_config(session, project_id, headers):
 
 
 # @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_config_contract
+# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
 # @features setup
 # @dimensions identity-platform authorized-domain
 def identity_platform_target(app_url):
@@ -91,7 +91,7 @@ def _core_matches(config, app_url):
 
 
 # @testable true
-# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_config_contract
+# @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
 # @features setup
 # @dimensions identity-platform provider-state authorized-domain
 def identity_platform_config_matches(config, app_url):

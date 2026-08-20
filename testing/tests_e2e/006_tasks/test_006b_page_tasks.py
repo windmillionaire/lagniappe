@@ -324,6 +324,7 @@ def test_create_page_task_with_model_task(get_user):
 
 
 # @pairs tasks:create tasks:assignee
+# @pair tasks:badge
 # @pair notifications:assignee-target
 # @template notifications.html::item
 def test_create_page_task_with_assigned_to(get_user):
@@ -628,6 +629,7 @@ def test_submit_attached_task_form(get_user):
 # @pair tasks:complete
 # @pair tasks:readonly
 # @pair tasks:attached-form
+# @pair reconnect-refresh:page-tasks
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
 # @template pages/tasks.html::settings_form

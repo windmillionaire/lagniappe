@@ -516,8 +516,8 @@ def test_user_login_success(get_user):
     expect(user.page).to_have_title("Home")
 
 
-# @features auth
-# @dimensions session-user switch invalidation session-keys user-key page-key
+# @pairs auth:session-user auth:switch auth:invalidation auth:session-keys
+# @pairs auth:user-key auth:page-key
 # @pair cache:invalidation-acknowledgement
 def test_switching_session_user_requests_client_cache_invalidation(get_user):
     owner = get_user(Users.OWNER)
@@ -1370,8 +1370,7 @@ def test_csrf_failure_is_identified_for_targeted_retry(get_user, browser_failure
     assert response["body"]
 
 
-# @features login
-# @dimensions logout session redirect session-keys clear
+# @pairs login:logout login:session login:redirect login:session-keys login:clear
 # @pair cache:invalidation-acknowledgement
 # @style login.heading
 def test_logout_clears_session_and_returns_login(get_user):
@@ -1422,8 +1421,7 @@ def test_logout_clears_session_and_returns_login(get_user):
     expect(user.page).to_have_title("Home")
 
 
-# @features login
-# @dimensions logout invalidation control redirect
+# @pairs login:logout login:invalidation login:redirect login:ajax
 # @pair cache:invalidation-acknowledgement
 def test_logout_flags_user_cache_invalidation(get_user):
     """The logout control should expose invalidation and navigate to login."""

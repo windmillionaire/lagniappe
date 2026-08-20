@@ -56,6 +56,7 @@ class AIEmailProviderError(RuntimeError):
     """Raised for a bounded provider operation that should be retried."""
 
 
+# @testable infrastructure
 class AIEmailRejection(ValueError):
     """A safe, correctable submission rejection for a known user."""
 
@@ -136,6 +137,9 @@ class AIEmailSubmissionResult:
     report: object | None = None
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::verify_svix_signature
+# @reason case-insensitive header lookup is exercised through signature verification
 def _header(headers, name):
     wanted = name.casefold()
     for key, value in (headers or {}).items():
@@ -144,6 +148,9 @@ def _header(headers, name):
     return ""
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::authentication_results_candidates
+# @reason multi-value header normalization is owned by authentication telemetry
 def _header_values(headers, name):
     if not isinstance(headers, dict):
         return []
@@ -159,6 +166,9 @@ def _header_values(headers, name):
     return values
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::verify_svix_signature
+# @reason signing-secret decoding is exercised through the signed webhook boundary
 def _svix_secret_bytes(secret):
     encoded = str(secret or "").strip()
     if encoded.startswith("whsec_"):
@@ -239,6 +249,9 @@ def parse_resend_event(raw_body):
     return {"type": event_type, "data": data}
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::authentication_results_candidates
+# @reason RFC comment removal is private authentication-header normalization
 def _strip_rfc_comments(value):
     output = []
     depth = 0
@@ -270,6 +283,9 @@ def _strip_rfc_comments(value):
     return "".join(output)
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::authentication_results_candidates
+# @reason domain canonicalization is owned by aligned authentication parsing
 def _parameter_domain(value):
     raw = str(value or "").strip().strip("<>")
     if "@" in raw:
@@ -312,6 +328,9 @@ def authentication_results_candidates(headers, visible_from_domain):
     return tuple(candidates)
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::ResendAIEmailClient
+# @reason provider identifier validation is exercised through the runtime adapter
 def _provider_id(value, label):
     identifier = str(value or "").strip()
     if not _PROVIDER_ID_PATTERN.fullmatch(identifier):
@@ -485,7 +504,7 @@ class ResendAIEmailClient:
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_inbound_message_normalization_routes_alias_and_strips_reply_marker
 # @features ai-email
-# @dimensions sender routing normalization reply-marker html-fallback
+# @dimensions sender routing reply-marker html-fallback
 def parse_mailbox(value):
     """Return one normalized mailbox while preserving exact local-part spelling."""
     if not isinstance(value, str) or any(ord(character) < 32 for character in value):
@@ -516,6 +535,9 @@ def parse_mailbox(value):
         ) from error
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::normalize_resend_message
+# @reason subject canonicalization is part of provider message normalization
 def _normalize_subject(value):
     text = str(value or "").replace("\r", " ").replace("\n", " ")
     text = "".join(
@@ -525,6 +547,9 @@ def _normalize_subject(value):
     return " ".join(text.split()).strip()
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::normalize_message_body
+# @reason HTML fallback conversion is owned by message-body normalization
 def _html_to_text(value):
     soup = BeautifulSoup(str(value or ""), "html.parser")
     for tag in soup(["script", "style", "noscript"]):
@@ -532,6 +557,10 @@ def _html_to_text(value):
     return soup.get_text("\n")
 
 
+# @testable true
+# @tests tests_unit/test_028_ai_email.py::test_inbound_message_normalization_routes_alias_and_strips_reply_marker
+# @features ai-email
+# @dimensions reply-marker html-fallback
 def normalize_message_body(text, html=None):
     """Normalize provider text without broad reply or quote heuristics."""
     source = text if isinstance(text, str) and text.strip() else _html_to_text(html)
@@ -648,6 +677,9 @@ def _select_inline_attachments(attachments, body, html):
     return frozenset(selected)
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::normalize_resend_message
+# @reason alias routing is exercised through provider message normalization
 def _recognized_tool(recipients, config):
     if not isinstance(recipients, (list, tuple)):
         raise AIEmailRejection("route_invalid", "AI email recipient is invalid.")
@@ -669,6 +701,9 @@ def _recognized_tool(recipients, config):
     return unique[0]
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::normalize_resend_message
+# @reason attachment canonicalization is exercised through message normalization
 def _normalize_attachment(value):
     if not isinstance(value, dict):
         raise AIEmailRejection(
@@ -745,6 +780,9 @@ def normalize_resend_message(message, attachments, config):
     ), tool
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::_preflight_submission
+# @reason automated-message classification is owned by submission preflight
 def _automated_message(message):
     headers = message.headers
     auto_submitted = _header(headers, "auto-submitted").strip().casefold()
@@ -769,6 +807,9 @@ def _automated_message(message):
     return "multipart/report" in content_type or "message/delivery-status" in content_type
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::_preflight_submission
+# @reason instruction assembly is owned by the submission body contract
 def _instructions(subject, body):
     return f"Subject: {subject or '(no subject)'}\n\n{body}".rstrip()
 
@@ -862,6 +903,9 @@ def _compact_report_name(tool, message, attachments):
     return f"{prefix}: {source}{suffix}"[:100]
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::_feedback_payload
+# @reason report-link construction is exercised through outbound feedback
 def report_url(report, config=None):
     if config is None:
         from lagniappe import CONFIG
@@ -872,10 +916,16 @@ def report_url(report, config=None):
     return f"https://{domain}/tools/reports/{report.urlsafe_key}"
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::_feedback_payload
+# @reason reply-address construction is exercised through outbound feedback
 def receiving_address(config, tool):
     return f"{config['aliases'][tool]}@{config['domain']}"
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::process_resend_email
+# @reason stored-address normalization is owned by sender authorization
 def _stored_email(user):
     """Normalize a stored mailbox without turning legacy bad data into retries."""
     try:
@@ -947,6 +997,9 @@ def _feedback_payload(config, user, tool, kind, *, report=None, message=None):
     }
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::send_report_feedback
+# @reason feedback idempotency hashing is owned by the outbound feedback contract
 def _feedback_digest(value):
     from lagniappe import CONFIG
 
@@ -957,6 +1010,10 @@ def _feedback_digest(value):
     ).hexdigest()
 
 
+# @testable true
+# @tests tests_unit/test_028_ai_email.py::test_report_feedback_links_to_report_and_remains_available_after_disable
+# @features ai-email
+# @dimensions terminal-link reply-to idempotency disabled-completion
 def send_report_feedback(report, kind, *, message=None, client=None):
     """Send one idempotent acceptance/result email for an email-origin report."""
     from lagniappe import CONFIG
@@ -987,6 +1044,9 @@ def send_report_feedback(report, kind, *, message=None, client=None):
     )
 
 
+# @testable false
+# @covered-by lagniappe/core/tools/ai_email.py::process_resend_email
+# @reason rejection delivery is a private terminal branch of event processing
 def _send_rejection(config, user, tool, rejection, digest, client):
     return client.send_email(
         _feedback_payload(
@@ -1063,7 +1123,7 @@ def _create_email_report(
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_process_resend_email_hands_off_to_existing_report_pipeline
 # @features ai-email
-# @dimensions webhook replay sender user-policy report-handoff feedback
+# @dimensions replay sender user-policy report-handoff
 def process_resend_email(event, event_id, config, digest_secret, *, client=None):
     """Retrieve, authorize, and durably hand one signed event to report ingestion."""
     from lagniappe.core.definitions import Fetch

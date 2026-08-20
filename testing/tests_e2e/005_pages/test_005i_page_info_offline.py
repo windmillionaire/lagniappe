@@ -37,7 +37,7 @@ def _fill_form_element(form, selector, value):
     field_input.fill(value)
 
 
-# @pairs offline:queue-submit offline:replay offline:notification
+# @pairs offline:queue-submit offline:replay offline:notification offline:durable-queue
 # @pairs offline:dropdown-refresh offline:target-link pages:lp-offline
 # @template pages/info.html::info_form
 # @template pages/document.html::document_settings

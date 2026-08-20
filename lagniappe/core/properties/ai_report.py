@@ -52,7 +52,7 @@ class Origin(DBProperty):
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_email_report_shape_preserves_safe_inbound_display_fields
 # @features ai-email ai-report
-# @dimensions inbound-manifest privacy json
+# @dimensions inbound-manifest privacy
 class InboundManifest(DBProperty):
     """Safe normalized email fields displayed with an email-origin report."""
 

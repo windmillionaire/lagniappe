@@ -1312,8 +1312,7 @@ class FileExtractAdapter(FileAdapter):
 
     # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_file_extract_adapter_checkpoints_and_applies_text_asset
-    # @features deferred-jobs file
-    # @dimensions checkpoint extraction text-asset
+    # @pairs deferred-jobs:checkpoint file:extraction file:text-asset
     def prepare(self, context):
         context.set_phase(DeferredJobPhase.PREPARING_INPUTS)
         file = context.input("file")
@@ -1349,8 +1348,7 @@ class FileExtractAdapter(FileAdapter):
 
     # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_file_extract_adapter_checkpoints_and_applies_text_asset
-    # @features deferred-jobs file
-    # @dimensions checkpoint extraction text-asset
+    # @pairs deferred-jobs:checkpoint file:extraction file:text-asset
     def apply(self, context):
         context.ensure_active()
         file = context.input("file")

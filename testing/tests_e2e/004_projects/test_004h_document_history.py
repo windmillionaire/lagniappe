@@ -143,8 +143,9 @@ def test_document_history_restore(get_user):
     expect(editor.text_entry).to_contain_text("Original content to preserve")
 
 
-# @features editor
-# @dimensions history-pin history-clear current-content validation ordering cleanup parent-scope confirmation batch
+# @pairs editor:history-pin editor:history-clear editor:current-content
+# @pairs editor:validation editor:ordering editor:cleanup editor:parent-scope
+# @pairs editor:confirmation editor:batch
 # @pair request-errors:plain-validation
 # @template delete/document_history.html::confirmation
 def test_pin_and_clear_document_history(get_user, browser_failures):

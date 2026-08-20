@@ -405,11 +405,21 @@ function pageMode() {
 	return document?.querySelector("meta[name='mode']")?.getAttribute("content");
 }
 
+/**
+ * @testable false
+ * @covered-by src/script/main.mjs::initialize
+ * @reason analytics startup is composition owned by the page-mode lifecycle
+ */
 async function startAnalytics() {
 	const { analytics } = await import("./shared/analytics");
 	analytics.view();
 }
 
+/**
+ * @testable false
+ * @covered-by src/script/main.mjs::initialize
+ * @reason global error-listener installation is composition owned by startup
+ */
 function startErrorHandling() {
 	window.addEventListener("unhandledrejection", onError);
 	window.addEventListener("error", onError);

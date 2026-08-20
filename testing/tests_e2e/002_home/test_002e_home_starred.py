@@ -176,8 +176,7 @@ def test_star_project(get_user):
     assert star_button.is_starred is True
 
 
-# @features starred
-# @dimensions page accessible-state title-menu
+# @pairs starred:page starred:accessible-state starred:title-menu
 # @pair view-transition:navigation
 # @template menus.html::star
 @pytest.mark.e2e

@@ -240,6 +240,7 @@ def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
 # @pairs messaging:compose-modal messaging:conversation-page messaging:history-page
 # @pairs messaging:read-race messaging:unread-count messaging:per-copy-delete
 # @pairs messaging:clear-horizon messaging:new-after-clear messaging:permission
+# @pair messaging:clear-confirmation
 # @pairs messaging:polling-revision messaging:active-polling
 # @pairs notifications:aggregate-count notifications:exact-count
 # @source lagniappe/core/tools/messages.py::send_message

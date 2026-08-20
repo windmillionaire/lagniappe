@@ -1726,7 +1726,7 @@ widget.commitReset = () => {
 
 
 # @features user-groups
-# @dimensions initialization authoritative-sections input-preservation
+# @dimensions initialization authoritative-sections
 def test_permissions_form_waits_for_authoritative_sections_before_initializing(
     run_node,
 ):
