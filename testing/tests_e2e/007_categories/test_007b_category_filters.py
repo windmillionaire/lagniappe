@@ -9,7 +9,6 @@ Verified against:
 """
 
 from dataclasses import replace
-import json
 from uuid import uuid4
 
 from playwright.sync_api import expect

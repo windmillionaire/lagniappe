@@ -139,7 +139,6 @@ def ingress_next(key, **kwargs):
 @permission(Resource.SITE)
 def ingress_import(key, **kwargs):
     file = kwargs["entity"]
-    body = request.get_json(silent=True) or {}
     service = IngressService(file)
     already_active = False
     try:

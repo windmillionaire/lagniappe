@@ -12,7 +12,6 @@ from installer.errors import (
     ProviderConflict,
     ProviderError,
     ProviderInvalidInput,
-    ProviderPermissionDenied,
     ProviderTimeout,
     ProviderTransientError,
 )

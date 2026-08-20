@@ -290,10 +290,7 @@ export class DeferredOperationManager {
 			try {
 				const editWatcher =
 					this.view.EditWatcher || (await this.view.ensureEditWatcher?.());
-				editWatcher?.expectDeferredCompletion?.(
-					status.entity_key,
-					status.key,
-				);
+				editWatcher?.expectDeferredCompletion?.(status.entity_key, status.key);
 				await this.view.reconcileChange?.({
 					type: "deferred-complete",
 					key: status.entity_key,
