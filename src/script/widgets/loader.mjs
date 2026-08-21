@@ -59,6 +59,7 @@ const WIDGETS = {
 	SavedFilters: () => import("./filters"),
 	SiteExport: () => import("./siteExport"),
 	SiteAiModels: () => import("./siteSettings/aiModels"),
+	SiteAdministrators: () => import("./siteSettings/administrators"),
 	SiteDeployment: () => import("./siteSettings/deployment"),
 	SiteImage: () => import("./siteSettings/image"),
 	SiteMaintenance: () => import("./siteSettings/maintenance"),

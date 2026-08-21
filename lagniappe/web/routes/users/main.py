@@ -41,7 +41,7 @@ def rows():
 # @covered-by lagniappe/web/routes/users/main.py::create
 # @reason form parsing helper owned by user create route
 def user_data(request):
-    if "ai_access" in request.form and not current_user.is_owner:
+    if "ai_access" in request.form and not current_user.is_admin:
         abort(403)
 
     data = {
@@ -84,10 +84,14 @@ def _delete_identity_login_account(user):
 @users.route("/create", methods=["POST"])
 @permission(Resource.USERS, Action.CREATE)
 def create():
+    requested_email = str(request.form.get("email") or "").strip().casefold()
+    owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().casefold()
+    if requested_email and requested_email == owner_email:
+        abort(403)
     try:
         new_user = Entities.USER.create(
             user_data(request),
-            adopt_public=current_user.is_owner,
+            adopt_public=current_user.is_admin,
         )
     except (TypeError, ValueError) as error:
         return responses.error(str(error))
@@ -114,6 +118,10 @@ def delete(key, **kwargs):
         return responses.not_found("User not found")
 
     user = entity if isinstance(entity, Entities.USER) else page.user
+    if user and user.is_owner:
+        abort(403)
+    if user and user.is_admin and not current_user.is_owner:
+        abort(403)
     try:
         _delete_identity_login_account(user)
     except Exception as e:

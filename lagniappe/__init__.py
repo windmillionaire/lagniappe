@@ -130,6 +130,14 @@ class Config:
             "GOOGLE_SIGNIN_ENABLED",
             getattr(constants, "DEFAULT_GOOGLE_SIGNIN_ENABLED", True),
         )
+        self.BOOTSTRAP_ADMIN_EMAIL = str(
+            getattr(
+                self,
+                "BOOTSTRAP_ADMIN_EMAIL",
+                getattr(constants, "DEFAULT_BOOTSTRAP_ADMIN_EMAIL", ""),
+            )
+            or ""
+        ).strip().casefold()
         self.GOOGLE_CLIENT_ID = str(
             getattr(self, "GOOGLE_CLIENT_ID", "") or ""
         ).strip()

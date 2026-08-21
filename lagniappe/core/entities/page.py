@@ -160,11 +160,21 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009f_page_view_access.py::test_page_restricted_access_group_match
-    # @features page, permissions
-    # @dimensions restricted-access, group-match
+    # @tests tests_unit/test_009b_user_permissions.py::test_privileged_user_rows_are_owner_managed
+    # @pairs page:restricted-access page:group-match
+    # @pairs admin:privileged-account admin:page owner:owner-only
     def allowed(self, action, user=None):
         user = current_context_user(user)
         if self.restricted_access(user):
+            return False
+        target_user = self.user
+        if (
+            target_user
+            and target_user.is_admin
+            and user
+            and not user.is_owner
+            and action.value > Action.VIEW.value
+        ):
             return False
         return super().allowed(action, user=user)
 
@@ -296,11 +306,34 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             and getattr(getattr(user, "page", None), "key", None) == self.key
         )
         is_owner_viewer = bool(user and user.is_owner)
+        is_admin_viewer = bool(user and user.is_admin)
+        target_is_privileged = bool(target_user and target_user.is_admin)
+        can_manage_target = bool(
+            is_admin_viewer and (is_owner_viewer or not target_is_privileged)
+        )
+
+        if target_is_privileged and not is_owner_viewer:
+            submitted_name = data.get("name")
+            if submitted_name is not None and submitted_name != target_user.name:
+                raise PermissionError("Only the Owner can edit an Administrator.")
+            protected_fields = {
+                "ai_access",
+                "groups",
+                "remove-user",
+                "reassign-page",
+            }
+            if protected_fields.intersection(data):
+                raise PermissionError("Only the Owner can edit an Administrator.")
+            submitted_email = data.get("email")
+            if submitted_email is not None and submitted_email != target_user.email:
+                raise PermissionError("Only the Owner can edit an Administrator.")
 
         ai_access = None
         if "ai_access" in data:
-            if not is_owner_viewer:
-                raise PermissionError("Only the owner can change AI access.")
+            if not can_manage_target:
+                raise PermissionError(
+                    "Only the owner or an authorized Administrator can change AI access."
+                )
             from ..definitions import AI
 
             ai_access = AI.name_for(data.get("ai_access"))
@@ -324,7 +357,8 @@ class Page(AssetMixin, SubmitterMixin, Entity):
                 )
             allow_site_email = bool(data.get("allow_site_email"))
 
-        target_user.name = data.get("name")
+        if not target_is_privileged or is_owner_viewer:
+            target_user.name = data.get("name")
         if ai_access is not None:
             target_user.ai_access = ai_access
         if notification_email_mode is not None:
@@ -351,10 +385,12 @@ class Page(AssetMixin, SubmitterMixin, Entity):
         self.add_mutation_intents(
             MutationIntent.standard(target_user, reason="page-user-update")
         )
-        if not is_owner_viewer or is_own_page:
+        if not can_manage_target or is_own_page:
             return
 
         if "email" in data:
+            if target_user.is_owner:
+                raise PermissionError("The primary Owner email cannot be changed.")
             target_user.email = data.get("email")
         if "groups" in data:
             target_user.groups = data.get("groups", [])

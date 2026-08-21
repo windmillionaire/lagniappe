@@ -85,11 +85,15 @@ def _index_result(entity):
 # @testable true
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_category_search_permission_filter_returns_editable_categories
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_user_assign_search_permission_filter_returns_assignable_users
-# @features search permissions
-# @dimensions permission-filter category-edit assign
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+# @pairs search:permission-filter permissions:category-edit permissions:assign admin:owner-only
 def _search_restrictions(kind):
     permission = request.values.get("permission")
     if not permission:
+        return current_user.properties.restrictions.search
+    if kind == "administrator" and permission == "administrator":
+        if not current_user.is_owner:
+            abort(403)
         return current_user.properties.restrictions.search
     if kind == "category" and permission == "edit":
         return current_user.properties.restrictions.category_edit_restrictions
@@ -106,6 +110,28 @@ def _search_restrictions(kind):
                 abort(403)
         return current_user.properties.restrictions.user_message_restrictions
     abort(400)
+
+
+# @testable true
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+# @pairs admin:managed-user-search admin:privileged-account
+def _administrator_results(results):
+    """Keep the role selector limited to ordinary managed-user pages."""
+    pages = {
+        page.urlsafe_key: page
+        for page in Entities.fetch(
+            *[result.get("id") for result in results if result.get("id")],
+            request=Fetch.direct(),
+        )
+        if isinstance(page, Entities.PAGE) and page.user
+    }
+    return [
+        result
+        for result in results
+        if (page := pages.get(result.get("id")))
+        and not page.user.is_public
+        and not page.user.is_admin
+    ]
 
 
 # @testable true
@@ -146,8 +172,8 @@ def _quick_create_entity(kind, form):
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_model_task_form_selector_quick_creates_form
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_home_create_category_form_selector_quick_creates_form
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_page_info_category_multiselect_quick_creates_category
-# @features search facets quick-create
-# @dimensions search-results command-row
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+# @pairs search:search-results facets:command-row admin:managed-user-search
 @internal.route("/search-index/<kind>")
 @logged_in
 def index(kind):
@@ -157,10 +183,11 @@ def index(kind):
     if len(query) < 1:
         return responses.index_results([])
 
+    search_kind = "user" if kind == "administrator" else kind
     if kind != "internal":
         search_results = cache.kind_search(
             query,
-            kind,
+            search_kind,
             _search_restrictions(kind),
             current_user.properties.restrictions.belongs_to,
             form_type=request.values.get("form-type"),
@@ -181,6 +208,8 @@ def index(kind):
         current_user,
         document_identifier=request.values.get("document"),
     )
+    if kind == "administrator":
+        search_results = _administrator_results(search_results)
 
     if preloaded_hashes:
         results = [

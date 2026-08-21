@@ -1,4 +1,5 @@
 {% from "manual/macros.html" import heading, subheading, card, callout, concept, link, nav_buttons %}
+
 {% macro open_source() %}
   {{ heading("Open Source") }}
   {% call card() %}
@@ -12,8 +13,8 @@
     {% if CONFIG.SOURCE_URL %}
       <p class="text-base-medium mt-3">
         {{ link(
-          CONFIG.SOURCE_URL,
-          "Source for this installation (version " ~ CONFIG.VERSION ~ ")"
+        CONFIG.SOURCE_URL,
+        "Source for this installation (version " ~ CONFIG.VERSION ~ ")"
         ) }}
       </p>
     {% endif %}
@@ -50,17 +51,12 @@
     </p>
     <p class="text-base-medium mb-3">
       The first page after an idle period may take a little longer—usually less
-      than a minute—while the server starts. Once awake, Lagniappe should feel
-      fast and fully interactive. This cold start is intentional cost control,
-      not the app's normal speed.
-    </p>
-    <p class="text-base-medium">
-      Owners who prefer an always-warm server can switch to automatic scaling
-      under <strong>Admin</strong>, <strong>Settings</strong>, then
-      <strong>Deployment</strong>, usually at a higher cost. See
+      than a minute—while the server starts. Owners who prefer an always-warm server
+      can switch to automatic scaling under <strong>Admin</strong>, <strong>Settings</strong>,
+      then <strong>Deployment</strong>, usually at a higher cost. See
       {{ link(
-        url_for("manual.index", section="personalization"),
-        "Deployment Settings"
+      url_for("manual.index", section="personalization"),
+      "Deployment Settings"
       ) }}
       for the complete steps.
     </p>

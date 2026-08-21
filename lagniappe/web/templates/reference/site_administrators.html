@@ -1,0 +1,21 @@
+{% from "manual/macros.html" import callout, subheading %}
+{% from "reference/macros.html" import modal %}
+{% call modal("Administrators") %}
+  <p class="text-sm text-base-dark">
+    Administrators can manage Lagniappe settings, users, groups, ingress,
+    exports, and content. Only the primary Owner can add or remove
+    Administrators or view installation configuration containing deployment
+    secrets.
+  </p>
+  {{ subheading("Roles and Accounts") }}
+  <p class="text-sm text-base-dark">
+    Adding an Administrator does not grant AI access or a Google Cloud IAM
+    role. Removing Administrator access keeps the managed user account active.
+    Open Users when an account should be created or permanently deleted.
+  </p>
+  {% call callout("warning") %}
+    An additional Administrator cannot edit or delete the primary Owner or
+    another Administrator. Use the primary Owner account for privileged account
+    changes.
+  {% endcall %}
+{% endcall %}

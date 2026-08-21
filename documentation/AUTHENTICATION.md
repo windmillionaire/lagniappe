@@ -194,6 +194,23 @@ separate-password alternative. Without Google it opens the password path
 directly. A separately created password must be verified through the normal
 email flow before it can create a session.
 
+For a delegated installation, `BOOTSTRAP_ADMIN_EMAIL` may hold the exact active
+installer address. On a private site that one address may be provisioned as an
+additional application Administrator through the Google callback only while
+the configured Owner has no successful login (`last_login` is absent). It is
+not accepted by the email/password handoff, is not shown in login HTML, and
+does not act as a pattern or domain allowlist. The first successful Owner login
+closes automatic installer creation permanently. A bootstrap Administrator
+created before then remains an ordinary stored Administrator until the Owner
+demotes or deletes that account; clearing the setting does not silently delete
+the user.
+
+Application roles and provider identities are separate. `owner` is the
+singleton canonical row matching `ADMIN_EMAIL`; stored `admin` grants ordinary
+application administration and does not confer AI entitlement or Google Cloud
+IAM. Conversely, a Google Cloud Owner binding does not create an application
+session or Lagniappe role.
+
 ### Invited and returning users
 
 After owner initialization, users choose Google or email sign-in. Email is

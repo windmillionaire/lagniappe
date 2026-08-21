@@ -40,6 +40,7 @@ Form State Machine:
 import base64
 from contextlib import contextmanager
 from datetime import datetime, timezone
+import importlib
 import json
 import re
 import time
@@ -989,6 +990,101 @@ def test_google_signin_setting_disables_ui_and_callback(monkeypatch):
     assert parse_qs(location.query) == {
         "next": ["/tasks/index?from=google"],
     }
+
+
+# @pairs login:bootstrap login:owner-first-login login:provisioning
+# @pairs admin:exact-email admin:google-only owner:provisioning
+def test_delegated_bootstrap_admin_requires_exact_google_email_and_closes_after_owner_login(
+    monkeypatch,
+):
+    """Only the exact saved installer can use the temporary Google-only window."""
+    login_module = importlib.import_module("lagniappe.web.routes.users.login")
+    installer_email = "installer@business.example"
+    monkeypatch.setattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", installer_email)
+    monkeypatch.setattr(CONFIG, "ADMIN_EMAIL", "owner@business.example")
+    monkeypatch.setattr(login_module, "_owner_requires_first_login", lambda: True)
+
+    assert login_module._bootstrap_admin_allowed(installer_email.upper())
+    assert not login_module._bootstrap_admin_allowed(
+        "installer+similar@business.example"
+    )
+
+    created = []
+
+    class BootstrapUser:
+        last_login = None
+
+        def save(self):
+            return None
+
+    fake_user = BootstrapUser()
+    monkeypatch.setattr(login_module.database.get, "user", lambda email: None)
+    monkeypatch.setattr(
+        login_module,
+        "Entities",
+        type(
+            "BootstrapEntities",
+            (),
+            {
+                "USER": type(
+                    "BootstrapUserFactory",
+                    (),
+                    {
+                        "create": staticmethod(
+                            lambda data: created.append(dict(data)) or fake_user
+                        )
+                    },
+                ),
+                "PUBLIC_GROUP": type(
+                    "ClosedPublicGroup",
+                    (),
+                    {"enabled": staticmethod(lambda: False)},
+                ),
+            },
+        ),
+    )
+
+    assert (
+        login_module.verify_user(
+            installer_email, "Installer", None, allow_bootstrap_admin=False
+        )
+        is None
+    )
+    assert created == []
+    assert login_module.verify_user(
+        installer_email, "Installer", None, allow_bootstrap_admin=True
+    ) is fake_user
+    assert created == [
+        {
+            "email": installer_email,
+            "name": "Installer",
+            "picture": None,
+            "admin": True,
+        }
+    ]
+
+    created.clear()
+    assert (
+        login_module.verify_user(
+            "wrong@business.example",
+            "Wrong Installer",
+            None,
+            allow_bootstrap_admin=True,
+        )
+        is None
+    )
+    monkeypatch.setattr(login_module, "_owner_requires_first_login", lambda: False)
+    assert not login_module._bootstrap_admin_allowed(installer_email)
+    assert (
+        login_module.verify_user(
+            installer_email, "Installer", None, allow_bootstrap_admin=True
+        )
+        is None
+    )
+    assert created == []
+
+    response = app.test_client().get("/users/login")
+    assert installer_email not in response.get_data(as_text=True)
 
 
 @pytest.mark.parametrize(

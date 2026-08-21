@@ -99,6 +99,7 @@ def test_redacted_install_summary_is_allowlisted():
         "INSTALLER_EMAIL": "installer@example.test",
         "DEPLOYER_EMAIL": "deployer@example.test",
         "ADMIN_EMAIL": "owner@example.test",
+        "BOOTSTRAP_ADMIN_EMAIL": "installer@example.test",
         "APP_ENGINE_LOCATION": "us-central",
         "RESOURCE_REGION": "us-central1",
         "OCR_LOCATION": "us",
@@ -128,6 +129,7 @@ def test_redacted_install_summary_is_allowlisted():
     text = "\n".join(lines)
 
     assert "Demo" in text
+    assert "Temporary application Administrator: installer@example.test" in text
     assert "runtime@demo-project.iam.gserviceaccount.com" in text
     assert "lagniappe-tasks" in text
     assert "python314" in text

@@ -391,7 +391,7 @@ class Entity:
     def restricted_access(self, user):
         if not user or not user.is_authenticated:
             return True
-        elif user.is_owner:
+        elif getattr(user, "is_admin", getattr(user, "is_owner", False)):
             return False
 
         if getattr(self, "restricted_to", False):

@@ -51,15 +51,17 @@
             </span>
             <span data-role="text">Apply Updates</span>
           </button>
-          <button data-role="configuration"
-                  data-kind="default"
-                  type="button"
-                  class="{{ styles.button.submit }}">
-            <span data-role="icon" data-visible="true" aria-hidden="true">
-              {{ render_icon("configuration") }}
-            </span>
-            <span data-role="text">Configuration</span>
-          </button>
+          {% if current_user.is_owner %}
+            <button data-role="configuration"
+                    data-kind="default"
+                    type="button"
+                    class="{{ styles.button.submit }}">
+              <span data-role="icon" data-visible="true" aria-hidden="true">
+                {{ render_icon("configuration") }}
+              </span>
+              <span data-role="text">Configuration</span>
+            </button>
+          {% endif %}
         </div>
         <div data-role="migration-status"
              data-visible="false"
@@ -77,6 +79,37 @@
               data-visible="false"
               class="mt-2 space-y-1 text-delete-dark empty:hidden">
           </ul>
+        </div>
+      {% endcall %}
+      {% call site_settings_section('administrators', 'SiteAdministrators', 'Administrators', 'site_administrators', 'Primary Owner and additional Administrators') %}
+        <div class="flex flex-col gap-4">
+          <p class="text-sm text-base-medium">
+            Administrators can manage the application and its content. Only the primary Owner can change this roster or access installation configuration.
+          </p>
+          <ul data-role="administrator-list" class="flex flex-col gap-2"></ul>
+          <form data-role="administrator-form"
+                data-visible="false"
+                class="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:items-end">
+            <label class="{{ styles.label.column }} w-full">
+              <span>Managed user</span>
+              <input type="search"
+                     data-role="managed-user-selector"
+                     name="user_key"
+                     data-index="administrator"
+                     data-permission="administrator"
+                     data-placeholder="search managed users..."
+                     class="{{ styles.input }}">
+            </label>
+            <button type="submit"
+                    data-kind="user"
+                    class="{{ styles.button.submit }} h-10">Add Administrator</button>
+          </form>
+          <p data-role="administrator-error"
+             data-visible="false"
+             class="text-sm font-semibold text-delete-default"></p>
+          <a href="{{ url_for('users.user_index') }}"
+             data-kind="user"
+             class="{{ styles.link.default }} w-fit">Open Users to create or permanently delete an account</a>
         </div>
       {% endcall %}
       {% call site_settings_section('deployment', 'SiteDeployment', 'Deployment', 'site_deployment', 'App Engine scaling and workers') %}

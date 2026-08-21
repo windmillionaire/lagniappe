@@ -187,12 +187,71 @@ class NotificationEmailPreference(DBProperty):
 
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_is_owner
-# @features user
-# @dimensions owner, property
+# @tests tests_unit/test_009a_user.py::test_user_admin_role_is_separate_from_owner_and_invalidates_cache
+# @pairs user:owner user:property owner:singleton
 class IsOwner(DBProperty):
-    """Whether the user is a site owner (highest privilege level)."""
+    """Whether this row is the configured singleton primary Owner."""
 
     _id = "owner"
+
+    @property
+    def value(self):
+        stored = bool(DBProperty.value.fget(self))
+        if getattr(self.entity, "_testing", False):
+            return stored
+
+        email = str(self.entity.db.get("email") or "").strip().casefold()
+        from ..entities import user as user_module
+
+        owner_email = str(
+            getattr(user_module.CONFIG, "ADMIN_EMAIL", "") or ""
+        ).strip().casefold()
+        validated_email = getattr(self, "_validated_owner_email", "")
+        return bool(
+            stored
+            and email
+            and (email == owner_email or email == validated_email)
+        )
+
+    @value.setter
+    def value(self, value):
+        enabled = bool(value)
+        if not getattr(self.entity, "_testing", False):
+            email = str(self.entity.db.get("email") or "").strip().casefold()
+            from ..entities import user as user_module
+
+            owner_email = str(
+                getattr(user_module.CONFIG, "ADMIN_EMAIL", "") or ""
+            ).strip().casefold()
+            if enabled and (not owner_email or email != owner_email):
+                raise ValueError("Only the configured primary Owner can be an owner.")
+            if not enabled and self.value:
+                raise ValueError("The configured primary Owner cannot be demoted.")
+            if enabled:
+                self._validated_owner_email = owner_email
+        DBProperty.value.fset(self, enabled)
+
+
+# @testable true
+# @tests tests_unit/test_009a_user.py::test_user_admin_role_is_separate_from_owner_and_invalidates_cache
+# @pairs admin:role admin:legacy-default admin:ai-independent
+# @pairs user:property cache:cache-invalidation
+class IsAdmin(DBProperty):
+    """Stored additional-Administrator role, with Owner inheritance."""
+
+    _id = "admin"
+
+    @property
+    def value(self):
+        return bool(getattr(self.entity, "is_owner", False) or DBProperty.value.fget(self))
+
+    @value.setter
+    def value(self, value):
+        enabled = bool(value)
+        previous = bool(DBProperty.value.fget(self))
+        DBProperty.value.fset(self, enabled)
+        if previous != enabled:
+            self.entity.invalidate_cache = True
 
 
 # @testable true

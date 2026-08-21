@@ -59,7 +59,7 @@ Credentials object used by the other runtime Google clients.
 
 ### Site data migrations (`migrations.py`)
 
-The owner-only **Apply Updates** action runs registered, idempotent raw-row
+The Administrator **Apply Updates** action runs registered, idempotent raw-row
 migrations from an append-only, version-pinned catalog in chunks of 100. Raw
 writes preserve business timestamps and avoid constructing typed properties
 from malformed persisted data. A transform mutates a copy and writes only after
@@ -300,7 +300,7 @@ structured final pass. It provides `generate_content(prompt, *, validator=None)`
 
 ### Text-generation observability (`observability.py`)
 
-AI generation observability is an operator-controlled, owner-only diagnostic
+AI generation observability is an operator-controlled, Administrator-only diagnostic
 dataset. It is disabled by default. Setup explicitly asks whether to enable
 `AI_OBSERVABILITY` during AI configuration and preserves that choice on later
 runs and recovery. While enabled, every `GenAI.generate_content` call is

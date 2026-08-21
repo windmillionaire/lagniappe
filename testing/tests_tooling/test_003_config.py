@@ -805,6 +805,7 @@ def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch
     assert snapshot["CONFIG_KIND"] == recovery.CONFIG_KIND
     assert snapshot["CONFIG_SCHEMA_VERSION"] == recovery.CONFIG_SCHEMA_VERSION
     assert snapshot["GOOGLE_SIGNIN_ENABLED"] is True
+    assert snapshot["BOOTSTRAP_ADMIN_EMAIL"] == ""
     assert "BUILD_ID" not in snapshot
     assert "FIREBASE_CONFIG" not in snapshot
     assert "version" not in snapshot
@@ -897,8 +898,7 @@ def _valid_recovery_document():
     }
 
 
-# @features config
-# @dimensions recovery-validation project-identity project-number
+# @pairs config:recovery-validation config:project-identity config:project-number
 def test_recovery_document_cross_checks_all_persisted_project_identities():
     from config import recovery
 
@@ -907,6 +907,7 @@ def test_recovery_document_cross_checks_all_persisted_project_identities():
     assert recovered["GOOGLE_CLOUD_PROJECT"] == "recovered-project-1"
     assert recovered["CONFIG_SCHEMA_VERSION"] == recovery.CONFIG_SCHEMA_VERSION
     assert recovered["GOOGLE_SIGNIN_ENABLED"] is True
+    assert recovered["BOOTSTRAP_ADMIN_EMAIL"] == ""
     assert recovered["RUNTIME_SERVICE_ACCOUNT_EMAIL"].startswith("runtime@")
     assert "FIREBASE_CONFIG" not in recovered
     assert recovered["IDENTITY_PLATFORM_CONFIG"] == {
@@ -925,6 +926,12 @@ def test_recovery_document_cross_checks_all_persisted_project_identities():
         "https://lagniappe.example.com/users/google-signin"
     )
     assert recovery.validate_recovery_document(custom_domain)
+
+    delegated = _valid_recovery_document()
+    delegated["BOOTSTRAP_ADMIN_EMAIL"] = " Installer@Business.Example "
+    assert recovery.validate_recovery_document(delegated)[
+        "BOOTSTRAP_ADMIN_EMAIL"
+    ] == "installer@business.example"
 
     google_disabled = _valid_recovery_document()
     google_disabled["GOOGLE_SIGNIN_ENABLED"] = False

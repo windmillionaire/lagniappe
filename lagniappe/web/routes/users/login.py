@@ -80,6 +80,22 @@ def _owner_requires_first_login():
 
 
 # @testable true
+# @tests tests_e2e/001_site/test_001b_login.py::test_delegated_bootstrap_admin_requires_exact_google_email_and_closes_after_owner_login
+# @pairs login:bootstrap admin:exact-email login:owner-first-login admin:google-only
+def _bootstrap_admin_allowed(email):
+    """Allow exactly the configured installer while the Owner is uninitialized."""
+    bootstrap_email = str(
+        getattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", "") or ""
+    ).strip().casefold()
+    candidate = str(email or "").strip().casefold()
+    return bool(
+        bootstrap_email
+        and candidate == bootstrap_email
+        and _owner_requires_first_login()
+    )
+
+
+# @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_returns_to_requested_url_after_redirect
 # @features login
 # @dimensions redirect-target
@@ -264,10 +280,11 @@ def _send_auth_action_email(email, action, *, user_ip=None, next_target=None):
     auth_email.send_auth_email(email, subject, text_body, html_body)
 
 
-# @testable false
-# @manual true
-# @reason account provisioning decisions are validated through live auth smoke testing
-def verify_user(email, name, picture):
+# @testable true
+# @tests tests_e2e/001_site/test_001b_login.py::test_delegated_bootstrap_admin_requires_exact_google_email_and_closes_after_owner_login
+# @pairs login:provisioning login:bootstrap admin:exact-email admin:google-only
+# @pair owner:provisioning
+def verify_user(email, name, picture, *, allow_bootstrap_admin=False):
     """Verify and create/update user based on authentication."""
     email = str(email or "").strip().lower()
     exists = database.get.user(email)
@@ -279,6 +296,15 @@ def verify_user(email, name, picture):
                 "email": email,
                 "name": name,
                 "picture": picture,
+            }
+        )
+    elif not exists and allow_bootstrap_admin and _bootstrap_admin_allowed(email):
+        user = Entities.USER.create(
+            {
+                "email": email,
+                "name": name,
+                "picture": picture,
+                "admin": True,
             }
         )
     elif not exists:
@@ -462,7 +488,11 @@ def login_google():
         google_email = str(google_claims.get("email") or "").strip().lower()
         owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().lower()
         registered = bool(database.get.user(google_email))
-        if not registered and google_email != owner_email:
+        if (
+            not registered
+            and google_email != owner_email
+            and not _bootstrap_admin_allowed(google_email)
+        ):
             if not Entities.PUBLIC_GROUP.enabled():
                 query = {"authError": "google-not-registered"}
                 safe_state = _safe_redirect_target(request.values.get("state"))
@@ -492,7 +522,12 @@ def login_google():
         name = idinfo.get("name") or exchange.get("displayName")
         picture = idinfo.get("picture") or exchange.get("photoUrl")
 
-        user = verify_user(email, name, picture)
+        user = verify_user(
+            email,
+            name,
+            picture,
+            allow_bootstrap_admin=True,
+        )
         if not user:
             abort(401, "Authentication failed")
 

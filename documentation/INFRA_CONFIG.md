@@ -87,7 +87,7 @@ uses that constant for cache busting.
 
 ## Canonical Recovery Snapshot
 
-The owner-only configuration download is a flat YAML recovery snapshot with
+The primary-Owner-only configuration download is a flat YAML recovery snapshot with
 the fixed filename `lagniappe_settings.yaml`. It copies the persisted settings,
 tokens, passwords, and other application secrets. Service-account key JSON is
 not part of the supported settings contract. It is not a shareable diagnostic
@@ -199,16 +199,25 @@ it with the same normalizer. Recursive recovery display redaction covers the
 webhook secret and both API keys. The plaintext settings file remains
 secret-bearing as described above.
 
-`INSTALLER_EMAIL` and `DEPLOYER_EMAIL` record the Google identities selected by
-the current setup run. The built-in flow uses the active
-`GCLOUD_CONFIG.ACCOUNT` for both responsibilities, including during recovery,
-while preserving `ADMIN_EMAIL` as the distinct application owner.
+`INSTALLER_EMAIL` records the original Google installer as durable historical
+metadata. `DEPLOYER_EMAIL` records the current permanent deployer; an ordinary
+install starts with the active `GCLOUD_CONFIG.ACCOUNT`, while delegated handoff
+changes it to `ADMIN_EMAIL` without erasing the installer. `ADMIN_EMAIL` is the
+distinct singleton application Owner. `BOOTSTRAP_ADMIN_EMAIL` is an optional
+exact Google address for delegated application bootstrap before the Owner's
+first login. Missing legacy values normalize to an explicit empty string, and
+handoff persists that empty value so later setup/update runs cannot recreate
+access. Handoff accepts either the saved installer or Owner as its active
+gcloud/ADC principal, then persists the Owner as both `DEPLOYER_EMAIL` and the
+working copy's `GCLOUD_CONFIG.ACCOUNT`; a third active principal is rejected.
 `RUNTIME_SERVICE_ACCOUNT_EMAIL` is the App Engine attachment and Storage
 signed-URL account. `INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL` is the identity
 expected in Cloud Tasks and Scheduler OIDC tokens. They are equal for this
 release, but remain separate settings so client authority and internal request
 authentication do not depend on credential JSON. These fields document
-responsibility; they do not themselves grant IAM roles.
+responsibility; they do not themselves grant application roles or IAM
+bindings. The `admin` field is stored on individual User entities, not in
+installation settings, and remains separate from per-user AI access.
 
 Runtime Google clients share project-bound Application Default Credentials
 (ADC). Startup fails when the explicit identities are missing, and client
@@ -279,7 +288,7 @@ user's access by reassigning groups from the agent user's settings page.
 
 AI model routing is configured in app settings with `AI_MODEL`,
 `AI_UTILITY_MODEL`, `AI_IMAGE_MODEL`, and `AI_LOCATION`. The location is kept at
-`global`. Owner-only Admin settings persist model choices in the Datastore
+`global`. Administrator Site Settings persist model choices in the Datastore
 `site/ai` entity. That entity is the live authority for both the Admin form and
 new AI generations, with deployed `CONFIG` values used when it is unavailable
 or absent. Each generation resolves its model once and keeps it through

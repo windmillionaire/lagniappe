@@ -856,7 +856,7 @@ def home_notes(user):
         .fetch_all()
     )
 
-    if not user.is_owner:
+    if not (getattr(user, "is_admin", False) or getattr(user, "is_owner", False)):
         user_key = datastore_key(user)
         notes = [
             note

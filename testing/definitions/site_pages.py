@@ -45,7 +45,7 @@ class SitePages(Enum):
 
     Members:
         HOME: Main dashboard at / (HomePage resource with project/category lists)
-        ADMIN: Owner-only admin settings page at /admin
+        ADMIN: Administrator settings page at /admin
         PING: Health check endpoint at /l/ping (returns "pong")
         FORM_INDEX: Form builder index at /forms/index
         SEARCH_PAGE: Full search results page at /l/search-page

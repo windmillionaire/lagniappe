@@ -69,6 +69,10 @@ def _parser():
         "development",
         help="Add development tooling to an existing installation",
     )
+    commands.add_parser(
+        "handoff",
+        help="Transfer delegated installer access to the permanent Owner",
+    )
     return parser
 
 
@@ -119,14 +123,19 @@ def _prepare_setup_dependencies(args):
     if _mode(args) == "auth":
         return
 
-    from runner.gcloud import activate_repository_gcloud
-
     mutating = _mode(args) != "doctor"
     try:
-        activate_repository_gcloud(
-            ensure_adc=mutating,
-            ensure_cli_token=mutating,
-        )
+        if _mode(args) == "handoff":
+            from installer.handoff import prepare_handoff_operator
+
+            prepare_handoff_operator()
+        else:
+            from runner.gcloud import activate_repository_gcloud
+
+            activate_repository_gcloud(
+                ensure_adc=mutating,
+                ensure_cli_token=mutating,
+            )
     except RuntimeError as error:
         from installer.errors import SetupError
 
@@ -195,6 +204,10 @@ def _dispatch(args):
         from installer.development import setup_development
 
         return setup_development()
+    if command == "handoff":
+        from installer.handoff import handoff
+
+        return handoff()
 
     from installer.install import install
 

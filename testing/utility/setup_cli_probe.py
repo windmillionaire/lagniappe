@@ -79,6 +79,8 @@ def main():
     )
     _install_module("install", "install", _entry_point("install", behavior, status))
     _install_module("doctor", "run_doctor", _entry_point("doctor", behavior, status))
+    _install_module("handoff", "handoff", _entry_point("handoff", behavior, status))
+    sys.modules["installer.handoff"].prepare_handoff_operator = lambda: True
 
     def update(*args, **kwargs):
         return _entry_point("update", behavior, status)(*args, **kwargs)

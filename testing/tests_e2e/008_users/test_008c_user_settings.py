@@ -1157,9 +1157,9 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
 
 
 # @features admin
-# @dimensions site-settings owner-only route page-load
+# @dimensions site-settings admin-only route page-load
 # @template home/admin.html::main
-def test_site_settings_is_owner_only(get_user, browser_failures):
+def test_site_settings_requires_administrator(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     user = get_user(Users.create_user, creator=owner)
 
@@ -1175,6 +1175,173 @@ def test_site_settings_is_owner_only(get_user, browser_failures):
             wait_until="domcontentloaded",
         )
     assert response.status == 403
+
+    user.entity.is_admin = True
+    user.entity.save()
+    response = user.page.goto(admin_url, wait_until="domcontentloaded")
+    assert response.status == 200
+    expect(user.locate("[data-widget='SiteSettings']")).to_be_visible()
+
+    user.entity.is_admin = False
+    user.entity.save()
+
+
+# @pairs admin:roster admin:managed-user-search admin:promotion admin:demotion
+# @pairs admin:read-only admin:privileged-account admin:responsive admin:failure-state
+# @pairs admin:managed-users admin:account-preservation admin:owner-only
+# @pairs owner:role-controls owner:awaiting-first-sign-in owner:owner-only
+# @pair cache:cache-invalidation
+# @template home/site_settings.html::site_settings
+def test_site_administrator_roster_and_owner_controls(get_user, browser_failures):
+    owner = get_user(Users.OWNER)
+    managed = get_user(Users.create_user, creator=owner)
+    _, settings_panel = _open_owner_site_settings(owner)
+    section = _open_site_settings_section(settings_panel, "administrators")
+    form = section.locator("[data-role='administrator-form']")
+    roster = section.locator("[data-role='administrator-list']")
+
+    expect(form).to_have_attribute("data-visible", "true")
+    expect(roster.locator("[data-owner='true']")).to_contain_text("Primary Owner")
+    expect(roster.locator("[data-owner='true']")).to_contain_text(owner.email)
+
+    selector = form.locator("[data-role='managed-user-selector']")
+    expect(selector).to_have_attribute("role", "combobox")
+    expect(selector).to_have_attribute("aria-haspopup", "listbox")
+    submit = form.locator("button[type='submit']")
+    selector_box = selector.bounding_box()
+    submit_box = submit.bounding_box()
+    assert selector_box and submit_box
+    assert abs(selector_box["width"] - submit_box["width"]) <= 2
+    assert abs(selector_box["height"] - submit_box["height"]) <= 2
+    selector.fill(managed.entity.name)
+    option = owner.page.locator(
+        f"[role='option'][data-id='{managed.entity.page.urlsafe_key}']"
+    )
+    expect(option).to_contain_text(managed.entity.name)
+    option.click()
+    expect(form.locator("select[name='user_key']")).to_have_value(
+        managed.entity.page.urlsafe_key
+    )
+    with owner.page.expect_response(
+        lambda response: response.url.endswith("/l/site-administrators")
+        and response.request.method == "POST"
+    ) as promotion:
+        submit.click()
+    assert promotion.value.status == 200
+    expect(roster).to_contain_text(managed.email)
+    promoted = Entities.USER(database.get.user(managed.email))
+    assert promoted.is_admin
+    assert promoted.invalidate_cache
+    assert not promoted.is_owner
+
+    admin_url = f"{SETTINGS.test_config['BASE_URL'].rstrip('/')}/admin"
+    response = managed.page.goto(admin_url, wait_until="domcontentloaded")
+    assert response.status == 200
+    expect(managed.locate("button[data-role='configuration']")).to_have_count(0)
+    admin_section = _open_site_settings_section(
+        managed.locate("[data-widget='SiteSettings']"), "administrators"
+    )
+    expect(
+        admin_section.locator("[data-role='administrator-form']")
+    ).to_have_attribute("data-visible", "false")
+    expect(
+        admin_section.locator("[data-role='demote-administrator']")
+    ).to_have_count(0)
+
+    protected_path = f"/users/{owner.entity.urlsafe_key}/delete"
+    with browser_failures.expect_http_error(
+        managed, status=403, path=protected_path
+    ):
+        protected_delete = _fetch_status(managed, protected_path, "DELETE")
+    assert protected_delete["status"] == 403
+    self_demote_path = f"/l/site-administrators/{managed.entity.urlsafe_key}"
+    with browser_failures.expect_http_error(
+        managed, status=403, path=self_demote_path
+    ):
+        self_demote = _fetch_status(managed, self_demote_path, "DELETE")
+    assert self_demote["status"] == 403
+
+    administrator_row = roster.locator(
+        f"[data-role='administrator']:has(button[data-key='{managed.entity.urlsafe_key}'])"
+    )
+    expect(administrator_row).to_have_class(re.compile(r".*\bsm:flex-row\b.*"))
+    owner.page.once("dialog", lambda dialog: dialog.accept())
+    with owner.page.expect_response(
+        lambda response: response.url.endswith(
+            f"/l/site-administrators/{managed.entity.urlsafe_key}"
+        )
+        and response.request.method == "DELETE"
+    ) as demotion:
+        administrator_row.locator("[data-role='demote-administrator']").click()
+    assert demotion.value.status == 200
+    expect(roster).not_to_contain_text(managed.email)
+    demoted = Entities.USER(database.get.user(managed.email))
+    assert not demoted.is_admin
+    assert demoted.invalidate_cache
+
+    with browser_failures.expect_http_error(managed, status=403, path=admin_url):
+        response = managed.page.goto(admin_url, wait_until="domcontentloaded")
+    assert response.status == 403
+
+
+# @pairs admin:site-settings export:admin-only owner:sensitive-configuration
+# @pairs owner:recovery-export owner:route-gate owner:configuration
+def test_additional_admin_cannot_access_owner_configuration(
+    get_user, browser_failures
+):
+    owner = get_user(Users.OWNER)
+    administrator = get_user(Users.create_user, creator=owner)
+    owner.go(SitePages.HOME)
+    administrator.go(SitePages.HOME)
+    promotion = _fetch_status(
+        owner,
+        "/l/site-administrators",
+        "POST",
+        {"user_key": administrator.entity.urlsafe_key},
+    )
+    assert promotion["status"] == 200
+
+    try:
+        persisted_administrator = Entities.USER(
+            database.get.user(administrator.email)
+        )
+        assert persisted_administrator.is_admin
+        admin = administrator.go(SitePages.ADMIN)
+        settings_panel = administrator.locate(admin.SITE_SETTINGS_FORM)
+        expect(settings_panel).to_be_visible()
+        expect(settings_panel.locator("button[data-role='configuration']")).to_have_count(
+            0
+        )
+
+        site_settings = _fetch_status(administrator, "/l/site-settings", "GET")
+        assert site_settings["status"] == 200
+        assert site_settings["data"]["can_manage_administrators"] is False
+        assert site_settings["data"]["can_view_sensitive_configuration"] is False
+        assert _fetch_status(administrator, "/l/site-export", "GET")["status"] == 200
+        assert _fetch_status(
+            administrator, "/reference/environment-variables", "GET"
+        )["status"] == 200
+        with browser_failures.expect_http_error(
+            administrator, status=403, path="/l/site-configuration"
+        ):
+            configuration = _fetch_status(
+                administrator, "/l/site-configuration", "GET"
+            )
+        assert configuration["status"] == 403
+        with browser_failures.expect_http_error(
+            administrator, status=403, path="/reference/download-settings"
+        ):
+            recovery = _fetch_status(
+                administrator, "/reference/download-settings", "GET"
+            )
+        assert recovery["status"] == 403
+    finally:
+        demotion = _fetch_status(
+            owner,
+            f"/l/site-administrators/{administrator.entity.urlsafe_key}",
+            "DELETE",
+        )
+        assert demotion["status"] == 200
 
 
 # @features admin

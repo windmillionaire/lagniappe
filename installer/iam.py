@@ -144,6 +144,41 @@ def reconcile_member_roles(
 
 
 # @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_handoff_policy_helpers_remove_only_the_target_member
+# @pairs iam:policy-inspection iam:conditions iam:unrelated-members
+def policy_member_roles(policy, member, *, include_conditions=True):
+    """Return direct roles containing one member without changing the policy."""
+    return {
+        _binding_value(binding, "role")
+        for binding in policy.bindings
+        if member in (_binding_value(binding, "members", ()) or ())
+        and (include_conditions or not _is_conditional(binding))
+    }
+
+
+# @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_handoff_policy_helpers_remove_only_the_target_member
+# @pairs iam:member-removal iam:conditions iam:unrelated-members iam:empty-bindings
+def remove_member_bindings(policy, member):
+    """Remove one direct member from every binding, including conditional ones."""
+    changed = False
+    rebuilt = []
+    for binding in list(policy.bindings):
+        members = list(_binding_value(binding, "members", ()) or ())
+        reconciled = [existing for existing in members if existing != member]
+        if reconciled != members:
+            changed = True
+            _set_binding_value(binding, "members", reconciled)
+        if reconciled:
+            rebuilt.append(binding)
+        elif members:
+            changed = True
+    if changed:
+        _replace_bindings(policy, rebuilt)
+    return changed
+
+
+# @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_operator_permission_preflight_reports_missing_boundaries
 # @features setup iam
 # @dimensions preflight installer deployer

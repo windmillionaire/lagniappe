@@ -102,6 +102,10 @@ def install_summary_lines(
             f"{_value(settings.get('DEPLOYER_EMAIL') or gcloud_config.get('ACCOUNT'))}"
         ),
         f"Application owner: {_value(settings.get('ADMIN_EMAIL'))}",
+        (
+            "Temporary application Administrator: "
+            f"{_value(settings.get('BOOTSTRAP_ADMIN_EMAIL'))}"
+        ),
         f"Runtime service account: {_value(runtime_email)}",
         f"Internal caller service account: {_value(internal_caller_email)}",
         f"Signed URL account: {_value(runtime_email)}",

@@ -33,6 +33,7 @@ class FakeSection {
 
 const names = [
   "maintenance",
+  "administrators",
   "deployment",
   "ai-models",
   "service-providers",
@@ -91,6 +92,7 @@ vm.runInContext(source, context);
 
   const expectedWidgets = [
     "SiteMaintenance",
+    "SiteAdministrators",
     "SiteDeployment",
     "SiteAiModels",
     "SiteServiceProviders",

@@ -9,7 +9,7 @@ from .common_entity import Permissions
 class UserPermissions(UserPermissionsMixin, Permissions):
     """Computed permission map for a user.
 
-    Resolution order: site owners skip persisting a map (checked explicitly).
+    Resolution order: application Administrators skip persisting a map.
     Public users get the public group's permissions. Users in groups get
     combined group permissions (most permissive per resource). Users with no
     groups fall back to ``create_permissions(form_data)``. The user always gets
@@ -32,7 +32,7 @@ class UserPermissions(UserPermissionsMixin, Permissions):
         self.entity.properties.restrictions.clear()
         self.entity.invalidate_cache = True
 
-        if self.entity.is_owner:
+        if self.entity.is_admin:
             return
         elif self.entity.is_public:
             public_group = self._public_group()

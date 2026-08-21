@@ -5334,6 +5334,367 @@ def test_app_engine_creation_prompt_and_bounded_failures(monkeypatch, capsys):
     )
 
 
+# @pairs iam:policy-inspection iam:member-removal iam:conditions
+# @pairs iam:unrelated-members iam:empty-bindings
+def test_handoff_policy_helpers_remove_only_the_target_member():
+    from installer import iam
+
+    installer = "user:installer@example.test"
+    other = "user:other@example.test"
+    policy = types.SimpleNamespace(
+        bindings=[
+            {"role": "roles/owner", "members": [installer, other]},
+            {
+                "role": "roles/viewer",
+                "members": [installer],
+                "condition": {"title": "temporary", "expression": "true"},
+            },
+            {"role": "roles/editor", "members": [other]},
+        ]
+    )
+
+    assert iam.policy_member_roles(policy, installer) == {
+        "roles/owner",
+        "roles/viewer",
+    }
+    assert iam.policy_member_roles(
+        policy, installer, include_conditions=False
+    ) == {"roles/owner"}
+    assert iam.remove_member_bindings(policy, installer)
+    assert iam.policy_member_roles(policy, installer) == set()
+    assert iam.policy_member_roles(policy, other) == {
+        "roles/owner",
+        "roles/editor",
+    }
+    assert not iam.remove_member_bindings(policy, installer)
+
+
+class _HandoffBucket:
+    def __init__(self, name, policy, events):
+        self.name = name
+        self.policy = policy
+        self.events = events
+
+    def get_iam_policy(self, requested_policy_version=3):
+        assert requested_policy_version == 3
+        return self.policy
+
+    def set_iam_policy(self, policy):
+        assert policy is self.policy
+        self.events.append(f"bucket:{self.name}")
+
+
+class _HandoffPolicyClient:
+    def __init__(self, policy, events, label):
+        self.policy = policy
+        self.events = events
+        self.label = label
+
+    def get_iam_policy(self, request):
+        assert request["options"]["requested_policy_version"] == 3
+        return self.policy
+
+    def set_iam_policy(self, request):
+        assert request["policy"] is self.policy
+        self.events.append(self.label)
+
+
+def _handoff_policy(*bindings):
+    return types.SimpleNamespace(
+        bindings=[
+            {"role": role, "members": list(members)}
+            for role, members in bindings
+        ]
+    )
+
+
+# @pairs handoff:operator handoff:installer handoff:owner handoff:active-account
+# @pairs handoff:gcloud handoff:adc handoff:preconditions
+def test_handoff_operator_preparation_accepts_installer_or_owner(
+    monkeypatch, capsys
+):
+    import config
+    from installer import handoff as handoff_module
+    from runner import gcloud as runner_gcloud
+
+    installer = "installer@example.test"
+    owner = "owner@example.test"
+    settings = _fake_settings(
+        app={"INSTALLER_EMAIL": installer, "ADMIN_EMAIL": owner},
+        gcloud={
+            "NAME": "handoff",
+            "ACCOUNT": installer,
+            "PROJECT": "handoff-project",
+        },
+    )
+    monkeypatch.setattr(config, "SETTINGS", settings)
+    active = {"email": installer}
+    activations = []
+    monkeypatch.setattr(
+        runner_gcloud,
+        "get_configuration_value",
+        lambda key: active["email"] if key == "account" else "",
+    )
+    monkeypatch.setattr(
+        runner_gcloud,
+        "activate_repository_gcloud",
+        lambda **kwargs: activations.append(
+            (settings.GCLOUD_CONFIG["ACCOUNT"], kwargs)
+        )
+        or True,
+    )
+
+    assert handoff_module.prepare_handoff_operator() == installer
+    active["email"] = owner
+    assert handoff_module.prepare_handoff_operator() == owner
+    assert activations == [
+        (installer, {"ensure_adc": True, "ensure_cli_token": True}),
+        (owner, {"ensure_adc": True, "ensure_cli_token": True}),
+    ]
+    assert settings.GCLOUD_CONFIG["ACCOUNT"] == installer
+    assert "(installer)" in capsys.readouterr().out
+
+    active["email"] = "unrelated@example.test"
+    with pytest.raises(RuntimeError, match="saved installer or permanent Owner"):
+        handoff_module.prepare_handoff_operator()
+    assert len(activations) == 2
+
+
+# @pairs handoff:ordering handoff:owner-add handoff:installer-removal
+# @pairs handoff:idempotence handoff:unrelated-members handoff:preview
+# @pairs handoff:bucket handoff:service-account handoff:verification
+# @pairs handoff:settings handoff:deploy handoff:project-role handoff:final-mutation
+# @pairs handoff:resumable handoff:cleanup handoff:all-bindings handoff:owner-lockout
+def test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent(
+    monkeypatch, capsys
+):
+    import config
+    from installer import handoff as handoff_module, iam
+
+    events = []
+    installer = "installer@example.test"
+    owner = "owner@example.test"
+    unrelated = "user:unrelated@example.test"
+    installer_member = iam.principal_member(installer)
+    owner_member = iam.principal_member(owner)
+    app = {
+        "GOOGLE_CLOUD_PROJECT": "handoff-project",
+        "INSTALLER_EMAIL": installer,
+        "DEPLOYER_EMAIL": installer,
+        "ADMIN_EMAIL": owner,
+        "BOOTSTRAP_ADMIN_EMAIL": installer,
+        "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
+            "runtime@handoff-project.iam.gserviceaccount.com"
+        ),
+        "GIBBERISH": "handoff-secret",
+        "PREFIX": "",
+    }
+    runtime_member = iam.principal_member(app["RUNTIME_SERVICE_ACCOUNT_EMAIL"])
+    settings = _fake_settings(
+        app=app,
+        gcloud={
+            "NAME": "handoff",
+            "ACCOUNT": installer,
+            "PROJECT": "handoff-project",
+        },
+    )
+    monkeypatch.setattr(config, "SETTINGS", settings)
+    monkeypatch.setattr(
+        config,
+        "File",
+        types.SimpleNamespace(
+            APP_SETTINGS_YAML=types.SimpleNamespace(exists=lambda: True)
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        handoff_module, "record_step", lambda step: events.append(f"step:{step}")
+    )
+    monkeypatch.setattr(
+        iam, "require_installer_bucket_permissions", lambda bucket: None
+    )
+
+    bucket_names = [
+        *handoff_module.storage_bucket_names(app).values(),
+        handoff_module.recovery_bucket_name(app),
+    ]
+    buckets = {
+        name: _HandoffBucket(
+            name,
+            _handoff_policy(
+                ("roles/storage.objectAdmin", [installer_member, unrelated]),
+                ("roles/storage.objectViewer", [unrelated]),
+            ),
+            events,
+        )
+        for name in bucket_names
+    }
+    service_policy = _handoff_policy(
+        (
+            "roles/iam.serviceAccountUser",
+            [installer_member, unrelated, runtime_member],
+        ),
+        (
+            "roles/iam.serviceAccountTokenCreator",
+            [installer_member, runtime_member],
+        ),
+        ("roles/iam.serviceAccountViewer", [unrelated]),
+    )
+    project_policy = _handoff_policy(
+        ("roles/owner", [owner_member, installer_member]),
+        ("roles/viewer", [installer_member, unrelated]),
+        ("roles/editor", [unrelated]),
+    )
+    context = {
+        "buckets": buckets,
+        "service_accounts": _HandoffPolicyClient(
+            service_policy, events, "service-account"
+        ),
+        "projects": _HandoffPolicyClient(project_policy, events, "project"),
+    }
+
+    def deploy(**kwargs):
+        assert kwargs == {"print_final_summary": False}
+        events.append("deploy")
+
+    result = handoff_module.handoff(
+        context=context,
+        deploy=deploy,
+        confirm=lambda prompt: "y",
+        permission_check=lambda project: events.append(f"preflight:{project}"),
+    )
+
+    assert result == 0
+    assert settings.APP["INSTALLER_EMAIL"] == installer
+    assert settings.APP["DEPLOYER_EMAIL"] == owner
+    assert settings.APP["BOOTSTRAP_ADMIN_EMAIL"] == ""
+    assert settings.GCLOUD_CONFIG["ACCOUNT"] == owner
+    assert settings._saves == [True]
+    preview = capsys.readouterr().out
+    assert "Installer/source: installer@example.test" in preview
+    assert "Permanent Owner/deployer: owner@example.test" in preview
+    assert "roles/storage.objectAdmin" in preview
+    assert "roles/iam.serviceAccountTokenCreator" in preview
+    assert "Project handoff-project (final cloud mutation)" in preview
+    assert events.index("deploy") < events.index(
+        "step:remove installer managed-resource access"
+    )
+    assert events[-1] == "project"
+
+    for bucket in buckets.values():
+        assert iam.policy_member_roles(bucket.policy, installer_member) == set()
+        assert "roles/storage.objectAdmin" in iam.policy_member_roles(
+            bucket.policy, owner_member
+        )
+        assert iam.policy_member_roles(bucket.policy, unrelated) == {
+            "roles/storage.objectAdmin",
+            "roles/storage.objectViewer",
+        }
+    assert iam.policy_member_roles(service_policy, installer_member) == set()
+    assert set(iam.constants.RUNTIME_SERVICE_ACCOUNT_ROLES).issubset(
+        iam.policy_member_roles(service_policy, owner_member)
+    )
+    assert set(iam.constants.RUNTIME_SERVICE_ACCOUNT_ROLES).issubset(
+        iam.policy_member_roles(service_policy, runtime_member)
+    )
+    assert "roles/iam.serviceAccountUser" in iam.policy_member_roles(
+        service_policy, unrelated
+    )
+    assert iam.policy_member_roles(project_policy, installer_member) == set()
+    assert iam.policy_member_roles(project_policy, owner_member) == {"roles/owner"}
+    assert iam.policy_member_roles(project_policy, unrelated) == {
+        "roles/viewer",
+        "roles/editor",
+    }
+
+    events.clear()
+    assert handoff_module.handoff(
+        context=context,
+        deploy=deploy,
+        confirm=lambda prompt: "yes",
+        permission_check=lambda project: None,
+    ) == 0
+    assert "project" not in events
+    assert "service-account" not in events
+    assert not any(event.startswith("bucket:") for event in events)
+
+
+# @pairs handoff:preconditions handoff:owner-lockout handoff:confirmation
+# @pairs handoff:default-no handoff:no-mutation
+def test_delegated_handoff_rejects_owner_lockout_and_default_no_confirmation(
+    monkeypatch,
+):
+    import config
+    from installer import handoff as handoff_module, iam
+
+    installer = "installer@example.test"
+    owner = "owner@example.test"
+    app = {
+        "GOOGLE_CLOUD_PROJECT": "handoff-project",
+        "INSTALLER_EMAIL": installer,
+        "DEPLOYER_EMAIL": installer,
+        "ADMIN_EMAIL": owner,
+        "BOOTSTRAP_ADMIN_EMAIL": installer,
+        "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
+            "runtime@handoff-project.iam.gserviceaccount.com"
+        ),
+        "GIBBERISH": "handoff-secret",
+    }
+    settings = _fake_settings(app=app)
+    monkeypatch.setattr(config, "SETTINGS", settings)
+    monkeypatch.setattr(
+        config,
+        "File",
+        types.SimpleNamespace(
+            APP_SETTINGS_YAML=types.SimpleNamespace(exists=lambda: True)
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        iam, "require_installer_bucket_permissions", lambda bucket: None
+    )
+    names = [
+        *handoff_module.storage_bucket_names(app).values(),
+        handoff_module.recovery_bucket_name(app),
+    ]
+    events = []
+    context = {
+        "buckets": {
+            name: _HandoffBucket(name, _handoff_policy(), events) for name in names
+        },
+        "service_accounts": _HandoffPolicyClient(
+            _handoff_policy(), events, "service-account"
+        ),
+        "projects": _HandoffPolicyClient(
+            _handoff_policy(
+                ("roles/owner", [iam.principal_member(installer)])
+            ),
+            events,
+            "project",
+        ),
+    }
+
+    with pytest.raises(RuntimeError, match="must already hold roles/owner"):
+        handoff_module.handoff(
+            context=context,
+            deploy=lambda **kwargs: pytest.fail("must not deploy"),
+            confirm=lambda prompt: "y",
+            permission_check=lambda project: None,
+        )
+
+    context["projects"].policy.bindings[0]["members"].append(
+        iam.principal_member(owner)
+    )
+    assert handoff_module.handoff(
+        context=context,
+        deploy=lambda **kwargs: pytest.fail("must not deploy"),
+        confirm=lambda prompt: "",
+        permission_check=lambda project: None,
+    ) == 1
+    assert settings._saves == []
+    assert events == []
+
+
 # @features setup
 # @dimensions image-restore storage-bucket site-image
 # def test_setup_image_client_and_site_image_restore_helpers(monkeypatch):

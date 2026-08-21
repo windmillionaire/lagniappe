@@ -4,6 +4,7 @@ const SECTION_STORAGE_KEY = "lagniappe:site-settings-section";
 const DEFAULT_SECTION = "maintenance";
 const SETTING_WIDGETS = {
 	maintenance: "SiteMaintenance",
+	administrators: "SiteAdministrators",
 	deployment: "SiteDeployment",
 	"ai-models": "SiteAiModels",
 	"service-providers": "SiteServiceProviders",

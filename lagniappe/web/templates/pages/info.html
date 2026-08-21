@@ -33,7 +33,9 @@
   </div>
 {% endmacro %}
 
-{% macro user_settings(page, is_own_page, is_owner_viewer, is_owner_page, view_permissions, close_target='PageInfo') %}
+{% macro user_settings(page, is_own_page, is_admin_viewer, is_owner_viewer, is_owner_page, view_permissions, close_target='PageInfo') %}
+  {% set can_manage_user = is_admin_viewer and (is_owner_viewer or not page.user.is_admin) %}
+  {% set can_edit_name = (is_own_page or can_manage_user) and (is_owner_viewer or not page.user.is_admin) %}
   <form data-widget="UserSettings"
         lp-update
         data-route="{{ url_for('pages.update', key=page.urlsafe_key) }}"
@@ -42,10 +44,10 @@
         data-close="info:{{ close_target }}"
         data-name="{{ page.user.name }}"
         {% if page.description %}data-description="{{ page.description }}"{% endif %}
-        data-can-edit-name="{{ (is_own_page or is_owner_viewer)|yesno }}"
-        data-can-edit-email="{{ (is_owner_viewer and not is_own_page)|yesno }}"
-        data-can-edit-groups="{{ is_owner_viewer|yesno }}"
-        data-can-edit-ai="{{ is_owner_viewer|yesno }}"
+        data-can-edit-name="{{ can_edit_name|yesno }}"
+        data-can-edit-email="{{ (can_manage_user and not is_own_page and not page.user.is_owner)|yesno }}"
+        data-can-edit-groups="{{ can_manage_user|yesno }}"
+        data-can-edit-ai="{{ can_manage_user|yesno }}"
         data-ai-access="{{ page.user.ai_access }}"
         data-notification-email-mode="{{ page.user.notification_email_mode }}"
         data-can-edit-notification-email="{{ (is_own_page and not page.user.is_public)|yesno }}"
@@ -77,7 +79,7 @@
                 <h3 class="{{ styles.label.sectionHeading }}">Email</h3>
                 <input name="email"
                        type="email"
-                       {% if not (is_owner_viewer and not is_own_page) %}readonly{% endif %}
+                       {% if not (can_manage_user and not is_own_page and not page.user.is_owner) %}readonly{% endif %}
                        value="{{ page.user.email or '' }}"
                        class="{{ styles.input }}">
               </label>
@@ -97,7 +99,7 @@
               <span>Allow {{ CONFIG.APP_NAME }} to email me</span>
             </label>
           {% endif %}
-          {% if is_owner_viewer and not is_owner_page %}
+          {% if can_manage_user and not is_owner_page %}
             <div data-role="user-groups">
               <h3 class="{{ styles.label.sectionHeading }}">User Group(s)</h3>
               <div class="{{ styles.select.container }}"
@@ -289,7 +291,7 @@
   </form>
 {% endmacro %}
 
-{% macro info_tab(page, is_owner_page, is_owner_viewer, view_permissions, is_own_page, can_view_user_settings) %}
+{% macro info_tab(page, is_owner_page, is_admin_viewer, is_owner_viewer, view_permissions, is_own_page, can_view_user_settings) %}
   <div id="info"
        lp-component
        data-title="Info"
@@ -301,7 +303,7 @@
        data-parent-nav="tabs">
     {{ info_form(page) }}
     {% if can_view_user_settings %}
-      {{ user_settings(page, is_own_page, is_owner_viewer, is_owner_page, view_permissions, 'PageInfo') }}
+      {{ user_settings(page, is_own_page, is_admin_viewer, is_owner_viewer, is_owner_page, view_permissions, 'PageInfo') }}
     {% endif %}
     {% if view_permissions and not page.user %}{{ permissions_form(page, 'PageInfo') }}{% endif %}
   </div>

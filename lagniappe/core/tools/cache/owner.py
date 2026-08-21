@@ -121,6 +121,11 @@ def get_owner_projection(*, repair=True):
 
     raw = database.get.user(CONFIG.ADMIN_EMAIL)
     owner = Entities.fetch_one(raw, request=Fetch.root()) if raw else None
+    if owner and not owner.is_owner and not owner.db.get("owner"):
+        # Schema-compatible repair for an old canonical row that predates the
+        # stored flag. IsOwner rejects every noncanonical email.
+        owner.is_owner = True
+        owner.save()
     if not owner or not owner.is_owner:
         return None
     return update_owner_projection(owner)

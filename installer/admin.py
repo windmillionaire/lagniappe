@@ -515,6 +515,20 @@ def configure_google_signin_choice():
 
 
 # @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_setup_collects_owner_and_requires_google_before_confirmation
+# @pairs setup:owner setup:preconfirmation admin:google-oauth admin:interactive-input
+def collect_owner_and_signin_choice():
+    """Collect permanent application ownership before cloud-change confirmation."""
+    from config import SETTINGS
+
+    if not str(SETTINGS.APP.get("ADMIN_NAME") or "").strip():
+        SETTINGS.APP["ADMIN_NAME"] = _get_admin_name()
+    if not str(SETTINGS.APP.get("ADMIN_EMAIL") or "").strip():
+        SETTINGS.APP["ADMIN_EMAIL"] = _get_admin_email().strip().casefold()
+    return configure_google_signin_choice()
+
+
+# @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_disabled_google_signin_skips_oauth_setup
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_admin_oauth_rejection_precedes_provider_update

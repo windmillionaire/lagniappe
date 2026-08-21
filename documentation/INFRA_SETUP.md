@@ -85,6 +85,9 @@ It supports subcommands for running specific steps:
   optionally redeploy
 - `jobs`: idempotently create or update deferred-job recovery infrastructure
   after the corresponding application version has been deployed
+- `handoff`: transfer a delegated installation from the saved installer to the
+  permanent application Owner/deployer, clear temporary application bootstrap
+  access, and remove the installer from Lagniappe-managed IAM
 - `update`: refresh generated config/index/manifest defaults without replacing
   source code, restore app-saved deployment settings, AI settings, and site
   images, then optionally deploy
@@ -525,13 +528,21 @@ The full installation runs these steps in order:
    then suggests a randomized project ID. Declining a proposed new project exits
    setup. Every value prompt that displays a bracketed suggestion
    explicitly says that Enter accepts it and substitutes that value before
-   validation. This includes project IDs, the default administrator
+   validation. This includes project IDs, the primary Owner
    name, and suggested email/SMTP values. Choice prompts use the conventional
    capitalized Enter default, such as `Y` in `[Y/n]` or `N` in `[y/N]`.
+   On a fresh run, setup also collects the primary Owner name/email and the
+   Google sign-in choice before cloud-change confirmation. If the active gcloud
+   account differs from the Owner, setup declares a delegated installation,
+   requires an already-existing project with billing linked by the business,
+   requires Google sign-in, and offers to save the exact active account as
+   `BOOTSTRAP_ADMIN_EMAIL`. An explicit empty value is durable and prevents a
+   later setup/update run from reopening bootstrap access.
 3. **Draft and mutation confirmation** -- for recovery, validates the exact
    target and surviving resources before recreating the development file. It
    then writes the complete generated local draft, displays a concise
-   **Configuration** summary with the identities, target, application owner,
+   **Configuration** summary with installer, temporary application
+   Administrator, target, permanent application Owner,
    planned or existing runtime service-account email, and API state, and asks
    `Continue with installation?` with a default-no confirmation.
 4. **Confirmed project preparation** -- for an existing project, explicitly
@@ -572,8 +583,8 @@ The full installation runs these steps in order:
    tests a Gmail or Google Workspace mailbox over SMTP/STARTTLS as the
    zero-domain bootstrap. It then initializes standalone Identity Platform
    against the selected public origin and enables email/password authentication.
-7. **Admin/OAuth** -- sets the admin user and asks whether Google sign-in should
-   be enabled. Declining persists `GOOGLE_SIGNIN_ENABLED: false` and skips the
+7. **Owner/OAuth** -- reuses the Owner and Google sign-in choice collected
+   before confirmation. Declining persists `GOOGLE_SIGNIN_ENABLED: false` and skips the
    remaining Google OAuth/provider work while leaving email/password sign-in
    available. When enabled, setup opens the target project's current Google Auth
    Platform Clients page and guides the remaining one-time registration and Web
@@ -661,7 +672,7 @@ Custom domain mapping is available during the default install when the
 operator already owns a domain; `url` remains the post-install entry point.
 Redis TLS is offered during a fresh Redis setup and can be changed later with
 `security`. Site images, deployment settings, and AI model settings are saved
-from the owner-only Admin settings page and applied with `update`.
+from the Administrator Site Settings page and applied with `update`.
 
 ## Module Breakdown
 
@@ -759,12 +770,14 @@ immediately before creation. For an existing application, setup reads
 and recovery never submit a location change or synthesize an `appspot.com`
 hostname. Recovery stops on a saved/provider location or hostname mismatch.
 
-The built-in workflow keeps three identities explicit:
+The built-in workflow keeps provider and application identities explicit:
 
 | Identity | Setup source | Authority |
 | --- | --- | --- |
 | Installer/provisioner | Active `GCLOUD_CONFIG.ACCOUNT`, recorded as `INSTALLER_EMAIL` | Select/create the project, verify billing, enable APIs, provision resources, and reconcile IAM |
 | Deployer/operator | Active `GCLOUD_CONFIG.ACCOUNT`, recorded as `DEPLOYER_EMAIL` | Deploy indexes/App Engine, run terminal backup/restore operations, and `actAs` only the attached runtime account |
+| Application Owner | `ADMIN_EMAIL` | Singleton application authority; governs Administrators and secret-bearing recovery configuration. In a delegated install this is also the permanent project Owner/deployer target |
+| Bootstrap Administrator | Exact optional `BOOTSTRAP_ADMIN_EMAIL` | Google-only application bootstrap before the Owner's first login; grants no Google Cloud IAM and is cleared during handoff |
 | Runtime service account | `RUNTIME_SERVICE_ACCOUNT_EMAIL` | Application data and consumer APIs, ADC, and remote signed-URL signing |
 
 The installer and deployer are the same authenticated principal in the
@@ -860,6 +873,42 @@ unconditional bindings for the Lagniappe member, preserves unrelated members
 and every conditional binding, and skips writes when the desired state already
 exists. An unexpected conditional broad-role grant on the runtime account is
 reported for manual resolution rather than silently modified.
+
+### Delegated installer handoff (`installer/handoff.py`)
+
+`./setup.sh handoff` and `.\setup.cmd handoff` use the saved
+`INSTALLER_EMAIL` as the source identity and `ADMIN_EMAIL` as the permanent
+deployer target. Production settings must exist, the identities must differ,
+and the target Owner must already have a direct, unconditional `roles/owner`
+binding on the project. The active gcloud/ADC principal may be either that
+saved installer or the permanent Owner; any third identity is rejected. Setup
+verifies that active principal's project/deploy permissions and every managed
+bucket boundary before presenting a default-no preview of all identities,
+resources, and binding changes. After a completed handoff removes the
+installer's access, only the Owner can rerun it.
+
+The transaction is ordered and idempotent:
+
+1. add the Owner's object-operator role on the four application buckets and
+   recovery bucket, plus User and Token Creator on the exact runtime service
+   account, then re-read and verify each policy;
+2. set `DEPLOYER_EMAIL` to the Owner, set `BOOTSTRAP_ADMIN_EMAIL` to an explicit
+   empty value, set the working copy's saved gcloud account to the Owner, save,
+   and deploy that application configuration with the currently authenticated
+   installer or Owner;
+3. remove the installer from every binding on all five managed buckets and the
+   runtime service-account policy, including conditional bindings, then re-read
+   and verify;
+4. as the final cloud mutation, remove the installer from every direct project
+   IAM binding, including a temporary Project Owner role; and
+5. verify the returned project policy still contains the permanent Owner and
+   no installer binding, then print Workspace/provider/local cleanup steps.
+
+Reconciliation preserves unrelated members, policies, conditions, runtime
+self-bindings, and `INSTALLER_EMAIL` as historical metadata. The command never
+deletes a Workspace account, changes billing-account IAM, or removes
+organization-level access. A partial run can be repeated: already-applied
+bindings and the explicit cleared bootstrap value are no-ops.
 
 `create_deferred_job_reconciler()` enables the Cloud Scheduler API and
 idempotently creates or updates `lagniappe-deferred-jobs-reconciler` in the app
@@ -1145,10 +1194,11 @@ Recovery checks live standalone Identity Platform state. Missing, forbidden,
 mismatched, and unavailable states remain distinct and cannot silently replace
 the canonical snapshot.
 
-### Admin (`installer/admin.py`)
+### Owner and Google sign-in (`installer/admin.py`)
 
-Creates the initial admin user configuration. Before this stage, setup has
-already initialized standalone Identity Platform;
+Fresh setup collects the singleton application Owner name/email and persisted
+Google sign-in choice before the main cloud-change confirmation. Before the
+later OAuth stage, setup has already initialized standalone Identity Platform;
 Google Auth Platform does not expose a separate public Service Usage toggle for
 general Google Sign-In client registration. Admin setup opens the target
 project's Google Auth Platform Clients page. When Google shows **Google Auth
@@ -1198,7 +1248,8 @@ settings. The old general OAuth client remains a manual Google Auth Platform
 resource; delete it in the console if it is no longer needed.
 
 Owner bootstrap, invited/returning user state, verification recovery,
-Google-provider availability, safe errors, and optional agent access are
+delegated Administrator bootstrap, Google-provider availability, safe errors,
+and optional agent access are
 documented in [AUTHENTICATION.md](AUTHENTICATION.md#login-ui-and-account-state).
 
 ### AI (`installer/ai.py`)

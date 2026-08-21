@@ -10,7 +10,7 @@ The normal release-update flow is:
 1. Run the release's documented upgrade workflow—normally
    `./setup.sh upgrade` for an unmodified installation—or merge the release
    into a maintained fork and run `./setup.sh update`, then deploy.
-2. Sign in as the site owner and open **Admin → Site Settings → Maintenance**.
+2. Sign in as an application Administrator and open **Admin → Site Settings → Maintenance**.
 3. Click **Apply Updates**. Pending migrations run in catalog order.
 4. Resolve any reported failure using the linked form or page, then retry.
 5. When every migration is complete, click **Refresh Cache**.

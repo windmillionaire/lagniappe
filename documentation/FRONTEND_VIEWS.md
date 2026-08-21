@@ -158,7 +158,11 @@ page task lists own their buttons directly. `SiteSettings` is a small composite
 coordinator: it owns the shared section headers and persisted accordion state,
 loads each persistent section body as a focused widget through its existing
 component, and forwards the aggregate settings response for normal widget
-reconciliation.
+reconciliation. Its Administrators section always renders the canonical Owner
+(including an awaiting-first-sign-in state), renders additional Administrators
+read-only for those Administrators, and exposes promotion/demotion controls only
+to the Owner. Maintenance Configuration is likewise rendered only for the
+Owner; the server independently enforces the same secret boundary.
 
 Title action menus are declared with the macros in `templates/menus.html`.
 `menus.title()` supplies the trigger and hidden source items, while
@@ -182,7 +186,8 @@ Notes use the shared `CreateNote` widget on Home and Pages. The textarea stays
 available while the native image chooser is open, so a submission may contain
 text, one photo, or both. The widget owns the selected-photo preview/removal
 state and resets it after creation. Home note creation is available to signed-in
-users and defaults to private; only users with `SITE:EDIT` (the site owner) see
+users and defaults to private; only users with `SITE:EDIT` (application
+Administrators) see
 the “Show for everyone” option. Home keeps its existing offline-create contract.
 The Page title menu opens an online-only composer beneath the title for users
 who can edit that Page, with both visibility options unchanged, while a
