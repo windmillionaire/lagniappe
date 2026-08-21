@@ -1,4 +1,4 @@
-"""Owner-only site export admin routes."""
+"""Administrator site export routes."""
 
 from flask import get_template_attribute, request
 from flask_login import current_user
@@ -28,7 +28,8 @@ def _site_export_html():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001f_site_export.py::test_owner_can_start_html_export
-# @pairs export:owner-only export:start-export
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
+# @pairs export:admin-only export:start-export
 @internal.route("/site-export", methods=["GET"])
 @permission(Resource.SITE)
 def site_export_widget():
@@ -37,7 +38,8 @@ def site_export_widget():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001f_site_export.py::test_owner_can_start_html_export
-# @pairs export:owner-only export:start-export export:notification
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
+# @pairs export:admin-only export:start-export export:notification
 @internal.route("/site-export", methods=["POST"])
 @permission(Resource.SITE)
 def create_site_export():

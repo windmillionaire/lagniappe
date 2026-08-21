@@ -2,28 +2,28 @@
 {% from "reference/macros.html" import modal %}
 {% call modal("Maintenance") %}
   <p class="text-sm text-base-dark">
-    Maintenance actions are owner tools for recovery and upgrades. They can affect cached search data, permissions, and stored metadata, so it is best to run them when you can watch the result.
+    Maintenance actions are Administrator tools for recovery and upgrades. They can affect cached search data, permissions, and stored metadata, so it is best to run them when you can watch the result. Secret-bearing Configuration remains available only to the primary Owner.
   </p>
   {{ subheading("Refresh Cache") }}
   <p class="text-sm text-base-dark">
     Refresh Cache rebuilds the server-side cache from the database. Use it when cached lists, permissions, or search results look stale after an upgrade or after Redis has been cleared.
   </p>
   {% call callout("warning") %}
-    This is not a normal cleanup button. While the cache rebuild is running, non-owner users may see missing search results, outdated permissions, or partial lists.
+    This is not a normal cleanup button. While the cache rebuild is running, non-Administrator users may see missing search results, outdated permissions, or partial lists.
   {% endcall %}
   {% call callout("error") %}
     The process can take several minutes on a larger site. Do not refresh the page or navigate away until the request finishes.
   {% endcall %}
   {{ subheading("Apply Updates") }}
   <p class="text-sm text-base-dark">
-    Apply Updates runs owner-only data adjustments that bring stored site records in line with the current Lagniappe version. It is usually used after pulling a new version of the app.
+    Apply Updates runs administrative data adjustments that bring stored site records in line with the current Lagniappe version. It is usually used after pulling a new version of the app.
   </p>
   <p class="text-sm text-base-dark">
     If an upgrade note says that existing filters, pages, forms, or tasks need a maintenance pass, this is the button that performs that pass. Confirm the update reports no failures, then run Refresh Cache. A release note will say explicitly if an unusual staged update needs an additional verification run.
   </p>
   {{ subheading("Configuration") }}
   <p class="text-sm text-base-dark">
-    Configuration opens the current environment variables and a download link for the settings file. This is useful before migration, recovery, or setup work on another machine.
+    Configuration is an Owner-only control that opens the current environment variables and a download link for the settings file. This is useful before migration, recovery, or setup work on another machine.
   </p>
   {% call callout("error") %}
     Treat Configuration like a secret. It can include API keys, client secrets, service identifiers, and other values that should not be shared in screenshots or copied into chat.

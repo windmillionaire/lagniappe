@@ -131,6 +131,7 @@ def build_recovery_snapshot(
     snapshot["CONFIG_KIND"] = CONFIG_KIND
     snapshot["CONFIG_SCHEMA_VERSION"] = CONFIG_SCHEMA_VERSION
     snapshot.setdefault("GOOGLE_SIGNIN_ENABLED", True)
+    snapshot.setdefault("BOOTSTRAP_ADMIN_EMAIL", "")
 
     if redis_tls_enabled(snapshot):
         if not redis_ca_pem:
@@ -230,9 +231,9 @@ def _require_project_resource(value, name, project_id):
 # @tests tests_tooling/test_003_config.py::test_recovery_validates_and_normalizes_auth_email_smtp
 # @tests tests_tooling/test_003_config.py::test_recovery_upgrades_schema_2_and_discards_legacy_messaging_config
 # @tests tests_tooling/test_003_config.py::test_recovery_accepts_and_redacts_optional_ai_email_config
-# @features config
-# @dimensions recovery-validation project-identity project-number current-schema required-settings authentication-email ai-email secrets schema-upgrade messaging-removal
-# @pair config:ai-email
+# @pairs config:recovery-validation config:project-identity config:project-number
+# @pairs config:current-schema config:required-settings config:authentication-email
+# @pairs config:ai-email config:secrets config:schema-upgrade config:messaging-removal
 def validate_recovery_document(settings):
     """Validate and normalize a canonical recovery document before provider access."""
     from config.locations import (
@@ -258,6 +259,9 @@ def validate_recovery_document(settings):
             "GOOGLE_SIGNIN_ENABLED must be true or false."
         )
     recovered["GOOGLE_SIGNIN_ENABLED"] = google_signin_value
+    recovered["BOOTSTRAP_ADMIN_EMAIL"] = str(
+        recovered.get("BOOTSTRAP_ADMIN_EMAIL") or ""
+    ).strip().casefold()
     unsupported = sorted(UNSUPPORTED_SETTING_KEYS.intersection(recovered))
     if unsupported:
         raise RecoveryConfigurationError(

@@ -2,7 +2,7 @@
 {% from "reference/macros.html" import modal %}
 {% call modal("Deployment") %}
   <p class="text-sm text-base-dark">
-    Deployment settings control a small, owner-managed part of the App Engine app.yaml file. Lagniappe saves your choices here, then writes them into app.yaml during the next setup update before deployment.
+    Deployment settings control a small, Administrator-managed part of the App Engine app.yaml file. Lagniappe saves your choices here, then writes them into app.yaml during the next setup update before deployment.
   </p>
   {% call callout("warning") %}
     Saving these settings does not deploy immediately. They take effect the next time you run <code>./setup.sh update</code> and deploy the app.

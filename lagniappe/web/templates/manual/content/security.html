@@ -85,7 +85,9 @@
       <div>
         {{ subheading("Auth and Internal Work") }}
         <ul class="text-base-medium space-y-2">
-          <li>Identity Platform login tokens are checked for the exact project, issuer, and user before they become a Lagniappe session.</li>
+          <li>
+            Identity Platform login tokens are checked for the exact project, issuer, and user before they become a Lagniappe session.
+          </li>
           <li>Google sign-in checks its anti-forgery token during the login flow.</li>
           <li>
             Background jobs from Cloud Tasks must present a Google-signed identity token for the expected service account before process routes run.
@@ -94,6 +96,32 @@
         </ul>
       </div>
     </div>
+  {% endcall %}
+  {{ heading("Owner, Administrators, and Installation Secrets") }}
+  {% call card() %}
+    <p class="text-base-medium mb-3">
+      Lagniappe has one configured primary Owner and may have additional
+      Administrators. Administrators can operate the application, including
+      ordinary Site Settings, user and group management, ingress, content, and
+      content exports. AI entitlement remains a separate per-user choice.
+    </p>
+    <p class="text-base-medium mb-3">
+      The Owner alone changes the Administrator roster, changes or deletes an
+      Administrator account, protects the canonical Owner account, and views
+      or downloads installation configuration. That configuration can contain
+      Redis passwords, API keys, SMTP credentials, and recovery material, so
+      the <b>Maintenance / Configuration</b> control is not rendered for additional
+      Administrators and its server routes reject them as well.
+    </p>
+    <p class="text-base-medium">
+      During a delegated installation, one exact saved installer email may use
+      Google sign-in to create a temporary application Administrator only until
+      the primary Owner's first successful login. The email is never advertised
+      on the public login page. Owner login closes automatic creation
+      permanently; an already-created installer remains an Administrator until
+      the Owner removes it. The later handoff deploy clears the saved bootstrap
+      value before removing the installer's managed cloud access.
+    </p>
   {% endcall %}
   {{ heading("Google Cloud Boundary") }}
   {% call card() %}
@@ -206,12 +234,12 @@
         before enabling the default destination.
       </li>
       <li>
-        <strong>Analytics:</strong> Optional owner-facing analytics can record page path, title, view type, referrer, navigation type, and user identifiers for authenticated visits.
+        <strong>Analytics:</strong> Optional Administrator-facing analytics can record page path, title, view type, referrer, navigation type, and user identifiers for authenticated visits.
       </li>
       <li>
         <strong>AI generation observability:</strong> Setup explicitly offers
         the default-off <code>AI_OBSERVABILITY</code> choice. When enabled, it
-        samples every text generation into an owner-only summary dataset.
+        samples every text generation into an Administrator-only summary dataset.
         Records exclude prompts, generated text, tool arguments/results,
         messages, file content, and application identifiers; activity-driven
         cleanup deletes up to 500 records older than 30 days after each new

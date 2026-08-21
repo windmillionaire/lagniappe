@@ -626,7 +626,9 @@ def track():
 
     data = request.get_json(silent=True) or {}
     action = data.get("action") or "view"
-    if action in ("view", "public_view") and getattr(current_user, "is_owner", False):
+    if action in ("view", "public_view") and getattr(
+        current_user, "is_admin", getattr(current_user, "is_owner", False)
+    ):
         return responses.ok()
 
     if getattr(current_user, "is_authenticated", False):

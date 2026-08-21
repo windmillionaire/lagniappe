@@ -1096,6 +1096,9 @@ def test_set_application_defaults_generates_fresh_settings(monkeypatch, tmp_path
     config.SETTINGS.NODE = config.File.PACKAGE_JSON.load()
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     config.SETTINGS.APP["APP_NAME"] = "Fresh App"
+    config.SETTINGS.APP["ADMIN_NAME"] = "Owner"
+    config.SETTINGS.APP["ADMIN_EMAIL"] = "owner@example.com"
+    config.SETTINGS.APP["GOOGLE_SIGNIN_ENABLED"] = True
 
     token_calls = []
 
@@ -1143,6 +1146,7 @@ def test_set_application_defaults_generates_fresh_settings(monkeypatch, tmp_path
     assert settings["INSTALLER_EMAIL"] == "owner@example.com"
     assert settings["DEPLOYER_EMAIL"] == "owner@example.com"
     assert settings["ADMIN_EMAIL"] == "owner@example.com"
+    assert settings["BOOTSTRAP_ADMIN_EMAIL"] == ""
     assert settings["VERSION"] == "9.8.7"
     assert "BUILD_ID" not in settings
     assert settings["GIBBERISH"] == "token-16"
@@ -1173,6 +1177,7 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
 
     import config
     import runner.gcloud as switcher
+    from installer import admin
     from installer import create_config
 
     (tmp_path / "package.json").write_text(json.dumps({"version": "1.0.0"}))
@@ -1199,6 +1204,14 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
     permission_checks = []
 
     monkeypatch.setattr(create_config, "_get_app_name", lambda: "Named App")
+    monkeypatch.setattr(
+        admin,
+        "collect_owner_and_signin_choice",
+        lambda: config.SETTINGS.APP.update(
+            {"ADMIN_NAME": "Owner", "ADMIN_EMAIL": account}
+        )
+        or True,
+    )
     monkeypatch.setattr(create_config, "_get_gcloud_account", lambda saved: account)
     monkeypatch.setattr(
         create_config,
@@ -1327,6 +1340,71 @@ def test_set_application_defaults_persists_prompted_name_before_cloud_change(
     assert config.File.DEV_YAML.exists()
     assert config.File.APP_YAML.exists()
     assert "setup_draft" not in config.File.DEV_YAML.load()
+
+
+# @pairs setup:owner setup:preconfirmation admin:google-oauth admin:interactive-input
+# @pairs setup:delegated-install setup:existing-project setup:billing
+# @pairs admin:google-signin admin:bootstrap-email admin:preserved-empty
+def test_delegated_setup_collects_owner_and_requires_google_before_confirmation(
+    monkeypatch, tmp_path
+):
+    _use_isolated_app_dir(monkeypatch, tmp_path)
+
+    import config
+    from installer import admin, create_config
+
+    monkeypatch.setattr(admin, "_get_admin_name", lambda: "Business Owner")
+    monkeypatch.setattr(
+        admin, "_get_admin_email", lambda: "OWNER@business.example"
+    )
+    monkeypatch.setattr(admin, "configure_google_signin_choice", lambda: True)
+
+    assert admin.collect_owner_and_signin_choice() is True
+    assert config.SETTINGS.APP["ADMIN_NAME"] == "Business Owner"
+    assert config.SETTINGS.APP["ADMIN_EMAIL"] == "owner@business.example"
+
+    new_project = {
+        "project": {"state": "absent"},
+        "billing_enabled": False,
+    }
+    with pytest.raises(RuntimeError, match="existing Google Cloud project"):
+        create_config._configure_delegated_bootstrap(
+            new_project, "INSTALLER@business.example", True
+        )
+
+    ready_project = {
+        "project": {"state": "available"},
+        "billing_enabled": True,
+    }
+    with pytest.raises(RuntimeError, match="requires Google sign-in"):
+        create_config._configure_delegated_bootstrap(
+            ready_project, "installer@business.example", False
+        )
+
+    prompts = []
+    monkeypatch.setattr(
+        "builtins.input", lambda prompt: prompts.append(prompt) or ""
+    )
+    assert create_config._configure_delegated_bootstrap(
+        ready_project, "INSTALLER@business.example", True
+    )
+    assert config.SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] == (
+        "installer@business.example"
+    )
+    assert prompts == [
+        "Temporarily allow the installer to sign in as an application "
+        "Administrator? [Y/n]: "
+    ]
+
+    config.SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] = ""
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: pytest.fail("an explicit empty bootstrap must be preserved"),
+    )
+    assert create_config._configure_delegated_bootstrap(
+        ready_project, "installer@business.example", True
+    )
+    assert config.SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] == ""
 
 
 # @features setup

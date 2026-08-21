@@ -152,7 +152,7 @@ and `page`; users and model tasks are intentionally excluded.
 
 ### LocationBox (`location.mjs`)
 
-Used by the `LocationElement` for Google Places autocomplete. Authenticated page startup requests the user's geolocation; clicking the control starts or joins that same per-page update as a fallback.
+Used by the `LocationElement` for Google Places autocomplete. Ordinary authenticated page startup updates only the user's timezone and does not touch browser geolocation. `LocationBox.init()` starts the retryable, per-page location update, so the browser permission prompt appears only on a view that actually loads a location control. Clicking the control joins or retries that update as a fallback.
 
 **`_input(event)`** searches the server (`/l/search-location`) after three characters. The search awaits the shared location update before its request so the server session can bias the first Places result set.
 

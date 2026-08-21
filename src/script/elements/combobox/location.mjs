@@ -5,7 +5,9 @@ import { Combobox } from "./combobox";
 
 /**
  * @testable true
+ * @tests tests_js/test_016_combobox_frontend.py::test_location_combobox_starts_location_sync_on_init
  * @tests tests_js/test_016_combobox_frontend.py::test_location_combobox_waits_for_session_sync_before_search
+ * @pairs location:initialization location:on-demand
  * @pairs location:session-update location:request-ordering
  */
 export class LocationBox extends Combobox {
@@ -34,6 +36,7 @@ export class LocationBox extends Combobox {
 		this._createHiddenInput();
 		this.element.autocomplete = "bork";
 		this.element.addEventListener("input", this._debouncedInput);
+		void updateUserLocation();
 	}
 
 	_input(event) {

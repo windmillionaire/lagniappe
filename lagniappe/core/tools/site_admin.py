@@ -1,4 +1,4 @@
-"""Runtime-safe orchestration for owner-only site administration."""
+"""Runtime-safe orchestration for application administration."""
 
 from dataclasses import dataclass
 from itertools import chain, islice

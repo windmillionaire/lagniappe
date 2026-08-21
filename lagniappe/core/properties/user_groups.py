@@ -22,7 +22,7 @@ def get_view_hashes(permissions):
 # @testable false
 # @covered-by lagniappe/core/properties/user_groups.py::GroupPermissions.create
 class GroupPermissions(GroupPermissionsMixin, Permissions):
-    """Permission map for a group entity. Only site owners can create/edit.
+    """Permission map for a group entity. Only Administrators can create/edit.
 
     Set:
         value (dict): {resource_hash: Action.name}.
@@ -42,8 +42,10 @@ class GroupPermissions(GroupPermissionsMixin, Permissions):
         if not user or not user.is_authenticated:
             return
 
-        if not getattr(user, "is_owner", False):
-            raise PermissionError("only site owner can create group permissions")
+        if not getattr(user, "is_admin", getattr(user, "is_owner", False)):
+            raise PermissionError(
+                "only site owner or an administrator can create group permissions"
+            )
 
         permissions = super().create_permissions(form_data)
         view_hashes = get_view_hashes(permissions)
@@ -57,7 +59,7 @@ class PublicPermissions(PublicPermissionsMixin, Permissions):
     """Permission map for the public group.
 
     Includes a Site.PUBLIC entry set to TRUE/FALSE based on whether the
-    group is active. Only site owners can create/edit.
+    group is active. Only Administrators can create/edit.
 
     Set:
         value (dict): {resource_hash: Action.name}.
@@ -104,8 +106,10 @@ class PublicPermissions(PublicPermissionsMixin, Permissions):
             self._value = {Site.PUBLIC.value: Levels.FALSE.name}
             return
 
-        if not getattr(user, "is_owner", False):
-            raise PermissionError("only site owner can create public permissions")
+        if not getattr(user, "is_admin", getattr(user, "is_owner", False)):
+            raise PermissionError(
+                "only site owner or an administrator can create public permissions"
+            )
 
         if form_data and Site.PUBLIC.value in form_data:
             self.entity.active = form_data.get(Site.PUBLIC.value) == Levels.TRUE.name

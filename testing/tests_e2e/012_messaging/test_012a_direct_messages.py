@@ -517,7 +517,8 @@ def test_inbound_message_allows_reply_without_compose_permission(get_user):
     incoming = f"Inbound message {uuid4().hex}"
     _send_from_modal(owner, recipient, incoming)
 
-    recipient.go(SitePages.HOME)
+    home = recipient.go(SitePages.HOME)
+    home.wait_for_interaction_readiness()
     notifications = recipient.locate("[data-role='notifications']")
     notifications.click()
     menu = recipient.page.locator("[role='listbox'][data-visible='true']")

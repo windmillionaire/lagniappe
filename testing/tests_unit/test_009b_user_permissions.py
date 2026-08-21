@@ -10,16 +10,18 @@ import pytest
 from testing.utility.test_entities import TestEntities
 
 
-def permission_user(*, authenticated=True, owner=False, permissions=None):
+def permission_user(*, authenticated=True, owner=False, admin=False, permissions=None):
     return SimpleNamespace(
         is_authenticated=authenticated,
         is_owner=owner,
+        is_admin=owner or admin,
         permissions=permissions or {},
     )
 
 
-# @features permissions
-# @dimensions action-lattice resource-gates owner anonymous default-deny aliases
+# @pairs permissions:action-lattice permissions:resource-gates
+# @pairs permissions:anonymous permissions:default-deny permissions:aliases
+# @pair permissions:admin
 @pytest.mark.unit
 def test_resource_allowed_direct_contract():
     """Direct contract for permission action ordering and resource gates."""
@@ -27,6 +29,7 @@ def test_resource_allowed_direct_contract():
 
     anonymous = permission_user(authenticated=False)
     owner = permission_user(owner=True)
+    admin = permission_user(admin=True)
     model_viewer = permission_user(permissions={"models": "VIEW"})
     form_editor = permission_user(permissions={"forms": "EDIT"})
     missing = permission_user()
@@ -42,6 +45,10 @@ def test_resource_allowed_direct_contract():
     assert Resource.SITE.allowed(Action.VIEW, owner)
     assert Resource.USER_GROUPS.allowed(Action.DELETE, owner)
     assert Resource.MODELS.allowed(Action.DELETE, owner)
+    assert Resource.SITE.allowed(Action.VIEW, admin)
+    assert Resource.USER_GROUPS.allowed(Action.DELETE, admin)
+    assert Resource.INGRESS.allowed(Action.ALL, admin)
+    assert Resource.MODELS.allowed(Action.DELETE, admin)
 
     assert not Resource.SITE.allowed(Action.VIEW, model_viewer)
     assert Resource.MODELS.allowed(Action.VIEW, model_viewer)
@@ -60,8 +67,8 @@ def test_resource_allowed_direct_contract():
     assert not Resource.USERS.allowed(Action.VIEW, missing)
 
 
-# @features permissions cache
-# @dimensions stored-permissions fingerprint owner empty-permissions
+# @pairs permissions:stored-permissions permissions:fingerprint
+# @pairs permissions:empty-permissions cache:role
 @pytest.mark.unit
 def test_user_permissions_fingerprint_tracks_permissions_and_owner_state():
     viewer = TestEntities.get(
@@ -86,6 +93,47 @@ def test_user_permissions_fingerprint_tracks_permissions_and_owner_state():
     owner.db.pop("permissions", None)
     assert owner.permissions_fingerprint == hashlib.md5(b"").hexdigest()
 
+    admin = TestEntities.get(
+        "USER",
+        {"name": "Fingerprint Admin", "hash": "fingerprint-admin"},
+    )
+    admin.ai_access = "NONE"
+    ordinary_authorization = admin.authorization_fingerprint
+    admin.is_admin = True
+    assert admin.permissions_fingerprint == hashlib.md5(b"").hexdigest()
+    assert admin.authorization_fingerprint != ordinary_authorization
+
+
+# @pairs admin:privileged-account admin:view admin:edit admin:delete admin:page
+# @pair owner:owner-only
+@pytest.mark.unit
+def test_privileged_user_rows_are_owner_managed():
+    """Only the primary Owner can mutate an Owner or additional Admin account."""
+    from lagniappe.core.definitions import Action
+
+    owner = TestEntities.get(
+        "USER", {"name": "Owner", "hash": "role-owner", "owner": True}
+    )
+    admin = TestEntities.get(
+        "USER", {"name": "Admin", "hash": "role-admin"}
+    )
+    other_admin = TestEntities.get(
+        "USER", {"name": "Other Admin", "hash": "role-other-admin"}
+    )
+    admin.is_admin = True
+    other_admin.is_admin = True
+
+    assert other_admin.allowed(Action.VIEW, admin)
+    assert not other_admin.allowed(Action.EDIT, admin)
+    assert not other_admin.allowed(Action.DELETE, admin)
+    assert other_admin.allowed(Action.DELETE, owner)
+
+    page = TestEntities.get("PAGE", {"name": "Admin Page", "hash": "role-admin-page"})
+    page.user = other_admin
+    assert page.allowed(Action.VIEW, admin)
+    assert not page.allowed(Action.EDIT, admin)
+    assert page.allowed(Action.EDIT, owner)
+
 
 # @features permissions
 # @dimensions global-resources resource-gates owner
@@ -94,8 +142,8 @@ def test_global_resources(get_permissions_test_data):
     """Test has_permission() with Resource enums (global resource access).
 
     Resource.allowed(user) returns:
-    - Owner-only resources (SITE, USER_GROUPS, INGRESS): ALL for site owner only
-    - Global resources (MODELS, FORMS, USERS): ALL for site owner, else from ``user.permissions``
+    - Admin resources (SITE, USER_GROUPS, INGRESS): ALL for application Admins
+    - Global resources (MODELS, FORMS, USERS): ALL for Admins, else from ``user.permissions``
     - Instance aliases (PROJECT, TASK, …): same global checks via ``Resource`` mapping
     """
     users, resources = get_permissions_test_data()

@@ -486,6 +486,12 @@ def _update_reporting_privacy_version(version: str) -> tuple[Path, ...]:
     return tuple(path for path, _content in updates)
 
 
+# @testable true
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_version_show_uses_package_only_before_generated_settings_exist
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_version_note_appends_concise_release_entry
+# @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_version_set_updates_package_settings_and_release_file
+# @features version
+# @dimensions cli-routing
 def run_version_command(command_args: list[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="run.py version",
@@ -504,10 +510,12 @@ def run_version_command(command_args: list[str]) -> int:
     args = parser.parse_args(command_args)
 
     if args.action == "show":
-        from config import SETTINGS, constants
+        from config import File, SETTINGS, constants
 
-        version = SETTINGS.APP.get("VERSION")
         package_version = SETTINGS.NODE.get("version")
+        version = SETTINGS.APP.get("VERSION")
+        if not File.APP_SETTINGS_YAML.exists():
+            version = package_version
         build_id = getattr(constants, "BUILD_ID", None) or version or package_version
         print(f"VERSION: {version}")
         print(f"package.json: {package_version}")

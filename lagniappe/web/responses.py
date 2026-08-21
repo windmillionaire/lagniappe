@@ -388,6 +388,7 @@ def user_settings(page):
     submission = page.properties.submission.form_value if page.form else None
     is_own_page = current_user.page.key == page.key
     is_owner_viewer = current_user.is_owner
+    is_admin_viewer = current_user.is_admin
     return entity_response(
         (
             jsonify(
@@ -395,6 +396,7 @@ def user_settings(page):
                     "html": template(
                         page,
                         is_own_page,
+                        is_admin_viewer,
                         is_owner_viewer,
                         is_owner_viewer and is_own_page,
                         Resource.USER.allowed(Action.PERMISSIONS),
@@ -649,7 +651,7 @@ def home_page(home):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_admin_directory_link_opens_admin_settings
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_is_owner_only
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
 # @features admin
 # @dimensions page-load site-settings
 def admin_page():

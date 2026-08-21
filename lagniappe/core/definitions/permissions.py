@@ -70,12 +70,12 @@ class Restriction(Enum):
 class Resource(Enum):
     """Resource types for permission checking.
 
-    Owner resources (SITE, USER_GROUPS, INGRESS) require owner.
-    Global resources (USERS, MODELS, FORMS) check admin or permissions.
+    Administrative resources (SITE, USER_GROUPS, INGRESS) require an Admin.
+    Global resources (USERS, MODELS, FORMS) check Admin or permissions.
     Instance resources alias to their global resource.
     """
 
-    # Owner Resources
+    # Administrative Resources
     SITE = "site"
     USER_GROUPS = "groups"
     INGRESS = "ingress"
@@ -115,7 +115,7 @@ class Resource(Enum):
         if not user.is_authenticated:
             return False
         if self in [Resource.SITE, Resource.USER_GROUPS, Resource.INGRESS]:
-            return self._owner_resource_allowed(user)
+            return self._admin_resource_allowed(user)
         elif self == Resource.MODELS:
             return self._models_resource_allowed(action, user)
         elif self == Resource.FORMS:
@@ -128,10 +128,9 @@ class Resource(Enum):
     # @testable true
     # @tests tests_unit/test_009b_user_permissions.py::test_resource_allowed_direct_contract
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_admin_permissions
-    # @features permissions
-    # @dimensions owner
-    def _owner_resource_allowed(self, user):
-        return True if user.is_owner else False
+    # @pair permissions:admin
+    def _admin_resource_allowed(self, user):
+        return bool(getattr(user, "is_admin", getattr(user, "is_owner", False)))
 
     # @testable false
     # @covered-by lagniappe/core/definitions/permissions.py::Resource._models_resource_allowed
@@ -141,7 +140,7 @@ class Resource(Enum):
     def _global_resource_allowed(self, action, user):
         return (
             True
-            if user.is_owner
+            if getattr(user, "is_admin", getattr(user, "is_owner", False))
             else Action[user.permissions.get(self.value)].implies(action)
         )
 

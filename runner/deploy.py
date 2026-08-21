@@ -314,7 +314,7 @@ def verify_runtime_deploy_surface(app_dir=None):
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_deploy_version_update_keeps_package_lock_in_sync
 # @features deploy
-# @dimensions version package-lock transactional-state
+# @dimensions version package-lock transactional-state utf8
 def update_package_lock_version(version, lock_path=None):
     """Keep package-lock root metadata aligned with package.json."""
     path = lock_path or File.PACKAGE_JSON.value.with_name("package-lock.json")
@@ -331,7 +331,7 @@ def update_package_lock_version(version, lock_path=None):
 
     _atomic_write_text(
         path,
-        f"{json.dumps(package_lock, indent=2)}\n",
+        f"{json.dumps(package_lock, indent=2, ensure_ascii=False)}\n",
     )
 
     return True

@@ -66,7 +66,7 @@ class AIReport(Entity):
         if not user or not user.is_authenticated:
             return False
 
-        if user.is_owner:
+        if getattr(user, "is_admin", False) or getattr(user, "is_owner", False):
             return True
 
         creator_key = self.properties.user.key

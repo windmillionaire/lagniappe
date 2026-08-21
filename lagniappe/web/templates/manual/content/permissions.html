@@ -15,16 +15,20 @@
   {{ heading("Basic Model", icon="permissions", kind="user") }}
   {% call card() %}
     <ul class="text-base-medium space-y-2 mb-3">
-      <li><strong>Owner:</strong> has access to everything and can manage site-level settings.</li>
+      <li><strong>Primary Owner:</strong> the single configured business identity. The Owner has full application access, governs the Administrator roster, protects the canonical Owner account, and can download secret-bearing installation configuration.</li>
+      <li><strong>Administrators:</strong> trusted managed users who can administer ordinary settings, users, groups, ingress, exports, and content. They cannot change the Owner or another Administrator, govern the Administrator roster, or retrieve installation secrets.</li>
+      <li><strong>AI access is separate:</strong> promoting a user to Administrator does not enable AI. AI entitlement is assigned independently.</li>
       <li><strong>Groups:</strong> users inherit permissions from every group they belong to.</li>
       <li><strong>Most permissive wins:</strong> if one group grants view and another grants edit, the user can edit.</li>
       <li><strong>Higher actions include lower actions:</strong> edit includes view; delete includes edit and view.</li>
       <li><strong>Pages belong to categories:</strong> editing a category lets a user add pages to it. Create permissions are for making new containers such as categories or projects.</li>
     </ul>
     {% call callout("tip", False) %}
-      The owner role is broad by design. For organizations, it is worth naming
-      at least one trusted backup owner, or jotting down a short recovery plan
-      for the underlying Google Cloud project.
+      There is exactly one Lagniappe Owner. Add trusted application
+      Administrators for operational coverage and keep a separate recovery
+      plan for the underlying Google Cloud project. Lagniappe roles do not
+      grant Google Cloud IAM, and Google Cloud IAM does not create a Lagniappe
+      login or application role.
     {% endcall %}
   {% endcall %}
 

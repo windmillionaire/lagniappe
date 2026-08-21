@@ -268,7 +268,8 @@ the health-check status. See
 
 ### Deferred Admin Export
 
-The `/admin` view includes an owner-only Export tab next to Site Settings. Its
+The `/admin` view is available to application Administrators and includes an
+Export tab next to Site Settings. Its
 `SiteExport` widget loads from `GET /l/site-export` and starts work with
 `POST /l/site-export`. The POST creates the queued `site_export` metadata record
 and starts a durable shared job with a pending notification. Production

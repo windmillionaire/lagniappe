@@ -6,7 +6,7 @@ from lagniappe.core.tools.recovery import (
     RecoverySnapshotUnavailable,
     load_recovery_snapshot,
 )
-from lagniappe.web.auth import logged_in, permission
+from lagniappe.web.auth import logged_in, owner_only, permission
 from lagniappe.web import responses
 
 from . import reference
@@ -24,7 +24,7 @@ def section(section):
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_is_owner_only
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
 @reference.route("/environment-variables")
 @permission(Resource.SITE)
 def environment_variables():
@@ -35,11 +35,11 @@ def environment_variables():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_is_owner_only
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @pairs admin:recovery-export
+# @pair owner:recovery-export
 @reference.route("/download-settings")
-@permission(Resource.SITE)
+@owner_only
 def download_settings():
     """Download the complete canonical recovery snapshot."""
     g.NO_CACHE = True

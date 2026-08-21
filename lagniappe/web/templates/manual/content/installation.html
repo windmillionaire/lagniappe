@@ -137,18 +137,14 @@
             Keep the bundled Python option selected. The other default choices
             are fine. Finish the installer, then close and reopen PowerShell.
           </li>
-          <li>
-            Verify both tools in the new PowerShell window:
-          </li>
+          <li>Verify both tools in the new PowerShell window:</li>
         </ol>
         {{ code("git --version\ngcloud.cmd --version") }}
       </div>
       <div class="min-w-0">
         <h4 class="font-semibold text-base-dark mb-2">macOS</h4>
         <ol class="text-base-medium text-sm space-y-3 list-decimal ml-5">
-          <li>
-            Open Terminal and check whether Git is installed:
-          </li>
+          <li>Open Terminal and check whether Git is installed:</li>
         </ol>
         {{ code("git --version") }}
         <p class="text-base-medium text-sm mt-2">
@@ -161,9 +157,7 @@
         </p>
         <ol start="2"
             class="text-base-medium text-sm space-y-3 list-decimal ml-5 mt-3">
-          <li>
-            Check whether the installed Python version is ready for Lagniappe:
-          </li>
+          <li>Check whether the installed Python version is ready for Lagniappe:</li>
         </ol>
         {{ code("python3") }}
         <p class="text-base-medium text-sm mt-2">
@@ -211,6 +205,127 @@
       available.
     {% endcall %}
   {% endcall %}
+  <details data-role="delegated-installation"
+           data-kind="page"
+           class="rounded-lg border border-base-light/50 bg-white shadow-sm">
+    <summary class="cursor-pointer px-5 py-4 text-base-dark marker:text-kind-default">
+      <span class="ml-1 inline-flex items-start gap-3 align-top">
+        <span class="mt-0.5 text-kind-default">{{ render_icon("installation", "icon-lg") }}</span>
+        <span>
+          <span class="block text-lg font-semibold">Delegated installation</span>
+          <span class="block text-sm font-normal leading-relaxed text-base-medium">
+            Open this checklist only when someone outside the business will perform the installation.
+          </span>
+        </span>
+      </span>
+    </summary>
+    <div class="border-t border-base-light/40 px-5 py-5">
+      <p class="text-base-medium mb-4">
+        Use this checklist when a consultant, developer, or other installer will
+        deploy Lagniappe for a business. The business keeps permanent ownership;
+        the installer receives broad access only to a new, empty project and
+        never receives the permanent Owner's password.
+      </p>
+      {% call callout("note", False) %}
+        Google Workspace and Google Cloud are separate services. Workspace owns
+        the business email accounts; Google Cloud owns the project, billing, and
+        access controls used to run Lagniappe. No prior Google Cloud experience
+        is required—the checklist names each page and button.
+      {% endcall %}
+      <ol class="text-base-medium space-y-4 list-decimal ml-5 mt-4">
+        <li>
+          Choose one permanent, business-controlled Google account to be both
+          the <strong>Lagniappe primary Owner</strong> and a
+          <strong>Google Cloud Project Owner</strong>. These are separate roles,
+          but the same durable business identity should hold both.
+        </li>
+        <li>
+          In Google Admin Console, open <strong>Directory / Users / Add new
+          user</strong>. Create a dedicated temporary installer account, enter a
+          secondary delivery email, and assign it no Workspace administrator
+          role. Follow Google's
+          {{ link("https://support.google.com/a/answer/33310", "user-creation instructions") }}.
+        </li>
+        <li>
+          Have the installer change the temporary password and enroll that
+          account in 2-Step Verification. Confirm that Google Cloud is enabled
+          for the user or its organizational unit.
+        </li>
+        <li>
+          Sign in to the
+          {{ link("https://console.cloud.google.com/", "Google Cloud console") }}
+          with the permanent Owner account and accept Google's first-time terms
+          if prompted. A Google Workspace subscription does not automatically
+          create a Google Cloud billing account. Follow Google's
+          {{ link("https://docs.cloud.google.com/resource-manager/docs/creating-managing-projects", "create-project instructions") }}:
+          open <strong>Manage Resources / Create Project</strong>, select the
+          business organization, name the project, and select
+          <strong>Create</strong>. If project creation is blocked, ask the
+          business's Workspace administrator to create it inside the business
+          organization. With that project selected, open
+          <strong>Navigation menu / Billing</strong>. If no Cloud Billing account
+          exists, choose <strong>Manage billing accounts / Create account</strong>
+          and add the business's payment details. Link that billing account to
+          the project and confirm that billing is enabled
+          <strong>before</strong> the installer runs setup. Google's
+          {{ link("https://docs.cloud.google.com/billing/docs/how-to/verify-billing-enabled", "billing-status instructions") }}
+          show the same check.
+        </li>
+        <li>
+          With the new project still selected, open
+          <strong>Navigation menu / IAM &amp; Admin / IAM / Grant access</strong>.
+          Enter the temporary Workspace email under
+          <strong>New principals</strong>, choose
+          <strong>Basic / Owner</strong> under <strong>Assign roles</strong>, and
+          select <strong>Save</strong>. This is broad access, but it is temporary
+          and confined to a new, empty project. Google's
+          {{ link("https://docs.cloud.google.com/iam/docs/granting-changing-revoking-access", "grant and revoke instructions") }}
+          cover both adding and later removing the binding.
+        </li>
+        <li>
+          Keep billing, the authentication-email mailbox, Redis, Cloudflare or
+          domain control, and recovery ownership in permanent business accounts.
+          Invite the installer only where a setup step truly requires it.
+        </li>
+        <li>
+          Give the installer the project ID and the permanent Lagniappe Owner
+          email. <strong>Never give them the Owner's Google password.</strong>
+          The installer signs in with the dedicated temporary Google account.
+        </li>
+        <li>
+          After deployment, the installer verifies the app using Google sign-in.
+          Then the permanent Owner signs in and downloads a secure configuration
+          backup from <strong>Admin / Site Settings / Maintenance /
+          Configuration</strong>.
+        </li>
+        <li>
+          The Owner removes the installer's Administrator role, or permanently
+          deletes the installer's application account from Users. From the
+          installation working copy, either the installer or permanent Owner
+          signs in to gcloud and Application Default Credentials, then runs
+          <code>./setup.sh handoff</code>, or <code>.\setup.cmd handoff</code> in
+          Windows PowerShell. The command rejects any other active account. The
+          business verifies the installer is absent from project IAM, revokes
+          provider invitations and tokens, removes local credentials and settings
+          from the installer's machine, then suspends and ultimately deletes the
+          temporary Workspace user. After a successful handoff, only the Owner
+          can rerun the command because the installer no longer has cloud access.
+        </li>
+        <li>
+          Rotate any provider secret that could not remain under direct business
+          control during installation.
+        </li>
+      </ol>
+      {% call callout("warning", False) %}
+        The handoff command previews the Owner, installer, project, service
+        account, buckets, and IAM changes, then asks for default-no confirmation.
+        It first establishes Owner access and deploys the closed bootstrap
+        configuration. It removes the installer's direct project IAM only as the
+        final cloud change. It does not delete Workspace users, alter billing IAM,
+        or remove organization-level access.
+      {% endcall %}
+    </div>
+  </details>
   {{ heading("Running the Commands") }}
   {% call card() %}
     <p class="text-base-medium mb-3">
@@ -218,9 +333,7 @@
       your terminal, and press Enter. You can still select and copy the text
       manually if you prefer.
     </p>
-    <p class="text-base-medium mb-3">
-      On Windows, use PowerShell. On macOS or Linux, use your usual terminal.
-    </p>
+    <p class="text-base-medium mb-3">On Windows, use PowerShell. On macOS or Linux, use your usual terminal.</p>
     {% call callout("note", False) %}
       Windows installation and recovery use <code>setup.cmd</code>. macOS and
       Linux use <code>setup.sh</code>.
@@ -283,23 +396,15 @@
   {{ heading("Installation") }}
   {% call card() %}
     {% call step(1, "Clone the repository") %}
-      <p class="text-base-medium text-sm mb-2">
-        In Windows PowerShell, use:
-      </p>
+      <p class="text-base-medium text-sm mb-2">In Windows PowerShell, use:</p>
       {{ code('$lagniappePath = Join-Path $env:USERPROFILE "Lagniappe"\ngit clone https://github.com/windmillionaire/lagniappe.git $lagniappePath\nSet-Location $lagniappePath') }}
-      <p class="text-base-medium text-sm my-2">
-        On macOS or Linux, use:
-      </p>
+      <p class="text-base-medium text-sm my-2">On macOS or Linux, use:</p>
       {{ code("git clone https://github.com/windmillionaire/lagniappe.git lagniappe\ncd lagniappe") }}
     {% endcall %}
     {% call step(2, "Authenticate with Google Cloud") %}
-      <p class="text-base-medium text-sm mb-2">
-        On macOS or Linux, this connects the terminal to your Google account:
-      </p>
+      <p class="text-base-medium text-sm mb-2">On macOS or Linux, this connects the terminal to your Google account:</p>
       {{ code("gcloud auth login") }}
-      <p class="text-base-medium text-sm my-2">
-        In Windows PowerShell, use:
-      </p>
+      <p class="text-base-medium text-sm my-2">In Windows PowerShell, use:</p>
       {{ code("gcloud.cmd auth login") }}
       <p class="text-base-medium text-sm mt-2">
         The command opens a browser. Later, setup opens a second Google sign-in
@@ -314,7 +419,8 @@
         deselect individual permissions: Google supports partial approval, but
         every permission requested here is needed to configure, verify, or
         deploy your installation.
-        <br><br>
+        <br>
+        <br>
         In practical terms, you are granting these permissions to
         <strong>yourself</strong>: they let Google Cloud CLI and the setup code
         on your own computer act for you in your project. They do not give the
@@ -328,9 +434,7 @@
         review each step before setup deploys the app.
       </p>
       {{ code("./setup.sh") }}
-      <p class="text-base-medium text-sm my-2">
-        In Windows PowerShell, use:
-      </p>
+      <p class="text-base-medium text-sm my-2">In Windows PowerShell, use:</p>
       {{ code(".\\setup.cmd") }}
       <p class="text-base-medium text-sm">
         Setup guides you through the cloud project, sign-in, email, Redis,
@@ -366,7 +470,7 @@
       Alongside a fresh copy of the Lagniappe source code, this is the one
       local file you need to recreate the same installation. It does not
       contain your records or uploaded files. Once the app is running, the
-      owner can also view or download the current settings from
+      primary Owner can also view or download the current settings from
       <strong>Admin</strong>, <strong>Settings</strong>,
       <strong>Maintenance</strong>, then <strong>Configuration</strong>.
     </p>
@@ -399,9 +503,7 @@
       attention.
     </p>
     {{ code("./setup.sh doctor") }}
-    <p class="text-base-medium my-3">
-      In Windows PowerShell, use:
-    </p>
+    <p class="text-base-medium my-3">In Windows PowerShell, use:</p>
     {{ code(".\\setup.cmd doctor") }}
     <p class="text-base-medium mt-3">
       The <code>repair</code> command reruns setup and fixes what it can:

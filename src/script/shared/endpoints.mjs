@@ -49,6 +49,12 @@ export const ENDPOINTS = {
 			setAiSettings: "/l/set-ai-settings",
 		};
 	},
+	SiteAdministrators: () => {
+		return {
+			promote: "/l/site-administrators",
+			demote: (key) => `/l/site-administrators/${key}`,
+		};
+	},
 	SiteDeployment: () => {
 		return {
 			setDeploymentSettings: "/l/set-deployment-settings",

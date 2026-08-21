@@ -31,6 +31,7 @@ class User(AssetMixin, UserMixin, Entity):
         return frozenset(
             {
                 "ai_access",
+                "admin",
                 "permissions",
                 "photo",
                 "allow_messages_and_mentions",
@@ -54,11 +55,22 @@ class User(AssetMixin, UserMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009b_user_permissions.py::test_user_visibility_uses_users_and_group_permissions_without_page_restrictions
+    # @tests tests_unit/test_009b_user_permissions.py::test_privileged_user_rows_are_owner_managed
     # @pairs users:owner users:users-view users:group-view
     # @pair users:restriction-independence
+    # @pairs admin:privileged-account admin:view admin:edit admin:delete
+    # @pair owner:owner-only
     def allowed(self, action, user=None):
         """Authorize user rows from their own Users/group permission scope."""
         viewer = current_context_user(user)
+        if (
+            self.is_admin
+            and viewer
+            and viewer.is_authenticated
+            and not viewer.is_owner
+            and action.value > Action.VIEW.value
+        ):
+            return False
         return bool(
             viewer
             and viewer.is_authenticated
@@ -92,6 +104,7 @@ class User(AssetMixin, UserMixin, Entity):
                 "restrictions": user_restrictions.Restrictions,
                 "is_public": common_entity.IsPublic,
                 "is_owner": user_entity.IsOwner,
+                "is_admin": user_entity.IsAdmin,
                 "allow_messages_and_mentions": user_entity.AllowMessagesAndMentions,
                 "allow_task_assignments": user_entity.AllowTaskAssignments,
                 "allow_site_email": user_entity.AllowSiteEmail,
@@ -110,11 +123,11 @@ class User(AssetMixin, UserMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009b_user_permissions.py::test_user_permissions_fingerprint_tracks_permissions_and_owner_state
-    # @features permissions cache
-    # @dimensions stored-permissions fingerprint owner empty-permissions
+    # @pairs permissions:stored-permissions permissions:fingerprint
+    # @pairs cache:role permissions:empty-permissions
     @property
     def permissions_fingerprint(self):
-        permissions = "" if self.is_owner else self.db.get("permissions", "{}")
+        permissions = "" if self.is_admin else self.db.get("permissions", "{}")
         return hashlib.md5(permissions.encode("utf-8")).hexdigest()
 
     # @testable true
@@ -137,7 +150,8 @@ class User(AssetMixin, UserMixin, Entity):
     # @dimensions authorization-fingerprint permissions entitlement
     @property
     def authorization_fingerprint(self):
-        value = f"{self.permissions_fingerprint}:{self.ai_access}"
+        role = "owner" if self.is_owner else "admin" if self.is_admin else "user"
+        value = f"{role}:{self.permissions_fingerprint}:{self.ai_access}"
         return hashlib.md5(value.encode("utf-8")).hexdigest()
 
     @property
@@ -158,7 +172,7 @@ class User(AssetMixin, UserMixin, Entity):
     def has_permission(self, resource, action=Action.ALL):
         if isinstance(resource, Entity):
             required, permissions = resource.requires, self.permissions
-            return self.is_owner or any(
+            return self.is_admin or any(
                 Action[a].implies(action)
                 for a in (permissions.get(r) for r in required)
             )
@@ -215,8 +229,13 @@ class User(AssetMixin, UserMixin, Entity):
         new_user.db["photo"] = data.get("picture")
         new_user.is_test_user = data.get("test_user", False)
 
-        if new_user.db.get("email") == CONFIG.ADMIN_EMAIL:
+        if str(new_user.db.get("email") or "").casefold() == str(
+            CONFIG.ADMIN_EMAIL or ""
+        ).casefold():
             new_user.is_owner = True
+
+        if data.get("admin", False):
+            new_user.is_admin = True
 
         new_user.ai_access = data.get(
             "ai_access",

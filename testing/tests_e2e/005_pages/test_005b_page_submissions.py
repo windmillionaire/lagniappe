@@ -102,8 +102,8 @@ def test_selection_submission(get_user):
             expect(read_value).to_contain_text(label)
 
 
-# @features pages
-# @dimensions submission link-field
+# @pairs pages:submission pages:link-field form-link:read-layout
+# @style form.linkLabel
 def test_link_submission(get_user):
     """Fill and verify external link (url + title) field."""
     user = get_user(Users.OWNER)
@@ -113,6 +113,21 @@ def test_link_submission(get_user):
     submission = Submissions.link_external.get()
     page.set_submission(submission)
     page.submit_and_verify_submission(submission)
+
+    read_value = page.info_form.locator(
+        "[id^='link-ab12-'] [data-role='read']"
+    )
+    layout = read_value.evaluate(
+        """readValue => {
+          const label = readValue.querySelector(".form-link-label");
+          const icon = readValue.querySelector(".icon[data-icon='out']");
+          return {
+            iconHeight: icon.getBoundingClientRect().height,
+            lineHeight: Number.parseFloat(getComputedStyle(label).lineHeight),
+          };
+        }"""
+    )
+    assert layout["lineHeight"] == pytest.approx(layout["iconHeight"])
 
 
 # @features form-table

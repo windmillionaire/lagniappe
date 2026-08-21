@@ -383,7 +383,7 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
     # Repository upgrades reload config after replacing the checkout, while an
     # old-generation runner.testing module may still be cached by Python.
     stale_testing = types.ModuleType("runner.testing")
-    sys.modules["runner.testing"] = stale_testing
+    monkeypatch.setitem(sys.modules, "runner.testing", stale_testing)
 
     def restore_config_modules():
         for name in [
@@ -805,6 +805,7 @@ def test_recovery_snapshot_is_complete_flat_and_merges_live_settings(monkeypatch
     assert snapshot["CONFIG_KIND"] == recovery.CONFIG_KIND
     assert snapshot["CONFIG_SCHEMA_VERSION"] == recovery.CONFIG_SCHEMA_VERSION
     assert snapshot["GOOGLE_SIGNIN_ENABLED"] is True
+    assert snapshot["BOOTSTRAP_ADMIN_EMAIL"] == ""
     assert "BUILD_ID" not in snapshot
     assert "FIREBASE_CONFIG" not in snapshot
     assert "version" not in snapshot
@@ -897,8 +898,7 @@ def _valid_recovery_document():
     }
 
 
-# @features config
-# @dimensions recovery-validation project-identity project-number
+# @pairs config:recovery-validation config:project-identity config:project-number
 def test_recovery_document_cross_checks_all_persisted_project_identities():
     from config import recovery
 
@@ -907,6 +907,7 @@ def test_recovery_document_cross_checks_all_persisted_project_identities():
     assert recovered["GOOGLE_CLOUD_PROJECT"] == "recovered-project-1"
     assert recovered["CONFIG_SCHEMA_VERSION"] == recovery.CONFIG_SCHEMA_VERSION
     assert recovered["GOOGLE_SIGNIN_ENABLED"] is True
+    assert recovered["BOOTSTRAP_ADMIN_EMAIL"] == ""
     assert recovered["RUNTIME_SERVICE_ACCOUNT_EMAIL"].startswith("runtime@")
     assert "FIREBASE_CONFIG" not in recovered
     assert recovered["IDENTITY_PLATFORM_CONFIG"] == {
@@ -925,6 +926,12 @@ def test_recovery_document_cross_checks_all_persisted_project_identities():
         "https://lagniappe.example.com/users/google-signin"
     )
     assert recovery.validate_recovery_document(custom_domain)
+
+    delegated = _valid_recovery_document()
+    delegated["BOOTSTRAP_ADMIN_EMAIL"] = " Installer@Business.Example "
+    assert recovery.validate_recovery_document(delegated)[
+        "BOOTSTRAP_ADMIN_EMAIL"
+    ] == "installer@business.example"
 
     google_disabled = _valid_recovery_document()
     google_disabled["GOOGLE_SIGNIN_ENABLED"] = False
@@ -1246,7 +1253,7 @@ def test_redis_tls_requires_a_valid_ca_bundle(monkeypatch, tmp_path):
 
 
 # @features deploy
-# @dimensions version package-lock transactional-state
+# @dimensions version package-lock transactional-state utf8
 def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path):
     app_dir = tmp_path / "demo-app"
     config_files_dir = app_dir / "config" / "files"
@@ -1283,10 +1290,15 @@ def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path)
                         "version": "1.23",
                         "dependencies": {"example": "^1.0.0"},
                     },
-                    "node_modules/example": {"version": "1.0.0"},
+                    "node_modules/example": {
+                        "version": "1.0.0",
+                        "funding": {"type": "GitHub Sponsors ❤"},
+                    },
                 },
-            }
-        )
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
     )
 
     try:
@@ -1309,6 +1321,9 @@ def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path)
     assert package_lock["version"] == "1.24"
     assert package_lock["packages"][""]["version"] == "1.24"
     assert package_lock["packages"]["node_modules/example"]["version"] == "1.0.0"
+    lock_text = lock_path.read_text(encoding="utf-8")
+    assert "GitHub Sponsors ❤" in lock_text
+    assert "\\u2764" not in lock_text
 
 
 # @features deploy

@@ -46,6 +46,49 @@ GOOGLE_AUTH_PERMISSION_GUIDANCE = (
 )
 
 
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_setup_collects_owner_and_requires_google_before_confirmation
+# @pairs setup:delegated-install setup:existing-project setup:billing
+# @pairs admin:google-signin admin:bootstrap-email admin:preserved-empty
+def _configure_delegated_bootstrap(preflight, account, google_signin_enabled):
+    """Validate and persist the temporary application Admin bootstrap window."""
+    from config import SETTINGS
+
+    account = str(account or "").strip().casefold()
+    owner_email = str(SETTINGS.APP.get("ADMIN_EMAIL") or "").strip().casefold()
+    delegated = bool(owner_email and owner_email != account)
+    if not delegated:
+        SETTINGS.APP.setdefault("BOOTSTRAP_ADMIN_EMAIL", "")
+        return False
+
+    if preflight["project"]["state"] != "available" or not preflight[
+        "billing_enabled"
+    ]:
+        raise RuntimeError(
+            "Delegated installation requires an existing Google Cloud project "
+            "whose billing is already linked by the business."
+        )
+    if not google_signin_enabled:
+        raise RuntimeError(
+            "Delegated installation requires Google sign-in for the temporary "
+            "bootstrap Administrator."
+        )
+
+    print(
+        f"Delegated installation detected: the active installer ({account}) "
+        f"differs from the permanent Owner ({owner_email})."
+    )
+    if "BOOTSTRAP_ADMIN_EMAIL" not in SETTINGS.APP:
+        bootstrap = input(
+            "Temporarily allow the installer to sign in as an application "
+            "Administrator? [Y/n]: "
+        ).strip().casefold()
+        SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] = (
+            "" if bootstrap in {"n", "no"} else account
+        )
+    return True
+
+
 # @testable false
 # @covered-by installer/create_config.py::verify_application_config
 # @reason small typed-failure adapter exercised through configuration validation
@@ -1202,6 +1245,10 @@ def _display_install_identity_summary(preflight, adc_identity):
         f"{SETTINGS.APP.get('DEPLOYER_EMAIL') or SETTINGS.GCLOUD_CONFIG['ACCOUNT']}"
     )
     print(f"Application owner: {SETTINGS.APP.get('ADMIN_EMAIL') or '(not set)'}")
+    print(
+        "Temporary application Administrator: "
+        f"{SETTINGS.APP.get('BOOTSTRAP_ADMIN_EMAIL') or '(none)'}"
+    )
     runtime_email = SETTINGS.APP.get("RUNTIME_SERVICE_ACCOUNT_EMAIL")
     if runtime_email:
         print(f"Runtime service account: {runtime_email}")
@@ -1258,8 +1305,15 @@ def _build_app_settings():
         "CONFIG_KIND": CONFIG_KIND,
         "CONFIG_SCHEMA_VERSION": CONFIG_SCHEMA_VERSION,
         "GOOGLE_CLOUD_PROJECT": SETTINGS.GCLOUD_CONFIG["PROJECT"],
-        "INSTALLER_EMAIL": SETTINGS.GCLOUD_CONFIG["ACCOUNT"],
-        "DEPLOYER_EMAIL": SETTINGS.GCLOUD_CONFIG["ACCOUNT"],
+        "INSTALLER_EMAIL": (
+            SETTINGS.APP.get("INSTALLER_EMAIL")
+            or SETTINGS.GCLOUD_CONFIG["ACCOUNT"]
+        ),
+        "DEPLOYER_EMAIL": (
+            SETTINGS.APP.get("DEPLOYER_EMAIL")
+            or SETTINGS.GCLOUD_CONFIG["ACCOUNT"]
+        ),
+        "BOOTSTRAP_ADMIN_EMAIL": SETTINGS.APP.get("BOOTSTRAP_ADMIN_EMAIL", ""),
         "ADMIN_EMAIL": (
             SETTINGS.APP.get("ADMIN_EMAIL")
             or SETTINGS.GCLOUD_CONFIG["ACCOUNT"]
@@ -1594,6 +1648,11 @@ def _set_application_defaults():
             "cross-check Cloud Storage ownership."
         )
     SETTINGS.GCLOUD_CONFIG["BILLING_ACCOUNT"] = preflight["billing_account"]
+    if not recovery_mode:
+        from installer.admin import collect_owner_and_signin_choice
+
+        google_signin_enabled = collect_owner_and_signin_choice()
+        _configure_delegated_bootstrap(preflight, account, google_signin_enabled)
     if preflight["project"]["state"] == "available":
         adc_identity = _ensure_adc_principal(account, project_id)
     else:

@@ -9,9 +9,9 @@ from config.ai_settings import normalize_ai_settings
 from config.deployment import normalize_deployment_settings
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Action, Fetch, Resource
+from lagniappe.core.definitions import Action, Fetch, FetchReason, Resource
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, database, site_image
+from lagniappe.core.tools import cache, collaboration, database, site_image
 from lagniappe.core.tools.ai_settings import runtime_ai_settings
 from lagniappe.core.tools.database import migrations as database_migrations
 from lagniappe.core.tools.site_admin import (
@@ -22,7 +22,12 @@ from lagniappe.core.tools.site_admin import (
 )
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
-from lagniappe.web.auth import clear_client_cache_invalidation, logged_in, permission
+from lagniappe.web.auth import (
+    clear_client_cache_invalidation,
+    logged_in,
+    owner_only,
+    permission,
+)
 from lagniappe.core.exceptions import AISettingsError, DeploymentSettingsError
 
 from . import home, internal
@@ -40,6 +45,86 @@ def _site_image_response(paths):
         for k, v in paths.items()
         if k != "version"
     }
+
+
+# @testable true
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+# @pairs admin:roster owner:awaiting-first-sign-in admin:managed-users owner:role-controls
+def _administrator_payload():
+    """Return the canonical Owner, additional Admins, and promotion choices."""
+    rows = database.get.users(limit=None).results
+    users = [
+        user
+        for user in Entities.fetch(*rows, request=Fetch.direct())
+        if isinstance(user, Entities.USER) and not user.is_public
+    ]
+    owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().casefold()
+    owner = next(
+        (
+            user
+            for user in users
+            if str(user.email or "").strip().casefold() == owner_email
+        ),
+        None,
+    )
+
+    # @testable false
+    # @covered-by lagniappe/web/routes/home/site.py::_administrator_payload
+    # @reason private roster row formatting is exercised through the payload owner
+    def role_entry(user, *, primary_owner=False):
+        last_login = user.last_login if user else None
+        if hasattr(last_login, "isoformat"):
+            last_login = last_login.isoformat()
+        return {
+            "key": user.urlsafe_key if user else None,
+            "name": (user.name if user else CONFIG.ADMIN_NAME) or "Owner",
+            "email": str((user.email if user else CONFIG.ADMIN_EMAIL) or ""),
+            "last_login": last_login,
+            "awaiting_first_sign_in": bool(primary_owner and not user),
+            "is_owner": primary_owner,
+        }
+
+    additional = sorted(
+        (
+            role_entry(user)
+            for user in users
+            if user is not owner and user.is_admin
+        ),
+        key=lambda entry: (
+            str(entry["name"] or "").casefold(),
+            str(entry["email"] or "").casefold(),
+        ),
+    )
+    candidates = sorted(
+        (
+            role_entry(user)
+            for user in users
+            if user is not owner and not user.is_admin
+        ),
+        key=lambda entry: (
+            str(entry["name"] or "").casefold(),
+            str(entry["email"] or "").casefold(),
+        ),
+    )
+    return [role_entry(owner, primary_owner=True), *additional], candidates
+
+
+# @testable false
+# @covered-by lagniappe/web/routes/home/site.py::promote_site_administrator
+# @covered-by lagniappe/web/routes/home/site.py::demote_site_administrator
+# @reason target loading and role protection are exercised through both role endpoints
+def _role_target(identifier):
+    target = collaboration.resolve_user(identifier)
+    if target:
+        target = Entities.fetch_one(
+            target.urlsafe_key,
+            request=Fetch.nested(because=FetchReason.USER_SAVE_REQUIREMENTS),
+        )
+    if not isinstance(target, Entities.USER) or target.is_public:
+        abort(404)
+    if target.is_owner:
+        abort(403)
+    return target
 
 
 # @testable true
@@ -98,10 +183,11 @@ def site_update():
 
 
 # @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_is_owner_only
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
 # @features admin
-# @dimensions site-settings owner-only public-preview metadata
+# @dimensions site-settings admin-only public-preview metadata
 @internal.route("/site-settings", methods=["GET"])
 @permission(Resource.SITE)
 def site_settings():
@@ -202,6 +288,7 @@ def site_settings():
 
     ai_settings, ai_model_options = load_ai_settings_payload(config=CONFIG)
 
+    administrators, administrator_candidates = _administrator_payload()
     return responses.json_response(
         {
             "ai_settings": ai_settings,
@@ -210,6 +297,57 @@ def site_settings():
             "site_image": site_image_response,
             "service_providers": links,
             "migration_status": database_migrations.get_migration_status(),
+            "administrators": administrators,
+            "administrator_candidates": administrator_candidates,
+            "can_manage_administrators": current_user.is_owner,
+            "can_view_sensitive_configuration": current_user.is_owner,
+        }
+    )
+
+
+# @testable true
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+# @pairs admin:promotion owner:owner-only cache:cache-invalidation
+@internal.route("/site-administrators", methods=["POST"])
+@owner_only
+def promote_site_administrator():
+    data = request.form if request.form else request.get_json(silent=True) or {}
+    identifier = str(data.get("user_key") or data.get("key") or "").strip()
+    if not identifier:
+        return responses.error("Choose an existing managed user.")
+    target = _role_target(identifier)
+    if not target.is_admin:
+        target.is_admin = True
+        target.save()
+    administrators, candidates = _administrator_payload()
+    return responses.json_response(
+        {
+            "administrators": administrators,
+            "administrator_candidates": candidates,
+            "can_manage_administrators": True,
+            "can_view_sensitive_configuration": True,
+        }
+    )
+
+
+# @testable true
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
+# @pairs admin:demotion owner:owner-only cache:cache-invalidation
+# @pair admin:account-preservation
+@internal.route("/site-administrators/<key>", methods=["DELETE"])
+@owner_only
+def demote_site_administrator(key):
+    target = _role_target(key)
+    if target.is_admin:
+        target.is_admin = False
+        target.save()
+    administrators, candidates = _administrator_payload()
+    return responses.json_response(
+        {
+            "administrators": administrators,
+            "administrator_candidates": candidates,
+            "can_manage_administrators": True,
+            "can_view_sensitive_configuration": True,
         }
     )
 
@@ -263,10 +401,10 @@ def set_ai_settings():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @features admin
-# @dimensions configuration-modal environment-variables
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
+# @pairs owner:sensitive-configuration owner:configuration
 @internal.route("/site-configuration", methods=["GET"])
-@permission(Resource.SITE)
+@owner_only
 def site_configuration():
     g.NO_CACHE = True
     return responses.site_configuration(SETTINGS.app_settings)

@@ -59,7 +59,7 @@ Credentials object used by the other runtime Google clients.
 
 ### Site data migrations (`migrations.py`)
 
-The owner-only **Apply Updates** action runs registered, idempotent raw-row
+The Administrator **Apply Updates** action runs registered, idempotent raw-row
 migrations from an append-only, version-pinned catalog in chunks of 100. Raw
 writes preserve business timestamps and avoid constructing typed properties
 from malformed persisted data. A transform mutates a copy and writes only after
@@ -300,7 +300,7 @@ structured final pass. It provides `generate_content(prompt, *, validator=None)`
 
 ### Text-generation observability (`observability.py`)
 
-AI generation observability is an operator-controlled, owner-only diagnostic
+AI generation observability is an operator-controlled, Administrator-only diagnostic
 dataset. It is disabled by default. Setup explicitly asks whether to enable
 `AI_OBSERVABILITY` during AI configuration and preserves that choice on later
 runs and recovery. While enabled, every `GenAI.generate_content` call is
@@ -454,8 +454,13 @@ reloads the target and user, rechecks current edit/AI permission, rebuilds the
 shared context, applies the generated submission, and sends a terminal
 operation status for the exact source/destination widget. Optional
 one-off prompt attachments use direct-upload records so they remain available
-across retries; terminal job cleanup deletes the temporary object after success
-or failure.
+across retries. A successful guarded apply copies the upload into one
+deterministically keyed File, keeps the original filename and MIME type, gives
+it a user-timezone `YYYY-MM-DD-autofill` display name, and attaches it directly
+to the Page or Task alongside the generated submission. Retried applies reuse
+that File instead of creating duplicates. Terminal cleanup deletes the
+temporary upload after success or failure; failed or drifted autofills do not
+create a durable File.
 
 Page/task targets also acquire a durable `form-autofill` lock in the
 same transaction as the job. While it is active, form submit/quick-edit/default

@@ -16,6 +16,7 @@ import secrets
 import shutil
 import tempfile
 import time
+import xml.etree.ElementTree as ElementTree
 
 import yaml
 
@@ -1645,11 +1646,285 @@ def _execution_name(payload, *output):
 
 
 # @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execution_wait_reports_progress_and_failure
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execution_wait_recognizes_success
+# @features hosted-e2e
+# @dimensions execution-status progress failure-reporting success
+def _wait_for_execution(
+    infrastructure,
+    execution,
+    *,
+    timeout=9000,
+    poll_interval=5,
+    report_interval=300,
+    report=True,
+    monotonic=time.monotonic,
+    sleep=time.sleep,
+):
+    """Wait for one Cloud Run execution and report useful periodic status."""
+    started = monotonic()
+    deadline = started + timeout
+    visibility_deadline = started + 120
+    next_report = started
+    previous_phase = None
+
+    while True:
+        payload = _describe(
+            [
+                "run",
+                "jobs",
+                "executions",
+                "describe",
+                execution,
+                f"--region={infrastructure.region}",
+                f"--project={infrastructure.project}",
+            ]
+        )
+        now = monotonic()
+        if payload is None:
+            if now >= visibility_deadline:
+                raise HostedE2EError(
+                    f"Cloud Run execution {execution} did not become visible."
+                )
+            phase = "STARTING"
+            terminal = False
+            exit_status = None
+            task_count = 1
+            succeeded = running = failed = 0
+            message = "Waiting for Cloud Run to publish execution status."
+        else:
+            status = payload.get("status")
+            status = status if isinstance(status, dict) else {}
+            spec = payload.get("spec")
+            spec = spec if isinstance(spec, dict) else {}
+            conditions = status.get("conditions")
+            conditions = conditions if isinstance(conditions, list) else []
+            completed = next(
+                (
+                    condition
+                    for condition in conditions
+                    if isinstance(condition, dict)
+                    and condition.get("type") == "Completed"
+                ),
+                {},
+            )
+            completed_status = str(completed.get("status") or "Unknown")
+            terminal = bool(status.get("completionTime")) or completed_status in {
+                "True",
+                "False",
+            }
+            task_count = int(spec.get("taskCount") or 1)
+            succeeded = int(status.get("succeededCount") or 0)
+            running = int(status.get("runningCount") or 0)
+            failed = int(status.get("failedCount") or 0)
+            message = str(completed.get("message") or "").strip()
+            if terminal:
+                exit_status = 0 if completed_status == "True" and not failed else 1
+                phase = "PASSED" if exit_status == 0 else "FAILED"
+            else:
+                exit_status = None
+                started_condition = any(
+                    isinstance(condition, dict)
+                    and condition.get("type") == "Started"
+                    and condition.get("status") == "True"
+                    for condition in conditions
+                )
+                phase = "RUNNING" if running or started_condition else "STARTING"
+
+        should_report = report and (
+            now >= next_report or phase != previous_phase or terminal
+        )
+        if should_report:
+            elapsed = max(0, int(now - started))
+            hours, remainder = divmod(elapsed, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            if hours:
+                elapsed_label = f"{hours}h {minutes}m {seconds}s"
+            elif minutes:
+                elapsed_label = f"{minutes}m {seconds}s"
+            else:
+                elapsed_label = f"{seconds}s"
+            if task_count == 1:
+                detail = (
+                    f"completed after {elapsed_label}"
+                    if terminal
+                    else f"{elapsed_label} elapsed"
+                )
+            else:
+                detail = (
+                    f"{succeeded}/{task_count} tasks succeeded, "
+                    f"{running} running, {failed} failed"
+                )
+            print(
+                f"[{hours:02d}:{minutes:02d}:{seconds:02d}] {phase}: {detail}",
+                flush=True,
+            )
+            if terminal and message:
+                print(f"  {message}", flush=True)
+            while next_report <= now:
+                next_report += report_interval
+            previous_phase = phase
+
+        if terminal:
+            return payload, exit_status
+        if now >= deadline:
+            raise HostedE2EError(
+                f"Cloud Run execution {execution} did not finish within "
+                f"{timeout} seconds."
+            )
+        sleep(poll_interval)
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_summary_reports_unique_junit_failures
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_command_defaults_to_all_and_imports
+# @features hosted-e2e
+# @dimensions result-summary junit duration artifact-location
+def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
+    """Format an operator-facing summary for one hosted execution result."""
+    execution = str(payload.get("execution") or "unknown")
+    exit_status = int(payload.get("exit_status") or 0)
+    result = "PASSED" if exit_status == 0 else "FAILED"
+    lines = [
+        "",
+        f"Hosted E2E {result}",
+        f"Execution: {execution}",
+        f"Suite: {payload.get('suite') or 'unknown'}",
+    ]
+    source = str(payload.get("source") or "").strip()
+    if source:
+        lines.append(f"Source: {source}")
+    version = str(payload.get("version") or "").strip()
+    build_id = str(payload.get("build_id") or "").strip()
+    if version or build_id:
+        deployment = version or "unknown version"
+        if build_id:
+            deployment = f"{deployment} (build {build_id})"
+        lines.append(f"Deployment: {deployment}")
+
+    started_at = payload.get("suite_started_at")
+    finished_at = payload.get("suite_finished_at")
+    if isinstance(started_at, str) and isinstance(finished_at, str):
+        try:
+            started = datetime.fromisoformat(started_at.replace("Z", "+00:00"))
+            finished = datetime.fromisoformat(finished_at.replace("Z", "+00:00"))
+            elapsed = max(0, int((finished - started).total_seconds()))
+            hours, remainder = divmod(elapsed, 3600)
+            minutes, seconds = divmod(remainder, 60)
+            if hours:
+                duration = f"{hours}h {minutes}m {seconds}s"
+            elif minutes:
+                duration = f"{minutes}m {seconds}s"
+            else:
+                duration = f"{seconds}s"
+            lines.append(f"Duration: {duration}")
+        except ValueError:
+            pass
+
+    destination = Path(state_root) / "results" / execution
+    junit_path = destination / "junit.xml"
+    if imported and junit_path.is_file():
+        try:
+            testcases = ElementTree.parse(junit_path).getroot().findall(
+                ".//testcase"
+            )
+        except (ElementTree.ParseError, OSError):
+            testcases = []
+        if testcases:
+            outcomes = {}
+            teardown_errors = 0
+            for testcase in testcases:
+                identity = (
+                    testcase.get("classname") or "",
+                    testcase.get("name") or "",
+                )
+                outcome = outcomes.setdefault(
+                    identity,
+                    {"failure": None, "error": None, "skipped": False},
+                )
+                failure = testcase.find("failure")
+                error = testcase.find("error")
+                skipped = testcase.find("skipped")
+                if failure is not None and outcome["failure"] is None:
+                    outcome["failure"] = failure
+                if error is not None and outcome["error"] is None:
+                    outcome["error"] = error
+                if error is not None:
+                    teardown_errors += 1
+                if skipped is not None:
+                    outcome["skipped"] = True
+
+            failed = [
+                (identity, outcome)
+                for identity, outcome in outcomes.items()
+                if outcome["failure"] is not None or outcome["error"] is not None
+            ]
+            skipped_count = sum(
+                outcome["skipped"]
+                and outcome["failure"] is None
+                and outcome["error"] is None
+                for outcome in outcomes.values()
+            )
+            passed = len(outcomes) - len(failed) - skipped_count
+            lines.append(
+                f"Tests: {len(outcomes):,} total — {passed:,} passed, "
+                f"{len(failed):,} failed, {skipped_count:,} skipped"
+            )
+            if teardown_errors:
+                lines.append(f"Additional error records: {teardown_errors:,}")
+            if failed:
+                lines.append("Failed tests:")
+                for (classname, name), outcome in failed[:12]:
+                    parts = classname.split(".") if classname else []
+                    module_indexes = [
+                        index
+                        for index, part in enumerate(parts)
+                        if part.startswith("test_")
+                    ]
+                    if parts and module_indexes and parts[0].startswith("tests_"):
+                        module_index = module_indexes[-1]
+                        test_path = Path(
+                            "testing", *parts[: module_index + 1]
+                        ).with_suffix(".py")
+                        qualifiers = parts[module_index + 1 :]
+                        nodeid_parts = [test_path.as_posix(), *qualifiers, name]
+                        nodeid = "::".join(part for part in nodeid_parts if part)
+                    else:
+                        nodeid = f"{classname}::{name}" if classname else name
+                    problem = (
+                        outcome["failure"]
+                        if outcome["failure"] is not None
+                        else outcome["error"]
+                    )
+                    message = (
+                        str(problem.get("message") or "").splitlines()[0].strip()
+                    )
+                    lines.append(f"  - {nodeid}")
+                    if message:
+                        lines.append(f"    {message}")
+                remaining = len(failed) - 12
+                if remaining:
+                    lines.append(f"  - …and {remaining} more; see JUnit XML below.")
+
+    if imported:
+        lines.append(f"Artifacts: {destination.resolve()}")
+        if junit_path.is_file():
+            lines.append(f"JUnit XML: {junit_path.resolve()}")
+    else:
+        lines.append("Results were left in Cloud Storage and were not imported.")
+        lines.append(
+            "Import later: venv/bin/python run.py hosted-e2e results "
+            f"--execution {execution}"
+        )
+    return "\n".join(lines)
+
+
+# @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_dispatches_validated_focused_targets
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
 # @features hosted-e2e
 # @dimensions focused-execution cloud-run override local-dispatch target-validation argument-injection
-def execute(*, suite="all", targets=(), import_results=True):
+def execute(*, suite="all", targets=(), import_results=True, progress=True):
     """Execute the shared Cloud Run job and normally import its evidence."""
     from testing.utility.hosted_e2e_job import validate_focused_targets
 
@@ -1683,10 +1958,10 @@ def execute(*, suite="all", targets=(), import_results=True):
         f"--region={infrastructure.region}",
         f"--project={infrastructure.project}",
         f"--args={','.join(job_arguments)}",
-        "--wait",
+        "--async",
         "--format=json",
         check=False,
-        timeout=9000,
+        timeout=300,
     )
     payload = {}
     if result.stdout.strip():
@@ -1704,8 +1979,19 @@ def execute(*, suite="all", targets=(), import_results=True):
     state["last_suite"] = suite
     state["last_targets"] = list(targets)
     _write_json(STATE_PATH, state, owner_only=True)
+    if progress:
+        print(f"Hosted E2E execution: {execution}", flush=True)
+        print(
+            "Progress updates will be printed every 5 minutes and when status changes.",
+            flush=True,
+        )
+    _provider_status, exit_status = _wait_for_execution(
+        infrastructure,
+        execution,
+        report=progress,
+    )
     if not import_results:
-        return {"execution": execution, "exit_status": result.returncode}
+        return {"execution": execution, "exit_status": exit_status, "suite": suite}
     manifest = results(execution=execution, latest=False, merge=True)
     return manifest
 
@@ -2046,9 +2332,28 @@ def _active_job_executions(infrastructure):
     return tuple(sorted(set(active)))
 
 
-# @testable infrastructure
+# @testable false
+# @covered-by runner/hosted_e2e.py::teardown
+# @reason teardown owns the lifecycle boundary for downloaded result cleanup
+def _clear_local_result_artifacts():
+    """Remove downloaded result bundles after a successful lifecycle teardown."""
+    result_root = STATE_ROOT / "results"
+    if not result_root.exists() and not result_root.is_symlink():
+        return False
+    if result_root.is_symlink() or result_root.is_file():
+        result_root.unlink()
+    else:
+        shutil.rmtree(result_root)
+    print(f"Removed local hosted E2E artifacts: {result_root}")
+    return True
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_teardown_removes_downloaded_results_after_success
+# @features hosted-e2e
+# @dimensions teardown local-artifacts evidence-retention deletion-safety
 def teardown(*, force=False):
-    """Delete the ephemeral app/job and remove only its temporary CORS origin."""
+    """Delete ephemeral resources and downloaded artifacts for the lifecycle."""
     (APP_DIR / ".hosted-e2e-app.yaml").unlink(missing_ok=True)
     _activate(adc=True)
     infrastructure = _infrastructure()
@@ -2144,6 +2449,7 @@ def teardown(*, force=False):
         state["status"] = "torn-down"
         state["torn_down_at"] = datetime.now(timezone.utc).isoformat()
         _write_json(STATE_PATH, state, owner_only=True)
+        _clear_local_result_artifacts()
         return state
     finally:
         if cleanup_lease is not None:
@@ -2263,7 +2569,12 @@ def run_hosted_e2e_command(arguments):
                 targets=args.targets or (),
                 import_results=not args.no_import_results,
             )
-            print(json.dumps(payload, indent=2, sort_keys=True))
+            print(
+                format_execute_summary(
+                    payload,
+                    imported=not args.no_import_results,
+                )
+            )
             return int(payload.get("exit_status") or 0)
         elif args.action == "import-results":
             payload = import_result_directory(

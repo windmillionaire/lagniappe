@@ -314,7 +314,7 @@ class Restrictions(Property):
         return ["models"] if Restriction.is_unrestricted(models) else models
 
     def _task_restrictions(self, can_view_models):
-        if self.entity.is_owner:
+        if self.entity.is_admin:
             return Restriction.UNRESTRICTED
         if can_view_models:
             return ["models"]
@@ -400,9 +400,9 @@ class Restrictions(Property):
         return False
 
     def _create(self):
-        if self.entity.is_owner:
+        if self.entity.is_admin:
             restricted_to = ["forms", "models", "users"]
-            belongs_to = ["owner"]
+            belongs_to = ["owner" if self.entity.is_owner else "admin"]
         else:
             restricted_to = [
                 h
@@ -454,7 +454,7 @@ class Restrictions(Property):
         )
         user_message = (
             Restriction.UNRESTRICTED
-            if self.entity.is_owner or can_view_users
+            if self.entity.is_admin or can_view_users
             else sorted(
                 set(belongs_to)
                 | set(
@@ -500,7 +500,7 @@ class Restrictions(Property):
             "fingerprint": self._fingerprint(),
             "value": value,
             "belongs_to": belongs_to,
-            "search": Restriction.UNRESTRICTED if self.entity.is_owner else value,
+            "search": Restriction.UNRESTRICTED if self.entity.is_admin else value,
             "task": task,
             "form": form,
             "project": project,

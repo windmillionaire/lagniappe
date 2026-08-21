@@ -1859,6 +1859,44 @@ def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
     assert "must identify a production build" in output
 
 
+# @features version
+# @dimensions cli-routing
+@pytest.mark.parametrize(
+    ("settings_exist", "settings_version", "expected_version"),
+    [
+        (False, None, "0.2.0"),
+        (True, "0.1.9", "0.1.9"),
+    ],
+)
+def test_run_py_version_show_uses_package_only_before_generated_settings_exist(
+    monkeypatch,
+    capsys,
+    settings_exist,
+    settings_version,
+    expected_version,
+):
+    settings = types.SimpleNamespace(
+        APP={"VERSION": settings_version} if settings_version else {},
+        NODE={"version": "0.2.0"},
+    )
+    app_settings_file = types.SimpleNamespace(exists=lambda: settings_exist)
+    config_module = types.ModuleType("config")
+    config_module.SETTINGS = settings
+    config_module.File = types.SimpleNamespace(APP_SETTINGS_YAML=app_settings_file)
+    config_module.constants = types.SimpleNamespace(BUILD_ID=None)
+    monkeypatch.setitem(sys.modules, "config", config_module)
+
+    assert run.run_version_command(["show"]) == 0
+
+    assert capsys.readouterr().out.splitlines() == [
+        f"VERSION: {expected_version}",
+        "package.json: 0.2.0",
+        f"BUILD_ID: {expected_version}",
+    ]
+
+
+# @features version
+# @dimensions cli-routing
 def test_run_py_version_note_appends_concise_release_entry(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(run, "RELEASES_DIR", tmp_path / "documentation" / "releases")
 
@@ -1874,6 +1912,8 @@ def test_run_py_version_note_appends_concise_release_entry(monkeypatch, tmp_path
     assert "Added version note" in capsys.readouterr().out
 
 
+# @features version
+# @dimensions cli-routing
 def test_run_py_version_set_updates_package_settings_and_release_file(
     monkeypatch, tmp_path, capsys
 ):

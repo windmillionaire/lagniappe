@@ -44,7 +44,7 @@ def _is_public_users_own_page(page):
 def _load_user_settings_groups(page):
     """Attach group relations needed by another user's settings selector."""
     is_own_page = getattr(getattr(current_user, "page", None), "key", None) == page.key
-    if page.user and current_user.is_owner and not is_own_page:
+    if page.user and current_user.is_admin and not is_own_page:
         Entities.fetch_one(page.user, request=Fetch.direct())
     return page
 

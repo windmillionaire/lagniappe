@@ -436,6 +436,63 @@ def run_combobox_check(run_node, assertion: str):
     run_node(script)
 
 
+# @pairs location:initialization location:on-demand
+def test_location_combobox_starts_location_sync_on_init(run_node):
+    script = r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+let locationCalls = 0;
+class Combobox {
+  constructor(element) {
+    this.element = element;
+    this.name = "location";
+  }
+  init() {}
+}
+const element = {
+  name: "place",
+  placeholder: "Search for a place",
+  addEventListener() {},
+  after(hiddenInput) { this.hiddenInput = hiddenInput; },
+  removeAttribute(name) {
+    if (name === "name") this.name = "";
+  },
+};
+const context = {
+  Combobox,
+  debounce: (callback) => callback,
+  document: {
+    createElement() { return {}; },
+  },
+  ENDPOINTS: { location: "/l/search-location" },
+  setIcon() {},
+  STYLES: { dropdown: { search: { result: "result" }, icon: "icon" } },
+  updateUserLocation() {
+    locationCalls += 1;
+    return Promise.resolve(true);
+  },
+};
+
+vm.createContext(context);
+let source = fs.readFileSync("src/script/elements/combobox/location.mjs", "utf8");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replace("export class LocationBox", "class LocationBox");
+source += "\nglobalThis.LocationBox = LocationBox;";
+vm.runInContext(source, context);
+
+const box = new context.LocationBox(element);
+box.init();
+if (locationCalls !== 1) {
+  throw new Error(`LocationBox initialization started ${locationCalls} location updates`);
+}
+if (element.name !== "" || element.hiddenInput?.name !== "place:id") {
+  throw new Error("LocationBox initialization did not preserve its field contract");
+}
+"""
+    run_node(script)
+
+
 # @pairs location:session-update location:request-ordering
 def test_location_combobox_waits_for_session_sync_before_search(run_node):
     script = r"""

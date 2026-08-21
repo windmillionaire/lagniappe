@@ -419,6 +419,27 @@ def logged_in(f):
 
 
 # @testable true
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
+# @pairs owner:route-gate owner:sensitive-configuration
+def owner_only(f):
+    """Require the configured primary Owner, not an additional Admin."""
+
+    # @testable false
+    # @covered-by lagniappe/web/auth.py::owner_only
+    # @reason route wrapper behavior is owned by the parent decorator contract
+    @wraps(f)
+    def wrapped(*args, **kwargs):
+        user, _entity = _load_request_context()
+        if not user.is_authenticated:
+            abort(401)
+        if not getattr(user, "is_owner", False):
+            abort(403)
+        return f(*args, **kwargs)
+
+    return wrapped
+
+
+# @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_manual_keeps_account_addresses_authenticated
 # @features manual

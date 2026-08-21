@@ -25,6 +25,7 @@ def _photo_form(user):
 
 
 def _photo_prompt(page):
+    page.wait_for_interaction_readiness()
     prompt = page.info_form.locator(page.PHOTO_PROMPT)
     expect(prompt).to_be_visible()
     return prompt
@@ -205,8 +206,7 @@ def test_empty_page_photo_prompt_can_disable_photo_without_reload(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_generated_image_page)
     info_form = page.info_form
-    prompt = info_form.locator(page.PHOTO_PROMPT)
-    expect(prompt).to_be_visible()
+    prompt = _photo_prompt(page)
     expect(user.locate(page.PHOTO_FORM)).not_to_be_visible()
     expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-5xl.*"))
 

@@ -156,7 +156,7 @@ Cache cleanup removes both the Page's physical `page` search projection and its
 former virtual `user` projection. Search hydration also drops and deletes a
 legacy projection whose authoritative entity-details row is already gone.
 
-The owner-facing create-user route may adopt an existing public user instead of
+The Administrator create-user route may adopt an existing public user instead of
 creating a duplicate. Adoption keeps the Identity Platform/user key, clears the
 public flag, and applies the submitted name, page, AI access, and groups through
 the normal user-creation assignments. If the submitted page replaces the
@@ -456,6 +456,27 @@ The `EntityType` enum maps type names to entity classes:
 Aliases exist for convenience where shown in the table. `USERS` is its own
 reserved category class, not a `CATEGORY` alias.
 
+### Application Owner and Administrators
+
+`User.is_owner` is true only for the singleton canonical User whose normalized
+email matches `CONFIG.ADMIN_EMAIL` and whose stored `owner` flag is true. Owner
+creation and owner-projection repair may establish that flag; ordinary role
+management cannot. The Owner cannot be demoted, deleted, reassigned, or have
+the canonical email changed through user-management routes.
+
+`User.is_admin` is true for the Owner or for a managed User with stored
+`admin: true`. Missing legacy fields are false. Additional Administrators have
+the Owner's ordinary application permissions for content, restrictions, Site
+Settings, exports, ingress, groups, and user management. Only the Owner may
+change the Administrator roster, edit/delete another privileged account, or
+inspect/download secret-bearing installation configuration. Demotion only
+clears `admin`; account deletion is a separate operation.
+
+Role identity is part of `User.authorization_fingerprint`, and a role change
+sets `invalidate_cache` on the target User so browser authorization changes
+take effect immediately. Application roles do not imply Google Cloud IAM, and
+Google Cloud IAM does not imply an application role.
+
 ### Per-user AI access
 
 `User.ai_access` is a separate entitlement from resource permissions and group
@@ -465,8 +486,9 @@ generation, autofill, summarization, Organize/Create reports, or proposal
 execution. `User.access(AI.ASK)` and `User.access(AI.CREATE)` are the
 authoritative checks. They deliberately do not grant an owner bypass.
 
-Only the configured owner can set this value through user creation or User
-Settings. New owners persist `CREATE`, while every other newly created user
+Administrators can set this value for ordinary managed users; only the Owner
+may edit an additional Administrator's account. New Owners persist `CREATE`,
+while every other newly created user
 persists `NONE`. For datastore compatibility, a regular user record with no
 stored value resolves to `CREATE`, while a legacy public user resolves to
 `NONE`; an explicit value always wins. No group-level AI entitlement or
@@ -571,8 +593,8 @@ plain-text `body` and photo asset, a server-assigned `scope` (`home` or `page`),
 and `visibility` (`private` or `everyone`). Home-scoped shared notes appear in
 authenticated Home feeds; Page-scoped shared notes remain on their Page and
 also require Page view access. Private notes and note deletion are limited to
-the creator and site owner. Any signed-in user may create a private Home-scoped
-note, but only the site owner may give it `everyone` visibility. Page-scoped
+the creator and application Administrators. Any signed-in user may create a private Home-scoped
+note, but only an Administrator may give it `everyone` visibility. Page-scoped
 note creation and visibility continue to follow Page edit access. Note
 mutations touch their parent and author, and Page/user deletion cascades through
 attached notes and photo assets.
@@ -694,7 +716,7 @@ failure callbacks, resolves its pending notification, records the missing input
 in diagnostics, and completes delivery
 so the orphan is not retried indefinitely.
 
-The owner-only AI analytics view shows each retained job's opaque ID and links
+The Administrator AI analytics view shows each retained job's opaque ID and links
 to a transferable JSON diagnostic. That projection includes bounded timing,
 dispatch/recovery state, safe input entity references, checkpoint stage, and
 AI-generation summaries correlated through the opaque telemetry ID. It excludes

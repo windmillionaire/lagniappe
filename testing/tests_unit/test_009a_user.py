@@ -137,6 +137,62 @@ def test_user_is_owner(get_test_entities):
         assert user.properties.is_owner.value is False
 
 
+# @pairs admin:role admin:legacy-default admin:ai-independent
+# @pairs owner:singleton cache:cache-invalidation user:property
+@pytest.mark.unit
+def test_user_admin_role_is_separate_from_owner_and_invalidates_cache():
+    """An additional Admin never becomes Owner and keeps independent AI access."""
+    user = User(testing=True)
+    user._key = "additional-admin"
+    user.email = "administrator@example.test"
+    user.ai_access = "NONE"
+    user.invalidate_cache = False
+
+    assert user.is_admin is False
+    assert "admin" not in user.db
+
+    user.is_admin = True
+
+    assert user.db["admin"] is True
+    assert user.is_admin is True
+    assert user.is_owner is False
+    assert user.ai_access == "NONE"
+    assert user.invalidate_cache is True
+
+    user.invalidate_cache = False
+    user.is_admin = False
+    assert user.is_admin is False
+    assert user.invalidate_cache is True
+
+    owner = User(testing=True)
+    owner._key = "primary-owner"
+    owner.email = "owner@example.test"
+    owner.is_owner = True
+    owner.db.pop("admin", None)
+    assert owner.is_admin is True
+
+    canonical_db = Entity(Key("users", "owner", project="test"))
+    canonical_db.update({"email": "owner@example.test", "type": "user"})
+    canonical = User(canonical_db)
+    with patch(
+        "lagniappe.core.entities.user.CONFIG",
+        SimpleNamespace(ADMIN_EMAIL="owner@example.test"),
+    ):
+        canonical.is_owner = True
+        with pytest.raises(ValueError, match="cannot be demoted"):
+            canonical.is_owner = False
+
+    other_db = Entity(Key("users", "other", project="test"))
+    other_db.update({"email": "other@example.test", "type": "user"})
+    other = User(other_db)
+    with patch(
+        "lagniappe.core.entities.user.CONFIG",
+        SimpleNamespace(ADMIN_EMAIL="owner@example.test"),
+    ):
+        with pytest.raises(ValueError, match="configured primary Owner"):
+            other.is_owner = True
+
+
 # @features user
 # @dimensions profile-photo default-image asset-lifecycle google-download
 @pytest.mark.unit

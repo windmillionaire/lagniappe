@@ -170,35 +170,25 @@ if (context.areEqual({ values: [1, 2] }, { values: [2, 1] })) {
     )
 
 
-# @pairs location:geolocation location:page-load location:session-update
-# @pairs location:deduplication timezone:session-update
-def test_user_data_sync_posts_location_on_page_load_and_deduplicates(run_node):
+# @pair location:permission-deferral
+# @pairs timezone:page-load timezone:session-update
+def test_user_data_sync_posts_timezone_without_requesting_location(run_node):
     run_user_check(
         run_node,
         """
-localStorage.values.set(
-  "location",
-  JSON.stringify({ latitude: 37.77, longitude: -122.42 }),
-);
-
 const startup = context.updateUserData();
-const combobox = context.updateUserLocation();
-if (startup !== combobox) {
-  throw new Error("Startup and combobox did not share one location update");
-}
 if ((await startup) !== true) {
-  throw new Error("Successful location update was not reported");
+  throw new Error("Successful timezone update was not reported");
 }
-if (geolocationCalls.length !== 1 || posts.length !== 1) {
-  throw new Error(`Location update was not deduplicated: ${geolocationCalls.length}/${posts.length}`);
+if (geolocationCalls.length !== 0 || posts.length !== 1) {
+  throw new Error(`Startup requested location: ${geolocationCalls.length}/${posts.length}`);
 }
 
 const [url, body, options] = posts[0];
 if (
   url !== "/l/update-session" ||
   body.timezone !== "America/Los_Angeles" ||
-  body.location.latitude !== 37.7749 ||
-  body.location.longitude !== -122.4194 ||
+  "location" in body ||
   options.keepalive !== true
 ) {
   throw new Error(`Unexpected user-data update: ${JSON.stringify(posts[0])}`);
@@ -207,17 +197,53 @@ if (
   sessionStorage.getItem("timezone_sent") !== "America/Los_Angeles" ||
   sessionStorage.getItem("userHash") !== "user-hash"
 ) {
-  throw new Error("Successful user-data update was not cached for the session");
+  throw new Error("Successful timezone update was not cached for the session");
 }
 """,
     )
 
 
-# @pairs location:session-update location:retry timezone:session-update
+# @pairs location:geolocation location:on-demand location:session-update
+# @pairs location:deduplication timezone:serialized-update
+def test_user_location_sync_starts_on_demand_and_deduplicates(run_node):
+    run_user_check(
+        run_node,
+        """
+const startup = context.updateUserData();
+const firstLocation = context.updateUserLocation();
+const secondLocation = context.updateUserLocation();
+if (firstLocation !== secondLocation || firstLocation === startup) {
+  throw new Error("On-demand location update was not independently deduplicated");
+}
+if ((await firstLocation) !== true) {
+  throw new Error("Successful on-demand location update was not reported");
+}
+if (geolocationCalls.length !== 1 || posts.length !== 2) {
+  throw new Error(`Unexpected on-demand updates: ${geolocationCalls.length}/${posts.length}`);
+}
+
+const timezoneBody = posts[0][1];
+const locationBody = posts[1][1];
+if (
+  timezoneBody.timezone !== "America/Los_Angeles" ||
+  "location" in timezoneBody ||
+  "timezone" in locationBody ||
+  locationBody.location.latitude !== 37.7749 ||
+  locationBody.location.longitude !== -122.4194
+) {
+  throw new Error(`Unexpected serialized updates: ${JSON.stringify(posts)}`);
+}
+""",
+    )
+
+
+# @pairs location:session-update location:retry
 def test_user_location_sync_retries_failed_session_update(run_node):
     run_user_check(
         run_node,
         """
+await context.updateUserData();
+posts.length = 0;
 let attempts = 0;
 context.setPostImplementation(async () => ({
   ok: ++attempts > 1,
@@ -226,9 +252,6 @@ context.setPostImplementation(async () => ({
 
 if ((await context.updateUserLocation()) !== false) {
   throw new Error("Failed location update was reported as successful");
-}
-if (sessionStorage.getItem("timezone_sent") !== null) {
-  throw new Error("Failed session update cached the timezone");
 }
 if ((await context.updateUserLocation()) !== true) {
   throw new Error("Location update did not retry successfully");
@@ -241,24 +264,27 @@ if (geolocationCalls.length !== 2 || posts.length !== 2) {
 
 
 # @pairs location:unavailable timezone:session-update
-def test_user_data_sync_still_posts_timezone_when_location_is_unavailable(run_node):
+def test_unavailable_user_location_does_not_affect_timezone_sync(run_node):
     run_user_check(
         run_node,
         """
 context.setGeolocationImplementation((success, error) => error({ code: 1 }));
 
-if ((await context.updateUserData()) !== false) {
-  throw new Error("Unavailable location was reported as synchronized");
+if ((await context.updateUserData()) !== true) {
+  throw new Error("Timezone update was not reported as synchronized");
 }
-if (posts.length !== 1) {
-  throw new Error(`Timezone fallback sent ${posts.length} requests`);
+if (geolocationCalls.length !== 0 || posts.length !== 1) {
+  throw new Error("Timezone synchronization requested browser location");
 }
 const body = posts[0][1];
 if (body.timezone !== "America/Los_Angeles" || "location" in body) {
-  throw new Error(`Unavailable location corrupted timezone update: ${JSON.stringify(body)}`);
+  throw new Error(`Location state corrupted timezone update: ${JSON.stringify(body)}`);
 }
 if (sessionStorage.getItem("timezone_sent") !== "America/Los_Angeles") {
-  throw new Error("Timezone fallback was not cached after success");
+  throw new Error("Timezone was not cached after success");
+}
+if ((await context.updateUserLocation()) !== false) {
+  throw new Error("Unavailable location was reported as synchronized");
 }
 await context.updateUserLocation();
 if (geolocationCalls.length !== 1 || posts.length !== 1) {

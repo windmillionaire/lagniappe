@@ -180,9 +180,11 @@ def test_user_create_defaults_non_owner_to_none():
                 "name": "New AI User",
                 "email": "user@example.test",
                 "page": page,
+                "admin": True,
             }
         )
 
     assert user.is_owner is not True
+    assert user.is_admin is True
     assert user.ai_access == "NONE"
     assert user.db["ai_access"] == "NONE"

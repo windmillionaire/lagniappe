@@ -39,6 +39,7 @@ CLI_MODES = (
     pytest.param(["ai-email"], "ai-email", id="ai-email"),
     pytest.param(["security"], "security", id="security"),
     pytest.param(["jobs"], "jobs", id="jobs"),
+    pytest.param(["handoff"], "handoff", id="handoff"),
     pytest.param(["update"], "update", id="update"),
     pytest.param(["upgrade"], "upgrade", id="upgrade"),
     pytest.param(["development"], "development", id="development"),
@@ -380,6 +381,7 @@ def test_recovery_is_announced_before_dependency_or_provider_mutation(
 def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
     from runner import gcloud as runner_gcloud
     import installer as setup_package
+    from installer import handoff as handoff_module
     from installer import package_install
     from installer import state
 
@@ -415,6 +417,11 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
             lambda **kwargs: events.append(("activate-gcloud", kwargs)),
         )
         monkeypatch.setattr(
+            handoff_module,
+            "prepare_handoff_operator",
+            lambda: events.append("prepare-handoff"),
+        )
+        monkeypatch.setattr(
             setup_cli,
             "_dispatch",
             lambda args: events.append("dispatch") or 0,
@@ -430,15 +437,18 @@ def test_setup_python_runtime_gate_precedes_every_cli_mode(monkeypatch):
         if arguments:
             expected.extend(("pip", "dependencies"))
             if arguments != ["auth"]:
-                expected.append(
-                    (
-                        "activate-gcloud",
-                        {
-                            "ensure_adc": arguments != ["doctor"],
-                            "ensure_cli_token": arguments != ["doctor"],
-                        },
+                if arguments == ["handoff"]:
+                    expected.append("prepare-handoff")
+                else:
+                    expected.append(
+                        (
+                            "activate-gcloud",
+                            {
+                                "ensure_adc": arguments != ["doctor"],
+                                "ensure_cli_token": arguments != ["doctor"],
+                            },
+                        )
                     )
-                )
         expected.append("dispatch")
         assert events == expected
 

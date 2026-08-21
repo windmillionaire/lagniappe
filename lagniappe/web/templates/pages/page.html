@@ -14,6 +14,7 @@
 {% set is_public_own_page = is_public_user and is_own_page %}
 {% set is_owner_page = current_user.is_owner and is_own_page %}
 {% set is_owner_viewer = current_user.is_owner %}
+{% set is_admin_viewer = current_user.is_admin %}
 {% set view_permissions = Resource.USER.allowed(Action.PERMISSIONS) %}
 {% set can_view_user_settings = page.user and (is_own_page or view_permissions) %}
 {% set can_edit_page = page.allowed(Action.EDIT) %}
@@ -199,7 +200,7 @@
           </div>
           {{ toggles('tabs', false) }}
         </div>
-        {{ info_tab(page, is_owner_page, is_owner_viewer, view_permissions, is_own_page, can_view_user_settings) }}
+        {{ info_tab(page, is_owner_page, is_admin_viewer, is_owner_viewer, view_permissions, is_own_page, can_view_user_settings) }}
         {% if render_document %}{{ document_tab(page, has_document) }}{% endif %}
         {% if render_tasks %}{{ task_tab(page, has_tasks) }}{% endif %}
         {% if render_files %}{{ files_tab(page, has_files) }}{% endif %}
