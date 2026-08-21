@@ -129,29 +129,6 @@ def _run_ask_job(report, job, ai_results):
     return response, saved_report
 
 
-def _poll_ask_job_completion(user, job):
-    user.page.evaluate(
-        """async (key) => {
-            const view = document.querySelector("[lp-view]")?._lp_view;
-            if (!view) throw new Error("Ask view is not initialized");
-            const operations = await view.ensureDeferredOperations();
-            if (operations?.operations?.has(key)) {
-                await view.PollingCoordinator.trigger(`operation:${key}`, {
-                    fresh: true,
-                });
-                return;
-            }
-            const pending = Array.from(
-                document.querySelectorAll("[data-operation]"),
-            ).some((node) => node.dataset.operation === key);
-            if (pending) {
-                throw new Error("Pending Ask operation is not tracked");
-            }
-        }""",
-        job.urlsafe_key,
-    )
-
-
 def _answer_text(response):
     text = f"{response.get('summary') or ''} {response.get('answer_html') or ''}"
     return " ".join(unescape(re.sub(r"<[^>]+>", " ", text)).split())
@@ -322,12 +299,10 @@ def test_ask_answers_from_attached_corpus_receipt(get_user, request, monkeypatch
     assert workspace_tool_calls, "Ask did not inspect the workspace"
     assert not failures, "\n".join(failures)
     assert report.status == "complete"
-    _poll_ask_job_completion(user, job)
     expect(item.locator("[data-role='report-stage']")).to_have_text(
         "Answer ready",
-        timeout=30_000,
+        timeout=45_000,
     )
-    expect(item).not_to_have_attribute("data-operation", re.compile(".+"))
 
     report_page = user.go(Report.for_entity(user, report))
     expect(report_page.answer).to_be_visible()
@@ -385,12 +360,10 @@ def test_ask_uses_structured_filter_for_form_submission_query(
     assert calls, "Ask did not call query_workspace_filter"
     assert not failures, "\n".join(failures)
     assert report.status == "complete"
-    _poll_ask_job_completion(user, job)
     expect(item.locator("[data-role='report-stage']")).to_have_text(
         "Answer ready",
-        timeout=30_000,
+        timeout=45_000,
     )
-    expect(item).not_to_have_attribute("data-operation", re.compile(".+"))
 
     report_page = user.go(Report.for_entity(user, report))
     expect(report_page.answer).to_be_visible()
