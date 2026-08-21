@@ -1656,7 +1656,7 @@ def _wait_for_execution(
     *,
     timeout=9000,
     poll_interval=5,
-    report_interval=30,
+    report_interval=300,
     report=True,
     monotonic=time.monotonic,
     sleep=time.sleep,
@@ -1738,10 +1738,25 @@ def _wait_for_execution(
             elapsed = max(0, int(now - started))
             hours, remainder = divmod(elapsed, 3600)
             minutes, seconds = divmod(remainder, 60)
+            if hours:
+                elapsed_label = f"{hours}h {minutes}m {seconds}s"
+            elif minutes:
+                elapsed_label = f"{minutes}m {seconds}s"
+            else:
+                elapsed_label = f"{seconds}s"
+            if task_count == 1:
+                detail = (
+                    f"completed after {elapsed_label}"
+                    if terminal
+                    else f"{elapsed_label} elapsed"
+                )
+            else:
+                detail = (
+                    f"{succeeded}/{task_count} tasks succeeded, "
+                    f"{running} running, {failed} failed"
+                )
             print(
-                f"[{hours:02d}:{minutes:02d}:{seconds:02d}] {phase}: "
-                f"{succeeded}/{task_count} tasks succeeded, "
-                f"{running} running, {failed} failed",
+                f"[{hours:02d}:{minutes:02d}:{seconds:02d}] {phase}: {detail}",
                 flush=True,
             )
             if terminal and message:
@@ -1967,7 +1982,7 @@ def execute(*, suite="all", targets=(), import_results=True, progress=True):
     if progress:
         print(f"Hosted E2E execution: {execution}", flush=True)
         print(
-            "Progress updates will be printed at least every 30 seconds.",
+            "Progress updates will be printed every 5 minutes and when status changes.",
             flush=True,
         )
     _provider_status, exit_status = _wait_for_execution(

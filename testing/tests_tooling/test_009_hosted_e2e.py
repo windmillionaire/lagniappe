@@ -699,7 +699,6 @@ def test_hosted_execution_wait_reports_progress_and_failure(monkeypatch, capsys)
             running,
             running,
             running,
-            running,
             {
                 "spec": {"taskCount": 1},
                 "status": {
@@ -730,8 +729,7 @@ def test_hosted_execution_wait_reports_progress_and_failure(monkeypatch, capsys)
     payload, exit_status = hosted_e2e._wait_for_execution(
         _infrastructure(),
         "lagniappe-e2e-progress1",
-        poll_interval=5,
-        report_interval=30,
+        poll_interval=60,
         monotonic=lambda: clock[0],
         sleep=sleep,
     )
@@ -746,10 +744,10 @@ def test_hosted_execution_wait_reports_progress_and_failure(monkeypatch, capsys)
         "lagniappe-e2e-progress1",
     ]
     output = capsys.readouterr().out
-    assert "[00:00:00] STARTING" in output
-    assert "[00:00:05] RUNNING" in output
-    assert "[00:00:30] RUNNING" in output
-    assert "[00:00:35] FAILED" in output
+    assert "[00:00:00] STARTING: 0s elapsed" in output
+    assert "[00:01:00] RUNNING: 1m 0s elapsed" in output
+    assert "[00:05:00] RUNNING: 5m 0s elapsed" in output
+    assert "[00:06:00] FAILED: completed after 6m 0s" in output
     assert "exited with code 1" in output
 
 

@@ -197,13 +197,14 @@ hosted version does not need to be restarted.
 
 Local `execute` starts the Cloud Run execution asynchronously and then follows
 its provider status. It prints the execution name immediately, reports the
-starting/running task counts at least every 30 seconds, and prints the terminal
-Cloud Run failure message when the task fails. After the normal artifact import,
-the command finishes with an operator-facing summary: suite duration, unique
-passed/failed/skipped test counts, a bounded list of failing nodeids and their
-first error lines, and the local artifact and JUnit XML paths. Additional pytest
-error records are reported separately so a test that both fails and errors
-during teardown is not misleadingly counted twice. `--no-import-results`
+elapsed time every five minutes for the normal single-task job, reports phase
+changes immediately, and prints the terminal Cloud Run failure message when the
+task fails. Multi-task jobs retain provider task counts. After the normal
+artifact import, the command finishes with an operator-facing summary: suite
+duration, unique passed/failed/skipped test counts, a bounded list of failing
+nodeids and their first error lines, and the local artifact and JUnit XML paths.
+Additional pytest error records are reported separately so a test that both
+fails and errors during teardown is not misleadingly counted twice. `--no-import-results`
 instead prints the exact recovery command needed to import that execution later.
 
 Inspect state or tear down the runnable resources with:
