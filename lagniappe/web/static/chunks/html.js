@@ -1,2 +1,161 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="705c0d52-207e-43cf-a2df-e15905162d97",e._sentryDebugIdIdentifier="sentry-dbid-705c0d52-207e-43cf-a2df-e15905162d97");}catch(e){}}();import{STYLES as o}from"./styles.js?v=ba668ac5";import{r as e,h as n,E as r}from"./foundation.js?v=ba668ac5";import"./connectivity.js?v=ba668ac5";import{i as a,T as d}from"./toolbar.js?v=ba668ac5";import{C as h}from"./base2.js?v=ba668ac5";import"./combobox.js?v=ba668ac5";import"./primitives.js?v=ba668ac5";import"./icons.js?v=ba668ac5";import"./dropdown.js?v=ba668ac5";import"./baseForm.js?v=ba668ac5";import"./loader.js?v=ba668ac5";import"./select2.js?v=ba668ac5";import"./results.js?v=ba668ac5";import"./formatting.js?v=ba668ac5";import"./submitter.js?v=ba668ac5";class c{constructor(t){Object.assign(this,t),this.content=""}init(){this._createContainer(),this.readonly||(this._initEditor(),this._initToolbar()),e.get(this.endpoints.getContent).then(t=>{this.readonly?this.container.innerHTML=t.markup||"":(t.markup||t.html)&&(this.content=(t.html||t.markup).trim()),this.container.setAttribute("loaded","")})}_createContainer(){this.container=document.createElement("div"),this.container.dataset.role="editor",this.container.className=`${o.editor.container}`,this.target.replaceChildren(this.container)}async _saveDocument(){if(!this.container.hasAttribute("loaded")||this.saving)return;this.saving=!0;const i=this.editor.getHTML();if(i.trim()==="<p></p>"||i.trim()==="<p><br></p>"){this.saving=!1;return}this.content!==i&&(this.content=i,await e.put(this.endpoints.save,{html:this.content})),this.saving=!1}_initEditor(){this.editor=a(this.container),this.editor.on("create",async()=>{await n(this.container,"loaded"),this.content.length>0?this.editor.commands.setContent(this.content):(this.container.querySelector(".ProseMirror").classList.add("min-h-[200px]"),this.editor.commands.focus("start"))}),this.editor.on("blur",()=>{requestAnimationFrame(()=>{document.activeElement.closest("[data-role='toolbar'], [role='listbox']")||this._saveDocument()})}),this.editor.on("destroy",()=>{this._saveDocument()})}_initToolbar(){this.toolbar=new d(this),this.toolbar.init(),this.target.prepend(this.toolbar.element)}hide(){this.target.classList.add("hidden")}show(){this.target.classList.remove("hidden")}destroy(){this.editor&&this.editor.destroy(),this.toolbar&&this.toolbar.destroy()}}class m extends h{constructor(t){super(t),this.expand=!0,this.endpoints=r.html(t.key,this.element.schema.id),this.kind="form",this._initialized=!1}init(){if(this._initialized)return;this._initialized=!0;const t=document.createElement("div");t.className="border-1 border-slate-300 rounded-md overflow-hidden";const i=new c({target:t,kind:this.kind,endpoints:this.endpoints});i.init(),this.destroyables.push(i),this.setTitle("Text Editor"),this.target.append(this.header,t)}}export{m as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { STYLES } from './styles.js?v=bc116afe';
+import { r as request, h as waitForAttribute, E as ENDPOINTS } from './foundation.js?v=bc116afe';
+import './connectivity.js?v=bc116afe';
+import { i as independentEditor, T as Toolbar } from './toolbar.js?v=bc116afe';
+import { C as Condition } from './base2.js?v=bc116afe';
+import './combobox.js?v=bc116afe';
+import './primitives.js?v=bc116afe';
+import './icons.js?v=bc116afe';
+import './dropdown.js?v=bc116afe';
+import './baseForm.js?v=bc116afe';
+import './loader.js?v=bc116afe';
+import './select2.js?v=bc116afe';
+import './results.js?v=bc116afe';
+import './formatting.js?v=bc116afe';
+import './submitter.js?v=bc116afe';
+
+/**
+ * @testable infrastructure
+ */
+class IndependentDocument {
+	constructor(attributes) {
+		Object.assign(this, attributes);
+		this.content = "";
+	}
+
+	init() {
+		this._createContainer();
+
+		if (!this.readonly) {
+			this._initEditor();
+			this._initToolbar();
+		}
+
+		request.get(this.endpoints.getContent).then((response) => {
+			if (this.readonly) {
+				this.container.innerHTML = response.markup || "";
+			} else if (response.markup || response.html) {
+				this.content = (response.html || response.markup).trim();
+			}
+			this.container.setAttribute("loaded", "");
+		});
+	}
+
+	_createContainer() {
+		this.container = document.createElement("div");
+		this.container.dataset.role = "editor";
+		this.container.className = `${STYLES.editor.container}`;
+		this.target.replaceChildren(this.container);
+	}
+
+	async _saveDocument() {
+		const loaded = this.container.hasAttribute("loaded");
+		if (!loaded || this.saving) return;
+		this.saving = true;
+
+		const html = this.editor.getHTML();
+		const empty = html.trim() === "<p></p>" || html.trim() === "<p><br></p>";
+		if (empty) {
+			this.saving = false;
+			return;
+		}
+
+		if (this.content !== html) {
+			this.content = html;
+			await request.put(this.endpoints.save, { html: this.content });
+		}
+		this.saving = false;
+	}
+
+	_initEditor() {
+		this.editor = independentEditor(this.container);
+
+		this.editor.on("create", async () => {
+			await waitForAttribute(this.container, "loaded");
+
+			if (this.content.length > 0) {
+				this.editor.commands.setContent(this.content);
+			} else {
+				this.container
+					.querySelector(".ProseMirror")
+					.classList.add("min-h-[200px]");
+				this.editor.commands.focus("start");
+			}
+		});
+
+		this.editor.on("blur", () => {
+			requestAnimationFrame(() => {
+				const activeElement = document.activeElement;
+				if (activeElement.closest("[data-role='toolbar'], [role='listbox']"))
+					return;
+				this._saveDocument();
+			});
+		});
+
+		this.editor.on("destroy", () => {
+			this._saveDocument();
+		});
+	}
+
+	_initToolbar() {
+		this.toolbar = new Toolbar(this);
+		this.toolbar.init();
+		this.target.prepend(this.toolbar.element);
+	}
+
+	hide() {
+		this.target.classList.add("hidden");
+	}
+
+	show() {
+		this.target.classList.remove("hidden");
+	}
+
+	destroy() {
+		if (this.editor) {
+			this.editor.destroy();
+		}
+		if (this.toolbar) {
+			this.toolbar.destroy();
+		}
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
+ * @features html-field
+ * @dimensions builder-html-field
+ */
+class HtmlEditor extends Condition {
+	constructor(builder) {
+		super(builder);
+		this.expand = true;
+		this.endpoints = ENDPOINTS.html(builder.key, this.element.schema.id);
+		this.kind = "form";
+		this._initialized = false;
+	}
+
+	init() {
+		if (this._initialized) return;
+		this._initialized = true;
+
+		const container = document.createElement("div");
+		container.className =
+			"border-1 border-slate-300 rounded-md overflow-hidden";
+
+		const editor = new IndependentDocument({
+			target: container,
+			kind: this.kind,
+			endpoints: this.endpoints,
+		});
+		editor.init();
+		this.destroyables.push(editor);
+
+		this.setTitle("Text Editor");
+		this.target.append(this.header, container);
+	}
+}
+
+export { HtmlEditor as default };

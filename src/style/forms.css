@@ -187,3 +187,8 @@ button[lp-select]:disabled {
 	outline-width: 1px;
 	outline-color: color-mix(in oklch, var(--kind-light) 50%, transparent);
 }
+
+/* @style form.linkLabel */
+.form-link-label {
+	line-height: 1.5rem;
+}

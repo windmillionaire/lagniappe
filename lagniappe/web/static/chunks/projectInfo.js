@@ -1,2 +1,135 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="fa14318c-5c0c-4ebb-97ba-7c8cedb44048",e._sentryDebugIdIdentifier="sentry-dbid-fa14318c-5c0c-4ebb-97ba-7c8cedb44048");}catch(e){}}();import{F as s}from"./form2.js?v=ba668ac5";import{InputElement as a}from"./input.js?v=ba668ac5";import{s as e}from"./sections.js?v=ba668ac5";import{TextareaElement as n}from"./textarea.js?v=ba668ac5";import"./foundation.js?v=ba668ac5";import"./connectivity.js?v=ba668ac5";import"./baseForm.js?v=ba668ac5";import"./icons.js?v=ba668ac5";import"./primitives.js?v=ba668ac5";import"./styles.js?v=ba668ac5";import"./loader.js?v=ba668ac5";import"./baseElement.js?v=ba668ac5";import"./formatting.js?v=ba668ac5";import"./baseUpload.js?v=ba668ac5";import"./buttons.js?v=ba668ac5";import"./dropdown.js?v=ba668ac5";import"./combobox.js?v=ba668ac5";class o extends s{get nameElement(){return new a({kind:"project",readonly:this.readonly},{id:"name",label:"Project Name",input:"text",placeholder:"name this project..."},this.target.dataset.name||"").elt}get descriptionElement(){return new n({kind:"project",readonly:this.readonly},{id:"description",label:"Project Description",input:"textarea",placeholder:"describe this project..."},this.target.dataset.description||"").elt}}class m extends o{constructor(t){super(t),this.messages={submit:"Update Project",submitting:"Updating Project",submitted:"Project Updated"}}get html(){return[this.nameElement,this.descriptionElement,this.readonly?null:e.attributes(this)]}postreconcile(){super.postreconcile(),this.setEntityMetadata()}}class c extends o{constructor(t){super(t),this.messages={submit:"Create Project",submitting:"Creating Project",submitted:"Project Created"},this.target.dataset.mode="manual",this.target.dataset.role="generate"}get html(){const t=this.nameElement,i=this.descriptionElement;return t.dataset.role="manual",i.dataset.role="manual",[e.generateEntityForm(this),t,i,e.attributes(this)]}postreconcile(){this.target.querySelectorAll("input, textarea").forEach(t=>{t.type!=="checkbox"&&(t.value="")}),this.target.dataset.mode="manual",this.form.resetSubmitButton()}}export{c as CreateProject,m as ProjectInfo};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FormElement } from './form2.js?v=bc116afe';
+import { InputElement } from './input.js?v=bc116afe';
+import { s as sections } from './sections.js?v=bc116afe';
+import { TextareaElement } from './textarea.js?v=bc116afe';
+import './foundation.js?v=bc116afe';
+import './connectivity.js?v=bc116afe';
+import './baseForm.js?v=bc116afe';
+import './icons.js?v=bc116afe';
+import './primitives.js?v=bc116afe';
+import './styles.js?v=bc116afe';
+import './loader.js?v=bc116afe';
+import './baseElement.js?v=bc116afe';
+import './formatting.js?v=bc116afe';
+import './baseUpload.js?v=bc116afe';
+import './buttons.js?v=bc116afe';
+import './dropdown.js?v=bc116afe';
+import './combobox.js?v=bc116afe';
+
+/**
+ * @testable false
+ * @covered-by src/script/widgets/projectInfo.mjs::CreateProject
+ * @covered-by src/script/widgets/projectInfo.mjs::ProjectInfo
+ * @reason shared field construction is exercised through concrete project widgets
+ */
+class ProjectForm extends FormElement {
+	get nameElement() {
+		return new InputElement(
+			{
+				kind: "project",
+				readonly: this.readonly,
+			},
+			{
+				id: "name",
+				label: "Project Name",
+				input: "text",
+				placeholder: "name this project...",
+			},
+			this.target.dataset.name || "",
+		).elt;
+	}
+
+	get descriptionElement() {
+		return new TextareaElement(
+			{
+				kind: "project",
+				readonly: this.readonly,
+			},
+			{
+				id: "description",
+				label: "Project Description",
+				input: "textarea",
+				placeholder: "describe this project...",
+			},
+			this.target.dataset.description || "",
+		).elt;
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004b_info.py::test_project_info_form
+ * @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_reads_project_without_editing_controls
+ * @features projects
+ * @dimensions info-form metadata-sync readonly
+ */
+class ProjectInfo extends ProjectForm {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Update Project",
+			submitting: "Updating Project",
+			submitted: "Project Updated",
+		};
+	}
+
+	get html() {
+		return [
+			this.nameElement,
+			this.descriptionElement,
+			this.readonly ? null : sections.attributes(this),
+		];
+	}
+
+	postreconcile() {
+		super.postreconcile();
+		this.setEntityMetadata();
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_form
+ * @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
+ * @features projects
+ * @dimensions manual-form ai-form
+ */
+class CreateProject extends ProjectForm {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Create Project",
+			submitting: "Creating Project",
+			submitted: "Project Created",
+		};
+		this.target.dataset.mode = "manual";
+		this.target.dataset.role = "generate";
+	}
+
+	get html() {
+		const name = this.nameElement;
+		const description = this.descriptionElement;
+		name.dataset.role = "manual";
+		description.dataset.role = "manual";
+
+		return [
+			sections.generateEntityForm(this),
+			name,
+			description,
+			sections.attributes(this),
+		];
+	}
+
+	postreconcile() {
+		this.target.querySelectorAll("input, textarea").forEach((element) => {
+			if (element.type !== "checkbox") {
+				element.value = "";
+			}
+		});
+		this.target.dataset.mode = "manual";
+		this.form.resetSubmitButton();
+	}
+}
+
+export { CreateProject, ProjectInfo };

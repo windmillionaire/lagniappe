@@ -437,6 +437,12 @@ form:
     classes: text-kind-default hover:text-kind-dark focus-visible:text-kind-dark focus-visible:bg-kind-bg focus-visible:outline-none ml-1 inline-grid place-items-center rounded-full
     intent: compact form action whose circular glyph provides its visible boundary
     surfaces: [frontend]
+  linkLabel:
+    classes: form-link-label
+    intent: form link text whose first-line height matches its leading icon
+    surfaces: [frontend]
+    hooks: [form-link-label]
+    css: [src/style/forms.css]
   restriction:
     classes: flex flex-row items-center gap-2 px-3 py-2 justify-between border-t border-user-light
     intent: restriction presentation within form

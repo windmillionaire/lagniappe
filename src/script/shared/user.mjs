@@ -1,32 +1,49 @@
 import { request } from "./request";
 
+let userDataUpdate = null;
 let userLocationUpdate = null;
 
 /**
  * @testable true
- * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_posts_location_on_page_load_and_deduplicates
- * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_still_posts_timezone_when_location_is_unavailable
- * @pairs location:page-load location:session-update timezone:session-update
+ * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_posts_timezone_without_requesting_location
+ * @pair location:permission-deferral
+ * @pairs timezone:page-load timezone:session-update
  */
 export function updateUserData() {
-	return updateUserLocation();
+	if (userDataUpdate) return userDataUpdate;
+
+	const update = _syncUserData().then(
+		({ retry, synced }) => {
+			if (retry && userDataUpdate === update) userDataUpdate = null;
+			return synced;
+		},
+		(error) => {
+			if (userDataUpdate === update) userDataUpdate = null;
+			throw error;
+		},
+	);
+	userDataUpdate = update;
+	return update;
 }
 
 /**
  * @testable false
+ * @covered-by src/script/shared/user.mjs::updateUserData
  * @covered-by src/script/shared/user.mjs::updateUserLocation
- * @reason one request keeps concurrent location and timezone writes in the same session response
+ * @reason shared payload construction keeps serialized timezone and optional location updates consistent
  */
-async function _syncUserData() {
+async function _syncUserData({ includeLocation = false } = {}) {
 	const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 	const sentThisSession = sessionStorage.getItem("timezone_sent");
 	const userHash = sessionStorage.getItem("userHash");
 	const timezoneChanged = sentThisSession !== currentTimezone || !userHash;
-	const position = await _getCurrentPosition({
-		enableHighAccuracy: false,
-		maximumAge: 3600000, // up to 1 hour old
-		timeout: 8000,
-	});
+	const position = includeLocation
+		? await _getCurrentPosition({
+				enableHighAccuracy: false,
+				maximumAge: 3600000, // up to 1 hour old
+				timeout: 8000,
+			})
+		: null;
 	const location = position
 		? {
 				latitude: position.coords.latitude,
@@ -49,7 +66,10 @@ async function _syncUserData() {
 		sessionStorage.setItem("timezone_sent", currentTimezone);
 	}
 	if (response.userHash) sessionStorage.setItem("userHash", response.userHash);
-	return { retry: false, synced: Boolean(location) };
+	return {
+		retry: false,
+		synced: includeLocation ? Boolean(location) : timezoneChanged,
+	};
 }
 
 /**
@@ -73,25 +93,30 @@ function _getCurrentPosition(options) {
 
 /**
  * @testable true
- * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_posts_location_on_page_load_and_deduplicates
+ * @tests tests_js/test_020_shared_utilities.py::test_user_location_sync_starts_on_demand_and_deduplicates
  * @tests tests_js/test_020_shared_utilities.py::test_user_location_sync_retries_failed_session_update
- * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_still_posts_timezone_when_location_is_unavailable
- * @pairs location:geolocation location:page-load location:session-update
+ * @tests tests_js/test_020_shared_utilities.py::test_unavailable_user_location_does_not_affect_timezone_sync
+ * @pairs location:geolocation location:on-demand location:session-update
  * @pairs location:deduplication location:retry location:unavailable
+ * @pair timezone:serialized-update
  */
 export function updateUserLocation() {
 	if (userLocationUpdate) return userLocationUpdate;
 
-	const update = _syncUserData().then(
-		({ retry, synced }) => {
-			if (retry && userLocationUpdate === update) userLocationUpdate = null;
-			return synced;
-		},
-		(error) => {
-			if (userLocationUpdate === update) userLocationUpdate = null;
-			throw error;
-		},
-	);
+	const update = updateUserData()
+		.then(() => _syncUserData({ includeLocation: true }))
+		.then(
+			({ retry, synced }) => {
+				if (retry && userLocationUpdate === update) {
+					userLocationUpdate = null;
+				}
+				return synced;
+			},
+			(error) => {
+				if (userLocationUpdate === update) userLocationUpdate = null;
+				throw error;
+			},
+		);
 	userLocationUpdate = update;
 	return update;
 }

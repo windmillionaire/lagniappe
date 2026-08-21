@@ -1,2 +1,90 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.1.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="80eb223f-2c64-4c6d-8c79-30c3097782c0",e._sentryDebugIdIdentifier="sentry-dbid-80eb223f-2c64-4c6d-8c79-30c3097782c0");}catch(e){}}();import{p as i}from"./primitives.js?v=ba668ac5";import{k as s}from"./foundation.js?v=ba668ac5";import"./connectivity.js?v=ba668ac5";import{C as o}from"./base2.js?v=ba668ac5";import"./styles.js?v=ba668ac5";import"./icons.js?v=ba668ac5";import"./baseForm.js?v=ba668ac5";import"./loader.js?v=ba668ac5";import"./select2.js?v=ba668ac5";import"./combobox.js?v=ba668ac5";import"./results.js?v=ba668ac5";import"./formatting.js?v=ba668ac5";import"./submitter.js?v=ba668ac5";class n extends o{constructor(t){super(t),this.key="options",this.messages={submit:"Add Option"}}init(){this.element.schema.options??=[],this.index!==-1?(this.setTitle("Edit Option"),this.messages.submit="Update Option",this.setting={...this.element.schema.options[this.index]}):(this.setTitle("Create Option"),this.messages.submit="Add Option",this.setting={}),super.init(),this.showProgress()}showProgress(){this.addOptionName(),this.setting.label&&(this.complete=!0),super.showProgress()}addOptionName(){if(this.options.has("name"))return;delete this.setting.value;const t=i.input({label:"Option Name",placeholder:"enter option name...",name:"option-name",type:"text",value:this.setting.label||null});this.options.set("name",t),this.focusTarget=t,t.addEventListener("input",e=>{this.setting.label=e.target.value,this.showProgress()})}validate(){return this.setting.label?(this.setting.value||(this.setting.value=`o${s(this.setting.label)}`),!0):(this.form.showError("Please enter an option name."),!1)}}export{n as default};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { p as primitives } from './primitives.js?v=bc116afe';
+import { k as simpleHash } from './foundation.js?v=bc116afe';
+import './connectivity.js?v=bc116afe';
+import { C as Condition } from './base2.js?v=bc116afe';
+import './styles.js?v=bc116afe';
+import './icons.js?v=bc116afe';
+import './baseForm.js?v=bc116afe';
+import './loader.js?v=bc116afe';
+import './select2.js?v=bc116afe';
+import './combobox.js?v=bc116afe';
+import './results.js?v=bc116afe';
+import './formatting.js?v=bc116afe';
+import './submitter.js?v=bc116afe';
+
+/**
+ * @testable true
+ * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
+ * @features forms
+ * @dimensions builder-select-options
+ */
+class Options extends Condition {
+	constructor(builder) {
+		super(builder);
+		this.key = "options";
+		this.messages = {
+			submit: "Add Option",
+		};
+	}
+
+	init() {
+		this.element.schema.options ??= [];
+
+		if (this.index !== -1) {
+			this.setTitle("Edit Option");
+			this.messages.submit = "Update Option";
+			this.setting = { ...this.element.schema.options[this.index] };
+		} else {
+			this.setTitle("Create Option");
+			this.messages.submit = "Add Option";
+			this.setting = {};
+		}
+
+		super.init();
+
+		this.showProgress();
+	}
+
+	showProgress() {
+		this.addOptionName();
+		if (this.setting.label) {
+			this.complete = true;
+		}
+		super.showProgress();
+	}
+
+	addOptionName() {
+		if (this.options.has("name")) return;
+		delete this.setting.value;
+
+		const optionName = primitives.input({
+			label: "Option Name",
+			placeholder: "enter option name...",
+			name: "option-name",
+			type: "text",
+			value: this.setting.label || null,
+		});
+
+		this.options.set("name", optionName);
+		this.focusTarget = optionName;
+
+		optionName.addEventListener("input", (e) => {
+			this.setting.label = e.target.value;
+			this.showProgress();
+		});
+	}
+
+	validate() {
+		if (!this.setting.label) {
+			this.form.showError("Please enter an option name.");
+			return false;
+		}
+		if (!this.setting.value) {
+			this.setting.value = `o${simpleHash(this.setting.label)}`;
+		}
+		return true;
+	}
+}
+
+export { Options as default };

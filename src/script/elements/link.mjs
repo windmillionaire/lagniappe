@@ -48,6 +48,12 @@ export class LinkElement extends BaseElement {
 		return true;
 	}
 
+	/**
+	 * @testable true
+	 * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_link_submission
+	 * @features form-link
+	 * @dimensions read-layout
+	 */
 	get read() {
 		if (this._read) return this._read;
 		if (!this.submission) return null;
@@ -63,6 +69,7 @@ export class LinkElement extends BaseElement {
 					icon: "in",
 					kind: this.submission.kind,
 					content: name,
+					classes: STYLES.form.linkLabel,
 					iconClasses: "text-kind-default",
 				}),
 			);
@@ -80,6 +87,7 @@ export class LinkElement extends BaseElement {
 					icon: "out",
 					kind: "page",
 					content: link,
+					classes: STYLES.form.linkLabel,
 					iconClasses: "text-base-default",
 				}),
 			);

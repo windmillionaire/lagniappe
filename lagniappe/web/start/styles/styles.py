@@ -132,6 +132,7 @@ STYLES = {
 			"controls": "flex flex-row items-center gap-1"
 		},
 		"icon": "text-kind-default hover:text-kind-dark focus-visible:text-kind-dark focus-visible:bg-kind-bg focus-visible:outline-none ml-1 inline-grid place-items-center rounded-full",
+		"linkLabel": "form-link-label",
 		"restriction": "flex flex-row items-center gap-2 px-3 py-2 justify-between border-t border-user-light",
 		"table": {
 			"body": "divide-y-kind-bg w-full border-t border-base-light",
