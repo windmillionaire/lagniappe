@@ -383,7 +383,7 @@ def test_python_config_package_resolves_expected_repo_files(monkeypatch, tmp_pat
     # Repository upgrades reload config after replacing the checkout, while an
     # old-generation runner.testing module may still be cached by Python.
     stale_testing = types.ModuleType("runner.testing")
-    sys.modules["runner.testing"] = stale_testing
+    monkeypatch.setitem(sys.modules, "runner.testing", stale_testing)
 
     def restore_config_modules():
         for name in [
@@ -1246,7 +1246,7 @@ def test_redis_tls_requires_a_valid_ca_bundle(monkeypatch, tmp_path):
 
 
 # @features deploy
-# @dimensions version package-lock transactional-state
+# @dimensions version package-lock transactional-state utf8
 def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path):
     app_dir = tmp_path / "demo-app"
     config_files_dir = app_dir / "config" / "files"
@@ -1283,10 +1283,15 @@ def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path)
                         "version": "1.23",
                         "dependencies": {"example": "^1.0.0"},
                     },
-                    "node_modules/example": {"version": "1.0.0"},
+                    "node_modules/example": {
+                        "version": "1.0.0",
+                        "funding": {"type": "GitHub Sponsors ❤"},
+                    },
                 },
-            }
-        )
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
     )
 
     try:
@@ -1309,6 +1314,9 @@ def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path)
     assert package_lock["version"] == "1.24"
     assert package_lock["packages"][""]["version"] == "1.24"
     assert package_lock["packages"]["node_modules/example"]["version"] == "1.0.0"
+    lock_text = lock_path.read_text(encoding="utf-8")
+    assert "GitHub Sponsors ❤" in lock_text
+    assert "\\u2764" not in lock_text
 
 
 # @features deploy

@@ -486,7 +486,10 @@ updates `package.json`, the package-lock root metadata, generated application
 settings, the release-note file, and the **Applies to** version in both
 `ERROR_REPORTING_PRIVACY.md` and its public HTML template. It does not change
 the notice's effective date; update that date only when the notice itself
-materially changes.
+materially changes. The package-lock update preserves literal UTF-8 text. The
+companion `version show` command reports the generated settings version after
+installation and uses the authoritative `package.json` version as the effective
+`VERSION` before the generated settings file exists.
 
 The App Engine upload filter in `.gcloudignore` root-anchors top-level
 development folders such as `/testing/`, `/installer/`, and `/runner/`. Do not
