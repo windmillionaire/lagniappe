@@ -19,7 +19,7 @@ from lagniappe.core.definitions import (
     Resource,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai, database, files, site_export
+from lagniappe.core.tools import ai, database, dates, files, site_export
 from lagniappe.core.tools.database import assets as storage_assets
 
 from .deferred_jobs import (
@@ -843,6 +843,18 @@ class AutofillAdapter(DeferredJobAdapter):
     mutation_inputs = ()
 
     # @testable true
+    # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_upload_checkpoint_records_durable_attachment
+    # @features deferred-jobs ai files
+    # @dimensions autofill upload checkpoint resume
+    def checkpoint_ready(self, context):
+        if not super().checkpoint_ready(context):
+            return False
+        return not context.parameters.get("upload_record") or isinstance(
+            context.checkpoint.get("attachment"),
+            dict,
+        )
+
+    # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_page_operation_reference_is_persisted_and_compare_cleared
     # @pairs deferred-jobs:active-operation pages:create-autofill
     def started(self, context):
@@ -960,30 +972,34 @@ class AutofillAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_prepare_waits_for_attached_file_summaries
+    # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_upload_checkpoint_records_durable_attachment
     # @features deferred-jobs ai files
-    # @dimensions autofill summary-dependency pending failed
+    # @dimensions autofill summary-dependency pending failed upload checkpoint
     def prepare(self, context):
         context.set_phase(DeferredJobPhase.PREPARING_INPUTS)
-        dependencies = ai.autofill_summary_dependencies(
-            context.input("target"),
-            context.actor,
-        )
-        if dependencies["failed"]:
-            raise DeferredJobDependencyFailedError(
-                "An attached file summary failed. Fix or remove that file, then "
-                "run autofill again."
+        existing_checkpoint = getattr(context, "checkpoint", None) or {}
+        prepared_submission = existing_checkpoint.get("submission")
+        if "submission" not in existing_checkpoint:
+            dependencies = ai.autofill_summary_dependencies(
+                context.input("target"),
+                context.actor,
             )
-        if dependencies["pending"]:
-            complete = len(dependencies["complete"])
-            total = complete + len(dependencies["pending"])
-            context.set_phase(
-                DeferredJobPhase.SUMMARIZING,
-                completed=complete,
-                total=total,
-            )
-            raise DeferredJobDependencyPendingError(
-                "Attached file summaries are still processing."
-            )
+            if dependencies["failed"]:
+                raise DeferredJobDependencyFailedError(
+                    "An attached file summary failed. Fix or remove that file, then "
+                    "run autofill again."
+                )
+            if dependencies["pending"]:
+                complete = len(dependencies["complete"])
+                total = complete + len(dependencies["pending"])
+                context.set_phase(
+                    DeferredJobPhase.SUMMARIZING,
+                    completed=complete,
+                    total=total,
+                )
+                raise DeferredJobDependencyPendingError(
+                    "Attached file summaries are still processing."
+                )
 
         record = context.parameters.get("upload_record")
         upload = (
@@ -994,31 +1010,127 @@ class AutofillAdapter(DeferredJobAdapter):
             if record
             else None
         )
-        prompt_data = ai.autofill_prompt_data(
-            context.input("target"),
-            context.actor,
-            user_context=context.parameters.get("user_context"),
-            file=upload,
-            mimetype=context.parameters.get("mimetype"),
-        )
-        prompt = ai.form_autofill_prompt(**prompt_data)
-        context.set_phase(DeferredJobPhase.GENERATING)
-        return {"submission": ai.generate_autofilled_submission(prompt)}
+        if "submission" not in existing_checkpoint:
+            prompt_data = ai.autofill_prompt_data(
+                context.input("target"),
+                context.actor,
+                user_context=context.parameters.get("user_context"),
+                file=upload,
+                mimetype=context.parameters.get("mimetype"),
+            )
+            prompt = ai.form_autofill_prompt(**prompt_data)
+            context.set_phase(DeferredJobPhase.GENERATING)
+            prepared_submission = ai.generate_autofilled_submission(prompt)
 
-    # @testable infrastructure
+        checkpoint = {"submission": prepared_submission}
+        if upload:
+            identity = hashlib.sha256(
+                str(context.job.urlsafe_key).encode("utf-8")
+            ).hexdigest()
+            file_key = database.create_named_key("file", f"autofill-{identity}")
+            checkpoint["attachment"] = {
+                "key": database.get.urlsafe_key(file_key),
+                "name": f"{dates.user_today(context.actor):%Y-%m-%d}-autofill",
+                "filename": upload.filename,
+                "mimetype": upload.content_type,
+            }
+        return checkpoint
+
+    # @testable true
+    # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_uploaded_file_is_attached_to_target
+    # @features deferred-jobs ai files pages tasks
+    # @dimensions autofill upload attachment idempotency inspection
     def inspect(self, context):
-        current = context.input("target").properties.submission.value
-        if current == context.checkpoint.get("submission"):
-            return DeferredJobInspection.APPLIED
-        return DeferredJobInspection.NOT_APPLIED
+        target = context.input("target")
+        current = target.properties.submission.value
+        if current != context.checkpoint.get("submission"):
+            return DeferredJobInspection.NOT_APPLIED
 
-    # @testable infrastructure
+        attachment = context.checkpoint.get("attachment")
+        if not attachment:
+            return DeferredJobInspection.APPLIED
+
+        file = Entities.fetch_one(attachment.get("key"), request=Fetch.direct())
+        if not isinstance(file, Entities.FILE):
+            return DeferredJobInspection.NOT_APPLIED
+        if isinstance(target, Entities.PAGE):
+            attached = target.key in file.properties.pages.keys
+        else:
+            attached = (
+                file.key in target.properties.files.keys
+                and target.key in file.properties.tasks.keys
+            )
+        return (
+            DeferredJobInspection.APPLIED
+            if attached
+            else DeferredJobInspection.NOT_APPLIED
+        )
+
+    # @testable true
+    # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_uploaded_file_is_attached_to_target
+    # @features deferred-jobs ai files pages tasks
+    # @dimensions autofill upload attachment naming idempotency
     def apply(self, context):
         context.ensure_active()
         target = context.input("target")
+        attachment = context.checkpoint.get("attachment")
+        attached_file = None
+        if attachment:
+            record = context.parameters.get("upload_record")
+            if not record:
+                raise exceptions.ValidationError(
+                    "The autofill attachment metadata is missing."
+                )
+            attached_file = Entities.fetch_one(
+                attachment.get("key"),
+                request=Fetch.direct(),
+            )
+            if attached_file is not None and not isinstance(
+                attached_file,
+                Entities.FILE,
+            ):
+                raise exceptions.ValidationError(
+                    "The autofill attachment could not be saved."
+                )
+            if attached_file is None:
+                upload = storage_assets.direct_upload_file(
+                    record,
+                    consumer=FileConsumer.AI_INLINE,
+                )
+                upload.lagniappe_preserve_source = True
+                file_key = database.get.datastore_key(attachment.get("key"))
+                if file_key is None:
+                    raise exceptions.ValidationError(
+                        "The autofill attachment key is invalid."
+                    )
+                attached_file = Entities.FILE.create(
+                    page=target if isinstance(target, Entities.PAGE) else None,
+                    upload=upload,
+                    data={
+                        "name": attachment.get("name"),
+                        "filename": attachment.get("filename"),
+                        "mimetype": attachment.get("mimetype"),
+                    },
+                    key=file_key,
+                )
+
+            if isinstance(target, Entities.PAGE):
+                attached_file.properties.pages.add(target)
+            else:
+                target.properties.files.add(attached_file)
+
         target.ai_submission(deepcopy(context.checkpoint["submission"]))
-        target.save()
-        return {"target_key": target.urlsafe_key, "target_kind": target.entity_kind}
+        if attached_file:
+            Entities.save(attached_file, target)
+        else:
+            target.save()
+        result = {
+            "target_key": target.urlsafe_key,
+            "target_kind": target.entity_kind,
+        }
+        if attached_file:
+            result["file_key"] = attached_file.urlsafe_key
+        return result
 
     # @testable true
     # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_terminal_cleanup_releases_target_lock

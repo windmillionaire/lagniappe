@@ -454,8 +454,13 @@ reloads the target and user, rechecks current edit/AI permission, rebuilds the
 shared context, applies the generated submission, and sends a terminal
 operation status for the exact source/destination widget. Optional
 one-off prompt attachments use direct-upload records so they remain available
-across retries; terminal job cleanup deletes the temporary object after success
-or failure.
+across retries. A successful guarded apply copies the upload into one
+deterministically keyed File, keeps the original filename and MIME type, gives
+it a user-timezone `YYYY-MM-DD-autofill` display name, and attaches it directly
+to the Page or Task alongside the generated submission. Retried applies reuse
+that File instead of creating duplicates. Terminal cleanup deletes the
+temporary upload after success or failure; failed or drifted autofills do not
+create a durable File.
 
 Page/task targets also acquire a durable `form-autofill` lock in the
 same transaction as the job. While it is active, form submit/quick-edit/default

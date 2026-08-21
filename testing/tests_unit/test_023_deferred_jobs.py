@@ -1388,6 +1388,219 @@ def test_autofill_prepare_waits_for_attached_file_summaries(monkeypatch):
         adapter.prepare(context)
 
 
+# @features deferred-jobs ai files
+# @dimensions autofill upload checkpoint resume
+def test_autofill_upload_checkpoint_records_durable_attachment(monkeypatch):
+    adapter = deferred_job_adapters.AutofillAdapter()
+    target = SimpleNamespace()
+    actor = SimpleNamespace()
+    upload = SimpleNamespace(
+        filename="assessment evidence.pdf",
+        content_type="application/pdf",
+    )
+    phases = []
+    named_keys = []
+    context = SimpleNamespace(
+        actor=actor,
+        job=SimpleNamespace(urlsafe_key="autofill-job-key"),
+        parameters={"upload_record": {"token": "signed-upload"}},
+        checkpoint={"submission": {"field-one": "Prepared answer"}},
+        input=lambda name: target if name == "target" else None,
+        set_phase=lambda phase, **details: phases.append((phase, details)),
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.storage_assets,
+        "direct_upload_file",
+        lambda *_args, **_kwargs: upload,
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.database,
+        "create_named_key",
+        lambda kind, identifier: named_keys.append((kind, identifier))
+        or "named-file-key",
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.database.get,
+        "urlsafe_key",
+        lambda key: f"encoded:{key}",
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.dates,
+        "user_today",
+        lambda user: datetime(2026, 8, 21, tzinfo=timezone.utc),
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.ai,
+        "generate_autofilled_submission",
+        lambda _prompt: (_ for _ in ()).throw(
+            AssertionError("a resumed checkpoint must not regenerate")
+        ),
+    )
+
+    assert adapter.checkpoint_ready(context) is False
+    checkpoint = adapter.prepare(context)
+    context.checkpoint = checkpoint
+
+    identity = hashlib.sha256(b"autofill-job-key").hexdigest()
+    assert named_keys == [("file", f"autofill-{identity}")]
+    assert checkpoint == {
+        "submission": {"field-one": "Prepared answer"},
+        "attachment": {
+            "key": "encoded:named-file-key",
+            "name": "2026-08-21-autofill",
+            "filename": "assessment evidence.pdf",
+            "mimetype": "application/pdf",
+        },
+    }
+    assert adapter.checkpoint_ready(context) is True
+    assert phases == [(DeferredJobPhase.PREPARING_INPUTS, {})]
+
+
+# @features deferred-jobs ai files pages tasks
+# @dimensions autofill upload attachment naming idempotency inspection
+@pytest.mark.parametrize("target_kind", ["page", "task"])
+def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
+    class Relation:
+        def __init__(self, on_add=None):
+            self.value = []
+            self.on_add = on_add
+
+        @property
+        def keys(self):
+            return [value.key for value in self.value]
+
+        def add(self, value):
+            if value.key in self.keys:
+                return False
+            self.value.append(value)
+            if self.on_add:
+                self.on_add(value)
+            return True
+
+    class Target:
+        def __init__(self):
+            self.key = f"{target_kind}-key"
+            self.urlsafe_key = self.key
+            self.entity_kind = target_kind
+            self.properties = SimpleNamespace(
+                submission=SimpleNamespace(value={}),
+            )
+            self.properties.files = Relation(
+                on_add=lambda file: file.properties.tasks.add(self)
+            )
+
+        def ai_submission(self, submission):
+            self.properties.submission.value = submission
+
+        def save(self):
+            raise AssertionError("an autofill attachment must save with its target")
+
+    class Page(Target):
+        pass
+
+    class Task(Target):
+        pass
+
+    created = []
+
+    class File:
+        @classmethod
+        def create(cls, page=None, upload=None, data=None, key=None):
+            file = cls()
+            file.key = key
+            file.urlsafe_key = key
+            file.upload = upload
+            file.data = dict(data or {})
+            file.properties = SimpleNamespace(
+                pages=Relation(),
+                tasks=Relation(),
+            )
+            if page:
+                file.properties.pages.add(page)
+            created.append(file)
+            return file
+
+    monkeypatch.setattr(deferred_job_adapters.Entities, "PAGE", Page)
+    monkeypatch.setattr(deferred_job_adapters.Entities, "TASK", Task)
+    monkeypatch.setattr(deferred_job_adapters.Entities, "FILE", File)
+
+    target = Page() if target_kind == "page" else Task()
+    upload = SimpleNamespace(
+        filename="original.pdf",
+        content_type="application/pdf",
+    )
+    stored = {}
+    saved = []
+    upload_loads = []
+
+    def fetch_one(key, request):
+        del request
+        return stored.get(key)
+
+    def save(*entities):
+        saved.append(entities)
+        for entity in entities:
+            if isinstance(entity, File):
+                stored["encoded-file-key"] = entity
+
+    monkeypatch.setattr(deferred_job_adapters.Entities, "fetch_one", fetch_one)
+    monkeypatch.setattr(deferred_job_adapters.Entities, "save", save)
+    monkeypatch.setattr(
+        deferred_job_adapters.storage_assets,
+        "direct_upload_file",
+        lambda record, **_kwargs: upload_loads.append(record) or upload,
+    )
+    monkeypatch.setattr(
+        deferred_job_adapters.database.get,
+        "datastore_key",
+        lambda key: "file-key" if key == "encoded-file-key" else None,
+    )
+
+    context = SimpleNamespace(
+        parameters={"upload_record": {"token": "signed-upload"}},
+        checkpoint={
+            "submission": {"field-one": "Autofilled answer"},
+            "attachment": {
+                "key": "encoded-file-key",
+                "name": "2026-08-21-autofill",
+                "filename": "original.pdf",
+                "mimetype": "application/pdf",
+            },
+        },
+        input=lambda name: target if name == "target" else None,
+        ensure_active=lambda: None,
+    )
+
+    adapter = deferred_job_adapters.AutofillAdapter()
+    result = adapter.apply(context)
+
+    assert len(created) == 1
+    assert upload_loads == [{"token": "signed-upload"}]
+    assert upload.lagniappe_preserve_source is True
+    assert created[0].data == {
+        "name": "2026-08-21-autofill",
+        "filename": "original.pdf",
+        "mimetype": "application/pdf",
+    }
+    assert saved == [(created[0], target)]
+    assert target.properties.submission.value == {"field-one": "Autofilled answer"}
+    if target_kind == "page":
+        assert created[0].properties.pages.keys == [target.key]
+    else:
+        assert target.properties.files.keys == [created[0].key]
+        assert created[0].properties.tasks.keys == [target.key]
+    assert result == {
+        "target_key": target.key,
+        "target_kind": target_kind,
+        "file_key": "file-key",
+    }
+    assert adapter.inspect(context) is DeferredJobInspection.APPLIED
+
+    adapter.apply(context)
+    assert len(created) == 1
+    assert upload_loads == [{"token": "signed-upload"}]
+
+
 def _runner(monkeypatch, job, adapter):
     registry = deferred_jobs.DeferredJobRegistry()
     registry._defaults_loaded = True
