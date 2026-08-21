@@ -596,6 +596,11 @@ def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
         )
 
     monkeypatch.setattr(hosted_e2e, "_gcloud", gcloud)
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_wait_for_execution",
+        lambda *_arguments, **_options: ({"status": {}}, 0),
+    )
 
     result = hosted_e2e.execute(
         suite="focused",
@@ -603,11 +608,17 @@ def test_hosted_execute_dispatches_validated_focused_targets(monkeypatch):
         import_results=False,
     )
 
-    assert result == {"execution": "lagniappe-e2e-focus1", "exit_status": 0}
+    assert result == {
+        "execution": "lagniappe-e2e-focus1",
+        "exit_status": 0,
+        "suite": "focused",
+    }
     assert (
         f"--args=--suite=focused,--target={target},--target={second_target}"
         in calls[0][0]
     )
+    assert "--async" in calls[0][0]
+    assert "--wait" not in calls[0][0]
     assert writes[0][1]["last_targets"] == [target, second_target]
 
 
@@ -644,23 +655,199 @@ def test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr(
             ),
         ),
     )
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_wait_for_execution",
+        lambda *_arguments, **_options: (
+            {
+                "status": {
+                    "completionTime": "2026-08-21T17:50:24Z",
+                    "failedCount": 1,
+                }
+            },
+            1,
+        ),
+    )
 
     result = hosted_e2e.execute(suite="all", import_results=False)
 
-    assert result == {"execution": "lagniappe-e2e-failed1", "exit_status": 1}
+    assert result == {
+        "execution": "lagniappe-e2e-failed1",
+        "exit_status": 1,
+        "suite": "all",
+    }
     assert writes[0][1]["last_execution"] == "lagniappe-e2e-failed1"
     assert writes[0][1]["last_suite"] == "all"
 
 
 # @features hosted-e2e
+# @dimensions execution-status progress failure-reporting
+def test_hosted_execution_wait_reports_progress_and_failure(monkeypatch, capsys):
+    clock = [0]
+    running = {
+        "spec": {"taskCount": 1},
+        "status": {
+            "runningCount": 1,
+            "conditions": [{"type": "Started", "status": "True"}],
+        },
+    }
+    payloads = iter(
+        [
+            {"spec": {"taskCount": 1}, "status": {"conditions": []}},
+            running,
+            running,
+            running,
+            running,
+            running,
+            running,
+            {
+                "spec": {"taskCount": 1},
+                "status": {
+                    "completionTime": "2026-08-21T17:50:24Z",
+                    "failedCount": 1,
+                    "conditions": [
+                        {
+                            "type": "Completed",
+                            "status": "False",
+                            "message": "The test container exited with code 1.",
+                        }
+                    ],
+                },
+            },
+        ]
+    )
+    calls = []
+
+    def describe(arguments):
+        calls.append(arguments)
+        return next(payloads)
+
+    def sleep(seconds):
+        clock[0] += seconds
+
+    monkeypatch.setattr(hosted_e2e, "_describe", describe)
+
+    payload, exit_status = hosted_e2e._wait_for_execution(
+        _infrastructure(),
+        "lagniappe-e2e-progress1",
+        poll_interval=5,
+        report_interval=30,
+        monotonic=lambda: clock[0],
+        sleep=sleep,
+    )
+
+    assert exit_status == 1
+    assert payload["status"]["failedCount"] == 1
+    assert calls[0][:5] == [
+        "run",
+        "jobs",
+        "executions",
+        "describe",
+        "lagniappe-e2e-progress1",
+    ]
+    output = capsys.readouterr().out
+    assert "[00:00:00] STARTING" in output
+    assert "[00:00:05] RUNNING" in output
+    assert "[00:00:30] RUNNING" in output
+    assert "[00:00:35] FAILED" in output
+    assert "exited with code 1" in output
+
+
+# @features hosted-e2e
+# @dimensions execution-status success
+def test_hosted_execution_wait_recognizes_success(monkeypatch):
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_describe",
+        lambda _arguments: {
+            "spec": {"taskCount": 1},
+            "status": {
+                "completionTime": "2026-08-21T17:50:24Z",
+                "succeededCount": 1,
+                "conditions": [{"type": "Completed", "status": "True"}],
+            },
+        },
+    )
+
+    payload, exit_status = hosted_e2e._wait_for_execution(
+        _infrastructure(),
+        "lagniappe-e2e-success1",
+        report=False,
+        monotonic=lambda: 0,
+        sleep=lambda _seconds: pytest.fail("completed execution should not sleep"),
+    )
+
+    assert exit_status == 0
+    assert payload["status"]["succeededCount"] == 1
+
+
+# @features hosted-e2e
+# @dimensions result-summary junit duration artifact-location
+def test_hosted_execute_summary_reports_unique_junit_failures(tmp_path):
+    execution = "lagniappe-e2e-summary1"
+    destination = tmp_path / "results" / execution
+    destination.mkdir(parents=True)
+    (destination / "junit.xml").write_text(
+        """\
+<testsuites>
+  <testsuite>
+    <testcase classname="tests_unit.test_example" name="test_passes" />
+    <testcase classname="tests_e2e.test_example" name="test_fails">
+      <failure message="assert 500 == 200" />
+    </testcase>
+    <testcase classname="tests_e2e.test_example" name="test_fails">
+      <error message="failed during teardown" />
+    </testcase>
+    <testcase classname="tests_unit.test_example" name="test_skips">
+      <skipped />
+    </testcase>
+  </testsuite>
+</testsuites>
+""",
+        encoding="utf-8",
+    )
+
+    summary = hosted_e2e.format_execute_summary(
+        {
+            "execution": execution,
+            "exit_status": 1,
+            "suite": "all",
+            "source": "a" * 40,
+            "version": "e2e-1234567890abcdef",
+            "build_id": "b1234567",
+            "suite_started_at": "2026-08-21T17:00:00+00:00",
+            "suite_finished_at": "2026-08-21T17:01:30+00:00",
+        },
+        state_root=tmp_path,
+    )
+
+    assert "Hosted E2E FAILED" in summary
+    assert f"Source: {'a' * 40}" in summary
+    assert "Deployment: e2e-1234567890abcdef (build b1234567)" in summary
+    assert "Duration: 1m 30s" in summary
+    assert "Tests: 3 total — 1 passed, 1 failed, 1 skipped" in summary
+    assert "Additional error records: 1" in summary
+    assert "testing/tests_e2e/test_example.py::test_fails" in summary
+    assert "assert 500 == 200" in summary
+    assert str(destination.resolve()) in summary
+
+
+# @features hosted-e2e
 # @dimensions cli-routing suite-scope evidence-import
-def test_hosted_execute_command_defaults_to_all_and_imports(monkeypatch):
+def test_hosted_execute_command_defaults_to_all_and_imports(
+    monkeypatch,
+    capsys,
+):
     calls = []
     monkeypatch.setattr(
         hosted_e2e,
         "execute",
         lambda **options: calls.append(options)
-        or {"execution": "lagniappe-e2e-alltest", "exit_status": 0},
+        or {
+            "execution": "lagniappe-e2e-alltest",
+            "exit_status": 0,
+            "suite": "all",
+        },
     )
 
     assert hosted_e2e.run_hosted_e2e_command(["execute"]) == 0
@@ -671,6 +858,10 @@ def test_hosted_execute_command_defaults_to_all_and_imports(monkeypatch):
         {"suite": "all", "targets": (), "import_results": True},
         {"suite": "all", "targets": (), "import_results": False},
     ]
+    output = capsys.readouterr().out
+    assert output.count("Hosted E2E PASSED") == 2
+    assert "Results were left in Cloud Storage" in output
+    assert not output.lstrip().startswith("{")
 
 
 # @pair hosted-e2e:cli-routing
@@ -763,6 +954,74 @@ def test_hosted_results_can_skip_large_report_archive(tmp_path, monkeypatch, cap
     output = capsys.readouterr().out
     assert str(tmp_path / "results" / execution) in output
     assert "downloading manifest.json" in output
+
+
+# @features hosted-e2e
+# @dimensions teardown local-artifacts evidence-retention deletion-safety
+def test_hosted_teardown_removes_downloaded_results_after_success(
+    tmp_path,
+    monkeypatch,
+    capsys,
+):
+    infrastructure = _infrastructure()
+    state_root = tmp_path / "reports/hosted-e2e"
+    state_path = state_root / "state.json"
+    result_root = state_root / "results"
+    result_root.mkdir(parents=True)
+    (result_root / "execution-1").mkdir()
+    (result_root / "execution-1/junit.xml").write_text(
+        "<testsuites/>\n",
+        encoding="utf-8",
+    )
+    setup_path = state_root / "setup.json"
+    setup_path.write_text("{}\n", encoding="utf-8")
+    version = "e2e-1234567890abcdef"
+    state = {
+        "project": infrastructure.project,
+        "region": infrastructure.region,
+        "service": hosted_e2e.SERVICE,
+        "job": infrastructure.job,
+        "artifact_bucket": infrastructure.artifact_bucket,
+        "version": version,
+        "base_url": "https://hosted-e2e.example.test",
+        "status": "ready",
+    }
+    hosted_e2e._write_json(state_path, state)
+
+    class CleanupLease:
+        def __exit__(self, *_arguments):
+            return None
+
+    monkeypatch.setattr(hosted_e2e, "APP_DIR", tmp_path)
+    monkeypatch.setattr(hosted_e2e, "STATE_ROOT", state_root)
+    monkeypatch.setattr(hosted_e2e, "STATE_PATH", state_path)
+    monkeypatch.setattr(hosted_e2e, "_activate", lambda **_options: None)
+    monkeypatch.setattr(hosted_e2e, "_infrastructure", lambda: infrastructure)
+    monkeypatch.setattr(hosted_e2e, "_verify_soft_routing_guard", lambda _value: None)
+    monkeypatch.setattr(hosted_e2e, "_describe", lambda _arguments: None)
+    monkeypatch.setattr(hosted_e2e, "_acquire_cleanup_lease", CleanupLease)
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_version_url",
+        lambda _infrastructure, _version: state["base_url"],
+    )
+    cors_changes = []
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_change_test_bucket_cors",
+        lambda *arguments, **options: cors_changes.append((arguments, options)),
+    )
+
+    result = hosted_e2e.teardown()
+
+    assert result["status"] == "torn-down"
+    assert hosted_e2e._load_json(state_path)["status"] == "torn-down"
+    assert not result_root.exists()
+    assert setup_path.exists()
+    assert cors_changes == [
+        ((infrastructure, state["base_url"]), {"present": False})
+    ]
+    assert f"Removed local hosted E2E artifacts: {result_root}" in capsys.readouterr().out
 
 
 # @features hosted-e2e traceability

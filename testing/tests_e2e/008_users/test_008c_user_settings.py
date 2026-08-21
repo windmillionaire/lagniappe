@@ -1178,12 +1178,13 @@ def test_site_settings_requires_administrator(get_user, browser_failures):
 
     user.entity.is_admin = True
     user.entity.save()
-    response = user.page.goto(admin_url, wait_until="domcontentloaded")
-    assert response.status == 200
-    expect(user.locate("[data-widget='SiteSettings']")).to_be_visible()
-
-    user.entity.is_admin = False
-    user.entity.save()
+    try:
+        response = user.page.goto(admin_url, wait_until="domcontentloaded")
+        assert response.status == 200
+        expect(user.locate("[data-widget='SiteSettings']")).to_be_visible()
+    finally:
+        user.entity.is_admin = False
+        user.entity.save()
 
 
 # @pairs admin:roster admin:managed-user-search admin:promotion admin:demotion

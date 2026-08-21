@@ -195,6 +195,17 @@ migration baseline. This matches the local ordering, where the Flask test
 server starts and seeds persistence only after cleanup; the already-running
 hosted version does not need to be restarted.
 
+Local `execute` starts the Cloud Run execution asynchronously and then follows
+its provider status. It prints the execution name immediately, reports the
+starting/running task counts at least every 30 seconds, and prints the terminal
+Cloud Run failure message when the task fails. After the normal artifact import,
+the command finishes with an operator-facing summary: suite duration, unique
+passed/failed/skipped test counts, a bounded list of failing nodeids and their
+first error lines, and the local artifact and JUnit XML paths. Additional pytest
+error records are reported separately so a test that both fails and errors
+during teardown is not misleadingly counted twice. `--no-import-results`
+instead prints the exact recovery command needed to import that execution later.
+
 Inspect state or tear down the runnable resources with:
 
 ```bash
@@ -348,7 +359,10 @@ version, and selected suite. Use `execute --no-import-results` for an
 exceptional dispatch that should leave its result only in Cloud Storage. The
 existing `results --latest`, `--download-only`, and `--skip-report-archive`
 options remain available for recovery and selective inspection. Downloads
-print their destination and per-file byte progress.
+print their destination and per-file byte progress. `execute` prints the compact
+human summary described above instead of dumping the raw result manifest; the
+downloaded `manifest.json` remains the stable structured record for scripts and
+deeper diagnosis.
 
 GitHub performs the same validation and merge from its downloaded directory,
 then commits the resulting evidence to the exact tested branch before it
@@ -380,6 +394,12 @@ lifecycle without storing credentials. If create or execution is interrupted:
 3. Use `hosted-e2e results --latest` if an execution reached artifact upload.
 4. Run `hosted-e2e teardown` when abandoning that lifecycle or moving to a
    different commit, then create the new candidate.
+
+After provider and test-data cleanup succeeds, teardown removes downloaded
+bundles under `reports/hosted-e2e/results/`. The imported outcomes remain in
+`testing/evidence/latest.json`; lifecycle metadata in `state.json` and
+one-time setup metadata in `setup.json` are retained. If teardown stops before
+completion, the downloaded bundles remain available for diagnosis and recovery.
 
 Do not run local E2E, hosted E2E, `test-server`, or browser-review sessions
 against the shared test data concurrently.

@@ -78,7 +78,7 @@ def _administrator_payload():
         return {
             "key": user.urlsafe_key if user else None,
             "name": (user.name if user else CONFIG.ADMIN_NAME) or "Owner",
-            "email": user.email if user else CONFIG.ADMIN_EMAIL,
+            "email": str((user.email if user else CONFIG.ADMIN_EMAIL) or ""),
             "last_login": last_login,
             "awaiting_first_sign_in": bool(primary_owner and not user),
             "is_owner": primary_owner,
@@ -90,7 +90,10 @@ def _administrator_payload():
             for user in users
             if user is not owner and user.is_admin
         ),
-        key=lambda entry: (str(entry["name"]).casefold(), entry["email"].casefold()),
+        key=lambda entry: (
+            str(entry["name"] or "").casefold(),
+            str(entry["email"] or "").casefold(),
+        ),
     )
     candidates = sorted(
         (
@@ -98,7 +101,10 @@ def _administrator_payload():
             for user in users
             if user is not owner and not user.is_admin
         ),
-        key=lambda entry: (str(entry["name"]).casefold(), entry["email"].casefold()),
+        key=lambda entry: (
+            str(entry["name"] or "").casefold(),
+            str(entry["email"] or "").casefold(),
+        ),
     )
     return [role_entry(owner, primary_owner=True), *additional], candidates
 
