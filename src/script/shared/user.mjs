@@ -6,6 +6,7 @@ let userLocationUpdate = null;
 /**
  * @testable true
  * @tests tests_js/test_020_shared_utilities.py::test_user_data_sync_posts_timezone_without_requesting_location
+ * @tests tests_js/test_020_shared_utilities.py::test_unavailable_user_location_does_not_affect_timezone_sync
  * @pair location:permission-deferral
  * @pairs timezone:page-load timezone:session-update
  */

@@ -102,7 +102,7 @@ def test_selection_submission(get_user):
             expect(read_value).to_contain_text(label)
 
 
-# @pairs pages:submission form-link:read-layout
+# @pairs pages:submission pages:link-field form-link:read-layout
 # @style form.linkLabel
 def test_link_submission(get_user):
     """Fill and verify external link (url + title) field."""
