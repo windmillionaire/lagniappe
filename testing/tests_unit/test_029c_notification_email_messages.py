@@ -7,9 +7,9 @@ import pytest
 
 from lagniappe.core.tools.database import notification_email as email_database
 from lagniappe.core.tools.database.core import KINDS
-from lagniappe.core.tools.notification_email import capture as email_capture
-from lagniappe.core.tools.notification_email import delivery as email_delivery
-from lagniappe.core.tools.notification_email import presentation as email_presentation
+from lagniappe.core.tools.email.notifications import capture as email_capture
+from lagniappe.core.tools.email.notifications import delivery as email_delivery
+from lagniappe.core.tools.email.notifications import presentation as email_presentation
 from testing.utility.notification_email_fakes import (
     MemoryDatastore,
     task_recorder,
@@ -20,8 +20,8 @@ from testing.utility.notification_email_fakes import (
 pytestmark = pytest.mark.unit
 
 
-# @source lagniappe/core/tools/notification_email/capture.py::record_message
-# @source lagniappe/core/tools/notification_email/delivery.py::deliver
+# @source lagniappe/core/tools/email/notifications/capture.py::record_message
+# @source lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @pairs notification-email:message notification-email:quiet-window notification-email:latest-only
 # @pair notification-email:read-suppression
 def test_immediate_messages_wait_for_conversation_quiet(monkeypatch):
@@ -89,7 +89,7 @@ def test_immediate_messages_wait_for_conversation_quiet(monkeypatch):
         lambda *_args, **_kwargs: False,
     )
     monkeypatch.setattr(
-        email_presentation.auth_email,
+        email_presentation.smtp,
         "send_email",
         lambda *args, **kwargs: sent.append((args, kwargs)) or True,
     )
@@ -128,4 +128,3 @@ def test_immediate_messages_wait_for_conversation_quiet(monkeypatch):
     ) == {"state": "sent"}
     assert "later message" in sent[1][0][2]
     assert sent[0][1]["message_id"] != sent[1][1]["message_id"]
-

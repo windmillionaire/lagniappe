@@ -3,7 +3,7 @@
 from ...definitions import Fetch
 from ...entities import Entities
 from .. import collaboration, database
-from ..notification_email import capture as email_capture
+from ..email.notifications import capture as email_capture
 from ..notifications import service as notification_service
 from .content import saved_mentions
 

@@ -27,7 +27,8 @@ from lagniappe.core.mixins.submitter import SubmitterMixin
 from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
 from lagniappe.core.properties.deferred_job_request import RequestFingerprint
 from lagniappe.core.properties import deferred_job_lifecycle
-from lagniappe.core.tools import database, task_queue
+from lagniappe.core.tools import database
+from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.database import deferred_jobs as deferred_database
@@ -81,7 +82,6 @@ pytestmark = pytest.mark.unit
 from lagniappe.core.tools.deferred_jobs.adapters import reports as report_adapters
 
 
-
 # @features deferred-jobs
 # @dimensions service-tier quota retry
 def test_organize_retry_uses_priority_for_every_generation_stage(monkeypatch):
@@ -115,16 +115,17 @@ def test_organize_retry_uses_priority_for_every_generation_stage(monkeypatch):
     monkeypatch.setattr(
         report_adapters.ai,
         "generate_organize_plan",
-        lambda prompt: generated.append(("plan", prompt.service_tier))
-        or {"summary": "Ready", "actions": []},
+        lambda prompt: (
+            generated.append(("plan", prompt.service_tier))
+            or {"summary": "Ready", "actions": []}
+        ),
     )
     monkeypatch.setattr(
         report_adapters.ai,
         "complete_organize_submissions",
-        lambda proposal, *_args, **kwargs: generated.append(
-            ("submissions", kwargs.get("service_tier"))
-        )
-        or proposal,
+        lambda proposal, *_args, **kwargs: (
+            generated.append(("submissions", kwargs.get("service_tier"))) or proposal
+        ),
     )
 
     for attempt in (1, 2):
@@ -147,8 +148,6 @@ def test_organize_retry_uses_priority_for_every_generation_stage(monkeypatch):
         ("plan", "priority"),
         ("submissions", "priority"),
     ]
-
-
 
 
 # @pair deferred-jobs:cancellation
@@ -188,8 +187,6 @@ def test_organize_prepare_stops_before_report_save_after_cancellation(monkeypatc
         adapter.prepare(context)
 
     assert saved == []
-
-
 
 
 # @pair deferred-jobs:report-execution
@@ -320,8 +317,6 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
     assert saved
 
 
-
-
 # @pair deferred-jobs:report-execution
 # @pair ai-report:recovery
 def test_report_execution_failure_preserves_a_retryable_ledger(monkeypatch):
@@ -348,9 +343,7 @@ def test_report_execution_failure_preserves_a_retryable_ledger(monkeypatch):
                     {"status": "applying"},
                 ],
             }
-            self.properties = SimpleNamespace(
-                process=SimpleNamespace(fail=self.fail)
-            )
+            self.properties = SimpleNamespace(process=SimpleNamespace(fail=self.fail))
 
         def fail(self, message, result=None):
             self.status = "failed"
@@ -384,8 +377,6 @@ def test_report_execution_failure_preserves_a_retryable_ledger(monkeypatch):
     assert report.error == "save worker stopped"
     assert report.result["status"] == "failed"
     assert report.result["failed_at"] == 2
-
-
 
 
 # @pair deferred-jobs:superseded
@@ -450,8 +441,6 @@ def test_report_replacement_supersedes_old_job_and_ignores_old_failure(monkeypat
         ("supersede", {"key": "old-operation"}),
         ("save", (report, actor)),
     ]
-
-
 
 
 # @pair ai-report:ask
@@ -535,18 +524,18 @@ def test_ask_report_adapter_prepares_and_applies_checkpointed_response(
     monkeypatch.setattr(
         report_adapters.ai,
         "ask_prompt",
-        lambda current_report, current_actor: prompt_calls.append(
-            ("initial", current_report, current_actor)
-        )
-        or "initial-prompt",
+        lambda current_report, current_actor: (
+            prompt_calls.append(("initial", current_report, current_actor))
+            or "initial-prompt"
+        ),
     )
     monkeypatch.setattr(
         report_adapters.ai,
         "revise_ask_prompt",
-        lambda current_report, current_actor, feedback: prompt_calls.append(
-            ("revision", current_report, current_actor, feedback)
-        )
-        or "revision-prompt",
+        lambda current_report, current_actor, feedback: (
+            prompt_calls.append(("revision", current_report, current_actor, feedback))
+            or "revision-prompt"
+        ),
     )
     monkeypatch.setattr(
         report_adapters.ai,
@@ -599,8 +588,6 @@ def test_ask_report_adapter_prepares_and_applies_checkpointed_response(
     assert saved == [(report, actor)]
 
 
-
-
 # @pair deferred-jobs:checkpoint
 # @pair ai-report:plan-resume
 # @pair ai-report:submission-completion
@@ -620,10 +607,9 @@ def test_organize_resumes_plan_checkpoint_without_second_planning_call(monkeypat
     monkeypatch.setattr(
         report_adapters.ai,
         "complete_organize_submissions",
-        lambda value, report, actor, **kwargs: calls.append(
-            (value, report, actor, kwargs)
-        )
-        or completed,
+        lambda value, report, actor, **kwargs: (
+            calls.append((value, report, actor, kwargs)) or completed
+        ),
     )
     saved = []
 
@@ -665,29 +651,33 @@ def test_organize_resumes_plan_checkpoint_without_second_planning_call(monkeypat
     )
 
     assert adapter.checkpoint_ready(context) is False
-    assert adapter.checkpoint_ready(
-        SimpleNamespace(
-            checkpoint={
-                "schema_version": 1,
-                "stage": "ready_to_apply",
-                "proposal": completed,
-            }
+    assert (
+        adapter.checkpoint_ready(
+            SimpleNamespace(
+                checkpoint={
+                    "schema_version": 1,
+                    "stage": "ready_to_apply",
+                    "proposal": completed,
+                }
+            )
         )
-    ) is True
-    assert adapter.checkpoint_ready(
-        SimpleNamespace(
-            checkpoint={
-                "schema_version": 2,
-                "stage": "ready_to_apply",
-                "proposal": completed,
-            }
+        is True
+    )
+    assert (
+        adapter.checkpoint_ready(
+            SimpleNamespace(
+                checkpoint={
+                    "schema_version": 2,
+                    "stage": "ready_to_apply",
+                    "proposal": completed,
+                }
+            )
         )
-    ) is False
+        is False
+    )
 
     assert adapter.prepare(context) is None
-    assert calls == [
-        (proposal, report, actor, {"service_tier": "priority"})
-    ]
+    assert calls == [(proposal, report, actor, {"service_tier": "priority"})]
     assert checkpoints == [
         (
             {

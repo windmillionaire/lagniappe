@@ -10,7 +10,7 @@ from ..entities import Entities
 from ..exceptions import PropertyError
 from ..properties import common_entity
 from ..tools import database
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 
 
 # @testable infrastructure
@@ -478,7 +478,10 @@ class Entity:
         for intent in intents:
             if not isinstance(intent, MutationIntent):
                 raise TypeError("Entity mutation intents must be MutationIntent values")
-            if intent.entity is not None and getattr(intent.entity, "key", None) is None:
+            if (
+                intent.entity is not None
+                and getattr(intent.entity, "key", None) is None
+            ):
                 raise ValueError("Mutation intent entities must have a key")
             signature = (
                 intent.intent,

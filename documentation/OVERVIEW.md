@@ -37,7 +37,7 @@ Working on server-side code in `lagniappe/`.
 | Document | Covers |
 |---|---|
 | [BACKEND_WEB.md](BACKEND_WEB.md) | Flask app initialization, blueprints, Jinja environment, error handling, permission decorators, route patterns, deferred responses, template structure. |
-| [BACKEND_TOOLS.md](BACKEND_TOOLS.md) | Database (Datastore + Cloud Storage), Redis cache, Vertex AI, durable deferred jobs, file processing, task queue (Cloud Tasks), dates, utilities. |
+| [BACKEND_TOOLS.md](BACKEND_TOOLS.md) | Backend tool ownership: persistence, external services, AI, durable jobs, polling, email, site, task, link, file, and cross-domain workflows. |
 | [AI_PIPELINE.md](AI_PIPELINE.md) | End-to-end AI context, tool, generation, durable-job, deterministic-application, and browser-reconciliation architecture. |
 | [BACKEND_DEFINITIONS.md](BACKEND_DEFINITIONS.md) | Permission enums, filter definitions, entity attributes, ordering, asset types, exceptions. |
 | [BACKEND_FILTERS.md](BACKEND_FILTERS.md) | End-to-end filter system — Condition, Filter entity, FilterCache (Redis JSON), FilterExpression (JSONPath), value alignment. |
@@ -80,9 +80,9 @@ Build, configuration, installation, and test workflows.
 | Work on search/combobox | [FRONTEND_COMBOBOX](FRONTEND_COMBOBOX.md) | `src/script/elements/combobox/` |
 | Work on the filter system | [BACKEND_FILTERS](BACKEND_FILTERS.md) | `lagniappe/core/entities/filter.py`, `lagniappe/core/tools/filters/` |
 | Work on CSV import | [BACKEND_INGRESS](BACKEND_INGRESS.md) | `lagniappe/core/tools/ingress.py`, `lagniappe/core/properties/file_ingress.py` |
-| Work on task scheduling | [BACKEND_ENTITIES](BACKEND_ENTITIES.md) | `lagniappe/core/properties/task_scheduling.py`, `lagniappe/core/tools/dates.py` |
+| Work on task scheduling | [BACKEND_ENTITIES](BACKEND_ENTITIES.md) | `lagniappe/core/properties/task_scheduling.py`, `lagniappe/core/tools/tasks/scheduling.py` |
 | Work on permissions | [BACKEND_DEFINITIONS](BACKEND_DEFINITIONS.md) | `lagniappe/core/definitions/permissions.py`, `lagniappe/web/auth/auth.py` |
-| Work on login or authentication | [AUTHENTICATION](AUTHENTICATION.md) | `installer/identity.py`, `lagniappe/core/tools/identity_platform.py`, `lagniappe/web/routes/users/login.py`, `src/script/login/` |
+| Work on login or authentication | [AUTHENTICATION](AUTHENTICATION.md) | `installer/identity.py`, `lagniappe/core/tools/services/identity_platform.py`, `lagniappe/web/routes/users/login.py`, `src/script/login/` |
 | Change styles or icons | [FRONTEND_OVERVIEW](FRONTEND_OVERVIEW.md), [INFRA_BUILD](INFRA_BUILD.md), [STYLE_CANDIDATES](STYLE_CANDIDATES.md) | `src/style/styles.yaml`, `src/style/icons.yaml` |
 | Work on caching/ETags | [FRONTEND_SERVICE_WORKER](FRONTEND_SERVICE_WORKER.md), [BACKEND_TOOLS](BACKEND_TOOLS.md) | `src/script/sw.template.mjs`, `lagniappe/core/tools/cache/` |
 | Work on real-time sync/collaboration | [SYNC_ARCHITECTURE](SYNC_ARCHITECTURE.md), [FRONTEND_EDITOR](FRONTEND_EDITOR.md) | `src/script/shared/sync.mjs`, `src/script/elements/editor/collaborative.mjs`, `lagniappe/core/tools/cache/documents.py`, `lagniappe/web/routes/home/sync.py` |

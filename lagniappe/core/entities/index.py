@@ -3,8 +3,9 @@ from flask import url_for
 from ..definitions import Action, Restriction, Fetch
 from ..entities import Entities
 from ..properties import category, index
-from ..tools import cache, database, utility
-from ..tools.user_context import current_context_user
+from ..tools import cache, database
+from ..tools.auth.context import current_context_user
+from ..tools.tasks.ordering import sort_tasks
 from .site import Site
 
 
@@ -195,9 +196,7 @@ class TaskIndex(Index):
             *undated.results,
             request=Fetch.root(),
         )
-        return utility.sort_tasks(
-            [task for task in roots if isinstance(task, Entities.TASK)]
-        )
+        return sort_tasks([task for task in roots if isinstance(task, Entities.TASK)])
 
 
 # @testable false
@@ -276,9 +275,7 @@ class PageIndex(Index):
     # @dimensions root-depth membership
     def refresh_roots(self):
         """Return every page in this category at root depth."""
-        restrictions = self.user.properties.restrictions.unrestricted_pages(
-            self.entity
-        )
+        restrictions = self.user.properties.restrictions.unrestricted_pages(self.entity)
         db = database.get.pages(
             self.entity.key,
             limit=None,

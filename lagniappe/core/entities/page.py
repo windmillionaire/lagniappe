@@ -11,8 +11,9 @@ from ..properties import (
     page_assets,
     page_related,
 )
-from ..tools import database, utility
-from ..tools.user_context import current_context_user
+from ..tools import database
+from ..tools.auth.context import current_context_user
+from ..tools.tasks.ordering import sort_tasks
 from .entity import Entity
 
 
@@ -130,8 +131,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     def _load_tasks(self):
         results = database.get.page_tasks(self)
         entities = {
-            e.key: e
-            for e in Entities.fetch(*results, self, request=Fetch.direct())
+            e.key: e for e in Entities.fetch(*results, self, request=Fetch.direct())
         }
 
         tasks = [
@@ -142,7 +142,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
 
         self._completed = [t for t in tasks if t.completed]
         self._completed.sort(key=lambda x: x.modified, reverse=True)
-        self._tasks = utility.sort_tasks([t for t in tasks if not t.completed])
+        self._tasks = sort_tasks([t for t in tasks if not t.completed])
 
     @property
     def tasks(self):
@@ -171,12 +171,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             return False
         if action.value > Action.VIEW.value:
             target_user = self.user
-            if (
-                target_user
-                and target_user.is_admin
-                and user
-                and not user.is_owner
-            ):
+            if target_user and target_user.is_admin and user and not user.is_owner:
                 return False
         return super().allowed(action, user=user)
 
@@ -374,10 +369,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
         }
         if inbound_toggles:
             if not (
-                is_owner_viewer
-                and is_own_page
-                and target_user
-                and target_user.is_owner
+                is_owner_viewer and is_own_page and target_user and target_user.is_owner
             ):
                 raise PermissionError(
                     "Only the owner can change their inbound collaboration settings."

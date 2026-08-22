@@ -3,8 +3,6 @@
 import json
 from datetime import timedelta
 
-from google.cloud.datastore import query as datastore_query
-
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
@@ -16,12 +14,11 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.deferred_job_lifecycle import (
-    ACTIVE_STATUSES,
     TERMINAL_STATUSES,
     datetime_value as _datetime,
 )
 from lagniappe.core.tools import database
-from lagniappe.core.tools.database.core import DATA, KINDS
+from lagniappe.core.tools.database import deferred_jobs as deferred_database
 
 from .common import _error_record, _publish_operation_projection, _utc
 from .errors import DeferredJobInfrastructureError
@@ -29,7 +26,6 @@ from .errors import DeferredJobInfrastructureError
 
 # @testable infrastructure
 class DeferredJobRecovery:
-
     # @testable true
     # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_reconciler_repairs_control_before_self_pausing
     # @features deferred-jobs cloud-scheduler
@@ -60,7 +56,6 @@ class DeferredJobRecovery:
             level="warning",
         )
         return jobs
-
 
     # @testable true
     # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_redispatches_one_cas_claimed_stale_job
@@ -195,38 +190,12 @@ class DeferredJobRecovery:
         self._sync_reconciler()
         return result
 
-
     # @testable infrastructure
     # @covered-by lagniappe/core/tools/deferred_jobs/recovery.py::DeferredJobRecovery.reconcile
     def _reconcile_candidates(self, *, limit):
-        records = []
-        per_status = (
-            None if limit is None else max(int(limit) // len(ACTIVE_STATUSES), 1)
-        )
-        for status in ACTIVE_STATUSES:
-            query = DATA.datastore.query(kind=KINDS.jobs.value)
-            query.add_filter(
-                filter=datastore_query.PropertyFilter("status", "=", status)
-            )
-            query.order = ["modified"]
-            records.extend(query.fetch(limit=per_status))
-        delivery_query = DATA.datastore.query(kind=KINDS.jobs.value)
-        delivery_query.add_filter(
-            filter=datastore_query.PropertyFilter(
-                "dispatch_state",
-                "=",
-                "delivery_pending",
-            )
-        )
-        delivery_query.order = ["modified"]
-        records.extend(delivery_query.fetch(limit=per_status))
-        records = list({record.key: record for record in records}.values())
-        records.sort(key=lambda record: _datetime(record.get("modified")) or _utc())
-        if limit is not None:
-            records = records[: int(limit)]
+        records = deferred_database.recovery_records(limit=limit)
         jobs = [Entities.DEFERRED_JOB(record) for record in records]
         return Entities.fetch(*jobs, request=Fetch.direct())
-
 
     # @testable infrastructure
     # @covered-by lagniappe/core/tools/deferred_jobs/recovery.py::DeferredJobRecovery.reconcile

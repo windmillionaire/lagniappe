@@ -14,7 +14,7 @@ from ..properties import (
 )
 from ..mixins import AssetMixin
 from ..tools import database
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 from .entity import Entity
 from . import Entities
 
@@ -72,9 +72,7 @@ class User(AssetMixin, UserMixin, Entity):
         ):
             return False
         return bool(
-            viewer
-            and viewer.is_authenticated
-            and viewer.has_permission(self, action)
+            viewer and viewer.is_authenticated and viewer.has_permission(self, action)
         )
 
     # @testable false
@@ -204,9 +202,7 @@ class User(AssetMixin, UserMixin, Entity):
             raise ValueError("email is required")
 
         exists = database.get.user(data.get("email"))
-        adopting_public = bool(
-            exists and adopt_public and exists.get("public", False)
-        )
+        adopting_public = bool(exists and adopt_public and exists.get("public", False))
         if exists and not adopting_public:
             return cls(exists)
 
@@ -229,9 +225,10 @@ class User(AssetMixin, UserMixin, Entity):
         new_user.db["photo"] = data.get("picture")
         new_user.is_test_user = data.get("test_user", False)
 
-        if str(new_user.db.get("email") or "").casefold() == str(
-            CONFIG.ADMIN_EMAIL or ""
-        ).casefold():
+        if (
+            str(new_user.db.get("email") or "").casefold()
+            == str(CONFIG.ADMIN_EMAIL or "").casefold()
+        ):
             new_user.is_owner = True
 
         if data.get("admin", False):

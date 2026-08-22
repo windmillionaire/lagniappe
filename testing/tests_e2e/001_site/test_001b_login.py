@@ -55,7 +55,9 @@ from playwright.sync_api import expect
 from config import SETTINGS, Environment, constants
 from lagniappe import CONFIG
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import auth_email, database, identity_platform
+from lagniappe.core.tools import database
+from lagniappe.core.tools.email import smtp as auth_email
+from lagniappe.core.tools.services import identity_platform
 from lagniappe.web import app
 
 from testing.definitions import SitePages, Users
@@ -482,9 +484,7 @@ def test_login_page_loads(get_user):
         confirmation = confirmations.nth(index)
         expect(confirmation).to_have_attribute("data-kind", "user")
         expect(confirmation).to_have_class(re.compile(r".*\bbg-kind-bg\b.*"))
-        expect(confirmation).to_have_class(
-            re.compile(r".*\bborder-kind-default\b.*")
-        )
+        expect(confirmation).to_have_class(re.compile(r".*\bborder-kind-default\b.*"))
 
 
 # @features login
@@ -1051,9 +1051,12 @@ def test_delegated_bootstrap_admin_requires_exact_google_email_and_closes_after_
         is None
     )
     assert created == []
-    assert login_module.verify_user(
-        installer_email, "Installer", None, allow_bootstrap_admin=True
-    ) is fake_user
+    assert (
+        login_module.verify_user(
+            installer_email, "Installer", None, allow_bootstrap_admin=True
+        )
+        is fake_user
+    )
     assert created == [
         {
             "email": installer_email,
@@ -1922,7 +1925,6 @@ def test_login_identity_client_handoff_redirects_or_requires_verification(
     assert login_identity_calls[0]["remember"] is False
     assert login_identity_calls[0]["authResult"]
     assert not identity_calls["unexpected"]
-
 
     user = get_user(Users.ANONYMOUS)
     identity_calls = _mock_identity_platform(user.page, sign_in_verified=False)

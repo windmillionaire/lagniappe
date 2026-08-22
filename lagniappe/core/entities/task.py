@@ -17,8 +17,9 @@ from ..properties import (
 )
 from .entity import Entity
 from . import Entities
-from ..tools import database, dates
-from ..tools.user_context import current_context_user
+from ..tools import database
+from ..tools.tasks import scheduling
+from ..tools.auth.context import current_context_user
 
 
 # @testable true
@@ -163,7 +164,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @dimensions postpone, due-date
     def postpone(self, due_date):
         """Push the due date forward, preserving the original as postponed_from."""
-        new_date = dates.calculate_postponed_due_date(due_date)
+        new_date = scheduling.calculate_postponed_due_date(due_date)
         if not self.postponed_from:
             self.db["postponed_from"] = self.due_date
         self.due_date = new_date
@@ -213,9 +214,12 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_repeats_when_completed
     # @features task-scheduling
     # @dimensions complete, schedule-queue, next-due-date, recurring
+    # @pairs task-scheduling:complete task-scheduling:schedule-queue
+    # @pairs task-scheduling:next-due-date task-scheduling:recurring
+    # @pair task-completion:next-due-date
     def _complete_active_schedule(self):
         self.properties.schedule.set_next_due_date()
-        dates.add_uncomplete_task_to_queue(self)
+        scheduling.add_uncomplete_task_to_queue(self)
 
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete
@@ -363,9 +367,9 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         self.assigned_to = assigned_to
         next_assignee_key = self.properties.assigned_to.key
         if previous_assignee_key != next_assignee_key:
-            self.db["assignment_revision"] = int(
-                self.db.get("assignment_revision") or 0
-            ) + 1
+            self.db["assignment_revision"] = (
+                int(self.db.get("assignment_revision") or 0) + 1
+            )
             if actor and getattr(actor, "page", None):
                 self.assigned_by = actor.page
             self._add_assignment_notice(actor, self.assigned_to)

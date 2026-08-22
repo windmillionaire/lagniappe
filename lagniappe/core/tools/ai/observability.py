@@ -11,10 +11,8 @@ import logging
 import time
 import uuid
 
-from google.cloud.datastore import query as datastore_query
-
 from lagniappe import CONFIG
-from lagniappe.core.tools.database.core import DATA, KINDS
+from lagniappe.core.tools.database import analytics as analytics_database
 
 
 LOGGER = logging.getLogger(__name__)
@@ -621,14 +619,11 @@ def mark_outcome(value):
 # @pair datastore:uuid-key
 # @pair datastore:index-exclusions
 def _write_summary(summary):
-    key = DATA.datastore.key(KINDS.ai_observability.value, summary.correlation_id)
-    entity = DATA.datastore.entity(
-        key=key,
+    return analytics_database.create_ai_observability(
+        summary.correlation_id,
+        summary.payload(),
         exclude_from_indexes=EXCLUDE_FROM_INDEXES,
     )
-    entity.update(summary.payload())
-    DATA.datastore.put(entity)
-    return entity
 
 
 # @testable true
@@ -636,14 +631,11 @@ def _write_summary(summary):
 # @pair datastore:retention-bound
 def prune_old_records(*, now=None, limit=PRUNE_LIMIT):
     cutoff = (now or datetime.now(timezone.utc)) - timedelta(days=RETENTION_DAYS)
-    query = DATA.datastore.query(kind=KINDS.ai_observability.value)
-    query.add_filter(filter=datastore_query.PropertyFilter("created", "<", cutoff))
-    query.order = ["created"]
-    query.keys_only()
-    keys = [record.key for record in query.fetch(limit=min(int(limit), PRUNE_LIMIT))]
-    if keys:
-        DATA.datastore.delete_multi(keys)
-    return len(keys)
+    return analytics_database.delete_ai_observability(
+        before=cutoff,
+        batch_size=min(int(limit), PRUNE_LIMIT),
+        once=True,
+    )
 
 
 # @testable true

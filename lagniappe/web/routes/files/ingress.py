@@ -10,7 +10,7 @@ from lagniappe.core.definitions import (
     Resource,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import task_queue
+from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.ingress import IngressService
 from lagniappe.web.auth import permission
 from lagniappe.web import responses
@@ -142,14 +142,10 @@ def ingress_import(key, **kwargs):
     service = IngressService(file)
     already_active = False
     try:
-        already_active = (
-            service.stage.name == "IMPORTING"
-            and service.run_status
-            in {
-                IngressRunStatus.QUEUED.value,
-                IngressRunStatus.RUNNING.value,
-            }
-        )
+        already_active = service.stage.name == "IMPORTING" and service.run_status in {
+            IngressRunStatus.QUEUED.value,
+            IngressRunStatus.RUNNING.value,
+        }
         service.start(
             {
                 "timezone": session.get("timezone", "UTC"),
@@ -188,9 +184,7 @@ def ingress_import(key, **kwargs):
             )[:32],
         )
     except Exception as e:
-        service.mark_dispatch_failed(
-            "Import could not be started. Please try again."
-        )
+        service.mark_dispatch_failed("Import could not be started. Please try again.")
         exceptions.capture(
             e,
             context={

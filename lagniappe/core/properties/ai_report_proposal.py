@@ -3,7 +3,7 @@
 import hashlib
 import json
 
-from ..tools.files.utility import sanitize_html
+from ..tools.files.html import sanitize_html
 from .ai_report_process import ReportProcessValue
 
 

@@ -10,9 +10,10 @@ from config.storage import (
     storage_bucket_names,
 )
 from lagniappe.core import exceptions
-from lagniappe.core.tools import site_image
+from lagniappe.core.tools.site import images as site_image
 from lagniappe.core.tools.database import assets
 from lagniappe.core.tools.database import core
+from lagniappe.core.tools.database import site as site_database
 from lagniappe.core.definitions import (
     FILE_CONSUMER_CAPABILITIES,
     FileConsumer,
@@ -22,6 +23,7 @@ from lagniappe.core.definitions import (
 )
 
 _DATA_SERVICES_INITIALIZE = core.DataServices.initialize
+
 
 # @features file storage
 # @dimensions byte-range
@@ -315,9 +317,7 @@ def test_configure_recovery_bucket_removes_cors_and_is_idempotent():
         lifecycle_rules = lifecycle
         retention_period = 86400
         soft_delete_policy = SimpleNamespace(retention_duration_seconds=604800)
-        iam_configuration = SimpleNamespace(
-            uniform_bucket_level_access_enabled=False
-        )
+        iam_configuration = SimpleNamespace(uniform_bucket_level_access_enabled=False)
         patches = 0
 
         def patch(self):
@@ -408,9 +408,7 @@ def test_configure_bucket_is_idempotent():
                 "maxAgeSeconds": expected[0]["maxAgeSeconds"],
             }
         ]
-        iam_configuration = SimpleNamespace(
-            uniform_bucket_level_access_enabled=True
-        )
+        iam_configuration = SimpleNamespace(uniform_bucket_level_access_enabled=True)
 
         def patch(self):
             raise AssertionError("patch should not be called")
@@ -432,9 +430,7 @@ def test_configure_bucket_repairs_cors_drift():
     class Bucket:
         storage_class = "STANDARD"
         cors = []
-        iam_configuration = SimpleNamespace(
-            uniform_bucket_level_access_enabled=False
-        )
+        iam_configuration = SimpleNamespace(uniform_bucket_level_access_enabled=False)
 
         def patch(self):
             patches.append(
@@ -472,9 +468,7 @@ def test_configure_bucket_repairs_storage_class_without_touching_lifecycle():
         lifecycle_rules = lifecycle
         retention_period = 86400
         soft_delete_policy = SimpleNamespace(retention_duration_seconds=604800)
-        iam_configuration = SimpleNamespace(
-            uniform_bucket_level_access_enabled=True
-        )
+        iam_configuration = SimpleNamespace(uniform_bucket_level_access_enabled=True)
 
         def patch(self):
             patches.append(self.storage_class)
@@ -515,9 +509,7 @@ def test_configure_bucket_retries_transient_patch_failure(monkeypatch):
     class Bucket:
         storage_class = "STANDARD"
         cors = []
-        iam_configuration = SimpleNamespace(
-            uniform_bucket_level_access_enabled=True
-        )
+        iam_configuration = SimpleNamespace(uniform_bucket_level_access_enabled=True)
 
         def patch(self):
             patch_attempts.append(self.cors)
@@ -585,8 +577,9 @@ def test_signed_url_uses_remote_iam_signing(monkeypatch):
 
     calls = []
     blob = SimpleNamespace(
-        generate_signed_url=lambda **kwargs: calls.append(kwargs)
-        or "https://storage.example.test/signed"
+        generate_signed_url=lambda **kwargs: (
+            calls.append(kwargs) or "https://storage.example.test/signed"
+        )
     )
     monkeypatch.setattr(
         assets.DATA,
@@ -618,9 +611,7 @@ def test_signed_url_uses_remote_iam_signing(monkeypatch):
             "expiration": datetime.timedelta(seconds=900),
             "method": "GET",
             "credentials": "adc",
-            "service_account_email": (
-                "runtime@project-1.iam.gserviceaccount.com"
-            ),
+            "service_account_email": ("runtime@project-1.iam.gserviceaccount.com"),
             "access_token": "fresh-token",
             "response_disposition": "attachment",
             "response_type": "text/plain",
@@ -931,10 +922,10 @@ def test_save_site_image_persists_version_without_mutating_input(monkeypatch):
         def put(self, entity):
             saved.append(dict(entity))
 
-    monkeypatch.setattr(assets, "DATA", SimpleNamespace(datastore=Datastore()))
+    monkeypatch.setattr(site_database, "DATA", SimpleNamespace(datastore=Datastore()))
 
     image_data = {"favicon-32x32.png": "favicon-32x32.png"}
-    assets.save_site_image(image_data)
+    site_database.save_image(image_data)
 
     assert image_data == {"favicon-32x32.png": "favicon-32x32.png"}
     assert saved == [{"favicon-32x32.png": "favicon-32x32.png", "version": 5}]
@@ -985,7 +976,7 @@ def test_save_site_deployment_persists_canonical_payload_and_prunes_old_keys(
         def put(self, entity):
             saved.append(dict(entity))
 
-    monkeypatch.setattr(assets, "DATA", SimpleNamespace(datastore=Datastore()))
+    monkeypatch.setattr(site_database, "DATA", SimpleNamespace(datastore=Datastore()))
 
     deployment_data = {
         "DEPLOY_SCALING_TYPE": "basic",
@@ -995,7 +986,7 @@ def test_save_site_deployment_persists_canonical_payload_and_prunes_old_keys(
         "DEPLOY_MIN_IDLE_INSTANCES": "0",
         "DEPLOY_IDLE_TIMEOUT": "15m",
     }
-    assets.save_site_deployment(deployment_data)
+    site_database.save_deployment(deployment_data)
 
     assert deployment_data == {
         "DEPLOY_SCALING_TYPE": "basic",
@@ -1041,7 +1032,7 @@ def test_save_site_ai_persists_canonical_payload_and_prunes_old_keys(monkeypatch
         def put(self, entity):
             saved.append(dict(entity))
 
-    monkeypatch.setattr(assets, "DATA", SimpleNamespace(datastore=Datastore()))
+    monkeypatch.setattr(site_database, "DATA", SimpleNamespace(datastore=Datastore()))
 
     ai_data = {
         "AI_MODEL": "gemini-3.5-flash",
@@ -1050,7 +1041,7 @@ def test_save_site_ai_persists_canonical_payload_and_prunes_old_keys(monkeypatch
         "AI_LOCATION": "global",
         "unrelated": "ignored",
     }
-    assets.save_site_ai(ai_data)
+    site_database.save_ai(ai_data)
 
     assert ai_data["unrelated"] == "ignored"
     assert saved == [

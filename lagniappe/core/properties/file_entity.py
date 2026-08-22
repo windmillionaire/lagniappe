@@ -1,5 +1,6 @@
 from ..mixins import AIMixin, CacheMixin
-from ..tools import utility, files
+from ..tools import files
+from ..tools.files.html import strip_tags
 from .base_db import DBProperty
 from .base_property import Property
 from .common_entity import Name
@@ -270,7 +271,7 @@ class Summary(CacheMixin, AIMixin, DBProperty):
     @value.setter
     def value(self, value):
         if isinstance(value, str):
-            value = utility.strip_tags(value).strip()
+            value = strip_tags(value).strip()
         DBProperty.value.fset(self, value)
 
     # @testable true

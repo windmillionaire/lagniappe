@@ -7,7 +7,7 @@ import pytest
 from lagniappe.core.definitions import Fetch, Restriction
 from lagniappe.core.entities import Entities
 from lagniappe.core.entities.index import PageIndex, TaskIndex, UserIndex
-from lagniappe.core.tools.refresh import (
+from lagniappe.core.tools.polling.refresh import (
     RefreshCollection,
     RefreshView,
     load_refresh_collection,
@@ -56,13 +56,16 @@ def _task(name, hash_value, modified, due_date=None):
 def test_load_refresh_view_uses_entity_or_site_index_fingerprint():
     category = SimpleNamespace(fingerprint="category-fingerprint")
 
-    with patch(
-        "lagniappe.core.tools.refresh._view_entity",
-        side_effect=[category, None],
-    ) as load_entity, patch(
-        "lagniappe.core.tools.refresh.database.site_fingerprint",
-        return_value="tasks-fingerprint",
-    ) as site_fingerprint:
+    with (
+        patch(
+            "lagniappe.core.tools.polling.refresh._view_entity",
+            side_effect=[category, None],
+        ) as load_entity,
+        patch(
+            "lagniappe.core.tools.polling.refresh.database.site_fingerprint",
+            return_value="tasks-fingerprint",
+        ) as site_fingerprint,
+    ):
         category_view = load_refresh_view({"key": "category-key"})
         task_view = load_refresh_view({"index": "tasks"})
 
@@ -81,16 +84,20 @@ def test_task_index_refresh_roots_uses_both_ordered_query_streams():
     undated = _task("Undated", "refresh-task-2", now - timedelta(days=1))
     parent = TaskIndex(user=_viewer())
 
-    with patch(
-        "lagniappe.core.entities.index.database.get.tasks_with_due_dates",
-        return_value=SimpleNamespace(results=["dated"]),
-    ) as dated_query, patch(
-        "lagniappe.core.entities.index.database.get.tasks_without_due_dates",
-        return_value=SimpleNamespace(results=["undated"]),
-    ) as undated_query, patch(
-        "lagniappe.core.entities.index.Entities.fetch",
-        return_value=[undated, dated],
-    ) as fetch:
+    with (
+        patch(
+            "lagniappe.core.entities.index.database.get.tasks_with_due_dates",
+            return_value=SimpleNamespace(results=["dated"]),
+        ) as dated_query,
+        patch(
+            "lagniappe.core.entities.index.database.get.tasks_without_due_dates",
+            return_value=SimpleNamespace(results=["undated"]),
+        ) as undated_query,
+        patch(
+            "lagniappe.core.entities.index.Entities.fetch",
+            return_value=[undated, dated],
+        ) as fetch,
+    ):
         roots = parent.refresh_roots()
 
     assert roots == [dated, undated]
@@ -118,7 +125,7 @@ def test_load_refresh_collection_allows_task_index_without_models_permission():
     parent = SimpleNamespace(refresh_roots=lambda: [root])
 
     with patch(
-        "lagniappe.core.tools.refresh.index.TaskIndex",
+        "lagniappe.core.tools.polling.refresh.index.TaskIndex",
         return_value=parent,
     ) as task_index:
         collection = load_refresh_collection(
@@ -139,22 +146,23 @@ def test_page_index_refresh_roots_reuses_restricted_collection_query():
     category = TestEntities.get(
         "CATEGORY", {"name": "Refresh Category", "hash": "refresh-category"}
     )
-    page = TestEntities.get(
-        "PAGE", {"name": "Refresh Page", "hash": "refresh-page"}
-    )
+    page = TestEntities.get("PAGE", {"name": "Refresh Page", "hash": "refresh-page"})
     restrictions = ["allowed-page"]
     viewer = _viewer()
-    viewer.properties.restrictions.unrestricted_pages = (
-        lambda candidate: restrictions if candidate is category else []
+    viewer.properties.restrictions.unrestricted_pages = lambda candidate: (
+        restrictions if candidate is category else []
     )
     parent = PageIndex(entity=category, user=viewer)
 
-    with patch(
-        "lagniappe.core.entities.index.database.get.pages",
-        return_value=SimpleNamespace(results=["page-key"]),
-    ) as query, patch(
-        "lagniappe.core.entities.index.Entities.fetch", return_value=[page]
-    ) as fetch:
+    with (
+        patch(
+            "lagniappe.core.entities.index.database.get.pages",
+            return_value=SimpleNamespace(results=["page-key"]),
+        ) as query,
+        patch(
+            "lagniappe.core.entities.index.Entities.fetch", return_value=[page]
+        ) as fetch,
+    ):
         roots = parent.refresh_roots()
 
     assert roots == [page]
@@ -192,16 +200,19 @@ def test_user_index_refresh_roots_preserves_regular_and_public_modes():
     public_index._public_users_enabled = True
     public_index._public_group = public_group
 
-    with patch(
-        "lagniappe.core.entities.index.database.get.users",
-        side_effect=[
-            SimpleNamespace(results=["regular", "public"]),
-            SimpleNamespace(results=["regular", "public"]),
-        ],
-    ) as query, patch(
-        "lagniappe.core.entities.index.Entities.fetch",
-        side_effect=[[regular, public], [regular, public]],
-    ) as fetch:
+    with (
+        patch(
+            "lagniappe.core.entities.index.database.get.users",
+            side_effect=[
+                SimpleNamespace(results=["regular", "public"]),
+                SimpleNamespace(results=["regular", "public"]),
+            ],
+        ) as query,
+        patch(
+            "lagniappe.core.entities.index.Entities.fetch",
+            side_effect=[[regular, public], [regular, public]],
+        ) as fetch,
+    ):
         regular_roots = regular_index.refresh_roots()
         public_roots = public_index.refresh_roots()
 
@@ -215,7 +226,9 @@ def test_user_index_refresh_roots_preserves_regular_and_public_modes():
         "group": public_group.key,
         "limit": None,
     }
-    assert all(call.kwargs == {"request": Fetch.root()} for call in fetch.call_args_list)
+    assert all(
+        call.kwargs == {"request": Fetch.root()} for call in fetch.call_args_list
+    )
 
 
 # @features reconnect-refresh permissions
@@ -251,7 +264,7 @@ def test_resolve_refresh_delta_expands_only_changed_roots_and_authorizes_before_
     ]
 
     with patch(
-        "lagniappe.core.tools.refresh.Entities.fetch",
+        "lagniappe.core.tools.polling.refresh.Entities.fetch",
         return_value=[changed_full, rejected_full],
     ) as fetch:
         delta = resolve_refresh_delta(collection, rows, _viewer())
@@ -274,11 +287,15 @@ def test_load_refresh_collection_resolves_component_from_view_entity():
     view = {"key": page.urlsafe_key, "index": None}
     target = {"id": "tasks"}
 
-    with patch(
-        "lagniappe.core.tools.refresh.Entities.fetch_one", return_value=page
-    ) as fetch_page, patch(
-        "lagniappe.core.tools.refresh.page_task_roots", return_value=list(roots)
-    ) as task_roots:
+    with (
+        patch(
+            "lagniappe.core.tools.polling.refresh.Entities.fetch_one", return_value=page
+        ) as fetch_page,
+        patch(
+            "lagniappe.core.tools.polling.refresh.page_task_roots",
+            return_value=list(roots),
+        ) as task_roots,
+    ):
         collection = load_refresh_collection(view, target, _viewer())
 
     fetch_page.assert_called_once_with(page.urlsafe_key, request=Fetch.direct())
@@ -294,12 +311,15 @@ def test_filter_cache_query_roots_uses_root_fetch_without_permission_expansion()
     filter_entity = SimpleNamespace(definitions=[])
     filter_cache = FilterCache(parent, user=_viewer())
 
-    with patch.object(
-        filter_cache, "_query_keys", return_value=["first", "second"]
-    ) as query, patch(
-        "lagniappe.core.tools.filters.cache.Entities.fetch",
-        return_value=["first-root", "second-root"],
-    ) as fetch:
+    with (
+        patch.object(
+            filter_cache, "_query_keys", return_value=["first", "second"]
+        ) as query,
+        patch(
+            "lagniappe.core.tools.filters.cache.Entities.fetch",
+            return_value=["first-root", "second-root"],
+        ) as fetch,
+    ):
         roots = filter_cache.query_roots(filter_entity)
 
     query.assert_called_once_with(filter_entity)
@@ -332,15 +352,20 @@ def test_load_refresh_collection_refreshes_saved_filter_cache_before_root_query(
     )
     viewer = _viewer()
 
-    with patch(
-        "lagniappe.core.tools.refresh._view_entity", return_value=filter_entity
-    ), patch(
-        "lagniappe.core.tools.refresh.FilterCache", return_value=filter_cache
-    ) as cache_type, patch.object(
-        filter_cache, "update", wraps=filter_cache.update
-    ) as update, patch.object(
-        filter_cache, "query_roots", wraps=filter_cache.query_roots
-    ) as query:
+    with (
+        patch(
+            "lagniappe.core.tools.polling.refresh._view_entity",
+            return_value=filter_entity,
+        ),
+        patch(
+            "lagniappe.core.tools.polling.refresh.FilterCache",
+            return_value=filter_cache,
+        ) as cache_type,
+        patch.object(filter_cache, "update", wraps=filter_cache.update) as update,
+        patch.object(
+            filter_cache, "query_roots", wraps=filter_cache.query_roots
+        ) as query,
+    ):
         collection = load_refresh_collection(
             {"key": "filter-key", "hash": "saved-filter"},
             {"id": "table"},

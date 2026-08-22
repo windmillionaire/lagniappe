@@ -27,7 +27,8 @@ from lagniappe.core.mixins.submitter import SubmitterMixin
 from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
 from lagniappe.core.properties.deferred_job_request import RequestFingerprint
 from lagniappe.core.properties import deferred_job_lifecycle
-from lagniappe.core.tools import database, task_queue
+from lagniappe.core.tools import database
+from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.database import deferred_jobs as deferred_database
@@ -79,7 +80,6 @@ from testing.utility.test_entities import TestEntities
 
 pytestmark = pytest.mark.unit
 from lagniappe.core.tools.deferred_jobs.adapters import pages as page_adapters
-
 
 
 # @pair ai:page-generation

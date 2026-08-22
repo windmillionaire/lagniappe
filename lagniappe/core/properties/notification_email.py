@@ -1,11 +1,10 @@
 """Schema values for queued notification-email delivery rows."""
 
-
 DELIVERY_SCHEMA_VERSION = 1
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/notification_email/capture.py::record_notification_event
+# @covered-by lagniappe/core/tools/email/notifications/capture.py::record_notification_event
 # @reason exact delivery construction is exercised through capture and delivery
 def initial_values(user, *, record_type, mode, due_at, preference_epoch, now):
     return {
@@ -23,7 +22,7 @@ def initial_values(user, *, record_type, mode, due_at, preference_epoch, now):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/notification_email/delivery.py::deliver
+# @covered-by lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @reason compact terminal schema is exercised through delivery completion
 def terminal_values(row, state, now):
     values = {

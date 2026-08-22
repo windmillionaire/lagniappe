@@ -17,7 +17,7 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.web.auth import permission, require_ai_access
 from lagniappe.web import responses
-from lagniappe.core.tools.utility import timed
+from lagniappe.core.tools.diagnostics import timed
 
 from . import categories
 

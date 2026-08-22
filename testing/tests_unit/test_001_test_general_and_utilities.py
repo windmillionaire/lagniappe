@@ -15,6 +15,7 @@ from lagniappe.core.definitions import (
     MutationEffectType,
     Restriction,
 )
+from lagniappe.core.definitions import identifiers
 from lagniappe.core.entities import Entities
 from lagniappe.core import entities as entities_module
 from lagniappe.core.mutations import delete as delete_module
@@ -24,8 +25,12 @@ from lagniappe.core.exceptions import unloaded_relations as unloaded_relations_m
 from lagniappe.core.exceptions import UnloadedRelationError
 from lagniappe.core.mixins.related import RelatedEntityListMixin, RelatedEntityMixin
 from lagniappe.core.properties.base_db import DBProperty
-from lagniappe.core.tools import agent_access, user_context, utility
+from lagniappe.core.tools import diagnostics
+from lagniappe.core.tools.auth import agent_access
+from lagniappe.core.tools.auth import context as user_context
 from lagniappe.core.tools.database.filter import Filter
+from lagniappe.core.tools.files import html as html_tools
+from lagniappe.core.tools.tasks import ordering
 from testing.utility.test_entities import TestEntities, TestUser as _TestUser
 
 pytestmark = pytest.mark.unit
@@ -1563,23 +1568,23 @@ def test_print_entity_load_trace_prints_once_per_request(monkeypatch, capsys):
 # @features utility
 # @dimensions html-stripping
 def test_strip_tags():
-    """Test utility.strip_tags removes HTML tags correctly."""
-    assert utility.strip_tags("<p>Hello <b>World</b></p>") == "Hello World"
-    assert utility.strip_tags("Plain text") == "Plain text"
-    assert utility.strip_tags(123) == 123  # Non-string input returned as is
+    """Test html_tools.strip_tags removes HTML tags correctly."""
+    assert html_tools.strip_tags("<p>Hello <b>World</b></p>") == "Hello World"
+    assert html_tools.strip_tags("Plain text") == "Plain text"
+    assert html_tools.strip_tags(123) == 123  # Non-string input returned as is
 
-    assert utility.strip_tags("") == ""
-    assert utility.strip_tags("   ") == ""
-    assert utility.strip_tags("<p></p>") == ""
-    assert utility.strip_tags("<p> </p>") == ""
+    assert html_tools.strip_tags("") == ""
+    assert html_tools.strip_tags("   ") == ""
+    assert html_tools.strip_tags("<p></p>") == ""
+    assert html_tools.strip_tags("<p> </p>") == ""
 
 
 # @features utility
 # @dimensions timing
 def test_timed_config_disabled(monkeypatch, capsys):
-    monkeypatch.setattr(utility, "CONFIG", SimpleNamespace(DEBUG_TRACING=False))
+    monkeypatch.setattr(diagnostics, "CONFIG", SimpleNamespace(DEBUG_TRACING=False))
 
-    @utility.timed
+    @diagnostics.timed
     def sample(value):
         return value + 1
 
@@ -1590,9 +1595,9 @@ def test_timed_config_disabled(monkeypatch, capsys):
 # @features utility
 # @dimensions timing
 def test_timed_config_enabled(monkeypatch, capsys):
-    monkeypatch.setattr(utility, "CONFIG", SimpleNamespace(DEBUG_TRACING=True))
+    monkeypatch.setattr(diagnostics, "CONFIG", SimpleNamespace(DEBUG_TRACING=True))
 
-    @utility.timed
+    @diagnostics.timed
     def sample(value):
         return value + 1
 
@@ -1607,7 +1612,7 @@ def test_timed_config_enabled(monkeypatch, capsys):
 # @features utility
 # @dimensions timing
 def test_timed_parameterized_preserves_metadata(capsys):
-    @utility.timed(enabled=True, label="custom-timer")
+    @diagnostics.timed(enabled=True, label="custom-timer")
     def named_function():
         """Timer metadata should survive decoration."""
         return "done"
@@ -1627,7 +1632,7 @@ def _timed_profile_helper(value):
 # @features utility
 # @dimensions timing
 def test_timed_profiles_project_calls(capsys):
-    @utility.timed(enabled=True, profile=True, label="profiled", limit=20)
+    @diagnostics.timed(enabled=True, profile=True, label="profiled", limit=20)
     def profiled():
         return _timed_profile_helper(5)
 
@@ -1647,7 +1652,7 @@ def test_timed_profiles_project_calls(capsys):
 # @features utility
 # @dimensions timing
 def test_timed_profile_omits_raw_profile_table(capsys):
-    @utility.timed(
+    @diagnostics.timed(
         enabled=True,
         profile=True,
         label="profiled-without-raw-table",
@@ -1666,9 +1671,9 @@ def test_timed_profile_omits_raw_profile_table(capsys):
 # @features utility
 # @dimensions timing
 def test_timed_project_filter_excludes_local_dependency_paths():
-    project_file = utility.PROJECT_ROOT / "lagniappe" / "web" / "auth.py"
+    project_file = diagnostics.PROJECT_ROOT / "lagniappe" / "web" / "auth.py"
     dependency_file = (
-        utility.PROJECT_ROOT
+        diagnostics.PROJECT_ROOT
         / "venv"
         / "lib"
         / "python3.14"
@@ -1679,11 +1684,13 @@ def test_timed_project_filter_excludes_local_dependency_paths():
     )
 
     assert (
-        utility._profile_location(str(project_file), 59, "wrapped", True)
+        diagnostics._profile_location(str(project_file), 59, "wrapped", True)
         == "lagniappe/web/auth.py:59 wrapped"
     )
-    assert utility._profile_location(str(dependency_file), 287, "retry", True) is None
-    assert "venv/lib" in utility._profile_location(
+    assert (
+        diagnostics._profile_location(str(dependency_file), 287, "retry", True) is None
+    )
+    assert "venv/lib" in diagnostics._profile_location(
         str(dependency_file), 287, "retry", False
     )
 
@@ -1691,18 +1698,18 @@ def test_timed_project_filter_excludes_local_dependency_paths():
 # @features utility
 # @dimensions timing
 def test_timed_profile_rows_use_total_calls(monkeypatch):
-    project_file = utility.PROJECT_ROOT / "lagniappe" / "demo.py"
+    project_file = diagnostics.PROJECT_ROOT / "lagniappe" / "demo.py"
     stats = {
         (str(project_file), 7, "recursive"): (1, 2, 0.003, 0.010, {}),
     }
 
     monkeypatch.setattr(
-        utility.pstats,
+        diagnostics.pstats,
         "Stats",
         lambda _profiler: SimpleNamespace(stats=stats),
     )
 
-    rows = utility._profile_rows(object(), limit=10, min_ms=0, project_only=True)
+    rows = diagnostics._profile_rows(object(), limit=10, min_ms=0, project_only=True)
 
     assert rows == [
         {
@@ -1717,7 +1724,7 @@ def test_timed_profile_rows_use_total_calls(monkeypatch):
 # @features utility
 # @dimensions timing
 def test_timed_prints_when_wrapped_function_raises(capsys):
-    @utility.timed(enabled=True, label="explode")
+    @diagnostics.timed(enabled=True, label="explode")
     def explode():
         raise RuntimeError("boom")
 
@@ -1732,7 +1739,7 @@ def test_timed_prints_when_wrapped_function_raises(capsys):
 # @dimensions timing
 def test_timed_prints_request_label_without_entity_trace(monkeypatch, capsys):
     app = Flask(__name__)
-    monkeypatch.setattr(utility, "CONFIG", SimpleNamespace(DEBUG_TRACING=True))
+    monkeypatch.setattr(diagnostics, "CONFIG", SimpleNamespace(DEBUG_TRACING=True))
 
     with app.test_request_context("/categories/demo?cursor=abc", method="GET"):
         g.entity_loads = [
@@ -1749,7 +1756,7 @@ def test_timed_prints_request_label_without_entity_trace(monkeypatch, capsys):
             },
         ]
 
-        @utility.timed(label="route-timer")
+        @diagnostics.timed(label="route-timer")
         def route():
             return "ok"
 
@@ -1763,41 +1770,41 @@ def test_timed_prints_request_label_without_entity_trace(monkeypatch, capsys):
 # @features utility
 # @dimensions html-cleaning
 def test_clean_html():
-    """Test utility.clean_html removes code blocks and empty tags."""
-    assert utility.clean_html(None) == ""
-    assert utility.clean_html("") == ""
-    assert utility.clean_html(123) == 123  # Non-string input returned as is
+    """Test html_tools.clean_html removes code blocks and empty tags."""
+    assert html_tools.clean_html(None) == ""
+    assert html_tools.clean_html("") == ""
+    assert html_tools.clean_html(123) == 123  # Non-string input returned as is
 
     # Removes markdown code blocks
-    assert utility.clean_html("```html\n<p>test</p>\n```") == "<p>test</p>"
-    assert utility.clean_html("```\n<p>test</p>\n```") == "<p>test</p>"
+    assert html_tools.clean_html("```html\n<p>test</p>\n```") == "<p>test</p>"
+    assert html_tools.clean_html("```\n<p>test</p>\n```") == "<p>test</p>"
 
     # Removes empty tags
     assert (
-        utility.clean_html("<p></p><div><span>  </span></div><p>Keep</p>")
+        html_tools.clean_html("<p></p><div><span>  </span></div><p>Keep</p>")
         == "<p>Keep</p>"
     )
 
     # Keeps tags with content or certain elements
     assert (
-        utility.clean_html("<p><img src='test.png'></p>")
+        html_tools.clean_html("<p><img src='test.png'></p>")
         == '<p><img src="test.png"/></p>'
     )
-    assert utility.clean_html("<hr>") == "<hr/>"
+    assert html_tools.clean_html("<hr>") == "<hr/>"
 
     # Removes whitespace between tags
-    assert utility.clean_html("<p>A</p> \n  <p>B</p>") == "<p>A</p><p>B</p>"
+    assert html_tools.clean_html("<p>A</p> \n  <p>B</p>") == "<p>A</p><p>B</p>"
 
 
 # @features utility
 # @dimensions hashing
 def test_short_hash_and_uuid():
     """Test hash and uuid utility functions."""
-    h = utility.short_hash("test")
+    h = identifiers.short_hash("test")
     assert len(h) == 12
     assert isinstance(h, str)
 
-    u = utility.short_uuid()
+    u = identifiers.short_uuid()
     assert len(u) == 8
     assert isinstance(u, str)
 
@@ -1805,7 +1812,7 @@ def test_short_hash_and_uuid():
 # @features utility
 # @dimensions task-sorting
 def test_sort_tasks():
-    """Test utility.sort_tasks sorts by due_date then modified."""
+    """Test ordering.sort_tasks sorts by due_date then modified."""
     from unittest.mock import MagicMock
     from datetime import datetime
 
@@ -1821,7 +1828,7 @@ def test_sort_tasks():
 
     # Expected order: t1 (earliest due), t2 (later due), t4 (no due, latest modified), t3 (no due, older modified)
     tasks = [t3, t1, t4, t2]
-    sorted_tasks = utility.sort_tasks(tasks)
+    sorted_tasks = ordering.sort_tasks(tasks)
     assert sorted_tasks == [t1, t2, t4, t3]
 
 

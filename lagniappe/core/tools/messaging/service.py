@@ -1,10 +1,10 @@
 """Authorization and post-commit orchestration for direct messages."""
 
-from ...definitions import MessageConflict, MessageRevisionConflict
+from ...definitions import MessageRevisionConflict
 from ...properties import message as message_values
 from ...properties import message_conversation as conversation_values
 from .. import collaboration, database
-from ..notification_email import capture as email_capture
+from ..email.notifications import capture as email_capture
 from ..notifications import service as notification_service
 from . import views
 
@@ -24,9 +24,7 @@ def send_message(
     recipient = collaboration.resolve_user(recipient_identifier)
     if not recipient:
         raise PermissionError("Recipient is not eligible for messages.")
-    can_initiate = collaboration.recipient_allowed(
-        actor, recipient, channel="message"
-    )
+    can_initiate = collaboration.recipient_allowed(actor, recipient, channel="message")
     reply_key = (
         database.get.datastore_key(conversation_identifier)
         if conversation_identifier

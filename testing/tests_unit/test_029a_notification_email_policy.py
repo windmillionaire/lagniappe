@@ -4,8 +4,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from lagniappe.core.tools.notification_email import policy as email_policy
-from lagniappe.core.tools.notification_email import presence as email_presence
+from lagniappe.core.tools.email.notifications import policy as email_policy
+from lagniappe.core.tools.email.notifications import presence as email_presence
 from testing.utility.notification_email_fakes import MemoryRedis, user_row
 
 
@@ -13,7 +13,7 @@ pytestmark = pytest.mark.unit
 
 
 # @source lagniappe/core/properties/user_entity.py::NotificationEmailPreference.value
-# @source lagniappe/core/tools/notification_email/policy.py::eligible_user
+# @source lagniappe/core/tools/email/notifications/policy.py::eligible_user
 # @pairs notification-email:preference notification-email:eligibility
 # @pairs notification-email:public-user notification-email:never-logged-in
 def test_notification_email_preference_defaults_and_eligibility():
@@ -39,8 +39,8 @@ def test_notification_email_preference_defaults_and_eligibility():
         user.notification_email_mode = "weekly"
 
 
-# @source lagniappe/core/tools/notification_email/presence.py::record_site_activity
-# @source lagniappe/core/tools/notification_email/presence.py::recently_active
+# @source lagniappe/core/tools/email/notifications/presence.py::record_site_activity
+# @source lagniappe/core/tools/email/notifications/presence.py::recently_active
 # @pairs notification-email:presence notification-email:coarse-request-activity
 def test_site_activity_is_coarse_and_expires(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
@@ -64,4 +64,3 @@ def test_site_activity_is_coarse_and_expires(monkeypatch):
         recipient,
         now=now + timedelta(minutes=11, seconds=2),
     )
-

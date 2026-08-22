@@ -2,7 +2,7 @@
 
 import pytest
 
-from lagniappe.core.tools.hosted_e2e_auth import (
+from lagniappe.core.tools.hosted_e2e.auth import (
     HostedE2EAuthenticationError,
     load_hosted_e2e_cookie,
     sign_hosted_e2e_cookie,
@@ -23,11 +23,14 @@ def test_validate_google_claims_requires_exact_verified_identity():
         "email_verified": True,
     }
 
-    assert validate_google_claims(
-        expected,
-        audience=expected["aud"],
-        caller_email=expected["email"],
-    ) is expected
+    assert (
+        validate_google_claims(
+            expected,
+            audience=expected["aud"],
+            caller_email=expected["email"],
+        )
+        is expected
+    )
 
     for field, value in (
         ("iss", "accounts.google.com"),

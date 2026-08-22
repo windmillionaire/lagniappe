@@ -11,7 +11,7 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
 from lagniappe.core.properties.deferred_job_lifecycle import ACTIVE_STATUSES
-from lagniappe.core.tools import task_queue
+from lagniappe.core.tools.services import task_queue
 
 from .errors import DeferredJobInfrastructureError
 
@@ -22,7 +22,6 @@ _feedback_task_id = TaskIdentity.feedback
 
 # @testable infrastructure
 class DeferredJobDispatch:
-
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_production_dispatch_rejects_disabled_task_queue
     # @pair deferred-jobs:dispatch
@@ -60,7 +59,6 @@ class DeferredJobDispatch:
                 return None
             threading.Thread(target=run_local, daemon=True).start()
         return None
-
 
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_long_running_feedback_dispatch_is_delayed_and_deterministic

@@ -279,7 +279,7 @@ thread, and testing runs the `SiteExportAdapter` inline.
 In production, `process.deferred_job_process` authenticates the Cloud Tasks OIDC
 request, claims the job, and rechecks the actor's current site permission.
 `SiteExportAdapter` marks the export record running, calls
-`lagniappe.core.tools.site_export.build_site_export()`, and persists the returned
+`lagniappe.core.tools.site.exports.build_site_export()`, and persists the returned
 complete metadata only after the builder writes `manifest.json` last. Generic
 terminal delivery then completes the notification. The browser's `operation`
 subscription observes terminal status and reconciles the admin widget on

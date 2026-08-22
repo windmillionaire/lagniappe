@@ -5,7 +5,7 @@ import io
 import re
 
 from ... import exceptions
-from ..utility import short_hash, short_uuid
+from ...definitions.identifiers import short_hash, short_uuid
 
 
 # @testable true

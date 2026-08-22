@@ -24,6 +24,7 @@ from lagniappe import CONFIG
 from lagniappe.core.definitions import AI, Action, Fetch, General, Levels, Site
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
+from lagniappe.core.tools.database import site as site_database
 from testing.definitions import Categories, Groups, SitePages, Submissions, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.resources import HomePage, Page
@@ -257,9 +258,7 @@ def _select_deployment_option(user, form, field_name, option_name):
 
 
 def _select_ai_option(user, form, field_name, option_value):
-    select = form.locator(
-        f"[data-role='ai-select']:has(select[name='{field_name}'])"
-    )
+    select = form.locator(f"[data-role='ai-select']:has(select[name='{field_name}'])")
     option_name = select.locator(
         f"select option[value='{option_value}']"
     ).text_content()
@@ -375,9 +374,7 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
     )
     expect(notification_options).to_have_count(3)
     expect(
-        settings_panel.locator(
-            "input[name='notification_email_mode'][value='DAILY']"
-        )
+        settings_panel.locator("input[name='notification_email_mode'][value='DAILY']")
     ).to_be_checked()
     expect(
         settings_panel.locator("fieldset[data-role='notification-email']")
@@ -450,9 +447,7 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
         settings_panel.locator("input[name='notification_email_mode']")
     ).to_have_count(3)
     expect(
-        settings_panel.locator(
-            "input[name='notification_email_mode'][value='DAILY']"
-        )
+        settings_panel.locator("input[name='notification_email_mode'][value='DAILY']")
     ).to_be_checked()
     assert _user_settings_field_order(settings_panel) == [
         "name",
@@ -932,9 +927,7 @@ def test_user_settings_preloads_existing_groups(get_user):
     expect(selected_options).to_have_count(len(expected_group_ids))
     for group_id in expected_group_ids:
         expect(
-            groups.locator(
-                f"select[name='group'] option[value='{group_id}']:checked"
-            )
+            groups.locator(f"select[name='group'] option[value='{group_id}']:checked")
         ).to_have_count(1)
     for group_name in (
         first_group.definition.name,
@@ -1224,8 +1217,10 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
         managed.entity.page.urlsafe_key
     )
     with owner.page.expect_response(
-        lambda response: response.url.endswith("/l/site-administrators")
-        and response.request.method == "POST"
+        lambda response: (
+            response.url.endswith("/l/site-administrators")
+            and response.request.method == "POST"
+        )
     ) as promotion:
         submit.click()
     assert promotion.value.status == 200
@@ -1242,23 +1237,17 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
     admin_section = _open_site_settings_section(
         managed.locate("[data-widget='SiteSettings']"), "administrators"
     )
-    expect(
-        admin_section.locator("[data-role='administrator-form']")
-    ).to_have_attribute("data-visible", "false")
-    expect(
-        admin_section.locator("[data-role='demote-administrator']")
-    ).to_have_count(0)
+    expect(admin_section.locator("[data-role='administrator-form']")).to_have_attribute(
+        "data-visible", "false"
+    )
+    expect(admin_section.locator("[data-role='demote-administrator']")).to_have_count(0)
 
     protected_path = f"/users/{owner.entity.urlsafe_key}/delete"
-    with browser_failures.expect_http_error(
-        managed, status=403, path=protected_path
-    ):
+    with browser_failures.expect_http_error(managed, status=403, path=protected_path):
         protected_delete = _fetch_status(managed, protected_path, "DELETE")
     assert protected_delete["status"] == 403
     self_demote_path = f"/l/site-administrators/{managed.entity.urlsafe_key}"
-    with browser_failures.expect_http_error(
-        managed, status=403, path=self_demote_path
-    ):
+    with browser_failures.expect_http_error(managed, status=403, path=self_demote_path):
         self_demote = _fetch_status(managed, self_demote_path, "DELETE")
     assert self_demote["status"] == 403
 
@@ -1268,10 +1257,12 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
     expect(administrator_row).to_have_class(re.compile(r".*\bsm:flex-row\b.*"))
     owner.page.once("dialog", lambda dialog: dialog.accept())
     with owner.page.expect_response(
-        lambda response: response.url.endswith(
-            f"/l/site-administrators/{managed.entity.urlsafe_key}"
+        lambda response: (
+            response.url.endswith(
+                f"/l/site-administrators/{managed.entity.urlsafe_key}"
+            )
+            and response.request.method == "DELETE"
         )
-        and response.request.method == "DELETE"
     ) as demotion:
         administrator_row.locator("[data-role='demote-administrator']").click()
     assert demotion.value.status == 200
@@ -1287,9 +1278,7 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
 
 # @pairs admin:site-settings export:admin-only owner:sensitive-configuration
 # @pairs owner:recovery-export owner:route-gate owner:configuration
-def test_additional_admin_cannot_access_owner_configuration(
-    get_user, browser_failures
-):
+def test_additional_admin_cannot_access_owner_configuration(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     administrator = get_user(Users.create_user, creator=owner)
     owner.go(SitePages.HOME)
@@ -1303,31 +1292,30 @@ def test_additional_admin_cannot_access_owner_configuration(
     assert promotion["status"] == 200
 
     try:
-        persisted_administrator = Entities.USER(
-            database.get.user(administrator.email)
-        )
+        persisted_administrator = Entities.USER(database.get.user(administrator.email))
         assert persisted_administrator.is_admin
         admin = administrator.go(SitePages.ADMIN)
         settings_panel = administrator.locate(admin.SITE_SETTINGS_FORM)
         expect(settings_panel).to_be_visible()
-        expect(settings_panel.locator("button[data-role='configuration']")).to_have_count(
-            0
-        )
+        expect(
+            settings_panel.locator("button[data-role='configuration']")
+        ).to_have_count(0)
 
         site_settings = _fetch_status(administrator, "/l/site-settings", "GET")
         assert site_settings["status"] == 200
         assert site_settings["data"]["can_manage_administrators"] is False
         assert site_settings["data"]["can_view_sensitive_configuration"] is False
         assert _fetch_status(administrator, "/l/site-export", "GET")["status"] == 200
-        assert _fetch_status(
-            administrator, "/reference/environment-variables", "GET"
-        )["status"] == 200
+        assert (
+            _fetch_status(administrator, "/reference/environment-variables", "GET")[
+                "status"
+            ]
+            == 200
+        )
         with browser_failures.expect_http_error(
             administrator, status=403, path="/l/site-configuration"
         ):
-            configuration = _fetch_status(
-                administrator, "/l/site-configuration", "GET"
-            )
+            configuration = _fetch_status(administrator, "/l/site-configuration", "GET")
         assert configuration["status"] == 403
         with browser_failures.expect_http_error(
             administrator, status=403, path="/reference/download-settings"
@@ -1433,13 +1421,13 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     assert response.headers["content-type"].startswith("application/yaml")
     assert downloaded["CONFIG_KIND"] == recovery.CONFIG_KIND
     assert downloaded["CONFIG_SCHEMA_VERSION"] == recovery.CONFIG_SCHEMA_VERSION
-    live_deployment = database.get.site_deployment()
+    live_deployment = site_database.deployment()
     if live_deployment:
         assert (
             downloaded["DEPLOY_MAX_INSTANCES"]
             == dict(live_deployment)["DEPLOY_MAX_INSTANCES"]
         )
-    live_ai = database.get.site_ai()
+    live_ai = site_database.ai()
     if live_ai:
         assert downloaded["AI_MODEL"] == dict(live_ai)["AI_MODEL"]
     modal.close()
@@ -1558,7 +1546,7 @@ def test_site_settings_ai_form_saves_current_models_through_route(
     expect(form.locator("button[type='submit']")).to_contain_text(
         "AI Model Settings Saved"
     )
-    saved = dict(database.get.site_ai())
+    saved = dict(site_database.ai())
     assert {name: saved[name] for name in expected} == expected
 
     owner.page.reload(wait_until="domcontentloaded")

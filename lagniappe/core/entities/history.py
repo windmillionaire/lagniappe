@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from .entity import Entity, EntityProperties
 from ..mixins import AssetMixin, SubmitterMixin
 from ..exceptions import ValidationError
+from ..definitions.identifiers import short_hash
 from ..properties import (
     common_entity,
     common_related,
@@ -11,7 +12,7 @@ from ..properties import (
     task_dates,
     task_related,
 )
-from ..tools import utility
+from ..tools.files.html import strip_tags
 
 
 # @testable true
@@ -48,7 +49,7 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
             return None
 
         urlsafe_key = self.urlsafe_key
-        return utility.short_hash(urlsafe_key) if urlsafe_key else None
+        return short_hash(urlsafe_key) if urlsafe_key else None
 
     @property
     def required(self):
@@ -305,7 +306,7 @@ class DocumentHistory(AssetMixin, Entity):
         if not isinstance(value, str):
             raise ValidationError("Version name is required")
 
-        name = utility.strip_tags(value).strip()
+        name = strip_tags(value).strip()
         if not name:
             raise ValidationError("Version name is required")
         if len(name) > cls.MAX_NAME_LENGTH:
@@ -319,7 +320,7 @@ class DocumentHistory(AssetMixin, Entity):
         if not isinstance(value, str) or not value.strip():
             raise ValidationError("Document content is required")
 
-        text = utility.strip_tags(value)
+        text = strip_tags(value)
         markup = value.lower()
         meaningful_markup = any(
             tag in markup

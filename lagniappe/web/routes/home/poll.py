@@ -8,12 +8,12 @@ from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
 from lagniappe.core.tools.deferred_jobs.locks import deferred_job_lock_descriptors
-from lagniappe.core.tools.polling_contract import (
+from lagniappe.core.tools.polling.contract import (
     POLL_TYPES,
     PollContractError,
     parse_poll_request,
 )
-from lagniappe.core.tools.polling import (
+from lagniappe.core.tools.polling.projections import (
     channel_revisions as _channel_revisions,
     lock_result as _project_lock_result,
     operation_statuses as _operation_statuses,
@@ -242,11 +242,7 @@ def poll():
     channel_revisions = _channel_revisions(
         channels,
         current_user,
-        **(
-            {"notification_state": notification_state}
-            if notification_polled
-            else {}
-        ),
+        **({"notification_state": notification_state} if notification_polled else {}),
     )
 
     results = []
@@ -313,6 +309,4 @@ def poll():
             result = _result(descriptor, "error", poll_after_ms=15_000)
         results.append(result)
 
-    return responses.json_response(
-        {"version": parsed.version, "results": results}
-    )
+    return responses.json_response({"version": parsed.version, "results": results})

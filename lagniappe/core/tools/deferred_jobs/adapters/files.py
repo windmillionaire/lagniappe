@@ -8,33 +8,20 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
     AI,
     Action,
-    DeferredJobSpec,
     DeferredJobInspection,
     DeferredJobPhase,
     DeferredJobStatus,
     DeferredJobType,
     Fetch,
-    FetchReason,
-    FileConsumer,
-    Resource,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai, database, dates, files, site_export
-from lagniappe.core.tools.database import assets as storage_assets
+from lagniappe.core.tools import ai, files
 
 from .base import DeferredJobAdapter
 from ..errors import (
     DeferredJobDependencyFailedError,
-    DeferredJobDependencyPendingError,
     DeferredJobDriftError,
 )
-from ..locks import (
-    AUTOFILL_FORM_LOCK_SCOPE,
-    active_deferred_job_lock,
-    deferred_job_lock_key,
-)
-
-
 
 
 # @testable infrastructure
@@ -62,9 +49,7 @@ class FileAdapter(DeferredJobAdapter):
     # @features deferred-jobs file
     # @dimensions validation original-asset fingerprint metadata-isolation
     def validate_apply(self, context):
-        expected = (context.job.authorization or {}).get(
-            "file_asset_fingerprint"
-        )
+        expected = (context.job.authorization or {}).get("file_asset_fingerprint")
         if expected is None:
             return super().validate_apply(context)
         file = context.input("file")
@@ -95,8 +80,6 @@ class FileAdapter(DeferredJobAdapter):
     def notification_target(self, context):
         file = context.input("file")
         return file if isinstance(file, Entities.FILE) else None
-
-
 
 
 # @testable infrastructure
@@ -171,8 +154,6 @@ class FileExtractAdapter(FileAdapter):
         if succeeded:
             return f"Text extraction complete for {name}"
         return f"Text extraction failed for {name}. {str(error or '').strip()}".strip()
-
-
 
 
 # @testable infrastructure

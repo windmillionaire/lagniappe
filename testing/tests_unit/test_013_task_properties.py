@@ -39,9 +39,7 @@ def test_task_description(get_test_entities):
             assert "<" not in (task.description or "")  # No HTML tags
 
             # FilterMixin
-            assert (
-                task.to_filter_index()["description"] == task.description
-            )
+            assert task.to_filter_index()["description"] == task.description
 
             # sort_value is True when description exists
             assert task.properties.description.sort_value is True
@@ -331,9 +329,7 @@ def test_task_signature_form_submission_saves_asset_id(get_schema):
     with patch("lagniappe.core.definitions.asset.database.assets.save_file"):
         task.form_submission(request)
 
-    assert json.loads(task.db["submission"]) == {
-        "signature-signop": "signature-signop"
-    }
+    assert json.loads(task.db["submission"]) == {"signature-signop": "signature-signop"}
     assert task.assets["signature-signop"]["type"] == "image"
     assert task.has_signature is True
     assert task.to_filter_index()["has_signature"] is True
@@ -399,12 +395,8 @@ def test_task_signature_form_submission_saves_multiple_assets_by_field_id():
         "signature-witness": "signature-witness",
     }
     assert set(task.assets) == {"signature-approver", "signature-witness"}
-    assert (
-        saved[task.assets["signature-approver"]["path"]] == b"approver signature"
-    )
-    assert (
-        saved[task.assets["signature-witness"]["path"]] == b"witness signature"
-    )
+    assert saved[task.assets["signature-approver"]["path"]] == b"approver signature"
+    assert saved[task.assets["signature-witness"]["path"]] == b"witness signature"
 
 
 # @features task
@@ -868,7 +860,7 @@ def test_task_postpone_preserves_original_due_date_once():
     task.due_date = first_due
 
     with patch(
-        "lagniappe.core.entities.task.dates.calculate_postponed_due_date",
+        "lagniappe.core.entities.task.scheduling.calculate_postponed_due_date",
         side_effect=[first_postponed, second_postponed],
     ):
         task.postpone(first_due)
@@ -1019,7 +1011,9 @@ def test_task_entity_lifecycle_readonly_and_save_relations():
         "lagniappe.core.entities.entity.database.create_key",
         return_value="tsk015created",
     ):
-        with patch("lagniappe.core.entities.entity.database.get.entity", return_value=None):
+        with patch(
+            "lagniappe.core.entities.entity.database.get.entity", return_value=None
+        ):
             with patch(
                 "lagniappe.core.entities.entity.database.create_entity",
                 return_value=created_db,

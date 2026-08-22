@@ -4,7 +4,7 @@ from google.cloud.datastore import Entity as DatastoreEntity
 from google.cloud.datastore import Key
 
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools.notification_email import dispatch as email_dispatch
+from lagniappe.core.tools.email.notifications import dispatch as email_dispatch
 from lagniappe.core.tools.database.core import KINDS
 
 

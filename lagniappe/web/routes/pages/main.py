@@ -9,7 +9,7 @@ from lagniappe.core.definitions import (
     enforce_file_consumer,
 )
 from lagniappe.core.tools import ai, database
-from lagniappe.core.tools.form_state import is_form_field, offline_replay_conflicts
+from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
 from lagniappe.core.definitions import PageAttributes, Action, Fetch, Resource
 from lagniappe.web.auth import (
     abort_public_user_action,
@@ -185,9 +185,7 @@ def _page_data(form, page=None, category=None):
     if "ai_access" in form:
         page_data["ai_access"] = form.get("ai_access")
     if "notification_email_mode" in form:
-        page_data["notification_email_mode"] = form.get(
-            "notification_email_mode"
-        )
+        page_data["notification_email_mode"] = form.get("notification_email_mode")
     if "allow_site_email" in form:
         page_data["allow_site_email"] = form.get("allow_site_email") == "true"
     for toggle in ("allow_messages_and_mentions", "allow_task_assignments"):

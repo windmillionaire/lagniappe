@@ -1,7 +1,7 @@
 """DB and related-entity properties for activity entities."""
 
 from ..mixins import RelatedEntityListMixin, RelatedEntityMixin
-from ..tools import utility
+from ..tools.files.html import strip_tags
 from .base_asset import AssetProperty
 from .base_db import DBProperty
 
@@ -104,7 +104,7 @@ class Body(DBProperty):
 
     @value.setter
     def value(self, value):
-        body = utility.strip_tags(value).strip() if value else None
+        body = strip_tags(value).strip() if value else None
         DBProperty.value.fset(self, body)
 
 

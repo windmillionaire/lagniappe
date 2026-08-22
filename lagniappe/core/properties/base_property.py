@@ -1,5 +1,5 @@
 from ..exceptions import PropertyError
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 
 
 UNSET = object()

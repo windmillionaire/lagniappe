@@ -3,7 +3,7 @@ from flask import url_for
 from ..definitions import Action
 from ..mixins import AssetMixin
 from ..properties import file_assets, file_entity, file_options, file_related
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 from .entity import Entity
 
 

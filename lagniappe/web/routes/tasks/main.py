@@ -15,8 +15,10 @@ from lagniappe.core.definitions import (
     enforce_file_consumer,
 )
 from lagniappe.core.entities import Entities, index
-from lagniappe.core.tools import ai, database, dates, task_combine
-from lagniappe.core.tools.form_state import is_form_field, offline_replay_conflicts
+from lagniappe.core.tools import ai, database
+from lagniappe.core.tools.tasks import combine as task_combine
+from lagniappe.core.tools.tasks import scheduling
+from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
 from lagniappe.web.auth import (
     abort_public_user_action,
     logged_in,
@@ -666,7 +668,7 @@ def history(key, **kwargs):
 # @reason response shaping is exercised through the home task mutation routes
 def _home_task_response(task):
     due = task.properties.due_date.value
-    if not task.completed and dates.due_in_home_task_window(due):
+    if not task.completed and scheduling.due_in_home_task_window(due):
         return responses.home_task(task)
 
     return responses.home_task_removed()

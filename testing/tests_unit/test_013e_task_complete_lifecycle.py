@@ -15,8 +15,8 @@ from lagniappe.core.entities.history import DocumentHistory, TaskHistory
 from lagniappe.core.entities.task import Task
 from lagniappe.core.exceptions import TaskCompletionError, ValidationError
 from lagniappe.core.mutations import plan_mutation
-from lagniappe.core.tools import dates
-from lagniappe.core.tools.task_combine import select_main_task
+from lagniappe.core.tools.tasks import scheduling as dates
+from lagniappe.core.tools.tasks.combine import select_main_task
 from testing.utility.test_entities import TestEntities
 
 # DateMixin resolves timezone via ``mixins.date.dates`` (not only ``tools.dates``).
@@ -163,9 +163,7 @@ def test_task_uncomplete_restores_default_submission_and_assignment(get_schema):
     task.db["assigned_to"] = assignee.key
     task.properties.assigned_by._value = assigner
     task.db["assigned_by"] = assigner.key
-    task.db["default_submission"] = json.dumps(
-        {"input-textab12": "Repeat this value"}
-    )
+    task.db["default_submission"] = json.dumps({"input-textab12": "Repeat this value"})
     task.properties.submission.value = {
         "input-textab12": "Completed value",
         "input-numgh78": 12,
@@ -324,9 +322,7 @@ def test_task_history_create_snapshots_completed_task_state():
 @pytest.mark.unit
 def test_task_combine_selects_completed_then_modified_main():
     page = TestEntities.get("PAGE", {"name": "Combine Page", "hash": "pgcmb1"})
-    active = TestEntities.get(
-        "TASK", {"name": "Active", "hash": "tskcmb1"}, page=page
-    )
+    active = TestEntities.get("TASK", {"name": "Active", "hash": "tskcmb1"}, page=page)
     older = TestEntities.get(
         "TASK", {"name": "Older completion", "hash": "tskcmb2"}, page=page
     )
@@ -355,12 +351,8 @@ def test_task_combine_selects_completed_then_modified_main():
 # @pairs task-combine:attachments task-combine:asset-copy signature:asset-copy
 @pytest.mark.unit
 def test_task_history_create_clones_another_task_and_existing_history():
-    main_page = TestEntities.get(
-        "PAGE", {"name": "Main Page", "hash": "pgcmb2"}
-    )
-    linked_page = TestEntities.get(
-        "PAGE", {"name": "Linked Page", "hash": "pgcmb3"}
-    )
+    main_page = TestEntities.get("PAGE", {"name": "Main Page", "hash": "pgcmb2"})
+    linked_page = TestEntities.get("PAGE", {"name": "Linked Page", "hash": "pgcmb3"})
     form = TestEntities.get("FORM", {"name": "Combine Form", "hash": "frmcmb1"})
     form.version = "source-schema-v2"
     file_entity = TestEntities.get(
@@ -442,7 +434,9 @@ def test_asset_mixin_copy_asset_copies_storage_and_updates_definition(monkeypatc
     )
     calls = []
 
-    def copy_file(source_path, source_visibility, destination_path, destination_visibility):
+    def copy_file(
+        source_path, source_visibility, destination_path, destination_visibility
+    ):
         calls.append(
             (
                 source_path,
@@ -692,10 +686,13 @@ def test_task_complete_with_schedule_queues_uncomplete():
 
     mock_today = datetime(2025, 6, 15, 0, 0, 0, tzinfo=ZoneInfo("UTC"))
 
-    with patch("lagniappe.core.tools.dates.user_today", return_value=mock_today):
+    with patch(
+        "lagniappe.core.tools.tasks.scheduling.user_today",
+        return_value=mock_today,
+    ):
         with patch(_USER_TZ, return_value=ZoneInfo("UTC")):
             with patch(
-                "lagniappe.core.entities.task.dates.add_uncomplete_task_to_queue"
+                "lagniappe.core.entities.task.scheduling.add_uncomplete_task_to_queue"
             ) as queue_mock:
                 with patch("lagniappe.core.entities.task.current_user", completer):
                     task.complete()
@@ -738,11 +735,20 @@ def test_task_complete_with_near_term_schedule_uncompletes_immediately():
     task.due_date = mock_today - timedelta(days=1)
 
     with (
-        patch("lagniappe.core.tools.dates.user_today", return_value=mock_today),
+        patch(
+            "lagniappe.core.tools.tasks.scheduling.user_today",
+            return_value=mock_today,
+        ),
+        patch(
+            "lagniappe.core.properties.task_scheduling.dates.user_today",
+            return_value=mock_today,
+        ),
         patch(_USER_TZ, return_value=ZoneInfo("UTC")),
         patch("lagniappe.core.entities.task.current_user", completer),
         patch.object(task, "create_history_entry") as create_history_entry,
-        patch("lagniappe.core.tools.dates.task_queue.create_task") as create_task,
+        patch(
+            "lagniappe.core.tools.tasks.scheduling.task_queue.create_task"
+        ) as create_task,
     ):
         task.complete()
 
@@ -775,15 +781,21 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
     task.due_date = next_due
 
     with (
-        patch("lagniappe.core.tools.dates.CONFIG", SimpleNamespace(production=True)),
-        patch("lagniappe.core.tools.dates.datetime") as dates_datetime,
-        patch("lagniappe.core.tools.dates.user_tomorrow_in_seconds", return_value=42),
         patch(
-            "lagniappe.core.tools.dates.url_for",
+            "lagniappe.core.tools.tasks.scheduling.CONFIG",
+            SimpleNamespace(production=True),
+        ),
+        patch("lagniappe.core.tools.tasks.scheduling.datetime") as dates_datetime,
+        patch(
+            "lagniappe.core.tools.tasks.scheduling.user_tomorrow_in_seconds",
+            return_value=42,
+        ),
+        patch(
+            "lagniappe.core.tools.tasks.scheduling.url_for",
             return_value="https://example.test/process/uncomplete-task",
         ),
         patch(
-            "lagniappe.core.tools.dates.task_queue.create_task",
+            "lagniappe.core.tools.tasks.scheduling.task_queue.create_task",
             return_value="queued-task",
         ) as create_task,
     ):

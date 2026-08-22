@@ -1,6 +1,6 @@
 from ..definitions import FieldType, FilterOptions, Ordering
+from ..definitions.identifiers import short_uuid
 from ..mixins import AIMixin, ColumnMixin, FilterMixin
-from ..tools import utility
 from .base_asset import AssetProperty
 from .base_schema import SchemaProperty
 from .base_property import UNSET
@@ -13,6 +13,10 @@ from .base_property import UNSET
 # @tests tests_unit/test_013_task_properties.py::test_task_signature_form_submission_saves_multiple_assets_by_field_id
 # @features signature
 # @dimensions asset-lifecycle, db-value, form-value, filter-value, ai-value, column, sort
+# @pairs signature:asset-lifecycle signature:db-value
+# @pairs submission:asset-lifecycle submission:db-value task:asset-lifecycle task:db-value
+# @pairs signature:multiple-fields signature:schema-id submission:multiple-fields submission:schema-id
+# @pairs task:multiple-fields task:schema-id
 class Signature(AssetProperty, FilterMixin, AIMixin, ColumnMixin, SchemaProperty):
     """Signature image field. Stored as an image asset.
 
@@ -147,7 +151,7 @@ class HTML(AssetProperty, SchemaProperty):
 
     # Asset Attributes
     def add_image(self, image, visibility="private"):
-        name = f"image_{self.id}_{utility.short_uuid()}"
+        name = f"image_{self.id}_{short_uuid()}"
         asset = self.entity.save_asset(image, name, "image", visibility=visibility)
         return asset.url if asset else None
 

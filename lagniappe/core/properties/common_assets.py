@@ -1,6 +1,6 @@
 from ..definitions import FieldType, FilterOptions, MutationIntent
+from ..definitions.identifiers import short_uuid
 from ..mixins import AIMixin, CacheMixin, FilterMixin
-from ..tools import utility
 from .base_property import Property, UNSET
 
 
@@ -87,7 +87,7 @@ class Document(CacheMixin, FilterMixin, AIMixin, Property):
     # @features editor
     # @dimensions image-upload
     def add_image(self, image, visibility="private"):
-        name = f"image_{utility.short_uuid()}"
+        name = f"image_{short_uuid()}"
         asset = self.entity.save_asset(image, name, "image", visibility=visibility)
         return asset.url
 

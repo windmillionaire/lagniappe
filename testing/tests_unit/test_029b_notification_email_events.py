@@ -9,10 +9,10 @@ import pytest
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import notification_email as email_database
 from lagniappe.core.tools.database.core import KINDS
-from lagniappe.core.tools.notification_email import capture as email_capture
-from lagniappe.core.tools.notification_email import delivery as email_delivery
-from lagniappe.core.tools.notification_email import links as email_links
-from lagniappe.core.tools.notification_email import presentation as email_presentation
+from lagniappe.core.tools.email.notifications import capture as email_capture
+from lagniappe.core.tools.email.notifications import delivery as email_delivery
+from lagniappe.core.tools.email.notifications import links as email_links
+from lagniappe.core.tools.email.notifications import presentation as email_presentation
 from testing.utility.notification_email_fakes import (
     MemoryDatastore,
     task_recorder,
@@ -23,8 +23,8 @@ from testing.utility.notification_email_fakes import (
 pytestmark = pytest.mark.unit
 
 
-# @source lagniappe/core/tools/notification_email/capture.py::record_notification_event
-# @source lagniappe/core/tools/notification_email/delivery.py::deliver
+# @source lagniappe/core/tools/email/notifications/capture.py::record_notification_event
+# @source lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @pairs notification-email:immediate notification-email:html notification-email:idempotency
 # @pair notification-email:presence-suppression
 # @pairs notification-email:notification notification-email:pending-filter
@@ -127,7 +127,7 @@ def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
         lambda *_args, **_kwargs: False,
     )
     monkeypatch.setattr(
-        email_presentation.auth_email,
+        email_presentation.smtp,
         "send_email",
         lambda *args, **kwargs: sent.append((args, kwargs)) or True,
     )
@@ -169,8 +169,8 @@ def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
     assert len(sent) == 1
 
 
-# @source lagniappe/core/tools/notification_email/capture.py::record_document_mention
-# @source lagniappe/core/tools/notification_email/delivery.py::deliver
+# @source lagniappe/core/tools/email/notifications/capture.py::record_document_mention
+# @source lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @pair notification-email:document-mention
 def test_document_mention_email_uses_concise_copy_and_document_tab(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
@@ -216,7 +216,7 @@ def test_document_mention_email_uses_concise_copy_and_document_tab(monkeypatch):
         lambda *_args, **_kwargs: False,
     )
     monkeypatch.setattr(
-        email_presentation.auth_email,
+        email_presentation.smtp,
         "send_email",
         lambda *args, **kwargs: sent.append((args, kwargs)) or True,
     )
@@ -243,8 +243,8 @@ def test_document_mention_email_uses_concise_copy_and_document_tab(monkeypatch):
     )
 
 
-# @source lagniappe/core/tools/notification_email/capture.py::record_notification
-# @source lagniappe/core/tools/notification_email/delivery.py::deliver
+# @source lagniappe/core/tools/email/notifications/capture.py::record_notification
+# @source lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @pair notification-email:task-assignment
 def test_task_assignment_email_uses_task_copy_without_headers(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
@@ -316,7 +316,7 @@ def test_task_assignment_email_uses_task_copy_without_headers(monkeypatch):
         lambda *_args, **_kwargs: False,
     )
     monkeypatch.setattr(
-        email_presentation.auth_email,
+        email_presentation.smtp,
         "send_email",
         lambda *args, **kwargs: sent.append((args, kwargs)) or True,
     )
@@ -340,4 +340,3 @@ def test_task_assignment_email_uses_task_copy_without_headers(monkeypatch):
         in html_body
     )
     assert 'href="https://lagniappe.example.test/tasks/assigned-task"' in html_body
-

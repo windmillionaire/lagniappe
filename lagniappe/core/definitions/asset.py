@@ -14,7 +14,8 @@ from .file_consumers import (
     LARGE_ASSET_BYTES,
     enforce_file_consumer,
 )
-from ..tools import database, utility
+from ..tools import database
+from ..tools.files.html import strip_tags
 from .default import DefaultEnum
 
 IMAGE_NAME = re.compile(r"image_[^.\"]+")
@@ -234,7 +235,9 @@ class FileAsset(Asset):
             return f"{public_url()}/{self.path}"
         elif self.visibility == AssetVisibility.private:
             key = database.get.urlsafe_key(self.entity.key)
-            identifier = f"{self.name}.{self.extension}" if self.extension else self.name
+            identifier = (
+                f"{self.name}.{self.extension}" if self.extension else self.name
+            )
             return f"/assets/{key}/{identifier}"
         return None
 
@@ -348,7 +351,7 @@ class HTMLAsset(Asset):
 
     @property
     def cache_value(self):
-        return utility.strip_tags(self.get()).strip()
+        return strip_tags(self.get()).strip()
 
 
 # @testable infrastructure

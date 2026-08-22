@@ -4,6 +4,7 @@ import pytest
 from playwright.sync_api import expect
 
 from lagniappe.core.tools import database
+from lagniappe.core.tools.database import site_exports as export_database
 from testing.definitions import SitePages, Users
 
 pytestmark = pytest.mark.e2e
@@ -31,12 +32,10 @@ def test_owner_can_start_html_export(get_user):
     notifications = owner.locate("[data-role='notifications']")
     expect(notifications).to_be_visible(timeout=15000)
 
-    latest = database.site_exports(limit=1)[0]
+    latest = export_database.recent(limit=1)[0]
     assert latest["status"] == "complete"
     prefix = latest["prefix"]
-    object_names = {
-        blob.name for blob in database.assets.list_files(prefix, "export")
-    }
+    object_names = {blob.name for blob in database.assets.list_files(prefix, "export")}
 
     assert f"{prefix}index.html" in object_names
     assert f"{prefix}manifest.json" in object_names

@@ -27,7 +27,8 @@ from lagniappe.core.mixins.submitter import SubmitterMixin
 from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
 from lagniappe.core.properties.deferred_job_request import RequestFingerprint
 from lagniappe.core.properties import deferred_job_lifecycle
-from lagniappe.core.tools import database, task_queue
+from lagniappe.core.tools import database
+from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.database import deferred_jobs as deferred_database
@@ -80,7 +81,6 @@ from testing.utility.test_entities import TestEntities
 pytestmark = pytest.mark.unit
 
 
-
 # @features deferred-jobs
 # @dimensions reconciliation redispatch compare-and-set deterministic-task-id
 def test_reconciler_redispatches_one_cas_claimed_stale_job(monkeypatch):
@@ -111,10 +111,9 @@ def test_reconciler_redispatches_one_cas_claimed_stale_job(monkeypatch):
     monkeypatch.setattr(
         registry,
         "dispatch",
-        lambda current, *, attempt, task_suffix: dispatched.append(
-            (current, attempt, task_suffix)
-        )
-        or "recovered-task",
+        lambda current, *, attempt, task_suffix: (
+            dispatched.append((current, attempt, task_suffix)) or "recovered-task"
+        ),
     )
     finalized = []
     monkeypatch.setattr(
@@ -141,8 +140,6 @@ def test_reconciler_redispatches_one_cas_claimed_stale_job(monkeypatch):
             now,
         )
     ]
-
-
 
 
 # @pair deferred-jobs:reconciliation
@@ -176,8 +173,6 @@ def test_reconciler_resumes_stale_terminal_delivery_after_grace(monkeypatch):
     assert delivered == []
 
 
-
-
 # @pair deferred-jobs:orphaned-input
 def test_reconciler_completes_terminal_delivery_when_input_was_deleted(
     monkeypatch,
@@ -197,9 +192,7 @@ def test_reconciler_completes_terminal_delivery_when_input_was_deleted(
         "cleanup": False,
         "notification": False,
     }
-    job.error = {
-        "message": "This operation could not finish after automatic recovery."
-    }
+    job.error = {"message": "This operation could not finish after automatic recovery."}
     job.notification = SimpleNamespace(body="Creating report...", pending=True)
     job.client = {
         "source_widget": "CreateToolReport",

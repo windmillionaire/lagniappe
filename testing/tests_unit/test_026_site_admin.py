@@ -10,7 +10,8 @@ from lagniappe.core.definitions import FetchDepth, FetchReason
 from lagniappe.core.entities.group import UserGroup
 from lagniappe.core.entities.page import Page
 from lagniappe.core.entities.user import User
-from lagniappe.core.tools import recovery, site_admin
+from lagniappe.core.tools.site import admin as site_admin
+from lagniappe.core.tools.site import recovery
 
 
 pytestmark = pytest.mark.unit
@@ -24,8 +25,8 @@ def test_deployment_settings_merge_live_values_over_runtime_defaults(monkeypatch
     )
     config.DEPLOY_WORKER_COUNT = "5"
     monkeypatch.setattr(
-        site_admin.database.get,
-        "site_deployment",
+        site_admin.site_database,
+        "deployment",
         lambda: {"DEPLOY_WORKER_COUNT": "7", "version": 2},
     )
     monkeypatch.setattr(site_admin, "normalize_deployment_settings", dict)
@@ -126,8 +127,7 @@ def test_cache_rebuild_rehydrates_entities_in_bounded_chunks(monkeypatch):
         site_admin.Entities,
         "fetch",
         lambda *keys, request: (
-            fetches.append((list(keys), request))
-            or [f"loaded:{key}" for key in keys]
+            fetches.append((list(keys), request)) or [f"loaded:{key}" for key in keys]
         ),
     )
     monkeypatch.setattr(
@@ -238,13 +238,13 @@ def test_cache_rebuild_materializes_nested_relations_across_batch_boundaries(
 def test_recovery_snapshot_merges_live_settings(monkeypatch):
     persisted = {"SECRET_KEY": "application-secret"}
     monkeypatch.setattr(
-        recovery.database.get,
-        "site_deployment",
+        recovery.site_database,
+        "deployment",
         lambda: {"DEPLOY_MAX_INSTANCES": "4"},
     )
     monkeypatch.setattr(
-        recovery.database.get,
-        "site_ai",
+        recovery.site_database,
+        "ai",
         lambda: {"AI_MODEL": "live-model"},
     )
     monkeypatch.setattr(recovery, "read_recovery_redis_ca", lambda _settings: "ca")
@@ -269,8 +269,8 @@ def test_recovery_snapshot_merges_live_settings(monkeypatch):
 # @dimensions recovery-export failure-isolation
 def test_recovery_snapshot_failures_use_safe_public_messages(monkeypatch):
     monkeypatch.setattr(
-        recovery.database.get,
-        "site_deployment",
+        recovery.site_database,
+        "deployment",
         lambda: (_ for _ in ()).throw(ConnectionError("provider unavailable")),
     )
 

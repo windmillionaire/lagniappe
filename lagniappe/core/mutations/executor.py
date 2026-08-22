@@ -131,7 +131,7 @@ def execute_post_commit(plan):
         if aggregates:
             projection_changes["aggregates"] = aggregates
         cache.update_notification_projection(**projection_changes)
-        from ..tools.notification_email import capture as email_capture
+        from ..tools.email.notifications import capture as email_capture
 
         for notification in notification_upserts:
             try:
@@ -141,9 +141,7 @@ def execute_post_commit(plan):
                     error,
                     context={
                         "operation": "notification-email-capture",
-                        "notification_key": getattr(
-                            notification, "urlsafe_key", None
-                        ),
+                        "notification_key": getattr(notification, "urlsafe_key", None),
                     },
                 )
         if notification_upserts:
@@ -176,8 +174,16 @@ def execute_post_commit(plan):
     if blob_effects:
         errors.extend(
             database.delete_blobs(
-                [effect.path for effect in blob_effects if effect.visibility == "private"],
-                [effect.path for effect in blob_effects if effect.visibility == "public"],
+                [
+                    effect.path
+                    for effect in blob_effects
+                    if effect.visibility == "private"
+                ],
+                [
+                    effect.path
+                    for effect in blob_effects
+                    if effect.visibility == "public"
+                ],
             )
             or []
         )
@@ -196,7 +202,9 @@ def execute_mutation(plan):
         raise TypeError("execute_mutation requires a MutationPlan")
 
     outcome = MutationOutcome(plan.operation)
-    durable = [effect for effect in plan.effects if effect.phase is MutationPhase.DURABLE]
+    durable = [
+        effect for effect in plan.effects if effect.phase is MutationPhase.DURABLE
+    ]
     writes = prepare_durable_writes(plan)
     deletes = [
         effect for effect in durable if effect.effect is MutationEffectType.DELETE

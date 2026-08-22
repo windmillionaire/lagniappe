@@ -38,6 +38,7 @@ GET_ENTITY = types.FunctionDeclaration(
 # @tests tests_unit/test_015_ai_tools.py::test_get_entity_loads_model_task_form_schema_from_stored_key
 # @pairs ai:tool-context ai:autofill form-schema:schema
 # @pairs form-schema:model-task form-schema:attached-form form-schema:stored-key
+# @pair form-schema:autofill
 def execute_get_entity(args, user):
     identifier = args.get("id")
     if not identifier:

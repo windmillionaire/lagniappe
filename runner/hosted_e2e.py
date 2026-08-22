@@ -224,7 +224,9 @@ def _cloud_build_service_account(infrastructure):
 # @testable infrastructure
 def _infrastructure(*, project_number=None):
     project = str(SETTINGS.APP.get("GOOGLE_CLOUD_PROJECT") or "").strip()
-    configured_project = str((SETTINGS.GCLOUD_CONFIG or {}).get("PROJECT") or "").strip()
+    configured_project = str(
+        (SETTINGS.GCLOUD_CONFIG or {}).get("PROJECT") or ""
+    ).strip()
     if not project or configured_project != project:
         raise HostedE2EError(
             "Hosted E2E requires matching app and repository gcloud projects."
@@ -232,7 +234,9 @@ def _infrastructure(*, project_number=None):
     region = str(SETTINGS.APP.get("RESOURCE_REGION") or "").strip()
     if not region:
         raise HostedE2EError("Hosted E2E requires RESOURCE_REGION.")
-    digest = hashlib.sha256(str(SETTINGS.APP.get("GIBBERISH") or "").encode()).hexdigest()
+    digest = hashlib.sha256(
+        str(SETTINGS.APP.get("GIBBERISH") or "").encode()
+    ).hexdigest()
     if not SETTINGS.APP.get("GIBBERISH"):
         raise HostedE2EError("Hosted E2E requires the configured bucket seed.")
     project_number = str(project_number or _project_number(project))
@@ -352,9 +356,7 @@ def _require_committed_production_build(
             f"{BUILD_METADATA_PATH} is not valid JSON in the committed source."
         ) from error
     if not isinstance(metadata, dict):
-        raise HostedE2EError(
-            f"{BUILD_METADATA_PATH} must contain a JSON object."
-        )
+        raise HostedE2EError(f"{BUILD_METADATA_PATH} must contain a JSON object.")
     if metadata.get("mode") != "production":
         raise HostedE2EError(
             "Hosted E2E create requires an already committed production "
@@ -537,7 +539,9 @@ def _deployer_member():
     deployer = str((SETTINGS.GCLOUD_CONFIG or {}).get("ACCOUNT") or "").strip()
     if not deployer:
         return None
-    member_kind = "serviceAccount" if deployer.endswith("gserviceaccount.com") else "user"
+    member_kind = (
+        "serviceAccount" if deployer.endswith("gserviceaccount.com") else "user"
+    )
     return f"{member_kind}:{deployer}"
 
 
@@ -708,9 +712,7 @@ def _ensure_workload_identity(infrastructure, github_repository):
         "--location=global",
         f"--project={infrastructure.project}",
     ]
-    workflow_prefix = (
-        f"{github_repository}/.github/workflows/hosted-e2e.yml@"
-    )
+    workflow_prefix = f"{github_repository}/.github/workflows/hosted-e2e.yml@"
     condition = (
         f"assertion.repository=='{github_repository}' && "
         f"assertion.workflow_ref.startsWith('{workflow_prefix}') && "
@@ -824,16 +826,19 @@ def setup(github_repository=None):
         deployer_member,
     )
 
-    if _describe(
-        [
-            "artifacts",
-            "repositories",
-            "describe",
-            infrastructure.artifact_repository,
-            f"--location={infrastructure.region}",
-            f"--project={infrastructure.project}",
-        ]
-    ) is None:
+    if (
+        _describe(
+            [
+                "artifacts",
+                "repositories",
+                "describe",
+                infrastructure.artifact_repository,
+                f"--location={infrastructure.region}",
+                f"--project={infrastructure.project}",
+            ]
+        )
+        is None
+    ):
         _gcloud(
             "artifacts",
             "repositories",
@@ -843,7 +848,9 @@ def setup(github_repository=None):
             f"--location={infrastructure.region}",
             f"--project={infrastructure.project}",
         )
-    cloud_build_member = f"serviceAccount:{_cloud_build_service_account(infrastructure)}"
+    cloud_build_member = (
+        f"serviceAccount:{_cloud_build_service_account(infrastructure)}"
+    )
     _gcloud(
         "artifacts",
         "repositories",
@@ -883,14 +890,17 @@ def setup(github_repository=None):
         infrastructure.settings_secret,
         infrastructure.redis_ca_secret,
     ):
-        if _describe(
-            [
-                "secrets",
-                "describe",
-                secret_name,
-                f"--project={infrastructure.project}",
-            ]
-        ) is None:
+        if (
+            _describe(
+                [
+                    "secrets",
+                    "describe",
+                    secret_name,
+                    f"--project={infrastructure.project}",
+                ]
+            )
+            is None
+        ):
             _gcloud(
                 "secrets",
                 "create",
@@ -932,9 +942,7 @@ def _app_default_hostname(infrastructure):
 
 # @testable infrastructure
 def _version_url(infrastructure, version):
-    hostname = (
-        f"{version}-dot-{SERVICE}-dot-{_app_default_hostname(infrastructure)}"
-    )
+    hostname = f"{version}-dot-{SERVICE}-dot-{_app_default_hostname(infrastructure)}"
     if len(hostname.split(".", 1)[0]) > 63:
         raise HostedE2EError(
             "Hosted E2E version hostname exceeds the App Engine DNS limit."
@@ -1143,9 +1151,7 @@ def _wait_runner_image_build(
         if status not in CLOUD_BUILD_PENDING_STATUSES:
             failure_info = payload.get("failureInfo") or {}
             detail = str(
-                payload.get("statusDetail")
-                or failure_info.get("detail")
-                or ""
+                payload.get("statusDetail") or failure_info.get("detail") or ""
             ).strip()
             suffix = f" ({detail})" if detail else ""
             log_url = str(payload.get("logUrl") or "").strip()
@@ -1180,9 +1186,7 @@ def _stage_app_runtime_files(source_root, *, repo_root=APP_DIR):
     for relative_path in runtime_paths:
         source_path = repo_root / relative_path
         if not source_path.is_file() or not source_path.stat().st_size:
-            raise HostedE2EError(
-                f"Hosted E2E runtime file is missing: {relative_path}"
-            )
+            raise HostedE2EError(f"Hosted E2E runtime file is missing: {relative_path}")
         destination = source_root / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_path, destination)
@@ -1218,9 +1222,7 @@ def _wait_hosted_health(state, *, attempts=60):
             last_error = error
         if attempt < attempts - 1:
             time.sleep(2)
-    raise HostedE2EError(
-        f"Hosted E2E version did not become ready: {last_error}"
-    )
+    raise HostedE2EError(f"Hosted E2E version did not become ready: {last_error}")
 
 
 # @testable true
@@ -1414,9 +1416,7 @@ def _resumable_create_state(
     if cloud_build_id is not None and not CLOUD_BUILD_ID_RE.fullmatch(
         str(cloud_build_id)
     ):
-        raise HostedE2EError(
-            "The interrupted lifecycle has an invalid Cloud Build ID."
-        )
+        raise HostedE2EError("The interrupted lifecycle has an invalid Cloud Build ID.")
     return dict(previous)
 
 
@@ -1593,9 +1593,7 @@ def _validate_state_infrastructure(state, infrastructure):
         "job": infrastructure.job,
         "artifact_bucket": infrastructure.artifact_bucket,
     }
-    mismatches = [
-        name for name, value in expected.items() if state.get(name) != value
-    ]
+    mismatches = [name for name, value in expected.items() if state.get(name) != value]
     if mismatches:
         raise HostedE2EError(
             "Hosted E2E lifecycle state belongs to different infrastructure "
@@ -1825,9 +1823,7 @@ def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
     junit_path = destination / "junit.xml"
     if imported and junit_path.is_file():
         try:
-            testcases = ElementTree.parse(junit_path).getroot().findall(
-                ".//testcase"
-            )
+            testcases = ElementTree.parse(junit_path).getroot().findall(".//testcase")
         except (ElementTree.ParseError, OSError):
             testcases = []
         if testcases:
@@ -1896,9 +1892,7 @@ def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
                         if outcome["failure"] is not None
                         else outcome["error"]
                     )
-                    message = (
-                        str(problem.get("message") or "").splitlines()[0].strip()
-                    )
+                    message = str(problem.get("message") or "").splitlines()[0].strip()
                     lines.append(f"  - {nodeid}")
                     if message:
                         lines.append(f"    {message}")
@@ -1935,9 +1929,7 @@ def execute(*, suite="all", targets=(), import_results=True, progress=True):
         except RuntimeError as error:
             raise HostedE2EError(str(error)) from error
     elif targets:
-        raise HostedE2EError(
-            "Focused targets require the hosted E2E focused suite."
-        )
+        raise HostedE2EError("Focused targets require the hosted E2E focused suite.")
     elif suite not in {"all", "full"}:
         raise HostedE2EError(f"Unsupported hosted E2E suite {suite!r}.")
 
@@ -2009,7 +2001,10 @@ def _latest_execution(infrastructure):
     ]
     if not manifests:
         raise HostedE2EError("No hosted E2E result artifacts exist.")
-    newest = max(manifests, key=lambda blob: blob.updated or datetime.min.replace(tzinfo=timezone.utc))
+    newest = max(
+        manifests,
+        key=lambda blob: blob.updated or datetime.min.replace(tzinfo=timezone.utc),
+    )
     return newest.name.split("/", 2)[1]
 
 
@@ -2025,11 +2020,19 @@ def merge_remote_evidence(local, remote):
         encode_test_run_snapshots,
     )
 
-    if not isinstance(remote, dict) or remote.get("schema_version") != TEST_RUN_SCHEMA_VERSION:
+    if (
+        not isinstance(remote, dict)
+        or remote.get("schema_version") != TEST_RUN_SCHEMA_VERSION
+    ):
         raise HostedE2EError("Hosted result evidence has an unsupported schema.")
     if remote.get("kind") != "test-run" or not isinstance(remote.get("tests"), dict):
         raise HostedE2EError("Hosted result evidence is malformed.")
-    local = local if isinstance(local, dict) and local.get("schema_version") in {2, TEST_RUN_SCHEMA_VERSION} else {}
+    local = (
+        local
+        if isinstance(local, dict)
+        and local.get("schema_version") in {2, TEST_RUN_SCHEMA_VERSION}
+        else {}
+    )
     tests = dict(local.get("tests") or {})
     tests.update(remote["tests"])
     snapshots = decode_test_run_snapshots(local)
@@ -2042,7 +2045,9 @@ def merge_remote_evidence(local, remote):
         for row in tests.values()
         if isinstance(row, dict) and isinstance(row.get("snapshot"), str)
     }
-    snapshots = {key: value for key, value in snapshots.items() if key in used_snapshots}
+    snapshots = {
+        key: value for key, value in snapshots.items() if key in used_snapshots
+    }
     pairs, encoded = encode_test_run_snapshots(snapshots)
     sessions = [
         *list(local.get("sessions") or []),
@@ -2155,13 +2160,18 @@ def validate_release_evidence(
     mode = "candidate"
     if evidence != candidate:
         mode = "continuation"
-        parents = _git(
-            "show",
-            "--no-patch",
-            "--format=%P",
-            evidence,
-            repo_root=repo_root,
-        ).stdout.strip().casefold().split()
+        parents = (
+            _git(
+                "show",
+                "--no-patch",
+                "--format=%P",
+                evidence,
+                repo_root=repo_root,
+            )
+            .stdout.strip()
+            .casefold()
+            .split()
+        )
         if parents != [candidate]:
             raise HostedE2EError(
                 "The evidence continuation must have the exact candidate as its only parent."
@@ -2240,6 +2250,7 @@ def results(
         raise HostedE2EError("A valid Cloud Run execution name is required.")
 
     from google.cloud import storage
+
     destination = STATE_ROOT / "results" / execution
     destination.mkdir(parents=True, exist_ok=True)
     print(f"Downloading hosted test artifacts to {destination}", flush=True)
@@ -2276,7 +2287,7 @@ def results(
 def _acquire_cleanup_lease():
     """Clean stale data and keep the lease until provider teardown finishes."""
     os.environ["FLASK_ENV"] = "testing"
-    from lagniappe.core.tools.e2e_lease import E2ELease
+    from lagniappe.core.tools.hosted_e2e.lease import E2ELease
     from runner.testing import cleanup_test_data
 
     lease = E2ELease()
@@ -2503,7 +2514,9 @@ def run_hosted_e2e_command(arguments):
         description="Run repository tests in an isolated Google-hosted environment.",
     )
     commands = parser.add_subparsers(dest="action", required=True)
-    setup_parser = commands.add_parser("setup", help="Provision stable hosted-E2E resources.")
+    setup_parser = commands.add_parser(
+        "setup", help="Provision stable hosted-E2E resources."
+    )
     setup_parser.add_argument("--github-repository", metavar="OWNER/REPOSITORY")
     commands.add_parser(
         "create",
@@ -2523,7 +2536,9 @@ def run_hosted_e2e_command(arguments):
         action="store_true",
         help="Leave this execution in Cloud Storage without importing it locally.",
     )
-    results_parser = commands.add_parser("results", help="Download and import job artifacts.")
+    results_parser = commands.add_parser(
+        "results", help="Download and import job artifacts."
+    )
     result_selector = results_parser.add_mutually_exclusive_group()
     result_selector.add_argument("--execution")
     result_selector.add_argument("--latest", action="store_true")
@@ -2547,7 +2562,9 @@ def run_hosted_e2e_command(arguments):
     validate_parser.add_argument("--evidence", required=True)
     validate_parser.add_argument("--base", required=True)
     commands.add_parser("status", help="Show local and provider lifecycle state.")
-    teardown_parser = commands.add_parser("teardown", help="Delete the ephemeral version and job.")
+    teardown_parser = commands.add_parser(
+        "teardown", help="Delete the ephemeral version and job."
+    )
     teardown_parser.add_argument("--force", action="store_true")
     args = parser.parse_args(arguments)
 

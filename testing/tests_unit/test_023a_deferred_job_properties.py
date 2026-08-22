@@ -33,13 +33,14 @@ from lagniappe.core.properties import (
     deferred_job_lock,
     deferred_job_request,
 )
-from lagniappe.core.tools import database, task_queue
+from lagniappe.core.tools import database
+from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.deferred_jobs import locks as deferred_locks
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.database import deferred_jobs as deferred_database
 from lagniappe.core.tools.database import notifications as notification_database
-from lagniappe.core.tools.database import utility as database_utility
+from lagniappe.core.tools.database import transactions as database_transactions
 from lagniappe.core.tools.deferred_jobs import common as deferred_common
 from lagniappe.core.tools.deferred_jobs import retry as deferred_retry
 from lagniappe.core.tools.deferred_jobs.adapters.base import DeferredJobAdapter
@@ -185,9 +186,10 @@ def test_deferred_job_request_properties_own_identity_and_payload_validation(
         "uuid4",
         lambda: SimpleNamespace(hex="nonce"),
     )
-    assert deferred_job_request.IdempotencyKey.generate(spec) == hashlib.sha256(
-        b"report-ask:actor-key:nonce"
-    ).hexdigest()
+    assert (
+        deferred_job_request.IdempotencyKey.generate(spec)
+        == hashlib.sha256(b"report-ask:actor-key:nonce").hexdigest()
+    )
 
     entity = SimpleNamespace(
         urlsafe_key="entity-key",
@@ -221,11 +223,14 @@ def test_deferred_job_task_identity_is_deterministic_and_bounded():
     digest = hashlib.sha256(b"stable-operation").hexdigest()[:32]
 
     assert TaskIdentity.create(job, 3) == f"job-{digest}-a3"
-    assert TaskIdentity.create(
-        job,
-        3,
-        suffix="Reconcile_42 !",
-    ) == f"job-{digest}-a3-reconcile42"
+    assert (
+        TaskIdentity.create(
+            job,
+            3,
+            suffix="Reconcile_42 !",
+        )
+        == f"job-{digest}-a3-reconcile42"
+    )
     assert TaskIdentity.feedback(job) == f"job-{digest}-feedback"
 
 
@@ -263,8 +268,9 @@ def test_deferred_job_lifecycle_normalizes_timestamps_and_elapsed_time():
     assert deferred_job_lifecycle.elapsed_seconds(naive, now) == 120
     assert deferred_job_lifecycle.elapsed_seconds(now + timedelta(seconds=1), now) == 0
     assert deferred_job_lifecycle.elapsed_seconds(None, now) == 0
-from lagniappe.core.tools.deferred_jobs.adapters import autofill as autofill_adapters
 
+
+from lagniappe.core.tools.deferred_jobs.adapters import autofill as autofill_adapters
 
 
 # @pairs deferred-jobs:user-write-isolation deferred-jobs:revision deferred-jobs:transaction
@@ -333,8 +339,6 @@ def test_deferred_job_status_transactions_do_not_write_actor(monkeypatch):
     assert all(entity is not actor for entity in datastore.saved)
 
 
-
-
 # @features deferred-jobs
 # @dimensions lease claim duplicate-delivery checkpoint compare-and-set
 def test_deferred_job_claim_and_checkpoint_are_compare_and_set(monkeypatch):
@@ -388,14 +392,12 @@ def test_deferred_job_claim_and_checkpoint_are_compare_and_set(monkeypatch):
     assert "next_attempt_at" not in entity
 
 
-
-
 # @features deferred-jobs
 # @dimensions transaction-contention retry
 def test_deferred_job_transactions_retry_aborted_contention(monkeypatch):
     now = datetime(2026, 7, 20, tzinfo=timezone.utc)
     sleeps = []
-    monkeypatch.setattr(database_utility.time, "sleep", sleeps.append)
+    monkeypatch.setattr(database_transactions.time, "sleep", sleeps.append)
     monkeypatch.setattr(deferred_database, "_deferred_job_key", lambda _value: "job")
     monkeypatch.setattr(
         deferred_database,
@@ -464,8 +466,6 @@ def test_deferred_job_transactions_retry_aborted_contention(monkeypatch):
     assert exhausted_datastore.attempts == 4
     assert exhausted_datastore.entity["attempt"] == 0
     assert sleeps[-3:] == [0.05, 0.1, 0.2]
-
-
 
 
 # @pair deferred-jobs:start
@@ -548,8 +548,6 @@ def test_deferred_job_create_is_transactionally_idempotent(monkeypatch):
     assert aggregate_repairs == [notification_owner, notification_owner]
     assert len(aggregate_mutations) == 1
     assert len(datastore.transaction_instance.saved) == 3
-
-
 
 
 # @features deferred-jobs
@@ -636,8 +634,6 @@ def test_autofill_start_acquires_one_target_lock(monkeypatch):
     assert datastore.entities["target-form-lock"]["operation"] == "job-one"
 
 
-
-
 # @features deferred-jobs
 # @dimensions form-lock compare-and-delete stale-worker
 # @pair deferred-jobs:form-lock
@@ -671,8 +667,6 @@ def test_autofill_lock_cleanup_is_compare_and_delete(monkeypatch):
     assert datastore.deleted == ["target-form-lock"]
 
 
-
-
 # @pair deferred-jobs:form-lock
 # @pair deferred-jobs:deterministic-key
 # @pair deferred-jobs:stale-cleanup
@@ -681,8 +675,9 @@ def test_deferred_job_lock_resolution_is_target_scoped(monkeypatch):
     monkeypatch.setattr(
         database,
         "create_named_key",
-        lambda kind, identifier: named_keys.append((kind, identifier))
-        or f"lock:{identifier}",
+        lambda kind, identifier: (
+            named_keys.append((kind, identifier)) or f"lock:{identifier}"
+        ),
     )
     target = SimpleNamespace(urlsafe_key="target-key")
 
@@ -743,8 +738,6 @@ def test_deferred_job_lock_resolution_is_target_scoped(monkeypatch):
     assert released == [("lock:terminal", "job-terminal")]
 
 
-
-
 # @features deferred-jobs
 # @dimensions form-lock browser-projection
 def test_deferred_job_lock_descriptor_is_browser_safe(monkeypatch):
@@ -762,8 +755,6 @@ def test_deferred_job_lock_descriptor_is_browser_safe(monkeypatch):
         "operation": "job-key",
         "revision": 7,
     }
-
-
 
 
 # @features deferred-jobs
@@ -844,8 +835,6 @@ def test_deferred_job_recovery_claim_is_compare_and_set(monkeypatch):
     assert recent["dispatch_state"] == "pending"
 
 
-
-
 # @features deferred-jobs
 # @dimensions cancellation tombstone lease compare-and-set terminal-race
 def test_deferred_job_terminal_transition_revokes_the_active_lease(monkeypatch):
@@ -890,8 +879,6 @@ def test_deferred_job_terminal_transition_revokes_the_active_lease(monkeypatch):
     assert entity["status"] == "cancelled"
 
 
-
-
 # @features deferred-jobs
 # @dimensions operation-fingerprint client-contract routing-identity
 def test_request_fingerprint_tracks_the_complete_client_contract():
@@ -917,8 +904,6 @@ def test_request_fingerprint_tracks_the_complete_client_contract():
 
     assert first != extended
     assert first != rerouted
-
-
 
 
 # @features deferred-jobs
@@ -955,8 +940,6 @@ def test_status_projection_is_bounded_and_marks_stale_work():
     assert status["phase_elapsed_seconds"] == 180
     assert "checkpoint" not in status
     assert "private authored content" not in json.dumps(status)
-
-
 
 
 # @pair deferred-jobs:diagnostics

@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from lagniappe.core.properties.form_links import Location
-from lagniappe.core.tools import location as loc
+from lagniappe.core.tools.services import places as loc
 
 
 class _FakeCredentials:
@@ -68,7 +68,9 @@ def test_simplify_address_for_search_no_change():
 # @dimensions retry suite-stripping
 def test_resolve_location_query_retries_after_simplify():
     """Second search uses simplified query when first returns empty."""
-    with patch.object(loc, "search_places", side_effect=[[], [{"id": "p1", "name": "Hit"}]]):
+    with patch.object(
+        loc, "search_places", side_effect=[[], [{"id": "p1", "name": "Hit"}]]
+    ):
         result = loc.resolve_location_query("123 Main St Suite 4")
     assert result == {"id": "p1", "name": "Hit"}
 
@@ -158,7 +160,9 @@ def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypat
     )
 
     with (
-        patch.object(loc, "get_places_access_token", return_value="access-token") as token,
+        patch.object(
+            loc, "get_places_access_token", return_value="access-token"
+        ) as token,
         patch.object(loc.requests, "post", return_value=response) as post,
     ):
         results = loc.search_places("coffee")
@@ -260,8 +264,7 @@ def test_location_address_only_value_and_column():
     assert field.value.get("id") is None
     cv = field.column_value
     assert cv["url"] == (
-        "https://www.google.com/maps/search/"
-        "?api=1&query=123+Main+St+Suite+4"
+        "https://www.google.com/maps/search/?api=1&query=123+Main+St+Suite+4"
     )
     assert cv["title"] == "123 Main St Suite 4"
 
@@ -282,9 +285,7 @@ def test_location_place_value_preserves_address2():
         "address": "123 Main St, City",
         "address2": "Suite 400",
     }
-    assert (
-        field.column_value["title"] == "Mock Place, 123 Main St, Suite 400, City"
-    )
+    assert field.column_value["title"] == "Mock Place, 123 Main St, Suite 400, City"
     assert field.column_value["url"] == (
         "https://www.google.com/maps/search/"
         "?api=1&query=Mock+Place%2C+123+Main+St%2C+Suite+400%2C+City"

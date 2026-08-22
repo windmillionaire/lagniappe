@@ -4,7 +4,8 @@ from flask import request
 from flask_login import current_user
 
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database, utility
+from lagniappe.core.tools import database
+from lagniappe.core.tools.tasks.ordering import sort_tasks
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.web.auth import permission
 from lagniappe.web import responses
@@ -140,4 +141,4 @@ def status(key, task_key, **kwargs):
     cached = Entities.fetch(*db.results, request=Fetch.direct())
     filter.route = request.path
 
-    return responses.filtered_task_index(utility.sort_tasks(cached), filter)
+    return responses.filtered_task_index(sort_tasks(cached), filter)

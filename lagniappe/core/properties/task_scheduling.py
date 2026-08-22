@@ -1,4 +1,5 @@
 from ..tools import ai, dates
+from ..tools.tasks import scheduling
 from ..exceptions import AIException, capture
 from .base_process import ProcessProperty
 from .base_property import Property
@@ -284,11 +285,11 @@ class Schedule(Property):
         if not self.active:
             return 0
         elif self.active.section_id == "scheduled":
-            return dates.calculate_skipped_scheduled_tasks(
+            return scheduling.calculate_skipped_scheduled_tasks(
                 self.entity, self.active.section
             )
         elif self.active.section_id == "periodic":
-            return dates.calculate_skipped_recurring_tasks(
+            return scheduling.calculate_skipped_recurring_tasks(
                 self.entity, self.active.section
             )
         return 0
@@ -304,19 +305,19 @@ class Schedule(Property):
             return
 
         if self.active.section_id == "recurring":
-            next_due_date = dates.get_next_recurring_date(self.active.section)
+            next_due_date = scheduling.get_next_recurring_date(self.active.section)
         elif self.active.section_id == "scheduled":
-            starting_due_date = dates.get_starting_due_date(self.entity)
-            next_due_date = dates.get_next_scheduled_date(
+            starting_due_date = scheduling.get_starting_due_date(self.entity)
+            next_due_date = scheduling.get_next_scheduled_date(
                 starting_due_date, self.active.section
             )
         elif self.active.section_id == "periodic":
-            starting_due_date = dates.get_starting_due_date(self.entity)
-            next_due_date = dates.get_next_periodic_date(
+            starting_due_date = scheduling.get_starting_due_date(self.entity)
+            next_due_date = scheduling.get_next_periodic_date(
                 starting_due_date, self.active.section
             )
 
-        self.entity.due_date = max(next_due_date, dates.user_today())
+        self.entity.due_date = max(next_due_date, scheduling.user_today())
         self.entity.db.pop("postponed_from", None)
 
     # @testable true

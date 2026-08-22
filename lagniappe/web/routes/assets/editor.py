@@ -4,7 +4,8 @@ from flask_login import current_user
 from lagniappe.core.definitions import AI, Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
-from lagniappe.core.tools import ai, database, utility
+from lagniappe.core.tools import ai, database
+from lagniappe.core.tools.files.html import clean_html
 from lagniappe.web.auth import (
     abort_public_user_action,
     permission,
@@ -171,7 +172,7 @@ def generate_text(key, **kwargs):
     except exceptions.AIException as e:
         return responses.error(str(e), exception=e)
 
-    cleaned_html = utility.clean_html(html)
+    cleaned_html = clean_html(html)
     return responses.document_html(cleaned_html)
 
 

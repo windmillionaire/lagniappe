@@ -88,7 +88,7 @@ def test_submission_bookmark_replace_flags_update_entity_fields(
             return_value=metadata,
         ) as get_metadata,
         patch(
-            "lagniappe.core.properties.form_links.utility.download_image",
+            "lagniappe.core.properties.form_links.download_image",
             return_value=downloaded,
         ) as download_image,
     ):

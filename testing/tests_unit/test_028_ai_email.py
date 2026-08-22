@@ -10,9 +10,9 @@ import pytest
 
 from config.ai_email import AI_EMAIL_LIMITS, normalize_ai_email_config
 from lagniappe.core.definitions import Action
-from lagniappe.core.tools import ai_email
+from lagniappe.core.tools.email import ai as ai_email
 from lagniappe.core.tools import ai as ai_tools
-from lagniappe.core.tools.ai_email import (
+from lagniappe.core.tools.email.ai import (
     AIEmailRejection,
     AIEmailWebhookError,
     InboundAttachment,
@@ -73,12 +73,15 @@ def _signed_headers(raw_body, *, event_id="event-1", timestamp=1_700_000_000):
 # @dimensions webhook signature raw-body timestamp rotation
 def test_svix_signature_verification_uses_raw_body_timestamp_and_any_v1_signature():
     raw_body = b'{"type":"email.received","data":{"email_id":"one"}}'
-    assert verify_svix_signature(
-        raw_body,
-        _signed_headers(raw_body),
-        "whsec_dGVzdC1zZWNyZXQ=",
-        now=1_700_000_200,
-    ) == "event-1"
+    assert (
+        verify_svix_signature(
+            raw_body,
+            _signed_headers(raw_body),
+            "whsec_dGVzdC1zZWNyZXQ=",
+            now=1_700_000_200,
+        )
+        == "event-1"
+    )
 
 
 # @features ai-email webhook
@@ -144,12 +147,9 @@ def test_resend_runtime_client_retrieves_with_full_key_and_sends_with_scoped_key
 
     assert calls[0][1].endswith("/emails/receiving/email-1")
     assert calls[1][1].endswith("/emails/receiving/email-1/attachments")
-    assert calls[2][1].endswith(
-        "/emails/receiving/email-1/attachments/attachment-1"
-    )
+    assert calls[2][1].endswith("/emails/receiving/email-1/attachments/attachment-1")
     assert all(
-        call[2]["headers"]["Authorization"] == "Bearer re_full"
-        for call in calls[:3]
+        call[2]["headers"]["Authorization"] == "Bearer re_full" for call in calls[:3]
     )
     assert calls[3][1].endswith("/emails")
     assert calls[3][2]["headers"]["Authorization"] == "Bearer re_send"
@@ -213,15 +213,18 @@ def test_authentication_results_candidates_require_aligned_dmarc_pass():
         },
         "example.com",
     ) == ("mx.resend.test",)
-    assert authentication_results_candidates(
-        {
-            "authentication-results": (
-                "mx.resend.test; dmarc=fail header.from=example.com; "
-                "spf=pass smtp.mailfrom=sender@example.com"
-            )
-        },
-        "example.com",
-    ) == ()
+    assert (
+        authentication_results_candidates(
+            {
+                "authentication-results": (
+                    "mx.resend.test; dmarc=fail header.from=example.com; "
+                    "spf=pass smtp.mailfrom=sender@example.com"
+                )
+            },
+            "example.com",
+        )
+        == ()
+    )
 
 
 # @features ai-email sender-auth
@@ -605,10 +608,7 @@ def test_report_feedback_links_to_report_and_remains_available_after_disable(
     payload, idempotency_key = sent[0]
     assert payload["to"] == ["Owner@example.com"]
     assert payload["reply_to"] == "ai@inbound.example.com"
-    assert (
-        "https://app.example.com/tools/reports/email-report-one"
-        in payload["text"]
-    )
+    assert "https://app.example.com/tools/reports/email-report-one" in payload["text"]
     assert REPLY_MARKER in payload["text"]
     assert payload["headers"]["Auto-Submitted"] == "auto-generated"
     assert idempotency_key.startswith("ai-email/success/")
@@ -645,7 +645,7 @@ def test_report_terminal_feedback_uses_generic_notification_delivery():
 # @features ai-email webhook
 # @dimensions replay transient-release transaction lease privacy terminal-compaction
 def test_ai_email_event_claim_is_durable_and_replay_safe(monkeypatch):
-    from lagniappe.core.tools.database import utility
+    from lagniappe.core.tools.database import ai_email as email_database
 
     class Record(dict):
         def __init__(self, key=None, **_kwargs):
@@ -675,20 +675,22 @@ def test_ai_email_event_claim_is_durable_and_replay_safe(monkeypatch):
             self.rows[record.key] = record
 
     store = Store()
-    monkeypatch.setattr(utility, "Entity", Record)
-    monkeypatch.setattr(utility.DATA, "_datastore_client", store)
+    monkeypatch.setattr(email_database, "Entity", Record)
+    monkeypatch.setattr(email_database.DATA, "_datastore_client", store)
     digest = "a" * 64
     now = datetime.now(timezone.utc)
 
-    assert utility.claim_ai_email_event(digest, "lease-one", now)["claimed"]
-    active = utility.claim_ai_email_event(digest, "lease-two", now + timedelta(seconds=1))
+    assert email_database.claim_ai_email_event(digest, "lease-one", now)["claimed"]
+    active = email_database.claim_ai_email_event(
+        digest, "lease-two", now + timedelta(seconds=1)
+    )
     assert active == {"claimed": False, "reason": "active", "state": "processing"}
-    assert not utility.release_ai_email_event(digest, "wrong-lease", now)
-    assert utility.release_ai_email_event(digest, "lease-one", now)
-    resumed = utility.claim_ai_email_event(digest, "lease-two", now)
+    assert not email_database.release_ai_email_event(digest, "wrong-lease", now)
+    assert email_database.release_ai_email_event(digest, "lease-one", now)
+    resumed = email_database.claim_ai_email_event(digest, "lease-two", now)
     assert resumed["claimed"]
-    assert utility.finish_ai_email_event(digest, "lease-two", "accepted", now)
-    terminal = utility.claim_ai_email_event(digest, "lease-three", now)
+    assert email_database.finish_ai_email_event(digest, "lease-two", "accepted", now)
+    terminal = email_database.claim_ai_email_event(digest, "lease-three", now)
     assert terminal == {"claimed": False, "reason": "terminal", "state": "accepted"}
     only_row = next(iter(store.rows.values()))
     assert "lease_token" not in only_row
@@ -715,6 +717,7 @@ class _InboundClient:
 def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch):
     from lagniappe.core.entities import Entities
     from lagniappe.core.tools import database
+    from lagniappe.core.tools.database import ai_email as email_database
 
     user = TestEntities.get(
         "USER",
@@ -724,10 +727,18 @@ def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch)
     user.is_public = False
     report = SimpleNamespace(urlsafe_key="report-one")
     states = []
-    monkeypatch.setattr(database, "claim_ai_email_event", lambda *_args: {"claimed": True})
-    monkeypatch.setattr(database, "finish_ai_email_event", lambda *args: states.append(args[2]))
-    monkeypatch.setattr(database, "release_ai_email_event", lambda *_args: None)
-    monkeypatch.setattr(database.get, "user", lambda email: "raw-user" if email == user.email else None)
+    monkeypatch.setattr(
+        email_database, "claim_ai_email_event", lambda *_args: {"claimed": True}
+    )
+    monkeypatch.setattr(
+        email_database,
+        "finish_ai_email_event",
+        lambda *args: states.append(args[2]),
+    )
+    monkeypatch.setattr(email_database, "release_ai_email_event", lambda *_args: None)
+    monkeypatch.setattr(
+        database.get, "user", lambda email: "raw-user" if email == user.email else None
+    )
     monkeypatch.setattr(
         Entities,
         "fetch_one",
@@ -824,9 +835,7 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
     from lagniappe import CONFIG
     from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
 
-    user = TestEntities.get(
-        "USER", {"name": "Owner", "owner": False}
-    )
+    user = TestEntities.get("USER", {"name": "Owner", "owner": False})
     user.email = "Owner@example.com"
     report = TestEntities.get(
         "REPORT",
@@ -845,7 +854,10 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
     monkeypatch.setattr(email_adapters.Entities, "save", lambda *_args: None)
     monkeypatch.setattr(
         "lagniappe.core.tools.deferred_jobs.service.DeferredJobs.start",
-        lambda spec: (starts.append(spec) or SimpleNamespace(urlsafe_key="child-job"), None),
+        lambda spec: (
+            starts.append(spec) or SimpleNamespace(urlsafe_key="child-job"),
+            None,
+        ),
     )
     monkeypatch.setattr(
         ai_email,
@@ -911,12 +923,14 @@ def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
     monkeypatch.setattr(
         email_adapters.ai,
         "route_ai_email",
-        lambda *args: calls.append(args)
-        or {
-            "workflow": "organize",
-            "confidence": 0.96,
-            "reason": "The attachment should update a submission.",
-        },
+        lambda *args: (
+            calls.append(args)
+            or {
+                "workflow": "organize",
+                "confidence": 0.96,
+                "reason": "The attachment should update a submission.",
+            }
+        ),
     )
     monkeypatch.setattr(
         email_adapters.Entities,
@@ -999,9 +1013,7 @@ def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
         checkpoint={},
         input=lambda name: report if name == "report" else None,
     )
-    error = ai_email.AIEmailProviderError(
-        "Resend returned an invalid attachment URL."
-    )
+    error = ai_email.AIEmailProviderError("Resend returned an invalid attachment URL.")
 
     adapter = email_adapters.EmailIngestAdapter()
     adapter.failure(context, error)
@@ -1031,9 +1043,7 @@ def test_submission_contract_keeps_create_and_organize_report_only(monkeypatch):
         headers={},
         subject="Create this",
         text_body="Use the existing report workflow.",
-        attachments=(
-            InboundAttachment("file-1", "notes.txt", "text/plain", 10),
-        ),
+        attachments=(InboundAttachment("file-1", "notes.txt", "text/plain", 10),),
     )
     with pytest.raises(AIEmailRejection, match="Create email does not accept"):
         ai_email._preflight_submission(message, "create", user, _config())

@@ -11,10 +11,10 @@ from lagniappe.core.definitions import NotificationEmailMode
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import notification_email as email_database
 from lagniappe.core.tools.database.core import KINDS
-from lagniappe.core.tools.notification_email import capture as email_capture
-from lagniappe.core.tools.notification_email import delivery as email_delivery
-from lagniappe.core.tools.notification_email import links as email_links
-from lagniappe.core.tools.notification_email import presentation as email_presentation
+from lagniappe.core.tools.email.notifications import capture as email_capture
+from lagniappe.core.tools.email.notifications import delivery as email_delivery
+from lagniappe.core.tools.email.notifications import links as email_links
+from lagniappe.core.tools.email.notifications import presentation as email_presentation
 from testing.utility.notification_email_fakes import (
     MemoryDatastore,
     task_recorder,
@@ -75,9 +75,9 @@ def test_daily_digest_query_retains_recipient_and_bucket_scope(monkeypatch):
     }
 
 
-# @source lagniappe/core/tools/notification_email/capture.py::record_notification
-# @source lagniappe/core/tools/notification_email/capture.py::record_message
-# @source lagniappe/core/tools/notification_email/delivery.py::deliver
+# @source lagniappe/core/tools/email/notifications/capture.py::record_notification
+# @source lagniappe/core/tools/email/notifications/capture.py::record_message
+# @source lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @pairs notification-email:digest notification-email:message-grouping
 # @pairs notification-email:target-title notification-email:target-link
 def test_daily_digest_groups_messages_and_uses_named_completion_links(monkeypatch):
@@ -219,7 +219,7 @@ def test_daily_digest_groups_messages_and_uses_named_completion_links(monkeypatc
     )
     sent = []
     monkeypatch.setattr(
-        email_presentation.auth_email,
+        email_presentation.smtp,
         "send_email",
         lambda *args, **kwargs: sent.append((args, kwargs)) or True,
     )
@@ -261,8 +261,8 @@ def test_daily_digest_groups_messages_and_uses_named_completion_links(monkeypatc
     assert report_url in html_body
 
 
-# @source lagniappe/core/tools/notification_email/capture.py::record_notification_event
-# @source lagniappe/core/tools/notification_email/delivery.py::deliver
+# @source lagniappe/core/tools/email/notifications/capture.py::record_notification_event
+# @source lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @pairs notification-email:digest notification-email:timezone notification-email:full-roundup
 # @pair notification-email:future-only-switch
 # @pair notification-email:item-cap
@@ -337,7 +337,7 @@ def test_daily_digest_uses_next_local_eight_and_batches(monkeypatch):
     )
     sent = []
     monkeypatch.setattr(
-        email_presentation.auth_email,
+        email_presentation.smtp,
         "send_email",
         lambda *args, **kwargs: sent.append(args) or True,
     )
@@ -354,4 +354,3 @@ def test_daily_digest_uses_next_local_eight_and_batches(monkeypatch):
     assert "First event" in sent[0][2]
     assert "Second event" in sent[0][2]
     assert "1 more item is available" in sent[0][2]
-

@@ -68,10 +68,7 @@ GOOGLE_IDENTITY_BASE = "https://accounts.google.com/gsi/"
 GOOGLE_IDENTITY_SCRIPT = f"{GOOGLE_IDENTITY_BASE}client"
 GOOGLE_IDENTITY_STYLE = f"{GOOGLE_IDENTITY_BASE}style"
 SCRIPT_SRC = f"script-src 'self' {GOOGLE_IDENTITY_SCRIPT}"
-CONNECT_SRC = (
-    "connect-src 'self' https://*.googleapis.com "
-    f"{GOOGLE_IDENTITY_BASE}"
-)
+CONNECT_SRC = f"connect-src 'self' https://*.googleapis.com {GOOGLE_IDENTITY_BASE}"
 STORAGE_SRC = "https://storage.googleapis.com"
 
 if SENTRY_LOADED and CONFIG.SENTRY_JS_DSN:
@@ -93,10 +90,7 @@ CSP = "; ".join(
         f"media-src 'self' {STORAGE_SRC}",
         "font-src 'self'",
         CONNECT_SRC,
-        (
-            "frame-src 'self' https://www.youtube-nocookie.com "
-            f"{GOOGLE_IDENTITY_BASE}"
-        ),
+        (f"frame-src 'self' https://www.youtube-nocookie.com {GOOGLE_IDENTITY_BASE}"),
         "frame-ancestors 'self'",
         "worker-src 'self' blob:",
         "manifest-src 'self'",
@@ -125,14 +119,14 @@ def clear_request_notification_state():
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/notification_email/presence.py::record_site_activity
+# @covered-by lagniappe/core/tools/email/notifications/presence.py::record_site_activity
 # @reason Flask response-hook wiring delegates to the tested coarse activity service
 @app.after_request
 def record_authenticated_site_activity(response):
     """Keep a coarse Redis activity hint without adding browser requests."""
     user_key = session.get(CONFIG.LOGIN_USER_KEY) if session.get("_user_id") else None
     if user_key and request.endpoint != "static":
-        from lagniappe.core.tools.notification_email import presence
+        from lagniappe.core.tools.email.notifications import presence
 
         presence.record_site_activity(user_key)
     return response

@@ -38,6 +38,7 @@ from lagniappe.core.properties.form_select import CategoricalElement
 from lagniappe.core.properties.form_special import HTML, Signature, Status
 from lagniappe.core.properties.form_table import Table
 from lagniappe.core.tools import database, dates, files
+from lagniappe.core.tools.database import ingress as ingress_database
 
 
 ACTIVE_RUN_STATUSES = {
@@ -60,11 +61,7 @@ def _form_data(data):
     if data is None:
         return {}
     items = data.items() if hasattr(data, "items") else dict(data).items()
-    return {
-        str(key).replace("_", "-"): value
-        for key, value in items
-        if key != "stage"
-    }
+    return {str(key).replace("_", "-"): value for key, value in items if key != "stage"}
 
 
 # @testable true
@@ -132,9 +129,7 @@ class IngressMapping:
             "icon": field.icon,
             "choices": bool(field.choices),
             "fuzzy_import": bool(
-                field.choices
-                or isinstance(field, Link)
-                and field.is_entity_valued
+                field.choices or isinstance(field, Link) and field.is_entity_valued
             ),
             "type": field.get("type"),
         }
@@ -204,9 +199,7 @@ class IngressMapping:
 
     # @testable infrastructure
     def ignore(self, column_id):
-        return self.entity.properties.assign_columns.section.get(
-            f"ignore-{column_id}"
-        )
+        return self.entity.properties.assign_columns.section.get(f"ignore-{column_id}")
 
     # @testable infrastructure
     def guess_field(self, column_id):
@@ -323,9 +316,7 @@ class IngressMapping:
     # @testable infrastructure
     def page_form(self):
         if self._page_form is None and self.verify_section.get("page-form-id"):
-            self._page_form = Entities.FORM(
-                self.verify_section.get("page-form-id")
-            )
+            self._page_form = Entities.FORM(self.verify_section.get("page-form-id"))
         return self._page_form
 
     @property
@@ -333,9 +324,7 @@ class IngressMapping:
     def page_options(self):
         if self._page_options is not None:
             return self._page_options
-        options = [
-            {"id": "name", "label": "Name", "icon": "text", "kind": "page"}
-        ]
+        options = [{"id": "name", "label": "Name", "icon": "text", "kind": "page"}]
         if self.page_form:
             for field in self.page_form.fields.values():
                 if field.get("type") == "input" and field.id != "name":
@@ -363,8 +352,7 @@ class IngressMapping:
             (
                 field
                 for field in self.file_options
-                if field["id"] == "name"
-                or field.get("label", "").lower() == "name"
+                if field["id"] == "name" or field.get("label", "").lower() == "name"
             ),
             None,
         )
@@ -456,7 +444,9 @@ class IngressMutationPlanner:
     def fuzzy_match(self, field_id):
         verify = self.entity.properties.verify_import
         method = getattr(verify, "fuzzy_match", None)
-        return method(field_id) if callable(method) else self.mapping.fuzzy_match(field_id)
+        return (
+            method(field_id) if callable(method) else self.mapping.fuzzy_match(field_id)
+        )
 
     @property
     # @testable infrastructure
@@ -503,8 +493,7 @@ class IngressMutationPlanner:
                 if created and created.new_history_created:
                     for history in created.new_history_created:
                         text = (
-                            "Completed on "
-                            f"{history.completed_on.strftime('%d %b %Y')}"
+                            f"Completed on {history.completed_on.strftime('%d %b %Y')}"
                         )
                         result.setdefault("history", []).append(text)
                 if created:
@@ -655,9 +644,7 @@ class IngressMutationPlanner:
     def _get_due_date(self, row, task):
         due_dates = [row.get(cid) for cid in self.field_map.get("due_date", [])]
         parsed = [
-            self.dates.parse_imported_date_as_utc(value)
-            for value in due_dates
-            if value
+            self.dates.parse_imported_date_as_utc(value) for value in due_dates if value
         ] + [task.due_date]
         parsed = [value for value in parsed if value]
         return max(parsed) if parsed else None
@@ -668,9 +655,7 @@ class IngressMutationPlanner:
         return sorted(
             value
             for value in (
-                self.dates.parse_imported_date_as_utc(raw)
-                for raw in values
-                if raw
+                self.dates.parse_imported_date_as_utc(raw) for raw in values if raw
             )
             if value
         )
@@ -749,14 +734,13 @@ class IngressMutationPlanner:
         task_name = " ".join(
             str(row.get(column_id)).strip()
             for column_id in self.field_map.get("task_name", [])
-            if row.get(column_id) is not None
-            and str(row.get(column_id)).strip()
+            if row.get(column_id) is not None and str(row.get(column_id)).strip()
         )
         verify = self.entity.properties.verify_import
-        map_to_value = to_validate.get(verify.index_from) or row.get(
-            verify.index_from
+        map_to_value = to_validate.get(verify.index_from) or row.get(verify.index_from)
+        target = (
+            getattr(verify, "index_to_field", None) or self.mapping.index_to_field or {}
         )
-        target = getattr(verify, "index_to_field", None) or self.mapping.index_to_field or {}
         field_label = target.get("label")
         if isinstance(map_to_value, list):
             map_to_value = " ".join(
@@ -780,8 +764,7 @@ class IngressMutationPlanner:
             {
                 "page": page,
                 "form": self.entity.form,
-                "name": task_name
-                or self.entity.properties.choose_parent.task_name,
+                "name": task_name or self.entity.properties.choose_parent.task_name,
                 "description": to_validate.get("description"),
                 "model": self.entity.model,
                 "project": self.entity.project,
@@ -858,10 +841,7 @@ class IngressService:
                 "highest_completed": IngressStage.PROCESS_CSV.name,
                 "configuration_revision": 1,
                 "process_csv": {
-                    **{
-                        key.replace("_", "-"): value
-                        for key, value in metadata.items()
-                    },
+                    **{key.replace("_", "-"): value for key, value in metadata.items()},
                     "complete": True,
                 },
             }
@@ -968,9 +948,7 @@ class IngressService:
             highest = IngressStage[highest_name]
         except (KeyError, TypeError):
             return target == IngressStage.PROCESS_CSV
-        return target.value <= min(
-            highest.value + 1, IngressStage.VERIFY_IMPORT.value
-        )
+        return target.value <= min(highest.value + 1, IngressStage.VERIFY_IMPORT.value)
 
     # @testable infrastructure
     def navigate(self, target, *, save=True):
@@ -1010,9 +988,9 @@ class IngressService:
             return section
         section.clear()
         section.update(submitted)
-        self.workflow["configuration_revision"] = int(
-            self.workflow.get("configuration_revision") or 0
-        ) + 1
+        self.workflow["configuration_revision"] = (
+            int(self.workflow.get("configuration_revision") or 0) + 1
+        )
         self._invalidate_from(stage)
         if save:
             self.save()
@@ -1202,9 +1180,7 @@ class IngressService:
             status.index_to = "name"
             status.index_field_choice = "name"
             status.fuzzy_page = True
-        if not all(
-            [status.index_from, status.index_to, status.index_field_choice]
-        ):
+        if not all([status.index_from, status.index_to, status.index_field_choice]):
             raise ValidationError("Please set the page index field")
 
     # @testable infrastructure
@@ -1222,9 +1198,9 @@ class IngressService:
         else:
             status.page_form_id = value
         status.complete = None
-        self.workflow["configuration_revision"] = int(
-            self.workflow.get("configuration_revision") or 0
-        ) + 1
+        self.workflow["configuration_revision"] = (
+            int(self.workflow.get("configuration_revision") or 0) + 1
+        )
         self.save()
         return IngressMapping(self.entity)
 
@@ -1254,9 +1230,7 @@ class IngressService:
                 "status": IngressRunStatus.QUEUED.value,
                 "cursor": 0,
                 "total_rows": len(self.entity.properties.rows.asset),
-                "dispatch_sequence": int(
-                    self.execution.get("dispatch_sequence") or 0
-                )
+                "dispatch_sequence": int(self.execution.get("dispatch_sequence") or 0)
                 + 1,
             }
         )
@@ -1275,9 +1249,9 @@ class IngressService:
         }:
             raise IngressTransitionError("Only stopped or failed imports can restart.")
         self.execution["status"] = IngressRunStatus.QUEUED.value
-        self.execution["dispatch_sequence"] = int(
-            self.execution.get("dispatch_sequence") or 0
-        ) + 1
+        self.execution["dispatch_sequence"] = (
+            int(self.execution.get("dispatch_sequence") or 0) + 1
+        )
         for key in ("error", "lease_token", "lease_expires"):
             self.execution.pop(key, None)
         self.save()
@@ -1305,7 +1279,7 @@ class IngressService:
             self.execution.pop("lease_token", None)
             self.execution.pop("lease_expires", None)
             return self.progress()
-        updated = database.update_ingress_status(
+        updated = ingress_database.update_ingress_status(
             self.entity,
             IngressRunStatus.STOPPED.value,
             now,
@@ -1317,7 +1291,9 @@ class IngressService:
     # @testable infrastructure
     def _replace_from_raw(self, raw):
         replacement = Entities.INGRESS(raw)
-        replacement = Entities.fetch_one(replacement, request=Fetch.direct()) or replacement
+        replacement = (
+            Entities.fetch_one(replacement, request=Fetch.direct()) or replacement
+        )
         self.entity = replacement
         return replacement
 
@@ -1429,9 +1405,9 @@ class IngressService:
         self.execution.pop("lease_token", None)
         self.execution.pop("lease_expires", None)
         if dispatch_next:
-            self.execution["dispatch_sequence"] = int(
-                self.execution.get("dispatch_sequence") or 0
-            ) + 1
+            self.execution["dispatch_sequence"] = (
+                int(self.execution.get("dispatch_sequence") or 0) + 1
+            )
         if complete:
             self._mark_completed()
 
@@ -1445,7 +1421,7 @@ class IngressService:
                 "reason": "committed",
                 "execution": dict(self.execution),
             }
-        committed = database.commit_ingress_row(
+        committed = ingress_database.commit_ingress_row(
             self.entity,
             cursor,
             self.entity,
@@ -1495,7 +1471,7 @@ class IngressService:
             self.execution.pop("lease_token", None)
             self.execution.pop("lease_expires", None)
         else:
-            updated = database.update_ingress_status(
+            updated = ingress_database.update_ingress_status(
                 self.entity,
                 IngressRunStatus.FAILED.value,
                 now,
@@ -1519,9 +1495,7 @@ class IngressService:
         status = self.run_status
         actions = []
         if self.stage in CONFIGURATION_STAGES and status == "idle":
-            actions.extend(
-                [IngressAction.NAVIGATE.value, IngressAction.ADVANCE.value]
-            )
+            actions.extend([IngressAction.NAVIGATE.value, IngressAction.ADVANCE.value])
             if self.stage == IngressStage.VERIFY_IMPORT:
                 actions.append(IngressAction.START.value)
         elif self.stage == IngressStage.IMPORTING:

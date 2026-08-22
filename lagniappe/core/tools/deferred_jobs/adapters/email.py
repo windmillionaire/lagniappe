@@ -1,40 +1,22 @@
 """Deferred-job adapters for the email domain."""
 
-from copy import deepcopy
 import hashlib
-import json
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
     AI,
     Action,
     DeferredJobSpec,
-    DeferredJobInspection,
     DeferredJobPhase,
     DeferredJobStatus,
     DeferredJobType,
     Fetch,
-    FetchReason,
     FileConsumer,
-    Resource,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai, database, dates, files, site_export
-from lagniappe.core.tools.database import assets as storage_assets
+from lagniappe.core.tools import ai, database
 
 from .base import DeferredJobAdapter
-from ..errors import (
-    DeferredJobDependencyFailedError,
-    DeferredJobDependencyPendingError,
-    DeferredJobDriftError,
-)
-from ..locks import (
-    AUTOFILL_FORM_LOCK_SCOPE,
-    active_deferred_job_lock,
-    deferred_job_lock_key,
-)
-
-
 
 
 # @testable true
@@ -86,7 +68,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
     def prepare(self, context):
         from lagniappe import CONFIG
         from lagniappe.core.definitions import enforce_file_consumer
-        from lagniappe.core.tools.ai_email import (
+        from lagniappe.core.tools.email.ai import (
             AIEmailRejection,
             ResendAIEmailClient,
             send_report_feedback,
@@ -160,12 +142,16 @@ class EmailIngestAdapter(DeferredJobAdapter):
                     upload.close()
                 total_bytes += actual_size
             else:
-                total_bytes += int(getattr(file, "size", 0) or attachment.get("size") or 0)
+                total_bytes += int(
+                    getattr(file, "size", 0) or attachment.get("size") or 0
+                )
             if file.key not in attached:
                 input_files.append(file)
                 attached[file.key] = file
                 report.input_files = input_files
-                report.summary = f"Preparing files ({index + 1} of {len(attachments)})..."
+                report.summary = (
+                    f"Preparing files ({index + 1} of {len(attachments)})..."
+                )
                 context.ensure_active()
                 Entities.save(file, report, actor)
 
@@ -263,7 +249,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
         }
 
     def failure(self, context, error):
-        from lagniappe.core.tools.ai_email import (
+        from lagniappe.core.tools.email.ai import (
             AIEmailProviderError,
             AIEmailRejection,
         )
@@ -290,10 +276,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
         code = str(context.parameters.get("_diagnostic_code") or "")
         if code not in diagnostic_codes:
             code = "email_ingest_failed"
-        message = (
-            "The email submission could not be prepared. "
-            f"Diagnostic: {code}."
-        )
+        message = f"The email submission could not be prepared. Diagnostic: {code}."
         if isinstance(error, AIEmailRejection):
             message = f"{message} {error.public_message}"
         elif isinstance(error, AIEmailProviderError):
@@ -323,7 +306,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
         return report if isinstance(report, Entities.REPORT) else None
 
     def external_delivery(self, context, *, succeeded, error=None):
-        from lagniappe.core.tools.ai_email import send_report_feedback
+        from lagniappe.core.tools.email.ai import send_report_feedback
 
         return send_report_feedback(
             context.input("report"),

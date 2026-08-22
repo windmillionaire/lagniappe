@@ -78,7 +78,7 @@ def create_ordinary_notification(user, *, identifier, body, target=None):
     notification = Entities.fetch_one(row, request=Fetch.direct())
     if created:
         try:
-            from ..notification_email import capture as email_capture
+            from ..email.notifications import capture as email_capture
 
             email_capture.record_notification_event(
                 user,

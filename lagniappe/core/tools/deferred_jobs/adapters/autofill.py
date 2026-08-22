@@ -2,24 +2,20 @@
 
 from copy import deepcopy
 import hashlib
-import json
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
     AI,
     Action,
-    DeferredJobSpec,
     DeferredJobInspection,
     DeferredJobPhase,
-    DeferredJobStatus,
     DeferredJobType,
     Fetch,
     FetchReason,
     FileConsumer,
-    Resource,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai, database, dates, files, site_export
+from lagniappe.core.tools import ai, database, dates
 from lagniappe.core.tools.database import assets as storage_assets
 
 from .base import DeferredJobAdapter
@@ -33,8 +29,6 @@ from ..locks import (
     active_deferred_job_lock,
     deferred_job_lock_key,
 )
-
-
 
 
 # @testable infrastructure
@@ -356,11 +350,7 @@ class AutofillAdapter(DeferredJobAdapter):
                 "id"
             )
             operation = getattr(context.job, "urlsafe_key", None)
-            if (
-                context.parameters.get("lock_target", True)
-                and target_key
-                and operation
-            ):
+            if context.parameters.get("lock_target", True) and target_key and operation:
                 lock_key = deferred_job_lock_key(target_key)
                 database.release_deferred_job_lock(lock_key, operation)
             if target_key and operation:

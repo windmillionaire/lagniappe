@@ -6,9 +6,10 @@ from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import dates, filters, task_queue
-from lagniappe.core.tools.notification_email import delivery as email_delivery
-from lagniappe.core.tools.notification_email.errors import NotificationEmailError
+from lagniappe.core.tools import dates, filters
+from lagniappe.core.tools.services import task_queue
+from lagniappe.core.tools.email.notifications import delivery as email_delivery
+from lagniappe.core.tools.email.notifications.errors import NotificationEmailError
 from lagniappe.core.tools.notifications.service import create_process_notification
 from lagniappe.core.tools.deferred_jobs.errors import DeferredJobInfrastructureError
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs

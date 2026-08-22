@@ -26,7 +26,8 @@ from google.cloud.storage import _signing as storage_signing
 from google.cloud.datastore.query import PropertyFilter
 
 from lagniappe import CONFIG
-from lagniappe.core.tools import location, task_queue
+from lagniappe.core.tools.services import places as location
+from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.ai.core import GenAI
 from lagniappe.core.tools.database import assets
 from lagniappe.core.tools.database.core import DATA
@@ -50,9 +51,8 @@ def _assert_xml_error_response(response, *, status, code):
 def require_impersonated_runtime_adc():
     """Keep live runtime contracts scoped to short-lived runtime ADC."""
     credentials = CONFIG.google_credentials
-    principal = (
-        getattr(credentials, "service_account_email", None)
-        or getattr(credentials, "signer_email", None)
+    principal = getattr(credentials, "service_account_email", None) or getattr(
+        credentials, "signer_email", None
     )
     assert principal == CONFIG.RUNTIME_SERVICE_ACCOUNT_EMAIL, (
         "The testing configuration did not impersonate the saved runtime "
@@ -86,9 +86,7 @@ def test_runtime_effective_permissions_exclude_provisioning_authority():
     assert forbidden_project_permissions.isdisjoint(effective.permissions)
 
     iam_client = iam_admin_v1.IAMClient(credentials=CONFIG.google_credentials)
-    service_account_resource = (
-        f"projects/{project_id}/serviceAccounts/{runtime_email}"
-    )
+    service_account_resource = f"projects/{project_id}/serviceAccounts/{runtime_email}"
     service_account_permissions = iam_client.test_iam_permissions(
         request={
             "resource": service_account_resource,
@@ -229,14 +227,8 @@ def test_runtime_task_create_delete_and_scheduler_oidc_delivery(monkeypatch):
 def test_runtime_document_ai_vertex_ai_and_places_operations():
     """Exercise the three runtime consumer APIs with the runtime credential."""
     probe_id = _probe_id()
-    sample_pdf = (
-        Path(__file__).resolve().parents[2]
-        / "files"
-        / "sample_document.pdf"
-    )
-    blob = DATA.private_bucket.blob(
-        f"setup-runtime-contract/{probe_id}.pdf"
-    )
+    sample_pdf = Path(__file__).resolve().parents[2] / "files" / "sample_document.pdf"
+    blob = DATA.private_bucket.blob(f"setup-runtime-contract/{probe_id}.pdf")
     try:
         blob.upload_from_filename(
             sample_pdf,

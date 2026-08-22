@@ -27,13 +27,13 @@ from lagniappe.core.mixins.submitter import SubmitterMixin
 from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
 from lagniappe.core.properties.deferred_job_request import RequestFingerprint
 from lagniappe.core.properties import deferred_job_lifecycle
-from lagniappe.core.tools import database, task_queue
+from lagniappe.core.tools import database
+from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.deferred_jobs import dispatch as deferred_dispatch
 from lagniappe.core.tools.deferred_jobs import service as deferred_service
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.database import deferred_jobs as deferred_database
-from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.deferred_jobs import common as deferred_common
 from lagniappe.core.tools.deferred_jobs import retry as deferred_retry
 from lagniappe.core.tools.deferred_jobs.adapters.base import DeferredJobAdapter
@@ -81,7 +81,6 @@ from testing.utility.test_entities import TestEntities
 
 
 pytestmark = pytest.mark.unit
-
 
 
 # @features deferred-jobs
@@ -145,8 +144,6 @@ def test_cancel_deletes_tasks_and_persists_a_tombstone(
     assert operation_projection == [job]
 
 
-
-
 # @pairs deferred-jobs:redis-projection deferred-jobs:cache-failure-isolation
 # @source lagniappe/core/tools/deferred_jobs/common.py::_publish_operation_projection
 def test_operation_projection_failure_is_nonfatal(monkeypatch):
@@ -178,8 +175,6 @@ def test_operation_projection_failure_is_nonfatal(monkeypatch):
             "operation": "status_projection",
         }
     }
-
-
 
 
 # @pairs deferred-jobs:terminal-delivery cloud-scheduler:datastore-read-isolation
@@ -222,8 +217,6 @@ def test_terminal_release_reuses_committed_scheduler_control(monkeypatch):
     assert synchronized == [{"control": control}]
 
 
-
-
 # @features deferred-jobs notifications
 # @dimensions long-running feedback terminal-safety
 def test_long_running_feedback_updates_pending_notification(monkeypatch):
@@ -252,8 +245,6 @@ def test_long_running_feedback_updates_pending_notification(monkeypatch):
 
     assert registry.feedback(job.urlsafe_key) is False
     assert saved == []
-
-
 
 
 # @features deferred-jobs notifications
@@ -295,8 +286,6 @@ def test_long_running_feedback_dispatch_is_delayed_and_deterministic(monkeypatch
     ]
 
 
-
-
 # @pair deferred-jobs:dispatch
 # @pair deferred-jobs:disabled-queue
 # @pair deferred-jobs:task-identity
@@ -325,8 +314,6 @@ def test_production_dispatch_rejects_disabled_task_queue(monkeypatch):
         match="did not return a task identity",
     ):
         registry.dispatch(job, attempt=1)
-
-
 
 
 # @pair deferred-jobs:transient-dispatch
@@ -371,10 +358,11 @@ def test_start_retains_site_export_intent_after_provider_enqueue_failure(monkeyp
         lambda _context: provider_or_apply_calls.append("apply") or {},
     )
     monkeypatch.setattr(
-        site_adapters.database,
-        "update_site_export",
-        lambda export_id, updates: export_updates.append((export_id, updates))
-        or updates,
+        site_adapters.export_database,
+        "update",
+        lambda export_id, updates: (
+            export_updates.append((export_id, updates)) or updates
+        ),
     )
 
     returned_job, returned_notification = registry.start(
@@ -402,8 +390,6 @@ def test_start_retains_site_export_intent_after_provider_enqueue_failure(monkeyp
     assert export_updates == []
     assert provider_or_apply_calls == []
     assert len(state["saved"]) == 3
-
-
 
 
 # @features deferred-jobs
@@ -438,8 +424,6 @@ def test_start_dispatch_marker_does_not_overwrite_a_fast_worker(monkeypatch):
     assert getattr(returned_job, "task_identity", None) is None
 
 
-
-
 # @pair deferred-jobs:start
 # @pair deferred-jobs:operation-fingerprint
 # @pair deferred-jobs:mismatch
@@ -471,8 +455,6 @@ def test_start_rejects_operation_id_reuse_for_different_request(monkeypatch):
         )
 
     assert "job" not in state
-
-
 
 
 # @pair deferred-jobs:retention
@@ -536,7 +518,7 @@ def test_delete_terminal_jobs_preserves_active_and_incomplete_delivery(monkeypat
         delete_multi=lambda keys: deleted_batches.append(list(keys)),
     )
     monkeypatch.setattr(
-        deferred_service,
+        deferred_database,
         "DATA",
         SimpleNamespace(datastore=datastore),
     )
@@ -550,8 +532,6 @@ def test_delete_terminal_jobs_preserves_active_and_incomplete_delivery(monkeypat
     assert deleted_batches == [["completed"], ["replaced"]]
     assert query.order == ["created"]
     assert len(query.filters) == 1
-
-
 
 
 # @features deferred-jobs

@@ -216,7 +216,7 @@ def test_user_profile_photo_value_asset_lifecycle_and_google_download():
 
     user.db["photo"] = "https://example.test/google-photo.jpg"
     with patch(
-        "lagniappe.core.properties.user_entity.utility.download_image",
+        "lagniappe.core.properties.user_entity.download_image",
         return_value={"success": False},
     ) as download:
         user.properties.photo.save_google_photo()
@@ -225,7 +225,7 @@ def test_user_profile_photo_value_asset_lifecycle_and_google_download():
     assert user.save_asset.call_count == 1
 
     with patch(
-        "lagniappe.core.properties.user_entity.utility.download_image",
+        "lagniappe.core.properties.user_entity.download_image",
         return_value={"success": True, "file": b"downloaded-photo"},
     ):
         user.properties.photo.save_google_photo()
@@ -859,9 +859,11 @@ def test_user_entity_create_save_load_owner_page_and_groups():
     assert created.page is page
     assert page.user is created
     assert page.model is users_model
-    assert [category.hash for category in page.categories] == [
-        page_category.hash
-    ] == ["cat009user"]
+    assert (
+        [category.hash for category in page.categories]
+        == [page_category.hash]
+        == ["cat009user"]
+    )
     assert created.db["photo"] == "https://example.test/photo.jpg"
     assert created.is_owner is True
     assert created.ai_access == "CREATE"

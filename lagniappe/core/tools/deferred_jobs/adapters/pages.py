@@ -1,40 +1,20 @@
 """Deferred-job adapters for the pages domain."""
 
 from copy import deepcopy
-import hashlib
-import json
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
     AI,
     Action,
-    DeferredJobSpec,
     DeferredJobInspection,
     DeferredJobPhase,
-    DeferredJobStatus,
     DeferredJobType,
     Fetch,
-    FetchReason,
-    FileConsumer,
-    Resource,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai, database, dates, files, site_export
-from lagniappe.core.tools.database import assets as storage_assets
+from lagniappe.core.tools import ai, database
 
 from .base import DeferredJobAdapter
-from ..errors import (
-    DeferredJobDependencyFailedError,
-    DeferredJobDependencyPendingError,
-    DeferredJobDriftError,
-)
-from ..locks import (
-    AUTOFILL_FORM_LOCK_SCOPE,
-    active_deferred_job_lock,
-    deferred_job_lock_key,
-)
-
-
 
 
 # @testable infrastructure
@@ -52,9 +32,13 @@ class PageGenerationAdapter(DeferredJobAdapter):
         super().authorize(context)
         category = context.input("category")
         if not isinstance(context.actor, Entities.USER):
-            raise exceptions.ValidationError("Deferred page generation user is invalid.")
+            raise exceptions.ValidationError(
+                "Deferred page generation user is invalid."
+            )
         if not isinstance(category, Entities.CATEGORY):
-            raise exceptions.ValidationError("Deferred page generation category is invalid.")
+            raise exceptions.ValidationError(
+                "Deferred page generation category is invalid."
+            )
         if not category.allowed(Action.EDIT, user=context.actor):
             raise exceptions.ValidationError(
                 "You do not have permission to edit this category."

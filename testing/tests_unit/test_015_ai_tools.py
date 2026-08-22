@@ -12,8 +12,8 @@ from config import ai_models as config_ai_models
 from config import ai_settings as config_ai_settings
 from lagniappe.core import exceptions
 from lagniappe.core.entities.history import TaskHistory
-from lagniappe.core.tools import ai_settings as runtime_ai_settings_module
-from lagniappe.core.tools import task_queue
+from lagniappe.core.tools.ai import settings as runtime_ai_settings_module
+from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.ai import (
     autofill,
     category,
@@ -70,7 +70,7 @@ WORD_NS = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 
 @pytest.fixture(autouse=True)
 def deployment_ai_model_defaults(monkeypatch):
-    monkeypatch.setattr(runtime_ai_settings_module.database.get, "site_ai", lambda: None)
+    monkeypatch.setattr(runtime_ai_settings_module.site_database, "ai", lambda: None)
 
 
 def model_response(text=None, finish_reason=None):
@@ -439,7 +439,9 @@ def test_ai_model_cleanup_extracts_json_text_and_blocked_responses():
     assert extracted == {"name": "Ada "}
 
     with pytest.raises(exceptions.AIException, match="Content generation blocked"):
-        ai_core.GenAI._extract_text(model_response("Nope", finish_reason="SAFETY"), "TEXT")
+        ai_core.GenAI._extract_text(
+            model_response("Nope", finish_reason="SAFETY"), "TEXT"
+        )
 
     assert ai_core.GenAI._extract_text(SimpleNamespace(candidates=[]), "TEXT") is None
 
@@ -491,9 +493,7 @@ def test_ai_config_combines_search_tools_json_and_thinking_settings():
     }
     assert len(config.tools) == 1
     assert config.tools[0].google_search is not None
-    assert [fd.name for fd in config.tools[0].function_declarations] == [
-        "get_entity"
-    ]
+    assert [fd.name for fd in config.tools[0].function_declarations] == ["get_entity"]
 
     with pytest.raises(ValueError, match="Service tier"):
         prompt.set_service_tier("fastest")
@@ -528,10 +528,7 @@ def test_deferred_ai_config_uses_short_sdk_retry_profile():
         config = ai_core.GenAI.create_config(prompt)
 
     assert config.http_options.retry_options.attempts == 2
-    assert (
-        ai_core.GenAI.create_config(prompt).http_options.retry_options.attempts
-        == 5
-    )
+    assert ai_core.GenAI.create_config(prompt).http_options.retry_options.attempts == 5
 
 
 # @features ai deferred-jobs
@@ -589,9 +586,7 @@ def test_ai_model_tier_routes_generation_to_primary_or_utility_model(monkeypatch
 
     primary_prompt = Prompt("Primary").set_output_format("TEXT")
     utility_prompt = (
-        Prompt("Utility")
-        .set_output_format("TEXT")
-        .set_model_tier("utility")
+        Prompt("Utility").set_output_format("TEXT").set_model_tier("utility")
     )
 
     assert generator.generate_content(primary_prompt) == "primary-model response"
@@ -627,8 +622,8 @@ def test_ai_runtime_settings_override_deployment_defaults(monkeypatch):
     monkeypatch.setattr(ai_core.CONFIG, "AI_LOCATION", "global", raising=False)
 
     monkeypatch.setattr(
-        runtime_ai_settings_module.database.get,
-        "site_ai",
+        runtime_ai_settings_module.site_database,
+        "ai",
         lambda: {
             "AI_MODEL": "runtime-primary",
             "AI_UTILITY_MODEL": "runtime-utility",
@@ -645,7 +640,7 @@ def test_ai_runtime_settings_override_deployment_defaults(monkeypatch):
         "AI_LOCATION": "global",
     }
 
-    monkeypatch.setattr(runtime_ai_settings_module.database.get, "site_ai", lambda: None)
+    monkeypatch.setattr(runtime_ai_settings_module.site_database, "ai", lambda: None)
     assert ai_core.runtime_ai_settings() == {
         "AI_MODEL": "deployed-primary",
         "AI_UTILITY_MODEL": "deployed-utility",
@@ -837,7 +832,10 @@ def test_ai_function_call_dispatch_serializes_caches_and_attaches_files(monkeypa
     assert responses[0].function_response.response == {
         "result": '{"name": "File", "id": "file-1"}'
     }
-    assert responses[1].function_response.response == responses[0].function_response.response
+    assert (
+        responses[1].function_response.response
+        == responses[0].function_response.response
+    )
     assert responses[2].function_response.response == {
         "result": '{"error": "Unknown function: missing_tool"}'
     }
@@ -1276,9 +1274,7 @@ def test_get_form_instances_filters_permissions_status_and_truncates(monkeypatch
     assert completed_result["truncated"] is True
     assert completed_result["instances"][0]["completed"] is True
     assert completed_result["instances"][0]["can_edit"] is False
-    assert completed_result["instances"][0]["submission"] == {
-        "select-status": "paid"
-    }
+    assert completed_result["instances"][0]["submission"] == {"select-status": "paid"}
     assert completed_result["instances"][0]["page"] == {
         "hash": "hash:page-1",
         "kind": "page",
@@ -1360,7 +1356,9 @@ def test_get_entity_returns_full_form_schema_for_ai_autofill(monkeypatch):
             "options": [{"label": "Plumbing", "value": "plumbing"}],
         },
     ]
-    form = TestEntities.get("FORM", {"name": "Professional / Trades", "hash": "form-ai"})
+    form = TestEntities.get(
+        "FORM", {"name": "Professional / Trades", "hash": "form-ai"}
+    )
     form.form_type = "page"
     form.schema = schema_definition
     user = SimpleNamespace(
@@ -1369,9 +1367,7 @@ def test_get_entity_returns_full_form_schema_for_ai_autofill(monkeypatch):
         has_permission=lambda *args, **kwargs: True,
     )
 
-    monkeypatch.setattr(
-        ai_get_entity.Entities, "fetch_one", lambda key, request: form
-    )
+    monkeypatch.setattr(ai_get_entity.Entities, "fetch_one", lambda key, request: form)
 
     result = ai_get_entity.execute_get_entity({"id": "form-ai"}, user)
 
@@ -1407,9 +1403,7 @@ def test_get_entity_returns_model_task_form_schema_for_ai_autofill(monkeypatch):
     project = TestEntities.get(
         "PROJECT", {"name": "Home Remodeling", "hash": "project-ai"}
     )
-    form = TestEntities.get(
-        "FORM", {"name": "Invoice", "hash": "invoice-form-ai"}
-    )
+    form = TestEntities.get("FORM", {"name": "Invoice", "hash": "invoice-form-ai"})
     form.form_type = "task"
     form.schema = schema_definition
     model = TestEntities.get(
@@ -1424,9 +1418,7 @@ def test_get_entity_returns_model_task_form_schema_for_ai_autofill(monkeypatch):
         has_permission=lambda *args, **kwargs: True,
     )
 
-    monkeypatch.setattr(
-        ai_get_entity.Entities, "fetch_one", lambda key, request: model
-    )
+    monkeypatch.setattr(ai_get_entity.Entities, "fetch_one", lambda key, request: model)
 
     result = ai_get_entity.execute_get_entity({"id": "invoice-model-ai"}, user)
 
@@ -1598,9 +1590,7 @@ def test_get_schema_returns_schema_for_form_bearing_entities(monkeypatch):
         is_owner=True,
         has_permission=lambda *args, **kwargs: True,
     )
-    form = TestEntities.get(
-        "FORM", {"name": "Invoice", "hash": "schema-invoice-form"}
-    )
+    form = TestEntities.get("FORM", {"name": "Invoice", "hash": "schema-invoice-form"})
     form.form_type = "task"
     form.schema = schema_definition
     category = TestEntities.get(
@@ -1862,9 +1852,7 @@ def test_ai_tool_json_generation_pins_runtime_model_through_structured_final_pas
                     "config": config,
                 }
             )
-            return [tool_response, done_response, final_response][
-                len(self.calls) - 1
-            ]
+            return [tool_response, done_response, final_response][len(self.calls) - 1]
 
     monkeypatch.setitem(
         ai_functions.HANDLERS,
@@ -1891,8 +1879,8 @@ def test_ai_tool_json_generation_pins_runtime_model_through_structured_final_pas
         }
 
     monkeypatch.setattr(
-        runtime_ai_settings_module.database.get,
-        "site_ai",
+        runtime_ai_settings_module.site_database,
+        "ai",
         runtime_settings,
     )
 
@@ -2086,7 +2074,9 @@ def test_ai_provider_quota_error_is_wrapped_for_tool_loop(monkeypatch):
 
     assert exc.value.context["ai_provider"]["quota_exhausted"] is True
     assert exc.value.context["ai_tool_loop"]["failed_iteration"] == 1
-    assert exc.value.context["ai_tool_loop"]["trace"][0]["calls"][0]["name"] == "get_file"
+    assert (
+        exc.value.context["ai_tool_loop"]["trace"][0]["calls"][0]["name"] == "get_file"
+    )
 
 
 # @features ai files
@@ -2237,9 +2227,7 @@ def test_get_page_tasks_returns_active_and_completed_tasks(monkeypatch):
             "name": "Prescriptions",
         },
         "tasks": [{"name": "Refill Lisinopril", "completed": False}],
-        "completed_tasks": [
-            {"name": "Atorvastatin Prescription", "completed": True}
-        ],
+        "completed_tasks": [{"name": "Atorvastatin Prescription", "completed": True}],
     }
 
 
@@ -2647,20 +2635,23 @@ def test_ai_generation_validators_reject_bad_payloads_and_clean_citations(monkey
     }
     assert category.validate_category(category_payload) is category_payload
     assert category_payload == {"category_name": "Customers"}
-    assert category.validate_category(
-        {
-            "category_name": "Customers",
-            "form_name": "Customer Form",
-            "form_schema": [
-                {
-                    "id": "input-segment",
-                    "type": "input",
-                    "input": "text",
-                    "title": "Segment",
-                }
-            ],
-        }
-    )["form_name"] == "Customer Form"
+    assert (
+        category.validate_category(
+            {
+                "category_name": "Customers",
+                "form_name": "Customer Form",
+                "form_schema": [
+                    {
+                        "id": "input-segment",
+                        "type": "input",
+                        "input": "text",
+                        "title": "Segment",
+                    }
+                ],
+            }
+        )["form_name"]
+        == "Customer Form"
+    )
     with pytest.raises(exceptions.AIException, match="form_name"):
         category.validate_category(
             {
@@ -2742,7 +2733,9 @@ def test_ai_generation_validators_reject_bad_payloads_and_clean_citations(monkey
             mode="periodic",
         )
     with pytest.raises(exceptions.AIException, match="Could not understand"):
-        dates.validate_schedule({"unit": None, "interval": None, "text": None}, "periodic")
+        dates.validate_schedule(
+            {"unit": None, "interval": None, "text": None}, "periodic"
+        )
 
 
 # @pair ai:validation
@@ -3008,8 +3001,8 @@ def test_ai_image_generation_config_and_provider_error(monkeypatch):
     generator._client = SimpleNamespace(models=FakeModels())
     runtime_settings = {"AI_IMAGE_MODEL": "gemini-3.1-flash-image"}
     monkeypatch.setattr(
-        runtime_ai_settings_module.database.get,
-        "site_ai",
+        runtime_ai_settings_module.site_database,
+        "ai",
         lambda: runtime_settings,
     )
 
@@ -3419,12 +3412,16 @@ def test_ai_task_start_delay_is_bounded(monkeypatch):
 @pytest.mark.unit
 def test_ai_search_entity_urls_and_result_scrubbing():
     assert ai_search.entity_url({"kind": "category", "id": "cat"}) == "/categories/cat"
-    assert ai_search.entity_url(
-        {"kind": "task", "id": "task", "parent": {"id": "page"}}
-    ) == "/tasks/task"
-    assert ai_search.entity_url(
-        {"kind": "model", "id": "model", "parent": {"id": "project"}}
-    ) == "/projects/project/tasks/model?completed=false"
+    assert (
+        ai_search.entity_url({"kind": "task", "id": "task", "parent": {"id": "page"}})
+        == "/tasks/task"
+    )
+    assert (
+        ai_search.entity_url(
+            {"kind": "model", "id": "model", "parent": {"id": "project"}}
+        )
+        == "/projects/project/tasks/model?completed=false"
+    )
     assert ai_search.entity_url({"kind": "file", "id": "file"}) == "/files/file"
 
     formatted = ai_search.format_search_result(

@@ -139,7 +139,7 @@ def _hosted_e2e_browser_cookie(run_id):
     from google.oauth2 import id_token
 
     from lagniappe import CONFIG
-    from lagniappe.core.tools.hosted_e2e_auth import HOSTED_E2E_COOKIE
+    from lagniappe.core.tools.hosted_e2e.auth import HOSTED_E2E_COOKIE
 
     token = id_token.fetch_id_token(google_requests.Request(), CONFIG.BASE_URL)
     session_response = requests.post(
@@ -251,7 +251,7 @@ def setup_test_server():
         lease_acquired = False
         try:
             from lagniappe import CONFIG
-            from lagniappe.core.tools.e2e_lease import E2ELease
+            from lagniappe.core.tools.hosted_e2e.lease import E2ELease
 
             if CONFIG.hosted_e2e_runner:
                 # A stale/delayed job must fail before it can clean shared data.
@@ -565,12 +565,8 @@ def get_user(browser, request, browser_failures, setup_test_server):
                 if user.page and not user.page.is_closed():
                     for msg in user.console_messages:
                         logger.error(f"\n{user.name} Console: {msg}")
-                    capture_on_failure(
-                        user.page, f"{request.node.name} - {user.name}"
-                    )
-        if unexpected and not request.config.getoption(
-            "--browser-failure-diagnostics"
-        ):
+                    capture_on_failure(user.page, f"{request.node.name} - {user.name}")
+        if unexpected and not request.config.getoption("--browser-failure-diagnostics"):
             browser_failures.assert_clean()
     finally:
         for context in list(reversed(contexts)):

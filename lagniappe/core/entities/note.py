@@ -2,7 +2,7 @@ from .entity import Entity
 from ..definitions import Action
 from ..mixins import AssetMixin
 from ..properties import activity
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 
 
 # @testable false

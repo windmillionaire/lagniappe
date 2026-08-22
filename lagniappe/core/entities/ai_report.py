@@ -5,7 +5,7 @@ from ..properties import ai_report_input
 from ..properties import ai_report_process
 from ..properties import ai_report_proposal
 from ..properties import ai_report_result
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 
 
 # @testable true

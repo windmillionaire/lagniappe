@@ -27,7 +27,8 @@ from lagniappe.core.mixins.submitter import SubmitterMixin
 from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
 from lagniappe.core.properties.deferred_job_request import RequestFingerprint
 from lagniappe.core.properties import deferred_job_lifecycle
-from lagniappe.core.tools import database, task_queue
+from lagniappe.core.tools import database
+from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.database import deferred_jobs as deferred_database
@@ -79,7 +80,6 @@ from testing.utility.test_entities import TestEntities
 
 pytestmark = pytest.mark.unit
 from lagniappe.core.tools.deferred_jobs.adapters import files as file_adapters
-
 
 
 # @pairs deferred-jobs:checkpoint file:extraction file:text-asset
@@ -145,8 +145,6 @@ def test_file_extract_adapter_checkpoints_and_applies_text_asset(monkeypatch):
     assert saved == [True]
 
 
-
-
 # @features deferred-jobs file
 # @dimensions authorization validation original-asset fingerprint metadata-isolation
 def test_file_adapter_drift_tracks_the_original_asset():
@@ -180,8 +178,6 @@ def test_file_adapter_drift_tracks_the_original_asset():
         match="original file changed",
     ):
         adapter.validate_apply(context)
-
-
 
 
 # @features deferred-jobs file
@@ -222,8 +218,6 @@ def test_file_summary_terminal_cleanup_starts_extraction_once(monkeypatch, statu
     assert parameters == {}
 
 
-
-
 # @features deferred-jobs file
 # @dimensions summary expected-failure no-duplicate-capture
 def test_file_summary_expected_rejection_is_not_reported_twice(monkeypatch):
@@ -250,8 +244,6 @@ def test_file_summary_expected_rejection_is_not_reported_twice(monkeypatch):
         match="page limit",
     ):
         file_adapters.FileSummarizeAdapter().prepare(context)
-
-
 
 
 # @features deferred-jobs file

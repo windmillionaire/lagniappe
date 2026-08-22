@@ -239,79 +239,6 @@ def category_by_name(name):
     )
 
 
-# --- Site ---
-
-
-# @testable false
-# @reason site config persistence is owned by route/E2E workflows
-def site(key):
-    """Fetch a site config entity by key, creating it if missing."""
-    site = DATA.datastore.get(key)
-    if site:
-        return site
-
-    site = DATA.datastore.entity(key=key)
-    DATA.datastore.put(site)
-
-    return site
-
-
-# @testable infrastructure
-def site_key(identifier):
-    """Build a Datastore key for a site config entry."""
-    return DATA.datastore.key(KINDS.site.value, identifier)
-
-
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @features admin
-# @dimensions metadata public-preview
-def site_image():
-    """Fetch the stored site image metadata entity."""
-    image_key = DATA.datastore.key("site", "image")
-    return DATA.datastore.get(image_key)
-
-
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
-# @features admin
-# @dimensions deployment-settings metadata
-def site_deployment():
-    """Fetch the stored deployment settings metadata entity."""
-    deployment_key = DATA.datastore.key("site", "deployment")
-    return DATA.datastore.get(deployment_key)
-
-
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
-# @features admin
-# @dimensions ai-settings metadata
-def site_ai():
-    """Fetch the stored AI model settings metadata entity."""
-    ai_key = DATA.datastore.key("site", "ai")
-    return DATA.datastore.get(ai_key)
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/database/assets.py::site_export
-# @reason public database API forwards to the metadata helper
-def site_export(export_id):
-    """Fetch a site export metadata record by export id."""
-    from .assets import site_export as _site_export
-
-    return _site_export(export_id)
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/database/assets.py::site_exports
-# @reason public database API forwards to the metadata helper
-def site_exports(limit=10):
-    """Fetch recent site export metadata records."""
-    from .assets import site_exports as _site_exports
-
-    return _site_exports(limit=limit)
-
-
 # @testable false
 # @reason maintenance iterator is persistence-owned and covered by maintenance/E2E workflows
 def all_models():
@@ -803,20 +730,14 @@ def activity(parent, types=("note", "notification")):
 def home_notes(user):
     """Fetch Home-scope notes visible to ``user``."""
     note_filter = Filter().eq("type", "note").eq("scope", "home")
-    notes = (
-        Query(KINDS.activity)
-        .filter(note_filter)
-        .order("-created")
-        .fetch_all()
-    )
+    notes = Query(KINDS.activity).filter(note_filter).order("-created").fetch_all()
 
     if not (getattr(user, "is_admin", False) or getattr(user, "is_owner", False)):
         user_key = datastore_key(user)
         notes = [
             note
             for note in notes
-            if note.get("visibility") == "everyone"
-            or note.get("user") == user_key
+            if note.get("visibility") == "everyone" or note.get("user") == user_key
         ]
 
     return notes

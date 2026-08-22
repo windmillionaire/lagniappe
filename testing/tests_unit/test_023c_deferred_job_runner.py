@@ -27,7 +27,8 @@ from lagniappe.core.mixins.submitter import SubmitterMixin
 from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
 from lagniappe.core.properties.deferred_job_request import RequestFingerprint
 from lagniappe.core.properties import deferred_job_lifecycle
-from lagniappe.core.tools import database, task_queue
+from lagniappe.core.tools import database
+from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.deferred_jobs import control as deferred_control
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.ai import observability
@@ -82,7 +83,6 @@ pytestmark = pytest.mark.unit
 from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
 
 
-
 # @pair deferred-jobs:preparation-context
 # @pair observability:job-type
 # @pair observability:attempt
@@ -106,8 +106,6 @@ def test_runner_supplies_bounded_ai_observability_context_during_prepare(monkeyp
     assert observability._EXECUTION_CONTEXT.get() == observability.AIExecutionContext()
 
 
-
-
 def _registered_ai_job_types():
     registry = DeferredJobService()
     registry.adapter_registry._load_default_adapters()
@@ -121,8 +119,6 @@ def _registered_ai_job_types():
             key=lambda job_type: job_type.value,
         )
     )
-
-
 
 
 # @pair ai-access:tier-declaration
@@ -149,11 +145,8 @@ def test_registered_adapters_declare_required_ai_tiers():
     }
 
     assert {
-        job_type: registry.adapter(job_type).required_ai_access
-        for job_type in expected
+        job_type: registry.adapter(job_type).required_ai_access for job_type in expected
     } == expected
-
-
 
 
 # @pair deferred-jobs:authorization
@@ -197,8 +190,6 @@ def test_registered_ai_adapters_reject_restricted_actor_before_prepare(
     assert result.state is DeferredJobRunState.FAILED
     assert result.error == "This user does not have the required AI access."
     assert prepare_calls == []
-
-
 
 
 # @features deferred-jobs
@@ -249,8 +240,6 @@ def test_runner_rechecks_ai_access_before_apply(monkeypatch):
     assert adapter.prepared == 1
     assert adapter.applied == 0
     assert job.actor.checks == 2
-
-
 
 
 # @features deferred-jobs
@@ -325,8 +314,6 @@ def test_runner_checkpoints_before_apply_and_resumes_without_prepare(monkeypatch
     assert "started" not in legacy_adapter.calls
 
 
-
-
 # @pair deferred-jobs:target-fingerprint
 # @pair deferred-jobs:no-apply
 def test_runner_rejects_changed_target_fingerprint_before_apply(monkeypatch):
@@ -349,8 +336,6 @@ def test_runner_rejects_changed_target_fingerprint_before_apply(monkeypatch):
     assert result.state is DeferredJobRunState.FAILED
     assert result.error == "The target changed while this operation was running."
     assert "apply" not in adapter.calls
-
-
 
 
 # @features deferred-jobs
@@ -409,9 +394,6 @@ def test_execution_control_renews_and_observes_lost_claim(monkeypatch):
         expired.ensure_active()
 
 
-
-
-
 # @features deferred-jobs
 # @dimensions retry
 def test_runner_classifies_wrapped_transient_errors_and_schedules_retry(monkeypatch):
@@ -438,17 +420,13 @@ def test_runner_classifies_wrapped_transient_errors_and_schedules_retry(monkeypa
     assert dispatched == [(job, 2, 60)]
 
 
-
-
 # @features deferred-jobs
 # @dimensions dependency-wait retry provider-attempt-isolation
 def test_runner_waits_for_dependency_without_consuming_provider_retry(monkeypatch):
     job = RunnerJob(attempt=2)
     job.parameters = {"_dependency_waits": 1}
     adapter = RecordingAdapter(
-        error=DeferredJobDependencyPendingError(
-            "summaries are still processing"
-        )
+        error=DeferredJobDependencyPendingError("summaries are still processing")
     )
     registry = make_runner(monkeypatch, job, adapter)
     dispatched = []
@@ -477,14 +455,10 @@ def test_runner_waits_for_dependency_without_consuming_provider_retry(monkeypatc
     assert deferred_retry._provider_retry_attempt(job) == 1
 
 
-
-
 # @features deferred-jobs
 # @dimensions dependency-failure terminal no-duplicate-capture
 def test_runner_fails_cleanly_when_dependency_failed(monkeypatch):
-    error = DeferredJobDependencyFailedError(
-        "attached file summary failed"
-    )
+    error = DeferredJobDependencyFailedError("attached file summary failed")
     job = RunnerJob(attempt=1)
     adapter = RecordingAdapter(error=error)
     registry = make_runner(monkeypatch, job, adapter)
@@ -501,8 +475,6 @@ def test_runner_fails_cleanly_when_dependency_failed(monkeypatch):
     assert result.error == str(error)
     assert job.error["message"] == str(error)
     assert captured == []
-
-
 
 
 # @features deferred-jobs
@@ -533,8 +505,6 @@ def test_runner_retries_sdk_timeout(monkeypatch):
     assert dispatched == [(job, 2, 60)]
 
 
-
-
 # @features deferred-jobs
 # @dimensions provider-errors terminal-message
 def test_runner_retries_sdk_5xx_and_persists_clean_terminal_message(monkeypatch):
@@ -560,8 +530,6 @@ def test_runner_retries_sdk_5xx_and_persists_clean_terminal_message(monkeypatch)
     assert job.error["message"] == MODEL_BUSY_MESSAGE
 
 
-
-
 # @features deferred-jobs
 # @dimensions quota retry backoff jitter
 def test_runner_increases_later_quota_backoff_without_adding_attempts(monkeypatch):
@@ -569,12 +537,10 @@ def test_runner_increases_later_quota_backoff_without_adding_attempts(monkeypatc
     transient_error = google_exceptions.ServiceUnavailable("unavailable")
     monkeypatch.setattr(deferred_retry.random, "randint", lambda start, end: 0)
     assert [
-        deferred_retry._retry_delay(quota_error, attempt)
-        for attempt in range(1, 3)
+        deferred_retry._retry_delay(quota_error, attempt) for attempt in range(1, 3)
     ] == [60, 300]
     assert [
-        deferred_retry._retry_delay(transient_error, attempt)
-        for attempt in range(1, 4)
+        deferred_retry._retry_delay(transient_error, attempt) for attempt in range(1, 4)
     ] == [60, 180, 600]
 
     wrapped = RuntimeError("provider wrapper")
@@ -612,8 +578,6 @@ def test_runner_increases_later_quota_backoff_without_adding_attempts(monkeypatc
     assert terminal_job.error["message"] == MODEL_BUSY_MESSAGE
 
 
-
-
 def test_runner_persists_terminal_domain_failure_without_provider_retry(monkeypatch):
     job = RunnerJob(attempt=1)
     error = ValueError("invalid domain input")
@@ -623,9 +587,7 @@ def test_runner_persists_terminal_domain_failure_without_provider_retry(monkeypa
     monkeypatch.setattr(
         exceptions,
         "capture",
-        lambda captured_error, **kwargs: captured.append(
-            (captured_error, kwargs)
-        ),
+        lambda captured_error, **kwargs: captured.append((captured_error, kwargs)),
     )
 
     result = registry.run(job.urlsafe_key)
@@ -654,8 +616,6 @@ def test_runner_persists_terminal_domain_failure_without_provider_retry(monkeypa
             },
         )
     ]
-
-
 
 
 # @source lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner._finish_terminal_delivery
@@ -732,8 +692,6 @@ def test_email_ingest_notification_is_created_only_for_failure(monkeypatch):
     assert failed_context.notification.pending is False
     assert failed_context.notification in saved
     assert failed_job.delivery["notification"] is True
-
-
 
 
 # @pair deferred-jobs:cancellation

@@ -4,8 +4,6 @@ import hashlib
 import json
 import uuid
 
-from google.cloud.datastore import query as datastore_query
-
 from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
@@ -21,7 +19,6 @@ from lagniappe.core.properties.deferred_job_lifecycle import (
     ACTIVE_STATUSES,
     TERMINAL_STATUSES,
     admin_projection as _admin_projection,
-    datetime_value as _datetime,
     status_projection as _status_projection,
 )
 from lagniappe.core.properties.deferred_job_request import (
@@ -30,8 +27,9 @@ from lagniappe.core.properties.deferred_job_request import (
     RequestFingerprint,
     validate_payload as _validate_payload,
 )
-from lagniappe.core.tools import database, task_queue
-from lagniappe.core.tools.database.core import DATA, KINDS
+from lagniappe.core.tools import database
+from lagniappe.core.tools.database import deferred_jobs as deferred_database
+from lagniappe.core.tools.services import task_queue
 
 from . import scheduler
 from .adapters.registry import DeferredJobAdapterRegistry
@@ -65,7 +63,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
     def adapter(self, job_type):
         return self.adapter_registry.adapter(job_type)
 
-
     # @testable true
     # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_registry_requires_resume_but_tolerates_pause_failure
     # @features deferred-jobs cloud-scheduler
@@ -93,7 +90,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
                     "Background-job recovery could not be enabled. Try again."
                 ) from error
             return None
-
 
     # @testable infrastructure
     # @covered-by lagniappe/core/tools/deferred_jobs/service.py::DeferredJobService.start
@@ -162,7 +158,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
             notification.pending = False
             Entities.save(notification)
         self._sync_reconciler(control=transition.get("scheduler_control"))
-
 
     # @testable true
     # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_create_is_transactionally_idempotent
@@ -438,7 +433,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
 
         return job, notification
 
-
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_cancel_deletes_tasks_and_persists_a_tombstone
     # @features deferred-jobs
@@ -530,7 +524,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
         Entities.save(*[entity for entity in (job, notification) if entity])
         return True
 
-
     # @testable false
     # @covered-by lagniappe/core/tools/deferred_jobs/service.py::DeferredJobService.cancel
     # @reason one-line status-specialized delegation retains cancel as the behavior owner
@@ -541,7 +534,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
             status=DeferredJobStatus.SUPERSEDED,
             message="Operation replaced by a newer request.",
         )
-
 
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_long_running_feedback_updates_pending_notification
@@ -567,7 +559,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
         notification.pending = True
         Entities.save(notification)
         return True
-
 
     # @testable true
     # @tests tests_e2e/002_home/test_002o_deferred_jobs.py::test_poll_operation_is_owner_safe
@@ -595,17 +586,13 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
             statuses.append(projection)
         return statuses
 
-
     # @testable infrastructure
     def recent(self, *, limit=100, now=None):
         """Return privacy-bounded operation rows for the owner dashboard."""
-        query = DATA.datastore.query(kind=KINDS.jobs.value)
-        query.order = ["-modified"]
-        records = list(query.fetch(limit=min(max(int(limit), 1), 250)))
+        records = deferred_database.recent_records(limit)
         jobs = [Entities.DEFERRED_JOB(record) for record in records]
         jobs = Entities.fetch(*jobs, request=Fetch.direct())
         return [_admin_projection(job, now=_utc(now)) for job in jobs]
-
 
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_delete_terminal_jobs_preserves_active_and_incomplete_delivery
@@ -614,37 +601,10 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
     def delete_terminal(self, *, before=None, batch_size=500):
         """Delete retained terminal jobs without interrupting unfinished work."""
         before = _utc(before) if before is not None else None
-        batch_size = max(int(batch_size), 1)
-        query = DATA.datastore.query(kind=KINDS.jobs.value)
-        if before is not None:
-            query.add_filter(
-                filter=datastore_query.PropertyFilter("created", "<", before)
-            )
-            query.order = ["created"]
-
-        deleted = 0
-        keys = []
-        for record in query.fetch():
-            created = _datetime(record.get("created"))
-            if before is not None and (created is None or created >= before):
-                continue
-            if record.get("status") not in TERMINAL_STATUSES:
-                continue
-            if record.get("dispatch_state") == "delivery_pending":
-                continue
-
-            keys.append(record.key)
-            if len(keys) < batch_size:
-                continue
-            DATA.datastore.delete_multi(keys)
-            deleted += len(keys)
-            keys = []
-
-        if keys:
-            DATA.datastore.delete_multi(keys)
-            deleted += len(keys)
-        return deleted
-
+        return deferred_database.delete_terminal_records(
+            before=before,
+            batch_size=batch_size,
+        )
 
 
 DeferredJobs = DeferredJobService()

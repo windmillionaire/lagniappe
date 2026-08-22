@@ -1,7 +1,7 @@
 from flask import g, request
 from flask_login import current_user
 
-from lagniappe.core.tools import link_preview
+from lagniappe.core.tools.links import preview as link_preview
 from lagniappe.web import responses
 from lagniappe.web.auth import logged_in
 
@@ -9,7 +9,7 @@ from . import internal
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/link_preview.py::preview_for_url
+# @covered-by lagniappe/core/tools/links/preview.py::preview_for_url
 # @reason route wrapper delegates preview resolution and safety checks to core helper
 @internal.route("/preview")
 @logged_in

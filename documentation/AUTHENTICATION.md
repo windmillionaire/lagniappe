@@ -11,7 +11,7 @@ Key implementation areas:
   provision authentication.
 - `config/files/lagniappe_settings.yaml` stores runtime-safe authentication
   settings.
-- `lagniappe/core/tools/identity_platform.py` owns server-side Identity
+- `lagniappe/core/tools/services/identity_platform.py` owns server-side Identity
   Platform operations.
 - `lagniappe/web/routes/users/login.py` owns login routes and session creation.
 - `lagniappe/web/templates/users/login.html` and `src/script/login/` own the

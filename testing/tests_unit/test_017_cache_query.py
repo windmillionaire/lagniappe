@@ -11,7 +11,7 @@ from lagniappe.core.tools.cache import details as cache_details
 from lagniappe.core.tools.cache import query, utility
 from lagniappe.core.tools.cache.core import Cache, CacheJSON
 from lagniappe.core.tools.cache.keys import SEARCH_SCORE_FIELD, Keys, Search
-from lagniappe.core.tools import e2e_lease
+from lagniappe.core.tools.hosted_e2e import lease as e2e_lease
 
 
 # @features cache
@@ -469,9 +469,10 @@ def test_search_queries_use_redis_cloud_compatible_tag_syntax(monkeypatch):
 
     monkeypatch.setattr(query, "cache", FakeCache())
 
-    assert query.kind_search(
-        "Alpha", "project", ["models", "abc123"], [], models=True
-    ) == []
+    assert (
+        query.kind_search("Alpha", "project", ["models", "abc123"], [], models=True)
+        == []
+    )
 
     assert calls[0] == (
         "(@name:Alpha*) (@kind:{ project | model }) "
@@ -479,17 +480,19 @@ def test_search_queries_use_redis_cloud_compatible_tag_syntax(monkeypatch):
     )
 
     calls.clear()
-    assert query.kind_search(
-        "Alpha",
-        "project",
-        Restriction.UNRESTRICTED,
-        [],
-        models=True,
-    ) == []
+    assert (
+        query.kind_search(
+            "Alpha",
+            "project",
+            Restriction.UNRESTRICTED,
+            [],
+            models=True,
+        )
+        == []
+    )
 
     assert calls[0] == (
-        "(@name:Alpha*) (@kind:{ project | model }) "
-        "(ismissing(@restricted_to))"
+        "(@name:Alpha*) (@kind:{ project | model }) (ismissing(@restricted_to))"
     )
 
     calls.clear()

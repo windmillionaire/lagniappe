@@ -1,5 +1,5 @@
 from ..definitions import Action
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 from .base_property import Property
 
 

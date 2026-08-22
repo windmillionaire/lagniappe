@@ -2,7 +2,7 @@
 
 from enum import Enum, auto
 
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 from .default import DefaultEnum
 
 

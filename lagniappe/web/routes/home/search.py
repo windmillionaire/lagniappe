@@ -5,7 +5,8 @@ from flask_login import current_user
 
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, collaboration, location
+from lagniappe.core.tools import cache, collaboration
+from lagniappe.core.tools.services import places as location
 from lagniappe.web.auth import logged_in
 from lagniappe.web import responses
 

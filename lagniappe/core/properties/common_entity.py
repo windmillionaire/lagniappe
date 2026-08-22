@@ -7,6 +7,7 @@ from ..definitions import (
     FilterOptions,
     Ordering,
 )
+from ..definitions.identifiers import random_hash, short_hash, short_uuid
 from ..entities import Entities
 from ..exceptions import PropertyError, ValidationError
 from ..mixins import (
@@ -17,7 +18,8 @@ from ..mixins import (
     DetailsMixin,
     FilterMixin,
 )
-from ..tools import cache, database, utility
+from ..tools import cache, database
+from ..tools.files.html import strip_tags
 from .base_db import DBProperty
 
 
@@ -71,9 +73,7 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
     def value(self, value):
         if isinstance(value, list):
             value = " ".join(
-                str(v).strip()
-                for v in value
-                if v is not None and str(v).strip()
+                str(v).strip() for v in value if v is not None and str(v).strip()
             )
         DBProperty.value.fset(self, value or None)
 
@@ -150,9 +150,7 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
         try:
             value_string = (
                 " ".join(
-                    str(v).strip()
-                    for v in value
-                    if v is not None and str(v).strip()
+                    str(v).strip() for v in value if v is not None and str(v).strip()
                 )
                 if isinstance(value, list)
                 else value
@@ -203,7 +201,7 @@ class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty):
 
     @value.setter
     def value(self, value):
-        DBProperty.value.fset(self, utility.strip_tags(value))
+        DBProperty.value.fset(self, strip_tags(value))
 
     @property
     def kind(self):
@@ -544,12 +542,12 @@ class Hash(DetailsMixin, CacheMixin, FilterMixin, AIMixin, DBProperty):
         if isinstance(self.entity, Entities.USER) and self.entity.page:
             self._value = self.entity.page.hash
         elif self.entity.temporary:
-            self._value = utility.random_hash()
+            self._value = random_hash()
 
         if not self.is_set or not self._value:
-            new_hash = utility.short_hash(self.entity.urlsafe_key)
+            new_hash = short_hash(self.entity.urlsafe_key)
             while cache.check_hash(new_hash):
-                new_hash = utility.random_hash()
+                new_hash = random_hash()
             self._value = new_hash
 
         return self._value
@@ -590,7 +588,6 @@ class Attributes(DBProperty):
     # Property Attributes
     _id = "attributes"
     _blank_values = (None,)
-
 
     @property
     def kind(self):
@@ -689,7 +686,7 @@ class PublicID(DBProperty):
     def _create_public_id(self):
         unique_id = False
         while not unique_id:
-            new_id = utility.short_uuid()
+            new_id = short_uuid()
             entity = database.get.public_pages(new_id)
             if not entity:
                 unique_id = new_id

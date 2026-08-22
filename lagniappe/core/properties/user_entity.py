@@ -3,7 +3,7 @@ from ..mixins import ColumnMixin, DateMixin
 from .base_db import DBProperty
 from .base_asset import AssetProperty
 from .base_property import UNSET
-from ..tools import utility
+from ..tools.files.downloads import download_image
 
 
 # @testable true
@@ -81,7 +81,7 @@ class ProfilePhoto(AssetProperty):
 
     def save_google_photo(self):
         if self.entity.db.get("photo"):
-            image = utility.download_image(self.entity.db["photo"])
+            image = download_image(self.entity.db["photo"])
             if image["success"]:
                 self.value = image["file"]
 
@@ -180,9 +180,9 @@ class NotificationEmailPreference(DBProperty):
         previous = self.value
         DBProperty.value.fset(self, name)
         if name == NotificationEmailMode.NONE.name and previous != name:
-            self.entity.db["notification_email_opt_out_epoch"] = int(
-                self.entity.db.get("notification_email_opt_out_epoch") or 0
-            ) + 1
+            self.entity.db["notification_email_opt_out_epoch"] = (
+                int(self.entity.db.get("notification_email_opt_out_epoch") or 0) + 1
+            )
 
 
 # @testable true
@@ -203,14 +203,12 @@ class IsOwner(DBProperty):
         email = str(self.entity.db.get("email") or "").strip().casefold()
         from ..entities import user as user_module
 
-        owner_email = str(
-            getattr(user_module.CONFIG, "ADMIN_EMAIL", "") or ""
-        ).strip().casefold()
+        owner_email = (
+            str(getattr(user_module.CONFIG, "ADMIN_EMAIL", "") or "").strip().casefold()
+        )
         validated_email = getattr(self, "_validated_owner_email", "")
         return bool(
-            stored
-            and email
-            and (email == owner_email or email == validated_email)
+            stored and email and (email == owner_email or email == validated_email)
         )
 
     @value.setter
@@ -220,9 +218,11 @@ class IsOwner(DBProperty):
             email = str(self.entity.db.get("email") or "").strip().casefold()
             from ..entities import user as user_module
 
-            owner_email = str(
-                getattr(user_module.CONFIG, "ADMIN_EMAIL", "") or ""
-            ).strip().casefold()
+            owner_email = (
+                str(getattr(user_module.CONFIG, "ADMIN_EMAIL", "") or "")
+                .strip()
+                .casefold()
+            )
             if enabled and (not owner_email or email != owner_email):
                 raise ValueError("Only the configured primary Owner can be an owner.")
             if not enabled and self.value:
@@ -243,7 +243,9 @@ class IsAdmin(DBProperty):
 
     @property
     def value(self):
-        return bool(getattr(self.entity, "is_owner", False) or DBProperty.value.fget(self))
+        return bool(
+            getattr(self.entity, "is_owner", False) or DBProperty.value.fget(self)
+        )
 
     @value.setter
     def value(self, value):

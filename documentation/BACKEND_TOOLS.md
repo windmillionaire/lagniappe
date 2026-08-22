@@ -1,6 +1,36 @@
 # Backend Tools
 
-The tools layer (`lagniappe/core/tools/`) provides infrastructure services used by entities and routes. It wraps Google Cloud services (Datastore, Cloud Storage, Vertex AI, Cloud Tasks), Redis caching, and various utility functions.
+The tools layer (`lagniappe/core/tools/`) provides application services used by
+entities and routes. It wraps Google Cloud services (Datastore, Cloud Storage,
+Vertex AI, Cloud Tasks), Redis caching, and focused domain workflows.
+
+## Package organization
+
+Keep new tools with the domain or provider boundary they serve. The tools root
+contains only genuinely cross-domain services; helpers do not collect in a
+general-purpose utility module.
+
+| Package | Responsibility |
+|---|---|
+| `ai/` | AI prompts, generation, settings, and observability orchestration |
+| `auth/` | Request-user context and agent-access authentication |
+| `cache/` | Redis persistence and projections |
+| `database/` | All raw Datastore and Cloud Storage access |
+| `deferred_jobs/` | Durable job lifecycle, dispatch, recovery, and adapters |
+| `email/` | Inbound AI email, authentication SMTP, and notification email |
+| `files/` | File inspection, extraction, download, and HTML handling |
+| `hosted_e2e/` | Hosted-test authentication and shared-data leases |
+| `links/` | External link metadata fetching and safe previews |
+| `mentions/`, `messaging/`, `notifications/` | Communication-domain services |
+| `polling/` | Poll request contracts, projections, form state, and refresh deltas |
+| `services/` | External platform clients: Identity Platform, Places, and Cloud Tasks |
+| `site/` | Site administration, exports, images, and recovery configuration |
+| `tasks/` | Task ordering, recurrence/postponement, and combine workflows |
+
+The remaining root modules are deliberate cross-domain boundaries:
+`collaboration.py`, `dates.py`, `diagnostics.py`, and `ingress.py`. Compact
+identifier helpers belong in `core/definitions/identifiers.py` because they are
+used by both durable definitions and tools.
 
 ## Database (`tools/database/`)
 
@@ -58,9 +88,13 @@ Credentials object used by the other runtime Google clients.
 **Query system** (`filter.py`): `Filter` and `Query` classes wrap Datastore queries with a composable filter builder. Supports `eq`, `any_of`, `all_of`, and compound filters.
 
 Deferred-job compare-and-set transactions, lock release, recovery claims, and
-Scheduler-control records live in `database/deferred_jobs.py`. They remain
-available through the public `database` facade; generic entity persistence and
-AI-email event claims remain in `utility.py`.
+Scheduler-control records live in `database/deferred_jobs.py`. AI-email event
+claims live in `database/ai_email.py`; ingress cursor and row transactions live
+in `database/ingress.py`; singleton site settings live in `database/site.py`;
+site-export metadata and source queries live in `database/site_exports.py`;
+analytics and AI-observability records live in `database/analytics.py`.
+Application services import these concrete persistence owners. The public
+`database` facade is limited to broadly shared entity and storage operations.
 
 Messaging-domain persistence follows the same boundary. Atomic conversation
 sequence/unread changes and bounded message queries live in
@@ -113,7 +147,6 @@ Cloud Storage file operations:
 | `get_signed_url(path, expires_in)` | Generate a time-limited signed URL for private files through IAM Credentials `signBlob` |
 | `delete_file(path, visibility)` | Delete a file |
 | `upload_site_image(filename, image_data)` | Upload site branding images to the public bucket |
-| `create_site_export(data)` / `update_site_export(id, updates)` / `site_exports()` | Site-level metadata records for generated exports |
 
 Buckets are addressed by visibility name: **public** (site images, public assets), **private** (user uploads and documents), **history** (document history), and **export** (exploded archive output).
 
@@ -147,9 +180,14 @@ These limits require no datastore migration. Durable File assets use their
 stored size metadata (falling back to Cloud Storage metadata where necessary),
 and temporary direct uploads are reloaded and generation-checked before use.
 
-### Site Export (`site_export.py`)
+### Site export persistence (`site_exports.py`)
 
-Builds owner-started, static HTML archives under the export bucket. The builder writes text objects directly with `save_text`, copies file/document assets with server-side storage copy operations, and writes `manifest.json` last so a completed metadata record always points at a complete archive. Export metadata lives in `KINDS.site` records with `type=site_export`, not as a content entity.
+Owns export metadata and bounded source-query recipes. The archive builder lives
+in `tools/site/exports.py`; it writes text objects with `save_text`, copies
+file/document assets with server-side storage operations, and writes
+`manifest.json` last so a completed metadata record always points at a complete
+archive. Export metadata uses `KINDS.site` records with `type=site_export`, not
+a content entity.
 
 The archive root is `html/YYYY-MM-DD/YYYYMMDDTHHMMSSZ-<short-id>/` and includes `index.html`, category/page/project pages, form schema JSON, copied files, `assets/archive.css`, `README.txt`, and `manifest.json`.
 
@@ -327,7 +365,7 @@ cycle. Properties own only entity-bound values and projections; cross-entity
 transactions, external services, execution, and recovery stay in this tools
 layer.
 
-## AI Email (`tools/ai_email.py`)
+## AI Email (`tools/email/ai.py`)
 
 The AI email service owns the provider-neutral inbound boundary: Svix
 verification, Resend retrieval/download/send calls, exact stored-email and
@@ -784,7 +822,9 @@ File processing utilities for uploads, text extraction, and CSV parsing.
 | `validate.py` | `process_csv()` parses CSV files, `create_schema()` generates form schemas from CSV headers |
 | `extract.py` | `get_file_text()` extracts text from uploaded files, `ocr_file()` uses Document AI for image/PDF OCR |
 | `ooxml.py` | Lightweight `.docx`/`.xlsx` text extraction for AI summary fallback without storing a File text asset |
-| `utility.py` | `determine_encoding()`, `determine_mimetype()`, `htmlize()` |
+| `downloads.py` | Bounded external image download |
+| `html.py` | HTML sanitization, text extraction, cleaning, and plain-text conversion |
+| `utility.py` | Encoding and MIME detection |
 | `constants.py` | MIME type categorizations (document AI, image, preview, text, code) and encoding options |
 
 Durable CSV import orchestration lives in `core/tools/ingress.py`, not in the
@@ -799,7 +839,7 @@ Ingress cursor/status through transaction-guarded database helpers.
 | `build.py` | `FilterExpression` -- builds JSONPath expressions from filter definitions |
 | `cache.py` | `FilterCache` -- caches filter results in Redis as JSON, keyed by entity hash + access level |
 
-## Standalone Tools
+## Cross-domain tools
 
 ### `dates.py`
 
@@ -811,7 +851,19 @@ Timezone-aware date utilities. All dates are stored as UTC in Datastore. Convers
 | `utc_datetime_to_user_date_string(dt)` | Format as YYYY-MM-DD in user timezone |
 | `user_date_string_to_utc_datetime(s)` | Parse user-local date string to UTC datetime |
 
-Also includes task scheduling helpers for recurring date calculations.
+Task recurrence and postponement calculations live with the task domain in
+`tasks/scheduling.py`.
+
+### `diagnostics.py`
+
+Optional timing and profiling decorators used during local diagnosis.
+
+### `ingress.py`
+
+Durable CSV ingress parsing, mapping, planning, and execution. Raw cursor and
+row-commit transactions are isolated in `database/ingress.py`.
+
+## External services (`tools/services/`)
 
 ### `task_queue.py`
 
@@ -851,20 +903,58 @@ See [BACKEND_ENTITIES.md](BACKEND_ENTITIES.md) for the durable job record and
 [AI_PIPELINE.md](AI_PIPELINE.md) for the lease, retry, checkpoint, context, and
 browser-delivery architecture.
 
-### `site_image.py`
+### `identity_platform.py`
 
-Generates site branding images (favicon, PWA icons, OpenGraph image) from an uploaded image. Uses PIL for resizing, background removal via flood fill, and icon generation at multiple sizes.
+Server-side Identity Platform token verification and account operations. See
+[AUTHENTICATION.md](AUTHENTICATION.md) for the public-client and session trust
+boundaries.
 
-### `location.py`
+### `places.py`
 
-Google Places API integration. It refreshes and reuses the shared ADC access
-token, then queries the Places API for autocomplete suggestions and place
-details. Includes user location from the session for biased results.
+Google Places autocomplete and detail lookup. It refreshes and reuses the
+shared ADC access token and includes the request user's location for biased
+results when available.
 
-### `external.py`
+## Site workflows (`tools/site/`)
 
-External URL metadata extraction. `get_link_attributes(url)` fetches a URL and extracts OpenGraph/meta tags (title, description, image) using BeautifulSoup. Used by the bookmark form element.
+| Module | Responsibility |
+|---|---|
+| `admin.py` | Runtime-safe administrator settings orchestration |
+| `exports.py` | Static HTML export archive construction |
+| `images.py` | Site branding image generation |
+| `recovery.py` | Fail-closed recovery configuration snapshots |
 
-### `utility.py`
+`images.py` generates favicons, PWA icons, and OpenGraph images from an uploaded
+image. It uses PIL for resizing, background removal by flood fill, and icon
+generation at multiple sizes.
 
-General utilities: `short_hash(value)` (SHA-256, first 12 chars), `short_uuid()`, `strip_tags(html)` (BeautifulSoup text extraction), `download_image(url)`.
+## Polling (`tools/polling/`)
+
+| Module | Responsibility |
+|---|---|
+| `contract.py` | Strict versioned request parsing and validation |
+| `projections.py` | Browser-safe channel revisions, locks, and operation status |
+| `forms.py` | Form mutation and offline-replay state contracts |
+| `refresh.py` | Permission-safe entity and collection refresh deltas |
+
+## Task workflows (`tools/tasks/`)
+
+| Module | Responsibility |
+|---|---|
+| `ordering.py` | Canonical task ordering and page-root discovery |
+| `scheduling.py` | Recurrence, postponement, and deferred uncomplete scheduling |
+| `combine.py` | Task-combine validation and execution |
+
+## Authentication and email
+
+`tools/auth/` contains request-user resolution and agent-access verification.
+`tools/email/ai.py` owns inbound AI mail, `tools/email/smtp.py` owns
+authentication SMTP, and `tools/email/notifications/` contains notification
+capture, policy, presentation, dispatch, and delivery.
+
+## Links and hosted E2E
+
+`tools/links/metadata.py` extracts external OpenGraph metadata;
+`tools/links/preview.py` provides the safe text-only editor preview boundary.
+`tools/hosted_e2e/` contains hosted-test authentication and the cross-machine
+lease for its shared prefixed data set.

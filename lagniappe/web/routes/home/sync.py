@@ -7,7 +7,7 @@ from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
 from lagniappe.core.tools.mentions import service as mentions
-from lagniappe.core.tools.form_state import validate_sync_payload
+from lagniappe.core.tools.polling.forms import validate_sync_payload
 from lagniappe.web import responses
 from lagniappe.web.auth import logged_in
 

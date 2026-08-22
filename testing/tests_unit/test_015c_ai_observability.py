@@ -12,6 +12,7 @@ from lagniappe.core.tools.ai import core as ai_core
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.ai.prompt import Prompt
+from lagniappe.core.tools.database import analytics as analytics_database
 
 
 pytestmark = pytest.mark.unit
@@ -450,14 +451,18 @@ def test_summary_persistence_uses_uuid_key_and_bounded_pruning(monkeypatch):
             self.put_record = record
 
         def query(self, *, kind):
-            assert kind == observability.KINDS.ai_observability.value
+            assert kind == analytics_database.KINDS.ai_observability.value
             return query
 
         def delete_multi(self, keys):
             self.deleted.extend(keys)
 
     datastore = Datastore()
-    monkeypatch.setattr(observability, "DATA", SimpleNamespace(datastore=datastore))
+    monkeypatch.setattr(
+        analytics_database,
+        "DATA",
+        SimpleNamespace(datastore=datastore),
+    )
     identifier = str(uuid.uuid4())
     summary = observability.GenerationSummaryV1(
         correlation_id=identifier,

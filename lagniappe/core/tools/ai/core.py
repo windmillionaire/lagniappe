@@ -20,7 +20,7 @@ from config.ai_models import (
 )
 
 from ... import exceptions
-from ..ai_settings import runtime_ai_settings
+from .settings import runtime_ai_settings
 from .functions import (
     FUNCTION_TOOL,
     MAX_TOOL_ITERATIONS,
@@ -321,6 +321,7 @@ class GenAI:
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_ai_config_combines_search_tools_json_and_thinking_settings
     # @tests tests_unit/test_015_ai_tools.py::test_deferred_ai_config_uses_short_sdk_retry_profile
+    # @tests tests_unit/test_015_ai_tools.py::test_ai_model_tier_routes_generation_to_primary_or_utility_model
     # @features ai
     # @dimensions config search tools output-format thinking service-tier retry-config retry-ownership
     @staticmethod
@@ -337,9 +338,7 @@ class GenAI:
         )
         config = {
             "http_options": retry_http_options(
-                attempts=(
-                    DEFERRED_AI_RETRY_ATTEMPTS if execution_control else None
-                ),
+                attempts=(DEFERRED_AI_RETRY_ATTEMPTS if execution_control else None),
                 headers=service_tier_headers,
             ),
             "safety_settings": MINIMUM_SAFETY_SETTINGS,
@@ -446,8 +445,10 @@ class GenAI:
     # @tests tests_unit/test_015_ai_tools.py::test_ai_retries_empty_text_response_once
     # @tests tests_unit/test_015_ai_tools.py::test_ai_accepts_empty_json_object_without_retry
     # @tests tests_unit/test_015_ai_tools.py::test_autofill_accepts_summary_backed_json_without_tool_or_final_call
+    # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_tool_loop
     # @features ai
     # @dimensions model-routing empty-response-retry empty-json
+    # @pairs ai:provider-errors ai:quota ai:tool-loop
     def generate_content(self, prompt, *, validator=None):
         """Generate and optionally validate text under one observable call boundary."""
         observer = GenerationObserver(prompt)

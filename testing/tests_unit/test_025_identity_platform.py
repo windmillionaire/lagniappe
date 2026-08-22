@@ -4,7 +4,8 @@ import smtplib
 
 import pytest
 
-from lagniappe.core.tools import auth_email, identity_platform
+from lagniappe.core.tools.email import smtp as auth_email
+from lagniappe.core.tools.services import identity_platform
 
 pytestmark = pytest.mark.unit
 
@@ -228,9 +229,7 @@ def test_google_provider_enabled_reads_live_provider_state():
     assert identity_platform.google_provider_enabled(**arguments) is False
 
     url, request = session.calls[0]
-    assert url.endswith(
-        "/projects/project%2Fone/defaultSupportedIdpConfigs/google.com"
-    )
+    assert url.endswith("/projects/project%2Fone/defaultSupportedIdpConfigs/google.com")
     assert request["headers"]["Authorization"] == "Bearer access-token"
     assert request["timeout"] == identity_platform.IDENTITY_REQUEST_TIMEOUT
 
@@ -244,6 +243,7 @@ def test_google_provider_enabled_reads_live_provider_state():
             access_token="access-token",
             session=unavailable_session,
         )
+
 
 # @features login
 # @dimensions identity-platform authentication-email action-codes

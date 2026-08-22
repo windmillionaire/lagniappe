@@ -6,34 +6,19 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
     AI,
     Action,
-    DeferredJobSpec,
     DeferredJobInspection,
     DeferredJobPhase,
-    DeferredJobStatus,
     DeferredJobType,
     Fetch,
-    FetchReason,
-    FileConsumer,
-    Resource,
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
-from lagniappe.core.tools import ai, database, dates, files, site_export
-from lagniappe.core.tools.database import assets as storage_assets
+from lagniappe.core.tools import ai
 
 from .base import DeferredJobAdapter
 from ..errors import (
-    DeferredJobDependencyFailedError,
-    DeferredJobDependencyPendingError,
     DeferredJobDriftError,
 )
-from ..locks import (
-    AUTOFILL_FORM_LOCK_SCOPE,
-    active_deferred_job_lock,
-    deferred_job_lock_key,
-)
-
-
 
 
 # @testable infrastructure
@@ -179,7 +164,6 @@ class ReportAdapter(DeferredJobAdapter):
         return f"{label} report failed. {str(error or '').strip()}".strip()
 
 
-
 # @testable true
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_retry_uses_priority_for_every_generation_stage
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_prepare_stops_before_report_save_after_cancellation
@@ -218,15 +202,12 @@ class OrganizeReportAdapter(ReportAdapter):
         }
         stage_index = stages.get(stage, 0)
         if checkpoint.get("schema_version") not in {None, 1} or (
-            stage_index >= 3
-            and not isinstance(checkpoint.get("proposal"), dict)
+            stage_index >= 3 and not isinstance(checkpoint.get("proposal"), dict)
         ):
             checkpoint = {}
             stage_index = 0
         service_tier = (
-            "priority"
-            if int(getattr(context.job, "attempt", 0) or 0) > 1
-            else None
+            "priority" if int(getattr(context.job, "attempt", 0) or 0) > 1 else None
         )
         if stage_index < 1:
             context.set_phase(DeferredJobPhase.PREPARING_INPUTS)
@@ -304,8 +285,6 @@ class OrganizeReportAdapter(ReportAdapter):
         return None
 
 
-
-
 # @testable true
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_ask_report_adapter_prepares_and_applies_checkpointed_response
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
@@ -348,8 +327,6 @@ class AskReportAdapter(ReportAdapter):
         }
 
 
-
-
 # @testable infrastructure
 class CreateReportAdapter(ReportAdapter):
     job_type = DeferredJobType.REPORT_CREATE
@@ -371,8 +348,6 @@ class CreateReportAdapter(ReportAdapter):
             "proposal": ai.generate_create_report(prompt),
             "status": "ready",
         }
-
-
 
 
 # @testable true
@@ -531,8 +506,6 @@ class ReportExecutionAdapter(DeferredJobAdapter):
         if succeeded:
             return "Report changes are saved."
         return f"Report execution failed. {str(error or '').strip()}".strip()
-
-
 
 
 # @testable false

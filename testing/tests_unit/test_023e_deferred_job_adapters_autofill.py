@@ -27,7 +27,8 @@ from lagniappe.core.mixins.submitter import SubmitterMixin
 from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
 from lagniappe.core.properties.deferred_job_request import RequestFingerprint
 from lagniappe.core.properties import deferred_job_lifecycle
-from lagniappe.core.tools import database, task_queue
+from lagniappe.core.tools import database
+from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.database import deferred_jobs as deferred_database
@@ -81,7 +82,6 @@ pytestmark = pytest.mark.unit
 from lagniappe.core.tools.deferred_jobs.adapters import autofill as autofill_adapters
 
 
-
 # @features deferred-jobs
 # @dimensions form-revision form-only drift
 # @pair deferred-jobs:form-revision
@@ -123,8 +123,6 @@ def test_autofill_revision_tracks_only_form_apply_state():
     assert target.autofill_revision != original
 
 
-
-
 # @features deferred-jobs
 # @dimensions target-editor status authorization
 # @pair deferred-jobs:status
@@ -154,8 +152,6 @@ def test_autofill_status_is_visible_to_target_editor(monkeypatch):
     assert len(checked) == 1
     assert checked[0][1] is actor
     assert fetches[0].reason is FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION
-
-
 
 
 # @pairs deferred-jobs:terminal-cleanup deferred-jobs:form-lock
@@ -210,8 +206,6 @@ def test_autofill_terminal_cleanup_releases_target_lock(monkeypatch):
     )
     adapter.cleanup(missing_context, terminal=True)
     assert released[-1] == ("lock:deleted-page-key", "missing-job-key")
-
-
 
 
 # @pairs deferred-jobs:active-operation pages:create-autofill
@@ -288,8 +282,6 @@ def test_autofill_page_operation_reference_is_persisted_and_compare_cleared(
     assert saved[-1] == (page, {"property_mask": ("deferred_job",)})
 
 
-
-
 # @features deferred-jobs ai files
 # @dimensions autofill summary-dependency pending failed
 def test_autofill_prepare_waits_for_attached_file_summaries(monkeypatch):
@@ -345,8 +337,6 @@ def test_autofill_prepare_waits_for_attached_file_summaries(monkeypatch):
         adapter.prepare(context)
 
 
-
-
 # @features deferred-jobs ai files
 # @dimensions autofill upload checkpoint resume
 def test_autofill_upload_checkpoint_records_durable_attachment(monkeypatch):
@@ -375,8 +365,9 @@ def test_autofill_upload_checkpoint_records_durable_attachment(monkeypatch):
     monkeypatch.setattr(
         autofill_adapters.database,
         "create_named_key",
-        lambda kind, identifier: named_keys.append((kind, identifier))
-        or "named-file-key",
+        lambda kind, identifier: (
+            named_keys.append((kind, identifier)) or "named-file-key"
+        ),
     )
     monkeypatch.setattr(
         autofill_adapters.database.get,
@@ -413,8 +404,6 @@ def test_autofill_upload_checkpoint_records_durable_attachment(monkeypatch):
     }
     assert adapter.checkpoint_ready(context) is True
     assert phases == [(DeferredJobPhase.PREPARING_INPUTS, {})]
-
-
 
 
 # @features deferred-jobs ai files pages tasks

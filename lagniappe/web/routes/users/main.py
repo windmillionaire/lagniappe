@@ -4,7 +4,7 @@ from flask_login import current_user
 from lagniappe import CONFIG
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.definitions import Action, Fetch, Resource
-from lagniappe.core.tools import identity_platform
+from lagniappe.core.tools.services import identity_platform
 from lagniappe.web.auth import permission
 from lagniappe.web import responses
 

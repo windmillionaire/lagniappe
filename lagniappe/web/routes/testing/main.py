@@ -10,12 +10,12 @@ from google.oauth2 import id_token
 
 from config.hosted_e2e import is_reserved_hosted_e2e_hostname
 from lagniappe import CONFIG
-from lagniappe.core.tools.e2e_lease import (
+from lagniappe.core.tools.hosted_e2e.lease import (
     bind_e2e_deployment,
     consume_e2e_bootstrap_token,
     e2e_deployment_lease_active,
 )
-from lagniappe.core.tools.hosted_e2e_auth import (
+from lagniappe.core.tools.hosted_e2e.auth import (
     HOSTED_E2E_COOKIE,
     HOSTED_E2E_COOKIE_MAX_AGE,
     HostedE2EAuthenticationError,

@@ -4,7 +4,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
     FileConsumerLimitError,
 )
-from lagniappe.core.tools.autofill_jobs import start_autofill_job
+from lagniappe.core.tools.deferred_jobs.autofill import start_autofill_job
 from lagniappe.core.tools.database.assets import DirectUploadError
 from lagniappe.core.tools.deferred_jobs.errors import DeferredJobLockedError
 from lagniappe.core.tools.deferred_jobs.locks import (

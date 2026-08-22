@@ -2,7 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from lagniappe.core.tools import link_preview
+from lagniappe.core.tools.links import preview as link_preview
 
 
 class PreviewEntity(SimpleNamespace):
@@ -86,9 +86,7 @@ def test_internal_status_preview_uses_project_permission(monkeypatch):
 # @features editor link-preview
 # @dimensions internal permissions
 def test_internal_preview_hides_missing_or_forbidden_entities(monkeypatch):
-    monkeypatch.setattr(
-        link_preview.Entities, "fetch_one", lambda key, request: None
-    )
+    monkeypatch.setattr(link_preview.Entities, "fetch_one", lambda key, request: None)
 
     missing = link_preview.preview_for_url(
         "/projects/missing-key",

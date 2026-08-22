@@ -10,7 +10,8 @@ from lagniappe.core.definitions import (
     Resource,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database, site_export
+from lagniappe.core.tools.database import site_exports as export_database
+from lagniappe.core.tools.site import exports as site_export
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import responses
 from lagniappe.web.auth import permission
@@ -23,7 +24,7 @@ from . import internal
 # @reason template rendering is exercised through the admin export widget route
 def _site_export_html():
     template = get_template_attribute("home/export.html", "site_export")
-    return template(database.site_exports())
+    return template(export_database.recent())
 
 
 # @testable true
@@ -39,7 +40,7 @@ def site_export_widget():
 # @testable true
 # @tests tests_e2e/001_site/test_001f_site_export.py::test_owner_can_start_html_export
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
-# @pairs export:admin-only export:start-export export:notification
+# @pairs export:admin-only export:owner-only export:start-export export:notification
 @internal.route("/site-export", methods=["POST"])
 @permission(Resource.SITE)
 def create_site_export():

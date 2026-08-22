@@ -17,7 +17,10 @@ from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import agent_access, auth_email, database, identity_platform
+from lagniappe.core.tools import database
+from lagniappe.core.tools.auth import agent_access
+from lagniappe.core.tools.email import smtp as auth_email
+from lagniappe.core.tools.services import identity_platform
 from lagniappe.core.tools.cache.rate_limit import check_limit, client_ip
 from lagniappe.web import csrf
 from lagniappe.web.auth import (
@@ -84,9 +87,9 @@ def _owner_requires_first_login():
 # @pairs login:bootstrap admin:exact-email login:owner-first-login admin:google-only
 def _bootstrap_admin_allowed(email):
     """Allow exactly the configured installer while the Owner is uninitialized."""
-    bootstrap_email = str(
-        getattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", "") or ""
-    ).strip().casefold()
+    bootstrap_email = (
+        str(getattr(CONFIG, "BOOTSTRAP_ADMIN_EMAIL", "") or "").strip().casefold()
+    )
     candidate = str(email or "").strip().casefold()
     return bool(
         bootstrap_email

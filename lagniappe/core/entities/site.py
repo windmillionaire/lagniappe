@@ -2,6 +2,7 @@ from google.cloud import datastore
 
 from ..exceptions import PropertyError
 from ..tools import database
+from ..tools.database import site as site_database
 
 
 # @testable true
@@ -63,7 +64,7 @@ class Site:
         if self._db and not self._key:
             self._key = self._db.key
         elif self._site_id:
-            self._key = database.get.site_key(self._site_id)
+            self._key = site_database.key(self._site_id)
         else:
             raise ValueError("Site identifier not set")
 
@@ -88,7 +89,7 @@ class Site:
         if not self.key:
             raise RuntimeError("no key assigned")
 
-        self._db = database.get.site(self.key)
+        self._db = site_database.get_or_create(self.key)
 
         return self._db
 

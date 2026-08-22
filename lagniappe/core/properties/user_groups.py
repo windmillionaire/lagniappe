@@ -3,7 +3,7 @@ from ..mixins import (
     GroupPermissionsMixin,
     PublicPermissionsMixin,
 )
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 from .common_entity import Permissions
 
 
@@ -75,8 +75,7 @@ class PublicPermissions(PublicPermissionsMixin, Permissions):
     @property
     def enabled(self):
         return (
-            self.entity.active
-            and self.value.get(Site.PUBLIC.value) == Levels.TRUE.name
+            self.entity.active and self.value.get(Site.PUBLIC.value) == Levels.TRUE.name
         )
 
     @staticmethod

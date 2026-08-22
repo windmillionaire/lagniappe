@@ -531,7 +531,7 @@ def test_column_and_filter_contract_errors_are_explicit():
 def test_site_missing_key_raises_runtime_error():
     site = _TestSite("missing-site")
 
-    with patch.object(site_module.database.get, "site_key", return_value=None):
+    with patch.object(site_module.site_database, "key", return_value=None):
         with pytest.raises(RuntimeError, match="no key assigned"):
             _ = site.urlsafe_key
 
@@ -833,7 +833,7 @@ def test_public_id_generation_is_unique_and_persisted():
 
     with (
         patch.object(
-            common_entity.utility,
+            common_entity,
             "short_uuid",
             side_effect=["duplicate-id", "unique-id"],
         ) as short_uuid,
@@ -859,7 +859,7 @@ def test_public_id_generation_is_unique_and_persisted():
     )
     existing.db["public_id"] = "existing-id"
 
-    with patch.object(common_entity.utility, "short_uuid") as short_uuid:
+    with patch.object(common_entity, "short_uuid") as short_uuid:
         assert existing.properties.public_id.value == "existing-id"
 
     short_uuid.assert_not_called()
@@ -895,9 +895,9 @@ def test_site_lazy_properties_database_key_and_error_context():
     site_db = {"name": "Site DB"}
 
     with (
-        patch.object(site_module.database.get, "site_key", return_value=site_key),
+        patch.object(site_module.site_database, "key", return_value=site_key),
         patch.object(site_module.database.get, "urlsafe_key", return_value="safe-site"),
-        patch.object(site_module.database.get, "site", return_value=site_db),
+        patch.object(site_module.site_database, "get_or_create", return_value=site_db),
     ):
         site = _TestSite("main")
 

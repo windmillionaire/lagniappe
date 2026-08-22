@@ -2,7 +2,6 @@
 
 import base64
 import datetime
-from datetime import timezone
 import io
 import uuid
 
@@ -11,8 +10,6 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from werkzeug.utils import secure_filename
 
 from lagniappe import CONFIG
-from config.ai_settings import AI_SETTING_KEYS
-from config.constants import DEFAULT_DEPLOYMENT_SETTINGS
 from lagniappe.core.definitions.file_consumers import (
     FILE_CONSUMER_CAPABILITIES,
     FileConsumer,
@@ -20,7 +17,7 @@ from lagniappe.core.definitions.file_consumers import (
     enforce_file_consumer,
 )
 
-from .core import DATA, KINDS
+from .core import DATA
 
 DIRECT_UPLOAD_PREFIX = "tmp/uploads"
 DIRECT_UPLOAD_VISIBILITY = "private"
@@ -213,8 +210,7 @@ def _content_types_match(expected, actual):
     if not actual:
         return False
     return (
-        expected.split(";")[0].strip().lower()
-        == actual.split(";")[0].strip().lower()
+        expected.split(";")[0].strip().lower() == actual.split(";")[0].strip().lower()
     )
 
 
@@ -478,208 +474,3 @@ def upload_site_image(filename, image_data):
     blob.upload_from_string(image_data, content_type=content_type)
 
     return filename
-
-
-# @testable true
-# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @tests tests_unit/test_018_database_assets.py::test_save_site_image_persists_version_without_mutating_input
-# @features admin
-# @dimensions site-image-upload metadata
-def save_site_image(data):
-    """Persist site image metadata to the Datastore 'site/image' entity.
-    Stores paths (filename -> path) and a version that is incremented on each save.
-    """
-    image_key = DATA.datastore.key("site", "image")
-    image = DATA.datastore.get(image_key)
-    if not image:
-        image = DATA.datastore.entity(key=image_key)
-
-    version = int(image.get("version", 0)) + 1
-    image.update({**data, "version": version})
-    DATA.datastore.put(image)
-
-
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_save_site_deployment_persists_canonical_payload_and_prunes_old_keys
-# @features admin
-# @dimensions deployment-settings metadata
-def save_site_deployment(data):
-    """Persist deployment settings metadata to the Datastore 'site/deployment' entity."""
-    deployment_key = DATA.datastore.key("site", "deployment")
-    deployment = DATA.datastore.get(deployment_key)
-    if not deployment:
-        deployment = DATA.datastore.entity(key=deployment_key)
-
-    version = int(deployment.get("version", 0)) + 1
-    canonical = {
-        key: value
-        for key, value in data.items()
-        if key in DEFAULT_DEPLOYMENT_SETTINGS
-    }
-    deployment.clear()
-    deployment.update({**canonical, "version": version})
-    DATA.datastore.put(deployment)
-
-
-# @testable true
-# @tests tests_unit/test_018_database_assets.py::test_save_site_ai_persists_canonical_payload_and_prunes_old_keys
-# @features admin
-# @dimensions ai-settings metadata
-def save_site_ai(data):
-    """Persist AI model settings metadata to the Datastore 'site/ai' entity."""
-    ai_key = DATA.datastore.key("site", "ai")
-    ai_settings = DATA.datastore.get(ai_key)
-    if not ai_settings:
-        ai_settings = DATA.datastore.entity(key=ai_key)
-
-    version = int(ai_settings.get("version", 0)) + 1
-    canonical = {
-        key: value
-        for key, value in data.items()
-        if key in AI_SETTING_KEYS
-    }
-    ai_settings.clear()
-    ai_settings.update({**canonical, "version": version})
-    DATA.datastore.put(ai_settings)
-
-
-SITE_EXPORT_INDEX_ID = "exports"
-SITE_EXPORT_PREFIX = "export:"
-SITE_EXPORT_INDEX_LIMIT = 25
-SITE_EXPORT_EXCLUDE_FROM_INDEXES = (
-    "command",
-    "entrypoint",
-    "error",
-    "manifest_path",
-    "prefix",
-    "readme_path",
-    "storage_uri",
-    "warnings",
-)
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/database/assets.py::create_site_export
-# @reason timestamp defaulting is covered through export metadata creation/update
-def _now():
-    return datetime.datetime.now(timezone.utc)
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/database/assets.py::site_export
-# @reason key construction is covered through export metadata fetch/list helpers
-def _site_export_key(export_id):
-    return DATA.datastore.key(KINDS.site.value, f"{SITE_EXPORT_PREFIX}{export_id}")
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/database/assets.py::site_exports
-# @reason index key construction is covered through recent export listing
-def _site_export_index_key():
-    return DATA.datastore.key(KINDS.site.value, SITE_EXPORT_INDEX_ID)
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/database/assets.py::create_site_export
-# @reason recent-index creation is covered through export metadata creation
-def _site_export_index():
-    key = _site_export_index_key()
-    entity = DATA.datastore.get(key)
-    if entity:
-        return entity
-
-    entity = DATA.datastore.entity(key=key)
-    entity.update({"ids": []})
-    return entity
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/database/assets.py::create_site_export
-# @reason entity shape is covered through export metadata creation
-def _site_export_entity(export_id):
-    return DATA.datastore.entity(
-        key=_site_export_key(export_id),
-        exclude_from_indexes=SITE_EXPORT_EXCLUDE_FROM_INDEXES,
-    )
-
-
-# @testable true
-# @tests tests_unit/test_019_site_export.py::test_create_site_export_records_metadata_and_recent_index
-# @features admin export
-# @dimensions metadata create recent-index
-def create_site_export(data):
-    """Create a site export metadata record and add it to the recent index."""
-    export_id = data.get("id") or uuid.uuid4().hex[:12]
-    now = _now()
-    entity = _site_export_entity(export_id)
-    entity.update(
-        {
-            "id": export_id,
-            "type": "site_export",
-            "profile": data.get("profile", "html"),
-            "status": data.get("status", "queued"),
-            "created": data.get("created", now),
-            "modified": data.get("modified", now),
-            "started": data.get("started"),
-            "completed": data.get("completed"),
-            "prefix": data.get("prefix"),
-            "storage_uri": data.get("storage_uri"),
-            "entrypoint": data.get("entrypoint"),
-            "manifest_path": data.get("manifest_path"),
-            "readme_path": data.get("readme_path"),
-            "object_count": int(data.get("object_count", 0) or 0),
-            "byte_count": int(data.get("byte_count", 0) or 0),
-            "warnings": data.get("warnings", []),
-            "error": data.get("error"),
-            "command": data.get("command"),
-        }
-    )
-
-    index = _site_export_index()
-    ids = [export_id, *[i for i in index.get("ids", []) if i != export_id]]
-    index["ids"] = ids[:SITE_EXPORT_INDEX_LIMIT]
-    DATA.datastore.put_multi([entity, index])
-    return entity
-
-
-# @testable true
-# @tests tests_unit/test_019_site_export.py::test_update_site_export_sets_modified_timestamp_and_keeps_counts
-# @features admin export
-# @dimensions metadata update
-def update_site_export(export_id, updates):
-    """Update an existing site export metadata record."""
-    entity = DATA.datastore.get(_site_export_key(export_id))
-    if not entity:
-        return None
-
-    entity.exclude_from_indexes = SITE_EXPORT_EXCLUDE_FROM_INDEXES
-    entity.update({**updates, "modified": _now()})
-    DATA.datastore.put(entity)
-    return entity
-
-
-# @testable true
-# @tests tests_unit/test_019_site_export.py::test_site_exports_returns_recent_records_in_index_order
-# @features admin export
-# @dimensions metadata list
-def site_export(export_id):
-    """Fetch a site export metadata record by export id."""
-    return DATA.datastore.get(_site_export_key(export_id))
-
-
-# @testable true
-# @tests tests_unit/test_019_site_export.py::test_site_exports_returns_recent_records_in_index_order
-# @features admin export
-# @dimensions metadata list
-def site_exports(limit=10):
-    """Fetch recent site export metadata records in newest-first index order."""
-    index = DATA.datastore.get(_site_export_index_key())
-    ids = list(index.get("ids", [])) if index else []
-    ids = ids[:limit]
-    if not ids:
-        return []
-
-    keys = [_site_export_key(export_id) for export_id in ids]
-    records = [record for record in DATA.datastore.get_multi(keys) if record]
-    by_id = {record.get("id"): record for record in records}
-    return [by_id[export_id] for export_id in ids if export_id in by_id]

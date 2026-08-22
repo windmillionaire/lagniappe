@@ -4,7 +4,7 @@ from flask import get_template_attribute, request
 from flask_login import current_user
 
 from lagniappe.core import exceptions
-from lagniappe.core.tools.refresh import (
+from lagniappe.core.tools.polling.refresh import (
     MAX_REFRESH_ROWS,
     RefreshFallback,
     load_refresh_collection,

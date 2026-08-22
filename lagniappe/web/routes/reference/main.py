@@ -2,7 +2,7 @@ from flask import abort, g
 
 from config import SETTINGS
 from lagniappe.core.definitions import Resource
-from lagniappe.core.tools.recovery import (
+from lagniappe.core.tools.site.recovery import (
     RecoverySnapshotUnavailable,
     load_recovery_snapshot,
 )
@@ -25,6 +25,8 @@ def section(section):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
+# @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
+# @pair admin:environment-variables
 @reference.route("/environment-variables")
 @permission(Resource.SITE)
 def environment_variables():

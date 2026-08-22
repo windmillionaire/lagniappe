@@ -8,7 +8,7 @@ from ..definitions import Action, Fetch, FilterDefinition
 from ..entities import Entities
 from ..properties import filter
 from ..tools import cache
-from ..tools.user_context import current_context_user
+from ..tools.auth.context import current_context_user
 from .condition import Condition
 from .entity import Entity
 

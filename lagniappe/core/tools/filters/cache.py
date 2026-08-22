@@ -8,9 +8,9 @@ from ...entities import Entities
 from ...tools import database
 from ...tools.database.core import KINDS
 from ...tools.database.filter import Filter, Query
-from ...tools.user_context import current_context_user
+from ...tools.auth.context import current_context_user
 from ..cache import Keys, filter_cache
-from ..task_queue import create_task
+from ..services.task_queue import create_task
 from .build import escape, FilterExpression
 
 
@@ -104,10 +104,7 @@ class FilterCache:
     # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
     # @reason index-map shaping is part of cache materialization
     def _entity_map(self, entities):
-        return {
-            e.hash: escape_for_filter(e.to_filter_index())
-            for e in entities
-        }
+        return {e.hash: escape_for_filter(e.to_filter_index()) for e in entities}
 
     # @testable false
     # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
@@ -125,9 +122,7 @@ class FilterCache:
                 hashes=Restriction.UNRESTRICTED,
             )
             self._to_cache.update(
-                self._entity_map(
-                    Entities.fetch(*index.results, request=Fetch.direct())
-                )
+                self._entity_map(Entities.fetch(*index.results, request=Fetch.direct()))
             )
 
         if index.next_cursor:
@@ -152,9 +147,7 @@ class FilterCache:
             )
             .order("-modified")
             .fetch_all(),
-            request=Fetch.nested(
-                because=FetchReason.TASK_FILTER_INDEX_MATERIALIZATION
-            ),
+            request=Fetch.nested(because=FetchReason.TASK_FILTER_INDEX_MATERIALIZATION),
         )
 
         self._to_cache.update(self._entity_map(tasks))
@@ -185,9 +178,7 @@ class FilterCache:
                 return
 
             request = (
-                Fetch.nested(
-                    because=FetchReason.TASK_FILTER_INDEX_MATERIALIZATION
-                )
+                Fetch.nested(because=FetchReason.TASK_FILTER_INDEX_MATERIALIZATION)
                 if self.entity.kind == "project"
                 else Fetch.direct()
             )

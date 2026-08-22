@@ -5,8 +5,9 @@ from flask_login import current_user
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database, utility
+from lagniappe.core.tools import database
 from lagniappe.core.tools.filters import FilterCache
+from lagniappe.core.tools.tasks.ordering import sort_tasks
 from lagniappe.web import responses
 from lagniappe.web.auth import permission
 
@@ -213,7 +214,7 @@ def run(key, **kwargs):
     results = cache.query(filter)
 
     if filter.parent.kind == "project":
-        tasks = utility.sort_tasks(results)
+        tasks = sort_tasks(results)
         return responses.filtered_task_index(tasks, filter)
     elif filter.parent.kind == "category":
         return responses.filtered_page_index(results, filter)
@@ -321,9 +322,7 @@ def condition(key, **kwargs):
 
     condition = Entities.CONDITION()
     condition.entity = (
-        entity
-        if parent == key
-        else Entities.fetch_one(parent, request=Fetch.direct())
+        entity if parent == key else Entities.fetch_one(parent, request=Fetch.direct())
     )
     condition.field = value if value else field
 
@@ -465,9 +464,7 @@ def options(key, **kwargs):
 
     condition = Entities.CONDITION()
     condition.entity = (
-        Entities.fetch_one(parent, request=Fetch.direct())
-        if parent != key
-        else entity
+        Entities.fetch_one(parent, request=Fetch.direct()) if parent != key else entity
     )
     condition.field = field
 

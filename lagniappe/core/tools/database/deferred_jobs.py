@@ -3,15 +3,101 @@
 from datetime import datetime, timedelta, timezone
 
 from google.cloud.datastore import Entity, Key
+from google.cloud.datastore import query as datastore_query
 
 from .core import DATA, KINDS
-from .utility import _retry_deferred_job_transaction
+from .transactions import retry_aborted
 
 
 ACTIVE_DEFERRED_JOB_STATUSES = {"queued", "running", "retry_wait"}
+TERMINAL_DEFERRED_JOB_STATUSES = {
+    "succeeded",
+    "failed",
+    "cancelled",
+    "superseded",
+}
 DEFERRED_JOB_SCHEDULER_CONTROL_ID = "deferred-jobs-control"
 DEFERRED_JOB_SCHEDULER_CONTROL_SCHEMA_VERSION = 2
 DEFERRED_JOB_SCHEDULER_STATES = {"enabled", "paused"}
+
+
+# @testable infrastructure
+def recent_records(limit=100):
+    """Return the newest durable job records for the admin projection."""
+    query = DATA.datastore.query(kind=KINDS.jobs.value)
+    query.order = ["-modified"]
+    return list(query.fetch(limit=min(max(int(limit), 1), 250)))
+
+
+# @testable infrastructure
+def recovery_records(*, limit):
+    """Return active or delivery-pending records in recovery order."""
+    records = []
+    per_status = (
+        None
+        if limit is None
+        else max(int(limit) // len(ACTIVE_DEFERRED_JOB_STATUSES), 1)
+    )
+    for status in ACTIVE_DEFERRED_JOB_STATUSES:
+        query = DATA.datastore.query(kind=KINDS.jobs.value)
+        query.add_filter(filter=datastore_query.PropertyFilter("status", "=", status))
+        query.order = ["modified"]
+        records.extend(query.fetch(limit=per_status))
+
+    delivery_query = DATA.datastore.query(kind=KINDS.jobs.value)
+    delivery_query.add_filter(
+        filter=datastore_query.PropertyFilter(
+            "dispatch_state",
+            "=",
+            "delivery_pending",
+        )
+    )
+    delivery_query.order = ["modified"]
+    records.extend(delivery_query.fetch(limit=per_status))
+    records = list({record.key: record for record in records}.values())
+    records.sort(
+        key=lambda record: (
+            _deferred_datetime(record.get("modified")) or datetime.now(timezone.utc)
+        )
+    )
+    if limit is not None:
+        records = records[: int(limit)]
+    return records
+
+
+# @testable true
+# @tests tests_unit/test_023b_deferred_job_service.py::test_delete_terminal_jobs_preserves_active_and_incomplete_delivery
+# @features deferred-jobs
+# @dimensions retention terminal-delivery
+def delete_terminal_records(*, before=None, batch_size=500):
+    """Delete retained terminal jobs without touching unfinished delivery."""
+    batch_size = max(int(batch_size), 1)
+    query = DATA.datastore.query(kind=KINDS.jobs.value)
+    if before is not None:
+        query.add_filter(filter=datastore_query.PropertyFilter("created", "<", before))
+        query.order = ["created"]
+
+    deleted = 0
+    keys = []
+    for record in query.fetch():
+        created = _deferred_datetime(record.get("created"))
+        if before is not None and (created is None or created >= before):
+            continue
+        if record.get("status") not in TERMINAL_DEFERRED_JOB_STATUSES:
+            continue
+        if record.get("dispatch_state") == "delivery_pending":
+            continue
+        keys.append(record.key)
+        if len(keys) < batch_size:
+            continue
+        DATA.datastore.delete_multi(keys)
+        deleted += len(keys)
+        keys = []
+
+    if keys:
+        DATA.datastore.delete_multi(keys)
+        deleted += len(keys)
+    return deleted
 
 
 # @testable infrastructure
@@ -155,7 +241,7 @@ def _update_deferred_job_scheduler_tracking(
 # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_control_repair_is_revision_checked
 # @features deferred-jobs cloud-scheduler
 # @dimensions drift-repair optimistic-concurrency
-@_retry_deferred_job_transaction
+@retry_aborted
 def repair_deferred_job_scheduler_control(job_keys, expected_generation, now):
     """Repair tracked recovery jobs if no lifecycle boundary raced the scan."""
     tracked_jobs = sorted({_deferred_job_tracking_id(key) for key in job_keys})
@@ -198,7 +284,7 @@ def repair_deferred_job_scheduler_control(job_keys, expected_generation, now):
 # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
 # @features deferred-jobs cloud-scheduler
 # @dimensions distributed-lease generation race
-@_retry_deferred_job_transaction
+@retry_aborted
 def acquire_deferred_job_scheduler_sync(lease_token, now, *, lease_seconds):
     """Acquire the short Datastore lease serializing Scheduler API mutations."""
     with DATA.datastore.transaction() as transaction:
@@ -227,7 +313,7 @@ def acquire_deferred_job_scheduler_sync(lease_token, now, *, lease_seconds):
 # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
 # @features deferred-jobs cloud-scheduler
 # @dimensions distributed-lease generation provider-state
-@_retry_deferred_job_transaction
+@retry_aborted
 def record_deferred_job_scheduler_sync(
     lease_token,
     actual_state,
@@ -265,7 +351,7 @@ def record_deferred_job_scheduler_sync(
 # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_releases_lease_after_provider_failure
 # @features deferred-jobs cloud-scheduler
 # @dimensions distributed-lease provider-failure
-@_retry_deferred_job_transaction
+@retry_aborted
 def release_deferred_job_scheduler_sync(lease_token, now):
     """Release a Scheduler synchronization lease still owned by the caller."""
     with DATA.datastore.transaction() as transaction:
@@ -294,7 +380,7 @@ def get_deferred_job_scheduler_control():
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_create_is_transactionally_idempotent
 # @pairs deferred-jobs:start deferred-jobs:get-or-create deferred-jobs:notification deferred-jobs:idempotency
 # @pair notifications:aggregate-count
-@_retry_deferred_job_transaction
+@retry_aborted
 def create_deferred_job_if_absent(job, notification=None, lock=None):
     """Atomically insert one prepared job, notification, and optional lock."""
     key = _deferred_job_key(job)
@@ -393,7 +479,7 @@ def create_deferred_job_if_absent(job, notification=None, lock=None):
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_autofill_lock_cleanup_is_compare_and_delete
 # @pairs deferred-jobs:form-lock deferred-jobs:compare-and-set
-@_retry_deferred_job_transaction
+@retry_aborted
 def release_deferred_job_lock(identifier, operation):
     """Delete a lock only when it still belongs to ``operation``."""
     key = _deferred_job_key(identifier)
@@ -411,11 +497,13 @@ def release_deferred_job_lock(identifier, operation):
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_claim_and_checkpoint_are_compare_and_set
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_status_transactions_do_not_write_actor
+# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_transactions_retry_aborted_contention
 # @features deferred-jobs
 # @dimensions lease claim duplicate-delivery
 # @pairs deferred-jobs:user-write-isolation deferred-jobs:revision deferred-jobs:transaction
 # @pairs deferred-jobs:lease deferred-jobs:claim deferred-jobs:duplicate-delivery deferred-jobs:compare-and-set
-@_retry_deferred_job_transaction
+# @pairs deferred-jobs:transaction-contention deferred-jobs:retry
+@retry_aborted
 def claim_deferred_job(identifier, lease_token, lease_expires, now):
     """Atomically claim a due job unless it is terminal or actively leased."""
     key = _deferred_job_key(identifier)
@@ -466,7 +554,7 @@ def claim_deferred_job(identifier, lease_token, lease_expires, now):
 # @dimensions lease checkpoint compare-and-set
 # @pairs deferred-jobs:user-write-isolation deferred-jobs:revision deferred-jobs:transaction
 # @pairs deferred-jobs:lease deferred-jobs:checkpoint deferred-jobs:compare-and-set
-@_retry_deferred_job_transaction
+@retry_aborted
 def update_claimed_deferred_job(
     identifier,
     lease_token,
@@ -555,7 +643,7 @@ def _deferred_recovery_due(entity, now, grace):
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_recovery_claim_is_compare_and_set
 # @features deferred-jobs
 # @dimensions reconciliation compare-and-set lease grace maximum-age
-@_retry_deferred_job_transaction
+@retry_aborted
 def claim_deferred_job_recovery(
     identifier,
     expected_revision,
@@ -634,7 +722,7 @@ def claim_deferred_job_recovery(
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_recovery_claim_is_compare_and_set
 # @features deferred-jobs
 # @dimensions reconciliation dispatch compare-and-set worker-race
-@_retry_deferred_job_transaction
+@retry_aborted
 def update_deferred_job_recovery_dispatch(
     identifier,
     expected_revision,
@@ -649,8 +737,7 @@ def update_deferred_job_recovery_dispatch(
         entity = DATA.datastore.get(key, transaction=transaction)
         if (
             entity is None
-            or int(entity.get("status_revision") or 0)
-            != int(expected_revision or 0)
+            or int(entity.get("status_revision") or 0) != int(expected_revision or 0)
             or entity.get("dispatch_state") != "dispatching"
         ):
             return False
@@ -668,7 +755,7 @@ def update_deferred_job_recovery_dispatch(
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_terminal_transition_revokes_the_active_lease
 # @features deferred-jobs
 # @dimensions cancellation tombstone lease compare-and-set terminal-race
-@_retry_deferred_job_transaction
+@retry_aborted
 def transition_active_deferred_job(identifier, updates, now):
     """Atomically tombstone active work without overwriting a terminal result."""
     key = _deferred_job_key(identifier)

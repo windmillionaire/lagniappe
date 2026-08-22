@@ -7,7 +7,10 @@ from lagniappe.core import exceptions
 from lagniappe.core.properties.notification_aggregate import counts as aggregate_counts
 from lagniappe.core.tools import cache, collaboration, database
 from lagniappe.core.tools.notifications import service as notification_service
-from lagniappe.core.tools.polling import channel_revisions, render_operation_statuses
+from lagniappe.core.tools.polling.projections import (
+    channel_revisions,
+    render_operation_statuses,
+)
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
 from lagniappe.web.auth import home_permission, logged_in, require_ai_access
 from lagniappe.web import responses
@@ -122,9 +125,7 @@ def notifications():
 @logged_in
 def clear_notifications():
     notification_keys = database.notification_keys(current_user)
-    notification_service.clear_ordinary_notifications(
-        current_user, notification_keys
-    )
+    notification_service.clear_ordinary_notifications(current_user, notification_keys)
     aggregate = database.get_notification_aggregate(current_user)
     notification_service.publish_notification_aggregate(current_user, aggregate)
 
