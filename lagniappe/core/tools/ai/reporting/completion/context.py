@@ -1,310 +1,23 @@
-"""Input preparation and post-plan submission completion for Organize reports."""
+"""Context resolution and deterministic application for completion."""
 
 import copy
 
 from lagniappe.core import exceptions
-from lagniappe.core.definitions import Action, Fetch, LARGE_ASSET_BYTES
+from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 
-from ..autofill import validate_submission
-from ..core import ai_model
-from ..debug import ai_debug
-from ..guidelines import SCHEMA_TYPE_GUIDELINES
-from ..prompt import Prompt
-from ..references import hash_reference
-from ..summarize import (
-    UNREADABLE_PDF_SUMMARY_ERROR,
-    can_summarize_file,
-    generate_summary,
-)
-from .proposals import (
+from ...autofill import validate_submission
+from ...references import hash_reference
+from ..proposals.references import (
     _first_data_reference,
     _has_form_reference_or_label,
     _proposal_file_refs,
     _strip_action_reference,
-    validate_proposal,
 )
 
-OVERSIZED_REPORT_SUMMARY = "File too large to summarize."
-
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::summarize_report_input_files
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
-# @reason summary presence is exercised through organize summary and completion tests
-def _has_report_file_summary(file):
-    return bool(str(getattr(file, "summary", None) or "").strip())
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::summarize_report_input_files
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
-# @reason warning projection is exercised through the report prepass and result
-def _report_file_summary_warning(file):
-    summarize = getattr(getattr(file, "properties", None), "summarize", None)
-    if getattr(summarize, "error", None) != UNREADABLE_PDF_SUMMARY_ERROR:
-        return None
-    label = (
-        getattr(file, "filename", None)
-        or getattr(file, "name", None)
-        or "the uploaded PDF"
-    )
-    return f"Could not read {label}. The PDF may be encrypted or password-protected."
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::summarize_report_input_files
-# @reason summary eligibility is exercised through the report summary prepass
-def _can_summarize_report_file(file):
-    if _has_report_file_summary(file) or _report_file_summary_warning(file):
-        return False
-    return can_summarize_file(file)
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::summarize_report_input_files
-# @reason large-file metadata fallback is exercised through the summary prepass
-def _is_large_report_file(file):
-    large = getattr(file, "large", None)
-    if large is not None:
-        return bool(large)
-
-    size = getattr(file, "size", None)
-    try:
-        return size is not None and int(size) > LARGE_ASSET_BYTES
-    except (TypeError, ValueError):
-        return False
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::summarize_report_input_files
-# @reason summary state mutation is asserted through the public prepass
-def _complete_report_file_summary(file, *, search):
-    summarize = file.properties.summarize
-    summarize.enabled = True
-    summarize.search = search
-    summarize.complete = True
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::summarize_report_input_files
-# @reason oversized fallback state is asserted through the public prepass
-def _set_oversized_report_summary(file):
-    file.summary = OVERSIZED_REPORT_SUMMARY
-    summarize = file.properties.summarize
-    summarize.status = OVERSIZED_REPORT_SUMMARY
-    summarize.error = None
-
-
-# @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_summarize_report_input_files_saves_missing_summaries
-# @tests tests_unit/test_020_ai_reports.py::test_summarize_report_input_files_falls_back_for_large_files
-# @tests tests_unit/test_020_ai_reports.py::test_unreadable_pdf_is_saved_skipped_and_reported
-# @features ai-report
-# @dimensions summary-prepass quota search-opt-in large-file fallback active-request unreadable-pdf
-def summarize_report_input_files(
-    report,
-    save=None,
-    search=True,
-    raise_quota=True,
-    service_tier=None,
-    ensure_active=None,
-):
-    """Generate missing summaries for report files before Organize planning."""
-    summarized = []
-    for file in report.input_files:
-        attempted_summary = False
-        if ensure_active:
-            ensure_active()
-        if _has_report_file_summary(file):
-            continue
-
-        large = _is_large_report_file(file)
-        if _can_summarize_report_file(file):
-            attempted_summary = True
-            summary_options = {"raise_quota": raise_quota}
-            if service_tier:
-                summary_options["service_tier"] = service_tier
-            generate_summary(file, **summary_options)
-
-        if _report_file_summary_warning(file):
-            if save and attempted_summary:
-                if ensure_active:
-                    ensure_active()
-                save(file)
-            continue
-
-        if not _has_report_file_summary(file) and large:
-            _set_oversized_report_summary(file)
-
-        if _has_report_file_summary(file):
-            _complete_report_file_summary(file, search=search)
-            summarized.append(file)
-            if save:
-                if ensure_active:
-                    ensure_active()
-                save(file)
-    return summarized
-
-
-# @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_complete_organize_submissions_uses_one_focused_prompt
-# @tests tests_unit/test_020_ai_reports.py::test_complete_organize_submissions_preserves_empty_form_records
-# @tests tests_unit/test_020_ai_reports.py::test_complete_organize_submissions_updates_existing_task_submission
-# @tests tests_unit/test_020_ai_reports.py::test_unreadable_pdf_is_saved_skipped_and_reported
-# @features ai-report
-# @dimensions submission-completion focused-prompt evidence-mapping persistence unreadable-pdf issue existing-task partial-update
-def complete_organize_submissions(
-    proposal,
-    report,
-    user,
-    generate=None,
-    allow_empty_submission_updates=False,
-    service_tier=None,
-):
-    """Complete every form-backed Organize target in one focused model call."""
-    proposal = validate_proposal(
-        proposal,
-        allow_empty_submission_updates=True,
-        require_pending_submission_target=True,
-        allow_pending_submissions=True,
-    )
-    actions = proposal.get("actions") or []
-    context = _submission_completion_context(proposal, report, user)
-    targets = []
-    request_actions = {}
-    prior_schema_updates = []
-
-    for index, action in enumerate(actions):
-        if not isinstance(action, dict):
-            continue
-        action_type = action.get("type")
-        if action_type == "update_form_schema":
-            prior_schema_updates.append(action)
-            continue
-        if action_type not in {
-            "create_page",
-            "create_task",
-            "update_submission_fields",
-        }:
-            continue
-
-        data = action.get("data") or {}
-        if not isinstance(data, dict):
-            continue
-        form_info = _completion_form_info(action, context)
-        if not form_info:
-            if _has_form_reference_or_label(data):
-                raise exceptions.AIException(
-                    f"Organize action {action.get('id') or index + 1} references "
-                    "a form that could not be resolved."
-                )
-            continue
-        form_info = _form_info_with_schema_updates(
-            form_info,
-            prior_schema_updates,
-            context,
-        )
-        expected_type = _completion_target_type(action)
-        if form_info.get("form_type") != expected_type:
-            raise exceptions.AIException(
-                f"Organize action {action.get('id') or index + 1} resolved a "
-                f"{form_info.get('form_type') or 'unknown'} form for a "
-                f"{expected_type} record."
-            )
-
-        if action_type == "create_task" and not _first_data_reference(data, "form"):
-            _inject_completion_form_reference(data, form_info)
-
-        request_id = action.get("id") or f"action_{index + 1}"
-        files, fallback_files = _completion_file_contexts_for_action(
-            action,
-            context,
-        )
-        target = _completion_target_context(
-            request_id,
-            action,
-            form_info,
-            files,
-            fallback_files,
-            context,
-        )
-        if not target["form"]["schema"]:
-            raise exceptions.AIException(
-                f"Organize action {request_id} resolved a form without schema fields."
-            )
-        targets.append(target)
-        request_actions[request_id] = (index, action)
-
-    if targets:
-        completion_context = _completion_prompt_context(report, proposal, targets)
-        ai_debug(
-            "organize.submission_completion.start",
-            target_count=len(targets),
-            targets=[_completion_target_debug_summary(target) for target in targets],
-        )
-        prompt = organize_submission_completion_prompt(
-            completion_context,
-            service_tier=service_tier,
-        )
-        if generate:
-            raw_result = generate(prompt)
-            results = validate_organize_submission_results(raw_result, targets)
-        else:
-            results = ai_model.generate_content(
-                prompt,
-                validator=lambda result: validate_organize_submission_results(
-                    result,
-                    targets,
-                ),
-            )
-        ai_debug(
-            "organize.submission_completion.complete",
-            target_count=len(targets),
-            results=_completion_results_debug_summary(results),
-        )
-        for target in targets:
-            request_id = target["action_id"]
-            index, action = request_actions[request_id]
-            result = results.get(request_id, {})
-            submission = result.get("submission")
-            if action.get("type") == "update_submission_fields":
-                _apply_completed_submission_update(
-                    proposal,
-                    action,
-                    target,
-                    submission,
-                    result.get("empty_reason"),
-                )
-            elif isinstance(submission, dict) and submission:
-                data = action.setdefault("data", {})
-                data["submission"] = submission
-                data.pop("submission_empty_reason", None)
-            else:
-                reason = result.get("empty_reason") or (
-                    "No submission fields were filled from the available evidence."
-                )
-                data = action.setdefault("data", {})
-                data["submission"] = {}
-                data["submission_empty_reason"] = reason
-                issue = f"{action.get('display_label') or request_id}: {reason}"
-                if issue not in proposal["issues"]:
-                    proposal["issues"].append(issue)
-
-    for file in getattr(report, "input_files", []) or []:
-        issue = _report_file_summary_warning(file)
-        if issue and issue not in proposal["issues"]:
-            proposal["issues"].append(issue)
-
-    return validate_proposal(
-        proposal,
-        allow_empty_submission_updates=allow_empty_submission_updates,
-        allow_pending_submissions=False,
-    )
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason target projection is asserted through the focused completion contract
 def _completion_target_context(
     action_id,
@@ -349,7 +62,7 @@ def _completion_target_context(
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason compact prompt context is verified by completion pipeline tests
 def _completion_prompt_context(report, proposal, targets):
     evidence = {}
@@ -450,87 +163,8 @@ Return one result for every record:
 """
 
 
-# @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_complete_organize_submissions_uses_one_focused_prompt
-# @features ai-report
-# @dimensions submission-completion prompt json-output
-def organize_submission_completion_prompt(context, service_tier=None):
-    """Build the single summary-based form completion prompt for Organize."""
-    prompt = Prompt(
-        "You complete form submissions for an already-organized Lagniappe report.",
-        type="organize submission completion",
-    )
-    prompt.set_instructions_before_context()
-    if service_tier:
-        prompt.set_service_tier(service_tier)
-    prompt.add_context("completion_context", context)
-    prompt.add_instructions(ORGANIZE_SUBMISSION_COMPLETION_RULES)
-    prompt.add_instructions(SCHEMA_TYPE_GUIDELINES)
-    prompt.set_output_format(
-        "JSON",
-        description=ORGANIZE_SUBMISSION_OUTPUT_REQUIREMENTS,
-    )
-    return prompt
-
-
-# @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_complete_organize_submissions_uses_one_focused_prompt
-# @tests tests_unit/test_020_ai_reports.py::test_complete_organize_submissions_preserves_empty_form_records
-# @features ai-report
-# @dimensions submission-completion validation partial empty
-def validate_organize_submission_results(result, targets):
-    """Return action-keyed, schema-filtered completion results."""
-    target_map = {target["action_id"]: target for target in targets}
-    results = {}
-    rows = result.get("submissions") if isinstance(result, dict) else None
-    if not isinstance(rows, list):
-        rows = []
-
-    for row in rows:
-        if not isinstance(row, dict):
-            continue
-        action_id = row.get("action_id")
-        if action_id not in target_map or action_id in results:
-            continue
-        raw_submission = row.get("submission")
-        if not isinstance(raw_submission, dict):
-            raw_submission = {}
-        schema = (target_map[action_id].get("form") or {}).get("schema") or []
-        allowed = {
-            field.get("id")
-            for field in schema
-            if isinstance(field, dict) and isinstance(field.get("id"), str)
-        }
-        raw_ids = sorted(key for key in raw_submission if isinstance(key, str))
-        submission = validate_submission(
-            {
-                key: value
-                for key, value in raw_submission.items()
-                if isinstance(key, str) and key in allowed
-            }
-        )
-        results[action_id] = {
-            "submission": submission,
-            "empty_reason": None
-            if submission
-            else _proposal_text(row.get("empty_reason")),
-            "filtered_out_field_ids": [key for key in raw_ids if key not in allowed],
-        }
-
-    for action_id in target_map:
-        results.setdefault(
-            action_id,
-            {
-                "submission": {},
-                "empty_reason": "No submission was returned for this record.",
-                "filtered_out_field_ids": [],
-            },
-        )
-    return results
-
-
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason context assembly is exercised through completion behavior tests
 def _submission_completion_context(proposal, report, user):
     actions = proposal.get("actions") or []
@@ -550,7 +184,7 @@ def _submission_completion_context(proposal, report, user):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason schema-update overlay is asserted through completion behavior tests
 def _form_info_with_schema_updates(form_info, schema_actions, context):
     if not schema_actions:
@@ -573,7 +207,7 @@ def _form_info_with_schema_updates(form_info, schema_actions, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::_form_info_with_schema_updates
+# @covered-by lagniappe/core/tools/ai/reporting/completion/context.py::_form_info_with_schema_updates
 # @reason form reference matching is covered by completion behavior tests
 def _form_reference_matches(form_info, form_ref, context):
     if not form_ref:
@@ -591,7 +225,7 @@ def _form_reference_matches(form_info, form_ref, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::_form_info_with_schema_updates
+# @covered-by lagniappe/core/tools/ai/reporting/completion/context.py::_form_info_with_schema_updates
 # @reason operation behavior is covered by completion behavior tests
 def _apply_completion_schema_operation(schema, operation):
     if not isinstance(operation, dict):
@@ -636,7 +270,7 @@ def _apply_completion_schema_operation(schema, operation):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason file evidence is asserted through completion behavior tests
 def _report_file_completion_context(report, user):
     files = {}
@@ -647,7 +281,7 @@ def _report_file_completion_context(report, user):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::_report_file_completion_context
+# @covered-by lagniappe/core/tools/ai/reporting/completion/context.py::_report_file_completion_context
 # @reason file projection is observed through completion behavior tests
 def _completion_file_context_item(file, user):
     return {
@@ -664,7 +298,7 @@ def _completion_file_context_item(file, user):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::_report_file_completion_context
+# @covered-by lagniappe/core/tools/ai/reporting/completion/context.py::_report_file_completion_context
 # @reason file reference indexing is observed through completion behavior tests
 def _index_completion_file_context(files, file, item, user):
     file_hash = hash_reference(file)
@@ -682,7 +316,7 @@ def _index_completion_file_context(files, file, item, user):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_complete_organize_submissions_uses_target_task_form
+# @tests tests_unit/test_020f_ai_report_completion.py::test_complete_organize_submissions_uses_target_task_form
 # @features ai-report
 # @dimensions submission-completion explicit-task-identity inherited-form
 def _completion_form_info(action, context):
@@ -715,7 +349,7 @@ def _completion_form_info(action, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason form inference is asserted through completion behavior tests
 def _form_info_from_data_reference(data, context):
     action_ref = data.get("form_action")
@@ -735,7 +369,7 @@ def _form_info_from_data_reference(data, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason created form projection is asserted through completion behavior tests
 def _form_info_from_create_form_action(action):
     data = action.get("data") or {}
@@ -752,7 +386,7 @@ def _form_info_from_create_form_action(action):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason existing form projection is asserted through completion behavior tests
 def _form_info_from_entity(form):
     if not form:
@@ -767,7 +401,7 @@ def _form_info_from_entity(form):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason category form inference is asserted through completion behavior tests
 def _category_form_info(category_ref, context):
     if not category_ref:
@@ -783,7 +417,7 @@ def _category_form_info(category_ref, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason model task form inference is asserted through completion behavior tests
 def _model_task_form_info(model_ref, context):
     if not model_ref:
@@ -799,7 +433,7 @@ def _model_task_form_info(model_ref, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason targeted-task form inference is asserted through completion behavior tests
 def _task_form_info(task_ref, context):
     if not task_ref:
@@ -816,7 +450,7 @@ def _task_form_info(task_ref, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason action reference resolution is asserted through completion behavior tests
 def _completion_action(context, reference):
     if not isinstance(reference, str):
@@ -825,7 +459,7 @@ def _completion_action(context, reference):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason entity loading is asserted through completion behavior tests
 def _load_completion_entity(reference, expected):
     if not reference or not isinstance(reference, str):
@@ -835,7 +469,7 @@ def _load_completion_entity(reference, expected):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason stored form relation access is asserted through completion behavior tests
 def _attached_completion_form(entity):
     if entity is None:
@@ -860,7 +494,7 @@ def _attached_completion_form(entity):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason inherited form injection is asserted through completion behavior tests
 def _inject_completion_form_reference(data, form_info):
     key = form_info.get("reference_key") or "form"
@@ -870,7 +504,7 @@ def _inject_completion_form_reference(data, form_info):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason request shaping is asserted through completion behavior tests
 def _completion_file_contexts_for_action(action, context):
     file_refs = _completion_action_file_refs(action, context)
@@ -879,7 +513,7 @@ def _completion_file_contexts_for_action(action, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason request shaping is asserted through completion behavior tests
 def _completion_request_target(action, context):
     data = action.get("data") or {}
@@ -899,7 +533,7 @@ def _completion_request_target(action, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason request shaping is asserted through completion behavior tests
 def _completion_request_form(form_info):
     return {
@@ -910,7 +544,7 @@ def _completion_request_form(form_info):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason request shaping is asserted through completion behavior tests
 def _completion_target_name(action, context):
     data = action.get("data") or {}
@@ -931,7 +565,7 @@ def _completion_target_name(action, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason request shaping is asserted through completion behavior tests
 def _completion_related_entity_name(data, root, expected, context):
     label = _completion_data_label(data, root)
@@ -951,7 +585,7 @@ def _completion_related_entity_name(data, root, expected, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason request shaping is asserted through completion behavior tests
 def _completion_data_label(data, root):
     keys = (f"{root}_name", f"{root}_display", f"{root}_label")
@@ -963,7 +597,7 @@ def _completion_data_label(data, root):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason request shaping is asserted through completion behavior tests
 def _proposal_text(value):
     if isinstance(value, str):
@@ -973,7 +607,7 @@ def _proposal_text(value):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason summary evidence is asserted through completion behavior tests
 def _completion_evidence_files(files, fallback_files):
     evidence_files = []
@@ -993,7 +627,7 @@ def _completion_evidence_files(files, fallback_files):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason file evidence is asserted through completion behavior tests
 def _completion_action_file_refs(action, context):
     refs = []
@@ -1050,7 +684,7 @@ def _completion_action_file_refs(action, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason existing-target resolution is exercised through completion behavior tests
 def _completion_target_type(action):
     action_type = action.get("type")
@@ -1063,7 +697,7 @@ def _completion_target_type(action):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason exact entity loading and authorization are exercised through completion tests
 def _completion_existing_target(action, context):
     target_type = _completion_target_type(action)
@@ -1083,7 +717,7 @@ def _completion_existing_target(action, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason existing values are asserted through focused completion prompt tests
 def _completion_existing_submission(action, context):
     entity, _target_type, _reference = _completion_existing_target(action, context)
@@ -1092,7 +726,7 @@ def _completion_existing_submission(action, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason completed update rows and safe empty fallback are asserted through completion tests
 def _apply_completed_submission_update(
     proposal,
@@ -1147,7 +781,7 @@ def _apply_completed_submission_update(
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason file evidence is asserted through completion behavior tests
 def _completion_action_files(refs, context):
     files = []
@@ -1176,7 +810,7 @@ def _completion_action_files(refs, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason fallback entity loading is observed through file evidence tests
 def _load_completion_file_context(ref, context):
     file = _load_completion_entity(str(ref), Entities.FILE)
@@ -1199,7 +833,7 @@ def _load_completion_file_context(ref, context):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason debug summary is asserted through completion behavior tests
 def _completion_target_debug_summary(target):
     form = target.get("form") or {}
@@ -1235,7 +869,7 @@ def _completion_target_debug_summary(target):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/organize_completion.py::complete_organize_submissions
+# @covered-by lagniappe/core/tools/ai/reporting/completion/service.py::complete_organize_submissions
 # @reason debug summary is asserted through completion behavior tests
 def _completion_results_debug_summary(results):
     if not isinstance(results, dict):

@@ -1,8 +1,6 @@
 """Deferred-job adapters for the reports domain."""
 
 from copy import deepcopy
-import hashlib
-import json
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
@@ -19,6 +17,7 @@ from lagniappe.core.definitions import (
     Resource,
 )
 from lagniappe.core.entities import Entities
+from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
 from lagniappe.core.tools import ai, database, dates, files, site_export
 from lagniappe.core.tools.database import assets as storage_assets
 
@@ -423,9 +422,7 @@ class ReportExecutionAdapter(DeferredJobAdapter):
             "previous_status": previous_status,
             "revision": int(getattr(context.job, "status_revision", 0) or 0),
         }
-        report.status = "running"
-        report.pending = True
-        report.error = None
+        report.properties.process.begin_execution()
         Entities.save(report, context.actor)
 
     def authorize(self, context):
@@ -510,10 +507,10 @@ class ReportExecutionAdapter(DeferredJobAdapter):
                         break
             report.properties.process.fail(str(error), result=result)
         else:
-            previous_status = active_job.get("previous_status")
-            report.status = previous_status if previous_status == "failed" else "ready"
-            report.pending = False
-            report.error = str(error)
+            report.properties.process.restore_after_execution_failure(
+                str(error),
+                previous_status=active_job.get("previous_status"),
+            )
         Entities.save(report, context.actor)
 
     def cleanup(self, context, *, terminal):
@@ -542,11 +539,4 @@ class ReportExecutionAdapter(DeferredJobAdapter):
 # @covered-by lagniappe/core/tools/deferred_jobs/adapters/reports.py::ReportExecutionAdapter
 # @reason execution authorization and drift checks own this canonical proposal hash
 def _report_proposal_fingerprint(report):
-    proposal = getattr(report, "proposal", None)
-    canonical = json.dumps(
-        proposal,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    )
-    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    return proposal_fingerprint(getattr(report, "proposal", None))

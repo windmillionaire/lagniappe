@@ -4,22 +4,26 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, MutationIntent, Resource
 from lagniappe.core.entities import Entities
 
-from .operations import (
+from .common import (
     PAGE_FORM_TYPE_ERROR,
     _category_form,
     _data,
-    _entity_result,
     _first_data_reference,
     _require_allowed,
     _require_form_type,
-    _resolve_entity,
-    _submission_result,
     _unique_entities,
+)
+from .results import (
+    _entity_result,
+    _submission_result,
+)
+from .references import (
+    _resolve_entity,
 )
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_creates_form_category_page_and_project_chain
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @pair ai-report:create-order
 def _create_form(action, _report, user, _created):
     _require_allowed(
@@ -50,7 +54,7 @@ def _create_form(action, _report, user, _created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_creates_form_category_page_and_project_chain
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @pair ai-report:create-order
 def _create_category(action, _report, user, created):
     _require_allowed(
@@ -80,7 +84,7 @@ def _create_category(action, _report, user, created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_creates_form_category_page_and_project_chain
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @pair ai-report:create-order
 def _create_project(action, _report, user, _created):
     _require_allowed(
@@ -100,7 +104,7 @@ def _create_project(action, _report, user, _created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_creates_form_category_page_and_project_chain
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @pair ai-report:create-order
 def _create_model_task(action, _report, user, created):
     data = _data(action)
@@ -136,8 +140,8 @@ def _create_model_task(action, _report, user, created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_creates_form_category_page_and_project_chain
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_uses_category_form_from_stored_key_for_page_submission
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_uses_category_form_from_stored_key_for_page_submission
 # @pair ai-report:create-order
 # @pair ai-report:default-category
 # @pair ai-report:submission-completion
@@ -198,7 +202,7 @@ def _create_page(action, _report, user, created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_adds_form_to_existing_page_with_undo
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_adds_form_to_existing_page_with_undo
 # @pair ai-report:page-form
 # @pair ai-report:idempotent
 def _add_form_to_page(action, _report, user, created):
@@ -259,9 +263,14 @@ def _add_form_to_page(action, _report, user, created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_adds_page_category_without_changing_primary_with_undo
+# @tests tests_unit/test_020g_ai_report_actions_entities.py::test_run_report_adds_page_category_without_changing_primary_with_undo
 # @pair ai-report:add-category
+# @pair ai-report:deterministic-run
 # @pair ai-report:idempotent
+# @pair categories:add-category
+# @pair categories:deterministic-run
+# @pair categories:idempotent
+# @pair categories:undo
 def _add_category(action, _report, user, created):
     data = _data(action)
     page = _resolve_entity(
@@ -325,7 +334,7 @@ def _add_category(action, _report, user, created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
 # @pair ai-report:moves
 def _move_page(action, _report, user, created):
     data = _data(action)
@@ -401,7 +410,7 @@ def _move_page(action, _report, user, created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
 # @pair ai-report:moves
 def _move_task(action, _report, user, created):
     data = _data(action)
@@ -455,7 +464,7 @@ def _move_task(action, _report, user, created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_renames_entity_without_submission_and_undoes
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_renames_entity_without_submission_and_undoes
 # @pair ai-report:rename
 def _rename_entity(action, _report, user, created):
     data = _data(action)
@@ -481,7 +490,7 @@ def _rename_entity(action, _report, user, created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_moves_file_and_records_manual_page_cleanup_with_undo
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_and_records_manual_page_cleanup_with_undo
 # @pair ai-report:manual-cleanup
 def _manual_delete_page_action(action, _report, user, created):
     data = _data(action)
@@ -515,14 +524,14 @@ def _manual_delete_page_action(action, _report, user, created):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/report_runner.py::run_report
+# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason skip actions are covered through deterministic report action dispatch
 def _skip_action(_action, _report, _user, _created):
     return None, []
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/report_runner.py::run_report
+# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason review actions are covered through deterministic report action dispatch
 def _needs_review_action(_action, _report, _user, _created):
     return None, []

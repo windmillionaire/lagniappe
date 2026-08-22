@@ -23,7 +23,7 @@ DIRECT_UPLOAD_RECORD_KEYS = (
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_prepare_report_upload_manifest_normalizes_browser_records
+# @tests tests_unit/test_020c_ai_report_uploads.py::test_prepare_report_upload_manifest_normalizes_browser_records
 # @features ai-report direct-upload
 # @dimensions upload-manifest validation normalization
 def prepare_report_upload_manifest(records, input_name="tool-files"):
@@ -86,9 +86,9 @@ def prepare_report_upload_manifest(records, input_name="tool-files"):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_finalize_report_upload_manifest_resumes_and_checkpoints
-# @tests tests_unit/test_020_ai_reports.py::test_finalize_report_upload_manifest_retains_source_until_checkpoint
-# @tests tests_unit/test_020_ai_reports.py::test_finalize_report_upload_manifest_accepts_actual_oversized_object
+# @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_resumes_and_checkpoints
+# @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_retains_source_until_checkpoint
+# @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_accepts_actual_oversized_object
 # @features ai-report direct-upload
 # @dimensions upload-manifest background-finalization resume progress checkpoint-failure large-file active-request
 def finalize_report_upload_manifest(
@@ -171,7 +171,7 @@ def finalize_report_upload_manifest(
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_cleanup_report_upload_manifest_deletes_only_pending_uploads
+# @tests tests_unit/test_020c_ai_report_uploads.py::test_cleanup_report_upload_manifest_deletes_only_pending_uploads
 # @features ai-report direct-upload
 # @dimensions upload-manifest cleanup partial-progress
 def cleanup_report_upload_manifest(report, delete_upload=None):

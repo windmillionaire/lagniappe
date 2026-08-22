@@ -112,11 +112,11 @@ still require browser review and deterministic execution.
 | Provider lifecycle | `ai/core.py` | Runtime model selection, Gemini configuration, SDK calls, tool loop, structured-final call, cleanup, and debug usage. |
 | Workspace retrieval | `ai/functions.py` and `function_definitions/` | Tool declaration, hash normalization, permission-filtered handler execution, exact-call cache, result/file parts, and failure trace. |
 | AI workflow | `ai/ask.py`, `create.py`, `organize.py`, `autofill.py`, `email_router.py` | Workflow-specific context, tool selection, email intent classification, generation stages, and fallback. |
-| Report proposal contract | `ai/reporting/contracts.py`, `proposals.py`, and `organize_completion.py` | Shared action schemas and ordering, proposal validation/repair, and Organize file-summary/submission completion. |
+| Report proposal contract | `ai/reporting/contracts/`, `proposals/`, and `completion/` | Shared action schemas and ordering, proposal validation/repair/selection, and Organize file-summary/submission completion. |
 | Durable request values | `properties/deferred_job_request.py`, `deferred_job_dispatch.py`, and `deferred_job_lifecycle.py` | Persisted request/dispatch/lifecycle values, deterministic identities, payload validation, and privacy-bounded projections. |
 | Durable generation service | `tools/deferred_jobs/service.py`, `runner.py`, `recovery.py`, and domain adapters | Job creation, claim/lease, retries, checkpoint, inspect/apply, cleanup, recovery, and durable notification state. |
 | Deferred transactions | `tools/database/deferred_jobs.py` | Atomic job/notification/lock creation, claims, compare-and-set transitions, and Scheduler tracking behind the database facade. |
-| Proposal application | `ai/report_runner.py` and `ai/reporting/actions/` | Ledger coordination plus callback-registered deterministic action inspection, execution, retry, compensation, and undo. |
+| Proposal application | `ai/reporting/execution/` | Ledger coordination plus deterministic action checkpoints, inspection, execution, retry, compensation, and undo. |
 | Browser completion | `/l/poll`, `PollingCoordinator`, `DeferredOperationManager`, `Core`, and `EditWatcher` | Operation acknowledgement, owner-safe status, revision validation, notification refresh, collection reconciliation, and watched-form refetch. |
 
 ## End-to-end workflow
@@ -238,10 +238,11 @@ added just because an attachment exists.
 ### 5. Validation, repair, and durable application
 
 Ask, Create, and Organize validate model output against application-owned
-contracts in `ai/reporting/`. `contracts.py` owns the allowed action set, action
-ordering, and typed action-data schemas; `proposals.py` owns their shared
-validation, normalization, and repair. Organize adds its workflow-specific
-file-summary and form-submission completion in `organize_completion.py`,
+contracts in `ai/reporting/`. `reporting/contracts/` owns the allowed action
+set, action ordering, and typed action-data schemas; `reporting/proposals/` owns
+their shared validation, normalization, and repair. Organize adds its
+workflow-specific file-summary and form-submission completion under
+`reporting/completion/`,
 including new records and exact existing page/task targets. Existing targets
 receive only evidence-backed changed fields, projected as reviewed
 `update_submission_fields` rows; the paired source file remains a normal
@@ -257,11 +258,15 @@ The adapter then inspects current state to distinguish already-applied from
 not-applied work and applies idempotently. AI report generation only saves a
 proposal. A later user-reviewed execution is queued as a distinct deferred job;
 its worker calls `run_report()` through the separate `report.result` recovery
-ledger. `report_runner.py` owns that version-1 ledger and ordered lifecycle;
-the action package owns one explicit callback adapter per contract action and
-groups domain handlers by entity, form, file, task, and shared-operation
-responsibility. The registry is checked against the proposal contract so a new
-action cannot silently exist on only the generation or execution side.
+ledger. `reporting/execution/ledger.py` and `runner.py` own that version-1
+ledger and ordered lifecycle; the execution action package owns one explicit
+callback adapter per contract action and groups domain handlers by entity,
+form, file, task, and shared-operation responsibility. Its registry is checked
+against the proposal contract so a new action cannot silently exist on only the
+generation or execution side. The reviewed proposal display is separately
+composed under `reporting/display/`: an explicit registry connects each action
+contract to domain-specific details and grouping metadata, while one projector
+builds the read-only grouped tree.
 
 ### 6. Terminal notification and browser refresh
 

@@ -10,7 +10,7 @@ ORGANIZE_RETRIEVAL_KINDS = ("category", "page", "form")
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_prepare_organize_retrieval_context_searches_bounded_structure_candidates
+# @tests tests_unit/test_020d_ai_report_prompts.py::test_prepare_organize_retrieval_context_searches_bounded_structure_candidates
 # @features ai-report search
 # @dimensions summary-terms redis-search kinds limits fallback
 def prepare_organize_retrieval_context(report, user):

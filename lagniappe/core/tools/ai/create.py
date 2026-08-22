@@ -9,15 +9,15 @@ from .guidelines import (
     REPORT_PREFLIGHT_CHECKS,
     REPORT_TASK_SCHEDULING_GUIDELINES,
 )
-from .reporting.contracts import (
-    READ_ONLY_CONTEXT_TOOLS,
+from .reporting.contracts.actions import READ_ONLY_CONTEXT_TOOLS
+from .reporting.contracts.permissions import (
     allowed_report_actions,
     permission_filtered_output_contract,
-    report_proposal_response_schema,
     report_action_permission_context,
     report_action_permission_instructions,
 )
-from .reporting.proposals import (
+from .reporting.contracts.schema import report_proposal_response_schema
+from .reporting.proposals.repair import (
     generate_validated_proposal,
 )
 from .prompt import Prompt
@@ -187,7 +187,7 @@ action list later if the user chooses to run it.
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_create_prompt_builds_creation_proposal_without_file_actions
+# @tests tests_unit/test_020d_ai_report_prompts.py::test_create_prompt_builds_creation_proposal_without_file_actions
 # @features ai-report
 # @dimensions create prompt search tools actions
 def create_prompt(report, user):
@@ -204,7 +204,7 @@ def create_prompt(report, user):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_revise_create_prompt_includes_feedback_and_current_proposal
+# @tests tests_unit/test_020d_ai_report_prompts.py::test_revise_create_prompt_includes_feedback_and_current_proposal
 # @features ai-report
 # @dimensions create revision feedback proposal context
 def revise_create_prompt(report, user, feedback):
@@ -236,7 +236,7 @@ partial actions.
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_generate_create_report_validates_non_empty_actions
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_create_report_validates_non_empty_actions
 # @features ai-report
 # @dimensions create generate validate
 def generate_create_report(prompt):

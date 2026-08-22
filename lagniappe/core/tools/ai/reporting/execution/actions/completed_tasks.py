@@ -1,4 +1,4 @@
-"""Task creation, completed-event history, recovery, and compensation."""
+"""Completed-task reuse, history, recovery, and compensation."""
 
 import copy
 import hashlib
@@ -11,45 +11,49 @@ from lagniappe.core.definitions import Action, Fetch, MutationIntent
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database, dates
 
-from ...debug import ai_debug
-from ..schedules import apply_task_schedule
-from .operations import (
+from ....debug import ai_debug
+from ...schedules import apply_task_schedule
+from .common import (
     TASK_FORM_TYPE_ERROR,
     _data,
+    _first_data_reference,
+    _require_allowed,
+    _require_form_type,
+    _safe_entity_relation,
+    _stored_relation_key,
+    _unique_entities,
+)
+from .results import (
     _capture_missing_task_submission,
     _diagnostic_entity,
     _diagnostic_file_refs,
     _entity_result,
-    _first_data_reference,
-    _load_result_entity,
-    _require_allowed,
-    _require_form_type,
-    _resolve_action_page,
-    _resolve_entity,
-    _safe_entity_relation,
-    _stored_relation_key,
     _submission_result,
     _task_structure_result,
-    _unique_entities,
+)
+from .references import (
+    _load_result_entity,
+    _resolve_action_page,
+    _resolve_entity,
 )
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/report_runner.py::run_report
+# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason before-state serialization is exercised through compensation tests
 def _snapshot_entity(entity):
     return _entity_result(entity) if entity is not None else None
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/report_runner.py::run_report
+# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason checkpoint date serialization is exercised through task recovery
 def _checkpoint_datetime(value):
     return value.isoformat() if hasattr(value, "isoformat") else value
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/report_runner.py::run_report
+# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason task checkpoint content is asserted through task recovery and undo
 def _task_checkpoint_state(task):
     if task is None:
@@ -77,7 +81,7 @@ def _task_checkpoint_state(task):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/report_runner.py::run_report
+# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason completed-task checkpointing is asserted through retry and undo
 def _capture_completed_task_before(action, data, user, created):
     page = _resolve_action_page(data, created, user)
@@ -127,7 +131,7 @@ def _capture_completed_task_before(action, data, user, created):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/report_runner.py::run_report
+# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason state fingerprints are exercised through completed-prefix validation
 def _value_fingerprint(value):
     data = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
@@ -135,135 +139,14 @@ def _value_fingerprint(value):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/report_runner.py::run_report
+# @covered-by lagniappe/core/tools/ai/reporting/execution/runner.py::run_report
 # @reason task state validation is exercised through completed-task retry
 def _task_state_fingerprint(task):
     return _value_fingerprint(_task_checkpoint_state(task))
 
 
-# @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_warns_but_continues_when_task_form_submission_missing
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_skips_task_that_references_page_form_and_continues
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_attach_file_to_task_targets_created_task
-# @pair ai-report:task-form
-# @pair tasks:task-form
-# @pair task-completion:task-form
-# @pair ai-report:missing-submission
-# @pair task-completion:missing-submission
-# @pair ai-report:mismatched-form
-# @pair tasks:mismatched-form
-# @pair ai-report:submission-completion
-# @pair ai-report:persistence
-def _create_task(action, _report, user, created, context=None):
-    data = _data(action)
-    page = _resolve_action_page(data, created, user)
-    _require_allowed(
-        page.allowed(Action.EDIT, user=user),
-        "You do not have permission to create tasks on this page.",
-    )
-    form = _resolve_entity(
-        data.get("form")
-        or data.get("form_id")
-        or data.get("form_ref")
-        or data.get("form_action"),
-        created,
-        expected=Entities.FORM,
-        optional=True,
-    )
-    project = _resolve_entity(
-        data.get("project")
-        or data.get("project_id")
-        or data.get("project_ref")
-        or data.get("project_action"),
-        created,
-        expected=Entities.PROJECT,
-        optional=True,
-    )
-    model = _resolve_entity(
-        data.get("model")
-        or data.get("model_id")
-        or data.get("model_ref")
-        or data.get("model_action"),
-        created,
-        expected=Entities.MODEL_TASK,
-        optional=True,
-    )
-    form = form or _model_task_form(model)
-    _require_form_type(form, "task", TASK_FORM_TYPE_ERROR)
-    ai_debug(
-        "report_runner.create_task.resolved",
-        report=_diagnostic_entity(_report),
-        action={
-            "id": action.get("id"),
-            "type": action.get("type"),
-            "display_label": action.get("display_label"),
-            "data_keys": sorted(data.keys()),
-            "completed": _is_completed_task_event(data),
-            "submission_key_present": "submission" in data,
-            "submission_field_count": (
-                len(data.get("submission"))
-                if isinstance(data.get("submission"), dict)
-                else None
-            ),
-        },
-        page=_diagnostic_entity(page),
-        project=_diagnostic_entity(project),
-        model=_diagnostic_entity(model),
-        form=_diagnostic_entity(form),
-        files=_diagnostic_file_refs(data),
-    )
-    if _is_completed_task_event(data):
-        return _record_completed_task_event(
-            action,
-            data,
-            page,
-            form,
-            project,
-            model,
-            _report,
-            user,
-            created,
-            context,
-        )
-
-    task = Entities.TASK.create(
-        {
-            "page": page,
-            "name": data.get("name") or "Generated task",
-            "description": data.get("description"),
-            "form": form,
-            "project": project,
-            "model": model,
-            "due_date": data.get("due_date") or data.get("due-date"),
-        }
-    )
-    if form is not None and "submission" in data:
-        task.ai_submission(data.get("submission") or {})
-    if data.get("schedule") is not None:
-        metadata_schedule = apply_task_schedule(task, data["schedule"])
-    else:
-        metadata_schedule = None
-
-    metadata = _task_structure_result(task)
-    metadata["page"] = _entity_result(page)
-    if metadata_schedule is not None:
-        metadata["schedule"] = metadata_schedule
-    if "submission" in data:
-        metadata["submission"] = _submission_result(
-            task,
-            data.get("submission_empty_reason"),
-        )
-    ai_debug(
-        "report_runner.create_task.created",
-        task=_diagnostic_entity(task),
-        form=_diagnostic_entity(form),
-        submission=_submission_result(task),
-    )
-    return task, _unique_entities([task, page]), metadata
-
-
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_create_task
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/tasks.py::_create_task
 # @reason completed task event detection is covered through report-run behavior
 def _is_completed_task_event(data):
     return bool(
@@ -272,15 +155,16 @@ def _is_completed_task_event(data):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_records_dateless_historical_task_completion
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_records_older_completed_event_without_mutating_live_task
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_promotes_newer_completed_event_to_live_task
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_reuses_one_created_task_for_multiple_completed_events
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_keeps_untargeted_same_model_tasks_distinct
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_loads_model_task_form_from_stored_key_for_history
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_reuses_existing_task_for_completed_event
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_automatically_reuses_dated_completed_task_family
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_keeps_ambiguous_completed_task_families_distinct
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_records_dateless_historical_task_completion
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_records_older_completed_event_without_mutating_live_task
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_promotes_newer_completed_event_to_live_task
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_reuses_one_created_task_for_multiple_completed_events
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_keeps_untargeted_same_model_tasks_distinct
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_loads_model_task_form_from_stored_key_for_history
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_reuses_existing_task_for_completed_event
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_automatically_reuses_dated_completed_task_family
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_keeps_ambiguous_completed_task_families_distinct
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_rejects_completed_task_target_from_another_page
 # @features ai-report tasks task-completion
 # @dimensions completed-task older-event name description attachments submission explicit-task-identity automatic-task-family period-name same-report ambiguity duplicate-task-prevention newest-completion live-task history-name model-form lazy-load distinct-task same-model existing-task
 def _record_completed_task_event(
@@ -432,7 +316,7 @@ def _record_completed_task_event(
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_record_completed_task_event
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
 # @reason task reuse is covered through completed event report-run tests
 def _find_or_create_completed_task(
     action,
@@ -472,7 +356,7 @@ def _find_or_create_completed_task(
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_find_or_create_completed_task
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_find_or_create_completed_task
 # @reason task naming is verified through report-run completed event tests
 def _completed_event_task_name(action, data, page, model):
     raw_name = data.get("name") or ""
@@ -500,7 +384,7 @@ _EVENT_DATE_PATTERN = rf"(?:{_NUMERIC_DATE_PATTERN}|{_MONTH_DATE_PATTERN})"
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_completed_event_task_name
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_completed_event_task_name
 # @reason normalized names are covered through report-run completed event tests
 def _strip_history_event_name(value, page_name=None):
     name = " ".join(str(value or "").replace("_", " ").split())
@@ -531,7 +415,7 @@ def _strip_history_event_name(value, page_name=None):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_strip_history_event_name
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_strip_history_event_name
 # @reason page prefix cleanup is covered through report-run tracker reuse tests
 def _strip_leading_page_name(name, page_name):
     if not page_name:
@@ -545,8 +429,8 @@ def _strip_leading_page_name(name, page_name):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_find_or_create_completed_task
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_capture_completed_task_before
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_find_or_create_completed_task
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_capture_completed_task_before
 # @reason deterministic task-family matching is exercised through report-run reuse tests
 def _find_completed_task_match(
     action,
@@ -590,7 +474,7 @@ def _find_completed_task_match(
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_find_completed_task_match
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_find_completed_task_match
 # @reason candidate collection is exercised through completed-task reuse and retry tests
 def _completed_task_candidates(page, created):
     candidates = [*_page_task_candidates(page)]
@@ -609,7 +493,7 @@ def _completed_task_candidates(page, created):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_find_completed_task_match
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_find_completed_task_match
 # @reason exact task-family matching is exercised through completed-task reuse tests
 def _completed_task_family_matches(task, page, project, model, form, name):
     if not _same_entity(_safe_entity_relation(task, "page"), page):
@@ -631,7 +515,7 @@ def _completed_task_family_matches(task, page, project, model, form, name):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_completed_task_family_matches
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_completed_task_family_matches
 # @reason normalized task-family names are exercised through dated completed-task reuse tests
 def _normalized_task_name_key(name):
     name = _strip_history_event_name(name) or str(name or "")
@@ -640,7 +524,7 @@ def _normalized_task_name_key(name):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_find_completed_task_match
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_find_completed_task_match
 # @reason page task loading fallback is covered through completed-task reuse tests
 def _page_task_candidates(page):
     candidates = []
@@ -665,7 +549,7 @@ def _page_task_candidates(page):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_rejects_completed_task_target_from_another_page
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_rejects_completed_task_target_from_another_page
 # @pair ai-report:page-validation
 # @pair tasks:page-validation
 # @pair task-completion:page-validation
@@ -712,7 +596,7 @@ def _resolve_completed_task_target(
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_resolve_completed_task_target
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_resolve_completed_task_target
 # @reason relation identity comparison is exercised through completed-target validation
 def _same_entity(left, right):
     if left is None or right is None:
@@ -721,7 +605,7 @@ def _same_entity(left, right):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_record_completed_task_event
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
 # @reason archive suppression is verified through completion promotion tests
 def _should_archive_live_completion(task):
     if not task.completed:
@@ -730,7 +614,7 @@ def _should_archive_live_completion(task):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_record_completed_task_event
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
 # @reason dated and dateless event placement is exercised through report-run completion tests
 def _completed_event_belongs_in_history(task, completed_on):
     if not task.completed:
@@ -742,7 +626,7 @@ def _completed_event_belongs_in_history(task, completed_on):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_record_completed_task_event
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
 # @reason live task mutation is verified through completion event tests
 def _apply_completed_task_event(
     task,
@@ -771,15 +655,15 @@ def _apply_completed_task_event(
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_record_completed_task_event
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
 # @reason blank-submission detection is exercised through completion event tests
 def _task_has_submission_data(task):
     return bool(getattr(task, "submission", None))
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_create_task
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_record_completed_task_event
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/tasks.py::_create_task
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
 # @reason model-form inheritance is verified through report-run completed event tests
 def _model_task_form(model):
     if model is None:
@@ -825,8 +709,8 @@ def _model_task_form(model):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_create_task
-# @covered-by lagniappe/core/tools/ai/reporting/actions/tasks.py::_record_completed_task_event
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/tasks.py::_create_task
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/completed_tasks.py::_record_completed_task_event
 # @reason existing task repair is verified through report-run completed event tests
 def _ensure_task_form_from_model(task, model=None):
     if getattr(task, "form", None):
@@ -837,7 +721,7 @@ def _ensure_task_form_from_model(task, model=None):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_skips_invalid_completed_task_events_and_continues
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_invalid_completed_task_events_and_continues
 # @pair ai-report:validation
 # @pair ai-report:completed-task
 def _parse_completed_task_completed_on(data):
@@ -859,14 +743,14 @@ def _parse_completed_task_completed_on(data):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/report_runner.py::undo_report
+# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
 # @reason checkpoint resolution is exercised through completed-task undo
 def _checkpoint_entity(details):
     return _load_result_entity(details) if details else None
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/report_runner.py::undo_report
+# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
 # @reason checkpoint resolution is exercised through completed-task undo
 def _checkpoint_entities(details):
     return [
@@ -877,7 +761,7 @@ def _checkpoint_entities(details):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/report_runner.py::undo_report
+# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
 # @reason date restoration is exercised through completed-task undo
 def _restore_checkpoint_datetime(value):
     if not value or isinstance(value, datetime):
@@ -886,7 +770,7 @@ def _restore_checkpoint_datetime(value):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/report_runner.py::undo_report
+# @covered-by lagniappe/core/tools/ai/reporting/execution/undo.py::undo_report
 # @reason asset restoration is owned by completed-task compensation
 def _restore_task_checkpoint_assets(task, state, histories):
     previous = copy.deepcopy(state.get("assets") or {})
@@ -903,7 +787,7 @@ def _restore_task_checkpoint_assets(task, state, histories):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_completed_task_retry_and_undo_restore_reused_task
+# @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
 # @pair ai-report:completed-task
 # @pair ai-report:reuse
 # @pair ai-report:compensation

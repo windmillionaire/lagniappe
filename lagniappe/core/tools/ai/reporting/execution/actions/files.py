@@ -4,28 +4,36 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action
 from lagniappe.core.entities import Entities
 
-from .operations import (
+from .references import (
     _add_file_to_endpoint,
-    _data,
-    _entity_result,
     _file_attached_to_endpoint,
-    _file_summary_result,
     _remove_file_from_endpoint,
-    _require_allowed,
     _resolve_action_page,
     _resolve_entity,
     _resolve_file_endpoint,
     _resolve_file_entity,
     _resolve_report_file,
+)
+from .common import (
+    _data,
+    _require_allowed,
     _unique_entities,
+)
+from .results import (
+    _entity_result,
+    _file_summary_result,
 )
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_moves_file_and_records_manual_page_cleanup_with_undo
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_moves_file_by_exact_source_attachment_name
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_and_records_manual_page_cleanup_with_undo
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_by_exact_source_attachment_name
 # @pair ai-report:move-file
+# @pair ai-report:deterministic-run
 # @pair files:move-file
+# @pair files:deterministic-run
+# @pair files:manual-cleanup
+# @pair files:undo
 # @pair ai-report:readable-file-fallback
 # @pair files:readable-file-fallback
 def _move_file(action, _report, user, created):
@@ -67,12 +75,19 @@ def _move_file(action, _report, user, created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_creates_form_category_page_and_project_chain
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_resolves_attachment_page_from_single_prior_task_when_reference_is_file
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_resolves_attachment_page_by_exact_page_name_when_reference_missing
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_marks_missing_file_placements_failed_and_continues
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_rejects_category_used_as_attachment_page
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_resolves_attachment_page_from_single_prior_task_when_reference_is_file
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_resolves_attachment_page_by_exact_page_name_when_reference_missing
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
+# @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_rejects_category_used_as_attachment_page
 # @pair ai-report:attachments
+# @pair ai-report:attachment
+# @pair ai-report:deterministic-run
+# @pair ai-report:exact-page-name
+# @pair ai-report:page-reference
+# @pair ai-report:partial-result
+# @pair ai-report:prior-task-page
+# @pair ai-report:repair
 # @pair files:attachment
 # @pair files:page-reference
 # @pair files:repair
@@ -94,7 +109,7 @@ def _attach_file_to_page(action, report, user, created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_attach_file_to_task_targets_created_task
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_to_task_targets_created_task
 # @pair ai-report:task-attachment
 # @pair tasks:task-attachment
 # @pair files:task-attachment
@@ -125,7 +140,7 @@ def _attach_file_to_task(action, report, user, created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_creates_form_category_page_and_project_chain
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @pair ai-report:file-summary
 def _summarize_file(action, report, _user, _created):
     data = _data(action)

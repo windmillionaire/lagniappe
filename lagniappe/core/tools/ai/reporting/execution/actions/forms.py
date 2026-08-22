@@ -7,23 +7,32 @@ from lagniappe.core.definitions import Action
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.schema import SchemaValidationError, canonicalize_schema
 
-from .operations import (
+from .common import (
     SUBMISSION_UPDATE_ROWS_ERROR,
     _data,
-    _entity_result,
-    _load_result_entity,
     _require_allowed,
-    _resolve_entity,
     _unique_entities,
+)
+from .results import (
+    _entity_result,
+)
+from .references import (
+    _load_result_entity,
+    _resolve_entity,
 )
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_skips_empty_submission_update_and_continues
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_skips_empty_submission_update_and_continues
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_runs_submission_updates
 # @pair ai-report:batch-field-patch
+# @pair ai-report:deterministic-run
 # @pair ai-report:empty-update
+# @pair submission:continue
+# @pair submission:deterministic-run
+# @pair submission:empty-update
+# @pair submission:recoverable
 def _update_submission_fields(action, _report, user, created):
     data = _data(action)
     updates = data.get("updates") or []
@@ -108,9 +117,12 @@ def _update_submission_fields(action, _report, user, created):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_rejects_schema_update_without_form_edit_permission
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_rejects_schema_update_without_form_edit_permission
 # @pair ai-report:schema-update
+# @pair ai-report:deterministic-run
+# @pair ai-report:permission-failure
+# @pair form-schema:deterministic-run
 # @pair form-schema:schema-update
 # @pair form-schema:permission-failure
 def _update_form_schema(action, _report, user, created):
@@ -172,7 +184,7 @@ def _update_form_schema(action, _report, user, created):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/forms.py::_update_submission_fields
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_submission_fields
 # @reason row entity resolution is covered through batch submission report-run tests
 def _resolve_submission_update_entity(update, created):
     page_reference = (
@@ -197,7 +209,7 @@ def _resolve_submission_update_entity(update, created):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/forms.py::_update_submission_fields
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_submission_fields
 # @reason previous value capture is covered through undo tests
 def _submission_previous_value(entity, schema_id):
     submission = getattr(entity, "submission", None)
@@ -210,7 +222,7 @@ def _submission_previous_value(entity, schema_id):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/forms.py::_update_submission_fields
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_submission_fields
 # @reason validation behavior is covered through batch submission report-run tests
 def _apply_submission_field_update(entity, schema_id, value):
     if not getattr(entity, "form", None):
@@ -235,7 +247,7 @@ def _apply_submission_field_update(entity, schema_id, value):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/forms.py::_update_form_schema
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
 # @reason schema operation parsing is covered through schema update report-run tests
 def _schema_add_field(schema, raw_field):
     field = _safe_schema_field(raw_field)
@@ -253,7 +265,7 @@ def _schema_add_field(schema, raw_field):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/forms.py::_update_form_schema
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
 # @reason schema operation parsing is covered through schema update report-run tests
 def _schema_add_select_option(schema, operation):
     schema_id = operation.get("schema_id") or operation.get("field_id")
@@ -302,7 +314,7 @@ def _schema_add_select_option(schema, operation):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/forms.py::_update_form_schema
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
 # @reason field sanitization is covered through schema update report-run tests
 def _safe_schema_field(raw_field):
     if not isinstance(raw_field, dict):
@@ -324,8 +336,8 @@ def _safe_schema_field(raw_field):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/forms.py::_update_submission_fields
-# @covered-by lagniappe/core/tools/ai/reporting/actions/forms.py::_update_form_schema
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_submission_fields
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_update_form_schema
 # @reason user-facing notes are asserted through report-run result tests
 def _update_summary_note(prefix, applied, skipped):
     count = len(applied or [])
@@ -340,7 +352,7 @@ def _update_summary_note(prefix, applied, skipped):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
 # @pair ai-report:batch-field-patch
 # @pair ai-report:undo
 def _undo_submission_updates(action, user):
@@ -383,7 +395,7 @@ def _undo_submission_updates(action, user):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/ai/reporting/actions/forms.py::_undo_submission_updates
+# @covered-by lagniappe/core/tools/ai/reporting/execution/actions/forms.py::_undo_submission_updates
 # @reason field restoration is covered through public undo tests
 def _restore_submission_field(entity, schema_id, had_value, previous_value):
     if getattr(entity, "form", None):
@@ -407,7 +419,7 @@ def _restore_submission_field(entity, schema_id, had_value, previous_value):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
+# @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
 # @pair ai-report:schema-update
 # @pair ai-report:undo
 def _undo_form_schema_update(action, user):

@@ -220,7 +220,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_create_history_entry_accepts_completion_overrides
-    # @tests tests_unit/test_020_ai_reports.py::test_run_report_records_older_completed_event_without_mutating_live_task
+    # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_records_older_completed_event_without_mutating_live_task
     # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
     # @pairs task-completion:history task-completion:uncomplete
     # @pairs task-completion:explicit-overrides task-completion:name

@@ -213,6 +213,13 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
         def __init__(self, report):
             self.report = report
 
+        def begin_execution(self, result=None):
+            self.report.status = "running"
+            self.report.pending = True
+            self.report.error = None
+            if result is not None:
+                self.report.result = result
+
         def fail(self, message, result=None):
             self.report.status = "failed"
             self.report.pending = None

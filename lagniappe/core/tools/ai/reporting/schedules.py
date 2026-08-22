@@ -12,7 +12,7 @@ SCHEDULE_PATTERN_TYPES = frozenset(
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_report_task_schedule_contract_validates_supported_patterns
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_report_task_schedule_contract_validates_supported_patterns
 # @features ai-report task-scheduling
 # @dimensions structured-output recurring scheduled periodic validation
 def task_schedule_response_schema():
@@ -66,7 +66,9 @@ def task_schedule_response_schema():
 # @reason numeric validation is exercised through the public schedule contract
 def _positive_integer(value, label):
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
-        raise exceptions.AIException(f"Task schedule {label} must be a positive integer.")
+        raise exceptions.AIException(
+            f"Task schedule {label} must be a positive integer."
+        )
     return value
 
 
@@ -96,7 +98,7 @@ def _optional_text(schedule, key):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_report_task_schedule_contract_validates_supported_patterns
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_report_task_schedule_contract_validates_supported_patterns
 # @features ai-report task-scheduling
 # @dimensions recurring scheduled periodic validation normalization
 def validate_task_schedule(schedule):
@@ -139,10 +141,7 @@ def validate_task_schedule(schedule):
                 "Weekly task schedule requires at least one weekday."
             )
         normalized["days"] = sorted(
-            {
-                _bounded_integer(day, "weekday", 0, 6)
-                for day in days
-            }
+            {_bounded_integer(day, "weekday", 0, 6) for day in days}
         )
     elif mode in {"monthly", "yearly"}:
         pattern_type = schedule.get("pattern_type")
@@ -152,9 +151,7 @@ def validate_task_schedule(schedule):
             )
         normalized["pattern_type"] = pattern_type
         if pattern_type == "specific_day":
-            normalized["day"] = _bounded_integer(
-                schedule.get("day"), "day", 1, 31
-            )
+            normalized["day"] = _bounded_integer(schedule.get("day"), "day", 1, 31)
         elif pattern_type == "ordinal_weekday":
             normalized["ordinal"] = _bounded_integer(
                 schedule.get("ordinal"),
@@ -183,7 +180,7 @@ def validate_task_schedule(schedule):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_run_report_creates_task_with_reviewed_schedule
+# @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_creates_task_with_reviewed_schedule
 # @features ai-report task-scheduling
 # @dimensions persistence recurring
 def apply_task_schedule(task, schedule):

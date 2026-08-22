@@ -18,35 +18,43 @@ from .guidelines import (
 from .prompt import Prompt
 from .references import hash_reference
 from .summarize import generate_summary
-from .reporting.contracts import (
+from .reporting.contracts.actions import (
     ACTION_ORDER,
     ALLOWED_ACTIONS,
     READ_ONLY_CONTEXT_TOOLS,
     REPORT_ACTION_DATA_CONTRACTS,
+)
+from .reporting.contracts.permissions import (
     allowed_report_actions,
     permission_filtered_output_contract,
     report_action_permission_context,
     report_action_permission_instructions,
-    report_proposal_response_schema,
 )
-from .reporting.organize_completion import (
-    ORGANIZE_SUBMISSION_COMPLETION_RULES,
-    ORGANIZE_SUBMISSION_OUTPUT_REQUIREMENTS,
+from .reporting.contracts.schema import report_proposal_response_schema
+from .reporting.completion.files import (
     OVERSIZED_REPORT_SUMMARY,
     _report_file_summary_warning,
-    complete_organize_submissions,
-    organize_submission_completion_prompt,
     summarize_report_input_files,
+)
+from .reporting.completion.prompt import (
+    ORGANIZE_SUBMISSION_COMPLETION_RULES,
+    ORGANIZE_SUBMISSION_OUTPUT_REQUIREMENTS,
+    organize_submission_completion_prompt,
     validate_organize_submission_results,
 )
-from .reporting.proposals import (
-    ENTITY_PAIR_ACTION_REFERENCES,
-    _proposal_debug_summary,
+from .reporting.completion.service import complete_organize_submissions
+from .reporting.proposals.diagnostics import _proposal_debug_summary
+from .reporting.proposals.repair import (
     generate_validated_proposal,
+    validate_or_repair_proposal,
+)
+from .reporting.proposals.selection import (
     skip_proposal_actions,
     toggle_proposal_action_indexes,
     toggle_proposal_action_skip,
-    validate_or_repair_proposal,
+)
+from .reporting.proposals.validation import (
+    ENTITY_PAIR_ACTION_REFERENCES,
     validate_proposal,
 )
 
@@ -148,7 +156,7 @@ def _organize_action_permission_context(user, allowed_actions):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_organize_prompt_includes_files_tools_instructions_and_high_limit
+# @tests tests_unit/test_020d_ai_report_prompts.py::test_organize_prompt_includes_files_tools_instructions_and_high_limit
 # @features ai-report
 # @dimensions prompt files tools iteration-limit
 def organize_prompt(report, user, retrieval_context=None):
@@ -175,7 +183,7 @@ to run it.
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_revise_organize_prompt_includes_feedback_and_current_proposal
+# @tests tests_unit/test_020d_ai_report_prompts.py::test_revise_organize_prompt_includes_feedback_and_current_proposal
 # @features ai-report
 # @dimensions revision feedback proposal context
 def revise_organize_prompt(report, user, feedback, retrieval_context=None):
@@ -350,7 +358,7 @@ def _input_file_context(report, user=None, retrieval_context=None):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_validates_ai_output
+# @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_validates_ai_output
 # @features ai-report
 # @dimensions generate validate
 def generate_organize_plan(prompt):
@@ -388,7 +396,7 @@ def generate_organize_plan(prompt):
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_generate_organize_report_completes_planned_submissions
+# @tests tests_unit/test_020f_ai_report_completion.py::test_generate_organize_report_completes_planned_submissions
 # @pair ai-report:generate
 # @pair ai-report:pipeline
 # @pair ai-report:submission-completion

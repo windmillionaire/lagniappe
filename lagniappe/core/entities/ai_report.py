@@ -1,11 +1,15 @@
 from .entity import Entity
 from ..definitions import Action
-from ..properties import activity, ai_report as report_properties
+from ..properties import activity
+from ..properties import ai_report_input
+from ..properties import ai_report_process
+from ..properties import ai_report_proposal
+from ..properties import ai_report_result
 from ..tools.user_context import current_context_user
 
 
 # @testable true
-# @tests tests_unit/test_020_ai_reports.py::test_ai_report_create_and_file_cleanup
+# @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_create_and_file_cleanup
 # @features ai-report
 # @dimensions create files status delete
 class AIReport(Entity):
@@ -37,18 +41,18 @@ class AIReport(Entity):
                 "tool": activity.Tool,
                 "instructions": activity.Instructions,
                 "input_files": activity.InputFiles,
-                "upload_manifest": report_properties.UploadManifest,
-                "origin": report_properties.Origin,
-                "inbound_manifest": report_properties.InboundManifest,
-                "process": report_properties.ReportProcess,
-                "status": report_properties.Status,
-                "deferred_job": report_properties.DeferredJob,
-                "summary": report_properties.Summary,
-                "proposal": report_properties.Proposal,
-                "result": report_properties.Result,
-                "error": report_properties.Error,
-                "pending": report_properties.Pending,
-                "note": report_properties.Note,
+                "upload_manifest": ai_report_input.UploadManifest,
+                "origin": ai_report_input.Origin,
+                "inbound_manifest": ai_report_input.InboundManifest,
+                "process": ai_report_process.ReportProcess,
+                "status": ai_report_process.Status,
+                "deferred_job": ai_report_process.DeferredJob,
+                "summary": ai_report_process.Summary,
+                "proposal": ai_report_proposal.Proposal,
+                "result": ai_report_result.Result,
+                "error": ai_report_process.Error,
+                "pending": ai_report_process.Pending,
+                "note": ai_report_process.Note,
             }
         )
         return properties
@@ -58,7 +62,7 @@ class AIReport(Entity):
         return [self.parent.hash]
 
     # @testable true
-    # @tests tests_unit/test_020_ai_reports.py::test_ai_report_permissions_follow_creator_ownership
+    # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_permissions_follow_creator_ownership
     # @features ai-report permissions
     # @dimensions creator owner unrelated-user delete view
     def allowed(self, action, user=None):

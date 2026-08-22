@@ -764,6 +764,20 @@ Organize, and Create generation/revision jobs retain their normal final
 notification, which is also the generic terminal email path for email-origin
 reports.
 
+AI report code follows the same concrete-owner convention as deferred jobs.
+Persisted input/origin fields, process-backed transitions, proposal
+fingerprinting, and result grouping live in focused `properties/ai_report_*`
+modules. The proposal property delegates its read-only display tree to
+`tools/ai/reporting/display/`, whose explicit registry composes entity, file,
+form, task, and review display adapters with shared detail/reference projection.
+Prompt contracts, proposal validation/repair/selection, Organize completion,
+and uploads also live under `tools/ai/reporting/`. Deterministic report execution
+is split under `tools/ai/reporting/execution/` into ledger, runner, undo, and
+action modules for checkpoints, recovery, references, results, compensation,
+and domain handlers. Package markers do not re-export execution internals;
+application code imports concrete owners, while `core.tools.ai` and the
+established `organize.py` exports remain the supported report facades.
+
 AI reports may temporarily persist a JSON `upload_manifest` containing signed
 direct-upload records. It is excluded from indexes and cleared after the
 background Organize process has converted every record into an attached `File`.

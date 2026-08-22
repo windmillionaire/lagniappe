@@ -505,9 +505,10 @@ normal operation poll uses the Redis revision projection and only falls back to
 the durable job when needed. Terminal cleanup compare-clears the Page reference
 so an older worker cannot erase a newer operation.
 
-### Report Runner (`report_runner.py`)
+### Report execution (`reporting/execution/`)
 
-Stored AI report proposals are executed deterministically by `run_report()`.
+Stored AI report proposals are executed deterministically by
+`reporting/execution/runner.py::run_report()`.
 Ask and Organize proposals can include reviewed edit actions in addition to
 creation and file attachment actions:
 

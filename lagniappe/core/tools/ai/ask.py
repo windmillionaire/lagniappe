@@ -6,10 +6,10 @@ from .guidelines import (
     HTML_GENERATION_RULES,
     LAGNIAPPE_WORKSPACE_CONCEPTS,
 )
-from .reporting.contracts import (
+from .reporting.contracts.actions import (
     READ_ONLY_CONTEXT_TOOLS,
 )
-from .reporting.proposals import (
+from .reporting.proposals.repair import (
     generate_validated_proposal,
 )
 from .prompt import Prompt
