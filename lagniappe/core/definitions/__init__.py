@@ -38,6 +38,7 @@ from .ingress import (
 from .permissions import General, Specific, Site, Levels, Resource, Action, Restriction
 from .ai_access import AI
 from .notification_email import NotificationEmailMode
+from .messaging import MessageConflict, MessageRevisionConflict
 from .asset import AssetTypes
 from .default import DefaultEnum
 from .fetch import Fetch, FetchDepth, FetchReason

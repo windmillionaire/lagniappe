@@ -7,6 +7,7 @@ from redis import WatchError
 
 from lagniappe.core.tools.cache import operations
 from lagniappe.core.tools.cache import notifications
+from lagniappe.core.tools.cache import notification_state as notification_projection
 
 
 pytestmark = pytest.mark.unit
@@ -164,7 +165,7 @@ def test_poll_state_read_batches_notifications_and_operations(redis, monkeypatch
     operations.update_operation_projection(current, now=100)
     notification_key, epoch_key = notifications._redis_keys(user)
     redis.hashes[notification_key] = {
-        "schema": notifications.NOTIFICATION_SCHEMA_VERSION,
+        "schema": notification_projection.NOTIFICATION_SCHEMA_VERSION,
         "generation": "generation-one",
         "revision": "3",
         "message_revision": "2",

@@ -161,21 +161,23 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @testable true
     # @tests tests_unit/test_009f_page_view_access.py::test_page_restricted_access_group_match
     # @tests tests_unit/test_009b_user_permissions.py::test_privileged_user_rows_are_owner_managed
+    # @tests tests_unit/test_009f_page_view_access.py::test_page_view_does_not_require_loaded_owner
     # @pairs page:restricted-access page:group-match
     # @pairs admin:privileged-account admin:page owner:owner-only
+    # @pair page:view-owner-short-circuit
     def allowed(self, action, user=None):
         user = current_context_user(user)
         if self.restricted_access(user):
             return False
-        target_user = self.user
-        if (
-            target_user
-            and target_user.is_admin
-            and user
-            and not user.is_owner
-            and action.value > Action.VIEW.value
-        ):
-            return False
+        if action.value > Action.VIEW.value:
+            target_user = self.user
+            if (
+                target_user
+                and target_user.is_admin
+                and user
+                and not user.is_owner
+            ):
+                return False
         return super().allowed(action, user=user)
 
     # @testable true

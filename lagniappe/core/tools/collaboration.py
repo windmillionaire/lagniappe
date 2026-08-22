@@ -6,7 +6,7 @@ from . import cache
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_collaboration_permissions_use_current_recipient_and_document_access
+# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
 # @pairs messaging:managed-user messaging:public-exclusion
 def managed_user(user):
@@ -18,7 +18,7 @@ def managed_user(user):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_collaboration_permissions_use_current_recipient_and_document_access
+# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_inbound_message_allows_reply_without_compose_permission
 # @pairs messaging:compose-eligibility messaging:owner-opt-in
 def can_initiate_messages(user):
@@ -30,7 +30,7 @@ def can_initiate_messages(user):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_collaboration_permissions_use_current_recipient_and_document_access
+# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
 # @pair messaging:recipient-resolution
 def resolve_user(identifier):
     """Resolve either a canonical User key or its personal Page selector key."""
@@ -55,7 +55,7 @@ def _ordinary_restriction_allows(recipient, restrictions):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_collaboration_permissions_use_current_recipient_and_document_access
+# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
 # @pairs messaging:permission messaging:self-exclusion messaging:owner-opt-in
 # @pair task-assignment:permission
@@ -89,7 +89,7 @@ def recipient_allowed(actor, recipient, *, channel):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_collaboration_permissions_use_current_recipient_and_document_access
+# @tests tests_unit/test_027d_collaboration.py::test_collaboration_permissions_use_current_recipient_and_document_access
 # @pairs mentions:permission mentions:document-view
 def mention_recipient_allowed(actor, recipient, document):
     return bool(
@@ -100,7 +100,7 @@ def mention_recipient_allowed(actor, recipient, document):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_collaboration_search_excludes_self_owner_and_stale_rows
+# @tests tests_unit/test_027d_collaboration.py::test_collaboration_search_excludes_self_owner_and_stale_rows
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
 # @pairs messaging:self-exclusion messaging:recipient-key messaging:owner-search
 # @pair mentions:recipient-search

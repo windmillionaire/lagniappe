@@ -14,7 +14,7 @@ _REQUEST_OWNER = ContextVar("owner_projection", default=None)
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_owner_projection_normalizes_and_round_trips
+# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
 # @pair owner-projection:normalization
 def normalize_owner_name(value):
     value = unicodedata.normalize("NFKC", str(value or ""))
@@ -22,7 +22,7 @@ def normalize_owner_name(value):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_owner_projection_normalizes_and_round_trips
+# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
 # @pair owner-projection:request-memo
 def clear_request_owner_projection():
     _REQUEST_OWNER.set(None)
@@ -87,7 +87,7 @@ def _mapping(user, revision):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_owner_projection_normalizes_and_round_trips
+# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
 # @pairs owner-projection:revision owner-projection:fail-closed
 def update_owner_projection(*users):
     """Publish an owner row only after its durable mutation has committed."""
@@ -103,7 +103,7 @@ def update_owner_projection(*users):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_owner_projection_normalizes_and_round_trips
+# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
 # @pairs owner-projection:repair owner-projection:request-memo
 def get_owner_projection(*, repair=True):
     """Read the request memo/Redis projection and repair from User on a miss."""
@@ -132,7 +132,7 @@ def get_owner_projection(*, repair=True):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_owner_projection_normalizes_and_round_trips
+# @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
 # @pair owner-projection:selector-shape
 def owner_search_result(projection):
     """Return the selector shape used by user facets."""

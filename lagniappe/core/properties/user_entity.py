@@ -150,7 +150,7 @@ class AIAccess(DBProperty):
 
 
 # @testable true
-# @tests tests_unit/test_029_notification_email.py::test_notification_email_preference_defaults_and_eligibility
+# @tests tests_unit/test_029a_notification_email_policy.py::test_notification_email_preference_defaults_and_eligibility
 # @pairs notification-email:preference notification-email:eligibility
 class NotificationEmailPreference(DBProperty):
     """Canonical per-user notification email mode."""
@@ -255,7 +255,7 @@ class IsAdmin(DBProperty):
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_messaging_entities_and_owner_toggles_are_fail_closed
+# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
 # @pair messaging:owner-opt-in
 class OwnerInboundToggle(DBProperty):
     """Fail-closed owner opt-in for a collaboration channel."""
@@ -263,7 +263,7 @@ class OwnerInboundToggle(DBProperty):
     _truthy = {True, "true", "True", "1", 1, "on", "yes"}
 
     # @testable true
-    # @tests tests_unit/test_027_messaging.py::test_messaging_entities_and_owner_toggles_are_fail_closed
+    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
     # @pair messaging:owner-opt-in
     @property
     def value(self):

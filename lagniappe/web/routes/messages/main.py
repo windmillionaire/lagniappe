@@ -4,7 +4,10 @@ from flask import g, request
 from flask_login import current_user
 
 from lagniappe.core.exceptions import ValidationError
-from lagniappe.core.tools import collaboration, messages as message_service
+from lagniappe.core.definitions import MessageConflict, MessageRevisionConflict
+from lagniappe.core.tools import collaboration
+from lagniappe.core.tools.messaging import service as message_service
+from lagniappe.core.tools.messaging import views as message_views
 from lagniappe.web import responses
 from lagniappe.web.auth import abort_public_user_action, logged_in
 
@@ -36,7 +39,7 @@ def conversations():
     _managed_only()
     g.NO_CACHE = True
     return responses.json_response(
-        message_service.conversations(current_user, request.args.get("cursor"))
+        message_views.conversations(current_user, request.args.get("cursor"))
     )
 
 
@@ -47,7 +50,7 @@ def history(key):
     _managed_only()
     g.NO_CACHE = True
     try:
-        payload = message_service.conversation_history(
+        payload = message_views.conversation_history(
             current_user,
             key,
             request.args.get("cursor"),
@@ -64,10 +67,10 @@ def clear_modal(key):
     _managed_only()
     g.NO_CACHE = True
     try:
-        conversation = message_service.get_conversation(current_user, key)
+        conversation = message_views.get_conversation(current_user, key)
     except PermissionError:
         return responses.json_response({"error": "Conversation not found."}, 404)
-    peer_name = message_service.serialize_conversation(
+    peer_name = message_views.serialize_conversation(
         conversation, current_user
     )["peer"]["name"]
     return responses.message_clear_modal(key, peer_name=peer_name)
@@ -90,7 +93,7 @@ def send():
         return responses.json_response({"error": str(error)}, 403)
     except ValidationError as error:
         return responses.json_response({"error": str(error)}, 422)
-    except message_service.MessageConflict as error:
+    except MessageConflict as error:
         return responses.json_response({"error": str(error)}, 409)
     return responses.json_response(payload, status=201 if payload["created"] else 200)
 
@@ -109,7 +112,7 @@ def read(key):
         )
     except (PermissionError, ValueError):
         return responses.json_response({"error": "Conversation not found."}, 404)
-    except message_service.MessageRevisionConflict as error:
+    except MessageRevisionConflict as error:
         return responses.json_response(
             {"error": str(error), "conversation": error.conversation}, 409
         )

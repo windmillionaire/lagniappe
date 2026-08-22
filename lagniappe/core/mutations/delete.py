@@ -223,14 +223,14 @@ class DeleteCollector:
                 self.note(note)
 
     # @testable true
-    # @tests tests_unit/test_027_messaging.py::test_user_delete_preserves_or_purges_message_history_by_survivor
+    # @tests tests_unit/test_027b_messaging_service.py::test_user_delete_preserves_or_purges_message_history_by_survivor
     # @pairs messaging:deleted-peer messaging:history-retention
     def user_messages(self, user):
         if not user or user.key in self._message_users:
             return
         self._message_users.add(user.key)
         conversations = self.entities.fetch(
-            *database.get.message_conversation_keys(user),
+            *database.message_conversation_keys(user),
             request=Fetch.direct(),
         )
         for conversation in conversations:
@@ -238,7 +238,7 @@ class DeleteCollector:
                 self._message_conversations[conversation.key] = conversation
 
     # @testable true
-    # @tests tests_unit/test_027_messaging.py::test_user_delete_preserves_or_purges_message_history_by_survivor
+    # @tests tests_unit/test_027b_messaging_service.py::test_user_delete_preserves_or_purges_message_history_by_survivor
     # @pairs messaging:history-retention messaging:orphan-purge
     def finalize_message_conversations(self):
         deleting_users = {
@@ -271,7 +271,7 @@ class DeleteCollector:
                 continue
 
             self.delete(conversation)
-            for message_key in database.get.message_keys(conversation):
+            for message_key in database.message_keys(conversation):
                 self.delete(self.entities.MESSAGE(message_key))
 
     # @testable infrastructure

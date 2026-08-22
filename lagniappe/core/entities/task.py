@@ -379,7 +379,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
         self.updated = True
 
     # @testable true
-    # @tests tests_unit/test_027_messaging.py::test_task_assignment_notice_uses_stable_transition_identity
+    # @tests tests_unit/test_027a_messaging_properties.py::test_task_assignment_notice_uses_stable_transition_identity
     # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_assigned_to
     # @pairs task-assignment:transition task-assignment:idempotency task-assignment:self-exclusion
     # @pair notifications:assignee-target

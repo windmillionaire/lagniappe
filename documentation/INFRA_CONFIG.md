@@ -278,6 +278,13 @@ autofill-target, and summarized-file names for completion links. Successful
 email ingestion does not create an app or notification-email event; ingestion
 failures still create a linked error notification.
 
+Runtime ownership is split without changing this provider contract:
+`tools/notification_email/capture.py`, `dispatch.py`, `presence.py`,
+`presentation.py`, and `delivery.py` own their named effects, while
+`tools/database/notification_email.py` owns durable rows, leases, digest
+queries, and terminal compaction. The package exposes no compatibility facade;
+the internal process route imports delivery and its typed error directly.
+
 Agent access is configured in app settings with `AGENT_ACCESS_ENABLED`,
 `AGENT_ACCESS_EMAIL`, `AGENT_ACCESS_NAME`, and `AGENT_ACCESS_CODE`. Setup adds
 these keys disabled by default and preserves non-empty user-edited values on

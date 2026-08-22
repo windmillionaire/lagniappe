@@ -4,7 +4,9 @@ from flask_login import current_user
 from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
-from lagniappe.core.tools import cache, collaboration, database, notification_service
+from lagniappe.core.properties.notification_aggregate import counts as aggregate_counts
+from lagniappe.core.tools import cache, collaboration, database
+from lagniappe.core.tools.notifications import service as notification_service
 from lagniappe.core.tools.polling import channel_revisions, render_operation_statuses
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
 from lagniappe.web.auth import home_permission, logged_in, require_ai_access
@@ -74,13 +76,13 @@ def activity():
 @internal.route("/notifications")
 @logged_in
 def notifications():
-    page = database.get.notifications_page(
+    page = database.notifications_page(
         current_user,
         start_cursor=request.args.get("cursor"),
         limit=25,
     )
     notification_keys = [row.key for row in page]
-    aggregate = notification_service.repair_notification_aggregate(
+    aggregate = database.repair_notification_aggregate(
         current_user,
     )
 
@@ -106,7 +108,7 @@ def notifications():
     g.NO_CACHE = True
     return responses.notifications(
         notifications,
-        aggregate=notification_service.aggregate_counts(aggregate),
+        aggregate=aggregate_counts(aggregate),
         cursor=page.next_cursor,
         can_message=collaboration.can_initiate_messages(current_user),
     )
@@ -119,11 +121,11 @@ def notifications():
 @internal.route("/notifications", methods=["DELETE"])
 @logged_in
 def clear_notifications():
-    notification_keys = Entities.NOTIFICATION.keys_for_parent(current_user)
+    notification_keys = database.notification_keys(current_user)
     notification_service.clear_ordinary_notifications(
         current_user, notification_keys
     )
-    aggregate = notification_service.get_notification_aggregate(current_user)
+    aggregate = database.get_notification_aggregate(current_user)
     notification_service.publish_notification_aggregate(current_user, aggregate)
 
     return responses.ok()
@@ -205,7 +207,7 @@ def delete_activity(key):
         if activity.notification_type != "ordinary":
             abort(403)
         notification_service.delete_ordinary_notification(current_user, activity.key)
-        aggregate = notification_service.get_notification_aggregate(current_user)
+        aggregate = database.get_notification_aggregate(current_user)
         notification_service.publish_notification_aggregate(current_user, aggregate)
     else:
         Entities.delete(activity)

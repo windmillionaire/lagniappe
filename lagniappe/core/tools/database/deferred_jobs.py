@@ -307,9 +307,9 @@ def create_deferred_job_if_absent(job, notification=None, lock=None):
         and getattr(notification, "notification_type", "ordinary") == "ordinary"
     )
     if ordinary_notification:
-        from .. import notification_service
+        from . import notifications as notification_database
 
-        notification_service.ensure_notification_aggregate(notification_owner)
+        notification_database.ensure_notification_aggregate(notification_owner)
 
     entities = [entity for entity in (job, notification, lock) if entity is not None]
     for entity in entities:
@@ -371,7 +371,7 @@ def create_deferred_job_if_absent(job, notification=None, lock=None):
             datetime.now(timezone.utc),
         )
         if ordinary_notification:
-            notification_service.mutate_aggregate_in_transaction(
+            notification_database.mutate_notification_aggregate(
                 transaction,
                 notification_owner,
                 ordinary_delta=1,

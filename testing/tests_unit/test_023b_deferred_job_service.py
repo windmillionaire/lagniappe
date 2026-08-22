@@ -27,7 +27,7 @@ from lagniappe.core.mixins.submitter import SubmitterMixin
 from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
 from lagniappe.core.properties.deferred_job_request import RequestFingerprint
 from lagniappe.core.properties import deferred_job_lifecycle
-from lagniappe.core.tools import database, notification_service, task_queue
+from lagniappe.core.tools import database, task_queue
 from lagniappe.core.tools.deferred_jobs import dispatch as deferred_dispatch
 from lagniappe.core.tools.deferred_jobs import service as deferred_service
 from lagniappe.core.tools.ai.prompt import Prompt

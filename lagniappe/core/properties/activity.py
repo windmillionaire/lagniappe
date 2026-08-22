@@ -66,13 +66,6 @@ class AttachedUser(RelatedEntityMixin, DBProperty):
     _id = "user"
 
 
-class Target(RelatedEntityMixin, DBProperty):
-    """The entity a notification points back to."""
-
-    # Property Attributes
-    _id = "target"
-
-
 class InputFiles(RelatedEntityListMixin, DBProperty):
     """Files uploaded as input for an AI report."""
 
@@ -92,30 +85,6 @@ class Instructions(DBProperty):
     """Optional user guidance supplied when creating an AI report."""
 
     _id = "instructions"
-
-
-# @testable false
-# @covered-by lagniappe/core/entities/notification.py::Notification.create
-# @reason pending is notification metadata exercised through notification workflows
-class Pending(DBProperty):
-    """Whether a notification represents work still in progress."""
-
-    _id = "pending"
-    _truthy = {True, "true", "True", "1", 1, "on", "yes"}
-
-    @property
-    def value(self):
-        return self.entity.db.get(self.db_key, False) in self._truthy
-
-    @value.setter
-    def value(self, value):
-        pending = value in self._truthy
-        self._value = pending
-
-        if pending:
-            self.entity.db[self.db_key] = True
-        else:
-            self.entity.db.pop(self.db_key, None)
 
 
 # @testable true

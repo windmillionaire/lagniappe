@@ -177,6 +177,34 @@ def test_page_allowed_uses_stored_requirements_without_loading_categories():
     assert page.properties.categories.is_set is False
 
 
+# @pair page:view-owner-short-circuit
+@pytest.mark.unit
+def test_page_view_does_not_require_loaded_owner(monkeypatch):
+    """View checks do not load the owner needed only by privileged mutations."""
+    page = TestEntities.get(
+        "PAGE",
+        {
+            "name": "Shallow Owner Page",
+            "hash": "shallow-owner-page",
+            "user": {"name": "Page Owner", "hash": "shallow-page-owner"},
+        },
+    )
+    viewer = TestEntities.get(
+        "USER",
+        {"name": "Site Owner", "hash": "shallow-view-owner", "owner": True},
+    )
+    page.properties.user.unset()
+    page.restricted_access = lambda _user: False
+    monkeypatch.setattr(
+        "lagniappe.core.mixins.related.capture_unloaded_relation",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("view permission loaded the page owner")
+        ),
+    )
+
+    assert page.allowed(Action.VIEW, user=viewer) is True
+
+
 # @features page task permissions
 # @dimensions task-visibility restricted-access
 @pytest.mark.unit

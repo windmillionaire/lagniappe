@@ -10,7 +10,7 @@ from ..definitions import (
 )
 from ..exceptions import capture
 from ..tools import cache, database
-from ..tools import notification_service
+from ..tools.notifications import service as notification_service
 
 
 WRITE_EFFECTS = {MutationEffectType.UPSERT, MutationEffectType.UNLINK}
@@ -131,11 +131,11 @@ def execute_post_commit(plan):
         if aggregates:
             projection_changes["aggregates"] = aggregates
         cache.update_notification_projection(**projection_changes)
-        from ..tools import notification_email
+        from ..tools.notification_email import capture as email_capture
 
         for notification in notification_upserts:
             try:
-                notification_email.record_notification(notification)
+                email_capture.record_notification(notification)
             except Exception as error:
                 capture(
                     error,

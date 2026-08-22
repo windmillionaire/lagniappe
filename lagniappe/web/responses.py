@@ -203,10 +203,10 @@ def rows(entities, parent):
 
 
 # @testable false
-# @covered-by lagniappe/core/tools/mentions.py::sanitize_mentions
+# @covered-by lagniappe/core/tools/mentions/content.py::sanitize_mentions
 # @reason public response delegates mention privacy normalization to the tested sanitizer
 def public_document(entity):
-    from lagniappe.core.tools.mentions import sanitize_mentions
+    from lagniappe.core.tools.mentions.content import sanitize_mentions
 
     html = sanitize_mentions(entity.properties.document.html)
     description = entity.description or f"Public page: {entity.name}"

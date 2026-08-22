@@ -29,7 +29,7 @@ Credentials object used by the other runtime Google clients.
 | `jobs` | durable deferred jobs |
 | `job_locks` | target-scoped deferred-job ownership |
 
-### Key and Entity Operations (`get.py`, `utility.py`, `deferred_jobs.py`)
+### Key and Entity Operations
 
 **Key resolution** (`get.py`): `datastore_key(identifier)` accepts a Datastore Key, an entity with a `.key`, or a urlsafe string and returns a Datastore Key. `urlsafe_key(identifier)` converts to a urlsafe string.
 
@@ -61,6 +61,18 @@ Deferred-job compare-and-set transactions, lock release, recovery claims, and
 Scheduler-control records live in `database/deferred_jobs.py`. They remain
 available through the public `database` facade; generic entity persistence and
 AI-email event claims remain in `utility.py`.
+
+Messaging-domain persistence follows the same boundary. Atomic conversation
+sequence/unread changes and bounded message queries live in
+`database/messaging.py`; mention-marker plus notification creation lives in
+`database/mentions.py`; ordinary notification and aggregate transactions plus
+their indexed queries live in `database/notifications.py`. Notification-email
+delivery rows, leases, compaction, and digest queries live in
+`database/notification_email.py`. Shared bounded Datastore contention handling
+is in `database/transactions.py`. The package facade exports application-facing
+messaging, mention, and notification operations; notification-email services
+import their concrete persistence module because those records are internal to
+that subsystem.
 
 ### Site data migrations (`migrations.py`)
 
@@ -200,12 +212,16 @@ Redis stores parent references as `parent_key`; this helper hydrates those
 pointers back into `parent` detail blocks for callers. Search-result hydration
 also lives here so query code does not need to know the detail storage format.
 
-### Notification projection (`notifications.py`)
+### Notification projection (`notification_state.py`, `notifications.py`)
 
-The notification projection stores only schema version, generation UUID,
-revision, and notification-key membership. Count is derived from membership;
-notification bodies stay in Datastore. Warm peeks are Redis-only and slide the
-30-minute expiration of both the state and epoch keys.
+`notification_state.py` owns the wire codec, browser-safe projection,
+membership normalization, and request-local mutation result. `notifications.py`
+owns only Redis optimistic transactions. The projection stores schema version,
+generation UUID, projection and message revisions, canonical ordinary and
+unread-message counts, and notification-key membership. The public count is
+the sum of the durable counts; notification bodies and message history stay in
+Datastore. Warm peeks are Redis-only and slide the 30-minute expiration of both
+the state and epoch keys.
 
 Cold population watches both keys, records the epoch, performs one keys-only
 ancestor query, and writes a new generation. Any concurrent committed
@@ -220,6 +236,24 @@ Redis errors are rebuildable provider failures: they are captured after the
 durable mutation and cannot roll it back. `/l/ping` similarly omits the optional
 notification-state header on Redis error while preserving its server-health
 response.
+
+## Messaging, mentions, and notifications
+
+Runtime orchestration imports concrete packages rather than compatibility
+facades. `tools/messaging/service.py` owns authorization and post-commit effects,
+while `views.py` owns authorized reads and browser projections.
+`tools/mentions/content.py` owns payload/checkpoint parsing and public
+sanitization; `service.py` owns recipient authorization and delivery fan-out.
+`tools/notifications/service.py` coordinates durable ordinary mutations,
+aggregate publication, and supplementary email capture.
+
+Notification email is decomposed by effect boundary: `policy.py` decides
+eligibility and due time, `presence.py` owns the best-effort Redis activity
+hint, `capture.py` translates committed domain events into durable delivery
+rows, `dispatch.py` schedules Cloud Tasks, `presentation.py` renders and sends
+multipart content, and `delivery.py` owns send-time suppression and terminal
+orchestration. Package markers are intentionally empty; callers import the
+capability they use.
 
 ### Deferred-operation projection (`operations.py`)
 

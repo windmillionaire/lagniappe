@@ -33,11 +33,12 @@ from lagniappe.core.properties import (
     deferred_job_lock,
     deferred_job_request,
 )
-from lagniappe.core.tools import database, notification_service, task_queue
+from lagniappe.core.tools import database, task_queue
 from lagniappe.core.tools.deferred_jobs import locks as deferred_locks
 from lagniappe.core.tools.ai.prompt import Prompt
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.database import deferred_jobs as deferred_database
+from lagniappe.core.tools.database import notifications as notification_database
 from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.deferred_jobs import common as deferred_common
 from lagniappe.core.tools.deferred_jobs import retry as deferred_retry
@@ -499,13 +500,13 @@ def test_deferred_job_create_is_transactionally_idempotent(monkeypatch):
     aggregate_repairs = []
     aggregate_mutations = []
     monkeypatch.setattr(
-        notification_service,
+        notification_database,
         "ensure_notification_aggregate",
         lambda owner: aggregate_repairs.append(owner),
     )
     monkeypatch.setattr(
-        notification_service,
-        "mutate_aggregate_in_transaction",
+        notification_database,
+        "mutate_notification_aggregate",
         lambda transaction, owner, **changes: aggregate_mutations.append(
             (transaction, owner, changes)
         ),

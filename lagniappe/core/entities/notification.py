@@ -1,5 +1,5 @@
 from .entity import Entity
-from ..properties import activity, messaging
+from ..properties import activity, notification, notification_aggregate
 from ..tools import database
 
 
@@ -22,15 +22,17 @@ class Notification(Entity):
         properties.update(
             {
                 "parent": activity.AttachedParent,
-                "target": activity.Target,
+                "target": notification.Target,
                 "body": activity.Body,
-                "pending": activity.Pending,
-                "notification_type": messaging.NotificationType,
-                "ordinary_count": messaging.OrdinaryCount,
-                "unread_message_count": messaging.UnreadMessageCount,
-                "aggregate_revision": messaging.AggregateRevision,
-                "message_revision": messaging.MessageRevision,
-                "aggregate_generation": messaging.AggregateGeneration,
+                "pending": notification.Pending,
+                "notification_type": notification.NotificationType,
+                "event_type": notification.EventType,
+                "sender_name": notification.SenderName,
+                "ordinary_count": notification_aggregate.OrdinaryCount,
+                "unread_message_count": notification_aggregate.UnreadMessageCount,
+                "aggregate_revision": notification_aggregate.AggregateRevision,
+                "message_revision": notification_aggregate.MessageRevision,
+                "aggregate_generation": notification_aggregate.AggregateGeneration,
             }
         )
         return properties
@@ -44,7 +46,7 @@ class Notification(Entity):
     # @reason notification ownership and deletion are exercised through the route
     @classmethod
     def keys_for_parent(cls, parent):
-        return database.get.notification_keys(parent)
+        return database.notification_keys(parent)
 
     # @testable true
     # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes
@@ -71,9 +73,11 @@ class Notification(Entity):
         new_notification.body = data.get("body")
         new_notification.pending = data.get("pending", False)
         new_notification.notification_type = "ordinary"
-        if data.get("event_type"):
-            new_notification.db["event_type"] = str(data["event_type"])
-        if data.get("sender_name"):
-            new_notification.db["sender_name"] = str(data["sender_name"])
+        new_notification.event_type = (
+            str(data["event_type"]) if data.get("event_type") else None
+        )
+        new_notification.sender_name = (
+            str(data["sender_name"]) if data.get("sender_name") else None
+        )
 
         return new_notification

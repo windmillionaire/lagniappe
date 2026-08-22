@@ -516,10 +516,12 @@ none, and email ingestion uses a failure-only policy so its successful handoff
 does not create an inbox or notification-email event.
 Committed notification creates/content updates/deletes emit a post-commit Redis
 projection effect. Ordinary create/delete/clear operations use
-`notification_service` to update the row and durable aggregate. Direct-message
-and mention transactions update their recipient aggregate in the same
-transaction as the unread state or visible Notification. They do not write the User or a notification/site
-fingerprint, and cache failure never rolls back the durable entity mutation.
+`tools/notifications/service.py` above `database/notifications.py` to update the
+row and durable aggregate. Direct-message and mention transactions live in
+`database/messaging.py` and `database/mentions.py`; they update the recipient
+aggregate in the same transaction as unread state or the visible Notification.
+They do not write the User or a notification/site fingerprint, and cache
+failure never rolls back the durable entity mutation.
 The notification menu promotes stored target keys to explicit fetch roots, so
 each target's direct relations are available for permission checks and display
 without a nested fetch. This includes a task's backing page.
@@ -572,6 +574,15 @@ per-user hide state. Its deterministic sender/operation key makes matching
 replays idempotent and conflicting reuse an error. All message body reads are
 participant-authorized; owner status grants no override. Permission loss keeps
 history but blocks new sends.
+
+The entity layer composes these schemas from focused property owners:
+`properties/message_conversation.py` owns participant identities, cursors, and
+pure conversation transitions; `properties/message.py` owns message identity,
+validation, and browser projection; `properties/mention.py` owns occurrence
+identity and display-name normalization; and `properties/notification.py` plus
+`notification_aggregate.py` own ordinary and aggregate values. Cross-record
+transactions, authorization, cache publication, email capture, and delivery
+remain service concerns rather than property methods.
 
 Managed-user collaboration uses the cached `user_message_restrictions` union
 of group membership and group `VIEW`, with global Users `VIEW` unrestricted.

@@ -11,6 +11,7 @@ from lagniappe.core.entities import entity as entity_module
 from lagniappe.core.mutations.delete import DeleteCollector
 from lagniappe.core.mutations import plan_mutation
 from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import notifications as notification_database
 from testing.utility.test_entities import TestEntities
 
 
@@ -216,7 +217,7 @@ def test_activity_query_filters_requested_types(monkeypatch):
 
 
 # @pairs notifications:bounded-page notifications:ordinary-discriminator notifications:cursor
-# @source lagniappe/core/tools/database/get.py::notifications_page
+# @source lagniappe/core/tools/database/notifications.py::notifications_page
 def test_notification_page_is_bounded_and_excludes_aggregate_rows(monkeypatch):
     class PageResult(list):
         next_cursor = "next-cursor"
@@ -227,11 +228,15 @@ def test_notification_page_is_bounded_and_excludes_aggregate_rows(monkeypatch):
 
     query = PageQuery([_RawActivity(f"notification-{index}") for index in range(30)])
     activity_filter = _ActivityFilter()
-    monkeypatch.setattr(database_get, "datastore_key", lambda _parent: "parent-key")
-    monkeypatch.setattr(database_get, "Filter", lambda: activity_filter)
-    monkeypatch.setattr(database_get, "Query", lambda _kind: query)
+    monkeypatch.setattr(
+        notification_database, "datastore_key", lambda _parent: "parent-key"
+    )
+    monkeypatch.setattr(notification_database, "Filter", lambda: activity_filter)
+    monkeypatch.setattr(notification_database, "Query", lambda _kind: query)
 
-    result = database_get.notifications_page(object(), "cursor-a", limit=25)
+    result = notification_database.notifications_page(
+        object(), "cursor-a", limit=25
+    )
 
     assert len(result) == 25
     assert result.next_cursor == "next-cursor"
@@ -246,7 +251,7 @@ def test_notification_page_is_bounded_and_excludes_aggregate_rows(monkeypatch):
 
 
 # @pairs notifications:cold-seed notifications:keys-only
-# @source lagniappe/core/tools/database/get.py::notification_keys
+# @source lagniappe/core/tools/database/notifications.py::notification_keys
 def test_notification_keys_query_returns_only_ancestor_keys(monkeypatch):
     query = _ActivityQuery(
         [
@@ -255,11 +260,13 @@ def test_notification_keys_query_returns_only_ancestor_keys(monkeypatch):
         ]
     )
     activity_filter = _ActivityFilter()
-    monkeypatch.setattr(database_get, "datastore_key", lambda _parent: "parent-key")
-    monkeypatch.setattr(database_get, "Filter", lambda: activity_filter)
-    monkeypatch.setattr(database_get, "Query", lambda _kind: query)
+    monkeypatch.setattr(
+        notification_database, "datastore_key", lambda _parent: "parent-key"
+    )
+    monkeypatch.setattr(notification_database, "Filter", lambda: activity_filter)
+    monkeypatch.setattr(notification_database, "Query", lambda _kind: query)
 
-    results = database_get.notification_keys(object())
+    results = notification_database.notification_keys(object())
 
     assert results == ["notification-one", "notification-two"]
     assert query.ancestor_key == "parent-key"

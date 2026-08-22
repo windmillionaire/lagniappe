@@ -679,7 +679,7 @@ class SiteExportBuilder:
         if not html:
             return "<section><h2>Document</h2><p class=\"empty\">No document.</p></section>"
 
-        from .mentions import sanitize_mentions
+        from .mentions.content import sanitize_mentions
 
         cleaned = self._sanitize_document_html(
             sanitize_mentions(html), entity, current_path

@@ -6,8 +6,10 @@ from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import dates, filters, notification_email, task_queue
-from lagniappe.core.tools.notifications import create_process_notification
+from lagniappe.core.tools import dates, filters, task_queue
+from lagniappe.core.tools.notification_email import delivery as email_delivery
+from lagniappe.core.tools.notification_email.errors import NotificationEmailError
+from lagniappe.core.tools.notifications.service import create_process_notification
 from lagniappe.core.tools.deferred_jobs.errors import DeferredJobInfrastructureError
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.tools.ingress import IngressService
@@ -133,8 +135,8 @@ def notification_email_delivery():
     if set(payload) != {"delivery_key"} or not payload.get("delivery_key"):
         return jsonify({"success": False, "error": "Invalid email payload."}), 400
     try:
-        result = notification_email.deliver(payload["delivery_key"])
-    except notification_email.NotificationEmailError as error:
+        result = email_delivery.deliver(payload["delivery_key"])
+    except NotificationEmailError as error:
         return jsonify({"success": False, "error": str(error)}), 503
     except Exception as error:
         exceptions.capture(

@@ -5,12 +5,13 @@ from types import SimpleNamespace
 import pytest
 
 from lagniappe.core.definitions import FileConsumer, FileConsumerLimitError
+from lagniappe.core.entities import Entities
 from lagniappe.core.tools import (
     autofill_jobs,
     form_state,
-    notifications,
     polling,
 )
+from lagniappe.core.tools.notifications import service as notifications
 from lagniappe.core.tools.deferred_jobs.adapters import (
     autofill as deferred_job_adapters,
 )
@@ -462,17 +463,17 @@ def test_process_notification_requires_a_valid_user(monkeypatch):
     user = SimpleNamespace(kind="user")
     saved = []
     monkeypatch.setattr(
-        notifications.Entities,
+        Entities,
         "fetch_one",
         lambda key, request: user if key == "user-key" else None,
     )
     monkeypatch.setattr(
-        notifications.Entities.NOTIFICATION,
+        Entities.NOTIFICATION,
         "create",
         lambda data: SimpleNamespace(**data),
     )
     monkeypatch.setattr(
-        notifications.Entities, "save", lambda value: saved.append(value)
+        Entities, "save", lambda value: saved.append(value)
     )
 
     assert notifications.create_process_notification({}, "Ignored") is None

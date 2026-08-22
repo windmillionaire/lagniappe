@@ -41,7 +41,7 @@ from playwright.sync_api import expect
 from config import SETTINGS
 from lagniappe import CONFIG
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, database, notification_service
+from lagniappe.core.tools import cache, database
 
 from testing.definitions import SitePages, Users
 from testing.utility import assert_same_etag
@@ -185,7 +185,7 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
     # cold aggregate repair and leave the projection one revision behind.
     existing = Entities.NOTIFICATION.keys_for_parent(user.entity)
     assert not existing
-    aggregate = notification_service.ensure_notification_aggregate(user.entity)
+    aggregate = database.ensure_notification_aggregate(user.entity)
     cache.repair_notification_state(user.entity, existing, aggregate=aggregate)
 
     notification = Entities.NOTIFICATION.create(

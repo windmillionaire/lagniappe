@@ -123,7 +123,7 @@ def _fetch(user, path, method="GET", data=None):
 # @source src/script/elements/editor/extensions/mention.mjs::LagniappeMention
 # @source src/script/elements/editor/extensions/mention.mjs::MentionSuggestions
 # @source lagniappe/core/tools/collaboration.py::collaboration_user_results
-# @source lagniappe/core/tools/mentions.py::deliver_mentions
+# @source lagniappe/core/tools/mentions/service.py::deliver_mentions
 def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
     owner = get_user(Users.OWNER)
     recipient = get_user(Users.admin, creator=owner)
@@ -243,12 +243,12 @@ def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
 # @pair messaging:clear-confirmation
 # @pairs messaging:polling-revision messaging:active-polling
 # @pairs notifications:aggregate-count notifications:exact-count
-# @source lagniappe/core/tools/messages.py::send_message
-# @source lagniappe/core/tools/messages.py::conversations
-# @source lagniappe/core/tools/messages.py::conversation_history
-# @source lagniappe/core/tools/messages.py::mark_read
-# @source lagniappe/core/tools/messages.py::hide_message
-# @source lagniappe/core/tools/messages.py::clear_conversation
+# @source lagniappe/core/tools/messaging/service.py::send_message
+# @source lagniappe/core/tools/messaging/views.py::conversations
+# @source lagniappe/core/tools/messaging/views.py::conversation_history
+# @source lagniappe/core/tools/messaging/service.py::mark_read
+# @source lagniappe/core/tools/messaging/service.py::hide_message
+# @source lagniappe/core/tools/messaging/service.py::clear_conversation
 # @source lagniappe/core/tools/collaboration.py::recipient_allowed
 # @source src/script/elements/messageComposer.mjs::MessageComposer
 # @source src/script/elements/notifications.mjs::Notifications
@@ -507,7 +507,7 @@ def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
 # @pairs messaging:compose-eligibility messaging:reply-permission
 # @pairs messaging:inline-reply notifications:menu-open
 # @source lagniappe/core/tools/collaboration.py::can_initiate_messages
-# @source lagniappe/core/tools/messages.py::send_message
+# @source lagniappe/core/tools/messaging/service.py::send_message
 # @source src/script/views/messages.mjs::Messages
 def test_inbound_message_allows_reply_without_compose_permission(get_user):
     owner = get_user(Users.OWNER)

@@ -426,6 +426,12 @@ epoch key. The public count is the sum of the durable counters; bodies and
 message history are never cached there. Both Redis keys use a sliding
 30-minute expiration.
 
+The pure Redis wire/request-state codec lives in
+`tools/cache/notification_state.py`; watched Redis transactions live in
+`tools/cache/notifications.py`. Durable counters and ordinary membership are
+owned separately by `tools/database/notifications.py`, so neither cache module
+is a transaction authority for application data.
+
 A cold seed watches the projection and epoch, records the epoch, performs one
 keys-only notification ancestor query, and publishes only if neither watched
 key changed. Concurrent creates, content updates, and deletes increment the

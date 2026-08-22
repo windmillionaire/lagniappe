@@ -1,19 +1,21 @@
 """Internal one-to-one messaging entities."""
 
 from .entity import Entity
-from ..properties import messaging
+from ..properties import message as message_properties
+from ..properties import message_conversation
+from ..tools import database
 
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-# @pair messaging:entity-contract
+# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
+# @pairs messaging:entity-contract messaging:polling-revision
 class MessageConversation(Entity):
     """Durable participant state and cursors for a direct-message thread."""
 
     entity_kind = "message_conversation"
 
     # @testable true
-    # @tests tests_unit/test_027_messaging.py::test_messaging_entities_and_owner_toggles_are_fail_closed
+    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
     # @pair messaging:index-exclusion
     @property
     def exclude_from_index(self):
@@ -33,23 +35,30 @@ class MessageConversation(Entity):
         properties = super()._get_properties()
         properties.update(
             {
-                "participants": messaging.Participants,
-                "visible_to": messaging.VisibleTo,
-                "participant_names": messaging.ParticipantNames,
-                "last_activity": messaging.LastActivity,
-                "last_sender": messaging.LastSender,
-                "sequence": messaging.Sequence,
-                "revision": messaging.Revision,
-                "unread_counts": messaging.UnreadCounts,
-                "read_through": messaging.ReadThrough,
-                "cleared_through": messaging.ClearedThrough,
+                "participants": message_conversation.Participants,
+                "visible_to": message_conversation.VisibleTo,
+                "participant_names": message_conversation.ParticipantNames,
+                "last_activity": message_conversation.LastActivity,
+                "last_sender": message_conversation.LastSender,
+                "sequence": message_conversation.Sequence,
+                "revision": message_conversation.Revision,
+                "unread_counts": message_conversation.UnreadCounts,
+                "read_through": message_conversation.ReadThrough,
+                "cleared_through": message_conversation.ClearedThrough,
             }
         )
         return properties
 
+    @classmethod
+    def create(cls, actor, recipient, *, key, now):
+        conversation = cls(database.create_entity(key))
+        conversation.db.exclude_from_indexes = conversation.exclude_from_index
+        conversation.db.update(message_conversation.initial_values(actor, recipient, now))
+        return conversation
+
 
 # @testable true
-# @tests tests_unit/test_027_messaging.py::test_messaging_entities_and_owner_toggles_are_fail_closed
+# @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
 # @pair messaging:entity-contract
 class Message(Entity):
     """One immutable plain-text message in a conversation ancestor group."""
@@ -57,7 +66,7 @@ class Message(Entity):
     entity_kind = "message"
 
     # @testable true
-    # @tests tests_unit/test_027_messaging.py::test_messaging_entities_and_owner_toggles_are_fail_closed
+    # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
     # @pair messaging:index-exclusion
     @property
     def exclude_from_index(self):
@@ -78,15 +87,43 @@ class Message(Entity):
         properties = super()._get_properties()
         properties.update(
             {
-                "conversation": messaging.Conversation,
-                "sequence": messaging.Sequence,
-                "sender": messaging.Sender,
-                "recipient": messaging.Recipient,
-                "sender_name": messaging.SenderName,
-                "recipient_name": messaging.RecipientName,
-                "body": messaging.Body,
-                "hidden_for": messaging.HiddenFor,
-                "operation_id": messaging.OperationID,
+                "conversation": message_properties.Conversation,
+                "sequence": message_properties.Sequence,
+                "sender": message_properties.Sender,
+                "recipient": message_properties.Recipient,
+                "sender_name": message_properties.SenderName,
+                "recipient_name": message_properties.RecipientName,
+                "body": message_properties.Body,
+                "hidden_for": message_properties.HiddenFor,
+                "operation_id": message_properties.OperationID,
             }
         )
         return properties
+
+    @classmethod
+    def create(
+        cls,
+        conversation,
+        actor,
+        recipient,
+        *,
+        key,
+        body,
+        operation_id,
+        sequence,
+        now,
+    ):
+        message = cls(database.create_entity(key))
+        message.db.exclude_from_indexes = message.exclude_from_index
+        message.db.update(
+            message_properties.initial_values(
+                conversation,
+                actor,
+                recipient,
+                body,
+                operation_id,
+                sequence,
+                now,
+            )
+        )
+        return message

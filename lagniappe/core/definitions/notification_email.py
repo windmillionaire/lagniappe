@@ -11,7 +11,7 @@ class NotificationEmailMode(Enum):
     DAILY = "daily"
 
     # @testable true
-    # @tests tests_unit/test_029_notification_email.py::test_notification_email_preference_defaults_and_eligibility
+    # @tests tests_unit/test_029a_notification_email_policy.py::test_notification_email_preference_defaults_and_eligibility
     # @pair notification-email:preference
     @classmethod
     def name_for(cls, value):
