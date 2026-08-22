@@ -41,7 +41,7 @@ def get_file_text(file, *, dispatch=True):
 
 
 # @testable true
-# @tests tests_unit/test_023_deferred_jobs.py::test_start_file_extraction_uses_explicit_actor_and_identity
+# @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_start_file_extraction_uses_explicit_actor_and_identity
 # @features deferred-jobs file
 # @dimensions follow-up extraction idempotency
 def start_file_extraction(
@@ -53,7 +53,7 @@ def start_file_extraction(
 ):
     """Dispatch extraction for a persisted file with an optional stable identity."""
     from ...definitions import DeferredJobSpec, DeferredJobType
-    from ..deferred_jobs import DeferredJobs
+    from ..deferred_jobs.service import DeferredJobs
 
     return DeferredJobs.start(
         DeferredJobSpec(

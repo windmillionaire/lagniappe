@@ -6,8 +6,15 @@ from types import SimpleNamespace
 from google.cloud.datastore import Key
 import pytest
 
-from lagniappe.core.tools import deferred_job_scheduler, deferred_jobs
-from lagniappe.core.tools.database import utility as database_utility
+from lagniappe.core import exceptions
+from lagniappe.core.tools.database import deferred_jobs as deferred_database
+from lagniappe.core.tools.deferred_jobs import recovery as deferred_recovery
+from lagniappe.core.tools.deferred_jobs import scheduler as deferred_job_scheduler
+from lagniappe.core.tools.deferred_jobs import service as deferred_service
+from lagniappe.core.tools.deferred_jobs.errors import (
+    DeferredJobInfrastructureError,
+)
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobService
 
 
 pytestmark = pytest.mark.unit
@@ -84,7 +91,7 @@ class FakeSchedulerSession:
 def scheduler_database(monkeypatch):
     datastore = MemoryDatastore()
     monkeypatch.setattr(
-        database_utility,
+        deferred_database,
         "DATA",
         SimpleNamespace(datastore=datastore),
     )
@@ -96,7 +103,7 @@ def _job_key(identifier="job-one"):
 
 
 def _control():
-    return database_utility.get_deferred_job_scheduler_control()
+    return deferred_database.get_deferred_job_scheduler_control()
 
 
 # @features deferred-jobs cloud-scheduler
@@ -105,7 +112,7 @@ def test_tracking_membership_follows_recovery_required_state(scheduler_database)
     now = datetime(2026, 8, 5, tzinfo=timezone.utc)
     job_key = _job_key()
     with scheduler_database.transaction() as transaction:
-        added = database_utility._update_deferred_job_scheduler_tracking(
+        added = deferred_database._update_deferred_job_scheduler_tracking(
             transaction,
             job_key,
             None,
@@ -116,7 +123,7 @@ def test_tracking_membership_follows_recovery_required_state(scheduler_database)
     assert added["active_jobs"] == 1
     assert added["desired_state"] == "enabled"
 
-    repaired = database_utility.repair_deferred_job_scheduler_control(
+    repaired = deferred_database.repair_deferred_job_scheduler_control(
         [job_key],
         added["generation"],
         now,
@@ -124,7 +131,7 @@ def test_tracking_membership_follows_recovery_required_state(scheduler_database)
     assert repaired["repaired"] is True
 
     with scheduler_database.transaction() as transaction:
-        status_changed = database_utility._update_deferred_job_scheduler_tracking(
+        status_changed = deferred_database._update_deferred_job_scheduler_tracking(
             transaction,
             job_key,
             {"status": "running", "dispatch_state": "claimed"},
@@ -136,7 +143,7 @@ def test_tracking_membership_follows_recovery_required_state(scheduler_database)
     assert _control()["active_jobs"] == 1
 
     with scheduler_database.transaction() as transaction:
-        removed = database_utility._update_deferred_job_scheduler_tracking(
+        removed = deferred_database._update_deferred_job_scheduler_tracking(
             transaction,
             job_key,
             {"status": "succeeded", "dispatch_state": "delivery_pending"},
@@ -166,7 +173,7 @@ def test_scheduler_control_repair_is_revision_checked(scheduler_database):
     }
 
     with scheduler_database.transaction() as transaction:
-        database_utility._update_deferred_job_scheduler_tracking(
+        deferred_database._update_deferred_job_scheduler_tracking(
             transaction,
             job_key,
             None,
@@ -174,7 +181,7 @@ def test_scheduler_control_repair_is_revision_checked(scheduler_database):
             now,
         )
 
-    raced = database_utility.repair_deferred_job_scheduler_control(
+    raced = deferred_database.repair_deferred_job_scheduler_control(
         [],
         0,
         now,
@@ -183,7 +190,7 @@ def test_scheduler_control_repair_is_revision_checked(scheduler_database):
     assert raced["reason"] == "generation"
     assert raced["control"]["tracked_jobs"] != []
 
-    repaired = database_utility.repair_deferred_job_scheduler_control(
+    repaired = deferred_database.repair_deferred_job_scheduler_control(
         [job_key],
         raced["control"]["generation"],
         now,
@@ -232,13 +239,13 @@ def test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
     scheduler_database,
 ):
     now = datetime(2026, 8, 5, tzinfo=timezone.utc)
-    empty = database_utility.repair_deferred_job_scheduler_control([], 0, now)
+    empty = deferred_database.repair_deferred_job_scheduler_control([], 0, now)
     assert empty["control"]["desired_state"] == "paused"
     job_key = _job_key()
 
     def create_job_while_pause_is_in_flight():
         with scheduler_database.transaction() as transaction:
-            database_utility._update_deferred_job_scheduler_tracking(
+            deferred_database._update_deferred_job_scheduler_tracking(
                 transaction,
                 job_key,
                 None,
@@ -282,7 +289,7 @@ def test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
 # @dimensions distributed-lease provider-failure
 def test_scheduler_sync_releases_lease_after_provider_failure(scheduler_database):
     now = datetime(2026, 8, 5, tzinfo=timezone.utc)
-    database_utility.repair_deferred_job_scheduler_control([], 0, now)
+    deferred_database.repair_deferred_job_scheduler_control([], 0, now)
     config = SimpleNamespace(
         production=True,
         GOOGLE_CLOUD_PROJECT="project-one",
@@ -307,7 +314,7 @@ def test_scheduler_sync_releases_lease_after_provider_failure(scheduler_database
 
 
 # @pairs deferred-jobs:datastore-read-isolation cloud-scheduler:datastore-read-isolation
-# @source lagniappe/core/tools/deferred_job_scheduler.py::synchronize_deferred_job_reconciler
+# @source lagniappe/core/tools/deferred_jobs/scheduler.py::synchronize_deferred_job_reconciler
 def test_scheduler_sync_uses_committed_control_hint_when_current(monkeypatch):
     control = {
         "desired_state": "enabled",
@@ -336,26 +343,26 @@ def test_scheduler_sync_uses_committed_control_hint_when_current(monkeypatch):
 # @features deferred-jobs cloud-scheduler
 # @dimensions resume-failure pause-failure recovery-guarantee
 def test_registry_requires_resume_but_tolerates_pause_failure(monkeypatch):
-    registry = deferred_jobs.DeferredJobRegistry()
+    registry = DeferredJobService()
     captured = []
 
     def fail(**_kwargs):
         raise deferred_job_scheduler.DeferredJobSchedulerError("provider down")
 
     monkeypatch.setattr(
-        deferred_jobs.deferred_job_scheduler,
+        deferred_service.scheduler,
         "synchronize_deferred_job_reconciler",
         fail,
     )
     monkeypatch.setattr(
-        deferred_jobs.exceptions,
+        exceptions,
         "capture",
         lambda error, **kwargs: captured.append((error, kwargs)),
     )
 
     assert registry._sync_reconciler(required=False) is None
     with pytest.raises(
-        deferred_jobs.DeferredJobInfrastructureError,
+        DeferredJobInfrastructureError,
         match="recovery could not be enabled",
     ):
         registry._sync_reconciler(required=True)
@@ -365,12 +372,16 @@ def test_registry_requires_resume_but_tolerates_pause_failure(monkeypatch):
 # @features deferred-jobs cloud-scheduler
 # @dimensions drift-repair optimistic-concurrency self-pause
 def test_reconciler_repairs_control_before_self_pausing(monkeypatch):
-    registry = deferred_jobs.DeferredJobRegistry()
+    registry = DeferredJobService()
     repaired = []
-    monkeypatch.setattr(deferred_jobs, "CONFIG", SimpleNamespace(production=True))
+    monkeypatch.setattr(
+        deferred_recovery,
+        "CONFIG",
+        SimpleNamespace(production=True),
+    )
     monkeypatch.setattr(registry, "_reconcile_candidates", lambda limit: [])
     monkeypatch.setattr(
-        deferred_jobs.database,
+        deferred_recovery.database,
         "get_deferred_job_scheduler_control",
         lambda: {"generation": 4},
     )
@@ -383,7 +394,7 @@ def test_reconciler_repairs_control_before_self_pausing(monkeypatch):
         }
 
     monkeypatch.setattr(
-        deferred_jobs.database,
+        deferred_recovery.database,
         "repair_deferred_job_scheduler_control",
         repair,
     )

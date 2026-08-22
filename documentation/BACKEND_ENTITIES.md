@@ -608,6 +608,16 @@ deadline, bounded progress phases, and opaque telemetry correlation. Unknown
 versions fail rather than guessing at compatibility. The combined inline
 contract is limited to 750 KiB.
 
+Deferred-job properties are grouped by behavior rather than kept in one field
+catalog. `deferred_job_request.py` owns request references, JSON inputs,
+authorization, payload validation, and immutable fingerprints;
+`deferred_job_dispatch.py` owns attempts, deadlines, leases, and deterministic
+task identities; and `deferred_job_lifecycle.py` owns state, checkpoints,
+errors, delivery state, and bounded browser/Administrator projections. These
+modules retain the original Datastore keys and encoding. Cross-entity writes,
+claims, recovery, and provider calls remain tool services rather than property
+behavior.
+
 Every committed client-visible status revision is published post-commit to a
 small per-job Redis projection containing only revision, terminal state, and a
 durable-verification timestamp. Lease-only heartbeats do not publish because
@@ -638,6 +648,12 @@ does not advance site fingerprints, so this internal lifecycle state cannot
 produce a user-facing form or collection change by itself. The form revision
 captured when the job is queued still guards proposal application against
 target drift.
+
+The lock `Scope` property owns the pure target/scope identity and the
+`Operation` property owns the browser-safe descriptor shape. Key construction,
+batch lookup, stale-lock cleanup, and compare-and-delete remain in
+`tools/deferred_jobs/locks.py` and `tools/database/deferred_jobs.py` because
+those operations cross record and transaction boundaries.
 
 Workers use a five-minute lease renewed every 60 seconds while blocking
 provider work is active. They check deadline, cancellation, and claim ownership

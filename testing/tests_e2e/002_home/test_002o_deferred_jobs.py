@@ -6,7 +6,7 @@ import pytest
 
 from lagniappe.core.definitions import DeferredJobSpec, DeferredJobType
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools.deferred_jobs import DeferredJobs
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from testing.definitions import SitePages, Users
 
 

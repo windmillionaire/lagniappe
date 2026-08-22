@@ -3118,7 +3118,7 @@ def test_summary_eligibility_includes_ooxml_fallback(monkeypatch):
         mimetype="application/zip",
         content=b"not an office file",
     )
-    from lagniappe.core.tools.deferred_jobs import DeferredJobs
+    from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
     started = []
     actor = SimpleNamespace()

@@ -25,13 +25,13 @@ class DeferredJobSchedulerError(RuntimeError):
 
 
 # @testable infrastructure
-# @covered-by lagniappe/core/tools/deferred_job_scheduler.py::synchronize_deferred_job_reconciler
+# @covered-by lagniappe/core/tools/deferred_jobs/scheduler.py::synchronize_deferred_job_reconciler
 def _utc():
     return datetime.now(timezone.utc)
 
 
 # @testable true
-# @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_provider_pause_and_resume_use_exact_job_resource
+# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_provider_pause_and_resume_use_exact_job_resource
 # @features deferred-jobs cloud-scheduler
 # @dimensions exact-resource provider-api
 def scheduler_job_url(config=CONFIG):
@@ -57,7 +57,7 @@ def scheduler_job_url(config=CONFIG):
 
 
 # @testable infrastructure
-# @covered-by lagniappe/core/tools/deferred_job_scheduler.py::set_scheduler_state
+# @covered-by lagniappe/core/tools/deferred_jobs/scheduler.py::set_scheduler_state
 def _response_state(response):
     response.raise_for_status()
     try:
@@ -74,7 +74,7 @@ def _response_state(response):
 
 
 # @testable infrastructure
-# @covered-by lagniappe/core/tools/deferred_job_scheduler.py::set_scheduler_state
+# @covered-by lagniappe/core/tools/deferred_jobs/scheduler.py::set_scheduler_state
 def _request_state(session, method, url):
     try:
         response = session.request(
@@ -92,7 +92,7 @@ def _request_state(session, method, url):
 
 
 # @testable true
-# @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_provider_pause_and_resume_use_exact_job_resource
+# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_provider_pause_and_resume_use_exact_job_resource
 # @features deferred-jobs cloud-scheduler
 # @dimensions pause resume provider-api idempotency
 def set_scheduler_state(desired_state, *, session, config=CONFIG):
@@ -118,7 +118,7 @@ def set_scheduler_state(desired_state, *, session, config=CONFIG):
 
 
 # @testable infrastructure
-# @covered-by lagniappe/core/tools/deferred_job_scheduler.py::synchronize_deferred_job_reconciler
+# @covered-by lagniappe/core/tools/deferred_jobs/scheduler.py::synchronize_deferred_job_reconciler
 def _control_converged(control):
     return bool(
         control.get("applied_state") == control.get("desired_state")
@@ -128,9 +128,9 @@ def _control_converged(control):
 
 
 # @testable true
-# @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
-# @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_sync_releases_lease_after_provider_failure
-# @tests tests_unit/test_023b_deferred_job_scheduler.py::test_scheduler_sync_uses_committed_control_hint_when_current
+# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
+# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_releases_lease_after_provider_failure
+# @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_uses_committed_control_hint_when_current
 # @features deferred-jobs cloud-scheduler
 # @dimensions distributed-lease generation convergence provider-failure
 # @pairs deferred-jobs:datastore-read-isolation cloud-scheduler:datastore-read-isolation

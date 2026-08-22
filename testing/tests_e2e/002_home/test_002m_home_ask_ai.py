@@ -11,7 +11,7 @@ from lagniappe.core.definitions import DeferredJobStatus, Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai.core import ai_model
-from lagniappe.core.tools.deferred_jobs import DeferredJobs
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import app as web_app
 from testing.definitions import SitePages, Users
 from testing.elements import List

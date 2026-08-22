@@ -15,8 +15,21 @@ from .assets import (
     update_site_export,
     upload_site_image,
 )
-from .utility import (
+from .deferred_jobs import (
     acquire_deferred_job_scheduler_sync,
+    claim_deferred_job,
+    claim_deferred_job_recovery,
+    create_deferred_job_if_absent,
+    get_deferred_job_scheduler_control,
+    record_deferred_job_scheduler_sync,
+    release_deferred_job_scheduler_sync,
+    repair_deferred_job_scheduler_control,
+    release_deferred_job_lock,
+    transition_active_deferred_job,
+    update_claimed_deferred_job,
+    update_deferred_job_recovery_dispatch,
+)
+from .utility import (
     claim_ai_email_event,
     create_entity,
     create_key,
@@ -28,22 +41,11 @@ from .utility import (
     save_mutations,
     save_raw,
     cleanup_test_data,
-    claim_deferred_job,
-    claim_deferred_job_recovery,
     commit_ingress_row,
-    create_deferred_job_if_absent,
-    get_deferred_job_scheduler_control,
     finish_ai_email_event,
-    record_deferred_job_scheduler_sync,
-    release_deferred_job_scheduler_sync,
     release_ai_email_event,
-    repair_deferred_job_scheduler_control,
-    release_deferred_job_lock,
     site_fingerprint,
     site_fingerprints,
-    transition_active_deferred_job,
-    update_claimed_deferred_job,
-    update_deferred_job_recovery_dispatch,
     update_ingress_status,
 )
 

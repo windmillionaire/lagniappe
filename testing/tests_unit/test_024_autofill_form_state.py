@@ -7,10 +7,12 @@ import pytest
 from lagniappe.core.definitions import FileConsumer, FileConsumerLimitError
 from lagniappe.core.tools import (
     autofill_jobs,
-    deferred_job_adapters,
     form_state,
     notifications,
     polling,
+)
+from lagniappe.core.tools.deferred_jobs.adapters import (
+    autofill as deferred_job_adapters,
 )
 
 

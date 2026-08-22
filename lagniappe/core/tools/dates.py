@@ -143,7 +143,7 @@ def beginning_of_day(dt):
 # @testable false
 # @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.set_next_due_date
 # @covered-by lagniappe/core/properties/task_scheduling.py::Schedule.skipped
-# @covered-by lagniappe/core/tools/deferred_job_adapters.py::AutofillAdapter.prepare
+# @covered-by lagniappe/core/tools/deferred_jobs/adapters/autofill.py::AutofillAdapter.prepare
 # @reason current user-day boundary is owned by task scheduling behaviors
 def user_today(user=None):
     """Return the beginning of today in the user's timezone."""

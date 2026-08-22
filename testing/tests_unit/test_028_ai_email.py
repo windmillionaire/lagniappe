@@ -614,10 +614,10 @@ def test_report_feedback_links_to_report_and_remains_available_after_disable(
     assert idempotency_key.startswith("ai-email/success/")
 
 
-# @source lagniappe/core/tools/deferred_jobs.py::DeferredJobAdapter.external_delivery_required
+# @source lagniappe/core/tools/deferred_jobs/adapters/base.py::DeferredJobAdapter.external_delivery_required
 # @pairs ai-email:generic-delivery ai-email:terminal-delivery
 def test_report_terminal_feedback_uses_generic_notification_delivery():
-    from lagniappe.core.tools.deferred_job_adapters import ReportAdapter
+    from lagniappe.core.tools.deferred_jobs.adapters.reports import ReportAdapter
 
     adapter = ReportAdapter()
     user = TestEntities.get("USER", {"name": "Owner", "owner": False})
@@ -761,7 +761,7 @@ def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch)
 def test_create_shared_address_email_report_preserves_routing_input(monkeypatch):
     from lagniappe.core.entities import Entities
     from lagniappe.core.tools import database
-    from lagniappe.core.tools.deferred_jobs import DeferredJobs
+    from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
     user = SimpleNamespace(urlsafe_key="user-one")
     message = SimpleNamespace(
@@ -822,7 +822,7 @@ def test_create_shared_address_email_report_preserves_routing_input(monkeypatch)
 # @dimensions report-handoff idempotency acceptance
 def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatch):
     from lagniappe import CONFIG
-    from lagniappe.core.tools import deferred_job_adapters
+    from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
 
     user = TestEntities.get(
         "USER", {"name": "Owner", "owner": False}
@@ -842,9 +842,9 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
     starts = []
     feedback = []
     monkeypatch.setattr(CONFIG, "AI_EMAIL_CONFIG", _config())
-    monkeypatch.setattr(deferred_job_adapters.Entities, "save", lambda *_args: None)
+    monkeypatch.setattr(email_adapters.Entities, "save", lambda *_args: None)
     monkeypatch.setattr(
-        "lagniappe.core.tools.deferred_jobs.DeferredJobs.start",
+        "lagniappe.core.tools.deferred_jobs.service.DeferredJobs.start",
         lambda spec: (starts.append(spec) or SimpleNamespace(urlsafe_key="child-job"), None),
     )
     monkeypatch.setattr(
@@ -871,7 +871,7 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
         ensure_active=lambda: None,
         checkpoint_stage=checkpoint_stage,
     )
-    checkpoint = deferred_job_adapters.EmailIngestAdapter().prepare(context)
+    checkpoint = email_adapters.EmailIngestAdapter().prepare(context)
     assert checkpoint == {
         "schema_version": 1,
         "stage": "acceptance_sent",
@@ -885,7 +885,7 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
 # @features ai-email deferred-jobs
 # @dimensions routing utility-model idempotency permissions
 def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
-    from lagniappe.core.tools import deferred_job_adapters
+    from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
 
     user = TestEntities.get("USER", {"name": "Owner", "owner": False})
     user.access = lambda _required: True
@@ -909,7 +909,7 @@ def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
     calls = []
     saved = []
     monkeypatch.setattr(
-        deferred_job_adapters.ai,
+        email_adapters.ai,
         "route_ai_email",
         lambda *args: calls.append(args)
         or {
@@ -919,7 +919,7 @@ def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
         },
     )
     monkeypatch.setattr(
-        deferred_job_adapters.Entities,
+        email_adapters.Entities,
         "save",
         lambda *entities: saved.append(entities),
     )
@@ -932,7 +932,7 @@ def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
             "size": 1200,
         }
     ]
-    adapter = deferred_job_adapters.EmailIngestAdapter()
+    adapter = email_adapters.EmailIngestAdapter()
 
     assert (
         adapter._route_shared_address(report, user, parameters, attachments)
@@ -954,7 +954,7 @@ def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
 # @features ai-email deferred-jobs feedback
 # @dimensions failure diagnostics privacy terminal-delivery
 def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
-    from lagniappe.core.tools import deferred_job_adapters
+    from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
 
     user = TestEntities.get("USER", {"name": "Owner", "owner": False})
     report = TestEntities.get(
@@ -972,12 +972,12 @@ def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
     saved = []
     feedback = []
     monkeypatch.setattr(
-        deferred_job_adapters.Entities,
+        email_adapters.Entities,
         "fetch_one",
         lambda *_args, **_kwargs: report,
     )
     monkeypatch.setattr(
-        deferred_job_adapters.Entities,
+        email_adapters.Entities,
         "save",
         lambda *entities: saved.extend(entities),
     )
@@ -1003,7 +1003,7 @@ def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
         "Resend returned an invalid attachment URL."
     )
 
-    adapter = deferred_job_adapters.EmailIngestAdapter()
+    adapter = email_adapters.EmailIngestAdapter()
     adapter.failure(context, error)
     expected = (
         "The email submission could not be prepared. "

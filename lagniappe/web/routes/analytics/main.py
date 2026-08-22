@@ -16,7 +16,7 @@ from lagniappe.core.tools.ai.observability import (
     aggregate_records,
     operation_diagnostic_payload,
 )
-from lagniappe.core.tools.deferred_jobs import DeferredJobs
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import responses
 from lagniappe.web.auth import permission
 

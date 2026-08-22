@@ -1070,7 +1070,7 @@ def _create_email_report(
     from lagniappe.core.definitions import DeferredJobSpec, DeferredJobType, Fetch
     from lagniappe.core.entities import Entities
     from lagniappe.core.tools import database
-    from lagniappe.core.tools.deferred_jobs import DeferredJobs
+    from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
     key = database.create_named_key("report", f"email-{digest}", user)
     report = Entities.fetch_one(key, request=Fetch.direct())

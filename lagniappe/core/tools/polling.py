@@ -6,7 +6,7 @@ import json
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action
 from lagniappe.core.tools import cache, database
-from lagniappe.core.tools.deferred_jobs import DeferredJobs
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
 
 PERSONAL_CHANNELS = frozenset({"starred", "tool-reports"})

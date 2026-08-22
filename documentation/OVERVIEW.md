@@ -86,8 +86,8 @@ Build, configuration, installation, and test workflows.
 | Change styles or icons | [FRONTEND_OVERVIEW](FRONTEND_OVERVIEW.md), [INFRA_BUILD](INFRA_BUILD.md), [STYLE_CANDIDATES](STYLE_CANDIDATES.md) | `src/style/styles.yaml`, `src/style/icons.yaml` |
 | Work on caching/ETags | [FRONTEND_SERVICE_WORKER](FRONTEND_SERVICE_WORKER.md), [BACKEND_TOOLS](BACKEND_TOOLS.md) | `src/script/sw.template.mjs`, `lagniappe/core/tools/cache/` |
 | Work on real-time sync/collaboration | [SYNC_ARCHITECTURE](SYNC_ARCHITECTURE.md), [FRONTEND_EDITOR](FRONTEND_EDITOR.md) | `src/script/shared/sync.mjs`, `src/script/elements/editor/collaborative.mjs`, `lagniappe/core/tools/cache/documents.py`, `lagniappe/web/routes/home/sync.py` |
-| Work on AI features | [AI_PIPELINE](AI_PIPELINE.md), [BACKEND_TOOLS](BACKEND_TOOLS.md) | `lagniappe/core/tools/ai/`, `lagniappe/core/tools/deferred_jobs.py`, `lagniappe/core/tools/deferred_job_adapters.py` |
-| Work on durable background jobs | [AI_PIPELINE](AI_PIPELINE.md), [BACKEND_ENTITIES](BACKEND_ENTITIES.md), [BACKEND_TOOLS](BACKEND_TOOLS.md) | `lagniappe/core/tools/deferred_jobs.py`, `lagniappe/core/tools/task_queue.py`, `lagniappe/web/routes/process/` |
+| Work on AI features | [AI_PIPELINE](AI_PIPELINE.md), [BACKEND_TOOLS](BACKEND_TOOLS.md) | `lagniappe/core/tools/ai/`, `lagniappe/core/tools/deferred_jobs/adapters/` |
+| Work on durable background jobs | [AI_PIPELINE](AI_PIPELINE.md), [BACKEND_ENTITIES](BACKEND_ENTITIES.md), [BACKEND_TOOLS](BACKEND_TOOLS.md) | `lagniappe/core/tools/deferred_jobs/`, `lagniappe/core/properties/deferred_job_*.py`, `lagniappe/core/tools/database/deferred_jobs.py` |
 | Author a template | [FRONTEND_NAVIGATION](FRONTEND_NAVIGATION.md), [BACKEND_WEB](BACKEND_WEB.md) | `lagniappe/web/templates/` |
 | Build the frontend | [INFRA_BUILD](INFRA_BUILD.md) | `build/rollup.config.mjs`, `build/utility.mjs` |
 | Prepare a release | [INFRA_BUILD](INFRA_BUILD.md), [INFRA_CONFIG](INFRA_CONFIG.md) | `.github/workflows/hosted-e2e.yml`, `run.py` |

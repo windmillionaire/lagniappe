@@ -247,7 +247,7 @@ class SubmitterMixin:
         ).hexdigest()
 
     # @testable true
-    # @tests tests_unit/test_023_deferred_jobs.py::test_autofill_revision_tracks_only_form_apply_state
+    # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_revision_tracks_only_form_apply_state
     # @pairs deferred-jobs:form-revision ai:autofill
     @property
     def autofill_revision(self):

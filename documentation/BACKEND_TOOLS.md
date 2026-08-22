@@ -29,7 +29,7 @@ Credentials object used by the other runtime Google clients.
 | `jobs` | durable deferred jobs |
 | `job_locks` | target-scoped deferred-job ownership |
 
-### Key and Entity Operations (`get.py`, `utility.py`)
+### Key and Entity Operations (`get.py`, `utility.py`, `deferred_jobs.py`)
 
 **Key resolution** (`get.py`): `datastore_key(identifier)` accepts a Datastore Key, an entity with a `.key`, or a urlsafe string and returns a Datastore Key. `urlsafe_key(identifier)` converts to a urlsafe string.
 
@@ -56,6 +56,11 @@ Credentials object used by the other runtime Google clients.
 | `initialize()` | Create default reserved entities if absent and report whether this was a truly fresh database |
 
 **Query system** (`filter.py`): `Filter` and `Query` classes wrap Datastore queries with a composable filter builder. Supports `eq`, `any_of`, `all_of`, and compound filters.
+
+Deferred-job compare-and-set transactions, lock release, recovery claims, and
+Scheduler-control records live in `database/deferred_jobs.py`. They remain
+available through the public `database` facade; generic entity persistence and
+AI-email event claims remain in `utility.py`.
 
 ### Site data migrations (`migrations.py`)
 
@@ -264,6 +269,29 @@ hash fields; no browser-routing or broadcast registrations are stored.
 | `update_document_asset(...)` | Refresh durable document metadata without replacing the live generation |
 | `close_presence(client_id, sync_ids)` | Remove a page-scoped client from its document presence sets |
 | `clear_document(sync_id)` | Drop externally invalidated live document state |
+
+## Deferred Jobs (`tools/deferred_jobs/`)
+
+The empty-marker package is split along durable ownership boundaries. Runtime
+callers import the concrete owner rather than relying on package re-exports:
+
+| Module | Responsibility |
+|---|---|
+| `service.py` | `DeferredJobService`, the `DeferredJobs` singleton, durable start/cancel/status/feedback/retention, and adapter registration delegation |
+| `dispatch.py` | Deterministic Cloud Tasks and local dispatch plus delayed feedback tasks |
+| `context.py`, `control.py` | Adapter context, attempt deadline, progress, cancellation checks, and background lease renewal |
+| `runner.py`, `retry.py` | Claim-through-terminal execution, checkpoint/apply/delivery flow, retry classification, and backoff |
+| `recovery.py`, `scheduler.py` | Stranded-work collection, terminal-delivery recovery, Scheduler-control repair, and Cloud Scheduler convergence |
+| `locks.py` | Target lock lookup, stale cleanup, and browser-safe projection |
+| `adapters/` | Independent email, report, autofill, page, file, and site strategies behind `DeferredJobAdapterRegistry` |
+
+`DeferredJobService` preserves the public method contracts for registration,
+start, cancellation/supersession, dispatch/feedback, run/recovery, status and
+recent reads, and terminal retention. The adapter registry is composable and
+lazy-loads the built-in domain strategies, avoiding a service-to-adapter import
+cycle. Properties own only entity-bound values and projections; cross-entity
+transactions, external services, execution, and recovery stay in this tools
+layer.
 
 ## AI Email (`tools/ai_email.py`)
 
@@ -672,7 +700,7 @@ checkpoint publication and proposal application belong to the deferred-adapter
 unit suite:
 
 ```bash
-venv/bin/python run.py test testing/tests_unit/test_023_deferred_jobs.py::test_organize_resumes_plan_checkpoint_without_second_planning_call
+venv/bin/python run.py test testing/tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_resumes_plan_checkpoint_without_second_planning_call
 ```
 
 Browser coverage instead starts reports through the public tools UI, observes
@@ -753,7 +781,7 @@ Also includes task scheduling helpers for recurring date calculations.
 ### `task_queue.py`
 
 Google Cloud Tasks carries authenticated HTTP POST requests to internal
-`process` routes. The shared deferred-job registry sends production work to
+`process` routes. The shared deferred-job service sends production work to
 `/process/jobs` and delayed feedback to `/process/jobs/feedback`; in development
 it runs shared jobs in local daemon threads. In testing, most adapters remain
 pending for deterministic test-controlled execution, while adapters explicitly

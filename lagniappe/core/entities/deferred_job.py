@@ -2,10 +2,17 @@
 
 from .entity import Entity
 from ..definitions import DEFERRED_JOB_VERSION, DeferredJobStatus
-from ..properties import deferred_job
+from ..properties import (
+    deferred_job_dispatch,
+    deferred_job_lifecycle,
+    deferred_job_request,
+)
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_property_split_preserves_persisted_schema
+# @features deferred-jobs
+# @dimensions persisted-schema property-ownership json-encoding index-exclusion
 class DeferredJob(Entity):
     """Internal versioned job record; domain entities remain the UI contract."""
 
@@ -49,33 +56,33 @@ class DeferredJob(Entity):
         properties = super()._get_properties()
         properties.update(
             {
-                "actor": deferred_job.Actor,
-                "notification": deferred_job.Notification,
-                "job_type": deferred_job.JobType,
-                "status": deferred_job.Status,
-                "job_version": deferred_job.Version,
-                "idempotency_key": deferred_job.IdempotencyKey,
-                "request_fingerprint": deferred_job.RequestFingerprint,
-                "dispatch_state": deferred_job.DispatchState,
-                "task_identity": deferred_job.TaskIdentity,
-                "dispatched_at": deferred_job.DispatchedAt,
-                "deadline_at": deferred_job.DeadlineAt,
-                "status_revision": deferred_job.StatusRevision,
-                "start_completed": deferred_job.StartCompleted,
-                "telemetry_id": deferred_job.TelemetryId,
-                "authorization": deferred_job.Authorization,
-                "inputs": deferred_job.Inputs,
-                "parameters": deferred_job.Parameters,
-                "client": deferred_job.Client,
-                "attempt": deferred_job.Attempt,
-                "lease_token": deferred_job.LeaseToken,
-                "lease_expires": deferred_job.LeaseExpires,
-                "next_attempt_at": deferred_job.NextAttemptAt,
-                "progress": deferred_job.Progress,
-                "checkpoint": deferred_job.Checkpoint,
-                "result": deferred_job.Result,
-                "error": deferred_job.Error,
-                "delivery": deferred_job.Delivery,
+                "actor": deferred_job_request.Actor,
+                "notification": deferred_job_request.Notification,
+                "job_type": deferred_job_request.JobType,
+                "status": deferred_job_lifecycle.Status,
+                "job_version": deferred_job_request.Version,
+                "idempotency_key": deferred_job_request.IdempotencyKey,
+                "request_fingerprint": deferred_job_request.RequestFingerprint,
+                "dispatch_state": deferred_job_dispatch.DispatchState,
+                "task_identity": deferred_job_dispatch.TaskIdentity,
+                "dispatched_at": deferred_job_dispatch.DispatchedAt,
+                "deadline_at": deferred_job_dispatch.DeadlineAt,
+                "status_revision": deferred_job_lifecycle.StatusRevision,
+                "start_completed": deferred_job_request.StartCompleted,
+                "telemetry_id": deferred_job_request.TelemetryId,
+                "authorization": deferred_job_request.Authorization,
+                "inputs": deferred_job_request.Inputs,
+                "parameters": deferred_job_request.Parameters,
+                "client": deferred_job_request.Client,
+                "attempt": deferred_job_dispatch.Attempt,
+                "lease_token": deferred_job_dispatch.LeaseToken,
+                "lease_expires": deferred_job_dispatch.LeaseExpires,
+                "next_attempt_at": deferred_job_dispatch.NextAttemptAt,
+                "progress": deferred_job_lifecycle.Progress,
+                "checkpoint": deferred_job_lifecycle.Checkpoint,
+                "result": deferred_job_lifecycle.Result,
+                "error": deferred_job_lifecycle.Error,
+                "delivery": deferred_job_lifecycle.Delivery,
             }
         )
         return properties

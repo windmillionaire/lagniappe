@@ -7,7 +7,7 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import assets as storage_assets
-from lagniappe.core.tools.deferred_jobs import DeferredJobs
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
 
 # @testable false

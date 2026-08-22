@@ -13,7 +13,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
 from lagniappe.core.tools.database.core import KINDS
 from lagniappe.core.tools.database.filter import Filter, Query
-from lagniappe.core.tools.deferred_jobs import DeferredJobs
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from testing.definitions import Pages, Tasks, Users
 from testing.resources import Page, Task
 
@@ -124,7 +124,7 @@ def test_task_autofill_runs_deferred_with_page_file_context(get_user, monkeypatc
     expect(form.locator(f"[name='{FIELD_ID}']")).to_be_disabled()
 
     from lagniappe.web import app as web_app
-    from lagniappe.core.tools import deferred_job_adapters
+    from lagniappe.core.tools.deferred_jobs.adapters import autofill as autofill_adapter
 
     prompts = []
 
@@ -133,7 +133,7 @@ def test_task_autofill_runs_deferred_with_page_file_context(get_user, monkeypatc
         return {FIELD_ID: "Tax evidence applied"}
 
     monkeypatch.setattr(
-        deferred_job_adapters.ai,
+        autofill_adapter.ai,
         "generate_autofilled_submission",
         generate,
     )

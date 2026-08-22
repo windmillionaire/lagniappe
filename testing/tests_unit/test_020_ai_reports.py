@@ -5262,7 +5262,7 @@ def test_run_report_checks_deferred_execution_guard(monkeypatch):
 # @pair ai-report:deterministic-run
 @pytest.mark.unit
 def test_run_report_propagates_deferred_control_stop(monkeypatch):
-    from lagniappe.core.tools.deferred_jobs import DeferredJobDeadlineError
+    from lagniappe.core.tools.deferred_jobs.errors import DeferredJobDeadlineError
 
     report = SimpleNamespace(
         urlsafe_key="interrupted-report",

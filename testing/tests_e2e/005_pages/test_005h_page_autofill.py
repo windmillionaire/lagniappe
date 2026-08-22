@@ -13,7 +13,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
 from lagniappe.core.tools.database.core import KINDS
 from lagniappe.core.tools.database.filter import Filter, Query
-from lagniappe.core.tools.deferred_jobs import DeferredJobs
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from testing.definitions import Pages, Users
 from testing.resources import Page
 from testing.utility import expect_poll_result, multipart_form_fields
@@ -164,7 +164,7 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
     assert unchanged.name == original_name
 
     from lagniappe.web import app as web_app
-    from lagniappe.core.tools import deferred_job_adapters
+    from lagniappe.core.tools.deferred_jobs.adapters import autofill as autofill_adapter
 
     prompts = []
 
@@ -173,7 +173,7 @@ def test_page_autofill_runs_deferred_with_attached_file_context(
         return {FIELD_ID: "Assessment evidence applied"}
 
     monkeypatch.setattr(
-        deferred_job_adapters.ai,
+        autofill_adapter.ai,
         "generate_autofilled_submission",
         generate,
     )

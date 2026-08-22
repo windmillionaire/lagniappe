@@ -11,7 +11,7 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database, site_export
-from lagniappe.core.tools.deferred_jobs import DeferredJobs
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import responses
 from lagniappe.web.auth import permission
 

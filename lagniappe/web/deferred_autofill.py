@@ -6,9 +6,9 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.tools.autofill_jobs import start_autofill_job
 from lagniappe.core.tools.database.assets import DirectUploadError
-from lagniappe.core.tools.deferred_jobs import (
+from lagniappe.core.tools.deferred_jobs.errors import DeferredJobLockedError
+from lagniappe.core.tools.deferred_jobs.locks import (
     AUTOFILL_FORM_LOCK_SCOPE,
-    DeferredJobLockedError,
     deferred_job_lock_descriptor,
 )
 from lagniappe.web import direct_uploads, responses

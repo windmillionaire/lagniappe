@@ -7,7 +7,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
-from lagniappe.core.tools.deferred_jobs import deferred_job_lock_descriptors
+from lagniappe.core.tools.deferred_jobs.locks import deferred_job_lock_descriptors
 from lagniappe.core.tools.polling_contract import (
     POLL_TYPES,
     PollContractError,

@@ -196,7 +196,7 @@ def run_report(report, user, ensure_active=None):
             report.result = result
             Entities.save(*to_save, report)
         except Exception as error:
-            from lagniappe.core.tools.deferred_jobs import (
+            from lagniappe.core.tools.deferred_jobs.errors import (
                 DeferredJobClaimLostError,
                 DeferredJobDeadlineError,
                 DeferredJobInfrastructureError,

@@ -93,7 +93,7 @@ EXCLUDE_FROM_INDEXES = (
 
 
 # @testable true
-# @tests tests_unit/test_023_deferred_jobs.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
+# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
 # @pair observability:job-type
 # @pair observability:attempt
 # @pair observability:contract-version
@@ -114,7 +114,7 @@ _CURRENT_OBSERVER = ContextVar("ai_generation_observer", default=None)
 
 
 # @testable true
-# @tests tests_unit/test_023_deferred_jobs.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
+# @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
 # @pair deferred-jobs:preparation-context
 @contextmanager
 def ai_execution_context(

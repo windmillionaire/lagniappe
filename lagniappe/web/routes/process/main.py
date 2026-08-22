@@ -8,10 +8,8 @@ from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import dates, filters, notification_email, task_queue
 from lagniappe.core.tools.notifications import create_process_notification
-from lagniappe.core.tools.deferred_jobs import (
-    DeferredJobInfrastructureError,
-    DeferredJobs,
-)
+from lagniappe.core.tools.deferred_jobs.errors import DeferredJobInfrastructureError
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.tools.ingress import IngressService
 from . import process
 

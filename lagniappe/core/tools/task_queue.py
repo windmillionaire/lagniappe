@@ -26,8 +26,8 @@ def ai_task_start_delay():
 
 
 # @testable true
-# @tests tests_unit/test_023_deferred_jobs.py::test_cloud_task_dispatch_uses_key_payload_stable_id_and_deadline
-# @tests tests_unit/test_023_deferred_jobs.py::test_cancel_deletes_tasks_and_persists_a_tombstone
+# @tests tests_unit/test_023b_deferred_job_service.py::test_cloud_task_dispatch_uses_key_payload_stable_id_and_deadline
+# @tests tests_unit/test_023b_deferred_job_service.py::test_cancel_deletes_tasks_and_persists_a_tombstone
 # @features deferred-jobs
 # @dimensions deterministic-task-id cancellation
 def task_name(task_id):
@@ -41,7 +41,7 @@ def task_name(task_id):
 
 
 # @testable true
-# @tests tests_unit/test_023_deferred_jobs.py::test_cloud_task_dispatch_uses_key_payload_stable_id_and_deadline
+# @tests tests_unit/test_023b_deferred_job_service.py::test_cloud_task_dispatch_uses_key_payload_stable_id_and_deadline
 # @features deferred-jobs
 # @dimensions task-payload deterministic-task-id dispatch-deadline
 def create_task(

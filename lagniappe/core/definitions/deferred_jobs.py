@@ -109,7 +109,7 @@ class DeferredJobResult:
 
     @property
     # @testable true
-    # @tests tests_unit/test_023_deferred_jobs.py::test_runner_checkpoints_before_apply_and_resumes_without_prepare
+    # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_checkpoints_before_apply_and_resumes_without_prepare
     # @features deferred-jobs
     # @dimensions delivery-result
     def success(self):

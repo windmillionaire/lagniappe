@@ -44,8 +44,7 @@ This document covers:
 
 - `lagniappe/core/tools/ai/`, including prompt construction, model calls,
   guidelines, function declarations, validation, repair, and report execution;
-- `lagniappe/core/tools/deferred_jobs.py` and
-  `lagniappe/core/tools/deferred_job_adapters.py`;
+- `lagniappe/core/tools/deferred_jobs/`, including its domain adapters;
 - AI entry routes, uploads, durable notifications, operation polling, and
   frontend destination reconciliation;
 - runtime model settings, provider retries, Cloud Tasks delivery, and queue
@@ -114,7 +113,9 @@ still require browser review and deterministic execution.
 | Workspace retrieval | `ai/functions.py` and `function_definitions/` | Tool declaration, hash normalization, permission-filtered handler execution, exact-call cache, result/file parts, and failure trace. |
 | AI workflow | `ai/ask.py`, `create.py`, `organize.py`, `autofill.py`, `email_router.py` | Workflow-specific context, tool selection, email intent classification, generation stages, and fallback. |
 | Report proposal contract | `ai/reporting/contracts.py`, `proposals.py`, and `organize_completion.py` | Shared action schemas and ordering, proposal validation/repair, and Organize file-summary/submission completion. |
-| Durable generation | `deferred_jobs.py` and adapters | Job creation, claim/lease, retries, checkpoint, inspect/apply, cleanup, and durable notification state. |
+| Durable request values | `properties/deferred_job_request.py`, `deferred_job_dispatch.py`, and `deferred_job_lifecycle.py` | Persisted request/dispatch/lifecycle values, deterministic identities, payload validation, and privacy-bounded projections. |
+| Durable generation service | `tools/deferred_jobs/service.py`, `runner.py`, `recovery.py`, and domain adapters | Job creation, claim/lease, retries, checkpoint, inspect/apply, cleanup, recovery, and durable notification state. |
+| Deferred transactions | `tools/database/deferred_jobs.py` | Atomic job/notification/lock creation, claims, compare-and-set transitions, and Scheduler tracking behind the database facade. |
 | Proposal application | `ai/report_runner.py` and `ai/reporting/actions/` | Ledger coordination plus callback-registered deterministic action inspection, execution, retry, compensation, and undo. |
 | Browser completion | `/l/poll`, `PollingCoordinator`, `DeferredOperationManager`, `Core`, and `EditWatcher` | Operation acknowledgement, owner-safe status, revision validation, notification refresh, collection reconciliation, and watched-form refetch. |
 
@@ -128,7 +129,7 @@ explain/preview intent.
 
 The route performs its ordinary request and permission checks, persists the
 pending report or target state, and calls `DeferredJobs.start()` with a typed
-`DeferredJobSpec`. The browser supplies an operation UUID and the registry
+`DeferredJobSpec`. The browser supplies an operation UUID and the service
 binds it to an immutable canonical request fingerprint. Job and pending
 notification are transactionally get/created; replay of the same stable spec is
 idempotent and UUID reuse for a different spec is rejected. Report creation and

@@ -64,7 +64,7 @@ def summarize_file(
         summarize.status = "Summarizing file..."
         if dispatch:
             from ...definitions import DeferredJobSpec, DeferredJobType
-            from ..deferred_jobs import DeferredJobs
+            from ..deferred_jobs.service import DeferredJobs
 
             DeferredJobs.start(
                 DeferredJobSpec(

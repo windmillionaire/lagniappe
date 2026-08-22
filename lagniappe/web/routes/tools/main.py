@@ -18,7 +18,7 @@ from lagniappe.core.definitions import (
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.tools import ai
-from lagniappe.core.tools.deferred_jobs import DeferredJobs
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
 from lagniappe.web.auth import ai_access, require_ai_access
