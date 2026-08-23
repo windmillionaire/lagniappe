@@ -245,6 +245,14 @@ share a route, and `response_check` only for response-payload assertions. Use
 header. Keep the visible postcondition after the wait, and reload or use a
 fresh context when durable state is part of the story.
 
+Do not remove the causal background boundary merely because a later visual
+assertion exists. Keep the response, poll, replay, replacement, transition, or
+service-worker acknowledgement when pre-action DOM could already satisfy that
+assertion or when the action replaces the nodes being observed. After the
+boundary completes, locate the current control again from a durable root and
+assert the visible result. The boundary provides synchronization; the visible
+or persisted result remains the success criterion.
+
 For persisted document replay after replacing or reloading the page, use
 `expect_offline_sync_replay()` with the durable sync ID. It installs the
 `/l/sync` response listener before navigation, waits for that sync ID's

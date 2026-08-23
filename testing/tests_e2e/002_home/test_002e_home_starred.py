@@ -48,6 +48,11 @@ def _title_star_action(user, menu_name, action_name):
     menu = user.page.get_by_role("menu", name=menu_name)
     if not menu.is_visible():
         trigger.click()
+
+    # The first click cold-loads EntityMenu; its portal can become visible
+    # before the background activation finishes replacing its options.
+    expect(trigger).not_to_have_attribute("aria-busy", "true")
+    menu = user.page.get_by_role("menu", name=menu_name)
     expect(menu).to_be_visible()
 
     action = menu.get_by_role("menuitem", name=action_name, exact=True)

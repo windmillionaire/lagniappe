@@ -497,7 +497,6 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
             entity.save()
             assert entity.invalidate_cache is True
             user.entity = entity
-            home = SitePages.HOME.get(user)
 
             with user.page.context.expect_event(
                 "response",
@@ -506,16 +505,12 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
                     and response.request.method == "POST"
                 ),
             ) as validation_info:
-                response = user.navigate(home.url)
-
-            assert response and response.status == 200
+                home = user.go(SitePages.HOME)
 
             validation = validation_info.value
             assert validation.status == 200
             assert validation.json()["cacheCleared"] is True
             assert Entities.USER.load(user.email).invalidate_cache is False
-            home.wait_for_interaction_readiness()
-            home.initialize_view()
         else:
             home = user.go(SitePages.HOME)
 
