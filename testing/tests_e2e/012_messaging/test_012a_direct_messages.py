@@ -16,12 +16,7 @@ from testing.resources import Project
 from testing.utility import expect_poll_result, expect_successful_response
 
 
-pytestmark = [
-    pytest.mark.e2e,
-    pytest.mark.parallel_safe(
-        reason="each story owns UUID-scoped users, entities, and message content"
-    ),
-]
+pytestmark = pytest.mark.e2e
 
 
 def _managed_definition(label):

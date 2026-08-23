@@ -51,9 +51,6 @@ pytestmark = pytest.mark.e2e
 # @features home icons
 # @dimensions material-symbol-markup
 # @template home/home.html::main
-@pytest.mark.parallel_safe(
-    reason="the read-only markup story is scoped to one browser context"
-)
 def test_home_material_symbols_use_semantic_span_markup(get_user):
     user = get_user(Users.OWNER)
     user.go(SitePages.HOME)
@@ -140,9 +137,6 @@ def test_home_material_symbols_use_semantic_span_markup(get_user):
 
 # @features home
 # @dimensions directory-list
-@pytest.mark.parallel_safe(
-    reason="the inline directory toggle creates no shared state"
-)
 def test_directory_list(get_user):
     """
     Verify a home toggle opens and closes its widget through client-side state.
@@ -167,9 +161,6 @@ def test_directory_list(get_user):
 
 # @features home
 # @dimensions prefetch task-list task-count
-@pytest.mark.parallel_safe(
-    reason="the read-only prefetch story asserts no collection cardinality"
-)
 def test_tasks_prefetch(get_user):
     """
     Verify tasks are prefetched on page load.
@@ -234,9 +225,6 @@ def test_model_lists_load_on_toggle(get_user):
 
 # @features home
 # @dimensions load mobile layout
-@pytest.mark.parallel_safe(
-    reason="the responsive form smoke story creates no shared state"
-)
 def test_home_mobile_dashboard_smoke(get_user):
     """Smoke-check the homepage dashboard and a representative form at mobile width."""
     user = get_user(Users.OWNER)
@@ -260,9 +248,6 @@ def test_home_mobile_dashboard_smoke(get_user):
 # @features notes
 # @dimensions body-create photo-picker preview remove combined-input
 # @template notes.html::composer
-@pytest.mark.parallel_safe(
-    reason="the composer draft remains inside its isolated browser context"
-)
 def test_create_note_composer_keeps_text_and_photo_from_home(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)

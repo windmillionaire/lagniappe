@@ -117,7 +117,6 @@ def _quick_create_from_combobox(user, combobox, label, name, response_glob):
 # @pairs facets:command-row facets:permissions
 # @pairs quick-create:command-row quick-create:opt-in quick-create:permissions
 # @pairs search:permissions search:search-results
-@pytest.mark.parallel_safe(reason="uses a unique lookup and creates no state")
 def test_quick_create_command_requires_opt_in_and_create_permission(get_user):
     owner = get_user(Users.OWNER)
     owner.go(SitePages.HOME)
@@ -288,7 +287,6 @@ def test_page_quick_create_uses_visible_uncategorized_pages_category(get_user):
 # @features quick-create
 # @dimensions create-route created-option create-entity
 # @template pages/tasks.html::action_buttons
-@pytest.mark.parallel_safe(reason="creates a uniquely named project without saving the fixed form")
 def test_project_combobox_quick_create_selects_new_project(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_create_page_task.get(user)
@@ -341,7 +339,6 @@ def test_model_task_form_selector_quick_creates_form(get_user):
 # @features quick-create
 # @dimensions create-route created-option create-entity form-type
 # @template home/categories.html::create
-@pytest.mark.parallel_safe(reason="creates a uniquely named form and category")
 def test_home_create_category_form_selector_quick_creates_form(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)

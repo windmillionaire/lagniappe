@@ -58,7 +58,6 @@ def _create_group(user, user_index, group):
 # @dimensions column-link query-route same-page-navigation reload
 # @template common.html::format_name
 # @template users/tools.html::group_permissions
-@pytest.mark.parallel_safe(reason="reads a fixed group without mutating shared state")
 def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
     owner = get_user(Users.OWNER)
     member = get_user(Users.general_users_view_only, creator=owner)
@@ -95,7 +94,6 @@ def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
 # @dimensions group-create nav permission-update general-permissions
 # @template users/tools.html::create_user_group
 # @template users/tools.html::group_permissions
-@pytest.mark.parallel_safe(reason="creates and mutates a uniquely named group")
 def test_set_general_permissions(get_user):
     user = get_user(Users.OWNER)
     user_index = user.go(SitePages.USER_INDEX)
@@ -114,7 +112,6 @@ def test_set_general_permissions(get_user):
 # @dimensions group-create nav permission-update entity-permissions selection-render responsive-layout
 # @template users/tools.html::create_user_group
 # @template users/tools.html::group_permissions
-@pytest.mark.parallel_safe(reason="creates and mutates a uniquely named group")
 def test_set_entity_specific_permissions(get_user):
     user = get_user(Users.OWNER)
     user_index = user.go(SitePages.USER_INDEX)
@@ -132,7 +129,6 @@ def test_set_entity_specific_permissions(get_user):
 # @pairs user-groups:rename user-groups:permission-update
 # @template users/tools.html::group_permissions
 # @template users/tools.html::group_selector
-@pytest.mark.parallel_safe(reason="creates and renames a uniquely named group")
 def test_rename_group(get_user):
     user = get_user(Users.OWNER)
     user_index = user.go(SitePages.USER_INDEX)
@@ -223,7 +219,6 @@ def test_set_public_permissions(get_user):
 # @features user-groups
 # @dimensions group-delete nav-refresh polling
 # @template users/tools.html::group_nav
-@pytest.mark.parallel_safe(reason="creates and deletes a uniquely named group")
 def test_delete_group_refreshes_group_navigation(get_user):
     user = get_user(Users.OWNER)
     user_index = user.go(SitePages.USER_INDEX)

@@ -43,7 +43,6 @@ MARKDOWN_TABLE_PASTE_FIXTURE = "\n".join(
 # @pair sync:empty-content
 # @pair sync:save-guard
 # @pair sync:parent-modified
-@pytest.mark.parallel_safe(reason="uses a dedicated untouched project document")
 def test_untouched_document_does_not_save_or_touch_project(get_user):
     user = get_user(Users.OWNER)
     # The shared toolbar project is intentionally edited by the earlier offline
@@ -146,7 +145,6 @@ def test_formatting_persists(get_user):
 
 # @features editor
 # @dimensions paste-markdown-table reload
-@pytest.mark.parallel_safe(reason="uses a dedicated project document")
 def test_pasting_markdown_table_preserves_table_after_reload(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_editor_markdown_table_paste.get(user)
@@ -171,7 +169,6 @@ def test_pasting_markdown_table_preserves_table_after_reload(get_user):
 
 # @features editor
 # @dimensions paste-html sanitization
-@pytest.mark.parallel_safe(reason="uses a dedicated project document")
 def test_pasting_plain_html_inserts_safe_formatted_content(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_editor_plain_html_paste.get(user)
@@ -212,7 +209,6 @@ def test_pasting_plain_html_inserts_safe_formatted_content(get_user):
 
 # @features editor
 # @dimensions paste-markdown reload
-@pytest.mark.parallel_safe(reason="uses a dedicated project document")
 def test_pasting_common_markdown_preserves_formatting(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_editor_common_markdown_paste.get(user)
@@ -269,7 +265,6 @@ raw <script> stays text
 
 # @features editor
 # @dimensions task-list reload
-@pytest.mark.parallel_safe(reason="uses a dedicated project document")
 def test_task_list_persists(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_editor_task_list.get(user)

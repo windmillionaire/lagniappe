@@ -32,7 +32,6 @@ pytestmark = pytest.mark.e2e
 
 # @features editor
 # @dimensions history-list
-@pytest.mark.parallel_safe(reason="uses a dedicated project document history")
 def test_document_history_created_on_save(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_document_history_created)
@@ -73,7 +72,6 @@ def test_document_history_created_on_save(get_user):
 
 # @features editor
 # @dimensions history-restore
-@pytest.mark.parallel_safe(reason="uses a dedicated project document history")
 def test_document_history_restore(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_document_history_restore)

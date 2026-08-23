@@ -196,9 +196,6 @@ def _warm_offline_create_widgets(home, *, note=True, task=True):
 # @pair activity:notes-exclusion
 # @template home/notes.html::list
 # @template home/notes.html::note_item
-@pytest.mark.parallel_safe(
-    reason="the story owns UUID-scoped note and notification content"
-)
 def test_home_notes_exclude_notifications(get_user):
     user = get_user(Users.OWNER)
     note_body = _unique("Activity note load")
@@ -233,9 +230,6 @@ def test_home_notes_exclude_notifications(get_user):
 # @pair notes:private-default
 # @template home/notes.html::add_note_form
 # @template notes.html::note_item
-@pytest.mark.parallel_safe(
-    reason="the story owns UUID-scoped notes and asset paths"
-)
 def test_create_note_body_and_photo_from_home(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -411,9 +405,6 @@ def test_home_note_visibility_across_users(get_user):
 # @pairs notifications:create notifications:body notifications:parent
 # @pairs notifications:html-stripping
 # @template notifications.html::item
-@pytest.mark.parallel_safe(
-    reason="the story owns UUID-scoped note and notification content"
-)
 def test_notification_channel_uses_menu_not_home_notes(get_user):
     user = get_user(Users.OWNER)
     note_body = _unique("Process notification control note")
@@ -440,9 +431,6 @@ def test_notification_channel_uses_menu_not_home_notes(get_user):
 # @features notifications
 # @dimensions dropdown-refresh target target-link pending long-text-wrap
 # @template notifications.html::item
-@pytest.mark.parallel_safe(
-    reason="the story owns UUID-scoped notifications and report content"
-)
 def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_create_page.get(user)
@@ -521,9 +509,6 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
 # @features notifications
 # @dimensions delete clear-all menu-open ownership dropdown-refresh accessible-state
 # @template nav.html::navbar
-@pytest.mark.parallel_safe(
-    reason="clear-all is confined to a UUID-scoped user and its notifications"
-)
 def test_notification_menu_deletes_and_clears(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -589,9 +574,6 @@ def test_notification_menu_deletes_and_clears(get_user):
 # @dimensions queue-create reload
 # @template home/notes.html::note_item
 # @template home/tasks.html::task
-@pytest.mark.parallel_safe(
-    reason="offline records and replayed entities use UUID-scoped browser and server keys"
-)
 def test_offline_home_create_mutations_persist_after_reload(get_user, browser_failures):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -674,9 +656,6 @@ def test_offline_home_create_mutations_persist_after_reload(get_user, browser_fa
 # @dimensions server-first reload replay optimistic-mutation
 # @template home/notes.html::list
 # @template home/tasks.html::list
-@pytest.mark.parallel_safe(
-    reason="offline records and the target task are UUID-scoped to one browser context"
-)
 def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_failures):
     user = get_user(Users.OWNER)
     note_body = _unique("Offline cached note")
@@ -745,9 +724,6 @@ def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_fa
 # @features offline
 # @dimensions replay queue-clear
 # @template home/notes.html::note_item
-@pytest.mark.parallel_safe(
-    reason="the offline mutation and replayed note use UUID-scoped keys"
-)
 def test_offline_home_mutations_replay_when_online(get_user, browser_failures):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -782,9 +758,6 @@ def test_offline_home_mutations_replay_when_online(get_user, browser_failures):
 # @features tasks
 # @dimensions complete offline-queue
 # @template home/tasks.html::task
-@pytest.mark.parallel_safe(
-    reason="the offline mutation and target task use UUID-scoped keys"
-)
 def test_offline_task_complete_replays_after_reload(get_user, browser_failures):
     user = get_user(Users.OWNER)
     task_name = _unique("Offline complete task")

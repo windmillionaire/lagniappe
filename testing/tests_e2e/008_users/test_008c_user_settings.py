@@ -806,7 +806,6 @@ def test_public_user_restricted_schedules_are_forbidden(
 # @pair cache:invalidation-acknowledgement
 # @pair notification-email:user-only
 # @template pages/info.html::user_settings
-@pytest.mark.parallel_safe(reason="creates and updates a uniquely named user")
 def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -954,7 +953,6 @@ def test_user_settings_preloads_existing_groups(get_user):
 # @pair cache:invalidation-acknowledgement
 # @pair auth:canonical-page
 # @template pages/info.html::user_settings
-@pytest.mark.parallel_safe(reason="creates and reassigns a unique user and pages")
 def test_owner_can_reassign_and_remove_user_from_page(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -1031,7 +1029,6 @@ def test_owner_can_reassign_and_remove_user_from_page(get_user):
 # @pairs user-settings:submit-boundary user-settings:attached-form
 # @pairs user-settings:categories user-settings:restrictions
 # @pair cache:invalidation-acknowledgement
-@pytest.mark.parallel_safe(reason="creates and updates a unique attached user page")
 def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     owner = get_user(Users.OWNER)
     category = Categories.test_basic_inputs_submission.get(owner)

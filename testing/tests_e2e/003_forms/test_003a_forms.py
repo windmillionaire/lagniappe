@@ -30,7 +30,6 @@ from testing.utility import expect_reconnect_refresh
 # @pair indexes:rendering
 # @pair indexes:fingerprint-gate
 # @template forms/index.html::view
-@pytest.mark.parallel_safe(reason="creates and deletes one uniquely named form")
 def test_forms_index_page(get_user, browser_failures):
     user = get_user(Users.OWNER)
     user.go(SitePages.FORM_INDEX)
@@ -62,7 +61,6 @@ def test_forms_index_page(get_user, browser_failures):
 # @features forms
 # @dimensions delete-modal instance-query preview-limit
 # @template delete/form.html::instance_link
-@pytest.mark.parallel_safe(reason="creates and deletes only uniquely named entities")
 def test_form_delete_modal_lists_page_and_task_users(get_user):
     user = get_user(Users.OWNER)
     suffix = uuid4().hex

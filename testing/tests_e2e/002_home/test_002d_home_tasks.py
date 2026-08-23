@@ -111,9 +111,6 @@ def _make_recurring_daily(task):
 # @features tasks
 # @dimensions create-form due-date
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="the form story is isolated to its browser context and creates no state"
-)
 def test_create_task_form(get_user):
     """
     Verify create personal task form opens with expected fields.
@@ -146,9 +143,6 @@ def test_create_task_form(get_user):
 # @features tasks
 # @dimensions create-personal due-date
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="the story creates and locates one distinct catalogued task"
-)
 def test_create_personal_task_due_today(get_user):
     """
     Verify personal task creation with today's due date via UI.
@@ -175,9 +169,6 @@ def test_create_personal_task_due_today(get_user):
 # @features tasks
 # @dimensions create-personal due-date
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="the story creates and locates one distinct catalogued task"
-)
 def test_create_personal_task_due_in_four_days(get_user):
     """
     Verify personal task creation with a due date four days out via UI.
@@ -199,9 +190,6 @@ def test_create_personal_task_due_in_four_days(get_user):
 # @features tasks
 # @dimensions complete
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="completion and restoration target one distinct catalogued task"
-)
 def test_complete_task_from_home_page(get_user):
     """
     Verify task completion via checkbox.
@@ -247,9 +235,6 @@ def test_complete_task_from_home_page(get_user):
 # @features tasks
 # @dimensions complete recurring
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="the story owns its UUID-scoped recurring task and exact locator"
-)
 def test_complete_recurring_task_from_home_page_reappears(get_user):
     """Completing a near-term recurring home task replaces it with the next occurrence."""
     user = get_user(Users.OWNER)
@@ -280,9 +265,6 @@ def test_complete_recurring_task_from_home_page_reappears(get_user):
 # @features tasks
 # @dimensions postpone due-date
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="postponement targets one distinct catalogued task"
-)
 def test_postpone_task_due_date_to_tomorrow(get_user):
     """
     Verify postponing task due date via dropdown.
@@ -311,9 +293,6 @@ def test_postpone_task_due_date_to_tomorrow(get_user):
 # @features tasks
 # @dimensions postpone due-date
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="postponement targets one distinct catalogued task"
-)
 def test_postpone_task_due_date_to_this_week(get_user):
     """Choose any remaining calendar date through Sunday from 'This Week…'."""
     user = get_user(Users.OWNER)
@@ -359,9 +338,6 @@ def test_postpone_task_due_date_to_this_week(get_user):
 # @features tasks
 # @dimensions postpone due-date
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="postponement targets one distinct catalogued task"
-)
 def test_postpone_task_due_date_to_next_week(get_user):
     """Choose a dated weekday from the progressive next-week postpone menu."""
     user = get_user(Users.OWNER)
@@ -392,9 +368,6 @@ def test_postpone_task_due_date_to_next_week(get_user):
 # @features tasks
 # @dimensions postpone due-date
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="postponement and restoration target one distinct catalogued task"
-)
 def test_postpone_task_due_date_to_no_due_date(get_user):
     """
     Clear due date via postpone menu; task leaves the home list (no near-term due).

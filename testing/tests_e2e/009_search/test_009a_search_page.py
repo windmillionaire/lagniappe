@@ -94,7 +94,6 @@ def _go_to_search_page(user, query):
 
 # @features search
 # @dimensions anonymous-access
-@pytest.mark.parallel_safe(reason="creates no state and uses an isolated anonymous context")
 def test_search_page_requires_login(get_user):
     anonymous = get_user(Users.ANONYMOUS)
     base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
@@ -154,7 +153,6 @@ def test_search_returns_results(get_user):
 # @features search
 # @dimensions no-results
 # @template search/results.html::search_results
-@pytest.mark.parallel_safe(reason="uses a query unique to the no-results story")
 def test_search_no_results(get_user):
     user = get_user(Users.OWNER)
 
@@ -165,7 +163,6 @@ def test_search_no_results(get_user):
 # @features search
 # @dimensions result-title
 # @template search/results.html::search_results
-@pytest.mark.parallel_safe(reason="creates a uniquely named project and scoped query")
 def test_search_result_titles(get_user):
     user = get_user(Users.OWNER)
     name = _unique("title")
@@ -181,7 +178,6 @@ def test_search_result_titles(get_user):
 # @features search
 # @dimensions primary-name-ranking
 # @template search/results.html::search_results
-@pytest.mark.parallel_safe(reason="creates uniquely named search entities")
 def test_primary_name_matches_rank_above_file_name_and_description_matches(get_user):
     user = get_user(Users.OWNER)
     token = _unique("primary-rank").replace("-", "")
@@ -209,7 +205,6 @@ def test_primary_name_matches_rank_above_file_name_and_description_matches(get_u
 # @features search
 # @dimensions details-hydration parent-refresh
 # @template search/results.html::search_results
-@pytest.mark.parallel_safe(reason="creates and renames a uniquely named category")
 def test_search_result_parent_details_refresh_after_category_rename(get_user):
     user = get_user(Users.OWNER)
     page_name = _unique("parent-refresh-page")
@@ -232,7 +227,6 @@ def test_search_result_parent_details_refresh_after_category_rename(get_user):
 # @features search
 # @dimensions snippets
 # @template search/results.html::search_results
-@pytest.mark.parallel_safe(reason="creates a uniquely named project and scoped query")
 def test_search_result_snippets(get_user):
     user = get_user(Users.OWNER)
     snippet_term = _unique("snippet").replace("-", "")
@@ -285,7 +279,6 @@ def test_click_facet_filters_results(get_user):
 # @features search
 # @dimensions facet-state
 # @template search/search.html::facet_button
-@pytest.mark.parallel_safe(reason="creates uniquely named facet results")
 def test_facet_selection_visual_state(get_user):
     user = get_user(Users.OWNER)
     term = _unique("facet-state").replace("-", "")
@@ -307,7 +300,6 @@ def test_facet_selection_visual_state(get_user):
 # @features search
 # @dimensions clear-facet
 # @template search/search.html::main
-@pytest.mark.parallel_safe(reason="creates uniquely named facet results")
 def test_clear_facet_filter(get_user):
     user = get_user(Users.OWNER)
     term = _unique("facet-clear").replace("-", "")
@@ -341,7 +333,6 @@ def test_clear_facet_filter(get_user):
 # @dimensions facet-filter task-model result-links
 # @template search/search.html::facet_button
 # @template search/results.html::search_results
-@pytest.mark.parallel_safe(reason="creates uniquely named project and task results")
 def test_task_facet_includes_task_and_model_results_with_links(get_user):
     user = get_user(Users.OWNER)
     token = _unique("task-facet").replace("-", "")
@@ -399,7 +390,6 @@ def test_task_facet_includes_task_and_model_results_with_links(get_user):
 # @pair template-formatting:safe-json
 # @template nav.html::search_results
 # @template common.html::format_name
-@pytest.mark.parallel_safe(reason="creates uniquely named task results")
 def test_navbar_task_results_render_current_completion_state(get_user):
     user = get_user(Users.OWNER)
     token = _unique("navbar-task").replace("-", "")
@@ -441,7 +431,6 @@ def test_navbar_task_results_render_current_completion_state(get_user):
 # @features search
 # @dimensions result-navigation
 # @template search/results.html::search_results
-@pytest.mark.parallel_safe(reason="creates a uniquely named navigation result")
 def test_click_result_navigates(get_user):
     user = get_user(Users.OWNER)
     name = _unique("navigate")
@@ -461,7 +450,6 @@ def test_click_result_navigates(get_user):
 # @features search
 # @dimensions result-links
 # @template search/results.html::search_results
-@pytest.mark.parallel_safe(reason="creates a uniquely named link result")
 def test_result_links_correct(get_user):
     user = get_user(Users.OWNER)
     name = _unique("link")
@@ -479,7 +467,6 @@ def test_result_links_correct(get_user):
 # @features search
 # @dimensions pagination
 # @template search/results.html::footer
-@pytest.mark.parallel_safe(reason="creates a uniquely scoped pagination result set")
 def test_pagination_controls_visible(get_user):
     user = get_user(Users.OWNER)
     term = _unique("pagination").replace("-", "")
@@ -501,7 +488,6 @@ def test_pagination_controls_visible(get_user):
 # @features search
 # @dimensions pagination-next
 # @template search/results.html::footer
-@pytest.mark.parallel_safe(reason="creates a uniquely scoped pagination result set")
 def test_next_page(get_user):
     user = get_user(Users.OWNER)
     term = _unique("next-page").replace("-", "")
@@ -524,7 +510,6 @@ def test_next_page(get_user):
 # @features search
 # @dimensions pagination-previous
 # @template search/results.html::footer
-@pytest.mark.parallel_safe(reason="creates a uniquely scoped pagination result set")
 def test_previous_page(get_user):
     user = get_user(Users.OWNER)
     term = _unique("previous-page").replace("-", "")
@@ -549,7 +534,6 @@ def test_previous_page(get_user):
 
 # @features search
 # @dimensions exact-match
-@pytest.mark.parallel_safe(reason="creates a uniquely named exact-match result")
 def test_search_exact_match(get_user):
     user = get_user(Users.OWNER)
     name = _unique("exact")
@@ -562,7 +546,6 @@ def test_search_exact_match(get_user):
 
 # @features search
 # @dimensions partial-match
-@pytest.mark.parallel_safe(reason="creates a uniquely named partial-match result")
 def test_search_partial_match(get_user):
     user = get_user(Users.OWNER)
     token = f"partial{uuid4().hex[:10]}"
@@ -576,7 +559,6 @@ def test_search_partial_match(get_user):
 
 # @features search
 # @dimensions special-characters
-@pytest.mark.parallel_safe(reason="creates a uniquely named special-character result")
 def test_search_special_characters(get_user):
     user = get_user(Users.OWNER)
     token = uuid4().hex[:8]

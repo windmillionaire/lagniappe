@@ -19,9 +19,6 @@ from testing.elements import Buttons, List, Modal
 from testing.resources import Report
 
 pytestmark = pytest.mark.e2e
-parallel_report_story = pytest.mark.parallel_safe(
-    reason="the story owns UUID-scoped reports, jobs, files, and proposal entities"
-)
 
 
 def _suffix():
@@ -417,7 +414,6 @@ def _needs_review_report(user):
 # @features ai-report
 # @dimensions upload-form multi-file instructions explain-button ask create tool-switcher
 # @template home/tools.html::create_report
-@parallel_report_story
 def test_tools_create_form_has_expected_controls(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -548,7 +544,6 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
 
 # @pair ai-access:report-read
 # @pair cache:invalidation-acknowledgement
-@parallel_report_story
 def test_ask_access_can_read_create_report_without_create_actions(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -595,7 +590,6 @@ def test_ask_access_can_read_create_report_without_create_actions(get_user):
 # @features ai-report
 # @dimensions create async persistence title-truncation
 # @template home/tools.html::create_report
-@parallel_report_story
 def test_create_tool_starts_pending_report(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -638,7 +632,6 @@ def test_create_tool_starts_pending_report(get_user):
 # @features ai-report
 # @dimensions list lazy-load status-reconciliation
 # @template home/tools.html::report_item
-@parallel_report_story
 def test_lazy_report_list_reconciles_active_job_status(get_user):
     user = get_user(Users.OWNER)
     owner = _owner(user)
@@ -693,7 +686,6 @@ def test_lazy_report_list_reconciles_active_job_status(get_user):
 
 # @features ai-report
 # @dimensions create async text-only ask-fallback
-@parallel_report_story
 def test_text_only_organize_uses_ask(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -718,7 +710,6 @@ def test_text_only_organize_uses_ask(get_user):
 
 # @features ai-report
 # @dimensions upload validation http-boundary
-@parallel_report_story
 def test_organize_rejects_zero_byte_folder_placeholder(get_user, browser_failures):
     user = get_user(Users.OWNER)
     user.go(SitePages.HOME)
@@ -777,7 +768,6 @@ def _create_uploaded_report_item(user):
 # @dimensions list deferred-refresh operation-poll stage-labels
 # @template home/tools.html::report_stage_label
 # @template home/tools.html::report_item
-@parallel_report_story
 def test_report_list_item_refreshes_stage_labels(get_user):
     user = get_user(Users.OWNER)
     item, report = _create_uploaded_report_item(user)
@@ -869,7 +859,6 @@ def test_report_list_item_refreshes_stage_labels(get_user):
 # @features ai-report
 # @dimensions list delete-modal file-cleanup
 # @template home/tools.html::report_item
-@parallel_report_story
 def test_report_list_item_delete_removes_report_only_file(get_user):
     user = get_user(Users.OWNER)
     item, report = _create_uploaded_report_item(user)
@@ -891,7 +880,6 @@ def test_report_list_item_delete_removes_report_only_file(get_user):
 
 # @features ai-report
 # @dimensions detail deterministic-run result-json delete-modal repeat-run idempotent
-@parallel_report_story
 def test_report_detail_runs_ready_report(get_user):
     user = get_user(Users.OWNER)
     report, category_name, page_name = _ready_report(user)
@@ -949,7 +937,6 @@ def test_report_detail_runs_ready_report(get_user):
     modal.element.get_by_role("button", name="Cancel").click()
 
 
-@parallel_report_story
 def test_email_report_detail_collapses_message_behind_subject_and_sender(get_user):
     user = get_user(Users.OWNER)
     owner = _owner(user)
@@ -995,7 +982,6 @@ def test_email_report_detail_collapses_message_behind_subject_and_sender(get_use
 
 # @features ai-report
 # @dimensions detail recovery retry failed-prefix undo deterministic-undo failure reload
-@parallel_report_story
 def test_failed_report_detail_offers_retry_and_partial_undo(get_user):
     user = get_user(Users.OWNER)
     report, project = _recoverable_failed_report(user)
@@ -1024,7 +1010,6 @@ def test_failed_report_detail_offers_retry_and_partial_undo(get_user):
 
 # @features ai-report
 # @dimensions ask detail answer-html links no-actions
-@parallel_report_story
 def test_ask_report_detail_shows_answer_without_duplicate_proposal(get_user):
     user = get_user(Users.OWNER)
     report = _ask_answer_report(user)
@@ -1049,7 +1034,6 @@ def test_ask_report_detail_shows_answer_without_duplicate_proposal(get_user):
 
 # @features ai-report
 # @dimensions revision ready-state completed-state route-guard
-@parallel_report_story
 def test_report_revision_is_only_available_before_completion(
     get_user, browser_failures
 ):
@@ -1119,7 +1103,6 @@ def test_report_revision_is_only_available_before_completion(
 # @features ai-report
 # @dimensions detail needs-review no-execute revision
 # @template tools/report.html::proposal_action_item
-@parallel_report_story
 def test_report_detail_shows_review_only_proposal_without_execute(get_user):
     user = get_user(Users.OWNER)
     report = _needs_review_report(user)
@@ -1142,7 +1125,6 @@ def test_report_detail_shows_review_only_proposal_without_execute(get_user):
 
 # @features ai-report
 # @dimensions create detail revision skip-action execute
-@parallel_report_story
 def test_create_report_detail_shows_revision_and_manual_execution(get_user):
     user = get_user(Users.OWNER)
     report = _create_ready_report(user)
@@ -1162,7 +1144,6 @@ def test_create_report_detail_shows_revision_and_manual_execution(get_user):
 
 # @features ai-report
 # @dimensions detail organize revision feedback async pending deferred-refresh live-submit
-@parallel_report_story
 def test_organize_report_detail_refreshes_when_submitted_revision_completes(
     get_user,
 ):
@@ -1228,7 +1209,6 @@ def test_organize_report_detail_refreshes_when_submitted_revision_completes(
 
 # @features ai-report
 # @dimensions detail skip-action dependencies result-json
-@parallel_report_story
 def test_report_detail_skips_action_dependencies(get_user):
     user = get_user(Users.OWNER)
     report = _dependency_report(user)
@@ -1285,7 +1265,6 @@ def test_report_detail_skips_action_dependencies(get_user):
 
 # @features ai-report
 # @dimensions detail schema-update skip-action deterministic-run batch-field-patch
-@parallel_report_story
 def test_report_detail_skips_schema_section_and_runs_submission_updates(get_user):
     user = get_user(Users.OWNER)
     report, form, page = _schema_section_report(user)

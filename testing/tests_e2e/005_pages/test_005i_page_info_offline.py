@@ -178,7 +178,6 @@ def test_page_info_replay_reconciles_after_reload(get_user, browser_failures):
 # @pairs forms:submission-choice forms:queued-conflict
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
-@pytest.mark.parallel_safe(reason="creates a uniquely named page for its offline queue")
 def test_offline_submission_conflict_keeps_queue_until_choice(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     collaborator = get_user(Users.admin, creator=owner)

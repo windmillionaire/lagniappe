@@ -176,7 +176,6 @@ def _create_user(user, create_form, definition):
 # @dimensions create-form create-submit created-row ai-access create-form-reset
 # @template users/index.html::tools_section
 # @template users/tools.html::create_user
-@pytest.mark.parallel_safe(reason="creates a uniquely named user")
 def test_create_user_from_index(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -218,7 +217,6 @@ def test_create_user_from_index(get_user):
 # @pairs user:public-adoption user:submitted-create-data user:page-reassign
 # @pairs users:public-user-adoption users:create-form-reset users:submitted-form-data
 # @template users/tools.html::create_user
-@pytest.mark.parallel_safe(reason="creates a unique public user and target page")
 def test_owner_create_adopts_public_user_and_resets_form(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -297,7 +295,6 @@ def test_owner_create_adopts_public_user_and_resets_form(get_user):
 # @features users
 # @dimensions owner-only
 # @template users/tools.html::create_user
-@pytest.mark.parallel_safe(reason="uses a unique rejected email and creates no state")
 def test_non_owner_cannot_set_ai_access_when_creating_user(
     get_user, browser_failures
 ):
@@ -332,7 +329,6 @@ def test_non_owner_cannot_set_ai_access_when_creating_user(
 # @pair users:group-selector
 # @pair users:multiple
 # @template users/tools.html::create_user
-@pytest.mark.parallel_safe(reason="creates a uniquely named user")
 def test_create_user_group_selector_accepts_multiple_groups(get_user):
     owner = get_user(Users.OWNER)
     first_group = Groups.general_users_view_only.get(owner)
@@ -390,7 +386,6 @@ def test_create_user_group_selector_accepts_multiple_groups(get_user):
 # @pair table-controls:sorting
 # @template users/index.html::view_header
 # @template table.html::mobile_toggles
-@pytest.mark.parallel_safe(reason="reads shared users without count or order assumptions")
 def test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load(get_user):
     owner = get_user(Users.OWNER)
     user_index = owner.go(SitePages.USER_INDEX)
@@ -418,7 +413,6 @@ def test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load(get_user
 
 # @features users
 # @dimensions attach-existing-page page-form-preserved
-@pytest.mark.parallel_safe(reason="creates a unique page and user")
 def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user):
     owner = get_user(Users.OWNER)
     category = Categories.test_basic_inputs_submission.get(owner)
@@ -485,7 +479,6 @@ def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user
 # @pairs pages:delete pages:default-cascade pages:preserve-page
 # @pair pages:category-fallback
 # @template table.html::row
-@pytest.mark.parallel_safe(reason="creates and deletes only uniquely named users and pages")
 def test_delete_user_can_preserve_page(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex

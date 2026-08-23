@@ -104,9 +104,6 @@ def _analytics_request(user, path, method="GET"):
 # @features home
 # @dimensions directory-list
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="the directory-link story is read-only and browser-context scoped"
-)
 def test_directory_links_present(get_user):
     """Test that all directory links are present."""
     user = get_user(Users.OWNER)
@@ -128,9 +125,6 @@ def test_directory_links_present(get_user):
 # @dimensions page-load
 # @template manual/content/overview.html::open_source
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="manual navigation is read-only and browser-context scoped"
-)
 def test_navigate_to_manual_from_home_button(get_user):
     """Test navigating to manual from the standalone home button."""
     user = get_user(Users.OWNER)
@@ -147,9 +141,6 @@ def test_navigate_to_manual_from_home_button(get_user):
 # @features admin
 # @dimensions page-load site-settings
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="admin navigation is read-only and browser-context scoped"
-)
 def test_admin_directory_link_opens_admin_settings(get_user):
     """The owner can open the Admin settings view from the home directory."""
     user = get_user(Users.OWNER)
@@ -341,9 +332,6 @@ def test_ai_dashboard_diagnostics_and_clear_use_real_routes(
 # @features manual
 # @dimensions section-navigation popstate
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="manual history navigation creates no shared application state"
-)
 def test_manual_ajax_section_navigation_and_popstate(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -381,9 +369,6 @@ def test_manual_ajax_section_navigation_and_popstate(get_user):
 # @features manual
 # @dimensions section-navigation
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="the manual security section is public read-only content"
-)
 def test_manual_security_section_loads(get_user):
     user = get_user(Users.OWNER)
     base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
@@ -415,9 +400,6 @@ def test_manual_security_section_loads(get_user):
 # @style manual.copyButton
 # @pair manual:command-copy
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="clipboard and mobile scrolling remain in one anonymous browser context"
-)
 def test_manual_installation_commands_are_copyable_and_scroll_on_mobile(
     get_user,
 ):
@@ -495,9 +477,6 @@ def test_manual_installation_commands_are_copyable_and_scroll_on_mobile(
 # @features manual
 # @dimensions anonymous-access no-auth-bootstrap
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="the anonymous manual request is read-only and context isolated"
-)
 def test_public_manual_loads_without_login_or_auth_bootstrap(get_user):
     anonymous = get_user(Users.ANONYMOUS)
     base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
@@ -533,9 +512,6 @@ def test_public_manual_loads_without_login_or_auth_bootstrap(get_user):
 # @features manual
 # @dimensions anonymous-access direct-section ajax-section ai-email address-redaction no-auth-bootstrap
 @pytest.mark.e2e
-@pytest.mark.parallel_safe(
-    reason="the authenticated manual links are read-only and exactly scoped"
-)
 def test_ai_manual_keeps_account_addresses_authenticated(get_user):
     anonymous = get_user(Users.ANONYMOUS)
     base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")

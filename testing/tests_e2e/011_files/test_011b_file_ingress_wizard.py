@@ -106,9 +106,6 @@ def _create_task_target_pages(user):
 # @template home/ingress.html::upload_ingress_file
 # @template files/ingress.html::ingress
 # @template files/status.html::column_values
-@pytest.mark.parallel_safe(
-    reason="the story owns a distinct ingress filename and only reads its wizard state"
-)
 def test_import_wizard_opens_with_processed_csv_status(get_user):
     user = get_user(Users.OWNER)
     _, wizard = _upload_ingress_file(user, Uploads.ingress_pages_status_csv)
@@ -130,9 +127,6 @@ def test_import_wizard_opens_with_processed_csv_status(get_user):
 # @template files/status/form.html::form_choice
 # @template files/status/assign.html::assign_columns
 # @template files/status/verify.html::verify_import
-@pytest.mark.parallel_safe(
-    reason="the story owns a distinct ingress file and does not create its proposed schema"
-)
 def test_import_wizard_advances_through_page_import_stages(get_user):
     user = get_user(Users.OWNER)
     _, wizard = _advance_page_import_to_verify(user, Uploads.ingress_pages_stages_csv)
@@ -188,9 +182,6 @@ def test_import_wizard_advances_through_task_import_stages(get_user):
 # @features ingress
 # @dimensions stage-wizard set-stage error-handling
 # @template files/status/parent.html::category_choice
-@pytest.mark.parallel_safe(
-    reason="the story mutates only its distinct ingress file's staged selections"
-)
 def test_import_wizard_stage_navigation_reconciles_downstream_status(get_user):
     user = get_user(Users.OWNER)
     file, wizard = _upload_ingress_file(user, Uploads.ingress_pages_stage_nav_csv)
@@ -228,9 +219,6 @@ def test_import_wizard_importing_stage_streams_results_and_completes(get_user):
 
 # @pairs ingress:non-csv ingress:validation
 # @pair request-errors:plain-validation
-@pytest.mark.parallel_safe(
-    reason="the rejected upload creates no entity and is isolated to its browser context"
-)
 def test_import_wizard_rejects_non_csv_upload(get_user, browser_failures):
     user = get_user(Users.OWNER)
     form = _open_import_upload_form(user)
@@ -252,9 +240,6 @@ def test_import_wizard_rejects_non_csv_upload(get_user, browser_failures):
 
 # @features ingress
 # @dimensions error-handling persistence reopen
-@pytest.mark.parallel_safe(
-    reason="the persisted error belongs to a distinct ingress file and browser context"
-)
 def test_import_wizard_error_state_persists_after_reopen(get_user):
     user = get_user(Users.OWNER)
     file, wizard = _upload_ingress_file(user, Uploads.ingress_pages_error_csv)
@@ -281,9 +266,6 @@ def test_import_wizard_error_state_persists_after_reopen(get_user):
 
 # @features ingress
 # @dimensions existing-parent existing-form
-@pytest.mark.parallel_safe(
-    reason="the story owns its ingress file and only reads the catalogued parent and form"
-)
 def test_import_wizard_selects_existing_parent_and_form(get_user):
     user = get_user(Users.OWNER)
     category = Categories.test_empty_category.get(user)
@@ -310,9 +292,6 @@ def test_import_wizard_selects_existing_parent_and_form(get_user):
 
 # @features ingress
 # @dimensions ignored-columns verify-import
-@pytest.mark.parallel_safe(
-    reason="column assignments are persisted only on the story's distinct ingress file"
-)
 def test_import_wizard_ignored_columns_are_not_imported(get_user):
     user = get_user(Users.OWNER)
     _, wizard = _advance_page_import_to_assign(user, Uploads.ingress_pages_ignored_csv)

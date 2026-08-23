@@ -20,12 +20,7 @@ from testing.definitions.page_definitions import PageDefinition
 from testing.resources import File, Page
 from testing.utility import expect_poll_result, expect_successful_response
 
-pytestmark = [
-    pytest.mark.e2e,
-    pytest.mark.parallel_safe(
-        reason="the story owns a UUID-scoped category, page, file, and asset path"
-    ),
-]
+pytestmark = pytest.mark.e2e
 
 
 # @features file

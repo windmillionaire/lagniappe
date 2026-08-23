@@ -25,12 +25,7 @@ from testing.elements import MobileNav, Select, SpinnerButtons, Tabs
 from testing.resources import File, Page
 from testing.utility import scoped_browser_route
 
-pytestmark = [
-    pytest.mark.e2e,
-    pytest.mark.parallel_safe(
-        reason="each story owns a UUID-scoped category, page, file, and asset path"
-    ),
-]
+pytestmark = pytest.mark.e2e
 
 
 def _upload_file(user, upload):
