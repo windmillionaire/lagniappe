@@ -11,14 +11,21 @@ Verified against:
 
 from playwright.sync_api import expect
 import pytest
+from uuid import uuid4
 
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Uploads, Users
-from testing.resources import File
+from testing.definitions.page_definitions import PageDefinition
+from testing.resources import File, Page
 from testing.utility import expect_poll_result, expect_successful_response
 
-pytestmark = pytest.mark.e2e
+pytestmark = [
+    pytest.mark.e2e,
+    pytest.mark.parallel_safe(
+        reason="the story owns a UUID-scoped category, page, file, and asset path"
+    ),
+]
 
 
 # @features file
@@ -28,9 +35,34 @@ def test_file_summary_completion_stages_authoritative_info_until_reset(
     browser_failures,
 ):
     user = get_user(Users.OWNER)
+    suffix = uuid4().hex
+    category = Entities.CATEGORY.create(
+        {
+            "name": f"File Reconciliation Category {suffix}",
+            "attributes": ["files"],
+        }
+    )
+    category.save()
+    page_entity = Entities.PAGE.create(
+        {
+            "name": f"File Reconciliation Page {suffix}",
+            "model": category,
+            "attributes": ["files"],
+        }
+    )
+    page_entity.save()
+    page = Page(
+        user=user,
+        definition=PageDefinition(
+            name=page_entity.name,
+            category=Pages.test_file_upload_page.value.definition.category,
+            attributes=["files"],
+        ),
+    )
+    page.entity = page_entity
     file = File.upload_from_page(
         user,
-        Pages.test_file_upload_page,
+        page,
         Uploads.csv_file_input,
     )
     summary = "Summary loaded from authoritative file state."

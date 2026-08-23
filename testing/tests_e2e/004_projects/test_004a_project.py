@@ -42,7 +42,6 @@ def _create_model_task(user, project, definition):
 # @features model-tasks
 # @dimensions create
 def test_create_model_task(get_user):
-    """Test that model task can be created."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_model_task.get(user)
     user.go(project)
@@ -54,7 +53,6 @@ def test_create_model_task(get_user):
 # @features model-tasks
 # @dimensions create attach-form
 def test_create_model_task_with_form(get_user):
-    """Test that model task can be created with a form."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_model_task_with_form.get(user)
     user.go(project)

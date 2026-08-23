@@ -1,13 +1,3 @@
-"""
-Tests for page mobile navigation and mobile-only actions.
-
-Verified against:
-- lagniappe/web/templates/pages/page.html
-- lagniappe/web/templates/pages/tasks.html
-- src/script/views/page.mjs
-- src/script/views/base/entity.mjs
-"""
-
 import pytest
 from playwright.sync_api import expect
 
@@ -26,7 +16,6 @@ def _empty_main_script(route):
 # @template pages/page.html::main
 # @style entity.tabIcon
 def test_page_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_user):
-    """Desktop tab icons never paint while a phone layout is unresolved."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
     page.user = user
@@ -47,7 +36,6 @@ def test_page_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_user):
 # @features entity-layout
 # @dimensions page-mobile nav visibility
 def test_page_mobile_nav_replaces_desktop_tabs(get_user):
-    """The page switches from desktop tabs to mobile section navigation."""
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_page_loads)
 
@@ -66,7 +54,6 @@ def test_page_mobile_nav_replaces_desktop_tabs(get_user):
 # @features entity-layout
 # @dimensions page-mobile flipper
 def test_page_mobile_flipper_reveals_sections(get_user):
-    """The mobile flipper exposes the page sections a user can visit."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
     user.go(page)
@@ -86,7 +73,6 @@ def test_page_mobile_flipper_reveals_sections(get_user):
 # @features entity-layout
 # @dimensions page-mobile section-switch
 def test_page_mobile_section_switching_updates_visible_panel_and_title(get_user):
-    """A phone user moves between document, tasks, files, and info."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
     user.go(page)
@@ -112,16 +98,11 @@ def test_page_mobile_section_switching_updates_visible_panel_and_title(get_user)
 # @features entity-layout
 # @dimensions page-mobile task-create
 def test_page_mobile_create_task_opens_from_tasks_section(get_user):
-    """The mobile page header keeps the new-task action close to the Tasks section."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
     user.go(page)
 
     page.mobile_nav.select_section("tasks:active")
-
-    # create_button = user.locate(Page.MOBILE_CREATE_TASK_BUTTON)
-    # expect(create_button).to_be_visible()
-    # create_button.click()
 
     create_form = user.locate(Page.CREATE_TASK_FORM)
     expect(create_form).to_be_visible()
@@ -131,7 +112,6 @@ def test_page_mobile_create_task_opens_from_tasks_section(get_user):
 # @features entity-layout
 # @dimensions page-mobile reload persistence
 def test_page_mobile_selection_persists_after_reload(get_user):
-    """The page restores the last mobile section after a full reload."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
     user.go(page)

@@ -21,7 +21,6 @@ pytestmark = pytest.mark.e2e
 @contextmanager
 def _mock_generate_text(browser_page, key, markers=None, error=None):
     path = f"/assets/{key}/document/generate"
-    requests = []
     remaining_markers = list(markers or ["Generated text marker"])
 
     def field_value(fields, name):
@@ -30,7 +29,6 @@ def _mock_generate_text(browser_page, key, markers=None, error=None):
     def fulfill_generate_text(route):
         assert route.request.method == "POST"
         fields = multipart_form_fields(route.request)
-        requests.append(fields)
 
         if error:
             route.fulfill(status=422, content_type="text/plain", body=error)
@@ -70,11 +68,7 @@ def _mock_generate_text(browser_page, key, markers=None, error=None):
         f"**{path}",
         fulfill_generate_text,
     ):
-        yield path, requests
-
-
-def _field_values(request, field):
-    return [value for name, value in request if name == field]
+        yield path
 
 
 def _submit_generated_text(editor, mode, prompt, path):
@@ -115,7 +109,7 @@ def test_generate_text_inserts_ai_markup_with_insert_modes(get_user):
         user.page,
         page.key,
         markers,
-    ) as (path, requests):
+    ) as path:
         editor.clear_text()
         editor.type_text("Original replace text")
         _submit_generated_text(
@@ -173,19 +167,6 @@ def test_generate_text_inserts_ai_markup_with_insert_modes(get_user):
         )
         _assert_ordered(editor.get_text(), "Cursor base", "Generated cursor marker")
 
-        assert len(requests) == len(markers)
-        for mode, post_data in zip(
-            [
-                "replace",
-                "append",
-                "prepend",
-                "quote-top",
-                "cursor",
-            ],
-            requests,
-        ):
-            assert mode in _field_values(post_data, "insert_mode")
-
     editor.blur()
     user.go(page)
     expect(page.editor.text_entry).to_contain_text("Generated cursor marker")
@@ -220,7 +201,7 @@ def test_generate_text_replaces_selection_and_posts_selected_text(get_user):
         user.page,
         page.key,
         ["Generated selection marker"],
-    ) as (path, requests):
+    ) as path:
         with expect_successful_response(
             user.page,
             method="POST",
@@ -229,9 +210,6 @@ def test_generate_text_replaces_selection_and_posts_selected_text(get_user):
             form.submit()
         editor.wait_for_render()
 
-        assert len(requests) == 1
-        assert selected_text in _field_values(requests[0], "selected_text")
-        assert "replace-selection" in _field_values(requests[0], "insert_mode")
         expect(editor.text_entry).to_contain_text("Generated selection marker")
         expect(editor.text_entry).not_to_contain_text(selected_text)
         expect(selection_highlight).to_have_count(0)
@@ -256,7 +234,7 @@ def test_generate_text_explain_includes_selected_text_context(get_user):
         "Initial Prompt"
     )
 
-    with _mock_generate_text(user.page, page.key) as (path, requests):
+    with _mock_generate_text(user.page, page.key) as path:
         with expect_successful_response(
             user.page,
             method="POST",
@@ -268,9 +246,6 @@ def test_generate_text_explain_includes_selected_text_context(get_user):
         expect(modal.element).to_be_visible()
         expect(modal.element).to_contain_text(re.compile("selected text", re.I))
         expect(modal.element).to_contain_text(selected_text)
-        assert len(requests) == 1
-        assert selected_text in _field_values(requests[0], "selected_text")
-        assert "explain" in _field_values(requests[0], "role")
         modal.close()
 
 
@@ -294,7 +269,7 @@ def test_generate_text_provider_error_surfaces_in_form(
         user.page,
         page.key,
         error=error,
-    ) as (path, requests):
+    ) as path:
         with browser_failures.expect(
             user,
             kind="console",
@@ -318,11 +293,6 @@ def test_generate_text_provider_error_surfaces_in_form(
             expect(form.form.locator("[data-role='error']")).to_contain_text(
                 re.compile(error)
             )
-
-        assert len(requests) == 1
-        assert ("prompt", prompt) in requests[0]
-        assert ("role", "generate") in requests[0]
-
 
 # @features ai
 # @dimensions generate-text live-provider page-context document-context

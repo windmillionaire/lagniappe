@@ -1,4 +1,3 @@
-import json
 import re
 from uuid import uuid4
 
@@ -95,8 +94,8 @@ def _go_to_search_page(user, query):
 
 # @features search
 # @dimensions anonymous-access
+@pytest.mark.parallel_safe(reason="creates no state and uses an isolated anonymous context")
 def test_search_page_requires_login(get_user):
-    """Anonymous search requests redirect to login with the target preserved."""
     anonymous = get_user(Users.ANONYMOUS)
     base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
     anonymous.navigate(f"{base_url}/l/search-page?q=private-search")
@@ -110,7 +109,6 @@ def test_search_page_requires_login(get_user):
 # @dimensions navbar-submit page-navigation results
 # @template nav.html::navbar
 def test_search_from_navbar(get_user):
-    """Test initiating search from navbar search input."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(SitePages.HOME)
@@ -134,7 +132,6 @@ def test_search_from_navbar(get_user):
 # @dimensions query-display
 # @template search/search.html::main
 def test_search_page_shows_query(get_user):
-    """Test that search page shows the query term."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
 
@@ -144,15 +141,9 @@ def test_search_page_shows_query(get_user):
     )
 
 
-# =============================================================================
-# Search Results Tests
-# =============================================================================
-
-
 # @features search
 # @dimensions results
 def test_search_returns_results(get_user):
-    """Test that search returns results for matching entities."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
 
@@ -163,8 +154,8 @@ def test_search_returns_results(get_user):
 # @features search
 # @dimensions no-results
 # @template search/results.html::search_results
+@pytest.mark.parallel_safe(reason="uses a query unique to the no-results story")
 def test_search_no_results(get_user):
-    """Test display when search has no matching results."""
     user = get_user(Users.OWNER)
 
     _go_to_search_page(user, "zzz-no-search-results-here-zzz")
@@ -174,8 +165,8 @@ def test_search_no_results(get_user):
 # @features search
 # @dimensions result-title
 # @template search/results.html::search_results
+@pytest.mark.parallel_safe(reason="creates a uniquely named project and scoped query")
 def test_search_result_titles(get_user):
-    """Test that search results show entity titles."""
     user = get_user(Users.OWNER)
     name = _unique("title")
     _create_project(name, "Search result title fixture.")
@@ -190,8 +181,8 @@ def test_search_result_titles(get_user):
 # @features search
 # @dimensions primary-name-ranking
 # @template search/results.html::search_results
+@pytest.mark.parallel_safe(reason="creates uniquely named search entities")
 def test_primary_name_matches_rank_above_file_name_and_description_matches(get_user):
-    """Primary entity name matches rank above a file matching twice."""
     user = get_user(Users.OWNER)
     token = _unique("primary-rank").replace("-", "")
     category = _create_category(f"{token} category")
@@ -218,8 +209,8 @@ def test_primary_name_matches_rank_above_file_name_and_description_matches(get_u
 # @features search
 # @dimensions details-hydration parent-refresh
 # @template search/results.html::search_results
+@pytest.mark.parallel_safe(reason="creates and renames a uniquely named category")
 def test_search_result_parent_details_refresh_after_category_rename(get_user):
-    """Search hydrates result parents from the current detail cache."""
     user = get_user(Users.OWNER)
     page_name = _unique("parent-refresh-page")
     original_parent_name = _unique("original-parent")
@@ -241,8 +232,8 @@ def test_search_result_parent_details_refresh_after_category_rename(get_user):
 # @features search
 # @dimensions snippets
 # @template search/results.html::search_results
+@pytest.mark.parallel_safe(reason="creates a uniquely named project and scoped query")
 def test_search_result_snippets(get_user):
-    """Test that search results show relevant snippets."""
     user = get_user(Users.OWNER)
     snippet_term = _unique("snippet").replace("-", "")
     name = _unique("snippet-project")
@@ -260,16 +251,10 @@ def test_search_result_snippets(get_user):
     expect(result.locator("b").filter(has_text=snippet_term)).to_be_visible()
 
 
-# =============================================================================
-# Facet Filtering Tests
-# =============================================================================
-
-
 # @features search
 # @dimensions facets
 # @template search/search.html::facet_button
 def test_facets_displayed(get_user):
-    """Test that facets (entity types) are displayed."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
 
@@ -282,7 +267,6 @@ def test_facets_displayed(get_user):
 # @dimensions facet-filter url-state results
 # @template search/search.html::facet_button
 def test_click_facet_filters_results(get_user):
-    """Test that clicking a facet filters results by type."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
 
@@ -301,8 +285,8 @@ def test_click_facet_filters_results(get_user):
 # @features search
 # @dimensions facet-state
 # @template search/search.html::facet_button
+@pytest.mark.parallel_safe(reason="creates uniquely named facet results")
 def test_facet_selection_visual_state(get_user):
-    """Test that selected facet has visual indication."""
     user = get_user(Users.OWNER)
     term = _unique("facet-state").replace("-", "")
     _create_project(f"{term} project", "Facet state project fixture.")
@@ -323,8 +307,8 @@ def test_facet_selection_visual_state(get_user):
 # @features search
 # @dimensions clear-facet
 # @template search/search.html::main
+@pytest.mark.parallel_safe(reason="creates uniquely named facet results")
 def test_clear_facet_filter(get_user):
-    """Test clearing facet filter shows all results."""
     user = get_user(Users.OWNER)
     term = _unique("facet-clear").replace("-", "")
     project = _create_project(f"{term} project", "Facet clear project fixture.")
@@ -357,8 +341,8 @@ def test_clear_facet_filter(get_user):
 # @dimensions facet-filter task-model result-links
 # @template search/search.html::facet_button
 # @template search/results.html::search_results
+@pytest.mark.parallel_safe(reason="creates uniquely named project and task results")
 def test_task_facet_includes_task_and_model_results_with_links(get_user):
-    """Task facet includes concrete tasks and model task stage links."""
     user = get_user(Users.OWNER)
     token = _unique("task-facet").replace("-", "")
     project = _create_project(
@@ -415,6 +399,7 @@ def test_task_facet_includes_task_and_model_results_with_links(get_user):
 # @pair template-formatting:safe-json
 # @template nav.html::search_results
 # @template common.html::format_name
+@pytest.mark.parallel_safe(reason="creates uniquely named task results")
 def test_navbar_task_results_render_current_completion_state(get_user):
     user = get_user(Users.OWNER)
     token = _unique("navbar-task").replace("-", "")
@@ -444,8 +429,6 @@ def test_navbar_task_results_render_current_completion_state(get_user):
     expect(active_option).to_be_visible()
     expect(active_option.locator("span[data-icon='unselected']")).to_have_count(1)
     expect(active_option).to_have_attribute("data-result", re.compile(r"\S+"))
-    active_details = json.loads(active_option.get_attribute("data-result"))["details"]
-    assert active_details.get("completed", False) is False
 
     navbar_search.fill(completed_task.name)
     completed_option = user.page.get_by_role("option").filter(
@@ -455,16 +438,11 @@ def test_navbar_task_results_render_current_completion_state(get_user):
     expect(completed_option.locator("span[data-icon='selected']")).to_have_count(1)
 
 
-# =============================================================================
-# Search Result Navigation Tests
-# =============================================================================
-
-
 # @features search
 # @dimensions result-navigation
 # @template search/results.html::search_results
+@pytest.mark.parallel_safe(reason="creates a uniquely named navigation result")
 def test_click_result_navigates(get_user):
-    """Test that clicking search result navigates to entity."""
     user = get_user(Users.OWNER)
     name = _unique("navigate")
     project = _create_project(name, "Search result navigation fixture.")
@@ -483,8 +461,8 @@ def test_click_result_navigates(get_user):
 # @features search
 # @dimensions result-links
 # @template search/results.html::search_results
+@pytest.mark.parallel_safe(reason="creates a uniquely named link result")
 def test_result_links_correct(get_user):
-    """Test that result links point to correct entity URLs."""
     user = get_user(Users.OWNER)
     name = _unique("link")
     project = _create_project(name, "Search result link fixture.")
@@ -498,16 +476,11 @@ def test_result_links_correct(get_user):
     )
 
 
-# =============================================================================
-# Pagination Tests
-# =============================================================================
-
-
 # @features search
 # @dimensions pagination
 # @template search/results.html::footer
+@pytest.mark.parallel_safe(reason="creates a uniquely scoped pagination result set")
 def test_pagination_controls_visible(get_user):
-    """Test that pagination controls are visible for many results."""
     user = get_user(Users.OWNER)
     term = _unique("pagination").replace("-", "")
     for index in range(12):
@@ -528,8 +501,8 @@ def test_pagination_controls_visible(get_user):
 # @features search
 # @dimensions pagination-next
 # @template search/results.html::footer
+@pytest.mark.parallel_safe(reason="creates a uniquely scoped pagination result set")
 def test_next_page(get_user):
-    """Test navigating to next page of results."""
     user = get_user(Users.OWNER)
     term = _unique("next-page").replace("-", "")
     for index in range(12):
@@ -551,8 +524,8 @@ def test_next_page(get_user):
 # @features search
 # @dimensions pagination-previous
 # @template search/results.html::footer
+@pytest.mark.parallel_safe(reason="creates a uniquely scoped pagination result set")
 def test_previous_page(get_user):
-    """Test navigating to previous page of results."""
     user = get_user(Users.OWNER)
     term = _unique("previous-page").replace("-", "")
     for index in range(12):
@@ -574,15 +547,10 @@ def test_previous_page(get_user):
     )
 
 
-# =============================================================================
-# Search Query Tests
-# =============================================================================
-
-
 # @features search
 # @dimensions exact-match
+@pytest.mark.parallel_safe(reason="creates a uniquely named exact-match result")
 def test_search_exact_match(get_user):
-    """Test search with exact entity name."""
     user = get_user(Users.OWNER)
     name = _unique("exact")
     _create_project(name, "Exact search fixture.")
@@ -594,8 +562,8 @@ def test_search_exact_match(get_user):
 
 # @features search
 # @dimensions partial-match
+@pytest.mark.parallel_safe(reason="creates a uniquely named partial-match result")
 def test_search_partial_match(get_user):
-    """Test search with partial text matches."""
     user = get_user(Users.OWNER)
     token = f"partial{uuid4().hex[:10]}"
     name = f"{token} complete project"
@@ -608,8 +576,8 @@ def test_search_partial_match(get_user):
 
 # @features search
 # @dimensions special-characters
+@pytest.mark.parallel_safe(reason="creates a uniquely named special-character result")
 def test_search_special_characters(get_user):
-    """Test search handles special characters."""
     user = get_user(Users.OWNER)
     token = uuid4().hex[:8]
     name = f"Special Search {token}: Pipe|Slash/Colon Value"

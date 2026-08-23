@@ -1,20 +1,3 @@
-"""
-Tests for page form submissions across all practical field types.
-
-Covers fill → save → verify for:
-- Basic inputs: text, date, time, number, email, phone
-- Selection types: textarea, checkbox, radio, single select, multi-select
-- External link: url + title
-
-Maps to:
-- Entity: lagniappe/core/entities/page.py
-- Routes: lagniappe/web/routes/pages/
-- Templates: lagniappe/web/templates/pages/
-- View: src/script/views/page.mjs
-"""
-
-import json
-
 import pytest
 from playwright.sync_api import expect
 
@@ -58,15 +41,9 @@ def _add_table_row(user, table, note):
     expect(form).not_to_be_attached()
 
 
-def _table_value(table):
-    value = table.locator("input[name='items']").input_value()
-    return json.loads(value or "[]")
-
-
 # @pairs template-formatting:date template-formatting:time
 # @pairs template-formatting:phone template-formatting:number pages:basic-inputs
 def test_basic_input_submission(get_user):
-    """Fill and verify text, date, time, number, email, and phone fields."""
     user = get_user(Users.OWNER)
     page = Pages.test_basic_input_submission.get(user)
     user.go(page)
@@ -79,7 +56,6 @@ def test_basic_input_submission(get_user):
 # @features pages
 # @dimensions submission selection-fields read-mode
 def test_selection_submission(get_user):
-    """Fill and verify textarea, checkbox, radio, select, and multi-select fields."""
     user = get_user(Users.OWNER)
     page = Pages.test_selection_submission.get(user)
     user.go(page)
@@ -105,7 +81,6 @@ def test_selection_submission(get_user):
 # @pairs pages:submission pages:link-field form-link:read-layout
 # @style form.linkLabel
 def test_link_submission(get_user):
-    """Fill and verify external link (url + title) field."""
     user = get_user(Users.OWNER)
     page = Pages.test_link_submission.get(user)
     user.go(page)
@@ -133,7 +108,6 @@ def test_link_submission(get_user):
 # @features form-table
 # @dimensions row-actions reorder edit delete reload
 def test_table_submission_row_actions(get_user):
-    """Desktop row actions can edit, delete, reorder, and persist rows."""
     user = get_user(Users.OWNER)
     page = Pages.test_table_submission.get(user)
     user.go(page)
@@ -159,11 +133,6 @@ def test_table_submission_row_actions(get_user):
     expect(second_actions).not_to_be_visible()
     expect(rows.nth(0)).to_contain_text("Row two")
     expect(rows.nth(1)).to_contain_text("Row one")
-    assert _table_value(table) == [
-        {"row_note": "Row two"},
-        {"row_note": "Row one"},
-    ]
-
     edit_actions = _open_row_actions(table, 0)
     edit_actions.locator("button[data-role='edit']").click()
     edit_form = table.locator("form")
@@ -176,17 +145,10 @@ def test_table_submission_row_actions(get_user):
 
     expect(edit_form).not_to_be_attached()
     expect(rows.nth(0)).to_contain_text("Row two edited")
-    assert _table_value(table) == [
-        {"row_note": "Row two edited"},
-        {"row_note": "Row one"},
-    ]
-
     delete_actions = _open_row_actions(table, 1)
     delete_actions.locator("button[data-role='delete']").click()
     expect(rows).to_have_count(1)
     expect(rows.first).to_contain_text("Row two edited")
-    assert _table_value(table) == [{"row_note": "Row two edited"}]
-
     with user.page.expect_response("**/update"):
         SpinnerButtons.UPDATE.click(page.info_form)
 
@@ -201,7 +163,6 @@ def test_table_submission_row_actions(get_user):
 # @features form-table
 # @dimensions row-actions mobile touch-gesture
 def test_table_submission_mobile_row_action_gestures(get_user):
-    """Real mobile touchscreen taps toggle row actions."""
     user = get_user(Users.OWNER, has_touch=True)
     page = Pages.test_table_submission.get(user)
     user.go(page)

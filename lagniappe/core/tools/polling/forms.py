@@ -3,7 +3,6 @@
 
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_sync_payload_validation_is_document_only_and_bounded
-# @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_live_sync_rejects_form_widget_payloads
 # @pairs sync:validation sync:document-only sync:client-identity forms:no-live-sync
 def validate_sync_payload(payload):
     """Return a public validation error, or ``None`` for a valid sync payload."""
@@ -59,7 +58,6 @@ def validate_sync_payload(payload):
 
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_offline_replay_conflict_requires_stale_origin_fingerprint
-# @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_task_offline_replay_rejects_a_stale_origin_fingerprint
 # @pairs offline:replay-precondition forms:conflict-review
 def offline_replay_conflicts(entity, form):
     """Return whether an offline form targets an outdated entity revision."""

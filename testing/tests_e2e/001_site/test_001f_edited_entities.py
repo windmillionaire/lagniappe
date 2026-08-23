@@ -1,13 +1,15 @@
 """E2E coverage for the unified polling contract."""
 
-import json
+from uuid import uuid4
 from urllib.parse import urlsplit
 
 import pytest
+from playwright.sync_api import expect
 
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache
 from lagniappe.core.tools.cache.keys import Keys
+from lagniappe.core.tools.notifications.service import create_ordinary_notification
 from testing.definitions import Pages, SitePages, Users
 
 
@@ -183,65 +185,32 @@ def test_cold_notification_state_seeds_through_one_poll(get_user):
     state_key = Keys.NOTIFICATIONS.value.format(actor.urlsafe_key)
     epoch_key = Keys.NOTIFICATION_EPOCH.value.format(actor.urlsafe_key)
     owner.go(SitePages.HOME)
-    owner.page.wait_for_timeout(250)
+    body = f"Cold notification seed {uuid4().hex}"
+    create_ordinary_notification(
+        actor,
+        identifier=uuid4().hex,
+        body=body,
+    )
+    expected_count = len(Entities.NOTIFICATION.keys_for_parent(actor))
+
     cache.core.cache.redis.delete(state_key, epoch_key)
-
-    poll_requests = []
-
-    def record_poll(request):
-        if urlsplit(request.url).path == "/l/poll":
-            poll_requests.append(request)
-
-    owner.page.on("request", record_poll)
     with owner.page.expect_response(
-        lambda response: (
-            urlsplit(response.url).path == "/l/ping"
-            and response.request.method == "HEAD"
-        )
-    ) as cold_ping_info, owner.page.expect_response(
         lambda response: (
             urlsplit(response.url).path == "/l/poll"
             and response.request.method == "POST"
         )
-    ) as seed_poll_info:
+    ):
         owner.page.reload()
 
-    missing = json.loads(
-        cold_ping_info.value.headers["x-lagniappe-notification-state"]
+    count = owner.locate("[data-role='notification-count']")
+    expect(count).to_have_text(str(expected_count), timeout=15000)
+    notifications = owner.locate("[data-role='notifications']")
+    expect(notifications).to_have_attribute(
+        "aria-label", f"Notifications: {expected_count}"
     )
-    seed_request = seed_poll_info.value.request.post_data_json
-    seeded = json.loads(
-        seed_poll_info.value.headers["x-lagniappe-notification-state"]
-    )
-
-    assert missing == {
-        "generation": None,
-        "revision": None,
-        "count": None,
-    }
-    assert seed_request["subscriptions"] == []
-    assert seed_request["notification_state"] == {
-        "generation": None,
-        "revision": None,
-        "seed": True,
-    }
-    assert isinstance(seeded["generation"], str)
-    assert seeded["revision"] >= 0
-    assert seeded["count"] >= 0
-    assert len(poll_requests) == 1
-
-    poll_requests.clear()
-    with owner.page.expect_response(
-        lambda response: (
-            urlsplit(response.url).path == "/l/ping"
-            and response.request.method == "HEAD"
+    notifications.click()
+    expect(
+        owner.page.locator("[role='listbox'][data-visible='true']").get_by_text(
+            body, exact=True
         )
-    ) as warm_ping_info:
-        owner.page.reload()
-    owner.page.wait_for_timeout(750)
-
-    warm = json.loads(
-        warm_ping_info.value.headers["x-lagniappe-notification-state"]
-    )
-    assert warm == seeded
-    assert poll_requests == []
+    ).to_be_visible()

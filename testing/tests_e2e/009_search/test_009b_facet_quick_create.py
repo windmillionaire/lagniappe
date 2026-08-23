@@ -9,6 +9,7 @@ from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.entities.category import UNCATEGORIZED_PAGES_NAME
 from testing.definitions import Categories, Pages, Projects, SitePages, Users
+from testing.definitions.user_definitions import UserDefinition
 from testing.elements import (
     FormElements,
     FormSelect,
@@ -24,6 +25,22 @@ pytestmark = pytest.mark.e2e
 
 def _unique(label):
     return f"test-quick-create-{label}-{uuid4().hex[:8]}"
+
+
+def _set_owner_task_assignment_opt_in(owner, enabled):
+    owner_page = Page(user=owner, definition=owner.definition)
+    owner_page.entity = owner.entity.page
+    owner.go(owner_page)
+    owner.locate(owner_page.USER_SETTINGS_TOGGLE).first.click()
+    settings = owner.locate(owner_page.USER_SETTINGS_FORM)
+    expect(settings).to_have_attribute("initialized", "")
+    expect(settings).to_be_visible()
+    checkbox = settings.locator("input[name='allow_task_assignments']")
+    checkbox.set_checked(enabled)
+    with owner.page.expect_response("**/pages/*/update"):
+        SpinnerButtons.UPDATE.click(settings)
+    owner.page.wait_for_load_state("load")
+    expect(owner.locate("[lp-view]")).to_have_attribute("initialized", "")
 
 
 def _fetch_json(user, path, method="GET", data=None):
@@ -97,8 +114,10 @@ def _quick_create_from_combobox(user, combobox, label, name, response_glob):
     expect(combobox.input).to_have_attribute("placeholder", re.compile(re.escape(name)))
 
 
-# @features search facets quick-create
-# @dimensions command-row opt-in permissions search-results
+# @pairs facets:command-row facets:permissions
+# @pairs quick-create:command-row quick-create:opt-in quick-create:permissions
+# @pairs search:permissions search:search-results
+@pytest.mark.parallel_safe(reason="uses a unique lookup and creates no state")
 def test_quick_create_command_requires_opt_in_and_create_permission(get_user):
     owner = get_user(Users.OWNER)
     owner.go(SitePages.HOME)
@@ -127,8 +146,7 @@ def test_quick_create_command_requires_opt_in_and_create_permission(get_user):
     assert "No Results" in denied["json"]["results"]
 
 
-# @features search permissions
-# @dimensions permission-filter category-edit
+# @pairs search:permission-filter permissions:category-edit
 def test_category_search_permission_filter_returns_editable_categories(get_user):
     owner = get_user(Users.OWNER)
     allowed = Categories.acl_create_allowed.get(owner)
@@ -149,8 +167,6 @@ def test_category_search_permission_filter_returns_editable_categories(get_user)
 
 
 # @pair search:permission-filter
-# @pair search:assign
-# @pair permissions:permission-filter
 # @pair permissions:assign
 # @pair combobox:permission-filter
 # @template pages/tasks.html::action_buttons
@@ -195,20 +211,26 @@ def test_user_assign_search_permission_filter_returns_assignable_users(get_user)
 
 # @pair task-assignment:owner-opt-in
 # @template pages/tasks.html::action_buttons
+# @template pages/info.html::user_settings
 def test_owner_assignment_opt_in_enables_managed_user_combobox(get_user):
     owner = get_user(Users.OWNER)
-    managed = get_user(Users.create_user, creator=owner)
+    suffix = uuid4().hex
+    managed = get_user(
+        UserDefinition(
+            name=f"Task Assignment User {suffix[:8]}",
+            email=f"task-assignment-{suffix}@example.test",
+        ),
+        creator=owner,
+    )
     original_opt_in = owner.entity.allow_task_assignments
 
     try:
-        owner.entity.allow_task_assignments = True
-        owner.entity.save()
-
-        home = managed.go(SitePages.HOME)
-        with managed.page.expect_navigation():
-            home.user_page_button.click()
+        _set_owner_task_assignment_opt_in(owner, True)
 
         user_page = Page(user=managed, definition=managed.definition)
+        user_page.entity = managed.entity.page
+        managed.go(user_page)
+        user_page.wait_for_interaction_readiness()
         create_form = user_page.create_task_form
         user_select = UserSelect(create_form)
         expect(user_select.button).to_contain_text("Assign To")
@@ -226,8 +248,7 @@ def test_owner_assignment_opt_in_enables_managed_user_combobox(get_user):
             panel.get_by_role("option", name=owner.definition.name, exact=True)
         ).to_be_visible()
     finally:
-        owner.entity.allow_task_assignments = original_opt_in
-        owner.entity.save()
+        _set_owner_task_assignment_opt_in(owner, original_opt_in)
 
 
 # @features quick-create
@@ -267,6 +288,7 @@ def test_page_quick_create_uses_visible_uncategorized_pages_category(get_user):
 # @features quick-create
 # @dimensions create-route created-option create-entity
 # @template pages/tasks.html::action_buttons
+@pytest.mark.parallel_safe(reason="creates a uniquely named project without saving the fixed form")
 def test_project_combobox_quick_create_selects_new_project(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_create_page_task.get(user)
@@ -319,6 +341,7 @@ def test_model_task_form_selector_quick_creates_form(get_user):
 # @features quick-create
 # @dimensions create-route created-option create-entity form-type
 # @template home/categories.html::create
+@pytest.mark.parallel_safe(reason="creates a uniquely named form and category")
 def test_home_create_category_form_selector_quick_creates_form(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -350,6 +373,7 @@ def test_home_create_category_form_selector_quick_creates_form(get_user):
 def test_page_info_category_multiselect_quick_creates_category(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_category_edit_page)
+    page.wait_for_interaction_readiness()
     category_name = _unique("page-info-category")
     original_page = Entities.fetch_one(page.key, request=Fetch.direct())
     original_categories = original_page.categories

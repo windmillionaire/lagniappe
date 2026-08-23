@@ -177,6 +177,54 @@ def test_operation_projection_failure_is_nonfatal(monkeypatch):
     }
 
 
+# @pairs deferred-jobs:status deferred-jobs:owner deferred-jobs:batching
+# @pairs deferred-jobs:progress deferred-jobs:timing
+# @source lagniappe/core/tools/deferred_jobs/service.py::DeferredJobService.statuses
+def test_statuses_returns_only_jobs_visible_to_the_actor(monkeypatch):
+    registry = DeferredJobService()
+    registry.adapter_registry._defaults_loaded = True
+    registry.register(RecordingAdapter())
+    actor = SimpleNamespace(urlsafe_key="actor-key")
+    owner_job = RunnerJob()
+    owner_job.key = "owner-job"
+    owner_job.urlsafe_key = owner_job.key
+    owner_job.status = DeferredJobStatus.QUEUED.value
+    owner_job.progress = {"phase": DeferredJobPhase.QUEUED.value}
+    other_job = RunnerJob()
+    other_job.key = "other-job"
+    other_job.urlsafe_key = other_job.key
+    other_job.actor = SimpleNamespace(urlsafe_key="other-actor-key")
+    fetched = []
+
+    def fetch(*keys, request):
+        fetched.append(list(keys))
+        return [owner_job, other_job]
+
+    monkeypatch.setattr(Entities, "DEFERRED_JOB", RunnerJob)
+    monkeypatch.setattr(Entities, "fetch", fetch)
+
+    statuses = registry.statuses(
+        [owner_job.key, other_job.key, owner_job.key, "missing-job"],
+        actor,
+        now=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+
+    assert fetched == [[owner_job.key, other_job.key, "missing-job"]]
+    assert [status["key"] for status in statuses] == [owner_job.key]
+    assert statuses[0]["status"] == DeferredJobStatus.QUEUED.value
+    assert statuses[0]["phase"] == DeferredJobPhase.QUEUED.value
+
+
+# @pair deferred-jobs:batching
+# @source lagniappe/core/tools/deferred_jobs/service.py::DeferredJobService.statuses
+def test_statuses_rejects_more_than_fifty_jobs():
+    with pytest.raises(exceptions.ValidationError, match="At most 50"):
+        DeferredJobService().statuses(
+            [f"job-{index}" for index in range(51)],
+            SimpleNamespace(urlsafe_key="actor-key"),
+        )
+
+
 # @pairs deferred-jobs:terminal-delivery cloud-scheduler:datastore-read-isolation
 # @source lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner._release
 def test_terminal_release_reuses_committed_scheduler_control(monkeypatch):

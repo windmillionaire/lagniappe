@@ -127,6 +127,7 @@ let _ping = null;
 
 /**
  * @testable true
+ * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
  * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
  * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
  * @tests tests_js/test_017_main_lifecycle.py::test_ping_uses_server_owned_cache_policy
@@ -267,6 +268,7 @@ function queueSync({
 
 /**
  * @testable true
+ * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
  * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
  * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
  * @tests tests_e2e/001_site/test_001d_offline.py::test_testing_mode_navigation_resets_offline_state

@@ -363,8 +363,9 @@ class FirstTimeSetupForm extends LoginForms {
  * @tests tests_e2e/001_site/test_001b_login.py::test_forgot_password_form_opens_from_sign_in
  * @tests tests_e2e/001_site/test_001b_login.py::test_login_auth_error_messages_are_user_safe
  * @tests tests_e2e/001_site/test_001b_login.py::test_verification_delivery_failure_recovers_safely
+ * @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
  * @features login
- * @dimensions sign-in-transition forgot-password existing-account recovery delivery-failure safe-error
+ * @dimensions sign-in-transition forgot-password existing-account recovery delivery-failure safe-error identity-platform hosted-e2e
  */
 class SignInForm extends LoginForms {
 	init() {

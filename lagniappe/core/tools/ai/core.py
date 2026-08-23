@@ -65,6 +65,16 @@ UTILITY_MODEL = getattr(CONFIG, "AI_UTILITY_MODEL", MODEL)
 IMAGE_MODEL = CONFIG.AI_IMAGE_MODEL
 IMAGE_RESPONSE_MODALITIES = ["TEXT", "IMAGE"]
 EMPTY_TEXT_RESPONSE_MESSAGE = "Model returned no text content."
+BLOCKED_FINISH_REASONS = {
+    "BLOCKED",
+    "BLOCKLIST",
+    "IMAGE_PROHIBITED_CONTENT",
+    "IMAGE_SAFETY",
+    "PROHIBITED_CONTENT",
+    "SAFETY",
+    "SPII",
+}
+EMPTY_FINISH_REASONS = {"FINISH_REASON_UNSPECIFIED", "STOP"}
 EMPTY_TEXT_RETRY_ATTEMPTS = 2
 DEFERRED_AI_RETRY_ATTEMPTS = 2
 
@@ -196,6 +206,18 @@ def _is_imagen_model(model):
 # @reason private prompt adapter for Imagen's text-only request shape
 def _image_prompt_text(prompt):
     return "\n\n".join(part for part in (prompt.intro, prompt.build()) if part)
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/ai/core.py::GenAI._extract_text
+# @covered-by lagniappe/core/tools/ai/core.py::GenAI.generate_image
+# @reason provider enum normalization is asserted through text and image extraction
+def _finish_reason_name(reason):
+    """Normalize SDK enum and string finish reasons to their provider value."""
+    if reason is None:
+        return None
+    value = getattr(reason, "value", reason)
+    return str(value).rsplit(".", 1)[-1].upper()
 
 
 # @testable true
@@ -421,8 +443,10 @@ class GenAI:
         if response.candidates:
             candidate = response.candidates[0]
 
-            finish = getattr(candidate, "finish_reason", None)
-            if finish and str(finish) in ("SAFETY", "BLOCKED"):
+            finish = _finish_reason_name(
+                getattr(candidate, "finish_reason", None)
+            )
+            if finish in BLOCKED_FINISH_REASONS:
                 raise exceptions.AIException(
                     f"Content generation blocked. Reason: {finish}"
                 )
@@ -438,6 +462,11 @@ class GenAI:
                     if output_format == "JSON" or result:
                         return result
 
+            if finish and finish not in EMPTY_FINISH_REASONS:
+                raise exceptions.AIException(
+                    f"Content generation ended without text. Reason: {finish}"
+                )
+
         return None
 
     # @testable true
@@ -445,10 +474,12 @@ class GenAI:
     # @tests tests_unit/test_015_ai_tools.py::test_ai_retries_empty_text_response_once
     # @tests tests_unit/test_015_ai_tools.py::test_ai_accepts_empty_json_object_without_retry
     # @tests tests_unit/test_015_ai_tools.py::test_autofill_accepts_summary_backed_json_without_tool_or_final_call
+    # @tests tests_unit/test_015_ai_tools.py::test_ai_search_json_generation_keeps_provider_response_unconstrained
     # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_tool_loop
     # @features ai
     # @dimensions model-routing empty-response-retry empty-json
     # @pairs ai:provider-errors ai:quota ai:tool-loop
+    # @pairs ai:search ai:output-format
     def generate_content(self, prompt, *, validator=None):
         """Generate and optionally validate text under one observable call boundary."""
         observer = GenerationObserver(prompt)
@@ -506,8 +537,11 @@ class GenAI:
         output_format = prompt.output_format.get("type")
         config = GenAI.create_config(prompt)
         final_config = None
-        if prompt.tools and output_format == "JSON":
-            # Keep tool turns unconstrained; apply structured JSON on the final pass.
+        if (prompt.tools or prompt.search) and output_format == "JSON":
+            # Search/tool turns can return empty candidates when combined with
+            # provider-side JSON constraints. The prompt still requires JSON,
+            # and cleanup validates it; schema-bearing tool flows get a separate
+            # constrained final pass below.
             config = GenAI.create_config(
                 prompt,
                 response_mime_type=None,
@@ -884,8 +918,8 @@ class GenAI:
             raise exceptions.AIException("No image generated in response")
 
         candidate = response.candidates[0]
-        finish = getattr(candidate, "finish_reason", None)
-        if finish and str(finish) in ("SAFETY", "BLOCKED"):
+        finish = _finish_reason_name(getattr(candidate, "finish_reason", None))
+        if finish in BLOCKED_FINISH_REASONS:
             raise exceptions.AIException(f"Image generation blocked: {finish}")
 
         if candidate.content and candidate.content.parts:

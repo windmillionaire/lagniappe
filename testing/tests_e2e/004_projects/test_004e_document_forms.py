@@ -35,14 +35,6 @@ from testing.utility import expect_successful_response
 # @features editor
 # @dimensions color reload
 def test_color_picker(get_user):
-    """
-    Test that color picker opens and colors can be selected.
-
-    Flow:
-        1. Navigate to project document tab
-        2. Open color picker via menu
-        3. Select a color
-    """
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
 
@@ -65,14 +57,6 @@ def test_color_picker(get_user):
 # @features editor
 # @dimensions font-family reload
 def test_font_family(get_user):
-    """
-    Test that font family picker opens and fonts can be selected.
-
-    Flow:
-        1. Navigate to project document tab
-        2. Open font family picker via menu
-        3. Select a font
-    """
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
 
@@ -84,10 +68,8 @@ def test_font_family(get_user):
     editor.select_text()
 
     EditorFontFamilyOptions.MONO.click(editor)
-    # Verify action applied immediately
     expect(editor.get_element("span[style*='font-family']")).to_contain_text(text)
 
-    # Verify formatting persists after save/reload
     editor.blur()
     user.go(project)
     editor = project.editor
@@ -112,7 +94,6 @@ def test_external_link_persists_searches_and_unlinks(get_user):
     link_form.fill(test_url)
     link_form.submit()
 
-    # Verify action applied immediately
     expect(editor.get_element("a")).to_contain_text(test_text)
     expect(editor.get_element("a")).to_have_attribute("href", test_url)
     expect(editor.get_element("a")).to_have_attribute("target", "_blank")
@@ -336,8 +317,7 @@ def test_internal_links_normalize_paste_and_popover_navigation(get_user):
     expect(editor.text_entry).to_contain_text(click_text)
 
 
-# @features editor
-# @dimensions link kind-color
+# @style editor.container
 def test_links_colorize_properly(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -405,14 +385,6 @@ def test_links_colorize_properly(get_user):
 # @features editor
 # @dimensions youtube-embed
 def test_add_youtube(get_user):
-    """
-    Test that YouTube form opens with URL input and can be filled.
-
-    Flow:
-        1. Navigate to project document tab
-        2. Open YouTube form via menu
-        3. Fill a URL (without submitting)
-    """
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
 
@@ -431,31 +403,18 @@ def test_add_youtube(get_user):
 # @features editor
 # @dimensions image-generate-toggle
 def test_add_image_generate_toggle(get_user):
-    """
-    Test that Image form opens and generate mode can be toggled.
-
-    Flow:
-        1. Navigate to project document tab
-        2. Open image form via menu
-        3. Open generate form via menu
-        4. Verify generate textarea is visible
-        5. Cancel generate and verify textarea is hidden
-    """
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
 
     editor = project.editor
     form = EditorAddImage(editor).form
 
-    # Generate textarea should start hidden
     expect(form.locator(EditorAddImage.PROMPT)).to_be_hidden()
     expect(form.locator(EditorAddImage.DROPZONE)).to_be_visible()
 
-    # Open generate form
     UploadDropdown.GENERATE.select(form)
     expect(form.locator(EditorAddImage.PROMPT)).to_be_visible()
 
-    # Cancel should hide the generate textarea
     form.locator(EditorAddImage.GENERATE_CANCEL).click()
     expect(form.locator(EditorAddImage.PROMPT)).to_be_hidden()
 
@@ -463,26 +422,12 @@ def test_add_image_generate_toggle(get_user):
 # @features editor
 # @dimensions image-upload image-selection
 def test_add_image(get_user):
-    """
-    Test image upload and setImage options appearing when image is selected.
-
-    Flow:
-        1. Navigate to project document tab
-        2. Clear editor content
-        3. Open image form and upload an image
-        4. Verify image appears in editor
-        5. Click the image to select it
-        6. Verify setImage options appear
-        7. Click elsewhere to deselect
-        8. Verify setImage options disappear
-    """
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
 
     editor = project.editor
     editor.clear_text()
 
-    # Upload an image
     form = EditorAddImage(editor).form
     Uploads.editor_test_image.set(form)
     SpinnerButtons.UPLOAD.click(form)

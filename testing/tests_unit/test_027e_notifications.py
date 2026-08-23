@@ -35,16 +35,17 @@ def test_ordinary_notification_service_mutates_aggregate_once(monkeypatch):
     first, created = notification_service.create_ordinary_notification(
         user,
         identifier="notice-one",
-        body="First",
+        body="<em>First</em>",
     )
     replay, replay_created = notification_service.create_ordinary_notification(
         user,
         identifier="notice-one",
-        body="First",
+        body="<em>First</em>",
     )
     assert created is True
     assert replay_created is False
     assert replay.key == first.key
+    assert first["body"] == "First"
     assert aggregate["ordinary_count"] == 1
 
     second, _created = notification_service.create_ordinary_notification(
@@ -110,4 +111,3 @@ def test_ordinary_notification_service_mutates_aggregate_once(monkeypatch):
     assert captured and captured[0][1]["context"] == {
         "operation": "notification-aggregate-publish"
     }
-

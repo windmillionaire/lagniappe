@@ -56,6 +56,8 @@ from config import SETTINGS, Environment, constants
 from lagniappe import CONFIG
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
+from lagniappe.core.tools.cache.core import cache as redis_cache
+from lagniappe.core.tools.cache.keys import Keys
 from lagniappe.core.tools.email import smtp as auth_email
 from lagniappe.core.tools.services import identity_platform
 from lagniappe.web import app
@@ -69,6 +71,13 @@ pytestmark = pytest.mark.e2e
 
 def _site_url(path):
     return f"{SETTINGS.test_config['BASE_URL']}{path}"
+
+
+def _clear_auth_rate_limit_scope(scope):
+    pattern = Keys.RATE_LIMIT.value.format(scope, "*")
+    keys = redis_cache.keys(pattern)
+    if keys:
+        redis_cache.delete(*keys)
 
 
 def _set_cookie_headers(response):
@@ -1719,48 +1728,52 @@ def test_login_identity_returns_rate_limit_response(get_user, browser_failures):
     user.go(SitePages.LOGIN_PAGE)
     csrf_token = user.locate("#token").input_value()
 
-    limited = None
-    with browser_failures.expect_http_error(
-        user,
-        status=429,
-        path="/users/login-identity",
-    ):
+    _clear_auth_rate_limit_scope("login-identity")
+    try:
+        limited = None
         with browser_failures.expect_http_error(
             user,
-            status=401,
+            status=429,
             path="/users/login-identity",
-            count=20,
         ):
-            for _ in range(25):
-                response = user.page.evaluate(
-                    """async ({ csrfToken, authResult }) => {
-                        const response = await fetch("/users/login-identity", {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "X-CSRFToken": csrfToken,
-                            },
-                            body: JSON.stringify({ authResult }),
-                        });
-                        return {
-                            status: response.status,
-                            retryAfter: response.headers.get("Retry-After"),
-                            json: await response.json(),
-                        };
-                    }""",
-                    {
-                        "csrfToken": csrf_token,
-                        "authResult": f"invalid-token-{uuid4().hex}",
-                    },
-                )
-                if response["status"] == 429:
-                    limited = response
-                    break
-                assert response["status"] == 401
+            with browser_failures.expect_http_error(
+                user,
+                status=401,
+                path="/users/login-identity",
+                count=20,
+            ):
+                for _ in range(25):
+                    response = user.page.evaluate(
+                        """async ({ csrfToken, authResult }) => {
+                            const response = await fetch("/users/login-identity", {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    "X-CSRFToken": csrfToken,
+                                },
+                                body: JSON.stringify({ authResult }),
+                            });
+                            return {
+                                status: response.status,
+                                retryAfter: response.headers.get("Retry-After"),
+                                json: await response.json(),
+                            };
+                        }""",
+                        {
+                            "csrfToken": csrf_token,
+                            "authResult": f"invalid-token-{uuid4().hex}",
+                        },
+                    )
+                    if response["status"] == 429:
+                        limited = response
+                        break
+                    assert response["status"] == 401
 
-    assert limited is not None
-    assert limited["retryAfter"] is not None
-    assert limited["json"]["success"] is False
+        assert limited is not None
+        assert limited["retryAfter"] is not None
+        assert limited["json"]["success"] is False
+    finally:
+        _clear_auth_rate_limit_scope("login-identity")
 
 
 # @features login

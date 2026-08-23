@@ -67,8 +67,7 @@ def _etag_fingerprint(base_fingerprint, user):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
-# @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_download_uses_original_filename_and_mimetype
-# @pairs cache:etag cache:standard-header cache:missing-fingerprint cache:byte-range
+# @pairs cache:etag cache:standard-header cache:missing-fingerprint
 def _fingerprint_matches_etag():
     """Check if the client's If-None-Match header matches the current fingerprint."""
     if not getattr(g, "fingerprint", None):

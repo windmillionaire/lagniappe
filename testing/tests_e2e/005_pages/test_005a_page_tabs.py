@@ -1,15 +1,3 @@
-"""
-Tests for page creation and management from category index.
-
-Tests page creation flows and page navigation.
-
-Maps to:
-- Entity: lagniappe/core/entities/page.py
-- Routes: lagniappe/web/routes/pages/
-- Templates: lagniappe/web/templates/pages/, lagniappe/web/templates/categories/
-- View: src/script/views/page.mjs, src/script/views/category.mjs
-"""
-
 import re
 
 from playwright.sync_api import expect
@@ -37,7 +25,6 @@ pytestmark = pytest.mark.e2e
 # @features entity-layout
 # @dimensions query-tab persistence
 def test_page_url_tab_overrides_saved_tab(get_user):
-    """A tab query parameter wins over the previously saved entity tab."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
     user.go(page)
@@ -93,7 +80,6 @@ def test_page_attribute_toggle_updates_tabs_without_reload(get_user):
 # @features pages
 # @dimensions submission default-form
 def test_page_with_default_category_form(get_user):
-    """Test a page with the default category form."""
     user = get_user(Users.OWNER)
     page = Pages.test_page_with_default_category_form.get(user)
     user.go(page)

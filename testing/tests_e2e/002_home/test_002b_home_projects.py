@@ -54,6 +54,9 @@ pytestmark = pytest.mark.e2e
 # @features projects
 # @dimensions manual-form ai-form create-help
 # @template home/projects.html::create
+@pytest.mark.parallel_safe(
+    reason="the form-mode story creates no project or shared state"
+)
 def test_create_project_form(get_user):
     """
     Verify create project form opens with expected fields and controls.
@@ -176,10 +179,13 @@ def test_create_project_ai_mode(get_user, results):
 
 
 # @features projects
-# @dimensions delete title-menu
+# @dimensions delete
 # @template projects/project.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
+@pytest.mark.parallel_safe(
+    reason="the story creates and deletes its distinct catalogued project"
+)
 def test_delete_project(get_user):
     """Verify project deletion from its title menu."""
     user = get_user(Users.OWNER)
@@ -197,6 +203,9 @@ def test_delete_project(get_user):
 # @features projects
 # @dimensions attribute-model-tasks
 # @template home/projects.html::create
+@pytest.mark.parallel_safe(
+    reason="the story owns a distinct catalogued project and exact page assertions"
+)
 def test_create_project_without_tasks(get_user):
     """
     Verify project created without tasks attribute.
@@ -220,6 +229,9 @@ def test_create_project_without_tasks(get_user):
 # @features projects
 # @dimensions attribute-document
 # @template home/projects.html::create
+@pytest.mark.parallel_safe(
+    reason="the story owns a distinct catalogued project and exact page assertions"
+)
 def test_create_project_without_document(get_user):
     """
     Verify project created without document attribute.

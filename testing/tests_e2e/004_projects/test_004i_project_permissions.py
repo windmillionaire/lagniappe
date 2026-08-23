@@ -27,7 +27,6 @@ pytestmark = pytest.mark.e2e
 # @features projects
 # @dimensions permission-gates
 def test_project_is_forbidden_without_model_permission(get_user, browser_failures):
-    """A signed-in user with no model access cannot open an existing project."""
     owner = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(owner)
 
@@ -40,7 +39,6 @@ def test_project_is_forbidden_without_model_permission(get_user, browser_failure
 # @features projects
 # @dimensions load readonly permission-gates
 def test_project_viewer_reads_project_without_editing_controls(get_user):
-    """A model viewer reads the project but cannot change project settings or models."""
     owner = get_user(Users.OWNER)
     model_task = ModelTasks.test_create_model_task.get(owner)
     project = model_task.project
@@ -63,9 +61,6 @@ def test_project_viewer_reads_project_without_editing_controls(get_user):
     expect(description_field).to_contain_text(project.definition.description)
     expect(info_form.locator(FormElements.NAME)).not_to_be_attached()
     expect(info_form.locator(FormElements.DESCRIPTION)).not_to_be_attached()
-    # Possible product bug: the current project info template renders feature
-    # toggles and an update submitter without checking project.allowed(EDIT).
-    # The intended user story is read-only project settings for VIEW-only users.
     expect(info_form.locator("[data-role='attributes']")).not_to_be_attached()
     expect(info_form.locator(SpinnerButtons.UPDATE.value)).not_to_be_attached()
 
@@ -97,7 +92,6 @@ def test_project_viewer_reads_project_without_editing_controls(get_user):
 # @dimensions readonly document-tab
 # @template projects/project.html::main
 def test_project_viewer_sees_document_tab_only_when_content_exists(get_user):
-    """Readonly viewers do not see empty document affordances, but can read saved docs."""
     owner = get_user(Users.OWNER)
     empty_project = Projects.test_readonly_document_visibility.get(owner)
     content_project = Projects.test_readonly_document_content.get(owner)
@@ -127,7 +121,6 @@ def test_project_viewer_sees_document_tab_only_when_content_exists(get_user):
 # @features model-tasks
 # @dimensions create permission-gates
 def test_project_editor_can_open_model_task_creation(get_user):
-    """A project editor sees the model-task creation path and can start a model."""
     owner = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(owner)
 

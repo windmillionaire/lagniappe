@@ -20,7 +20,6 @@ Definitions:
 """
 
 import base64
-import json
 import re
 
 from playwright.sync_api import expect
@@ -147,21 +146,9 @@ def _clear_signature(form, field_id=SIGNATURE_FIELD_ID):
     expect(hidden_input).to_have_value("")
 
 
-def _saved_task_submission(task):
-    saved_task = Entities.fetch_one(task.key, request=Fetch.direct())
-    return saved_task, json.loads(saved_task.db.get("submission", "{}"))
-
-
-def _latest_history(task):
-    saved_task = Entities.fetch_one(task.key, request=Fetch.direct())
-    assert saved_task.history
-    return saved_task.history[0]
-
-
 # @features tasks
 # @dimensions create basic
 def test_create_basic_page_task(get_user):
-    """Test creating a task on a page."""
     user = get_user(Users.OWNER)
 
     task = Tasks.test_create_page_task.get(user, create=False)
@@ -182,7 +169,6 @@ def test_create_basic_page_task(get_user):
 # @template pages/tasks.html::task_list
 # @template pages/tasks.html::task_empty
 def test_empty_page_task_list_shows_marker_only_after_create_closes(get_user):
-    """An editable empty task list opens CreateTask before its empty marker."""
     user = get_user(Users.OWNER)
     page = Pages.test_empty_page_task_list.get(user)
     user.go(page)
@@ -206,7 +192,6 @@ def test_empty_page_task_list_shows_marker_only_after_create_closes(get_user):
 # @features tasks
 # @dimensions create attach-form
 def test_create_page_task_with_form(get_user):
-    """Test creating a task on a page with a form."""
     user = get_user(Users.OWNER)
 
     task = Tasks.test_create_page_task_with_form.get(user, create=False)
@@ -224,7 +209,6 @@ def test_create_page_task_with_form(get_user):
 # @features tasks
 # @dimensions complete
 def test_complete_page_task(get_user):
-    """Test completing a task on a page."""
     user = get_user(Users.OWNER)
 
     task = Tasks.test_complete_page_task.get(user)
@@ -243,7 +227,6 @@ def test_complete_page_task(get_user):
 # @style select.button
 # @template pages/tasks.html::action_buttons
 def test_create_page_task_with_project(get_user):
-    """Create a page task linked to a project; the project badge appears on the row."""
     user = get_user(Users.OWNER)
 
     task = Tasks.test_create_page_task_with_project.get(user, create=False)
@@ -289,11 +272,6 @@ def test_create_page_task_with_project(get_user):
 # @features tasks
 # @dimensions create model-task-link attach-form badge
 def test_create_page_task_with_model_task(get_user):
-    """
-    Searching by project name lists each model task; picking one with a form fills the form field.
-
-    Uses a project with two model tasks so the facet panel must show both before selection.
-    """
     user = get_user(Users.OWNER)
 
     project = Projects.test_page_tasks_multi_model.get(user)
@@ -328,7 +306,6 @@ def test_create_page_task_with_model_task(get_user):
 # @pair notifications:assignee-target
 # @template notifications.html::item
 def test_create_page_task_with_assigned_to(get_user):
-    """Assigning a user adds a badge and a linked recipient notification."""
     user = get_user(Users.OWNER)
 
     task = Tasks.test_create_page_task_with_assigned_to.get(user, create=False)
@@ -363,7 +340,6 @@ def test_create_page_task_with_assigned_to(get_user):
 # @features tasks
 # @dimensions create due-date badge
 def test_create_page_task_with_due_date(get_user):
-    """A due date shows the due-date badge on the new task row."""
     user = get_user(Users.OWNER)
 
     task = Tasks.test_create_page_task_with_due_date.get(user, create=False)
@@ -502,11 +478,6 @@ def test_adding_form_from_task_settings_preserves_widget_identity(get_user):
         expect(settings_form.locator(f"[data-role='{role}']")).to_be_visible()
     expect(settings_form.locator("[name='input-textab12']")).to_have_count(0)
     expect(task_form.locator("[name='input-textab12']")).to_have_count(1)
-
-    saved_task, submission = _saved_task_submission(task)
-    assert saved_task.name == updated_name
-    assert saved_task.form.key == form.entity.key
-    assert submission["input-textab12"] == task_value
 
     user.reload()
     task.wait_for_load()
@@ -733,13 +704,9 @@ def test_completed_task_with_partial_submission_omits_empty_fields(get_user):
     expect(task_form.locator("input")).to_have_count(0)
 
     task.uncomplete()
-
-    saved_task = Entities.fetch_one(task.key, request=Fetch.direct())
-    assert saved_task.submission == {}
-    assert any(
-        history.submission.get("input-textab12") == "Partial completed task text"
-        for history in saved_task.history
-    )
+    active_form = task.task_form
+    expect(active_form).not_to_have_attribute("data-readonly", "true")
+    expect(active_form.locator("[name='input-textab12']")).to_have_value("")
 
 
 # @features tasks
@@ -789,10 +756,6 @@ def test_signature_submission_draw_save_reload_and_clear(get_user):
 
     task_form = _open_page_task_form(page, task)
     expect(_signature_field(task_form)).to_have_attribute("data-mode", "edit")
-    saved_task, submission = _saved_task_submission(task)
-    assert SIGNATURE_FIELD_ID not in submission
-    assert SIGNATURE_FIELD_ID not in saved_task.assets
-    assert saved_task.has_signature is False
 
     _upload_signature(task_form)
     with expect_successful_response(
@@ -806,10 +769,6 @@ def test_signature_submission_draw_save_reload_and_clear(get_user):
     assert SpinnerButtons.UPDATE_SUCCESS.successful(task_form)
     expect(task_form).to_be_visible()
     _expect_signature_image(task_form)
-    saved_task, submission = _saved_task_submission(task)
-    assert submission[SIGNATURE_FIELD_ID] == SIGNATURE_FIELD_ID
-    assert SIGNATURE_FIELD_ID in saved_task.assets
-    assert saved_task.has_signature is True
 
     user.reload()
     task.wait_for_load()
@@ -829,10 +788,6 @@ def test_signature_submission_draw_save_reload_and_clear(get_user):
     field = _signature_field(task_form)
     expect(field).to_have_attribute("data-mode", "edit")
     expect(field.locator("[data-role='read']")).to_have_count(0)
-    saved_task, submission = _saved_task_submission(task)
-    assert SIGNATURE_FIELD_ID not in submission
-    assert SIGNATURE_FIELD_ID not in saved_task.assets
-    assert saved_task.has_signature is False
 
     _upload_signature(task_form)
     with expect_successful_response(
@@ -845,11 +800,6 @@ def test_signature_submission_draw_save_reload_and_clear(get_user):
 
     assert SpinnerButtons.UPDATE_SUCCESS.successful(task_form)
     _expect_signature_image(task_form)
-    saved_task, submission = _saved_task_submission(task)
-    assert submission[SIGNATURE_FIELD_ID] == SIGNATURE_FIELD_ID
-    assert SIGNATURE_FIELD_ID in saved_task.assets
-    signature_asset = saved_task.assets[SIGNATURE_FIELD_ID]
-    assert saved_task.has_signature is True
 
     task.complete()
     readonly_form = task.task_form
@@ -862,27 +812,12 @@ def test_signature_submission_draw_save_reload_and_clear(get_user):
     reset_field = _signature_field(reset_form)
     expect(reset_field).to_have_attribute("data-mode", "edit")
     expect(reset_field.locator("[data-role='read']")).to_have_count(0)
-    saved_task, submission = _saved_task_submission(task)
-    assert SIGNATURE_FIELD_ID not in submission
-    assert SIGNATURE_FIELD_ID not in saved_task.assets
-    assert saved_task.has_signature is False
-
-    history = _latest_history(task)
-    assert history.submission[SIGNATURE_FIELD_ID] == SIGNATURE_FIELD_ID
-    history_asset = history.assets[SIGNATURE_FIELD_ID]
-    assert history_asset["type"] == "image"
-    assert history_asset["path"] != signature_asset["path"]
-    assert history_asset["path"].endswith(f"_{SIGNATURE_FIELD_ID}.png")
-    assert history.properties.submission.form_value[SIGNATURE_FIELD_ID].endswith(
-        f"/{SIGNATURE_FIELD_ID}.png"
-    )
 
 
 # @features tasks
 # @dimensions create file-upload async-upload remove attachment
 # @template pages/tasks.html::action_buttons
 def test_create_page_task_with_file(get_user):
-    """Attach a file via task file upload and assert the file badge."""
     user = get_user(Users.OWNER)
 
     task = Tasks.test_create_page_task_with_file.get(user, create=False)

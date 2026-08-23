@@ -1,5 +1,3 @@
-"""E2E coverage for Page note visibility, composition, and deletion."""
-
 from urllib.parse import urlsplit
 from uuid import uuid4
 

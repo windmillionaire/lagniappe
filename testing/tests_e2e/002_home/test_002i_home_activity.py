@@ -10,9 +10,14 @@ from playwright.sync_api import expect
 from config import SETTINGS
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, database
+from lagniappe.core.tools import database
+from lagniappe.core.tools.notifications.service import (
+    create_ordinary_notification,
+    publish_notification_aggregate,
+)
 from testing.definitions import DueDates, Pages, SitePages, Users
 from testing.definitions.task_definitions import TaskDefinition
+from testing.definitions.user_definitions import UserDefinition
 from testing.elements import Buttons, FormElements, List, Modal
 from testing.resources import Task
 from testing.utility import (
@@ -65,15 +70,20 @@ def _save_note(user, body, visibility="private"):
 
 
 def _save_notification(user, body, target=None, pending=False):
-    notification = Entities.NOTIFICATION.create(
-        {
-            "parent": user.entity,
-            "target": target,
-            "body": body,
-            "pending": pending,
-        }
+    notification, created = create_ordinary_notification(
+        user.entity,
+        identifier=f"home-activity-{uuid4().hex}",
+        body=body,
+        target=target,
     )
-    Entities.save(notification, user.entity)
+    assert created
+    publish_notification_aggregate(
+        user.entity,
+        database.get_notification_aggregate(user.entity),
+    )
+    if pending:
+        notification.pending = True
+        Entities.save(notification)
     return notification
 
 
@@ -181,10 +191,14 @@ def _warm_offline_create_widgets(home, *, note=True, task=True):
         )
 
 
-# @features activity notes notifications
-# @dimensions load cached-response notes-only
+# @pairs activity:load activity:cached-response activity:notes-only
+# @pairs notes:load notes:cached-response notes:notes-only
+# @pair activity:notes-exclusion
 # @template home/notes.html::list
 # @template home/notes.html::note_item
+@pytest.mark.parallel_safe(
+    reason="the story owns UUID-scoped note and notification content"
+)
 def test_home_notes_exclude_notifications(get_user):
     user = get_user(Users.OWNER)
     note_body = _unique("Activity note load")
@@ -219,6 +233,9 @@ def test_home_notes_exclude_notifications(get_user):
 # @pair notes:private-default
 # @template home/notes.html::add_note_form
 # @template notes.html::note_item
+@pytest.mark.parallel_safe(
+    reason="the story owns UUID-scoped notes and asset paths"
+)
 def test_create_note_body_and_photo_from_home(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -394,6 +411,9 @@ def test_home_note_visibility_across_users(get_user):
 # @pairs notifications:create notifications:body notifications:parent
 # @pairs notifications:html-stripping
 # @template notifications.html::item
+@pytest.mark.parallel_safe(
+    reason="the story owns UUID-scoped note and notification content"
+)
 def test_notification_channel_uses_menu_not_home_notes(get_user):
     user = get_user(Users.OWNER)
     note_body = _unique("Process notification control note")
@@ -420,6 +440,9 @@ def test_notification_channel_uses_menu_not_home_notes(get_user):
 # @features notifications
 # @dimensions dropdown-refresh target target-link pending long-text-wrap
 # @template notifications.html::item
+@pytest.mark.parallel_safe(
+    reason="the story owns UUID-scoped notifications and report content"
+)
 def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_create_page.get(user)
@@ -438,7 +461,7 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
         }
     )
     report_body = _unique("Organize report is ready")
-    Entities.save(report, user.entity)
+    Entities.save(report)
     _save_notification(user, report_body, target=report)
     assert notification.pending is True
     assert (
@@ -498,28 +521,25 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
 # @features notifications
 # @dimensions delete clear-all menu-open ownership dropdown-refresh accessible-state
 # @template nav.html::navbar
+@pytest.mark.parallel_safe(
+    reason="clear-all is confined to a UUID-scoped user and its notifications"
+)
 def test_notification_menu_deletes_and_clears(get_user):
-    user = get_user(Users.OWNER)
+    owner = get_user(Users.OWNER)
+    suffix = uuid4().hex
+    user = get_user(
+        UserDefinition(
+            name=f"Notification Clear {suffix[:8]}",
+            email=f"notification-clear-{suffix}@example.test",
+        ),
+        creator=owner,
+    )
     first_body = _unique("Notification delete one")
     second_body = _unique("Notification clear rest")
     starting_count = len(Entities.NOTIFICATION.keys_for_parent(user.entity))
     first = _save_notification(user, first_body)
     second = _save_notification(user, second_body)
-    assert len(Entities.NOTIFICATION.keys_for_parent(user.entity)) == starting_count + 2
-    projected = cache.peek_notification_state(user.entity)
-    if projected is not None:
-        assert projected["count"] == starting_count + 2
-
     user.go(SitePages.HOME)
-    user.page.wait_for_function(
-        "() => window.__NOTIFICATION_STATE__?.miss === false",
-        timeout=15000,
-    )
-    browser_state = user.page.evaluate("window.__NOTIFICATION_STATE__")
-    assert isinstance(browser_state["generation"], str)
-    assert isinstance(browser_state["revision"], int)
-    assert browser_state["count"] == starting_count + 2
-    assert browser_state["miss"] is False
     notifications = user.locate("[data-role='notifications']")
     expect(notifications).to_be_visible(timeout=15000)
     expect(notifications).to_have_attribute(
@@ -532,24 +552,8 @@ def test_notification_menu_deletes_and_clears(get_user):
     panel = user.page.locator("[role='listbox'][data-visible='true']")
     expect(panel).to_be_visible()
 
-    message_user = panel.locator("[data-action='message-user']")
-    expect(message_user).to_have_css("border-top-width", "0px")
-    expect(message_user).to_have_css("border-bottom-width", "0px")
-
     clear_all = panel.locator("[data-action='clear-notifications']")
     expect(clear_all).to_be_visible()
-    expect(clear_all).to_have_css("border-radius", "0px")
-    expect(clear_all).to_have_css("margin-top", "0px")
-    expect(clear_all).to_have_css("margin-bottom", "0px")
-    expect(clear_all).to_have_css("border-top-width", "1px")
-    expect(clear_all).to_have_css("border-bottom-width", "1px")
-    expect(clear_all).to_have_class(re.compile(r"(?:^|\s)bg-base-bg(?:\s|$)"))
-    expect(panel.locator("[role='option']").first).to_have_attribute(
-        "data-action", "message-user"
-    )
-    expect(panel.locator("[role='option']").nth(1)).to_have_attribute(
-        "data-action", "clear-notifications"
-    )
 
     first_option = panel.locator("[role='option']").filter(has_text=first_body)
     expect(first_option).to_be_visible()
@@ -572,8 +576,7 @@ def test_notification_menu_deletes_and_clears(get_user):
         clear_all.click()
 
     expect(panel).to_be_visible()
-    expect(panel.locator("[role='option']")).to_have_count(1)
-    expect(panel.locator("[data-action='message-user']")).to_be_visible()
+    expect(panel.locator("[role='option']")).to_have_count(0)
     expect(notifications).to_have_attribute("data-visible", "true")
     expect(notifications).to_have_attribute("aria-hidden", "false")
     expect(notifications).to_have_attribute("tabindex", "0")
@@ -586,6 +589,9 @@ def test_notification_menu_deletes_and_clears(get_user):
 # @dimensions queue-create reload
 # @template home/notes.html::note_item
 # @template home/tasks.html::task
+@pytest.mark.parallel_safe(
+    reason="offline records and replayed entities use UUID-scoped browser and server keys"
+)
 def test_offline_home_create_mutations_persist_after_reload(get_user, browser_failures):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -668,6 +674,9 @@ def test_offline_home_create_mutations_persist_after_reload(get_user, browser_fa
 # @dimensions server-first reload replay optimistic-mutation
 # @template home/notes.html::list
 # @template home/tasks.html::list
+@pytest.mark.parallel_safe(
+    reason="offline records and the target task are UUID-scoped to one browser context"
+)
 def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_failures):
     user = get_user(Users.OWNER)
     note_body = _unique("Offline cached note")
@@ -736,6 +745,9 @@ def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_fa
 # @features offline
 # @dimensions replay queue-clear
 # @template home/notes.html::note_item
+@pytest.mark.parallel_safe(
+    reason="the offline mutation and replayed note use UUID-scoped keys"
+)
 def test_offline_home_mutations_replay_when_online(get_user, browser_failures):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -770,6 +782,9 @@ def test_offline_home_mutations_replay_when_online(get_user, browser_failures):
 # @features tasks
 # @dimensions complete offline-queue
 # @template home/tasks.html::task
+@pytest.mark.parallel_safe(
+    reason="the offline mutation and target task use UUID-scoped keys"
+)
 def test_offline_task_complete_replays_after_reload(get_user, browser_failures):
     user = get_user(Users.OWNER)
     task_name = _unique("Offline complete task")

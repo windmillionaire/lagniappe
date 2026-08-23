@@ -907,7 +907,7 @@ def test_request_fingerprint_tracks_the_complete_client_contract():
 
 
 # @features deferred-jobs
-# @dimensions status stale-state privacy timing
+# @dimensions status progress stale-state privacy timing
 def test_status_projection_is_bounded_and_marks_stale_work():
     now = datetime(2026, 7, 19, 12, tzinfo=timezone.utc)
     job = SimpleNamespace(

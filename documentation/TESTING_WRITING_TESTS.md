@@ -83,6 +83,23 @@ defers any development rebuild while an E2E session is live. It also preserves
 a completed production bundle; run `npm run dev` explicitly when replacing
 production assets with a development build is intentional.
 
+`parallel_safe` is an audit classification, not permission to start concurrent
+local pytest sessions. It may be placed on one test or a complete E2E file and
+must include a concise reason:
+
+```python
+@pytest.mark.parallel_safe(reason="uses one UUID-scoped page and no shared settings")
+def test_example(get_user):
+    ...
+```
+
+Only use the marker after checking that the story creates distinct entities,
+does not clear or mutate shared state, does not depend on collection order, and
+qualifies every list/result assertion by its own durable identity. Leave an
+uncertain test serial. Tests under `001_site` and live-provider tests remain
+serial. The ordinary runner continues to execute all E2E tests sequentially;
+hosted fan-out is implemented only in the later parallelization phase.
+
 ### Touch and responsive interaction
 
 Viewport size and input capability are separate browser-context contracts.

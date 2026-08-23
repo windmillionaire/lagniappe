@@ -52,10 +52,11 @@ async function checkUserStatus(email, form) {
  * @tests tests_e2e/001_site/test_001b_login.py::test_login_identity_client_handoff_redirects_or_requires_verification
  * @tests tests_e2e/001_site/test_001b_login.py::test_verification_delivery_failure_recovers_safely
  * @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
+ * @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
  * @tests tests_js/test_009_request_csrf.py::test_login_handoff_refreshes_csrf_before_submit_and_retries_once
  * @tests tests_js/test_009_request_csrf.py::test_login_verification_email_reuses_refreshed_csrf
  * @features login
- * @dimensions identity-platform redirect verify-email remember-preference csrf-refresh owner-bootstrap delivery-failure recovery safe-error
+ * @dimensions identity-platform redirect verify-email remember-preference csrf-refresh owner-bootstrap delivery-failure recovery safe-error email-password token-verification hosted-e2e
  */
 async function handleIdentityUser(user, form) {
 	const body = JSON.stringify({

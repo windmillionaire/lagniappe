@@ -143,7 +143,6 @@ def _assert_hash_cached(entity):
 
 # @features entities
 # @dimensions save dependent-owner process-state cache database
-# @source lagniappe/core/entities/__init__.py::EntityRegistry.save
 def test_entity_save_persists_relations_process_payloads_and_cache():
     form = _create_form("save-form")
     category = _create_category("save-category", form=form)

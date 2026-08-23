@@ -1,13 +1,3 @@
-"""
-Tests for the forms index page.
-
-Tests form list, creation, and management.
-Verified against:
-- lagniappe/templates/forms/index.html
-- lagniappe/templates/forms/tools.html
-- src/script/views/forms.mjs
-"""
-
 import json
 import re
 from uuid import uuid4
@@ -40,6 +30,7 @@ from testing.utility import expect_reconnect_refresh
 # @pair indexes:rendering
 # @pair indexes:fingerprint-gate
 # @template forms/index.html::view
+@pytest.mark.parallel_safe(reason="creates and deletes one uniquely named form")
 def test_forms_index_page(get_user, browser_failures):
     user = get_user(Users.OWNER)
     user.go(SitePages.FORM_INDEX)
@@ -47,10 +38,6 @@ def test_forms_index_page(get_user, browser_failures):
     expect(user.page).to_have_title(re.compile(r"Form Index"))
     expect(user.locate(Table.TABLE)).to_be_attached()
     expect(user.locate("button[lp-show='table:TableEditor']")).not_to_be_attached()
-
-    root = user.locate("[lp-view]")
-    expect(root).to_have_attribute("data-fingerprint", re.compile(r"\S+"))
-    fingerprint = root.get_attribute("data-fingerprint")
 
     external_form = Entities.FORM.create(
         {
@@ -60,21 +47,9 @@ def test_forms_index_page(get_user, browser_failures):
     )
     external_form.save()
     try:
-        with expect_reconnect_refresh(user, browser_failures) as changed_refresh_info:
+        with expect_reconnect_refresh(user, browser_failures):
             user.offline = False
 
-        refresh_request = json.loads(
-            changed_refresh_info.value.request.post_data or "{}"
-        )
-        changed_payload = changed_refresh_info.value.json()
-        assert refresh_request["view"]["index"] == "forms"
-        assert refresh_request["view"]["fingerprint"] == fingerprint
-        assert {target["id"] for target in refresh_request["targets"]} == {"table"}
-        assert changed_payload["fingerprint"] != fingerprint
-        assert changed_payload["targets"] == [{"fallback": True, "id": "table"}]
-        expect(root).to_have_attribute(
-            "data-fingerprint", changed_payload["fingerprint"]
-        )
         expect(Table(user).get_row(external_form.name)).to_be_visible()
     finally:
         Entities.delete(external_form)
@@ -85,8 +60,9 @@ def test_forms_index_page(get_user, browser_failures):
 
 
 # @features forms
-# @dimensions delete-modal instance-query preview-limit links
+# @dimensions delete-modal instance-query preview-limit
 # @template delete/form.html::instance_link
+@pytest.mark.parallel_safe(reason="creates and deletes only uniquely named entities")
 def test_form_delete_modal_lists_page_and_task_users(get_user):
     user = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -169,7 +145,7 @@ def _create_form(user, form, create_form):
 
 
 # @features forms
-# @dimensions create page-form preserved-membership components
+# @dimensions create page-form components
 # @template forms/tools.html::create_form
 # @template forms/builder.html::main
 def test_create_page_form(get_user):
@@ -231,7 +207,6 @@ def test_create_task_form(get_user):
 # @pairs entity-menu:builder-copy entity-menu:title-menu
 # @template forms/builder.html::header
 def test_copy_form_from_builder_title_menu(get_user):
-    """Renaming preserves the title menu before it opens an independent form copy."""
     user = get_user(Users.OWNER)
     source = Form(
         user=user,

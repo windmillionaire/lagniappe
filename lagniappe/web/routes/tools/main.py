@@ -240,6 +240,8 @@ def _start_tool_report(
 # @features ai-report
 # @dimensions create upload async explain-button text-only ask-fallback
 # @pairs ai-report:validation ai-report:http-boundary
+# @pairs ai-report:create ai-report:upload ai-report:async
+# @pairs ai-report:text-only ai-report:ask-fallback
 @tools.route("/organize", methods=["POST"])
 @ai_access(AI.CREATE)
 def create_organize_report():
@@ -352,6 +354,9 @@ def _get_report(key):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_access_can_read_create_report_without_create_actions
 # @features ai-report
 # @dimensions detail skip-action ask answer-html links no-actions create revision execute report-view needs-review no-execute deferred-refresh pending
+# @pairs ai-report:detail ai-report:needs-review ai-report:no-execute
+# @pairs ai-report:revision ai-report:organize ai-report:live-submit
+# @pairs ai-report:schema-update ai-report:skip-action
 # @pair ai-access:report-read
 @tools.route("/reports/<key>", methods=["GET"])
 @ai_access(AI.ASK)
@@ -480,6 +485,9 @@ def undo_report(key):
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_revision_is_only_available_before_completion
 # @features ai-report
 # @dimensions revision feedback async completed-state ready-state route-guard
+# @pairs ai-report:organize ai-report:live-submit
+# @pairs ai-report:revision ai-report:feedback ai-report:async
+# @pairs ai-report:completed-state ai-report:ready-state ai-report:route-guard
 @tools.route("/reports/<key>/revise", methods=["POST"])
 @ai_access(AI.ASK)
 def revise_report(key):

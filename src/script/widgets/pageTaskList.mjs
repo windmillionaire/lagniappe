@@ -22,6 +22,7 @@ import { withTransition } from "../shared";
  * @pair tasks:dirty-form-preservation
  * @pairs tasks:completed-only tasks:empty-state tasks:create-close
  * @pairs tasks:create tasks:refresh tasks:dedupe
+ * @pair tasks:unsaved-marker
  * @pair tasks:detached-structure
  */
 export class PageTaskList extends BaseList {

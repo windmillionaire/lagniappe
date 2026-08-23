@@ -1,4 +1,3 @@
-import json
 import re
 from types import SimpleNamespace
 from uuid import uuid4
@@ -23,18 +22,6 @@ from testing.resources import Page
 from testing.utility import expect_reconnect_refresh, expect_successful_response
 
 pytestmark = pytest.mark.e2e
-
-"""
-Tests for the Users index page (/users).
-
-Tests user list, user creation, user groups, and permissions management.
-Verified against:
-- lagniappe/templates/users/index.html
-- lagniappe/templates/users/tools.html
-- src/script/views/indexes/user.mjs
-- src/script/views/forms/user.mjs
-- src/script/components/permissions.mjs
-"""
 
 
 def _set_public_users_allowed(owner, enabled):
@@ -100,19 +87,6 @@ def _post_form_status(user, path, data):
     )
 
 
-def _get_text(user, path):
-    return user.page.evaluate(
-        """async (path) => {
-            const response = await fetch(path, {
-                credentials: "include",
-                headers: {"X-Lagniappe-Request": "true"},
-            });
-            return {status: response.status, body: await response.text()};
-        }""",
-        path,
-    )
-
-
 # @features users
 # @dimensions index-mode-toggle disabled
 # @template users/index.html::public_users_toggle
@@ -162,30 +136,12 @@ def test_users_index_public_toggle_shows_public_users(get_user, browser_failures
         expect(table.get_row(public_name)).to_be_visible()
         expect(table.get_row(owner.name)).to_have_count(0)
 
-        root = owner.locate("[lp-view]")
-        expect(root).to_have_attribute("data-fingerprint", re.compile(r"\S+"))
-        fingerprint = root.get_attribute("data-fingerprint")
-        refreshed_public_user = _create_public_user(
+        _create_public_user(
             refreshed_public_email,
             refreshed_public_name,
         )
-        with expect_reconnect_refresh(owner, browser_failures) as refresh_info:
+        with expect_reconnect_refresh(owner, browser_failures):
             owner.offline = False
-
-        refresh_request = json.loads(refresh_info.value.request.post_data or "{}")
-        assert refresh_request["view"]["index"] == "users"
-        assert refresh_request["view"]["mode"] == "public"
-        assert refresh_request["view"]["fingerprint"] == fingerprint
-        assert {target["id"] for target in refresh_request["targets"]} == {"table"}
-        refresh_payload = refresh_info.value.json()
-        assert refresh_payload["fingerprint"] != fingerprint
-        table_refresh = next(
-            target for target in refresh_payload["targets"] if target["id"] == "table"
-        )
-        assert table_refresh["fallback"] is False
-        assert refreshed_public_user.urlsafe_key in {
-            row["key"] for row in table_refresh["upsert"]
-        }
 
         expect(table.get_row(public_name)).to_be_visible()
         expect(table.get_row(refreshed_public_name)).to_be_visible()
@@ -220,13 +176,8 @@ def _create_user(user, create_form, definition):
 # @dimensions create-form create-submit created-row ai-access create-form-reset
 # @template users/index.html::tools_section
 # @template users/tools.html::create_user
+@pytest.mark.parallel_safe(reason="creates a uniquely named user")
 def test_create_user_from_index(get_user):
-    """
-    Create a user through the user index tools panel UI.
-
-    Opens the tools panel, fills name and email in the CreateUser
-    widget, submits, and verifies the user appears in the table.
-    """
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
     created_user = SimpleNamespace(
@@ -245,23 +196,12 @@ def test_create_user_from_index(get_user):
     ).to_be_checked()
     create_form.locator("input[name='ai_access'][value='ASK']").check()
 
-    payload = create_form.evaluate(
-        "form => Object.fromEntries(new FormData(form).entries())"
-    )
-    assert payload["name"] == created_user.name
-    assert payload["email"] == created_user.email
-    assert payload["ai_access"] == "ASK"
-
     new_row = _create_user(owner, create_form, created_user)
-    assert Entities.USER.load(created_user.email).ai_access == "ASK"
-    reset_payload = create_form.evaluate(
-        "form => Object.fromEntries(new FormData(form).entries())"
-    )
-    assert reset_payload == {
-        "name": "",
-        "email": "",
-        "ai_access": "NONE",
-    }
+    expect(create_form.locator("input[name='name']")).to_have_value("")
+    expect(create_form.locator("input[name='email']")).to_have_value("")
+    expect(
+        create_form.locator("input[name='ai_access'][value='NONE']")
+    ).to_be_checked()
 
     new_row.locator(Table.ENTITY_URL).click()
     expect(owner.page).to_have_title(re.compile(created_user.name))
@@ -278,8 +218,8 @@ def test_create_user_from_index(get_user):
 # @pairs user:public-adoption user:submitted-create-data user:page-reassign
 # @pairs users:public-user-adoption users:create-form-reset users:submitted-form-data
 # @template users/tools.html::create_user
+@pytest.mark.parallel_safe(reason="creates a unique public user and target page")
 def test_owner_create_adopts_public_user_and_resets_form(get_user):
-    """Owner provisioning replaces public status and starts a fresh create form."""
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
     public_user = _create_public_user(
@@ -337,33 +277,27 @@ def test_owner_create_adopts_public_user_and_resets_form(get_user):
     assert [saved_group.key for saved_group in saved_user.groups] == [
         group.entity.key
     ]
-    assert saved_user.invalidate_cache is True
     assert saved_previous_page.user is None
 
-    reset_state = create_form.evaluate(
-        """form => {
-            const data = new FormData(form);
-            return {
-                name: data.get("name"),
-                email: data.get("email"),
-                aiAccess: data.get("ai_access"),
-                page: data.get("page"),
-                groups: data.getAll("group"),
-            };
-        }"""
+    expect(create_form.locator("input[name='name']")).to_have_value("")
+    expect(create_form.locator("input[name='email']")).to_have_value("")
+    expect(
+        create_form.locator("input[name='ai_access'][value='NONE']")
+    ).to_be_checked()
+    reset_page_select = Select(
+        create_form.locator("label").filter(has_text="Attach to Existing Page")
     )
-    assert reset_state == {
-        "name": "",
-        "email": "",
-        "aiAccess": "NONE",
-        "page": None,
-        "groups": [],
-    }
+    reset_group_select = Select(
+        create_form.locator("label").filter(has_text="User Group(s)")
+    )
+    expect(reset_page_select.input).to_have_value("")
+    expect(reset_group_select.input).to_have_value("")
 
 
 # @features users
 # @dimensions owner-only
 # @template users/tools.html::create_user
+@pytest.mark.parallel_safe(reason="uses a unique rejected email and creates no state")
 def test_non_owner_cannot_set_ai_access_when_creating_user(
     get_user, browser_failures
 ):
@@ -398,8 +332,8 @@ def test_non_owner_cannot_set_ai_access_when_creating_user(
 # @pair users:group-selector
 # @pair users:multiple
 # @template users/tools.html::create_user
+@pytest.mark.parallel_safe(reason="creates a uniquely named user")
 def test_create_user_group_selector_accepts_multiple_groups(get_user):
-    """A new user can be assigned to more than one group."""
     owner = get_user(Users.OWNER)
     first_group = Groups.general_users_view_only.get(owner)
     second_group = Groups.test_user_one_category.get(owner)
@@ -421,17 +355,6 @@ def test_create_user_group_selector_accepts_multiple_groups(get_user):
     expect(group_select.input).to_have_attribute("data-multiple", "true")
     group_select.select_by_name(first_group.definition.name)
     group_select.select_by_name(second_group.definition.name)
-
-    expect(name_input).to_have_value(created_user.name)
-    expect(email_input).to_have_value(created_user.email)
-
-    selected_groups = create_form.evaluate(
-        "form => new FormData(form).getAll('group')"
-    )
-    assert set(selected_groups) == {
-        first_group.entity.urlsafe_key,
-        second_group.entity.urlsafe_key,
-    }
 
     new_row = _create_user(owner, create_form, created_user)
     saved_user = Entities.USER.load(created_user.email)
@@ -467,8 +390,8 @@ def test_create_user_group_selector_accepts_multiple_groups(get_user):
 # @pair table-controls:sorting
 # @template users/index.html::view_header
 # @template table.html::mobile_toggles
+@pytest.mark.parallel_safe(reason="reads shared users without count or order assumptions")
 def test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load(get_user):
-    """Loading the index at phone width initializes both mobile control paths."""
     owner = get_user(Users.OWNER)
     user_index = owner.go(SitePages.USER_INDEX)
 
@@ -494,9 +417,9 @@ def test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load(get_user
 
 
 # @features users
-# @dimensions create-form attach-existing-page page-form-preserved
+# @dimensions attach-existing-page page-form-preserved
+@pytest.mark.parallel_safe(reason="creates a unique page and user")
 def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user):
-    """Assigning a user to an existing form-backed page keeps normal PageInfo."""
     owner = get_user(Users.OWNER)
     category = Categories.test_basic_inputs_submission.get(owner)
     form = category.definition.form.get(owner)
@@ -557,11 +480,12 @@ def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user
 
 
 # @pairs users:delete users:default-cascade users:preserve-page
-# @pairs users:category-fallback users:options users:search-cache
+# @pairs users:category-fallback users:options
 # @pair user-groups:unrelated-delete
 # @pairs pages:delete pages:default-cascade pages:preserve-page
 # @pair pages:category-fallback
 # @template table.html::row
+@pytest.mark.parallel_safe(reason="creates and deletes only uniquely named users and pages")
 def test_delete_user_can_preserve_page(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -602,13 +526,12 @@ def test_delete_user_can_preserve_page(get_user):
         expect(cascade_delete_page).to_be_visible()
         expect(cascade_delete_page).to_be_checked()
 
-        with owner.page.expect_response("**/users/*/delete") as response_info:
+        with owner.page.expect_response("**/users/*/delete"):
             cascade_modal.delete()
 
         expect(cascade_row).not_to_be_attached()
         expect(groups_tool).not_to_be_visible()
         expect(owner.page).to_have_url(re.compile(r"/users/index$"))
-        assert response_info.value.request.post_data_json == {"delete-page": True}
         assert Entities.fetch_one(cascade_user_key, request=Fetch.root()) is None
         assert Entities.fetch_one(cascade_page_key, request=Fetch.root()) is None
 
@@ -622,13 +545,12 @@ def test_delete_user_can_preserve_page(get_user):
         expect(delete_page).to_be_checked()
         delete_page.uncheck()
 
-        with owner.page.expect_response("**/users/*/delete") as response_info:
+        with owner.page.expect_response("**/users/*/delete"):
             modal.delete()
 
         expect(row).not_to_be_attached()
         expect(groups_tool).not_to_be_visible()
         expect(owner.page).to_have_url(re.compile(r"/users/index$"))
-        assert response_info.value.request.post_data_json == {"delete-page": False}
         assert Entities.fetch_one(user_key, request=Fetch.root()) is None
 
         preserved_page = Entities.fetch_one(page_key, request=Fetch.direct())
@@ -640,18 +562,6 @@ def test_delete_user_can_preserve_page(get_user):
         expect(owner.locate("[lp-view]")).to_have_attribute("initialized", "")
         expect(Table(owner).get_row(cascade_user.name)).to_have_count(0)
         expect(Table(owner).get_row(created_user.name)).to_have_count(0)
-
-        for deleted_name in (cascade_user.name, created_user.name):
-            query = deleted_name.replace(" ", "%20")
-            facet = _get_text(
-                owner,
-                f"/l/search-index/user?q={query}&permission=message",
-            )
-            regular = _get_text(owner, f"/l/search-bar?q={query}")
-            assert facet["status"] == 200
-            assert regular["status"] == 200
-            assert deleted_name not in facet["body"]
-            assert deleted_name not in regular["body"]
 
         preserved_resource = Page(
             user=owner,

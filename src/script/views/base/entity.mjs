@@ -260,7 +260,8 @@ export default class Entity extends Core {
 	 * @tests tests_js/test_012_entity_layout_frontend.py::test_dynamic_mobile_secondary_uses_final_layout_state
 	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_mobile_photo_prompt_rejoins_section_switching
 	 * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_enabled_model_tasks_rejoins_section_switching
-	 * @pair entity-layout:dynamic-secondary
+	 * @features entity-layout
+	 * @dimensions dynamic-secondary project-mobile page-mobile
 	 */
 	async updateLayout({
 		attribute = null,

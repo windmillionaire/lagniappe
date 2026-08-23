@@ -81,6 +81,7 @@ class TaskIndex(Index):
     # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
     # @features task-index
     # @dimensions restrictions
+    # @pair task-index:assignee-visibility
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._undated = bool(kwargs.get("undated"))

@@ -561,7 +561,8 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
         return True
 
     # @testable true
-    # @tests tests_e2e/002_home/test_002o_deferred_jobs.py::test_poll_operation_is_owner_safe
+    # @tests tests_unit/test_023b_deferred_job_service.py::test_statuses_returns_only_jobs_visible_to_the_actor
+    # @tests tests_unit/test_023b_deferred_job_service.py::test_statuses_rejects_more_than_fifty_jobs
     # @features deferred-jobs
     # @dimensions status owner batching progress timing
     def statuses(self, job_keys, actor, *, now=None):

@@ -569,8 +569,9 @@ def login_google():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_identity_returns_rate_limit_response
+# @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
 # @features login
-# @dimensions identity-platform rate-limit
+# @dimensions identity-platform rate-limit email-password token-verification hosted-e2e
 @users.route("/login-identity", methods=["POST"])
 def login_identity():
     """Handle Identity Platform email/password authentication."""

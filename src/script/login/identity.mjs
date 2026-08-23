@@ -41,8 +41,9 @@ class IdentityPlatformError extends Error {
 /**
  * @testable true
  * @tests tests_js/test_033_identity_platform.py::test_identity_platform_rest_client_contract
+ * @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
  * @features login
- * @dimensions identity-platform email-password action-codes browser-fetch
+ * @dimensions identity-platform email-password action-codes browser-fetch hosted-e2e
  */
 class IdentityPlatformClient {
 	constructor(config) {

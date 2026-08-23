@@ -13,6 +13,7 @@ from xml.etree import ElementTree
 
 import pytest
 import requests
+from playwright.sync_api import expect
 from google.api_core.client_options import ClientOptions
 from google.auth import impersonated_credentials
 from google.auth.transport.requests import Request
@@ -26,11 +27,16 @@ from google.cloud.storage import _signing as storage_signing
 from google.cloud.datastore.query import PropertyFilter
 
 from lagniappe import CONFIG
+from lagniappe.core.entities import Entities
+from lagniappe.core.tools.services import identity_platform
 from lagniappe.core.tools.services import places as location
 from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.ai.core import GenAI
 from lagniappe.core.tools.database import assets
 from lagniappe.core.tools.database.core import DATA
+
+from testing.definitions import SitePages, Users
+from testing.elements import Buttons, FormElements
 
 pytestmark = [pytest.mark.e2e, pytest.mark.setup_provider]
 
@@ -102,6 +108,102 @@ def test_runtime_effective_permissions_exclude_provisioning_authority():
         "iam.serviceAccounts.actAs",
         "iam.serviceAccounts.signBlob",
     }
+
+
+# @features login
+# @dimensions identity-platform email-password token-verification hosted-e2e
+def test_runtime_identity_platform_sign_in_reaches_hosted_home(get_user):
+    """Sign in through the live provider and deployed application handoff."""
+    if not CONFIG.hosted_e2e_runner:
+        pytest.skip("requires the hosted App Engine E2E service")
+
+    probe_id = uuid4().hex
+    email = f"setup-runtime-auth-{probe_id}@example.test"
+    password = f"E2E-{probe_id}-aA1!"
+    display_name = f"Runtime Auth {probe_id[:8]}"
+    provider_created = False
+    local_user = None
+    anonymous = None
+
+    try:
+        client_config = CONFIG.IDENTITY_PLATFORM_CONFIG
+        provider_session = requests.Session()
+        sign_up = provider_session.post(
+            f"{identity_platform.IDENTITY_TOOLKIT_API}/accounts:signUp",
+            params={"key": client_config["apiKey"]},
+            json={
+                "email": email,
+                "password": password,
+                "returnSecureToken": True,
+            },
+            timeout=30,
+        )
+        assert sign_up.status_code == 200, sign_up.text
+        provider_user = sign_up.json()
+        provider_created = True
+        local_id = provider_user.get("localId")
+        assert local_id
+
+        verified = provider_session.post(
+            (
+                f"{identity_platform.IDENTITY_TOOLKIT_API}/projects/"
+                f"{client_config['projectId']}/accounts:update"
+            ),
+            headers={
+                "Authorization": f"Bearer {CONFIG.google_access_token()}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "localId": local_id,
+                "emailVerified": True,
+                "displayName": display_name,
+            },
+            timeout=30,
+        )
+        assert verified.status_code == 200, verified.text
+
+        local_user = Entities.USER.create(
+            {
+                "email": email,
+                "name": display_name,
+                "admin": True,
+            }
+        )
+        local_user.last_login = datetime.now(timezone.utc)
+        local_user.save()
+
+        owner = Users.OWNER.get(None)
+        owner.entity.last_login = datetime.now(timezone.utc)
+        owner.entity.save()
+
+        anonymous = get_user(Users.ANONYMOUS)
+        login_page = anonymous.go(SitePages.LOGIN_PAGE)
+        auth_method = anonymous.locate(login_page.AUTH_METHOD_FORM)
+        auth_method.locator("[data-role='show-email-check']").click()
+
+        email_form = anonymous.locate(login_page.EMAIL_CHECK_FORM)
+        email_form.locator(FormElements.EMAIL).fill(email)
+        email_form.locator(Buttons.SIGNIN).click()
+
+        sign_in_form = anonymous.locate(login_page.SIGN_IN_FORM)
+        sign_in_form.locator("input[type='password']").fill(password)
+        sign_in_form.locator(Buttons.SIGNIN).click()
+
+        anonymous.page.wait_for_url(
+            f"{str(CONFIG.APP_URL).rstrip('/')}/",
+            timeout=30_000,
+        )
+        assert anonymous.page.title() == "Home"
+        expect(anonymous.page.locator("[lp-view]")).to_have_attribute(
+            "initialized", ""
+        )
+    finally:
+        if anonymous and anonymous.page and not anonymous.page.is_closed():
+            anonymous.page.close()
+        if provider_created:
+            identity_platform.delete_account_by_email(email)
+        if local_user is not None:
+            Entities.delete(local_user)
 
 
 def test_runtime_datastore_and_all_storage_bucket_operations(monkeypatch):

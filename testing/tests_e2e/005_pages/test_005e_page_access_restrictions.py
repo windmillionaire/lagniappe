@@ -1,13 +1,3 @@
-"""
-Tests for page-level access restrictions.
-
-Verified against:
-- lagniappe/web/templates/pages/info.html
-- lagniappe/web/templates/pages/restrictions.html
-- lagniappe/web/routes/pages/main.py
-- src/script/widgets/pagePermissions.mjs
-"""
-
 import re
 
 import pytest
@@ -68,7 +58,6 @@ def _restrict_page_to_group(user, page, group):
 def test_owner_restricted_page_is_hidden_from_model_viewer(
     get_user, browser_failures
 ):
-    """The owner marks a page owner-only; a normal model viewer can no longer open it."""
     owner = get_user(Users.OWNER)
     page = Pages.test_owner_restricted_page.get(owner)
 
@@ -83,7 +72,6 @@ def test_owner_restricted_page_is_hidden_from_model_viewer(
 # @features pages
 # @dimensions access-restrictions group-restricted
 def test_group_restricted_page_opens_for_member_only(get_user, browser_failures):
-    """The owner restricts a page to a group; members keep access and others lose it."""
     owner = get_user(Users.OWNER)
     page = Pages.test_group_restricted_page.get(owner)
     group = Groups.general_models_view_only.get(owner)
@@ -103,7 +91,6 @@ def test_group_restricted_page_opens_for_member_only(get_user, browser_failures)
 # @features pages
 # @dimensions access-restrictions index-filter
 def test_restricted_page_is_not_listed_for_outsider_on_category_index(get_user):
-    """Category tables should not leak pages the current user cannot open."""
     owner = get_user(Users.OWNER)
     page = Pages.test_group_restricted_page.get(owner)
     category = Categories.test_page_access_restrictions.get(owner)
@@ -118,6 +105,4 @@ def test_restricted_page_is_not_listed_for_outsider_on_category_index(get_user):
     outsider = get_user(Users.admin)
     outsider.go(category)
     outsider_table = Table(outsider)
-    # Possible product bug: PageIndex currently loads category pages by query
-    # restrictions, then templates render every row without checking page.allowed(VIEW).
     expect(outsider_table.get_row(page.definition.name)).not_to_be_attached()

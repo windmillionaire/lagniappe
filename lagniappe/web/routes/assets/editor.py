@@ -49,7 +49,6 @@ def form_html(key, field_id, **kwargs):
 
 
 # @testable true
-# @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_sync_response_contract_is_browser_visible
 # @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
 @assets.route("<key>/document/state", methods=["GET"])
 @permission(requested=Action.VIEW)

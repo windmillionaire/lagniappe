@@ -1,12 +1,3 @@
-"""
-Tests for user settings and preferences.
-
-Tests user page, profile updates, and application settings.
-Verified against:
-- lagniappe/templates/pages/page.html (user page variant)
-- src/script/views/page.mjs
-"""
-
 import json
 import re
 from pathlib import Path
@@ -44,7 +35,6 @@ pytestmark = pytest.mark.e2e
 
 
 def _open_user_settings(user, user_page):
-    """Open the user settings subpanel from the page Info tab."""
     toggle = user.locate(user_page.USER_SETTINGS_TOGGLE).first
     expect(toggle).to_be_visible()
     toggle.click()
@@ -338,13 +328,33 @@ def _session_page_key(user):
     return serializer.loads(cookie["value"])[CONFIG.LOGIN_USER_PAGE_KEY]
 
 
+def _acknowledge_user_cache_invalidation(user, destination=None):
+    """Consume a permission mutation through the browser-owned protocol."""
+    assert Entities.USER.load(user.email).invalidate_cache is True
+    destination = destination or SitePages.HOME.get(user).url
+    with user.page.context.expect_event(
+        "response",
+        predicate=lambda response: (
+            response.url.endswith("/l/validate-user")
+            and response.request.method == "POST"
+        ),
+    ) as validation_info:
+        response = user.navigate(destination)
+
+    validation = validation_info.value
+    assert validation.status == 200
+    assert validation.json()["cacheCleared"] is True
+    user.entity = Entities.USER.load(user.email)
+    assert user.entity.invalidate_cache is False
+    return response
+
+
 # @pairs user-settings:personal-page user-settings:readonly-email
 # @pairs user-settings:sign-out user-settings:group-selector-hidden
 # @pair user-settings:field-order
 # @pairs notification-email:user-setting notification-email:default-daily
 # @template pages/info.html::user_settings
 def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
-    """A signed-in user can open settings from their personal page."""
     owner = get_user(Users.OWNER)
     user = get_user(Users.create_user, creator=owner)
     user.go(SitePages.HOME)
@@ -796,6 +806,7 @@ def test_public_user_restricted_schedules_are_forbidden(
 # @pair cache:invalidation-acknowledgement
 # @pair notification-email:user-only
 # @template pages/info.html::user_settings
+@pytest.mark.parallel_safe(reason="creates and updates a uniquely named user")
 def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -900,7 +911,6 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
 # @pair user-settings:relation-loading
 # @template pages/info.html::user_settings
 def test_user_settings_preloads_existing_groups(get_user):
-    """The group selector shows every group already assigned to the user."""
     owner = get_user(Users.OWNER)
     created_user = get_user(Users.user_settings_group_preload, creator=owner)
     first_group = Groups.general_users_view_only.get(owner)
@@ -944,6 +954,7 @@ def test_user_settings_preloads_existing_groups(get_user):
 # @pair cache:invalidation-acknowledgement
 # @pair auth:canonical-page
 # @template pages/info.html::user_settings
+@pytest.mark.parallel_safe(reason="creates and reassigns a unique user and pages")
 def test_owner_can_reassign_and_remove_user_from_page(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -1020,6 +1031,7 @@ def test_owner_can_reassign_and_remove_user_from_page(get_user):
 # @pairs user-settings:submit-boundary user-settings:attached-form
 # @pairs user-settings:categories user-settings:restrictions
 # @pair cache:invalidation-acknowledgement
+@pytest.mark.parallel_safe(reason="creates and updates a unique attached user page")
 def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     owner = get_user(Users.OWNER)
     category = Categories.test_basic_inputs_submission.get(owner)
@@ -1151,16 +1163,22 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
 
 # @features admin
 # @dimensions site-settings admin-only route page-load
+# @pair cache:invalidation-acknowledgement
 # @template home/admin.html::main
 def test_site_settings_requires_administrator(get_user, browser_failures):
     owner = get_user(Users.OWNER)
-    user = get_user(Users.create_user, creator=owner)
+    suffix = uuid4().hex
+    user = get_user(
+        UserDefinition(
+            name=f"Temporary Administrator {suffix[:8]}",
+            email=f"temporary-administrator-{suffix}@example.test",
+        ),
+        creator=owner,
+    )
 
-    # Owner: admin settings page is available.
     admin = owner.go(SitePages.ADMIN)
     expect(owner.locate(admin.SITE_SETTINGS_FORM)).to_be_visible()
 
-    # Non-owner: direct route is forbidden.
     admin_url = f"{SETTINGS.test_config['BASE_URL'].rstrip('/')}/admin"
     with browser_failures.expect_http_error(user, status=403, path=admin_url):
         response = user.page.goto(
@@ -1172,12 +1190,15 @@ def test_site_settings_requires_administrator(get_user, browser_failures):
     user.entity.is_admin = True
     user.entity.save()
     try:
+        _acknowledge_user_cache_invalidation(user)
         response = user.page.goto(admin_url, wait_until="domcontentloaded")
         assert response.status == 200
         expect(user.locate("[data-widget='SiteSettings']")).to_be_visible()
     finally:
+        user.entity = Entities.USER.load(user.email)
         user.entity.is_admin = False
         user.entity.save()
+        _acknowledge_user_cache_invalidation(user)
 
 
 # @pairs admin:roster admin:managed-user-search admin:promotion admin:demotion
@@ -1185,10 +1206,18 @@ def test_site_settings_requires_administrator(get_user, browser_failures):
 # @pairs admin:managed-users admin:account-preservation admin:owner-only
 # @pairs owner:role-controls owner:awaiting-first-sign-in owner:owner-only
 # @pair cache:cache-invalidation
+# @pair cache:invalidation-acknowledgement
 # @template home/site_settings.html::site_settings
 def test_site_administrator_roster_and_owner_controls(get_user, browser_failures):
     owner = get_user(Users.OWNER)
-    managed = get_user(Users.create_user, creator=owner)
+    suffix = uuid4().hex
+    managed = get_user(
+        UserDefinition(
+            name=f"Administrator Roster User {suffix[:8]}",
+            email=f"administrator-roster-{suffix}@example.test",
+        ),
+        creator=owner,
+    )
     _, settings_panel = _open_owner_site_settings(owner)
     section = _open_site_settings_section(settings_panel, "administrators")
     form = section.locator("[data-role='administrator-form']")
@@ -1231,7 +1260,8 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
     assert not promoted.is_owner
 
     admin_url = f"{SETTINGS.test_config['BASE_URL'].rstrip('/')}/admin"
-    response = managed.page.goto(admin_url, wait_until="domcontentloaded")
+    managed.entity = promoted
+    response = _acknowledge_user_cache_invalidation(managed, admin_url)
     assert response.status == 200
     expect(managed.locate("button[data-role='configuration']")).to_have_count(0)
     admin_section = _open_site_settings_section(
@@ -1270,17 +1300,26 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
     demoted = Entities.USER(database.get.user(managed.email))
     assert not demoted.is_admin
     assert demoted.invalidate_cache
+    managed.entity = demoted
 
     with browser_failures.expect_http_error(managed, status=403, path=admin_url):
-        response = managed.page.goto(admin_url, wait_until="domcontentloaded")
+        response = _acknowledge_user_cache_invalidation(managed, admin_url)
     assert response.status == 403
 
 
 # @pairs admin:site-settings export:admin-only owner:sensitive-configuration
 # @pairs owner:recovery-export owner:route-gate owner:configuration
+# @pair cache:invalidation-acknowledgement
 def test_additional_admin_cannot_access_owner_configuration(get_user, browser_failures):
     owner = get_user(Users.OWNER)
-    administrator = get_user(Users.create_user, creator=owner)
+    suffix = uuid4().hex
+    administrator = get_user(
+        UserDefinition(
+            name=f"Restricted Administrator {suffix[:8]}",
+            email=f"restricted-administrator-{suffix}@example.test",
+        ),
+        creator=owner,
+    )
     owner.go(SitePages.HOME)
     administrator.go(SitePages.HOME)
     promotion = _fetch_status(
@@ -1294,6 +1333,8 @@ def test_additional_admin_cannot_access_owner_configuration(get_user, browser_fa
     try:
         persisted_administrator = Entities.USER(database.get.user(administrator.email))
         assert persisted_administrator.is_admin
+        administrator.entity = persisted_administrator
+        _acknowledge_user_cache_invalidation(administrator)
         admin = administrator.go(SitePages.ADMIN)
         settings_panel = administrator.locate(admin.SITE_SETTINGS_FORM)
         expect(settings_panel).to_be_visible()
@@ -1331,6 +1372,9 @@ def test_additional_admin_cannot_access_owner_configuration(get_user, browser_fa
             "DELETE",
         )
         assert demotion["status"] == 200
+        administrator.entity = Entities.USER.load(administrator.email)
+        assert not administrator.entity.is_admin
+        _acknowledge_user_cache_invalidation(administrator)
 
 
 # @features admin

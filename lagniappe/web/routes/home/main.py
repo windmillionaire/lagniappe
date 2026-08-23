@@ -58,8 +58,8 @@ def get(kind):
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_notes_exclude_notifications
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes
-# @features activity notes
-# @dimensions load cached-response notes-only
+# @pairs activity:load activity:cached-response activity:notes-only
+# @pairs notes:load notes:cached-response notes:notes-only
 # @pair activity:notes-exclusion
 @internal.route("/activity")
 @home_permission()

@@ -24,7 +24,6 @@ def _empty_main_script(route):
 # @template projects/project.html::main
 # @style entity.tabIcon
 def test_project_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_user):
-    """Desktop tab icons never paint while a phone layout is unresolved."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
     project.user = user
@@ -46,7 +45,6 @@ def test_project_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_user
 # @dimensions project-mobile nav visibility
 # @template projects/project.html::toggles
 def test_mobile_nav_visibility_changes_with_viewport(get_user):
-    """Mobile nav replaces desktop tab nav below the mobile breakpoint."""
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_create_project_manual_mode)
 
@@ -70,7 +68,6 @@ def test_mobile_nav_visibility_changes_with_viewport(get_user):
 # @features entity-layout
 # @dimensions project-mobile flipper
 def test_mobile_flipper_reveals_section_toggles(get_user):
-    """The mobile flipper reveals hidden section toggles and tracks flipped state."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(project)
@@ -93,7 +90,6 @@ def test_mobile_flipper_reveals_section_toggles(get_user):
 # @features entity-layout
 # @dimensions project-mobile section-switch
 def test_mobile_section_switching_updates_visible_cards_and_title(get_user):
-    """Mobile nav switches between model tasks card and tabs-backed sections."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(project)
@@ -116,7 +112,6 @@ def test_mobile_section_switching_updates_visible_cards_and_title(get_user):
 # @pair projects:mobile-model-tasks
 # @template projects/project.html::main
 def test_mobile_enabled_model_tasks_rejoins_section_switching(get_user):
-    """Enabling Model Tasks on mobile gives the card normal section behavior."""
     user = get_user(Users.OWNER)
     project = Projects.test_project_info_form.get(user)
     user.go(project)
@@ -143,7 +138,6 @@ def test_mobile_enabled_model_tasks_rejoins_section_switching(get_user):
 # @features entity-layout
 # @dimensions project-mobile secondary-create
 def test_mobile_create_model_form_opens_from_model_tasks_section(get_user):
-    """The mobile layout still allows creating model tasks from the models section."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(project)
@@ -162,7 +156,6 @@ def test_mobile_create_model_form_opens_from_model_tasks_section(get_user):
 # @features entity-layout
 # @dimensions project-mobile secondary-info
 def test_mobile_model_task_info_still_opens_in_models_section(get_user):
-    """Existing model task rows remain editable after switching to the mobile models section."""
     user = get_user(Users.OWNER)
     model_task = ModelTasks.test_create_model_task.get(user)
     user.go(model_task.project)
@@ -181,7 +174,6 @@ def test_mobile_model_task_info_still_opens_in_models_section(get_user):
 # @features entity-layout
 # @dimensions project-mobile resize secondary-card
 def test_resize_from_mobile_models_to_desktop_restores_dual_card_layout(get_user):
-    """Desktop resize restores the model tasks card beside the tabs card."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(project)
@@ -201,7 +193,6 @@ def test_resize_from_mobile_models_to_desktop_restores_dual_card_layout(get_user
 # @features entity-layout
 # @dimensions project-mobile resize persistence
 def test_resize_from_mobile_filters_to_desktop_preserves_selected_tab(get_user):
-    """Resizing back to desktop preserves the currently selected tabs-backed section."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(project)
@@ -218,7 +209,6 @@ def test_resize_from_mobile_filters_to_desktop_preserves_selected_tab(get_user):
 # @features entity-layout
 # @dimensions project-mobile reload persistence
 def test_mobile_selected_section_persists_after_reload(get_user):
-    """The last selected mobile section is restored after a full reload."""
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
     user.go(project)

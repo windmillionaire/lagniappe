@@ -140,8 +140,11 @@ class PageList(HomeProperty):
 # @tests tests_unit/test_002i_home_properties.py::test_home_task_list_restrictions_visibility_and_count
 # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_home_task_list_shows_view_only_page_tasks_without_controls
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
+# @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_add_due_date
 # @features home
 # @dimensions tasks count permissions task-list view-only
+# @pairs home:assignee-visibility task-assignment:home-list
+# @pair tasks:inaccessible-backing-page
 class TaskList(HomeProperty):
     _id = "tasks"
     _label = "Tasks"

@@ -440,7 +440,19 @@ def test_ai_model_cleanup_extracts_json_text_and_blocked_responses():
 
     with pytest.raises(exceptions.AIException, match="Content generation blocked"):
         ai_core.GenAI._extract_text(
-            model_response("Nope", finish_reason="SAFETY"), "TEXT"
+            model_response(
+                "Nope",
+                finish_reason=ai_core.types.FinishReason.SAFETY,
+            ),
+            "TEXT",
+        )
+
+    with pytest.raises(exceptions.AIException, match="Reason: MAX_TOKENS"):
+        ai_core.GenAI._extract_text(
+            model_response(
+                finish_reason=ai_core.types.FinishReason.MAX_TOKENS,
+            ),
+            "TEXT",
         )
 
     assert ai_core.GenAI._extract_text(SimpleNamespace(candidates=[]), "TEXT") is None
@@ -742,6 +754,45 @@ def test_autofill_accepts_summary_backed_json_without_tool_or_final_call():
     assert len(models.calls) == 1
     assert models.calls[0]["config"].response_mime_type is None
     assert models.calls[0]["config"].response_schema is None
+
+
+# @pairs ai:search ai:output-format
+@pytest.mark.unit
+def test_ai_search_json_generation_keeps_provider_response_unconstrained():
+    response = SimpleNamespace(
+        function_calls=[],
+        candidates=[
+            SimpleNamespace(
+                finish_reason=ai_core.types.FinishReason.STOP,
+                content=SimpleNamespace(
+                    parts=[SimpleNamespace(text='```json\n{"answer": "Ada"}\n```')]
+                ),
+            )
+        ],
+    )
+
+    class SearchModels:
+        def __init__(self):
+            self.calls = []
+
+        def generate_content(self, *, model, contents, config):
+            self.calls.append(
+                {"model": model, "contents": contents, "config": config}
+            )
+            return response
+
+    prompt = Prompt("System").enable_search().set_output_format("JSON")
+    generator = ai_core.GenAI()
+    models = SearchModels()
+    generator._client = SimpleNamespace(models=models)
+
+    assert generator.generate_content(prompt) == {"answer": "Ada"}
+    assert len(models.calls) == 1
+    config = models.calls[0]["config"]
+    assert config.response_mime_type is None
+    assert config.response_schema is None
+    assert len(config.tools) == 1
+    assert config.tools[0].google_search is not None
 
 
 # @features ai
@@ -3034,6 +3085,16 @@ def test_ai_image_generation_config_and_provider_error(monkeypatch):
     with pytest.raises(exceptions.AIException) as exc:
         generator.generate_image(prompt)
     assert str(exc.value) == "Request contains an invalid argument."
+
+    class BlockedModels:
+        def generate_content(self, *, model, contents, config):
+            return model_response(
+                finish_reason=ai_core.types.FinishReason.SAFETY,
+            )
+
+    generator._client = SimpleNamespace(models=BlockedModels())
+    with pytest.raises(exceptions.AIException, match="blocked: SAFETY"):
+        generator.generate_image(prompt)
 
     captured_imagen = {}
 

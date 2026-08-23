@@ -87,6 +87,9 @@ def _create_category(user, home, definition):
 # @features categories
 # @dimensions manual-form attach-form
 @pytest.mark.e2e
+@pytest.mark.parallel_safe(
+    reason="the form shell story creates no category or shared state"
+)
 def test_create_category_form(get_user):
     """
     Verify create category form opens with expected fields.
@@ -122,6 +125,9 @@ def test_create_category_form(get_user):
 # @features categories
 # @dimensions ai-form explain-button
 @pytest.mark.e2e
+@pytest.mark.parallel_safe(
+    reason="the prompt preview remains inside its isolated browser context"
+)
 def test_category_form_explain_button(get_user):
     """
     Verify AI explain button shows prompt preview modal.
@@ -153,6 +159,9 @@ def test_category_form_explain_button(get_user):
 # @features categories
 # @dimensions manual-form ai-form
 @pytest.mark.e2e
+@pytest.mark.parallel_safe(
+    reason="the form-mode story creates no category or shared state"
+)
 def test_category_form_generate_toggle(get_user):
     """
     Verify manual/AI mode toggle switches form fields.
@@ -221,6 +230,9 @@ def test_create_category_ai_mode(get_user, results):
 # @features categories
 # @dimensions navigate
 @pytest.mark.e2e
+@pytest.mark.parallel_safe(
+    reason="the story reads and navigates to one distinct catalogued category"
+)
 def test_navigate_to_category(get_user):
     """
     Verify navigation from category list to category index page.
@@ -241,6 +253,9 @@ def test_navigate_to_category(get_user):
 # @features categories
 # @dimensions attach-form create-manual
 @pytest.mark.e2e
+@pytest.mark.parallel_safe(
+    reason="the story owns a distinct category and only reads its attached form"
+)
 def test_create_category_with_form(get_user):
     """
     Verify category with attached form shows form fields.
@@ -265,10 +280,13 @@ def test_create_category_with_form(get_user):
 
 
 # @features categories
-# @dimensions delete title-menu
+# @dimensions delete
 # @template categories/index.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
+@pytest.mark.parallel_safe(
+    reason="the story creates and deletes its distinct catalogued category"
+)
 def test_delete_category(get_user):
     """Verify category deletion from its title menu."""
     user = get_user(Users.OWNER)

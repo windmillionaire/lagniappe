@@ -18,9 +18,14 @@ from . import process
 
 
 # Validate OIDC token from Cloud Tasks
-# @testable false
-# @manual true
-# @reason requires Cloud Tasks OIDC provider validation
+# @testable true
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
+# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
+# @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
+# @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
+# @features deferred-jobs
+# @dimensions cloud-tasks oidc provider-delivery hosted-e2e
 def authenticate_task(request):
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
@@ -57,11 +62,14 @@ def authenticate_task(request):
         return None
 
 
-# @testable false
-# @manual true
-# @reason requires Cloud Tasks OIDC authentication and provider delivery
+# @testable true
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
+# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
+# @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
+# @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
 # @features deferred-jobs
-# @dimensions process-route versioned-envelope
+# @dimensions process-route versioned-envelope cloud-tasks oidc provider-delivery hosted-e2e
 @process.route("/jobs", methods=["POST"])
 def deferred_job_process():
     """Run one durable job; Cloud Tasks carries only its Datastore key."""

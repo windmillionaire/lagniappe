@@ -52,8 +52,6 @@ pytestmark = pytest.mark.e2e
 PREFIX = SETTINGS.test_config["PREFIX"]
 
 
-# @features database
-# @dimensions datastore-creation
 def test_database_setup():
     """
     Verify test database entity kinds use the test prefix.
@@ -110,8 +108,6 @@ def test_cache_setup():
     assert cache.core.filter_cache.redis.ft(cache.core.filter_cache.INDEX).info()
 
 
-# @features storage
-# @dimensions bucket-creation
 def test_storage_setup():
     """
     Verify test GCS buckets exist in Cloud Storage with the test prefix.
@@ -376,8 +372,6 @@ def test_error_handling(get_user, browser_failures):
     expect(user.page).to_have_title("Error 404")
 
 
-# @features e2e browser-failures
-# @dimensions harness pageerror teardown
 def test_browser_failure_guard_detects_unhandled_page_errors(
     get_user, browser_failures
 ):

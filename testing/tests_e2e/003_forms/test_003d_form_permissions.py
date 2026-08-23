@@ -1,12 +1,3 @@
-"""
-Permission tests for form index and form builder templates.
-
-Verified against:
-    - lagniappe/web/templates/forms/index.html
-    - lagniappe/web/templates/forms/builder.html
-    - lagniappe/web/routes/forms/main.py
-"""
-
 import pytest
 from playwright.sync_api import expect
 

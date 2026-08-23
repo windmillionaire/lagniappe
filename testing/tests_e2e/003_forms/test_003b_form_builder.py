@@ -66,7 +66,6 @@ def _html_editor_text_entry(builder):
 # @dimensions builder-preview
 # @template forms/builder.html::header
 def test_preview_panel(get_user):
-    """Preview panel renders the existing saved schema."""
     user = get_user(Users.OWNER)
     form = Forms.test_preview_panel.get(user)
     form.schema = Schemas.add_fields.get()
@@ -89,7 +88,6 @@ def test_preview_panel(get_user):
 # @features forms
 # @dimensions builder-delete-components
 def test_delete_components(get_user):
-    """Deleting a selected component removes it from the builder schema."""
     user = get_user(Users.OWNER)
     form = Forms.test_delete_components.get(user)
     builder = form.builder
@@ -118,7 +116,6 @@ def test_delete_components(get_user):
 # @pairs forms:builder-select-options forms:builder-field-title
 # @pairs frontend-icons:material-icon-preservation
 def test_change_select_options(get_user):
-    """Select labels and icons survive title edits while options remain editable."""
     user = get_user(Users.OWNER)
     form = Forms.test_change_select_options.get(user)
     builder = form.builder
@@ -179,7 +176,6 @@ def test_change_select_options(get_user):
 # @features forms
 # @dimensions builder-field-visibility
 def test_field_visibility(get_user):
-    """A field visibility condition is stored in schema and drives preview state."""
     user = get_user(Users.OWNER)
     form = Forms.test_field_visibility.get(user)
     builder = form.builder
@@ -218,7 +214,6 @@ def test_field_visibility(get_user):
 # @features forms
 # @dimensions builder-field-visibility select-or-values
 def test_field_visibility_select_multiple_values(get_user):
-    """A field can be visible for multiple values from the same select."""
     user = get_user(Users.OWNER)
     form = Forms.test_field_visibility_select_multiple_values.get(user)
     builder = form.builder
@@ -261,7 +256,6 @@ def test_field_visibility_select_multiple_values(get_user):
 # @features forms
 # @dimensions builder-table-column
 def test_table_column_condition_editor(get_user):
-    """Table columns can be created, validated while editing, and reloaded."""
     user = get_user(Users.OWNER)
     form = Forms.test_table_column_condition_editor.get(user)
     builder = form.builder
@@ -310,7 +304,6 @@ def test_table_column_condition_editor(get_user):
 # @features forms
 # @dimensions builder-status-message
 def test_status_message_condition_editor(get_user):
-    """Status message conditions store schema and update the builder preview."""
     user = get_user(Users.OWNER)
     form = Forms.test_status_message_condition_editor.get(user)
     builder = form.builder
@@ -374,7 +367,6 @@ def test_status_message_condition_editor(get_user):
 # @features forms signature
 # @dimensions builder-signature-field unique-component builder-preview
 def test_signature_field_builder_unique_component(get_user):
-    """Task-form signature components render in preview and remain unique."""
     user = get_user(Users.OWNER)
     form = Forms.test_signature_field_builder_unique_component.get(user)
     builder = form.builder
@@ -407,7 +399,6 @@ def test_signature_field_builder_unique_component(get_user):
 # @features html-field
 # @dimensions builder-html-field image-upload unsaved-schema asset-lifecycle render-fetch submitter-key form-asset
 def test_html_field(get_user):
-    """Rich HTML fields save assets and render from a submitter form context."""
     user = get_user(Users.OWNER)
     form = Forms.test_html_field.get(user)
     builder = form.builder
@@ -486,7 +477,6 @@ def test_html_field(get_user):
 # @features forms
 # @dimensions builder-drag-component
 def test_drag_component(get_user):
-    """Dragging components into the model panel creates schema entries in order."""
     user = get_user(Users.OWNER)
     form = Forms.test_drag_component.get(user)
     builder = form.builder

@@ -459,14 +459,15 @@ def _should_submit_task_form(active, role, task):
 # @testable true
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_task_from_home_page
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_complete_page_task
+# @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_due_date
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_empty_form_is_readonly
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_partial_submission_omits_empty_fields
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_task_without_edit_controls
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_assigned_user_can_work_their_assigned_task
-# @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_task_offline_replay_rejects_a_stale_origin_fingerprint
 # @features tasks
 # @dimensions complete due-date readonly assignee permission-gates attached-form empty-fields partial-submission
-# @pairs tasks:no-mutation offline:replay-precondition forms:conflict-review
+# @pairs tasks:complete tasks:due-date tasks:readonly tasks:assignee
+# @pairs tasks:permission-gates tasks:attached-form tasks:empty-fields tasks:partial-submission
 @tasks.route("<key>/update", methods=["PUT", "GET"])
 @permission(Resource.TASK, Action.EDIT)
 def update(key, **kwargs):

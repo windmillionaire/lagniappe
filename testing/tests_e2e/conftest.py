@@ -213,6 +213,23 @@ def _e2e_session_lock():
             fcntl.flock(lock_file, fcntl.LOCK_UN)
 
 
+def pytest_collection_modifyitems(items):
+    """Validate the audit-only marker without changing execution behavior."""
+    for item in items:
+        marker = item.get_closest_marker("parallel_safe")
+        if marker is None:
+            continue
+        reason = marker.kwargs.get("reason")
+        if not isinstance(reason, str) or not reason.strip():
+            raise pytest.UsageError(
+                f"{item.nodeid}: parallel_safe requires a nonempty reason"
+            )
+        if "/001_site/" in f"/{item.nodeid}":
+            raise pytest.UsageError(
+                f"{item.nodeid}: 001_site must remain in the serial gate"
+            )
+
+
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     """Store pytest phase reports on the test item for fixture teardown access."""

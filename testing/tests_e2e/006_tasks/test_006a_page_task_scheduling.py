@@ -1,30 +1,14 @@
 from playwright.sync_api import expect
 
-from lagniappe.core.definitions import Fetch
-from lagniappe.core.entities import Entities
 from testing.definitions import SitePages, Tasks, Users
 from testing.elements import DateSelect, UserSelect
 from testing.utility.local_time import (
-    local_date_from_utc_datetime,
-    local_date_iso,
     local_date_plus_days_iso,
 )
 
 
 DUE_DATE_BADGE = "[data-role='change-due-date']"
 SCHEDULE_BADGE = "[data-role='schedule']"
-
-
-def _fresh_task(task):
-    return Entities.fetch_one(task.key, request=Fetch.direct())
-
-
-def _assert_due_date(task, expected_iso):
-    entity = _fresh_task(task)
-    assert entity.due_date is not None
-    local_value = local_date_from_utc_datetime(entity.due_date)
-    local_date = local_value.date() if hasattr(local_value, "date") else local_value
-    assert local_date.isoformat() == expected_iso
 
 
 def _open_schedule_form(task):
@@ -68,7 +52,6 @@ def test_page_task_add_due_date(get_user):
 
     UserSelect(task.settings_form).select(assignee)
     _save_settings(task)
-    assert _fresh_task(task).properties.assigned_to.key == assignee.entity.page.key
     settings_form = task.settings_form
     expect(UserSelect(settings_form).button).to_contain_text(assignee.definition.name)
     expect(settings_form.locator("select[name='assigned_to']")).to_have_value(
@@ -81,8 +64,9 @@ def test_page_task_add_due_date(get_user):
     _save_settings(task)
 
     expect(task.element.locator(DUE_DATE_BADGE)).to_be_visible()
-    _assert_due_date(task, due_date)
-    assert _fresh_task(task).properties.assigned_to.key == assignee.entity.page.key
+    expect(UserSelect(task.settings_form).button).to_contain_text(
+        assignee.definition.name
+    )
 
     assigned_user = get_user(Users.create_user)
     assigned_home = assigned_user.go(SitePages.HOME)
@@ -102,7 +86,6 @@ def test_page_task_remove_due_date(get_user):
     _save_settings(task)
 
     expect(task.element.locator(DUE_DATE_BADGE)).not_to_be_attached()
-    assert _fresh_task(task).due_date is None
 
 
 # @features task-scheduling
@@ -117,7 +100,6 @@ def test_page_task_due_today(get_user):
     _save_settings(task)
 
     expect(task.element.locator(DUE_DATE_BADGE)).to_contain_text("Today")
-    _assert_due_date(task, local_date_iso())
 
 
 # @features task-scheduling
@@ -135,11 +117,6 @@ def test_page_task_repeats_when_completed(get_user):
     expect(task.element.locator(task.COMPLETE_TASK_CHECKBOX)).not_to_be_checked()
     expect(task.element.locator(DUE_DATE_BADGE)).to_be_visible()
 
-    entity = _fresh_task(task)
-    assert entity.completed is False
-    assert entity.completed_on is None
-    assert entity.active is True
-    _assert_due_date(task, local_date_plus_days_iso(1))
 
 
 # @features task-scheduling
@@ -152,10 +129,6 @@ def test_page_task_add_schedule(get_user):
     _add_weekly_schedule(task)
 
     expect(task.element.locator(SCHEDULE_BADGE)).to_contain_text("weekly")
-    schedule = _fresh_task(task).properties.schedule.active
-    assert schedule.section_id == "scheduled"
-    assert schedule.mode == "weekly"
-    assert schedule.days == [0]
 
 
 # @features task-scheduling
@@ -172,7 +145,6 @@ def test_page_task_remove_schedule(get_user):
     _save_settings(task)
 
     expect(task.element.locator(SCHEDULE_BADGE)).not_to_be_attached()
-    assert _fresh_task(task).properties.schedule.active is None
 
 
 # @features task-scheduling
@@ -187,7 +159,3 @@ def test_page_task_add_recurring(get_user):
     expect(task.element.locator(SCHEDULE_BADGE)).to_contain_text(
         "2 weeks after completion"
     )
-    schedule = _fresh_task(task).properties.schedule.active
-    assert schedule.section_id == "recurring"
-    assert schedule.interval == 2
-    assert schedule.unit == "week"

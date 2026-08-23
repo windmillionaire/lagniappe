@@ -43,6 +43,7 @@ MARKDOWN_TABLE_PASTE_FIXTURE = "\n".join(
 # @pair sync:empty-content
 # @pair sync:save-guard
 # @pair sync:parent-modified
+@pytest.mark.parallel_safe(reason="uses a dedicated untouched project document")
 def test_untouched_document_does_not_save_or_touch_project(get_user):
     user = get_user(Users.OWNER)
     # The shared toolbar project is intentionally edited by the earlier offline
@@ -84,21 +85,6 @@ def test_untouched_document_does_not_save_or_touch_project(get_user):
 # @features editor
 # @dimensions text-save reload
 def test_editor_loads_and_saves_text(get_user):
-    """
-    Test that editor loads and basic text persists after save.
-
-    Flow:
-        1. Navigate to project document tab
-        2. Type text into editor
-        3. Blur to trigger save
-        4. Reload page
-        5. Verify text persisted
-
-    Verifies:
-        - Editor loads with toolbar visible
-        - Text content saves on blur
-        - Content persists after reload
-    """
     user = get_user(Users.OWNER)
     project = Projects.test_toolbar_loads.get(user)
     user.go(project)
@@ -121,20 +107,6 @@ def test_editor_loads_and_saves_text(get_user):
 # @dimensions formatting reload
 @pytest.mark.filterwarnings("ignore:.*[tiptap warn].*")
 def test_formatting_persists(get_user):
-    """
-    Test that bold and italic formatting persists after save.
-
-    Flow:
-        1. Navigate to project document tab
-        2. Type text, select it, apply bold
-        3. Blur to trigger save
-        4. Reload page
-        5. Verify <strong> tag present in HTML
-
-    Verifies:
-        - Bold formatting applied correctly
-        - Formatting persists in saved HTML
-    """
     user = get_user(Users.OWNER)
     project = Projects.test_formatting_persists.get(user)
     user.go(project)
@@ -174,6 +146,7 @@ def test_formatting_persists(get_user):
 
 # @features editor
 # @dimensions paste-markdown-table reload
+@pytest.mark.parallel_safe(reason="uses a dedicated project document")
 def test_pasting_markdown_table_preserves_table_after_reload(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_editor_markdown_table_paste.get(user)
@@ -198,6 +171,7 @@ def test_pasting_markdown_table_preserves_table_after_reload(get_user):
 
 # @features editor
 # @dimensions paste-html sanitization
+@pytest.mark.parallel_safe(reason="uses a dedicated project document")
 def test_pasting_plain_html_inserts_safe_formatted_content(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_editor_plain_html_paste.get(user)
@@ -238,6 +212,7 @@ def test_pasting_plain_html_inserts_safe_formatted_content(get_user):
 
 # @features editor
 # @dimensions paste-markdown reload
+@pytest.mark.parallel_safe(reason="uses a dedicated project document")
 def test_pasting_common_markdown_preserves_formatting(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_editor_common_markdown_paste.get(user)
@@ -294,6 +269,7 @@ raw <script> stays text
 
 # @features editor
 # @dimensions task-list reload
+@pytest.mark.parallel_safe(reason="uses a dedicated project document")
 def test_task_list_persists(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_editor_task_list.get(user)

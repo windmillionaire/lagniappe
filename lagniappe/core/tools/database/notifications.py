@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from google.cloud.datastore import Entity as DatastoreEntity
 
 from ...properties import notification_aggregate
+from ..files.html import strip_tags
 from .core import DATA, KINDS
 from .filter import Filter, Query
 from .get import datastore_key
@@ -146,7 +147,7 @@ def prepare_ordinary_notification(key, user, *, body, target=None):
             "notification_type": "ordinary",
             "parent": user.key,
             "target": getattr(target, "key", target),
-            "body": body,
+            "body": strip_tags(body).strip() if body else None,
             "pending": False,
             "created": now,
             "modified": now,

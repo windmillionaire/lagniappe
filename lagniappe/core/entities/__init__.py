@@ -172,6 +172,11 @@ class EntityRegistry:
         fetched = self.fetch(identifier, request=request)
         return fetched[0] if fetched else None
 
+    # @testable true
+    # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
+    # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_project_cascades_models_forms_filters_and_cache
+    # @features entities
+    # @dimensions delete cascade assets cache database forms
     def delete(self, *entities, preserve_user_pages=False):
         return execute_mutation(
             plan_delete(

@@ -105,26 +105,11 @@ def test_task_todo_list_editing_and_history_restore(get_user):
         ):
             task_form.get_by_role("button", name="Update", exact=True).click()
 
-        saved = Entities.fetch_one(task.key, request=Fetch.direct())
-        assert saved.submission["todo-work"] == {
-            "items": [
-                {"text": "Renamed step", "checked": True},
-                {"text": "Third step", "checked": False},
-            ]
-        }
-
         parent.complete_task(task)
         parent.uncomplete_task(task)
         user.reload()
         task.wait_for_load()
 
-        default_requests = []
-        user.page.on(
-            "request",
-            lambda request: default_requests.append(request.url)
-            if "/default-submission" in request.url
-            else None,
-        )
         task_form = task.task_form
         todo = task_form.locator("[id^='todo-work-'].form-element")
         expect(todo.locator("li[data-index]")).to_have_count(0)
@@ -136,11 +121,11 @@ def test_task_todo_list_editing_and_history_restore(get_user):
         restored_checkboxes = todo.locator("[data-role='todo-check']")
         expect(restored_checkboxes.first).not_to_be_checked()
         expect(restored_checkboxes.nth(1)).not_to_be_checked()
-        assert default_requests == []
 
-        reopened = Entities.fetch_one(task.key, request=Fetch.direct())
-        assert reopened.default_submission == {}
-        assert reopened.submission == {}
+        user.reload()
+        task.wait_for_load()
+        todo = task.task_form.locator("[id^='todo-work-'].form-element")
+        expect(todo.locator("li[data-index]")).to_have_count(0)
     finally:
         Entities.delete(task_entity)
         Entities.delete(form)

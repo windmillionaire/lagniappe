@@ -48,7 +48,28 @@ class SiteResource:
                 .getEntriesByName("lagniappe:services-ready", "mark").length > 0""",
             timeout=VIEW_INITIALIZATION_TIMEOUT,
         )
-        self.user.page.evaluate("() => window.__WAIT_FOR_VIEW_TRANSITIONS__()")
+        self.user.page.wait_for_function(
+            """() => {
+                const transitionAnimation = document.getAnimations().some(
+                    (animation) => animation.playState !== "finished" &&
+                        animation.effect?.pseudoElement?.startsWith(
+                            "::view-transition"
+                        )
+                );
+                if (
+                    window.__NAVIGATION_TRANSITION_SETTLED__ !== true ||
+                    document.activeViewTransition ||
+                    transitionAnimation
+                ) {
+                    window.__E2E_INACTIVE_TRANSITION_FRAMES__ = 0;
+                    return false;
+                }
+                window.__E2E_INACTIVE_TRANSITION_FRAMES__ =
+                    (window.__E2E_INACTIVE_TRANSITION_FRAMES__ || 0) + 1;
+                return window.__E2E_INACTIVE_TRANSITION_FRAMES__ >= 2;
+            }""",
+            timeout=VIEW_INITIALIZATION_TIMEOUT,
+        )
         return self
 
     def reload(self, wait_until="load"):

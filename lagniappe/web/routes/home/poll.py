@@ -127,7 +127,10 @@ def _document_result(descriptor, entity, client_id):
 # @testable true
 # @tests tests_e2e/001_site/test_001f_edited_entities.py::test_poll_endpoint_batches_entity_changes
 # @tests tests_e2e/001_site/test_001f_edited_entities.py::test_cold_notification_state_seeds_through_one_poll
-# @tests tests_e2e/002_home/test_002o_deferred_jobs.py::test_poll_operation_is_owner_safe
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
+# @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
+# @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
+# @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
 # @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_presence_appears_and_clears
 # @features polling
 # @dimensions protocol entity channel operation document presence permissions authorization fingerprint identifiers unavailable owner batching progress revision timing lifecycle

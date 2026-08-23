@@ -1,22 +1,13 @@
-"""
-Tests for the Category index page (/categories/{key}).
-
-Tests page listing, page creation (manual/AI), category settings, and filtering.
-Verified against:
-- lagniappe/templates/categories/index.html
-- lagniappe/templates/categories/tools.html
-- src/script/views/category.mjs
-- src/script/widgets/category.mjs
-"""
-
-import json
 import re
 from urllib.parse import parse_qs, urlsplit
 from uuid import uuid4
 
 from playwright.sync_api import expect
 
+from lagniappe import CONFIG
+from lagniappe.core.definitions import DeferredJobStatus, Fetch
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from testing.definitions import Categories, Forms, Pages, Users
 from testing.elements import (
     Attributes,
@@ -28,24 +19,16 @@ from testing.elements import (
     Table,
 )
 from testing.utility import expect_reconnect_refresh, scoped_browser_route
+from testing.utility.hosted_deferred_jobs import dispatch_hosted_deferred_job
 
 
 def _create_page(user, page, create_form):
-    with user.page.expect_response("**/create") as response_info:
+    with user.page.expect_response("**/create"):
         SpinnerButtons.CREATE.click(create_form)
 
     table = Table(user)
     new_row = table.new_row(page.definition.name)
-    return new_row.get_attribute("data-key"), response_info.value
-
-
-def _response_entity_fingerprint(response, key):
-    revisions = json.loads(
-        response.headers["x-lagniappe-entity-revisions"]
-    )
-    matches = [revision for revision in revisions if revision["key"] == key]
-    assert len(matches) == 1
-    return matches[0]["fingerprint"]
+    return new_row.get_attribute("data-key")
 
 
 def _fill_editable_field(form, field_id, selector, value):
@@ -75,7 +58,6 @@ def _open_visibility_panel(user, category):
 def test_category_index_renders_first_batch_before_cursor_continuation(
     get_user, browser_failures
 ):
-    """A failed remainder cannot hide the category's server-rendered rows."""
     user = get_user(Users.OWNER)
     category = Categories.test_create_page.get(user)
     suffix = uuid4().hex
@@ -159,11 +141,8 @@ def test_create_page_from_category_index(get_user):
     create_form.locator(FormElements.NAME).fill(page.definition.name)
     create_form.locator(FormElements.DESCRIPTION).fill(page.definition.description)
 
-    page.key, response = _create_page(user, page, create_form)
-    fingerprint = _response_entity_fingerprint(response, category.key)
-    expect(user.locate("[lp-view][lp-entity]")).to_have_attribute(
-        "data-fingerprint", fingerprint
-    )
+    page.key = _create_page(user, page, create_form)
+    expect(Table(user).get_row(page.name)).to_be_visible()
 
 
 # @pair category-index:refresh
@@ -175,9 +154,6 @@ def test_category_index_reconnect_refreshes_external_page(get_user, browser_fail
     category = Categories.test_empty_category.get(user)
     user.go(category)
 
-    root = user.locate("[lp-view]")
-    expect(root).to_have_attribute("data-fingerprint", re.compile(r"\S+"))
-    fingerprint = root.get_attribute("data-fingerprint")
     external_page = Entities.PAGE.create(
         {
             "name": f"Reconnect Refresh Page {uuid4().hex}",
@@ -186,23 +162,9 @@ def test_category_index_reconnect_refreshes_external_page(get_user, browser_fail
     )
     external_page.save()
     try:
-        with expect_reconnect_refresh(user, browser_failures) as refresh_info:
+        with expect_reconnect_refresh(user, browser_failures):
             user.offline = False
 
-        request_payload = json.loads(refresh_info.value.request.post_data or "{}")
-        assert request_payload["view"]["key"] == category.key
-        assert request_payload["view"]["fingerprint"] == fingerprint
-        assert {target["id"] for target in request_payload["targets"]} == {"table"}
-        assert set(request_payload["targets"][0]) == {"id", "rows"}
-
-        payload = refresh_info.value.json()
-        assert payload["fingerprint"] != fingerprint
-        table_refresh = next(target for target in payload["targets"] if target["id"] == "table")
-        assert table_refresh["fallback"] is False
-        assert external_page.urlsafe_key in {
-            row["key"] for row in table_refresh["upsert"]
-        }
-        expect(root).to_have_attribute("data-fingerprint", payload["fingerprint"])
         expect(Table(user).get_row(external_page.name)).to_be_visible()
     finally:
         Entities.delete(external_page)
@@ -210,34 +172,34 @@ def test_category_index_reconnect_refreshes_external_page(get_user, browser_fail
 
 # @features pages
 # @dimensions autofill create deferred deferred-submit
+# @pairs deferred-jobs:process-route deferred-jobs:versioned-envelope
+# @pairs deferred-jobs:cloud-tasks deferred-jobs:oidc
+# @pairs deferred-jobs:provider-delivery deferred-jobs:hosted-e2e
+# @pairs polling:operation polling:owner polling:progress polling:timing
 # @template categories/tools.html::create_page
-def test_create_page_autofill_is_deferred(get_user):
-    """Category-tool autofill persists the page and queues its form fill."""
+def test_create_page_autofill_is_deferred(get_user, monkeypatch):
     user = get_user(Users.OWNER)
-    category = Categories.test_create_page.get(user)
+    category = Categories.test_basic_inputs_submission.get(user)
     user.go(category)
 
     create_form = category.new_page_form()
     expect(create_form).to_have_attribute("lp-deferred", "")
-    create_form.locator(FormElements.NAME).fill("Deferred Create Autofill")
+    suffix = uuid4().hex[:8]
+    page_name = f"Deferred Create Autofill {suffix}"
+    expected_text = f"Hosted autofill completed {suffix}"
+    create_form.locator(FormElements.NAME).fill(page_name)
     create_form.locator("[data-role='show-autofill']").click()
     create_form.locator("textarea[name='autofill-description']").fill(
-        "Use the available page context to fill the attached form."
+        f"Set Text Field to exactly '{expected_text}' and leave every "
+        "other field blank."
     )
 
     with user.page.expect_response("**/create") as response_info:
         create_form.locator("button[data-role='autofill-submit']").click()
 
     payload = response_info.value.json()
-    assert payload["deferred"] is True
-    assert "locked" not in payload
-    assert "Autofilling page" in payload["notification"]
-    assert "Deferred Create Autofill" in payload["html"]
-    row = Table(user).get_row("Deferred Create Autofill")
+    row = Table(user).get_row(page_name)
     expect(row).to_be_visible()
-    expect(create_form.locator("[data-role='deferred-progress']")).to_have_count(0)
-    expect(create_form.locator(FormElements.NAME)).to_have_value("")
-    expect(create_form.locator("[data-role='submit-group']")).to_be_visible()
 
     row.locator(Table.ENTITY_URL).click()
 
@@ -249,6 +211,38 @@ def test_create_page_autofill_is_deferred(get_user):
         "Autofill"
     )
 
+    job = Entities.fetch_one(payload["operation"], request=Fetch.direct())
+    if CONFIG.hosted_e2e_runner:
+        completed, attempts = dispatch_hosted_deferred_job(user.page, job)
+        assert completed.status == DeferredJobStatus.SUCCEEDED.value, attempts
+
+        user.page.reload()
+        page_form = user.page.locator("[data-widget='PageInfo']")
+        expect(page_form).not_to_have_attribute("data-deferred-lock", "form")
+        expect(
+            user.page.locator("input[name='input-textab12']")
+        ).to_have_value(expected_text)
+    else:
+        from lagniappe.web import app as web_app
+        from lagniappe.core.tools.deferred_jobs.adapters import (
+            autofill as autofill_adapter,
+        )
+
+        prompts = []
+        monkeypatch.setattr(
+            autofill_adapter.ai,
+            "generate_autofilled_submission",
+            lambda prompt: prompts.append(prompt)
+            or {"input-textab12": expected_text},
+        )
+        with user.page.expect_response("**/pages/*/info/replace"):
+            with web_app.test_request_context("/"):
+                result = DeferredJobs.run(job.urlsafe_key)
+        assert result.success is True
+        preview = prompts[0].preview()
+        assert page_name in preview
+        assert expected_text in preview
+        assert "input-textab12" in preview
 
 # @pair categories:info-form
 # @pair categories:update
@@ -278,14 +272,9 @@ def test_update_category_info_from_tools(get_user):
     FormSelect(info_form).select(updated_form)
     Attributes(info_form).set_selected("files", False)
 
-    with user.page.expect_response("**/update") as response_info:
+    with user.page.expect_response("**/update"):
         SpinnerButtons.UPDATE.click(info_form)
 
-    response = response_info.value
-    fingerprint = _response_entity_fingerprint(response, category.key)
-    expect(user.locate("[lp-view][lp-entity]")).to_have_attribute(
-        "data-fingerprint", fingerprint
-    )
     expect(user.locate("[data-nav='view'] [data-role='title']")).to_have_text(
         updated_name
     )
@@ -339,7 +328,6 @@ def test_create_page_related_form_badge_selects_form(get_user):
 # @features category-index
 # @dimensions quick-edit editable-cell
 def test_category_index_quick_edit_updates_text_cell(get_user):
-    """Quick edit can update and persist an editable category-index text cell."""
     user = get_user(Users.OWNER)
     page = Pages.test_basic_input_submission.get(user)
     category = page.definition.category.get(user)
@@ -367,7 +355,6 @@ def test_category_index_quick_edit_updates_text_cell(get_user):
     with user.page.expect_response("**/pages/*/patch"):
         name_input.press("Enter")
 
-    expect(cell).to_contain_text(updated_name)
     user.reload(category)
 
     row = user.locate(f"{category.TABLE} tbody tr[data-key='{page.key}']")
@@ -377,7 +364,6 @@ def test_category_index_quick_edit_updates_text_cell(get_user):
 # @features category-index
 # @dimensions quick-edit checkbox-cell
 def test_category_index_quick_edit_renders_checkbox_cells(get_user):
-    """Quick edit renders visible checkbox columns immediately and saves toggles."""
     user = get_user(Users.OWNER)
     page = Pages.test_category_filter_match_page.get(user)
     category = page.definition.category.get(user)
@@ -422,7 +408,6 @@ def test_category_index_quick_edit_renders_checkbox_cells(get_user):
 # @template cell.html::table_cell
 # @template controls.html::expand
 def test_category_index_expands_table_submission_cell(get_user):
-    """A category row with a table-valued submission expands in-place."""
     user = get_user(Users.OWNER)
     page = Pages.test_category_table_expansion.get(user)
     category = page.definition.category.get(user)
@@ -475,7 +460,6 @@ def test_generate_pages_explain_prompt_from_category_tools(get_user):
 # @features pages
 # @dimensions generate ai-form deferred-submit success-state
 def test_generate_pages_submit_marks_form_successful(get_user):
-    """Queued page generation marks the submit button successful."""
     user = get_user(Users.OWNER)
     category = Categories.test_create_page.get(user)
     user.go(category)

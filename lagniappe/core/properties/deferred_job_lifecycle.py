@@ -97,7 +97,6 @@ def elapsed_seconds(start, now):
 
 
 # @testable true
-# @tests tests_e2e/002_home/test_002o_deferred_jobs.py::test_poll_operation_is_owner_safe
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_status_projection_is_bounded_and_marks_stale_work
 # @features deferred-jobs
 # @dimensions status progress timing stale-state privacy

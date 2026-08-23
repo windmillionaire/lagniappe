@@ -62,7 +62,6 @@ def _assert_visible_task_order(user, tasks):
 
 # @pairs task-index:authenticated-access permissions:own-page-only
 def test_task_index_allows_own_page_only_users(get_user):
-    """A signed-in user with no global model access can open the task index."""
     user = get_user(Users.user_no_access)
 
     task_index = user.go(SitePages.TASK_INDEX)
@@ -103,7 +102,6 @@ def test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index(get_user):
 # @features task-index
 # @dimensions columns
 def test_tasks_table_columns(get_user):
-    """Test that table has expected columns (name, due date, status, etc.)."""
     user = get_user(Users.OWNER)
     Tasks.test_mobile_index_task.get(user)
 
@@ -133,7 +131,6 @@ def test_tasks_table_columns(get_user):
 # @features table-controls
 # @dimensions sorting sort-asc name
 def test_task_index_name_sort_ascending_reorders_rows(get_user):
-    """Name column A-Z sort reorders visible task-index rows."""
     user = get_user(Users.OWNER)
     personal = Tasks.test_task_index_personal_today.get(user)
     page_active = Tasks.test_task_index_page_active.get(user)
@@ -148,7 +145,6 @@ def test_task_index_name_sort_ascending_reorders_rows(get_user):
 # @features table-controls
 # @dimensions sorting filtering due-date
 def test_task_index_due_date_sort_filters_to_dated_rows(get_user):
-    """Due-date sort orders dated tasks and hides undated rows."""
     user = get_user(Users.OWNER)
     today = Tasks.test_task_index_personal_today.get(user)
     undated = Tasks.test_task_index_page_active.get(user)
@@ -164,7 +160,6 @@ def test_task_index_due_date_sort_filters_to_dated_rows(get_user):
 # @features tasks
 # @dimensions row-link page-task focus
 def test_task_index_title_link_opens_backing_page_task(get_user):
-    """Clicking a task-index title opens the parent page with that task focused."""
     user = get_user(Users.OWNER)
     task = Tasks.test_task_index_project_linked.get(user)
     user.go(SitePages.TASK_INDEX)
@@ -181,7 +176,6 @@ def test_task_index_title_link_opens_backing_page_task(get_user):
 # @features tasks
 # @dimensions navigation canonical-url reload
 def test_task_route_rewrites_to_page_url_after_focus(get_user):
-    """A task URL focuses the task once, then becomes the canonical page URL."""
     user = get_user(Users.OWNER)
     task = Tasks.test_task_index_page_active.get(user)
     page = task.definition.origin.get(user)
@@ -232,7 +226,6 @@ def test_task_index_delete_task_from_row(get_user):
 # @features task-index
 # @dimensions quick-edit editable-cell link-affordance
 def test_task_index_quick_edit_updates_editable_cell(get_user):
-    """Quick edit can update and persist an editable task-index text cell."""
     user = get_user(Users.OWNER)
     task = Tasks.test_task_index_page_active.get(user)
     user.go(SitePages.TASK_INDEX)
@@ -268,7 +261,6 @@ def test_task_index_quick_edit_updates_editable_cell(get_user):
 # @features task-index table-controls
 # @dimensions quick-edit column-visibility checkbox-cell
 def test_task_index_quick_edit_keeps_revealed_completed_column_editable(get_user):
-    """A checkbox column revealed during quick edit remains an editor control."""
     user = get_user(Users.OWNER)
     task = Tasks.test_task_index_page_active.get(user)
     user.go(SitePages.TASK_INDEX)

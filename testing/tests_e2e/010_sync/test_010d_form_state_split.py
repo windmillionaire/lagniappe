@@ -1,5 +1,3 @@
-"""Server contracts for document-only sync and marker-owned form operations."""
-
 from copy import deepcopy
 from dataclasses import replace
 from types import SimpleNamespace
@@ -8,7 +6,7 @@ from uuid import uuid4
 import pytest
 from playwright.sync_api import expect
 
-from lagniappe.core.definitions import Fetch, FetchReason
+from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Tasks, Users
 from testing.resources import Page, Task
@@ -16,83 +14,6 @@ from testing.utility import expect_poll_result, expect_successful_response
 
 
 pytestmark = pytest.mark.e2e
-
-
-# @pairs sync:document-only forms:no-live-sync
-def test_live_sync_rejects_form_widget_payloads(get_user, browser_failures):
-    owner = get_user(Users.OWNER)
-    owner.go(Pages.test_sync_form_page)
-
-    with browser_failures.expect_http_error(owner, status=422, path="/l/sync"):
-        result = owner.page.evaluate(
-            """async () => {
-                const response = await fetch("/l/sync", {
-                    method: "POST",
-                    credentials: "include",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "X-CSRFToken": document.getElementById("token")?.value,
-                        "X-Lagniappe-Request": "true",
-                    },
-                    body: JSON.stringify({
-                        client_id: "form-contract-test",
-                        updates: [{
-                            key: "page-key",
-                            sync_id: "page-hash:form-hash:form",
-                            update: "encoded-state",
-                            save: false,
-                        }],
-                    }),
-                });
-                return {status: response.status, text: await response.text()};
-            }"""
-        )
-
-    assert result["status"] == 422
-    assert "Only identified document widgets may use live sync" in result["text"]
-
-
-# @pairs offline:replay-precondition forms:conflict-review tasks:no-mutation
-def test_task_offline_replay_rejects_a_stale_origin_fingerprint(get_user):
-    owner = get_user(Users.OWNER)
-    task = Tasks.test_task_revision_review.get(owner)
-    owner.go(task)
-    current = Entities.fetch_one(
-        task.key,
-        request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
-    )
-    original_name = current.name
-    original_fingerprint = current.fingerprint
-    path = f"/tasks/{task.key}/update"
-
-    result = owner.page.evaluate(
-        """async ({path, name}) => {
-            const body = new FormData();
-            body.set("offline", "True");
-            body.set("offline-fingerprint", "stale-origin-fingerprint");
-            body.set("name", name);
-            const response = await fetch(path, {
-                method: "PUT",
-                credentials: "include",
-                headers: {
-                    "X-CSRFToken": document.getElementById("token")?.value,
-                    "X-Lagniappe-Request": "true",
-                },
-                body,
-            });
-            return {status: response.status, data: await response.json()};
-        }""",
-        {"path": path, "name": "This stale replay must not be saved"},
-    )
-
-    assert result["status"] == 200
-    assert result["data"]["conflict"] is True
-    saved = Entities.fetch_one(
-        task.key,
-        request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
-    )
-    assert saved.name == original_name
-    assert saved.fingerprint == original_fingerprint
 
 
 def _fill_form_field(form, field_prefix, value):
@@ -143,6 +64,7 @@ def _create_reconciliation_page(user):
 # @pairs reconnect-refresh:dirty-form-preservation form-schema:notice
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
+@pytest.mark.parallel_safe(reason="creates a unique form, category, and page")
 def test_form_submission_reconciliation_uses_latest_schema(
     get_user,
     browser_failures,
@@ -265,6 +187,7 @@ def test_form_submission_reconciliation_uses_latest_schema(
 # @pair tasks:active-form-preservation
 # @template controls.html::edited_marker
 # @template pages/tasks.html::task_form
+@pytest.mark.parallel_safe(reason="creates a uniquely named task")
 def test_task_collection_refresh_preserves_active_form_for_revision_review(
     get_user,
 ):

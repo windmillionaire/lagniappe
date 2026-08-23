@@ -1,13 +1,3 @@
-"""
-Tests for category index mobile controls.
-
-Verified against:
-- lagniappe/web/templates/categories/index.html
-- lagniappe/web/templates/table.html
-- src/script/views/base/index.mjs
-- src/script/widgets/mobileTableControls.mjs
-"""
-
 import re
 
 import pytest
@@ -23,7 +13,6 @@ pytestmark = pytest.mark.e2e
 # @features table-controls
 # @dimensions mobile-controls columns
 def test_category_mobile_controls_open_with_page_columns(get_user):
-    """A phone user opens category table controls and sees page-oriented columns."""
     user = get_user(Users.OWNER)
     Pages.test_create_page.get(user)
     user.go(Categories.test_create_page)
@@ -45,7 +34,6 @@ def test_category_mobile_controls_open_with_page_columns(get_user):
 # @template categories/index.html::view_header
 # @template categories/index.html::view
 def test_category_viewer_mobile_controls_do_not_require_edit_permission(get_user):
-    """A VIEW-only phone user can initialize and open client-side table controls."""
     owner = get_user(Users.OWNER)
     category = Categories.acl_create_denied.get(owner)
 
@@ -64,7 +52,6 @@ def test_category_viewer_mobile_controls_do_not_require_edit_permission(get_user
 # @features table-controls
 # @dimensions mobile-controls column-visibility
 def test_category_mobile_visibility_toggle_hides_column(get_user):
-    """Mobile controls hide a category column without leaving cells behind."""
     user = get_user(Users.OWNER)
     Pages.test_create_page.get(user)
     user.go(Categories.test_create_page)
@@ -84,7 +71,6 @@ def test_category_mobile_visibility_toggle_hides_column(get_user):
 # @features table-controls
 # @dimensions mobile-controls sorting
 def test_category_mobile_filter_button_opens_sorting_panel(get_user):
-    """The mobile filter button opens sorting controls for the selected column."""
     user = get_user(Users.OWNER)
     Pages.test_create_page.get(user)
     user.go(Categories.test_create_page)
@@ -104,7 +90,6 @@ def test_category_mobile_filter_button_opens_sorting_panel(get_user):
 # @features table-controls
 # @dimensions mobile-controls form-columns sorting
 def test_category_mobile_controls_handle_form_columns(get_user):
-    """Mobile table controls include category form columns and open their sorts."""
     user = get_user(Users.OWNER)
     Pages.test_category_filter_match_page.get(user)
     user.go(Categories.test_category_filter_pages)
@@ -142,7 +127,6 @@ def test_category_mobile_controls_handle_form_columns(get_user):
 # @features pages
 # @dimensions create category-index mobile-tools
 def test_category_mobile_tools_dropdown_opens_new_page_form(get_user):
-    """The mobile tools menu still gives page creators the New Page flow."""
     user = get_user(Users.OWNER)
     user.go(Categories.test_empty_category)
 

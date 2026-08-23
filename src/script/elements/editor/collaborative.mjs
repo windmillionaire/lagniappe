@@ -231,7 +231,6 @@ export class CollaborativeDocument {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
-	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_document_sync_response_contract_is_browser_visible
 	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
 	 * @features sync
 	 * @dimensions document collaboration response-contract offline-replay replay-order

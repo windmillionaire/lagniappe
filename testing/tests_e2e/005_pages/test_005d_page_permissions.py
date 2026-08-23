@@ -1,12 +1,3 @@
-"""
-Permission tests for page view and edit affordances.
-
-Verified against:
-- lagniappe/web/templates/pages/page.html
-- lagniappe/web/templates/pages/info.html
-- lagniappe/web/routes/pages/main.py
-"""
-
 import pytest
 from playwright.sync_api import expect
 
@@ -22,7 +13,6 @@ pytestmark = pytest.mark.e2e
 def test_page_is_forbidden_without_model_or_page_permission(
     get_user, browser_failures
 ):
-    """A user with no page/category/model access cannot open a page."""
     owner = get_user(Users.OWNER)
     page = Pages.test_create_page.get(owner)
 
@@ -36,7 +26,6 @@ def test_page_is_forbidden_without_model_or_page_permission(
 # @dimensions load tabs readonly permission-gates
 # @template pages/info.html::info_form
 def test_page_viewer_reads_page_without_page_editing_affordances(get_user):
-    """A page-level viewer can read the page but cannot edit page-level settings."""
     owner = get_user(Users.OWNER)
     page = Pages.acl_lab_visible.get(owner)
 
@@ -71,7 +60,6 @@ def test_page_viewer_reads_page_without_page_editing_affordances(get_user):
 # @dimensions readonly document-tab
 # @template pages/page.html::main
 def test_page_viewer_sees_document_tab_only_when_content_exists(get_user):
-    """Readonly viewers do not see empty document affordances, but can read saved docs."""
     owner = get_user(Users.OWNER)
     page = Pages.acl_lab_document.get(owner)
     marker = "Readonly document content marker"
@@ -92,7 +80,6 @@ def test_page_viewer_sees_document_tab_only_when_content_exists(get_user):
 # @dimensions readonly empty-state permission-gates async-load
 # @template pages/files.html::file_list
 def test_page_viewer_sees_empty_files_tab_without_upload_affordances(get_user):
-    """Readonly viewers can open an empty files tab without upload controls."""
     owner = get_user(Users.OWNER)
     page = Pages.acl_lab_visible.get(owner)
 
@@ -113,7 +100,6 @@ def test_page_viewer_sees_empty_files_tab_without_upload_affordances(get_user):
 # @features pages
 # @dimensions permissions-panel permission-gates
 def test_owner_can_open_page_permissions_panel(get_user):
-    """The site owner can see who can view a page and adjust restrictions."""
     owner = get_user(Users.OWNER)
     owner.go(Pages.test_create_page)
 

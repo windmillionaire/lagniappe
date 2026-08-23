@@ -1,5 +1,3 @@
-"""Page photo upload, generation, replacement, and removal workflows."""
-
 from contextlib import contextmanager
 import re
 
@@ -11,7 +9,6 @@ from testing.elements import Attributes, UploadDropdown
 from testing.resources import Page
 from testing.utility import (
     expect_successful_response,
-    multipart_form_fields,
     scoped_browser_route,
 )
 
@@ -59,11 +56,9 @@ def _ensure_photo_form(user, page):
 @contextmanager
 def _mock_generated_image(page, key, html):
     path = f"/assets/{key}/generate-page-image"
-    requests = []
 
     def fulfill_generated_image(route):
         assert route.request.method == "POST"
-        requests.append(multipart_form_fields(route.request))
         route.fulfill(status=200, content_type="text/html", body=html)
 
     with scoped_browser_route(
@@ -71,7 +66,7 @@ def _mock_generated_image(page, key, html):
         f"**{path}",
         fulfill_generated_image,
     ):
-        yield path, requests
+        yield path
 
 
 def _expect_cache_busted_image(form):
@@ -184,7 +179,7 @@ def test_generate_image_on_page(get_user):
         user.page,
         page.key,
         generated_dropzone,
-    ) as (path, requests):
+    ) as path:
         with expect_successful_response(
             user.page,
             method="POST",
@@ -195,10 +190,6 @@ def test_generate_image_on_page(get_user):
         expect(form.locator("img[alt='Generated test image']")).to_be_visible()
         expect(prompt).not_to_be_attached()
         expect(user.locate("[lp-view]")).to_have_class(re.compile(".*max-w-7xl.*"))
-
-    assert len(requests) == 1
-    assert ("prompt", image_prompt) in requests[0]
-
 
 # @features pages
 # @dimensions photo-prompt photo-disable

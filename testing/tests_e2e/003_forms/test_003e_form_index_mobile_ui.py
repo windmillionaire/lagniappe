@@ -1,13 +1,3 @@
-"""
-Tests for form index mobile controls.
-
-Verified against:
-- lagniappe/web/templates/forms/index.html
-- lagniappe/web/templates/table.html
-- src/script/views/base/index.mjs
-- src/script/widgets/mobileTableControls.mjs
-"""
-
 import re
 
 import pytest
@@ -25,7 +15,6 @@ pytestmark = pytest.mark.e2e
 # @template forms/index.html::view_header
 # @template table.html::mobile_toggles
 def test_form_index_mobile_tools_and_column_controls_are_exclusive(get_user):
-    """Mobile Tools and column controls close one another when opened."""
     user = get_user(Users.OWNER)
     Forms.test_create_page_form.get(user)
     user.go(SitePages.FORM_INDEX)

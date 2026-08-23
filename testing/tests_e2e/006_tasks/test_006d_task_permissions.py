@@ -56,7 +56,6 @@ def _task_side_effect_state(task, *users):
 def test_task_route_is_forbidden_without_model_or_page_permission(
     get_user, browser_failures
 ):
-    """A signed-in user with no model/page access cannot follow a task URL."""
     owner = get_user(Users.OWNER)
     task = Tasks.test_create_page_task.get(owner)
 
@@ -96,7 +95,6 @@ def test_task_route_is_forbidden_without_model_or_page_permission(
 
 # @pairs tasks:history task-combine:authorization
 def test_task_history_routes_are_forbidden_without_permission(get_user):
-    """History/combine fragments enforce the task permission boundary."""
     owner = get_user(Users.OWNER)
     task = Tasks.test_create_page_task.get(owner)
 
@@ -123,7 +121,6 @@ def test_task_history_routes_are_forbidden_without_permission(get_user):
 
 # @pairs tasks:readonly tasks:permission-gates
 def test_page_task_viewer_sees_task_without_edit_controls(get_user):
-    """A page-level viewer reads a task row but cannot complete, edit, or delete it."""
     owner = get_user(Users.OWNER)
     task = Tasks.test_view_only_page_task.get(owner)
 
@@ -145,7 +142,6 @@ def test_page_task_viewer_sees_task_without_edit_controls(get_user):
 # @pairs tasks:completed-only tasks:empty-state
 # @template pages/tasks.html::task_list
 def test_completed_only_task_list_hides_empty_marker(get_user):
-    """A completed task prevents the page-task empty marker from appearing."""
     owner = get_user(Users.OWNER)
     task = Tasks.test_completed_only_page_task.get(owner)
     if not task.entity.completed:
@@ -165,7 +161,6 @@ def test_completed_only_task_list_hides_empty_marker(get_user):
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
 def test_page_task_viewer_sees_empty_form_structure_without_edit_controls(get_user):
-    """A page-level viewer sees active task form structure without edit controls."""
     owner = get_user(Users.OWNER)
     task = Tasks.test_view_only_page_task_with_empty_form.get(owner)
 
@@ -197,7 +192,6 @@ def test_page_task_viewer_sees_empty_form_structure_without_edit_controls(get_us
 
 # @pairs tasks:assignee tasks:permission-gates
 def test_assigned_user_can_work_their_assigned_task(get_user):
-    """An assignee can work a task whose Page is otherwise unavailable."""
     owner = get_user(Users.OWNER)
     assignee = get_user(Users.create_user)
     Tasks.test_filter_by_assigned_user.get(owner)
