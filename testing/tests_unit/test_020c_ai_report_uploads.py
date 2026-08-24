@@ -1,9 +1,19 @@
 """Focused AI-report characterization coverage."""
 
-from testing.utility.ai_report_fakes import *  # noqa: F403
+import copy
+from types import SimpleNamespace
 
+import pytest
 
-
+from lagniappe.core import exceptions
+from lagniappe.core.definitions import LARGE_ASSET_BYTES
+from lagniappe.core.entities.ai_report import AIReport
+from lagniappe.core.tools.ai.reporting import uploads as report_uploads
+from testing.utility.ai_report_fakes import (
+    _patch_fake_keys,
+    _test_file,
+    _test_user,
+)
 
 # @features ai-report direct-upload
 # @dimensions upload-manifest validation normalization

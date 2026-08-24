@@ -89,9 +89,11 @@ def _apply_update(*, upgrade):
     create_config = reload(create_config)
     gcloud = reload(gcloud)
     utils = reload(utils)
+    from runner.deploy import verify_runtime_deploy_surface
 
     new_version = create_config.update_config()
     create_config.verify_application_config(upgrade=upgrade)
+    verify_runtime_deploy_surface()
     if upgrade:
         print(f.success(f"Upgrading to version {new_version}"))
     else:

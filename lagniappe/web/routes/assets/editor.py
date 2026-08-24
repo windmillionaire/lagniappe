@@ -179,8 +179,7 @@ def generate_text(key, **kwargs):
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_created_on_save
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @features editor
-# @dimensions history-list history-restore ordering
+# @pair editor:history-list
 @assets.route("<key>/document/history", methods=["GET"])
 @permission(requested=Action.VIEW)
 def list_document_history(key, **kwargs):
@@ -226,8 +225,7 @@ def pin_document_history(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @features editor
-# @dimensions history-clear confirmation batch cleanup
+# @pairs editor:history-clear editor:confirmation
 @assets.route("<key>/document/history/unpinned", methods=["GET", "DELETE"])
 @permission(requested=Action.EDIT)
 def unpinned_document_history(key, **kwargs):

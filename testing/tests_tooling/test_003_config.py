@@ -674,6 +674,7 @@ def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirem
                 "import json",
                 "import requests",
                 "from flask import Flask",
+                "from google.cloud import firestore_admin_v1",
                 "from installer.deployment import normalize_deployment_settings",
                 "from runner.context import REPOSITORY_ROOT",
             ]
@@ -688,7 +689,9 @@ def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirem
     (app_dir / ".gcloudignore").write_text(
         "installer/\nrunner/\ntesting/\n.gcloudignore\n"
     )
-    (app_dir / "requirements.txt").write_text("flask==3.1.3\n")
+    (app_dir / "requirements.txt").write_text(
+        "flask==3.1.3\ngoogle-cloud-firestore==2.28.0\n"
+    )
     (app_dir / "package.json").write_text(json.dumps({"version": "1.0"}))
     (app_dir / "index.yaml").write_text("indexes: []\n")
     (app_dir / "lagniappe.yaml").write_text("runtime: python314\n")
@@ -723,6 +726,7 @@ def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirem
         assert any("excluded by .gcloudignore" in issue for issue in issues)
         assert any("imports 'requests'" in issue for issue in issues)
         assert not any("imports 'flask'" in issue for issue in issues)
+        assert not any("firestore_admin_v1" in issue for issue in issues)
 
         with pytest.raises(RuntimeError, match="Runtime deploy surface check failed"):
             verify_runtime_deploy_surface(app_dir)
@@ -751,12 +755,7 @@ def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirem
 def test_runtime_upload_boundary_has_no_local_orchestration_imports():
     from runner.deploy import runtime_deploy_surface_issues
 
-    excluded_import_issues = [
-        issue
-        for issue in runtime_deploy_surface_issues(runner_context.REPOSITORY_ROOT)
-        if "excluded by .gcloudignore" in issue
-    ]
-    assert excluded_import_issues == []
+    assert runtime_deploy_surface_issues(runner_context.REPOSITORY_ROOT) == []
 
 
 # @pairs config:recovery-export config:current-schema config:messaging-removal

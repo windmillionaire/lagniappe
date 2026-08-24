@@ -2057,6 +2057,7 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch):
     create_config_module = types.ModuleType("installer.create_config")
     gcloud_module = types.ModuleType("installer.gcloud")
     utils_module = types.ModuleType("installer.utils")
+    deploy_module = types.ModuleType("runner.deploy")
 
     create_config_module.update_config = lambda: events.append("update_config") or "2.0"
     create_config_module.verify_application_config = lambda upgrade=False: (
@@ -2072,6 +2073,9 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch):
         "storage-buckets"
     )
     utils_module.deploy_to_app_engine = lambda **kwargs: events.append("deploy")
+    deploy_module.verify_runtime_deploy_surface = lambda: events.append(
+        "verify-runtime-deploy-surface"
+    )
     config_module.SETTINGS = settings
     config_module.constants = constants_module
     config_module.verify_generation_manifest = lambda: events.append(
@@ -2083,6 +2087,7 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch):
     monkeypatch.setitem(sys.modules, "installer.gcloud", gcloud_module)
     monkeypatch.setattr(setup_pkg, "gcloud", gcloud_module, raising=False)
     monkeypatch.setattr(setup_pkg, "utils", utils_module, raising=False)
+    monkeypatch.setitem(sys.modules, "runner.deploy", deploy_module)
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     monkeypatch.setattr(
@@ -2123,6 +2128,7 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch):
         ("reload", "installer.utils"),
         "update_config",
         ("verify_application_config", False),
+        "verify-runtime-deploy-surface",
         "app-engine-and-runtime-iam",
         "storage-buckets",
         "images",

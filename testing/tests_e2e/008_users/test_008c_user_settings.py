@@ -1158,8 +1158,7 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     user_page.submit_and_verify_submission(updated_submission)
 
 
-# @features admin
-# @dimensions site-settings admin-only route page-load
+# @pairs admin:site-settings admin:admin-only admin:route admin:page-load
 # @pair cache:invalidation-acknowledgement
 # @template home/admin.html::main
 def test_site_settings_requires_administrator(get_user, browser_failures):

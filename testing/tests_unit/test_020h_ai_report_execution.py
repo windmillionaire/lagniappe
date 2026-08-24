@@ -1,9 +1,31 @@
 """Focused AI-report characterization coverage."""
 
-from testing.utility.ai_report_fakes import *  # noqa: F403
+from datetime import datetime, timezone
+from types import SimpleNamespace
 
+import pytest
 
-
+from lagniappe.core import exceptions
+from lagniappe.core.entities import entity as entity_module
+from lagniappe.core.tools.ai.reporting.contracts import actions as report_contracts
+from lagniappe.core.tools.ai.reporting.execution import ledger as report_ledger
+from lagniappe.core.tools.ai.reporting.execution import runner as report_runner
+from lagniappe.core.tools.ai.reporting.execution import undo as report_undo
+from lagniappe.core.tools.ai.reporting.execution.actions import (
+    base as report_action_lifecycle,
+)
+from lagniappe.core.tools.ai.reporting.execution.actions.registry import (
+    REPORT_ACTION_ADAPTERS,
+)
+from testing.utility.ai_report_fakes import (
+    _attach_report_process,
+    _fetch_one_from,
+    _patch_fake_keys,
+    _recovery_store,
+    _test_file,
+    _test_user,
+)
+from testing.utility.test_entities import TestEntities
 
 # @features ai-report
 # @dimensions action-registry contract

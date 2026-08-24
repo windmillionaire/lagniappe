@@ -261,8 +261,8 @@ def _medical_project(owner, case, slug):
     return project, matching, distractor
 
 
-# @features ai-report
-# @dimensions ask live-provider workspace-tools usable-answer async persistence
+# @pairs ai-report:ask ai-report:live-provider ai-report:workspace-tools
+# @pairs ai-report:usable-answer ai-report:async ai-report:persistence
 # @pairs deferred-jobs:process-route deferred-jobs:versioned-envelope
 # @pairs deferred-jobs:cloud-tasks deferred-jobs:oidc
 # @pairs deferred-jobs:provider-delivery deferred-jobs:hosted-e2e
@@ -311,8 +311,9 @@ def test_ask_answers_from_attached_corpus_receipt(get_user, request):
     expect(report_page.execute_button).not_to_be_visible()
 
 
-# @features ai-report
-# @dimensions ask live-provider workspace-tools structured-filter usable-answer async persistence
+# @pairs ai-report:ask ai-report:live-provider ai-report:workspace-tools
+# @pairs ai-report:structured-filter ai-report:usable-answer ai-report:async
+# @pair ai-report:persistence
 # @pairs deferred-jobs:process-route deferred-jobs:versioned-envelope
 # @pairs deferred-jobs:cloud-tasks deferred-jobs:oidc
 # @pairs deferred-jobs:provider-delivery deferred-jobs:hosted-e2e

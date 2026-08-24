@@ -230,6 +230,7 @@ export class CollaborativeDocument {
 
 	/**
 	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_collaborative_document_does_not_save_untouched_empty_state
 	 * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
 	 * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
 	 * @features sync

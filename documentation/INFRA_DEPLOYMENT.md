@@ -81,10 +81,14 @@ falls back to the curated catalog on failure.
 
 1. verifies the saved gcloud credential can mint a fresh token;
 2. rebuilds generated configuration, indexes, and manifest defaults;
-3. validates required settings;
+3. validates required settings and the runtime dependency/upload surface;
 4. reconciles runtime IAM and managed buckets;
 5. restores app-saved deployment settings, AI settings, and site images; and
 6. optionally deploys.
+
+The runtime deploy-surface preflight runs before provider reconciliation, so a
+missing runtime requirement or excluded local import stops an update before it
+changes remote resources.
 
 Use it for maintained forks and local source changes.
 

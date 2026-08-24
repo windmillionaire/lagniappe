@@ -1,51 +1,11 @@
-"""Shared AI-report characterization imports and lightweight fakes."""
+"""Shared AI-report characterization helpers and lightweight fakes."""
 
-import copy
 import json
-from datetime import datetime, timezone
 from types import SimpleNamespace
 
-import pytest
-from google.genai import types as genai_types
-
-from lagniappe.core import exceptions
-from lagniappe.core.entities import Entities
-from lagniappe.core.entities.ai_report import AIReport
 from lagniappe.core.entities import entity as entity_module
-from lagniappe.core.definitions import (
-    Action,
-    LARGE_ASSET_BYTES,
-    MutationIntent,
-    MutationIntentType,
-)
-from lagniappe.core.tools.ai import (
-    ask,
-    create,
-    organize,
-    organize_retrieval,
-    references as ai_references,
-    summarize,
-)
-from lagniappe.core.tools.ai.reporting import uploads as report_uploads
-from lagniappe.core.tools.ai.reporting.completion import files as organize_completion
-from lagniappe.core.tools.ai.reporting.contracts import actions as report_contracts
-from lagniappe.core.tools.ai.reporting.contracts.schema import (
-    report_proposal_response_schema,
-)
-from lagniappe.core.tools.ai.reporting.execution import ledger as report_ledger
+from lagniappe.core.definitions import MutationIntent
 from lagniappe.core.tools.ai.reporting.execution import runner as report_runner
-from lagniappe.core.tools.ai.reporting.execution import undo as report_undo
-from lagniappe.core.tools.ai.reporting.execution.actions import (
-    base as report_action_lifecycle,
-)
-from lagniappe.core.tools.ai.reporting.execution.actions.registry import (
-    REPORT_ACTION_ADAPTERS,
-)
-from lagniappe.core.tools.ai.reporting.execution.actions import common as report_common
-from lagniappe.core.tools.ai.reporting.execution.actions import references as report_references
-from lagniappe.core.tools.ai.reporting.execution.actions import results as report_results
-from lagniappe.core.tools.ai.reporting import schedules as report_schedules
-from testing.utility.mock_restrictions import MockRestrictions
 from testing.utility.test_entities import TestEntities
 
 
@@ -126,6 +86,8 @@ def _patch_fake_keys(monkeypatch):
             {"name": "Uncategorized Pages", "hash": "uncategorized"},
         ),
     )
+
+
 def _test_file(name="scan.pdf", mimetype="application/pdf"):
     file = TestEntities.get(
         "FILE",
@@ -246,8 +208,6 @@ def _assert_repair_prompt_contract(prompt, *, invalid_proposal, allowed_actions)
     assert tuple(_response_action_schemas(prompt)) == tuple(allowed_actions)
     assert prompt.audit()["duplicate_headings"] == []
 
-
-
 def _recovery_store(monkeypatch, *initial):
     stored = {entity.urlsafe_key: entity for entity in initial}
     saves = []
@@ -267,4 +227,20 @@ def _recovery_store(monkeypatch, *initial):
     monkeypatch.setattr(report_runner.Entities, "fetch_one", fetch_one)
     return stored, saves
 
-__all__ = tuple(name for name in globals() if not name.startswith("__"))
+
+__all__ = (
+    "FakeKey",
+    "_assert_repair_prompt_contract",
+    "_attach_report_process",
+    "_fetch_one_from",
+    "_patch_fake_keys",
+    "_patch_task_file_add",
+    "_permissioned_user",
+    "_prompt_context",
+    "_prompt_context_json",
+    "_recovery_store",
+    "_response_action_schemas",
+    "_test_file",
+    "_test_user",
+    "_with_validator",
+)

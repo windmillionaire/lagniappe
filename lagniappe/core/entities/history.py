@@ -91,8 +91,7 @@ class TaskHistory(Entity, SubmitterMixin, AssetMixin):
 
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_snapshots_completed_task_state
-    # @features task-completion, signature
-    # @dimensions history, asset-copy
+    # @pairs task-completion:history task-completion:asset-copy signature:asset-copy
     def copy_assets(self, task):
         for name in list(getattr(task, "assets", {}).keys()):
             asset = task.get_asset(name)

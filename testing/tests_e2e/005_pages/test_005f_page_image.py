@@ -111,6 +111,7 @@ def test_photo_prompt_upload_keeps_mobile_photo_tab_hidden_on_desktop(get_user):
 
 # @pairs pages:photo-prompt pages:mobile-photo-tab
 # @pair entity-layout:dynamic-secondary
+# @pair entity-layout:page-mobile
 # @template pages/page.html::main
 def test_mobile_photo_prompt_rejoins_section_switching(get_user):
     user = get_user(Users.OWNER)

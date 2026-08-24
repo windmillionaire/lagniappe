@@ -24,6 +24,7 @@ PACKAGE_IMPORTS = {
     "google.auth": "google-auth",
     "google.cloud.datastore": "google-cloud-datastore",
     "google.cloud.documentai": "google-cloud-documentai",
+    "google.cloud.firestore_admin_v1": "google-cloud-firestore",
     "google.cloud.storage": "google-cloud-storage",
     "google.cloud.tasks_v2": "google-cloud-tasks",
     "google.genai": "google-genai",

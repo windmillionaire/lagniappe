@@ -1,9 +1,24 @@
 """Focused AI-report characterization coverage."""
 
-from testing.utility.ai_report_fakes import *  # noqa: F403
+from types import SimpleNamespace
 
+import pytest
+from google.genai import types as genai_types
 
-
+from lagniappe.core import exceptions
+from lagniappe.core.definitions import LARGE_ASSET_BYTES
+from lagniappe.core.tools.ai import ask, create, organize, organize_retrieval, summarize
+from lagniappe.core.tools.ai.reporting.completion import files as organize_completion
+from testing.utility.ai_report_fakes import (
+    _permissioned_user,
+    _prompt_context,
+    _prompt_context_json,
+    _response_action_schemas,
+    _test_file,
+    _test_user,
+)
+from testing.utility.mock_restrictions import MockRestrictions
+from testing.utility.test_entities import TestEntities
 
 # @features ai-report
 # @dimensions prompt files tools iteration-limit

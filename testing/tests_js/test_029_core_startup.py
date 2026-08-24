@@ -910,6 +910,7 @@ vm.runInContext(source, context);
 # @pair sync:checkpoint
 # @pair sync:dirty-state
 # @pair sync:concurrent-edit
+# @pair sync:response-contract
 # @pair editor:initialization
 # @pair editor:empty-content
 # @pair editor:save-guard
@@ -986,6 +987,17 @@ if (documentWidget._dirty) {
 }
 documentWidget._commitInitialBaseline();
 documentWidget.initialized = true;
+
+documentWidget.currentState = "current-document-state";
+documentWidget.updateQueue.push("pending-user-update");
+const syncPayload = documentWidget.syncData;
+if (
+  syncPayload?.update !== "user-update" ||
+  syncPayload?.ydoc !== "current-document-state" ||
+  documentWidget.updateQueue.length !== 0
+) {
+  throw new Error("Document sync payload did not package its delta and checkpoint");
+}
 
 if (documentWidget.saveData !== null) {
   throw new Error("Untouched fresh document produced an eager save payload");

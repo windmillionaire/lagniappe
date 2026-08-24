@@ -1,9 +1,17 @@
 """Focused AI-report characterization coverage."""
 
-from testing.utility.ai_report_fakes import *  # noqa: F403
+import copy
+from types import SimpleNamespace
 
+import pytest
 
-
+from lagniappe.core import exceptions
+from lagniappe.core.tools.ai import create, organize, references as ai_references
+from testing.utility.ai_report_fakes import (
+    _assert_repair_prompt_contract,
+    _prompt_context,
+    _with_validator,
+)
 
 # @features ai-report
 # @dimensions generate validate

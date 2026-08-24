@@ -1,9 +1,19 @@
 """Focused AI-report characterization coverage."""
 
-from testing.utility.ai_report_fakes import *  # noqa: F403
+import pytest
 
+from lagniappe.core.definitions import Action
+from lagniappe.core.entities import Entities
+from lagniappe.core.entities.ai_report import AIReport
 from lagniappe.core.tools.ai.reporting.contracts.actions import ALLOWED_ACTIONS
 from lagniappe.core.tools.ai.reporting.display.registry import ACTION_DISPLAY_REGISTRY
+from testing.utility.ai_report_fakes import (
+    _patch_fake_keys,
+    _permissioned_user,
+    _test_file,
+    _test_user,
+)
+from testing.utility.test_entities import TestEntities
 
 
 # @features ai-report permissions

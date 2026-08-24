@@ -1,8 +1,12 @@
 """Focused AI-report characterization coverage."""
 
-from testing.utility.ai_report_fakes import *  # noqa: F403
+import pytest
 
-
+from lagniappe.core.tools.ai import organize
+from lagniappe.core.tools.ai.reporting.execution import runner as report_runner
+from lagniappe.core.tools.ai.reporting.execution import undo as report_undo
+from testing.utility.ai_report_fakes import _fetch_one_from, _test_user
+from testing.utility.test_entities import TestEntities
 
 
 # @features ai-report

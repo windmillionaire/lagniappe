@@ -18,6 +18,7 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools.tasks.ordering import page_task_roots
 from testing.definitions import ModelTasks, Pages, Tasks, Users
 from testing.resources import Task
 from testing.utility import expect_successful_response
@@ -584,6 +585,8 @@ def test_combine_task_form_filters_compatible_tasks(get_user):
 
 # @pairs task-combine:winner task-combine:completed-on
 # @pairs task-combine:attachments task-combine:migrate-history task-combine:delete
+# @pairs task-combine:current-snapshot task-combine:existing-history
+# @pairs task-combine:upsert task-combine:remove task-combine:ordering
 # @pairs task-combine:delta task-combine:checkbox-submit task-combine:isolated-form
 # @pairs task-combine:no-reload
 # @template pages/tasks.html::combine_form
@@ -646,8 +649,13 @@ def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_user):
         .rstrip("/")
         .endswith("/combine")
         and response.request.method == "PUT"
-    ):
+    ) as response_info:
         combine_form.get_by_role("button", name="Combine Tasks").click()
+
+    delta = response_info.value.json()["task_delta"]
+    assert [update["key"] for update in delta["upsert"]] == [winner.key]
+    assert set(delta["remove"]) == {source.key, secondary.key}
+    assert delta["order"] == [task.urlsafe_key for task in page_task_roots(page)]
 
     assert user.page.url == before_url
 
