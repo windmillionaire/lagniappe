@@ -106,15 +106,19 @@ class FilterCache:
     def _entity_map(self, entities):
         return {e.hash: escape_for_filter(e.to_filter_index()) for e in entities}
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
-    # @reason paginated project/category loading is part of cache materialization
+    # @testable true
+    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_loads_category_pages_without_restrictions
+    # @features filters
+    # @dimensions cache category-pagination source-query restrictions
     def _load(self, cursor=None):
         if self.entity.kind == "project":
             self._load_project_tasks()
             return
 
-        if self.entity.kind == "category":
+        if self.entity.kind != "category":
+            return
+
+        while True:
             index = database.get.pages(
                 self.entity.key,
                 start_cursor=cursor,
@@ -124,9 +128,9 @@ class FilterCache:
             self._to_cache.update(
                 self._entity_map(Entities.fetch(*index.results, request=Fetch.direct()))
             )
-
-        if index.next_cursor:
-            self._load(index.next_cursor)
+            if not index.next_cursor:
+                return
+            cursor = index.next_cursor
 
     # @testable false
     # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache

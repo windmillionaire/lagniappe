@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import call, patch
 
 import pytest
 
@@ -84,35 +84,53 @@ def test_filter_cache_query_filters_loaded_entities_by_view_permission():
     assert results == [visible]
 
 
-# @features filters cache category
-# @dimensions source-query restrictions pagination
+# @features filters
+# @dimensions cache category-pagination source-query restrictions
 @pytest.mark.unit
 def test_filter_cache_loads_category_pages_without_restrictions():
     parent = _parent("category")
-    page = SimpleNamespace(
-        hash="page-hash",
-        to_filter_index=lambda: {"id": "page-key", "name": "Page"},
-    )
+    pages_by_key = {
+        "page-key-1": SimpleNamespace(
+            hash="page-hash-1",
+            to_filter_index=lambda: {"id": "page-key-1", "name": "Page 1"},
+        ),
+        "page-key-2": SimpleNamespace(
+            hash="page-hash-2",
+            to_filter_index=lambda: {"id": "page-key-2", "name": "Page 2"},
+        ),
+    }
 
     with patch(
         "lagniappe.core.tools.filters.cache.database.get.pages",
-        return_value=SimpleNamespace(results=["page-key"], next_cursor=None),
+        side_effect=[
+            SimpleNamespace(results=["page-key-1"], next_cursor="cursor-2"),
+            SimpleNamespace(results=["page-key-2"], next_cursor=None),
+        ],
     ) as pages:
         with patch(
             "lagniappe.core.tools.filters.cache.Entities.fetch",
-            return_value=[page],
+            side_effect=lambda *keys, **_kwargs: [pages_by_key[key] for key in keys],
         ):
             cache = FilterCache(parent, user=_user(models=["restricted"]))
             cache._load()
 
-    pages.assert_called_once_with(
-        parent.key,
-        start_cursor=None,
-        limit=100,
-        hashes=Restriction.UNRESTRICTED,
-    )
+    assert pages.call_args_list == [
+        call(
+            parent.key,
+            start_cursor=None,
+            limit=100,
+            hashes=Restriction.UNRESTRICTED,
+        ),
+        call(
+            parent.key,
+            start_cursor="cursor-2",
+            limit=100,
+            hashes=Restriction.UNRESTRICTED,
+        ),
+    ]
     assert cache._to_cache == {
-        "page-hash": {"id": "page-key", "name": "Page"}
+        "page-hash-1": {"id": "page-key-1", "name": "Page 1"},
+        "page-hash-2": {"id": "page-key-2", "name": "Page 2"},
     }
 
 

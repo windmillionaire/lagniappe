@@ -1,5 +1,6 @@
 import { STYLES } from "styles";
 import { setIcon } from "../../shared/icons";
+import { localStore } from "../../shared/storage";
 import { formatting } from "../formatting";
 
 const SEARCH_ENTITY_PATTERN = /&(#(?:x[0-9a-f]+|\d+)|amp|apos|gt|lt|quot);/gi;
@@ -173,7 +174,11 @@ export class Results {
 	}
 
 	get options() {
-		return JSON.parse(localStorage.getItem(`recent-${this.index}`) || "[]");
+		const key = `recent-${this.index}`;
+		const recent = localStore.getJSON(key, []);
+		if (Array.isArray(recent)) return recent;
+		localStore.remove(key);
+		return [];
 	}
 
 	add(option) {
@@ -194,10 +199,7 @@ export class Results {
 			filtered.unshift(details);
 		}
 		if (Array.isArray(filtered)) {
-			localStorage.setItem(
-				`recent-${this.index}`,
-				JSON.stringify(filtered.slice(0, 10)),
-			);
+			localStore.setJSON(`recent-${this.index}`, filtered.slice(0, 10));
 		}
 	}
 

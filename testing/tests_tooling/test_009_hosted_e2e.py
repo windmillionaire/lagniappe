@@ -1252,11 +1252,13 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert dispatch["suite"]["options"] == ["all", "full"]
     assert {"pull_request", "candidate_sha", "evidence_sha"} <= set(dispatch)
     request = workflow["jobs"]["request"]
+    preflight = workflow["jobs"]["preflight"]
     execute = workflow["jobs"]["execute"]
     quality = workflow["jobs"]["quality"]
     attest = workflow["jobs"]["attest"]
     assert workflow["permissions"] == {}
     assert request["permissions"] == {"pull-requests": "read"}
+    assert preflight["permissions"] == {"contents": "read"}
     assert execute["permissions"] == {
         "contents": "write",
         "actions": "write",
@@ -1268,7 +1270,13 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     }
     assert attest["permissions"] == {"statuses": "write"}
     assert request["name"] == "Resolve hosted release request"
-    assert execute["needs"] == "request"
+    assert preflight["needs"] == "request"
+    assert "github.event_name != 'workflow_dispatch'" in preflight["if"]
+    assert "environment" not in preflight
+    assert execute["needs"] == ["request", "preflight"]
+    assert "always()" in execute["if"]
+    assert "inputs.mode == 'manual'" in execute["if"]
+    assert "needs.preflight.result == 'success'" in execute["if"]
     assert execute["environment"] == "hosted-e2e"
     assert "environment" not in quality
     assert "Prepare hosted release evidence" in execute["name"]
@@ -1304,6 +1312,19 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert 'statuses/$EVIDENCE_SHA' in workflow_text
     assert "Exact hosted evidence and release gates passed" in workflow_text
     assert "EVIDENCE_SHA: ${{ needs.quality.outputs.evidence_sha }}" in workflow_text
+
+    preflight_text = yaml.dump(preflight, sort_keys=False)
+    assert "ref: ${{ needs.request.outputs.candidate_sha }}" in preflight_text
+    assert "persist-credentials: 'false'" in preflight_text
+    assert "npm ci" in preflight_text
+    assert "npm run check" in preflight_text
+    assert "ruff check ." in preflight_text
+    assert preflight_text.count("run.py traceability") == 2
+    assert "traceability --changed \"$BASE_SHA\"" in preflight_text
+    assert preflight_text.count("--no-report --no-manifest") == 2
+    assert "release-check --base \"$BASE_SHA\"" in preflight_text
+    assert "google-github-actions" not in preflight_text
+    assert "gcloud" not in preflight_text
 
     quality_text = yaml.dump(quality, sort_keys=False)
     assert "gh api" in quality_text

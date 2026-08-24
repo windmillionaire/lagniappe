@@ -23,6 +23,10 @@ from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.deferred_jobs import retry as deferred_retry
 from lagniappe.core.tools.deferred_jobs.adapters.base import DeferredJobAdapter
 from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
+from lagniappe.core.tools.deferred_jobs.adapters import registry_defaults
+from lagniappe.core.tools.deferred_jobs.adapters.registry import (
+    DeferredJobAdapterRegistry,
+)
 from lagniappe.core.tools.deferred_jobs.control import (
     DeferredExecutionControl,
     _DeferredLeaseGuard,
@@ -105,11 +109,86 @@ def test_registered_adapters_declare_required_ai_tiers():
         DeferredJobType.PAGE_GENERATION: AI.CREATE,
         DeferredJobType.FILE_SUMMARIZE: AI.CREATE,
         DeferredJobType.FILE_EXTRACT: None,
+        DeferredJobType.EMAIL_INGEST: None,
     }
 
+    assert set(registry.adapter_registry._adapters) == set(DeferredJobType)
     assert {
         job_type: registry.adapter(job_type).required_ai_access for job_type in expected
     } == expected
+
+
+# @pairs deferred-jobs:adapter-registry deferred-jobs:adapter-registration
+def test_adapter_registry_rejects_duplicate_job_types():
+    registry = DeferredJobAdapterRegistry()
+    registry.register(RecordingAdapter())
+
+    with pytest.raises(ValueError, match="autofill"):
+        registry.register(RecordingAdapter())
+
+
+# @pairs deferred-jobs:adapter-registry deferred-jobs:failure-isolation
+def test_adapter_registry_rolls_back_failed_default_loading(monkeypatch):
+    registry = DeferredJobAdapterRegistry()
+    adapter = RecordingAdapter()
+
+    def fail_loading(target):
+        target.register(adapter)
+        raise RuntimeError("default import failed")
+
+    monkeypatch.setattr(registry_defaults, "register_adapters", fail_loading)
+    with pytest.raises(RuntimeError, match="default import failed"):
+        registry._load_default_adapters()
+
+    assert registry._adapters == {}
+    assert registry._defaults_loaded is False
+
+    monkeypatch.setattr(
+        registry_defaults,
+        "register_adapters",
+        lambda target: target.register(adapter),
+    )
+    registry._load_default_adapters()
+
+    assert registry._adapters == {DeferredJobType.AUTOFILL: adapter}
+    assert registry._defaults_loaded is True
+
+
+# @pairs deferred-jobs:adapter-registry deferred-jobs:concurrency
+def test_adapter_registry_loads_defaults_once_across_threads(monkeypatch):
+    registry = DeferredJobAdapterRegistry()
+    started = threading.Event()
+    release = threading.Event()
+    calls = []
+    failures = []
+
+    def load_defaults(target):
+        calls.append("load")
+        started.set()
+        assert release.wait(timeout=2)
+        target.register(RecordingAdapter())
+
+    def load_in_thread():
+        try:
+            registry._load_default_adapters()
+        except Exception as error:  # pragma: no cover - asserted through failures
+            failures.append(error)
+
+    monkeypatch.setattr(registry_defaults, "register_adapters", load_defaults)
+    first = threading.Thread(target=load_in_thread)
+    second = threading.Thread(target=load_in_thread)
+    first.start()
+    assert started.wait(timeout=2)
+    second.start()
+    release.set()
+    first.join(timeout=2)
+    second.join(timeout=2)
+
+    assert not first.is_alive()
+    assert not second.is_alive()
+    assert failures == []
+    assert calls == ["load"]
+    assert registry._defaults_loaded is True
 
 
 # @pair deferred-jobs:authorization

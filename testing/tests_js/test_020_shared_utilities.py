@@ -163,10 +163,67 @@ def test_are_equal_normalizes_object_keys_but_preserves_array_order(run_node):
 if (!context.areEqual({ b: 2, nested: { y: 2, x: 1 } }, { nested: { x: 1, y: 2 }, b: 2 })) {
   throw new Error("equivalent object key orders compared unequal");
 }
+if (!context.areEqual(
+  { values: [{ b: 2, a: 1 }, { nested: { y: 2, x: 1 } }] },
+  { values: [{ a: 1, b: 2 }, { nested: { x: 1, y: 2 } }] },
+)) {
+  throw new Error("equivalent objects nested in arrays compared unequal");
+}
 if (context.areEqual({ values: [1, 2] }, { values: [2, 1] })) {
   throw new Error("array order was incorrectly normalized");
 }
 """,
+    )
+
+
+# @pairs browser-storage:availability browser-storage:json
+def test_safe_storage_adapters_handle_browser_failures_and_json(run_node):
+    run_node(
+        """
+import assert from "node:assert/strict";
+import { localStore, sessionStore } from "./src/script/shared/storage.mjs";
+
+Object.defineProperty(globalThis, "localStorage", {
+  configurable: true,
+  get() { throw new Error("blocked"); },
+});
+assert.equal(localStore.get("missing", "fallback"), "fallback");
+assert.equal(localStore.set("key", "value"), false);
+assert.equal(localStore.remove("key"), false);
+
+const values = new Map();
+const storage = {
+  getItem(key) { return values.get(key) ?? null; },
+  setItem(key, value) { values.set(key, String(value)); },
+  removeItem(key) { values.delete(key); },
+};
+Object.defineProperty(globalThis, "localStorage", {
+  configurable: true,
+  value: storage,
+});
+Object.defineProperty(globalThis, "sessionStorage", {
+  configurable: true,
+  value: storage,
+});
+
+assert.equal(localStore.set("plain", "value"), true);
+assert.equal(localStore.get("plain", "fallback"), "value");
+assert.equal(localStore.remove("plain"), true);
+assert.equal(localStore.get("plain", "fallback"), "fallback");
+
+values.set("broken", "{not-json");
+assert.deepEqual(localStore.getJSON("broken", []), []);
+assert.equal(values.has("broken"), false);
+assert.equal(sessionStore.setJSON("state", { active: true }), true);
+assert.deepEqual(sessionStore.getJSON("state"), { active: true });
+
+const circular = {};
+circular.self = circular;
+assert.equal(localStore.setJSON("circular", circular), false);
+storage.setItem = () => { throw new Error("quota"); };
+assert.equal(sessionStore.setJSON("quota", { active: true }), false);
+""",
+        module=True,
     )
 
 

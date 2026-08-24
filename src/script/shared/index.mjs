@@ -21,6 +21,7 @@ export {
 	WORKER_MESSAGES,
 } from "./protocol";
 export { request } from "./request";
+export { localStore, sessionStore } from "./storage";
 export { SyncManager } from "./sync";
 export { updateUserData, updateUserLocation } from "./user";
 export {

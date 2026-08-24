@@ -131,8 +131,9 @@ let _ping = null;
  * @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
  * @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
  * @tests tests_js/test_017_main_lifecycle.py::test_ping_uses_server_owned_cache_policy
+ * @tests tests_js/test_017_main_lifecycle.py::test_ping_clears_only_the_settled_pending_promise
  * @features offline
- * @dimensions server-health cache-policy
+ * @dimensions server-health cache-policy pending-ownership settled-cleanup
  */
 async function pingServer() {
 	if (_ping) return _ping;
@@ -154,12 +155,13 @@ async function pingServer() {
 			_ping = null;
 		}
 	})();
-	window.__PING_PENDING__ = _ping;
-	void _ping.finally(() => {
-		if (window.__PING_PENDING__ === _ping) window.__PING_PENDING__ = null;
+	const pending = _ping;
+	window.__PING_PENDING__ = pending;
+	void pending.finally(() => {
+		if (window.__PING_PENDING__ === pending) window.__PING_PENDING__ = null;
 	});
 
-	return _ping;
+	return pending;
 }
 
 let _pollTimeout = null;

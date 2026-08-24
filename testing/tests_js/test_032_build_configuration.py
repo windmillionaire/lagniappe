@@ -51,7 +51,12 @@ assert.deepEqual(Object.keys(VIEW_ENTRIES).sort(), [
   "page", "project", "report", "results", "user",
 ]);
 assert.equal(VIEW_REGISTRY.category.entry, VIEW_REGISTRY.form.entry);
-assert.equal(STARTUP_BUDGETS.core, 120 * 1024);
+const documentedBudgets = Object.fromEntries(
+  [...readFileSync("documentation/INFRA_BUILD.md", "utf8").matchAll(
+    /^\| `([a-z]+)` \| [^|]+ \| ([0-9]+) \|$/gm,
+  )].map(([, key, kib]) => [key, Number(kib) * 1024]),
+);
+assert.deepEqual(documentedBudgets, STARTUP_BUDGETS);
 
 for (const configPath of [
   "build/rollup.config.mjs",

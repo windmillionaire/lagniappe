@@ -1,3 +1,4 @@
+import math
 import os
 
 from config import SETTINGS, Environment, constants
@@ -23,18 +24,38 @@ def _env_flag(name, default=False):
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+# @testable false
+# @covered-by lagniappe/__init__.py::Config
+# @reason Sentry sampling normalization is exercised through runtime Config construction
+def _sample_rate(value, name):
+    if isinstance(value, bool):
+        raise RuntimeError(f"Invalid {name}: expected a number from 0.0 through 1.0")
+    try:
+        normalized = float(value)
+    except (TypeError, ValueError) as error:
+        raise RuntimeError(
+            f"Invalid {name}: expected a number from 0.0 through 1.0"
+        ) from error
+    if not math.isfinite(normalized) or not 0.0 <= normalized <= 1.0:
+        raise RuntimeError(f"Invalid {name}: expected a number from 0.0 through 1.0")
+    return normalized
+
+
 # @testable true
 # @tests tests_unit/test_016_config.py::test_config_prefers_tracked_build_id_over_app_settings
 # @tests tests_unit/test_016_config.py::test_config_requires_hosted_build_id_to_match_built_source
 # @tests tests_unit/test_016_config.py::test_config_honors_ai_observability_setting
 # @tests tests_unit/test_016_config.py::test_config_honors_configured_source_url
+# @tests tests_unit/test_016_config.py::test_config_normalizes_and_validates_sentry_sample_rates
 # @pair config:build-id
 # @pair config:constants
+# @pair config:error-reporting
 # @pair config:stale-settings
 # @pair config:observability-setting
 # @pair config:google-signin
 # @pair config:source-link
 # @pair ai:observability
+# @pair error-reporting:sampling
 class Config:
     """Application configuration."""
 
@@ -125,6 +146,26 @@ class Config:
         self.TASK_QUEUE_ENABLED = _env_flag("TASK_QUEUE_ENABLED", self.production)
         self.TEST_CURRENT_USER = None
         self.ANALYTICS = getattr(self, "ANALYTICS", False)
+        self.SENTRY_TRACES_SAMPLE_RATE = _sample_rate(
+            getattr(
+                self,
+                "SENTRY_TRACES_SAMPLE_RATE",
+                getattr(constants, "DEFAULT_SENTRY_TRACES_SAMPLE_RATE", 1.0),
+            ),
+            "SENTRY_TRACES_SAMPLE_RATE",
+        )
+        self.SENTRY_PROFILE_SESSION_SAMPLE_RATE = _sample_rate(
+            getattr(
+                self,
+                "SENTRY_PROFILE_SESSION_SAMPLE_RATE",
+                getattr(
+                    constants,
+                    "DEFAULT_SENTRY_PROFILE_SESSION_SAMPLE_RATE",
+                    1.0,
+                ),
+            ),
+            "SENTRY_PROFILE_SESSION_SAMPLE_RATE",
+        )
         self.GOOGLE_SIGNIN_ENABLED = getattr(
             self,
             "GOOGLE_SIGNIN_ENABLED",

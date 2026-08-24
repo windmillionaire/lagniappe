@@ -30,8 +30,8 @@ if CONFIG.capture_errors:
     sentry_sdk.init(
         dsn=CONFIG.SENTRY_DSN,
         send_default_pii=False,
-        traces_sample_rate=1.0,
-        profile_session_sample_rate=1.0,
+        traces_sample_rate=CONFIG.SENTRY_TRACES_SAMPLE_RATE,
+        profile_session_sample_rate=CONFIG.SENTRY_PROFILE_SESSION_SAMPLE_RATE,
         profile_lifecycle="trace",
         before_send=filter_sentry_event,
         before_send_transaction=sanitize_sentry_event,

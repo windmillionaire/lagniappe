@@ -82,6 +82,14 @@ const context = {
     getItem: (key) => values.get(key) ?? null,
     setItem: (key, value) => values.set(key, value),
   },
+  localStore: {
+    getJSON(key, fallback = null) {
+      const value = values.get(key);
+      return value === undefined ? fallback : JSON.parse(value);
+    },
+    remove: (key) => values.delete(key),
+    setJSON: (key, value) => values.set(key, JSON.stringify(value)),
+  },
   STYLES: {
     dropdown: {
       icon: "dropdown-option-icon",

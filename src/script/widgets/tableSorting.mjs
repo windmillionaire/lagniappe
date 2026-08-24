@@ -1,5 +1,5 @@
 import { primitives } from "../elements/primitives";
-import { withTransition } from "../shared";
+import { sessionStore, withTransition } from "../shared";
 
 /**
  * @testable infrastructure
@@ -140,8 +140,11 @@ export class TableSorting {
 	}
 
 	_loadState() {
-		const saved = sessionStorage.getItem(this.storageKey);
-		return saved ? JSON.parse(saved) : null;
+		const saved = sessionStore.getJSON(this.storageKey);
+		if (saved === null) return null;
+		if (typeof saved === "object" && !Array.isArray(saved)) return saved;
+		sessionStore.remove(this.storageKey);
+		return null;
 	}
 
 	/**
@@ -159,20 +162,17 @@ export class TableSorting {
 		});
 
 		if (Object.keys(sorts).length) {
-			sessionStorage.setItem(
-				this.storageKey,
-				JSON.stringify({
-					lastReorderColumn: this.lastReorderColumn,
-					sorts: sorts,
-				}),
-			);
+			sessionStore.setJSON(this.storageKey, {
+				lastReorderColumn: this.lastReorderColumn,
+				sorts: sorts,
+			});
 		} else {
 			this._clearState();
 		}
 	}
 
 	_clearState() {
-		sessionStorage.removeItem(this.storageKey);
+		sessionStore.remove(this.storageKey);
 	}
 
 	_restoreLastReorderColumn(saved) {

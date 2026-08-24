@@ -395,6 +395,37 @@ if ("cache" in call.options || new Headers(call.options.headers).has("Cache-Cont
     )
 
 
+# @features offline
+# @dimensions server-health pending-ownership settled-cleanup
+def test_ping_clears_only_the_settled_pending_promise(run_node):
+    run_main_check(
+        run_node,
+        """
+const settled = pingServer();
+if (!context.window.__PING_PENDING__) {
+  throw new Error("Ping did not publish its pending boundary");
+}
+await settled;
+await Promise.resolve();
+if (context.window.__PING_PENDING__ !== null) {
+  throw new Error("Settled ping retained its pending boundary");
+}
+
+let releaseFetch;
+context.fetch = () => new Promise((resolve) => { releaseFetch = resolve; });
+const superseded = pingServer();
+const successor = Promise.resolve(true);
+context.window.__PING_PENDING__ = successor;
+releaseFetch(new Response("pong", { status: 200 }));
+await superseded;
+await Promise.resolve();
+if (context.window.__PING_PENDING__ !== successor) {
+  throw new Error("Settled ping cleared a newer pending boundary");
+}
+""",
+    )
+
+
 # @pair offline:rapid-transitions
 # @pair offline:coalescing
 # @pair offline:server-health

@@ -119,6 +119,47 @@ def test_error_context_sanitizer_redacts_nested_secrets_and_bounds_payloads():
 
 
 # @features error-reporting
+# @dimensions privacy redaction url-metadata
+def test_error_context_sanitizer_replaces_urls_with_bounded_metadata():
+    context = {
+        "URL": (
+            "HTTPS://private-user:private-password@Example.COM:8443/secret/path"
+            "?signed=private-query#private-fragment"
+        ),
+        "nested": {"url": "http://[invalid-host"},
+    }
+
+    sanitized = core_exceptions.sanitize_error_context(context)
+    serialized = repr(sanitized)
+
+    for secret in (
+        "private-user",
+        "private-password",
+        "secret/path",
+        "private-query",
+        "private-fragment",
+    ):
+        assert secret not in serialized
+    assert sanitized["URL"] == {
+        "parseable": True,
+        "has_path": True,
+        "has_query": True,
+        "has_fragment": True,
+        "has_credentials": True,
+        "scheme": "https",
+        "host": "example.com",
+        "port": 8443,
+    }
+    assert sanitized["nested"]["url"] == {
+        "parseable": False,
+        "has_path": False,
+        "has_query": False,
+        "has_fragment": False,
+        "has_credentials": False,
+    }
+
+
+# @features error-reporting
 # @dimensions privacy request-context payload-bounds
 def test_request_info_uses_bounded_structural_allowlist():
     app = Flask("request-privacy-test")

@@ -129,9 +129,11 @@ Do not run local E2E, hosted E2E, test-server, or browser review concurrently.
 
 `.github/workflows/hosted-e2e.yml` accepts trusted manual dispatch and release
 pull-request candidates. It resolves the exact pull-request head commit,
-verifies that the Cloud Run job was created from that source, invokes through
-WIF, and waits for the result bucket's last-uploaded `manifest.json` completion
-marker.
+then runs npm source checks, Ruff, full and changed traceability, and the release
+check in an unprivileged job. Only a passing automatic candidate proceeds to
+the protected environment, where the workflow verifies that the Cloud Run job
+was created from that source, invokes through WIF, and waits for the result
+bucket's last-uploaded `manifest.json` completion marker.
 
 The workflow validates and merges evidence, confirms that no tracked file other
 than `testing/evidence/latest.json` changed, and non-force pushes an
@@ -142,9 +144,10 @@ publishes the required **Source quality and traceability** status on the exact
 evidence head.
 
 Only the execution job enters the protected environment and can mint the GCP
-identity or write the branch. Resolver, continuation, and status jobs receive
-smaller job-specific permissions. Manual/local results remain diagnostic and do
-not replace the release-pull-request status.
+identity or write the branch. Resolver, preflight, continuation, and status jobs
+receive smaller job-specific permissions. A manual dispatch may bypass the
+automatic preflight for diagnosis, but manual/local results cannot publish or
+replace the release-pull-request status.
 
 ## Artifacts and evidence
 

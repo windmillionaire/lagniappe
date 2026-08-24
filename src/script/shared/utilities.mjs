@@ -337,7 +337,10 @@ export function waitForAttribute(element, attributeName, timeout = 10000) {
  * @reason object sorting is private deep-comparison normalization
  */
 function _sortObject(obj) {
-	if (obj === null || typeof obj !== "object" || Array.isArray(obj)) {
+	if (Array.isArray(obj)) {
+		return obj.map((value) => _sortObject(value));
+	}
+	if (obj === null || typeof obj !== "object") {
 		return obj;
 	}
 	return Object.keys(obj)

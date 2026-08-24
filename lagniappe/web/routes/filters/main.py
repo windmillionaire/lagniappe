@@ -163,7 +163,7 @@ def test(key, **kwargs):
 def save(key, **kwargs):
     entity = kwargs["entity"]
 
-    definitions = [json.loads(d) for d in request.values.getlist("definition")]
+    definitions = _definitions_from_request()
     if not definitions:
         return responses.error("Please add at least one filter condition")
 

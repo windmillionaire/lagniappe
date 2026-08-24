@@ -64,10 +64,12 @@ and similar code stay lazy until their owning surface requests them.
 
 The main startup path has four measured closures:
 
-- main entry alone: 16 KiB;
-- main plus a shell view: 64 KiB;
-- main plus a Core view: 120 KiB; and
-- Builder: 192 KiB.
+| Budget key | Measured closure | Limit (KiB) |
+| --- | --- | ---: |
+| `main` | Main entry alone | 32 |
+| `shell` | Main plus a shell view | 64 |
+| `core` | Main plus a Core view | 120 |
+| `builder` | Builder view | 200 |
 
 `build/startupBudget.mjs` measures deduplicated minified static imports and
 fails when a closure exceeds its budget. It also prevents heavy interactive

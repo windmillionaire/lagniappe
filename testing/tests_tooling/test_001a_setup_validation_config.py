@@ -1484,6 +1484,8 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
     assert settings.APP["AI_UTILITY_MODEL"] == constants.DEFAULT_UTILITY_AI_MODEL
     assert settings.APP["AI_IMAGE_MODEL"] == constants.DEFAULT_AI_IMAGE_MODEL
     assert settings.APP["SOURCE_URL"] == constants.DEFAULT_SOURCE_URL
+    assert settings.APP["SENTRY_TRACES_SAMPLE_RATE"] == 1.0
+    assert settings.APP["SENTRY_PROFILE_SESSION_SAMPLE_RATE"] == 1.0
     assert settings.APP["REDIS_TLS"] is False
     assert settings.APP["VERSION"] == "2.0"
     assert settings.APP["INSTALLER_EMAIL"] == "owner@example.com"
@@ -1509,6 +1511,8 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
             "AI_UTILITY_MODEL": "custom-utility-model",
             "AI_IMAGE_MODEL": "custom-image-model",
             "AI_OBSERVABILITY": True,
+            "SENTRY_TRACES_SAMPLE_RATE": 0.25,
+            "SENTRY_PROFILE_SESSION_SAMPLE_RATE": 0.5,
             "SOURCE_URL": "https://example.test/custom-source",
             "REDIS_TLS": True,
             "REDIS_CA_CERT": "config/files/redis_ca.pem",
@@ -1524,6 +1528,8 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
     assert settings.APP["AI_UTILITY_MODEL"] == "custom-utility-model"
     assert settings.APP["AI_IMAGE_MODEL"] == "custom-image-model"
     assert settings.APP["AI_OBSERVABILITY"] is True
+    assert settings.APP["SENTRY_TRACES_SAMPLE_RATE"] == 0.25
+    assert settings.APP["SENTRY_PROFILE_SESSION_SAMPLE_RATE"] == 0.5
     assert settings.APP["SOURCE_URL"] == "https://example.test/custom-source"
     assert settings.APP["REDIS_TLS"] is True
     assert settings.APP["REDIS_CA_CERT"] == "config/files/redis_ca.pem"

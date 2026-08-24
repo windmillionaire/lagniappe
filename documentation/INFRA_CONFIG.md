@@ -131,6 +131,10 @@ remove request payloads and identity context, allowlist structural request
 metadata, redact recognized credentials, and bound nested context. Error
 messages and stack traces remain diagnostic content.
 
+Backend tracing and profiling use the optional `SENTRY_TRACES_SAMPLE_RATE` and
+`SENTRY_PROFILE_SESSION_SAMPLE_RATE` settings. Each accepts a finite value from
+`0.0` through `1.0`; both default to `1.0` for backward-compatible reporting.
+
 Optional agent access uses `AGENT_ACCESS_ENABLED`, `AGENT_ACCESS_EMAIL`,
 `AGENT_ACCESS_NAME`, and `AGENT_ACCESS_CODE`. Successful login resolves to a
 normal User and normal group permissions.

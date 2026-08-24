@@ -1347,6 +1347,14 @@ def _build_app_settings():
         "CAPTURE_ERRORS": SETTINGS.APP.get(
             "CAPTURE_ERRORS", constants.DEFAULT_ERROR_MONITORING_ENABLED
         ),
+        "SENTRY_TRACES_SAMPLE_RATE": SETTINGS.APP.get(
+            "SENTRY_TRACES_SAMPLE_RATE",
+            constants.DEFAULT_SENTRY_TRACES_SAMPLE_RATE,
+        ),
+        "SENTRY_PROFILE_SESSION_SAMPLE_RATE": SETTINGS.APP.get(
+            "SENTRY_PROFILE_SESSION_SAMPLE_RATE",
+            constants.DEFAULT_SENTRY_PROFILE_SESSION_SAMPLE_RATE,
+        ),
         "PUBLIC_MANUAL": SETTINGS.APP.get(
             "PUBLIC_MANUAL", constants.DEFAULT_PUBLIC_MANUAL
         ),
