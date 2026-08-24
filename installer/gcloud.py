@@ -694,23 +694,10 @@ def create_task_queue():
             ) from e
 
 
-# @testable false
-# @covered-by installer/gcloud.py::configure_data_protection
-# @reason setup runs the isolated migration boundary before enabling scheduled backups
-def _prepare_backup_metadata():
-    from installer.data_lifecycle.provider import ProviderContext
-
-    result = ProviderContext.from_settings().run_runtime_action(
-        "migrate", "(default)"
-    )
-    if result.get("status") != "current":
-        raise RuntimeError("Data migrations are not current for scheduled backups.")
-
-
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_deferred_job_reconciler_contract
 # @features setup deferred-jobs
-# @dimensions cloud-scheduler recovery oidc iam
+# @dimensions cloud-scheduler recovery oidc iam runtime-isolation
 def create_deferred_job_reconciler():
     """Create or update the five-minute durable-job recovery schedule."""
     from config import SETTINGS
@@ -828,14 +815,13 @@ def create_deferred_job_reconciler():
             identifier=f"{region}/{name}",
         )
         sp.ok(f.ok_glyph)
-    configure_data_protection()
     return True
 
 
 # @testable true
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_deferred_job_reconciler_contract
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_data_protection_contract
 # @features setup disaster-recovery
-# @dimensions pitr native-backups retention idempotent
+# @dimensions pitr native-backups retention idempotent runtime-isolation
 def configure_data_protection():
     """Enable PITR and reconcile daily/weekly native backup schedules."""
     import json
@@ -844,7 +830,6 @@ def configure_data_protection():
 
     project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
     database = "(default)"
-    _prepare_backup_metadata()
     run_gcloud_command(
         [
             "firestore",

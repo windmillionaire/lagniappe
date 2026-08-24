@@ -22,9 +22,11 @@ exact printed confirmation.
 
 Setup enables a seven-day Firestore PITR window, daily native backups retained
 for 14 days, Sunday backups retained for 14 weeks, and 14-week noncurrent
-generation retention on runtime buckets. It runs pending data migrations before
-enabling schedules so provider backups contain current asset-generation
-metadata.
+generation retention on runtime buckets. Provider data protection is reconciled
+as its own setup step; deferred-job Scheduler setup does not import or execute
+the application runtime. Creating an exact recovery set runs pending data
+migrations immediately before choosing its snapshot so the set contains current
+asset-generation metadata.
 
 The recovery bucket has no browser CORS and no runtime-account access. The
 human installer/deployer has object administration. `GIBBERISH` deterministically

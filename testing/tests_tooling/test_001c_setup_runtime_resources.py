@@ -2072,6 +2072,9 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch):
     gcloud_module.configure_storage_buckets = lambda: events.append(
         "storage-buckets"
     )
+    gcloud_module.configure_data_protection = lambda: events.append(
+        "data-protection"
+    )
     utils_module.deploy_to_app_engine = lambda **kwargs: events.append("deploy")
     deploy_module.verify_runtime_deploy_surface = lambda: events.append(
         "verify-runtime-deploy-surface"
@@ -2131,6 +2134,7 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch):
         "verify-runtime-deploy-surface",
         "app-engine-and-runtime-iam",
         "storage-buckets",
+        "data-protection",
         "images",
         "deployment",
         "ai-settings",
@@ -3527,9 +3531,9 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     ]
 
 
-# @features setup deferred-jobs disaster-recovery
-# @dimensions cloud-scheduler recovery oidc iam pitr native-backups retention idempotent
-# @pairs setup:cloud-scheduler setup:recovery setup:oidc setup:iam deferred-jobs:cloud-scheduler deferred-jobs:recovery deferred-jobs:oidc deferred-jobs:iam setup:pitr setup:native-backups setup:retention setup:idempotent disaster-recovery:pitr disaster-recovery:native-backups disaster-recovery:retention disaster-recovery:idempotent
+# @features setup deferred-jobs
+# @dimensions cloud-scheduler recovery oidc iam runtime-isolation
+# @pairs setup:cloud-scheduler setup:recovery setup:oidc setup:iam setup:runtime-isolation deferred-jobs:cloud-scheduler deferred-jobs:recovery deferred-jobs:oidc deferred-jobs:iam deferred-jobs:runtime-isolation
 def test_setup_deferred_job_reconciler_contract(monkeypatch):
     import installer as setup_pkg
     from installer import gcloud
@@ -3555,7 +3559,6 @@ def test_setup_deferred_job_reconciler_contract(monkeypatch):
 
     commands = []
     iam_calls = []
-    migration_calls = []
     existing_returncode = 1
 
     def fake_run(command, check=True):
@@ -3573,8 +3576,10 @@ def test_setup_deferred_job_reconciler_contract(monkeypatch):
     monkeypatch.setattr(gcloud, "run_gcloud_command", fake_run)
     monkeypatch.setattr(
         gcloud,
-        "_prepare_backup_metadata",
-        lambda: migration_calls.append("migrate"),
+        "configure_data_protection",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("deferred-job setup must not configure data protection")
+        ),
     )
     monkeypatch.setattr(
         gcloud.iam_access,
@@ -3663,6 +3668,37 @@ def test_setup_deferred_job_reconciler_contract(monkeypatch):
     ]
     assert "--update-headers=Content-Type=application/json" in scheduler
     assert not any(part.startswith("--headers=") for part in scheduler)
+    assert not any(command[:1] == ["firestore"] for command, _check in commands)
+
+
+# @features setup disaster-recovery
+# @dimensions pitr native-backups retention idempotent runtime-isolation
+# @pairs setup:pitr setup:native-backups setup:retention setup:idempotent setup:runtime-isolation disaster-recovery:pitr disaster-recovery:native-backups disaster-recovery:retention disaster-recovery:idempotent disaster-recovery:runtime-isolation
+def test_setup_data_protection_contract(monkeypatch):
+    from installer import gcloud
+
+    constants = _load_config_constants()
+    settings = _fake_settings(gcloud={"PROJECT": "project-1"})
+    _install_config_package(monkeypatch, constants, settings=settings)
+
+    commands = []
+    mutations = []
+    schedules = []
+
+    def fake_run(command, check=True):
+        commands.append((command, check))
+        if command[:4] == ["firestore", "backups", "schedules", "list"]:
+            return completed_process(command, stdout=json.dumps(schedules))
+        return completed_process(command)
+
+    monkeypatch.setattr(gcloud, "run_gcloud_command", fake_run)
+    monkeypatch.setattr(
+        gcloud,
+        "record_mutation",
+        lambda *args, **kwargs: mutations.append((args, kwargs)),
+    )
+
+    assert gcloud.configure_data_protection()
     assert any(
         command[:3] == ["firestore", "databases", "update"]
         and "--enable-pitr" in command
@@ -3683,7 +3719,36 @@ def test_setup_deferred_job_reconciler_contract(monkeypatch):
         and "--retention=98d" in command
         for command in backup_schedules
     )
-    assert migration_calls == ["migrate", "migrate"]
+    assert mutations[-1][1]["identifier"] == "project-1/(default)"
+
+    commands.clear()
+    schedules.extend(
+        [
+            {
+                "name": "projects/project-1/databases/(default)/backupSchedules/daily-1",
+                "dailyRecurrence": {},
+            },
+            {
+                "name": "projects/project-1/databases/(default)/backupSchedules/weekly-1",
+                "weeklyRecurrence": {},
+            },
+        ]
+    )
+
+    assert gcloud.configure_data_protection()
+    updates = [
+        command
+        for command, _check in commands
+        if command[:4] == ["firestore", "backups", "schedules", "update"]
+    ]
+    assert any(
+        "--backup-schedule=daily-1" in command and "--retention=14d" in command
+        for command in updates
+    )
+    assert any(
+        "--backup-schedule=weekly-1" in command and "--retention=98d" in command
+        for command in updates
+    )
 
 
 # @features setup

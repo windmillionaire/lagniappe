@@ -169,6 +169,7 @@ def _install_harness(
         setup_app_engine=step("setup_app_engine"),
         configure_storage_buckets=step("configure_storage_buckets"),
         create_task_queue=step("create_task_queue"),
+        configure_data_protection=step("configure_data_protection"),
         create_ocr_processor=step("create_ocr_processor"),
         create_deferred_job_reconciler=step("create_deferred_job_reconciler", True),
     )
@@ -270,6 +271,7 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
         "setup_app_engine",
         "configure_storage_buckets",
         "create_task_queue",
+        "configure_data_protection",
         "create_ocr_processor",
         "setup_auth_email",
         "setup_identity_platform",
@@ -1319,6 +1321,7 @@ REMOTE_MUTATION_BOUNDARIES = (
     "setup_app_engine",
     "configure_storage_buckets",
     "create_task_queue",
+    "configure_data_protection",
     "create_ocr_processor",
     "setup_auth_email",
     "setup_identity_platform",

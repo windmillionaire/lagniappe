@@ -89,6 +89,7 @@ def install():
         ("reconcile App Engine", gcloud.setup_app_engine),
         ("reconcile storage buckets", gcloud.configure_storage_buckets),
         ("reconcile task queue", gcloud.create_task_queue),
+        ("reconcile database data protection", gcloud.configure_data_protection),
         ("reconcile OCR processor", gcloud.create_ocr_processor),
         ("configure authentication email", auth_email.setup_auth_email),
         (

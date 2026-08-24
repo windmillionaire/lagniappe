@@ -101,6 +101,7 @@ def _apply_update(*, upgrade):
 
     gcloud.setup_app_engine()
     gcloud.configure_storage_buckets()
+    gcloud.configure_data_protection()
     _update_custom_images(f)
     _update_deployment_settings(f)
     _update_ai_settings(f)
