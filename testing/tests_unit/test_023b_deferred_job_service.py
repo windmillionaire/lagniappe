@@ -1,83 +1,38 @@
 """Focused deferred-job behavior tests."""
 
 from datetime import datetime, timedelta, timezone
-import hashlib
 import json
-import threading
 from types import SimpleNamespace
 
 from google.api_core import exceptions as google_exceptions
-from google.genai import errors as genai_errors
-import httpx
 import pytest
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
-    AI,
-    DeferredJobInspection,
     DeferredJobPhase,
-    DeferredJobRunState,
     DeferredJobSpec,
     DeferredJobStatus,
     DeferredJobType,
-    FetchReason,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.mixins.submitter import SubmitterMixin
 from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
-from lagniappe.core.properties.deferred_job_request import RequestFingerprint
-from lagniappe.core.properties import deferred_job_lifecycle
 from lagniappe.core.tools import database
 from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.deferred_jobs import dispatch as deferred_dispatch
 from lagniappe.core.tools.deferred_jobs import service as deferred_service
-from lagniappe.core.tools.ai.prompt import Prompt
-from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.database import deferred_jobs as deferred_database
 from lagniappe.core.tools.deferred_jobs import common as deferred_common
-from lagniappe.core.tools.deferred_jobs import retry as deferred_retry
-from lagniappe.core.tools.deferred_jobs.adapters.base import DeferredJobAdapter
-from lagniappe.core.tools.deferred_jobs.context import DeferredJobContext
-from lagniappe.core.tools.deferred_jobs.control import (
-    DeferredExecutionControl,
-    _DeferredLeaseGuard,
-)
-from lagniappe.core.tools.deferred_jobs.dispatch import DeferredJobDispatch
 from lagniappe.core.tools.deferred_jobs.errors import (
-    DeferredJobClaimLostError,
-    DeferredJobDeadlineError,
-    DeferredJobDependencyFailedError,
-    DeferredJobDependencyPendingError,
-    DeferredJobDriftError,
     DeferredJobInfrastructureError,
-    DeferredJobLockedError,
 )
-from lagniappe.core.tools.deferred_jobs.locks import (
-    AUTOFILL_FORM_LOCK_SCOPE,
-    active_deferred_job_lock,
-    deferred_job_lock_descriptor,
-    deferred_job_lock_descriptors,
-    deferred_job_lock_key,
-)
-from lagniappe.core.tools.deferred_jobs.retry import MODEL_BUSY_MESSAGE
-from lagniappe.core.tools.deferred_jobs.runner import MISSING_INPUT_MESSAGE
-from lagniappe.core.tools.deferred_jobs.service import DeferredJobService, DeferredJobs
-from lagniappe.core.tools.deferred_jobs.adapters import site as site_adapters
-from lagniappe.core.tools.files import extract as file_extract
+from lagniappe.core.tools.deferred_jobs.service import DeferredJobService
 from testing.utility.deferred_job_fakes import (
-    ContendedDatastore,
-    FakeDatastore,
     FakeTasksClient,
-    KeyedDatastore,
-    KeyedEntity,
     RecordingAdapter,
     RunnerJob,
     fake_start_entities,
-    operation_projection,
-    runner,
-    terminal_delivery_runner,
 )
-from testing.utility.test_entities import TestEntities
+from testing.utility.deferred_job_fakes import operation_projection  # noqa: F401
 
 
 pytestmark = pytest.mark.unit
@@ -87,7 +42,7 @@ pytestmark = pytest.mark.unit
 # @dimensions cancellation deterministic-task-id
 def test_cancel_deletes_tasks_and_persists_a_tombstone(
     monkeypatch,
-    operation_projection,
+    operation_projection,  # noqa: F811
 ):
     registry = DeferredJobService()
     job = RunnerJob(attempt=2)
@@ -340,7 +295,7 @@ def test_long_running_feedback_dispatch_is_delayed_and_deterministic(monkeypatch
 def test_production_dispatch_rejects_disabled_task_queue(monkeypatch):
     registry = DeferredJobService()
     job = RunnerJob()
-    job.job_type = DeferredJobType.SITE_EXPORT.value
+    job.job_type = DeferredJobType.FILE_EXTRACT.value
     monkeypatch.setattr(
         deferred_dispatch,
         "CONFIG",
@@ -364,62 +319,32 @@ def test_production_dispatch_rejects_disabled_task_queue(monkeypatch):
         registry.dispatch(job, attempt=1)
 
 
-# @pair deferred-jobs:transient-dispatch
-# @pair deferred-jobs:no-apply
-# @pair export:intent-preservation
+# @pairs deferred-jobs:transient-dispatch deferred-jobs:no-apply
 # @pair notifications:pending-state
-def test_start_retains_site_export_intent_after_provider_enqueue_failure(monkeypatch):
+def test_start_retains_generic_intent_after_dispatch_failure(monkeypatch):
     actor, state = fake_start_entities(monkeypatch)
     registry = DeferredJobService()
-    adapter = registry.adapter(DeferredJobType.SITE_EXPORT)
-    provider_or_apply_calls = []
-    export_updates = []
-
+    adapter = RecordingAdapter()
+    registry.adapter_registry._defaults_loaded = True
+    registry.register(adapter)
     monkeypatch.setattr(
         deferred_service,
         "CONFIG",
         SimpleNamespace(production=True),
     )
-    monkeypatch.setattr(
-        deferred_dispatch,
-        "CONFIG",
-        SimpleNamespace(production=True),
-    )
-    monkeypatch.setattr(
-        deferred_dispatch,
-        "url_for",
-        lambda endpoint, _external: f"https://example.test/{endpoint}",
-    )
 
-    def enqueue_failure(*_args, **_kwargs):
+    def dispatch_failure(*_args, **_kwargs):
         raise google_exceptions.ServiceUnavailable("queue provider unavailable")
 
-    monkeypatch.setattr(task_queue, "create_task", enqueue_failure)
-    monkeypatch.setattr(
-        adapter,
-        "prepare",
-        lambda _context: provider_or_apply_calls.append("prepare") or {},
-    )
-    monkeypatch.setattr(
-        adapter,
-        "apply",
-        lambda _context: provider_or_apply_calls.append("apply") or {},
-    )
-    monkeypatch.setattr(
-        site_adapters.export_database,
-        "update",
-        lambda export_id, updates: (
-            export_updates.append((export_id, updates)) or updates
-        ),
-    )
+    monkeypatch.setattr(registry, "dispatch", dispatch_failure)
+    monkeypatch.setattr(registry, "dispatch_feedback", lambda *_args: None)
 
     returned_job, returned_notification = registry.start(
         DeferredJobSpec(
-            job_type=DeferredJobType.SITE_EXPORT,
+            job_type=DeferredJobType.AUTOFILL,
             actor=actor,
             inputs={},
-            parameters={"export_id": "export-1"},
-            notification_body="Building HTML export archive...",
+            notification_body="Preparing background work...",
         )
     )
 
@@ -434,10 +359,8 @@ def test_start_retains_site_export_intent_after_provider_enqueue_failure(monkeyp
     assert job.error["retryable"] is True
     assert job.start_completed is True
     assert notification.pending is True
-    assert notification.body == "Building HTML export archive..."
-    assert export_updates == []
-    assert provider_or_apply_calls == []
-    assert len(state["saved"]) == 3
+    assert notification.body == "Preparing background work..."
+    assert adapter.calls == []
 
 
 # @features deferred-jobs

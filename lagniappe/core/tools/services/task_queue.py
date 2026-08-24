@@ -49,6 +49,7 @@ def create_task(
     payload=None,
     delay_seconds=0,
     *,
+    schedule_at=None,
     task_id=None,
     dispatch_deadline_seconds=None,
 ):
@@ -85,10 +86,18 @@ def create_task(
     else:
         task["http_request"]["body"] = json.dumps({}).encode()
 
-    if delay_seconds > 0:
-        d = datetime.datetime.now(datetime.UTC) + datetime.timedelta(
-            seconds=delay_seconds
-        )
+    if schedule_at is not None and delay_seconds:
+        raise ValueError("Cloud Task delay_seconds and schedule_at are mutually exclusive")
+    if schedule_at is not None:
+        d = schedule_at
+        if d.tzinfo is None:
+            raise ValueError("Cloud Task schedule_at must include a timezone")
+        d = d.astimezone(datetime.UTC)
+    elif delay_seconds > 0:
+        d = datetime.datetime.now(datetime.UTC) + datetime.timedelta(seconds=delay_seconds)
+    else:
+        d = None
+    if d is not None:
         timestamp = timestamp_pb2.Timestamp()
         timestamp.FromDatetime(d)
         task["schedule_time"] = timestamp

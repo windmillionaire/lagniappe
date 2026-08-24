@@ -167,7 +167,8 @@ def uncomplete_task():
     payload = authenticate_task(request)
     if payload is None:
         return make_response("Unauthorized", 401)
-    if not payload.get("key") or not set(payload).issubset({"key", "next_due_date"}):
+    allowed = {"key", "token"} if payload.get("token") else {"key", "next_due_date"}
+    if not payload.get("key") or not set(payload).issubset(allowed):
         return jsonify({"success": False, "error": "Invalid task payload."}), 400
 
     task = None
@@ -177,11 +178,35 @@ def uncomplete_task():
             payload["key"],
             request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
         )
-        task.uncomplete()
-        if payload.get("next_due_date"):
-            task.due_date = dates.utc_date_string_to_utc_datetime(
-                payload["next_due_date"]
+        if not task:
+            return make_response("", 200)
+        token = str(payload.get("token") or "")
+        active_schedule = task.properties.schedule.active
+        if token:
+            valid = (
+                task.completed
+                and task.active
+                and active_schedule is not None
+                and token == task.scheduled_uncomplete_token
             )
+        else:
+            expected_due = (
+                dates.utc_date_string_to_utc_datetime(payload["next_due_date"])
+                if payload.get("next_due_date")
+                else None
+            )
+            valid = bool(
+                task.completed
+                and task.active
+                and active_schedule is not None
+                and expected_due is not None
+                and task.due_date == expected_due
+            )
+        if not valid:
+            return make_response("", 200)
+        next_due_date = task.due_date
+        task.uncomplete()
+        task.due_date = next_due_date
         task.save()
     except Exception as e:
         exceptions.capture(

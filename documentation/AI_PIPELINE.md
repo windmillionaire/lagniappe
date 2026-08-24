@@ -81,8 +81,7 @@ Browser form
 There are three different checkpoint systems and they should not be conflated:
 
 1. `DeferredJob.checkpoint` typically stores a prepared final output before the
-   adapter's final apply; Site Export instead relies on domain-specific
-   idempotent state.
+   adapter's final apply.
 2. `report.upload_manifest` records per-file Organize ingestion progress.
 3. `report.result` is the versioned per-action execution/undo ledger used after
    a user approves a proposal.
@@ -132,9 +131,9 @@ pending report or target state, and calls `DeferredJobs.start()` with a typed
 `DeferredJobSpec`. The browser supplies an operation UUID and the service
 binds it to an immutable canonical request fingerprint. Job and pending
 notification are transactionally get/created; replay of the same stable spec is
-idempotent and UUID reuse for a different spec is rejected. Report creation and
-site export allocate their domain record immediately before this
-transaction, outside the durable job/notification transaction. The durable job
+idempotent and UUID reuse for a different spec is rejected. Report creation
+allocates its domain record immediately before this transaction, outside the
+durable job/notification transaction. The durable job
 contains entity references and bounded parameters rather than fully rendered
 prompts or file bytes. File processing creates only a terminal notification.
 Email ingestion creates no pending or success notification; it creates a linked
@@ -166,7 +165,7 @@ their start-time fingerprints, and verifies the active claim.
 The generic AI gate is driven by `adapter.required_ai_access`. Ask jobs require
 `AI.ASK`; generation, organization, execution, autofill, page generation, and
 file summarization require `AI.CREATE`. Domain adapters add their own checks,
-such as edit access to an autofill target or owner access to site export. Every
+such as edit access to an autofill target. Every
 adapter with a required tier delegates to the shared authorization method, and
 a parameterized registry test protects the tier contract. The synchronous
 multi-file upload summary path applies the same `AI.CREATE` gate at its route
@@ -252,9 +251,8 @@ residual actions become review items; a structurally unusable plan becomes an
 accurately labeled review-only proposal.
 
 Most deferred generation saves the final prepared proposal or submission in the
-job checkpoint before its final domain apply. Site Export is an exception: its
-adapter relies on its own idempotent metadata/archive protocol during apply.
-The adapter then inspects current state to distinguish already-applied from
+job checkpoint before its final domain apply. The adapter then inspects current
+state to distinguish already-applied from
 not-applied work and applies idempotently. AI report generation only saves a
 proposal. A later user-reviewed execution is queued as a distinct deferred job;
 its worker calls `run_report()` through the separate `report.result` recovery

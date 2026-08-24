@@ -398,6 +398,8 @@ def save_text(text, path, content_type, visibility):
     bucket = DATA.bucket(visibility)
     blob = bucket.blob(path)
     blob.upload_from_string(text, content_type=content_type)
+    blob.reload()
+    return blob
 
 
 # @testable false
@@ -464,7 +466,7 @@ def delete_file(path, visibility):
 # @features admin
 # @dimensions site-image-upload
 def upload_site_image(filename, image_data):
-    """Upload a site image to the public bucket. Returns the blob path (filename)."""
+    """Upload a site image and return its path and immutable generation."""
     if filename.endswith(".png"):
         content_type = "image/png"
     elif filename.endswith(".ico"):
@@ -472,5 +474,6 @@ def upload_site_image(filename, image_data):
 
     blob = DATA.public_bucket.blob(filename)
     blob.upload_from_string(image_data, content_type=content_type)
+    blob.reload()
 
-    return filename
+    return {"path": filename, "generation": str(blob.generation)}

@@ -232,6 +232,17 @@ class MutationPlanBuilder:
             reason,
         )
 
+    # @testable true
+    # @tests tests_unit/test_022_mutation_contracts.py::test_scheduled_uncomplete_dispatch_is_planned_after_task_write
+    # @features mutations task-scheduling
+    # @dimensions durable-first post-commit
+    def dispatch_scheduled_uncomplete(self, entity, *, reason):
+        self._add_entity_cache_effect(
+            MutationEffectType.SCHEDULED_UNCOMPLETE_DISPATCH,
+            entity,
+            reason,
+        )
+
     # @testable infrastructure
     def clear_cache_state(self, cache_key, *, reason):
         if not cache_key:
@@ -333,6 +344,11 @@ class MutationPlanBuilder:
             elif intent.intent is MutationIntentType.CACHE_SEARCH_DELETE:
                 self.delete_from_search(
                     intent.cache_kind,
+                    intent.entity,
+                    reason=intent.reason,
+                )
+            elif intent.intent is MutationIntentType.SCHEDULED_UNCOMPLETE_DISPATCH:
+                self.dispatch_scheduled_uncomplete(
                     intent.entity,
                     reason=intent.reason,
                 )

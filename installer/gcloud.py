@@ -694,6 +694,19 @@ def create_task_queue():
             ) from e
 
 
+# @testable false
+# @covered-by installer/gcloud.py::configure_data_protection
+# @reason setup runs the isolated migration boundary before enabling scheduled backups
+def _prepare_backup_metadata():
+    from installer.data_lifecycle.provider import ProviderContext
+
+    result = ProviderContext.from_settings().run_runtime_action(
+        "migrate", "(default)"
+    )
+    if result.get("status") != "current":
+        raise RuntimeError("Data migrations are not current for scheduled backups.")
+
+
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_deferred_job_reconciler_contract
 # @features setup deferred-jobs
@@ -815,6 +828,102 @@ def create_deferred_job_reconciler():
             identifier=f"{region}/{name}",
         )
         sp.ok(f.ok_glyph)
+    configure_data_protection()
+    return True
+
+
+# @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_deferred_job_reconciler_contract
+# @features setup disaster-recovery
+# @dimensions pitr native-backups retention idempotent
+def configure_data_protection():
+    """Enable PITR and reconcile daily/weekly native backup schedules."""
+    import json
+
+    from config import SETTINGS
+
+    project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
+    database = "(default)"
+    _prepare_backup_metadata()
+    run_gcloud_command(
+        [
+            "firestore",
+            "databases",
+            "update",
+            f"--database={database}",
+            "--enable-pitr",
+            f"--project={project_id}",
+            "--quiet",
+        ]
+    )
+    result = run_gcloud_command(
+        [
+            "firestore",
+            "backups",
+            "schedules",
+            "list",
+            f"--database={database}",
+            f"--project={project_id}",
+            "--format=json",
+        ]
+    )
+    try:
+        schedules = json.loads(str(result.stdout or "[]"))
+    except json.JSONDecodeError as error:
+        raise RuntimeError("Firestore returned malformed backup schedules.") from error
+    if not isinstance(schedules, list):
+        raise RuntimeError("Firestore returned malformed backup schedules.")
+
+    daily = next(
+        (item for item in schedules if isinstance(item, dict) and "dailyRecurrence" in item),
+        None,
+    )
+    weekly = next(
+        (item for item in schedules if isinstance(item, dict) and "weeklyRecurrence" in item),
+        None,
+    )
+    desired = (
+        ("daily", "14d", daily, None),
+        ("weekly", "98d", weekly, "SUN"),
+    )
+    for recurrence, retention, existing, day in desired:
+        if existing:
+            schedule_id = str(existing.get("name") or "").rsplit("/", 1)[-1]
+            if not schedule_id:
+                raise RuntimeError("Firestore backup schedule has no resource name.")
+            arguments = [
+                "firestore",
+                "backups",
+                "schedules",
+                "update",
+                f"--backup-schedule={schedule_id}",
+                f"--database={database}",
+                f"--retention={retention}",
+                f"--project={project_id}",
+                "--quiet",
+            ]
+        else:
+            arguments = [
+                "firestore",
+                "backups",
+                "schedules",
+                "create",
+                f"--database={database}",
+                f"--retention={retention}",
+                f"--recurrence={recurrence}",
+                f"--project={project_id}",
+                "--quiet",
+            ]
+            if day:
+                arguments.insert(-2, f"--day-of-week={day}")
+        run_gcloud_command(arguments)
+    record_mutation(
+        "reconcile database data protection",
+        action="update",
+        resource="firestore-data-protection",
+        identifier=f"{project_id}/{database}",
+        details={"pitr": True, "daily_retention": "14d", "weekly_retention": "98d"},
+    )
     return True
 
 

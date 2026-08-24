@@ -1304,9 +1304,8 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
     assert response.status == 403
 
 
-# @pairs admin:site-settings export:admin-only owner:sensitive-configuration
+# @pairs admin:site-settings owner:sensitive-configuration
 # @pairs owner:recovery-export owner:route-gate owner:configuration
-# @pair cache:invalidation-acknowledgement
 def test_additional_admin_cannot_access_owner_configuration(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -1343,7 +1342,6 @@ def test_additional_admin_cannot_access_owner_configuration(get_user, browser_fa
         assert site_settings["status"] == 200
         assert site_settings["data"]["can_manage_administrators"] is False
         assert site_settings["data"]["can_view_sensitive_configuration"] is False
-        assert _fetch_status(administrator, "/l/site-export", "GET")["status"] == 200
         assert (
             _fetch_status(administrator, "/reference/environment-variables", "GET")[
                 "status"

@@ -45,7 +45,7 @@ def _site_image_response(paths):
         if (v.startswith("http://") or v.startswith("https://") or v.startswith("/"))
         else f"/images/{v}"
         for k, v in paths.items()
-        if k != "version"
+        if k not in {"version", "asset_generations"}
     }
 
 

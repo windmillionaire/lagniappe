@@ -217,67 +217,121 @@ needed.
 
 The encrypted settings snapshot does not itself contain application data.
 Lagniappe's minimal provider-data recovery workflow is described in
-[Disaster-Recovery Backups](#disaster-recovery-backups).
+[Data Lifecycle](#data-lifecycle-backup-archive-and-restore).
 
-### Disaster-Recovery Backups
+### Data Lifecycle: Backup, Archive, and Restore
 
-Setup provisions a fifth, production-only `recovery` bucket alongside the
-private, public, history, and export runtime buckets. The recovery bucket uses
-the same stable settings-derived naming contract, but it is not exposed through
-runtime `DataServices`, has no browser CORS policy, and grants neither the
-runtime service account nor `allUsers` setup-managed bucket access. Setup
-grants the recorded human installer/deployer object administration on this
-bucket and the four runtime buckets so terminal backup and restore commands can
-read and write their objects. Keep the encrypted canonical settings and its key
-off-machine: the saved `GIBBERISH` value is what lets a fresh checkout
-rediscover this bucket.
+Setup provisions an operator-only `recovery` bucket alongside the private,
+public, and history application buckets. Runtime `DataServices` cannot access
+the recovery bucket, it has no browser CORS policy, and setup grants the saved
+human installer/deployer—not the runtime service account—object administration.
+The encrypted canonical settings and its key must remain off-machine because
+`GIBBERISH` deterministically rediscovers this bucket.
 
-Create a manual recovery set with:
+Use only the setup entry point:
 
 ```bash
-venv/bin/python run.py backup create
-venv/bin/python run.py backup list
+./setup.sh backup create
+./setup.sh backup list
+./setup.sh backup materialize projects/PROJECT/locations/LOCATION/backups/BACKUP
+./setup.sh backup delete BACKUP_ID
+./setup.sh archive [BACKUP_ID] [--output PATH] [--zip]
+./setup.sh archive validate ARCHIVE_PATH
+./setup.sh restore BACKUP_ID --dry-run
+./setup.sh restore BACKUP_ID
 ```
 
-One recovery set contains a complete managed export of the default Datastore
-mode database and a recursive copy of every live object in each of the four
-runtime buckets. The copies run sequentially and the Datastore export is not a
-point-in-time snapshot, so the set intentionally has a fuzzy start-to-finish
-consistency window. A `complete` manifest is created last; failed or abandoned
-sets are not listed or restorable. Versioned, noncurrent, and soft-deleted
-Storage objects are outside this first recovery contract.
+Use `setup.cmd` on Windows. Backup IDs are generated UTC timestamps plus a
+random suffix. Setup enables the seven-day Firestore PITR window, configures a
+daily native backup with 14-day retention, and configures a Sunday native
+backup with 14-week retention. Runtime bucket versioning retains noncurrent
+asset generations for 14 weeks. Before enabling those schedules, setup runs
+pending data migrations so new native backups contain generation-bound asset
+metadata. `backup materialize` converts a selected native backup into the same
+self-contained recovery-set format used by restore and portable archive.
 
-For a disaster in which the application database and runtime buckets were
-deleted, restore the canonical settings into a fresh checkout, run the normal
-installer/repair flow against the exact recovered project, and then use:
+`backup create` exports every kind and namespace in `(default)` at one explicit
+whole-minute PITR timestamp under `lagniappe-data/v3/recovery-sets/`. At that
+same read time it inventories every entity and its referenced Storage
+generation, then copies those exact asset generations under the recovery-set
+prefix. For a live backup, it first runs pending idempotent data migrations and
+then waits for the next whole minute, ensuring asset-generation metadata is in
+the selected snapshot. A create-only `manifest.json` is written last, so
+incomplete prefixes are neither listed nor consumed. Delete requires
+the exact typed `DELETE <project> <backup-id>` confirmation and invalidates the
+manifest before deleting the remaining exact prefix.
 
-```bash
-venv/bin/python run.py backup list
-venv/bin/python run.py restore BACKUP_ID --dry-run
-venv/bin/python run.py restore BACKUP_ID
-```
+Archive derives from one complete backup. Without a supplied ID it first
+creates a backup in the same resumable operation. It uses a temporary named
+Datastore database and owner-only local SQLite staging, includes private and
+public durable content (active and inactive), replaces all source/scratch keys
+with typed `(namespace, type, id)` identities and owner-scoped history/message
+children, and reads only the immutable generation-bound asset copies in the
+recovery set. It never rereads mutable runtime asset paths. Missing optional assets produce a
+degraded archive; missing canonical document content prevents publication.
 
-The recovery bucket and selected complete set must still exist. If that bucket
-was also permanently deleted, the canonical settings alone cannot reconstruct
-application data. This first version deliberately keeps recovery data in the
-same project; cross-project or offline replication can be added later.
+The default output is `archives/<backup-id>/`; `--zip` produces
+`archives/<backup-id>.zip`. Both contain a key-free portable JSON contract,
+machine schema, canonical document HTML, local referenced assets, checksums,
+and a network-free owner-oriented site at `site/index.html`. Archives include
+owner-visible private data and are not encrypted. Store and transmit them as
+sensitive data. Publication is atomic and `manifest.json` is the final ZIP
+entry. `archive validate` verifies a directory or ZIP entirely offline,
+including paths, inventory, hashes, counts, relationships, links, assets, and
+the absence of recognizable Datastore keys.
 
-An actual restore requires App Engine to be disabled or have no
-traffic-serving versions. It verifies the exact saved/active project,
-settings-derived bucket identities, manifest paths, Datastore mode and
-location, and required artifacts before asking for a typed project-and-backup
-confirmation. It then makes each runtime bucket exactly match the snapshot,
-deleting extra live objects, bulk-deletes every existing Datastore entity, and
-imports the selected export. If the default database was deleted, restore
-recreates it in the recorded location. Redis is not backed up; its cache is
-flushed after a successful data import. Leave the application offline until
-smoke checks pass, then re-enable it manually.
+Interrupted work resumes only for the exact project, command, and output. A
+failed scratch database and private staging state are retained for inspection
+and retry; a successful archive deletes them. If publication succeeds but
+cleanup fails, the archive remains valid and rerunning the exact command only
+finishes cleanup. Never delete retained scratch databases by broad pattern.
 
-This is intentionally a manual, full-backup baseline. It does not schedule or
-prune sets, replicate them outside the project, preserve Cloud Storage bucket
-configuration, or capture Cloud Tasks, indexes, and other provider control
-plane state. Setup and deployment reconstruct the setup-owned bucket metadata,
-IAM, and indexes.
+Restore is an in-place merge into `(default)`. Managed import overwrites every
+entity whose key exists in the recovery set, recreates recovery-set entities
+that are currently missing, and leaves entities with keys absent from the
+recovery set untouched. This is the intended “back to that point while keeping
+later additions” behavior; it does not compare `modified` fields because the
+provider import already supplies the exact and less ambiguous key-overlay
+semantics.
+
+Restore reuses the configured Cloud Tasks queue. Once the deferred-job
+reconciler and queue are paused and traffic is in maintenance, it captures
+every task visible through FULL view in an immutable recovery-bucket object,
+purges the queue, and waits for it to become empty. After moving traffic it
+also allows 65 seconds for requests already executing on the former App Engine
+version to drain. It then waits to a safe whole-minute boundary, creates a
+temporary PITR clone of the quiescent default database, and records the live
+asset generations before beginning import.
+Cloud Tasks has no atomic list-and-purge operation, so the queue snapshot is
+accurately an observation made after pausing producers, not a provider receipt
+enumerating the purge.
+
+After import, exact recovery asset bytes are copied to their runtime paths and
+entity descriptors are rebound to the new generations. Nonterminal deferred
+jobs, locks, Scheduler control state, and active-operation pointers are
+discarded. Migrations, relation-aware cache reconstruction, owner/reserved-model
+validation, and the full Redis rebuild run before traffic returns. Completed
+scheduled tasks carry durable uncompletion tokens and absolute times; restore
+regenerates only those Cloud Tasks. Legacy completed scheduled tasks without a
+token are backfilled and queued for immediate uncompletion. Other purged queue
+entries are intentionally not replayed.
+
+`--dry-run` is read-only and reports how many snapshot keys will overwrite or
+be recreated. A mutating restore requires the exact printed confirmation and
+resumes only the same project/backup checkpoint after interruption. The local
+checkpoint is mirrored without credentials into a generation-checked recovery
+bucket journal. Failures stay in maintenance with the safety clone retained;
+there is no automatic rollback. After validation, traffic and prior queue/
+scheduler state return and the temporary clone is deleted. Runtime asset
+versioning retains the pre-restore generations for manual recovery. Do not
+treat the portable archive as a provider restore artifact. If the recovery
+bucket is permanently lost, the canonical settings alone cannot reconstruct
+application data.
+
+The Admin **Backups & Archives** tab is informational and read-only. It shows
+live PITR/native-schedule metadata, recent native backups, the sanitized
+recovery-set catalog, and terminal instructions. Restore remains a deliberate
+operator command and the runtime service account has no recovery-bucket access.
 
 After installation, recovery, or any manual config edit, use:
 
@@ -368,8 +422,9 @@ Setup and repair continue using the human source ADC; the underprivileged
 runtime identity never provisions or reconciles the installation. No downloaded
 private key or
 `GOOGLE_APPLICATION_CREDENTIALS` key file is part of the supported workflow.
-Backup and restore remain privileged operator commands executed by the saved
-human gcloud CLI identity; they do not load human ADC into the application.
+Backup, archive, and restore remain privileged operator commands executed by
+the saved human gcloud CLI identity; they do not load human ADC into the
+application.
 
 ### Optional Hosted E2E Infrastructure
 
@@ -431,7 +486,7 @@ onboarding is therefore intentionally two-stage:
 The ordinary installer creates the production installation and may be completed
 without accepting its final deployment prompt. It does not create test-prefixed
 buckets. `development` then verifies the saved installation and active Google
-Cloud identity, provisions the four test-prefixed buckets, checks Node/npm and
+Cloud identity, provisions the three test-prefixed runtime buckets, checks Node/npm and
 the `package.json` engine range, installs `requirements-dev.txt`, runs `npm ci`,
 installs Playwright Chromium, and runs `npm run dev`. It is additive and
 idempotent: it never replaces the installation config or provisions duplicate
@@ -791,7 +846,7 @@ the bucket exists and before reconciling it. Runtime object permissions are not
 part of that human preflight: during reconciliation, setup grants
 `roles/storage.objectAdmin` to the recorded human operator on all managed
 buckets and separately grants the runtime service account its bucket-scoped
-roles on the four application buckets. For an existing project, the
+roles on the three application buckets. For an existing project, the
 project-scoped check happens after ADC alignment and before any local draft or
 cloud mutation. A new project must first be created before project permissions
 can be tested; setup then performs the project-scoped check before billing, API
@@ -850,9 +905,9 @@ project-wide Storage roles. Upgrade/repair also removes the retired messaging
 roles listed in `REMOVED_RUNTIME_PROJECT_ROLES`.
 
 `configure_storage_buckets()` runs with installer ADC. Ordinary install,
-repair, and update modes create or reconcile the four deterministically named
-production buckets plus the recovery bucket. Only `development` requests the
-four test-prefixed counterparts. New buckets explicitly use the `US` location
+repair, and update modes create or reconcile the three deterministically named
+production runtime buckets plus the recovery bucket. Only `development`
+requests the three test-prefixed counterparts. New buckets explicitly use the `US` location
 and `STANDARD` default storage class;
 existing bucket locations are retained, while default storage-class drift is
 reconciled to `STANDARD`. Setup preserves any operator-managed retention,
@@ -889,14 +944,14 @@ installer's access, only the Owner can rerun it.
 
 The transaction is ordered and idempotent:
 
-1. add the Owner's object-operator role on the four application buckets and
+1. add the Owner's object-operator role on the three application buckets and
    recovery bucket, plus User and Token Creator on the exact runtime service
    account, then re-read and verify each policy;
 2. set `DEPLOYER_EMAIL` to the Owner, set `BOOTSTRAP_ADMIN_EMAIL` to an explicit
    empty value, set the working copy's saved gcloud account to the Owner, save,
    and deploy that application configuration with the currently authenticated
    installer or Owner;
-3. remove the installer from every binding on all five managed buckets and the
+3. remove the installer from every binding on all four managed buckets and the
    runtime service-account policy, including conditional bindings, then re-read
    and verify;
 4. as the final cloud mutation, remove the installer from every direct project
@@ -1388,10 +1443,10 @@ has just seeded a truly empty database.
 Cloud Storage bucket provisioning and metadata are owned by
 `installer.gcloud.configure_storage_buckets`, using the shared naming and CORS
 contract in `config.storage`. Setup and update create or get the private,
-public, history, export, and operator-only recovery buckets and enable uniform
-bucket-level access. The four runtime buckets receive the browser CORS policy
+public, history, and operator-only recovery buckets and enable uniform
+bucket-level access. The three runtime buckets receive the browser CORS policy
 and bucket-scoped runtime IAM; the recovery bucket receives neither. Runtime
-`DataServices` only gets the four expected runtime buckets and fails with an
+`DataServices` only gets the three expected runtime buckets and fails with an
 actionable setup-repair message when one is absent.
 
 ### Verification (`installer/verify.py`)

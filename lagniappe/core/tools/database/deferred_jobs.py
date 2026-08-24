@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from google.cloud.datastore import Entity, Key
 from google.cloud.datastore import query as datastore_query
+from config.datastore import encode_urlsafe_key
 
 from .core import DATA, KINDS
 from .transactions import retry_aborted
@@ -152,8 +153,7 @@ def _deferred_job_tracking_id(identifier):
         return str(identifier)
     if not hasattr(key, "to_legacy_urlsafe"):
         return str(key)
-    encoded = key.to_legacy_urlsafe()
-    return encoded.decode() if isinstance(encoded, bytes) else str(encoded)
+    return encode_urlsafe_key(key)
 
 
 # @testable infrastructure

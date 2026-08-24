@@ -655,7 +655,20 @@ def home_page(home):
 # @features admin
 # @dimensions page-load site-settings
 def admin_page():
-    return render_template("home/admin.html"), 200
+    from lagniappe.core.tools.site.data_protection import data_protection_status
+
+    try:
+        protection = data_protection_status()
+        protection_error = None
+    except Exception as error:
+        exceptions.capture(error)
+        protection = None
+        protection_error = "provider metadata could not be loaded"
+    return render_template(
+        "home/admin.html",
+        data_protection=protection,
+        data_protection_error=protection_error,
+    ), 200
 
 
 # @testable false

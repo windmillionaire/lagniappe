@@ -2,6 +2,8 @@
 
 import hashlib
 
+from config.datastore import encode_urlsafe_key
+
 from .base_db import DBProperty
 
 
@@ -15,8 +17,7 @@ def encoded_identifier(value):
     if identifier:
         return str(identifier)
     if key is not None and hasattr(key, "to_legacy_urlsafe"):
-        encoded = key.to_legacy_urlsafe()
-        return encoded.decode("utf-8") if isinstance(encoded, bytes) else str(encoded)
+        return encode_urlsafe_key(key)
     return str(key) if key is not None else None
 
 

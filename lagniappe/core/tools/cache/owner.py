@@ -3,6 +3,7 @@
 from contextvars import ContextVar
 import unicodedata
 
+from config.datastore import encode_urlsafe_key
 from lagniappe import CONFIG
 
 from .core import cache
@@ -68,9 +69,7 @@ def _project(values):
 # @covered-by lagniappe/core/tools/cache/owner.py::update_owner_projection
 # @reason mapping construction is asserted through the published projection
 def _mapping(user, revision):
-    page_key = user.properties.page.key.to_legacy_urlsafe()
-    if isinstance(page_key, bytes):
-        page_key = page_key.decode()
+    page_key = encode_urlsafe_key(user.properties.page.key)
     return {
         "schema": OWNER_SCHEMA_VERSION,
         "key": user.urlsafe_key,

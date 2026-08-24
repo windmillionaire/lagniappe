@@ -416,6 +416,15 @@ These are inherited by all entities via the base `Entity._get_properties()`:
 | `Requires` | Cache, DB | List of entity hashes required for access. |
 | `Active` | DB | Boolean. Inactive entities are excluded from normal active-entity queries. Task completion is tracked separately. |
 
+Portable archives do not add hashes to TaskHistory, MessageConversation, or
+Message. Task history is serialized inside its owning Task with its typed
+Datastore child-key tail, and each message is serialized inside its owning
+conversation the same way. A conversation's portable ID is derived from its
+two typed participant User identities. Import planning reconstructs those
+ancestor relationships and uses the target sender plus `operation_id` for the
+message key. Existing hashes on ordinary entities remain unchanged application
+data and continue to serve their permission/search roles.
+
 Other common property classes, such as `Description`, `Attributes`,
 `RestrictedTo`, `IsPublic`, and `PublicID`, are registered by the entity types
 that need them rather than by every entity.
@@ -764,7 +773,7 @@ and deletes its queued deterministic Cloud Task before deleting report-owned
 state.
 
 The shared cohort covers report generation/revision, reviewed report execution,
-page/task autofill, page generation, site export, file OCR, and file summary.
+page/task autofill, page generation, file OCR, and file summary.
 Ingress, scheduled task uncompletion, and cache maintenance retain their
 specialized orchestration.
 
@@ -996,8 +1005,17 @@ Date calculation functions in `tools/dates.py`:
 When a task is completed and has a schedule:
 
 1. `set_next_due_date()` calculates the next occurrence
-2. A new task is created with the next due date (via Cloud Tasks in production)
-3. The task stays active but is marked `completed=True` until the scheduled uncomplete step clears completion state
+2. The Task persists a random `scheduled_uncomplete_token` and absolute
+   `scheduled_uncomplete_at` time in the same write as completion
+3. A post-commit mutation effect creates a deterministic Cloud Task carrying
+   `{key, token}` at that absolute time
+4. The task stays active but is marked `completed=True` until a matching token
+   clears completion state; stale or duplicate deliveries are successful no-ops
+
+Manual uncompletion and schedule clearing remove the durable marker. Disaster
+recovery can therefore purge the queue and reconstruct only these wake-ups from
+the merged database. Completed legacy scheduled tasks without a token are
+backfilled for immediate uncompletion during restore.
 
 ### Task Combination Flow
 

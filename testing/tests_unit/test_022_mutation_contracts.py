@@ -45,6 +45,43 @@ def _writes(plan):
     ]
 
 
+# @features mutations task-scheduling
+# @dimensions durable-first post-commit
+# @source lagniappe/core/definitions/mutations.py::MutationIntent.dispatch_scheduled_uncomplete
+# @source lagniappe/core/mutations/base.py::MutationPlanBuilder.dispatch_scheduled_uncomplete
+def test_scheduled_uncomplete_dispatch_is_planned_after_task_write():
+    task = TestEntities.get(
+        "TASK",
+        {
+            "name": "Durable scheduled dispatch",
+            "hash": "mutation-uncomplete",
+            "page": {"name": "Task page", "hash": "mutation-uncomplete-page"},
+        },
+    )
+    task.db["scheduled_uncomplete_token"] = "token"
+    task.db["scheduled_uncomplete_at"] = datetime(2026, 8, 25, tzinfo=timezone.utc)
+    task.add_mutation_intents(
+        MutationIntent.dispatch_scheduled_uncomplete(
+            task,
+            reason="scheduled-task-uncompletion",
+        )
+    )
+
+    plan = plan_mutation(MutationOperation.SAVE, task, registry=Entities)
+
+    task_write = next(
+        index
+        for index, effect in enumerate(plan.effects)
+        if effect.effect is MutationEffectType.UPSERT and effect.entity is task
+    )
+    dispatch = next(
+        index
+        for index, effect in enumerate(plan.effects)
+        if effect.effect is MutationEffectType.SCHEDULED_UNCOMPLETE_DISPATCH
+    )
+    assert task_write < dispatch
+
+
 # @features mutations
 # @dimensions contract completeness serialization lookup validation planner-registry
 # @source lagniappe/core/mutations/__init__.py::registered_kinds

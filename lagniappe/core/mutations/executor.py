@@ -188,6 +188,18 @@ def execute_post_commit(plan):
             or []
         )
         complete(MutationEffectType.BLOB_DELETE)
+
+    scheduled_uncomplete = [
+        effect.entity
+        for effect in post_commit
+        if effect.effect is MutationEffectType.SCHEDULED_UNCOMPLETE_DISPATCH
+    ]
+    if scheduled_uncomplete:
+        from ..tools.tasks import scheduling
+
+        for task in scheduled_uncomplete:
+            scheduling.dispatch_scheduled_uncomplete(task)
+        complete(MutationEffectType.SCHEDULED_UNCOMPLETE_DISPATCH)
     return completed, errors
 
 

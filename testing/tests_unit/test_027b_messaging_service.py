@@ -96,11 +96,13 @@ def test_message_transactions_are_idempotent_and_keep_exact_unread_counts(monkey
     conversation_key = messaging_database.conversation_key(actor, recipient)
     assert conversation_key == messaging_database.conversation_key(recipient, actor)
     conversation = store.get(conversation_key)
+    assert "hash" not in conversation
+    messages = [row for row in store.rows.values() if row.get("type") == "message"]
+    assert len(messages) == 1 and "hash" not in messages[0]
     recipient_id = conversation_values.participant_id(recipient)
     assert conversation["unread_counts"][recipient_id] == 1
     assert notification_service.aggregate_counts(recipient_aggregate)["count"] == 1
     assert recipient_aggregate["message_revision"] == 1
-
     monkeypatch.setattr(
         message_service.collaboration,
         "recipient_allowed",

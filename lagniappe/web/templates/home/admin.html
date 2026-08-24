@@ -1,7 +1,6 @@
 {% set view_entry = "admin" %}
 {% extends "layouts/base.html" %}
 {% from 'home/site_settings.html' import site_settings %}
-{% from 'home/export.html' import export_tab %}
 {% import 'home/ingress.html' as ingress %}
 {% import 'controls.html' as controls %}
 
@@ -25,19 +24,19 @@
             class="{{ styles.entity.tabIcon }}">
       {{ render_icon("siteOwner") }}
     </button>
-    <button lp-show="exports:active"
-            data-kind="file"
-            title="Export"
-            aria-label="Export"
-            class="{{ styles.entity.tabIcon }}">
-      {{ render_icon("download") }}
-    </button>
     <button lp-show="ingress:active"
             data-kind="file"
             title="Import Data"
             aria-label="Import Data"
             class="{{ styles.entity.tabIcon }}">
       {{ render_icon("import", kind="file") }}
+    </button>
+    <button lp-show="backups:active"
+            data-kind="default"
+            title="Backups & Archives"
+            aria-label="Backups & Archives"
+            class="{{ styles.entity.tabIcon }}">
+      {{ render_icon("database") }}
     </button>
   </nav>
 {% endmacro %}
@@ -107,6 +106,71 @@
   </div>
 {% endmacro %}
 
+{% macro backups_tab() %}
+  <div id="backups"
+       lp-component
+       data-title="Backups & Archives"
+       data-tab="true"
+       data-visible="false"
+       data-kind="default"
+       class="mt-4 sm:mt-0 p-4 sm:p-6 space-y-6"
+       data-parent-nav="tabs">
+    <section>
+      <h2 class="text-lg font-semibold">Data protection</h2>
+      {% if data_protection_error %}
+        <p class="mt-2 text-red-700">Backup status is currently unavailable: {{ data_protection_error }}</p>
+      {% else %}
+        <p class="mt-2">Database <code>{{ data_protection.database }}</code> · {{ data_protection.pitr }}</p>
+        {% if data_protection.earliest_version_time %}
+          <p class="mt-1 text-sm">Earliest recoverable point: {{ data_protection.earliest_version_time }}</p>
+        {% endif %}
+        <ul class="mt-3 list-disc pl-6">
+          {% for schedule in data_protection.schedules %}
+            <li>{{ schedule.recurrence }} backup · retention {{ schedule.retention }}</li>
+          {% else %}
+            <li>No native backup schedules were reported.</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </section>
+    {% if data_protection %}
+      <section>
+        <h2 class="text-lg font-semibold">Recent native backups</h2>
+        <ul class="mt-3 space-y-2">
+          {% for backup in data_protection.native_backups %}
+            <li><code>{{ backup.id }}</code> · {{ backup.state }} · snapshot {{ backup.snapshot_time or "pending" }}</li>
+          {% else %}
+            <li>No native backups were reported yet.</li>
+          {% endfor %}
+        </ul>
+      </section>
+      <section>
+        <h2 class="text-lg font-semibold">Recovery sets</h2>
+        <p class="mt-2 text-sm">These exact restore sources can also be converted into separate portable archives with the archive command below.</p>
+        <ul class="mt-3 space-y-2">
+          {% for backup in data_protection.recovery_sets %}
+            <li>
+              <code>{{ backup.backup_id }}</code> · {{ backup.snapshot_time }} ·
+              {{ backup.entity_count }} entities · {{ backup.asset_count }} assets
+            </li>
+          {% else %}
+            <li>No recovery sets have been materialized yet.</li>
+          {% endfor %}
+        </ul>
+      </section>
+      <section>
+        <h2 class="text-lg font-semibold">Operator commands</h2>
+        <p class="mt-2">Run these from the installation checkout. Restores are intentionally unavailable in the web UI.</p>
+        <dl class="mt-3 space-y-2">
+          {% for label, command in data_protection.instructions.items() %}
+            <div><dt class="inline font-medium capitalize">{{ label }}:</dt> <dd class="inline"><code>{{ command }}</code></dd></div>
+          {% endfor %}
+        </dl>
+      </section>
+    {% endif %}
+  </div>
+{% endmacro %}
+
 {% macro main() %}
   <div lp-view
        data-kind="admin"
@@ -129,8 +193,8 @@
           {{ toggles('tabs') }}
         </div>
         {{ settings_tab() }}
-        {{ export_tab() }}
         {{ ingress_tab() }}
+        {{ backups_tab() }}
       </div>
     </div>
   </div>

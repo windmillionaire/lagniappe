@@ -1,6 +1,7 @@
 """Datastore persistence for analytics and AI observability records."""
 
 from google.cloud.datastore import query as datastore_query
+from config.datastore import encode_urlsafe_key
 
 from .core import DATA, KINDS
 
@@ -12,7 +13,7 @@ def create_event(data):
     """Persist one application analytics event."""
     key = DATA.datastore.allocate_ids(DATA.datastore.key(KINDS.analytics.value), 1)[0]
     event = DATA.datastore.entity(key=key)
-    event.update({"urlsafe_key": key.to_legacy_urlsafe().decode(), **data})
+    event.update({"urlsafe_key": encode_urlsafe_key(key), **data})
     DATA.datastore.put(event)
     return event
 

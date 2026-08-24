@@ -325,6 +325,9 @@ class Schedule(Property):
     # @features task-scheduling
     # @dimensions scheduled, remove
     def clear(self):
+        clear_pending = getattr(self.entity, "_clear_scheduled_uncomplete", None)
+        if clear_pending:
+            clear_pending()
         self._value = {}
         self.entity.processes.pop(self.id, None)
         self.entity.db.pop(self.id, None)

@@ -103,7 +103,6 @@ class DataServices:
     _private_bucket = None
     _public_bucket = None
     _history_bucket = None
-    _export_bucket = None
 
     # @testable true
     # @tests tests_unit/test_018_database_assets.py::test_data_services_initialize_uses_shared_adc
@@ -118,7 +117,6 @@ class DataServices:
         project = getattr(CONFIG, "GOOGLE_CLOUD_PROJECT", None)
         client_kwargs = {"project": project} if project else {}
         client_kwargs["credentials"] = credentials
-
         self._datastore_client = datastore.Client(**client_kwargs)
         self._storage_client = storage.Client(**client_kwargs)
 
@@ -164,7 +162,6 @@ class DataServices:
                 ("history", CONFIG.HISTORY_BUCKET),
                 ("private", CONFIG.PRIVATE_BUCKET),
                 ("public", CONFIG.PUBLIC_BUCKET),
-                ("export", CONFIG.EXPORT_BUCKET),
             )
         }
 
@@ -180,8 +177,6 @@ class DataServices:
             return self.private_bucket
         elif name == "public":
             return self.public_bucket
-        elif name == "export":
-            return self.export_bucket
         else:
             raise ValueError(f"Invalid bucket name: {name}")
 
@@ -197,7 +192,6 @@ class DataServices:
             CONFIG.HISTORY_BUCKET,
             CONFIG.PRIVATE_BUCKET,
             CONFIG.PUBLIC_BUCKET,
-            CONFIG.EXPORT_BUCKET,
         ):
             bucket_name = f"{PREFIX}{config_name}"
             try:
@@ -210,7 +204,6 @@ class DataServices:
         self._history_bucket = None
         self._private_bucket = None
         self._public_bucket = None
-        self._export_bucket = None
 
     @property
     def history_bucket(self):
@@ -239,14 +232,6 @@ class DataServices:
         self._public_bucket = self._create_bucket(CONFIG.PUBLIC_BUCKET)
         return self._public_bucket
 
-    @property
-    def export_bucket(self):
-        """Return the setup-provisioned export bucket."""
-        if self._export_bucket:
-            return self._export_bucket
-
-        self._export_bucket = self._create_bucket(CONFIG.EXPORT_BUCKET)
-        return self._export_bucket
 
 
 DATA = DataServices()

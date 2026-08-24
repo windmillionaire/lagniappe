@@ -57,7 +57,6 @@ const WIDGETS = {
 	ProjectInfo: () => import("./projectInfo"),
 	PublicPermissions: () => import("./user"),
 	SavedFilters: () => import("./filters"),
-	SiteExport: () => import("./siteExport"),
 	SiteAiModels: () => import("./siteSettings/aiModels"),
 	SiteAdministrators: () => import("./siteSettings/administrators"),
 	SiteDeployment: () => import("./siteSettings/deployment"),

@@ -1,2 +1,93 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="0d705162-27d7-4996-b04c-b89fe24bf291",e._sentryDebugIdIdentifier="sentry-dbid-0d705162-27d7-4996-b04c-b89fe24bf291");}catch(e){}}();import{F as n}from"./toolbar.js?v=b13179d5";import"./combobox.js?v=b13179d5";import"./styles.js?v=b13179d5";import"./foundation.js?v=b13179d5";import"./connectivity.js?v=b13179d5";import"./primitives.js?v=b13179d5";import"./icons.js?v=b13179d5";import"./dropdown.js?v=b13179d5";class r{constructor(o){this.toolbar=o,this.name="setFontFamily",this.usedWithEditor=!0,this.active=!1,this.toggles=new Map}_fontToggle(o,e){const t=document.createElement("button");return t.className="cursor-pointer rounded bg-slate-200 px-3 py-1.5 text-base transition-transform hover:scale-110 hover:bg-slate-300 data-[active=true]:bg-slate-300 sm:text-sm",t.textContent=e,t.dataset.style=o,t.title=e,t.dataset.active="false",t}setActiveFontStyle(o){this.toggles.forEach((e,t)=>{const a=t===o;a!==e.active&&(e.button.dataset.active=a?"true":"false",e.active=a)})}init(){const o=this.toolbar.element.appendChild(document.createElement("div"));o.dataset.option=this.name,o.className='group mt-4 hidden flex-row flex-wrap items-center gap-2 group-data-[open-form="setFontFamily"]/toolbar:flex',n.forEach(({style:e,name:t})=>{const a=this._fontToggle(e,t);this.toggles.set(e,{active:!1,button:a})}),o.append(...Array.from(this.toggles.values()).map(e=>e.button)),this.active=!0,o.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;const a=this.toggles.get(t.dataset.style),s=Array.from(this.toggles.values()).find(i=>i.active&&i!==a);s&&(s.active=!1,s.button.dataset.active="false"),a.active=!a.active,t.dataset.active=a.active?"true":"false",a.active?this.toolbar.editor.chain().focus().setFontFamily(t.dataset.style).run():this.toolbar.editor.chain().focus().unsetFontFamily().run()})}}export{r as setFontFamily};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { F as FONT_MENU } from './toolbar.js?v=b05079d4';
+import './combobox.js?v=b05079d4';
+import './styles.js?v=b05079d4';
+import './foundation.js?v=b05079d4';
+import './connectivity.js?v=b05079d4';
+import './primitives.js?v=b05079d4';
+import './icons.js?v=b05079d4';
+import './dropdown.js?v=b05079d4';
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_font_family
+ * @features editor
+ * @dimensions font-family reload
+ */
+class FontFamilyPicker {
+	constructor(toolbar) {
+		this.toolbar = toolbar;
+		this.name = "setFontFamily";
+		this.usedWithEditor = true;
+		this.active = false;
+		this.toggles = new Map();
+	}
+
+	_fontToggle(style, name) {
+		const fontButton = document.createElement("button");
+		fontButton.className = `cursor-pointer rounded bg-slate-200 px-3 py-1.5 text-base transition-transform hover:scale-110 hover:bg-slate-300 data-[active=true]:bg-slate-300 sm:text-sm`;
+		fontButton.textContent = name;
+		fontButton.dataset.style = style;
+		fontButton.title = name;
+		fontButton.dataset.active = "false";
+		return fontButton;
+	}
+
+	setActiveFontStyle(activeFont) {
+		this.toggles.forEach((toggle, style) => {
+			const isActive = style === activeFont;
+			if (isActive !== toggle.active) {
+				toggle.button.dataset.active = isActive ? "true" : "false";
+				toggle.active = isActive;
+			}
+		});
+	}
+
+	init() {
+		const fontOptions = this.toolbar.element.appendChild(
+			document.createElement("div"),
+		);
+		fontOptions.dataset.option = this.name;
+		fontOptions.className = `group mt-4 hidden flex-row flex-wrap items-center gap-2 group-data-[open-form="setFontFamily"]/toolbar:flex`;
+
+		FONT_MENU.forEach(({ style, name }) => {
+			const fontButton = this._fontToggle(style, name);
+			this.toggles.set(style, { active: false, button: fontButton });
+		});
+
+		fontOptions.append(
+			...Array.from(this.toggles.values()).map((toggle) => toggle.button),
+		);
+		this.active = true;
+
+		fontOptions.addEventListener("click", (e) => {
+			const fontButton = e.target.closest("button");
+			if (!fontButton) return;
+
+			const toggle = this.toggles.get(fontButton.dataset.style);
+
+			const currentActive = Array.from(this.toggles.values()).find(
+				(t) => t.active && t !== toggle,
+			);
+			if (currentActive) {
+				currentActive.active = false;
+				currentActive.button.dataset.active = "false";
+			}
+
+			toggle.active = !toggle.active;
+			fontButton.dataset.active = toggle.active ? "true" : "false";
+
+			if (toggle.active) {
+				this.toolbar.editor
+					.chain()
+					.focus()
+					.setFontFamily(fontButton.dataset.style)
+					.run();
+			} else {
+				this.toolbar.editor.chain().focus().unsetFontFamily().run();
+			}
+		});
+	}
+}
+
+export { FontFamilyPicker as setFontFamily };

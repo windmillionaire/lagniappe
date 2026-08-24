@@ -77,11 +77,6 @@ export const ENDPOINTS = {
 			siteSettings: "/l/site-settings",
 		};
 	},
-	SiteExport: () => {
-		return {
-			start: "/l/site-export",
-		};
-	},
 	HomeTaskList: () => {
 		return {
 			completeTask: (key) => {

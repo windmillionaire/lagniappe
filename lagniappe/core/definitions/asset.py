@@ -74,6 +74,7 @@ class Asset:
     _fingerprint = None
     _size = None
     _large = None
+    _generation = None
 
     def __init__(self, definition=None, *, name=None, entity=None):
         definition = definition or {}
@@ -82,6 +83,7 @@ class Asset:
         self._fingerprint = definition.get("fingerprint")
         self._size = definition.get("size")
         self._large = definition.get("large")
+        self._generation = definition.get("generation")
         self.name = name
         self.entity = entity
 
@@ -156,6 +158,14 @@ class Asset:
         return self.size > LARGE_ASSET_BYTES
 
     @property
+    def generation(self):
+        return str(self._generation) if self._generation is not None else None
+
+    @generation.setter
+    def generation(self, value):
+        self._generation = str(value) if value is not None else None
+
+    @property
     def visibility(self):
         return AssetVisibility[self._visibility]
 
@@ -191,12 +201,17 @@ class Asset:
         if self.size is not None:
             definition["size"] = self.size
             definition["large"] = self.large
+        if self.generation:
+            definition["generation"] = self.generation
         return definition
 
     def _record_saved_blob(self, blob):
         size = getattr(blob, "size", None)
         if size is not None:
             self.size = size
+        generation = getattr(blob, "generation", None)
+        if generation is not None:
+            self.generation = generation
 
     @property
     def cache_value(self):
@@ -212,9 +227,10 @@ class Asset:
         if not content:
             return False
 
-        database.assets.save_text(
+        blob = database.assets.save_text(
             content, self.path, self.content_type, self.visibility.value
         )
+        self._record_saved_blob(blob)
         return True
 
 

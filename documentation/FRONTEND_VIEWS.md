@@ -48,6 +48,11 @@ structural `initialized` contract remains unchanged.
 Component-capable base class for Home, entity/detail views, indexes, Report, and
 Admin. `getView()` creates it through the stable entry in `viewRegistry.mjs`.
 
+The Admin view includes a server-rendered, read-only **Backups & Archives** tab.
+It displays live Firestore PITR/schedule and native-backup metadata plus the
+URI-free runtime recovery-set catalog. It intentionally exposes no restore or
+delete controls; those remain exact-confirmation setup commands.
+
 ### Transition and DOM commit policy
 
 Noticeable structural DOM changes use one of two boundaries:

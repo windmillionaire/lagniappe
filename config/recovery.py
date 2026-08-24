@@ -132,7 +132,6 @@ def build_recovery_snapshot(
     snapshot["CONFIG_SCHEMA_VERSION"] = CONFIG_SCHEMA_VERSION
     snapshot.setdefault("GOOGLE_SIGNIN_ENABLED", True)
     snapshot.setdefault("BOOTSTRAP_ADMIN_EMAIL", "")
-
     if redis_tls_enabled(snapshot):
         if not redis_ca_pem:
             raise RecoveryConfigurationError(

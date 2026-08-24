@@ -557,61 +557,6 @@ def run_upgrade_command(command_args: list[str]) -> int:
     return upgrade_all()
 
 
-def run_backup_command(command_args: list[str]) -> int:
-    """Create or list complete production data recovery sets."""
-    parser = argparse.ArgumentParser(
-        prog="run.py backup",
-        description="Manage full Datastore and Cloud Storage recovery sets.",
-    )
-    subparsers = parser.add_subparsers(dest="action", required=True)
-    subparsers.add_parser("create", help="Create a complete recovery set.")
-    subparsers.add_parser("list", help="List completed recovery sets.")
-    args = parser.parse_args(command_args)
-
-    from runner.data_recovery import (
-        DataRecoveryError,
-        create_backup,
-        list_backups,
-    )
-
-    try:
-        if args.action == "create":
-            create_backup()
-        else:
-            list_backups()
-    except DataRecoveryError as error:
-        print(f"Backup command failed: {error}")
-        return 1
-    return 0
-
-
-def run_restore_command(command_args: list[str]) -> int:
-    """Restore one completed production data recovery set."""
-    parser = argparse.ArgumentParser(
-        prog="run.py restore",
-        description=(
-            "Replace production Datastore and Cloud Storage contents from "
-            "one completed recovery set."
-        ),
-    )
-    parser.add_argument("backup_id", metavar="BACKUP_ID")
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Validate and describe the restore without changing data.",
-    )
-    args = parser.parse_args(command_args)
-
-    from runner.data_recovery import DataRecoveryError, restore_backup
-
-    try:
-        restored = restore_backup(args.backup_id, dry_run=args.dry_run)
-    except DataRecoveryError as error:
-        print(f"Restore failed: {error}")
-        return 1
-    return 0 if restored else 1
-
-
 def _run_release_git(
     repo_root: Path,
     args: list[str],
@@ -923,10 +868,6 @@ if __name__ == "__main__":
         sys.exit(run_version_command(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "upgrade":
         sys.exit(run_upgrade_command(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "backup":
-        sys.exit(run_backup_command(sys.argv[2:]))
-    if len(sys.argv) > 1 and sys.argv[1] == "restore":
-        sys.exit(run_restore_command(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "release-check":
         sys.exit(run_release_check_command(sys.argv[2:]))
     if len(sys.argv) > 1 and sys.argv[1] == "hosted-e2e":
@@ -939,7 +880,6 @@ if __name__ == "__main__":
         "command",
         choices=[
             "auth",
-            "backup",
             "browser-review",
             "dev",
             "indexes",
@@ -948,7 +888,6 @@ if __name__ == "__main__":
             "hosted-e2e",
             "mutation-contracts",
             "release-check",
-            "restore",
             "test",
             "test-server",
             "traceability",

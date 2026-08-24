@@ -1,5 +1,6 @@
-"""Task recurrence, postponement, and deferred uncomplete scheduling."""
+"""Task recurrence, postponement, and durable uncomplete scheduling."""
 
+import hashlib
 from datetime import datetime, timedelta, timezone
 from dateutil.relativedelta import relativedelta
 from flask import url_for
@@ -24,6 +25,17 @@ def user_tomorrow_in_seconds():
     delay_seconds = (tomorrow_user - now_user).total_seconds()
 
     return delay_seconds if delay_seconds > 0 else 0
+
+
+# @testable true
+# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
+# @features task-scheduling
+# @dimensions durable-uncomplete timezone
+def scheduled_uncomplete_time():
+    """Return the next user-local midnight as an absolute UTC timestamp."""
+    now_user = datetime.now(user_timezone())
+    tomorrow_user = beginning_of_day(now_user + timedelta(days=1))
+    return tomorrow_user.astimezone(timezone.utc)
 
 
 # @testable false
@@ -304,7 +316,7 @@ def due_in_home_task_window(due_date):
 # @features task-completion task-scheduling
 # @dimensions complete schedule-queue
 def add_uncomplete_task_to_queue(task):
-    """Queue a task to be uncompleted at midnight (or do it immediately in dev)."""
+    """Record an uncompletion intent or apply a near-term recurrence now."""
     next_due = task.due_date
 
     if due_in_home_task_window(next_due):
@@ -312,21 +324,35 @@ def add_uncomplete_task_to_queue(task):
         task.due_date = next_due
         return None
 
-    delay_seconds = user_tomorrow_in_seconds()
-
-    payload = {
-        "key": task.urlsafe_key,
-        "next_due_date": utc_datetime_to_utc_date_string(next_due),
-    }
-    endpoint = url_for("process.uncomplete_task", _external=True)
-    if CONFIG.production:
-        return task_queue.create_task(
-            endpoint=endpoint, payload=payload, delay_seconds=delay_seconds
-        )
-    else:
+    if not CONFIG.production:
         task.uncomplete()
         task.due_date = next_due
         return None
+
+    task._defer_scheduled_uncomplete(scheduled_uncomplete_time())
+    return task.scheduled_uncomplete_token
+
+
+# @testable true
+# @tests tests_unit/test_013e_task_complete_lifecycle.py::test_add_uncomplete_task_to_queue_future_due_queues_in_production
+# @features task-scheduling cloud-tasks
+# @dimensions durable-uncomplete post-commit idempotency
+def dispatch_scheduled_uncomplete(task, *, task_id_suffix=None):
+    """Dispatch the durable marker currently persisted on ``task``."""
+    token = task.scheduled_uncomplete_token
+    schedule_at = task.scheduled_uncomplete_at
+    if not token or not schedule_at or not task.completed:
+        return None
+
+    identity = token if not task_id_suffix else f"{token}:{task_id_suffix}"
+    task_id = f"task-uncomplete-{hashlib.sha256(identity.encode()).hexdigest()[:40]}"
+    endpoint = url_for("process.uncomplete_task", _external=True)
+    return task_queue.create_task(
+        endpoint=endpoint,
+        payload={"key": task.urlsafe_key, "token": token},
+        schedule_at=schedule_at,
+        task_id=task_id,
+    )
 
 
 # @testable true

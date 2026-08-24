@@ -10,7 +10,6 @@ from .reports import (
     OrganizeReportAdapter,
     ReportExecutionAdapter,
 )
-from .site import SiteExportAdapter
 
 
 # @testable infrastructure
@@ -25,7 +24,6 @@ def register_adapters(registry):
         ReportExecutionAdapter(),
         AutofillAdapter(),
         PageGenerationAdapter(),
-        SiteExportAdapter(),
         FileExtractAdapter(),
         FileSummarizeAdapter(),
     ):

@@ -104,6 +104,9 @@ CONFIG_SCHEMA_VERSION: 3
 
 Schema 3 stores `RUNTIME_SERVICE_ACCOUNT_EMAIL` and
 `INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL` as explicit, non-secret identities.
+The runtime database is always `(default)` and is not configurable. Named
+databases are temporary installer resources for portable conversion and restore
+safety, so they do not appear in the application settings recovery contract.
 It is the only current export and runtime contract. Recovery upgrades schema 2
 documents to schema 3, rejects other schema versions, and requires both
 identities explicitly. Snapshot construction accepts the schema scalar in its
@@ -438,20 +441,47 @@ commands never invoke either interactive flow themselves; application
 configuration turns the saved human credential into the short-lived runtime
 credential during startup.
 
-### Data Disaster Recovery (`runner/data_recovery.py`, `run.py`)
+### Data Lifecycle (`installer/data_lifecycle/`)
 
-`venv/bin/python run.py backup create` creates one full, fuzzy recovery set for
-the production default Datastore mode database and all four runtime Cloud
-Storage buckets. `backup list` shows only sets whose completion manifest was
-written successfully.
+The setup entry point owns the v3 recovery-set lifecycle:
 
-`venv/bin/python run.py restore BACKUP_ID --dry-run` performs restore preflight
-without changing data. The command without `--dry-run` requires the application
-to be offline and an exact typed confirmation, replaces the live bucket
-contents, purges Datastore, imports the selected export, and flushes Redis as a
-cache rather than restoring it. See
-[INFRA_SETUP.md](INFRA_SETUP.md#disaster-recovery-backups) for the recovery
-contract and fresh-install runbook.
+```text
+./setup.sh backup create
+./setup.sh backup list
+./setup.sh backup materialize projects/PROJECT/locations/LOCATION/backups/BACKUP
+./setup.sh backup delete BACKUP_ID
+./setup.sh archive [BACKUP_ID] [--output PATH] [--zip]
+./setup.sh archive validate ARCHIVE_PATH
+./setup.sh restore BACKUP_ID --dry-run
+./setup.sh restore BACKUP_ID
+```
+
+Windows uses the corresponding `setup.cmd` commands. Setup enables PITR,
+reconciles daily (14-day) and Sunday weekly (14-week) native backup schedules,
+and enables 14-week noncurrent-generation retention on runtime buckets. A v3
+recovery set combines an exact PITR export of `(default)`, a same-read-time
+entity inventory, and immutable copies of every referenced asset generation.
+Its manifest under the operator-only recovery bucket is written last.
+
+Archive imports that backup into a temporary named database, stages bounded
+pages into owner-only SQLite state, replaces provider keys with typed portable
+identities, reads only recovery-set asset copies, and publishes a validated private
+directory or ZIP. `archive validate` is local and contacts no provider.
+
+Restore imports directly into `(default)`: matching keys are overwritten,
+missing snapshot keys are recreated, and live-only keys remain. Maintenance
+pauses producers and allows requests on the prior App Engine version to drain;
+a FULL-view queue audit, PITR safety clone, and current asset generation catalog
+are captured before import. Recovery copies are restored to runtime buckets
+and their owning descriptors are rebound. Nonterminal deferred execution is
+discarded, while durable scheduled-uncompletion markers are regenerated into
+the reused queue. Dry-run performs only reads. Mutating restore requires exact
+confirmation and uses a local plus secret-free remote journal.
+Failures remain paused for operator diagnosis rather than automatically rolling
+back. The validated flow restores traffic and execution state, publishes an
+audit record, and removes the temporary clone. See
+[INFRA_SETUP.md](INFRA_SETUP.md#data-lifecycle-backup-archive-and-restore) for
+consistency, privacy, cleanup, and recovery details.
 
 ### Development Server (`runner/development.py`)
 

@@ -128,7 +128,7 @@ def test_storage_setup():
     data = database.core.DATA
     data.initialize()
 
-    for role in ("public", "private", "history", "export"):
+    for role in ("public", "private", "history"):
         data.bucket(role)
 
     storage = data.storage
@@ -136,7 +136,6 @@ def test_storage_setup():
         CONFIG.PUBLIC_BUCKET,
         CONFIG.PRIVATE_BUCKET,
         CONFIG.HISTORY_BUCKET,
-        CONFIG.EXPORT_BUCKET,
     ):
         bucket_name = f"{PREFIX}{config_name}"
         assert bucket_name.startswith(PREFIX)

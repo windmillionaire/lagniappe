@@ -346,7 +346,7 @@ The live setup-provider contract first audits the reconciled project, bucket,
 and exact service-account IAM bindings. It uses `testIamPermissions` with the
 runtime credential to prove deployment, API enablement, project IAM, key
 administration, and bucket-administration permissions are absent. It then
-exercises that credential against Datastore, all four Storage buckets, Cloud
+exercises that credential against Datastore, all three runtime Storage buckets, Cloud
 Tasks, the Scheduler OIDC target, Document AI, Vertex AI, Places, Identity
 Platform token verification. Its Scheduler probe also verifies that a
 valid OIDC request with an

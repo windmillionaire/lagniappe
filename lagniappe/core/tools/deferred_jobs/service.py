@@ -162,7 +162,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
     # @testable true
     # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_create_is_transactionally_idempotent
     # @tests tests_unit/test_023b_deferred_job_service.py::test_start_rejects_operation_id_reuse_for_different_request
-    # @tests tests_unit/test_023b_deferred_job_service.py::test_start_retains_site_export_intent_after_provider_enqueue_failure
+    # @tests tests_unit/test_023b_deferred_job_service.py::test_start_retains_generic_intent_after_dispatch_failure
     # @tests tests_unit/test_023b_deferred_job_service.py::test_start_dispatch_marker_does_not_overwrite_a_fast_worker
     # @pair deferred-jobs:transactional-start
     # @pair deferred-jobs:start
@@ -172,7 +172,6 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
     # @pair deferred-jobs:dispatch-worker-race
     # @pair deferred-jobs:compare-and-set
     # @pair deferred-jobs:no-apply
-    # @pair export:intent-preservation
     # @pair notifications:pending-state
     def start(self, spec):
         if not isinstance(spec, DeferredJobSpec):

@@ -2,6 +2,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from google.cloud.datastore import Key
+
+from lagniappe import CONFIG
 from lagniappe.core.tools.database import get, utility
 from lagniappe.core.tools.database.filter import Results
 
@@ -291,3 +294,36 @@ def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
     assert batch.mutations[3].update is deferred_reference.db
     assert batch.mutations[3].property_mask.paths == ["deferred_job"]
     assert batch.mutations[4].upsert is fingerprint
+
+
+# @pair database:named-key-encoding
+@pytest.mark.unit
+def test_database_aware_urlsafe_key_round_trip():
+    from config.datastore import decode_urlsafe_key, encode_urlsafe_key
+
+    key = Key(
+        "instances",
+        "page-1",
+        project=CONFIG.GOOGLE_CLOUD_PROJECT,
+        namespace="owner-space",
+        database="current-db",
+    )
+    decoded = decode_urlsafe_key(encode_urlsafe_key(key))
+    assert decoded.flat_path == key.flat_path
+    assert decoded.project == key.project
+    assert decoded.namespace == key.namespace
+    assert decoded.database == "current-db"
+
+
+# @pair database:named-key-encoding
+@pytest.mark.unit
+def test_datastore_key_decodes_without_runtime_rebinding():
+    from config.datastore import encode_urlsafe_key
+
+    source = Key("instances", "page-1", project="source-proj1", database="source-db")
+    decoded = get.datastore_key(encode_urlsafe_key(source))
+    assert decoded == source
+    assert get.datastore_key("not-a-key") is None
+    assert get.datastore_key(source) is source
+    holder = SimpleNamespace(key=source)
+    assert get.datastore_key(holder) is source

@@ -42,7 +42,7 @@ def _bucket_names(settings):
     prefix = str(settings.get("PREFIX") or "")
     names = {
         kind: f"{prefix}{kind}-{digest}"[: len(prefix) + 32].lower()
-        for kind in ("history", "private", "public", "export")
+        for kind in ("history", "private", "public")
     }
     names["recovery"] = (
         f"{prefix}recovery-{digest}"[: len(prefix) + 32].lower()

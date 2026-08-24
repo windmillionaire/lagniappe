@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from google.api_core import exceptions as google_exceptions
 from google.cloud.datastore import Entity as DatastoreEntity
+from config.datastore import encode_urlsafe_key
 
 from lagniappe import CONFIG
 
@@ -77,7 +78,7 @@ def _form_record_reference(entity):
     if key is None:
         return None
     try:
-        identifier = key.to_legacy_urlsafe().decode()
+        identifier = encode_urlsafe_key(key)
     except (AttributeError, TypeError, ValueError):
         identifier = key if isinstance(key, str) else None
     if not identifier:
@@ -193,6 +194,78 @@ def _run_messaging_notification_migration(context):
     return result
 
 
+# @testable true
+# @tests tests_unit/test_018b_database_migrations.py::test_asset_generation_migration_backfills_legacy_descriptors
+# @pairs migrations:runner disaster-recovery:asset-generation
+def _run_asset_generation_migration(context):
+    """Bind pre-v3 asset descriptors to their current immutable generations."""
+    result = _result("AST-001", "Asset generation metadata")
+
+    # @testable false
+    # @covered-by lagniappe/core/tools/database/migrations.py::_run_asset_generation_migration
+    # @reason row transformation is exercised by the registered migration workflow
+    def transform(row):
+        changed = False
+        raw = row.get("assets")
+        if raw:
+            encoded = isinstance(raw, str)
+            definitions = json.loads(raw) if encoded else deepcopy(raw)
+            if not isinstance(definitions, dict):
+                raise MigrationDataError("asset metadata must be an object")
+            for definition in definitions.values():
+                if not isinstance(definition, dict) or not definition.get("path"):
+                    raise MigrationDataError("asset descriptor is incomplete")
+                if definition.get("generation"):
+                    continue
+                visibility = str(definition.get("visibility") or "private")
+                blob = DATA.bucket(visibility).blob(definition["path"])
+                blob.reload()
+                if not getattr(blob, "generation", None):
+                    raise MigrationDataError("asset generation metadata is unavailable")
+                definition["generation"] = str(blob.generation)
+                changed = True
+            if changed:
+                row["assets"] = (
+                    json.dumps(definitions, sort_keys=True, separators=(",", ":"))
+                    if encoded
+                    else definitions
+                )
+
+        if row.key.kind == KINDS.site.value and row.key.id_or_name == "image":
+            generations = dict(row.get("asset_generations") or {})
+            for name, path in row.items():
+                if (
+                    name in {"version", "asset_generations"}
+                    or not isinstance(path, str)
+                    or not path.casefold().endswith((".png", ".ico", ".jpg", ".jpeg", ".webp"))
+                    or generations.get(name)
+                ):
+                    continue
+                blob = DATA.public_bucket.blob(path)
+                blob.reload()
+                if not getattr(blob, "generation", None):
+                    raise MigrationDataError("site-image generation metadata is unavailable")
+                generations[name] = str(blob.generation)
+                changed = True
+            if generations != (row.get("asset_generations") or {}):
+                row["asset_generations"] = generations
+        return changed
+
+    for kind in dict.fromkeys(KINDS):
+        scan_kind(
+            result,
+            context,
+            kind,
+            lambda row: bool(row.get("assets"))
+            or (
+                row.key.kind == KINDS.site.value
+                and row.key.id_or_name == "image"
+            ),
+            transform,
+        )
+    return result
+
+
 MIGRATION_CATALOG = (
     MigrationDefinition(
         sequence=1,
@@ -208,6 +281,13 @@ MIGRATION_CATALOG = (
         introduced_in="0.1",
         label="Messaging notification aggregates",
         runner=_run_messaging_notification_migration,
+    ),
+    MigrationDefinition(
+        sequence=3,
+        id="AST-001",
+        introduced_in="0.3",
+        label="Asset generation metadata",
+        runner=_run_asset_generation_migration,
     ),
 )
 
@@ -284,7 +364,7 @@ def _entity_identifier(entity):
     if key is None:
         return "unknown"
     try:
-        return key.to_legacy_urlsafe().decode()
+        return encode_urlsafe_key(key)
     except (AttributeError, TypeError, ValueError):
         return str(key)
 

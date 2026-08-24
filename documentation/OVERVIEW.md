@@ -94,7 +94,7 @@ Build, configuration, installation, and test workflows.
 | Deploy the app | [INFRA_CONFIG](INFRA_CONFIG.md) | `runner/deploy.py` |
 | Set up a new instance | [INFRA_SETUP](INFRA_SETUP.md) | `setup.sh`, `setup.cmd`, `installer/` |
 | QA login on a fresh production install | [AUTHENTICATION](AUTHENTICATION.md), [MANUAL_LOGIN_FLOW_CHECK](../MANUAL_LOGIN_FLOW_CHECK.md) | `lagniappe/web/routes/users/login.py`, `src/script/login.mjs` |
-| Back up or restore production data | [INFRA_SETUP](INFRA_SETUP.md#disaster-recovery-backups), [INFRA_CONFIG](INFRA_CONFIG.md#data-disaster-recovery-runpy) | `runner/data_recovery.py`, `run.py` |
+| Back up, archive, validate, or restore production data | [INFRA_SETUP](INFRA_SETUP.md#data-lifecycle-backup-archive-and-restore), [INFRA_CONFIG](INFRA_CONFIG.md#data-lifecycle-installerdata_lifecycle) | `installer/data_lifecycle/`, `setup.sh`, `setup.cmd` |
 | Add or run a data migration | [DATA_MIGRATIONS](DATA_MIGRATIONS.md) | `lagniappe/core/tools/database/migrations.py`, `lagniappe/web/routes/home/site.py` |
 | Change entity saves, relation writes, or delete cascades | [BACKEND_ENTITIES](BACKEND_ENTITIES.md) | `lagniappe/core/entities/__init__.py`, `lagniappe/core/mixins/related.py`, `lagniappe/core/tools/database/utility.py` |
 | Write tests | [TESTING](TESTING.md), [TESTING_WRITING_TESTS](TESTING_WRITING_TESTS.md) | `testing/tests_e2e/`, `testing/tests_js/`, `testing/tests_unit/`, `testing/definitions/` |

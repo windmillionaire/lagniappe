@@ -1,2 +1,138 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="5d477cd5-6682-484d-b76e-5379e13c5b55",e._sentryDebugIdIdentifier="sentry-dbid-5d477cd5-6682-484d-b76e-5379e13c5b55");}catch(e){}}();import{BaseList as o}from"./baseList.js?v=b13179d5";import{F as r}from"./form2.js?v=b13179d5";import{InputElement as a}from"./input.js?v=b13179d5";import{S as n}from"./sectionToggle.js?v=b13179d5";import"./foundation.js?v=b13179d5";import"./connectivity.js?v=b13179d5";import"./baseForm.js?v=b13179d5";import"./icons.js?v=b13179d5";import"./primitives.js?v=b13179d5";import"./styles.js?v=b13179d5";import"./loader.js?v=b13179d5";import"./baseElement.js?v=b13179d5";import"./formatting.js?v=b13179d5";import"./facets.js?v=b13179d5";import"./combobox.js?v=b13179d5";import"./results.js?v=b13179d5";import"./submitter.js?v=b13179d5";import"./buttons.js?v=b13179d5";import"./baseUpload.js?v=b13179d5";import"./dropdown.js?v=b13179d5";class i extends r{get formSelectElement(){const t=this.target.querySelector('[data-action="select-form"]');if(!t)return null;const e=n.facet(this,t);return e.init(),this.destroyables.push(e),e.elt}get html(){return this.nameElement=new a({kind:"task",readonly:this.readonly},{id:"name",name:"name",title:"Name",input:"text",required:!0,label:"Name"},this.target.dataset.name||""),[this.nameElement.elt,this.formSelectElement]}}class m extends i{constructor(t){super(t),this.messages={submit:"Create Model Task",submitting:"Creating Model Task",submitted:"Model Task Created"}}postreconcile(){const t=this._created;super.postreconcile(),t&&(this.nameElement.clear(),this.visible&&this.form?.success(),this.form?.resetSubmitButton()),this.visible&&this.nameElement.focus()}}class l extends i{constructor(t){super(t),this.messages={submit:"Update Model Task",submitting:"Updating Model Task",submitted:"Model Task Updated"}}postreconcile(){super.postreconcile();const t=this.nameElement?.value||this.target.dataset.name||this.component.elt.dataset.title||"";if(!t)return;this.component.elt.dataset.title=t;const e=this.component.elt.querySelector("span[data-role='title']");e&&t!==e.textContent&&(e.textContent=t)}}class c extends o{postreconcile(){super.postreconcile(),this.target.setAttribute("loaded","")}}export{m as CreateModelTask,l as ModelTaskInfo,c as ModelTaskList};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { BaseList } from './baseList.js?v=b05079d4';
+import { F as FormElement } from './form2.js?v=b05079d4';
+import { InputElement } from './input.js?v=b05079d4';
+import { S as SectionToggle } from './sectionToggle.js?v=b05079d4';
+import './foundation.js?v=b05079d4';
+import './connectivity.js?v=b05079d4';
+import './baseForm.js?v=b05079d4';
+import './icons.js?v=b05079d4';
+import './primitives.js?v=b05079d4';
+import './styles.js?v=b05079d4';
+import './loader.js?v=b05079d4';
+import './baseElement.js?v=b05079d4';
+import './formatting.js?v=b05079d4';
+import './facets.js?v=b05079d4';
+import './combobox.js?v=b05079d4';
+import './results.js?v=b05079d4';
+import './submitter.js?v=b05079d4';
+import './buttons.js?v=b05079d4';
+import './baseUpload.js?v=b05079d4';
+import './dropdown.js?v=b05079d4';
+
+/**
+ * @testable infrastructure
+ */
+class ModelTask extends FormElement {
+	get formSelectElement() {
+		const target = this.target.querySelector('[data-action="select-form"]');
+		if (!target) return null;
+
+		const control = SectionToggle.facet(this, target);
+		control.init();
+		this.destroyables.push(control);
+		return control.elt;
+	}
+
+	get html() {
+		this.nameElement = new InputElement(
+			{
+				kind: "task",
+				readonly: this.readonly,
+			},
+			{
+				id: "name",
+				name: "name",
+				title: "Name",
+				input: "text",
+				required: true,
+				label: "Name",
+			},
+			this.target.dataset.name || "",
+		);
+		return [this.nameElement.elt, this.formSelectElement];
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004a_project.py::test_create_model_task
+ * @tests tests_e2e/004_projects/test_004a_project.py::test_create_model_task_with_form
+ * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_create_model_form_opens_from_model_tasks_section
+ * @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_editor_can_open_model_task_creation
+ * @features model-tasks
+ * @dimensions create attach-form permission-gates
+ */
+class CreateModelTask extends ModelTask {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Create Model Task",
+			submitting: "Creating Model Task",
+			submitted: "Model Task Created",
+		};
+	}
+
+	postreconcile() {
+		const created = this._created;
+		super.postreconcile();
+
+		if (created) {
+			this.nameElement.clear();
+			if (this.visible) this.form?.success();
+			this.form?.resetSubmitButton();
+		}
+		if (this.visible) this.nameElement.focus();
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_click_model_opens_info
+ * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_edit_model_task_name
+ * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_change_model_task_form
+ * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task_form
+ * @features model-tasks
+ * @dimensions info-form update name form-change form-clear
+ */
+class ModelTaskInfo extends ModelTask {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Update Model Task",
+			submitting: "Updating Model Task",
+			submitted: "Model Task Updated",
+		};
+	}
+
+	postreconcile() {
+		super.postreconcile();
+		const name =
+			this.nameElement?.value ||
+			this.target.dataset.name ||
+			this.component.elt.dataset.title ||
+			"";
+		if (!name) return;
+
+		this.component.elt.dataset.title = name;
+		const title = this.component.elt.querySelector("span[data-role='title']");
+		if (title && name !== title.textContent) {
+			title.textContent = name;
+		}
+	}
+}
+
+/**
+ * @testable true
+ * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task
+ * @features model-tasks
+ * @dimensions delete
+ */
+class ModelTaskList extends BaseList {
+	postreconcile() {
+		super.postreconcile();
+		this.target.setAttribute("loaded", "");
+	}
+}
+
+export { CreateModelTask, ModelTaskInfo, ModelTaskList };

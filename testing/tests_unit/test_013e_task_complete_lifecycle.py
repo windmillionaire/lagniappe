@@ -230,8 +230,9 @@ def test_task_history_attached_page_details_key_uses_parent():
     assert history.properties.page.column_value == page.reference_details
 
 
-# @features task-completion signature
-# @dimensions history snapshot name description submission schema-version linked-pages asset-copy
+# @pairs task-completion:history task-completion:snapshot task-completion:name
+# @pairs task-completion:description task-completion:submission task-completion:schema-version
+# @pairs task-completion:linked-pages task-completion:asset-copy signature:asset-copy
 @pytest.mark.unit
 def test_task_history_create_snapshots_completed_task_state():
     """``TaskHistory.create`` snapshots the task state being archived."""
@@ -312,6 +313,7 @@ def test_task_history_create_snapshots_completed_task_state():
     assert history.db["files"] == [file_entity.key]
     assert history.db["schema_version"] == "schema-v1"
     assert history.db["completed_on"] == completed_on
+    assert "hash" not in history.db
     assert "completed" not in history.db
 
     copy_asset.assert_called_once_with(signature_asset)
@@ -655,7 +657,8 @@ def test_task_create_history_entry_accepts_completion_overrides(
 
 
 # @features task-completion task-scheduling
-# @dimensions complete schedule-queue next-due-date
+# @dimensions complete schedule-queue next-due-date durable-uncomplete post-commit timezone
+# @pairs task-completion:complete task-completion:schedule-queue task-completion:next-due-date task-scheduling:complete task-scheduling:schedule-queue task-scheduling:next-due-date task-scheduling:durable-uncomplete task-scheduling:post-commit task-scheduling:timezone
 @pytest.mark.unit
 def test_task_complete_with_schedule_queues_uncomplete():
     """With an active schedule, ``complete`` advances due date then queues uncomplete (patched)."""
@@ -762,11 +765,12 @@ def test_task_complete_with_near_term_schedule_uncompletes_immediately():
     assert task.db.get("postponed_from") is None
 
 
-# @features task-completion task-scheduling
-# @dimensions schedule-queue
+# @features task-completion task-scheduling cloud-tasks
+# @dimensions schedule-queue durable-uncomplete post-commit idempotency
+# @pairs task-completion:schedule-queue task-scheduling:schedule-queue task-scheduling:durable-uncomplete task-scheduling:post-commit task-scheduling:idempotency cloud-tasks:durable-uncomplete cloud-tasks:post-commit cloud-tasks:idempotency
 @pytest.mark.unit
 def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
-    """A production task whose next due date is outside the home window keeps the deferred queue behavior."""
+    """A future recurrence persists intent before its tokenized queue dispatch."""
     task = TestEntities.get(
         "TASK",
         {
@@ -785,10 +789,13 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
             "lagniappe.core.tools.tasks.scheduling.CONFIG",
             SimpleNamespace(production=True),
         ),
-        patch("lagniappe.core.tools.tasks.scheduling.datetime") as dates_datetime,
         patch(
-            "lagniappe.core.tools.tasks.scheduling.user_tomorrow_in_seconds",
-            return_value=42,
+            "lagniappe.core.tools.tasks.scheduling.scheduled_uncomplete_time",
+            return_value=datetime(2025, 6, 16, tzinfo=timezone.utc),
+        ),
+        patch(
+            "lagniappe.core.tools.tasks.scheduling.due_in_home_task_window",
+            return_value=False,
         ),
         patch(
             "lagniappe.core.tools.tasks.scheduling.url_for",
@@ -799,21 +806,54 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
             return_value="queued-task",
         ) as create_task,
     ):
-        dates_datetime.now.return_value = datetime(
-            2025, 6, 15, 12, 0, 0, tzinfo=timezone.utc
-        )
-        task_name = dates.add_uncomplete_task_to_queue(task)
+        token = dates.add_uncomplete_task_to_queue(task)
+        create_task.assert_not_called()
+        task_name = dates.dispatch_scheduled_uncomplete(task)
 
+    assert token == task.scheduled_uncomplete_token
+    assert len(token) == 32
+    assert task.scheduled_uncomplete_at == datetime(
+        2025, 6, 16, tzinfo=timezone.utc
+    )
     assert task_name == "queued-task"
     create_task.assert_called_once_with(
         endpoint="https://example.test/process/uncomplete-task",
         payload={
             "key": task.urlsafe_key,
-            "next_due_date": "2025-07-01 00:00:00",
+            "token": token,
         },
-        delay_seconds=42,
+        schedule_at=datetime(2025, 6, 16, tzinfo=timezone.utc),
+        task_id=create_task.call_args.kwargs["task_id"],
     )
+    assert create_task.call_args.kwargs["task_id"].startswith("task-uncomplete-")
     assert task.completed is True
     assert task.completed_on is not None
     assert task.active is True
     assert task.due_date == next_due
+
+
+# @features task-completion task-scheduling
+# @dimensions stale-delivery idempotency
+@pytest.mark.unit
+def test_manual_uncomplete_clears_pending_scheduled_delivery():
+    task = TestEntities.get(
+        "TASK",
+        {
+            "name": "Pending recurring task",
+            "hash": "tcl006",
+            "page": {"name": "Parent Page", "hash": "pgtcl6"},
+        },
+    )
+    task.completed = True
+    task.due_date = datetime(2025, 7, 1, tzinfo=timezone.utc)
+    task._defer_scheduled_uncomplete(datetime(2025, 6, 16, tzinfo=timezone.utc))
+
+    with patch.object(task, "create_history_entry"):
+        task.uncomplete()
+
+    assert task.scheduled_uncomplete_token == ""
+    assert task.scheduled_uncomplete_at is None
+    assert not any(
+        intent.intent.value == "scheduled-uncomplete-dispatch"
+        for intent in task.mutation_intents
+    )

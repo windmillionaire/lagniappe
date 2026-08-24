@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import datetime, timezone
+from uuid import uuid4
 
 from flask_login import current_user
 from flask import url_for
@@ -40,8 +41,47 @@ class Task(AssetMixin, SubmitterMixin, Entity):
                 "schedule",
                 "schema_version",
                 "assignment_revision",
+                "scheduled_uncomplete_token",
             }
         )
+
+    @property
+    def scheduled_uncomplete_token(self):
+        return str(self.db.get("scheduled_uncomplete_token") or "")
+
+    @property
+    def scheduled_uncomplete_at(self):
+        value = self.db.get("scheduled_uncomplete_at")
+        if value is not None and value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+
+    # @testable true
+    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
+    # @features task-scheduling
+    # @dimensions durable-uncomplete post-commit
+    def _defer_scheduled_uncomplete(self, schedule_at):
+        self.db["scheduled_uncomplete_token"] = uuid4().hex
+        self.db["scheduled_uncomplete_at"] = schedule_at
+        self.add_mutation_intents(
+            MutationIntent.dispatch_scheduled_uncomplete(
+                self,
+                reason="scheduled-task-uncompletion",
+            )
+        )
+
+    # @testable true
+    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_manual_uncomplete_clears_pending_scheduled_delivery
+    # @features task-completion task-scheduling
+    # @dimensions stale-delivery idempotency
+    def _clear_scheduled_uncomplete(self):
+        self.db.pop("scheduled_uncomplete_token", None)
+        self.db.pop("scheduled_uncomplete_at", None)
+        self._mutation_intents = [
+            intent
+            for intent in self.mutation_intents
+            if intent.intent is not MutationIntentType.SCHEDULED_UNCOMPLETE_DISPATCH
+        ]
 
     @property
     def required(self):
@@ -224,6 +264,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_create_history_entry_accepts_completion_overrides
+    # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_history_create_clones_another_task_and_existing_history
     # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_records_older_completed_event_without_mutating_live_task
     # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
     # @pairs task-completion:history task-completion:uncomplete
@@ -285,6 +326,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @pair form-todo:field-reset
     def uncomplete(self, history_key=None):
         """Archive the current completion as TaskHistory and reset the task."""
+        self._clear_scheduled_uncomplete()
         if self.completed:
             if history_key is None:
                 self.create_history_entry()

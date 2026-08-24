@@ -2,6 +2,8 @@
 
 from contextvars import ContextVar
 
+from config.datastore import encode_urlsafe_key
+
 from .keys import Keys
 
 
@@ -34,13 +36,19 @@ def notification_id(notification):
     if isinstance(notification, str):
         return notification
     if hasattr(notification, "to_legacy_urlsafe"):
-        return decode(notification.to_legacy_urlsafe())
+        try:
+            return encode_urlsafe_key(notification)
+        except AttributeError:
+            return decode(notification.to_legacy_urlsafe())
     identifier = getattr(notification, "urlsafe_key", None)
     if identifier:
         return identifier
     key = getattr(notification, "key", None)
     if key and hasattr(key, "to_legacy_urlsafe"):
-        return key.to_legacy_urlsafe().decode("utf-8")
+        try:
+            return encode_urlsafe_key(key)
+        except AttributeError:
+            return decode(key.to_legacy_urlsafe())
     return str(key) if key else None
 
 

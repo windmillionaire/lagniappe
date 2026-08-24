@@ -340,7 +340,7 @@ that each occurrence still exists in saved HTML, reloads the recipient, checks
 current mention and recipient document-`VIEW` authorization, and transactionally
 creates a deterministic `MentionMarker`, ordinary Notification, and aggregate
 increment. The marker survives Notification deletion, so replay cannot deliver
-the same occurrence twice. Public responses and site exports replace internal
+the same occurrence twice. Public responses replace internal
 mention nodes with inert `@Display Name` text before further sanitization.
 
 After 64 retained deltas, the poll response asks an editable client for a

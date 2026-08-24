@@ -18,8 +18,9 @@ IMAGE_DOWNLOAD_TIMEOUT = 60
 # @reason thin Datastore client adapter owned by image metadata discovery
 def get_datastore_client():
     from google.cloud import datastore
+    from config import SETTINGS
 
-    return datastore.Client()
+    return datastore.Client(project=SETTINGS.APP.get("GOOGLE_CLOUD_PROJECT"))
 
 
 # @testable false

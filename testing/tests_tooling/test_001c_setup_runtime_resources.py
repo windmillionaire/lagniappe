@@ -3521,8 +3521,9 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     ]
 
 
-# @features setup deferred-jobs
-# @dimensions cloud-scheduler recovery oidc iam
+# @features setup deferred-jobs disaster-recovery
+# @dimensions cloud-scheduler recovery oidc iam pitr native-backups retention idempotent
+# @pairs setup:cloud-scheduler setup:recovery setup:oidc setup:iam deferred-jobs:cloud-scheduler deferred-jobs:recovery deferred-jobs:oidc deferred-jobs:iam setup:pitr setup:native-backups setup:retention setup:idempotent disaster-recovery:pitr disaster-recovery:native-backups disaster-recovery:retention disaster-recovery:idempotent
 def test_setup_deferred_job_reconciler_contract(monkeypatch):
     import installer as setup_pkg
     from installer import gcloud
@@ -3548,6 +3549,7 @@ def test_setup_deferred_job_reconciler_contract(monkeypatch):
 
     commands = []
     iam_calls = []
+    migration_calls = []
     existing_returncode = 1
 
     def fake_run(command, check=True):
@@ -3563,6 +3565,11 @@ def test_setup_deferred_job_reconciler_contract(monkeypatch):
         return completed_process(command)
 
     monkeypatch.setattr(gcloud, "run_gcloud_command", fake_run)
+    monkeypatch.setattr(
+        gcloud,
+        "_prepare_backup_metadata",
+        lambda: migration_calls.append("migrate"),
+    )
     monkeypatch.setattr(
         gcloud.iam_access,
         "reconcile_project_service_agent",
@@ -3650,6 +3657,27 @@ def test_setup_deferred_job_reconciler_contract(monkeypatch):
     ]
     assert "--update-headers=Content-Type=application/json" in scheduler
     assert not any(part.startswith("--headers=") for part in scheduler)
+    assert any(
+        command[:3] == ["firestore", "databases", "update"]
+        and "--enable-pitr" in command
+        for command, _check in commands
+    )
+    backup_schedules = [
+        command
+        for command, _check in commands
+        if command[:4] == ["firestore", "backups", "schedules", "create"]
+    ]
+    assert any(
+        "--recurrence=daily" in command and "--retention=14d" in command
+        for command in backup_schedules
+    )
+    assert any(
+        "--recurrence=weekly" in command
+        and "--day-of-week=SUN" in command
+        and "--retention=98d" in command
+        for command in backup_schedules
+    )
+    assert migration_calls == ["migrate", "migrate"]
 
 
 # @features setup
@@ -4577,6 +4605,18 @@ def test_installer_bucket_permission_preflight_uses_bucket_resource(monkeypatch)
 def test_runtime_role_plan_limits_administration_to_owned_scheduler_lifecycle():
     constants = _load_config_constants()
 
+    assert {
+        "cloudscheduler.jobs.enable",
+        "cloudscheduler.jobs.pause",
+        "cloudtasks.queues.pause",
+        "cloudtasks.queues.purge",
+        "cloudtasks.queues.resume",
+        "cloudtasks.tasks.fullView",
+        "cloudtasks.tasks.list",
+    }.issubset(constants.INSTALLER_PROJECT_PERMISSIONS)
+    assert "appengine.services.updateTraffic" in (
+        constants.DEPLOYER_PROJECT_PERMISSIONS
+    )
     assert "iam.serviceAccountKeys.create" not in (
         constants.INSTALLER_PROJECT_PERMISSIONS
     )

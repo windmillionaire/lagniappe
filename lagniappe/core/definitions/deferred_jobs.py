@@ -30,7 +30,6 @@ class DeferredJobType(Enum):
     REPORT_EXECUTION = "report-execution"
     AUTOFILL = "autofill"
     PAGE_GENERATION = "page-generation"
-    SITE_EXPORT = "site-export"
     FILE_EXTRACT = "file-extract"
     FILE_SUMMARIZE = "file-summarize"
 

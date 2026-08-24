@@ -370,6 +370,62 @@ def test_form_schema_transform_rejects_unreadable_rows_without_mutation():
     assert dict(row) == before
 
 
+# @pairs migrations:runner disaster-recovery:asset-generation
+def test_asset_generation_migration_backfills_legacy_descriptors(monkeypatch):
+    page = _entity(
+        migrations.KINDS.instances.value,
+        "page-1",
+        {
+            "type": "page",
+            "assets": json.dumps(
+                {
+                    "document": {
+                        "type": "html",
+                        "path": "page-1_document.html",
+                    }
+                }
+            ),
+        },
+    )
+    site_image = _entity(
+        migrations.KINDS.site.value,
+        "image",
+        {"logo.png": "logo.png", "version": 2},
+    )
+    datastore = _Datastore([page, site_image])
+
+    class Blob:
+        generation = 41
+
+        def reload(self):
+            return None
+
+    bucket = SimpleNamespace(blob=lambda _path: Blob())
+    monkeypatch.setattr(
+        migrations,
+        "DATA",
+        SimpleNamespace(
+            bucket=lambda visibility: bucket,
+            public_bucket=bucket,
+        ),
+    )
+    result = migrations._run_asset_generation_migration(
+        migrations.MigrationContext(
+            datastore.query_factory,
+            datastore.write,
+            datastore,
+        )
+    )
+
+    assert result["changed"] == 2
+    assert json.loads(datastore.rows[page.key]["assets"])["document"][
+        "generation"
+    ] == "41"
+    assert datastore.rows[site_image.key]["asset_generations"] == {
+        "logo.png": "41"
+    }
+
+
 # @pairs migrations:runner migrations:audit
 # @pairs form-schema:canonicalization form-schema:history-snapshot
 def test_registered_form_schema_migration_scans_forms_and_history():

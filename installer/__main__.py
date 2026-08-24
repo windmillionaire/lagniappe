@@ -73,6 +73,35 @@ def _parser():
         "handoff",
         help="Transfer delegated installer access to the permanent Owner",
     )
+    backup = commands.add_parser(
+        "backup",
+        help="Create, list, materialize, or explicitly delete recovery sets",
+    )
+    backup_commands = backup.add_subparsers(dest="backup_action", required=True)
+    backup_commands.add_parser("create", help="Create or resume a complete v3 recovery set")
+    backup_commands.add_parser("list", help="List valid completed v3 recovery sets")
+    backup_materialize = backup_commands.add_parser(
+        "materialize", help="Convert one native Firestore backup to a v3 recovery set"
+    )
+    backup_materialize.add_argument("backup_resource", metavar="BACKUP_RESOURCE")
+    backup_delete = backup_commands.add_parser("delete", help="Delete one exact v3 recovery set")
+    backup_delete.add_argument("backup_id", metavar="BACKUP_ID")
+
+    archive = commands.add_parser(
+        "archive",
+        help="Build a portable archive, or validate one without Google access",
+    )
+    archive.add_argument("archive_target", nargs="?", metavar="BACKUP_ID|validate")
+    archive.add_argument("validation_path", nargs="?", metavar="ARCHIVE_PATH")
+    archive.add_argument("--output", metavar="PATH")
+    archive.add_argument("--zip", action="store_true", dest="zip_output")
+
+    restore = commands.add_parser(
+        "restore",
+        help="Preflight or run a maintenance-gated merge into (default)",
+    )
+    restore.add_argument("backup_id", metavar="BACKUP_ID")
+    restore.add_argument("--dry-run", action="store_true")
     return parser
 
 
@@ -81,6 +110,24 @@ def _parser():
 # @reason small argument-to-operation mapping owned by the tested CLI boundary
 def _mode(args):
     return args.command or "install"
+
+
+# @testable true
+# @tests tests_tooling/test_008_data_lifecycle.py::test_lifecycle_cli_routes_nested_commands_and_read_only_boundaries
+# @pairs data-lifecycle:cli-routing data-lifecycle:read-only
+def _local_only(args):
+    return args.command == "archive" and args.archive_target == "validate"
+
+
+# @testable true
+# @tests tests_tooling/test_008_data_lifecycle.py::test_lifecycle_cli_routes_nested_commands_and_read_only_boundaries
+# @pairs data-lifecycle:cli-routing data-lifecycle:read-only
+def _read_only(args):
+    return (
+        _local_only(args)
+        or (args.command == "backup" and args.backup_action == "list")
+        or (args.command == "restore" and args.dry_run)
+    )
 
 
 # @testable true
@@ -113,6 +160,22 @@ def _prepare_setup_dependencies(args):
     if _mode(args) == "install":
         # The full installer owns this step so it can announce recovery and ask
         # for consent before changing the project environment.
+        return
+
+    if _read_only(args):
+        if _local_only(args):
+            return
+        from runner.gcloud import activate_repository_gcloud
+
+        try:
+            activate_repository_gcloud(
+                ensure_adc=True,
+                ensure_cli_token=True,
+            )
+        except RuntimeError as error:
+            from installer.errors import SetupError
+
+            raise SetupError(str(error)) from error
         return
 
     from installer.package_install import ensure_pip_is_available, ensure_setup_dependencies
@@ -208,6 +271,58 @@ def _dispatch(args):
         from installer.handoff import handoff
 
         return handoff()
+    if command == "backup":
+        from installer.data_lifecycle import backup as lifecycle_backup
+
+        if args.backup_action == "list":
+            from installer.verify import validate_installation
+
+            validate_installation()
+            lifecycle_backup.list_backups()
+            return 0
+        from installer.verify import prepare_existing_installation
+
+        prepare_existing_installation()
+        if args.backup_action == "create":
+            lifecycle_backup.create_backup()
+        elif args.backup_action == "materialize":
+            lifecycle_backup.materialize_native_backup(args.backup_resource)
+        else:
+            lifecycle_backup.delete_backup(args.backup_id)
+        return 0
+    if command == "archive":
+        if args.archive_target == "validate":
+            from installer.data_lifecycle.validation import validate_archive
+
+            result = validate_archive(args.validation_path)
+            print(
+                f"Archive {result['archive_id']} is valid "
+                f"({result['entities']} entities, {result['files']} files)."
+            )
+            return 0
+        from installer.verify import prepare_existing_installation
+
+        prepare_existing_installation()
+        from installer.data_lifecycle.archive import build_archive
+
+        build_archive(
+            args.archive_target,
+            output=args.output,
+            zip_output=args.zip_output,
+        )
+        return 0
+    if command == "restore":
+        from installer.data_lifecycle.restore import restore_backup
+        if args.dry_run:
+            from installer.verify import validate_installation
+
+            validate_installation()
+        else:
+            from installer.verify import prepare_existing_installation
+
+            prepare_existing_installation()
+        restore_backup(args.backup_id, dry_run=args.dry_run)
+        return 0
 
     from installer.install import install
 
@@ -223,6 +338,14 @@ def main(argv=None):
     arguments = list(sys.argv[1:] if argv is None else argv)
     parser = _parser()
     args = parser.parse_args(arguments)
+    if args.command == "archive":
+        if args.archive_target == "validate":
+            if not args.validation_path:
+                parser.error("archive validate requires ARCHIVE_PATH")
+            if args.output or args.zip_output:
+                parser.error("archive validate does not accept --output or --zip")
+        elif args.validation_path:
+            parser.error("archive accepts at most one BACKUP_ID")
     if getattr(args, "branch", None) is not None:
         args.branch = args.branch.strip()
         if not args.branch:
@@ -233,7 +356,7 @@ def main(argv=None):
     verify_setup_runtime()
     _prepare_setup_dependencies(args)
 
-    if args.command == "doctor":
+    if args.command == "doctor" or _read_only(args):
         return _status(_dispatch(args))
 
     from installer.state import setup_operation

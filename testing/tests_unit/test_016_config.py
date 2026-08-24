@@ -559,3 +559,13 @@ def test_reserved_hosted_e2e_hostname_is_exact():
     assert not is_reserved_hosted_e2e_hostname(
         "prefix-e2e-abcdef1234567890-dot-e2e-dot-project-1.appspot.com"
     )
+
+
+# @pair data-lifecycle:named-scratch-database
+def test_installer_database_id_validation():
+    from config.datastore import validate_database_id
+
+    assert validate_database_id("(default)") == "(default)"
+    assert validate_database_id("current-db") == "current-db"
+    with pytest.raises(ValueError):
+        validate_database_id("UPPERCASE")

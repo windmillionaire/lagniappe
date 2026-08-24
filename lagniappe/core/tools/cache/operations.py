@@ -4,6 +4,7 @@ import hashlib
 import time
 
 from redis import WatchError
+from config.datastore import encode_urlsafe_key
 
 from .core import cache
 from .keys import Keys
@@ -38,8 +39,7 @@ def _operation_id(operation):
         return identifier
     key = getattr(operation, "key", None)
     if key and hasattr(key, "to_legacy_urlsafe"):
-        encoded = key.to_legacy_urlsafe()
-        return encoded.decode("utf-8") if isinstance(encoded, bytes) else str(encoded)
+        return encode_urlsafe_key(key)
     return str(key) if key else None
 
 

@@ -296,7 +296,7 @@ def test_storage_bucket_names_match_runtime_contract():
     names = storage_bucket_names(settings)
     recovery = recovery_bucket_name(settings)
 
-    assert set(names) == {"history", "private", "public", "export"}
+    assert set(names) == {"history", "private", "public"}
     assert all(name.startswith("test-") for name in names.values())
     assert all(len(name) == 37 for name in names.values())
     assert names["public"].startswith("test-public-")
@@ -400,6 +400,13 @@ def test_configure_bucket_is_idempotent():
 
     class Bucket:
         storage_class = "STANDARD"
+        versioning_enabled = True
+        lifecycle_rules = [
+            {
+                "action": {"type": "Delete"},
+                "condition": {"daysSinceNoncurrentTime": 98},
+            }
+        ]
         cors = [
             {
                 "origin": list(reversed(expected[0]["origin"])),
@@ -429,6 +436,13 @@ def test_configure_bucket_repairs_cors_drift():
 
     class Bucket:
         storage_class = "STANDARD"
+        versioning_enabled = True
+        lifecycle_rules = [
+            {
+                "action": {"type": "Delete"},
+                "condition": {"daysSinceNoncurrentTime": 98},
+            }
+        ]
         cors = []
         iam_configuration = SimpleNamespace(uniform_bucket_level_access_enabled=False)
 
@@ -451,19 +465,33 @@ def test_configure_bucket_repairs_cors_drift():
 
 
 # @features storage
-# @dimensions bucket-metadata storage-class lifecycle-preservation
+# @dimensions bucket-metadata storage-class object-versioning lifecycle-preservation
 @pytest.mark.unit
-def test_configure_bucket_repairs_storage_class_without_touching_lifecycle():
+def test_configure_bucket_enables_versioning_and_reconciles_noncurrent_lifecycle():
     config = SimpleNamespace(
         APP_URL="https://app.example.com",
         CUSTOM_DOMAIN=None,
         local=False,
     )
-    lifecycle = [{"action": {"type": "Delete"}, "condition": {"age": 365}}]
+    lifecycle = [
+        {"action": {"type": "Delete"}, "condition": {"age": 365}},
+        {
+            "action": {"type": "Delete"},
+            "condition": {"daysSinceNoncurrentTime": 7},
+        },
+        {
+            "action": {"type": "Delete"},
+            "condition": {
+                "daysSinceNoncurrentTime": 30,
+                "matchesPrefix": ["user-owned/"],
+            },
+        },
+    ]
     patches = []
 
     class Bucket:
         storage_class = "NEARLINE"
+        versioning_enabled = False
         cors = core.expected_storage_cors(config)
         lifecycle_rules = lifecycle
         retention_period = 86400
@@ -477,7 +505,21 @@ def test_configure_bucket_repairs_storage_class_without_touching_lifecycle():
 
     assert core.configure_storage_bucket(bucket, config=config) is True
     assert bucket.storage_class == core.BUCKET_DEFAULT_STORAGE_CLASS
-    assert bucket.lifecycle_rules is lifecycle
+    assert bucket.versioning_enabled is True
+    assert bucket.lifecycle_rules == [
+        {"action": {"type": "Delete"}, "condition": {"age": 365}},
+        {
+            "action": {"type": "Delete"},
+            "condition": {
+                "daysSinceNoncurrentTime": 30,
+                "matchesPrefix": ["user-owned/"],
+            },
+        },
+        {
+            "action": {"type": "Delete"},
+            "condition": {"daysSinceNoncurrentTime": 98},
+        },
+    ]
     assert bucket.retention_period == 86400
     assert bucket.soft_delete_policy.retention_duration_seconds == 604800
     assert patches == ["STANDARD"]
@@ -508,6 +550,13 @@ def test_configure_bucket_retries_transient_patch_failure(monkeypatch):
 
     class Bucket:
         storage_class = "STANDARD"
+        versioning_enabled = True
+        lifecycle_rules = [
+            {
+                "action": {"type": "Delete"},
+                "condition": {"daysSinceNoncurrentTime": 98},
+            }
+        ]
         cors = []
         iam_configuration = SimpleNamespace(uniform_bucket_level_access_enabled=True)
 
@@ -684,17 +733,15 @@ def test_test_cleanup_deletes_objects_without_deleting_buckets():
     data._history_bucket = object()
     data._private_bucket = object()
     data._public_bucket = object()
-    data._export_bucket = object()
     data.initialize = lambda: None
 
     data.delete_buckets()
 
-    assert len(deleted) == 8
+    assert len(deleted) == 6
     assert all(name.startswith(core.PREFIX) for name in deleted)
     assert data._history_bucket is None
     assert data._private_bucket is None
     assert data._public_bucket is None
-    assert data._export_bucket is None
 
 
 # @features storage

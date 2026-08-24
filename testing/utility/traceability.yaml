@@ -27,7 +27,7 @@ test_roots:
   - testing/tests_tooling/test_003_config.py
   - testing/tests_tooling/test_005_test_server_command.py
   - testing/tests_tooling/test_007_run_py_test_command.py
-  - testing/tests_tooling/test_008_data_recovery.py
+  - testing/tests_tooling/test_008_data_lifecycle.py
   - testing/tests_tooling/test_009_hosted_e2e.py
   - testing/tests_tooling/test_icons.py
 
@@ -36,6 +36,7 @@ annotated_source_roots:
   - config/locations.py
   - config/redis.py
   - config/recovery.py
+  - config/datastore.py
   - config/deployment.py
   - config/ai_email.py
   - config/ai_models.py
@@ -43,7 +44,6 @@ annotated_source_roots:
   - run.py
   - runner/context.py
   - runner/adc.py
-  - runner/data_recovery.py
   - runner/deploy.py
   - runner/development.py
   - runner/gcloud.py

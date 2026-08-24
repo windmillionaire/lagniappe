@@ -130,10 +130,20 @@ def create_site_image(image, remove_bg=True, bg_tolerance=30):
     image_paths = {}
     try:
         generated_images = generate_site_images(source_image)
+        image_generations = {}
         for filename, image_bytes in generated_images.items():
-            path = storage_database.upload_site_image(filename, image_bytes)
-            image_paths[filename] = path
-        site_database.save_image(image_paths)
+            uploaded = storage_database.upload_site_image(filename, image_bytes)
+            if isinstance(uploaded, dict):
+                image_paths[filename] = uploaded["path"]
+                image_generations[filename] = uploaded["generation"]
+            else:
+                image_paths[filename] = uploaded
+        site_database.save_image(
+            {
+                **image_paths,
+                **({"asset_generations": image_generations} if image_generations else {}),
+            }
+        )
     except Exception as e:
         context = {
             "image_processing": {

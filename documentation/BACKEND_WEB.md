@@ -266,29 +266,6 @@ Redis peek without activating Flask-Login. Redis misses/errors do not change
 the health-check status. See
 [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md).
 
-### Deferred Admin Export
-
-The `/admin` view is available to application Administrators and includes an
-Export tab next to Site Settings. Its
-`SiteExport` widget loads from `GET /l/site-export` and starts work with
-`POST /l/site-export`. The POST creates the queued `site_export` metadata record
-and starts a durable shared job with a pending notification. Production
-dispatches that job to `/process/jobs`, development runs it in a local daemon
-thread, and testing runs the `SiteExportAdapter` inline.
-
-In production, `process.deferred_job_process` authenticates the Cloud Tasks OIDC
-request, claims the job, and rechecks the actor's current site permission.
-`SiteExportAdapter` marks the export record running, calls
-`lagniappe.core.tools.site.exports.build_site_export()`, and persists the returned
-complete metadata only after the builder writes `manifest.json` last. Generic
-terminal delivery then completes the notification. The browser's `operation`
-subscription observes terminal status and reconciles the admin widget on
-success or failure. If the initial production enqueue raises or returns no task
-identity, start compensation instead marks both the export record and durable
-job failed, completes the pending notification, and returns the enqueue failure
-to the request boundary without running the export builder. See
-[AI_PIPELINE.md](AI_PIPELINE.md) for the shared job and polling architecture.
-
 ### Index Page Access and Collection Fingerprints
 
 Index routes use the access decorator appropriate to the collection. Forms and

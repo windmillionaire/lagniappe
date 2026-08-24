@@ -34,6 +34,7 @@ class MutationEffectType(Enum):
     OPERATION_UPSERT = "operation-upsert"
     OPERATION_DELETE = "operation-delete"
     BLOB_DELETE = "blob-delete"
+    SCHEDULED_UNCOMPLETE_DISPATCH = "scheduled-uncomplete-dispatch"
 
 
 class MutationIntentType(Enum):
@@ -44,6 +45,7 @@ class MutationIntentType(Enum):
     TOUCH = "touch"
     CACHE_STATE_DELETE = "cache-state-delete"
     CACHE_SEARCH_DELETE = "cache-search-delete"
+    SCHEDULED_UNCOMPLETE_DISPATCH = "scheduled-uncomplete-dispatch"
 
 
 class RelationAuthority(Enum):
@@ -301,6 +303,19 @@ class MutationIntent:
             refresh_cache=False,
             reason=reason,
             cache_kind=kind,
+        )
+
+    @classmethod
+    # @testable true
+    # @tests tests_unit/test_022_mutation_contracts.py::test_scheduled_uncomplete_dispatch_is_planned_after_task_write
+    # @features mutations task-scheduling
+    # @dimensions durable-first post-commit
+    def dispatch_scheduled_uncomplete(cls, entity, *, reason):
+        """Dispatch one tokenized uncompletion only after ``entity`` commits."""
+        return cls(
+            MutationIntentType.SCHEDULED_UNCOMPLETE_DISPATCH,
+            entity=entity,
+            reason=reason,
         )
 
 

@@ -3,11 +3,11 @@
 from datetime import datetime, timedelta, timezone
 
 from google.cloud.datastore import Entity, Key
-from google.protobuf.message import DecodeError
 
 from ...definitions import Restriction
 from .core import DATA, KINDS
 from .filter import Filter, Query, Results
+from config.datastore import decode_urlsafe_key, encode_urlsafe_key
 
 
 # @testable true
@@ -25,14 +25,16 @@ def urlsafe_key(identifier):
     """Convert an identifier to its URL-safe base64 key string."""
     key = datastore_key(identifier)
     if key:
-        return key.to_legacy_urlsafe().decode()
+        return encode_urlsafe_key(key)
 
     return None
 
 
-# @testable infrastructure
+# @testable true
+# @tests tests_unit/test_018_database_utility.py::test_datastore_key_decodes_without_runtime_rebinding
+# @pair database:named-key-encoding
 def datastore_key(identifier):
-    """Resolve an identifier (key, entity, or URL-safe string) to a Datastore Key."""
+    """Resolve a live key, keyed entity, or urlsafe string without rebinding."""
     if identifier is None:
         return None
     elif isinstance(identifier, Key):
@@ -41,8 +43,8 @@ def datastore_key(identifier):
         return identifier.key
     elif isinstance(identifier, str):
         try:
-            return Key.from_legacy_urlsafe(identifier)
-        except (ValueError, DecodeError):
+            return decode_urlsafe_key(identifier)
+        except (ValueError, UnicodeError):
             return None
     return None
 
@@ -51,9 +53,9 @@ def datastore_key(identifier):
 def is_urlsafe_key(identifier):
     """Return True if the identifier is a valid URL-safe Datastore key."""
     try:
-        Key.from_legacy_urlsafe(identifier)
+        decode_urlsafe_key(identifier)
         return True
-    except (ValueError, DecodeError):
+    except (ValueError, UnicodeError):
         return False
 
 

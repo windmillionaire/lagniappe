@@ -24,7 +24,7 @@ general-purpose utility module.
 | `mentions/`, `messaging/`, `notifications/` | Communication-domain services |
 | `polling/` | Poll request contracts, projections, form state, and refresh deltas |
 | `services/` | External platform clients: Identity Platform, Places, and Cloud Tasks |
-| `site/` | Site administration, exports, images, and recovery configuration |
+| `site/` | Site administration, images, and recovery configuration |
 | `tasks/` | Task ordering, recurrence/postponement, and combine workflows |
 
 The remaining root modules are deliberate cross-domain boundaries:
@@ -38,9 +38,11 @@ Wraps Google Cloud Datastore and Cloud Storage for entity persistence and file s
 
 ### Data Services (`core.py`)
 
-The `DataServices` singleton manages connections to Datastore and Cloud
-Storage. Both clients receive the same project-bound Application Default
-Credentials object used by the other runtime Google clients.
+The `DataServices` singleton manages connections to the canonical `(default)`
+Datastore database and Cloud Storage. Both clients receive the same
+project-bound Application Default Credentials object used by the other runtime
+Google clients. Named databases are setup-only scratch/safety resources and are
+never selected through runtime configuration.
 
 **KINDS enum** maps entity types to Datastore kind strings (all prefixed with `CONFIG.PREFIX`). Multiple entity types share kinds:
 
@@ -61,7 +63,16 @@ Credentials object used by the other runtime Google clients.
 
 ### Key and Entity Operations
 
-**Key resolution** (`get.py`): `datastore_key(identifier)` accepts a Datastore Key, an entity with a `.key`, or a urlsafe string and returns a Datastore Key. `urlsafe_key(identifier)` converts to a urlsafe string.
+**Key resolution** (`get.py`): `datastore_key(identifier)` accepts a Datastore
+Key, an entity with a `.key`, or a urlsafe string and returns a Datastore Key.
+Live Key objects and entity `.key` values pass through unchanged, while a
+serialized urlsafe string is decoded without runtime partition rebinding.
+In-place restore imports original keys into `(default)`, discards nonterminal
+deferred execution state, runs migrations, and rebuilds Redis. The configured
+Cloud Tasks queue is captured through FULL view, purged, and reused. Only
+durable scheduled-task uncompletion markers are regenerated; ordinary purged
+tasks are audit data. Setup-only key codecs preserve named scratch-database
+identity while materializing archives and native backups.
 
 **Entity retrieval** (`get.py`):
 
@@ -91,7 +102,6 @@ Deferred-job compare-and-set transactions, lock release, recovery claims, and
 Scheduler-control records live in `database/deferred_jobs.py`. AI-email event
 claims live in `database/ai_email.py`; ingress cursor and row transactions live
 in `database/ingress.py`; singleton site settings live in `database/site.py`;
-site-export metadata and source queries live in `database/site_exports.py`;
 analytics and AI-observability records live in `database/analytics.py`.
 Application services import these concrete persistence owners. The public
 `database` facade is limited to broadly shared entity and storage operations.
@@ -148,7 +158,10 @@ Cloud Storage file operations:
 | `delete_file(path, visibility)` | Delete a file |
 | `upload_site_image(filename, image_data)` | Upload site branding images to the public bucket |
 
-Buckets are addressed by visibility name: **public** (site images, public assets), **private** (user uploads and documents), **history** (document history), and **export** (exploded archive output).
+Buckets are addressed by visibility name: **public** (site images and public
+assets), **private** (user uploads and documents), and **history** (document
+history). Portable archives are setup-owned local outputs, not a runtime
+bucket.
 
 #### File-consumer byte contracts
 
@@ -179,17 +192,6 @@ server-side copy path remains large-file capable.
 These limits require no datastore migration. Durable File assets use their
 stored size metadata (falling back to Cloud Storage metadata where necessary),
 and temporary direct uploads are reloaded and generation-checked before use.
-
-### Site export persistence (`site_exports.py`)
-
-Owns export metadata and bounded source-query recipes. The archive builder lives
-in `tools/site/exports.py`; it writes text objects with `save_text`, copies
-file/document assets with server-side storage operations, and writes
-`manifest.json` last so a completed metadata record always points at a complete
-archive. Export metadata uses `KINDS.site` records with `type=site_export`, not
-a content entity.
-
-The archive root is `html/YYYY-MM-DD/YYYYMMDDTHHMMSSZ-<short-id>/` and includes `index.html`, category/page/project pages, form schema JSON, copied files, `assets/archive.css`, `README.txt`, and `manifest.json`.
 
 ## Cache (`tools/cache/`)
 
@@ -872,7 +874,7 @@ Google Cloud Tasks carries authenticated HTTP POST requests to internal
 `/process/jobs` and delayed feedback to `/process/jobs/feedback`; in development
 it runs shared jobs in local daemon threads. In testing, most adapters remain
 pending for deterministic test-controlled execution, while adapters explicitly
-marked synchronous (currently site export) run inline. Ingress, cache refresh,
+marked synchronous run inline. Ingress, cache refresh,
 and scheduled task uncompletion retain their specialized process routes. A
 production shared-job dispatch is accepted only when `create_task()` returns a
 task identity. An explicitly disabled production queue fails the job, runs
@@ -895,7 +897,7 @@ request.
 | Filter cache update | `process.update_cache` | Filter creation or entity changes |
 | CSV import execution | `process.ingress` | Import start |
 | Task uncompletion | `process.uncomplete_task` | Task schedule creates new task |
-| Shared deferred jobs | `process.deferred_job_process` (`/process/jobs`) | Report generation/revision, page/task autofill, page generation, site export, file OCR, and file summary |
+| Shared deferred jobs | `process.deferred_job_process` (`/process/jobs`) | Report generation/revision, page/task autofill, page generation, file OCR, and file summary |
 | Long-running feedback | `process.deferred_job_feedback` (`/process/jobs/feedback`) | Production deferred jobs that start with a pending notification |
 | Deferred-job recovery | `process.deferred_job_reconcile` (`/process/jobs/reconcile`) | Five-minute Cloud Scheduler OIDC request while recovery-required jobs exist; redelivers missing/expired work, completes terminal delivery, and self-pauses when empty |
 
