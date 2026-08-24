@@ -276,7 +276,7 @@ when judging whether a test really covers a source symbol.
 Use `@template path.html::macro` when a template's DOM skeleton is part of the
 test contract. Run the template-contract reporter after changing tagged UI
 tests or their templates. Use
-[REPORTS_BROWSER_REVIEW.md](REPORTS_BROWSER_REVIEW.md) when the story also needs
+[TESTING_BROWSER_REVIEW.md](TESTING_BROWSER_REVIEW.md) when the story also needs
 human/agent inspection of the rendered experience.
 
 ## Before Finishing

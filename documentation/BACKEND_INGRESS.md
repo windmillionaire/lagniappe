@@ -44,7 +44,7 @@ The machine-readable transition inventory is `INGRESS_TRANSITIONS`.
 Invalid transitions return HTTP 409. User-correctable validation remains on
 the current stage with a persisted error. Editing a configuration stage clears
 its completion and every dependent section, increments the configuration
-revision, and detaches obsolete setup relations. Configuration is immutable
+revision, and detaches setup relations that no longer apply. Configuration is immutable
 after execution starts.
 
 ## Service boundaries

@@ -1,4 +1,4 @@
-# Reports Browser Review
+# Browser Review Reports
 
 Reference tag: `@REPORTS_BROWSER_REVIEW`
 

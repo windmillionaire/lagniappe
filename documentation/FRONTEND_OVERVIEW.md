@@ -44,9 +44,10 @@ installation `SENTRY_JS_DSN`, explicitly disables default PII, and applies the
 shared browser event sanitizer. Browser events can therefore use a separate
 Sentry project from backend events.
 
-## View Registry (`main.mjs`)
+## View registry
 
-`main.mjs` contains the `VIEWS` registry that maps `data-kind` values to lazy-loaded view modules:
+`src/script/viewRegistry.mjs` maps `data-kind` values to lazy-loaded view
+modules:
 
 ```
 project  → views/project    (extends Entity)
@@ -69,10 +70,7 @@ calls `init()`. The active view is stored for access by the health check and
 sync systems.
 
 The manual view delegates section navigation and command-copy actions from its
-stable root. Command blocks rendered by `manual/macros.html::code` therefore
-keep working after AJAX section replacement. Copy uses the browser Clipboard
-API first, falls back to a temporary selected textarea for older browsers, and
-briefly reports `Copied!` or `Copy failed` on the originating button.
+stable root, so AJAX section replacement does not discard its listeners.
 
 ## Shared Utilities (`shared/`)
 
@@ -100,51 +98,16 @@ point; internal implementation modules are noted below. Modules:
 | `user.mjs` | `updateUserData()` performs the retryable startup timezone update without browser geolocation. `updateUserLocation()` is started by `LocationBox`, requests geolocation on demand, and serializes its session write after the timezone update so client-side session-cookie responses cannot overwrite one another. |
 | `utilities.mjs` | `withTransition()` (View Transitions API wrapper with debug mode), `debounce()`, `waitForAttribute()` (MutationObserver-based attribute wait), `simpleHash()`, `generateElementId()`, `areEqual()` (deep JSON comparison), `base64ToUint8Array()`, `uint8ArrayToBase64()`. |
 
-## Style System
+## Styles and build output
 
-Styles are defined in two places:
+Authored styles live in `src/style/`. CSS files own layout and behavior;
+`styles.yaml` and `icons.yaml` define semantic records shared by JavaScript and
+Jinja. `pipeline.json` connects those inputs to Tailwind, Rollup, and the
+generated Python maps.
 
-### CSS files (`src/style/`)
-
-| File | Purpose |
-|---|---|
-| `icons.css` | Sole owner of icon geometry: the outer `.icon` box, independently sized Material `.icon-glyph`, contextual scale modifiers, semantic optical exceptions, and the CSS-drawn loading spinner. |
-| `main.css` | Tailwind base + imports |
-| `base.css`, `media.css`, `motion.css`, `state.css` | Global structure, media behavior, transitions, and state visibility |
-| `navigation.css`, `tables.css`, `forms.css` | Semantic layout and control rules |
-| `attributes.css`, `buttons.css`, `links.css`, `content.css` | Focused component rules with semantic owners |
-| `interaction.css` | Cross-component interactive behavior |
-| `editor.css` | TipTap rich text editor styles |
-| `fonts.css` | Font-face declarations |
-| `kinds.css` | Entity kind color theming (CSS custom properties) |
-
-### YAML definitions (`src/style/`)
-
-| File | Purpose |
-|---|---|
-| `styles.yaml` | Validated semantic style records keyed by component path (e.g. `button.submit`, `badge.default`, `builder.view`). Records normalize to the string-valued `STYLES` constant used throughout JS and Python. |
-| `icons.yaml` | Material Symbols Rounded records keyed by lower-camel semantic IDs (e.g. `star.active`, `alignLeft`, `removeDueDate`). Each leaf owns `glyph` and `fill`, with optional `weight` or `spin`. |
-| `icons.schema.json` | Shared semantic-ID and Material record contract used by Rollup and traceability. |
-| `pipeline.json` | Machine-readable registry, CSS entry/output, Tailwind source, transform, and generated-map contract shared by Rollup and traceability. |
-
-### Build Pipeline
-
-The `buildStyles()` Rollup plugin in `build/utility.mjs` reads the pipeline
-contract and both YAML files, validates/normalizes the style and icon records,
-and:
-
-1. **For JavaScript**: creates a virtual `"styles"` module that exports `ICONS` and `STYLES` as JSON objects. Shared `createIcon()` / `setIcon()` helpers resolve the structured icon records.
-2. **For Python**: writes `lagniappe/web/start/styles/icons.py` and `styles.py` as auto-generated Python files containing the same dictionaries. Jinja's `render_icon()` helper resolves them server-side.
-
-This means a single YAML source of truth drives both client and server rendering.
-Use `venv/bin/python run.py traceability --styles` to check style and icon
-consumers, CSS ownership, build reachability, and generated-map parity.
-Review-level findings are prompts for semantic extraction, not a mandate to
-deduplicate every equal class string. Equal values with distinct roles are
-recorded as YAML exceptions; local responsive, spacing, state, and kind
-variants remain inline until they represent a reusable concept. The Home toggle
-label is a shared semantic record because the same wrapping contract appears
-throughout that view.
+Read [INFRA_BUILD_STYLES.md](INFRA_BUILD_STYLES.md) before changing shared
+styles or icons. Read [INFRA_BUILD.md](INFRA_BUILD.md) for bundles, chunks,
+service-worker generation, and release output.
 
 ## Directory Structure
 

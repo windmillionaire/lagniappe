@@ -1,306 +1,178 @@
 # Authentication
 
-This document is the canonical contract for Lagniappe authentication. It covers
-installation choices, Identity Platform, the browser/server trust boundary,
-Google sign-in, email delivery, login UI state, recovery behavior, and safe
-failure handling.
+Lagniappe uses standalone Google Cloud Identity Platform for provider identity
+and Flask-Login for application sessions. Provider accounts never grant
+application access by themselves: the server verifies the credential, applies
+Lagniappe's account and permission rules, and only then creates a session.
 
 Key implementation areas:
 
-- `installer/identity.py`, `installer/admin.py`, and `installer/auth_email.py`
-  provision authentication.
-- `config/files/lagniappe_settings.yaml` stores runtime-safe authentication
-  settings.
-- `lagniappe/core/tools/services/identity_platform.py` owns server-side Identity
-  Platform operations.
-- `lagniappe/web/routes/users/login.py` owns login routes and session creation.
-- `lagniappe/web/templates/users/login.html` and `src/script/login/` own the
-  unauthenticated forms and browser REST client.
+| Area | Location |
+| --- | --- |
+| Provider setup | `installer/identity.py`, `installer/admin.py` |
+| Authentication email | `installer/auth_email.py` |
+| Runtime settings | `config/files/lagniappe_settings.yaml` |
+| Provider service | `lagniappe/core/tools/services/identity_platform.py` |
+| Session routes | `lagniappe/web/routes/users/login.py` |
+| Login interface | `lagniappe/web/templates/users/login.html`, `src/script/login/` |
 
-## Installation contract
+See [INFRA_SETUP_CLOUD.md](INFRA_SETUP_CLOUD.md) for provisioning and recovery
+commands.
 
-### Standalone Identity Platform
+## Provider configuration
 
-Email/password authentication always uses standalone Google Cloud Identity
-Platform. `installer/identity.py`:
+Email/password authentication is always enabled through standalone Identity
+Platform. Setup initializes the service, confirms the live subtype, enables
+the provider, preserves authorized domains, and adds the application host. It
+stores only the project ID and public Web API key in
+`IDENTITY_PLATFORM_CONFIG`.
 
-- initializes `projects.identityPlatform.initializeAuth` and requires the
-  resulting subtype to be `IDENTITY_PLATFORM`;
-- accepts the provider's already-initialized responses only after re-reading
-  and verifying live state;
-- enables email/password sign-in;
-- preserves authorized domains and adds the App Engine or custom-domain host;
-- stores `IDENTITY_PLATFORM_CONFIG` with only the project ID and public Web API
-  key; and
-- sends the confirmed ADC project as `x-goog-user-project` for installer quota.
+The browser key identifies the project and attributes API quota. It is not a
+Google Cloud credential, application session, or authorization to Lagniappe
+data. Administrative setup is authorized by the installer's ADC identity and
+the enabled Identity Toolkit service.
 
-Identity Platform email/password setup is unconditional. Google sign-in is an
-optional provider layered on top of it.
+Google sign-in is optional. `GOOGLE_SIGNIN_ENABLED` records the operator's
+choice and defaults to enabled; an absent value is normalized to enabled. When
+disabled, email/password remains available and setup skips OAuth and Google
+provider reconciliation without deleting provider resources.
 
-`initializeAuth` creates the default browser key. Lagniappe reads
-`config.client.apiKey`; setup does not create a key through the API Keys API or
-assign its API targets and browser-referrer restrictions. The enabled Identity
-Toolkit service and the installer's ADC OAuth scope authorize administrative
-setup requests. They are not authority embedded in the public browser key.
+For Google sign-in, the operator creates a Web application client using the
+origin and `/users/google-signin` callback printed by setup. Setup verifies the
+downloaded client JSON before updating Identity Platform. Lagniappe stores the
+public client ID; Identity Platform stores the client secret.
 
-### Google sign-in choice and OAuth
+## Authentication email
 
-`GOOGLE_SIGNIN_ENABLED` is the persisted operator intent. Fresh setup asks
-before beginning Google Auth Platform or OAuth work and defaults to enabled for
-backward compatibility. When false:
+Lagniappe sends verification and password-reset mail through its configured
+SMTP provider. `AUTH_EMAIL_CONFIG` contains the host, port, TLS mode,
+credentials, sender address, and sender name. New settings replace the active
+sender only after a successful test message, and TLS certificate validation is
+always enabled.
 
-- email/password authentication remains available;
-- OAuth instructions and Google-provider reconciliation are skipped;
-- custom-domain setup still reconciles the Identity Platform authorized
-  domain; and
-- retained OAuth clients and provider resources are not deleted.
+The server requests an action code from Identity Platform, embeds it in the
+local `/users/login` action URL, and sends that URL through SMTP. Provider
+access tokens and SMTP credentials never reach the browser.
 
-Existing and recovered settings without the key migrate to `true`. A successful
-focused `./setup.sh oauth` run stores `true` explicitly.
+Custom-domain setup validates the sender and guides SPF, DKIM, and DMARC
+configuration. AI email uses the same sender but separate receive and send
+credentials; see [AI_EMAIL.md](AI_EMAIL.md).
 
-When Google sign-in is enabled, the operator creates a Web application client
-in Google Auth Platform with the exact origin and `/users/google-signin`
-callback printed by setup. The downloaded JSON must be placed at the exact
-temporary path printed by the installer. Setup verifies its client type,
-project, origin, callback, and Google propagation before changing Identity
-Platform. It persists only the public client ID. Identity Platform stores the
-client secret; the deployed application does not need it. The downloaded JSON
-may then be removed or transferred to secure storage.
+## Browser/server trust boundary
 
-### Authentication email
+`GET /l/identity-config` returns the public project ID and Web API key. The
+browser uses the Identity Platform REST endpoints for account creation,
+password sign-in, and action-code application, then sends the short-lived ID
+token to `POST /users/login-identity`. It does not persist provider refresh
+tokens.
 
-Lagniappe, rather than Google's default mailer, delivers verification and
-password-reset messages. `AUTH_EMAIL_CONFIG` stores the selected SMTP provider,
-host, port, TLS mode, username, password or API key, sender address, and sender
-name. The sender is independent of the installer, deployer, application owner,
-and Google Cloud IAM identities.
+Immediately before session handoff, the client refreshes the Flask-WTF token
+from `GET /l/token`. A response explicitly identified as a CSRF failure is
+refreshed and retried once.
 
-Without a custom domain, setup can bootstrap a Gmail or Google Workspace
-mailbox with a Google App Password over STARTTLS. With a custom domain, setup
-supports a tested provider-neutral SMTP configuration and a Resend shortcut.
-New values replace the previous sender only after a successful test message.
-SMTP TLS always verifies certificates. On a Resend rerun, setup automatically
-reuses the saved Sending key when the verified sending domain is unchanged; a
-different domain requires a new domain-scoped key.
+The server verifies:
 
-The custom-domain path also makes DMARC part of email setup. SPF authenticates
-the provider's envelope sender, DKIM signs the message, and DMARC requires at
-least one of those identities to align with the visible `From` domain. After a
-successful SMTP test, setup creates or verifies `_dmarc.<sender-domain>` through
-Cloudflare when selected, or prints the exact TXT record for manual DNS. The
-operator may enter `s` to skip this optional step without blocking email setup.
-A new record starts at `v=DMARC1; p=none;`, which enables DMARC authentication
-without asking receivers to quarantine or reject failures. An existing valid
-`none`, `quarantine`, or `reject` policy on the sender domain—or an applicable
-parent-zone policy—is retained. The Gmail/App Password bootstrap path does not
-offer DMARC because Google or the Workspace domain owner controls that sender's
-DNS policy.
+- Secure Token signature;
+- exact project audience and issuer;
+- subject and email;
+- verification state; and
+- the matching Lagniappe account and access policy.
 
-Optional `./setup.sh ai-email` reuses the same verified Resend sender address,
-sender name, and Sending-access key for acceptance/result feedback. It creates
-only a separate Full access key for receiving administration; the two keys must
-differ. That receiving key is saved in `AI_EMAIL_CONFIG` and reused without a
-key prompt on later reconciliation runs; the live Resend operations still
-validate it. More importantly, the deployed runtime needs that key after each
-signed webhook event to retrieve the complete received message, list attachment
-metadata, and obtain each attachment download URL. The separate Sending key is
-used only for outbound feedback. Inbound `From` matching selects an existing
-account but does not grant browser access or permission to execute a proposal:
-reports remain owner-scoped, rate-limited, and Create/Organize changes require
-normal sign-in and review.
+Unknown and returning addresses receive the same ordinary password failure so
+the sign-in route does not enumerate accounts. Identity Platform account
+creation on a public-registration site still does not create a Lagniappe
+session until the application rules pass.
 
-At runtime the server uses authenticated ADC and
-`accounts:sendOobCode` with `returnOobLink: true`. It embeds the returned code
-in Lagniappe's existing `/users/login` action URL on the configured login
-origin, then sends that local URL through SMTP. The browser never receives the
-runtime Google access token or SMTP credential.
+## Google sign-in path
 
-### Recovery
+Google Identity Services renders its control in Google's iframe. The CSP
+allows only the required Google `/gsi/` script, style, connection, and frame
+paths; `frame-ancestors 'self'` controls who may embed Lagniappe.
 
-Recovery verifies live standalone Identity Platform state and keeps absent,
-forbidden, mismatched, and unavailable results distinct. Repair does not delete
-operator-owned cloud APIs, OAuth clients, or provider resources.
+The GIS credential is posted to `POST /users/google-signin`. The server:
 
-## Browser and server trust boundary
+1. verifies the Google double-submit CSRF token;
+2. verifies the credential for the configured OAuth client;
+3. enforces private-site provisioning;
+4. exchanges it through Identity Platform `accounts:signInWithIdp`;
+5. verifies the resulting Identity Platform token; and
+6. applies the same Lagniappe account rules used by password sign-in.
 
-### Public client configuration and API key
+Lagniappe does not store Google provider refresh tokens.
 
-`GET /l/identity-config` returns the Identity Platform project ID and Web API
-key. These are public client configuration. The key selects the Google Cloud
-project and attributes browser API usage/quota; it is not a Lagniappe session,
-Google Cloud credential, installer credential, or authorization to application
-data.
+## Application accounts and roles
 
-The browser can use that key with the Identity Platform client endpoints that
-the project enables, including account creation and email/password sign-in.
-Consequently, on a public-registration installation someone may be able to
-create an Identity Platform account through the same public API. That alone
-does not grant access to Lagniappe. Every application session is created by the
-server only after token verification and the application's owner,
-provisioning, public-registration, and disabled-account rules pass.
+Provider identity, Lagniappe roles, and Google Cloud IAM are independent.
+`owner` is the singleton application row matching `ADMIN_EMAIL`; `admin` is an
+ordinary application role. Neither role follows from a Cloud IAM binding.
 
-The browser does not persist Identity Platform refresh tokens. It hands the
-short-lived ID token to Lagniappe for session creation.
+Until the owner completes a login, `/users/login` presents owner setup. Google
+sign-in is offered when enabled; password setup always uses the email
+verification flow.
 
-### Email/password path
+For a delegated installation, `BOOTSTRAP_ADMIN_EMAIL` may name the active
+installer. On a private site, that exact address can be provisioned as an
+additional Administrator through the Google callback only until the owner has
+a `last_login`. The setting is not an address pattern, does not authorize the
+password handoff, and does not delete an administrator account when cleared.
 
-The browser's focused REST client calls Identity Platform directly for account
-creation, password sign-in, and action-code application. It sends the returned
-ID token to `POST /users/login-identity`. Immediately before that handoff, the
-client refreshes the Flask-WTF token from `GET /l/token`; a CSRF-specific `400`
-is refreshed and retried once.
+After owner initialization:
 
-The server verifies the Secure Token signature, exact project audience and
-issuer, subject, email, and verification state. It then applies Lagniappe's
-access rules and creates the Flask-Login session. Unknown and returning email
-addresses receive deliberately generic password errors so the ordinary sign-in
-path does not enumerate accounts.
+- a provisioned user without `last_login` enters first-time password setup;
+- returning and unknown addresses see the same password screen;
+- public sites may offer account creation; and
+- Google sign-in on a private site must match a provisioned user.
 
-### Google path
+Adopting a user from the public group applies the owner-defined name, page, AI,
+and group settings before subsequent authentication.
 
-Google Identity Services renders its own sign-in control in a provider-owned
-iframe. That iframe is part of Google's button implementation, not a place
-where Lagniappe embeds its authentication application. The response CSP
-explicitly permits only Google's `/gsi/` script, style, connection, and frame
-paths. Independently, `frame-ancestors 'self'` limits which sites may embed
-Lagniappe.
+## Verification and password reset
 
-The GIS control posts a Google credential to `POST /users/google-signin`. The
-server:
+Password creation produces an unverified provider credential. After the server
+confirms delivery of the verification link, the creation controls are removed.
+If delivery fails, the UI returns to ordinary sign-in with safe guidance; the
+provider error is reported through the private error path. Signing in with the
+created password retries delivery after the sender is repaired.
 
-1. validates the Google double-submit CSRF token;
-2. verifies the Google credential for the configured OAuth client;
-3. prevents an unprovisioned account from being auto-created on private sites;
-4. exchanges the credential through Identity Platform's
-   `accounts:signInWithIdp` endpoint;
-5. verifies the resulting Identity Platform token for the configured project;
-   and
-6. applies the same Lagniappe access rules before creating a session.
+A user can verify an account and close the page before completing sign-in. If a
+later first-time attempt receives `EMAIL_EXISTS`, the client treats the account
+as already initialized and opens ordinary password sign-in.
 
-No Google provider refresh token is persisted by the application.
+Password reset validates the action code before exposing password controls.
+Consumed, invalid, and expired links show a safe message and retain a **Request
+a new reset link** action. A successful reset returns to password sign-in.
 
-## Login UI and account state
+Before reset lookup, the server checks SMTP availability without using the
+submitted address. Sender failure returns the same `503` for every address;
+subsequent account lookup and delivery outcomes retain a generic success
+response. Provider details go to error reporting, not the browser.
 
-`src/script/login.mjs` initializes the client and selects one of the server
-rendered forms. Forms communicate through `login:show-*` events; all workflow
-forms use the shared login card, heading, guidance, error, and user-kind
-confirmation styles.
+## Availability and failure behavior
 
-### Owner bootstrap
+Google controls require both explicit operator enablement and usable provider
+state. In production, the server reads the live Identity Platform Google
+provider configuration. An absent or disabled provider omits the control. A
+control-plane read failure leaves an explicitly enabled control available so a
+temporary administrative outage does not remove a working sign-in method.
 
-Until the configured owner completes a Lagniappe login, `/users/login` opens
-owner setup. With Google available it begins with Google sign-in and offers a
-separate-password alternative. Without Google it opens the password path
-directly. A separately created password must be verified through the normal
-email flow before it can create a session.
+Known provider rejections are normalized whether returned as HTTP errors or an
+`errorMessage`. Disabled accounts and providers receive safe UI messages; raw
+codes, credentials, and provider text are limited to the privacy-reduced error
+path.
 
-For a delegated installation, `BOOTSTRAP_ADMIN_EMAIL` may hold the exact active
-installer address. On a private site that one address may be provisioned as an
-additional application Administrator through the Google callback only while
-the configured Owner has no successful login (`last_login` is absent). It is
-not accepted by the email/password handoff, is not shown in login HTML, and
-does not act as a pattern or domain allowlist. The first successful Owner login
-closes automatic installer creation permanently. A bootstrap Administrator
-created before then remains an ordinary stored Administrator until the Owner
-demotes or deletes that account; clearing the setting does not silently delete
-the user.
+Only local post-login destinations survive Google, verification, and reset
+handoffs. Authentication routes have focused rate limits. Session and remember
+cookies are Secure, HttpOnly, and SameSite=Lax; the non-sensitive remember
+preference is separate from authentication state.
 
-Application roles and provider identities are separate. `owner` is the
-singleton canonical row matching `ADMIN_EMAIL`; stored `admin` grants ordinary
-application administration and does not confer AI entitlement or Google Cloud
-IAM. Conversely, a Google Cloud Owner binding does not create an application
-session or Lagniappe role.
-
-### Invited and returning users
-
-After owner initialization, users choose Google or email sign-in. Email is
-collected before the password:
-
-- a provisioned local user with no completed login enters first-time password
-  setup;
-- returning and unknown addresses see the same ordinary password screen and
-  generic failure; and
-- a public site may direct an unknown address into account creation.
-
-Google sign-in on a private site must match a provisioned local user. A user
-adopted from the public group becomes non-public and receives the owner-created
-name, page, AI, and group settings before later authentication.
-
-### Verification-link recovery
-
-Creating a password produces an unverified Identity Platform credential. The
-server generates and sends the verification link. Once delivery is confirmed,
-the password field and create action are removed from the form rather than left
-active beneath the confirmation.
-
-If verification delivery fails, the browser catches the generic application
-error and opens ordinary sign-in for the same email with safe visible guidance;
-it does not leave an unhandled promise or expose SMTP/provider detail. The
-server reports the underlying provider exception to Sentry. The password was
-already created, so signing in with it retries verification delivery. Restoring
-the sender configuration therefore recovers without creating another Identity
-Platform account.
-
-An invited user can apply the verification link and close the page before the
-final password sign-in. Their local `last_login` is still empty, so a later
-email check may offer first-time setup again. The repeated provider create then
-returns `EMAIL_EXISTS`. This is recovery state, not a terminal error: the
-browser opens ordinary password sign-in for the same email and displays
-guidance that the password is already set. The user can sign in with
-the password created before verification.
-
-Password reset follows the same local-link delivery model. The browser validates
-the action code before enabling or showing the password controls. A consumed,
-invalid, or expired link displays the safe invalid/expired message immediately;
-it does not render a usable-looking reset action. The invalid-link state retains
-a **Request a new reset link** action that opens the existing forgot-password
-form without requiring URL editing. After a successful reset, the UI returns to
-ordinary password sign-in with confirmation feedback.
-
-Before generating a reset link, the server checks SMTP availability without
-consulting the submitted address. An unavailable sender therefore returns the
-same generic `503` for every address; the forgot-password form retains its email
-and action controls and displays safe retry guidance. Account lookup and any
-later account-specific delivery outcome retain the generic success response so
-password-reset behavior cannot be used to enumerate accounts. The backend
-reports both failure classes to Sentry without exposing provider detail in the
-browser.
-
-## Google availability and safe failures
-
-Google controls require both operator intent and usable provider state:
-
-1. `GOOGLE_SIGNIN_ENABLED` must be exactly true. When false, the server omits
-   Google UI, skips the live provider read, and rejects a direct callback.
-2. In production, the server reads the live Identity Platform Google-provider
-   configuration with the runtime service account. Disabled or absent state
-   omits the controls.
-
-Identity Platform uses protobuf JSON encoding. A disabled provider may omit the
-default-false `enabled` field entirely; that omission is treated as disabled.
-A control-plane read failure is fail-open so a transient administrative outage
-does not remove an otherwise working login method. This exception does not
-override an explicit false operator setting or an explicit disabled response.
-
-Known sign-in rejections are normalized whether Google returns them as an HTTP
-error or a successful-response `errorMessage`. A disabled Identity Platform
-user returns to the method chooser with a safe visible account-disabled
-message. A disabled Google provider returns safely without raw provider text;
-the next page render omits the unavailable control. Raw provider codes and
-credentials are captured only through the privacy-reduced error path, not
-shown to users or placed in redirect URLs.
-
-## Redirects, cookies, and rate limits
-
-Only locally safe post-login destinations are retained through Google,
-verification, and password-reset handoffs. Authentication routes have focused
-rate limits. Session and remember cookies are Secure, HttpOnly, and
-SameSite=Lax; the non-sensitive remember preference used across login forms is
-separate from authentication state.
+Recovery verifies live Identity Platform state and distinguishes absent,
+forbidden, mismatched, and unavailable responses. It repairs Lagniappe-managed
+configuration without deleting operator-owned APIs, OAuth clients, or provider
+resources.
 
 ## Agent access
 
-Optional browser-review agent access uses `AGENT_ACCESS_ENABLED`,
+Optional browser-review access uses `AGENT_ACCESS_ENABLED`,
 `AGENT_ACCESS_EMAIL`, `AGENT_ACCESS_NAME`, and `AGENT_ACCESS_CODE`. It is off by
-default. Successful agent access resolves to a normal user account, so its
-application permissions remain group-managed in the ordinary owner UI.
+default. A successful `/users/agent-login` submission resolves to a normal user
+whose permissions remain group-managed in the owner interface.

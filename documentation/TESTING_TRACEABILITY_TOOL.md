@@ -1,4 +1,4 @@
-# Traceability
+# Testing Traceability
 
 `testing/utility/traceability.py` connects durable source symbols to the tests
 that exercise them. It is designed to answer three practical questions:
@@ -192,7 +192,7 @@ not a supported tag; use `@todo` when a missing behavior should remain visible.
 
 - `--source PATH` inventories one or more files or directories. Add
   `--suggest-sources` to find likely tests for undecided source symbols.
-- `--test TARGET` works backward from a nodeid, file, or folder to its source
+- `--test TARGET` maps a nodeid, file, or folder to its source
   owners. Add `--suggest-sources` to review likely missing owners.
 - `--feature-dimension FEATURE:DIMENSION` lists code, tests, templates, and
   links for one behavioral pair.

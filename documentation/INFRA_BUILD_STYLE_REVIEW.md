@@ -1,4 +1,4 @@
-# Style Candidate Review
+# Shared Style Review
 
 Use this guide for the advisory cleanup candidates emitted by style
 traceability. The registry, compiled-candidate, CSS-ownership, build-parity, and

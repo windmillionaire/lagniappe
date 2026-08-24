@@ -1,4 +1,4 @@
-# Template contract tracking
+# Testing Template Contracts
 
 `testing/utility/template_contracts.py` follows `@template` tags from E2E tests
 into Jinja macros, imported macros, frontend handlers, and test selectors. It

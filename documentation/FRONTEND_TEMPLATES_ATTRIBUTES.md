@@ -1,4 +1,4 @@
-# Template Attributes
+# Frontend Template Attributes
 
 The `lp-*` attributes are the handshake between server-rendered Jinja
 templates and the frontend. Templates write ordinary HTML with stable
