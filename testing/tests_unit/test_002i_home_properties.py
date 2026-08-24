@@ -246,7 +246,7 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
 
 
 # @features starred
-# @dimensions stale-cleanup pagination
+# @dimensions stale-cleanup pagination view-authorization
 @pytest.mark.unit
 def test_home_starred_list_paginates_and_cleans_stale_keys(monkeypatch):
     class FakeStarred:
@@ -272,9 +272,19 @@ def test_home_starred_list_paginates_and_cleans_stale_keys(monkeypatch):
     user = FakeUser(starred)
     loaded_requests = []
 
+    class FakeEntity:
+        def __init__(self, key, visible=True):
+            self.key = key
+            self.visible = visible
+            self.allowed_requests = []
+
+        def allowed(self, action, user=None):
+            self.allowed_requests.append((action, user))
+            return self.visible
+
     def load_entities(*keys, request):
         loaded_requests.append(keys)
-        return [SimpleNamespace(key=key) for key in keys if key != stale_key]
+        return [FakeEntity(key) for key in keys if key != stale_key]
 
     monkeypatch.setattr(home_properties, "current_user", user)
     monkeypatch.setattr(home_properties.Entities, "fetch", load_entities)
@@ -291,6 +301,57 @@ def test_home_starred_list_paginates_and_cleans_stale_keys(monkeypatch):
     assert section.cursor == 1
     assert section.count == 11
     assert user.saved is True
+    assert all(
+        entity.allowed_requests == [(home_properties.Action.VIEW, user)]
+        for entity in loaded
+    )
+
+
+# @features starred
+# @dimensions view-authorization retained-inaccessible
+@pytest.mark.unit
+def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
+    class FakeEntity:
+        def __init__(self, key, visible):
+            self.key = key
+            self.visible = visible
+
+        def allowed(self, action, user=None):
+            assert action is home_properties.Action.VIEW
+            assert user is current_user
+            return self.visible
+
+    class FakeStarred:
+        keys = ["visible", "restricted", "missing"]
+
+        def __init__(self):
+            self.deleted = []
+
+        def delete_starred_keys(self, keys):
+            self.deleted.extend(keys)
+            self.keys = [key for key in self.keys if key not in keys]
+
+    starred = FakeStarred()
+    current_user = SimpleNamespace(
+        properties=SimpleNamespace(starred=starred),
+        save=lambda: None,
+    )
+    visible = FakeEntity("visible", True)
+    restricted = FakeEntity("restricted", False)
+
+    monkeypatch.setattr(home_properties, "current_user", current_user)
+    monkeypatch.setattr(
+        home_properties.Entities,
+        "fetch",
+        lambda *keys, request: [visible, restricted],
+    )
+
+    section = home_properties.StarredList()
+
+    assert section.list == [visible]
+    assert starred.deleted == ["missing"]
+    assert starred.keys == ["visible", "restricted"]
+    assert section.count == 2
 
 
 # @features home ai-report

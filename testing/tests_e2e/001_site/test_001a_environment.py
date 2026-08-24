@@ -255,9 +255,7 @@ def test_authenticated_home_response_headers_include_etag(get_user):
     assert "content-security-policy-report-only" not in headers
     assert '<div lp-view data-kind="home"' in direct.text
     csp = headers["content-security-policy"]
-    assert (
-        "script-src 'self' https://accounts.google.com/gsi/client" in csp
-    )
+    assert "script-src 'self' https://accounts.google.com/gsi/client" in csp
     assert (
         "style-src 'self' 'unsafe-inline' "
         "https://accounts.google.com/gsi/style" in csp
@@ -306,6 +304,87 @@ def test_authenticated_home_response_headers_include_etag(get_user):
     assert_same_etag(uncached.headers.get("etag"), headers["etag"])
     assert uncached.headers["content-type"].startswith("text/html")
     assert '<div lp-view data-kind="home"' in uncached.text
+
+
+# @features session location timezone
+# @dimensions validation atomic-update coordinates
+def test_update_session_rejects_invalid_timezone_and_location_atomically(
+    get_user, browser_failures
+):
+    user = get_user(Users.OWNER)
+    user.go(SitePages.HOME)
+    persisted = Entities.USER.load(user.email)
+    timezone_before = persisted.db.get("timezone")
+    location_before = persisted.db.get("location")
+
+    def update_session(raw_body):
+        return user.page.evaluate(
+            """async (body) => {
+                const token = await (await fetch("/l/token")).text();
+                const response = await fetch("/l/update-session", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-CSRFToken": token,
+                        "X-Lagniappe-Request": "true",
+                    },
+                    body,
+                });
+                return { status: response.status, body: await response.text() };
+            }""",
+            raw_body,
+        )
+
+    invalid_payloads = [
+        "{",
+        json.dumps({"timezone": "Mars/Olympus"}),
+        json.dumps({"location": "not-an-object"}),
+        json.dumps({"location": {"latitude": True, "longitude": 1}}),
+        '{"location":{"latitude":1e999,"longitude":1}}',
+        json.dumps(
+            {
+                "timezone": "UTC",
+                "location": {"latitude": 91, "longitude": -90},
+            }
+        ),
+    ]
+    with browser_failures.expect_http_error(
+        user,
+        status=422,
+        path="/l/update-session",
+        count=len(invalid_payloads),
+    ):
+        results = [update_session(payload) for payload in invalid_payloads]
+
+    assert [result["status"] for result in results] == [422] * len(invalid_payloads)
+    persisted = Entities.USER.load(user.email)
+    assert persisted.db.get("timezone") == timezone_before
+
+    valid = update_session(
+        json.dumps(
+            {
+                "timezone": "UTC",
+                "location": {
+                    "latitude": 29.9511,
+                    "longitude": -90.0715,
+                    "ignored": "not persisted",
+                },
+            }
+        )
+    )
+    assert valid["status"] == 200
+    assert Entities.USER.load(user.email).db.get("timezone") == "UTC"
+
+    persisted = Entities.USER.load(user.email)
+    if timezone_before is None:
+        persisted.db.pop("timezone", None)
+    else:
+        persisted.db["timezone"] = timezone_before
+    if location_before is None:
+        persisted.db.pop("location", None)
+    else:
+        persisted.db["location"] = location_before
+    persisted.save()
 
 
 # @features privacy public-pages

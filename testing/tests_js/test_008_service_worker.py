@@ -579,7 +579,10 @@ context.fetch = async (url, options = {}) => {
   }
   if (url === "/l/validate-user") {
     validateCalls.push(options);
-    return new Response("", { status: 200 });
+    return new Response(JSON.stringify({ cacheCleared: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
   }
   throw new Error(`Unexpected fetch ${url}`);
 };
@@ -593,7 +596,7 @@ const result = await context.checkForCacheInvalidation(
   }),
 );
 
-if (!result.invalidated || !result.cacheCleared) {
+if (!result.invalidated || !result.cacheCleared || !result.acknowledged) {
   throw new Error("cache invalidation did not report a confirmed clear");
 }
 if (validateCalls.length !== 1) {
@@ -605,6 +608,104 @@ if (!body.cacheCleared || !body.responseCacheCleared || "etagStoreCleared" in bo
 }
 if (validateCalls[0].headers["X-CSRFToken"] !== "csrf-token") {
   throw new Error("validate-user did not include refreshed CSRF token");
+}
+""",
+    )
+
+
+# @features cache
+# @dimensions invalidation service-worker acknowledgement failure retry
+def test_cache_invalidation_requires_explicit_server_acknowledgement(run_node):
+    run_service_worker_check(
+        run_node,
+        """
+const captures = [];
+context.self.Sentry = {
+  captureException(error, options) {
+    captures.push({ message: error.message, ...options });
+  },
+};
+
+const scenarios = [
+  {
+    stage: "token-response",
+    fetch: async (url) => new Response("", { status: url === "/l/token" ? 500 : 200 }),
+    validateCalls: 0,
+  },
+  {
+    stage: "token-empty",
+    fetch: async (url) => new Response(url === "/l/token" ? "   " : "", { status: 200 }),
+    validateCalls: 0,
+  },
+  {
+    stage: "validation-response",
+    fetch: async (url) => url === "/l/token"
+      ? new Response("csrf-token")
+      : new Response("", { status: 503 }),
+    validateCalls: 1,
+  },
+  {
+    stage: "validation-body",
+    fetch: async (url) => url === "/l/token"
+      ? new Response("csrf-token")
+      : new Response("not-json", { status: 200 }),
+    validateCalls: 1,
+  },
+  {
+    stage: "validation-acknowledgement",
+    fetch: async (url) => url === "/l/token"
+      ? new Response("csrf-token")
+      : new Response(JSON.stringify({ cacheCleared: false }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    validateCalls: 1,
+  },
+];
+
+vm.runInContext(`checkForCacheInvalidation = realCheckForCacheInvalidation;`, context);
+for (const scenario of scenarios) {
+  let validateCalls = 0;
+  context.fetch = async (url, options = {}) => {
+    if (url === "/l/validate-user") validateCalls += 1;
+    return scenario.fetch(url, options);
+  };
+  const before = captures.length;
+  const result = await context.checkForCacheInvalidation(
+    new Response("", {
+      headers: { "X-Lagniappe-Invalidate-Cache": "true" },
+    }),
+  );
+  if (result.acknowledged !== false) {
+    throw new Error(`Expected failed acknowledgement for ${scenario.stage}`);
+  }
+  if (validateCalls !== scenario.validateCalls) {
+    throw new Error(`Unexpected validate calls for ${scenario.stage}: ${validateCalls}`);
+  }
+  if (captures.length !== before + 1 || captures.at(-1).stage !== scenario.stage) {
+    throw new Error(`Expected one ${scenario.stage} capture: ${JSON.stringify(captures)}`);
+  }
+  if (captures.at(-1).message.includes("csrf-token") || "body" in captures.at(-1)) {
+    throw new Error("Validation diagnostics included sensitive response data");
+  }
+}
+
+let validationAttempts = 0;
+context.fetch = async (url) => {
+  if (url === "/l/token") return new Response("csrf-token");
+  validationAttempts += 1;
+  return new Response(JSON.stringify({ cacheCleared: validationAttempts > 1 }), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+};
+const invalidation = new Response("", {
+  headers: { "X-Lagniappe-Invalidate-Cache": "true" },
+});
+const first = await context.checkForCacheInvalidation(invalidation.clone());
+const second = await context.checkForCacheInvalidation(invalidation.clone());
+if (first.acknowledged !== false || second.acknowledged !== true || validationAttempts !== 2) {
+  throw new Error("A failed acknowledgement did not reset for the next invalidation header");
 }
 """,
     )

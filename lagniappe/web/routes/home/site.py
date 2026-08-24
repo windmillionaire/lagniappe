@@ -1,4 +1,5 @@
 import json
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from flask import abort, request, session, g
 from flask_login import current_user
@@ -13,6 +14,7 @@ from lagniappe.core.definitions import Action, Fetch, FetchReason, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache, collaboration, database
 from lagniappe.core.tools.site import images as site_image
+from lagniappe.core.tools.services import places
 from lagniappe.core.tools.ai.settings import runtime_ai_settings
 from lagniappe.core.tools.database import site as site_database
 from lagniappe.core.tools.database import migrations as database_migrations
@@ -496,18 +498,44 @@ def identity_config():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
+# @tests tests_e2e/001_site/test_001a_environment.py::test_update_session_rejects_invalid_timezone_and_location_atomically
+# @features session location timezone
+# @dimensions validation atomic-update coordinates
 @internal.route("/update-session", methods=["POST"])
 @logged_in
 def update_session():
-    if request.json.get("timezone"):
-        tz = request.json.get("timezone")
-        session["timezone"] = tz
-        if current_user.db.get("timezone") != tz:
-            current_user.db["timezone"] = tz
-            current_user.save()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return responses.error("Invalid session update.")
 
-    if request.json.get("location"):
-        session["location"] = json.dumps(request.json.get("location"))
+    timezone = None
+    if "timezone" in data:
+        timezone = data["timezone"].strip() if isinstance(data["timezone"], str) else ""
+        try:
+            if not timezone:
+                raise ValueError("timezone is empty")
+            ZoneInfo(timezone)
+        except (ValueError, ZoneInfoNotFoundError):
+            return responses.error("Invalid session update.")
+
+    location = None
+    if "location" in data:
+        location = places.normalize_location_coordinates(data["location"])
+        if location is None:
+            return responses.error("Invalid session update.")
+
+    save_user = False
+    if timezone is not None:
+        session["timezone"] = timezone
+        if current_user.db.get("timezone") != timezone:
+            current_user.db["timezone"] = timezone
+            save_user = True
+
+    if location is not None:
+        session["location"] = json.dumps(location, separators=(",", ":"))
+
+    if save_user:
+        current_user.save()
 
     return responses.json_response({"userHash": current_user.hash})
 

@@ -89,6 +89,11 @@ It makes billable provider calls, creates test-prefixed state, and must run
 alone. Use `-m provider` to run both opt-in groups in one sequential session.
 An ordinary `test setup` remains offline.
 
+Setup targets come from one declarative inventory split into ordinary,
+`setup_drift`, and `setup_provider` groups. Repository-health coverage requires
+every `testing/tests_tooling/test_*_setup_*.py` module to appear exactly once,
+so adding a setup module cannot silently omit it from the alias.
+
 ## Markers
 
 | Marker | Meaning |

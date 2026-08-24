@@ -101,6 +101,13 @@ validates the user session with confirmation that the response cache was
 cleared. This is used for events like permission changes or site-wide updates
 that require a clean slate.
 
+The server acknowledgement is complete only when the token response is OK and
+nonempty and `POST /l/validate-user` returns an OK JSON response with
+`cacheCleared: true`. Failures are reported with stage/status metadata only.
+The worker does not spin a private retry loop: the server retains its
+invalidation flag, so a later response repeats the header and starts another
+coalesced acknowledgement attempt.
+
 ## Quota Management
 
 `maybeEvictForQuota()` runs after each new cache entry, throttled to at most once

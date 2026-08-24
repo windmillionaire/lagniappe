@@ -78,6 +78,11 @@ permission-readonly Task forms use this mode.
 Table, Todo, Html, and Status implement their own `create()` because they do
 not follow the normal read/edit field shape.
 
+Location selections are verified through the Places detail endpoint before an
+ID is stored. If details are temporarily unavailable, the submitted name or
+address and secondary address are retained as free text with a warning; an
+unverified provider ID is never persisted.
+
 ## Schema values
 
 Common schema keys are `id`, `type`, `title`, `placeholder`, `required`,

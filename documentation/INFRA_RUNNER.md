@@ -55,7 +55,10 @@ Hosted infrastructure is in [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md).
 
 `runner/development.py` activates the saved gcloud target, verifies ADC, and
 starts Flask with `FLASK_ENV=development`. It never opens an authentication
-browser. Google clients run as the runtime service account.
+browser. Google clients run as the runtime service account. The command is
+intentionally long-lived with no fixed timeout. The runner starts Flask and its
+debug reloader in an owned process group, forwards SIGINT/SIGTERM, and cleans up
+that group if the foreground runner exits exceptionally.
 
 ## Test server
 

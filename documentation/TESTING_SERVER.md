@@ -17,6 +17,9 @@ Startup:
 - checks frontend inputs and generated output, running `npm run dev` only when
   the bundle is stale or incomplete;
 - starts Flask with `FLASK_ENV=testing` at configured `BASE_URL`;
+- probes `/l/ping` immediately within one 20-second monotonic readiness budget,
+  deriving finite connect/read timeouts from the remaining time and reporting
+  only the last connection or HTTP state on timeout;
 - resets E2E artifact folders; and
 - records PID/log files under `reports/`.
 

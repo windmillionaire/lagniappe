@@ -137,8 +137,10 @@ def users(start_cursor=None, hashes=Restriction.UNRESTRICTED, group=None, limit=
     return q.fetch()
 
 
-# @testable false
-# @reason datastore query recipe is persistence-owned and covered by route/E2E workflows
+# @testable true
+# @tests tests_unit/test_018_database_utility.py::test_groups_with_denied_hashes_does_not_query_datastore
+# @features database permissions
+# @dimensions group-query deny-all
 def groups(hashes=Restriction.UNRESTRICTED):
     """Fetch all group models, optionally restricted to the given hashes."""
     return (

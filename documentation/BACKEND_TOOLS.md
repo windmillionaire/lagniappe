@@ -87,7 +87,11 @@ when the provider returns a task identity.
 
 `tools/services/identity_platform.py` owns server-side account and token
 operations; see [AUTHENTICATION.md](AUTHENTICATION.md). `places.py` owns Places
-autocomplete/detail calls and uses the requesting user's location when present.
+autocomplete/detail calls and uses the requesting user's validated location
+when present. Autocomplete uses a 2-second connect/4-second read deadline;
+details use 3/7 seconds. Expected credential, transport, HTTP, and provider-
+shape failures are captured once without response content and degrade to an
+empty result rather than failing the request.
 
 ## Cross-domain modules
 

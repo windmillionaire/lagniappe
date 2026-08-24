@@ -45,6 +45,9 @@ The coordinator:
 - distinguishes periodic from foreground-only work and immediate from
   scheduled first checks;
 - backs transport errors off to 60 seconds;
+- keeps a cold notification seed pending until the response header publishes a
+  warm generation, retrying an unacknowledged seed with the same 4-to-60-second
+  jittered error backoff even when no ordinary subscriptions exist;
 - suspends ordinary polling when hidden, unfocused, or offline; and
 - performs one catch-up batch after focus, visibility, browser-online, or
   server-online recovery.

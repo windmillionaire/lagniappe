@@ -67,6 +67,11 @@ compound filters. Query modules return keys or raw rows to their owning service;
 permission checks and typed relation hydration remain above the persistence
 layer.
 
+`Filter.requires([])` is an explicit deny-all, not an absent filter. Denied
+branches compose as false inside OR expressions, while a denied top-level/AND
+filter dominates the query. Every `Query` terminal method returns its typed
+empty result without constructing a Datastore query when the filter denies all.
+
 Keep queries bounded and ordered. When a browser list uses a cursor, preserve
 provider order through `Entities.fetch()` instead of applying a second sort
 after hydration.

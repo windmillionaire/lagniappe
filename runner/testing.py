@@ -11,7 +11,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
-from time import sleep
+from time import monotonic, sleep
 from urllib.parse import urlparse
 
 from runner.context import GCLOUD_CLI, NPM_CLI
@@ -313,24 +313,41 @@ def update_test_indexes():
 
 # @testable true
 # @tests tests_tooling/test_005_test_server_command.py::test_wait_for_server_allows_slow_local_startup
+# @tests tests_tooling/test_005_test_server_command.py::test_wait_for_server_bounds_stalled_requests_by_one_deadline
+# @tests tests_tooling/test_005_test_server_command.py::test_wait_for_server_reports_last_http_state
 # @features test-server
-# @dimensions readiness slow-start
-def wait_for_server(BASE_URL, max_retries=30):
+# @dimensions readiness slow-start deadline stalled-response diagnostics http-state
+def wait_for_server(base_url, timeout_seconds=20.0):
     import requests
-    from time import sleep
 
-    sleep(2)
-
-    for attempt in range(max_retries):
+    deadline = monotonic() + timeout_seconds
+    last_state = "no response"
+    while True:
+        remaining = deadline - monotonic()
+        if remaining <= 0.01:
+            break
+        connect_timeout = min(0.5, remaining / 2)
+        read_timeout = min(2.0, remaining - connect_timeout)
         try:
-            response = requests.get(f"{BASE_URL}/l/ping")
+            response = requests.get(
+                f"{base_url}/l/ping",
+                timeout=(connect_timeout, read_timeout),
+            )
             if response.status_code == 200:
                 return True
-        except Exception as e:
-            print(f"Error waiting for server: {e}")
-        if attempt < max_retries - 1:
-            sleep(0.5)
+            last_state = f"HTTP {response.status_code}"
+        except requests.RequestException as error:
+            last_state = type(error).__name__
 
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            break
+        sleep(min(0.5, remaining))
+
+    print(
+        f"Server readiness timed out after {timeout_seconds:g}s "
+        f"(last state: {last_state})."
+    )
     return False
 
 

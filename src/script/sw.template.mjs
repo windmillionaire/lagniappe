@@ -64,10 +64,40 @@ async function precacheStaticAssets() {
  * @reason validate-user confirmation is exercised through the cache invalidation owner
  */
 const _validateUser = async (cacheConfirmation = {}) => {
+	/**
+	 * @testable false
+	 * @covered-by src/script/sw.template.mjs::_validateUser
+	 * @reason validation failures share one safe diagnostic shape
+	 */
+	const failed = (stage, status = null) => {
+		captureError(new Error("User validation acknowledgement failed."), {
+			context: "validate_user",
+			stage,
+			...(Number.isInteger(status) ? { status } : {}),
+		});
+		return false;
+	};
+
+	let tokenResponse;
 	try {
-		const response = await fetch("/l/token", TOKEN_REQUEST);
-		const newToken = await response.text();
-		await fetch("/l/validate-user", {
+		tokenResponse = await fetch("/l/token", TOKEN_REQUEST);
+	} catch {
+		return failed("token-request");
+	}
+	if (!tokenResponse?.ok)
+		return failed("token-response", tokenResponse?.status);
+
+	let newToken;
+	try {
+		newToken = (await tokenResponse.text()).trim();
+	} catch {
+		return failed("token-body", tokenResponse.status);
+	}
+	if (!newToken) return failed("token-empty", tokenResponse.status);
+
+	let validationResponse;
+	try {
+		validationResponse = await fetch("/l/validate-user", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -81,12 +111,23 @@ const _validateUser = async (cacheConfirmation = {}) => {
 				cacheGeneration: cacheConfirmation.cacheGeneration,
 			}),
 		});
-	} catch (error) {
-		captureError(error, {
-			context: "validate_user",
-		});
-		return null;
+	} catch {
+		return failed("validation-request");
 	}
+	if (!validationResponse?.ok) {
+		return failed("validation-response", validationResponse?.status);
+	}
+
+	let acknowledgement;
+	try {
+		acknowledgement = await validationResponse.json();
+	} catch {
+		return failed("validation-body", validationResponse.status);
+	}
+	if (acknowledgement?.cacheCleared !== true) {
+		return failed("validation-acknowledgement", validationResponse.status);
+	}
+	return true;
 };
 
 let _cacheGeneration = 0;
@@ -149,14 +190,20 @@ function validateUserOnce(cacheConfirmation) {
 /**
  * @testable true
  * @tests tests_js/test_008_service_worker.py::test_cache_invalidation_confirmation_posts_after_local_clear
+ * @tests tests_js/test_008_service_worker.py::test_cache_invalidation_requires_explicit_server_acknowledgement
  * @features cache
- * @dimensions invalidation service-worker
+ * @dimensions invalidation service-worker acknowledgement failure retry
  */
 async function checkForCacheInvalidation(response, options = {}) {
 	if (!responseInvalidatesCache(response)) return { invalidated: false };
 	const confirmation = await clearClientCache();
-	if (options.validate !== false) await validateUserOnce(confirmation);
-	return { invalidated: true, ...confirmation };
+	const acknowledged =
+		options.validate !== false ? await validateUserOnce(confirmation) : null;
+	return {
+		invalidated: true,
+		...confirmation,
+		...(acknowledged === null ? {} : { acknowledged }),
+	};
 }
 
 /**

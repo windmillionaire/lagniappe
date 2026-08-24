@@ -1,9 +1,12 @@
 """Google Places API integration (autocomplete and place details)."""
 
 import json
+import math
 import re
 import time
+from urllib.parse import quote
 
+from google.auth.exceptions import GoogleAuthError
 from flask import session
 from google.auth.transport.requests import Request
 import requests
@@ -13,6 +16,9 @@ from lagniappe import CONFIG
 from ... import exceptions
 
 _token_cache = {"token": None, "expires_at": 0}
+_PLACES_BASE_URL = "https://places.googleapis.com/v1"
+PLACES_AUTOCOMPLETE_TIMEOUT = (2.0, 4.0)
+PLACES_DETAILS_TIMEOUT = (3.0, 7.0)
 
 # Trailing secondary unit (suite, apt, etc.) without a preceding comma.
 _TRAILING_UNIT = re.compile(
@@ -27,6 +33,109 @@ _COMMA_THEN_UNIT = re.compile(
 _UNIT_LABEL = re.compile(
     r"(?i)^(?:suite|ste|apt|apartment|unit|floor|fl|room|rm|#)\b|^#"
 )
+
+
+# @testable true
+# @tests tests_unit/test_003d_submission_location.py::test_normalize_location_coordinates_rejects_malformed_values
+# @features location
+# @dimensions session-bias validation coordinates
+def normalize_location_coordinates(value):
+    """Return normalized finite latitude/longitude coordinates, or ``None``."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (TypeError, json.JSONDecodeError):
+            return None
+    if not isinstance(value, dict):
+        return None
+
+    latitude = value.get("latitude")
+    longitude = value.get("longitude")
+    if (
+        isinstance(latitude, bool)
+        or isinstance(longitude, bool)
+        or not isinstance(latitude, (int, float))
+        or not isinstance(longitude, (int, float))
+    ):
+        return None
+
+    latitude = float(latitude)
+    longitude = float(longitude)
+    if (
+        not math.isfinite(latitude)
+        or not math.isfinite(longitude)
+        or not -90 <= latitude <= 90
+        or not -180 <= longitude <= 180
+    ):
+        return None
+    return {"latitude": latitude, "longitude": longitude}
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/services/places.py::search_places
+# @covered-by lagniappe/core/tools/services/places.py::get_place_details
+# @reason fixed-host provider transport is exercised through both public Places operations
+def _request_places_json(method, path, *, operation, timeout, params=None, data=None):
+    status = None
+    try:
+        access_token = get_places_access_token()
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+        url = f"{_PLACES_BASE_URL}/{path.lstrip('/')}"
+        if method == "GET":
+            response = requests.get(
+                url,
+                headers=headers,
+                params=params,
+                timeout=timeout,
+            )
+        else:
+            response = requests.post(
+                url,
+                headers=headers,
+                json=data,
+                timeout=timeout,
+            )
+        status = response.status_code
+        if status != 200:
+            raise exceptions.NetworkError(
+                f"Places {method} request returned HTTP {status}."
+            )
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise exceptions.NetworkError(
+                f"Places {method} response was not a JSON object."
+            )
+        return payload
+    except (
+        GoogleAuthError,
+        RuntimeError,
+        ValueError,
+        requests.RequestException,
+        exceptions.NetworkError,
+    ) as error:
+        exceptions.capture(
+            error,
+            {
+                "context": operation,
+                "method": method,
+                **({"status": status} if status is not None else {}),
+            },
+        )
+        return None
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/services/places.py::search_places
+# @covered-by lagniappe/core/tools/services/places.py::get_place_details
+# @reason provider-shape failures share the same sanitized diagnostic boundary
+def _capture_contract_failure(operation, method):
+    exceptions.capture(
+        exceptions.NetworkError("Places response did not match its contract."),
+        {"context": operation, "method": method},
+    )
 
 
 # @testable true
@@ -192,141 +301,126 @@ def get_places_access_token():
 # @testable true
 # @tests tests_unit/test_003d_submission_location.py::test_get_place_details_formats_address2_and_meaningful_name
 # @tests tests_unit/test_003d_submission_location.py::test_get_place_details_omits_street_address_display_name
+# @tests tests_unit/test_003d_submission_location.py::test_places_provider_failures_capture_once_and_degrade
 # @features location
-# @dimensions api-request, address2, name-normalization
+# @dimensions api-request, address2, name-normalization deadline degradation provider-failure diagnostics
 def get_place_details(place_id):
     """Fetch place details (name, address) from Google Places API."""
     if not place_id:
         return None
 
-    try:
-        access_token = get_places_access_token()
-        if not access_token:
-            return None
-
-        url = f"https://places.googleapis.com/v1/places/{place_id}"
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-        }
-
-        params = {
+    data = _request_places_json(
+        "GET",
+        f"places/{quote(str(place_id), safe='')}",
+        operation="get_place_details",
+        timeout=PLACES_DETAILS_TIMEOUT,
+        params={
             "fields": (
                 "id,displayName,formattedAddress,addressComponents,location,"
                 "nationalPhoneNumber,websiteUri,regularOpeningHours"
             )
-        }
+        },
+    )
+    if data is None:
+        return None
 
-        response = requests.get(url, headers=headers, params=params)
-
-        if response.status_code == 200:
-            data = response.json()
-            address_components = data.get("addressComponents", [])
-            address2 = _format_address2(
-                _address_component(address_components, "subpremise")
+    address_components = data.get("addressComponents", [])
+    display_name = data.get("displayName", {})
+    formatted_address = data.get("formattedAddress")
+    if (
+        not isinstance(data.get("id"), str)
+        or not data["id"].strip()
+        or not isinstance(address_components, list)
+        or not all(isinstance(component, dict) for component in address_components)
+        or not all(
+            isinstance(component.get("types", []), list)
+            and all(
+                isinstance(component_type, str)
+                for component_type in component.get("types", [])
             )
-            formatted_address = data.get("formattedAddress")
-            address = _formatted_address_without_unit(formatted_address, address2)
-            name = _meaningful_place_name(
-                data.get("displayName", {}).get("text"),
-                formatted_address,
-                address_components,
-            )
+            and isinstance(component.get("longText"), (str, type(None)))
+            and isinstance(component.get("shortText"), (str, type(None)))
+            for component in address_components
+        )
+        or not isinstance(display_name, dict)
+        or not isinstance(display_name.get("text", ""), str)
+        or not isinstance(formatted_address, (str, type(None)))
+    ):
+        _capture_contract_failure("get_place_details", "GET")
+        return None
 
-            place = {
-                "id": data.get("id"),
-                "name": name,
-                "address": address,
-                "address2": address2,
-            }
-            return {k: v for k, v in place.items() if v}
+    address2 = _format_address2(
+        _address_component(address_components, "subpremise")
+    )
+    address = _formatted_address_without_unit(formatted_address, address2)
+    name = _meaningful_place_name(
+        display_name.get("text"),
+        formatted_address,
+        address_components,
+    )
 
-        else:
-            error = exceptions.NetworkError(response.text)
-            context = {
-                "method": "GET",
-                "context": "get_place_details",
-                "place_id": place_id,
-            }
-            exceptions.capture(error, context)
-            raise error
-
-    except Exception as e:
-        context = {
-            "context": "get_place_details",
-            "place_id": place_id,
-        }
-        exceptions.capture(e, context)
-        raise e
+    place = {
+        "id": data.get("id"),
+        "name": name,
+        "address": address,
+        "address2": address2,
+    }
+    place = {key: value for key, value in place.items() if value}
+    if not place.get("name") and not place.get("address"):
+        _capture_contract_failure("get_place_details", "GET")
+        return None
+    return place
 
 
 # @testable true
 # @tests tests_unit/test_003d_submission_location.py::test_search_places_uses_session_location_bias_and_maps_suggestions
+# @tests tests_unit/test_003d_submission_location.py::test_places_provider_failures_capture_once_and_degrade
+# @tests tests_unit/test_003d_submission_location.py::test_places_malformed_provider_payload_captures_once
 # @features location
-# @dimensions api-request, session-bias, response-mapping
+# @dimensions api-request, session-bias, response-mapping deadline degradation provider-failure diagnostics provider-contract
 def search_places(query):
     """Autocomplete a place query, biased to the user's session location."""
     if not query or len(query) < 3:
         return []
 
-    try:
-        access_token = get_places_access_token()
-        if not access_token:
-            return []
-
-        url = "https://places.googleapis.com/v1/places:autocomplete"
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
+    data = {"input": query}
+    location = normalize_location_coordinates(session.get("location"))
+    if location:
+        data["locationBias"] = {
+            "circle": {
+                "center": location,
+                "radius": 25000.0,
+            }
         }
 
-        data = {"input": query}
+    payload = _request_places_json(
+        "POST",
+        "places:autocomplete",
+        operation="search_places",
+        timeout=PLACES_AUTOCOMPLETE_TIMEOUT,
+        data=data,
+    )
+    if payload is None:
+        return []
 
-        if "location" in session:
-            location = json.loads(session["location"])
-            data["locationBias"] = {
-                "circle": {
-                    "center": {
-                        "latitude": location["latitude"],
-                        "longitude": location["longitude"],
-                    },
-                    "radius": 25000.0,
-                }
-            }
+    suggestions = payload.get("suggestions", [])
+    if not isinstance(suggestions, list):
+        _capture_contract_failure("search_places", "POST")
+        return []
 
-        response = requests.post(url, headers=headers, json=data)
+    results = []
+    for suggestion in suggestions:
+        if not isinstance(suggestion, dict):
+            continue
+        place_prediction = suggestion.get("placePrediction")
+        if not isinstance(place_prediction, dict):
+            continue
+        prediction_text = place_prediction.get("text", {})
+        if not isinstance(prediction_text, dict):
+            continue
+        place_id = place_prediction.get("placeId")
+        full_text = prediction_text.get("text")
+        if place_id and full_text:
+            results.append({"id": place_id, "name": full_text})
 
-        if response.status_code == 200:
-            data = response.json()
-            suggestions = data.get("suggestions", [])
-
-            results = []
-            for suggestion in suggestions:
-                place_prediction = suggestion.get("placePrediction")
-                if place_prediction:
-                    full_text = place_prediction.get("text", {}).get("text", "")
-
-                    results.append(
-                        {
-                            "id": place_prediction.get("placeId"),
-                            "name": full_text,
-                        }
-                    )
-
-            return results
-        else:
-            error = exceptions.NetworkError(response.text)
-            context = {
-                "method": "POST",
-                "context": "search_places",
-            }
-            exceptions.capture(error, context)
-            raise error
-
-    except Exception as e:
-        context = {
-            "method": "POST",
-            "context": "search_places",
-        }
-        exceptions.capture(e, context)
-        raise e
+    return results

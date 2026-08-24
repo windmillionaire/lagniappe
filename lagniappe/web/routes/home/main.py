@@ -12,7 +12,7 @@ from lagniappe.core.tools.polling.projections import (
     render_operation_statuses,
 )
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
-from lagniappe.web.auth import home_permission, logged_in, require_ai_access
+from lagniappe.web.auth import home_permission, logged_in, permission, require_ai_access
 from lagniappe.web import responses
 
 from . import home, internal
@@ -221,22 +221,19 @@ def delete_activity(key):
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_file
+# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_route_rejects_inaccessible_and_missing_targets
 # @features starred
-# @dimensions category project page file
+# @dimensions category project page file authorization missing-target no-mutation
 @internal.route("/toggle-star/<key>", methods=["PATCH"])
-@logged_in
-def toggle_star(key):
+@permission(requested=Action.VIEW)
+def toggle_star(key, **kwargs):
     """Toggle starred status for an entity.
 
     Returns JSON with the new starred status. Client updates
     the star control state.
     """
-    entity = Entities.fetch_one(
-        key,
-        request=Fetch.direct(),
-    )
-    user = Entities.fetch_one(current_user, request=Fetch.direct())
-    starred = user.properties.starred.toggle_star(entity)
-    user.save()
+    entity = kwargs["entity"]
+    starred = current_user.properties.starred.toggle_star(entity)
+    current_user.save()
 
     return responses.json_response({"starred": starred})

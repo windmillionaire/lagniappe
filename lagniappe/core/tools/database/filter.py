@@ -106,8 +106,13 @@ class Results:
         return self.results[0] if self.results else None
 
 
-# @testable false
-# @reason datastore filter construction is covered through route/E2E query workflows
+_DENY_ALL_FILTER = object()
+
+
+# @testable true
+# @tests tests_unit/test_018_database_utility.py::test_filter_preserves_explicit_deny_all_through_composition
+# @features database permissions
+# @dimensions deny-all filter-composition
 class Filter:
     """
     Fluent builder for Datastore filters.
@@ -247,10 +252,13 @@ class Filter:
 
         Returns None if no filters were added.
         """
+        if self.is_denied:
+            return _DENY_ALL_FILTER
+
         all_conditions = list(self._conditions)
 
         # Add requires filter if set
-        if self._requires:
+        if self._requires is not None:
             all_conditions.append(
                 datastore_query.PropertyFilter("requires", "IN", self._requires)
             )
@@ -259,8 +267,12 @@ class Filter:
         if self._or_groups:
             or_filters = []
             for f in self._or_groups:
+                if not f:
+                    continue
                 built = f.build()
-                if built:
+                if built is _DENY_ALL_FILTER:
+                    continue
+                if built is not None:
                     or_filters.append(built)
 
             if or_filters and all_conditions:
@@ -280,13 +292,28 @@ class Filter:
         else:
             return datastore_query.And(all_conditions)
 
+    @property
+    def is_denied(self) -> bool:
+        """Return whether this filter represents an explicit deny-all."""
+        if self._requires is not None and Restriction.is_denied(self._requires):
+            return True
+
+        meaningful_or_groups = [group for group in self._or_groups if group]
+        return bool(meaningful_or_groups) and all(
+            group.is_denied for group in meaningful_or_groups
+        )
+
     def __bool__(self) -> bool:
         """Return True if any filters have been added."""
-        return bool(self._conditions or self._or_groups or self._requires)
+        return bool(
+            self._conditions or self._or_groups or self._requires is not None
+        )
 
 
-# @testable false
-# @reason query execution is owned by E2E coverage against configured services
+# @testable true
+# @tests tests_unit/test_018_database_utility.py::test_denied_query_terminals_do_not_create_datastore_query
+# @features database permissions
+# @dimensions deny-all query-short-circuit terminal-results
 class Query:
     """
     Fluent query builder for Datastore.
@@ -396,14 +423,16 @@ class Query:
         self._ancestor = key
         return self
 
-    def _build_query(self) -> datastore_query.Query:
+    def _build_query(self) -> Optional[datastore_query.Query]:
         """Build the underlying Datastore query object."""
+        built_filter = self._filter.build() if self._filter else None
+        if built_filter is _DENY_ALL_FILTER:
+            return None
+
         q = DATA.datastore.query(kind=self._kind, ancestor=self._ancestor)
 
-        if self._filter:
-            built_filter = self._filter.build()
-            if built_filter:
-                q.add_filter(filter=built_filter)
+        if built_filter is not None:
+            q.add_filter(filter=built_filter)
 
         if self._order:
             q.order = self._order
@@ -427,6 +456,8 @@ class Query:
             Results object with .results list and .next_cursor (None if no more results).
         """
         q = self._build_query()
+        if q is None:
+            return Results([], None)
 
         if self._limit:
             q_iter = q.fetch(start_cursor=self._cursor, limit=self._limit)
@@ -442,17 +473,23 @@ class Query:
     def fetch_all(self) -> list:
         """Execute the query and return all results (no pagination)."""
         q = self._build_query()
+        if q is None:
+            return []
         return list(q.fetch())
 
     def fetch_one(self) -> Optional[Any]:
         """Execute the query and return the first result or None."""
         q = self._build_query()
+        if q is None:
+            return None
         results = list(q.fetch(limit=1))
         return results[0] if results else None
 
     def fetch_iter(self) -> Iterator:
         """Execute the query and return an iterator over results."""
         q = self._build_query()
+        if q is None:
+            return iter(())
         return q.fetch(start_cursor=self._cursor, limit=self._limit)
 
     def count(self) -> int:
@@ -466,11 +503,15 @@ class Query:
         # Ensure keys_only for efficiency
         self._keys_only = True
         q = self._build_query()
+        if q is None:
+            return 0
         return len(list(q.fetch()))
 
     def exists(self) -> bool:
         """Check if any matching entities exist."""
         self._keys_only = True
         q = self._build_query()
+        if q is None:
+            return False
         results = list(q.fetch(limit=1))
         return len(results) > 0

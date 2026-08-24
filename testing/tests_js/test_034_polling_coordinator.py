@@ -502,6 +502,104 @@ if (timers.length !== 1 || timers[0].delay < 14_900) {
     )
 
 
+# @pairs notifications:cold-seed notifications:acknowledgement
+# @pairs notifications:bounded-backoff notifications:zero-subscriptions
+def test_polling_coordinator_retries_cold_seed_until_warm_acknowledgement(run_node):
+    run_node(
+        r"""
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+let now = 1_000;
+let timerId = 0;
+const timers = [];
+const cleared = new Set();
+const listeners = new Map();
+const calls = [];
+const deterministicMath = Object.create(Math);
+deterministicMath.random = () => 0.5;
+const context = {
+  console,
+  crypto: { randomUUID: () => "client-1" },
+  Date: { now: () => now },
+  ENDPOINTS: { poll: "/l/poll" },
+  Math: deterministicMath,
+  queueMicrotask,
+  sessionStorage: { getItem() { return null; }, setItem() {} },
+  captureError(error) { throw error; },
+  request: {
+    async post(_url, body) {
+      calls.push(body);
+      if (calls.length === 1) return { ok: false, status: 503 };
+      const warm = { generation: "warm", revision: 1, count: 0, miss: false };
+      context.window.__NOTIFICATION_STATE__ = warm;
+      listeners.get("notification-state")?.({ detail: warm });
+      return { ok: true, version: 1, results: [] };
+    },
+  },
+  window: {
+    __NOTIFICATION_STATE__: {
+      generation: null,
+      revision: null,
+      count: null,
+      miss: true,
+    },
+    addEventListener(name, listener) { listeners.set(name, listener); },
+    removeEventListener(name) { listeners.delete(name); },
+    clearTimeout(id) { cleared.add(id); },
+    setTimeout(callback, delay) {
+      timerId += 1;
+      timers.push({ id: timerId, callback, delay });
+      return timerId;
+    },
+  },
+};
+context.globalThis = context;
+vm.createContext(context);
+let source = fs.readFileSync("src/script/shared/polling.mjs", "utf8");
+source = source.replace(/^import .*;\n/gm, "");
+source = source.replace("export class PollingCoordinator", "class PollingCoordinator");
+source += "\nglobalThis.PollingCoordinator = PollingCoordinator;";
+vm.runInContext(source, context);
+
+const view = { elt: {}, hidden: false, online: true };
+const coordinator = new context.PollingCoordinator(view).init();
+(async () => {
+  await coordinator.trigger();
+  if (calls.length !== 1 || !calls[0].notification_state?.seed) {
+    throw new Error("Initial cold seed request was not sent");
+  }
+  if (!coordinator.notificationSeedPending || coordinator.notificationSeedDueAt !== 5_000) {
+    throw new Error(`Failed seed did not schedule 4s backoff: ${coordinator.notificationSeedDueAt}`);
+  }
+  const retryTimer = timers.at(-1);
+  if (retryTimer.delay !== 4_000 || cleared.has(retryTimer.id)) {
+    throw new Error(`Unexpected seed retry timer: ${JSON.stringify(retryTimer)}`);
+  }
+
+  now = coordinator.notificationSeedDueAt;
+  await coordinator.trigger();
+  if (calls.length !== 2 || !calls[1].notification_state?.seed) {
+    throw new Error("Cold seed was not retried after the backoff");
+  }
+  if (coordinator.notificationSeedPending || coordinator.notificationSeedErrorCount !== 0) {
+    throw new Error("Warm notification acknowledgement did not clear retry state");
+  }
+
+  now += 60_000;
+  await coordinator.trigger();
+  if (calls.length !== 2) {
+    throw new Error("Warm acknowledgement allowed another notification-only request");
+  }
+  coordinator.destroy();
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+"""
+    )
+
+
 # @pair polling:reentrancy
 # @pair polling:requested-cycle
 # @pair polling:freshness

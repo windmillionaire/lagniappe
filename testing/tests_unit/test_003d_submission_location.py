@@ -26,10 +26,9 @@ class _FakeCredentials:
 
 
 class _FakeResponse:
-    status_code = 200
-
-    def __init__(self, data):
+    def __init__(self, data, status_code=200):
         self._data = data
+        self.status_code = status_code
 
     def json(self):
         return self._data
@@ -41,6 +40,31 @@ def _location_field(existing=None):
         {"id": "where", "type": "location", "title": "Where"},
         entity=SimpleNamespace(submission=submission),
     )
+
+
+# @features location
+# @dimensions session-bias validation coordinates
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "value",
+    [
+        None,
+        "not-json",
+        [],
+        {},
+        {"latitude": True, "longitude": 1},
+        {"latitude": "1", "longitude": 1},
+        {"latitude": float("nan"), "longitude": 1},
+        {"latitude": 91, "longitude": 1},
+        {"latitude": 1, "longitude": -181},
+    ],
+)
+def test_normalize_location_coordinates_rejects_malformed_values(value):
+    assert loc.normalize_location_coordinates(value) is None
+
+    assert loc.normalize_location_coordinates(
+        json.dumps({"latitude": 29, "longitude": -90, "ignored": "value"})
+    ) == {"latitude": 29.0, "longitude": -90.0}
 
 
 # @features location
@@ -187,6 +211,7 @@ def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypat
                 }
             },
         },
+        timeout=loc.PLACES_AUTOCOMPLETE_TIMEOUT,
     )
 
 
@@ -220,6 +245,7 @@ def test_get_place_details_formats_address2_and_meaningful_name():
         "address2": "Unit 400",
     }
     get.assert_called_once()
+    assert get.call_args.kwargs["timeout"] == loc.PLACES_DETAILS_TIMEOUT
     assert get.call_args.kwargs["params"]["fields"] == (
         "id,displayName,formattedAddress,addressComponents,location,"
         "nationalPhoneNumber,websiteUri,regularOpeningHours"
@@ -252,6 +278,86 @@ def test_get_place_details_omits_street_address_display_name():
         "id": "place-1",
         "address": "123 Main St, New Orleans, LA 70112, USA",
     }
+
+
+# @features location
+# @dimensions provider-failure deadline diagnostics degradation
+@pytest.mark.unit
+def test_places_provider_failures_capture_once_and_degrade(monkeypatch):
+    captured = []
+    monkeypatch.setattr(loc, "session", {"location": "not-json"})
+    monkeypatch.setattr(loc.exceptions, "capture", lambda error, context: captured.append((error, context)))
+
+    with (
+        patch.object(loc, "get_places_access_token", return_value="access-token"),
+        patch.object(loc.requests, "post", side_effect=loc.requests.Timeout) as post,
+    ):
+        assert loc.search_places("coffee") == []
+
+    assert post.call_args.kwargs["timeout"] == loc.PLACES_AUTOCOMPLETE_TIMEOUT
+    assert len(captured) == 1
+    assert captured[0][1] == {"context": "search_places", "method": "POST"}
+
+    captured.clear()
+    with (
+        patch.object(loc, "get_places_access_token", return_value="access-token"),
+        patch.object(
+            loc.requests,
+            "get",
+            return_value=_FakeResponse({}, status_code=503),
+        ),
+    ):
+        assert loc.get_place_details("place-1") is None
+
+    assert len(captured) == 1
+    assert captured[0][1] == {
+        "context": "get_place_details",
+        "method": "GET",
+        "status": 503,
+    }
+
+
+# @features location
+# @dimensions provider-contract diagnostics degradation
+@pytest.mark.unit
+def test_places_malformed_provider_payload_captures_once(monkeypatch):
+    captured = []
+    monkeypatch.setattr(loc, "session", {})
+    monkeypatch.setattr(loc.exceptions, "capture", lambda error, context: captured.append((error, context)))
+
+    with (
+        patch.object(loc, "get_places_access_token", return_value="access-token"),
+        patch.object(
+            loc.requests,
+            "post",
+            return_value=_FakeResponse({"suggestions": {"not": "a list"}}),
+        ),
+    ):
+        assert loc.search_places("coffee") == []
+
+    assert len(captured) == 1
+    assert captured[0][1] == {"context": "search_places", "method": "POST"}
+
+    captured.clear()
+    with (
+        patch.object(loc, "get_places_access_token", return_value="access-token"),
+        patch.object(
+            loc.requests,
+            "get",
+            return_value=_FakeResponse(
+                {
+                    "id": "place-1",
+                    "displayName": {"text": {"not": "text"}},
+                    "formattedAddress": "123 Main St",
+                    "addressComponents": [],
+                }
+            ),
+        ),
+    ):
+        assert loc.get_place_details("place-1") is None
+
+    assert len(captured) == 1
+    assert captured[0][1] == {"context": "get_place_details", "method": "GET"}
 
 
 # @features location
@@ -342,6 +448,30 @@ def test_location_same_id_updates_address2_without_refetch():
         "address": "123 Main St",
         "address2": "Unit B",
     }
+
+
+# @features location
+# @dimensions provider-failure free-text fallback warnings
+@pytest.mark.unit
+def test_location_place_detail_failure_falls_back_to_submitted_text():
+    field = _location_field()
+
+    with patch.object(loc, "get_place_details", return_value=None):
+        field.validate_submission(
+            {
+                "id": "unverified-place",
+                "name": "Cafe Du Test, New Orleans",
+                "address2": "Suite 4",
+            }
+        )
+
+    assert field.value == {
+        "address": "Cafe Du Test, New Orleans",
+        "name": "Cafe Du Test, New Orleans",
+        "address2": "Suite 4",
+    }
+    assert "id" not in field.value
+    assert field.warnings
 
 
 # @features location

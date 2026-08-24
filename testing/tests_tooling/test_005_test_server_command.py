@@ -278,22 +278,87 @@ def test_wait_for_server_allows_slow_local_startup(
     import_config_testing, monkeypatch, tmp_path
 ):
     testing = import_config_testing(make_demo_app(tmp_path))
+    import requests
+
     attempts = []
     sleeps = []
+    now = [100.0]
 
-    def delayed_ping(url):
-        attempts.append(url)
+    def delayed_ping(url, timeout):
+        attempts.append((url, timeout))
         if len(attempts) <= 10:
-            raise ConnectionError("server still starting")
+            raise requests.ConnectionError("server still starting")
         return types.SimpleNamespace(status_code=200)
 
+    def fake_sleep(delay):
+        sleeps.append(delay)
+        now[0] += delay
+
     monkeypatch.setattr("requests.get", delayed_ping)
-    monkeypatch.setattr("time.sleep", sleeps.append)
+    monkeypatch.setattr(testing, "monotonic", lambda: now[0])
+    monkeypatch.setattr(testing, "sleep", fake_sleep)
 
     assert testing.wait_for_server("http://127.0.0.1:5000") is True
     assert len(attempts) == 11
-    assert set(attempts) == {"http://127.0.0.1:5000/l/ping"}
-    assert sleeps == [2, *([0.5] * 10)]
+    assert {url for url, _timeout in attempts} == {
+        "http://127.0.0.1:5000/l/ping"
+    }
+    assert all(
+        connect > 0 and read > 0 and connect + read <= 20
+        for _url, (connect, read) in attempts
+    )
+    assert sleeps == [0.5] * 10
+
+
+# @features test-server
+# @dimensions readiness deadline stalled-response diagnostics
+def test_wait_for_server_bounds_stalled_requests_by_one_deadline(
+    import_config_testing, monkeypatch, tmp_path, capsys
+):
+    testing = import_config_testing(make_demo_app(tmp_path))
+    import requests
+
+    attempts = []
+    now = [0.0]
+
+    def stalled_ping(url, timeout):
+        attempts.append((url, timeout))
+        now[0] += sum(timeout)
+        raise requests.ReadTimeout("listener did not answer")
+
+    def fake_sleep(delay):
+        now[0] += delay
+
+    monkeypatch.setattr("requests.get", stalled_ping)
+    monkeypatch.setattr(testing, "monotonic", lambda: now[0])
+    monkeypatch.setattr(testing, "sleep", fake_sleep)
+
+    assert testing.wait_for_server("http://127.0.0.1:5000") is False
+    assert now[0] <= 20.0
+    assert attempts
+    assert all(sum(timeout) <= 20.0 for _url, timeout in attempts)
+    output = capsys.readouterr().out
+    assert "timed out after 20s" in output
+    assert "ReadTimeout" in output
+
+
+# @features test-server
+# @dimensions readiness http-state diagnostics
+def test_wait_for_server_reports_last_http_state(
+    import_config_testing, monkeypatch, tmp_path, capsys
+):
+    testing = import_config_testing(make_demo_app(tmp_path))
+    now = [0.0]
+
+    monkeypatch.setattr(
+        "requests.get",
+        lambda url, timeout: types.SimpleNamespace(status_code=503),
+    )
+    monkeypatch.setattr(testing, "monotonic", lambda: now[0])
+    monkeypatch.setattr(testing, "sleep", lambda delay: now.__setitem__(0, now[0] + delay))
+
+    assert testing.wait_for_server("http://127.0.0.1:5000", timeout_seconds=1) is False
+    assert "last state: HTTP 503" in capsys.readouterr().out
 
 
 def test_run_test_server_prepares_frontend_before_flask_launch(

@@ -66,25 +66,32 @@ def configure_test_environment(test_args: list[str]) -> None:
 
 PYTEST_CONFIG = "testing/pytest.ini"
 TRACEABILITY_RESULTS_PLUGIN = "testing.utility.traceability_results"
-TEST_SUITE_ALIASES = {
-    "unit": ["testing/tests_unit/"],
-    "e2e": ["testing/tests_e2e/"],
-    "js": ["testing/tests_js/"],
-    "tooling": ["testing/tests_tooling/"],
-    "setup": [
+SETUP_TEST_GROUPS = {
+    "ordinary": (
         "testing/tests_tooling/test_001a_setup_validation_config.py",
         "testing/tests_tooling/test_001b_setup_providers.py",
         "testing/tests_tooling/test_001c_setup_runtime_resources.py",
         "testing/tests_tooling/test_001e_setup_orchestration.py",
         "testing/tests_tooling/test_001f_setup_portability.py",
         "testing/tests_tooling/test_001g_setup_release_readiness.py",
-    ],
-}
-SETUP_OPT_IN_TESTS = {
+        "testing/tests_tooling/test_001h_setup_ai_email.py",
+    ),
     "setup_drift": ("testing/tests_tooling/test_001d_setup_drift.py",),
     "setup_provider": (
         "testing/tests_e2e/001_site/test_001g_setup_provider_contracts.py",
     ),
+}
+TEST_SUITE_ALIASES = {
+    "unit": ["testing/tests_unit/"],
+    "e2e": ["testing/tests_e2e/"],
+    "js": ["testing/tests_js/"],
+    "tooling": ["testing/tests_tooling/"],
+    "setup": list(SETUP_TEST_GROUPS["ordinary"]),
+}
+SETUP_OPT_IN_TESTS = {
+    marker: targets
+    for marker, targets in SETUP_TEST_GROUPS.items()
+    if marker != "ordinary"
 }
 PYTEST_OPTIONS_WITH_VALUES = {
     "-c",

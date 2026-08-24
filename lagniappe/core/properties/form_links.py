@@ -424,8 +424,9 @@ class Location(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
     # @tests tests_unit/test_003d_submission_location.py::test_location_place_value_preserves_address2
     # @tests tests_unit/test_003d_submission_location.py::test_location_free_text_value_preserves_address2
     # @tests tests_unit/test_003d_submission_location.py::test_location_same_id_updates_address2_without_refetch
+    # @tests tests_unit/test_003d_submission_location.py::test_location_place_detail_failure_falls_back_to_submitted_text
     # @features location
-    # @dimensions address2, free-text, no-refetch
+    # @dimensions address2, free-text, no-refetch provider-failure fallback warnings
     @property
     def value(self):
         return super().value
@@ -455,6 +456,19 @@ class Location(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
             place.pop("address2", None)
         else:
             place = self._normalize_place(location.get_place_details(google_id))
+
+        if not place:
+            fallback = self._clean_text(value.get("address") or value.get("name"))
+            if fallback:
+                place = {"address": fallback, "name": fallback}
+                self.warnings.append(
+                    "Place details were unavailable; stored the submitted location "
+                    "as text."
+                )
+            else:
+                self.warnings.append(
+                    "Place details were unavailable and no location text was supplied."
+                )
 
         if place and address2:
             place["address2"] = address2

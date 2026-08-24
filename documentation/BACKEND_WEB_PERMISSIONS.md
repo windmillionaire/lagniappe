@@ -49,6 +49,12 @@ Other access decorators:
 | `@logged_in` | Authentication without a resource-wide permission check. |
 | `@home_permission()` | Home access plus the route or starred fingerprint. |
 
+Star mutation is an entity route protected by `@permission(requested=VIEW)`:
+missing targets return 404 and existing targets the user cannot view return
+403 before either the User or target can be touched. Starred-list rendering
+rechecks VIEW as defense in depth. A temporarily inaccessible saved key is
+hidden but retained; only keys whose entities no longer exist are cleaned up.
+
 Authentication provider flows are documented in
 [AUTHENTICATION.md](AUTHENTICATION.md). Backend permission enums and entity
 rules are documented in [BACKEND_DEFINITIONS.md](BACKEND_DEFINITIONS.md).

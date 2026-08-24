@@ -6,7 +6,9 @@ from google.cloud.datastore import Key
 
 from lagniappe import CONFIG
 from lagniappe.core.tools.database import get, utility
-from lagniappe.core.tools.database.filter import Results
+from lagniappe.core.definitions import Restriction
+from lagniappe.core.tools.database import filter as database_filter
+from lagniappe.core.tools.database.filter import Filter, Query, Results
 
 
 # @pairs database:restricted-results database:empty-page
@@ -29,6 +31,74 @@ def test_results_use_normal_list_indexing_and_keep_cursor_metadata():
     assert results[1:] == ["second", "third"]
     assert list(results) == ["first", "second", "third"]
     assert results.next_cursor == "next-page"
+
+
+# @features database permissions
+# @dimensions deny-all filter-composition
+@pytest.mark.unit
+def test_filter_preserves_explicit_deny_all_through_composition():
+    denied = Filter().requires([])
+
+    assert denied
+    assert denied.is_denied
+    assert denied.build() is not None
+    assert not Filter().requires(Restriction.UNRESTRICTED)
+
+    allowed_branch = Filter().eq("type", "page")
+    mixed = Filter().any_of(denied, allowed_branch)
+    assert not mixed.is_denied
+    assert mixed.build() is not None
+
+    only_denied = Filter().eq("active", True).any_of(
+        Filter().requires([]),
+        Filter(),
+    )
+    assert only_denied.is_denied
+    assert only_denied.build() is not None
+
+
+# @features database permissions
+# @dimensions deny-all query-short-circuit terminal-results
+@pytest.mark.unit
+def test_denied_query_terminals_do_not_create_datastore_query(monkeypatch):
+    class Datastore:
+        def query(self, **kwargs):
+            raise AssertionError(f"Denied query reached Datastore: {kwargs}")
+
+    monkeypatch.setattr(
+        database_filter,
+        "DATA",
+        SimpleNamespace(datastore=Datastore()),
+    )
+
+    def denied_query():
+        return Query("instances").filter(Filter().requires([]))
+
+    results = denied_query().limit(25).cursor("cursor").fetch()
+    assert list(results) == []
+    assert results.next_cursor is None
+    assert denied_query().fetch_all() == []
+    assert denied_query().fetch_one() is None
+    assert list(denied_query().fetch_iter()) == []
+    assert denied_query().count() == 0
+    assert denied_query().exists() is False
+
+
+# @features database permissions
+# @dimensions deny-all group-query
+@pytest.mark.unit
+def test_groups_with_denied_hashes_does_not_query_datastore(monkeypatch):
+    class Datastore:
+        def query(self, **kwargs):
+            raise AssertionError(f"Denied group query reached Datastore: {kwargs}")
+
+    monkeypatch.setattr(
+        database_filter,
+        "DATA",
+        SimpleNamespace(datastore=Datastore()),
+    )
+
+    assert get.groups([]) == []
 
 
 # @features users caching

@@ -594,6 +594,32 @@ def test_normalize_test_args_expands_supported_suite_aliases_only():
     assert opt_in_targets.isdisjoint(run.TEST_SUITE_ALIASES["setup"])
 
 
+def test_setup_suite_inventory_classifies_every_setup_module_once():
+    repository_root = Path(run.__file__).parent
+    discovered = {
+        path.relative_to(repository_root).as_posix()
+        for path in (repository_root / "testing/tests_tooling").glob(
+            "test_*_setup_*.py"
+        )
+    }
+    configured = [
+        target
+        for targets in run.SETUP_TEST_GROUPS.values()
+        for target in targets
+    ]
+    configured_tooling = {
+        target for target in configured if target.startswith("testing/tests_tooling/")
+    }
+
+    assert discovered == configured_tooling
+    assert len(configured) == len(set(configured))
+    assert all((repository_root / target).is_file() for target in configured)
+    assert (
+        "testing/tests_tooling/test_001h_setup_ai_email.py"
+        in run.TEST_SUITE_ALIASES["setup"]
+    )
+
+
 # @features testing setup
 # @dimensions cli-routing pytest-markers opt-in
 @pytest.mark.parametrize(
@@ -895,13 +921,17 @@ def test_run_dev_server_aligns_adc_before_flask_launch(monkeypatch):
         "activate_repository_gcloud",
         lambda **kwargs: calls.append(("gcloud", kwargs)),
     )
+    class FakeProcess:
+        pid = 5050
+
+        def wait(self):
+            return 0
+
     monkeypatch.setattr(
         development.subprocess,
-        "run",
-        lambda command, **kwargs: calls.append(
-            ("flask", command, kwargs)
-        )
-        or types.SimpleNamespace(returncode=0),
+        "Popen",
+        lambda command, **kwargs: calls.append(("flask", command, kwargs))
+        or FakeProcess(),
     )
     monkeypatch.setenv("FLASK_ENV", "testing")
 
@@ -935,7 +965,7 @@ def test_run_dev_server_aligns_adc_before_flask_launch(monkeypatch):
                     "FLASK_ENV": "development",
                 },
                 "cwd": Path("/app"),
-                "timeout": 900,
+                "start_new_session": True,
             },
         ),
     ]
@@ -955,7 +985,7 @@ def test_run_dev_server_adc_mismatch_stops_before_flask(monkeypatch, capsys):
     )
     monkeypatch.setattr(
         development.subprocess,
-        "run",
+        "Popen",
         lambda *args, **kwargs: pytest.fail("Flask must not start"),
     )
 
@@ -963,6 +993,94 @@ def test_run_dev_server_adc_mismatch_stops_before_flask(monkeypatch, capsys):
     output = capsys.readouterr().out
     assert "Development server startup stopped:" in output
     assert "run.py auth" in output
+
+
+# @features development
+# @dimensions process-ownership signals lifecycle
+def test_run_dev_server_forwards_signals_and_restores_handlers(monkeypatch):
+    from runner import development
+
+    installed = {}
+    restored = []
+    sent = []
+    previous = {
+        development.signal.SIGINT: object(),
+        development.signal.SIGTERM: object(),
+    }
+
+    class FakeProcess:
+        pid = 8642
+
+        def wait(self):
+            installed[development.signal.SIGINT](development.signal.SIGINT, None)
+            installed[development.signal.SIGTERM](development.signal.SIGTERM, None)
+            return 7
+
+    def fake_signal(signum, handler):
+        if handler is previous[signum]:
+            restored.append(signum)
+        else:
+            installed[signum] = handler
+
+    monkeypatch.setattr(
+        development,
+        "SETTINGS",
+        types.SimpleNamespace(dev_config={"SERVER_PORT": "5050"}),
+    )
+    monkeypatch.setattr(development, "activate_repository_gcloud", lambda **kwargs: None)
+    monkeypatch.setattr(development.subprocess, "Popen", lambda *args, **kwargs: FakeProcess())
+    monkeypatch.setattr(development.signal, "getsignal", lambda signum: previous[signum])
+    monkeypatch.setattr(development.signal, "signal", fake_signal)
+    monkeypatch.setattr(development.os, "killpg", lambda pid, signum: sent.append((pid, signum)))
+
+    assert development.run_dev_server() == 7
+    assert sent == [
+        (8642, development.signal.SIGINT),
+        (8642, development.signal.SIGTERM),
+    ]
+    assert restored == [development.signal.SIGINT, development.signal.SIGTERM]
+
+
+# @features development
+# @dimensions process-ownership exceptional-cleanup escalation
+def test_run_dev_server_cleans_up_process_group_after_runner_failure(monkeypatch):
+    from runner import development
+
+    sent = []
+
+    class FakeProcess:
+        pid = 9753
+
+        def __init__(self):
+            self.waits = 0
+
+        def wait(self, timeout=None):
+            self.waits += 1
+            if self.waits == 1:
+                raise RuntimeError("runner wait failed")
+            if timeout == 5:
+                raise development.subprocess.TimeoutExpired("flask", timeout)
+            return -9
+
+        def poll(self):
+            return None
+
+    monkeypatch.setattr(
+        development,
+        "SETTINGS",
+        types.SimpleNamespace(dev_config={"SERVER_PORT": "5050"}),
+    )
+    monkeypatch.setattr(development, "activate_repository_gcloud", lambda **kwargs: None)
+    monkeypatch.setattr(development.subprocess, "Popen", lambda *args, **kwargs: FakeProcess())
+    monkeypatch.setattr(development.os, "killpg", lambda pid, signum: sent.append((pid, signum)))
+
+    with pytest.raises(RuntimeError, match="runner wait failed"):
+        development.run_dev_server()
+
+    assert sent == [
+        (9753, development.signal.SIGTERM),
+        (9753, development.signal.SIGKILL),
+    ]
 
 
 # @features auth

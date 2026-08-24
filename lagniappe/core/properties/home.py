@@ -183,8 +183,10 @@ class TaskList(HomeProperty):
 
 # @testable true
 # @tests tests_unit/test_002i_home_properties.py::test_home_starred_list_paginates_and_cleans_stale_keys
+# @tests tests_unit/test_002i_home_properties.py::test_home_starred_list_hides_but_retains_inaccessible_keys
+# @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_route_rejects_inaccessible_and_missing_targets
 # @features starred
-# @dimensions stale-cleanup pagination
+# @dimensions stale-cleanup pagination view-authorization retained-inaccessible
 class StarredList(HomeProperty):
     _id = "starred"
     _label = "Starred"
@@ -207,14 +209,19 @@ class StarredList(HomeProperty):
             starred = []
             next_cursor = None
 
-        self._list = Entities.fetch(*starred, request=Fetch.direct())
+        loaded = Entities.fetch(*starred, request=Fetch.direct())
 
-        loaded_keys = {e.key for e in self._list}
+        loaded_keys = {entity.key for entity in loaded}
         deleted = [s for s in starred if s not in loaded_keys]
         if deleted:
             current_user.properties.starred.delete_starred_keys(deleted)
             current_user.save()
 
+        self._list = [
+            entity
+            for entity in loaded
+            if entity.allowed(Action.VIEW, user=current_user)
+        ]
         self._cursor = next_cursor
         return self._list
 
