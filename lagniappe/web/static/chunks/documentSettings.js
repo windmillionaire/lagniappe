@@ -1,12 +1,12 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bcdf9883';
-import { F as FormElement } from './form2.js?v=bcdf9883';
-import { p as primitives } from './primitives.js?v=bcdf9883';
-import './foundation.js?v=bcdf9883';
-import './connectivity.js?v=bcdf9883';
-import './baseForm.js?v=bcdf9883';
-import './icons.js?v=bcdf9883';
-import './loader.js?v=bcdf9883';
+import { STYLES } from './styles.js?v=bdc368f0';
+import { F as FormElement } from './form2.js?v=bdc368f0';
+import { p as primitives } from './primitives.js?v=bdc368f0';
+import './foundation.js?v=bdc368f0';
+import './connectivity.js?v=bdc368f0';
+import './baseForm.js?v=bdc368f0';
+import './icons.js?v=bdc368f0';
+import './loader.js?v=bdc368f0';
 
 const VISIBILITY = {
 	public: "This document is currently public. It can be viewed at this URL: ",

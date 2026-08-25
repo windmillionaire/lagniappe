@@ -1,20 +1,20 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { b as buttons } from './buttons.js?v=bcdf9883';
-import { r as request, w as withTransition } from './foundation.js?v=bcdf9883';
-import './connectivity.js?v=bcdf9883';
-import { Modal } from './modal.js?v=bcdf9883';
-import { p as primitives } from './primitives.js?v=bcdf9883';
-import { F as FacetsBox } from './facets.js?v=bcdf9883';
-import { f as formatting } from './formatting.js?v=bcdf9883';
-import { S as SelectBox } from './select2.js?v=bcdf9883';
-import './styles.js?v=bcdf9883';
-import './icons.js?v=bcdf9883';
-import './remote.js?v=bcdf9883';
-import './queryLifecycle.js?v=bcdf9883';
-import './combobox.js?v=bcdf9883';
-import './results.js?v=bcdf9883';
-import './storage.js?v=bcdf9883';
-import './submitter.js?v=bcdf9883';
+import { b as buttons } from './buttons.js?v=bdc368f0';
+import { r as request, c as captureError, w as withTransition } from './foundation.js?v=bdc368f0';
+import './connectivity.js?v=bdc368f0';
+import { Modal } from './modal.js?v=bdc368f0';
+import { p as primitives } from './primitives.js?v=bdc368f0';
+import { F as FacetsBox } from './facets.js?v=bdc368f0';
+import { S as SelectBox } from './select2.js?v=bdc368f0';
+import './styles.js?v=bdc368f0';
+import './icons.js?v=bdc368f0';
+import './formatting.js?v=bdc368f0';
+import './remote.js?v=bdc368f0';
+import './queryLifecycle.js?v=bdc368f0';
+import './combobox.js?v=bdc368f0';
+import './results.js?v=bdc368f0';
+import './storage.js?v=bdc368f0';
+import './submitter.js?v=bdc368f0';
 
 /**
  * @testable infrastructure
@@ -22,6 +22,8 @@ import './submitter.js?v=bcdf9883';
 class ImportData {
 	constructor(attributes) {
 		Object.assign(this, attributes);
+		this._destroyed = false;
+		this._stageActionPromise = null;
 		this.stageElt = this.target.querySelector("[data-role='stage']");
 		this.progressElt = this.target.querySelector("[data-role='progress']");
 		this.stage = this.target.dataset.stage;
@@ -46,9 +48,14 @@ class ImportData {
 	}
 
 	init() {
-		request.get(this.endpoints.get(this.key)).then((resp) => {
-			this._setStage(resp);
-		});
+		request
+			.get(this.endpoints.get(this.key))
+			.then((resp) => {
+				if (!this._destroyed) this._setStage(resp);
+			})
+			.catch((error) => {
+				captureError(error, this.target, { context: "ingress-initial-stage" });
+			});
 
 		this.target.addEventListener("click", this._click);
 		this.progressElt.addEventListener("change", this._change);
@@ -56,15 +63,22 @@ class ImportData {
 	}
 
 	async _click(e) {
+		if (this._destroyed) return;
 		const button = e.target.closest("button");
 		if (!button) return;
 
 		if (button.dataset.role === "next") {
-			formatting.working(button, "Processing...");
-			await this._next();
+			await this._runStageAction(button, {
+				pendingText: "Processing...",
+				fallback: "Could not continue. Try again.",
+				operation: () => this._next(),
+			});
 		} else if (button.dataset.role === "import") {
-			formatting.working(button, "Starting Import...");
-			this._startImport();
+			await this._runStageAction(button, {
+				pendingText: "Starting Import...",
+				fallback: "Import could not be started. Please try again.",
+				operation: () => this._startImport(),
+			});
 		} else if (button.dataset.role === "set-stage") {
 			const stage = button.dataset.stage;
 			this._setStage(
@@ -73,16 +87,108 @@ class ImportData {
 		} else if (button.dataset.role === "delete-imported") {
 			await this._deleteImported(button);
 		} else if (button.dataset.role === "stop" && this.actions.has("stop")) {
-			this.stopButton.activate("Stopping...", "delete");
-			this._setImportStopped();
-			this._setStage(await request.post(this.endpoints.stop(this.key)));
+			await this._runStageAction(button, {
+				pendingText: "Stopping...",
+				pendingKind: "delete",
+				fallback: "Import could not be stopped. Please try again.",
+				pausePolling: true,
+				operation: () => request.post(this.endpoints.stop(this.key)),
+			});
 		} else if (button.dataset.role === "stop" && this.actions.has("restart")) {
-			this.stopButton.activate("Restarting...", "project");
-			this.stopped = false;
-			this.importRequestStarted = false;
-			this._startImport();
-			button.dataset.stopped = "false";
+			await this._runStageAction(button, {
+				pendingText: "Restarting...",
+				pendingKind: "project",
+				fallback: "Import could not be restarted. Please try again.",
+				operation: () => this._startImport(),
+			});
 		}
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_stage_action_failure_restores_button_and_polling_for_retry
+	 * @features ingress ui-action
+	 * @dimensions stage-action single-flight retryable-action polling-recovery
+	 */
+	_runStageAction(
+		button,
+		{
+			pendingText,
+			pendingKind = null,
+			fallback,
+			operation,
+			pausePolling = false,
+		},
+	) {
+		if (this._stageActionPromise) return this._stageActionPromise;
+		if (this._destroyed || !button) return Promise.resolve(false);
+
+		const originalText = button.textContent.trim();
+		const originalKind = button.dataset.kind;
+		const hadFocus = document.activeElement === button;
+		const wasPolling = this.importRequestStarted;
+		const action = buttons.active({
+			existingButton: button,
+			defaultText: originalText,
+			completedText: originalText,
+		});
+		this._clearError();
+		action.activate(pendingText, pendingKind);
+		button.setAttribute("aria-disabled", "true");
+		button.setAttribute("aria-busy", "true");
+		if (pausePolling) this._setImportStopped();
+
+		let committed = false;
+		const pending = (async () => {
+			try {
+				const response = await operation();
+				if (this._destroyed) return false;
+				if (response?.ok !== true) {
+					this._showError(response?.error || fallback);
+					return false;
+				}
+				committed = response.stage
+					? this._setStage(response)
+					: await this._refreshProgress();
+				if (!committed && !this._destroyed) this._showError(fallback);
+				return committed;
+			} catch (error) {
+				captureError(error, button, { context: "ingress-stage-action" });
+				if (!this._destroyed) this._showError(fallback);
+				return false;
+			} finally {
+				if (!committed && pausePolling && wasPolling && !this._destroyed) {
+					Promise.resolve()
+						.then(() => this._startImportPolling())
+						.catch((error) => {
+							captureError(error, this.target, {
+								context: "ingress-polling-recovery",
+							});
+						});
+				}
+				if (!committed && !this._destroyed && button.isConnected !== false) {
+					action.deactivate(originalText, originalKind);
+					button.setAttribute("aria-disabled", "false");
+					button.removeAttribute("aria-busy");
+					if (
+						hadFocus &&
+						(!document.activeElement ||
+							document.activeElement === document.body ||
+							document.activeElement === button)
+					) {
+						button.focus({ preventScroll: true });
+					}
+				}
+			}
+		})();
+		this._stageActionPromise = pending;
+		const clearPending = () => {
+			if (this._stageActionPromise === pending) {
+				this._stageActionPromise = null;
+			}
+		};
+		pending.then(clearPending, clearPending);
+		return pending;
 	}
 
 	/**
@@ -122,6 +228,7 @@ class ImportData {
 	 * @dimensions stage-wizard
 	 */
 	_setStage(resp) {
+		if (this._destroyed || !resp) return false;
 		const {
 			stage,
 			error,
@@ -420,11 +527,12 @@ class ImportData {
 	 */
 	async _next() {
 		await this._stageUpdate;
+		if (this._destroyed) return null;
 		const form = this.stageSettings.target;
 		const updates = form ? new FormData(form) : new FormData();
 		updates.append("stage", this.stage);
 
-		this._setStage(await request.put(this.endpoints.next(this.key), updates));
+		return request.put(this.endpoints.next(this.key), updates);
 	}
 
 	_setImportControls() {
@@ -440,12 +548,14 @@ class ImportData {
 	}
 
 	async _refreshProgress() {
+		if (this._destroyed) return false;
 		const response = await request.get(this.endpoints.get(this.key));
-		if (!response?.ok) return false;
+		if (this._destroyed || response?.ok !== true) return false;
 		return this._setStage(response);
 	}
 
 	_startImportPolling() {
+		if (this._destroyed) return;
 		this.importRequestStarted = true;
 		return this.syncPollingSubscription();
 	}
@@ -478,6 +588,7 @@ class ImportData {
 	 * @pairs polling:active-widget polling:visibility polling:subscription-lifecycle polling:catch-up
 	 */
 	async syncPollingSubscription() {
+		if (this._destroyed) return;
 		if (!this.importRequestStarted || !this._pollingVisible()) {
 			this._stopImportPolling();
 			return;
@@ -540,29 +651,15 @@ class ImportData {
 	}
 
 	_startImport() {
-		this._setImportControls();
-		this.importRequestStarted = true;
-		this.stopButton?.deactivate("Stop Import", "delete");
-
-		this._startImportPolling();
-
-		request.post(this.endpoints.import(this.key), {}).then((resp) => {
-			if (!resp.ok) {
-				this._setImportStopped();
-				this._showError(
-					resp.error || "Import could not be started. Please try again.",
-				);
-				return;
-			}
-			if (resp.stage) {
-				this._setStage(resp);
-			} else {
-				this._refreshProgress();
-			}
-		});
+		return request.post(this.endpoints.import(this.key), {});
 	}
 
 	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this.target.removeEventListener("click", this._click);
+		this.progressElt.removeEventListener("change", this._change);
+		this.progressElt.removeEventListener("input", this._updateVisibility);
 		this._destroyStage();
 		this._stopImportPolling();
 	}

@@ -137,9 +137,15 @@ restrictions.
 and appended to the model. Supports an "explain" mode that shows the AI's prompt
 interpretation in an Initial Prompt modal. The modal shows only the starting
 prompt; later tool or search context is dynamic and is not part of the preview.
+Generation is single-flight. Failure leaves its form error visible and releases
+the submitter for retry. Because schema generation persists its response on the
+server, the Builder only accepts that response as a saved acknowledgement when
+generation began from a saved form and the live schema/name still exactly match
+the acknowledged response; otherwise the Builder stays unsaved.
 
 It also wires group restriction selection through `FacetsBox` and updates
-restriction rows through the route configured in the template.
+restriction rows through the route configured in the template. A failed row
+removal restores its button, opacity, and pointer behavior so it can be retried.
 
 ### ConditionPanel (`panels/condition.mjs`)
 
@@ -159,7 +165,16 @@ Preview rendering uses a generation guard. A renderer that finishes after a
 new toggle or Builder teardown destroys its detached resources and cannot
 reopen the preview.
 
-**Save button**: PUTs the save form data to the server. Disables during save, shows saved/error state.
+**Save button**: PUTs the schema/name snapshot to the server through one
+single-flight promise. While pending, it is disabled and exposes `aria-busy`.
+Only an explicit successful response can acknowledge the submitted snapshot;
+if the live schema or name changed in the meantime, the form remains unsaved.
+Failure leaves an error in the Builder's polite live region and releases the
+connected button in `finally`, including its accessibility and focus state, so
+the same action can be retried. Connectivity continues to own whether the save
+control is visible. Copy and restriction actions use the same retryable-failure
+rule, except successful copy navigation and successful row removal are terminal
+and do not restore the old control.
 
 Readonly builders keep the component palette, settings, schema manipulation,
 and preview interactions available for exploration. Persistence controls are

@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bcdf9883';
-import { B as BaseForm } from './baseForm.js?v=bcdf9883';
-import { s as setIcon } from './icons.js?v=bcdf9883';
-import { w as withTransition } from './foundation.js?v=bcdf9883';
-import './connectivity.js?v=bcdf9883';
-import { p as primitives } from './primitives.js?v=bcdf9883';
-import { S as SelectBox } from './select2.js?v=bcdf9883';
+import { STYLES } from './styles.js?v=bdc368f0';
+import { B as BaseForm } from './baseForm.js?v=bdc368f0';
+import { s as setIcon } from './icons.js?v=bdc368f0';
+import { w as withTransition } from './foundation.js?v=bdc368f0';
+import './connectivity.js?v=bdc368f0';
+import { p as primitives } from './primitives.js?v=bdc368f0';
+import { S as SelectBox } from './select2.js?v=bdc368f0';
 
 /**
  * @testable infrastructure

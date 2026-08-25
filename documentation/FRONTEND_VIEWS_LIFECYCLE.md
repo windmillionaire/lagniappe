@@ -45,6 +45,23 @@ their owner, and replay the intended action. A failed import clears the busy
 and single-flight state so the next interaction can retry. Global Search keeps
 its native GET submit available until `SearchBox` takes over.
 
+## Retryable UI actions
+
+A retryable action owns one local single-flight promise. It snapshots the state
+being submitted, disables its initiating control, and sets `aria-disabled` and
+`aria-busy` before starting the request. An explicit successful response may
+commit authoritative state; an acknowledgement must not mark newer local edits
+as saved. Non-OK responses and thrown errors keep persistent, accessible error
+feedback and release the connected control in `finally`. Release restores the
+original label/presentation and focus only when focus has not moved elsewhere.
+
+Successful navigation, removal, or authoritative DOM replacement is terminal,
+so the obsolete control is not restored. Teardown similarly prevents late
+settlement from publishing UI. Domain state still has an owner: for example,
+connectivity owns save visibility and ingress owns its polling subscription.
+An ingress stop pauses polling while pending and restores it if the stop fails;
+successful stage responses replace the controls from server state.
+
 ## Transition policy
 
 Cross-document navigation uses the CSS View Transition opt-in. In-page

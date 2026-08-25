@@ -1,6 +1,132 @@
 """Node-backed checks for ingress polling ownership and stage actions."""
 
 
+# @features ingress ui-action
+# @dimensions stage-action single-flight retryable-action polling-recovery
+def test_ingress_stage_action_failure_restores_button_and_polling_for_retry(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const document = { activeElement: null, body: {} };
+const context = {
+  buttons: {
+    active({ existingButton }) {
+      return {
+        activate(text, kind) {
+          existingButton.disabled = true;
+          existingButton.textContent = text;
+          if (kind) existingButton.dataset.kind = kind;
+        },
+        deactivate(text, kind) {
+          existingButton.disabled = false;
+          existingButton.textContent = text;
+          if (kind) existingButton.dataset.kind = kind;
+        },
+      };
+    },
+  },
+  captureError() {},
+  console,
+  document,
+  DOMParser: class {},
+  FacetsBox: class {},
+  Modal: class {},
+  primitives: {},
+  request: {},
+  SelectBox: class {},
+  withTransition(callback) { return callback(); },
+};
+vm.createContext(context);
+let source = fs.readFileSync("src/script/widgets/ingress.mjs", "utf8");
+source = source.replace(/^import .*$/gm, "");
+source = source.replace("export class ImportData", "class ImportData");
+source += "\nglobalThis.ImportData = ImportData;";
+vm.runInContext(source, context);
+
+(async () => {
+const stage = {};
+const progress = {};
+const target = {
+  dataset: { stage: "IMPORTING" },
+  querySelector(selector) {
+    if (selector === "[data-role='stage']") return stage;
+    if (selector === "[data-role='progress']") return progress;
+    return null;
+  },
+};
+const widget = new context.ImportData({ key: "ingress-key", target });
+let pollingRestarts = 0;
+let operationCount = 0;
+let finishRequest;
+let shownError = null;
+widget.importRequestStarted = true;
+widget._clearError = () => { shownError = null; };
+widget._showError = (message) => { shownError = message; };
+widget._setImportStopped = () => { widget.importRequestStarted = false; };
+widget._startImportPolling = () => {
+  pollingRestarts += 1;
+  widget.importRequestStarted = true;
+};
+
+const attributes = {};
+const button = {
+  dataset: { kind: "delete" },
+  disabled: false,
+  isConnected: true,
+  textContent: "Stop Import",
+  setAttribute(name, value) { attributes[name] = value; },
+  removeAttribute(name) { delete attributes[name]; },
+  focus() { document.activeElement = this; },
+};
+document.activeElement = button;
+const options = {
+  pendingText: "Stopping...",
+  pendingKind: "delete",
+  fallback: "Import could not be stopped. Please try again.",
+  pausePolling: true,
+  operation() {
+    operationCount += 1;
+    return new Promise((resolve) => { finishRequest = resolve; });
+  },
+};
+
+const first = widget._runStageAction(button, options);
+const duplicate = widget._runStageAction(button, options);
+if (first !== duplicate || operationCount !== 1) {
+  throw new Error("Concurrent ingress actions were not coalesced");
+}
+if (!button.disabled || attributes["aria-busy"] !== "true") {
+  throw new Error("Ingress action did not expose its pending state");
+}
+finishRequest({ ok: false, error: "Stop unavailable" });
+if (await first !== false) throw new Error("Failed ingress action was not reported");
+if (
+  button.disabled ||
+  button.textContent !== "Stop Import" ||
+  attributes["aria-busy"] !== undefined
+) {
+  throw new Error("Failed ingress action did not restore its control");
+}
+if (shownError !== "Stop unavailable" || pollingRestarts !== 1) {
+  throw new Error("Failed stop did not preserve its error and polling lifecycle");
+}
+
+const retry = widget._runStageAction(button, options);
+if (retry === first || operationCount !== 2) {
+  throw new Error("Released ingress action could not be retried");
+}
+finishRequest({ ok: false, error: "Still unavailable" });
+await retry;
+})().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});
+'''
+    )
+
+
 # @features ingress
 # @dimensions stage-update serialization next-action
 def test_ingress_next_waits_for_pending_stage_update(run_node):

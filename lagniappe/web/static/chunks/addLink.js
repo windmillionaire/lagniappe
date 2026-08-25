@@ -1,20 +1,20 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { g as getMarkRange, n as normalizeLinkAttributes } from './toolbar.js?v=bcdf9883';
-import { STYLES } from './styles.js?v=bcdf9883';
-import { E as ENDPOINTS, r as request } from './foundation.js?v=bcdf9883';
-import './connectivity.js?v=bcdf9883';
-import { B as BaseForm } from './baseForm.js?v=bcdf9883';
-import { b as buttons } from './buttons.js?v=bcdf9883';
-import { R as RemoteQueryCombobox } from './remote.js?v=bcdf9883';
-import { R as Results } from './results.js?v=bcdf9883';
-import { p as primitives } from './primitives.js?v=bcdf9883';
-import './combobox.js?v=bcdf9883';
-import './queryLifecycle.js?v=bcdf9883';
-import './icons.js?v=bcdf9883';
-import './dropdown.js?v=bcdf9883';
-import './loader.js?v=bcdf9883';
-import './formatting.js?v=bcdf9883';
-import './storage.js?v=bcdf9883';
+import { g as getMarkRange, n as normalizeLinkAttributes } from './toolbar.js?v=bdc368f0';
+import { STYLES } from './styles.js?v=bdc368f0';
+import { E as ENDPOINTS, r as request } from './foundation.js?v=bdc368f0';
+import './connectivity.js?v=bdc368f0';
+import { B as BaseForm } from './baseForm.js?v=bdc368f0';
+import { b as buttons } from './buttons.js?v=bdc368f0';
+import { R as RemoteQueryCombobox } from './remote.js?v=bdc368f0';
+import { R as Results } from './results.js?v=bdc368f0';
+import { p as primitives } from './primitives.js?v=bdc368f0';
+import './combobox.js?v=bdc368f0';
+import './queryLifecycle.js?v=bdc368f0';
+import './icons.js?v=bdc368f0';
+import './dropdown.js?v=bdc368f0';
+import './loader.js?v=bdc368f0';
+import './formatting.js?v=bdc368f0';
+import './storage.js?v=bdc368f0';
 
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:/i;
 const BARE_DOMAIN_PATTERN = /^[^\s/]+\.[^\s]+(?:\/.*)?$/;

@@ -1,21 +1,21 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { SearchBox } from './search.js?v=bcdf9883';
-import { EntityMenu } from './entityMenu.js?v=bcdf9883';
-import { w as withTransition, r as request, E as ENDPOINTS, c as captureError, g as generateElementId } from './foundation.js?v=bcdf9883';
-import { c as connectivity } from './connectivity.js?v=bcdf9883';
-import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=bcdf9883';
-import { STYLES } from './styles.js?v=bcdf9883';
-import { s as setIcon } from './icons.js?v=bcdf9883';
-import { p as primitives } from './primitives.js?v=bcdf9883';
-import { B as BaseForm, R as Renderer } from './baseForm.js?v=bcdf9883';
-import { F as FacetsBox } from './facets.js?v=bcdf9883';
+import { SearchBox } from './search.js?v=bdc368f0';
+import { EntityMenu } from './entityMenu.js?v=bdc368f0';
+import { w as withTransition, r as request, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=bdc368f0';
+import { c as connectivity } from './connectivity.js?v=bdc368f0';
+import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=bdc368f0';
+import { STYLES } from './styles.js?v=bdc368f0';
+import { s as setIcon } from './icons.js?v=bdc368f0';
+import { p as primitives } from './primitives.js?v=bdc368f0';
+import { B as BaseForm, R as Renderer } from './baseForm.js?v=bdc368f0';
+import { F as FacetsBox } from './facets.js?v=bdc368f0';
 
 const CONDITION_REGISTRY = {
-	html: () => import('./html.js?v=bcdf9883'),
-	status: () => import('./status.js?v=bcdf9883'),
-	visibility: () => import('./visibility.js?v=bcdf9883'),
-	columns: () => import('./columns.js?v=bcdf9883'),
-	options: () => import('./options.js?v=bcdf9883'),
+	html: () => import('./html.js?v=bdc368f0'),
+	status: () => import('./status.js?v=bdc368f0'),
+	visibility: () => import('./visibility.js?v=bdc368f0'),
+	columns: () => import('./columns.js?v=bdc368f0'),
+	options: () => import('./options.js?v=bdc368f0'),
 };
 
 /**
@@ -3588,6 +3588,7 @@ class ElementSettings {
 class FormSettings {
 	constructor(builder) {
 		this._destroyed = false;
+		this._generationPromise = null;
 		this.builder = builder;
 		this.column = document.getElementById("form-settings-panel");
 		this.restrictions = document.querySelector("[data-role='restrict-access']");
@@ -3728,62 +3729,136 @@ class FormSettings {
 	}
 
 	async _removeRestriction(button) {
-		if (this._destroyed || !this.restrictions) return;
+		if (this._destroyed || !this.restrictions || button.disabled) return;
 
 		const route = this.restrictions.dataset.route;
 		const key = button.dataset.key;
 		const item = button.closest("li");
+		if (!item) return;
+		const hadFocus = document.activeElement === button;
+		let removed = false;
+		button.disabled = true;
+		button.setAttribute("aria-disabled", "true");
+		button.setAttribute("aria-busy", "true");
 		item.classList.add("opacity-50", "pointer-events-none");
 
 		const data = new FormData();
 		data.set("action", "remove");
 		data.set("group-key", key);
 
-		const response = await request.put(route, data);
-		if (this._destroyed) return;
-		if (response.ok) {
-			item.remove();
+		try {
+			const response = await request.put(route, data);
+			if (this._destroyed) return;
+			if (response?.ok === true) {
+				removed = true;
+				item.remove();
+			} else {
+				this.builder.header.message(
+					response?.error || "Could not remove this restriction. Try again.",
+					{ persistent: true },
+				);
+			}
+		} catch (error) {
+			captureError(error, button, { context: "builder-remove-restriction" });
+			this.builder.header.message(
+				"Could not remove this restriction. Try again.",
+				{ persistent: true },
+			);
+		} finally {
+			if (!removed && !this._destroyed && button.isConnected !== false) {
+				button.disabled = false;
+				button.setAttribute("aria-disabled", "false");
+				button.removeAttribute("aria-busy");
+				item.classList.remove("opacity-50", "pointer-events-none");
+				if (
+					hadFocus &&
+					(!document.activeElement ||
+						document.activeElement === document.body ||
+						document.activeElement === button)
+				) {
+					button.focus({ preventScroll: true });
+				}
+			}
 		}
 	}
 
-	async _generateSchema(event) {
-		if (this._destroyed || !this.generateForm?.target) return;
-
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_generation_failure_stays_visible_and_releases_submitter
+	 * @features forms ui-action
+	 * @dimensions schema-generation single-flight retryable-action persistent-error
+	 */
+	_generateSchema(event) {
 		event.preventDefault();
 		event.stopPropagation();
+		if (this._generationPromise) return this._generationPromise;
+		if (this._destroyed || !this.generateForm?.target) {
+			return Promise.resolve(false);
+		}
 
 		const data = new FormData(this.generateForm.target);
 		const prompt = data.get("description");
-		event.submitter.disabled = true;
+		const submitter = event.submitter || this.generateForm.submitButton;
 
 		if (!prompt) {
 			this.generateForm.showError("Please enter a description");
-			event.submitter.disabled = false;
-			return;
-		} else if (event.submitter.dataset.explain) {
-			data.append("explain", event.submitter.dataset.explain);
+			return Promise.resolve(false);
+		} else if (submitter?.dataset.explain) {
+			data.append("explain", submitter.dataset.explain);
 		}
 
-		const response = await request.post(ENDPOINTS.createSchema, data);
-		if (this._destroyed) return;
-		const success = await this._updateSchema(response);
-		if (this._destroyed) return;
-
-		event.submitter.disabled = false;
-		this.generateForm.resetSubmitButton();
-
-		if (success) {
-			this.generateForm.target.dataset.visible = "false";
+		const acknowledgement = {
+			wasSaved: this.builder.header.saveButton?.dataset.saved === "true",
+			name: this.builder.header.persistenceState.name,
+		};
+		if (submitter) {
+			submitter.disabled = true;
+			submitter.setAttribute("aria-disabled", "true");
+			submitter.setAttribute("aria-busy", "true");
 		}
+
+		const pending = (async () => {
+			try {
+				const response = await request.post(ENDPOINTS.createSchema, data);
+				if (this._destroyed) return false;
+				const success = await this._updateSchema(response, acknowledgement);
+				if (this._destroyed) return false;
+				if (success || (response?.ok === true && response.modal)) {
+					this.generateForm.resetSubmitButton();
+				}
+				if (success) this.generateForm.target.dataset.visible = "false";
+				return success;
+			} catch (error) {
+				captureError(error, submitter, { context: "builder-generate-schema" });
+				if (!this._destroyed) {
+					this.generateForm.showError(
+						"Could not generate this form. Try again.",
+					);
+				}
+				return false;
+			} finally {
+				if (submitter && !this._destroyed && submitter.isConnected !== false) {
+					submitter.disabled = false;
+					submitter.setAttribute("aria-disabled", "false");
+					submitter.removeAttribute("aria-busy");
+				}
+			}
+		})();
+		this._generationPromise = pending;
+		const clearPending = () => {
+			if (this._generationPromise === pending) this._generationPromise = null;
+		};
+		pending.then(clearPending, clearPending);
+		return pending;
 	}
 
-	async _updateSchema(response) {
+	async _updateSchema(response, acknowledgement = null) {
 		if (this._destroyed || !this.generateForm) return false;
 
-		if (response.ok && response.schema) {
+		if (response?.ok === true && response.schema) {
 			if (response.schema.length === 0) {
 				this.generateForm.showError("No form elements generated");
-				return;
+				return false;
 			}
 
 			for (const element of response.schema) {
@@ -3794,14 +3869,23 @@ class FormSettings {
 				this.builder.model.panel.appendChild(newElement);
 			}
 			this.builder.updateSchemaOrder();
-			this.builder.header.saved();
+			if (acknowledgement?.wasSaved) {
+				this.builder.header.acknowledge({
+					schema: response.schema,
+					name: acknowledgement.name,
+				});
+			} else {
+				this.builder.header.unsaved();
+			}
 			return true;
-		} else if (response.ok && response.modal) {
+		} else if (response?.ok === true && response.modal) {
 			this.modal?.destroy();
 			this.modal = new Modal(this.builder);
 			void this.modal.attach(response.modal, this.generateForm);
-		} else if (response.error) {
-			this.generateForm.showError(response.error);
+		} else {
+			this.generateForm.showError(
+				response?.error || "Could not generate this form. Try again.",
+			);
 		}
 		return false;
 	}
@@ -3831,6 +3915,7 @@ class Header {
 		this._destroyed = false;
 		this._previewGeneration = 0;
 		this._messageTimer = null;
+		this._savePromise = null;
 		this.builder = builder;
 		this.nameDisplay = document.getElementById("form-name-display");
 		this.nameInput = document.getElementById("form-name-input");
@@ -3840,6 +3925,10 @@ class Header {
 		this.notification = document.getElementById("notification");
 		this.previewToggle = document.getElementById("preview-toggle");
 		this.previewPanel = document.getElementById("preview-panel");
+		this.saveButton?.setAttribute("aria-describedby", "notification");
+		this.notification?.setAttribute("role", "status");
+		this.notification?.setAttribute("aria-live", "polite");
+		this.notification?.setAttribute("aria-atomic", "true");
 
 		this.togglePreviewPanel = this.togglePreviewPanel.bind(this);
 		this.saveForm = this.saveForm.bind(this);
@@ -3859,10 +3948,9 @@ class Header {
 
 	saved() {
 		if (!this.saveButton) return;
-		this.saveButton.disabled = false;
-		this.saveButton.classList.remove("opacity-50");
 		this.saveButton.dataset.saved = "true";
 		this.saveButton.dataset.kind = "saved";
+		this.clearMessage();
 	}
 
 	unsaved() {
@@ -3871,15 +3959,48 @@ class Header {
 		this.saveButton.dataset.kind = "unsaved";
 	}
 
-	message(text) {
+	clearMessage() {
+		clearTimeout(this._messageTimer);
+		this._messageTimer = null;
+		if (!this.notification) return;
+		this.notification.textContent = "";
+		this.notification.dataset.visible = "false";
+	}
+
+	message(text, { persistent = false } = {}) {
 		if (this._destroyed) return;
 		clearTimeout(this._messageTimer);
+		this._messageTimer = null;
 		this.notification.textContent = text;
 		this.notification.dataset.visible = "true";
-		this._messageTimer = setTimeout(() => {
-			if (this._destroyed) return;
-			this.notification.dataset.visible = "false";
-		}, 3000);
+		if (!persistent) {
+			this._messageTimer = setTimeout(() => {
+				if (this._destroyed) return;
+				this.notification.dataset.visible = "false";
+			}, 3000);
+		}
+	}
+
+	get persistenceState() {
+		return {
+			schema: this.builder.schema,
+			name: this.nameHidden?.value ?? "",
+		};
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/views/builder/panels/header.mjs::Header.saveForm
+	 * @reason acknowledgements are only valid when the live state matches the submitted snapshot
+	 */
+	acknowledge(state) {
+		const current = this.persistenceState;
+		if (current.name === state.name && areEqual(current.schema, state.schema)) {
+			this.saved();
+			return true;
+		}
+		this.unsaved();
+		return false;
 	}
 
 	/**
@@ -3939,19 +4060,72 @@ class Header {
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
-	 * @features forms
-	 * @dimensions builder-save builder-reload
+	 * @tests tests_e2e/003_forms/test_003e_retryable_builder_actions.py::test_builder_save_failure_releases_control_for_retry
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
+	 * @features forms ui-action
+	 * @dimensions builder-save builder-reload single-flight retryable-action stale-acknowledgement persistent-error focus-recovery
 	 */
-	async saveForm() {
-		if (this._destroyed || !this.saveButton || !this.schemaForm) return;
-		this.saveButton.disabled = true;
-		this.saveButton.classList.add("opacity-50");
-		const response = await request.put(
-			this.schemaForm.dataset.route,
-			new FormData(this.schemaForm),
-		);
-		if (this._destroyed) return;
-		response.ok ? this.saved() : this.message(response.error);
+	saveForm() {
+		if (this._savePromise) return this._savePromise;
+		if (this._destroyed || !this.saveButton || !this.schemaForm) {
+			return Promise.resolve(false);
+		}
+
+		const button = this.saveButton;
+		const hadFocus = document.activeElement === button;
+		const state = this.persistenceState;
+		this.unsaved();
+		this.clearMessage();
+		button.disabled = true;
+		button.setAttribute("aria-disabled", "true");
+		button.setAttribute("aria-busy", "true");
+		button.classList.add("opacity-50");
+
+		const pending = (async () => {
+			try {
+				const response = await request.put(
+					this.schemaForm.dataset.route,
+					new FormData(this.schemaForm),
+				);
+				if (this._destroyed) return false;
+				if (response?.ok === true) {
+					this.acknowledge(state);
+					return true;
+				}
+				this.message(
+					response?.error || "Could not save this form. Try again.",
+					{ persistent: true },
+				);
+				return false;
+			} catch (error) {
+				captureError(error, button, { context: "builder-save" });
+				this.message("Could not save this form. Try again.", {
+					persistent: true,
+				});
+				return false;
+			} finally {
+				if (!this._destroyed && button.isConnected !== false) {
+					button.disabled = false;
+					button.setAttribute("aria-disabled", "false");
+					button.removeAttribute("aria-busy");
+					button.classList.remove("opacity-50");
+					if (
+						hadFocus &&
+						(!document.activeElement ||
+							document.activeElement === document.body ||
+							document.activeElement === button)
+					) {
+						button.focus({ preventScroll: true });
+					}
+				}
+			}
+		})();
+		this._savePromise = pending;
+		const clearPending = () => {
+			if (this._savePromise === pending) this._savePromise = null;
+		};
+		pending.then(clearPending, clearPending);
+		return pending;
 	}
 
 	editFormName() {
@@ -4694,19 +4868,46 @@ class FormBuilder {
 	async copyForm(button) {
 		if (this._destroyed || !button?.dataset.route || button.disabled) return;
 
+		const hadFocus = document.activeElement === button;
+		let terminal = false;
 		button.disabled = true;
-		const response = await request.post(button.dataset.route, {
-			name: this.header.nameDisplay.textContent.trim(),
-			schema: this.schema,
-		});
-		if (this._destroyed) return;
-		if (response?.ok && response.url) {
-			window.location.assign(response.url);
-			return;
+		button.setAttribute("aria-disabled", "true");
+		button.setAttribute("aria-busy", "true");
+		this.header.clearMessage();
+		try {
+			const response = await request.post(button.dataset.route, {
+				name: this.header.nameDisplay.textContent.trim(),
+				schema: this.schema,
+			});
+			if (this._destroyed) return;
+			if (response?.ok === true && response.url) {
+				window.location.assign(response.url);
+				terminal = true;
+				return;
+			}
+			this.header.message(response?.error || "Could not copy this form.", {
+				persistent: true,
+			});
+		} catch (error) {
+			captureError(error, button, { context: "builder-copy-form" });
+			this.header.message("Could not copy this form. Try again.", {
+				persistent: true,
+			});
+		} finally {
+			if (!terminal && !this._destroyed && button.isConnected !== false) {
+				button.disabled = false;
+				button.setAttribute("aria-disabled", "false");
+				button.removeAttribute("aria-busy");
+				if (
+					hadFocus &&
+					(!document.activeElement ||
+						document.activeElement === document.body ||
+						document.activeElement === button)
+				) {
+					button.focus({ preventScroll: true });
+				}
+			}
 		}
-
-		button.disabled = false;
-		this.header.message(response?.error || "Could not copy this form.");
 	}
 
 	async _showDeleteModal(button) {

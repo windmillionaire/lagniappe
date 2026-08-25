@@ -1,10 +1,10 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bcdf9883';
-import { s as setIcon } from './icons.js?v=bcdf9883';
-import { j as areEqual } from './foundation.js?v=bcdf9883';
-import { B as BaseElement } from './baseElement.js?v=bcdf9883';
-import { p as primitives } from './primitives.js?v=bcdf9883';
-import './connectivity.js?v=bcdf9883';
+import { STYLES } from './styles.js?v=bdc368f0';
+import { s as setIcon } from './icons.js?v=bdc368f0';
+import { f as areEqual } from './foundation.js?v=bdc368f0';
+import { B as BaseElement } from './baseElement.js?v=bdc368f0';
+import { p as primitives } from './primitives.js?v=bdc368f0';
+import './connectivity.js?v=bdc368f0';
 
 /**
  * @testable true

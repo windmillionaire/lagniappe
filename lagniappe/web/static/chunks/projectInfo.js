@@ -1,21 +1,21 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { F as FormElement } from './form2.js?v=bcdf9883';
-import { InputElement } from './input.js?v=bcdf9883';
-import { s as sections } from './sections.js?v=bcdf9883';
-import { TextareaElement } from './textarea.js?v=bcdf9883';
-import './foundation.js?v=bcdf9883';
-import './connectivity.js?v=bcdf9883';
-import './baseForm.js?v=bcdf9883';
-import './icons.js?v=bcdf9883';
-import './primitives.js?v=bcdf9883';
-import './styles.js?v=bcdf9883';
-import './loader.js?v=bcdf9883';
-import './baseElement.js?v=bcdf9883';
-import './formatting.js?v=bcdf9883';
-import './baseUpload.js?v=bcdf9883';
-import './buttons.js?v=bcdf9883';
-import './dropdown.js?v=bcdf9883';
-import './combobox.js?v=bcdf9883';
+import { F as FormElement } from './form2.js?v=bdc368f0';
+import { InputElement } from './input.js?v=bdc368f0';
+import { s as sections } from './sections.js?v=bdc368f0';
+import { TextareaElement } from './textarea.js?v=bdc368f0';
+import './foundation.js?v=bdc368f0';
+import './connectivity.js?v=bdc368f0';
+import './baseForm.js?v=bdc368f0';
+import './icons.js?v=bdc368f0';
+import './primitives.js?v=bdc368f0';
+import './styles.js?v=bdc368f0';
+import './loader.js?v=bdc368f0';
+import './baseElement.js?v=bdc368f0';
+import './formatting.js?v=bdc368f0';
+import './baseUpload.js?v=bdc368f0';
+import './buttons.js?v=bdc368f0';
+import './dropdown.js?v=bdc368f0';
+import './combobox.js?v=bdc368f0';
 
 /**
  * @testable false

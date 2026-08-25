@@ -221,19 +221,46 @@ class FormBuilder {
 	async copyForm(button) {
 		if (this._destroyed || !button?.dataset.route || button.disabled) return;
 
+		const hadFocus = document.activeElement === button;
+		let terminal = false;
 		button.disabled = true;
-		const response = await request.post(button.dataset.route, {
-			name: this.header.nameDisplay.textContent.trim(),
-			schema: this.schema,
-		});
-		if (this._destroyed) return;
-		if (response?.ok && response.url) {
-			window.location.assign(response.url);
-			return;
+		button.setAttribute("aria-disabled", "true");
+		button.setAttribute("aria-busy", "true");
+		this.header.clearMessage();
+		try {
+			const response = await request.post(button.dataset.route, {
+				name: this.header.nameDisplay.textContent.trim(),
+				schema: this.schema,
+			});
+			if (this._destroyed) return;
+			if (response?.ok === true && response.url) {
+				window.location.assign(response.url);
+				terminal = true;
+				return;
+			}
+			this.header.message(response?.error || "Could not copy this form.", {
+				persistent: true,
+			});
+		} catch (error) {
+			captureError(error, button, { context: "builder-copy-form" });
+			this.header.message("Could not copy this form. Try again.", {
+				persistent: true,
+			});
+		} finally {
+			if (!terminal && !this._destroyed && button.isConnected !== false) {
+				button.disabled = false;
+				button.setAttribute("aria-disabled", "false");
+				button.removeAttribute("aria-busy");
+				if (
+					hadFocus &&
+					(!document.activeElement ||
+						document.activeElement === document.body ||
+						document.activeElement === button)
+				) {
+					button.focus({ preventScroll: true });
+				}
+			}
 		}
-
-		button.disabled = false;
-		this.header.message(response?.error || "Could not copy this form.");
 	}
 
 	async _showDeleteModal(button) {

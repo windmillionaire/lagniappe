@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from './foundation.js?v=bcdf9883';
-import './connectivity.js?v=bcdf9883';
+import { w as withTransition } from './foundation.js?v=bdc368f0';
+import './connectivity.js?v=bdc368f0';
 
 const SECTION_STORAGE_KEY = "lagniappe:site-settings-section";
 const DEFAULT_SECTION = "maintenance";

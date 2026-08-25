@@ -1,6 +1,6 @@
 import { BaseForm } from "../../../elements/base/baseForm";
 import { FacetsBox } from "../../../elements/combobox";
-import { ENDPOINTS, Modal, request } from "../../../shared";
+import { captureError, ENDPOINTS, Modal, request } from "../../../shared";
 
 /**
  * @testable infrastructure
@@ -8,6 +8,7 @@ import { ENDPOINTS, Modal, request } from "../../../shared";
 export class FormSettings {
 	constructor(builder) {
 		this._destroyed = false;
+		this._generationPromise = null;
 		this.builder = builder;
 		this.column = document.getElementById("form-settings-panel");
 		this.restrictions = document.querySelector("[data-role='restrict-access']");
@@ -24,6 +25,9 @@ export class FormSettings {
 					submitted: "Generated",
 				},
 			});
+			this.generateForm.error.setAttribute("role", "status");
+			this.generateForm.error.setAttribute("aria-live", "polite");
+			this.generateForm.error.setAttribute("aria-atomic", "true");
 		} else {
 			this.generateForm = null;
 		}
@@ -148,62 +152,137 @@ export class FormSettings {
 	}
 
 	async _removeRestriction(button) {
-		if (this._destroyed || !this.restrictions) return;
+		if (this._destroyed || !this.restrictions || button.disabled) return;
 
 		const route = this.restrictions.dataset.route;
 		const key = button.dataset.key;
 		const item = button.closest("li");
+		if (!item) return;
+		const hadFocus = document.activeElement === button;
+		let removed = false;
+		button.disabled = true;
+		button.setAttribute("aria-disabled", "true");
+		button.setAttribute("aria-busy", "true");
 		item.classList.add("opacity-50", "pointer-events-none");
+		this.builder.header.clearMessage();
 
 		const data = new FormData();
 		data.set("action", "remove");
 		data.set("group-key", key);
 
-		const response = await request.put(route, data);
-		if (this._destroyed) return;
-		if (response.ok) {
-			item.remove();
+		try {
+			const response = await request.put(route, data);
+			if (this._destroyed) return;
+			if (response?.ok === true) {
+				removed = true;
+				item.remove();
+			} else {
+				this.builder.header.message(
+					response?.error || "Could not remove this restriction. Try again.",
+					{ persistent: true },
+				);
+			}
+		} catch (error) {
+			captureError(error, button, { context: "builder-remove-restriction" });
+			this.builder.header.message(
+				"Could not remove this restriction. Try again.",
+				{ persistent: true },
+			);
+		} finally {
+			if (!removed && !this._destroyed && button.isConnected !== false) {
+				button.disabled = false;
+				button.setAttribute("aria-disabled", "false");
+				button.removeAttribute("aria-busy");
+				item.classList.remove("opacity-50", "pointer-events-none");
+				if (
+					hadFocus &&
+					(!document.activeElement ||
+						document.activeElement === document.body ||
+						document.activeElement === button)
+				) {
+					button.focus({ preventScroll: true });
+				}
+			}
 		}
 	}
 
-	async _generateSchema(event) {
-		if (this._destroyed || !this.generateForm?.target) return;
-
+	/**
+	 * @testable true
+	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_generation_failure_stays_visible_and_releases_submitter
+	 * @features forms ui-action
+	 * @dimensions schema-generation single-flight retryable-action persistent-error
+	 */
+	_generateSchema(event) {
 		event.preventDefault();
 		event.stopPropagation();
+		if (this._generationPromise) return this._generationPromise;
+		if (this._destroyed || !this.generateForm?.target) {
+			return Promise.resolve(false);
+		}
 
 		const data = new FormData(this.generateForm.target);
 		const prompt = data.get("description");
-		event.submitter.disabled = true;
+		const submitter = event.submitter || this.generateForm.submitButton;
 
 		if (!prompt) {
 			this.generateForm.showError("Please enter a description");
-			event.submitter.disabled = false;
-			return;
-		} else if (event.submitter.dataset.explain) {
-			data.append("explain", event.submitter.dataset.explain);
+			return Promise.resolve(false);
+		} else if (submitter?.dataset.explain) {
+			data.append("explain", submitter.dataset.explain);
 		}
 
-		const response = await request.post(ENDPOINTS.createSchema, data);
-		if (this._destroyed) return;
-		const success = await this._updateSchema(response);
-		if (this._destroyed) return;
-
-		event.submitter.disabled = false;
-		this.generateForm.resetSubmitButton();
-
-		if (success) {
-			this.generateForm.target.dataset.visible = "false";
+		const acknowledgement = {
+			wasSaved: this.builder.header.saveButton?.dataset.saved === "true",
+			name: this.builder.header.persistenceState.name,
+		};
+		if (submitter) {
+			submitter.disabled = true;
+			submitter.setAttribute("aria-disabled", "true");
+			submitter.setAttribute("aria-busy", "true");
 		}
+
+		const pending = (async () => {
+			try {
+				const response = await request.post(ENDPOINTS.createSchema, data);
+				if (this._destroyed) return false;
+				const success = await this._updateSchema(response, acknowledgement);
+				if (this._destroyed) return false;
+				if (success || (response?.ok === true && response.modal)) {
+					this.generateForm.resetSubmitButton();
+				}
+				if (success) this.generateForm.target.dataset.visible = "false";
+				return success;
+			} catch (error) {
+				captureError(error, submitter, { context: "builder-generate-schema" });
+				if (!this._destroyed) {
+					this.generateForm.showError(
+						"Could not generate this form. Try again.",
+					);
+				}
+				return false;
+			} finally {
+				if (submitter && !this._destroyed && submitter.isConnected !== false) {
+					submitter.disabled = false;
+					submitter.setAttribute("aria-disabled", "false");
+					submitter.removeAttribute("aria-busy");
+				}
+			}
+		})();
+		this._generationPromise = pending;
+		const clearPending = () => {
+			if (this._generationPromise === pending) this._generationPromise = null;
+		};
+		pending.then(clearPending, clearPending);
+		return pending;
 	}
 
-	async _updateSchema(response) {
+	async _updateSchema(response, acknowledgement = null) {
 		if (this._destroyed || !this.generateForm) return false;
 
-		if (response.ok && response.schema) {
+		if (response?.ok === true && response.schema) {
 			if (response.schema.length === 0) {
 				this.generateForm.showError("No form elements generated");
-				return;
+				return false;
 			}
 
 			for (const element of response.schema) {
@@ -214,14 +293,23 @@ export class FormSettings {
 				this.builder.model.panel.appendChild(newElement);
 			}
 			this.builder.updateSchemaOrder();
-			this.builder.header.saved();
+			if (acknowledgement?.wasSaved) {
+				this.builder.header.acknowledge({
+					schema: response.schema,
+					name: acknowledgement.name,
+				});
+			} else {
+				this.builder.header.unsaved();
+			}
 			return true;
-		} else if (response.ok && response.modal) {
+		} else if (response?.ok === true && response.modal) {
 			this.modal?.destroy();
 			this.modal = new Modal(this.builder);
 			void this.modal.attach(response.modal, this.generateForm);
-		} else if (response.error) {
-			this.generateForm.showError(response.error);
+		} else {
+			this.generateForm.showError(
+				response?.error || "Could not generate this form. Try again.",
+			);
 		}
 		return false;
 	}
