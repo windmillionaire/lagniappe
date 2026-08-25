@@ -154,3 +154,16 @@ pointer listeners, even when a lazy load is pending. Component/widget teardown
 must remove owned listeners, observers, editor instances, Floating UI loops,
 and polling subscriptions. Do not leave page-scoped work attached to globals
 after navigation.
+
+Asynchronous UI owners use an epoch or generation guard in addition to any
+transport cancellation. A prepared result must re-check that its view and
+logical input owner are current immediately before publishing connected DOM.
+Base combobox mutation/open methods reject work after destroy as defense in
+depth.
+
+Body portals are owned by exact instance references, never rediscovered by a
+global ID during teardown. `Modal.remove()` detaches a reusable modal instance;
+`destroy()` permanently rejects late attachment. `OfflineModal` stores one
+trigger callback so enable/disable/destroy are idempotent. Core and standalone
+Builder views retain their SearchBox and modal services, and destroy any manager
+whose initialization finishes after its view is gone.

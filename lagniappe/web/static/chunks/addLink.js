@@ -1,18 +1,20 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { g as getMarkRange, n as normalizeLinkAttributes } from './toolbar.js?v=b66dffd0';
-import { STYLES } from './styles.js?v=b66dffd0';
-import { E as ENDPOINTS, d as debounce, r as request } from './foundation.js?v=b66dffd0';
-import './connectivity.js?v=b66dffd0';
-import { B as BaseForm } from './baseForm.js?v=b66dffd0';
-import { b as buttons } from './buttons.js?v=b66dffd0';
-import { C as Combobox } from './combobox.js?v=b66dffd0';
-import { R as Results } from './results.js?v=b66dffd0';
-import { p as primitives } from './primitives.js?v=b66dffd0';
-import './icons.js?v=b66dffd0';
-import './dropdown.js?v=b66dffd0';
-import './loader.js?v=b66dffd0';
-import './formatting.js?v=b66dffd0';
-import './storage.js?v=b66dffd0';
+import { g as getMarkRange, n as normalizeLinkAttributes } from './toolbar.js?v=bcdf9883';
+import { STYLES } from './styles.js?v=bcdf9883';
+import { E as ENDPOINTS, r as request } from './foundation.js?v=bcdf9883';
+import './connectivity.js?v=bcdf9883';
+import { B as BaseForm } from './baseForm.js?v=bcdf9883';
+import { b as buttons } from './buttons.js?v=bcdf9883';
+import { R as RemoteQueryCombobox } from './remote.js?v=bcdf9883';
+import { R as Results } from './results.js?v=bcdf9883';
+import { p as primitives } from './primitives.js?v=bcdf9883';
+import './combobox.js?v=bcdf9883';
+import './queryLifecycle.js?v=bcdf9883';
+import './icons.js?v=bcdf9883';
+import './dropdown.js?v=bcdf9883';
+import './loader.js?v=bcdf9883';
+import './formatting.js?v=bcdf9883';
+import './storage.js?v=bcdf9883';
 
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:/i;
 const BARE_DOMAIN_PATTERN = /^[^\s/]+\.[^\s]+(?:\/.*)?$/;
@@ -20,7 +22,7 @@ const BARE_DOMAIN_PATTERN = /^[^\s/]+\.[^\s]+(?:\/.*)?$/;
 /**
  * @testable infrastructure
  */
-class LinkSearchBox extends Combobox {
+class LinkSearchBox extends RemoteQueryCombobox {
 	constructor(element, addLink) {
 		super(element);
 		this.addLink = addLink;
@@ -28,27 +30,24 @@ class LinkSearchBox extends Combobox {
 		this.results = new Results(this.index);
 		this.endpoints = ENDPOINTS.search;
 		this.placement = "bottom-start";
-		this._debouncedInput = debounce(this._input.bind(this), 200);
 	}
 
 	init() {
 		this.styles.panel = `${STYLES.dropdown.panel} ${STYLES.editor.toolbar.portalIconContext} w-64 sm:w-96 mt-2`;
-		this.element.addEventListener("input", this._debouncedInput);
 		super.init();
 	}
 
 	_input(event) {
 		const query = event.target.value.trim();
 		if (this.addLink.linkHref(query)) {
-			this.hidePanel();
+			this.settleQueryInput({ clear: true });
 			return;
 		}
 
 		if (query.length > 2) {
-			this._search(query);
-		} else if (query.length === 0) {
-			this.hidePanel();
+			return this._search(query);
 		}
+		this.settleQueryInput({ clear: true });
 	}
 
 	elementClick(event) {
@@ -56,14 +55,22 @@ class LinkSearchBox extends Combobox {
 		if (!this.panelOpen && this.options.length > 0) this.showPanel();
 	}
 
-	async _search(query) {
+	_search(query) {
 		const params = new URLSearchParams();
 		params.set("q", query);
-		const response = await request.get(this.endpoints.bar, params);
-		if (response.ok) {
-			this.updatePanel(response.results || null);
-		}
-		this.showPanel();
+		return this.runQuery(
+			query,
+			(token) =>
+				request.get(this.endpoints.bar, params, { signal: token.signal }),
+			(response) => {
+				if (response?.ok) {
+					this.updatePanel(response.results || null);
+				} else {
+					this.clearQueryResults();
+				}
+				return this.showPanel();
+			},
+		);
 	}
 
 	selectOption(option) {
@@ -72,11 +79,6 @@ class LinkSearchBox extends Combobox {
 		this.results.save(option);
 		this.hidePanel();
 		this.addLink.applySearchResult(option.dataset.url);
-	}
-
-	destroy() {
-		this.element.removeEventListener("input", this._debouncedInput);
-		super.destroy();
 	}
 }
 

@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { w as withTransition } from '../foundation.js?v=b66dffd0';
-import '../connectivity.js?v=b66dffd0';
-import { E as Entity } from '../entity-foundation.js?v=b66dffd0';
-import '../core-foundation.js?v=b66dffd0';
+import { w as withTransition } from '../foundation.js?v=bcdf9883';
+import '../connectivity.js?v=bcdf9883';
+import { E as Entity } from '../entity-foundation.js?v=bcdf9883';
+import '../core-foundation.js?v=bcdf9883';
 
 /**
  * @testable true

@@ -9,42 +9,51 @@ export class ConditionPanel {
 		this.panel = document.getElementById("condition-panel");
 		this.loading = false;
 		this.condition = null;
+		this._click = this._click.bind(this);
 		this.init();
 	}
 
 	init() {
-		this.panel.addEventListener("click", (e) => {
-			const button = e.target.closest("button");
-			if (button?.dataset.role === "save") {
-				const validated = this.condition.validate();
-				if (!validated) return;
+		this.panel.addEventListener("click", this._click);
+	}
 
-				const index = this.condition.index;
-				const schema = this.condition.element.schema;
-				const conditions = schema[this.condition.key] ?? [];
+	_click(e) {
+		const button = e.target.closest("button");
+		if (button?.dataset.role === "save") {
+			const validated = this.condition.validate();
+			if (!validated) return;
 
-				if (index === -1) {
-					conditions.push(this.condition.setting);
-				} else {
-					conditions[index] = this.condition.setting;
-				}
+			const index = this.condition.index;
+			const schema = this.condition.element.schema;
+			const conditions = schema[this.condition.key] ?? [];
 
-				schema[this.condition.key] = conditions;
-				this.condition.element.settings = this.builder.settings.create(schema);
-				this.builder.updateSchema();
-
-				withTransition(() => {
-					this.condition.index = -1;
-					this.condition.init();
-					this.condition.showSuccess();
-					this.condition.focus();
-					this.builder.settings.updateItem();
-					this.builder.model.updateItem();
-				});
-			} else if (button?.dataset.role === "close") {
-				this.close();
+			if (index === -1) {
+				conditions.push(this.condition.setting);
+			} else {
+				conditions[index] = this.condition.setting;
 			}
-		});
+
+			schema[this.condition.key] = conditions;
+			this.condition.element.settings = this.builder.settings.create(schema);
+			this.builder.updateSchema();
+
+			withTransition(() => {
+				this.condition.index = -1;
+				this.condition.init();
+				this.condition.showSuccess();
+				this.condition.focus();
+				this.builder.settings.updateItem();
+				this.builder.model.updateItem();
+			});
+		} else if (button?.dataset.role === "close") {
+			this.close();
+		}
+	}
+
+	destroy() {
+		this.panel?.removeEventListener("click", this._click);
+		this.loading = false;
+		this.condition = null;
 	}
 
 	open(condition) {

@@ -1,5 +1,5 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { c as connectivity } from './connectivity.js?v=b66dffd0';
+import { c as connectivity } from './connectivity.js?v=bcdf9883';
 
 /**
  * @testable false
@@ -592,14 +592,29 @@ const showBriefly = (element, content, duration = 1500) => {
 };
 
 /**
- * @testable infrastructure
+ * @testable true
+ * @tests tests_js/test_020_shared_utilities.py::test_debounce_cancel_prevents_delayed_callback
+ * @pair async-query:debounce-teardown
  */
 const debounce = (func, wait) => {
-	let timeout;
-	return function (...args) {
+	let timeout = null;
+	/**
+	 * @testable false
+	 * @covered-by src/script/shared/utilities.mjs::debounce
+	 * @reason callable wrapper behavior is exercised through the debounce contract
+	 */
+	const debounced = function (...args) {
 		clearTimeout(timeout);
-		timeout = setTimeout(() => func.apply(this, args), wait);
+		timeout = setTimeout(() => {
+			timeout = null;
+			func.apply(this, args);
+		}, wait);
 	};
+	debounced.cancel = () => {
+		clearTimeout(timeout);
+		timeout = null;
+	};
+	return debounced;
 };
 
 /**
@@ -1235,6 +1250,7 @@ const _request = async (
 		requestHeaders = {},
 		acknowledgeEntities = true,
 		replaceErrorPage = true,
+		signal = undefined,
 	} = {},
 ) => {
 	method = method.toUpperCase();
@@ -1250,6 +1266,7 @@ const _request = async (
 		method,
 		headers,
 		credentials: "include",
+		...(signal ? { signal } : {}),
 		...(keepalive ? { keepalive: true } : {}),
 	};
 
@@ -1439,7 +1456,7 @@ class ShellView {
 			"_pollingPromise",
 			"PollingCoordinator",
 			async () => {
-				const { PollingCoordinator } = await import('./polling.js?v=b66dffd0');
+				const { PollingCoordinator } = await import('./polling.js?v=bcdf9883');
 				return this._destroyed ? null : new PollingCoordinator(this).init();
 			},
 		);
@@ -1449,7 +1466,7 @@ class ShellView {
 		return this._loadShellManager("_searchPromise", "SearchBox", async () => {
 			const search = document.querySelector("[lp-search]");
 			if (!search) return null;
-			const { SearchBox } = await import('./search.js?v=b66dffd0');
+			const { SearchBox } = await import('./search.js?v=bcdf9883');
 			if (this._destroyed) return null;
 			const box = new SearchBox(search);
 			await box.init();
@@ -1464,7 +1481,7 @@ class ShellView {
 			async () => {
 				if (!document.querySelector("[data-role='notifications']")) return null;
 				await this.ensurePollingCoordinator();
-				const { Notifications } = await import('./notifications.js?v=b66dffd0');
+				const { Notifications } = await import('./notifications.js?v=bcdf9883');
 				if (this._destroyed) return null;
 				const notifications = new Notifications(this);
 				notifications.init();

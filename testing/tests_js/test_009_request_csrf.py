@@ -88,6 +88,7 @@ context.fetch = async (url, config = {{}}) => {{
     headers: cloneHeaders(config.headers),
     keepalive: Boolean(config.keepalive),
     method: config.method || "GET",
+    signal: config.signal,
   }});
 
   if (requestUrl === "/upstream-reset") {{
@@ -305,6 +306,21 @@ if (calls.length !== 1) {
 }
 if (fetchCalls.some((call) => call.url === "/l/token")) {
   throw new Error("Non-CSRF 400 triggered a token refresh");
+}
+""",
+    )
+
+
+# @source src/script/shared/request.mjs::_request
+def test_get_request_forwards_abort_signal_to_fetch(run_node):
+    run_request_check(
+        run_node,
+        """
+const controller = new AbortController();
+await request.get("/unchanged", null, { signal: controller.signal });
+const call = fetchCalls.find((item) => item.url === "/unchanged");
+if (call?.signal !== controller.signal) {
+  throw new Error("GET request did not forward its AbortSignal to fetch");
 }
 """,
     )

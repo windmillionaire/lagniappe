@@ -426,6 +426,13 @@ export class ElementSettings {
 		this.panel.addEventListener("blur", this._blur);
 	}
 
+	destroy() {
+		this.panel.removeEventListener("input", this._input);
+		this.panel.removeEventListener("change", this._change);
+		this.panel.removeEventListener("click", this._click);
+		this.panel.removeEventListener("blur", this._blur);
+	}
+
 	_input(e) {
 		const element = this.builder.selectedElement;
 		if (e.target.closest("[data-setting=title]")) {

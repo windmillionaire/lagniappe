@@ -20,6 +20,7 @@ export {
 	validateConnectivityState,
 	WORKER_MESSAGES,
 } from "./protocol";
+export { QueryLifecycle } from "./queryLifecycle";
 export { request } from "./request";
 export { localStore, sessionStore } from "./storage";
 export { SyncManager } from "./sync";

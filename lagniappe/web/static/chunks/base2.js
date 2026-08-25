@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b66dffd0';
-import { B as BaseForm } from './baseForm.js?v=b66dffd0';
-import { s as setIcon } from './icons.js?v=b66dffd0';
-import { w as withTransition } from './foundation.js?v=b66dffd0';
-import './connectivity.js?v=b66dffd0';
-import { p as primitives } from './primitives.js?v=b66dffd0';
-import { S as SelectBox } from './select2.js?v=b66dffd0';
+import { STYLES } from './styles.js?v=bcdf9883';
+import { B as BaseForm } from './baseForm.js?v=bcdf9883';
+import { s as setIcon } from './icons.js?v=bcdf9883';
+import { w as withTransition } from './foundation.js?v=bcdf9883';
+import './connectivity.js?v=bcdf9883';
+import { p as primitives } from './primitives.js?v=bcdf9883';
+import { S as SelectBox } from './select2.js?v=bcdf9883';
 
 /**
  * @testable infrastructure
@@ -25,6 +25,7 @@ class Condition {
 		this.complete = false;
 		this.focusTarget = null;
 		this.index = null;
+		this._successTimer = null;
 	}
 
 	get html() {
@@ -38,13 +39,14 @@ class Condition {
 	}
 
 	showSuccess() {
+		clearTimeout(this._successTimer);
 		const status = document.createElement("span");
 		const icon = status.appendChild(document.createElement("span"));
 		status.dataset.kind = "success";
 		setIcon(icon, "check", "ml-2 text-kind-default");
 		this.header.querySelector("[data-role='title']").appendChild(status);
 
-		setTimeout(() => {
+		this._successTimer = setTimeout(() => {
 			void withTransition(() => status.remove(), {
 				label: "builder:condition-success",
 			});
@@ -136,6 +138,10 @@ class Condition {
 	}
 
 	destroy() {
+		clearTimeout(this._successTimer);
+		this._successTimer = null;
+		this.form?.destroy?.();
+		this.form = null;
 		this.destroyables.forEach((destroyable) => {
 			destroyable?.destroy?.();
 		});

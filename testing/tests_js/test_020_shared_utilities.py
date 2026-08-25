@@ -112,7 +112,7 @@ source = source.replace(
 );
 source = source.replaceAll("export const ", "const ");
 source = source.replaceAll("export function ", "function ");
-source += "\\nglobalThis.waitForAttribute = waitForAttribute; globalThis.areEqual = areEqual;";
+source += "\\nglobalThis.waitForAttribute = waitForAttribute; globalThis.areEqual = areEqual; globalThis.debounce = debounce;";
 vm.runInContext(source, context);
 
 (async () => {{
@@ -123,6 +123,24 @@ vm.runInContext(source, context);
 }});
 """
     run_node(script)
+
+
+# @pair async-query:debounce-teardown
+# @source src/script/shared/utilities.mjs::debounce
+def test_debounce_cancel_prevents_delayed_callback(run_node):
+    run_utility_check(
+        run_node,
+        """
+let calls = 0;
+const delayed = context.debounce(() => { calls += 1; }, 5);
+delayed();
+delayed.cancel();
+await new Promise((resolve) => setTimeout(resolve, 15));
+if (calls !== 0) {
+  throw new Error("Cancelled debounce callback still ran");
+}
+""",
+    )
 
 
 # @pairs frontend-utilities:mutation-observer frontend-utilities:cleanup

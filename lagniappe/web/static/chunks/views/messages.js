@@ -1,18 +1,20 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from '../styles.js?v=b66dffd0';
-import { ensureMessageComposer } from '../messageComposer.js?v=b66dffd0';
-import { r as request, E as ENDPOINTS } from '../foundation.js?v=b66dffd0';
-import '../connectivity.js?v=b66dffd0';
-import { c as createIcon } from '../icons.js?v=b66dffd0';
-import { C as Core } from '../core-foundation.js?v=b66dffd0';
-import '../modal.js?v=b66dffd0';
-import '../facets.js?v=b66dffd0';
-import '../combobox.js?v=b66dffd0';
-import '../primitives.js?v=b66dffd0';
-import '../results.js?v=b66dffd0';
-import '../storage.js?v=b66dffd0';
-import '../formatting.js?v=b66dffd0';
-import '../submitter.js?v=b66dffd0';
+import { STYLES } from '../styles.js?v=bcdf9883';
+import { ensureMessageComposer } from '../messageComposer.js?v=bcdf9883';
+import { r as request, E as ENDPOINTS } from '../foundation.js?v=bcdf9883';
+import '../connectivity.js?v=bcdf9883';
+import { c as createIcon } from '../icons.js?v=bcdf9883';
+import { C as Core } from '../core-foundation.js?v=bcdf9883';
+import '../modal.js?v=bcdf9883';
+import '../facets.js?v=bcdf9883';
+import '../remote.js?v=bcdf9883';
+import '../queryLifecycle.js?v=bcdf9883';
+import '../combobox.js?v=bcdf9883';
+import '../primitives.js?v=bcdf9883';
+import '../results.js?v=bcdf9883';
+import '../storage.js?v=bcdf9883';
+import '../formatting.js?v=bcdf9883';
+import '../submitter.js?v=bcdf9883';
 
 const MESSAGE_POLL_SUBSCRIPTION = "view:channel:messages";
 
@@ -261,7 +263,7 @@ class Messages extends Core {
 		if (this.conversationDropdown || this._conversationDropdownPromise) {
 			return this.conversationDropdown || this._conversationDropdownPromise;
 		}
-		this._conversationDropdownPromise = import('../dropdown.js?v=b66dffd0')
+		this._conversationDropdownPromise = import('../dropdown.js?v=bcdf9883')
 			.then(({ Dropdown }) => {
 				if (this._destroyed || !this.mobile) return null;
 				this.conversationDropdown = new Dropdown(this.selector).init({

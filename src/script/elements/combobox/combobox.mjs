@@ -24,6 +24,7 @@ import { primitives } from "../primitives";
  */
 export class Combobox {
 	constructor(element) {
+		this._destroyed = false;
 		this.parent = element;
 		this.element = this.parent.querySelector("select, input") || element;
 		this.mobile = window.matchMedia("(max-width: 768px)").matches;
@@ -72,6 +73,7 @@ export class Combobox {
 	}
 
 	init() {
+		if (this._destroyed) return;
 		if (!this.element) throw new Error("Element not found");
 
 		this.element.autocomplete = "off";
@@ -171,7 +173,7 @@ export class Combobox {
 	}
 
 	_createPanel() {
-		if (this.panel) return;
+		if (this._destroyed || this.panel) return;
 
 		this.panel = document.createElement("div");
 		this.panel.id = `${this.id}-panel`;
@@ -188,6 +190,7 @@ export class Combobox {
 
 	_startAutoUpdate() {
 		this._cleanupAutoUpdate();
+		if (this._destroyed) return Promise.resolve(false);
 		const reference = this.positionReference || this.element;
 		const panel = this.panel;
 		if (!panel) return Promise.resolve(false);
@@ -210,7 +213,7 @@ export class Combobox {
 			else resolveReady(positioned);
 		};
 		const cleanup = autoUpdate(reference, panel, () => {
-			if (!active || this.panel !== panel) return;
+			if (!active || this._destroyed || this.panel !== panel) return;
 			const request = ++positionRequest;
 			const middleware = [
 				offset(4),
@@ -231,7 +234,7 @@ export class Combobox {
 				middleware: middleware,
 			})
 				.then(({ x, y, placement }) => {
-					if (!active || this.panel !== panel) {
+					if (!active || this._destroyed || this.panel !== panel) {
 						settleReady(false);
 						return;
 					}
@@ -244,7 +247,7 @@ export class Combobox {
 					settleReady(true);
 				})
 				.catch((error) => {
-					if (!active || this.panel !== panel) {
+					if (!active || this._destroyed || this.panel !== panel) {
 						settleReady(false);
 						return;
 					}
@@ -282,7 +285,9 @@ export class Combobox {
 	}
 
 	updatePanel(html) {
+		if (this._destroyed) return false;
 		if (!this.panel) this._createPanel();
+		if (!this.panel) return false;
 		this.options = [];
 		this.focusedIndex = -1;
 		this.element.removeAttribute("aria-activedescendant");
@@ -318,6 +323,7 @@ export class Combobox {
 	}
 
 	showPanel() {
+		if (this._destroyed) return Promise.resolve(false);
 		const renderedOptions =
 			this.panel?.querySelectorAll(`[role='${this.optionRole}']`).length || 0;
 		if (renderedOptions === 0) {
@@ -517,6 +523,8 @@ export class Combobox {
 	}
 
 	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
 		this._removeElementHandlers();
 		this._removePanelHandlers();
 		this._removeDocumentHandlers();
@@ -528,5 +536,10 @@ export class Combobox {
 		this.hidePanel();
 		if (this.panel) this.panel.remove();
 		this.panel = null;
+		this.element.removeAttribute("aria-controls");
+		this.parent.removeAttribute("data-combobox-id");
+		if (this.parent._lp_combobox === this) {
+			delete this.parent._lp_combobox;
+		}
 	}
 }

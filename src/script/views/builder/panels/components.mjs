@@ -112,6 +112,8 @@ export class ComponentsPanel {
 	}
 
 	destroy() {
-		this.sortable.destroy();
+		this.column?.removeEventListener("click", this._click);
+		this.sortable?.destroy();
+		this.sortable = null;
 	}
 }

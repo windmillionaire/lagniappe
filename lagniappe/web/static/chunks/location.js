@@ -1,12 +1,14 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b66dffd0';
-import { s as setIcon } from './icons.js?v=b66dffd0';
-import { d as debounce, E as ENDPOINTS, r as request } from './foundation.js?v=b66dffd0';
-import './connectivity.js?v=b66dffd0';
-import { p as primitives } from './primitives.js?v=b66dffd0';
-import { updateUserLocation } from './user2.js?v=b66dffd0';
-import { C as Combobox } from './combobox.js?v=b66dffd0';
-import { B as BaseElement } from './baseElement.js?v=b66dffd0';
+import { STYLES } from './styles.js?v=bcdf9883';
+import { s as setIcon } from './icons.js?v=bcdf9883';
+import { E as ENDPOINTS, r as request } from './foundation.js?v=bcdf9883';
+import './connectivity.js?v=bcdf9883';
+import { p as primitives } from './primitives.js?v=bcdf9883';
+import { updateUserLocation } from './user2.js?v=bcdf9883';
+import { R as RemoteQueryCombobox } from './remote.js?v=bcdf9883';
+import { B as BaseElement } from './baseElement.js?v=bcdf9883';
+import './queryLifecycle.js?v=bcdf9883';
+import './combobox.js?v=bcdf9883';
 
 /**
  * @testable true
@@ -15,17 +17,13 @@ import { B as BaseElement } from './baseElement.js?v=b66dffd0';
  * @pairs location:initialization location:on-demand
  * @pairs location:session-update location:request-ordering
  */
-class LocationBox extends Combobox {
+class LocationBox extends RemoteQueryCombobox {
 	constructor(element, { name = null, onSelect = null } = {}) {
 		super(element);
 		this.index = "location";
-		this.currentQuery = "";
 		this.fieldName = name || this.name;
 		this.location = null;
 		this.onSelect = onSelect;
-
-		this._input = this._input.bind(this);
-		this._debouncedInput = debounce(this._input, 200);
 
 		this.endpoint = ENDPOINTS.location;
 	}
@@ -40,18 +38,15 @@ class LocationBox extends Combobox {
 		this.basePlaceholder = this.element.placeholder;
 		this._createHiddenInput();
 		this.element.autocomplete = "bork";
-		this.element.addEventListener("input", this._debouncedInput);
 		void updateUserLocation();
 	}
 
 	_input(event) {
 		const query = event.target.value.trim();
-		this.currentQuery = query;
 		if (query.length > 2) {
-			this._search(query);
-		} else if (this.panelOpen) {
-			this.hidePanel();
+			return this._search(query);
 		}
+		this.settleQueryInput({ clear: true });
 	}
 
 	elementClick(event) {
@@ -59,23 +54,24 @@ class LocationBox extends Combobox {
 		super.elementClick(event, false);
 	}
 
-	async _search(query) {
-		await updateUserLocation();
-		if (query !== this.currentQuery) return;
-
+	_search(query) {
 		const params = new URLSearchParams();
 		params.set("q", query);
-		const response = await request.get(this.endpoint, params);
-		if (query !== this.currentQuery) return;
-
-		if (!this.panel) this._createPanel();
-		this.panel.innerHTML = "";
-		this.options = [];
-		this.focusedIndex = -1;
-
-		if (response.ok) this.updatePanel(response.results || null);
-		this._appendManualOption(query);
-		this.showPanel();
+		return this.runQuery(
+			query,
+			async (token) => {
+				await updateUserLocation();
+				if (token.signal?.aborted) return null;
+				return request.get(this.endpoint, params, { signal: token.signal });
+			},
+			(response) => {
+				this.clearQueryResults();
+				if (response?.ok) this.updatePanel(response.results || null);
+				if (!this.panel) this._createPanel();
+				this._appendManualOption(query);
+				return this.showPanel();
+			},
+		);
 	}
 
 	_setManualAddress(text, notify = true) {
@@ -140,11 +136,6 @@ class LocationBox extends Combobox {
 		this.hidePanel();
 		if (this.onSelect) this.onSelect(null, { notify });
 		if (notify && !this.onSelect) this._dispatchChange();
-	}
-
-	destroy() {
-		this.element.removeEventListener("input", this._debouncedInput);
-		super.destroy();
 	}
 
 	_appendManualOption(query) {

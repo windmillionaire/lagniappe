@@ -278,14 +278,29 @@ export const showBriefly = (element, content, duration = 1500) => {
 };
 
 /**
- * @testable infrastructure
+ * @testable true
+ * @tests tests_js/test_020_shared_utilities.py::test_debounce_cancel_prevents_delayed_callback
+ * @pair async-query:debounce-teardown
  */
 export const debounce = (func, wait) => {
-	let timeout;
-	return function (...args) {
+	let timeout = null;
+	/**
+	 * @testable false
+	 * @covered-by src/script/shared/utilities.mjs::debounce
+	 * @reason callable wrapper behavior is exercised through the debounce contract
+	 */
+	const debounced = function (...args) {
 		clearTimeout(timeout);
-		timeout = setTimeout(() => func.apply(this, args), wait);
+		timeout = setTimeout(() => {
+			timeout = null;
+			func.apply(this, args);
+		}, wait);
 	};
+	debounced.cancel = () => {
+		clearTimeout(timeout);
+		timeout = null;
+	};
+	return debounced;
 };
 
 /**

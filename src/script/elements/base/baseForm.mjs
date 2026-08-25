@@ -453,6 +453,11 @@ export class BaseForm {
 	}
 
 	destroy() {
+		const submitButton = this.submitButton;
+		if (submitButton?.__initialized) {
+			submitButton.removeEventListener("click", this.submitting);
+			delete submitButton.__initialized;
+		}
 		if (this._offlineListener) {
 			this._widget.view?.elt?.removeEventListener(
 				"offline-status",

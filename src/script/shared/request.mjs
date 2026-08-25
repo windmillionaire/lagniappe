@@ -336,6 +336,7 @@ const _request = async (
 		requestHeaders = {},
 		acknowledgeEntities = true,
 		replaceErrorPage = true,
+		signal = undefined,
 	} = {},
 ) => {
 	method = method.toUpperCase();
@@ -351,6 +352,7 @@ const _request = async (
 		method,
 		headers,
 		credentials: "include",
+		...(signal ? { signal } : {}),
 		...(keepalive ? { keepalive: true } : {}),
 	};
 

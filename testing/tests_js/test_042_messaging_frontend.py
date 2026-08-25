@@ -24,6 +24,15 @@ def test_mention_node_collection_insertion_and_keyboard_contract(run_node):
               request: {},
               console,
               crypto: globalThis.crypto,
+              debounce(callback) {
+                const debounced = (...args) => callback(...args);
+                debounced.cancel = () => {};
+                return debounced;
+              },
+              QueryLifecycle: class {
+                invalidate() {}
+                destroy() {}
+              },
             };
             context.globalThis = context;
             vm.createContext(context);

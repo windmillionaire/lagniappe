@@ -1,16 +1,18 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b66dffd0';
-import { j as areEqual } from './foundation.js?v=b66dffd0';
-import './connectivity.js?v=b66dffd0';
-import { p as primitives } from './primitives.js?v=b66dffd0';
-import { F as FacetsBox } from './facets.js?v=b66dffd0';
-import { f as formatting } from './formatting.js?v=b66dffd0';
-import { B as BaseElement } from './baseElement.js?v=b66dffd0';
-import './icons.js?v=b66dffd0';
-import './combobox.js?v=b66dffd0';
-import './results.js?v=b66dffd0';
-import './storage.js?v=b66dffd0';
-import './submitter.js?v=b66dffd0';
+import { STYLES } from './styles.js?v=bcdf9883';
+import { j as areEqual } from './foundation.js?v=bcdf9883';
+import './connectivity.js?v=bcdf9883';
+import { p as primitives } from './primitives.js?v=bcdf9883';
+import { F as FacetsBox } from './facets.js?v=bcdf9883';
+import { f as formatting } from './formatting.js?v=bcdf9883';
+import { B as BaseElement } from './baseElement.js?v=bcdf9883';
+import './icons.js?v=bcdf9883';
+import './remote.js?v=bcdf9883';
+import './queryLifecycle.js?v=bcdf9883';
+import './combobox.js?v=bcdf9883';
+import './results.js?v=bcdf9883';
+import './storage.js?v=bcdf9883';
+import './submitter.js?v=bcdf9883';
 
 /**
  * @testable infrastructure

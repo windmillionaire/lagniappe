@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { g as generateElementId, w as withTransition, c as captureError, s as showBriefly } from './foundation.js?v=b66dffd0';
-import './connectivity.js?v=b66dffd0';
-import { c as createIcon } from './icons.js?v=b66dffd0';
-import { p as primitives } from './primitives.js?v=b66dffd0';
-import { g as getFormElement } from './loader.js?v=b66dffd0';
+import { g as generateElementId, w as withTransition, c as captureError, s as showBriefly } from './foundation.js?v=bcdf9883';
+import './connectivity.js?v=bcdf9883';
+import { c as createIcon } from './icons.js?v=bcdf9883';
+import { p as primitives } from './primitives.js?v=bcdf9883';
+import { g as getFormElement } from './loader.js?v=bcdf9883';
 
 /**
  * @testable infrastructure
@@ -684,6 +684,11 @@ class BaseForm {
 	}
 
 	destroy() {
+		const submitButton = this.submitButton;
+		if (submitButton?.__initialized) {
+			submitButton.removeEventListener("click", this.submitting);
+			delete submitButton.__initialized;
+		}
 		if (this._offlineListener) {
 			this._widget.view?.elt?.removeEventListener(
 				"offline-status",

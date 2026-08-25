@@ -7,7 +7,13 @@ import {
 } from "@floating-ui/dom";
 import { mergeAttributes, Node } from "@tiptap/core";
 import { STYLES } from "styles";
-import { generateElementId, request } from "../../../shared";
+import {
+	captureError,
+	debounce,
+	generateElementId,
+	QueryLifecycle,
+	request,
+} from "../../../shared";
 
 /**
  * @testable true
@@ -96,6 +102,14 @@ const currentQuery = (editor) => {
 };
 
 /**
+ * @testable false
+ * @covered-by src/script/elements/editor/extensions/mention.mjs::MentionSuggestions
+ * @reason suggestion publication validates the combined query and editor range key
+ */
+const queryKey = (active) =>
+	active ? `${active.from}:${active.to}:${active.query}` : null;
+
+/**
  * @testable true
  * @tests tests_js/test_042_messaging_frontend.py::test_mention_node_collection_insertion_and_keyboard_contract
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
@@ -104,18 +118,23 @@ const currentQuery = (editor) => {
  */
 export class MentionSuggestions {
 	constructor(editor, { documentKey, onInsert = null }) {
+		this._destroyed = false;
 		this.editor = editor;
 		this.documentKey = documentKey;
 		this.onInsert = onInsert;
 		this.options = [];
 		this.focused = 0;
-		this.sequence = 0;
+		this.queries = new QueryLifecycle();
 		this._refresh = this._refresh.bind(this);
 		this._keydown = this._keydown.bind(this);
 		this._click = this._click.bind(this);
+		this._debouncedSearch = debounce(() => {
+			this.search().catch((error) => captureError(error, this.popup));
+		}, 120);
 	}
 
 	init() {
+		if (this._destroyed) return this;
 		this.popup = document.createElement("div");
 		this.popup.id = generateElementId("mention-suggestions");
 		this.popup.dataset.role = "mention-suggestions";
@@ -138,36 +157,46 @@ export class MentionSuggestions {
 
 	/** @testable infrastructure */
 	_refresh() {
-		clearTimeout(this.timer);
-		this.timer = setTimeout(() => this.search(), 120);
+		if (this._destroyed) return;
+		this.hide();
+		this._debouncedSearch();
 	}
 
 	/** @testable infrastructure */
 	async search() {
+		if (this._destroyed) return false;
 		const active = currentQuery(this.editor);
 		if (!active) return this.hide();
-		this.active = active;
-		const sequence = ++this.sequence;
 		const params = new URLSearchParams({
 			q: active.query,
 			permission: "mention",
 			document: this.documentKey,
 		});
-		const response = await request.get("/l/search-index/user", params);
-		if (sequence !== this.sequence || !response?.ok) return;
-		const template = document.createElement("template");
-		template.innerHTML = response.results || "";
-		this.rows = Array.from(
-			template.content.querySelectorAll("[role='option']"),
+		const key = queryKey(active);
+		return this.queries.run(
+			key,
+			(token) =>
+				request.get("/l/search-index/user", params, { signal: token.signal }),
+			(response) => {
+				if (!response?.ok) return this.hide();
+				const template = document.createElement("template");
+				template.innerHTML = response.results || "";
+				this.rows = Array.from(
+					template.content.querySelectorAll("[role='option']"),
+				);
+				this.options = this.rows.filter((option) => option.dataset.id);
+				if (!this.rows.length) return this.hide();
+				this.active = active;
+				this.focused = 0;
+				this.render();
+			},
+			{ getCurrentKey: () => queryKey(currentQuery(this.editor)) },
 		);
-		this.options = this.rows.filter((option) => option.dataset.id);
-		if (!this.rows.length) return this.hide();
-		this.focused = 0;
-		this.render();
 	}
 
 	/** @testable infrastructure */
 	render() {
+		if (this._destroyed || !this.popup?.isConnected) return;
 		this.popup.replaceChildren(
 			...this.rows.map((option, rowIndex) => {
 				const rendered = option.cloneNode(true);
@@ -199,6 +228,7 @@ export class MentionSuggestions {
 
 	/** @testable infrastructure */
 	_startPositioning() {
+		if (this._destroyed || !this.active || !this.popup?.isConnected) return;
 		this._cleanupPositioning();
 		const contextElement = this.editor.view.dom;
 		const reference = {
@@ -222,13 +252,21 @@ export class MentionSuggestions {
 				placement: "bottom-start",
 				strategy: "fixed",
 				middleware: [offset(4), shift({ padding: 5 }), flip({ padding: 5 })],
-			}).then(({ x, y }) => {
-				if (this.popup?.dataset.visible !== "true") return;
-				Object.assign(this.popup.style, {
-					left: `${x}px`,
-					top: `${y}px`,
-				});
-			});
+			})
+				.then(({ x, y }) => {
+					if (
+						this._destroyed ||
+						!this.popup?.isConnected ||
+						this.popup.dataset.visible !== "true"
+					) {
+						return;
+					}
+					Object.assign(this.popup.style, {
+						left: `${x}px`,
+						top: `${y}px`,
+					});
+				})
+				.catch((error) => captureError(error, this.popup));
 		});
 	}
 
@@ -313,10 +351,10 @@ export class MentionSuggestions {
 
 	/** @testable infrastructure */
 	hide() {
-		this.sequence += 1;
+		this.queries.invalidate();
 		this._cleanupPositioning();
-		this.popup.classList.add("hidden");
-		this.popup.dataset.visible = "false";
+		this.popup?.classList.add("hidden");
+		if (this.popup) this.popup.dataset.visible = "false";
 		this.editor.view.dom.setAttribute("aria-expanded", "false");
 		this.editor.view.dom.removeAttribute("aria-activedescendant");
 		this.options = [];
@@ -325,13 +363,17 @@ export class MentionSuggestions {
 	}
 
 	destroy() {
-		clearTimeout(this.timer);
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this._debouncedSearch.cancel();
+		this.queries.destroy();
 		this._cleanupPositioning();
 		this.editor.off("update", this._refresh);
 		this.editor.off("selectionUpdate", this._refresh);
 		this.editor.view.dom.removeEventListener("keydown", this._keydown, true);
-		this.popup.removeEventListener("click", this._click);
-		this.popup.remove();
+		this.popup?.removeEventListener("click", this._click);
+		this.popup?.remove();
+		this.popup = null;
 		this.editor.view.dom.removeAttribute("aria-controls");
 		this.editor.view.dom.removeAttribute("aria-expanded");
 		this.editor.view.dom.removeAttribute("aria-haspopup");

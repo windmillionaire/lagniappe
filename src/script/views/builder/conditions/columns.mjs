@@ -17,6 +17,7 @@ export default class Columns extends Condition {
 		this.messages = {
 			submit: "Add Column",
 		};
+		this._updated = this._updated.bind(this);
 	}
 
 	init() {
@@ -105,13 +106,22 @@ export default class Columns extends Condition {
 		this.destroyables.push(selectBox);
 		this.focusTarget = selectElt;
 
-		this.target.addEventListener("updated", (e) => {
-			const options = Object.values(e.detail.options);
-			const value = options[0].id;
-			this._updateSetting(value);
-			this.addColumnName();
-			this.showProgress();
-		});
+		this.target.removeEventListener("updated", this._updated);
+		this.target.addEventListener("updated", this._updated);
+	}
+
+	_updated(e) {
+		const options = Object.values(e.detail.options);
+		const value = options[0]?.id;
+		if (!value) return;
+		this._updateSetting(value);
+		this.addColumnName();
+		this.showProgress();
+	}
+
+	destroy() {
+		this.target.removeEventListener("updated", this._updated);
+		super.destroy();
 	}
 
 	validate() {

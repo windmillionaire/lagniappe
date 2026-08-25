@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b66dffd0';
-import { g as generateElementId, c as captureError } from './foundation.js?v=b66dffd0';
-import './connectivity.js?v=b66dffd0';
-import { p as primitives } from './primitives.js?v=b66dffd0';
+import { STYLES } from './styles.js?v=bcdf9883';
+import { g as generateElementId, c as captureError } from './foundation.js?v=bcdf9883';
+import './connectivity.js?v=bcdf9883';
+import { p as primitives } from './primitives.js?v=bcdf9883';
 
 /**
  * Custom positioning reference element.
@@ -1548,6 +1548,7 @@ const computePosition = (reference, floating, options) => {
  */
 class Combobox {
 	constructor(element) {
+		this._destroyed = false;
 		this.parent = element;
 		this.element = this.parent.querySelector("select, input") || element;
 		this.mobile = window.matchMedia("(max-width: 768px)").matches;
@@ -1596,6 +1597,7 @@ class Combobox {
 	}
 
 	init() {
+		if (this._destroyed) return;
 		if (!this.element) throw new Error("Element not found");
 
 		this.element.autocomplete = "off";
@@ -1695,7 +1697,7 @@ class Combobox {
 	}
 
 	_createPanel() {
-		if (this.panel) return;
+		if (this._destroyed || this.panel) return;
 
 		this.panel = document.createElement("div");
 		this.panel.id = `${this.id}-panel`;
@@ -1712,6 +1714,7 @@ class Combobox {
 
 	_startAutoUpdate() {
 		this._cleanupAutoUpdate();
+		if (this._destroyed) return Promise.resolve(false);
 		const reference = this.positionReference || this.element;
 		const panel = this.panel;
 		if (!panel) return Promise.resolve(false);
@@ -1734,7 +1737,7 @@ class Combobox {
 			else resolveReady(positioned);
 		};
 		const cleanup = autoUpdate(reference, panel, () => {
-			if (!active || this.panel !== panel) return;
+			if (!active || this._destroyed || this.panel !== panel) return;
 			const request = ++positionRequest;
 			const middleware = [
 				offset(4),
@@ -1755,7 +1758,7 @@ class Combobox {
 				middleware: middleware,
 			})
 				.then(({ x, y, placement }) => {
-					if (!active || this.panel !== panel) {
+					if (!active || this._destroyed || this.panel !== panel) {
 						settleReady(false);
 						return;
 					}
@@ -1768,7 +1771,7 @@ class Combobox {
 					settleReady(true);
 				})
 				.catch((error) => {
-					if (!active || this.panel !== panel) {
+					if (!active || this._destroyed || this.panel !== panel) {
 						settleReady(false);
 						return;
 					}
@@ -1806,7 +1809,9 @@ class Combobox {
 	}
 
 	updatePanel(html) {
+		if (this._destroyed) return false;
 		if (!this.panel) this._createPanel();
+		if (!this.panel) return false;
 		this.options = [];
 		this.focusedIndex = -1;
 		this.element.removeAttribute("aria-activedescendant");
@@ -1842,6 +1847,7 @@ class Combobox {
 	}
 
 	showPanel() {
+		if (this._destroyed) return Promise.resolve(false);
 		const renderedOptions =
 			this.panel?.querySelectorAll(`[role='${this.optionRole}']`).length || 0;
 		if (renderedOptions === 0) {
@@ -2041,6 +2047,8 @@ class Combobox {
 	}
 
 	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
 		this._removeElementHandlers();
 		this._removePanelHandlers();
 		this._removeDocumentHandlers();
@@ -2052,6 +2060,11 @@ class Combobox {
 		this.hidePanel();
 		if (this.panel) this.panel.remove();
 		this.panel = null;
+		this.element.removeAttribute("aria-controls");
+		this.parent.removeAttribute("data-combobox-id");
+		if (this.parent._lp_combobox === this) {
+			delete this.parent._lp_combobox;
+		}
 	}
 }
 

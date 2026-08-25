@@ -908,6 +908,7 @@ export default class Core extends ShellView {
 		this.EditWatcher?.destroy();
 		this.Notifications?.destroy?.();
 		this.PollingCoordinator?.destroy();
+		this.SearchBox?.destroy?.();
 		this.offlineModal?.destroy?.();
 		this._componentActions.clear();
 

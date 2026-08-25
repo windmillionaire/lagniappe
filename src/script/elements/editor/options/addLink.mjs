@@ -1,9 +1,9 @@
 import { getMarkRange } from "@tiptap/core";
 import { STYLES } from "styles";
-import { debounce, ENDPOINTS, request } from "../../../shared";
+import { ENDPOINTS, request } from "../../../shared";
 import { BaseForm } from "../../base/baseForm";
 import { buttons } from "../../buttons";
-import { Combobox } from "../../combobox/combobox";
+import { RemoteQueryCombobox } from "../../combobox/remote";
 import { Results } from "../../combobox/results";
 import { primitives } from "../../primitives";
 import { normalizeLinkAttributes } from "../extensions/linkAttributes.mjs";
@@ -14,7 +14,7 @@ const BARE_DOMAIN_PATTERN = /^[^\s/]+\.[^\s]+(?:\/.*)?$/;
 /**
  * @testable infrastructure
  */
-class LinkSearchBox extends Combobox {
+class LinkSearchBox extends RemoteQueryCombobox {
 	constructor(element, addLink) {
 		super(element);
 		this.addLink = addLink;
@@ -22,27 +22,24 @@ class LinkSearchBox extends Combobox {
 		this.results = new Results(this.index);
 		this.endpoints = ENDPOINTS.search;
 		this.placement = "bottom-start";
-		this._debouncedInput = debounce(this._input.bind(this), 200);
 	}
 
 	init() {
 		this.styles.panel = `${STYLES.dropdown.panel} ${STYLES.editor.toolbar.portalIconContext} w-64 sm:w-96 mt-2`;
-		this.element.addEventListener("input", this._debouncedInput);
 		super.init();
 	}
 
 	_input(event) {
 		const query = event.target.value.trim();
 		if (this.addLink.linkHref(query)) {
-			this.hidePanel();
+			this.settleQueryInput({ clear: true });
 			return;
 		}
 
 		if (query.length > 2) {
-			this._search(query);
-		} else if (query.length === 0) {
-			this.hidePanel();
+			return this._search(query);
 		}
+		this.settleQueryInput({ clear: true });
 	}
 
 	elementClick(event) {
@@ -50,14 +47,22 @@ class LinkSearchBox extends Combobox {
 		if (!this.panelOpen && this.options.length > 0) this.showPanel();
 	}
 
-	async _search(query) {
+	_search(query) {
 		const params = new URLSearchParams();
 		params.set("q", query);
-		const response = await request.get(this.endpoints.bar, params);
-		if (response.ok) {
-			this.updatePanel(response.results || null);
-		}
-		this.showPanel();
+		return this.runQuery(
+			query,
+			(token) =>
+				request.get(this.endpoints.bar, params, { signal: token.signal }),
+			(response) => {
+				if (response?.ok) {
+					this.updatePanel(response.results || null);
+				} else {
+					this.clearQueryResults();
+				}
+				return this.showPanel();
+			},
+		);
 	}
 
 	selectOption(option) {
@@ -66,11 +71,6 @@ class LinkSearchBox extends Combobox {
 		this.results.save(option);
 		this.hidePanel();
 		this.addLink.applySearchResult(option.dataset.url);
-	}
-
-	destroy() {
-		this.element.removeEventListener("input", this._debouncedInput);
-		super.destroy();
 	}
 }
 

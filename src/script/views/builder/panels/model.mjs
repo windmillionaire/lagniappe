@@ -152,7 +152,8 @@ export class ModelPanel {
 	}
 
 	destroy() {
-		this.sortable.destroy();
+		this.sortable?.destroy();
+		this.sortable = null;
 	}
 }
 

@@ -6,6 +6,9 @@ import { request, withTransition } from "../../../shared";
  */
 export class Header {
 	constructor(builder) {
+		this._destroyed = false;
+		this._previewGeneration = 0;
+		this._messageTimer = null;
 		this.builder = builder;
 		this.nameDisplay = document.getElementById("form-name-display");
 		this.nameInput = document.getElementById("form-name-input");
@@ -47,9 +50,12 @@ export class Header {
 	}
 
 	message(text) {
+		if (this._destroyed) return;
+		clearTimeout(this._messageTimer);
 		this.notification.textContent = text;
 		this.notification.dataset.visible = "true";
-		setTimeout(() => {
+		this._messageTimer = setTimeout(() => {
+			if (this._destroyed) return;
 			this.notification.dataset.visible = "false";
 		}, 3000);
 	}
@@ -61,6 +67,8 @@ export class Header {
 	 * @dimensions builder-preview
 	 */
 	async togglePreviewPanel() {
+		if (this._destroyed) return;
+		const generation = ++this._previewGeneration;
 		const active = this.previewToggle.dataset.active === "true";
 		this.previewToggle.dataset.active = active ? "false" : "true";
 		this.previewToggle.setAttribute("aria-checked", active ? "false" : "true");
@@ -75,10 +83,18 @@ export class Header {
 				submission: {},
 			});
 			await renderer.render();
+			if (this._destroyed || generation !== this._previewGeneration) {
+				renderer.destroy();
+				return;
+			}
 		}
 
 		await withTransition(
 			() => {
+				if (this._destroyed || generation !== this._previewGeneration) {
+					renderer?.destroy();
+					return;
+				}
 				if (!active) {
 					this.renderer = renderer;
 					this.builder.elt.dataset.expanded = "true";
@@ -86,7 +102,7 @@ export class Header {
 					this.builder.conditions.hide();
 					this.builder.model.hide();
 				} else {
-					this.renderer.destroy();
+					this.renderer?.destroy();
 					this.renderer = null;
 					this.builder.elt.dataset.expanded = "false";
 					this.previewPanel.dataset.visible = "false";
@@ -105,13 +121,14 @@ export class Header {
 	 * @dimensions builder-save builder-reload
 	 */
 	async saveForm() {
-		if (!this.saveButton || !this.schemaForm) return;
+		if (this._destroyed || !this.saveButton || !this.schemaForm) return;
 		this.saveButton.disabled = true;
 		this.saveButton.classList.add("opacity-50");
 		const response = await request.put(
 			this.schemaForm.dataset.route,
 			new FormData(this.schemaForm),
 		);
+		if (this._destroyed) return;
 		response.ok ? this.saved() : this.message(response.error);
 	}
 
@@ -150,6 +167,13 @@ export class Header {
 	}
 
 	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this._previewGeneration += 1;
+		clearTimeout(this._messageTimer);
+		this._messageTimer = null;
+		this.nameInput.removeEventListener("blur", this._nameBlur);
+		this.nameInput.removeEventListener("keydown", this._nameKeyDown);
 		this.renderer?.destroy();
 		this.renderer = null;
 	}

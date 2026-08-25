@@ -7,6 +7,7 @@ import { ENDPOINTS, Modal, request } from "../../../shared";
  */
 export class FormSettings {
 	constructor(builder) {
+		this._destroyed = false;
 		this.builder = builder;
 		this.column = document.getElementById("form-settings-panel");
 		this.restrictions = document.querySelector("[data-role='restrict-access']");
@@ -31,6 +32,8 @@ export class FormSettings {
 		this._addRestriction = this._addRestriction.bind(this);
 		this._input = this._input.bind(this);
 		this._click = this._click.bind(this);
+		this._restrictionUpdated = this._restrictionUpdated.bind(this);
+		this.modal = null;
 	}
 
 	/**
@@ -40,6 +43,7 @@ export class FormSettings {
 	 * @dimensions access-restrictions group-restricted
 	 */
 	init() {
+		if (this._destroyed) return;
 		if (this.generateForm) {
 			this.generateForm.init();
 			this.generateForm.target.addEventListener("submit", this._generateSchema);
@@ -54,16 +58,19 @@ export class FormSettings {
 			);
 			this.selectGroup = new FacetsBox(input);
 			this.selectGroup.init();
-			this.restrictions.addEventListener("updated", (event) => {
-				const data = new FormData();
-				data.set("action", "add");
-
-				Object.keys(event.detail.options).forEach((key) => {
-					data.append("group-key", key);
-				});
-				this._addRestriction(data);
-			});
+			this.restrictions.addEventListener("updated", this._restrictionUpdated);
 		}
+	}
+
+	_restrictionUpdated(event) {
+		if (this._destroyed) return;
+		const data = new FormData();
+		data.set("action", "add");
+
+		Object.keys(event.detail.options).forEach((key) => {
+			data.append("group-key", key);
+		});
+		void this._addRestriction(data);
 	}
 
 	/**
@@ -118,11 +125,12 @@ export class FormSettings {
 	 * @dimensions access-restrictions owner-restricted group-restricted
 	 */
 	async _addRestriction(data) {
-		if (!this.restrictions) return;
+		if (this._destroyed || !this.restrictions) return;
 
 		const route = this.restrictions.dataset.route;
 
 		const response = await request.put(route, data);
+		if (this._destroyed) return;
 		if (response.html) {
 			const list = this.restrictions.querySelector("ul");
 			const nodes =
@@ -140,7 +148,7 @@ export class FormSettings {
 	}
 
 	async _removeRestriction(button) {
-		if (!this.restrictions) return;
+		if (this._destroyed || !this.restrictions) return;
 
 		const route = this.restrictions.dataset.route;
 		const key = button.dataset.key;
@@ -152,13 +160,14 @@ export class FormSettings {
 		data.set("group-key", key);
 
 		const response = await request.put(route, data);
+		if (this._destroyed) return;
 		if (response.ok) {
 			item.remove();
 		}
 	}
 
 	async _generateSchema(event) {
-		if (!this.generateForm?.target) return;
+		if (this._destroyed || !this.generateForm?.target) return;
 
 		event.preventDefault();
 		event.stopPropagation();
@@ -169,13 +178,16 @@ export class FormSettings {
 
 		if (!prompt) {
 			this.generateForm.showError("Please enter a description");
+			event.submitter.disabled = false;
 			return;
 		} else if (event.submitter.dataset.explain) {
 			data.append("explain", event.submitter.dataset.explain);
 		}
 
 		const response = await request.post(ENDPOINTS.createSchema, data);
+		if (this._destroyed) return;
 		const success = await this._updateSchema(response);
+		if (this._destroyed) return;
 
 		event.submitter.disabled = false;
 		this.generateForm.resetSubmitButton();
@@ -186,7 +198,7 @@ export class FormSettings {
 	}
 
 	async _updateSchema(response) {
-		if (!this.generateForm) return false;
+		if (this._destroyed || !this.generateForm) return false;
 
 		if (response.ok && response.schema) {
 			if (response.schema.length === 0) {
@@ -195,16 +207,19 @@ export class FormSettings {
 			}
 
 			for (const element of response.schema) {
+				if (this._destroyed) return false;
 				if (this.builder.elements.get(element.id)) continue;
 				const newElement = await this.builder.createElement(element);
+				if (this._destroyed) return false;
 				this.builder.model.panel.appendChild(newElement);
 			}
 			this.builder.updateSchemaOrder();
 			this.builder.header.saved();
 			return true;
 		} else if (response.ok && response.modal) {
-			const modal = new Modal(this.builder);
-			modal.attach(response.modal, this.generateForm);
+			this.modal?.destroy();
+			this.modal = new Modal(this.builder);
+			void this.modal.attach(response.modal, this.generateForm);
 		} else if (response.error) {
 			this.generateForm.showError(response.error);
 		}
@@ -212,7 +227,18 @@ export class FormSettings {
 	}
 
 	destroy() {
+		if (this._destroyed) return;
+		this._destroyed = true;
+		this.generateForm?.target?.removeEventListener(
+			"submit",
+			this._generateSchema,
+		);
+		this.column?.removeEventListener("input", this._input);
+		this.column?.removeEventListener("click", this._click);
+		this.restrictions?.removeEventListener("updated", this._restrictionUpdated);
 		this.generateForm?.destroy();
 		this.selectGroup?.destroy();
+		this.modal?.destroy();
+		this.modal = null;
 	}
 }

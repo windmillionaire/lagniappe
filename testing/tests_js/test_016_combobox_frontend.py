@@ -450,6 +450,10 @@ class Combobox {
   }
   init() {}
 }
+class RemoteQueryCombobox extends Combobox {
+  settleQueryInput() {}
+  clearQueryResults() {}
+}
 const element = {
   name: "place",
   placeholder: "Search for a place",
@@ -461,6 +465,7 @@ const element = {
 };
 const context = {
   Combobox,
+  RemoteQueryCombobox,
   debounce: (callback) => callback,
   document: {
     createElement() { return {}; },
@@ -512,8 +517,17 @@ class Combobox {
   updatePanel() {}
   showPanel() { calls.push("panel"); }
 }
+class RemoteQueryCombobox extends Combobox {
+  runQuery(key, loader, publisher) {
+    return loader({ signal: undefined }).then(publisher);
+  }
+  clearQueryResults() {
+    this.options = [];
+  }
+}
 const context = {
   Combobox,
+  RemoteQueryCombobox,
   debounce: (callback) => callback,
   ENDPOINTS: { location: "/l/search-location" },
   request: {
@@ -540,7 +554,6 @@ vm.runInContext(source, context);
 
 (async () => {
   const box = new context.LocationBox({});
-  box.currentQuery = "coffee";
   box._appendManualOption = () => {};
   const search = box._search("coffee");
   await Promise.resolve();

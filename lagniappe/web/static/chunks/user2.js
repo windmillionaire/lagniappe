@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request } from './foundation.js?v=b66dffd0';
-import './connectivity.js?v=b66dffd0';
+import { r as request } from './foundation.js?v=bcdf9883';
+import './connectivity.js?v=bcdf9883';
 
 let userDataUpdate = null;
 let userLocationUpdate = null;

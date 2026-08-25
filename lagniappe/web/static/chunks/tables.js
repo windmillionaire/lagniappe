@@ -1,21 +1,23 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { r as request, E as ENDPOINTS, w as withTransition } from './foundation.js?v=b66dffd0';
-import './connectivity.js?v=b66dffd0';
-import { STYLES } from './styles.js?v=b66dffd0';
-import { p as primitives } from './primitives.js?v=b66dffd0';
-import { s as setIcon } from './icons.js?v=b66dffd0';
-import { TableElement } from './table.js?v=b66dffd0';
-import './baseElement.js?v=b66dffd0';
-import './checkbox.js?v=b66dffd0';
-import './input.js?v=b66dffd0';
-import './formatting.js?v=b66dffd0';
-import './link.js?v=b66dffd0';
-import './facets.js?v=b66dffd0';
-import './combobox.js?v=b66dffd0';
-import './results.js?v=b66dffd0';
-import './storage.js?v=b66dffd0';
-import './submitter.js?v=b66dffd0';
-import './loader.js?v=b66dffd0';
+import { r as request, E as ENDPOINTS, w as withTransition } from './foundation.js?v=bcdf9883';
+import './connectivity.js?v=bcdf9883';
+import { STYLES } from './styles.js?v=bcdf9883';
+import { p as primitives } from './primitives.js?v=bcdf9883';
+import { s as setIcon } from './icons.js?v=bcdf9883';
+import { TableElement } from './table.js?v=bcdf9883';
+import './baseElement.js?v=bcdf9883';
+import './checkbox.js?v=bcdf9883';
+import './input.js?v=bcdf9883';
+import './formatting.js?v=bcdf9883';
+import './link.js?v=bcdf9883';
+import './facets.js?v=bcdf9883';
+import './remote.js?v=bcdf9883';
+import './queryLifecycle.js?v=bcdf9883';
+import './combobox.js?v=bcdf9883';
+import './results.js?v=bcdf9883';
+import './storage.js?v=bcdf9883';
+import './submitter.js?v=bcdf9883';
+import './loader.js?v=bcdf9883';
 
 /**
  * @testable true
