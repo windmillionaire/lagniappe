@@ -15,6 +15,7 @@ import os
 from pathlib import Path
 import shutil
 from typing import Any
+from urllib.parse import urlsplit
 
 from config import SETTINGS
 
@@ -68,6 +69,9 @@ def _admin_login_url() -> str:
     return f"{SETTINGS.test_config['BASE_URL']}/users/login?test_user={email}"
 
 
+# @testable true
+# @tests tests_tooling/test_004_reports.py::test_browser_review_capture_cleans_failed_folder
+# @matrix browser-review : attachment failure-cleanup
 def capture_review(args: argparse.Namespace) -> int:
     """Capture screenshots and browser diagnostics into a review folder."""
     os.environ["FLASK_ENV"] = "testing"
@@ -77,9 +81,9 @@ def capture_review(args: argparse.Namespace) -> int:
 
     from playwright.sync_api import sync_playwright
 
+    target_url = _resolve_target_url(args.path)
     review_dir = create_review_dir(args.name)
     screenshots_dir = review_dir / "screenshots"
-    target_url = _resolve_target_url(args.path)
     viewports = [parse_viewport(value) for value in args.viewport]
     capture_data: dict[str, Any] = {
         "name": args.name,
@@ -89,7 +93,20 @@ def capture_review(args: argparse.Namespace) -> int:
         "captures": [],
     }
 
+    attachment_id = None
+    configured_origin = urlsplit(str(SETTINGS.test_config["BASE_URL"]))
+    target_origin = urlsplit(target_url)
     try:
+        if args.login_admin or (
+            (target_origin.scheme, target_origin.netloc)
+            == (configured_origin.scheme, configured_origin.netloc)
+        ):
+            from runner.testing import attach_browser_review
+
+            attachment_id = attach_browser_review(
+                ["run.py", "browser-review", "capture", args.name, args.path]
+            )
+
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(
                 headless=True,
@@ -178,11 +195,19 @@ def capture_review(args: argparse.Namespace) -> int:
             json.dumps(starter, indent=2) + "\n",
             encoding="utf-8",
         )
-    except Exception:
+    except BaseException:
         if not args.keep_failed:
             shutil.rmtree(review_dir, ignore_errors=True)
+        if attachment_id is not None:
+            from runner.testing import detach_browser_review
+
+            detach_browser_review(attachment_id)
         raise
 
+    if attachment_id is not None:
+        from runner.testing import detach_browser_review
+
+        detach_browser_review(attachment_id)
     print(review_dir)
     return 0
 

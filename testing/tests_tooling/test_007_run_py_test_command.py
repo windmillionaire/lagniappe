@@ -1006,8 +1006,8 @@ def test_run_py_test_argument_errors_stop_before_preflight(monkeypatch, capsys):
     assert "suite aliases cannot be combined" in capsys.readouterr().err
 
 
-# @pair testing:frontend-build
-def test_configure_test_environment_prepares_frontend_only_for_e2e(monkeypatch):
+# @pair testing:environment
+def test_configure_test_environment_only_sets_import_environment(monkeypatch):
     calls = []
     config_module = types.ModuleType("config")
     config_module.__path__ = ["config"]
@@ -1023,7 +1023,7 @@ def test_configure_test_environment_prepares_frontend_only_for_e2e(monkeypatch):
     run.configure_test_environment(includes_e2e=True)
     run.configure_test_environment(includes_e2e=True)
 
-    assert calls == ["bundle", "bundle"]
+    assert calls == []
 
 
 # @matrix hosted-e2e testing : cli-routing frontend-build provider-auth
@@ -1150,6 +1150,41 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
 def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
     calls = []
 
+    class FakeAuthority:
+        nonce = "nonce-01234567890123456789"
+        mode = "local-e2e"
+
+        def update(self, **changes):
+            calls.append(("update", changes))
+
+        def complete(self):
+            calls.append("complete")
+
+        def mark_recovery_required(self):
+            calls.append("recovery")
+
+    fake_authority = FakeAuthority()
+    fake_session = types.ModuleType("runner.test_session")
+    fake_session.SESSION_MODE_ENV = "LAGNIAPPE_TEST_SESSION_MODE"
+    fake_session.SESSION_NONCE_ENV = "LAGNIAPPE_TEST_SESSION_NONCE"
+    fake_session.acquire_test_session = (
+        lambda mode, command: calls.append(("acquire", mode, command))
+        or fake_authority
+    )
+    fake_testing = types.ModuleType("runner.testing")
+    fake_testing.require_legacy_test_server_clear = lambda: calls.append("legacy")
+    fake_testing.require_server_port_available = lambda url: calls.append(("port", url))
+    fake_testing.ensure_test_frontend_bundle = lambda authority: calls.append("bundle")
+    fake_testing.prepare_test_artifacts = lambda authority: calls.append("artifacts")
+    fake_testing.cleanup_test_data = lambda authority: calls.append("cleanup")
+    fake_testing.run_test_server = lambda authority: types.SimpleNamespace(pid=5000)
+    fake_testing.terminate_test_server_process = lambda process: calls.append("stop")
+    fake_config = types.ModuleType("config")
+    fake_config.__path__ = []
+    fake_config.SETTINGS = types.SimpleNamespace(
+        test_config={"BASE_URL": "http://127.0.0.1:5000"}
+    )
+
     class FakeProcess:
         pid = 8642
 
@@ -1172,6 +1207,9 @@ def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
         lambda command, **kwargs: calls.append(("pytest", command))
         or FakeProcess(),
     )
+    monkeypatch.setitem(sys.modules, "runner.test_session", fake_session)
+    monkeypatch.setitem(sys.modules, "runner.testing", fake_testing)
+    monkeypatch.setitem(sys.modules, "config", fake_config)
 
     assert run.run_tests(["e2e"]) == 0
     assert calls[:2] == [

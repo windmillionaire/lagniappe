@@ -43,16 +43,11 @@ def hosted_e2e_enabled() -> bool:
 
 
 # @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_configure_test_environment_prepares_frontend_only_for_e2e
-# @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
-# @matrix hosted-e2e testing : frontend-build
+# @tests tests_tooling/test_007_run_py_test_command.py::test_configure_test_environment_only_sets_import_environment
+# @matrix testing : environment
 def configure_test_environment(*, includes_e2e: bool) -> None:
     """Set test env vars before pytest imports the app package."""
     os.environ["FLASK_ENV"] = "testing"
-    if includes_e2e and not hosted_e2e_enabled():
-        from runner.testing import ensure_test_frontend_bundle
-
-        ensure_test_frontend_bundle()
 
 
 RELEASES_DIR = REPOSITORY_ROOT / "documentation/releases"
@@ -159,16 +154,85 @@ def run_tests(test_args: list[str]) -> int:
             return 1
     command_variable = "LAGNIAPPE_TEST_COMMAND"
     previous_command = os.environ.get(command_variable)
-    os.environ[command_variable] = json.dumps(
-        [sys.executable, str(REPOSITORY_ROOT / "run.py"), "test", *test_args]
-    )
+    full_command = [
+        sys.executable,
+        str(REPOSITORY_ROOT / "run.py"),
+        "test",
+        *test_args,
+    ]
+    os.environ[command_variable] = json.dumps(full_command)
+    authority = None
+    server_process = None
+    crossed_data_boundary = False
+    session_environment = {}
     try:
+        if invocation.includes_e2e and not hosted_e2e_enabled():
+            from runner.test_session import (
+                SESSION_MODE_ENV,
+                SESSION_NONCE_ENV,
+                acquire_test_session,
+            )
+            from runner.testing import (
+                cleanup_test_data,
+                ensure_test_frontend_bundle,
+                prepare_test_artifacts,
+                require_legacy_test_server_clear,
+                require_server_port_available,
+                run_test_server,
+            )
+
+            require_legacy_test_server_clear()
+            authority = acquire_test_session("local-e2e", full_command)
+            for name, value in (
+                (SESSION_NONCE_ENV, authority.nonce),
+                (SESSION_MODE_ENV, authority.mode),
+            ):
+                session_environment[name] = os.environ.get(name)
+                os.environ[name] = value
+
+            from config import SETTINGS
+
+            require_server_port_available(SETTINGS.test_config["BASE_URL"])
+            ensure_test_frontend_bundle(authority)
+            prepare_test_artifacts(authority)
+            # Treat cleanup as crossed before invoking it: partial provider
+            # deletion still requires the guarded final cleanup path.
+            crossed_data_boundary = True
+            cleanup_test_data(authority)
+            server_process = run_test_server(authority)
+            authority.update(phase="ready")
+
         return _run_pytest_subprocess(pytest_command(list(invocation.pytest_args)))
+    except RuntimeError as error:
+        print(f"Test startup stopped: {error}")
+        return 1
     finally:
-        if previous_command is None:
-            os.environ.pop(command_variable, None)
-        else:
-            os.environ[command_variable] = previous_command
+        try:
+            if authority is not None:
+                from runner.testing import (
+                    cleanup_test_data,
+                    terminate_test_server_process,
+                )
+
+                try:
+                    if server_process is not None:
+                        terminate_test_server_process(server_process)
+                    if crossed_data_boundary:
+                        cleanup_test_data(authority)
+                    authority.complete()
+                except BaseException:
+                    authority.mark_recovery_required()
+                    raise
+        finally:
+            for name, previous in session_environment.items():
+                if previous is None:
+                    os.environ.pop(name, None)
+                else:
+                    os.environ[name] = previous
+            if previous_command is None:
+                os.environ.pop(command_variable, None)
+            else:
+                os.environ[command_variable] = previous_command
 
 
 def run_test_server_command(command_args: list[str]) -> int:
@@ -189,6 +253,16 @@ def run_test_server_command(command_args: list[str]) -> int:
         action="store_true",
         help="Stop the background testing server and clean test data.",
     )
+    action.add_argument(
+        "--status",
+        action="store_true",
+        help="Show the recorded session, process, and health status.",
+    )
+    action.add_argument(
+        "--recover",
+        action="store_true",
+        help="Recover a stale session only after proving its owner exited.",
+    )
     parser.add_argument(
         "--load",
         action="append",
@@ -204,25 +278,28 @@ def run_test_server_command(command_args: list[str]) -> int:
     if args.load and not args.start:
         parser.error("--load can only be used with --start")
 
-    if not GCLOUD_CLI:
+    if not args.status and not GCLOUD_CLI:
         print("gcloud CLI not found")
         return 1
 
     from config import SETTINGS
     from runner.testing import (
+        recover_managed_test_server,
         start_managed_test_server,
+        test_server_status,
         teardown_managed_test_server,
     )
 
     try:
         if args.start:
-            pid = start_managed_test_server()
+            result = start_managed_test_server(args.load or ())
             print(
                 f"Test server started at "
-                f"{SETTINGS.test_config['BASE_URL']} (pid {pid})"
+                f"{SETTINGS.test_config['BASE_URL']} (pid {result['pid']}, "
+                f"keeper {result['keeper_pid']})"
             )
-            if args.load:
-                summary = test_server_seed.load_packs(args.load)
+            summary = result.get("seed_summary")
+            if summary:
                 report = test_server_seed.LOAD_REPORT
                 print(
                     "Loaded test-server seed pack(s): "
@@ -232,6 +309,16 @@ def run_test_server_command(command_args: list[str]) -> int:
                 for landing in summary["landings"]:
                     print(f"Seed landing: {landing['name']} - {landing['url']}")
                 print(f"Seed report written to {report}")
+            return 0
+
+        if args.status:
+            status = test_server_status()
+            print(json.dumps(status, indent=2, sort_keys=True))
+            return 0
+
+        if args.recover:
+            result = recover_managed_test_server()
+            print(result["detail"])
             return 0
 
         pid = teardown_managed_test_server()

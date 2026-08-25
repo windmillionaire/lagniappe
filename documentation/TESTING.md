@@ -79,9 +79,12 @@ An unconfigured checkout can run offline tests; a partial target fails before
 collection. E2E and managed-server startup also verify ADC. Use
 `venv/bin/python run.py auth` when alignment is needed.
 
-Start with one nodeid or file. Expand after focused probes pass. E2E pytest,
-`test-server`, and browser-review sessions share one managed server/data prefix
-and must not run concurrently. Put several nodeids into one pytest invocation.
+Start with one nodeid or file. Expand after focused probes pass. Local E2E and
+`test-server` share one durable checkout session plus a cross-machine data
+lease, and conflicting starts fail before mutation. A local browser review may
+attach only to a ready managed server. Hosted E2E participates in the shared
+data lease but does not create checkout-local process state. Put several E2E
+nodeids into one pytest invocation.
 
 ## Provider contracts
 
@@ -165,7 +168,9 @@ Generated artifacts live under `reports/`:
 - browser screenshots/HTML: `reports/test_failures/`;
 - rich test reports: `reports/test_reports/`;
 - curated UI reviews: `reports/browser_reviews/`;
-- managed server state: `reports/test-server.*`;
+- managed/local E2E ownership: `reports/test-session.json` and
+  `reports/test-session.lock`;
+- managed server log: `reports/test-server.log`;
 - hosted bundles: `reports/hosted-e2e/`; and
 - traceability/template/style reports at their named report paths.
 

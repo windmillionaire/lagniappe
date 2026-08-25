@@ -820,3 +820,33 @@ def test_e2e_lease_acquire_heartbeat_and_owner_release(monkeypatch):
     ) as lease:
         lease.assert_active()
     assert e2e_lease.current_e2e_lease(client=client) is None
+
+
+# @matrix hosted-e2e : heartbeat lease-ownership transfer
+def test_e2e_lease_handoff_keeps_owner_for_heartbeat_adoption(monkeypatch):
+    monkeypatch.setattr(
+        e2e_lease,
+        "CONFIG",
+        SimpleNamespace(GOOGLE_CLOUD_PROJECT="project-1", PREFIX="test-"),
+    )
+    client = _LeaseRedis()
+    owner = "owner_abcdefghijklmnopqrstuvwxyz"
+    lease = e2e_lease.E2ELease(
+        owner,
+        client=client,
+        heartbeat_seconds=100,
+    )
+    lease.__enter__()
+
+    assert lease.handoff() == owner
+    lease.__exit__(None, None, None)
+    assert e2e_lease.current_e2e_lease(client=client) == owner
+
+    with e2e_lease.E2ELeaseHeartbeat(
+        owner,
+        client=client,
+        heartbeat_seconds=100,
+    ) as adopter:
+        adopter.assert_active()
+    assert e2e_lease.current_e2e_lease(client=client) == owner
+    assert e2e_lease.release_e2e_lease(owner, client=client)

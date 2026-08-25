@@ -29,9 +29,7 @@ See Also:
     - documentation/TESTING_WRITING_TESTS.md for test authoring guidance
 """
 
-from contextlib import contextmanager
 from dataclasses import dataclass
-import fcntl
 import logging
 import os
 
@@ -39,12 +37,9 @@ import pytest
 
 from config import SETTINGS
 from runner.testing import (
-    _e2e_session_lock_path,
     cleanup_test_data,
     initialize_test_data,
     prepare_test_artifacts,
-    run_test_server,
-    terminate_test_server_process,
 )
 
 from ..utility import TestResults, capture_on_failure
@@ -170,40 +165,6 @@ def _hosted_e2e_browser_cookie(run_id):
     }
 
 
-@contextmanager
-def _e2e_session_lock():
-    """Prevent overlapping E2E sessions from sharing one test server."""
-    port = SETTINGS.test_config["SERVER_PORT"]
-    lock_path = _e2e_session_lock_path()
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with lock_path.open("a+", encoding="utf-8") as lock_file:
-        try:
-            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            lock_file.seek(0)
-            owner = lock_file.read().strip() or "unknown owner"
-            pytest.exit(
-                "Another E2E pytest session is already running against the "
-                f"managed test server on port {port} ({owner}). Run E2E "
-                "targets sequentially or pass multiple files/nodeids to one "
-                "pytest command.",
-                returncode=2,
-            )
-
-        lock_file.seek(0)
-        lock_file.truncate()
-        lock_file.write(f"pid={os.getpid()}")
-        lock_file.flush()
-
-        try:
-            yield
-        finally:
-            lock_file.seek(0)
-            lock_file.truncate()
-            fcntl.flock(lock_file, fcntl.LOCK_UN)
-
-
 @pytest.hookimpl(hookwrapper=True)
 def pytest_runtest_makereport(item, call):
     """Store pytest phase reports on the test item for fixture teardown access."""
@@ -236,62 +197,64 @@ def setup_test_server():
         - runner/testing.py: cleanup_test_data()
         - lagniappe/core/tools/cache.py: cleanup_test_data()
     """
-    with _e2e_session_lock():
-        process = None
-        lease = None
-        lease_acquired = False
+    from lagniappe import CONFIG
+
+    if CONFIG.hosted_e2e_runner:
+        from lagniappe.core.tools.hosted_e2e.lease import E2ELease
+
+        # Hosted execution shares only the cross-machine data lease; it has no
+        # local Flask process or checkout-local ownership record.
+        _validate_hosted_e2e_health()
+        lease = E2ELease()
+        lease.__enter__()
         try:
-            from lagniappe import CONFIG
-            from lagniappe.core.tools.hosted_e2e.lease import E2ELease
-
-            if CONFIG.hosted_e2e_runner:
-                # A stale/delayed job must fail before it can clean shared data.
-                _validate_hosted_e2e_health()
-
-            lease = E2ELease()
-            lease.__enter__()
-            lease_acquired = True
-
-            # Recover from interrupted runs whose fixture finalizers never ran.
-            cleanup_test_data()
-
-            # A local Flask process starts after cleanup and seeds persistence as
-            # part of startup. The hosted app is already running, so replay that
-            # same persistence initialization from the regional runner.
-            if CONFIG.hosted_e2e_runner:
-                initialize_test_data()
-
-            # Clean up previous test artifacts
-            prepare_test_artifacts()
-
-            browser_cookies = ()
-            if CONFIG.hosted_e2e_runner:
-                browser_cookies = (_hosted_e2e_browser_cookie(lease.run_id),)
-            else:
-                process = run_test_server()
+            cleanup_test_data(lease)
+            initialize_test_data(lease)
+            prepare_test_artifacts(lease)
 
             from lagniappe.core.entities import Entities
 
             Entities.initialize()
-
             yield E2ERuntime(
                 run_id=lease.run_id,
-                browser_cookies=browser_cookies,
+                browser_cookies=(_hosted_e2e_browser_cookie(lease.run_id),),
             )
         finally:
             try:
-                if lease_acquired:
-                    # Only the lease owner may delete shared test-prefixed data.
-                    lease.assert_active()
-                    cleanup_test_data()
+                lease.assert_active()
+                cleanup_test_data(lease)
             finally:
-                try:
-                    # Graceful shutdown with fallback to forceful termination.
-                    if process is not None:
-                        terminate_test_server_process(process)
-                finally:
-                    if lease_acquired:
-                        lease.__exit__(None, None, None)
+                lease.__exit__(None, None, None)
+        return
+
+    from runner.test_session import authority_from_environment
+
+    try:
+        state, adopter = authority_from_environment(expected_mode="local-e2e")
+    except RuntimeError as error:
+        pytest.exit(str(error), returncode=2)
+
+    try:
+        from runner.testing import wait_for_session_server
+
+        if not wait_for_session_server(
+            state["base_url"],
+            state["nonce"],
+            expected_pid=state["server"]["pid"],
+            expected_mode=state["mode"],
+            timeout_seconds=2,
+        ):
+            pytest.exit(
+                "Inherited Flask health does not match local E2E ownership.",
+                returncode=2,
+            )
+        from lagniappe.core.entities import Entities
+
+        adopter.assert_active()
+        Entities.initialize()
+        yield E2ERuntime(run_id=state["nonce"])
+    finally:
+        adopter.__exit__(None, None, None)
 
 
 @pytest.fixture(scope="session", autouse=True)

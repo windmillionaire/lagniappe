@@ -74,6 +74,8 @@ class File(Enum):
     GENERATION_JSON = Directory.CONFIG.value / "lagniappe_generation.json"
     MANAGED_TEST_SERVER_PID = Directory.REPORTS.value / "test-server.pid"
     MANAGED_TEST_SERVER_LOG = Directory.REPORTS.value / "test-server.log"
+    TEST_SESSION_STATE = Directory.REPORTS.value / "test-session.json"
+    TEST_SESSION_LOCK = Directory.REPORTS.value / "test-session.lock"
 
     @property
     def convert(self):

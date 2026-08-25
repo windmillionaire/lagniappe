@@ -240,6 +240,7 @@ class E2ELease:
         self._stop = threading.Event()
         self._lost = threading.Event()
         self._thread = None
+        self._release_on_exit = True
 
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
@@ -291,6 +292,19 @@ class E2ELease:
             raise RuntimeError("The shared E2E data lease was lost during the run.")
 
     # @testable true
+    # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_handoff_keeps_owner_for_heartbeat_adoption
+    # @matrix hosted-e2e : heartbeat lease-ownership transfer
+    def handoff(self):
+        """Stop this heartbeat without releasing the owner token."""
+        self.assert_active()
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2)
+        self._thread = None
+        self._release_on_exit = False
+        return self.run_id
+
+    # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
     # @matrix hosted-e2e : lease ownership
     def __exit__(self, exc_type, exc_value, traceback):
@@ -298,13 +312,76 @@ class E2ELease:
         if self._thread is not None:
             self._thread.join(timeout=2)
         try:
-            release_e2e_lease(self.run_id, client=self.client)
+            if self._release_on_exit:
+                release_e2e_lease(self.run_id, client=self.client)
         finally:
             self._thread = None
 
 
+# @testable true
+# @tests tests_unit/test_017_cache_query.py::test_e2e_lease_handoff_keeps_owner_for_heartbeat_adoption
+# @matrix hosted-e2e : heartbeat lease-ownership transfer
+class E2ELeaseHeartbeat:
+    """Heartbeat an existing owner token without acquiring or releasing it."""
+
+    def __init__(
+        self,
+        run_id: str,
+        *,
+        ttl=DEFAULT_LEASE_SECONDS,
+        heartbeat_seconds=DEFAULT_HEARTBEAT_SECONDS,
+        client=None,
+    ):
+        self.run_id = _validate_run_id(run_id)
+        self.ttl = int(ttl)
+        self.heartbeat_seconds = int(heartbeat_seconds)
+        self.client = client
+        self._stop = threading.Event()
+        self._lost = threading.Event()
+        self._thread = None
+
+    def __enter__(self):
+        if not e2e_lease_active(self.run_id, client=self.client):
+            raise RuntimeError("Cannot adopt an inactive shared E2E data lease.")
+        self._thread = threading.Thread(
+            target=self._heartbeat,
+            name="lagniappe-e2e-lease-adopter",
+            daemon=True,
+        )
+        self._thread.start()
+        return self
+
+    def _heartbeat(self):
+        while not self._stop.wait(self.heartbeat_seconds):
+            try:
+                active = heartbeat_e2e_lease(
+                    self.run_id,
+                    ttl=self.ttl,
+                    client=self.client,
+                )
+            except Exception:
+                active = False
+            if not active:
+                self._lost.set()
+                return
+
+    def assert_active(self):
+        if self._lost.is_set() or not e2e_lease_active(
+            self.run_id,
+            client=self.client,
+        ):
+            raise RuntimeError("The adopted E2E data lease was lost.")
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._stop.set()
+        if self._thread is not None:
+            self._thread.join(timeout=2)
+        self._thread = None
+
+
 __all__ = [
     "E2ELease",
+    "E2ELeaseHeartbeat",
     "acquire_e2e_lease",
     "bind_e2e_deployment",
     "consume_e2e_bootstrap_token",

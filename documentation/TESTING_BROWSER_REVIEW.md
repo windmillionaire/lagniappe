@@ -73,9 +73,10 @@ places where a real user would wonder what happens next.
      tools. It loads plain users, permissioned users, user groups, and
      representative general/entity-specific permission profiles.
 
-   Run browser reviews and E2E tests sequentially. The managed testing server
-   owns shared test data and teardown, so a parallel pytest or browser-review
-   session can clean up underneath another run.
+   Run browser reviews and E2E tests sequentially. Local capture commands
+   attach to the managed server's durable session record, so teardown and a
+   second capture are refused while that attachment is live. E2E and managed
+   server startup also share the same enforced ownership coordinator.
 
 3. Capture browser evidence into a review folder:
 

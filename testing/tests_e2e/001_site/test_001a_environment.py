@@ -32,6 +32,7 @@ Test Isolation Strategy:
 """
 
 import json
+import os
 from urllib.parse import urlsplit
 
 import pytest
@@ -50,6 +51,36 @@ pytestmark = pytest.mark.e2e
 
 
 PREFIX = SETTINGS.test_config["PREFIX"]
+
+
+# @matrix test-session : health-nonce readiness server-identity
+# @matrix hosted-e2e : readiness server-identity
+def test_testing_health_identifies_the_exact_session(setup_test_server):
+    response = requests.get(f"{CONFIG.BASE_URL}/testing/health", timeout=5)
+    response.raise_for_status()
+    health = response.json()
+
+    if CONFIG.hosted_e2e_runner:
+        assert health == {
+            "ready": True,
+            "service": CONFIG.HOSTED_E2E_SERVICE,
+            "version": CONFIG.HOSTED_E2E_VERSION,
+            "source": CONFIG.HOSTED_E2E_SOURCE,
+            "source_snapshot": CONFIG.HOSTED_E2E_SOURCE_SNAPSHOT,
+            "build_id": CONFIG.HOSTED_E2E_BUILD_ID,
+        }
+        return
+
+    from runner.test_session import load_session_state
+
+    state = load_session_state()
+    assert health == {
+        "ready": True,
+        "mode": "local-e2e",
+        "session_nonce": os.environ["LAGNIAPPE_TEST_SESSION_NONCE"],
+        "pid": state["server"]["pid"],
+    }
+    assert setup_test_server.run_id == health["session_nonce"]
 
 
 def test_database_setup():

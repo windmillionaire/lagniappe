@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 
 from flask import abort, jsonify, make_response, request
 from google.auth.transport import requests as google_requests
@@ -123,13 +124,30 @@ def require_hosted_e2e_session():
     return None
 
 
-# @testable infrastructure
-# @matrix hosted-e2e : deployment-binding readiness
+# @testable true
+# @tests tests_e2e/001_site/test_001a_environment.py::test_testing_health_identifies_the_exact_session
+# @matrix hosted-e2e : readiness server-identity
+# @matrix test-session : health-nonce readiness server-identity
 @testing.route("/health", methods=["GET"])
 def health():
     """Expose only non-secret identity needed to validate a fresh version."""
     if not CONFIG.hosted_e2e_server:
-        return _hidden()
+        if not CONFIG.testing:
+            return _hidden()
+        nonce = os.environ.get("LAGNIAPPE_TEST_SESSION_NONCE", "").strip()
+        mode = os.environ.get("LAGNIAPPE_TEST_SESSION_MODE", "").strip()
+        if not nonce or mode not in {"local-e2e", "managed-server"}:
+            return _hidden()
+        response = jsonify(
+            {
+                "ready": True,
+                "mode": mode,
+                "session_nonce": nonce,
+                "pid": os.getpid(),
+            }
+        )
+        response.headers["Cache-Control"] = "no-store"
+        return response
     response = jsonify(
         {
             "ready": True,

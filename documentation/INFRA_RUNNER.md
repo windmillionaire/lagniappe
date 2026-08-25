@@ -77,10 +77,13 @@ build; missing, partial, corrupt, or stale output is replaced with
 performs this check before pytest imports application configuration so the test
 and Flask processes share one `BUILD_ID`.
 
-The managed server records PID/log files under `reports/`, resets browser
-artifact folders at start, and stops the server before cleaning test-prefixed
-provider/cache state on teardown. E2E and managed browser sessions share one
-server/data namespace and must run sequentially.
+Local E2E and the managed server acquire `reports/test-session.json` plus the
+shared Redis data lease before frontend, artifact, or test-data mutation. The
+record includes nonce-bound process start identities; Flask publishes the same
+nonce and PID from testing-only health. The managed keeper and server log live
+under `reports/`. Teardown signals only a fully verified recorded process group
+before cleaning test-prefixed provider/cache state. `test-server --status` is
+read-only and `--recover` is the fail-closed stale-owner path.
 
 ## Version and dependency commands
 

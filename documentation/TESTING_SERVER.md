@@ -2,29 +2,58 @@
 
 The managed test server runs the same Flask configuration and fixed test data
 prefix used by E2E. Use it for manual or agent browser exploration. Do not run
-it alongside E2E pytest, hosted E2E, or another browser-review session.
+it alongside E2E pytest or hosted E2E. One local browser-review capture may
+attach to a ready managed server; overlapping captures are refused.
 
 ## Lifecycle
 
 ```bash
 venv/bin/python run.py test-server --start
+venv/bin/python run.py test-server --status
 venv/bin/python run.py test-server --teardown
 ```
 
 Startup:
 
 - verifies gcloud/ADC for the checkout;
+- acquires the checkout-local session record and shared Redis data lease before
+  artifact, frontend, or test-data mutation;
+- refuses an existing session or occupied port without signaling its process;
 - checks frontend inputs and generated output, running `npm run dev` only when
   the bundle is stale or incomplete;
+- clears only the reserved `test-` Datastore/cache namespace;
 - starts Flask with `FLASK_ENV=testing` at configured `BASE_URL`;
-- probes `/l/ping` immediately within one 20-second monotonic readiness budget,
-  deriving finite connect/read timeouts from the remaining time and reporting
-  only the last connection or HTTP state on timeout;
+- verifies `/testing/health` against the random session nonce, mode, and exact
+  recorded Flask PID within one bounded readiness budget;
 - resets E2E artifact folders; and
-- records PID/log files under `reports/`.
+- hands ownership to a detached keeper process that heartbeats both leases.
 
-Teardown stops Flask before deleting test-prefixed Datastore/cache data. The
-E2E session lock prevents most overlap, but callers still own sequential use.
+The durable owner record is `reports/test-session.json`; the short transition
+lock and server log are `reports/test-session.lock` and
+`reports/test-server.log`. `--status` reports the state phase plus owner/server
+identity and nonce-health verification without changing the session.
+
+Teardown verifies the state, process start identity, process group, health
+nonce, data namespace, and absence of a live browser attachment. It then stops
+only the recorded group before deleting test-prefixed Datastore/cache data. A
+missing record makes teardown a no-op. A foreign mode, reused PID, wrong health
+nonce, uninspectable process, or unverified port listener is refused.
+
+## Crash recovery
+
+Normal startup and teardown never force an unknown process. After a runner or
+keeper crash, inspect the record and recover explicitly:
+
+```bash
+venv/bin/python run.py test-server --status
+venv/bin/python run.py test-server --recover
+```
+
+Recovery refuses while the recorded owner or browser attachment is live. For
+an orphaned Flask process, it requires both the recorded start identity and
+exact health nonce before signaling its recorded group. It never discovers or
+kills arbitrary port listeners. Corrupt or permission-ambiguous state remains
+fail-closed for manual inspection.
 
 ## Seed packs
 
@@ -44,7 +73,10 @@ venv/bin/python run.py test-server --start --load project-review
 | `task-index-review` | Personal/Page Tasks, due/assignment/model/form data, and completed contrast. |
 | `user-index-review` | Users, Groups, and permission profiles. |
 
-The latest load summary is `reports/test-server-load.json`.
+Seed loading runs before detached-owner handoff and revalidates the same local
+and Redis authority around mutations. A failed load stops the new server and
+performs guarded cleanup. The latest successful load summary is
+`reports/test-server-load.json`.
 
 ## Login
 

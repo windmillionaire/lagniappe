@@ -26,7 +26,9 @@ test_roots:
   - testing/tests_tooling/test_001g_setup_release_readiness.py
   - testing/tests_tooling/test_001h_setup_ai_email.py
   - testing/tests_tooling/test_003_config.py
+  - testing/tests_tooling/test_004_reports.py
   - testing/tests_tooling/test_005_test_server_command.py
+  - testing/tests_tooling/test_005_test_session.py
   - testing/tests_tooling/test_005a_frontend_build.py
   - testing/tests_tooling/test_007_run_py_test_command.py
   - testing/tests_tooling/test_008_data_lifecycle.py
@@ -55,6 +57,7 @@ annotated_source_roots:
   - runner/process.py
   - runner/pytest_routing.py
   - runner/testing.py
+  - runner/test_session.py
   - runner/upgrade.py
   - runner/hosted_e2e.py
   - runner/hosted_e2e_anchor/main.py
@@ -66,6 +69,8 @@ annotated_source_roots:
   - lagniappe/web/deferred_autofill.py
   - lagniappe/web/direct_uploads.py
   - lagniappe/web/responses.py
+  - testing/utility/browser_review.py
+  - testing/utility/test_server_seed.py
 
 annotation_scan_roots:
   - installer

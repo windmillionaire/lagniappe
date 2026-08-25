@@ -549,9 +549,13 @@ def _run_post_load_actions(
     return actions
 
 
-def load_packs(pack_names: Iterable[str]) -> dict[str, object]:
+# @testable true
+# @tests tests_tooling/test_005_test_session.py::test_seed_loading_requires_authority_before_import_or_mutation
+# @matrix test-session : lease-ownership seed-loading
+def load_packs(pack_names: Iterable[str], authority) -> dict[str, object]:
     """Load one or more seed packs into the testing datastore/cache."""
 
+    authority.assert_active(phases={"seeding"})
     pack_names = list(pack_names)
     if not pack_names:
         raise ValueError("At least one load pack is required.")
@@ -566,6 +570,7 @@ def load_packs(pack_names: Iterable[str]) -> dict[str, object]:
 
     resources = []
     for item in _merged_items(pack_names):
+        authority.assert_active(phases={"seeding"})
         enum_member = _resolve_definition_ref(item.ref)
         resource = enum_member.get(owner)
         if item.complete:
@@ -573,9 +578,11 @@ def load_packs(pack_names: Iterable[str]) -> dict[str, object]:
         resources.append(_resource_summary(item.ref, resource, item))
 
     post_load_actions = _run_post_load_actions(pack_names, owner)
+    authority.assert_active(phases={"seeding"})
 
     landings = []
     for pack_name in pack_names:
+        authority.assert_active(phases={"seeding"})
         landing_ref = PACKS[pack_name].landing_ref
         if not landing_ref:
             continue
@@ -604,5 +611,7 @@ def load_packs(pack_names: Iterable[str]) -> dict[str, object]:
         "post_load_actions": post_load_actions,
         "landings": landings,
     }
+    authority.assert_active(phases={"seeding"})
     _write_report(summary)
+    authority.assert_active(phases={"seeding"})
     return summary

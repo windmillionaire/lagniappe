@@ -2274,7 +2274,7 @@ def _acquire_cleanup_lease():
     lease.__enter__()
     try:
         lease.assert_active()
-        cleanup_test_data()
+        cleanup_test_data(lease)
         lease.assert_active()
     except BaseException:
         lease.__exit__(None, None, None)
