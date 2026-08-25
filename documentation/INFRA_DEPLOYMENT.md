@@ -45,10 +45,10 @@ unstaged working-tree build from validating a different committed candidate.
 
 Hosted E2E exports that exact commit for both its App Engine version and Cloud
 Run runner image and never rebuilds it. `hosted-e2e create` runs source-quality,
-full and changed traceability, and release checks before gcloud activation or
-provider mutation. The GitHub workflow then requires the prepared Cloud Run job
-to identify the exact release candidate. Manual diagnostic runs cannot publish
-release attestation. See
+tooling tests, full and changed traceability, and release checks before gcloud
+activation or provider mutation. The GitHub workflow then requires the prepared
+Cloud Run job to identify the exact release candidate. Manual diagnostic runs
+cannot publish release attestation. See
 [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md).
 
 ## App Engine upload boundary
