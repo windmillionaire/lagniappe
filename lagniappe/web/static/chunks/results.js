@@ -1,8 +1,8 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=bdc368f0';
-import { s as setIcon } from './icons.js?v=bdc368f0';
-import { l as localStore } from './storage.js?v=bdc368f0';
-import { f as formatting } from './formatting.js?v=bdc368f0';
+import { STYLES } from './styles.js?v=bb2fbed3';
+import { s as setIcon } from './icons.js?v=bb2fbed3';
+import { l as localStore } from './storage.js?v=bb2fbed3';
+import { f as formatting } from './formatting.js?v=bb2fbed3';
 
 const SEARCH_ENTITY_PATTERN = /&(#(?:x[0-9a-f]+|\d+)|amp|apos|gt|lt|quot);/gi;
 const SEARCH_ENTITIES = Object.freeze({

@@ -79,6 +79,15 @@ class Condition:
         return description
 
     @property
+    def contract_condition(self):
+        """Return the explicit v1 DTO without client-controlled type metadata."""
+        if not self._definition:
+            return {}
+        from ..tools.filters.contract import condition_contract
+
+        return condition_contract(self._definition)
+
+    @property
     def definition(self):
         return self._definition
 

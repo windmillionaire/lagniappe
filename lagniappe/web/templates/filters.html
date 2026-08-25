@@ -149,12 +149,16 @@
       data-key="{{ f.urlsafe_key }}"
       data-fingerprint="{{ f.fingerprint }}">
     <div class="flex flex-wrap gap-4">
-      {%- for c in f.conditions -%}
-        {{- filter_badge(c.details) -}}
-      {%- endfor -%}
+      {% if f.unavailable %}
+        <span data-role="unavailable-filter">Unavailable saved filter</span>
+      {% else %}
+        {%- for c in f.conditions -%}
+          {{- filter_badge(c.details) -}}
+        {%- endfor -%}
+      {% endif %}
     </div>
     <div class="flex flex-row items-center gap-2">
-      {{ controls.run(f) }}
+      {% if not f.unavailable %}{{ controls.run(f) }}{% endif %}
       {% if f.allowed(Action.EDIT) %}{{ controls.delete() }}{% endif %}
     </div>
   </li>

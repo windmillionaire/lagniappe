@@ -16,16 +16,16 @@ Frontend (filters.mjs widget)
          ▼
 Routes (web/routes/filters/main.py)
   │
-  ├── Create Condition objects from form data
-  ├── Create Filter entity with definitions
-  └── Query via FilterCache
+  ├── Parse the bounded v1 request contract
+  ├── Resolve fields and values through the viewer's authorized catalog
+  └── Produce an immutable CompiledFilter
          │
          ▼
 Filter Entity (core/entities/filter.py)
   │
-  ├── Stores FilterDefinitions as JSON
-  ├── Creates Condition objects from definitions
-  └── Loads related entities (categories, forms, etc.)
+  ├── Stores the canonical versioned contract as JSON
+  ├── Recompiles saved data for each viewer before use
+  └── Adapts and validates legacy compact definitions at runtime
          │
          ▼
 FilterCache (core/tools/filters/cache.py)
@@ -45,16 +45,51 @@ FilterExpression (core/tools/filters/build.py)
 The critical design constraint: the same field identifier must be consistent across the entire stack.
 
 ```
-Frontend form input:    name="{field.id}_value"
+Frontend condition DTO: field="{field.filter_key}"
 Condition.field:        Property or SubmissionField object
 FilterDefinition.field: field.filter_key
 Cache index key:        field.filter_key (from entity.to_filter_index())
-JSONPath query:         @.{field} where field = FilterDefinition.field
+JSONPath query:         @["{field}"] where field = FilterDefinition.field
 ```
 
 For values, the same alignment applies -- `field.filter_value` is used consistently in definitions and cache indices.
 
-Exception: `EntityForm` uses `id="form-{hash}"` for frontend disambiguation but `filter_key="form"` for cache storage. The `Condition.initialize()` method handles this by constructing a compound field lookup key.
+Dynamic form/model selectors use their related entity hash for frontend
+disambiguation and the relation field's `filter_key` for cache storage. The
+authorized catalog maps the selector back to its exact attached entity.
+
+## Versioned Request Contract
+
+Browser preview/save requests and saved filters use this envelope:
+
+```json
+{
+  "version": 1,
+  "conditions": [
+    {
+      "source_id": "entity-hash",
+      "field": "name",
+      "comparator": "substring",
+      "values": ["urgent"]
+    }
+  ]
+}
+```
+
+The client never supplies field type or entity-valued flags. The compiler
+derives those from the viewer's current catalog, validates referenced entities
+and attached-form scope, normalizes values, and returns `CompiledFilter`.
+`FilterCache.query()` and `query_roots()` reject every other input type.
+
+The envelope is limited to 32 KiB, 12 effective predicates (including injected
+form selectors), 25 values per condition, and 512 UTF-8 bytes per string or
+identifier. Malformed JSON/envelopes return `400`; well-formed invalid,
+unavailable, or oversized filters return `422`.
+
+Repeated compact `definition` values remain a request compatibility input and
+legacy saved top-level lists remain readable. Both are converted to v1 and
+fully recompiled without trusting their stored type flags. New saves write v1;
+there is no write-on-read migration.
 
 ## Condition (`entities/condition.py`)
 
@@ -97,18 +132,22 @@ Stores a saved filter configuration. Properties:
 | `creator` | The User who created the filter |
 | `related` | Entities referenced by conditions (for relationship loading) |
 | `table` | Column configuration for displaying results |
-| `definitions` | JSON-serialized list of `FilterDefinition` objects |
+| `definitions` | Canonical v1 contract, compiled to `FilterDefinition` objects on access |
 | `conditions` | Condition objects created from definitions |
 
 ### Creation
 
-`Filter.create(entity, definitions, temporary=False)`:
+`Filter.create(entity, compiled_filter, temporary=False)`:
 
 1. Creates a new Filter entity
-2. Sets creator, filtered entity, and definitions
-3. Collects all entity hashes referenced by conditions
-4. Loads referenced entities from cache
-5. Initializes each condition with the loaded entity map
+2. Stores the compiler's canonical contract
+3. Stores only the authorized related entities returned by compilation
+4. Initializes display conditions from the derived predicates
+
+Saved filters retain parent-scoped sharing semantics. A direct run recompiles
+for its current viewer. Stale or inaccessible filters never query Redis;
+view-only users do not see them, while parent editors receive a generic
+deletable unavailable row.
 
 ### Filter Table
 
@@ -128,7 +167,9 @@ Caches entity filter indices in Redis JSON for fast querying.
 
 ### Cache Key
 
-Keyed by entity hash + user access level hash. Different users with different permissions get different cache entries, ensuring permission-filtered results.
+The shared cache key is the parent hash plus the format scope `all-v2`.
+Permission checks happen after matched roots are loaded. The scope version
+ensures caches built before punctuation-preserving values are not reused.
 
 ### Building the Cache
 
@@ -139,10 +180,10 @@ Keyed by entity hash + user access level hash. Different users with different pe
 
 ### Querying
 
-`query(filter)` builds a `FilterExpression` from the filter's definitions,
+`query(compiled_filter)` builds a `FilterExpression` from validated definitions,
 executes it as a JSONPath query against the cached JSON, loads the matching
 entity IDs with `Entities.fetch(..., request=Fetch.direct())`, and keeps only
-entities the current user may view. `query_roots(filter)` uses `Fetch.root()`
+entities the current user may view. `query_roots(compiled_filter)` uses `Fetch.root()`
 for refresh membership checks that do not need relationships.
 
 ### Background Updates
@@ -157,27 +198,23 @@ Converts a list of `FilterDefinition` objects into a JSONPath query string. Each
 
 | Comparator | JSONPath Pattern |
 |---|---|
-| `IS_TRUE` | `@.field == true` |
-| `IS_FALSE` | `@.field == false` |
-| `EQUALS` (string) | `@.field =~ '(?i)^value$'` (case-insensitive regex) |
-| `EQUALS` (non-string) | `@.field == value` |
-| `NOT_EQUALS` | `!(@.field == 'value')` |
-| `GREATER_THAN` | `@.field > value` |
-| `LESS_THAN` | `@.field < value` |
-| `GREATER_EQUAL` | `@.field >= value` |
-| `LESS_EQUAL` | `@.field <= value` |
-| `BETWEEN` | `@.field >= low && @.field <= high` |
-| `CONTAINS` | `@.field[?(@=='value')]` (array membership) |
-| `IN` | `@.field == 'a' \|\| @.field == 'b'` |
-| `SUBSTRING` | `@.field =~ '(?i)pattern'` (case-insensitive regex) |
-| `CONTAINS_ANY` | `@.field[?(@=='a')] \|\| @.field[?(@=='b')]` |
-| `EXISTS` | `@.field != null` |
-| `NOT_EXISTS` | `@.field == null` |
+| `IS_TRUE` | `@["field"] == true` |
+| `IS_FALSE` | `@["field"] == false` |
+| `EQUALS` (string) | `@["field"] =~ "(?i)^value$"` |
+| `EQUALS` (non-string) | `@["field"] == value` |
+| `GREATER_THAN` / `LESS_THAN` | Encoded numeric comparison |
+| `GREATER_EQUAL` / `LESS_EQUAL` | Encoded numeric comparison |
+| `BETWEEN` | Inclusive pair of encoded numeric comparisons |
+| `CONTAINS` | Array membership plus scalar fallback |
+| `IN` | Equality against each encoded value |
+| `SUBSTRING` | Case-insensitive, regex-escaped literal match |
+| `CONTAINS_ANY` | Membership against each encoded value |
 
 The final query wraps all conditions: `$..[?((@.id) && (cond1) && (cond2))].id`
 
-`Comparator.NOT_IN` is defined in `definitions/filters.py` but is not
-implemented in `build.py` yet.
+Field names use bracket notation and JSON encoding. String equality/substring
+escapes regex metacharacters before JSON encoding. Unsupported comparators
+raise rather than silently generating an incomplete expression.
 
 ## Routes (`lagniappe/web/routes/filters/main.py`)
 
@@ -195,4 +232,8 @@ All routes are on the `filters` blueprint (`/filters` prefix).
 
 ## Frontend Integration
 
-The `Filters` widget (`src/script/widgets/filters.mjs`) manages the filter builder UI. It sends condition data to the backend as serialized JSON definitions in form data. The test endpoint returns a rendered table for preview, while the save endpoint returns a filter list item. Saved filters can be loaded and run as full-page views.
+The `Filters` widget (`src/script/widgets/filters.mjs`) manages the filter builder
+UI. Server-rendered badges contain explicit condition DTOs; preview/save wraps
+them in one v1 `contract` form value. The test endpoint returns a rendered table
+for preview, while save returns a filter list item. Saved filters can be loaded
+and run as full-page views.

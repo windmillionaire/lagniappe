@@ -154,13 +154,16 @@ export class Filters {
 		});
 	}
 
+	get contract() {
+		return JSON.stringify({
+			version: 1,
+			conditions: this.definitions.map((definition) => JSON.parse(definition)),
+		});
+	}
+
 	get formData() {
 		const data = new FormData();
-		this.filters
-			.querySelectorAll("input[name='definition']")
-			.forEach((input) => {
-				data.append("definition", input.value);
-			});
+		data.append("contract", this.contract);
 		return data;
 	}
 
@@ -205,7 +208,9 @@ export class Filters {
 
 		this._buttons.run.activate();
 
-		const response = await request.get(this.endpoints.test, this.formData);
+		const response = await request.get(this.endpoints.test, {
+			contract: this.contract,
+		});
 		if (!this.view.successfulResponse(response, this.component)) return;
 
 		const results = await this.component.loadWidget("FilterResults");

@@ -1,13 +1,13 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { C as COLOR_MENU } from './toolbar.js?v=bdc368f0';
-import './combobox.js?v=bdc368f0';
-import './styles.js?v=bdc368f0';
-import './foundation.js?v=bdc368f0';
-import './connectivity.js?v=bdc368f0';
-import './primitives.js?v=bdc368f0';
-import './icons.js?v=bdc368f0';
-import './queryLifecycle.js?v=bdc368f0';
-import './dropdown.js?v=bdc368f0';
+import { C as COLOR_MENU } from './toolbar.js?v=bb2fbed3';
+import './combobox.js?v=bb2fbed3';
+import './styles.js?v=bb2fbed3';
+import './foundation.js?v=bb2fbed3';
+import './connectivity.js?v=bb2fbed3';
+import './primitives.js?v=bb2fbed3';
+import './icons.js?v=bb2fbed3';
+import './queryLifecycle.js?v=bb2fbed3';
+import './dropdown.js?v=bb2fbed3';
 
 /**
  * @testable true

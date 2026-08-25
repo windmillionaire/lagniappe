@@ -2,6 +2,8 @@
 
 from dataclasses import dataclass
 
+from lagniappe.core import exceptions
+
 from ...definitions import Action, Fetch, Resource
 from ...entities import Entities, index
 from .. import database
@@ -95,9 +97,14 @@ def _filtered_roots(filter_entity, user):
     if not isinstance(parent, (Entities.PROJECT, Entities.CATEGORY)):
         raise RefreshFallback("Unsupported filter parent")
 
+    try:
+        compiled = filter_entity.compile(user)
+    except exceptions.ValidationError as error:
+        raise RefreshFallback("Filter definition is no longer valid") from error
+
     filter_cache = FilterCache(parent, user=user)
     filter_cache.update(queue=False)
-    roots = filter_cache.query_roots(filter_entity)
+    roots = filter_cache.query_roots(compiled)
     if isinstance(parent, Entities.PROJECT):
         tasks = [root for root in roots if isinstance(root, Entities.TASK)]
         return "filtered-task-index", tuple(sort_tasks(tasks))

@@ -15,6 +15,7 @@ from lagniappe.core.tools.ai import ask
 from lagniappe.core.tools.ai import functions as ai_functions
 from lagniappe.core.tools.ai.function_definitions import workspace_filter
 from lagniappe.core.tools.filters import ai_query
+from lagniappe.core.tools.filters import contract
 from testing.utility.test_entities import TestEntities
 
 
@@ -260,7 +261,7 @@ def test_compile_filter_definitions_normalizes_dates_numbers_and_booleans(monkey
     user = object()
     project, _model, form, _hidden_form = _workspace_filter_fixture()
     monkeypatch.setattr(
-        ai_query.dates,
+        contract.dates,
         "user_timezone",
         lambda _user=None: timezone.utc,
     )

@@ -5,6 +5,7 @@ import pytest
 
 from lagniappe.core.definitions import Action, Fetch, FetchReason, Restriction
 from lagniappe.core.tools.filters.cache import FilterCache
+from lagniappe.core.tools.filters.contract import CompiledFilter
 
 
 def _user(*, models=None, task=None):
@@ -46,7 +47,7 @@ def test_filter_cache_uses_shared_cache_key_without_user_restrictions():
     restricted_cache = FilterCache(parent, user=_user(models=["category-a"]))
 
     assert owner_cache.cache_key == restricted_cache.cache_key
-    assert owner_cache.cache_key.endswith(":all")
+    assert owner_cache.cache_key.endswith(":all-v2")
 
 
 # @features filters cache permissions
@@ -59,7 +60,11 @@ def test_filter_cache_query_filters_loaded_entities_by_view_permission():
         allowed=lambda action, user=None: action == Action.VIEW and user is viewer
     )
     hidden = SimpleNamespace(allowed=lambda action, user=None: False)
-    entity_filter = SimpleNamespace(definitions=["definition"])
+    entity_filter = CompiledFilter(
+        definitions=("definition",),
+        contract={"version": 1, "conditions": []},
+        related=(),
+    )
 
     with patch(
         "lagniappe.core.tools.filters.cache.FilterExpression", _FilterExpression
@@ -82,6 +87,18 @@ def test_filter_cache_query_filters_loaded_entities_by_view_permission():
         "visible-key", "hidden-key", request=Fetch.direct()
     )
     assert results == [visible]
+
+
+# @features filters cache
+# @dimensions validation query-boundary
+@pytest.mark.unit
+def test_filter_cache_rejects_uncompiled_query_definitions():
+    parent = _parent("project")
+
+    with pytest.raises(TypeError, match="CompiledFilter"):
+        FilterCache(parent, user=_user()).query(
+            SimpleNamespace(definitions=["untrusted"])
+        )
 
 
 # @features filters

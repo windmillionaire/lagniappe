@@ -11,31 +11,24 @@ from ...tools.database.filter import Filter, Query
 from ...tools.auth.context import current_context_user
 from ..cache import Keys, filter_cache
 from ..services.task_queue import create_task
-from .build import escape, FilterExpression
+from .build import FilterExpression
+from .contract import CompiledFilter
 
 
-FILTER_CACHE_SCOPE = "all"
+FILTER_CACHE_SCOPE = "all-v2"
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
 # @reason filter-index value escaping is part of cache materialization
 def escape_for_filter(to_filter):
-    """Escape string values in a filter dict for safe JSONPath matching."""
-    for k, v in to_filter.items():
-        if k == "id":
-            continue
-        if isinstance(v, str):
-            to_filter[k] = escape(v)
-        elif isinstance(v, list):
-            to_filter[k] = [escape(item) for item in v]
+    """Preserve semantic cache values; query literals provide the escaping."""
     return to_filter
 
 
-# @testable false
-# @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.query
-# @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.cache
-# @reason cache facade delegates source-visible behavior to query and cache
+# @testable true
+# @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_uses_shared_cache_key_without_user_restrictions
+# @pairs filters:shared-key filters:restrictions cache:shared-key cache:restrictions permissions:shared-key permissions:restrictions
 class FilterCache:
     """Manages a cached filter index for an entity."""
 
@@ -46,11 +39,13 @@ class FilterCache:
 
         self._to_cache = {}
 
-    # @testable false
-    # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.query
-    # @covered-by lagniappe/core/tools/filters/cache.py::FilterCache.query_roots
-    # @reason shared expression execution is covered by the public query paths
+    # @testable true
+    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_query_filters_loaded_entities_by_view_permission
+    # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_rejects_uncompiled_query_definitions
+    # @pairs filters:query filters:allowed filters:related-load cache:query cache:allowed cache:related-load permissions:query permissions:allowed permissions:related-load filters:validation filters:query-boundary cache:validation cache:query-boundary
     def _query_keys(self, filter):
+        if not isinstance(filter, CompiledFilter):
+            raise TypeError("FilterCache queries require a CompiledFilter")
         expression = FilterExpression(filter.definitions).build()
         return filter_cache.query(self.cache_key, expression)
 

@@ -1,21 +1,21 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { SearchBox } from './search.js?v=bdc368f0';
-import { EntityMenu } from './entityMenu.js?v=bdc368f0';
-import { w as withTransition, r as request, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=bdc368f0';
-import { c as connectivity } from './connectivity.js?v=bdc368f0';
-import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=bdc368f0';
-import { STYLES } from './styles.js?v=bdc368f0';
-import { s as setIcon } from './icons.js?v=bdc368f0';
-import { p as primitives } from './primitives.js?v=bdc368f0';
-import { B as BaseForm, R as Renderer } from './baseForm.js?v=bdc368f0';
-import { F as FacetsBox } from './facets.js?v=bdc368f0';
+import { SearchBox } from './search.js?v=bb2fbed3';
+import { EntityMenu } from './entityMenu.js?v=bb2fbed3';
+import { w as withTransition, r as request, c as captureError, E as ENDPOINTS, f as areEqual, g as generateElementId } from './foundation.js?v=bb2fbed3';
+import { c as connectivity } from './connectivity.js?v=bb2fbed3';
+import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=bb2fbed3';
+import { STYLES } from './styles.js?v=bb2fbed3';
+import { s as setIcon } from './icons.js?v=bb2fbed3';
+import { p as primitives } from './primitives.js?v=bb2fbed3';
+import { B as BaseForm, R as Renderer } from './baseForm.js?v=bb2fbed3';
+import { F as FacetsBox } from './facets.js?v=bb2fbed3';
 
 const CONDITION_REGISTRY = {
-	html: () => import('./html.js?v=bdc368f0'),
-	status: () => import('./status.js?v=bdc368f0'),
-	visibility: () => import('./visibility.js?v=bdc368f0'),
-	columns: () => import('./columns.js?v=bdc368f0'),
-	options: () => import('./options.js?v=bdc368f0'),
+	html: () => import('./html.js?v=bb2fbed3'),
+	status: () => import('./status.js?v=bb2fbed3'),
+	visibility: () => import('./visibility.js?v=bb2fbed3'),
+	columns: () => import('./columns.js?v=bb2fbed3'),
+	options: () => import('./options.js?v=bb2fbed3'),
 };
 
 /**
@@ -3605,6 +3605,9 @@ class FormSettings {
 					submitted: "Generated",
 				},
 			});
+			this.generateForm.error.setAttribute("role", "status");
+			this.generateForm.error.setAttribute("aria-live", "polite");
+			this.generateForm.error.setAttribute("aria-atomic", "true");
 		} else {
 			this.generateForm = null;
 		}
@@ -3741,6 +3744,7 @@ class FormSettings {
 		button.setAttribute("aria-disabled", "true");
 		button.setAttribute("aria-busy", "true");
 		item.classList.add("opacity-50", "pointer-events-none");
+		this.builder.header.clearMessage();
 
 		const data = new FormData();
 		data.set("action", "remove");
@@ -4062,7 +4066,7 @@ class Header {
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
 	 * @tests tests_e2e/003_forms/test_003e_retryable_builder_actions.py::test_builder_save_failure_releases_control_for_retry
 	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
-	 * @features forms ui-action
+	 * @features forms
 	 * @dimensions builder-save builder-reload single-flight retryable-action stale-acknowledgement persistent-error focus-recovery
 	 */
 	saveForm() {

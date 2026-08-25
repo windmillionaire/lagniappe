@@ -15,6 +15,7 @@ from lagniappe.core.tools.polling.refresh import (
     resolve_refresh_delta,
 )
 from lagniappe.core.tools.filters import FilterCache
+from lagniappe.core.tools.filters.contract import CompiledFilter
 from testing.utility.test_entities import TestEntities
 
 
@@ -346,6 +347,12 @@ def test_load_refresh_collection_refreshes_saved_filter_cache_before_root_query(
     filter_entity.parent = project
     filter_entity.allowed = lambda *_args, **_kwargs: True
     filter_entity.related_entities_allowed = lambda *_args, **_kwargs: True
+    compiled = CompiledFilter(
+        definitions=(),
+        contract={"version": 1, "conditions": []},
+        related=(),
+    )
+    filter_entity.compile = lambda _user: compiled
     filter_cache = SimpleNamespace(
         update=lambda **_kwargs: None,
         query_roots=lambda _filter: [task],
@@ -374,7 +381,7 @@ def test_load_refresh_collection_refreshes_saved_filter_cache_before_root_query(
 
     cache_type.assert_called_once_with(project, user=viewer)
     update.assert_called_once_with(queue=False)
-    query.assert_called_once_with(filter_entity)
+    query.assert_called_once_with(compiled)
     assert collection == RefreshCollection(
         "filtered-task-index", filter_entity, (task,)
     )

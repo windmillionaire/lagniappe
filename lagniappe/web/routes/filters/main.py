@@ -1,12 +1,18 @@
-import json
-
 from flask import request
 from flask_login import current_user
 
+from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
-from lagniappe.core.tools.filters import FilterCache
+from lagniappe.core.tools.filters import (
+    FilterCache,
+    FilterContractError,
+    compile_filter_contract,
+    parse_filter_request,
+    resolve_allowed_value,
+    resolve_filter_field,
+)
 from lagniappe.core.tools.tasks.ordering import sort_tasks
 from lagniappe.web import responses
 from lagniappe.web.auth import permission
@@ -14,26 +20,45 @@ from lagniappe.web.auth import permission
 from . import filters
 
 
+# @testable true
+# @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_preview_rejects_malformed_and_forged_contracts
+# @pairs filters:malformed-contract request-errors:stable-status
+def _contract_from_request():
+    return parse_filter_request(
+        request.values.get("contract"),
+        request.values.getlist("definition"),
+    )
+
+
 # @testable false
 # @covered-by lagniappe/web/routes/filters/main.py::test
 # @covered-by lagniappe/web/routes/filters/main.py::save
-# @reason request parsing helper owned by filter preview/save endpoints
-def _definitions_from_request():
-    return [json.loads(d) for d in request.values.getlist("definition")]
+# @reason preview/save exercise the shared request compiler
+def _compiled_from_request(entity):
+    return compile_filter_contract(entity, _contract_from_request(), current_user)
+
+
+# @testable false
+# @covered-by lagniappe/web/routes/filters/main.py::test
+# @reason preview error cases assert the stable HTTP translation
+def _contract_error_response(error):
+    if getattr(error, "status", 422) == 400:
+        return responses.bad_request(str(error))
+    return responses.error(str(error))
 
 
 # @testable false
 # @covered-by lagniappe/web/routes/filters/main.py::_filter_results_owner
 # @reason filter definition shape helper is part of result-owner dispatch
 def _definition_field(definition):
-    return definition[1] if len(definition) > 1 else None
+    return definition.field
 
 
 # @testable false
 # @covered-by lagniappe/web/routes/filters/main.py::_filter_results_owner
 # @reason filter definition shape helper is part of entity-valued dispatch
 def _definition_is_entity_valued(definition):
-    return bool(definition[5]) if len(definition) > 5 else False
+    return definition.is_entity_valued
 
 
 # @testable true
@@ -51,11 +76,11 @@ def _definition_is_entity_valued(definition):
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_select_condition
 # @features filters
 # @dimensions string-condition boolean-condition number-condition select-condition attached-form run-results
-def _filter_results_response(entity, definitions):
-    new_filter = Entities.FILTER.create(entity, definitions, temporary=True)
+def _filter_results_response(entity, compiled):
+    new_filter = Entities.FILTER.create(entity, compiled, temporary=True)
     cache = FilterCache(new_filter.parent)
     cache.update(queue=False)
-    results = cache.query(new_filter)
+    results = cache.query(compiled)
     new_filter.table.embedded = True
 
     return responses.table(results, new_filter)
@@ -142,13 +167,13 @@ def _filter_results_owner(definitions):
 @permission(requested=Action.VIEW)
 def test(key, **kwargs):
     entity = kwargs["entity"]
+    try:
+        compiled = _compiled_from_request(entity)
+    except FilterContractError as error:
+        return _contract_error_response(error)
 
-    definitions = _definitions_from_request()
-    if not definitions:
-        return responses.error("Please add at least one filter condition")
-
-    response_owner = _filter_results_owner(definitions)
-    return response_owner(entity, definitions)
+    response_owner = _filter_results_owner(compiled.definitions)
+    return response_owner(entity, compiled)
 
 
 # @testable true
@@ -162,12 +187,12 @@ def test(key, **kwargs):
 @permission(requested=Action.EDIT)
 def save(key, **kwargs):
     entity = kwargs["entity"]
+    try:
+        compiled = _compiled_from_request(entity)
+    except FilterContractError as error:
+        return _contract_error_response(error)
 
-    definitions = _definitions_from_request()
-    if not definitions:
-        return responses.error("Please add at least one filter condition")
-
-    new_filter = Entities.FILTER.create(entity, definitions)
+    new_filter = Entities.FILTER.create(entity, compiled)
     Entities.save(new_filter, entity)
 
     return responses.new_filter(new_filter)
@@ -181,15 +206,20 @@ def save(key, **kwargs):
 @filters.route("<key>/get", methods=["GET"])
 @permission(requested=Action.VIEW)
 def get(key, **kwargs):
-    entity = kwargs["entity"]
-
-    filters = [
-        entity_filter
-        for entity_filter in Entities.fetch(
-            *database.get.filters(entity), request=Fetch.direct()
-        )
-        if entity_filter.related_entities_allowed(current_user)
-    ]
+    entity = Entities.fetch_one(kwargs["entity"], request=Fetch.direct())
+    filters = []
+    can_edit = entity.allowed(Action.EDIT, user=current_user)
+    for entity_filter in Entities.fetch(
+        *database.get.filters(entity), request=Fetch.direct()
+    ):
+        try:
+            entity_filter.compile(current_user)
+            entity_filter.unavailable = False
+            filters.append(entity_filter)
+        except exceptions.ValidationError:
+            if can_edit:
+                entity_filter.unavailable = True
+                filters.append(entity_filter)
 
     return responses.saved_filters(entity, filters)
 
@@ -208,10 +238,15 @@ def run(key, **kwargs):
         filter.parent,
         request=Fetch.direct(),
     )
+    try:
+        compiled = filter.compile(current_user)
+    except exceptions.ValidationError:
+        return responses.error("This saved filter is no longer available")
+
     cache = FilterCache(filter.parent)
 
     cache.update(queue=False)
-    results = cache.query(filter)
+    results = cache.query(compiled)
 
     if filter.parent.kind == "project":
         tasks = sort_tasks(results)
@@ -301,6 +336,23 @@ def _condition_options_owner(condition):
 
 
 # @testable false
+# @covered-by lagniappe/web/routes/filters/main.py::condition
+# @covered-by lagniappe/web/routes/filters/main.py::options
+# @reason condition/option E2E owns compiled badge reconstruction
+def _validated_display_condition(parent, condition):
+    compiled = compile_filter_contract(
+        parent,
+        {"version": 1, "conditions": [condition.contract_condition]},
+        current_user,
+    )
+    entity_map = {entity.hash: entity for entity in compiled.related}
+    display = Entities.CONDITION.create(compiled.definitions[-1], entity_map)
+    if not display:
+        raise FilterContractError("Filter condition is unavailable.")
+    return display
+
+
+# @testable false
 # @covered-by lagniappe/web/routes/filters/main.py::_string_condition_options_response
 # @covered-by lagniappe/web/routes/filters/main.py::_status_condition_options_response
 # @covered-by lagniappe/web/routes/filters/main.py::_date_condition_options_response
@@ -320,21 +372,36 @@ def condition(key, **kwargs):
     value = request.values.get(f"{field}_value")
     entity_key = request.values.get(f"{field}_key")
 
-    condition = Entities.CONDITION()
-    condition.entity = (
-        entity if parent == key else Entities.fetch_one(parent, request=Fetch.direct())
-    )
-    condition.field = value if value else field
+    try:
+        entry = resolve_filter_field(entity, parent, field, current_user)
+        condition = Entities.CONDITION()
+        condition.entity = entry.source
+        if not (entity_key and value):
+            condition.field = entry.field.filter_key
+    except (FilterContractError, ValueError) as error:
+        return _contract_error_response(error)
 
-    updates = {"parent": parent, "kind": condition.field.filter_kind, "field": field}
+    updates = {"parent": parent, "field": field}
 
     if entity_key and value:
-        related_entity = Entities.fetch_one(entity_key, request=Fetch.direct())
-        condition.entity_map[related_entity.hash] = related_entity
-        condition.set_value(value, default_comparator=None)
+        try:
+            related_entity = resolve_allowed_value(entry, value)
+            if str(entity_key) != str(related_entity.urlsafe_key):
+                raise FilterContractError("Filter entity is unavailable.")
+            condition.field = related_entity.hash
+            updates["kind"] = condition.field.filter_kind
+            condition.entity_map[related_entity.hash] = related_entity
+            condition.set_value(value, default_comparator=None)
+            condition = _validated_display_condition(entity, condition)
+            return _dynamic_entity_condition_response(
+                updates,
+                condition,
+                related_entity,
+            )
+        except (FilterContractError, ValueError) as error:
+            return _contract_error_response(error)
 
-        return _dynamic_entity_condition_response(updates, condition, related_entity)
-
+    updates["kind"] = condition.field.filter_kind
     response_owner = _condition_options_owner(condition)
     return response_owner(updates, condition)
 
@@ -353,11 +420,6 @@ def _options_values(condition, field, comparator):
         ]
     else:
         values = [v for v in request.values.getlist(f"{field}_value") if v]
-
-    if condition.field.is_entity_valued:
-        related = Entities.fetch(*values, request=Fetch.root())
-        condition.entity_map.update({e.hash: e for e in related})
-        values = [e.hash for e in related]
 
     return values
 
@@ -383,6 +445,9 @@ def _filter_options_response(updates, condition, values, comparator):
 
     try:
         condition.set_value(values, default_comparator=comparator)
+        condition = _validated_display_condition(condition._contract_parent, condition)
+    except FilterContractError as error:
+        return _contract_error_response(error)
     except Exception as e:
         return responses.error(f"Invalid value for {updates['field']}: {e}")
 
@@ -462,11 +527,14 @@ def options(key, **kwargs):
     field = request.values.get("field")
     parent = request.values.get("parent")
 
-    condition = Entities.CONDITION()
-    condition.entity = (
-        Entities.fetch_one(parent, request=Fetch.direct()) if parent != key else entity
-    )
-    condition.field = field
+    try:
+        entry = resolve_filter_field(entity, parent, field, current_user)
+        condition = Entities.CONDITION()
+        condition.entity = entry.source
+        condition.field = entry.field.filter_key
+        condition._contract_parent = entity
+    except (FilterContractError, ValueError) as error:
+        return _contract_error_response(error)
 
     comparator = request.values.get(f"{field}_comparator")
     updates = {

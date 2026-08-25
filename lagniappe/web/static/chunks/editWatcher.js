@@ -1,9 +1,9 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { a as loadRevisionPreview } from './core-foundation.js?v=bdc368f0';
-import { STYLES } from './styles.js?v=bdc368f0';
-import { Modal } from './modal.js?v=bdc368f0';
-import { f as areEqual, c as captureError, w as withTransition, r as request } from './foundation.js?v=bdc368f0';
-import './connectivity.js?v=bdc368f0';
+import { a as loadRevisionPreview } from './core-foundation.js?v=bb2fbed3';
+import { STYLES } from './styles.js?v=bb2fbed3';
+import { Modal } from './modal.js?v=bb2fbed3';
+import { f as areEqual, c as captureError, w as withTransition, r as request } from './foundation.js?v=bb2fbed3';
+import './connectivity.js?v=bb2fbed3';
 
 /**
  * @testable true

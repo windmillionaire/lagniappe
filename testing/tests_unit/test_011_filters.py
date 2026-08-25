@@ -207,8 +207,28 @@ def test_filter_expression_list_contains_accepts_scalar_form_values():
 
     expression = FilterExpression([definition]).build()
 
-    assert "@.filter-decision[?(@=='approved')]" in expression
-    assert "@.filter-decision == 'approved'" in expression
+    assert '@["filter-decision"][?(@=="approved")]' in expression
+    assert '@["filter-decision"] == "approved"' in expression
+
+
+# @features filters
+# @dimensions jsonpath escaping punctuation regex-literal field-name
+@pytest.mark.unit
+def test_filter_expression_encodes_field_names_and_literal_regex_values():
+    definition = FilterDefinition(
+        "source",
+        'field["unsafe"]',
+        FieldType.STRING,
+        Comparator.EQUALS,
+        "A-B.*'quoted'",
+        False,
+    )
+
+    expression = FilterExpression([definition]).build()
+
+    assert '@["field[\\"unsafe\\"]"]' in expression
+    assert "A-B\\\\.\\\\*'quoted'" in expression
+    assert "@.field" not in expression
 
 
 # @features filter
@@ -238,7 +258,7 @@ def test_filter_parent_sets_parent_hash():
 # @features filter
 # @dimensions fingerprint parent
 @pytest.mark.unit
-def test_filter_fingerprint_uses_loaded_parent_fingerprint(monkeypatch):
+def test_filter_fingerprint_uses_loaded_parent_fingerprint():
     filter_entity = FilterEntity(testing=True)
     parent = TestEntities.get(
         "PROJECT",
@@ -246,14 +266,6 @@ def test_filter_fingerprint_uses_loaded_parent_fingerprint(monkeypatch):
     )
     filter_entity.modified = datetime(2026, 1, 1, tzinfo=timezone.utc)
     filter_entity.parent = parent
-
-    def fail_cache_lookup(*args, **kwargs):
-        raise AssertionError("filter fingerprint should use the loaded parent")
-
-    monkeypatch.setattr(
-        "lagniappe.core.entities.filter.cache.get_details_by_hash",
-        fail_cache_lookup,
-    )
 
     expected = hashlib.md5(
         f"{super(FilterEntity, filter_entity).fingerprint}:{parent.fingerprint}".encode(

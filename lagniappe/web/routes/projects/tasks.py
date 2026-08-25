@@ -1,5 +1,3 @@
-import json
-
 from flask import request
 from flask_login import current_user
 
@@ -7,6 +5,7 @@ from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
+from lagniappe.core.tools.filters import compile_filter_contract
 from lagniappe.core.tools.tasks.ordering import sort_tasks
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.web.auth import permission
@@ -148,13 +147,28 @@ def delete_model(key, task_key, **kwargs):
 # @covered-by lagniappe/web/routes/projects/tasks.py::status
 # @reason temporary filter construction is exercised through the model-task status route
 def _status_filter(project, model, completed):
-    model_definition = [project.hash, "model", "string", "eq", model.hash, True]
-
-    status_value = "is_true" if completed else "is_false"
-    status_definition = [project.hash, "completed", "boolean", status_value]
-
-    definitions = [json.dumps(model_definition), json.dumps(status_definition)]
-    filter = Entities.FILTER.create(project, definitions, temporary=True)
+    compiled = compile_filter_contract(
+        project,
+        {
+            "version": 1,
+            "conditions": [
+                {
+                    "source_id": project.hash,
+                    "field": "model",
+                    "comparator": "eq",
+                    "values": [model.hash],
+                },
+                {
+                    "source_id": project.hash,
+                    "field": "completed",
+                    "comparator": "is_true" if completed else "is_false",
+                    "values": [],
+                },
+            ],
+        },
+        current_user,
+    )
+    filter = Entities.FILTER.create(project, compiled, temporary=True)
     # identifier = f"{project.hash}-{model.hash}-{status_value}"
     # filter.hash = utility.short_hash(identifier)
 

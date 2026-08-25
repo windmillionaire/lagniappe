@@ -29,6 +29,7 @@ Test Framework:
 
 from dataclasses import replace
 from datetime import datetime
+import json
 from uuid import uuid4
 
 import pytest
@@ -77,6 +78,55 @@ def test_project_filter_conditions_include_task_fields(get_user):
     expect(panel.get_by_role("option", name="Completed", exact=True)).to_be_visible()
 
 
+# @pairs filters:malformed-contract filters:unavailable-source permissions:unavailable-source request-errors:stable-status
+def test_filter_preview_rejects_malformed_and_forged_contracts(
+    get_user,
+    browser_failures,
+):
+    user = get_user(Users.OWNER)
+    project = Projects.test_filter_project.get(user)
+    user.go(project)
+    endpoint = f"{project.url.rsplit('/projects/', 1)[0]}/filters/{project.key}/test"
+    path = f"/filters/{project.key}/test"
+
+    def request_contract(value):
+        return user.page.evaluate(
+            """async ({endpoint, contract}) => {
+                const query = new URLSearchParams({contract});
+                const response = await fetch(`${endpoint}?${query}`, {
+                    headers: {"X-Lagniappe-Request": "true"},
+                });
+                return {status: response.status, text: await response.text()};
+            }""",
+            {"endpoint": endpoint, "contract": value},
+        )
+
+    with browser_failures.expect_http_error(user, status=400, path=path):
+        malformed = request_contract("{not-json")
+    assert malformed == {
+        "status": 400,
+        "text": "Filter contract contains malformed JSON.",
+    }
+
+    forged_contract = json.dumps(
+        {
+            "version": 1,
+            "conditions": [
+                {
+                    "source_id": "unrelated-source",
+                    "field": "name",
+                    "comparator": "substring",
+                    "values": ["Filter"],
+                }
+            ],
+        }
+    )
+    with browser_failures.expect_http_error(user, status=422, path=path):
+        forged = request_contract(forged_contract)
+    assert forged["status"] == 422
+    assert "unavailable field" in forged["text"]
+
+
 # --- String conditions (Task Name) ---
 
 
@@ -113,6 +163,10 @@ def test_filter_by_task_name_exact(get_user):
 
     badges = filters.name_equals(task.definition.name).add_filter()
     expect(badges).to_be_visible()
+    definition = json.loads(
+        badges.locator("input[name='definition']").input_value()
+    )
+    assert definition["values"] == [task.definition.name]
 
     results = filters.run()
     expect(results).to_be_visible()
@@ -384,6 +438,7 @@ def test_saved_filter_quick_edit_persists_attached_form_checkbox(get_user):
 
 # @features filters
 # @dimensions attached-form select-condition run-results
+# @pairs filters:attached-form filters:selector permissions:relationship
 def test_filter_by_attached_form_select_condition(get_user):
     user = get_user(Users.OWNER)
     filters, matching_task, excluded_task = _attached_form_filter_context(user)

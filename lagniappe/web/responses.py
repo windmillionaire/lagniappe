@@ -52,6 +52,13 @@ def error(error, exception=None):
     return Response(str(error), status=422, mimetype="text/plain")
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/filters/main.py::_contract_error_response
+# @reason filter request tests assert the route-owned 400 response
+def bad_request(error):
+    return Response(str(error), status=400, mimetype="text/plain")
+
+
 def not_found(error):
     return error, 404
 
@@ -795,10 +802,17 @@ def filtered_page_index(pages, filter):
     return render_template("categories/index.html", pages=pages, filtered=filter), 200
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/filters/main.py::condition
+# @covered-by lagniappe/web/routes/filters/main.py::options
+# @reason condition and option routes own rendered filter response behavior
 def filter_condition(data, condition, filter=False, options=False):
     if filter:
         badge_template = get_template_attribute("filters.html", "filter_badge")
-        data["html"] = badge_template(condition.details, condition.description)
+        data["html"] = badge_template(
+            condition.details,
+            condition.contract_condition,
+        )
 
     if options:
         options_template = get_template_attribute("filters.html", "filter_condition")

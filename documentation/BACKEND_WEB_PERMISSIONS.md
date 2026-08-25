@@ -92,9 +92,15 @@ permission-filtered to avoid exposing stored details in the browser.
 
 The internal Link preflight is deliberately enabled by browser route callers.
 Trusted AI, import, migration, and background-service flows keep their existing
-service-owned policy instead of depending on Flask session state. Filter DTOs
-remain a separate validation project because their parent, field, comparator,
-and value contracts are broader than entity-key resolution alone.
+service-owned policy instead of depending on Flask session state.
+
+Filter DTOs use their own versioned compiler because their source, field,
+comparator, and value contracts are broader than entity-key resolution alone.
+Condition/options routes resolve sources and dynamic selectors only through the
+primary project's/category's authorized filter catalog. Preview, save, saved
+run, AI queries, and polling all compile to the same `CompiledFilter` boundary;
+an unavailable secondary reference returns a generic `422` and cannot reach
+Datastore mutation or Redis query construction.
 
 ## ETags and collection fingerprints
 

@@ -1,20 +1,20 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { BaseList } from './baseList.js?v=bdc368f0';
-import { b as buttons } from './buttons.js?v=bdc368f0';
-import { r as request, w as withTransition } from './foundation.js?v=bdc368f0';
-import './connectivity.js?v=bdc368f0';
-import { p as primitives } from './primitives.js?v=bdc368f0';
-import { F as FacetsBox } from './facets.js?v=bdc368f0';
-import { S as SelectBox } from './select2.js?v=bdc368f0';
-import './styles.js?v=bdc368f0';
-import './icons.js?v=bdc368f0';
-import './formatting.js?v=bdc368f0';
-import './remote.js?v=bdc368f0';
-import './queryLifecycle.js?v=bdc368f0';
-import './combobox.js?v=bdc368f0';
-import './results.js?v=bdc368f0';
-import './storage.js?v=bdc368f0';
-import './submitter.js?v=bdc368f0';
+import { BaseList } from './baseList.js?v=bb2fbed3';
+import { b as buttons } from './buttons.js?v=bb2fbed3';
+import { r as request, w as withTransition } from './foundation.js?v=bb2fbed3';
+import './connectivity.js?v=bb2fbed3';
+import { p as primitives } from './primitives.js?v=bb2fbed3';
+import { F as FacetsBox } from './facets.js?v=bb2fbed3';
+import { S as SelectBox } from './select2.js?v=bb2fbed3';
+import './styles.js?v=bb2fbed3';
+import './icons.js?v=bb2fbed3';
+import './formatting.js?v=bb2fbed3';
+import './remote.js?v=bb2fbed3';
+import './queryLifecycle.js?v=bb2fbed3';
+import './combobox.js?v=bb2fbed3';
+import './results.js?v=bb2fbed3';
+import './storage.js?v=bb2fbed3';
+import './submitter.js?v=bb2fbed3';
 
 /**
  * @testable infrastructure
@@ -166,13 +166,16 @@ class Filters {
 		});
 	}
 
+	get contract() {
+		return JSON.stringify({
+			version: 1,
+			conditions: this.definitions.map((definition) => JSON.parse(definition)),
+		});
+	}
+
 	get formData() {
 		const data = new FormData();
-		this.filters
-			.querySelectorAll("input[name='definition']")
-			.forEach((input) => {
-				data.append("definition", input.value);
-			});
+		data.append("contract", this.contract);
 		return data;
 	}
 
@@ -217,7 +220,9 @@ class Filters {
 
 		this._buttons.run.activate();
 
-		const response = await request.get(this.endpoints.test, this.formData);
+		const response = await request.get(this.endpoints.test, {
+			contract: this.contract,
+		});
 		if (!this.view.successfulResponse(response, this.component)) return;
 
 		const results = await this.component.loadWidget("FilterResults");
