@@ -31,8 +31,12 @@ Redis uses isolated keys per document:
 | `Sync.CLIENTS` | Expiring client-to-User display projections. |
 
 Document state expires after five minutes. Presence fields expire after one
-minute and are refreshed by the active two-second poll. When working state is
-absent, the server creates a new generation from the durable document asset.
+minute and are refreshed by the active two-second poll. An existing document
+poll reads the state and refreshes its TTL with one Redis `GETEX`; it does not
+enter an optimistic transaction or rewrite the full document. When working
+state is absent, the poll enters the normal isolated transaction to create one
+new generation from the durable document asset. Document updates and asset
+refreshes continue to use optimistic transactions.
 
 ## Deltas and checkpoints
 

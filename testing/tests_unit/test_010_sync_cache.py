@@ -1,5 +1,6 @@
 """Unit coverage for revisioned Redis document state."""
 
+import json
 from importlib import import_module
 
 import pytest
@@ -35,20 +36,51 @@ class _DocumentPipeline:
         self.pending = (key, value, ex)
 
     def execute(self):
+        if (
+            self.redis.conflict_state is not None
+            and not self.redis.conflict_injected
+        ):
+            self.redis.values[self.key] = json.dumps(
+                self.redis.conflict_state,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+            self.redis.conflict_injected = True
+            raise documents.WatchError()
         key, value, expires = self.pending
         self.redis.values[key] = value
         self.redis.expirations[key] = expires
+        self.redis.sets.append(key)
         return [True]
 
 
 class _DocumentRedis:
     def __init__(self):
+        self.after_getex_state = None
+        self.conflict_injected = False
+        self.conflict_state = None
         self.expirations = {}
+        self.getex_calls = []
+        self.sets = []
         self.values = {}
         self.watched = []
 
     def pipeline(self):
         return _DocumentPipeline(self)
+
+    def getex(self, key, *, ex):
+        self.getex_calls.append((key, ex))
+        value = self.values.get(key)
+        if value is not None:
+            self.expirations[key] = ex
+        if self.after_getex_state is not None:
+            self.values[key] = json.dumps(
+                self.after_getex_state,
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+            self.after_getex_state = None
+        return value
 
 
 # @pairs sync:document sync:concurrency sync:isolation sync:ttl
@@ -76,6 +108,140 @@ def test_document_transactions_are_key_isolated_and_expiring(monkeypatch):
         expires == documents.DOCUMENT_TTL_SECONDS
         for expires in redis.expirations.values()
     )
+
+
+def _without_presence(monkeypatch):
+    monkeypatch.setattr(
+        documents,
+        "_register_presence",
+        lambda *_args: ([], "presence-empty"),
+    )
+
+
+# @pairs polling:document polling:read-path polling:ttl polling:write-amplification
+@pytest.mark.unit
+def test_existing_document_poll_refreshes_ttl_without_full_write(monkeypatch):
+    redis = _DocumentRedis()
+    state = documents._new_state(
+        {"ydoc": "snapshot-0", "fingerprint": "fingerprint-0"}
+    )
+    document_key = documents.Sync.DOCUMENTS.key("page:document")
+    redis.values[document_key] = json.dumps(state)
+    monkeypatch.setattr(documents.cache, "_redis", redis)
+    _without_presence(monkeypatch)
+
+    payload = documents.poll_document(
+        "page:document",
+        seed={"ydoc": "stale-seed"},
+        client_id="client-1",
+        user={"hash": "user-1"},
+    )
+
+    assert payload["generation"] == state["generation"]
+    assert payload["ydoc"] == "snapshot-0"
+    assert redis.getex_calls == [(document_key, documents.DOCUMENT_TTL_SECONDS)]
+    assert redis.expirations[document_key] == documents.DOCUMENT_TTL_SECONDS
+    assert redis.watched == []
+    assert redis.sets == []
+
+
+# @pairs polling:document polling:concurrency polling:read-path
+# @pairs sync:document sync:revision
+@pytest.mark.unit
+def test_document_poll_does_not_overwrite_a_concurrent_update(monkeypatch):
+    redis = _DocumentRedis()
+    initial_state = documents._new_state(
+        {"ydoc": "snapshot-0", "fingerprint": "fingerprint-0"}
+    )
+    updated_state = {
+        **initial_state,
+        "revision": 1,
+        "updates": [
+            {"revision": 1, "update": "concurrent-delta", "user_hash": None}
+        ],
+    }
+    document_key = documents.Sync.DOCUMENTS.key("page:document")
+    redis.values[document_key] = json.dumps(initial_state)
+    redis.after_getex_state = updated_state
+    monkeypatch.setattr(documents.cache, "_redis", redis)
+    _without_presence(monkeypatch)
+
+    first_payload = documents.poll_document(
+        "page:document",
+        seed={"ydoc": "stale-seed"},
+        client_id="client-1",
+        user={"hash": "user-1"},
+    )
+    next_state = documents._read_document_state(
+        "page:document",
+        {"ydoc": "stale-seed"},
+    )
+
+    assert first_payload["revision"] == 0
+    assert next_state["revision"] == 1
+    assert next_state["updates"] == updated_state["updates"]
+    assert documents._decode(redis.values[document_key])["revision"] == 1
+    assert redis.watched == []
+    assert redis.sets == []
+
+
+# @pairs polling:document polling:initialization polling:ttl
+@pytest.mark.unit
+def test_missing_document_poll_initializes_from_durable_seed(monkeypatch):
+    redis = _DocumentRedis()
+    document_key = documents.Sync.DOCUMENTS.key("page:document")
+    monkeypatch.setattr(documents.cache, "_redis", redis)
+    _without_presence(monkeypatch)
+
+    payload = documents.poll_document(
+        "page:document",
+        seed={"ydoc": "durable-snapshot", "fingerprint": "durable-fingerprint"},
+        client_id="client-1",
+        user={"hash": "user-1"},
+    )
+
+    stored = documents._decode(redis.values[document_key])
+    assert payload["generation"] == stored["generation"]
+    assert payload["ydoc"] == "durable-snapshot"
+    assert payload["fingerprint"] == "durable-fingerprint"
+    assert redis.getex_calls == [(document_key, documents.DOCUMENT_TTL_SECONDS)]
+    assert redis.watched == [document_key]
+    assert redis.sets == [document_key]
+    assert redis.expirations[document_key] == documents.DOCUMENT_TTL_SECONDS
+
+
+# @pairs polling:document polling:concurrency polling:initialization
+@pytest.mark.unit
+def test_document_poll_initialization_conflict_keeps_winning_generation(monkeypatch):
+    redis = _DocumentRedis()
+    winning_state = documents._new_state(
+        {"ydoc": "winning-snapshot", "fingerprint": "winning-fingerprint"}
+    )
+    winning_state.update(
+        revision=1,
+        updates=[{"revision": 1, "update": "concurrent-delta", "user_hash": None}],
+    )
+    redis.conflict_state = winning_state
+    document_key = documents.Sync.DOCUMENTS.key("page:document")
+    monkeypatch.setattr(documents.cache, "_redis", redis)
+    _without_presence(monkeypatch)
+
+    payload = documents.poll_document(
+        "page:document",
+        seed={"ydoc": "losing-snapshot"},
+        client_id="client-1",
+        user={"hash": "user-1"},
+    )
+
+    stored = documents._decode(redis.values[document_key])
+    assert payload["generation"] == winning_state["generation"]
+    assert payload["revision"] == 1
+    assert payload["updates"] == winning_state["updates"]
+    assert stored["generation"] == winning_state["generation"]
+    assert stored["updates"] == winning_state["updates"]
+    assert redis.conflict_injected is True
+    assert redis.watched == [document_key, document_key]
+    assert redis.sets == [document_key]
 
 
 class _PresenceRegistrationPipeline:
@@ -149,6 +315,11 @@ def document_state(monkeypatch):
         return state, result
 
     monkeypatch.setattr(documents, "_mutate", mutate)
+    monkeypatch.setattr(
+        documents,
+        "_read_document_state",
+        lambda _sync_id, _seed: state,
+    )
     monkeypatch.setattr(
         documents,
         "_register_presence",

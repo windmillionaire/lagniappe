@@ -65,6 +65,7 @@ def _author_projection(author):
 
 # @testable true
 # @tests tests_unit/test_010_sync_cache.py::test_document_transactions_are_key_isolated_and_expiring
+# @tests tests_unit/test_010_sync_cache.py::test_document_poll_initialization_conflict_keeps_winning_generation
 # @features sync polling
 # @dimensions document concurrency isolation ttl
 def _mutate(sync_id, seed, transform):
@@ -89,6 +90,29 @@ def _mutate(sync_id, seed, transform):
             except WatchError:
                 continue
     raise RuntimeError("Collaborative document state changed too frequently.")
+
+
+# @testable true
+# @tests tests_unit/test_010_sync_cache.py::test_existing_document_poll_refreshes_ttl_without_full_write
+# @tests tests_unit/test_010_sync_cache.py::test_document_poll_does_not_overwrite_a_concurrent_update
+# @tests tests_unit/test_010_sync_cache.py::test_missing_document_poll_initializes_from_durable_seed
+# @tests tests_unit/test_010_sync_cache.py::test_document_poll_initialization_conflict_keeps_winning_generation
+# @pairs polling:document polling:read-path polling:initialization
+# @pairs polling:concurrency polling:ttl polling:write-amplification
+def _read_document_state(sync_id, seed):
+    """Read existing state with a sliding TTL, initializing only on a miss."""
+    document_key = Sync.DOCUMENTS.key(sync_id)
+    state = _decode(
+        cache.redis.getex(
+            document_key,
+            ex=DOCUMENT_TTL_SECONDS,
+        )
+    )
+    if state is not None:
+        return state
+
+    state, _result = _mutate(sync_id, seed, lambda current: None)
+    return state
 
 
 # @testable false
@@ -139,6 +163,8 @@ def _register_presence(sync_id, client_id, user):
 
 # @testable true
 # @tests tests_unit/test_010_sync_cache.py::test_revisioned_document_poll_returns_snapshot_then_deltas
+# @tests tests_unit/test_010_sync_cache.py::test_existing_document_poll_refreshes_ttl_without_full_write
+# @tests tests_unit/test_010_sync_cache.py::test_document_poll_does_not_overwrite_a_concurrent_update
 # @features sync polling
 # @dimensions document revision snapshot delta presence author-attribution
 def poll_document(
@@ -152,7 +178,7 @@ def poll_document(
     presence_digest=None,
 ):
     """Return the state changes and presence visible after ``revision``."""
-    state, _result = _mutate(sync_id, seed, lambda current: None)
+    state = _read_document_state(sync_id, seed)
     users, current_presence_digest = _register_presence(
         sync_id,
         client_id,
