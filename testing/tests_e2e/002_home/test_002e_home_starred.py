@@ -306,14 +306,22 @@ def test_star_route_rejects_inaccessible_and_missing_targets(
     assert target_after.fingerprint == target_fingerprint
     assert target_after.modified == target_modified
 
-    saved_user.db["starred"] = [
-        target_after.key,
-        *[key for key in starred_before if key != target_after.key],
-    ]
+    saved_user.db["starred"] = [target_after.key]
     saved_user.save()
 
     home = restricted.go(SitePages.HOME)
-    expect(home.starred_list.get_item(target)).not_to_be_attached()
+    expect(restricted.locate(home.STARRED_COUNT)).to_have_text("1")
+    toggle = restricted.locate(home.STARRED_LIST_TOGGLE)
+    with restricted.page.expect_response("**/l/get/starred"):
+        toggle.click()
+    starred = restricted.locate(home.STARRED_LIST)
+    expect(starred).to_have_attribute("loaded", "")
+    expect(starred).not_to_be_visible()
+    expect(
+        starred.locator(f"li[lp-entity][data-key='{target.key}']")
+    ).not_to_be_attached()
+    expect(restricted.locate(home.STARRED_COUNT)).to_have_text("0")
+    expect(toggle).to_contain_class("pointer-events-none")
     saved_user = Entities.USER.load(restricted.email)
     assert target_after.key in saved_user.db.get("starred", [])
 

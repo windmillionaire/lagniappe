@@ -194,7 +194,7 @@ def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypat
     token.assert_called_once_with()
     request.assert_called_once_with(
         "POST",
-        "places:autocomplete",
+        "v1/places:autocomplete",
         loc.PLACES_AUTOCOMPLETE_POLICY,
         headers={
             "Authorization": "Bearer access-token",
@@ -244,7 +244,7 @@ def test_get_place_details_formats_address2_and_meaningful_name():
     request.assert_called_once()
     assert request.call_args.args == (
         "GET",
-        "places/place-1",
+        "v1/places/place-1",
         loc.PLACES_DETAILS_POLICY,
     )
     assert request.call_args.kwargs["params"]["fields"] == (

@@ -297,7 +297,7 @@ def get_place_details(place_id):
 
     data = _request_places_json(
         "GET",
-        f"places/{quote(str(place_id), safe='')}",
+        f"v1/places/{quote(str(place_id), safe='')}",
         operation="get_place_details",
         policy=PLACES_DETAILS_POLICY,
         params={
@@ -380,7 +380,7 @@ def search_places(query):
 
     payload = _request_places_json(
         "POST",
-        "places:autocomplete",
+        "v1/places:autocomplete",
         operation="search_places",
         policy=PLACES_AUTOCOMPLETE_POLICY,
         data=data,

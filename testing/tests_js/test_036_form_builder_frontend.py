@@ -69,8 +69,8 @@ const context = {
   FormData: class { constructor(form) { this.form = form; } },
   Renderer: class {},
   request: {
-    put() {
-      return new Promise((resolve, reject) => requests.push({ resolve, reject }));
+    put(...args) {
+      return new Promise((resolve, reject) => requests.push({ resolve, reject, args }));
     },
   },
   setTimeout() { throw new Error("Persistent save errors must not schedule hiding"); },
@@ -107,6 +107,9 @@ if (first !== duplicate || requests.length !== 1) {
 }
 if (!button.disabled || button.attributes["aria-busy"] !== "true") {
   throw new Error("Save did not expose its pending state");
+}
+if (requests[0].args[2]?.replaceErrorPage !== false) {
+  throw new Error("Builder save did not preserve its retryable page on HTTP errors");
 }
 
 schema = [...schema, { id: "second", type: "number" }];

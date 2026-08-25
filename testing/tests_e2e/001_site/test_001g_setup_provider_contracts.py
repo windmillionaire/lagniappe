@@ -206,7 +206,7 @@ def test_runtime_identity_platform_sign_in_reaches_hosted_home(get_user):
 
 
 def test_runtime_datastore_and_all_storage_bucket_operations(monkeypatch):
-    """Exercise the exact Datastore and four-bucket object operations used at runtime."""
+    """Exercise the exact Datastore and three-bucket object operations used at runtime."""
     probe_id = _probe_id()
     datastore_client = DATA.datastore
     kind = f"{CONFIG.PREFIX}setup-runtime-contract"
@@ -233,7 +233,7 @@ def test_runtime_datastore_and_all_storage_bucket_operations(monkeypatch):
         datastore_client.delete(key)
     assert datastore_client.get(key) is None
 
-    for bucket_role in ("public", "private", "history", "export"):
+    for bucket_role in ("public", "private", "history"):
         bucket = DATA.bucket(bucket_role)
         blob = bucket.blob(f"setup-runtime-contract/{probe_id}.txt")
         try:

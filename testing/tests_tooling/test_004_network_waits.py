@@ -524,7 +524,10 @@ def test_offline_sync_replay_waits_for_manager_and_exact_matching_response(
     )
     expected = FakeResponse(
         url="http://test.local/l/sync",
-        post_data='{"updates":["offline edit","remote edit"]}',
+        post_data=(
+            '{"sync_id":"project:document",'
+            '"updates":["offline edit","remote edit"]}'
+        ),
     )
 
     with offline.expect_offline_sync_replay(
@@ -535,7 +538,10 @@ def test_offline_sync_replay_waits_for_manager_and_exact_matching_response(
         page.respond(
             FakeResponse(
                 url="http://test.local/l/sync",
-                post_data='{"updates":["unrelated"]}',
+                post_data=(
+                    '{"sync_id":"unrelated:document",'
+                    '"updates":["offline edit","remote edit"]}'
+                ),
             )
         )
         page.respond(expected)

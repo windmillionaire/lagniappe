@@ -203,7 +203,10 @@ exact method/path/message with `browser_failures.expect(...)` or use
 
 Use `scoped_browser_route()` for request interception. It always removes the
 route in `finally`; an unscoped route can leak into later actions in the same
-browser context.
+browser context. Playwright interception cannot observe a network request owned
+by the registered service worker. For those paths, arrange a narrow real server
+failure and recovery when practical so the test retains the production worker
+boundary.
 
 ## Targeted Hosted Production Flows
 

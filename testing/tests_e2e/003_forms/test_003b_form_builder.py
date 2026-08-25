@@ -1,13 +1,15 @@
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 from playwright.sync_api import expect
 
-from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Forms, Pages, Schemas, Uploads, Users
 from testing.definitions.form_definitions import FormDefinition
 from testing.definitions.schema_fields import SchemaFields
+from testing.definitions.user_definitions import UserDefinition
 from testing.elements import EditorAddImage, Select, SpinnerButtons
 from testing.resources.form import Builder, Form
 from testing.resources.task import Task as TaskResource
@@ -63,18 +65,11 @@ def _html_editor_text_entry(builder):
     return text_entry
 
 
-def _fail_next_browser_fetch(page, *, method, path_prefix, error):
-    def fail_request(route):
-        if route.request.method.upper() != method:
-            route.fallback()
-            return
-        route.fulfill(status=503, json={"error": error})
-
-    page.route(
-        f"**{path_prefix}*",
-        fail_request,
-        times=1,
-    )
+def _set_forms_permission(user, action):
+    entity = Entities.USER.load(user.email)
+    entity.permissions = {**entity.permissions, "forms": action.name}
+    entity.save()
+    user.entity = entity
 
 
 # @pair forms:builder-preview
@@ -485,37 +480,55 @@ def test_html_field(get_user):
 # @matrix html-field : authoritative-content builder-html-field error-reporting form-asset initial-load intentional-clear retry server-acknowledgement
 # @style message
 # @style editor.container
-def test_html_editor_recovers_from_failed_load_and_save(get_user):
-    user = get_user(Users.OWNER)
+def test_html_editor_recovers_from_failed_load_and_save(
+    get_user, browser_failures
+):
+    owner = get_user(Users.OWNER)
+    html = SchemaFields.HTML.get(title="Resilient instructions")
     form = Form(
-        user=user,
+        user=owner,
         definition=FormDefinition(
             name="Builder HTML Persistence Recovery",
             form_type="task",
+            schema=(html,),
         ),
     ).create()
-    builder = form.builder
-    html = SchemaFields.HTML.get(title="Resilient instructions")
-    _fail_next_browser_fetch(
-        user.page,
-        method="GET",
-        path_prefix=f"/assets/{form.key}/html/",
-        error="Test-only HTML load failure",
+    user = get_user(
+        UserDefinition(
+            name="Builder HTML Recovery Editor",
+            email=f"builder-html-recovery-{uuid4().hex}@example.test",
+        ),
+        creator=owner,
     )
-    builder.add_field(html)
-
-    status = builder.condition.locator("[data-role='editor-status']")
-    editor = builder.condition.locator("[data-role='editor']")
-    expect(status).to_be_visible()
-    expect(status).to_contain_text("Test-only HTML load failure")
-    expect(editor).to_have_attribute("inert", "")
-    expect(editor).not_to_have_attribute("aria-busy", "true")
-    expect(editor.locator(".ProseMirror")).to_have_count(0)
-
+    _set_forms_permission(user, Action.EDIT)
+    form.user = user
+    builder = form.builder
     load_path = f"/assets/{form.key}/html/{html.id}"
-    with user.page.expect_response(
-        lambda response: response.url.endswith(load_path)
-        and response.status == 200
+    _set_forms_permission(user, Action.NONE)
+    with browser_failures.expect_http_error(user, status=403, path=load_path):
+        with user.page.context.expect_event(
+            "response",
+            predicate=lambda response: response.url.endswith(load_path)
+            and response.request.method == "GET"
+            and response.status == 403,
+        ):
+            builder.select_field(html)
+            builder.open_condition("html", role="edit")
+
+        status = builder.condition.locator("[data-role='editor-status']")
+        editor = builder.condition.locator("[data-role='editor']")
+        expect(status).to_be_visible()
+        expect(status).to_contain_text("Error 403")
+        expect(editor).to_have_attribute("inert", "")
+        expect(editor).not_to_have_attribute("aria-busy", "true")
+        expect(editor.locator(".ProseMirror")).to_have_count(0)
+
+    _set_forms_permission(user, Action.EDIT)
+    with user.page.context.expect_event(
+        "response",
+        predicate=lambda response: response.url.endswith(load_path)
+        and response.request.method == "GET"
+        and response.status == 200,
     ):
         status.locator("[data-role='retry']").click()
 
@@ -525,20 +538,25 @@ def test_html_editor_recovers_from_failed_load_and_save(get_user):
     save_path = f"/assets/{form.key}/form-html/{html.id}"
     text = "Retry this durable text."
     text_entry.press_sequentially(text)
-    _fail_next_browser_fetch(
-        user.page,
-        method="PUT",
-        path_prefix=save_path,
-        error="Test-only HTML save failure",
-    )
-    text_entry.blur()
+    _set_forms_permission(user, Action.VIEW)
+    with browser_failures.expect_http_error(user, status=403, path=save_path):
+        with user.page.context.expect_event(
+            "response",
+            predicate=lambda response: response.url.endswith(save_path)
+            and response.request.method == "PUT"
+            and response.status == 403,
+        ):
+            text_entry.blur()
 
-    expect(status).to_be_visible()
-    expect(status).to_contain_text("Test-only HTML save failure")
+        expect(status).to_be_visible()
+        expect(status).to_contain_text("Error 403")
 
-    with user.page.expect_response(
-        lambda response: response.url.endswith(save_path)
-        and response.status == 200
+    _set_forms_permission(user, Action.EDIT)
+    with user.page.context.expect_event(
+        "response",
+        predicate=lambda response: response.url.endswith(save_path)
+        and response.request.method == "PUT"
+        and response.status == 200,
     ):
         status.locator("[data-role='retry']").click()
     expect(status).to_be_hidden()
@@ -549,8 +567,10 @@ def test_html_editor_recovers_from_failed_load_and_save(get_user):
     text_entry.click()
     text_entry.press("Control+A")
     text_entry.press("Backspace")
-    with user.page.expect_response(
-        lambda response: response.url.endswith(save_path)
+    with user.page.context.expect_event(
+        "response",
+        predicate=lambda response: response.url.endswith(save_path)
+        and response.request.method == "PUT"
         and response.status == 200
     ):
         text_entry.blur()

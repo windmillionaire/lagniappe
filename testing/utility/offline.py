@@ -100,6 +100,7 @@ def expect_offline_sync_replay(
         if (
             request.method == "POST"
             and urlsplit(response.url).path == "/l/sync"
+            and sync_id in body
             and all(marker in body for marker in markers)
         ):
             responses.append(response)

@@ -183,6 +183,7 @@ export class Header {
 				const response = await request.put(
 					this.schemaForm.dataset.route,
 					new FormData(this.schemaForm),
+					{ replaceErrorPage: false },
 				);
 				if (this._destroyed) return false;
 				if (response?.ok === true) {
