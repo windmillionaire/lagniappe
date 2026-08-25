@@ -389,17 +389,6 @@ def _run_create_preflight(source, *, base_ref=None):
             [python, run_py, "traceability", *traceability_options],
         ),
         (
-            "changed source traceability",
-            [
-                python,
-                run_py,
-                "traceability",
-                "--changed",
-                base_revision,
-                *traceability_options,
-            ],
-        ),
-        (
             "complete release tree",
             [python, run_py, "release-check", "--base", base_revision],
         ),

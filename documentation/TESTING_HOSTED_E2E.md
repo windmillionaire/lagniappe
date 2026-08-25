@@ -90,8 +90,11 @@ venv/bin/python run.py hosted-e2e create --base origin/main
 `create` requires a clean committed production build. It exports that exact
 commit for both artifacts, never rebuilds, never edits canonical
 `lagniappe.yaml`, and deploys with `--no-promote`. Before gcloud activation or
-provider mutation, it runs npm source checks, Ruff, tooling tests, full and
-changed traceability, and the release check against the clean local HEAD.
+provider mutation, it runs npm source checks, Ruff, tooling tests, full
+structural traceability, and the release check against the clean local HEAD.
+Creation does not require current local test evidence; the hosted job produces
+that evidence when it runs the candidate's suites.
+
 `--base` selects the comparison point and defaults to `origin/main`, then `main`.
 Interrupted create state is recorded under `reports/hosted-e2e/state.json`;
 rerunning from the same commit resumes completed phases. A different commit
