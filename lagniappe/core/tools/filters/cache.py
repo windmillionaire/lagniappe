@@ -28,7 +28,7 @@ def escape_for_filter(to_filter):
 
 # @testable true
 # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_uses_shared_cache_key_without_user_restrictions
-# @pairs filters:shared-key filters:restrictions cache:shared-key cache:restrictions permissions:shared-key permissions:restrictions
+# @matrix cache filters permissions : restrictions shared-key
 class FilterCache:
     """Manages a cached filter index for an entity."""
 
@@ -42,7 +42,8 @@ class FilterCache:
     # @testable true
     # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_query_filters_loaded_entities_by_view_permission
     # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_rejects_uncompiled_query_definitions
-    # @pairs filters:query filters:allowed filters:related-load cache:query cache:allowed cache:related-load permissions:query permissions:allowed permissions:related-load filters:validation filters:query-boundary cache:validation cache:query-boundary
+    # @matrix cache filters : allowed query query-boundary related-load validation
+    # @matrix permissions : allowed query related-load
     def _query_keys(self, filter):
         if not isinstance(filter, CompiledFilter):
             raise TypeError("FilterCache queries require a CompiledFilter")
@@ -51,8 +52,7 @@ class FilterCache:
 
     # @testable true
     # @tests tests_unit/test_021_refresh.py::test_filter_cache_query_roots_uses_root_fetch_without_permission_expansion
-    # @features reconnect-refresh filters
-    # @dimensions root-depth membership
+    # @matrix filters reconnect-refresh : membership root-depth
     def query_roots(self, filter):
         """Return matching roots for modified-time comparison without expansion."""
         return Entities.fetch(*self._query_keys(filter), request=Fetch.root())
@@ -64,8 +64,8 @@ class FilterCache:
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_results_respect_task_permissions
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_multiple_conditions
     # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_results_respect_page_permissions
-    # @features filters
-    # @dimensions string-condition entity-condition compound run-results view-access
+    # @matrix filters : compound entity-condition run-results string-condition view-access
+    # @pair filters:query
     def query(self, filter):
         """Query the cache with a filter and return matching entities."""
         return [
@@ -103,8 +103,7 @@ class FilterCache:
 
     # @testable true
     # @tests tests_unit/test_011b_filter_cache.py::test_filter_cache_loads_category_pages_without_restrictions
-    # @features filters
-    # @dimensions cache category-pagination source-query restrictions
+    # @matrix filters : cache category-pagination restrictions source-query
     def _load(self, cursor=None):
         if self.entity.kind == "project":
             self._load_project_tasks()
@@ -158,8 +157,8 @@ class FilterCache:
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_category
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_model_task
-    # @features filters
-    # @dimensions string-condition entity-condition model-task run-results
+    # @matrix filters : entity-condition model-task run-results string-condition
+    # @matrix filters : all-tasks restrictions shared-key
     def cache(self):
         """Build or incrementally refresh the filter cache."""
         # filter_cache.delete(self.cache_key)

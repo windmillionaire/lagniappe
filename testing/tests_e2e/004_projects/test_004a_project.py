@@ -39,8 +39,7 @@ def _create_model_task(user, project, definition):
     return new_task.get_attribute("data-key")
 
 
-# @features model-tasks
-# @dimensions create
+# @pair model-tasks:create
 def test_create_model_task(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_create_model_task.get(user)
@@ -50,8 +49,7 @@ def test_create_model_task(get_user):
     model_task.key = _create_model_task(user, project, model_task.definition)
 
 
-# @features model-tasks
-# @dimensions create attach-form
+# @matrix model-tasks : attach-form create
 def test_create_model_task_with_form(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_create_model_task_with_form.get(user)

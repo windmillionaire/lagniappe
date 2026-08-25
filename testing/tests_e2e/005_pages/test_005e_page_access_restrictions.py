@@ -53,8 +53,7 @@ def _restrict_page_to_group(user, page, group):
     return permissions
 
 
-# @features pages
-# @dimensions access-restrictions owner-restricted
+# @matrix pages : access-restrictions owner-restricted
 def test_owner_restricted_page_is_hidden_from_model_viewer(
     get_user, browser_failures
 ):
@@ -69,8 +68,7 @@ def test_owner_restricted_page_is_hidden_from_model_viewer(
         expect(viewer.page).to_have_title("Error 403")
 
 
-# @features pages
-# @dimensions access-restrictions group-restricted
+# @matrix pages : access-restrictions group-restricted
 def test_group_restricted_page_opens_for_member_only(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = Pages.test_group_restricted_page.get(owner)
@@ -88,8 +86,7 @@ def test_group_restricted_page_opens_for_member_only(get_user, browser_failures)
         expect(outsider.page).to_have_title("Error 403")
 
 
-# @features pages
-# @dimensions access-restrictions index-filter
+# @matrix pages : access-restrictions index-filter
 def test_restricted_page_is_not_listed_for_outsider_on_category_index(get_user):
     owner = get_user(Users.OWNER)
     page = Pages.test_group_restricted_page.get(owner)

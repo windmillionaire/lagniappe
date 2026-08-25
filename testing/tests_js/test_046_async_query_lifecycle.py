@@ -3,9 +3,7 @@
 import textwrap
 
 
-# @features async-query
-# @dimensions ordering repeated-key cancellation
-# @source src/script/shared/queryLifecycle.mjs::QueryLifecycle
+# @matrix async-query : cancellation ordering repeated-key
 def test_query_lifecycle_publishes_only_the_current_request(run_node):
     run_node(
         textwrap.dedent(
@@ -84,9 +82,7 @@ def test_query_lifecycle_publishes_only_the_current_request(run_node):
     )
 
 
-# @features async-query
-# @dimensions teardown error-propagation
-# @source src/script/shared/queryLifecycle.mjs::QueryLifecycle
+# @matrix async-query : error-propagation teardown
 def test_query_lifecycle_invalidates_repeated_keys_and_destroyed_owners(run_node):
     run_node(
         textwrap.dedent(
@@ -113,9 +109,7 @@ def test_query_lifecycle_invalidates_repeated_keys_and_destroyed_owners(run_node
     )
 
 
-# @features async-query
-# @dimensions error-propagation
-# @source src/script/shared/queryLifecycle.mjs::QueryLifecycle
+# @pair async-query:error-propagation
 def test_query_lifecycle_propagates_current_loader_errors(run_node):
     run_node(
         textwrap.dedent(
@@ -135,9 +129,7 @@ def test_query_lifecycle_propagates_current_loader_errors(run_node):
     )
 
 
-# @features async-query combobox
-# @dimensions debounce stale-publication dismissal teardown
-# @source src/script/elements/combobox/remote.mjs::RemoteQueryCombobox
+# @matrix async-query combobox : debounce dismissal stale-publication teardown
 def test_remote_combobox_invalidates_before_debounce_and_on_destroy(run_node):
     run_node(
         textwrap.dedent(
@@ -238,8 +230,7 @@ def test_remote_combobox_invalidates_before_debounce_and_on_destroy(run_node):
     )
 
 
-# @pairs search:threshold search:recent-results search:stale-publication
-# @source src/script/elements/combobox/search.mjs::SearchBox
+# @matrix search : recent-results stale-publication threshold
 def test_search_threshold_settles_stale_work_and_restores_recent_results(run_node):
     run_node(
         textwrap.dedent(
@@ -294,10 +285,7 @@ def test_search_threshold_settles_stale_work_and_restores_recent_results(run_nod
     )
 
 
-# @features modal
-# @dimensions exact-owner late-publication listener-teardown reuse
-# @source src/script/shared/modal.mjs::Modal
-# @source src/script/shared/modal.mjs::OfflineModal
+# @matrix modal : exact-owner late-publication listener-teardown reuse
 def test_modal_owns_exact_node_and_rejects_late_attachment(run_node):
     run_node(
         textwrap.dedent(
@@ -393,9 +381,7 @@ def test_modal_owns_exact_node_and_rejects_late_attachment(run_node):
     )
 
 
-# @features forms
-# @dimensions builder-lifecycle late-publication listener-teardown
-# @source src/script/views/builder/builder.mjs::FormBuilder
+# @matrix forms : builder-lifecycle late-publication listener-teardown
 def test_builder_destroys_owned_search_modal_and_panels_during_startup(run_node):
     run_node(
         textwrap.dedent(

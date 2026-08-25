@@ -1,8 +1,7 @@
 """Node-backed checks for the shared adaptive polling scheduler."""
 
 
-# @features polling
-# @dimensions batching cadence lifecycle coalescing acknowledgement terminal-operation-order
+# @matrix polling : acknowledgement batching cadence coalescing lifecycle terminal-operation-order
 def test_polling_coordinator_batches_due_subscriptions_and_applies_results(run_node):
     run_node(
         r"""
@@ -184,9 +183,7 @@ if (timerId !== 3 || clearedTimers.join(",") !== "1,2") {
     )
 
 
-# @pair polling:cadence
-# @pair messaging:active-polling
-# @source src/script/shared/polling.mjs::PollingCoordinator
+# @pairs messaging:active-polling polling:cadence
 def test_polling_coordinator_temporarily_boosts_a_subscription(run_node):
     run_node(
         r"""
@@ -253,9 +250,7 @@ if (coordinator._interval(subscription, { status: "unchanged" }) < 15_000) {
     )
 
 
-# @pair polling:blur
-# @pair polling:visibility
-# @pair polling:cadence
+# @matrix polling : blur cadence visibility
 # @pair deferred-jobs:polling
 def test_polling_coordinator_limits_visible_blur_to_eligible_operations(run_node):
     run_node(
@@ -397,8 +392,7 @@ coordinator.subscribe(
     )
 
 
-# @pair polling:foreground
-# @pair polling:scheduled-initial
+# @matrix polling : foreground scheduled-initial
 # @pair notifications:cold-seed
 def test_polling_coordinator_schedules_modes_and_notification_seed(run_node):
     run_node(
@@ -502,8 +496,7 @@ if (timers.length !== 1 || timers[0].delay < 14_900) {
     )
 
 
-# @pairs notifications:cold-seed notifications:acknowledgement
-# @pairs notifications:bounded-backoff notifications:zero-subscriptions
+# @matrix notifications : acknowledgement bounded-backoff cold-seed zero-subscriptions
 def test_polling_coordinator_retries_cold_seed_until_warm_acknowledgement(run_node):
     run_node(
         r"""
@@ -600,9 +593,7 @@ const coordinator = new context.PollingCoordinator(view).init();
     )
 
 
-# @pair polling:reentrancy
-# @pair polling:requested-cycle
-# @pair polling:freshness
+# @matrix polling : freshness reentrancy requested-cycle
 def test_polling_coordinator_enqueues_reentrant_followup_without_waiting(run_node):
     run_node(
         r"""
@@ -749,8 +740,7 @@ coordinator.subscribe(
     )
 
 
-# @pairs polling:validation polling:diagnostics polling:presence
-# @pairs polling:protocol polling:revision polling:batching
+# @matrix polling : batching diagnostics presence protocol revision validation
 def test_polling_coordinator_captures_and_isolates_contract_failures(run_node):
     run_node(
         r"""

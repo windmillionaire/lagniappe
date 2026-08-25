@@ -84,8 +84,7 @@ def _create_category(user, home, definition):
     return new_category_key
 
 
-# @features categories
-# @dimensions manual-form attach-form
+# @matrix categories : attach-form manual-form
 @pytest.mark.e2e
 def test_create_category_form(get_user):
     """
@@ -119,8 +118,7 @@ def test_create_category_form(get_user):
     expect(form).not_to_be_visible()
 
 
-# @features categories
-# @dimensions ai-form explain-button
+# @matrix categories : ai-form explain-button
 @pytest.mark.e2e
 def test_category_form_explain_button(get_user):
     """
@@ -150,8 +148,7 @@ def test_category_form_explain_button(get_user):
     expect(form).to_be_visible()
 
 
-# @features categories
-# @dimensions manual-form ai-form
+# @matrix categories : ai-form manual-form
 @pytest.mark.e2e
 def test_category_form_generate_toggle(get_user):
     """
@@ -180,8 +177,7 @@ def test_category_form_generate_toggle(get_user):
     expect(ai_description).not_to_be_visible()
 
 
-# @features categories
-# @dimensions create-manual
+# @pair categories:create-manual
 @pytest.mark.e2e
 def test_create_category_manual_mode(get_user):
     """
@@ -199,8 +195,7 @@ def test_create_category_manual_mode(get_user):
     header_search.verify_entity_in_results(category)
 
 
-# @features categories
-# @dimensions ai-create ai-generated
+# @matrix categories : ai-create ai-generated
 @pytest.mark.ai
 def test_create_category_ai_mode(get_user, results):
     """
@@ -218,8 +213,7 @@ def test_create_category_ai_mode(get_user, results):
     results.record("category", category.entity.db)
 
 
-# @features categories
-# @dimensions navigate
+# @pair categories:navigate
 @pytest.mark.e2e
 def test_navigate_to_category(get_user):
     """
@@ -238,8 +232,7 @@ def test_navigate_to_category(get_user):
     expect(user.page).to_have_title(re.compile(category.definition.name))
 
 
-# @features categories
-# @dimensions attach-form create-manual
+# @matrix categories : attach-form create-manual
 @pytest.mark.e2e
 def test_create_category_with_form(get_user):
     """
@@ -264,8 +257,7 @@ def test_create_category_with_form(get_user):
     assert FormSelect(new_page_form).contains(category_form)
 
 
-# @features categories
-# @dimensions delete
+# @pair categories:delete
 # @template categories/index.html::view_header
 # @template menus.html::title
 # @template menus.html::delete

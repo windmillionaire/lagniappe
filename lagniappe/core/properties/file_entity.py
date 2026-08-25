@@ -8,8 +8,7 @@ from .common_entity import Name
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_display_name
-# @features file
-# @dimensions display-name filename-fallback
+# @matrix file : display-name filename-fallback
 class DisplayName(Name):
     """Display name for a File entity.
 
@@ -22,8 +21,7 @@ class DisplayName(Name):
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_display_name
-    # @features file
-    # @dimensions display-name, filename-fallback
+    # @matrix file : display-name filename-fallback
     @property
     def value(self):
         if self.is_set:
@@ -45,8 +43,7 @@ class DisplayName(Name):
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_filename_mimetype_encoding
-# @features file
-# @dimensions property
+# @pair file:property
 class Filename(AIMixin, DBProperty):
     """Original filename of the uploaded file."""
 
@@ -64,8 +61,7 @@ class Filename(AIMixin, DBProperty):
 # @tests tests_unit/test_006_file_properties.py::test_text_asset_extractable_only_for_non_text_document_ai_mimetypes
 # @tests tests_unit/test_006_file_properties.py::test_preview_url_when_mimetype_supported_and_file_present
 # @tests tests_unit/test_006_file_properties.py::test_preview_none_when_mimetype_not_supported
-# @features file
-# @dimensions property, mimetype, extractable, preview, unsupported
+# @matrix file : extractable mimetype preview property unsupported
 class Mimetype(AIMixin, DBProperty):
     """MIME type of the uploaded file. Determined on upload.
 
@@ -92,8 +88,7 @@ class Mimetype(AIMixin, DBProperty):
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_filename_mimetype_encoding
-# @features file
-# @dimensions property, encoding
+# @matrix file : encoding property
 class Encoding(DBProperty):
     """Character encoding for text files. Determined on upload."""
 
@@ -112,8 +107,7 @@ class Encoding(DBProperty):
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_file_size_and_large_use_asset_metadata
-# @features file
-# @dimensions asset-metadata size
+# @matrix file : asset-metadata size
 class Size(Property):
     """Stored byte size for the uploaded file, when known."""
 
@@ -139,9 +133,8 @@ class Size(Property):
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_file_to_ai_exports_metadata_and_uri_to_ai
 # @tests tests_unit/test_006_file_properties.py::test_file_size_and_large_use_asset_metadata
-# @pair file:large-file
+# @matrix file : asset-metadata large-file
 # @pair ai:large-file
-# @pair file:asset-metadata
 class Large(AIMixin, Property):
     """Whether the uploaded file is too large to attach to AI by default."""
 
@@ -186,8 +179,7 @@ class Preview(Property):
     # @tests tests_unit/test_006_file_properties.py::test_preview_url_when_mimetype_supported_and_file_present
     # @tests tests_unit/test_006_file_properties.py::test_preview_none_when_mimetype_not_supported
     # @tests tests_unit/test_006_file_properties.py::test_preview_none_when_no_file_asset
-    # @features file
-    # @dimensions preview, mimetype, asset, unsupported, missing-asset
+    # @matrix file : asset mimetype missing-asset preview unsupported
     @property
     def value(self):
         if self.is_set:
@@ -221,8 +213,7 @@ class AsHTML(Property):
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_as_html
     # @tests tests_unit/test_006_file_properties.py::test_text_asset_falls_back_to_original_text_file
-    # @features file
-    # @dimensions html-preview, text-asset, fallback
+    # @matrix file : fallback html-preview text-asset
     @property
     def value(self):
         if self.is_set:
@@ -262,8 +253,7 @@ class Summary(CacheMixin, AIMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_summary
     # @tests tests_unit/test_014_security.py::test_file_summary_strips_tags
-    # @features file, security
-    # @dimensions summary, html-stripping
+    # @matrix file security : html-stripping summary
     @property
     def value(self):
         return super().value
@@ -277,8 +267,7 @@ class Summary(CacheMixin, AIMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_summary
     # @tests tests_unit/test_006_file_properties.py::test_file_description_form_field_populates_search_cache
-    # @features file
-    # @dimensions cache
+    # @pair file:cache
     @property
     def cache_value(self):
         if self.entity.properties.summarize.search:

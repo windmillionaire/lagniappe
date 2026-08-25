@@ -93,7 +93,7 @@ def serialize_message(message, viewer):
 # @testable true
 # @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @pairs messaging:conversation-page messaging:compose-eligibility
+# @matrix messaging : compose-eligibility conversation-page
 def conversations(user, cursor=None, limit=CONVERSATION_PAGE_SIZE):
     if not collaboration.managed_user(user):
         raise PermissionError("Messaging is available to managed users only.")
@@ -132,7 +132,7 @@ def get_conversation(user, conversation_identifier):
 # @testable true
 # @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @pairs messaging:history-page messaging:chronological-display
+# @matrix messaging : chronological-display history-page
 def conversation_history(
     user,
     conversation_identifier,

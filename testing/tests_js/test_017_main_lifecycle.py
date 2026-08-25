@@ -206,7 +206,7 @@ const flushPaint = context.flushPaint;
     run_node(script)
 
 
-# @pairs view-transition:navigation startup:settled-boundary
+# @pairs startup:settled-boundary view-transition:navigation
 def test_cross_document_transition_publishes_settled_readiness(run_node):
     run_main_check(
         run_node,
@@ -237,8 +237,7 @@ if (
     )
 
 
-# @features startup
-# @dimensions navigation transient-network error-reporting
+# @matrix startup : error-reporting navigation transient-network
 def test_navigation_fetch_abort_is_not_reported_as_application_error(run_node):
     run_main_check(
         run_node,
@@ -271,8 +270,7 @@ if (capturedErrors.length !== 1 || capturedErrors[0].message !== "broken startup
     )
 
 
-# @features offline sync
-# @dimensions pagehide visibility deregistration
+# @matrix offline sync : deregistration pagehide visibility
 def test_suspend_current_view_deregisters_without_health_check(run_node):
     run_main_check(
         run_node,
@@ -302,10 +300,7 @@ if (fetchCalls.length !== 0) {
     )
 
 
-# @pair polling:blur
-# @pair polling:focus
-# @pair polling:visibility
-# @pair polling:catch-up
+# @matrix polling : blur catch-up focus visibility
 # @pair offline:visible-blur
 def test_window_blur_soft_suspends_visible_tab_until_focus_catchup(run_node):
     run_main_check(
@@ -374,8 +369,7 @@ if (
     )
 
 
-# @features offline
-# @dimensions server-health cache-policy
+# @matrix offline : cache-policy server-health
 def test_ping_uses_server_owned_cache_policy(run_node):
     run_main_check(
         run_node,
@@ -395,8 +389,7 @@ if ("cache" in call.options || new Headers(call.options.headers).has("Cache-Cont
     )
 
 
-# @features offline
-# @dimensions server-health pending-ownership settled-cleanup
+# @matrix offline : pending-ownership server-health settled-cleanup
 def test_ping_clears_only_the_settled_pending_promise(run_node):
     run_main_check(
         run_node,
@@ -426,10 +419,7 @@ if (context.window.__PING_PENDING__ !== successor) {
     )
 
 
-# @pair offline:rapid-transitions
-# @pair offline:coalescing
-# @pair offline:server-health
-# @pair offline:transitions
+# @matrix offline : coalescing rapid-transitions server-health transitions
 def test_rapid_sync_requests_coalesce_and_retain_forced_transition(run_node):
     run_main_check(
         run_node,
@@ -459,8 +449,7 @@ if (fetchCalls.length !== 2) {
     )
 
 
-# @features connectivity offline
-# @dimensions browser-state transitions settled-boundary error-recovery
+# @matrix connectivity offline : browser-state error-recovery settled-boundary transitions
 def test_native_connectivity_state_publishes_before_async_view_sync_and_exposes_settled_boundary(
     run_node,
 ):
@@ -531,12 +520,7 @@ if (syncCalls.length !== 2 || connectivityState.browser !== "online") {
     )
 
 
-# @pair connectivity:controller-replacement
-# @pair connectivity:state-publication
-# @pair connectivity:version
-# @pair service-worker:controller-replacement
-# @pair service-worker:state-publication
-# @pair service-worker:version
+# @matrix connectivity service-worker : controller-replacement state-publication version
 def test_controller_replacement_receives_current_versioned_connectivity_state(run_node):
     run_main_check(
         run_node,
@@ -572,8 +556,7 @@ if (message.protocol !== "lagniappe-browser" ||
     )
 
 
-# @pair startup:interaction-ready
-# @pair service-worker:registration
+# @pairs service-worker:registration startup:interaction-ready
 def test_service_worker_registration_starts_immediately(run_node):
     run_main_check(
         run_node,
@@ -608,9 +591,7 @@ if (serviceWorkerRegistrations.length !== 1) {
     )
 
 
-# @pair startup:public-boundary
-# @pair startup:deferred-lifecycle
-# @pair startup:analytics
+# @matrix startup : analytics deferred-lifecycle public-boundary
 # @pair service-worker:registration
 def test_public_page_skips_authenticated_lifecycle(run_node):
     run_main_check(

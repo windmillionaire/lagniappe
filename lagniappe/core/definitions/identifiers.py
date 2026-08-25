@@ -7,8 +7,7 @@ import uuid
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_short_hash_and_uuid
-# @features utility
-# @dimensions hashing
+# @pair utility:hashing
 def short_hash(value):
     """Return the first 12 characters of a SHA-256 hex digest."""
     return hashlib.sha256(value.encode()).hexdigest()[:12]
@@ -25,8 +24,7 @@ def random_hash(length=12):
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_short_hash_and_uuid
-# @features utility
-# @dimensions hashing
+# @pair utility:hashing
 def short_uuid():
     """Return the first segment of a UUID4."""
     return str(uuid.uuid4()).split("-")[0]

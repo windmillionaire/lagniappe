@@ -117,8 +117,8 @@ def job(key="job-one", *, revision=1, status="running"):
     )
 
 
-# @pairs deferred-jobs:redis-projection deferred-jobs:ttl polling:batching
-# @source lagniappe/core/tools/cache/operations.py::peek_operation_states
+# @matrix deferred-jobs : redis-projection ttl
+# @pair polling:batching
 def test_operation_projection_is_revisioned_and_slides_ttl(redis):
     current = job()
     operations.update_operation_projection(current, now=100)
@@ -132,8 +132,7 @@ def test_operation_projection_is_revisioned_and_slides_ttl(redis):
     assert operations.operation_state_current(state, 1, now=160) is False
 
 
-# @pairs deferred-jobs:redis-projection deferred-jobs:revision deferred-jobs:concurrency
-# @source lagniappe/core/tools/cache/operations.py::update_operation_projection
+# @matrix deferred-jobs : concurrency redis-projection revision
 def test_operation_projection_rejects_delayed_older_revision(redis):
     latest = job(revision=5, status="succeeded")
     operations.update_operation_projection(latest, now=200)
@@ -145,7 +144,6 @@ def test_operation_projection_rejects_delayed_older_revision(redis):
 
 
 # @pair deferred-jobs:redis-projection
-# @source lagniappe/core/tools/cache/operations.py::delete_operation_projection
 def test_operation_projection_deletes_with_durable_job(redis):
     current = job()
     operations.update_operation_projection(current, now=100)
@@ -157,8 +155,8 @@ def test_operation_projection_deletes_with_durable_job(redis):
     }
 
 
-# @pairs polling:batching notifications:redis-projection deferred-jobs:redis-projection
-# @source lagniappe/core/tools/cache/operations.py::peek_poll_states
+# @matrix deferred-jobs notifications : redis-projection
+# @pair polling:batching
 def test_poll_state_read_batches_notifications_and_operations(redis, monkeypatch):
     user = SimpleNamespace(urlsafe_key="user-one")
     current = job()

@@ -31,8 +31,7 @@ GET_PAGE_FILE_LIST = types.FunctionDeclaration(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_file_tools_return_summary_and_content
-# @features ai files
-# @dimensions page-file-list summary projection
+# @matrix ai files : page-file-list projection summary
 def execute_get_page_file_list(args, user):
     page_id = args.get("page_id")
     if not page_id:

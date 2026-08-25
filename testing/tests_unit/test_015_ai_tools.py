@@ -201,8 +201,7 @@ class FakeDatastoreKey:
         return self._key.encode("utf-8")
 
 
-# @features ai
-# @dimensions model-discovery fallback custom-current validation
+# @matrix ai : custom-current fallback model-discovery validation
 @pytest.mark.unit
 def test_ai_model_discovery_falls_back_to_catalog_and_preserves_custom():
     class ErrorModels:
@@ -263,8 +262,7 @@ def test_ai_model_discovery_falls_back_to_catalog_and_preserves_custom():
     assert "Preview" in live["label"]
 
 
-# @features ai
-# @dimensions model-discovery provider-filtering ordering api-version
+# @matrix ai : api-version model-discovery ordering provider-filtering
 @pytest.mark.unit
 def test_ai_model_discovery_uses_agent_platform_catalog_and_filters_specialized_models(
     monkeypatch,
@@ -324,8 +322,7 @@ def test_ai_model_discovery_uses_agent_platform_catalog_and_filters_specialized_
     assert all(option["source"] == "provider" for option in options["text"])
 
 
-# @features ai
-# @dimensions model-discovery option-limit custom-current
+# @matrix ai : custom-current model-discovery option-limit
 @pytest.mark.unit
 def test_ai_model_discovery_limits_options_and_preserves_current_models():
     class ManyModels:
@@ -364,8 +361,7 @@ def test_ai_model_discovery_limits_options_and_preserves_current_models():
     assert "gemini-2.5-flash-image" in {option["id"] for option in options["image"]}
 
 
-# @features ai
-# @dimensions model-settings validation custom-current
+# @matrix ai : custom-current model-settings validation
 @pytest.mark.unit
 def test_ai_settings_normalize_validates_models_and_keeps_current_custom():
     current = {
@@ -402,8 +398,7 @@ def test_ai_settings_normalize_validates_models_and_keeps_current_custom():
         )
 
 
-# @features ai
-# @dimensions cleanup response-extraction safety citations json-extraction
+# @matrix ai : citations cleanup json-extraction response-extraction safety
 @pytest.mark.unit
 def test_ai_model_cleanup_extracts_json_text_and_blocked_responses():
     cleaned_json = ai_core.GenAI.cleanup(
@@ -458,8 +453,7 @@ def test_ai_model_cleanup_extracts_json_text_and_blocked_responses():
     assert ai_core.GenAI._extract_text(SimpleNamespace(candidates=[]), "TEXT") is None
 
 
-# @features ai
-# @dimensions config search tools output-format thinking retry-config service-tier
+# @matrix ai : config output-format retry-config search service-tier thinking tools
 @pytest.mark.unit
 def test_ai_config_combines_search_tools_json_and_thinking_settings():
     user = SimpleNamespace(email="owner@example.com")
@@ -532,8 +526,7 @@ def test_ai_config_combines_search_tools_json_and_thinking_settings():
     assert ai_functions.build_function_tool("missing_tool") is None
 
 
-# @pair ai:retry-config
-# @pair ai:retry-ownership
+# @matrix ai : retry-config retry-ownership
 def test_deferred_ai_config_uses_short_sdk_retry_profile():
     prompt = Prompt("Deferred generation")
     with observability.ai_execution_context(execution_control=object()):
@@ -543,8 +536,7 @@ def test_deferred_ai_config_uses_short_sdk_retry_profile():
     assert ai_core.GenAI.create_config(prompt).http_options.retry_options.attempts == 5
 
 
-# @features ai deferred-jobs
-# @dimensions provider-errors retry-classification
+# @matrix ai deferred-jobs : provider-errors retry-classification
 @pytest.mark.unit
 def test_ai_provider_transient_error_classification():
     assert ai_core.is_provider_transient_error(httpx.ReadTimeout("stalled"))
@@ -574,8 +566,7 @@ def test_ai_provider_transient_error_classification():
     )
 
 
-# @features ai
-# @dimensions model-routing retry-config
+# @matrix ai : model-routing retry-config
 @pytest.mark.unit
 def test_ai_model_tier_routes_generation_to_primary_or_utility_model(monkeypatch):
     calls = []
@@ -614,8 +605,7 @@ def test_ai_model_tier_routes_generation_to_primary_or_utility_model(monkeypatch
     ]
 
 
-# @features ai
-# @dimensions model-routing runtime-settings deployment-fallback
+# @matrix ai : deployment-fallback model-routing runtime-settings
 @pytest.mark.unit
 def test_ai_runtime_settings_override_deployment_defaults(monkeypatch):
     monkeypatch.setattr(ai_core.CONFIG, "AI_MODEL", "deployed-primary", raising=False)
@@ -661,8 +651,7 @@ def test_ai_runtime_settings_override_deployment_defaults(monkeypatch):
     }
 
 
-# @features ai
-# @dimensions empty-response-retry
+# @pair ai:empty-response-retry
 @pytest.mark.unit
 def test_ai_retries_empty_text_response_once():
     class EmptyThenTextModels:
@@ -685,8 +674,7 @@ def test_ai_retries_empty_text_response_once():
     assert len(models.calls) == 2
 
 
-# @features ai
-# @dimensions empty-json empty-response-retry
+# @matrix ai : empty-json empty-response-retry
 @pytest.mark.unit
 def test_ai_accepts_empty_json_object_without_retry():
     class EmptyJsonModels:
@@ -707,9 +695,7 @@ def test_ai_accepts_empty_json_object_without_retry():
     assert models.calls == 1
 
 
-# @pair ai:tools
-# @pair ai:file-context
-# @pair ai:output-format
+# @matrix ai : file-context output-format tools
 @pytest.mark.unit
 def test_autofill_accepts_summary_backed_json_without_tool_or_final_call():
     initial_response = SimpleNamespace(
@@ -756,7 +742,7 @@ def test_autofill_accepts_summary_backed_json_without_tool_or_final_call():
     assert models.calls[0]["config"].response_schema is None
 
 
-# @pairs ai:search ai:output-format
+# @matrix ai : output-format search
 @pytest.mark.unit
 def test_ai_search_json_generation_keeps_provider_response_unconstrained():
     response = SimpleNamespace(
@@ -795,8 +781,7 @@ def test_ai_search_json_generation_keeps_provider_response_unconstrained():
     assert config.tools[0].google_search is not None
 
 
-# @features ai
-# @dimensions hash-reference normalization batched-cache
+# @matrix ai : batched-cache hash-reference normalization
 @pytest.mark.unit
 def test_ai_hash_reference_normalizer_batches_lookup(monkeypatch):
     calls = []
@@ -840,8 +825,7 @@ def test_ai_hash_reference_normalizer_batches_lookup(monkeypatch):
     assert normalized["unknown"] == "hash:000000000000"
 
 
-# @features ai
-# @dimensions tool-dispatch caching file-parts unknown-tool trace
+# @matrix ai : caching file-parts tool-dispatch trace unknown-tool
 @pytest.mark.unit
 def test_ai_function_call_dispatch_serializes_caches_and_attaches_files(monkeypatch):
     user = SimpleNamespace(email="owner@example.com")
@@ -900,8 +884,7 @@ def test_ai_function_call_dispatch_serializes_caches_and_attaches_files(monkeypa
     assert trace[2]["result"]["error"] == "Unknown function: missing_tool"
 
 
-# @features ai
-# @dimensions tool-dispatch file-parts limit
+# @matrix ai : file-parts limit tool-dispatch
 @pytest.mark.unit
 def test_ai_function_call_dispatch_caps_file_parts_per_turn(monkeypatch):
     user = SimpleNamespace(email="owner@example.com")
@@ -944,8 +927,7 @@ def test_ai_function_call_dispatch_caps_file_parts_per_turn(monkeypatch):
     assert trace[1]["omitted_file_parts"] == 1
 
 
-# @features ai
-# @dimensions resource-inventory redis-cache categories projects forms
+# @matrix ai : categories forms projects redis-cache resource-inventory
 @pytest.mark.unit
 def test_list_workspace_resources_caches_inventory(monkeypatch):
     class FakeForm:
@@ -1163,8 +1145,7 @@ def test_list_workspace_resources_caches_inventory(monkeypatch):
     assert "schema" not in first["projects"][0]["model_tasks"][0]["form"]
 
 
-# @features ai form-schema
-# @dimensions form-instances permissions status truncation submission
+# @matrix ai form-schema : form-instances permissions status submission truncation
 @pytest.mark.unit
 def test_get_form_instances_filters_permissions_status_and_truncates(monkeypatch):
     class FakeForm:
@@ -1333,8 +1314,7 @@ def test_get_form_instances_filters_permissions_status_and_truncates(monkeypatch
     }
 
 
-# @features ai
-# @dimensions guidelines tool-dispatch
+# @matrix ai : guidelines tool-dispatch
 @pytest.mark.unit
 def test_get_guidelines_returns_named_bundle():
     assert "request those get_guidelines calls together" in (
@@ -1390,7 +1370,8 @@ def test_get_guidelines_returns_named_bundle():
     assert "schema_evolution" in unknown["available"]
 
 
-# @pairs ai:tool-context ai:autofill form-schema:schema
+# @matrix ai : autofill tool-context
+# @pair form-schema:schema
 @pytest.mark.unit
 def test_get_entity_returns_full_form_schema_for_ai_autofill(monkeypatch):
     schema_definition = [
@@ -1433,8 +1414,7 @@ def test_get_entity_returns_full_form_schema_for_ai_autofill(monkeypatch):
     ]
 
 
-# @features ai form-schema
-# @dimensions model-task attached-form schema autofill
+# @matrix ai form-schema : attached-form autofill model-task schema
 @pytest.mark.unit
 def test_get_entity_returns_model_task_form_schema_for_ai_autofill(monkeypatch):
     schema_definition = [
@@ -1490,8 +1470,7 @@ def test_get_entity_returns_model_task_form_schema_for_ai_autofill(monkeypatch):
     }
 
 
-# @features ai form-schema
-# @dimensions model-task attached-form stored-key autofill
+# @matrix ai form-schema : attached-form autofill model-task stored-key
 @pytest.mark.unit
 def test_get_entity_loads_model_task_form_schema_from_stored_key(monkeypatch):
     schema_definition = [
@@ -1537,8 +1516,7 @@ def test_get_entity_loads_model_task_form_schema_from_stored_key(monkeypatch):
     assert result["Form"]["schema"] == schema_definition
 
 
-# @features ai category-pages
-# @dimensions tool-context compact
+# @matrix ai category-pages : compact tool-context
 @pytest.mark.unit
 def test_get_category_pages_compact_returns_lightweight_page_refs(monkeypatch):
     category = TestEntities.get(
@@ -1619,8 +1597,7 @@ def test_get_category_pages_compact_returns_lightweight_page_refs(monkeypatch):
     ]
 
 
-# @features ai form-schema
-# @dimensions tool-context page task model-task form
+# @matrix ai form-schema : form model-task page task tool-context
 @pytest.mark.unit
 def test_get_schema_returns_schema_for_form_bearing_entities(monkeypatch):
     schema_definition = [
@@ -1740,8 +1717,7 @@ def test_get_schema_returns_schema_for_form_bearing_entities(monkeypatch):
     assert loads == [form.key, form.key]
 
 
-# @features ai form-schema
-# @dimensions category-forms schema autofill
+# @matrix ai form-schema : autofill category-forms schema
 @pytest.mark.unit
 def test_get_category_forms_returns_full_form_schema(monkeypatch):
     class FakeForm:
@@ -1801,8 +1777,7 @@ def test_get_category_forms_returns_full_form_schema(monkeypatch):
     }
 
 
-# @features ai
-# @dimensions tool-dispatch trace error-context
+# @matrix ai : error-context tool-dispatch trace
 @pytest.mark.unit
 def test_ai_tool_loop_limit_exception_includes_trace(monkeypatch):
     call = SimpleNamespace(name="missing_tool", args={"query": "oxtail"})
@@ -1846,8 +1821,7 @@ def test_ai_tool_loop_limit_exception_includes_trace(monkeypatch):
     assert models.calls == 2
 
 
-# @features ai
-# @dimensions structured-output tool-loop config runtime-settings request-pinning
+# @matrix ai : config request-pinning runtime-settings structured-output tool-loop
 @pytest.mark.unit
 def test_ai_tool_json_generation_pins_runtime_model_through_structured_final_pass(
     monkeypatch,
@@ -1957,8 +1931,7 @@ def test_ai_tool_json_generation_pins_runtime_model_through_structured_final_pas
     assert "Return the final JSON response now" in final_instruction
 
 
-# @features ai
-# @dimensions structured-output tool-loop response-preservation
+# @matrix ai : response-preservation structured-output tool-loop
 @pytest.mark.unit
 def test_ai_tool_json_generation_preserves_no_call_response_in_structured_final():
     initial_response = SimpleNamespace(
@@ -2010,8 +1983,7 @@ def test_ai_tool_json_generation_preserves_no_call_response_in_structured_final(
     )
 
 
-# @features ai
-# @dimensions error-context terminal-capture
+# @matrix ai : error-context terminal-capture
 @pytest.mark.unit
 def test_ai_exception_context_survives_autofill_wrapper_without_duplicate_capture(
     monkeypatch,
@@ -2038,8 +2010,7 @@ def test_ai_exception_context_survives_autofill_wrapper_without_duplicate_captur
     assert captured == []
 
 
-# @features ai
-# @dimensions provider-errors quota
+# @matrix ai : provider-errors quota
 @pytest.mark.unit
 def test_ai_provider_quota_error_is_wrapped_for_text_generation(monkeypatch):
     provider_error = genai_errors.ClientError(
@@ -2077,8 +2048,7 @@ def test_ai_provider_quota_error_is_wrapped_for_text_generation(monkeypatch):
     }
 
 
-# @features ai
-# @dimensions provider-errors quota tool-loop
+# @matrix ai : provider-errors quota tool-loop
 @pytest.mark.unit
 def test_ai_provider_quota_error_is_wrapped_for_tool_loop(monkeypatch):
     provider_error = genai_errors.ClientError(
@@ -2130,8 +2100,7 @@ def test_ai_provider_quota_error_is_wrapped_for_tool_loop(monkeypatch):
     )
 
 
-# @features ai files
-# @dimensions page-file-list get-file summary projection content attachments
+# @matrix ai files : attachments content get-file page-file-list projection summary
 @pytest.mark.unit
 def test_ai_file_tools_return_summary_and_content(monkeypatch):
     user = SimpleNamespace(email="owner@example.com")
@@ -2234,8 +2203,7 @@ def test_ai_file_tools_return_summary_and_content(monkeypatch):
     assert file_parts == [{"uri": "gs://bucket/source.txt", "mime_type": "text/plain"}]
 
 
-# @features ai tasks
-# @dimensions page-task-context active completed
+# @matrix ai tasks : active completed page-task-context
 @pytest.mark.unit
 def test_get_page_tasks_returns_active_and_completed_tasks(monkeypatch):
     user = SimpleNamespace(email="owner@example.com")
@@ -2282,8 +2250,7 @@ def test_get_page_tasks_returns_active_and_completed_tasks(monkeypatch):
     }
 
 
-# @features ai files pages tasks
-# @dimensions page-details summary projection exclusions
+# @matrix ai files pages tasks : exclusions page-details projection summary
 @pytest.mark.unit
 def test_ai_page_details_includes_file_summaries_by_default(monkeypatch):
     user = SimpleNamespace(email="owner@example.com")
@@ -2342,8 +2309,7 @@ def test_ai_page_details_includes_file_summaries_by_default(monkeypatch):
     assert "files" not in without_related
 
 
-# @features ai files
-# @dimensions get-file large-file attachments
+# @matrix ai files : attachments get-file large-file
 @pytest.mark.unit
 def test_ai_get_file_skips_large_original_unless_requested(monkeypatch):
     user = SimpleNamespace(email="owner@example.com")
@@ -2449,8 +2415,7 @@ def test_ai_get_file_skips_large_original_unless_requested(monkeypatch):
     ]
 
 
-# @features ai files
-# @dimensions get-file unsupported
+# @matrix ai files : get-file unsupported
 @pytest.mark.unit
 def test_ai_get_file_reports_unsupported_original_file(monkeypatch):
     user = SimpleNamespace(email="owner@example.com")
@@ -2496,8 +2461,7 @@ def test_ai_get_file_reports_unsupported_original_file(monkeypatch):
     }
 
 
-# @features ai tasks
-# @dimensions task-history context tool-context files
+# @matrix ai tasks : context files task-history tool-context
 @pytest.mark.unit
 def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
     user = TestEntities.get(
@@ -2649,8 +2613,7 @@ def test_get_task_history_returns_dates_submissions_and_files(monkeypatch):
     }
 
 
-# @features ai
-# @dimensions validation citations schema category project pages schedule
+# @matrix ai : category citations pages project schedule schema validation
 @pytest.mark.unit
 def test_ai_generation_validators_reject_bad_payloads_and_clean_citations(monkeypatch):
     submission = autofill.validate_submission(
@@ -2789,10 +2752,7 @@ def test_ai_generation_validators_reject_bad_payloads_and_clean_citations(monkey
         )
 
 
-# @pair ai:validation
-# @pair ai:pages
-# @pair ai:form-defaults
-# @pair ai:no-form
+# @matrix ai : form-defaults no-form pages validation
 @pytest.mark.unit
 def test_page_generation_reconciles_page_and_form_default_fields():
     form_schema = [
@@ -2868,8 +2828,7 @@ def test_page_generation_reconciles_page_and_form_default_fields():
     )
 
 
-# @features categories
-# @dimensions ai-create ai-generated default-form
+# @matrix categories : ai-create ai-generated default-form
 @pytest.mark.unit
 def test_generate_category_default_form_is_conservative(monkeypatch):
     responses = iter(
@@ -2924,8 +2883,7 @@ def test_generate_category_default_form_is_conservative(monkeypatch):
     }
 
 
-# @features ai
-# @dimensions document-context project-context
+# @matrix ai : document-context project-context
 @pytest.mark.unit
 def test_document_generation_context_builds_form_page_and_project_payloads():
     user = SimpleNamespace(email="owner@example.com")
@@ -2972,8 +2930,7 @@ def test_document_generation_context_builds_form_page_and_project_payloads():
         text.document_generation_context(SimpleNamespace(entity_kind="file"), user)
 
 
-# @features ai
-# @dimensions image-prompt aspect-ratio fallback
+# @matrix ai : aspect-ratio fallback image-prompt
 @pytest.mark.unit
 def test_ai_image_prompting_and_aspect_ratio_selection(monkeypatch):
     prompt = images.page_image_generation_prompt(
@@ -3015,8 +2972,7 @@ def test_ai_image_prompting_and_aspect_ratio_selection(monkeypatch):
     assert images._choose_aspect_ratio(prompt) is None
 
 
-# @features ai
-# @dimensions image-generate config provider-errors imagen
+# @matrix ai : config image-generate imagen provider-errors
 @pytest.mark.unit
 def test_ai_image_generation_config_and_provider_error(monkeypatch):
     prompt = Prompt("Create a page image", type="image generation")
@@ -3128,8 +3084,7 @@ def test_ai_image_generation_config_and_provider_error(monkeypatch):
     assert captured_imagen["config"].aspect_ratio == "16:9"
 
 
-# @features ai
-# @dimensions image-generate provider-errors user-message
+# @matrix ai : image-generate provider-errors user-message
 @pytest.mark.unit
 def test_generate_ai_image_returns_clean_provider_message(monkeypatch):
     class FakeAI:
@@ -3162,8 +3117,7 @@ def test_generate_ai_image_returns_clean_provider_message(monkeypatch):
     assert isinstance(captured[0], genai_errors.ClientError)
 
 
-# @features ai
-# @dimensions summary-prompt ooxml eligibility task-queue
+# @matrix ai : eligibility ooxml summary-prompt task-queue
 @pytest.mark.unit
 def test_summary_eligibility_includes_ooxml_fallback(monkeypatch):
     office_file = ooxml_summary_file()
@@ -3206,10 +3160,7 @@ def test_summary_eligibility_includes_ooxml_fallback(monkeypatch):
     assert started[-1].client == {}
 
 
-# @pair ai:summary-prompt
-# @pair ai:ooxml
-# @pair ai:errors
-# @pair ai:docx
+# @matrix ai : docx errors ooxml summary-prompt
 @pytest.mark.unit
 def test_ai_summary_generation_reports_ooxml_extraction_errors(monkeypatch):
     captured = []
@@ -3239,8 +3190,7 @@ def test_ai_summary_generation_reports_ooxml_extraction_errors(monkeypatch):
     assert len(captured) == 1
 
 
-# @features ai
-# @dimensions summary-prompt errors unreadable-pdf
+# @matrix ai : errors summary-prompt unreadable-pdf
 @pytest.mark.unit
 def test_ai_summary_generation_marks_unreadable_pdf_without_capture(monkeypatch):
     provider_error = genai_errors.ClientError(
@@ -3275,8 +3225,7 @@ def test_ai_summary_generation_marks_unreadable_pdf_without_capture(monkeypatch)
     assert captured == []
 
 
-# @features ai
-# @dimensions summary-prompt errors pdf-page-limit
+# @matrix ai : errors pdf-page-limit summary-prompt
 @pytest.mark.unit
 def test_ai_summary_generation_marks_pdf_page_limit_without_capture(monkeypatch):
     provider_error = genai_errors.ClientError(
@@ -3314,8 +3263,7 @@ def test_ai_summary_generation_marks_pdf_page_limit_without_capture(monkeypatch)
     assert captured == []
 
 
-# @features ai files
-# @dimensions ooxml xlsx shared-strings rows tabs summary-fallback
+# @matrix ai files : ooxml rows shared-strings summary-fallback tabs xlsx
 @pytest.mark.unit
 def test_ooxml_xlsx_extraction_preserves_rows_tabs_and_shared_strings():
     text = extract_ooxml_text(
@@ -3328,8 +3276,7 @@ def test_ooxml_xlsx_extraction_preserves_rows_tabs_and_shared_strings():
     assert "Alice\tEngineering\t2" in text
 
 
-# @features ai
-# @dimensions summary-prompt status errors quota
+# @matrix ai : errors quota status summary-prompt
 @pytest.mark.unit
 def test_ai_summary_generation_updates_file_status_from_model_result(monkeypatch):
     generated_prompts = []
@@ -3420,8 +3367,7 @@ def test_ai_summary_generation_updates_file_status_from_model_result(monkeypatch
         summarize.generate_summary(quota_file, raise_quota=True)
 
 
-# @features ai
-# @dimensions cache summary-prompt
+# @matrix ai : cache summary-prompt
 @pytest.mark.unit
 def test_ai_summary_generation_populates_file_search_cache(monkeypatch):
     monkeypatch.setattr(
@@ -3452,8 +3398,7 @@ def test_ai_summary_generation_populates_file_search_cache(monkeypatch):
     assert file.to_cache["desc"] == "Searchable summary."
 
 
-# @features ai
-# @dimensions queue-jitter
+# @pair ai:queue-jitter
 @pytest.mark.unit
 def test_ai_task_start_delay_is_bounded(monkeypatch):
     calls = []
@@ -3468,8 +3413,7 @@ def test_ai_task_start_delay_is_bounded(monkeypatch):
     assert calls == [(5, 30)]
 
 
-# @features ai
-# @dimensions search-url result-scrubbing parent-hydration
+# @matrix ai : parent-hydration result-scrubbing search-url
 @pytest.mark.unit
 def test_ai_search_entity_urls_and_result_scrubbing():
     assert ai_search.entity_url({"kind": "category", "id": "cat"}) == "/categories/cat"
@@ -3521,8 +3465,7 @@ def test_ai_search_entity_urls_and_result_scrubbing():
     }
 
 
-# @features ai
-# @dimensions search-filter search-limit
+# @matrix ai : search-filter search-limit
 @pytest.mark.unit
 def test_ai_search_entity_filter_arguments(monkeypatch):
     calls = []

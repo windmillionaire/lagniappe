@@ -33,8 +33,7 @@ if _DEFAULT_PLAYWRIGHT_BROWSERS.is_dir():
 
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
-# @features testing hosted-e2e
-# @dimensions provider-auth frontend-build
+# @matrix hosted-e2e testing : frontend-build provider-auth
 def hosted_e2e_enabled():
     """Return whether this process is the managed hosted-E2E runner."""
     return os.environ.get("LAGNIAPPE_HOSTED_E2E", "").strip().casefold() in {
@@ -187,13 +186,8 @@ def _inspect_test_frontend_bundle(*, expected_mode=None):
 # @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_defers_build_during_active_e2e_session
 # @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_preserves_current_production_build
 # @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_replaces_stale_production_build
+# @matrix frontend-build : e2e-session-isolation freshness no-op output-validation production-preservation rebuild
 # @pair test-server:freshness
-# @pair frontend-build:freshness
-# @pair frontend-build:no-op
-# @pair frontend-build:rebuild
-# @pair frontend-build:output-validation
-# @pair frontend-build:e2e-session-isolation
-# @pair frontend-build:production-preservation
 def ensure_test_frontend_bundle():
     """Build development assets when test-server inputs or outputs changed."""
     with _test_frontend_bundle_session_guard() as may_build:
@@ -304,8 +298,7 @@ def update_test_indexes():
 # @tests tests_tooling/test_005_test_server_command.py::test_wait_for_server_allows_slow_local_startup
 # @tests tests_tooling/test_005_test_server_command.py::test_wait_for_server_bounds_stalled_requests_by_one_deadline
 # @tests tests_tooling/test_005_test_server_command.py::test_wait_for_server_reports_last_http_state
-# @features test-server
-# @dimensions readiness slow-start deadline stalled-response diagnostics http-state
+# @matrix test-server : deadline diagnostics http-state readiness slow-start stalled-response
 def wait_for_server(base_url, timeout_seconds=20.0):
     import requests
 
@@ -500,8 +493,7 @@ def terminate_test_server_process(process, timeout=15):
 
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_cleanup_scope_requires_the_reserved_test_prefix
-# @features testing hosted-e2e
-# @dimensions cleanup prefix fail-closed
+# @matrix hosted-e2e testing : cleanup fail-closed prefix
 def _require_test_cleanup_scope(config):
     if not config.testing or config.PREFIX != DEFAULT_TEST_PREFIX:
         raise RuntimeError(
@@ -525,8 +517,7 @@ def cleanup_test_data():
 
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_initialize_test_services_replays_server_persistence_startup
-# @features testing hosted-e2e
-# @dimensions initialization database cache migrations
+# @matrix hosted-e2e testing : cache database initialization migrations
 def _initialize_test_services(database, cache, migrations):
     """Replay the persistence portion of application startup after cleanup."""
     cache.initialize()
@@ -536,8 +527,7 @@ def _initialize_test_services(database, cache, migrations):
 
 
 # @testable infrastructure
-# @features testing hosted-e2e
-# @dimensions initialization cleanup
+# @matrix hosted-e2e testing : cleanup initialization
 def initialize_test_data():
     """Seed clean test persistence without starting another Flask process."""
     os.environ["FLASK_ENV"] = Environment.TESTING.value
@@ -650,8 +640,7 @@ def start_managed_test_server():
 
 # @testable true
 # @tests tests_tooling/test_005_test_server_command.py::test_teardown_managed_test_server_stops_before_cleaning
-# @features test-server
-# @dimensions teardown process-management
+# @matrix test-server : process-management teardown
 def teardown_managed_test_server():
     """Stop the detached test server and clean test data."""
     os.environ["FLASK_ENV"] = Environment.TESTING.value

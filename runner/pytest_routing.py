@@ -76,8 +76,7 @@ class PytestInvocation:
 
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_pytest_invocation_routes_registered_option_values
-# @features testing
-# @dimensions pytest-options
+# @pair testing:pytest-options
 def pytest_addoption(parser) -> None:
     """Register options that must be known before suite conftests are imported."""
     group = parser.getgroup("lagniappe")
@@ -90,8 +89,7 @@ def pytest_addoption(parser) -> None:
 
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_pytest_routing_plugin_normalizes_provider_marker_tokens
-# @features testing setup
-# @dimensions pytest-markers
+# @matrix setup testing : pytest-markers
 def normalize_marker_expression(expression: str) -> str:
     """Expand the documented provider marker alias without substring matches."""
     return _PROVIDER_MARKER_PATTERN.sub(
@@ -101,8 +99,7 @@ def normalize_marker_expression(expression: str) -> str:
 
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_pytest_routing_plugin_normalizes_provider_marker_tokens
-# @features testing setup
-# @dimensions pytest-markers
+# @matrix setup testing : pytest-markers
 def pytest_configure(config) -> None:
     """Apply runner-owned marker aliases before pytest evaluates collection."""
     expression = str(getattr(config.option, "markexpr", "") or "")
@@ -167,8 +164,7 @@ def _target_path(target: str, repository_root: Path) -> Path:
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_pytest_invocation_routes_registered_option_values
 # @tests tests_tooling/test_007_run_py_test_command.py::test_normalized_targets_control_actual_pytest_collection
-# @features testing
-# @dimensions cli-routing target-selection
+# @matrix testing : cli-routing target-selection
 def targets_include_e2e(
     targets: tuple[str, ...], repository_root: Path
 ) -> bool:
@@ -189,7 +185,8 @@ def targets_include_e2e(
 # @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_pytest_invocation_routes_registered_option_values
 # @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_pytest_invocation_rejects_ambiguous_or_indirect_targets
 # @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_pytest_invocation_adds_setup_opt_in_targets_without_filenames
-# @pairs testing:cli-routing testing:pytest-options testing:target-selection testing:pytest-markers testing:opt-in setup:cli-routing setup:pytest-markers setup:opt-in
+# @matrix setup : cli-routing opt-in pytest-markers
+# @matrix testing : cli-routing opt-in pytest-markers pytest-options target-selection
 def normalize_pytest_invocation(
     test_args: list[str], repository_root: Path
 ) -> PytestInvocation:

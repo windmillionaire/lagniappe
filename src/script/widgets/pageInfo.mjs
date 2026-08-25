@@ -130,8 +130,7 @@ export class PageForm extends FormElement {
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_category_to_page
 	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_remove_category_from_page
-	 * @features pages
-	 * @dimensions category-add category-remove
+	 * @matrix pages : category-add category-remove
 	 */
 	get categoriesElement() {
 		return this._facetElement('[data-role="categories"]');
@@ -186,7 +185,7 @@ export class PageForm extends FormElement {
  * @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
- * @pairs pages:readonly pages:permission-gates pages:lp-offline
+ * @matrix pages : lp-offline permission-gates readonly
  */
 export class PageInfo extends PageForm {
 	constructor(attributes) {
@@ -259,8 +258,7 @@ export class PageInfo extends PageForm {
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_switch_page_form
 	 * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_clear_page_info_form_selector_keeps_widget_stable
-	 * @features pages
-	 * @dimensions form-switch form-clear info-form
+	 * @matrix pages : form-clear form-switch info-form
 	 */
 	async _changeForm(e) {
 		if (!e.target.closest("[data-role='form-select']")) return;
@@ -320,8 +318,8 @@ export class PageInfo extends PageForm {
  * @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_related_form_badge_selects_form
  * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filters_hide_create_page_tool
  * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
- * @features pages
- * @dimensions create category-index related-forms mobile-tools tool-switch
+ * @matrix pages : category-index create mobile-tools related-forms tool-switch
+ * @pair deferred-jobs:hosted-e2e
  */
 export class CreatePage extends PageForm {
 	constructor(attributes) {
@@ -411,8 +409,7 @@ export class UserSettings extends PagePermissions {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
-	 * @features user-settings
-	 * @dimensions owner-other-page group-selector edit-groups
+	 * @matrix user-settings : edit-groups group-selector owner-other-page
 	 */
 	_initGroups() {
 		const groupInput = this.target.querySelector(
@@ -490,8 +487,7 @@ export class UserSettings extends PagePermissions {
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
-	 * @features user-settings
-	 * @dimensions personal-page owner-own-page owner-other-page readonly-email editable-email
+	 * @matrix user-settings : editable-email owner-other-page owner-own-page personal-page readonly-email
 	 */
 	get userEmailElement() {
 		return this.target.querySelector("[data-role='user-email']");
@@ -524,8 +520,7 @@ export class UserSettings extends PagePermissions {
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_own_page_hides_photo_and_file_surfaces
-	 * @pairs notification-email:user-setting notification-email:default-daily
-	 * @pairs notification-email:user-only notification-email:public-user
+	 * @matrix notification-email : default-daily public-user user-only user-setting
 	 */
 	get notificationEmailElement() {
 		if (this.target.dataset.canEditNotificationEmail !== "true") return null;
@@ -554,8 +549,7 @@ export class UserSettings extends PagePermissions {
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
-	 * @features user-settings
-	 * @dimensions personal-page owner-own-page sign-out
+	 * @matrix user-settings : owner-own-page personal-page sign-out
 	 */
 	get userActionsElement() {
 		return this.target.querySelector("[data-role='user-actions']");
@@ -565,8 +559,7 @@ export class UserSettings extends PagePermissions {
 	 * @testable true
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_panel_opens_from_my_page
 	 * @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_settings_hides_group_selector_on_own_page
-	 * @features user-settings
-	 * @dimensions personal-page owner-own-page group-selector-hidden
+	 * @matrix user-settings : group-selector-hidden owner-own-page personal-page
 	 */
 	get userGroupsElement() {
 		return this.target.querySelector("[data-role='user-groups']");

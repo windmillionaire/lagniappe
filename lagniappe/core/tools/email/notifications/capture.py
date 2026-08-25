@@ -112,9 +112,7 @@ def _record_event(user, values, *, now=None):
 # @tests tests_unit/test_029b_notification_email_events.py::test_immediate_notification_is_delayed_escaped_and_delivered
 # @tests tests_unit/test_029b_notification_email_events.py::test_task_assignment_email_uses_task_copy_without_headers
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_groups_messages_and_uses_named_completion_links
-# @pairs notification-email:notification notification-email:pending-filter
-# @pair notification-email:task-assignment
-# @pairs notification-email:target-title notification-email:target-link
+# @matrix notification-email : notification pending-filter target-link target-title task-assignment
 def record_notification(notification, *, now=None):
     """Capture one final ordinary notification for email delivery."""
     if (
@@ -175,9 +173,7 @@ def record_notification(notification, *, now=None):
 # @tests tests_unit/test_029b_notification_email_events.py::test_immediate_notification_is_delayed_escaped_and_delivered
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_uses_next_local_eight_and_batches
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_groups_messages_and_uses_named_completion_links
-# @pairs notification-email:immediate notification-email:digest notification-email:idempotency
-# @pairs notification-email:timezone notification-email:full-roundup
-# @pair notification-email:future-only-switch
+# @matrix notification-email : digest full-roundup future-only-switch idempotency immediate timezone
 def record_notification_event(user, source_key, *, body, target=None, now=None):
     """Capture a known final notification at a direct transaction boundary."""
     now = policy.utc(now)
@@ -216,7 +212,8 @@ def record_document_mention(user, source_key, *, document, now=None):
 # @testable true
 # @tests tests_unit/test_029c_notification_email_messages.py::test_immediate_messages_wait_for_conversation_quiet
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_groups_messages_and_uses_named_completion_links
-# @pairs notification-email:message notification-email:quiet-window notification-email:latest-only
+# @matrix notification-email : latest-only message quiet-window
+# @pair notification-email:message-grouping
 def record_message(message, conversation, recipient, *, now=None):
     """Capture a newly-created inbound direct message."""
     now = policy.utc(now or message.get("created"))

@@ -43,8 +43,7 @@ from . import tasks
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_restricted_schedules_are_forbidden
-# @features public-users
-# @dimensions ai-schedule-guard
+# @pair public-users:ai-schedule-guard
 def _ai_schedule_requested(form):
     schedule_type = form.get("schedule-type")
     return bool(
@@ -58,10 +57,7 @@ def _ai_schedule_requested(form):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_tasks_table_columns
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_allows_own_page_only_users
-# @features task-index
-# @dimensions columns
-# @pair task-index:columns
-# @pair task-index:authenticated-access
+# @matrix task-index : authenticated-access columns
 # @pair permissions:own-page-only
 @tasks.route("/index", methods=["GET"])
 @logged_in
@@ -74,10 +70,7 @@ def task_index():
 # @testable true
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_name_sort_ascending_reorders_rows
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_allows_own_page_only_users
-# @features table-controls
-# @dimensions sorting sort-asc name
-# @pair task-index:authenticated-access
-# @pair permissions:own-page-only
+# @pairs permissions:own-page-only table-controls:sort-asc task-index:authenticated-access
 @tasks.route("/rows", methods=["GET"])
 @logged_in
 def rows():
@@ -91,7 +84,9 @@ def rows():
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_task_without_edit_controls
 # @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
-# @pairs ai:completion-refresh tasks:autofill tasks:deferred
+# @matrix tasks : autofill deferred
+# @matrix tasks : create readonly
+# @pair ai:completion-refresh
 @tasks.route("/<key>/replace", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW)
 def get(key, **kwargs):
@@ -121,8 +116,8 @@ def settings(key, **kwargs):
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_assigned_user_can_work_their_assigned_task
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_empty_form_structure_without_edit_controls
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_title_link_opens_backing_page_task
-# @features tasks
-# @dimensions permission-gates readonly assignee attached-form empty-fields row-link page-task focus
+# @matrix tasks : assignee attached-form empty-fields focus page-task permission-gates readonly row-link
+# @pair permissions:resource-gates
 @tasks.route("<key>", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW)
 def view(key, **kwargs):
@@ -136,6 +131,7 @@ def view(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
+# @pair entities:delete
 @tasks.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.TASK, Action.DELETE)
 def delete(key, **kwargs):
@@ -155,8 +151,7 @@ def delete(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_can_move_to_another_page
-# @features tasks
-# @dimensions move completed title-menu
+# @matrix tasks : completed move title-menu
 @tasks.route("<key>/move", methods=["PUT"])
 @permission(Resource.TASK, Action.EDIT)
 def move(key, **kwargs):
@@ -184,12 +179,8 @@ def move(key, **kwargs):
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_history_routes_are_forbidden_without_permission
-# @pairs task-combine:compatible task-combine:same-page
-# @pairs task-combine:same-model task-combine:no-model
-# @pairs task-combine:view-page task-combine:linked-page
-# @pairs web-headers:no-store
-# @pairs task-combine:migrate-history task-combine:delta
-# @pairs task-combine:authorization
+# @matrix task-combine : authorization compatible delta linked-page migrate-history no-model same-model same-page view-page
+# @pair web-headers:no-store
 @tasks.route("<key>/combine", methods=["GET", "PUT"])
 @permission(Resource.TASK, Action.DELETE)
 def combine(key, **kwargs):
@@ -330,8 +321,7 @@ def _task_base_data(request):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_form
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_model_task
-# @features tasks
-# @dimensions create attach-form
+# @matrix tasks : attach-form create
 def _task_form_data(loaded, request):
     return {"form": loaded.get(request.form.get("form"))}
 
@@ -339,8 +329,7 @@ def _task_form_data(loaded, request):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_project
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_model_task
-# @features tasks
-# @dimensions create project-link model-task-link badge
+# @matrix tasks : badge create model-task-link project-link
 def _task_project_data(loaded, request):
     return {
         "model": loaded.get(request.form.get("model")),
@@ -350,8 +339,7 @@ def _task_project_data(loaded, request):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_assigned_to
-# @features tasks
-# @dimensions create assignee badge
+# @matrix tasks : assignee badge create
 def _task_assignee_data(loaded, request):
     return {"assigned_to": loaded.get(request.form.get("assigned_to"))}
 
@@ -360,16 +348,14 @@ def _task_assignee_data(loaded, request):
 # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_add_due_date
 # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_remove_due_date
 # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_due_today
-# @features task-scheduling
-# @dimensions due-date add remove today
+# @matrix task-scheduling : add due-date remove today
 def _task_scheduling_due_date_data(request):
     return request.form.get("due-date")
 
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_due_date
-# @features tasks
-# @dimensions create due-date badge
+# @matrix tasks : badge create due-date
 def _task_create_due_date_data(request):
     return _task_scheduling_due_date_data(request)
 
@@ -541,8 +527,7 @@ def task_data(request, page, task=None):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_file
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_new_task_attachment_claim_is_required_and_scope_bound
-# @features tasks
-# @dimensions file-upload async-upload signed-claim
+# @matrix tasks : async-upload file-upload signed-claim
 @tasks.route("<key>/upload-file", methods=["POST"])
 @permission(requested=Action.EDIT)
 def upload_file(key, **kwargs):
@@ -612,7 +597,7 @@ def _autofill_data(task, request):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_partial_submission_omits_empty_fields
-# @pairs tasks:complete tasks:readonly tasks:partial-submission
+# @matrix tasks : complete partial-submission readonly
 def _should_submit_task_form(active, role, task):
     if "TaskForm" not in active:
         return False
@@ -628,11 +613,7 @@ def _should_submit_task_form(active, role, task):
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_task_without_edit_controls
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_assigned_user_can_work_their_assigned_task
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page
-# @features tasks
-# @dimensions complete due-date readonly assignee permission-gates attached-form empty-fields partial-submission
-# @pairs tasks:complete tasks:due-date tasks:readonly tasks:assignee
-# @pairs tasks:permission-gates tasks:attached-form tasks:empty-fields tasks:partial-submission
-# @pair tasks:submitted-reference
+# @matrix tasks : assignee attached-form complete due-date empty-fields partial-submission permission-gates readonly submitted-reference
 @tasks.route("<key>/update", methods=["PUT", "GET"])
 @permission(Resource.TASK, Action.EDIT)
 def update(key, **kwargs):
@@ -745,8 +726,7 @@ def update_direct(key, **kwargs):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_creates_task_with_reduced_schedule_options
-# @features tasks
-# @dimensions create basic
+# @matrix tasks : basic create
 @tasks.route("<key>/create", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def create(key, **kwargs):
@@ -792,8 +772,7 @@ def create_direct(key, **kwargs):
 # @testable true
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_create_personal_task_due_today
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_create_personal_task_due_in_four_days
-# @features tasks
-# @dimensions create-personal due-date
+# @matrix tasks : create-personal due-date
 @tasks.route("<key>/personal", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def personal(key, **kwargs):
@@ -823,8 +802,7 @@ def personal_direct(key, **kwargs):
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_appears_after_completion_cycle
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_visibility_persists_after_reload
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_history_routes_are_forbidden_without_permission
-# @features tasks
-# @dimensions history completion-cycle reload
+# @matrix tasks : completion-cycle history reload
 @tasks.route("<key>/history", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW)
 def history(key, **kwargs):
@@ -852,8 +830,8 @@ def _home_task_response(task):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_history_routes_are_forbidden_without_permission
-# @features tasks
-# @dimensions history-fill latest-submission
+# @matrix tasks : history-fill latest-submission
+# @pair tasks:history
 @tasks.route("<key>/history/latest-submission", methods=["GET"])
 @permission(Resource.TASK, Action.VIEW)
 def latest_history_submission(key, **kwargs):
@@ -867,8 +845,7 @@ def latest_history_submission(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
-# @features tasks
-# @dimensions history-fill repeating-default patch
+# @matrix tasks : history-fill patch repeating-default
 @tasks.route("<key>/default-submission", methods=["PATCH"])
 @permission(Resource.TASK, Action.EDIT)
 def save_default_field(key, **kwargs):
@@ -903,8 +880,7 @@ def _delete_file_if_unreferenced(file):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_file
-# @features tasks
-# @dimensions file-upload remove attachment
+# @matrix tasks : attachment file-upload remove
 @tasks.route("<key>/files/<file_key>", methods=["DELETE"])
 @permission(Resource.TASK, Action.EDIT)
 def delete_file(key, file_key, **kwargs):
@@ -944,9 +920,8 @@ def delete_file(key, file_key, **kwargs):
 # @testable true
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_task_index_quick_edit_updates_editable_cell
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_saved_filter_quick_edit_persists_attached_form_checkbox
-# @features task-index
-# @dimensions quick-edit editable-cell
-# @pairs filters:quick-edit filters:attached-form filters:checkbox filters:reload-persistence
+# @matrix filters : attached-form checkbox quick-edit reload-persistence
+# @pair task-index:quick-edit
 @tasks.route("<key>/patch", methods=["PATCH"])
 @permission(Resource.TASK, Action.EDIT)
 def patch(key, **kwargs):
@@ -1010,8 +985,7 @@ def patch(key, **kwargs):
 # @testable true
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_task_from_home_page
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_recurring_task_from_home_page_reappears
-# @features tasks
-# @dimensions complete recurring
+# @matrix tasks : complete recurring
 @tasks.route("/<key>/complete", methods=["PUT"])
 @permission(Resource.TASK, Action.EDIT)
 def complete(key, **kwargs):
@@ -1041,8 +1015,7 @@ def complete(key, **kwargs):
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_this_week
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_next_week
 # @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_no_due_date
-# @features tasks
-# @dimensions postpone due-date
+# @matrix tasks : due-date postpone
 @tasks.route("/<key>/change-due-date", methods=["PUT"])
 @permission(Resource.TASK, Action.EDIT)
 def change_due_date(key, **kwargs):

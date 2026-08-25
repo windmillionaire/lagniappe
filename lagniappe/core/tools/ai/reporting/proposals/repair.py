@@ -5,7 +5,6 @@ import json
 import re
 
 from lagniappe.core import exceptions
-from lagniappe.core.properties.schema import SchemaFields
 
 from ...core import ai_model
 from ...debug import ai_debug
@@ -61,13 +60,8 @@ def _schema_field_title(field):
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_repairs_create_form_field_missing_id
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_completes_additive_schema_field
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_infers_create_form_type_from_usage
-# @pair ai-report:deterministic-repair
-# @pair ai-report:schema-field-id
-# @pair ai-report:schema-update
-# @pair ai-report:form-type
-# @pair form-schema:deterministic-repair
-# @pair form-schema:schema-update
-# @pair form-schema:form-type
+# @matrix ai-report : deterministic-repair form-type schema-field-id schema-update
+# @matrix form-schema : deterministic-repair form-type schema-update
 def _complete_form_schema_fields(proposal):
     """Complete safe mechanical parts of proposed create/add field definitions."""
     if not isinstance(proposal, dict):
@@ -179,9 +173,7 @@ def _complete_form_schema_fields(proposal):
 
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_infers_unambiguous_add_form_reference
-# @pair ai-report:deterministic-repair
-# @pair ai-report:page-form
-# @pair ai-report:references
+# @matrix ai-report : deterministic-repair page-form references
 def _complete_unambiguous_add_form_references(proposal):
     """Link a form-less page-form action when one earlier page form can fit."""
     if not isinstance(proposal, dict) or not isinstance(proposal.get("actions"), list):
@@ -257,10 +249,7 @@ def _missing_entity_pair_action_reference(action):
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_reviews_ambiguous_missing_add_form_reference
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_reviews_unresolved_references_after_failed_repair
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_downgrades_missing_category_without_sentry_capture
-# @pair ai-report:needs-review
-# @pair ai-report:references
-# @pair ai-report:page-form
-# @pair ai-report:per-action-fallback
+# @matrix ai-report : needs-review page-form per-action-fallback references
 def _review_unresolved_action_references(
     proposal,
     allowed_actions,
@@ -361,9 +350,7 @@ def _review_unresolved_action_references(
 
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_downgrades_malformed_action_after_failed_repair
-# @pair ai-report:needs-review
-# @pair ai-report:per-action-fallback
-# @pair ai-report:malformed-data
+# @matrix ai-report : malformed-data needs-review per-action-fallback
 def _review_invalid_action_shapes(
     proposal,
     allowed_actions,
@@ -479,8 +466,7 @@ def _review_invalid_action_shapes(
 
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_reviews_files_missing_after_repair
-# @pair ai-report:fallback
-# @pair ai-report:file-placement
+# @matrix ai-report : fallback file-placement
 def _report_needs_review_proposal(
     proposal,
     error=None,
@@ -559,8 +545,7 @@ def _report_needs_review_proposal(
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_reviews_unresolved_references_after_failed_repair
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_downgrades_malformed_action_after_failed_repair
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_downgrades_missing_category_without_sentry_capture
-# @pair ai-report:fallback
-# @pair ai-report:per-action-fallback
+# @matrix ai-report : fallback per-action-fallback
 def _report_validation_fallback(
     proposal,
     validator,
@@ -607,8 +592,7 @@ def _report_validation_fallback(
 
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_repairs_invalid_action_type_once
-# @pair ai-report:generate
-# @pair ai-report:validate
+# @matrix ai-report : generate validate
 def generate_validated_proposal(
     prompt,
     report_label="Organize",
@@ -631,12 +615,7 @@ def generate_validated_proposal(
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_reviews_files_missing_after_repair
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_plan_leaves_form_submission_for_completion
 # @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_repairs_unusable_answers
-# @pair ai-report:ask
-# @pair ai-report:validate
-# @pair ai-report:repair
-# @pair ai-report:fallback
-# @pair ai-report:file-placement
-# @pair ai-report:submission
+# @matrix ai-report : ask fallback file-placement repair submission validate
 def validate_or_repair_proposal(
     prompt,
     proposal,
@@ -790,13 +769,7 @@ def _organize_prompt_report_file_refs(prompt):
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_repairs_missing_add_category_target
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_repairs_empty_form_schema_without_capture
 # @tests tests_unit/test_020b_ai_ask.py::test_generate_ask_report_repairs_unusable_answers
-# @pair ai-report:repair
-# @pair ai-report:file-placement
-# @pair ai-report:references
-# @pair ai-report:required-data
-# @pair ai-report:add-category
-# @pair ai-report:empty-form
-# @pair ai-report:capture
+# @matrix ai-report : add-category capture empty-form file-placement references repair required-data
 def _proposal_repair_prompt(source_prompt, proposal, error, report_label):
     allowed_actions = tuple(getattr(source_prompt, "allowed_actions", None) or ())
     output_description = None

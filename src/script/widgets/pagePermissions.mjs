@@ -6,8 +6,7 @@ import { request, withTransition } from "../shared";
 /**
  * @testable true
  * @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_owner_can_open_page_permissions_panel
- * @features pages
- * @dimensions permissions-panel permission-gates
+ * @matrix pages : permission-gates permissions-panel
  */
 export class PagePermissions extends FormElement {
 	constructor(attributes) {
@@ -61,8 +60,7 @@ export class PagePermissions extends FormElement {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_owner_restricted_page_is_hidden_from_model_viewer
-	 * @features pages
-	 * @dimensions access-restrictions owner-restricted
+	 * @matrix pages : access-restrictions owner-restricted
 	 */
 	_input(event) {
 		if (event.target.name === "owner") {
@@ -85,8 +83,7 @@ export class PagePermissions extends FormElement {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_group_restricted_page_opens_for_member_only
-	 * @features pages
-	 * @dimensions access-restrictions group-restricted
+	 * @matrix pages : access-restrictions group-restricted
 	 */
 	_addGroup(event) {
 		const data = new FormData();

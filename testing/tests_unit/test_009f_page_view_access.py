@@ -11,8 +11,7 @@ from testing.utility.mock_restrictions import MockRestrictions
 from testing.utility.test_entities import TestEntities
 
 
-# @features page
-# @dimensions view-access owner
+# @matrix page : owner view-access
 @pytest.mark.unit
 def test_page_view_access_owner_stored_only(get_test_entities):
     """Stored ``restricted_to`` containing ``owner`` yields no group disclosure list."""
@@ -20,8 +19,7 @@ def test_page_view_access_owner_stored_only(get_test_entities):
     assert page.view_access == []
 
 
-# @features page
-# @dimensions view-access attached-groups
+# @matrix page : attached-groups view-access
 @pytest.mark.unit
 def test_page_view_access_returns_attached_groups(get_test_entities):
     """When the page has attached groups, ``view_access`` returns them (not DB lookup)."""
@@ -34,8 +32,7 @@ def test_page_view_access_returns_attached_groups(get_test_entities):
     ]
 
 
-# @features page
-# @dimensions view-access group-views db-load
+# @matrix page : db-load group-views view-access
 @pytest.mark.unit
 def test_page_view_access_from_group_views(get_test_entities):
     """No attached groups: load groups whose ``views`` index hits ``page.required``."""
@@ -63,8 +60,7 @@ def test_page_view_access_from_group_views(get_test_entities):
     assert out == [g1]
 
 
-# @features page permissions users
-# @dimensions view-access user-page models-scope
+# @matrix page permissions users : models-scope user-page view-access
 @pytest.mark.unit
 def test_user_page_uses_users_permissions_not_models_permissions():
     """Users-only pages use Users access; attached categories still grant page access."""
@@ -131,8 +127,7 @@ def test_user_page_uses_users_permissions_not_models_permissions():
     mock_gva.assert_called_once_with(["users", "pguserscope"])
 
 
-# @features page permissions user-groups
-# @dimensions restricted-access group-match
+# @matrix page permissions user-groups : group-match restricted-access
 @pytest.mark.unit
 def test_page_restricted_access_group_match(get_test_entities):
     """``restricted_access`` uses intersection of page restriction and user's groups."""
@@ -149,8 +144,7 @@ def test_page_restricted_access_group_match(get_test_entities):
         assert page.allowed(Action.VIEW, user=outsider) is False
 
 
-# @features page permissions
-# @dimensions stored-requires shallow-page no-category-expansion
+# @matrix page permissions : no-category-expansion shallow-page stored-requires
 @pytest.mark.unit
 def test_page_allowed_uses_stored_requirements_without_loading_categories():
     page = TestEntities.get(
@@ -205,8 +199,7 @@ def test_page_view_does_not_require_loaded_owner(monkeypatch):
     assert page.allowed(Action.VIEW, user=viewer) is True
 
 
-# @features page task permissions
-# @dimensions task-visibility restricted-access
+# @matrix page permissions task : restricted-access task-visibility
 @pytest.mark.unit
 def test_page_tasks_filtered_by_task_allowed(get_test_entities, monkeypatch):
     """``Page._load_tasks`` keeps only tasks where ``task.allowed(VIEW)`` is true."""

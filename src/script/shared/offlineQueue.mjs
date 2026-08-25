@@ -137,8 +137,7 @@ export class OfflineQueue {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_028_form_state_split.py::test_offline_submit_record_keeps_originating_entity_fingerprint
-	 * @features offline
-	 * @dimensions queue-submit fingerprint immutable-command
+	 * @matrix offline : fingerprint immutable-command queue-submit
 	 */
 	async queueSubmit(component, data, route, method = "POST") {
 		const widget = component.active;
@@ -233,12 +232,8 @@ export class OfflineQueue {
 	 * @tests tests_js/test_045_offline_queue.py::test_offline_replay_releases_ownership_after_handler_errors
 	 * @tests tests_js/test_028_form_state_split.py::test_offline_replay_retries_a_conflict_rebased_by_the_form
 	 * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
-	 * @features offline edited-entity-notice
-	 * @dimensions replay replay-reconciliation conflict-rebase queue-submit reload replayed-response replay-order queue-preserved retry-boundary
-	 * @pairs offline:replay offline:replay-reconciliation offline:conflict-rebase
-	 * @pairs offline:queue-submit offline:reload
-	 * @pairs offline:replay-order offline:queue-preserved offline:retry-boundary
-	 * @pairs edited-entity-notice:replayed-response
+	 * @matrix offline : conflict-rebase queue-preserved queue-submit reload replay replay-order replay-reconciliation retry-boundary
+	 * @pair edited-entity-notice:replayed-response
 	 */
 	async replay() {
 		if (!this.view.online || this._replaying) return 0;
@@ -323,8 +318,7 @@ export class OfflineQueue {
 	 * @testable true
 	 * @tests tests_js/test_028_form_state_split.py::test_offline_replay_polls_mounted_form_without_direct_acknowledgement
 	 * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
-	 * @pair offline:replay-reconciliation
-	 * @pair edited-entity-notice:replayed-response
+	 * @pairs edited-entity-notice:replayed-response offline:replay-reconciliation
 	 */
 	_mountedUpdateTargets(record, targets = this.targets) {
 		return targets.filter(

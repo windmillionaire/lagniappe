@@ -49,8 +49,7 @@ def utc_datetime_to_user_date_string(utc_dt):
 
 # @testable true
 # @tests tests_unit/test_013d_date_utilities.py::test_format_date_as_input_string
-# @features template-formatting
-# @dimensions date input-value blank-value string-passthrough
+# @matrix template-formatting : blank-value date input-value string-passthrough
 def format_date_as_input_string(value):
     """Format a date-like value for an HTML date input."""
     if not value:

@@ -7,8 +7,7 @@ import { withTransition } from "./utilities";
 /**
  * @testable true
  * @tests tests_js/test_046_async_query_lifecycle.py::test_modal_owns_exact_node_and_rejects_late_attachment
- * @features modal
- * @dimensions exact-owner late-publication listener-teardown reuse
+ * @matrix modal : exact-owner late-publication listener-teardown reuse
  */
 export class Modal {
 	constructor(view, trigger) {
@@ -176,8 +175,8 @@ export class Modal {
  * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
- * @pairs categories:delete projects:delete model-tasks:delete pages:delete
- * @pairs tasks:delete task-index:delete forms:delete users:delete users:options
+ * @matrix categories forms model-tasks pages projects task-index tasks : delete
+ * @matrix users : delete options
  * @pair messaging:clear-confirmation
  */
 export class DeleteModal extends Modal {
@@ -296,8 +295,7 @@ export class HelpModal extends Modal {
 /**
  * @testable true
  * @tests tests_js/test_046_async_query_lifecycle.py::test_modal_owns_exact_node_and_rejects_late_attachment
- * @features modal
- * @dimensions listener-teardown reuse
+ * @matrix modal : listener-teardown reuse
  */
 export class OfflineModal extends Modal {
 	constructor(view, trigger) {

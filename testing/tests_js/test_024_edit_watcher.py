@@ -1,8 +1,7 @@
 """Node-backed checks for generic form state and committed edit watching."""
 
 
-# @features forms unsaved-state
-# @dimensions non-sync input change success reset
+# @matrix forms unsaved-state : change input non-sync reset success
 def test_base_form_tracks_unsaved_state_without_sync(run_node):
     run_node(
         r'''
@@ -72,8 +71,7 @@ queueMicrotask(() => {
     )
 
 
-# @features edited-entity-notice forms
-# @dimensions formdata canonicalization repeated-values revision-only-state
+# @matrix edited-entity-notice forms : canonicalization formdata repeated-values revision-only-state
 def test_form_revision_snapshot_is_canonical_and_memory_only(run_node):
     run_node(
         r'''
@@ -146,8 +144,7 @@ if (target.dataset?.revisionFingerprint) {
     )
 
 
-# @features edited-entity-notice
-# @dimensions entity-ancestor batching per-form comparison acknowledgement targeted-reset reload-fallback overlap-follow-up acknowledgement-no-probe active-state focused-state clean-state transition visibility subscription-lifecycle
+# @matrix edited-entity-notice : acknowledgement acknowledgement-no-probe active-state batching clean-state comparison entity-ancestor focused-state overlap-follow-up per-form reload-fallback subscription-lifecycle targeted-reset transition visibility
 def test_edit_watcher_compares_and_resets_each_form_independently(run_node):
     run_node(
         r'''
@@ -432,8 +429,7 @@ vm.runInContext(source, context);
     )
 
 
-# @features edited-entity-notice
-# @dimensions overlap-follow-up coalescing clean-state
+# @matrix edited-entity-notice : clean-state coalescing overlap-follow-up
 def test_edit_watcher_coalesces_overlapping_revision_probes(run_node):
     run_node(
         r'''

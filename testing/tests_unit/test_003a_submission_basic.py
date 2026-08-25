@@ -5,8 +5,7 @@ import pytest
 pytestmark = pytest.mark.unit
 
 
-# @features date-input
-# @dimensions ai-value, filter-value, import, column
+# @matrix date-input : ai-value column filter-value import
 def test_submission_date_input(get_test_entities, get_schema, test_submission_values):
     """Test DateInput field outputs with timezone handling."""
     for entity in get_test_entities():
@@ -14,8 +13,7 @@ def test_submission_date_input(get_test_entities, get_schema, test_submission_va
         test_submission_values(entity)
 
 
-# @features time-input
-# @dimensions ai-value, filter-value, import, column
+# @matrix time-input : ai-value column filter-value import
 def test_submission_time_input(get_test_entities, get_schema, test_submission_values):
     """Test TimeInput field outputs."""
     for entity in get_test_entities():
@@ -23,8 +21,7 @@ def test_submission_time_input(get_test_entities, get_schema, test_submission_va
         test_submission_values(entity)
 
 
-# @features text-input
-# @dimensions ai-value, filter-value, search-value, import
+# @matrix text-input : ai-value filter-value import search-value
 def test_submission_text_input(get_test_entities, get_schema, test_submission_values):
     """Test TextInput field outputs."""
     for entity in get_test_entities():
@@ -32,8 +29,7 @@ def test_submission_text_input(get_test_entities, get_schema, test_submission_va
         test_submission_values(entity)
 
 
-# @features submission text-input
-# @dimensions column empty-field empty-value
+# @matrix submission text-input : column empty-field empty-value
 def test_submission_text_input_empty_column_value_is_blank(
     get_test_entities, get_schema
 ):
@@ -48,8 +44,7 @@ def test_submission_text_input_empty_column_value_is_blank(
     assert field.column_value is None
 
 
-# @features number-input
-# @dimensions ai-value, filter-value, import
+# @matrix number-input : ai-value filter-value import
 def test_submission_number_input(get_test_entities, get_schema, test_submission_values):
     """Test NumberInput field outputs."""
     for entity in get_test_entities():
@@ -57,8 +52,7 @@ def test_submission_number_input(get_test_entities, get_schema, test_submission_
         test_submission_values(entity)
 
 
-# @features email-input
-# @dimensions ai-value, filter-value, import
+# @matrix email-input : ai-value filter-value import
 def test_submission_email_input(get_test_entities, get_schema, test_submission_values):
     """Test EmailInput field outputs."""
     for entity in get_test_entities():
@@ -66,8 +60,7 @@ def test_submission_email_input(get_test_entities, get_schema, test_submission_v
         test_submission_values(entity)
 
 
-# @features tel-input
-# @dimensions ai-value, filter-value, import, formatting
+# @matrix tel-input : ai-value filter-value formatting import
 def test_submission_tel_input(get_test_entities, get_schema, test_submission_values):
     """Test TelInput field outputs with E.164 normalization."""
     for entity in get_test_entities():
@@ -75,8 +68,7 @@ def test_submission_tel_input(get_test_entities, get_schema, test_submission_val
         test_submission_values(entity)
 
 
-# @features checkbox
-# @dimensions ai-value, filter-value, import
+# @matrix checkbox : ai-value filter-value import
 def test_submission_checkbox(get_test_entities, get_schema, test_submission_values):
     """Test Checkbox field outputs."""
     for entity in get_test_entities():
@@ -84,8 +76,7 @@ def test_submission_checkbox(get_test_entities, get_schema, test_submission_valu
         test_submission_values(entity)
 
 
-# @features textarea
-# @dimensions ai-value, filter-value, search-value, import
+# @matrix textarea : ai-value filter-value import search-value
 def test_submission_textarea(get_test_entities, get_schema, test_submission_values):
     """Test Textarea field outputs."""
     for entity in get_test_entities():

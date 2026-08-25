@@ -17,8 +17,7 @@ from testing.utility.permissions import (
 )
 
 
-# @features permissions
-# @dimensions form-data no-groups restricted
+# @matrix permissions : form-data no-groups restricted
 @pytest.mark.unit
 def test_form_permissions(get_permissions_test_data):
     """Empty form vs general models:VIEW for a user with no groups."""

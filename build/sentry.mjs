@@ -3,8 +3,7 @@
  *
  * @testable true
  * @tests tests_js/test_032_build_configuration.py::test_sentry_build_requires_nonblank_upload_token
- * @features build
- * @dimensions sentry source-maps optional-credentials
+ * @matrix build : optional-credentials sentry source-maps
  */
 export const resolveSentryBuild = (settings = {}) => {
 	const authToken =

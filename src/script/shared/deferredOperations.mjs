@@ -58,8 +58,7 @@ function operationNodeVisible(node) {
  *
  * @testable true
  * @tests tests_js/test_023_deferred_operations.py::test_deferred_operation_manager_batches_orders_and_renders_status
- * @features deferred-jobs
- * @dimensions status revision polling progress timing backoff teardown decoration-opt-out visible-blur rendered-visibility lazy-watcher terminal-ownership
+ * @matrix deferred-jobs : backoff decoration-opt-out lazy-watcher polling progress rendered-visibility revision status teardown terminal-ownership timing visible-blur
  */
 export class DeferredOperationManager {
 	constructor(view) {

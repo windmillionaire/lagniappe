@@ -6,15 +6,13 @@ from .entity import Entity
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_model_task_entity_create_update_order_and_save_relations
 # @tests tests_unit/test_005_project_properties.py::test_model_task_allowed_inherits_attached_form_restrictions
-# @features project model-task
-# @dimensions create update relation-save ordering attached-form restricted-access
+# @matrix model-task project : attached-form create ordering relation-save restricted-access update
 class ModelTask(Entity):
     entity_kind = "model"
 
     # @testable true
     # @tests tests_unit/test_006b_ingress_entity.py::test_model_task_required_reports_unloaded_project_relation
-    # @features requires
-    # @dimensions validation unloaded-relation
+    # @matrix requires : unloaded-relation validation
     @property
     def required(self):
         project = self.project

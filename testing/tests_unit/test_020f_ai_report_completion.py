@@ -14,8 +14,7 @@ from testing.utility.ai_report_fakes import (
 )
 from testing.utility.test_entities import TestEntities
 
-# @features ai-report
-# @dimensions validation page-form no-category
+# @matrix ai-report : no-category page-form validation
 @pytest.mark.unit
 def test_validate_proposal_accepts_add_form_to_page_without_category():
     proposal = {
@@ -55,12 +54,9 @@ def test_validate_proposal_accepts_add_form_to_page_without_category():
 
 
 
-# @pair ai-report:submission-completion
-# @pair ai-report:generate
-# @pair ai-report:pipeline
+# @matrix ai-report : generate pipeline submission-completion
+# @matrix submission : evidence-mapping focused-prompt
 # @pair form-schema:structured-output
-# @pair submission:focused-prompt
-# @pair submission:evidence-mapping
 @pytest.mark.unit
 def test_generate_organize_report_completes_planned_submissions(monkeypatch):
     user = _test_user("complete-pipeline-owner")
@@ -157,8 +153,7 @@ def test_generate_organize_report_completes_planned_submissions(monkeypatch):
 
 
 
-# @features ai-report
-# @dimensions submission-completion focused-prompt evidence-mapping json-output prompt validation partial
+# @matrix ai-report : evidence-mapping focused-prompt json-output partial prompt submission-completion validation
 @pytest.mark.unit
 def test_complete_organize_submissions_uses_one_focused_prompt(
     monkeypatch,
@@ -289,8 +284,7 @@ def test_complete_organize_submissions_uses_one_focused_prompt(
 
 
 
-# @features ai-report
-# @dimensions submission-completion explicit-task-identity inherited-form
+# @matrix ai-report : explicit-task-identity inherited-form submission-completion
 @pytest.mark.unit
 def test_complete_organize_submissions_uses_target_task_form(
     monkeypatch,
@@ -373,8 +367,7 @@ def test_complete_organize_submissions_uses_target_task_form(
 
 
 
-# @features ai-report
-# @dimensions submission-completion existing-task partial-update evidence-mapping
+# @matrix ai-report : evidence-mapping existing-task partial-update submission-completion
 @pytest.mark.unit
 def test_complete_organize_submissions_updates_existing_task_submission(
     monkeypatch,
@@ -479,8 +472,7 @@ def test_complete_organize_submissions_updates_existing_task_submission(
 
 
 
-# @features ai-report form-schema submission
-# @dimensions submission-completion empty preservation issue
+# @matrix ai-report form-schema submission : empty issue preservation submission-completion
 @pytest.mark.unit
 def test_complete_organize_submissions_preserves_empty_form_records(
     monkeypatch,

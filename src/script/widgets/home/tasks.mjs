@@ -236,8 +236,7 @@ const _postponeMenu = (button, postponeFn) => {
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002a_home.py::test_tasks_prefetch
- * @features home
- * @dimensions prefetch task-list task-count
+ * @matrix home : prefetch task-count task-list
  */
 export class HomeTaskList extends BaseList {
 	constructor(attributes) {
@@ -302,8 +301,7 @@ export class HomeTaskList extends BaseList {
 	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_task_from_home_page
 	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_complete_recurring_task_from_home_page_reappears
 	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_task_complete_replays_after_reload
-	 * @features tasks
-	 * @dimensions complete recurring offline-queue
+	 * @matrix tasks : complete offline-queue recurring
 	 */
 	async _change(e) {
 		const toggle = e.target.closest("[data-role='complete']");
@@ -395,8 +393,7 @@ export class HomeTaskList extends BaseList {
 	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_this_week
 	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_next_week
 	 * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_postpone_task_due_date_to_no_due_date
-	 * @features tasks
-	 * @dimensions postpone due-date
+	 * @matrix tasks : due-date postpone
 	 */
 	async _postpone(elt, button, value) {
 		if (!this.view.online) {

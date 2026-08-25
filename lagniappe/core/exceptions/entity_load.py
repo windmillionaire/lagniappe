@@ -86,9 +86,8 @@ def _trace_caller():
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_record_entity_load_trace_uses_request_context
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_record_entity_load_trace_skips_no_database_work
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_record_entity_load_trace_includes_fetch_scope
+# @matrix permissions : explicit-fetch-depth registered-reason
 # @pair entities:load-tracing
-# @pair permissions:explicit-fetch-depth
-# @pair permissions:registered-reason
 def record_entity_load_trace(
     *,
     primary,
@@ -136,8 +135,7 @@ def record_entity_load_trace(
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_print_entity_load_trace_outputs_request_summary
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_print_entity_load_trace_prints_once_per_request
-# @features entities
-# @dimensions load-tracing
+# @pair entities:load-tracing
 def print_entity_load_trace(response=None):
     """Print request-local entity-fetch diagnostics."""
     if not _entity_load_tracing_enabled():

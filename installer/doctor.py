@@ -141,8 +141,7 @@ def _active_cli_identity(runner):
 
 # @testable true
 # @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_reads_adc_identity_without_changing_it
-# @features setup
-# @dimensions doctor adc provider-identity read-only
+# @matrix setup : adc doctor provider-identity read-only
 def _read_adc_identity(
     *,
     auth_default=None,
@@ -201,8 +200,7 @@ def _read_adc_identity(
 
 # @testable true
 # @tests tests_tooling/test_001g_setup_release_readiness.py::test_default_doctor_provider_checker_targets_saved_project
-# @features setup
-# @dimensions doctor provider-discovery project-identity
+# @matrix setup : doctor project-identity provider-discovery
 def _default_provider_checker(settings, project):
     from installer.recovery import verify_recovery_resources
     from installer.utils import run_gcloud_command
@@ -245,8 +243,7 @@ def _identity_issues(saved, active):
 
 # @testable true
 # @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_reports_keyless_identity_drift
-# @features setup
-# @dimensions doctor adc keyless-config project-identity
+# @matrix setup : adc doctor keyless-config project-identity
 def _keyless_identity_issues(settings, deploy):
     """Return local keyless identity and deployment attachment drift."""
     runtime_email = str(
@@ -285,8 +282,7 @@ def _keyless_identity_issues(settings, deploy):
 
 # @testable true
 # @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_reports_drift_without_writing
-# @features setup
-# @dimensions doctor read-only drift provider-identity
+# @matrix setup : doctor drift provider-identity read-only
 def run_doctor(
     *,
     root=REPOSITORY_ROOT,

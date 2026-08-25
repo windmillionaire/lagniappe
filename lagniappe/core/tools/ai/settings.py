@@ -19,8 +19,7 @@ RUNTIME_AI_SETTING_KEYS = (
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_runtime_settings_override_deployment_defaults
-# @features ai
-# @dimensions model-routing runtime-settings deployment-fallback
+# @matrix ai : deployment-fallback model-routing runtime-settings
 def runtime_ai_settings(config=CONFIG):
     """Return live site AI settings over deployment-configured fallbacks."""
     settings = {

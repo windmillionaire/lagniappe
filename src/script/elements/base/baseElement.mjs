@@ -51,8 +51,7 @@ export class BaseElement {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
-	 * @features tasks
-	 * @dimensions history-fill element-matrix
+	 * @matrix tasks : element-matrix history-fill
 	 */
 	get historyFillable() {
 		return !NON_HISTORY_FILLABLE_TYPES.has(this.schema?.type);

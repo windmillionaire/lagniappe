@@ -77,8 +77,7 @@ def _attached_form_filter_context(user):
     return filters, matching_page, excluded_page
 
 
-# @features filters
-# @dimensions related-forms
+# @pair filters:related-forms
 def test_category_filter_select_includes_form_from_created_page(get_user):
     user = get_user(Users.OWNER)
     category = Categories.test_category_filter_related_form_registration.get(user)
@@ -104,8 +103,7 @@ def test_category_filter_select_includes_form_from_created_page(get_user):
     expect(filters.form_conditions).to_be_visible()
 
 
-# @features filters
-# @dimensions tab-open
+# @pair filters:tab-open
 def test_category_filters_form_opens(get_user):
     user = get_user(Users.OWNER)
     category = Categories.test_create_page.get(user)
@@ -118,8 +116,7 @@ def test_category_filters_form_opens(get_user):
     expect(filters.locator("button[data-role='save']")).to_be_visible()
 
 
-# @features filters
-# @dimensions empty-validation
+# @pair filters:empty-validation
 def test_category_filters_require_at_least_one_condition(get_user):
     user = get_user(Users.OWNER)
     category = Categories.test_create_page.get(user)
@@ -130,8 +127,7 @@ def test_category_filters_require_at_least_one_condition(get_user):
     expect(filters.error).to_contain_text("Please add at least one filter condition")
 
 
-# @features filters
-# @dimensions saved-filters empty-state
+# @matrix filters : empty-state saved-filters
 def test_category_saved_filters_empty_state(get_user):
     user = get_user(Users.OWNER)
     category = Categories.test_empty_category.get(user)
@@ -150,8 +146,7 @@ def test_category_saved_filters_empty_state(get_user):
     )
 
 
-# @features pages
-# @dimensions tool-switch
+# @pair pages:tool-switch
 def test_category_saved_filters_hide_create_page_tool(get_user):
     user = get_user(Users.OWNER)
     category = Categories.test_empty_category.get(user)
@@ -179,8 +174,7 @@ def test_category_saved_filters_hide_create_page_tool(get_user):
     expect(create_page).to_be_hidden()
 
 
-# @features filters
-# @dimensions saved-filters query-tool
+# @matrix filters : query-tool saved-filters
 def test_category_url_tool_opens_saved_filters(get_user):
     user = get_user(Users.OWNER)
     category = Categories.test_empty_category.get(user)
@@ -199,8 +193,7 @@ def test_category_url_tool_opens_saved_filters(get_user):
     )
 
 
-# @features filters
-# @dimensions string-condition run-results
+# @matrix filters : run-results string-condition
 def test_category_filter_by_page_name(get_user):
     user = get_user(Users.OWNER)
     category, matching_page, excluded_page, _, _ = _category_filter_context(user)
@@ -213,8 +206,7 @@ def test_category_filter_by_page_name(get_user):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @features filters
-# @dimensions string-condition run-results view-access
+# @matrix filters : run-results string-condition view-access
 def test_category_filter_results_respect_page_permissions(get_user):
     owner = get_user(Users.OWNER)
     category = Categories.test_category_filter_pages.get(owner)
@@ -234,8 +226,7 @@ def test_category_filter_results_respect_page_permissions(get_user):
     _expect_result_includes_excludes(results, visible, hidden)
 
 
-# @features filters
-# @dimensions string-condition description run-results
+# @matrix filters : description run-results string-condition
 def test_category_filter_by_page_description(get_user):
     user = get_user(Users.OWNER)
     category, matching_page, excluded_page, _, _ = _category_filter_context(user)
@@ -248,8 +239,7 @@ def test_category_filter_by_page_description(get_user):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @features filters
-# @dimensions entity-condition category run-results
+# @matrix filters : category entity-condition run-results
 def test_category_filter_by_additional_category(get_user):
     user = get_user(Users.OWNER)
     category, matching_page, excluded_page, _, extra_category = (
@@ -264,8 +254,7 @@ def test_category_filter_by_additional_category(get_user):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @features filters
-# @dimensions boolean-condition public run-results
+# @matrix filters : boolean-condition public run-results
 def test_category_filter_by_public_page(get_user):
     user = get_user(Users.OWNER)
     category, _, excluded_page, public_document_page, _ = (
@@ -280,8 +269,7 @@ def test_category_filter_by_public_page(get_user):
     _expect_result_includes_excludes(results, public_document_page, excluded_page)
 
 
-# @features filters
-# @dimensions boolean-condition document run-results
+# @matrix filters : boolean-condition document run-results
 def test_category_filter_by_document_asset(get_user):
     user = get_user(Users.OWNER)
     category, _, excluded_page, public_document_page, _ = (
@@ -296,8 +284,7 @@ def test_category_filter_by_document_asset(get_user):
     _expect_result_includes_excludes(results, public_document_page, excluded_page)
 
 
-# @features filters
-# @dimensions attached-form string-condition run-results
+# @matrix filters : attached-form run-results string-condition
 def test_category_filter_by_attached_form_text_condition(get_user):
     user = get_user(Users.OWNER)
     filters, matching_page, excluded_page = _attached_form_filter_context(user)
@@ -312,8 +299,7 @@ def test_category_filter_by_attached_form_text_condition(get_user):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @features filters
-# @dimensions attached-form number-condition run-results
+# @matrix filters : attached-form number-condition run-results
 def test_category_filter_by_attached_form_number_condition(get_user):
     user = get_user(Users.OWNER)
     filters, matching_page, excluded_page = _attached_form_filter_context(user)
@@ -328,8 +314,7 @@ def test_category_filter_by_attached_form_number_condition(get_user):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @features filters
-# @dimensions attached-form boolean-condition run-results
+# @matrix filters : attached-form boolean-condition run-results
 def test_category_filter_by_attached_form_checkbox_condition(get_user):
     user = get_user(Users.OWNER)
     filters, matching_page, excluded_page = _attached_form_filter_context(user)
@@ -342,8 +327,7 @@ def test_category_filter_by_attached_form_checkbox_condition(get_user):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @features filters
-# @dimensions attached-form select-condition run-results
+# @matrix filters : attached-form run-results select-condition
 def test_category_filter_by_attached_form_select_condition(get_user):
     user = get_user(Users.OWNER)
     filters, matching_page, excluded_page = _attached_form_filter_context(user)
@@ -358,8 +342,7 @@ def test_category_filter_by_attached_form_select_condition(get_user):
     _expect_result_includes_excludes(results, matching_page, excluded_page)
 
 
-# @features filters
-# @dimensions saved-filters save reload-persistence
+# @matrix filters : reload-persistence save saved-filters
 def test_category_saved_filter_save_and_run(get_user):
     user = get_user(Users.OWNER)
     category, matching_page, excluded_page, _, _ = _category_filter_context(user)

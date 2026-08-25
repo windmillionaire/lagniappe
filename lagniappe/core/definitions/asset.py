@@ -30,16 +30,14 @@ BUCKET_PREFIX = CONFIG.PREFIX
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_asset_uri_and_public_url_include_bucket_prefix
-# @features file storage
-# @dimensions bucket-prefix
+# @matrix file storage : bucket-prefix
 def storage_bucket_name(bucket):
     return f"{BUCKET_PREFIX}{bucket}"
 
 
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_asset_uri_and_public_url_include_bucket_prefix
-# @features file storage
-# @dimensions bucket-prefix public-url
+# @matrix file storage : bucket-prefix public-url
 def public_url():
     return f"https://storage.googleapis.com/{storage_bucket_name(PUBLIC_BUCKET)}"
 
@@ -94,8 +92,7 @@ class Asset:
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_text_plain_asset_uses_txt_extension
     # @tests tests_unit/test_006_file_properties.py::test_file_asset_detects_mislabeled_png_upload
-    # @features file storage
-    # @dimensions asset-extension mimetype
+    # @matrix file storage : asset-extension mimetype
     @property
     def path(self):
         if not self._path:
@@ -104,8 +101,7 @@ class Asset:
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_image_asset_content_type_falls_back_without_recursing
-    # @features file
-    # @dimensions image content-type
+    # @matrix file : content-type image
     @property
     def content_type(self):
         return self._content_type
@@ -118,8 +114,7 @@ class Asset:
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_text_plain_asset_uses_txt_extension
     # @tests tests_unit/test_006_file_properties.py::test_file_asset_detects_mislabeled_png_upload
-    # @features file storage
-    # @dimensions asset-extension mimetype
+    # @matrix file storage : asset-extension mimetype
     @property
     def extension(self):
         if self._path:
@@ -177,8 +172,7 @@ class Asset:
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_asset_uri_and_public_url_include_bucket_prefix
-    # @features file storage
-    # @dimensions asset-uri bucket-prefix
+    # @matrix file storage : asset-uri bucket-prefix
     @property
     def uri(self):
         bucket = (
@@ -243,8 +237,7 @@ class FileAsset(Asset):
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_private_asset_url_uses_asset_name_for_shared_storage_path
-    # @features file storage
-    # @dimensions private-url shared-asset-path
+    # @matrix file storage : private-url shared-asset-path
     @property
     def url(self):
         if self.visibility == AssetVisibility.public:

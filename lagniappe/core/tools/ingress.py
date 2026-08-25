@@ -84,13 +84,7 @@ class IngressParser:
 # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_maps_csv_columns_to_page_task_and_table_fields
 # @tests tests_unit/test_006b_ingress_entity.py::test_task_import_story_chooses_page_lookup_fields_before_rows_are_imported
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-# @pair ingress:assign-columns
-# @pair ingress:verify-import
-# @pair ingress:table-fields
-# @pair ingress:ignored-columns
-# @pair ingress:guessed-fields
-# @pair ingress:task-name
-# @pair ingress:multiple-columns
+# @matrix ingress : assign-columns guessed-fields ignored-columns multiple-columns table-fields task-name verify-import
 class IngressMapping:
     """Canonical projection from stored ingress configuration to row mappings."""
 
@@ -380,25 +374,7 @@ class IngressMapping:
 # @tests tests_unit/test_006b_ingress_entity.py::test_importer_records_older_completion_snapshot_text
 # @tests tests_unit/test_006b_ingress_entity.py::test_importer_task_page_lookup_uses_shared_find_page
 # @tests tests_unit/test_006d_ingress_service.py::test_mutation_planner_preallocates_stable_entity_and_history_keys
-# @pair ingress:row-results
-# @pair ingress:import-pages
-# @pair ingress:validation-errors
-# @pair ingress:list-normalization
-# @pair ingress:entity-name
-# @pair ingress:task-import
-# @pair ingress:idempotency
-# @pair ingress:deterministic-key
-# @pair ingress:page-match
-# @pair ingress:fuzzy-match
-# @pair ingress:completion-history
-# @pair ingress:name
-# @pair ingress:description
-# @pair ingress:due-date
-# @pair ingress:live-completion
-# @pair ingress:task-name
-# @pair ingress:multiple-columns
-# @pair ingress:row-task
-# @pair ingress:existing-model-task
+# @matrix ingress : completion-history description deterministic-key due-date entity-name existing-model-task fuzzy-match idempotency import-pages list-normalization live-completion multiple-columns name page-match row-results row-task task-import task-name validation-errors
 class IngressMutationPlanner:
     """Convert one mapped CSV row into deterministic entity mutations."""
 
@@ -797,20 +773,7 @@ class IngressMutationPlanner:
 # @tests tests_unit/test_006d_ingress_service.py::test_failed_batch_restarts_from_committed_cursor
 # @tests tests_unit/test_006d_ingress_service.py::test_service_rejects_unversioned_records_and_future_navigation
 # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_reports_stage_errors_without_advancing
-# @pair ingress:invalidation
-# @pair ingress:batch
-# @pair ingress:failure
-# @pair ingress:configuration-lock
-# @pair ingress:progress-actions
-# @pair ingress:cursor-resume
-# @pair ingress:restart
-# @pair ingress:format-validation
-# @pair ingress:invalid-transition
-# @pair ingress:cursor
-# @pair ingress:duplicate-delivery
-# @pair ingress:results
-# @pair ingress:terminal
-# @pair ingress:error-handling
+# @matrix ingress : batch configuration-lock cursor cursor-resume duplicate-delivery error-handling failure format-validation invalid-transition invalidation progress-actions restart results terminal
 class IngressService:
     """Single durable owner for ingress transitions and row execution."""
 

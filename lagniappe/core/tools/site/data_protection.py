@@ -57,8 +57,7 @@ def _backup(payload):
 
 # @testable true
 # @tests tests_unit/test_024_data_protection_status.py::test_data_protection_status_is_sanitized_and_read_only
-# @features admin disaster-recovery
-# @dimensions schedules native-backups recovery-catalog sanitization
+# @matrix admin disaster-recovery : native-backups recovery-catalog sanitization schedules
 def data_protection_status(admin_client=None):
     """Return provider metadata and a URI-free recovery-set catalog."""
     project_id = CONFIG.GOOGLE_CLOUD_PROJECT

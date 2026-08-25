@@ -35,8 +35,7 @@ class RelatedEntityListMixin:
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_related_property_writes_refresh_entity_and_column_projections
-    # @features related-properties cache
-    # @dimensions cache-invalidation details column-value parent-pointer
+    # @matrix cache related-properties : cache-invalidation column-value details parent-pointer
     def _invalidate_projections(self):
         self._column_value = None
         if self.entity:
@@ -236,8 +235,7 @@ class RelatedEntityMixin:
     # Entity Attributes
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_related_property_writes_refresh_entity_and_column_projections
-    # @features related-properties cache
-    # @dimensions cache-invalidation details column-value parent-pointer
+    # @matrix cache related-properties : cache-invalidation column-value details parent-pointer
     def _invalidate_projections(self):
         self._column_value = None
         if self.entity:
@@ -252,8 +250,7 @@ class RelatedEntityMixin:
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_related_attach_caches_attached_entity_map
-    # @features relations
-    # @dimensions attach-cache
+    # @pair relations:attach-cache
     def attach(self, key_map):
         if not isinstance(self, DBProperty) or not self.entity:
             return
@@ -322,8 +319,7 @@ class RelatedEntityMixin:
 
     # @testable true
     # @tests tests_unit/test_006b_ingress_entity.py::test_related_entity_setter_rejects_values_without_key
-    # @features relations
-    # @dimensions validation key-validation
+    # @matrix relations : key-validation validation
     @value.setter
     def value(self, value):
         if value is not None and not getattr(value, "key", None):

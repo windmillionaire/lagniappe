@@ -7,8 +7,7 @@ import { Combobox } from "./combobox";
  *
  * @testable true
  * @tests tests_js/test_046_async_query_lifecycle.py::test_remote_combobox_invalidates_before_debounce_and_on_destroy
- * @features async-query combobox
- * @dimensions debounce stale-publication dismissal teardown
+ * @matrix async-query combobox : debounce dismissal stale-publication teardown
  */
 export class RemoteQueryCombobox extends Combobox {
 	constructor(element, { queryWait = 200 } = {}) {

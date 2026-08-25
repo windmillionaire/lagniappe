@@ -43,8 +43,8 @@ class ModelTask extends FormElement {
  * @tests tests_e2e/004_projects/test_004a_project.py::test_create_model_task_with_form
  * @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_create_model_form_opens_from_model_tasks_section
  * @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_editor_can_open_model_task_creation
- * @features model-tasks
- * @dimensions create attach-form permission-gates
+ * @matrix model-tasks : attach-form create permission-gates
+ * @pair entity-layout:project-mobile
  */
 export class CreateModelTask extends ModelTask {
 	constructor(attributes) {
@@ -75,8 +75,7 @@ export class CreateModelTask extends ModelTask {
  * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_edit_model_task_name
  * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_change_model_task_form
  * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task_form
- * @features model-tasks
- * @dimensions info-form update name form-change form-clear
+ * @matrix model-tasks : form-change form-clear info-form name update
  */
 export class ModelTaskInfo extends ModelTask {
 	constructor(attributes) {
@@ -108,8 +107,7 @@ export class ModelTaskInfo extends ModelTask {
 /**
  * @testable true
  * @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task
- * @features model-tasks
- * @dimensions delete
+ * @pair model-tasks:delete
  */
 export class ModelTaskList extends BaseList {
 	postreconcile() {

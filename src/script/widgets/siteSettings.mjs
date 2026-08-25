@@ -18,8 +18,7 @@ const SETTING_WIDGETS = {
  * @testable true
  * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
  * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_coordinates_section_widgets
- * @features admin
- * @dimensions site-settings sections composite-widgets persistence
+ * @matrix admin : composite-widgets persistence sections site-settings
  */
 export class SiteSettings {
 	constructor(attributes) {

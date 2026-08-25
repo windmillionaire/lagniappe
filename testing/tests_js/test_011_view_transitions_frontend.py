@@ -72,8 +72,7 @@ const withTransition = context.withTransition;
     run_node(script)
 
 
-# @features view-transition
-# @dimensions nested-callback error-reporting
+# @matrix view-transition : error-reporting nested-callback
 def test_nested_transition_joins_active_transition_without_error_report(run_node):
     run_transition_check(
         run_node,
@@ -102,8 +101,7 @@ if (events.join(",") !== "outer-start,inner,outer-end") {
     )
 
 
-# @features view-transition
-# @dimensions update-completion animation-lifecycle queueing
+# @matrix view-transition : animation-lifecycle queueing update-completion
 def test_transition_resolves_after_update_without_waiting_for_animation(run_node):
     run_transition_check(
         run_node,
@@ -123,8 +121,7 @@ context.finishTransition();
     )
 
 
-# @features view-transition
-# @dimensions coalescing exact-once
+# @matrix view-transition : coalescing exact-once
 def test_same_turn_commits_share_one_transition_and_run_once(run_node):
     run_transition_check(
         run_node,
@@ -147,8 +144,7 @@ context.finishTransition();
     )
 
 
-# @features view-transition
-# @dimensions ready-rejection exact-once
+# @matrix view-transition : exact-once ready-rejection
 def test_ready_rejection_does_not_replay_commit(run_node):
     script = r'''
 const fs = require("node:fs");

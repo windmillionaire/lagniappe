@@ -24,8 +24,7 @@ SORTS = frozenset(
 # @testable true
 # @tests tests_unit/test_015c_ai_filter_query.py::test_describe_filter_fields_exposes_parent_relations_and_form_fields
 # @tests tests_unit/test_015c_ai_filter_query.py::test_describe_filter_fields_uses_real_project_and_form_filter_surfaces
-# @features ai-filter
-# @dimensions schema permissions integration
+# @matrix ai-filter : integration permissions schema
 def describe_filter_fields(parent, user):
     """Describe filterable fields visible to ``user`` under a project/category."""
     return describe_filter_contract(parent, user)
@@ -34,8 +33,7 @@ def describe_filter_fields(parent, user):
 # @testable true
 # @tests tests_unit/test_015c_ai_filter_query.py::test_compile_filter_definitions_normalizes_dates_numbers_and_booleans
 # @tests tests_unit/test_015c_ai_filter_query.py::test_compile_filter_definitions_rejects_unknown_fields_comparators_and_values
-# @features ai-filter
-# @dimensions compilation validation permissions
+# @matrix ai-filter : compilation permissions validation
 def compile_filter_definitions(parent, conditions, user):
     """Compile AI condition DTOs through the shared filter contract."""
     compiled = compile_filter_contract(
@@ -49,8 +47,7 @@ def compile_filter_definitions(parent, conditions, user):
 
 # @testable true
 # @tests tests_unit/test_015c_ai_filter_query.py::test_query_workspace_filter_uses_shared_cache_and_permission_filters_results
-# @features ai-filter
-# @dimensions cache-query permissions output
+# @matrix ai-filter : cache-query output permissions
 def query_workspace_filter(
     parent,
     conditions,

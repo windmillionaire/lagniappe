@@ -21,8 +21,7 @@ from . import Entities
 
 # @testable true
 # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
-# @features user
-# @dimensions entity-lifecycle
+# @pair user:entity-lifecycle
 class User(AssetMixin, UserMixin, Entity):
     entity_kind = "user"
 
@@ -43,8 +42,7 @@ class User(AssetMixin, UserMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
-    # @features user
-    # @dimensions search-cache page-canonical
+    # @matrix user : page-canonical search-cache
     @property
     def to_cache(self):
         return {}
@@ -56,9 +54,8 @@ class User(AssetMixin, UserMixin, Entity):
     # @testable true
     # @tests tests_unit/test_009b_user_permissions.py::test_user_visibility_uses_users_and_group_permissions_without_page_restrictions
     # @tests tests_unit/test_009b_user_permissions.py::test_privileged_user_rows_are_owner_managed
-    # @pairs users:owner users:users-view users:group-view
-    # @pair users:restriction-independence
-    # @pairs admin:privileged-account admin:view admin:edit admin:delete
+    # @matrix admin : delete edit privileged-account view
+    # @matrix users : group-view owner restriction-independence users-view
     # @pair owner:owner-only
     def allowed(self, action, user=None):
         """Authorize user rows from their own Users/group permission scope."""
@@ -121,8 +118,8 @@ class User(AssetMixin, UserMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009b_user_permissions.py::test_user_permissions_fingerprint_tracks_permissions_and_owner_state
-    # @pairs permissions:stored-permissions permissions:fingerprint
-    # @pairs cache:role permissions:empty-permissions
+    # @matrix permissions : empty-permissions fingerprint stored-permissions
+    # @pair cache:role
     @property
     def permissions_fingerprint(self):
         permissions = "" if self.is_admin else self.db.get("permissions", "{}")
@@ -130,8 +127,7 @@ class User(AssetMixin, UserMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009f_user_ai_access.py::test_user_access_is_independent_hierarchical_and_fail_closed
-    # @features ai-access
-    # @dimensions authentication hierarchy permissions-independent owner-no-bypass
+    # @matrix ai-access : authentication hierarchy owner-no-bypass permissions-independent
     def access(self, required):
         """Check this user's independent AI entitlement."""
         if (
@@ -144,8 +140,7 @@ class User(AssetMixin, UserMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009f_user_ai_access.py::test_authorization_fingerprint_tracks_ai_access
-    # @features ai-access cache
-    # @dimensions authorization-fingerprint permissions entitlement
+    # @matrix ai-access cache : authorization-fingerprint entitlement permissions
     @property
     def authorization_fingerprint(self):
         role = "owner" if self.is_owner else "admin" if self.is_admin else "user"
@@ -165,8 +160,7 @@ class User(AssetMixin, UserMixin, Entity):
     # @tests tests_unit/test_009b_user_permissions.py::test_entity_permissions
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_one_category_permissions
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_category_home_rows_only_offer_star_controls
-    # @features permissions
-    # @dimensions global-resources, resource-gates, owner, entity-resources, requires
+    # @matrix permissions : entity-resources global-resources owner requires resource-gates
     def has_permission(self, resource, action=Action.ALL):
         if isinstance(resource, Entity):
             required, permissions = resource.requires, self.permissions
@@ -188,12 +182,8 @@ class User(AssetMixin, UserMixin, Entity):
     # @tests tests_unit/test_009a_user.py::test_user_create_public_user_assigns_public_group
     # @tests tests_unit/test_009f_user_ai_access.py::test_user_create_defaults_non_owner_to_none
     # @tests tests_e2e/008_users/test_008a_user_index.py::test_owner_create_adopts_public_user_and_resets_form
-    # @pairs user:create user:owner user:page user:groups user:cache-invalidation
-    # @pairs user:public-user user:public-group user:personal-page user:limited-attrs
-    # @pair user:new-user-default
-    # @pairs user:public-adoption user:submitted-create-data user:page-reassign
-    # @pairs public-users:create public-users:public-user public-users:public-group
-    # @pairs public-users:personal-page public-users:limited-attrs
+    # @matrix public-users : create limited-attrs personal-page public-group public-user
+    # @matrix user : cache-invalidation create groups limited-attrs new-user-default owner page page-reassign personal-page public-adoption public-group public-user submitted-create-data
     @classmethod
     def create(cls, data, *, adopt_public=False):
         if not data.get("name"):
@@ -273,8 +263,7 @@ class User(AssetMixin, UserMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
-    # @features user
-    # @dimensions save page
+    # @matrix user : page save
     def save(self):
         if self.db.get("photo") and not self.get_asset("photo"):
             self.properties.photo.save_google_photo()
@@ -282,8 +271,7 @@ class User(AssetMixin, UserMixin, Entity):
 
     # @testable true
     # @tests tests_unit/test_009a_user.py::test_user_entity_create_save_load_owner_page_and_groups
-    # @features user
-    # @dimensions load
+    # @pair user:load
     @classmethod
     def load(cls, email):
         user = database.get.user(email)

@@ -11,8 +11,7 @@ import { SiteSetting } from "./base";
 /**
  * @testable true
  * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
- * @features admin
- * @dimensions configuration-modal
+ * @pair admin:configuration-modal
  */
 export class SiteMaintenance extends SiteSetting {
 	constructor(attributes) {
@@ -135,8 +134,7 @@ export class SiteMaintenance extends SiteSetting {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_migration_status_uses_generic_release_states
-	 * @features admin database-migrations
-	 * @dimensions current pending running failed audit-error version-history repairs actionable-links cache-gate
+	 * @matrix admin database-migrations : actionable-links audit-error cache-gate current failed pending repairs running version-history
 	 */
 	_renderMigrationStatus(status) {
 		const panel = this.target.querySelector("[data-role='migration-status']");

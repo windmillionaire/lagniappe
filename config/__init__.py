@@ -84,8 +84,7 @@ class File(Enum):
 
     # @testable true
     # @tests tests_tooling/test_003_config.py::test_atomic_config_write_preserves_valid_file_and_restricts_secrets
-    # @features config
-    # @dimensions transactional-state utf8 permissions
+    # @matrix config : permissions transactional-state utf8
     def save(self, data):
         if self.name.endswith("_YAML"):
             content = self._serialize_yaml(data)
@@ -101,8 +100,7 @@ class File(Enum):
 
     # @testable true
     # @tests tests_tooling/test_003_config.py::test_python_config_package_resolves_expected_repo_files
-    # @features config
-    # @dimensions config-files parsing
+    # @matrix config : config-files parsing
     def load(self):
         if not self.exists():
             return {}
@@ -264,8 +262,7 @@ def _fsync_directory(path):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_atomic_config_write_preserves_valid_file_and_restricts_secrets
-# @features config setup
-# @dimensions transactional-state utf8 permissions
+# @matrix config setup : permissions transactional-state utf8
 def _atomic_write_text(path, content, *, owner_only=False):
     """Atomically replace one non-empty UTF-8 text file in its own directory."""
     path = Path(path)
@@ -351,8 +348,7 @@ def _generation_source_checksum():
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_generation_manifest_tracks_constants_and_required_outputs
-# @features config setup
-# @dimensions generation source-marker completeness
+# @matrix config setup : completeness generation source-marker
 def write_generation_manifest():
     """Record the constants generation after every output has been persisted."""
     _require_generation_files()
@@ -372,8 +368,7 @@ def write_generation_manifest():
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_generation_manifest_tracks_constants_and_required_outputs
-# @features config deploy
-# @dimensions generation source-marker completeness
+# @matrix config deploy : completeness generation source-marker
 def verify_generation_manifest():
     """Fail when required outputs or their constants generation are stale."""
     try:

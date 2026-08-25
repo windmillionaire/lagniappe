@@ -59,8 +59,7 @@ export class IndependentDocument {
 	 * @testable true
 	 * @tests tests_js/test_045_browser_persistence.py::test_independent_editor_failed_load_stays_inert_and_retries
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
-	 * @features editor html-field
-	 * @dimensions initial-load retry authoritative-content error-reporting
+	 * @matrix editor html-field : authoritative-content error-reporting initial-load retry
 	 */
 	load() {
 		if (this._destroyed) return Promise.resolve(false);
@@ -207,8 +206,7 @@ export class IndependentDocument {
 	 * @tests tests_js/test_045_browser_persistence.py::test_independent_editor_serializes_inflight_edits_and_acknowledges_in_order
 	 * @tests tests_js/test_045_browser_persistence.py::test_independent_editor_saves_intentional_clear
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
-	 * @features editor html-field
-	 * @dimensions server-acknowledgement retry error-reporting serialized-save concurrent-edit intentional-clear keepalive
+	 * @matrix editor html-field : concurrent-edit error-reporting intentional-clear keepalive retry serialized-save server-acknowledgement
 	 */
 	flush({ keepalive = false } = {}) {
 		if (this.readonly || this._destroyed || !this.editor) {

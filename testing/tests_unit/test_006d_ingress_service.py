@@ -58,8 +58,7 @@ def _ingress(*, stage="PROCESS_CSV", highest="PROCESS_CSV", rows=None):
     return entity
 
 
-# @features ingress
-# @dimensions transition-contract
+# @pair ingress:transition-contract
 def test_transition_table_covers_every_ingress_stage():
     stages = set(CONFIGURATION_STAGES)
     stages.update(
@@ -72,8 +71,7 @@ def test_transition_table_covers_every_ingress_stage():
     assert INGRESS_TRANSITIONS["create"] == (None, IngressStage.PROCESS_CSV)
 
 
-# @features ingress
-# @dimensions stage presentation
+# @matrix ingress : presentation stage
 def test_property_stage_facade_uses_durable_workflow():
     entity = _ingress(stage="CHOOSE_TYPE")
     assert isinstance(entity.stage, Stage)
@@ -82,8 +80,7 @@ def test_property_stage_facade_uses_durable_workflow():
     assert entity.get_process("workflow")["current"] == "CHOOSE_PARENT"
 
 
-# @features ingress
-# @dimensions format-validation invalid-transition
+# @matrix ingress : format-validation invalid-transition
 def test_service_rejects_unversioned_records_and_future_navigation():
     entity = _ingress()
     entity.db.pop("ingress_format")
@@ -96,8 +93,7 @@ def test_service_rejects_unversioned_records_and_future_navigation():
         service.navigate(IngressStage.CHOOSE_FORM)
 
 
-# @features ingress
-# @dimensions invalidation configuration-lock progress-actions
+# @matrix ingress : configuration-lock invalidation progress-actions
 def test_configuration_change_invalidates_downstream_and_locks_after_start():
     entity = _ingress(
         stage="CHOOSE_TYPE", highest="VERIFY_IMPORT", rows=[{"name": "A"}]
@@ -124,8 +120,7 @@ def test_configuration_change_invalidates_downstream_and_locks_after_start():
         service.update_stage(IngressStage.CHOOSE_TYPE, {"entity-type": "task"})
 
 
-# @features ingress
-# @dimensions batch cursor results terminal duplicate-delivery
+# @matrix ingress : batch cursor duplicate-delivery results terminal
 def test_testing_batch_commits_ordered_results_and_finishes(monkeypatch):
     entity = _ingress(
         stage="IMPORTING",
@@ -167,8 +162,7 @@ def test_testing_batch_commits_ordered_results_and_finishes(monkeypatch):
     assert duplicate.results == ()
 
 
-# @features ingress
-# @dimensions failure restart cursor-resume
+# @matrix ingress : cursor-resume failure restart
 def test_failed_batch_restarts_from_committed_cursor(monkeypatch):
     entity = _ingress(
         stage="IMPORTING",
@@ -200,8 +194,7 @@ def test_failed_batch_restarts_from_committed_cursor(monkeypatch):
     assert service.cursor == 1
 
 
-# @features ingress
-# @dimensions idempotency deterministic-key row-task
+# @matrix ingress : deterministic-key idempotency row-task
 def test_mutation_planner_preallocates_stable_entity_and_history_keys():
     created = []
 
@@ -322,8 +315,7 @@ def _database(monkeypatch, execution):
     return entity, datastore
 
 
-# @pair ingress:cursor
-# @pair ingress:duplicate-delivery
+# @matrix ingress : cursor duplicate-delivery
 def test_ingress_row_commit_rejects_duplicate_cursor(monkeypatch):
     now = datetime(2026, 7, 16, tzinfo=timezone.utc)
     entity, _datastore = _database(
@@ -372,8 +364,7 @@ def test_ingress_stop_is_durable_and_preserves_current_row_boundary(monkeypatch)
     assert committed["execution"]["cursor"] == 0
 
 
-# @features ingress
-# @dimensions cursor compare-and-set durable-commit property-mask
+# @matrix ingress : compare-and-set cursor durable-commit property-mask
 def test_ingress_row_commit_requires_expected_cursor_and_applies_masks(monkeypatch):
     now = datetime(2026, 7, 16, tzinfo=timezone.utc)
     entity, datastore = _database(
@@ -406,8 +397,7 @@ def test_ingress_row_commit_requires_expected_cursor_and_applies_masks(monkeypat
     assert mutation.property_mask.paths == ["modified"]
 
 
-# @features ingress
-# @dimensions status cursor compare-and-set stop failure
+# @matrix ingress : compare-and-set cursor failure status stop
 def test_ingress_status_update_is_cursor_checked(monkeypatch):
     now = datetime(2026, 7, 16, tzinfo=timezone.utc)
     _entity, _datastore = _database(

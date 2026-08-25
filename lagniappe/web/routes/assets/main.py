@@ -111,8 +111,7 @@ def _file_response(asset, mimetype):
 # @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_renders_pdf_preview_widget
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_pdf_toolbar_navigates_pages
-# @features file
-# @dimensions preview
+# @pairs editor:image-upload file:preview page:asset-lifecycle
 @assets.route("<key>/<name>", methods=["GET", "HEAD"])
 @permission(requested=Action.VIEW)
 def get_image(key, name, **kwargs):

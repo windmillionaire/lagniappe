@@ -240,8 +240,7 @@ const initializeLogoutForms = context.initializeLogoutForms;
     run_node(script)
 
 
-# @features csrf
-# @dimensions stale-token concurrent-refresh
+# @matrix csrf : concurrent-refresh stale-token
 def test_concurrent_stale_writes_share_server_controlled_token_refresh(run_node):
     run_request_check(
         run_node,
@@ -289,8 +288,7 @@ if (!writeCalls.some((call) => call.keepalive)) {
     )
 
 
-# @features csrf request-errors
-# @dimensions retry-classification
+# @matrix csrf request-errors : retry-classification
 def test_non_csrf_bad_request_is_not_retried(run_node):
     run_request_check(
         run_node,
@@ -312,6 +310,7 @@ if (fetchCalls.some((call) => call.url === "/l/token")) {
 
 
 # @source src/script/shared/request.mjs::_request
+# @pair request:abort-signal
 def test_get_request_forwards_abort_signal_to_fetch(run_node):
     run_request_check(
         run_node,
@@ -326,8 +325,7 @@ if (call?.signal !== controller.signal) {
     )
 
 
-# @features request-errors polling
-# @dimensions structured-validation diagnostics
+# @matrix polling request-errors : diagnostics structured-validation
 def test_request_preserves_structured_validation_error(run_node):
     run_request_check(
         run_node,
@@ -344,8 +342,7 @@ if (response.ok || response.status !== 422 ||
     )
 
 
-# @features request-errors
-# @dimensions plain-validation diagnostics
+# @matrix request-errors : diagnostics plain-validation
 def test_request_preserves_plain_validation_error(run_node):
     run_request_check(
         run_node,
@@ -360,8 +357,7 @@ if (response.ok || response.status !== 422 ||
     )
 
 
-# @features request-errors edited-entity-notice
-# @dimensions non-invasive-probe reload-fallback
+# @matrix edited-entity-notice request-errors : non-invasive-probe reload-fallback
 def test_request_can_return_html_error_without_replacing_page(run_node):
     run_request_check(
         run_node,
@@ -381,8 +377,7 @@ if (document.documentElement.innerHTML !== "mounted page") {
     )
 
 
-# @features cache request
-# @dimensions conditional-response dom-refresh
+# @matrix cache request : conditional-response dom-refresh
 def test_request_exposes_service_worker_updated_marker(run_node):
     run_request_check(
         run_node,
@@ -398,14 +393,8 @@ if (!Array.isArray(response.rows)) {
     )
 
 
-# @pair cache:conditional-response
-# @pair cache:etag
-# @pair request:conditional-response
-# @pair request:etag
-# @pair request:post-headers
-# @pair deferred-jobs:conditional-response
-# @pair deferred-jobs:etag
-# @pair deferred-jobs:post-headers
+# @matrix cache : conditional-response etag
+# @matrix deferred-jobs request : conditional-response etag post-headers
 def test_request_supports_conditional_post_not_modified(run_node):
     run_request_check(
         run_node,
@@ -426,8 +415,7 @@ if (call.headers["If-None-Match"] !== '"deferred-state"') {
     )
 
 
-# @features cache request
-# @dimensions invalidation reload
+# @matrix cache request : invalidation reload
 def test_request_exposes_client_cache_invalidation_marker(run_node):
     run_request_check(
         run_node,
@@ -443,8 +431,7 @@ if (!Array.isArray(response.targets)) {
     )
 
 
-# @features edited-entity-notice request
-# @dimensions acknowledgement response-headers multiple-entities
+# @matrix edited-entity-notice request : acknowledgement multiple-entities response-headers
 def test_request_dispatches_entity_fingerprint_acknowledgement(run_node):
     run_request_check(
         run_node,
@@ -479,8 +466,7 @@ if (entityEvents.length !== 0) {
     )
 
 
-# @features request-errors
-# @dimensions proxy-text-error ajax-upload
+# @matrix request-errors : ajax-upload proxy-text-error
 def test_plain_text_upstream_error_stays_in_request_error_path(run_node):
     run_request_check(
         run_node,
@@ -504,8 +490,7 @@ if (document.documentElement.innerHTML !== "<html><body>app still mounted</body>
     )
 
 
-# @features login
-# @dimensions logout button
+# @matrix login : button logout
 def test_logout_button_posts_without_hidden_form(run_node):
     run_request_check(
         run_node,
@@ -568,8 +553,7 @@ if (logoutCalls.some((call) => call.body)) {
     )
 
 
-# @features login
-# @dimensions csrf-refresh
+# @pair login:csrf-refresh
 def test_login_handoff_refreshes_csrf_before_submit_and_retries_once(run_node):
     run_node(
         r'''
@@ -695,8 +679,7 @@ const form = {
     )
 
 
-# @features login
-# @dimensions csrf-refresh verify-email
+# @matrix login : csrf-refresh verify-email
 def test_login_verification_email_reuses_refreshed_csrf(run_node):
     run_node(
         r'''

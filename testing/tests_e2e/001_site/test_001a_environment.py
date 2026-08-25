@@ -74,9 +74,7 @@ def test_database_setup():
     assert database.core.datastore is not None
 
 
-# @pair cache:redis-connection
-# @pair cache:cleanup
-# @pair cache:index-recreation
+# @matrix cache : cleanup index-recreation redis-connection
 def test_cache_setup():
     """
     Verify Redis cache is connected and using test-prefixed index.
@@ -143,8 +141,7 @@ def test_storage_setup():
         assert bucket.name == bucket_name
 
 
-# @features server
-# @dimensions initialization
+# @pair server:initialization
 def test_server_running(get_user):
     """
     Verify Flask test server is running and responding.
@@ -168,7 +165,7 @@ def test_server_running(get_user):
     expect(user.locate("body")).to_contain_text("pong")
 
 
-# @pairs notifications:ping notifications:redis-projection
+# @matrix notifications : ping redis-projection
 # @pair web-headers:notification-state
 def test_ping_notification_state_is_redis_only_and_optional(get_user):
     """A real notification reaches a reloaded page through the ping header."""
@@ -219,9 +216,8 @@ def test_ping_notification_state_is_redis_only_and_optional(get_user):
     assert notification_requests == []
 
 
-# @pairs web-headers:etag web-headers:security web-headers:conditional-request
-# @pairs web-headers:missing-fingerprint cache:etag cache:build-id
-# @pairs cache:missing-fingerprint cache:standard-header
+# @matrix cache : build-id etag missing-fingerprint standard-header
+# @matrix web-headers : conditional-request etag missing-fingerprint security
 def test_authenticated_home_response_headers_include_etag(get_user):
     """Authenticated app responses should carry the common header envelope."""
     user = get_user(Users.OWNER)
@@ -306,8 +302,7 @@ def test_authenticated_home_response_headers_include_etag(get_user):
     assert '<div lp-view data-kind="home"' in uncached.text
 
 
-# @features session location timezone
-# @dimensions validation atomic-update coordinates
+# @matrix location session timezone : atomic-update coordinates validation
 def test_update_session_rejects_invalid_timezone_and_location_atomically(
     get_user, browser_failures
 ):
@@ -387,8 +382,7 @@ def test_update_session_rejects_invalid_timezone_and_location_atomically(
     persisted.save()
 
 
-# @features privacy public-pages
-# @dimensions anonymous-access document-load
+# @matrix privacy public-pages : anonymous-access document-load
 def test_privacy_policy_is_public(get_user):
     """Verify anonymous visitors can load the public privacy policy."""
     user = get_user(Users.ANONYMOUS)
@@ -401,8 +395,7 @@ def test_privacy_policy_is_public(get_user):
     expect(body).to_contain_text("Optional Analytics and Error Reporting")
 
 
-# @features privacy public-pages error-reporting
-# @dimensions anonymous-access document-load maintainer-destination
+# @matrix error-reporting privacy public-pages : anonymous-access document-load maintainer-destination
 def test_reporting_privacy_notice_is_public(get_user):
     """Verify anonymous visitors can load the maintainer reporting notice."""
     user = get_user(Users.ANONYMOUS)
@@ -420,8 +413,7 @@ def test_reporting_privacy_notice_is_public(get_user):
     expect(body).to_contain_text("supplies a Sentry DSN")
 
 
-# @features error-handling
-# @dimensions http-404 error-page
+# @matrix error-handling : error-page http-404
 def test_error_handling(get_user, browser_failures):
     """
     Verify 404 error page renders correctly.

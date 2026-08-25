@@ -64,11 +64,9 @@ def _create_autofill_fixture(user):
     return page, task
 
 
-# @pairs ai:autofill ai:deferred ai:attached-files ai:completion-refresh
-# @pairs tasks:autofill tasks:deferred
-# @pairs notifications:autofill notifications:deferred
-# @pairs deferred-jobs:process-route deferred-jobs:cloud-tasks deferred-jobs:oidc
-# @pairs deferred-jobs:provider-delivery deferred-jobs:hosted-e2e
+# @matrix ai : attached-files autofill completion-refresh deferred
+# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery
+# @matrix notifications tasks : autofill deferred
 # @template pages/tasks.html::task_form
 @pytest.mark.ai
 def test_task_autofill_runs_deferred_with_page_file_context(get_user, monkeypatch):

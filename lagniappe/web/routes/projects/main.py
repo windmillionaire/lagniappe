@@ -21,8 +21,7 @@ from . import projects
 # @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_is_forbidden_without_model_permission
 # @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_reads_project_without_editing_controls
 # @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_viewer_sees_document_tab_only_when_content_exists
-# @features projects
-# @dimensions navigate load permission-gates readonly document-tab
+# @matrix projects : document-tab load navigate permission-gates readonly
 @projects.route("/<key>", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
 def view(key, **kwargs):
@@ -35,13 +34,7 @@ def view(key, **kwargs):
 # @testable true
 # @tests tests_e2e/004_projects/test_004b_info.py::test_project_info_replacement_is_side_effect_free_for_timestamp_only_revision
 # @tests tests_e2e/004_projects/test_004b_info.py::test_project_revision_notice_only_resets_changed_form
-# @pairs edited-entity-notice:replacement edited-entity-notice:info-form
-# @pairs edited-entity-notice:side-effect-free edited-entity-notice:timestamp-only
-# @pairs edited-entity-notice:staged-reset edited-entity-notice:no-reload
-# @pair edited-entity-notice:dirty-state
-# @pairs projects:replacement projects:info-form projects:side-effect-free
-# @pairs projects:timestamp-only projects:staged-reset projects:no-reload
-# @pair projects:dirty-state
+# @matrix edited-entity-notice projects : dirty-state info-form no-reload replacement side-effect-free staged-reset timestamp-only
 @projects.route("/<key>/info/replace", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
 def info(key, **kwargs):
@@ -51,8 +44,7 @@ def info(key, **kwargs):
 # @testable true
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_without_tasks
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_without_document
-# @features projects
-# @dimensions attribute-model-tasks attribute-document
+# @matrix projects : attribute-document attribute-model-tasks
 def create_update_data(form):
     return {
         "name": form.get("name"),
@@ -65,8 +57,7 @@ def create_update_data(form):
 # @tests tests_e2e/004_projects/test_004b_info.py::test_project_info_form
 # @tests tests_e2e/004_projects/test_004b_info.py::test_toggle_tasks_attribute
 # @tests tests_e2e/004_projects/test_004b_info.py::test_toggle_document_attribute
-# @features projects
-# @dimensions update info-form attribute-model-tasks attribute-document
+# @matrix projects : attribute-document attribute-model-tasks info-form update
 @projects.route("<key>/update", methods=["PUT"])
 @permission(Resource.PROJECT, Action.EDIT)
 def update(key, **kwargs):
@@ -104,8 +95,7 @@ def _set_project_attribute(project, attribute, active):
 # @testable true
 # @tests tests_e2e/004_projects/test_004b_info.py::test_toggle_tasks_attribute
 # @tests tests_e2e/004_projects/test_004b_info.py::test_toggle_document_attribute
-# @features projects
-# @dimensions attributes-live-toggle attribute-model-tasks attribute-document no-reload
+# @matrix projects : attribute-document attribute-model-tasks attributes-live-toggle no-reload
 @projects.route("<key>/attributes/<attribute>", methods=["PUT"])
 @permission(Resource.PROJECT, Action.EDIT)
 def set_attribute(key, attribute, **kwargs):
@@ -154,8 +144,7 @@ def _create_project(generated_data):
 # @testable true
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
-# @features projects
-# @dimensions create-manual ai-create explain-button
+# @matrix projects : ai-create create-manual explain-button
 @projects.route("/create", methods=["POST"])
 @permission(Resource.PROJECTS, Action.CREATE)
 def create():
@@ -205,8 +194,7 @@ def create():
 
 # @testable true
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_delete_project
-# @features projects
-# @dimensions delete
+# @pair projects:delete
 @projects.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.PROJECT, Action.DELETE)
 def delete(key, **kwargs):

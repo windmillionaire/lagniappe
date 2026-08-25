@@ -10,7 +10,6 @@ from .references import (
     _remove_file_from_endpoint,
 )
 from .results import _entity_result
-from .forms import _undo_form_schema_update, _undo_submission_updates
 from .completed_tasks import _undo_reused_completed_task
 
 
@@ -66,8 +65,7 @@ def _noop_compensation(_action, _report, _user):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_adds_form_to_existing_page_with_undo
-# @pair ai-report:page-form
-# @pair ai-report:undo
+# @matrix ai-report : page-form undo
 def _undo_add_form_to_page_action(action, user):
     previous = action.get("previous") or {}
     if previous.get("had_form"):
@@ -111,8 +109,7 @@ def _undo_add_form_to_page_action(action, user):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_entities.py::test_run_report_adds_page_category_without_changing_primary_with_undo
-# @pair ai-report:add-category
-# @pair ai-report:undo
+# @matrix ai-report : add-category undo
 def _undo_add_category_action(action, user):
     previous = action.get("previous") or {}
     if previous.get("had_category"):
@@ -158,9 +155,7 @@ def _undo_add_category_action(action, user):
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_and_records_manual_page_cleanup_with_undo
-# @pair ai-report:moves
-# @pair ai-report:move-file
-# @pair ai-report:undo
+# @matrix ai-report : move-file moves undo
 def _undo_move_action(action, user):
     entity = _load_result_entity(action.get("entity"))
     if entity is None:
@@ -179,8 +174,7 @@ def _undo_move_action(action, user):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_renames_entity_without_submission_and_undoes
-# @pair ai-report:rename
-# @pair ai-report:undo
+# @matrix ai-report : rename undo
 def _undo_rename_entity(action, user):
     entity = _load_result_entity(action.get("entity"))
     if entity is None:

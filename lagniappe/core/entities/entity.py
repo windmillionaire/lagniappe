@@ -85,8 +85,7 @@ class EntityProperties:
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_entity_requires_subclass_entity_kind
 # @tests tests_unit/test_002_entity_general_properties.py::test_entity_preserves_key_from_empty_datastore_entity
-# @features entity
-# @dimensions initialization validation empty-datastore-entity key-preservation
+# @matrix entity : empty-datastore-entity initialization key-preservation validation
 class Entity:
     """Base class for all persistent entities.
 
@@ -284,8 +283,7 @@ class Entity:
     # @testable true
     # @tests tests_unit/test_004e_submission_behavior.py::test_default_entity_fields_are_not_duplicated_in_submission_search_cache
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_to_cache_stores_detail_parent_pointers
-    # @features cache
-    # @dimensions default-fields cache-deduplication details-key parent-key
+    # @matrix cache : cache-deduplication default-fields details-key parent-key
     @property
     def to_cache(self):
         if self.reserved or not self.hash:
@@ -315,8 +313,7 @@ class Entity:
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_context_exports_authentication_and_filter_index_neutrality
-    # @features permissions
-    # @dimensions authenticated-user
+    # @pair permissions:authenticated-user
     def to_ai(self, user=None):
         user = current_context_user(user)
         if not user or not getattr(user, "is_authenticated", False):
@@ -360,9 +357,8 @@ class Entity:
     # @tests tests_unit/test_002_entity_general_properties.py::test_context_exports_authentication_and_filter_index_neutrality
     # @tests tests_unit/test_013_task_properties.py::test_task_filter_index_includes_restricted_related_values
     # @tests tests_unit/test_004e_submission_behavior.py::test_unset_submission_fields_do_not_erase_entity_filter_metadata
-    # @features filter-index permissions
-    # @dimensions permission-neutral related-values
-    # @pairs filter-index:unset-values filter-index:entity-metadata
+    # @matrix filter-index : entity-metadata unset-values
+    # @pairs filter-index:related-values permissions:filter-index-neutral
     def to_filter_index(self, user=None):
         values = {"id": self.urlsafe_key}
 
@@ -386,8 +382,7 @@ class Entity:
 
     # @testable true
     # @tests tests_unit/test_009f_page_view_access.py::test_page_restricted_access_group_match
-    # @features page, permissions, user-groups
-    # @dimensions restricted-access, group-match
+    # @matrix page permissions user-groups : group-match restricted-access
     def restricted_access(self, user):
         if not user or not user.is_authenticated:
             return True
@@ -404,8 +399,7 @@ class Entity:
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_testing_entity_allowed_uses_real_permissions
-    # @features permissions testing
-    # @dimensions entity-allowed no-testing-shortcut
+    # @matrix permissions testing : entity-allowed no-testing-shortcut
     def allowed(self, action, user=None):
         user = current_context_user(user)
 
@@ -423,8 +417,7 @@ class Entity:
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_key_access_without_key_raises_runtime_error
-    # @features entity
-    # @dimensions key-validation
+    # @pair entity:key-validation
     @property
     def urlsafe_key(self):
         if not self.key:
@@ -438,8 +431,7 @@ class Entity:
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_key_access_without_key_raises_runtime_error
-    # @features entity
-    # @dimensions key-validation
+    # @pair entity:key-validation
     @property
     def db(self):
         if self._db or self._temporary or self._testing:
@@ -457,8 +449,7 @@ class Entity:
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_add_mutation_intents_requires_typed_intents_and_dedupes
-    # @features entity
-    # @dimensions typed-intent validation key-validation dedupe
+    # @matrix entity : dedupe key-validation typed-intent validation
     def add_mutation_intents(self, *intents):
         if self._mutation_intents is None:
             self._mutation_intents = []

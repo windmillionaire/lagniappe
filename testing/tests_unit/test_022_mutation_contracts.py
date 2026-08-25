@@ -45,10 +45,8 @@ def _writes(plan):
     ]
 
 
-# @features mutations task-scheduling
-# @dimensions durable-first post-commit
+# @matrix mutations task-scheduling : durable-first post-commit
 # @source lagniappe/core/definitions/mutations.py::MutationIntent.dispatch_scheduled_uncomplete
-# @source lagniappe/core/mutations/base.py::MutationPlanBuilder.dispatch_scheduled_uncomplete
 def test_scheduled_uncomplete_dispatch_is_planned_after_task_write():
     task = TestEntities.get(
         "TASK",
@@ -82,10 +80,7 @@ def test_scheduled_uncomplete_dispatch_is_planned_after_task_write():
     assert task_write < dispatch
 
 
-# @features mutations
-# @dimensions contract completeness serialization lookup validation planner-registry
-# @source lagniappe/core/mutations/__init__.py::registered_kinds
-# @source lagniappe/core/mutations/registry.py::planner_for
+# @matrix mutations : completeness contract lookup planner-registry serialization validation
 def test_mutation_contract_registry_covers_persisted_entities_and_relations(capsys):
     assert mutation_contracts._registry_errors() == []
     assert registered_kinds() == frozenset(ENTITY_MUTATION_CONTRACTS)
@@ -98,11 +93,7 @@ def test_mutation_contract_registry_covers_persisted_entities_and_relations(caps
     assert "tasks -> task, task_history" in output
 
 
-# @features mutations
-# @dimensions save plan serialization durable-first typed-intent-preservation
-# @source lagniappe/core/definitions/mutations.py::MutationEffect
-# @source lagniappe/core/definitions/mutations.py::MutationPlan
-# @source lagniappe/core/mutations/executor.py::execute_mutation
+# @matrix mutations : durable-first plan save serialization typed-intent-preservation
 def test_save_plan_is_serializable_and_preserves_intents_until_commit(monkeypatch):
     page = TestEntities.get("PAGE", {"name": "Plan Page", "hash": "plan-page"})
     category = TestEntities.get(
@@ -137,16 +128,7 @@ def test_save_plan_is_serializable_and_preserves_intents_until_commit(monkeypatc
     assert page.mutation_intents == [intent]
 
 
-# @pair mutations:root-save
-# @pair mutations:exclusions
-# @pair mutations:direct-save
-# @pair mutations:lifecycle-isolation
-# @pair mutations:intent-isolation
-# @pair mutations:cache-isolation
-# @pair mutations:plan
-# @pair mutations:serialization
-# @source lagniappe/core/entities/__init__.py::EntityRegistry.save_root
-# @source lagniappe/core/mutations/__init__.py::plan_root
+# @matrix mutations : cache-isolation direct-save exclusions intent-isolation lifecycle-isolation plan root-save serialization
 def test_save_root_persists_full_exclusions_without_lifecycle_intents_or_cache(
     monkeypatch,
 ):
@@ -194,10 +176,7 @@ def test_save_root_persists_full_exclusions_without_lifecycle_intents_or_cache(
     assert outcome.complete is True
 
 
-# @features mutations
-# @dimensions touch root-save modified exclusions property-mask
-# @source lagniappe/core/entities/__init__.py::EntityRegistry.touch
-# @source lagniappe/core/mutations/__init__.py::plan_root
+# @matrix mutations : exclusions modified property-mask root-save touch
 def test_touch_uses_masked_root_save_and_only_updates_modified(monkeypatch):
     category = TestEntities.get(
         "CATEGORY", {"name": "Touched category", "hash": "touched-category"}
@@ -220,10 +199,7 @@ def test_touch_uses_masked_root_save_and_only_updates_modified(monkeypatch):
     assert outcome.complete is True
 
 
-# @features mutations sync
-# @dimensions document checkpoint property-mask history parent-fingerprint list-owner
-# @source lagniappe/core/entities/__init__.py::EntityRegistry.save_document_checkpoint
-# @source lagniappe/core/mutations/document.py::plan_document_checkpoint
+# @matrix mutations sync : checkpoint document history list-owner parent-fingerprint property-mask
 def test_document_checkpoint_masks_parent_state_and_optionally_advances_lists(
     monkeypatch,
 ):
@@ -282,10 +258,7 @@ def test_document_checkpoint_masks_parent_state_and_optionally_advances_lists(
     assert writes["document-category"].property_mask == ("modified",)
 
 
-# @features mutations sync
-# @dimensions document parent-fingerprint property-mask list-owner
-# @source lagniappe/core/entities/__init__.py::EntityRegistry.advance_document_parent
-# @source lagniappe/core/mutations/document.py::plan_document_parent_touch
+# @matrix mutations sync : document list-owner parent-fingerprint property-mask
 def test_document_parent_touch_only_advances_parent_and_list_fingerprints(
     monkeypatch,
 ):
@@ -328,9 +301,7 @@ def test_document_parent_touch_only_advances_parent_and_list_fingerprints(
     assert outcome.complete is True
 
 
-# @pairs notifications:personal-activity notifications:mutation notifications:cache-isolation
-# @pair notifications:cache-failure-isolation
-# @source lagniappe/core/mutations/save.py::NotificationMutation.plan_save
+# @matrix notifications : cache-failure-isolation cache-isolation mutation personal-activity
 def test_notification_save_updates_projection_without_touching_user(monkeypatch):
     modified = datetime(2026, 7, 30, tzinfo=timezone.utc)
     user = User(testing=True)
@@ -406,8 +377,7 @@ def test_notification_save_updates_projection_without_touching_user(monkeypatch)
     assert failed_outcome.errors == ["redis unavailable"]
 
 
-# @pairs deferred-jobs:redis-projection deferred-jobs:mutation deferred-jobs:cache-isolation
-# @source lagniappe/core/mutations/save.py::JobMutation.plan_save
+# @matrix deferred-jobs : cache-isolation mutation redis-projection
 def test_job_save_updates_operation_projection_without_touching_relations(monkeypatch):
     modified = datetime(2026, 8, 5, tzinfo=timezone.utc)
     user = User(testing=True)
@@ -461,8 +431,7 @@ def test_job_save_updates_operation_projection_without_touching_relations(monkey
     assert outcome.complete is True
 
 
-# @pairs mutations:delete deferred-jobs:redis-projection
-# @source lagniappe/core/mutations/delete.py::plan_delete
+# @pairs deferred-jobs:redis-projection mutations:delete
 def test_job_delete_removes_operation_projection_after_commit(monkeypatch):
     job = DeferredJob(testing=True)
     job._key = "deleted-operation-job"
@@ -491,9 +460,7 @@ def test_job_delete_removes_operation_projection_after_commit(monkeypatch):
     assert outcome.complete is True
 
 
-# @features mutations
-# @dimensions save mutation-plan durable-first post-commit-outcome cache-failure
-# @source lagniappe/core/mutations/executor.py::execute_mutation
+# @matrix mutations : cache-failure durable-first mutation-plan post-commit-outcome save
 def test_save_executes_datastore_before_cache_and_reports_cache_failure(monkeypatch):
     entity = TestEntities.get(
         "CATEGORY", {"name": "Ordered Save", "hash": "ordered-save"}
@@ -521,9 +488,7 @@ def test_save_executes_datastore_before_cache_and_reports_cache_failure(monkeypa
     assert outcome.errors == ["redis down"]
 
 
-# @features mutations
-# @dimensions save multiple-explicit-roots standard-lifecycle property-mask
-# @source lagniappe/core/mutations/__init__.py::plan_mutation
+# @matrix mutations : multiple-explicit-roots property-mask save standard-lifecycle
 def test_each_explicit_save_argument_is_a_standard_root():
     page = TestEntities.get("PAGE", {"name": "Root page", "hash": "root-page"})
     category = TestEntities.get(
@@ -544,9 +509,7 @@ def test_each_explicit_save_argument_is_a_standard_root():
     assert writes[category.key].serialize_processes is True
 
 
-# @features mutations user
-# @dimensions save canonical-page intent-isolation
-# @source lagniappe/core/mutations/save.py::UserMutation.plan_save
+# @matrix mutations user : canonical-page intent-isolation save
 def test_existing_user_save_does_not_implicitly_mutate_canonical_page():
     user = TestEntities.get(
         "USER",
@@ -563,9 +526,7 @@ def test_existing_user_save_does_not_implicitly_mutate_canonical_page():
     assert [effect.entity for effect in _writes(plan)] == [user]
 
 
-# @features mutations
-# @dimensions delete plan overlapping-roots mergeable-unlinks property-mask
-# @source lagniappe/core/mutations/delete.py::_merge_survivors
+# @matrix mutations : delete mergeable-unlinks overlapping-roots plan property-mask
 def test_delete_survivor_merge_combines_relation_removals():
     page_a = TestEntities.get("PAGE", {"name": "A", "hash": "merge-page-a"})
     page_b = TestEntities.get("PAGE", {"name": "B", "hash": "merge-page-b"})

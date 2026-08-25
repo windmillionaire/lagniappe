@@ -30,8 +30,7 @@ Tag the test with the template macro that owns its stable DOM contract:
 
 ```python
 # @template projects/info.html::info_form
-# @features projects
-# @dimensions update
+# @matrix projects : update
 def test_project_info_update(...):
     ...
 ```

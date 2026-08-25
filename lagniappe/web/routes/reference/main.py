@@ -14,8 +14,7 @@ from . import reference
 
 # @testable true
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_form
-# @features projects
-# @dimensions create-help
+# @pair projects:create-help
 @reference.route("/section/<section>")
 @logged_in
 def section(section):
@@ -26,7 +25,7 @@ def section(section):
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @pair admin:environment-variables
+# @matrix admin : environment-variables site-settings
 @reference.route("/environment-variables")
 @permission(Resource.SITE)
 def environment_variables():
@@ -39,7 +38,7 @@ def environment_variables():
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @pair owner:recovery-export
+# @matrix admin owner : recovery-export
 @reference.route("/download-settings")
 @owner_only
 def download_settings():

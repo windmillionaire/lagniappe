@@ -64,35 +64,20 @@ def _html_editor_text_entry(builder):
 
 
 def _fail_next_browser_fetch(page, *, method, path_prefix, error):
-    page.evaluate(
-        """([method, pathPrefix, error]) => {
-            const originalFetch = window.fetch.bind(window);
-            let pending = true;
-            window.fetch = (input, options = {}) => {
-                const url = typeof input === "string" ? input : input.url;
-                const requestMethod = (
-                    options.method || (typeof input === "string" ? "GET" : input.method)
-                ).toUpperCase();
-                const pathname = new URL(url, window.location.href).pathname;
-                if (pending && requestMethod === method && pathname.startsWith(pathPrefix)) {
-                    pending = false;
-                    return Promise.resolve(new Response(
-                        JSON.stringify({ error }),
-                        {
-                            status: 503,
-                            headers: { "Content-Type": "application/json" },
-                        },
-                    ));
-                }
-                return originalFetch(input, options);
-            };
-        }""",
-        [method, path_prefix, error],
+    def fail_request(route):
+        if route.request.method.upper() != method:
+            route.fallback()
+            return
+        route.fulfill(status=503, json={"error": error})
+
+    page.route(
+        f"**{path_prefix}*",
+        fail_request,
+        times=1,
     )
 
 
-# @features forms
-# @dimensions builder-preview
+# @pair forms:builder-preview
 # @template forms/builder.html::header
 def test_preview_panel(get_user):
     user = get_user(Users.OWNER)
@@ -114,8 +99,7 @@ def test_preview_panel(get_user):
     expect(preview_toggle).to_have_attribute("aria-checked", "false")
 
 
-# @features forms
-# @dimensions builder-delete-components
+# @pair forms:builder-delete-components
 def test_delete_components(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_delete_components.get(user)
@@ -142,8 +126,8 @@ def test_delete_components(get_user):
     ).not_to_be_attached()
 
 
-# @pairs forms:builder-select-options forms:builder-field-title
-# @pairs frontend-icons:material-icon-preservation
+# @matrix forms : builder-field-title builder-select-options
+# @pair frontend-icons:material-icon-preservation
 def test_change_select_options(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_change_select_options.get(user)
@@ -202,8 +186,7 @@ def test_change_select_options(get_user):
     ]
 
 
-# @features forms
-# @dimensions builder-field-visibility
+# @pair forms:builder-field-visibility
 def test_field_visibility(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_field_visibility.get(user)
@@ -240,8 +223,7 @@ def test_field_visibility(get_user):
     )
 
 
-# @features forms
-# @dimensions builder-field-visibility select-or-values
+# @matrix forms : builder-field-visibility select-or-values
 def test_field_visibility_select_multiple_values(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_field_visibility_select_multiple_values.get(user)
@@ -282,8 +264,7 @@ def test_field_visibility_select_multiple_values(get_user):
     expect(target).to_have_attribute("data-visible", "true")
 
 
-# @features forms
-# @dimensions builder-table-column
+# @pair forms:builder-table-column
 def test_table_column_condition_editor(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_table_column_condition_editor.get(user)
@@ -330,8 +311,7 @@ def test_table_column_condition_editor(get_user):
     expect(saved_column.locator("[data-icon='number']")).to_be_visible()
 
 
-# @features forms
-# @dimensions builder-status-message
+# @pair forms:builder-status-message
 def test_status_message_condition_editor(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_status_message_condition_editor.get(user)
@@ -393,8 +373,7 @@ def test_status_message_condition_editor(get_user):
     )
 
 
-# @features forms signature
-# @dimensions builder-signature-field unique-component builder-preview
+# @matrix forms signature : builder-preview builder-signature-field unique-component
 def test_signature_field_builder_unique_component(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_signature_field_builder_unique_component.get(user)
@@ -425,8 +404,7 @@ def test_signature_field_builder_unique_component(get_user):
     expect(builder.model.locator(f"[id='{signature.id}']")).to_be_visible()
 
 
-# @features html-field
-# @dimensions builder-html-field image-upload unsaved-schema asset-lifecycle render-fetch submitter-key form-asset
+# @matrix html-field : asset-lifecycle builder-html-field form-asset image-upload render-fetch submitter-key unsaved-schema
 def test_html_field(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_html_field.get(user)
@@ -503,11 +481,8 @@ def test_html_field(get_user):
     expect(html_content.locator("img")).to_be_visible()
 
 
-# @pairs editor:initial-load editor:retry editor:authoritative-content
-# @pairs editor:error-reporting editor:server-acknowledgement editor:intentional-clear
-# @pairs html-field:initial-load html-field:retry html-field:authoritative-content
-# @pairs html-field:error-reporting html-field:server-acknowledgement
-# @pairs html-field:intentional-clear html-field:form-asset html-field:builder-html-field
+# @matrix editor : authoritative-content error-reporting initial-load intentional-clear retry server-acknowledgement
+# @matrix html-field : authoritative-content builder-html-field error-reporting form-asset initial-load intentional-clear retry server-acknowledgement
 # @style message
 # @style editor.container
 def test_html_editor_recovers_from_failed_load_and_save(get_user):
@@ -584,8 +559,7 @@ def test_html_editor_recovers_from_failed_load_and_save(get_user):
     assert cleared_form.get_html_field(html.id) is None
 
 
-# @features forms
-# @dimensions builder-drag-component
+# @pair forms:builder-drag-component
 def test_drag_component(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_drag_component.get(user)

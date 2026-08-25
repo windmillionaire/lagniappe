@@ -134,8 +134,7 @@ def _asset_definitions(entity, source_database_id):
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_inventory_uses_one_read_time_and_requires_asset_generations
 # @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_inventory_includes_uploaded_file_asset_generations
-# @features data-lifecycle disaster-recovery
-# @dimensions point-in-time inventory asset-generation
+# @matrix data-lifecycle disaster-recovery : asset-generation inventory point-in-time
 def inventory_database(
     client,
     *,
@@ -233,8 +232,7 @@ def _blob_sha256(blob, size):
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_capture_recovery_assets_copies_exact_generation_create_only
-# @features data-lifecycle storage
-# @dimensions asset-generation immutable-copy checksum
+# @matrix data-lifecycle storage : asset-generation checksum immutable-copy
 def capture_assets(context, backup_id, assets, runtime_buckets):
     """Copy exact referenced generations into the recovery-set prefix."""
     captured = []

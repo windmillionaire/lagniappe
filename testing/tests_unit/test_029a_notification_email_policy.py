@@ -13,9 +13,7 @@ pytestmark = pytest.mark.unit
 
 
 # @source lagniappe/core/properties/user_entity.py::NotificationEmailPreference.value
-# @source lagniappe/core/tools/email/notifications/policy.py::eligible_user
-# @pairs notification-email:preference notification-email:eligibility
-# @pairs notification-email:public-user notification-email:never-logged-in
+# @matrix notification-email : eligibility never-logged-in preference public-user
 def test_notification_email_preference_defaults_and_eligibility():
     now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
     user = user_row("managed", now)
@@ -39,9 +37,7 @@ def test_notification_email_preference_defaults_and_eligibility():
         user.notification_email_mode = "weekly"
 
 
-# @source lagniappe/core/tools/email/notifications/presence.py::record_site_activity
-# @source lagniappe/core/tools/email/notifications/presence.py::recently_active
-# @pairs notification-email:presence notification-email:coarse-request-activity
+# @matrix notification-email : coarse-request-activity presence
 def test_site_activity_is_coarse_and_expires(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
     cache = MemoryRedis()

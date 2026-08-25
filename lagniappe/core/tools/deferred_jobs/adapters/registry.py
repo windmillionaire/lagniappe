@@ -13,8 +13,7 @@ from .base import DeferredJobAdapter
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_adapter_registry_rejects_duplicate_job_types
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_adapter_registry_rolls_back_failed_default_loading
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_adapter_registry_loads_defaults_once_across_threads
-# @pair deferred-jobs:adapter-registry
-# @pair deferred-jobs:domain-strategy
+# @matrix deferred-jobs : adapter-registry domain-strategy
 class DeferredJobAdapterRegistry:
     def __init__(self):
         self._adapters = {}
@@ -53,8 +52,7 @@ class DeferredJobAdapterRegistry:
     # @testable true
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_adapter_registry_rolls_back_failed_default_loading
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_adapter_registry_loads_defaults_once_across_threads
-    # @pair deferred-jobs:failure-isolation
-    # @pair deferred-jobs:concurrency
+    # @matrix deferred-jobs : concurrency failure-isolation
     def _load_default_adapters(self):
         with self._lock:
             if self._defaults_loaded:

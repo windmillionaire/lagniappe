@@ -10,9 +10,8 @@ from lagniappe.core.tools.deferred_jobs.adapters import pages as page_adapters
 pytestmark = pytest.mark.unit
 
 
+# @matrix pages : form-defaults no-form
 # @pair ai:page-generation
-# @pair pages:form-defaults
-# @pair pages:no-form
 def test_page_generation_apply_uses_direct_fields_and_form_fallbacks(monkeypatch):
     created = []
     saved = []

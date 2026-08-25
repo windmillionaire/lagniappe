@@ -31,7 +31,7 @@ def _timestamp(value):
 
 # @testable true
 # @tests tests_unit/test_029a_notification_email_policy.py::test_site_activity_is_coarse_and_expires
-# @pairs notification-email:presence notification-email:coarse-request-activity
+# @matrix notification-email : coarse-request-activity presence
 def record_site_activity(user, *, now=None):
     """Record coarse authenticated activity without creating browser traffic."""
     now = utc(now)
@@ -50,7 +50,7 @@ def record_site_activity(user, *, now=None):
 # @testable true
 # @tests tests_unit/test_029a_notification_email_policy.py::test_site_activity_is_coarse_and_expires
 # @tests tests_unit/test_029b_notification_email_events.py::test_immediate_notification_is_delayed_escaped_and_delivered
-# @pairs notification-email:presence notification-email:presence-suppression
+# @matrix notification-email : presence presence-suppression
 def recently_active(user, *, now=None):
     """Return a best-effort recent-activity hint; cache failure fails open."""
     now = utc(now)

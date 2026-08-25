@@ -7,8 +7,7 @@ import { Dropdown } from "../../combobox/dropdown";
  * @testable true
  * @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_created_on_save
  * @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
- * @features editor
- * @dimensions history-list history-restore
+ * @matrix editor : history-list history-restore
  */
 class DocumentHistoryButton {
 	constructor(toolbar) {

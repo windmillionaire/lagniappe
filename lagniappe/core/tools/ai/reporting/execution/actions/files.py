@@ -28,14 +28,8 @@ from .results import (
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_and_records_manual_page_cleanup_with_undo
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_by_exact_source_attachment_name
-# @pair ai-report:move-file
-# @pair ai-report:deterministic-run
-# @pair files:move-file
-# @pair files:deterministic-run
-# @pair files:manual-cleanup
-# @pair files:undo
-# @pair ai-report:readable-file-fallback
-# @pair files:readable-file-fallback
+# @matrix ai-report : deterministic-run move-file readable-file-fallback
+# @matrix files : deterministic-run manual-cleanup move-file readable-file-fallback undo
 def _move_file(action, _report, user, created):
     data = _data(action)
     source = _resolve_file_endpoint(data, created, endpoint="source")
@@ -80,19 +74,8 @@ def _move_file(action, _report, user, created):
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_resolves_attachment_page_by_exact_page_name_when_reference_missing
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_rejects_category_used_as_attachment_page
-# @pair ai-report:attachments
-# @pair ai-report:attachment
-# @pair ai-report:deterministic-run
-# @pair ai-report:exact-page-name
-# @pair ai-report:page-reference
-# @pair ai-report:partial-result
-# @pair ai-report:prior-task-page
-# @pair ai-report:repair
-# @pair files:attachment
-# @pair files:page-reference
-# @pair files:repair
-# @pair files:prior-task-page
-# @pair files:exact-page-name
+# @matrix ai-report : attachment attachments deterministic-run exact-page-name page-reference partial-result prior-task-page repair
+# @matrix files : attachment exact-page-name page-reference prior-task-page repair
 def _attach_file_to_page(action, report, user, created):
     data = _data(action)
     page = _resolve_action_page(data, created, user)
@@ -110,10 +93,8 @@ def _attach_file_to_page(action, report, user, created):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_to_task_targets_created_task
-# @pair ai-report:task-attachment
-# @pair tasks:task-attachment
-# @pair files:task-attachment
-# @pair ai-report:created-task
+# @matrix ai-report : created-task task-attachment
+# @matrix files tasks : task-attachment
 def _attach_file_to_task(action, report, user, created):
     data = _data(action)
     target = _resolve_entity(

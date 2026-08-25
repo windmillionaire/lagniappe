@@ -60,8 +60,7 @@ def _bearer_token() -> str | None:
 
 
 # @testable infrastructure
-# @features hosted-e2e
-# @dimensions authentication internal-callback
+# @matrix hosted-e2e : authentication internal-callback
 def _valid_internal_process_request() -> bool:
     """Allow the app's own OIDC-authenticated task callbacks through the gate."""
     if request.method != "POST" or not request.path.startswith("/process/"):
@@ -91,8 +90,7 @@ def _valid_internal_process_request() -> bool:
 
 
 # @testable infrastructure
-# @features hosted-e2e
-# @dimensions authentication request-gate lease deployment-binding
+# @matrix hosted-e2e : authentication deployment-binding lease request-gate
 @testing.before_app_request
 def require_hosted_e2e_session():
     """Hide every dynamic/static Flask request without an active run cookie."""
@@ -126,8 +124,7 @@ def require_hosted_e2e_session():
 
 
 # @testable infrastructure
-# @features hosted-e2e
-# @dimensions readiness deployment-binding
+# @matrix hosted-e2e : deployment-binding readiness
 @testing.route("/health", methods=["GET"])
 def health():
     """Expose only non-secret identity needed to validate a fresh version."""
@@ -148,8 +145,7 @@ def health():
 
 
 # @testable infrastructure
-# @features hosted-e2e
-# @dimensions authentication bootstrap replay cookie
+# @matrix hosted-e2e : authentication bootstrap cookie replay
 @testing.route("/session", methods=["POST"])
 def create_session():
     """Exchange one Google ID token for a run- and version-bound cookie."""

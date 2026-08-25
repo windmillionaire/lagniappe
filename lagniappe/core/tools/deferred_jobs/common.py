@@ -14,7 +14,8 @@ from lagniappe.core.tools import cache
 # @testable true
 # @tests tests_unit/test_023b_deferred_job_service.py::test_cancel_deletes_tasks_and_persists_a_tombstone
 # @tests tests_unit/test_023b_deferred_job_service.py::test_operation_projection_failure_is_nonfatal
-# @pairs deferred-jobs:redis-projection deferred-jobs:cache-failure-isolation
+# @matrix deferred-jobs : cache-failure-isolation redis-projection
+# @pair deferred-jobs:deterministic-task-id
 def _publish_operation_projection(job, *, operation):
     """Publish disposable polling state without changing a durable outcome."""
     try:

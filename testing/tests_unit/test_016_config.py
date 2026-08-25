@@ -49,8 +49,7 @@ def _disabled_ai_email_config():
     }
 
 
-# @features config
-# @dimensions build-id constants stale-settings ai-email public-projection secrets
+# @matrix config : ai-email build-id constants public-projection secrets stale-settings
 def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
     app_settings = {
         "CONFIG_KIND": "lagniappe-settings",
@@ -175,7 +174,7 @@ def test_config_requires_hosted_build_id_to_match_built_source(monkeypatch):
         mismatch_spec.loader.exec_module(mismatch_module)
 
 
-# @pair config:observability-setting config:google-signin
+# @matrix config : google-signin observability-setting
 # @pair ai:observability
 def test_config_honors_ai_observability_setting(monkeypatch):
     app_settings = {
@@ -227,8 +226,7 @@ def test_config_honors_ai_observability_setting(monkeypatch):
     assert module.CONFIG.REDIS_CA_CERT == "config/files/redis_ca.pem"
 
 
-# @pair config:error-reporting
-# @pair error-reporting:sampling
+# @pairs config:error-reporting error-reporting:sampling
 def test_config_normalizes_and_validates_sentry_sample_rates(monkeypatch):
     app_settings = {
         "CONFIG_KIND": "lagniappe-settings",
@@ -325,8 +323,7 @@ def test_config_honors_configured_source_url(monkeypatch):
     assert module.CONFIG.SOURCE_URL == "https://example.test/fork/tree/release"
 
 
-# @features config
-# @dimensions adc project-identity credential-cache
+# @matrix config : adc credential-cache project-identity
 def test_google_credentials_are_shared_and_project_bound(monkeypatch):
     import google.auth
     from lagniappe import Config
@@ -358,9 +355,8 @@ def test_google_credentials_are_shared_and_project_bound(monkeypatch):
         _ = mismatched.google_credentials
 
 
-# @pairs config:adc config:project-identity config:credential-cache
-# @pairs testing:adc testing:project-identity testing:credential-cache testing:runtime-impersonation
-# @pairs development:adc development:project-identity development:credential-cache development:runtime-impersonation
+# @matrix config : adc credential-cache project-identity
+# @matrix development testing : adc credential-cache project-identity runtime-impersonation
 @pytest.mark.parametrize("environment_name", ["development", "testing"])
 def test_local_google_credentials_impersonate_runtime_identity(
     monkeypatch,
@@ -442,8 +438,7 @@ def test_local_google_credentials_impersonate_runtime_identity(
     assert len(calls) == 1
 
 
-# @features config
-# @dimensions adc token-refresh
+# @matrix config : adc token-refresh
 def test_google_access_token_refreshes_adc_when_stale(monkeypatch):
     from lagniappe import Config
 
@@ -478,8 +473,7 @@ def test_google_access_token_refreshes_adc_when_stale(monkeypatch):
     assert isinstance(failure.value.__cause__, PermissionError)
 
 
-# @features testing hosted-e2e
-# @dimensions configuration prefix identity fail-closed deployment-binding
+# @matrix hosted-e2e testing : configuration deployment-binding fail-closed identity prefix
 def test_hosted_e2e_overrides_require_exact_runtime_identity():
     from config.hosted_e2e import hosted_e2e_settings_overrides
     from lagniappe import Config
@@ -553,8 +547,7 @@ def test_hosted_e2e_overrides_require_exact_runtime_identity():
     assert config.hosted_e2e_server is False
 
 
-# @features testing hosted-e2e
-# @dimensions configuration identity fail-closed deployment-binding
+# @matrix hosted-e2e testing : configuration deployment-binding fail-closed identity
 def test_hosted_e2e_server_rejects_wrong_app_engine_version():
     from config.hosted_e2e import hosted_e2e_settings_overrides
     from lagniappe import Config
@@ -598,8 +591,7 @@ def test_hosted_e2e_server_rejects_wrong_app_engine_version():
     assert config.hosted_e2e_runner is False
 
 
-# @features testing hosted-e2e
-# @dimensions authentication soft-routing deletion-safety
+# @matrix hosted-e2e testing : authentication deletion-safety soft-routing
 def test_reserved_hosted_e2e_hostname_is_exact():
     from config.hosted_e2e import is_reserved_hosted_e2e_hostname
 

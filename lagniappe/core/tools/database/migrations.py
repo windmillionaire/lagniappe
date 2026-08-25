@@ -92,8 +92,8 @@ def _form_record_reference(entity):
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_registered_form_schema_migration_scans_forms_and_history
 # @tests tests_unit/test_018b_database_migrations.py::test_form_schema_migration_links_unreadable_row_failure_to_form
-# @pairs migrations:runner migrations:audit
-# @pairs form-schema:canonicalization form-schema:history-snapshot form-schema:malformed-data
+# @matrix form-schema : canonicalization history-snapshot malformed-data
+# @matrix migrations : audit runner
 def _run_form_schema_migration(context):
     result = _result("FSM-001", "Canonical form schemas")
 
@@ -196,7 +196,7 @@ def _run_messaging_notification_migration(context):
 
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_asset_generation_migration_backfills_legacy_descriptors
-# @pairs migrations:runner disaster-recovery:asset-generation
+# @pairs disaster-recovery:asset-generation migrations:runner
 def _run_asset_generation_migration(context):
     """Bind pre-v3 asset descriptors to their current immutable generations."""
     result = _result("AST-001", "Asset generation metadata")
@@ -433,8 +433,7 @@ def _save_changed(result, changed, writer, reference=None):
 
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_scan_kind_is_copy_on_write_chunked_and_failure_isolated
-# @features database migrations
-# @dimensions raw-scan copy-on-write chunks failures inactive-rows heartbeat
+# @matrix database migrations : chunks copy-on-write failures heartbeat inactive-rows raw-scan
 def scan_kind(result, context, kind, predicate, transform, reference=None):
     """Apply one transform to matching raw rows and update ``result`` counts."""
 
@@ -558,8 +557,7 @@ def _transaction_put(datastore, transaction, entity):
 
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_fresh_install_retries_transaction_contention
-# @features database-migrations setup
-# @dimensions transaction-contention retry
+# @matrix database-migrations setup : retry transaction-contention
 def _run_transaction(datastore, operation):
     """Retry a complete migration-ledger transaction after contention."""
     for attempt in range(len(MIGRATION_TRANSACTION_RETRY_DELAYS) + 1):
@@ -603,8 +601,7 @@ def _attempts(record):
 
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_catalog_rejects_identity_and_order_errors
-# @features admin database-migrations
-# @dimensions catalog identity order version runner
+# @matrix admin database-migrations : catalog identity order runner version
 def validate_catalog(catalog=MIGRATION_CATALOG):
     """Reject mutable or ambiguous migration catalog definitions."""
 
@@ -825,8 +822,7 @@ def _status_counts(views):
 # @tests tests_unit/test_018b_database_migrations.py::test_status_reads_completed_migrations_across_builds_and_blocks_after_failure
 # @tests tests_unit/test_018b_database_migrations.py::test_legacy_audit_projects_as_completed
 # @tests tests_unit/test_018b_database_migrations.py::test_migration_status_rejects_malformed_ledger
-# @features admin database-migrations
-# @dimensions catalog persistence build-history failure-order legacy-audit read-through invalid-storage audit identity sticky-completion
+# @matrix admin database-migrations : audit build-history catalog failure-order identity invalid-storage legacy-audit persistence read-through sticky-completion
 def get_migration_status(
     *,
     datastore=None,
@@ -1121,8 +1117,8 @@ def _totals(results):
 # @tests tests_unit/test_018b_database_migrations.py::test_legacy_audit_projects_as_completed
 # @tests tests_unit/test_018b_database_migrations.py::test_no_registered_migrations_is_a_noop_success
 # @tests tests_unit/test_018b_database_migrations.py::test_attempt_history_retains_only_the_latest_five_runs
-# @features admin database-migrations
-# @dimensions ordered-run checkpoint failure resume lease lost-lease idempotence normalization catalog no-op concurrency interrupted-attempt stale-recovery bounded-history retries
+# @matrix admin database-migrations : bounded-history catalog checkpoint concurrency failure idempotence interrupted-attempt lease lost-lease no-op normalization ordered-run resume retries stale-recovery
+# @pair form-schema:history-snapshot
 def run_data_migrations(
     *,
     query_factory=None,
@@ -1201,8 +1197,7 @@ def run_data_migrations(
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_fresh_install_baselines_catalog_without_running_steps
 # @tests tests_unit/test_018b_database_migrations.py::test_fresh_install_retries_transaction_contention
-# @features database-migrations setup
-# @dimensions fresh-install baseline idempotence
+# @matrix database-migrations setup : baseline fresh-install idempotence
 def initialize_fresh_install(
     fresh_install,
     *,

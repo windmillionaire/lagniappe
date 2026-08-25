@@ -72,7 +72,7 @@ def _merge_counts(context, manifest):
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_dry_run_is_deterministic_and_read_only
-# @pairs data-lifecycle:restore-preflight data-lifecycle:in-place-merge data-lifecycle:dry-run
+# @matrix data-lifecycle : dry-run in-place-merge restore-preflight
 def restore_plan(backup_id, context=None):
     """Perform a read-only preflight for an in-place default-database merge."""
     context = context or ProviderContext.from_settings()
@@ -261,7 +261,7 @@ def _publish_safety_assets(context, plan, snapshot_time):
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_assets_rebinds_owner_to_new_generation
-# @pairs data-lifecycle:restore-assets data-lifecycle:asset-generation disaster-recovery:restore-assets disaster-recovery:asset-generation
+# @matrix data-lifecycle disaster-recovery : asset-generation restore-assets
 def restore_generation_bound_assets(context, plan):
     """Restore recovery copies and rewrite descriptors to their new generations."""
     from config import SETTINGS
@@ -329,7 +329,7 @@ def restore_generation_bound_assets(context, plan):
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_requeues_only_durable_scheduled_uncompletion
-# @pairs data-lifecycle:scheduled-uncomplete data-lifecycle:queue-reconciliation disaster-recovery:scheduled-uncomplete disaster-recovery:queue-reconciliation
+# @matrix data-lifecycle disaster-recovery : queue-reconciliation scheduled-uncomplete
 def reconcile_scheduled_uncomplete_tasks(context, plan, *, now=None):
     """Backfill durable markers and recreate only scheduled uncompletion wake-ups."""
     now = now or datetime.now(timezone.utc)
@@ -422,8 +422,7 @@ def _completion_record(context, plan, checkpoint):
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_in_place_restore_is_confirmed_resumable_and_has_no_rollback
 # @tests tests_tooling/test_008_data_lifecycle.py::test_in_place_restore_rejects_legacy_named_database_checkpoint
-# @pairs data-lifecycle:restore data-lifecycle:resume data-lifecycle:in-place-merge data-lifecycle:confirmation data-lifecycle:queue-purge-audit data-lifecycle:remote-journal
-# @pair data-lifecycle:legacy-journal-rejection
+# @matrix data-lifecycle : confirmation in-place-merge legacy-journal-rejection queue-purge-audit remote-journal restore resume
 def restore_backup(
     backup_id,
     *,

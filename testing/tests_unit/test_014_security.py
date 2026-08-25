@@ -6,8 +6,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools import files
 
 
-# @features security files
-# @dimensions html-sanitization markdown
+# @matrix files security : html-sanitization markdown
 @pytest.mark.unit
 def test_htmlize_sanitizes_markdown_html():
     """Markdown rendering should strip active HTML and unsafe links."""
@@ -24,8 +23,7 @@ def test_htmlize_sanitizes_markdown_html():
     assert ">Bad<" in html
 
 
-# @features security files
-# @dimensions html-sanitization markdown table
+# @matrix files security : html-sanitization markdown table
 @pytest.mark.unit
 def test_htmlize_preserves_markdown_tables_and_sanitizes_cells():
     """Markdown tables should render while unsafe cell content is stripped."""
@@ -51,8 +49,7 @@ def test_htmlize_preserves_markdown_tables_and_sanitizes_cells():
     assert "onerror" not in html
 
 
-# @features security files
-# @dimensions html-sanitization html
+# @matrix files security : html html-sanitization
 @pytest.mark.unit
 def test_htmlize_sanitizes_text_html():
     """HTML previews should keep safe formatting and drop active content."""
@@ -71,16 +68,14 @@ def test_htmlize_sanitizes_text_html():
     assert 'href="mailto:test@example.com"' in html
 
 
-# @features security files
-# @dimensions preview mimetype svg
+# @matrix files security : mimetype preview svg
 @pytest.mark.unit
 def test_svg_removed_from_preview_mimetypes():
     """SVG should no longer be previewable inline."""
     assert "image/svg+xml" not in files.PREVIEW_MIMETYPES
 
 
-# @features security file
-# @dimensions summary html-stripping
+# @matrix file security : html-stripping summary
 @pytest.mark.unit
 def test_file_summary_strips_tags():
     """File summaries should be stored as plain text."""

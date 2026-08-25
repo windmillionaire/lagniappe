@@ -5,8 +5,7 @@ import pytest
 import lagniappe.core.properties.home as home_properties
 
 
-# @features home ai-report
-# @dimensions projects pagination restrictions
+# @matrix ai-report home : pagination projects restrictions
 @pytest.mark.unit
 def test_home_project_list_restrictions_and_cursor(monkeypatch):
     user = SimpleNamespace(
@@ -51,8 +50,7 @@ def test_home_project_list_restrictions_and_cursor(monkeypatch):
     assert section.list is projects
 
 
-# @features home
-# @dimensions categories pagination restrictions
+# @matrix home : categories pagination restrictions
 @pytest.mark.unit
 def test_home_category_list_restrictions_and_cursor(monkeypatch):
     user = SimpleNamespace(
@@ -102,8 +100,7 @@ def test_home_category_list_restrictions_and_cursor(monkeypatch):
     assert section.list is loaded_categories
 
 
-# @features home pages
-# @dimensions pagination restrictions
+# @matrix home pages : pagination restrictions
 @pytest.mark.unit
 def test_home_page_list_restrictions_and_cursor(monkeypatch):
     class FakePage:
@@ -162,8 +159,7 @@ def test_home_page_list_restrictions_and_cursor(monkeypatch):
     assert section.list is visible_pages
 
 
-# @features home
-# @dimensions tasks count permissions view-only
+# @matrix home : count permissions tasks view-only
 @pytest.mark.unit
 def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
     class FakeTask:
@@ -245,8 +241,7 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
     assert count_requests == ["user-page"]
 
 
-# @features starred
-# @dimensions stale-cleanup pagination view-authorization
+# @matrix starred : pagination stale-cleanup view-authorization
 @pytest.mark.unit
 def test_home_starred_list_paginates_and_cleans_stale_keys(monkeypatch):
     class FakeStarred:
@@ -307,8 +302,7 @@ def test_home_starred_list_paginates_and_cleans_stale_keys(monkeypatch):
     )
 
 
-# @features starred
-# @dimensions view-authorization retained-inaccessible
+# @matrix starred : retained-inaccessible view-authorization
 @pytest.mark.unit
 def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
     class FakeEntity:
@@ -354,8 +348,7 @@ def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
     assert section.count == 2
 
 
-# @features home ai-report
-# @dimensions notes ingress tools query list
+# @matrix ai-report home : ingress list notes query tools
 @pytest.mark.unit
 def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
     user = SimpleNamespace(email="owner@example.com")

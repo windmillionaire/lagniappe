@@ -79,8 +79,7 @@ FUNCTION_TOOL = types.Tool(function_declarations=list(DECLARATIONS.values()))
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_config_combines_search_tools_json_and_thinking_settings
-# @features ai
-# @dimensions config tools
+# @matrix ai : config tools
 def build_function_tool(*names):
     """Build a types.Tool with only the requested function declarations."""
     declarations = [DECLARATIONS[n] for n in names if n in DECLARATIONS]
@@ -202,8 +201,7 @@ def _mark_file_parts_omitted(result):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_function_call_dispatch_serializes_caches_and_attaches_files
 # @tests tests_unit/test_015_ai_tools.py::test_ai_function_call_dispatch_caps_file_parts_per_turn
-# @features ai
-# @dimensions tool-dispatch caching file-parts unknown-tool trace limit
+# @matrix ai : caching file-parts limit tool-dispatch trace unknown-tool
 def execute_function_calls(
     function_calls,
     user,

@@ -110,8 +110,7 @@ def test_runtime_effective_permissions_exclude_provisioning_authority():
     }
 
 
-# @features login
-# @dimensions identity-platform email-password token-verification hosted-e2e
+# @matrix login : email-password hosted-e2e identity-platform token-verification
 def test_runtime_identity_platform_sign_in_reaches_hosted_home(get_user):
     """Sign in through the live provider and deployed application handoff."""
     if not CONFIG.hosted_e2e_runner:

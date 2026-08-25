@@ -57,8 +57,7 @@ class Restrictions(Property):
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @features restrictions, permissions
-    # @dimensions facets
+    # @matrix permissions restrictions : facets
     @property
     def value(self):
         self._ensure_loaded()
@@ -67,16 +66,14 @@ class Restrictions(Property):
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_one_category_permissions
-    # @features restrictions, permissions
-    # @dimensions search
+    # @matrix permissions restrictions : search
     @property
     def search(self):
         return self._state_value("search")
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @features restrictions, permissions
-    # @dimensions facets
+    # @matrix permissions restrictions : facets
     @property
     def task(self):
         return self._state_value("task")
@@ -90,8 +87,7 @@ class Restrictions(Property):
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @features restrictions, permissions
-    # @dimensions facets
+    # @matrix permissions restrictions : facets
     @property
     def form(self):
         return self._state_value("form")
@@ -106,8 +102,7 @@ class Restrictions(Property):
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @features restrictions
-    # @dimensions page-list
+    # @pair restrictions:page-list
     @property
     def page(self):
         return self._state_value("page")
@@ -115,8 +110,7 @@ class Restrictions(Property):
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
     # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_user_assign_search_permission_filter_returns_assignable_users
-    # @features restrictions, permissions
-    # @dimensions assign search
+    # @matrix permissions restrictions : assign search
     @property
     def user_assign_restrictions(self):
         return self._state_value("user_assign")
@@ -140,24 +134,21 @@ class Restrictions(Property):
 # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
 # @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_category_search_permission_filter_returns_editable_categories
 # @tests tests_e2e/002_home/test_002k_home_pages.py::test_home_page_create_visible_for_category_editor
-    # @features restrictions, permissions
-    # @dimensions category-edit search
+    # @matrix permissions restrictions : category-edit search
     @property
     def category_edit_restrictions(self):
         return self._state_value("category_edit")
 
     # @testable true
     # @tests tests_unit/test_020d_ai_report_prompts.py::test_report_prompts_filter_actions_by_user_permissions
-    # @features ai-report
-    # @dimensions action-capabilities permissions
+    # @matrix ai-report : action-capabilities permissions
     @property
     def ai_action_capabilities(self):
         return self._ai_action_capabilities()
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions
-    # @features restrictions, permissions
-    # @dimensions facets
+    # @matrix permissions restrictions : facets
     @property
     def users(self):
         return self._state_value("users")
@@ -168,9 +159,8 @@ class Restrictions(Property):
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_builds_group_membership_from_stored_requires
+    # @matrix permissions : group-membership stored-requires
     # @pair restrictions:root-fetch
-    # @pair permissions:stored-requires
-    # @pair permissions:group-membership
     @property
     def belongs_to(self):
         self._ensure_loaded()
@@ -178,8 +168,7 @@ class Restrictions(Property):
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_clear_removes_session_blob
-    # @features restrictions permissions
-    # @dimensions clear session-blob
+    # @matrix permissions restrictions : clear session-blob
     def clear(self):
         if has_request_context():
             session.pop(self._session_key, None)
@@ -190,8 +179,7 @@ class Restrictions(Property):
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_empty_list_is_loaded_state
-    # @pairs restrictions:empty-access restrictions:loaded-state
-    # @pairs permissions:empty-access permissions:loaded-state
+    # @matrix permissions restrictions : empty-access loaded-state
     def _ensure_loaded(self):
         if getattr(self, "_state", None) is not None and self.is_set:
             return
@@ -219,8 +207,7 @@ class Restrictions(Property):
 
     # @testable true
     # @tests tests_unit/test_009d_user_restrictions.py::test_restrictions_session_blob_and_fingerprint
-    # @features restrictions permissions
-    # @dimensions session-blob stale-session empty-access
+    # @matrix permissions restrictions : empty-access session-blob stale-session
     def _session_state(self):
         if not self._session_enabled():
             return None

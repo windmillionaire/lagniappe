@@ -11,7 +11,7 @@ from lagniappe.core.tools.database import filter as database_filter
 from lagniappe.core.tools.database.filter import Filter, Query, Results
 
 
-# @pairs database:restricted-results database:empty-page
+# @matrix database : empty-page restricted-results
 @pytest.mark.unit
 def test_empty_results_has_no_items_or_cursor():
     results = get._empty_results()
@@ -20,8 +20,7 @@ def test_empty_results_has_no_items_or_cursor():
     assert results.next_cursor is None
 
 
-# @features database
-# @dimensions query-results indexing slicing pagination
+# @matrix database : indexing pagination query-results slicing
 @pytest.mark.unit
 def test_results_use_normal_list_indexing_and_keep_cursor_metadata():
     results = Results(["first", "second", "third"], "next-page")
@@ -33,8 +32,7 @@ def test_results_use_normal_list_indexing_and_keep_cursor_metadata():
     assert results.next_cursor == "next-page"
 
 
-# @features database permissions
-# @dimensions deny-all filter-composition
+# @matrix database permissions : deny-all filter-composition
 @pytest.mark.unit
 def test_filter_preserves_explicit_deny_all_through_composition():
     denied = Filter().requires([])
@@ -57,8 +55,7 @@ def test_filter_preserves_explicit_deny_all_through_composition():
     assert only_denied.build() is not None
 
 
-# @features database permissions
-# @dimensions deny-all query-short-circuit terminal-results
+# @matrix database permissions : deny-all query-short-circuit terminal-results
 @pytest.mark.unit
 def test_denied_query_terminals_do_not_create_datastore_query(monkeypatch):
     class Datastore:
@@ -84,8 +81,7 @@ def test_denied_query_terminals_do_not_create_datastore_query(monkeypatch):
     assert denied_query().exists() is False
 
 
-# @features database permissions
-# @dimensions deny-all group-query
+# @matrix database permissions : deny-all group-query
 @pytest.mark.unit
 def test_groups_with_denied_hashes_does_not_query_datastore(monkeypatch):
     class Datastore:
@@ -101,8 +97,7 @@ def test_groups_with_denied_hashes_does_not_query_datastore(monkeypatch):
     assert get.groups([]) == []
 
 
-# @features users caching
-# @dimensions site-fingerprint save
+# @matrix caching users : save site-fingerprint
 @pytest.mark.unit
 def test_save_persists_user_and_users_fingerprint_record(monkeypatch):
     saved = []
@@ -134,8 +129,7 @@ def test_save_persists_user_and_users_fingerprint_record(monkeypatch):
     ]
 
 
-# @features database migrations
-# @dimensions raw-save site-fingerprint
+# @matrix database migrations : raw-save site-fingerprint
 @pytest.mark.unit
 def test_save_raw_persists_datastore_entities_without_typed_save_hooks(
     monkeypatch,
@@ -172,8 +166,7 @@ def test_save_raw_persists_datastore_entities_without_typed_save_hooks(
     ]
 
 
-# @features users caching
-# @dimensions site-fingerprint invalidation
+# @matrix caching users : invalidation site-fingerprint
 @pytest.mark.unit
 def test_update_site_fingerprints_upserts_missing_users_fingerprint(monkeypatch):
     missing_record = {"key": ("site", "users")}
@@ -196,8 +189,7 @@ def test_update_site_fingerprints_upserts_missing_users_fingerprint(monkeypatch)
     assert records == [{"key": ("site", "users"), "fingerprint": "users-fingerprint"}]
 
 
-# @pairs polling:channel polling:batching polling:mounted-scope
-# @source lagniappe/core/tools/database/utility.py::site_fingerprints
+# @matrix polling : batching channel mounted-scope
 @pytest.mark.unit
 def test_site_fingerprints_batch_reads_only_resolved_paths(monkeypatch):
     class Record(dict):
@@ -236,8 +228,7 @@ def test_site_fingerprints_batch_reads_only_resolved_paths(monkeypatch):
     assert [record.key for record in saved] == [("site", "tasks")]
 
 
-# @pairs notifications:mutation notifications:site-fingerprint-isolation
-# @source lagniappe/core/tools/database/utility.py::save_mutations
+# @matrix notifications : mutation site-fingerprint-isolation
 @pytest.mark.unit
 def test_notification_save_and_delete_skip_site_fingerprints(monkeypatch):
     fingerprinted = []
@@ -278,9 +269,7 @@ def test_notification_save_and_delete_skip_site_fingerprints(monkeypatch):
     ]
 
 
-# @features mutations database
-# @dimensions property-mask update full-upsert site-fingerprint document-checkpoint
-# @source lagniappe/core/tools/database/utility.py::save_mutations
+# @matrix database mutations : document-checkpoint full-upsert property-mask site-fingerprint update
 @pytest.mark.unit
 def test_save_mutations_applies_property_masks_and_fingerprints(monkeypatch):
     class Mutation:

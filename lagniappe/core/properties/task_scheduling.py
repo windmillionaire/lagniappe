@@ -19,8 +19,7 @@ class ScheduleType(ProcessProperty):
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_scheduled
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_periodic
-    # @features task-scheduling
-    # @dimensions ai-generation
+    # @pair task-scheduling:ai-generation
     @property
     def generate(self):
         if self.error or not self.prompt:
@@ -44,8 +43,7 @@ class ScheduleType(ProcessProperty):
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_scheduled
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_periodic
-    # @features task-scheduling
-    # @dimensions ai-generation
+    # @pair task-scheduling:ai-generation
     def create(self):
         if not self.prompt:
             return
@@ -81,8 +79,7 @@ class Recurring(ScheduleType):
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_recurring
     # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_add_recurring
-    # @features task-scheduling
-    # @dimensions recurring, update, validation, add
+    # @matrix task-scheduling : add recurring update validation
     def update(self, form_data):
         try:
             interval = int(form_data.get("interval"))
@@ -118,8 +115,7 @@ class Periodic(ScheduleType):
 
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_periodic
-    # @features task-scheduling
-    # @dimensions periodic, update, validation
+    # @matrix task-scheduling : periodic update validation
     def update(self, form_data):
         user_prompt = form_data.get("periodic-description")
         start_date = form_data.get("start-date")
@@ -137,8 +133,7 @@ class Periodic(ScheduleType):
 
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_periodic
-    # @features task-scheduling
-    # @dimensions periodic, ai-generation
+    # @matrix task-scheduling : ai-generation periodic
     def create(self):
         super().create()
         self.entity.due_date = self._start_date
@@ -173,8 +168,7 @@ class Scheduled(ScheduleType):
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_scheduled
     # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_add_schedule
-    # @features task-scheduling
-    # @dimensions scheduled, update, validation, add
+    # @matrix task-scheduling : add scheduled update validation
     def update(self, form_data):
         self.mode = form_data.get("schedule-type")
 
@@ -220,8 +214,7 @@ class Schedule(Property):
 
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_schedule
-    # @features task-scheduling
-    # @dimensions active-process, coordinator
+    # @matrix task-scheduling : active-process coordinator
     @property
     def value(self):
         if self.is_set:
@@ -233,8 +226,7 @@ class Schedule(Property):
 
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_schedule
-    # @features task-scheduling
-    # @dimensions coordinator, update, active-process
+    # @matrix task-scheduling : active-process coordinator update
     def update(self, form_data):
         new_schedule = None
 
@@ -261,8 +253,7 @@ class Schedule(Property):
 
     # @testable true
     # @tests tests_unit/test_013a_task_scheduling.py::test_task_schedule
-    # @features task-scheduling
-    # @dimensions active-process, coordinator
+    # @matrix task-scheduling : active-process coordinator
     @property
     def active(self):
         schedule = next(
@@ -278,8 +269,7 @@ class Schedule(Property):
     # @testable true
     # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_recurring
     # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled
-    # @features task-scheduling
-    # @dimensions skipped, recurring, periodic, scheduled
+    # @matrix task-scheduling : periodic recurring scheduled skipped
     @property
     def skipped(self):
         if not self.active:
@@ -298,8 +288,7 @@ class Schedule(Property):
     # @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_recurring
     # @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_scheduled
     # @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_periodic
-    # @features task-scheduling
-    # @dimensions next-due-date, recurring, scheduled, periodic, postponed
+    # @matrix task-scheduling : next-due-date periodic postponed recurring scheduled
     def set_next_due_date(self):
         if not self.active:
             return
@@ -322,8 +311,7 @@ class Schedule(Property):
 
     # @testable true
     # @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_remove_schedule
-    # @features task-scheduling
-    # @dimensions scheduled, remove
+    # @matrix task-scheduling : remove scheduled
     def clear(self):
         clear_pending = getattr(self.entity, "_clear_scheduled_uncomplete", None)
         if clear_pending:

@@ -191,9 +191,8 @@ def _warm_offline_create_widgets(home, *, note=True, task=True):
         )
 
 
-# @pairs activity:load activity:cached-response activity:notes-only
-# @pairs notes:load notes:cached-response notes:notes-only
-# @pair activity:notes-exclusion
+# @matrix activity : cached-response load notes-exclusion notes-only
+# @matrix notes : cached-response load notes-only
 # @template home/notes.html::list
 # @template home/notes.html::note_item
 def test_home_notes_exclude_notifications(get_user):
@@ -211,23 +210,8 @@ def test_home_notes_exclude_notifications(get_user):
     expect(_activity_item(home, notification_body)).not_to_be_attached()
 
 
-# @pair activity:create
-# @pair activity:body
-# @pair activity:photo
-# @pair activity:parent
-# @pair activity:visibility
-# @pair activity:scope
-# @pair activity:asset-lifecycle
-# @pair activity:html-stripping
-# @pair notes:create
-# @pair notes:body
-# @pair notes:photo
-# @pair notes:parent
-# @pair notes:visibility
-# @pair notes:scope
-# @pair notes:asset-lifecycle
-# @pair notes:html-stripping
-# @pair notes:private-default
+# @matrix activity : asset-lifecycle body create html-stripping parent photo scope visibility
+# @matrix notes : asset-lifecycle body create html-stripping parent photo private-default scope visibility
 # @template home/notes.html::add_note_form
 # @template notes.html::note_item
 def test_create_note_body_and_photo_from_home(get_user):
@@ -264,7 +248,7 @@ def test_create_note_body_and_photo_from_home(get_user):
     expect(photo_item).to_contain_text("Everyone")
 
 
-# @pairs activity:owner-only-shared notes:owner-only-shared permissions:owner-only-shared
+# @matrix activity notes permissions : owner-only-shared
 # @template home/home.html::create
 # @template notes.html::composer
 def test_home_note_shared_visibility_is_owner_only(get_user):
@@ -324,12 +308,7 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
     ).to_have_count(0)
 
 
-# @pair activity:delete
-# @pair activity:ownership
-# @pair notes:delete
-# @pair notes:ownership
-# @pair notifications:delete
-# @pair notifications:ownership
+# @matrix activity notes notifications : delete ownership
 # @template notes.html::note_item
 def test_delete_activity_item_from_home(get_user):
     user = get_user(Users.OWNER)
@@ -363,18 +342,7 @@ def test_delete_activity_item_from_home(get_user):
     expect(activity_list).to_contain_text(other_body)
 
 
-# @pair activity:home
-# @pair activity:shared
-# @pair activity:private
-# @pair activity:owner
-# @pair notes:home
-# @pair notes:shared
-# @pair notes:private
-# @pair notes:owner
-# @pair permissions:home
-# @pair permissions:shared
-# @pair permissions:private
-# @pair permissions:owner
+# @matrix activity notes permissions : home owner private shared
 # @template notes.html::note_item
 def test_home_note_visibility_across_users(get_user):
     owner = get_user(Users.OWNER)
@@ -400,10 +368,8 @@ def test_home_note_visibility_across_users(get_user):
     expect(_activity_item(owner_home, private_body)).to_be_visible()
 
 
-# @pairs activity:create activity:body activity:parent
-# @pairs activity:html-stripping activity:notes-exclusion
-# @pairs notifications:create notifications:body notifications:parent
-# @pairs notifications:html-stripping
+# @matrix activity : body create html-stripping notes-exclusion parent
+# @matrix notifications : body create html-stripping parent
 # @template notifications.html::item
 def test_notification_channel_uses_menu_not_home_notes(get_user):
     user = get_user(Users.OWNER)
@@ -428,8 +394,7 @@ def test_notification_channel_uses_menu_not_home_notes(get_user):
     expect(option).not_to_contain_text("<em>")
 
 
-# @features notifications
-# @dimensions dropdown-refresh target target-link pending long-text-wrap
+# @matrix notifications : dropdown-refresh long-text-wrap pending target target-link
 # @template notifications.html::item
 def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
     user = get_user(Users.OWNER)
@@ -506,8 +471,7 @@ def test_notification_menu_renders_target_and_preserves_pending_state(get_user):
     ) <= 2
 
 
-# @features notifications
-# @dimensions delete clear-all menu-open ownership dropdown-refresh accessible-state
+# @matrix notifications : accessible-state clear-all delete dropdown-refresh menu-open ownership
 # @template nav.html::navbar
 def test_notification_menu_deletes_and_clears(get_user):
     owner = get_user(Users.OWNER)
@@ -570,8 +534,7 @@ def test_notification_menu_deletes_and_clears(get_user):
     assert Entities.fetch_one(second.urlsafe_key, request=Fetch.root()) is None
 
 
-# @features offline
-# @dimensions queue-create reload
+# @matrix offline : queue-create reload
 # @template home/notes.html::note_item
 # @template home/tasks.html::task
 def test_offline_home_create_mutations_persist_after_reload(get_user, browser_failures):
@@ -652,8 +615,7 @@ def test_offline_home_create_mutations_persist_after_reload(get_user, browser_fa
     expect(_task_item(home, task_name)).to_be_visible()
 
 
-# @features offline
-# @dimensions server-first reload replay optimistic-mutation
+# @matrix offline : optimistic-mutation reload replay server-first
 # @template home/notes.html::list
 # @template home/tasks.html::list
 def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_failures):
@@ -721,8 +683,7 @@ def test_offline_home_reload_uses_server_state_until_replay(get_user, browser_fa
     expect(_task_item(home, task_name)).not_to_be_attached()
 
 
-# @features offline
-# @dimensions replay queue-clear
+# @matrix offline : queue-clear replay
 # @template home/notes.html::note_item
 def test_offline_home_mutations_replay_when_online(get_user, browser_failures):
     user = get_user(Users.OWNER)
@@ -755,8 +716,7 @@ def test_offline_home_mutations_replay_when_online(get_user, browser_failures):
     assert Entities.fetch_one(replayed_key, request=Fetch.direct()).body == note_body
 
 
-# @features tasks
-# @dimensions complete offline-queue
+# @matrix tasks : complete offline-queue
 # @template home/tasks.html::task
 def test_offline_task_complete_replays_after_reload(get_user, browser_failures):
     user = get_user(Users.OWNER)

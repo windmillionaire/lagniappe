@@ -8,8 +8,7 @@ import { primitives } from "./primitives";
 /**
  * @testable true
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_signature_submission_draw_save_reload_and_clear
- * @features signature
- * @dimensions file-input asset-lifecycle form-value editable readonly reload clear
+ * @matrix signature : asset-lifecycle clear editable file-input form-value readonly reload
  */
 export class SignatureElement extends BaseElement {
 	get value() {
@@ -111,8 +110,7 @@ export class SignatureElement extends BaseElement {
 /**
  * @testable true
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_signature_submission_draw_save_reload_and_clear
- * @features signature
- * @dimensions file-input asset-lifecycle form-value editable readonly reload clear
+ * @matrix signature : asset-lifecycle clear editable file-input form-value readonly reload
  */
 export class Signature {
 	constructor(container, imageUrl = null, inputName = "signature-image") {

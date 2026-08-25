@@ -55,15 +55,13 @@ class IdempotencyKey(DBProperty):
 
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_request_fingerprint_tracks_the_complete_client_contract
-# @features deferred-jobs
-# @dimensions operation-fingerprint client-contract routing-identity
+# @matrix deferred-jobs : client-contract operation-fingerprint routing-identity
 class RequestFingerprint(DBProperty):
     _id = "request_fingerprint"
 
     # @testable true
     # @tests tests_unit/test_023a_deferred_job_properties.py::test_request_fingerprint_tracks_the_complete_client_contract
-    # @features deferred-jobs
-    # @dimensions operation-fingerprint client-contract routing-identity
+    # @matrix deferred-jobs : client-contract operation-fingerprint routing-identity
     @staticmethod
     def create(*, job_type, actor, authorization, inputs, parameters, client):
         """Hash the complete immutable deferred-operation request contract."""

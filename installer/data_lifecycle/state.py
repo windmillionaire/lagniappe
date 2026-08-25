@@ -22,7 +22,7 @@ ARCHIVE_SQLITE_SCHEMA = 1
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_secure_directory_and_checkpoint_exact_resume
-# @pairs data-lifecycle:private-state data-lifecycle:resume
+# @matrix data-lifecycle : private-state resume
 def secure_directory(path: str | Path) -> Path:
     """Create an owner-only directory, failing closed when that cannot be proved."""
     path = Path(path)
@@ -75,7 +75,7 @@ def _identity(project_id: str, command: list[str], output_target: str | None) ->
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_secure_directory_and_checkpoint_exact_resume
-# @pairs data-lifecycle:resume data-lifecycle:private-state
+# @matrix data-lifecycle : private-state resume
 class LifecycleCheckpoint:
     """Durable exact-command state independent of the rewritten setup journal."""
 
@@ -211,7 +211,7 @@ CREATE TABLE IF NOT EXISTS assets (
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_archive_state_is_private_transactional_and_resumable
-# @pairs data-lifecycle:sqlite-staging data-lifecycle:resume
+# @matrix data-lifecycle : resume sqlite-staging
 class ArchiveState:
     """Owner-only SQLite staging store with bounded transaction checkpoints."""
 

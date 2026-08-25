@@ -1,8 +1,7 @@
 import pytest
 
 
-# @features task-scheduling
-# @dimensions next-due-date recurring
+# @matrix task-scheduling : next-due-date recurring
 @pytest.mark.unit
 def test_next_due_date_recurring(get_test_entities):
     """Test set_next_due_date for recurring schedules.
@@ -56,8 +55,7 @@ def test_next_due_date_recurring(get_test_entities):
                 )
 
 
-# @features task-scheduling
-# @dimensions next-due-date scheduled postponed
+# @matrix task-scheduling : next-due-date postponed scheduled
 @pytest.mark.unit
 def test_next_due_date_scheduled(get_test_entities):
     """Test set_next_due_date for scheduled schedules.
@@ -131,8 +129,7 @@ def test_next_due_date_scheduled(get_test_entities):
                 )
 
 
-# @features task-scheduling
-# @dimensions next-due-date periodic postponed
+# @matrix task-scheduling : next-due-date periodic postponed
 @pytest.mark.unit
 def test_next_due_date_periodic(get_test_entities):
     """Test set_next_due_date for periodic schedules.

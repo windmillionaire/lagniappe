@@ -51,8 +51,7 @@ def _task(name, hash_value, modified, due_date=None):
     return task
 
 
-# @features reconnect-refresh
-# @dimensions root-fingerprint entity-view site-index
+# @matrix reconnect-refresh : entity-view root-fingerprint site-index
 @pytest.mark.unit
 def test_load_refresh_view_uses_entity_or_site_index_fingerprint():
     category = SimpleNamespace(fingerprint="category-fingerprint")
@@ -76,8 +75,7 @@ def test_load_refresh_view_uses_entity_or_site_index_fingerprint():
     site_fingerprint.assert_called_once_with("/tasks/index")
 
 
-# @features reconnect-refresh task-index
-# @dimensions root-depth ordering
+# @matrix reconnect-refresh task-index : ordering root-depth
 @pytest.mark.unit
 def test_task_index_refresh_roots_uses_both_ordered_query_streams():
     now = datetime.now(timezone.utc)
@@ -117,7 +115,7 @@ def test_task_index_refresh_roots_uses_both_ordered_query_streams():
     fetch.assert_called_once_with("dated", "undated", request=Fetch.root())
 
 
-# @pairs reconnect-refresh:authenticated-access permissions:own-page-only
+# @pairs permissions:own-page-only reconnect-refresh:authenticated-access
 @pytest.mark.unit
 def test_load_refresh_collection_allows_task_index_without_models_permission():
     viewer = _viewer()
@@ -140,8 +138,7 @@ def test_load_refresh_collection_allows_task_index_without_models_permission():
     assert collection == RefreshCollection("task-index", parent, (root,))
 
 
-# @features reconnect-refresh category-index
-# @dimensions root-depth membership
+# @matrix category-index reconnect-refresh : membership root-depth
 @pytest.mark.unit
 def test_page_index_refresh_roots_reuses_restricted_collection_query():
     category = TestEntities.get(
@@ -171,8 +168,7 @@ def test_page_index_refresh_roots_reuses_restricted_collection_query():
     fetch.assert_called_once_with("page-key", request=Fetch.root())
 
 
-# @features reconnect-refresh user-index
-# @dimensions root-depth mode
+# @matrix reconnect-refresh user-index : mode root-depth
 @pytest.mark.unit
 def test_user_index_refresh_roots_preserves_regular_and_public_modes():
     regular = TestEntities.get(
@@ -232,8 +228,7 @@ def test_user_index_refresh_roots_preserves_regular_and_public_modes():
     )
 
 
-# @features reconnect-refresh permissions
-# @dimensions modified direct-depth authorization removal ordering
+# @matrix permissions reconnect-refresh : authorization direct-depth modified ordering removal
 @pytest.mark.unit
 def test_resolve_refresh_delta_expands_only_changed_roots_and_authorizes_before_upsert():
     unchanged = SimpleNamespace(
@@ -276,8 +271,7 @@ def test_resolve_refresh_delta_expands_only_changed_roots_and_authorizes_before_
     assert delta.order == ("a", "b")
 
 
-# @features reconnect-refresh
-# @dimensions target-validation root-depth component-identity
+# @matrix reconnect-refresh : component-identity root-depth target-validation
 @pytest.mark.unit
 def test_load_refresh_collection_resolves_component_from_view_entity():
     page = TestEntities.get(
@@ -304,8 +298,7 @@ def test_load_refresh_collection_resolves_component_from_view_entity():
     assert collection == RefreshCollection("page-tasks", page, roots)
 
 
-# @features reconnect-refresh filters
-# @dimensions root-depth membership
+# @matrix filters reconnect-refresh : membership root-depth
 @pytest.mark.unit
 def test_filter_cache_query_roots_uses_root_fetch_without_permission_expansion():
     parent = SimpleNamespace(hash="refresh-filter-parent")
@@ -328,9 +321,7 @@ def test_filter_cache_query_roots_uses_root_fetch_without_permission_expansion()
     assert roots == ["first-root", "second-root"]
 
 
-# @pair reconnect-refresh:cache-refresh
-# @pair reconnect-refresh:root-depth
-# @pair reconnect-refresh:component-identity
+# @matrix reconnect-refresh : cache-refresh component-identity root-depth
 # @pair filters:cache-refresh
 @pytest.mark.unit
 def test_load_refresh_collection_refreshes_saved_filter_cache_before_root_query():

@@ -30,8 +30,7 @@ PROFILE_SOURCE_FILES = {"main.py", "run.py"}
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_timed_profile_rows_use_total_calls
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_timed_prints_when_wrapped_function_raises
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_timed_prints_request_label_without_entity_trace
-# @features utility
-# @dimensions timing
+# @pair utility:timing
 def timed(
     func=None,
     *,

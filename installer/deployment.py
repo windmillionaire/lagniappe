@@ -1,7 +1,6 @@
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_deployment_settings_applies_saved_app_config
-# @features setup
-# @dimensions deployment-settings datastore
+# @matrix setup : datastore deployment-settings
 def get_deployment_settings():
     from installer.utils import ensure_datastore_dependency
     from installer.image import DATASTORE_TIMEOUT, get_datastore_client

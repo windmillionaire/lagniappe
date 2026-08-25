@@ -506,20 +506,20 @@ def test_traceability_result_plugin_migrates_legacy_snapshot_maps(
 def test_behavior_fingerprint_ignores_python_and_javascript_comments(tmp_path):
     python_path = tmp_path / "sample.py"
     python_path.write_text(
-        '"""first module note"""\n# @features old\ndef value():\n    """old note"""\n    return 1\n'
+        '"""first module note"""\n# @matrix old : behavior\ndef value():\n    """old note"""\n    return 1\n'
     )
     python_before = traceability_common.behavior_file_fingerprint(python_path)
     python_path.write_text(
-        '"""new module note"""\n# @features new\ndef value():\n    """new note"""\n    return 1\n'
+        '"""new module note"""\n# @matrix new : behavior\ndef value():\n    """new note"""\n    return 1\n'
     )
 
     javascript_path = tmp_path / "sample.mjs"
     javascript_path.write_text(
-        "/** @features old */\nexport function value() { return 'https://a.test'; }\n"
+        "/** @matrix old : behavior */\nexport function value() { return 'https://a.test'; }\n"
     )
     javascript_before = traceability_common.behavior_file_fingerprint(javascript_path)
     javascript_path.write_text(
-        "// @features new\nexport function value() { return 'https://a.test'; }\n"
+        "// @matrix new : behavior\nexport function value() { return 'https://a.test'; }\n"
     )
 
     assert traceability_common.behavior_file_fingerprint(python_path) == python_before
@@ -569,7 +569,7 @@ def test_behavior_snapshot_fingerprints_style_records_independently(tmp_path):
     assert before["@style/label.default"] == after["@style/label.default"]
 
 
-# @pairs testing:cli-routing testing:pytest-options testing:target-selection
+# @matrix testing : cli-routing pytest-options target-selection
 @pytest.mark.parametrize(
     ("arguments", "expected_args", "expected_targets", "includes_e2e"),
     (
@@ -693,8 +693,7 @@ def test_pytest_cli_options_are_not_registered_in_suite_conftests():
     assert violations == []
 
 
-# @features testing setup
-# @dimensions cli-routing pytest-markers opt-in
+# @matrix setup testing : cli-routing opt-in pytest-markers
 @pytest.mark.parametrize(
     ("marker_expression", "expected_markers"),
     (
@@ -757,7 +756,7 @@ def test_normalize_pytest_invocation_handles_strict_and_pytest_separator():
     assert literal_target.collection_targets == ("--strict",)
 
 
-# @pairs testing:cli-routing testing:pytest-options testing:target-selection
+# @matrix testing : cli-routing pytest-options target-selection
 @pytest.mark.parametrize(
     "arguments",
     (
@@ -897,7 +896,7 @@ def test_normalize_pytest_invocation_isolates_parser_imports_and_cwd(
     )
 
 
-# @pairs testing:cli-routing testing:target-selection
+# @matrix testing : cli-routing target-selection
 def test_normalized_targets_control_actual_pytest_collection(
     monkeypatch, tmp_path
 ):
@@ -971,7 +970,7 @@ def test_normalized_targets_control_actual_pytest_collection(
         assert invocation.includes_e2e is includes_e2e
 
 
-# @pairs testing:pytest-markers setup:pytest-markers
+# @matrix setup testing : pytest-markers
 def test_pytest_routing_plugin_normalizes_provider_marker_tokens():
     config = types.SimpleNamespace(
         option=types.SimpleNamespace(markexpr="provider and not ai_provider")
@@ -1007,6 +1006,7 @@ def test_run_py_test_argument_errors_stop_before_preflight(monkeypatch, capsys):
     assert "suite aliases cannot be combined" in capsys.readouterr().err
 
 
+# @pair testing:frontend-build
 def test_configure_test_environment_prepares_frontend_only_for_e2e(monkeypatch):
     calls = []
     config_module = types.ModuleType("config")
@@ -1026,8 +1026,7 @@ def test_configure_test_environment_prepares_frontend_only_for_e2e(monkeypatch):
     assert calls == ["bundle", "bundle"]
 
 
-# @features testing hosted-e2e
-# @dimensions cli-routing provider-auth frontend-build
+# @matrix hosted-e2e testing : cli-routing frontend-build provider-auth
 def test_hosted_e2e_runner_skips_local_build_and_gcloud_activation(monkeypatch):
     calls = []
     from runner import testing as testing_module
@@ -1053,8 +1052,7 @@ def test_hosted_e2e_runner_skips_local_build_and_gcloud_activation(monkeypatch):
     assert [name for name, *_rest in calls] == ["pytest"]
 
 
-# @features testing hosted-e2e
-# @dimensions cleanup prefix fail-closed
+# @matrix hosted-e2e testing : cleanup fail-closed prefix
 def test_cleanup_scope_requires_the_reserved_test_prefix():
     from runner import testing as testing_module
 
@@ -1070,8 +1068,7 @@ def test_cleanup_scope_requires_the_reserved_test_prefix():
             testing_module._require_test_cleanup_scope(config)
 
 
-# @features testing hosted-e2e
-# @dimensions initialization database cache migrations
+# @matrix hosted-e2e testing : cache database initialization migrations
 def test_initialize_test_services_replays_server_persistence_startup():
     from runner import testing as testing_module
 
@@ -1149,6 +1146,7 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
     assert os.environ["LAGNIAPPE_TEST_COMMAND"] == '["outer", "test"]'
 
 
+# @pair testing:adc
 def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
     calls = []
 
@@ -1210,8 +1208,7 @@ def test_run_py_e2e_adc_mismatch_stops_before_pytest(monkeypatch, capsys):
     assert "run.py auth" in output
 
 
-# @features development
-# @dimensions gcloud-config adc launch-order
+# @matrix development : adc gcloud-config launch-order
 def test_run_dev_server_aligns_adc_before_flask_launch(monkeypatch):
     from runner import development
 
@@ -1277,8 +1274,7 @@ def test_run_dev_server_aligns_adc_before_flask_launch(monkeypatch):
     ]
 
 
-# @features development
-# @dimensions gcloud-config adc launch-order noninteractive
+# @matrix development : adc gcloud-config launch-order noninteractive
 def test_run_dev_server_adc_mismatch_stops_before_flask(monkeypatch, capsys):
     from runner import development
 
@@ -1301,8 +1297,7 @@ def test_run_dev_server_adc_mismatch_stops_before_flask(monkeypatch, capsys):
     assert "run.py auth" in output
 
 
-# @features development
-# @dimensions process-ownership signals lifecycle
+# @matrix development : lifecycle process-ownership signals
 def test_run_dev_server_forwards_signals_and_restores_handlers(monkeypatch):
     from runner import development
 
@@ -1347,8 +1342,7 @@ def test_run_dev_server_forwards_signals_and_restores_handlers(monkeypatch):
     assert restored == [development.signal.SIGINT, development.signal.SIGTERM]
 
 
-# @features development
-# @dimensions process-ownership exceptional-cleanup escalation
+# @matrix development : escalation exceptional-cleanup process-ownership
 def test_run_dev_server_cleans_up_process_group_after_runner_failure(monkeypatch):
     from runner import development
 
@@ -1389,8 +1383,7 @@ def test_run_dev_server_cleans_up_process_group_after_runner_failure(monkeypatch
     ]
 
 
-# @features auth
-# @dimensions adc runtime-identity interactive explicit-command
+# @matrix auth : adc explicit-command interactive runtime-identity
 def test_run_py_auth_runs_interactive_human_adc_alignment(
     monkeypatch,
     capsys,
@@ -1417,8 +1410,7 @@ def test_run_py_auth_runs_interactive_human_adc_alignment(
     )
 
 
-# @features auth
-# @dimensions adc runtime-identity interactive explicit-command
+# @matrix auth : adc explicit-command interactive runtime-identity
 def test_run_py_auth_reports_alignment_failure(monkeypatch, capsys):
     monkeypatch.setattr(run, "GCLOUD_CLI", "/usr/bin/gcloud")
     monkeypatch.setattr(
@@ -1505,8 +1497,6 @@ def test_run_py_test_forwards_signals_to_pytest_process_group(monkeypatch):
     assert restored_handlers == [run.signal.SIGINT, run.signal.SIGTERM]
 
 
-# @features setup testing development auth
-# @dimensions gcloud-config activation
 # @pair setup:gcloud-token
 def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
     from runner import adc as runner_adc
@@ -1589,7 +1579,7 @@ def test_runner_gcloud_activation_uses_complete_saved_target(monkeypatch):
     ]
 
 
-# @pairs auth:gcloud-token auth:interactive auth:refresh
+# @matrix auth : gcloud-token interactive refresh
 def test_runner_gcloud_source_login_refreshes_stale_token(monkeypatch):
     from runner import adc as runner_adc
 
@@ -1650,7 +1640,7 @@ def test_runner_gcloud_source_login_refreshes_stale_token(monkeypatch):
     ]
 
 
-# @pairs setup:gcloud-token setup:safe-failure
+# @matrix setup : gcloud-token safe-failure
 def test_runner_gcloud_source_login_stops_before_authentication_by_default(
     monkeypatch,
 ):
@@ -1685,9 +1675,7 @@ def test_runner_gcloud_source_login_stops_before_authentication_by_default(
     ]
 
 
-# @pairs setup:adc setup:identity setup:project-identity
-# @pairs testing:adc testing:identity testing:project-identity
-# @pairs development:adc development:identity development:project-identity
+# @matrix development setup testing : adc identity project-identity
 def test_runner_adc_identity_is_secret_free_and_project_bound():
     from runner import adc as runner_adc
 
@@ -1724,8 +1712,7 @@ def test_runner_adc_identity_is_secret_free_and_project_bound():
     assert "secret-access-token" not in repr(identity)
 
 
-# @pairs setup:adc setup:identity setup:project-identity setup:automatic-activation setup:quota-project
-# @pairs testing:adc testing:identity testing:project-identity testing:automatic-activation testing:quota-project
+# @matrix setup testing : adc automatic-activation identity project-identity quota-project
 def test_runner_adc_alignment_reauthenticates_and_sets_quota_project(monkeypatch):
     from runner import adc as runner_adc
 
@@ -1796,7 +1783,7 @@ def test_runner_adc_alignment_reauthenticates_and_sets_quota_project(monkeypatch
     ]
 
 
-# @pairs auth:adc auth:identity auth:project-identity auth:automatic-activation auth:quota-project
+# @matrix auth : adc automatic-activation identity project-identity quota-project
 def test_runner_adc_auth_selects_account_then_project_before_login(monkeypatch):
     from runner import adc as runner_adc
 
@@ -1930,10 +1917,7 @@ def test_runner_adc_auth_selects_account_then_project_before_login(monkeypatch):
     ]
 
 
-# @pairs testing:adc testing:identity testing:project-identity
-# @pairs development:adc development:identity development:project-identity
-# @pairs testing:automatic-activation testing:quota-project
-# @pairs development:automatic-activation development:quota-project
+# @matrix development testing : adc automatic-activation identity project-identity quota-project
 @pytest.mark.parametrize(
     "identity",
     [
@@ -1982,8 +1966,7 @@ def test_runner_local_adc_mismatch_directs_to_auth_command(
         )
 
 
-# @pairs setup:adc setup:automatic-activation setup:quota-project
-# @pairs testing:adc testing:automatic-activation testing:quota-project
+# @matrix setup testing : adc automatic-activation quota-project
 def test_runner_adc_alignment_updates_only_stale_quota_project(monkeypatch):
     from runner import adc as runner_adc
 
@@ -2035,8 +2018,7 @@ def test_runner_adc_alignment_updates_only_stale_quota_project(monkeypatch):
     ]
 
 
-# @features setup testing development auth
-# @dimensions gcloud-config activation unconfigured
+# @matrix auth development setup testing : activation gcloud-config unconfigured
 def test_runner_gcloud_activation_skips_unconfigured_repository(monkeypatch):
     from runner import gcloud as runner_gcloud
 
@@ -2047,8 +2029,7 @@ def test_runner_gcloud_activation_skips_unconfigured_repository(monkeypatch):
     assert runner_gcloud.activate_repository_gcloud() is False
 
 
-# @features setup testing development auth
-# @dimensions gcloud-config activation validation
+# @matrix auth development setup testing : activation gcloud-config validation
 def test_runner_gcloud_activation_rejects_partial_saved_target(monkeypatch):
     from runner import gcloud as runner_gcloud
 
@@ -2284,8 +2265,7 @@ def test_main_release_workflow_contract():
     assert "pr-clean" not in workflow_text
 
 
-# @features release
-# @dimensions delivery-tree
+# @pair release:delivery-tree
 def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
     repo = _release_check_repository(tmp_path)
     _write_release_candidate(repo)
@@ -2315,8 +2295,7 @@ def test_run_py_release_check_accepts_complete_release(tmp_path, capsys):
     assert "Release check passed against main" in capsys.readouterr().out
 
 
-# @features release
-# @dimensions delivery-tree build-mode
+# @matrix release : build-mode delivery-tree
 def test_run_py_release_check_rejects_development_build(tmp_path, capsys):
     repo = _release_check_repository(tmp_path)
     _write_release_candidate(repo, mode="development")
@@ -2328,8 +2307,7 @@ def test_run_py_release_check_rejects_development_build(tmp_path, capsys):
     assert "does not contain a newly generated BUILD_ID" not in output
 
 
-# @features release
-# @dimensions delivery-tree
+# @pair release:delivery-tree
 def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
     repo = _release_check_repository(tmp_path)
     (repo / "package.json").write_text(
@@ -2357,8 +2335,7 @@ def test_run_py_release_check_rejects_incomplete_release(tmp_path, capsys):
     assert "must identify a production build" in output
 
 
-# @features version
-# @dimensions cli-routing
+# @pair version:cli-routing
 @pytest.mark.parametrize(
     ("settings_exist", "settings_version", "expected_version"),
     [
@@ -2393,8 +2370,7 @@ def test_run_py_version_show_uses_package_only_before_generated_settings_exist(
     ]
 
 
-# @features version
-# @dimensions cli-routing
+# @pair version:cli-routing
 def test_run_py_version_note_appends_concise_release_entry(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(run, "RELEASES_DIR", tmp_path / "documentation" / "releases")
 
@@ -2410,8 +2386,7 @@ def test_run_py_version_note_appends_concise_release_entry(monkeypatch, tmp_path
     assert "Added version note" in capsys.readouterr().out
 
 
-# @features version
-# @dimensions cli-routing
+# @pair version:cli-routing
 def test_run_py_version_set_updates_package_settings_and_release_file(
     monkeypatch, tmp_path, capsys
 ):

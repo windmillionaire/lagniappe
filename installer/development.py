@@ -69,8 +69,7 @@ def _installed_node_version():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_development_setup_validates_node_range
-# @features setup
-# @dimensions development node-version
+# @matrix setup : development node-version
 def node_version_supported(version):
     """Return whether a Node version satisfies the project's engine floor."""
     match = _NODE_VERSION_PATTERN.match(str(version).strip())
@@ -111,8 +110,7 @@ def _run_command(label, command, timeout=None):
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_development_setup_requires_existing_installation
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_development_setup_is_additive_and_idempotent
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_development_setup_directs_native_windows_to_wsl
-# @features setup
-# @dimensions development prerequisites package-install frontend-build idempotence portability windows
+# @matrix setup : development frontend-build idempotence package-install portability prerequisites windows
 def setup_development():
     """Install local development dependencies after ordinary installer."""
     print("Lagniappe Development Setup")

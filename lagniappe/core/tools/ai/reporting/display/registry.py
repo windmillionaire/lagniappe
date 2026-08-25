@@ -26,8 +26,7 @@ if len(ACTION_DISPLAY_REGISTRY) != len(REGISTERED_ACTION_DISPLAYS):
 
 # @testable true
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_display_registry_covers_action_contracts
-# @pair ai-report:display-registry
-# @pair ai-report:action-contracts
+# @matrix ai-report : action-contracts display-registry
 def proposal_action_display(action_type):
     """Return registered behavior or a conservative unknown-action fallback."""
 

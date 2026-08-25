@@ -6,8 +6,7 @@ from .ai_report_process import ReportProcessValue
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @tests tests_unit/test_020h_ai_report_execution.py::test_grouped_result_actions_groups_completed_task_history_under_created_task
 # @tests tests_unit/test_020h_ai_report_execution.py::test_grouped_result_actions_groups_page_files_tasks_and_summaries
-# @features ai-report
-# @dimensions result grouping attachments completed-task-history
+# @matrix ai-report : attachments completed-task-history grouping result
 class Result(ReportProcessValue):
     """Structured deterministic run result for an AI report."""
 

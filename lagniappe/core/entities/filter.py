@@ -30,8 +30,7 @@ class Filter(Entity):
 
     # @testable true
     # @tests tests_unit/test_011_filters.py::test_filter_fingerprint_uses_loaded_parent_fingerprint
-    # @features filter
-    # @dimensions fingerprint parent
+    # @matrix filter : fingerprint parent
     @property
     def fingerprint(self):
         fingerprint = super().fingerprint
@@ -84,8 +83,7 @@ class Filter(Entity):
     # @testable true
     # @tests tests_unit/test_011_filters.py::test_filter_related_entities_allowed_checks_referenced_entities
     # @tests tests_unit/test_011_filters.py::test_filter_related_entities_allowed_checks_model_task_form_restrictions
-    # @features filter permissions
-    # @dimensions saved-filters related-entities model-task restricted-access
+    # @matrix filter permissions : model-task related-entities restricted-access saved-filters
     def related_entities_allowed(self, user=None):
         user = current_context_user(user)
         related = Entities.fetch(*self.related, request=Fetch.direct())
@@ -96,8 +94,7 @@ class Filter(Entity):
     # @tests tests_unit/test_011_filters.py::test_filter_conditions_boolean
     # @tests tests_unit/test_011_filters.py::test_filter_conditions_entity_valued
     # @tests tests_unit/test_011_filters.py::test_filter_conditions_multiple_types
-    # @features filter
-    # @dimensions conditions, string, boolean, entity-valued, mixed-types
+    # @matrix filter : boolean conditions entity-valued mixed-types string
     @property
     def conditions(self):
         if getattr(self, "_conditions", None):
@@ -141,8 +138,7 @@ class Filter(Entity):
 
     # @testable true
     # @tests tests_unit/test_011c_filter_contract.py::test_saved_filter_compiles_legacy_data_per_viewer
-    # @features filters permissions
-    # @dimensions saved-filter validation authorization legacy
+    # @matrix filters permissions : authorization legacy saved-filter validation
     def compile(self, user=None):
         """Validate saved data for the current viewer before it can be queried."""
         from ..tools.filters.contract import compile_saved_filter

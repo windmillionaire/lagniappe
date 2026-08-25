@@ -431,15 +431,9 @@ function jitter(delay, factor = 0.9 + Math.random() * 0.2) {
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_captures_and_isolates_contract_failures
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_temporarily_boosts_a_subscription
  * @tests tests_js/test_034_polling_coordinator.py::test_polling_coordinator_retries_cold_seed_until_warm_acknowledgement
- * @features polling
- * @dimensions batching cadence lifecycle coalescing acknowledgement reentrancy requested-cycle freshness visible-blur deadline
- * @pairs polling:batching polling:cadence polling:lifecycle polling:coalescing polling:acknowledgement
- * @pairs polling:reentrancy polling:requested-cycle polling:freshness polling:foreground polling:scheduled-initial
- * @pair polling:terminal-operation-order
- * @pairs polling:protocol polling:validation polling:diagnostics polling:revision polling:presence
- * @pairs polling:blur polling:visibility deferred-jobs:polling
- * @pairs notifications:cold-seed notifications:acknowledgement notifications:bounded-backoff notifications:zero-subscriptions
- * @pair messaging:active-polling
+ * @matrix notifications : acknowledgement bounded-backoff cold-seed zero-subscriptions
+ * @matrix polling : acknowledgement batching blur cadence coalescing diagnostics foreground freshness lifecycle presence protocol reentrancy requested-cycle revision scheduled-initial terminal-operation-order validation visibility
+ * @pairs deferred-jobs:polling messaging:active-polling
  */
 export class PollingCoordinator {
 	constructor(view) {

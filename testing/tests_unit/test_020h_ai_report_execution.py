@@ -27,8 +27,7 @@ from testing.utility.ai_report_fakes import (
 )
 from testing.utility.test_entities import TestEntities
 
-# @features ai-report
-# @dimensions action-registry contract
+# @matrix ai-report : action-registry contract
 @pytest.mark.unit
 def test_report_action_registry_matches_proposal_contracts():
     adapters = REPORT_ACTION_ADAPTERS
@@ -40,8 +39,7 @@ def test_report_action_registry_matches_proposal_contracts():
 
 
 
-# @pair ai-report:cancellation
-# @pair ai-report:deterministic-run
+# @matrix ai-report : cancellation deterministic-run
 @pytest.mark.unit
 def test_run_report_checks_deferred_execution_guard(monkeypatch):
     report = _attach_report_process(SimpleNamespace(
@@ -79,8 +77,7 @@ def test_run_report_checks_deferred_execution_guard(monkeypatch):
 
 
 
-# @pair ai-report:cancellation
-# @pair ai-report:deterministic-run
+# @matrix ai-report : cancellation deterministic-run
 @pytest.mark.unit
 def test_run_report_propagates_deferred_control_stop(monkeypatch):
     from lagniappe.core.tools.deferred_jobs.errors import DeferredJobDeadlineError
@@ -134,8 +131,7 @@ def test_run_report_propagates_deferred_control_stop(monkeypatch):
 
 
 
-# @features ai-report
-# @dimensions deterministic-run recovery create idempotency completed-prefix
+# @matrix ai-report : completed-prefix create deterministic-run idempotency recovery
 @pytest.mark.unit
 def test_run_report_retry_resumes_after_completed_create_without_duplicate(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -207,8 +203,7 @@ def test_run_report_retry_resumes_after_completed_create_without_duplicate(monke
 
 
 
-# @features ai-report
-# @dimensions deterministic-run recovery permissions completed-prefix
+# @matrix ai-report : completed-prefix deterministic-run permissions recovery
 @pytest.mark.unit
 def test_run_report_retry_stops_when_completed_prefix_permission_is_revoked(
     monkeypatch,
@@ -270,8 +265,7 @@ def test_run_report_retry_stops_when_completed_prefix_permission_is_revoked(
 
 
 
-# @features ai-report
-# @dimensions deterministic-run recovery post-commit-checkpoint idempotency
+# @matrix ai-report : deterministic-run idempotency post-commit-checkpoint recovery
 @pytest.mark.unit
 def test_run_report_reconciles_applying_create_when_output_already_exists(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -335,8 +329,7 @@ def test_run_report_reconciles_applying_create_when_output_already_exists(monkey
 
 
 
-# @features ai-report
-# @dimensions deterministic-run recovery moves batch-field-patch completed-prefix
+# @matrix ai-report : batch-field-patch completed-prefix deterministic-run moves recovery
 @pytest.mark.parametrize("first_action", ["move", "update"])
 @pytest.mark.unit
 def test_run_report_retry_validates_completed_move_and_update_prefix(
@@ -448,8 +441,7 @@ def test_run_report_retry_validates_completed_move_and_update_prefix(
 
 
 
-# @features ai-report
-# @dimensions deterministic-run compensation failed-prefix idempotency
+# @matrix ai-report : compensation deterministic-run failed-prefix idempotency
 @pytest.mark.unit
 def test_undo_report_compensates_completed_prefix_of_failed_report(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -515,8 +507,7 @@ def test_undo_report_compensates_completed_prefix_of_failed_report(monkeypatch):
 
 
 
-# @features ai-report
-# @dimensions deterministic-run recovery completed-task reuse compensation
+# @matrix ai-report : compensation completed-task deterministic-run recovery reuse
 @pytest.mark.unit
 def test_completed_task_retry_and_undo_restore_reused_task(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -615,8 +606,7 @@ def test_completed_task_retry_and_undo_restore_reused_task(monkeypatch):
 
 
 
-# @features ai-report
-# @dimensions result grouping completed-task-history
+# @matrix ai-report : completed-task-history grouping result
 @pytest.mark.unit
 def test_grouped_result_actions_groups_page_files_tasks_and_summaries():
     user = _test_user("page-result-owner")
@@ -749,8 +739,7 @@ def test_grouped_result_actions_groups_page_files_tasks_and_summaries():
 
 
 
-# @features ai-report
-# @dimensions result grouping completed-task-history
+# @matrix ai-report : completed-task-history grouping result
 @pytest.mark.unit
 def test_grouped_result_actions_groups_completed_task_history_under_created_task():
     user = _test_user("history-result-owner")
@@ -815,8 +804,7 @@ def test_grouped_result_actions_groups_completed_task_history_under_created_task
 
 
 
-# @features ai-report
-# @dimensions deterministic-run undo delete-links report-files created-entities file-links
+# @matrix ai-report : created-entities delete-links deterministic-run file-links report-files undo
 @pytest.mark.unit
 def test_undo_report_deletes_created_entities_and_unlinks_files(monkeypatch):
     _patch_fake_keys(monkeypatch)

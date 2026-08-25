@@ -26,8 +26,7 @@ SAFE_LINK_SCHEMES = {"", "http", "https", "mailto"}
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_strip_tags
-# @features utility
-# @dimensions html-stripping
+# @pair utility:html-stripping
 def strip_tags(html_content):
     """Strip HTML tags and collapse whitespace in text content."""
     if not isinstance(html_content, str):
@@ -38,8 +37,7 @@ def strip_tags(html_content):
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_clean_html
-# @features utility
-# @dimensions html-cleaning
+# @pair utility:html-cleaning
 def clean_html(content):
     """Strip Markdown fences, empty tags, and inter-tag whitespace."""
     if not content or not isinstance(content, str):
@@ -68,8 +66,7 @@ def _safe_link(href):
 # @tests tests_unit/test_014_security.py::test_htmlize_sanitizes_markdown_html
 # @tests tests_unit/test_014_security.py::test_htmlize_sanitizes_text_html
 # @tests tests_unit/test_014_security.py::test_htmlize_preserves_markdown_tables_and_sanitizes_cells
-# @features files security
-# @dimensions html-sanitization table
+# @matrix files security : html-sanitization table
 def sanitize_html(content):
     """Allow only a small safe subset of HTML for inline rendering."""
     if not isinstance(content, str) or not content:
@@ -105,8 +102,7 @@ def sanitize_html(content):
 # @tests tests_unit/test_014_security.py::test_htmlize_sanitizes_markdown_html
 # @tests tests_unit/test_014_security.py::test_htmlize_sanitizes_text_html
 # @tests tests_unit/test_014_security.py::test_htmlize_preserves_markdown_tables_and_sanitizes_cells
-# @features files security
-# @dimensions html-sanitization html markdown table
+# @matrix files security : html html-sanitization markdown table
 def htmlize(text, mimetype):
     """Convert text content to sanitized HTML for its MIME type."""
     if mimetype == "text/html":

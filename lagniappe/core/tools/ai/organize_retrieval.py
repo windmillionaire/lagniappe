@@ -11,8 +11,7 @@ ORGANIZE_RETRIEVAL_KINDS = ("category", "page", "form")
 
 # @testable true
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_prepare_organize_retrieval_context_searches_bounded_structure_candidates
-# @features ai-report search
-# @dimensions summary-terms redis-search kinds limits fallback
+# @matrix ai-report search : fallback kinds limits redis-search summary-terms
 def prepare_organize_retrieval_context(report, user):
     """Fetch bounded category/page/form candidates for saved summary terms."""
     files = list(getattr(report, "input_files", None) or [])

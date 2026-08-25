@@ -266,9 +266,9 @@ executing Node.
 
 ## Traceability and Template Contracts
 
-Use supported `@features`, `@dimensions`, exact `@pair`, `@template`, and
-`@todo` tags as evidence, not decoration. A test should claim only behavior
-that its assertions prove. Follow
+Use supported `@matrix`, exact `@pair`, `@source`, `@template`, and `@todo`
+tags as evidence, not decoration. A test should claim only behavior that its
+assertions prove. Follow
 [TESTING_TRACEABILITY_TOOL.md](TESTING_TRACEABILITY_TOOL.md) before adding or
 changing source annotations, and [TESTING_SOURCE_REVIEW.md](TESTING_SOURCE_REVIEW.md)
 when judging whether a test really covers a source symbol.

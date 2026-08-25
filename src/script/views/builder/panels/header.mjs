@@ -105,8 +105,7 @@ export class Header {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_preview_panel
-	 * @features forms
-	 * @dimensions builder-preview
+	 * @pair forms:builder-preview
 	 */
 	async togglePreviewPanel() {
 		if (this._destroyed) return;
@@ -161,8 +160,7 @@ export class Header {
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
 	 * @tests tests_e2e/003_forms/test_003e_retryable_builder_actions.py::test_builder_save_failure_releases_control_for_retry
 	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state
-	 * @features forms
-	 * @dimensions builder-save builder-reload single-flight retryable-action stale-acknowledgement persistent-error focus-recovery
+	 * @matrix forms : builder-reload builder-save focus-recovery persistent-error retryable-action single-flight stale-acknowledgement
 	 */
 	saveForm() {
 		if (this._savePromise) return this._savePromise;
@@ -237,8 +235,7 @@ export class Header {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
-	 * @pairs forms:builder-form-name entity-menu:title-menu
-	 * @pairs frontend-icons:material-icon-preservation
+	 * @pairs entity-menu:title-menu forms:builder-form-name frontend-icons:material-icon-preservation
 	 */
 	_nameBlur() {
 		const newName = this.nameInput.value.trim();

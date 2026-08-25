@@ -25,8 +25,7 @@ def _setting(settings, name, default=None):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_redis_client_kwargs_support_verified_tls
-# @features config
-# @dimensions redis-tls settings
+# @matrix config : redis-tls settings
 def redis_tls_enabled(settings):
     """Return the normalized Redis TLS flag from a mapping or config object."""
     value = _setting(settings, "REDIS_TLS", False)
@@ -48,8 +47,7 @@ def redis_tls_enabled(settings):
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_redis_client_kwargs_support_verified_tls
 # @tests tests_tooling/test_003_config.py::test_redis_tls_requires_a_valid_ca_bundle
-# @features config
-# @dimensions redis-tls certificate-validation failure
+# @matrix config : certificate-validation failure redis-tls
 def validate_redis_ca_cert(path, *, app_dir=None):
     """Resolve and validate a PEM CA bundle, returning its absolute path."""
     if not path:
@@ -84,8 +82,7 @@ def validate_redis_ca_cert(path, *, app_dir=None):
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_redis_client_kwargs_support_verified_tls
 # @tests tests_tooling/test_003_config.py::test_redis_tls_requires_a_valid_ca_bundle
-# @features config
-# @dimensions redis-connection redis-tls
+# @matrix config : redis-connection redis-tls
 def redis_client_kwargs(settings, *, app_dir=None, **connection_options):
     """Build redis-py client options shared by setup and runtime clients."""
     options = {

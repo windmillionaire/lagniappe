@@ -9,8 +9,7 @@ from testing.utility.ai_report_fakes import _fetch_one_from, _test_user
 from testing.utility.test_entities import TestEntities
 
 
-# @features ai-report
-# @dimensions proposal skip grouped-display exact-indexes schema-section
+# @matrix ai-report : exact-indexes grouped-display proposal schema-section skip
 @pytest.mark.unit
 def test_toggle_proposal_action_indexes_can_skip_exact_indexes_without_dependencies():
     proposal = {
@@ -61,8 +60,7 @@ def test_toggle_proposal_action_indexes_can_skip_exact_indexes_without_dependenc
 
 
 
-# @features ai-report categories
-# @dimensions deterministic-run add-category idempotent undo
+# @matrix ai-report categories : add-category deterministic-run idempotent undo
 @pytest.mark.unit
 def test_run_report_adds_page_category_without_changing_primary_with_undo(
     monkeypatch,

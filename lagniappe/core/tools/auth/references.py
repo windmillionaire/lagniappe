@@ -37,8 +37,7 @@ def _existing_keys(existing) -> set:
 # @testable true
 # @tests tests_unit/test_031_submitted_references.py::test_submitted_reference_resolver_rejects_unavailable_targets
 # @tests tests_unit/test_031_submitted_references.py::test_submitted_reference_resolver_preserves_authorized_order_and_existing_targets
-# @features submitted-references
-# @dimensions batch kind action predicate existing generic-error order dedup
+# @matrix submitted-references : action batch dedup existing generic-error kind order predicate
 class SubmittedReferenceResolver:
     """Batch-load and authorize secondary entity keys from a request body."""
 

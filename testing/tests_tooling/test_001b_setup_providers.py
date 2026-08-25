@@ -63,8 +63,7 @@ class FakeSMTP:
         self.message = message
 
 
-# @features setup
-# @dimensions authentication-email validation smtp app-password
+# @matrix setup : app-password authentication-email smtp validation
 def test_auth_email_config_requires_canonical_smtp():
     from installer import auth_email
 
@@ -94,8 +93,7 @@ def test_auth_email_config_requires_canonical_smtp():
     )
 
 
-# @features setup
-# @dimensions authentication-email smtp tls certificate-validation transient-retry error-reporting
+# @matrix setup : authentication-email certificate-validation error-reporting smtp tls transient-retry
 def test_smtp_test_message_supports_tls_and_reports_transport_failures(monkeypatch):
     from installer import auth_email
 
@@ -254,8 +252,7 @@ def test_smtp_test_message_supports_tls_and_reports_transport_failures(monkeypat
     assert InvalidCertificateSMTP.attempts == 1
 
 
-# @features setup
-# @dimensions authentication-email interactive-input settings-save failure-isolation
+# @matrix setup : authentication-email failure-isolation interactive-input settings-save
 def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsys):
     from installer import auth_email
 
@@ -359,8 +356,7 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsy
     assert "only if Gmail explicitly rejects sign-in" in output
 
 
-# @features setup
-# @dimensions authentication-email custom-domain smtp interactive-input
+# @matrix setup : authentication-email custom-domain interactive-input smtp
 def test_setup_auth_email_uses_custom_domain_provider_path(monkeypatch):
     from installer import auth_email
     from installer import custom_domain
@@ -403,8 +399,7 @@ def test_setup_auth_email_uses_custom_domain_provider_path(monkeypatch):
     ]
 
 
-# @features setup
-# @dimensions authentication-email dmarc cloudflare-dns manual-dns
+# @matrix setup : authentication-email cloudflare-dns dmarc manual-dns
 def test_auth_email_dmarc_setup_supports_cloudflare_and_manual_dns(
     monkeypatch,
     capsys,
@@ -484,8 +479,7 @@ def test_auth_email_dmarc_setup_supports_cloudflare_and_manual_dns(
     assert "Skipped optional DMARC setup" in capsys.readouterr().out
 
 
-# @features setup
-# @dimensions authentication-email smtp resend cloudflare-dns interactive-input settings-save
+# @matrix setup : authentication-email cloudflare-dns interactive-input resend settings-save smtp
 def test_provider_auth_email_uses_resend_cloudflare_shortcut(monkeypatch):
     from installer import auth_email
 
@@ -570,8 +564,7 @@ def test_provider_auth_email_uses_resend_cloudflare_shortcut(monkeypatch):
     assert saves == [True]
 
 
-# @features setup
-# @dimensions authentication-email smtp resend interactive-input settings-save
+# @matrix setup : authentication-email interactive-input resend settings-save smtp
 def test_resend_auth_email_rerun_reuses_saved_sending_key_without_prompt(
     monkeypatch,
     capsys,
@@ -654,8 +647,7 @@ def test_resend_auth_email_rerun_reuses_saved_sending_key_without_prompt(
     assert saves == [True]
 
 
-# @features setup
-# @dimensions authentication-email smtp custom-domain interactive-input settings-save
+# @matrix setup : authentication-email custom-domain interactive-input settings-save smtp
 def test_provider_auth_email_saves_only_after_successful_smtp_test(monkeypatch):
     from installer import auth_email
 
@@ -732,8 +724,7 @@ def test_provider_auth_email_saves_only_after_successful_smtp_test(monkeypatch):
     assert saves == [True]
 
 
-# @features setup
-# @dimensions google-provider authentication retry
+# @matrix setup : authentication google-provider retry
 def test_google_provider_access_token_refresh_retries_connection_resets(monkeypatch):
     import google.auth
     from installer import google_provider
@@ -769,10 +760,7 @@ def test_google_provider_access_token_refresh_retries_connection_resets(monkeypa
     assert delays == [1, 2]
 
 
-# @features setup
-# @dimensions google-provider-api
-# @pair setup:google-provider-api
-# @pair google-provider-api:quota-project
+# @pairs google-provider-api:quota-project setup:google-provider-api
 def test_google_provider_helpers_use_timeouts_and_report_errors(monkeypatch):
     from installer import google_provider
 
@@ -829,8 +817,7 @@ def test_google_provider_helpers_use_timeouts_and_report_errors(monkeypatch):
     assert len(bad_session.calls) == 4
 
 
-# @features setup
-# @dimensions google-provider-api diagnostics retry
+# @matrix setup : diagnostics google-provider-api retry
 def test_google_provider_api_request_reports_reason_and_retries_service_activation(
     monkeypatch,
     capsys,
@@ -921,8 +908,7 @@ def test_google_provider_api_request_reports_reason_and_retries_service_activati
     assert delays[-1] == 5
 
 
-# @features setup
-# @dimensions identity-platform provider-state provider-convergence retry diagnostics
+# @matrix setup : diagnostics identity-platform provider-convergence provider-state retry
 def test_identity_platform_initialization_retries_api_activation(
     monkeypatch,
 ):
@@ -977,8 +963,7 @@ def test_identity_platform_initialization_retries_api_activation(
     assert mutations[0][1]["action"] == "created"
 
 
-# @features setup
-# @dimensions identity-platform provider-state idempotency
+# @matrix setup : idempotency identity-platform provider-state
 def test_identity_platform_initialization_accepts_existing_provider(
     monkeypatch,
 ):
@@ -1018,8 +1003,7 @@ def test_identity_platform_initialization_accepts_existing_provider(
     assert mutations[0][1]["action"] == "existing"
 
 
-# @features setup
-# @dimensions identity-platform provider-state idempotency diagnostics
+# @matrix setup : diagnostics idempotency identity-platform provider-state
 def test_identity_platform_initialization_accepts_already_enabled_http_400(
     monkeypatch,
 ):
@@ -1086,8 +1070,7 @@ def test_identity_platform_initialization_accepts_already_enabled_http_400(
         )
 
 
-# @features setup
-# @dimensions identity-platform diagnostics spinner error-reporting
+# @matrix setup : diagnostics error-reporting identity-platform spinner
 def test_identity_platform_setup_finishes_spinner_before_reporting_error(
     monkeypatch,
 ):
@@ -1133,8 +1116,7 @@ def test_identity_platform_setup_finishes_spinner_before_reporting_error(
     assert "provider response timed out" in events[1][1]
 
 
-# @features setup
-# @dimensions identity-platform provider-state settings-save authorized-domain
+# @matrix setup : authorized-domain identity-platform provider-state settings-save
 def test_identity_platform_setup_is_idempotent_for_matching_provider_state(
     monkeypatch,
 ):
@@ -1179,7 +1161,7 @@ def test_identity_platform_setup_is_idempotent_for_matching_provider_state(
     assert saves == []
 
 
-# @pairs setup:identity-platform setup:provider-state setup:auth-separation
+# @matrix setup : auth-separation identity-platform provider-state
 def test_identity_platform_verification_preserves_standalone_subtype():
     from installer import identity
 
@@ -1193,8 +1175,7 @@ def test_identity_platform_verification_preserves_standalone_subtype():
         identity._ensure_standalone_subtype(firebase_auth, "project-1")
 
 
-# @features setup
-# @dimensions identity-platform google-oauth provider-state secrets
+# @matrix setup : google-oauth identity-platform provider-state secrets
 def test_identity_platform_google_provider_reconciliation(monkeypatch):
     import requests
     from installer import identity
@@ -1235,8 +1216,7 @@ def test_identity_platform_google_provider_reconciliation(monkeypatch):
     }
 
 
-# @features setup
-# @pairs setup:identity-platform setup:recovery
+# @matrix setup : identity-platform recovery
 def test_identity_platform_recovery_gets_live_config(monkeypatch):
     import requests
     import installer
@@ -1281,8 +1261,7 @@ def test_identity_platform_recovery_gets_live_config(monkeypatch):
     }
 
 
-# @features setup
-# @dimensions cloudflare-api cloudflare-dns zone-resolution dns-only idempotence provider-records partial-failure
+# @matrix setup : cloudflare-api cloudflare-dns dns-only idempotence partial-failure provider-records zone-resolution
 def test_cloudflare_dns_only_reconciliation(monkeypatch):
     from installer.domain import cloudflare
 
@@ -1391,8 +1370,7 @@ def test_cloudflare_dns_only_reconciliation(monkeypatch):
     )
 
 
-# @features setup
-# @dimensions authentication-email cloudflare-dns dmarc idempotence
+# @matrix setup : authentication-email cloudflare-dns dmarc idempotence
 def test_cloudflare_dmarc_reconciliation_creates_or_reuses_valid_policy(
     monkeypatch,
 ):

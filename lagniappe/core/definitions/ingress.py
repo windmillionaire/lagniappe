@@ -11,8 +11,7 @@ INGRESS_BATCH_SIZE = 25
 
 # @testable true
 # @tests tests_unit/test_006d_ingress_service.py::test_transition_table_covers_every_ingress_stage
-# @features ingress
-# @dimensions transition-contract
+# @pair ingress:transition-contract
 class IngressStage(Enum):
     """Strict, ordered stages of the CSV import workflow."""
 

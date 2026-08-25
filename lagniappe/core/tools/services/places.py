@@ -38,8 +38,7 @@ _UNIT_LABEL = re.compile(
 
 # @testable true
 # @tests tests_unit/test_003d_submission_location.py::test_normalize_location_coordinates_rejects_malformed_values
-# @features location
-# @dimensions session-bias validation coordinates
+# @matrix location : coordinates session-bias validation
 def normalize_location_coordinates(value):
     """Return normalized finite latitude/longitude coordinates, or ``None``."""
     if isinstance(value, str):
@@ -133,8 +132,7 @@ def _capture_contract_failure(operation, method):
 # @tests tests_unit/test_003d_submission_location.py::test_simplify_address_for_search_comma_suite
 # @tests tests_unit/test_003d_submission_location.py::test_simplify_address_for_search_trailing_suite
 # @tests tests_unit/test_003d_submission_location.py::test_simplify_address_for_search_no_change
-# @features location
-# @dimensions suite-stripping
+# @pair location:suite-stripping
 def simplify_address_for_search(query):
     """Strip one secondary-address clause for a follow-up Places search.
 
@@ -164,8 +162,7 @@ def simplify_address_for_search(query):
 # @testable true
 # @tests tests_unit/test_003d_submission_location.py::test_resolve_location_query_retries_after_simplify
 # @tests tests_unit/test_003d_submission_location.py::test_resolve_location_query_first_hit_wins
-# @features location
-# @dimensions retry, suite-stripping, first-hit
+# @matrix location : first-hit retry suite-stripping
 def resolve_location_query(query):
     """Autocomplete a query; if empty, retry once with simplified address text.
 
@@ -259,8 +256,7 @@ def _formatted_address_without_unit(formatted_address, address2):
 
 # @testable true
 # @tests tests_unit/test_003d_submission_location.py::test_get_places_access_token_reuses_cached_token_until_refresh_window
-# @features location
-# @dimensions api-cache, oauth
+# @matrix location : api-cache oauth
 def get_places_access_token():
     """Get a cached OAuth2 access token for the Places API."""
     now = time.time()
@@ -293,8 +289,7 @@ def get_places_access_token():
 # @tests tests_unit/test_003d_submission_location.py::test_get_place_details_formats_address2_and_meaningful_name
 # @tests tests_unit/test_003d_submission_location.py::test_get_place_details_omits_street_address_display_name
 # @tests tests_unit/test_003d_submission_location.py::test_places_provider_failures_capture_once_and_degrade
-# @features location
-# @dimensions api-request, address2, name-normalization deadline degradation provider-failure diagnostics
+# @matrix location : address2 api-request deadline degradation diagnostics name-normalization provider-failure
 def get_place_details(place_id):
     """Fetch place details (name, address) from Google Places API."""
     if not place_id:
@@ -367,8 +362,7 @@ def get_place_details(place_id):
 # @tests tests_unit/test_003d_submission_location.py::test_search_places_uses_session_location_bias_and_maps_suggestions
 # @tests tests_unit/test_003d_submission_location.py::test_places_provider_failures_capture_once_and_degrade
 # @tests tests_unit/test_003d_submission_location.py::test_places_malformed_provider_payload_captures_once
-# @features location
-# @dimensions api-request, session-bias, response-mapping deadline degradation provider-failure diagnostics provider-contract
+# @matrix location : api-request deadline degradation diagnostics provider-contract provider-failure response-mapping session-bias
 def search_places(query):
     """Autocomplete a place query, biased to the user's session location."""
     if not query or len(query) < 3:

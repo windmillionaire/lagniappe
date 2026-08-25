@@ -87,8 +87,7 @@ def _required_text(value, name, *, maximum=1000):
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_rejects_security_weakening_values
-# @features ai-email
-# @dimensions config domain email-address
+# @matrix ai-email : config domain email-address
 def normalize_email_address(value, name="email address"):
     """Normalize one bare mailbox without provider-specific rewrites."""
     address = unicodedata.normalize("NFC", str(value or "").strip())
@@ -104,8 +103,7 @@ def normalize_email_address(value, name="email address"):
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_rejects_security_weakening_values
-# @features ai-email
-# @dimensions config domain idna
+# @matrix ai-email : config domain idna
 def normalize_email_domain(value, name="AI email domain"):
     """Return a lower-case IDNA ASCII domain without a trailing dot."""
     domain = str(value or "").strip().rstrip(".")
@@ -137,8 +135,7 @@ def normalize_email_domain(value, name="AI email domain"):
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_rejects_security_weakening_values
-# @features ai-email
-# @dimensions aliases
+# @pair ai-email:aliases
 def _normalize_aliases(value):
     aliases = _mapping(value, "AI_EMAIL_CONFIG.aliases")
     _reject_unknown_keys(aliases, set(AI_EMAIL_TOOLS), "AI_EMAIL_CONFIG.aliases")
@@ -206,8 +203,8 @@ def _normalize_resend(value):
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_rejects_security_weakening_values
 # @tests tests_tooling/test_003_config.py::test_recovery_accepts_and_redacts_optional_ai_email_config
-# @features ai-email
-# @dimensions config normalization validation secrets limits
+# @matrix ai-email : config limits normalization secrets validation
+# @pair config:ai-email
 def normalize_ai_email_config(value):
     """Return canonical schema-1 configuration, or ``None`` when absent."""
     if value in (None, ""):
@@ -243,8 +240,7 @@ def normalize_ai_email_config(value):
 
 # @testable true
 # @tests tests_tooling/test_001h_setup_ai_email.py::test_ai_email_config_normalizes_domains_aliases_and_public_projection
-# @features ai-email
-# @dimensions config public-projection secrets
+# @matrix ai-email : config public-projection secrets
 def ai_email_public_config(value):
     """Expose only enabled addresses; never return provider state or secrets."""
     config = normalize_ai_email_config(value)

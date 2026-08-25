@@ -31,6 +31,7 @@ test_roots:
   - testing/tests_tooling/test_007_run_py_test_command.py
   - testing/tests_tooling/test_008_data_lifecycle.py
   - testing/tests_tooling/test_009_hosted_e2e.py
+  - testing/tests_tooling/test_010_runtime_outbound_http.py
   - testing/tests_tooling/test_icons.py
 
 annotated_source_roots:

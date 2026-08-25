@@ -42,8 +42,7 @@ def add_custom_domain():
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_custom_domain_uses_provider_records_and_dns_only_cloudflare
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_custom_domain_supports_manual_dns
-# @features setup
-# @dimensions custom-domain cloudflare-dns dns-only provider-records idempotence disabled-provider
+# @matrix setup : cloudflare-dns custom-domain disabled-provider dns-only idempotence provider-records
 def _setup_custom_domain(*, configure_auth=True):
     """Create the domain mapping and optionally update existing authentication."""
     from config import SETTINGS

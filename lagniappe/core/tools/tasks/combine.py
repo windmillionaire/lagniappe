@@ -45,8 +45,7 @@ def _compatible(source, candidate, page):
 
 # @testable true
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_combine_selects_completed_then_modified_main
-# @features task-combine
-# @dimensions winner completed-on modified deterministic-tie
+# @matrix task-combine : completed-on deterministic-tie modified winner
 def select_main_task(tasks):
     """Choose the task whose current state remains after a combination."""
     tasks = tuple(task for task in tasks if isinstance(task, Entities.TASK))
@@ -76,9 +75,7 @@ def select_main_task(tasks):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
-# @pairs task-combine:compatible task-combine:same-page
-# @pairs task-combine:same-model task-combine:no-model
-# @pairs task-combine:view-page task-combine:linked-page
+# @matrix task-combine : compatible linked-page no-model same-model same-page view-page
 def compatible_tasks(task, page, user):
     """Return delete-permitted peers owned by the page displaying ``task``."""
     if not isinstance(task, Entities.TASK) or not isinstance(page, Entities.PAGE):
@@ -135,9 +132,7 @@ def _source_histories(tasks):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
-# @pairs task-combine:migrate-history task-combine:current-snapshot
-# @pairs task-combine:existing-history task-combine:attachments
-# @pairs task-combine:delete task-combine:winner task-combine:completed-on
+# @matrix task-combine : attachments completed-on current-snapshot delete existing-history migrate-history winner
 def combine_tasks(task, selected_keys, page, user):
     """Combine ``task`` with selected compatible peers and return the outcome."""
     selected_keys = tuple(selected_keys or ())

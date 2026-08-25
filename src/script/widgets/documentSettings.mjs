@@ -10,8 +10,7 @@ const VISIBILITY = {
 /**
  * @testable true
  * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_document_visibility_can_toggle_public_private
- * @features pages
- * @dimensions document-visibility public private
+ * @matrix pages : document-visibility private public
  */
 export class DocumentSettings extends FormElement {
 	constructor(attributes) {

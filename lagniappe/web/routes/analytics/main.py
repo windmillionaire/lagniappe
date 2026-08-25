@@ -435,12 +435,8 @@ def _dashboard(events):
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
-# @pair analytics:dashboard
-# @pair analytics:period-controls
-# @pair ai-observability:ai-only
-# @pair ai-observability:independent-flags
-# @pair analytics:page-tracking
-# @pair ai-observability:job-correlation
+# @matrix ai-observability : ai-only independent-flags job-correlation
+# @matrix analytics : dashboard page-tracking period-controls
 # @pair deferred-jobs:diagnostics
 @analytics.route("/", methods=["GET"])
 @permission(Resource.SITE, Action.EDIT)
@@ -495,8 +491,7 @@ def index():
 
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_dashboard_diagnostics_and_clear_use_real_routes
-# @pair ai-observability:job-correlation
-# @pair deferred-jobs:diagnostics
+# @pairs ai-observability:job-correlation deferred-jobs:diagnostics
 @analytics.route("/ai/operations/<job_id>.json", methods=["GET"])
 @permission(Resource.SITE, Action.EDIT)
 def operation_diagnostic(job_id):
@@ -513,8 +508,7 @@ def operation_diagnostic(job_id):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
-# @features analytics
-# @dimensions dashboard accordion
+# @matrix analytics : accordion dashboard
 @analytics.route("/events/<prefix>", methods=["GET"])
 @permission(Resource.SITE, Action.EDIT)
 def events(prefix):
@@ -533,8 +527,7 @@ def events(prefix):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
-# @features analytics
-# @dimensions retention-clear owner-filter
+# @matrix analytics : owner-filter retention-clear
 @analytics.route("/clear/<retention>", methods=["DELETE"])
 @permission(Resource.SITE, Action.EDIT)
 def clear_records(retention):
@@ -575,8 +568,7 @@ def clear_ai_records(retention):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_analytics_dashboard_owner_filter_and_retention_clear
-# @features analytics
-# @dimensions page-load owner-filter
+# @matrix analytics : owner-filter page-load
 @analytics.route("/track", methods=["POST"])
 def track():
     if not enabled():

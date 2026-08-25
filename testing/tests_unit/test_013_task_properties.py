@@ -15,8 +15,7 @@ from lagniappe.core.mixins import ColumnMixin
 from testing.utility.test_entities import TestEntities, TestUser as UtilityTestUser
 
 
-# @features task
-# @dimensions description cache column ai-value filter-value html-stripping
+# @matrix task : ai-value cache column description filter-value html-stripping
 @pytest.mark.unit
 def test_task_description(get_test_entities):
     """Test Description property for Task entities.
@@ -61,8 +60,7 @@ def test_task_description(get_test_entities):
             assert task.properties.description.cache_value is None
 
 
-# @features task
-# @dimensions due-date date column ai-value filter-value
+# @matrix task : ai-value column date due-date filter-value
 @pytest.mark.unit
 def test_task_due_date(get_test_entities):
     """Test DueDate property for Task entities.
@@ -108,8 +106,7 @@ def test_task_due_date(get_test_entities):
                 assert task.to_ai().get("Due Date") is None
 
 
-# @features task
-# @dimensions completed column details filter-value
+# @matrix task : column completed details filter-value
 @pytest.mark.unit
 def test_task_completed(get_test_entities):
     """Test Completed property for Task entities.
@@ -148,8 +145,7 @@ def test_task_completed(get_test_entities):
             assert "completed" not in task.details
 
 
-# @features task
-# @dimensions completed-on
+# @pair task:completed-on
 @pytest.mark.unit
 def test_task_completed_on_stores_timestamp():
     task = TestEntities.get(
@@ -169,8 +165,7 @@ def test_task_completed_on_stores_timestamp():
     assert task.db["completed_on"] == completed_on
 
 
-# @features task signature filters
-# @dimensions schema-field filter-value
+# @matrix filters signature task : filter-value schema-field
 @pytest.mark.unit
 def test_task_has_signature_filter_value(get_schema):
     """Task-level signature filter distinguishes signed, unsigned, and inapplicable tasks."""
@@ -233,8 +228,7 @@ def test_task_has_signature_filter_value(get_schema):
     assert "has_signature" not in plain.to_filter_index()
 
 
-# @features task status filters
-# @dimensions schema-field filter-value
+# @matrix filters status task : filter-value schema-field
 @pytest.mark.unit
 def test_task_has_status_filter_value(get_schema):
     """Task-level status filter distinguishes active, inactive, and inapplicable tasks."""
@@ -295,8 +289,7 @@ def test_task_has_status_filter_value(get_schema):
     assert "has_status" not in plain.to_filter_index()
 
 
-# @features task signature submission
-# @dimensions asset-lifecycle db-value
+# @matrix signature submission task : asset-lifecycle db-value
 @pytest.mark.unit
 def test_task_signature_form_submission_saves_asset_id(get_schema):
     """Submitting a signature file saves it as a task asset and stores the field id."""
@@ -335,8 +328,7 @@ def test_task_signature_form_submission_saves_asset_id(get_schema):
     assert task.to_filter_index()["has_signature"] is True
 
 
-# @features task signature submission
-# @dimensions asset-lifecycle db-value multiple-fields schema-id
+# @matrix signature submission task : asset-lifecycle db-value multiple-fields schema-id
 @pytest.mark.unit
 def test_task_signature_form_submission_saves_multiple_assets_by_field_id():
     """Multiple signature uploads are matched by each field's schema id."""
@@ -399,8 +391,7 @@ def test_task_signature_form_submission_saves_multiple_assets_by_field_id():
     assert saved[task.assets["signature-witness"]["path"]] == b"witness signature"
 
 
-# @features task
-# @dimensions categories parent-derived filter-value
+# @matrix task : categories filter-value parent-derived
 @pytest.mark.unit
 def test_task_categories_follow_parent_page_categories():
     """Task categories are derived from the parent page, including filter details."""
@@ -439,8 +430,7 @@ def test_task_categories_follow_parent_page_categories():
     assert "text" not in details
 
 
-# @features task filter-index permissions
-# @dimensions permission-neutral related-values column-view
+# @matrix filter-index permissions task : column-view permission-neutral related-values
 @pytest.mark.unit
 def test_task_filter_index_includes_restricted_related_values():
     """Filter index export includes related values hidden from column display."""
@@ -471,8 +461,7 @@ def test_task_filter_index_includes_restricted_related_values():
     assert task.to_filter_index(user=outsider)["assigned_to"] == "upg013r"
 
 
-# @features task
-# @dimensions assignment assigned-by assignee
+# @matrix task : assigned-by assignee assignment
 @pytest.mark.unit
 def test_task_assignment_records_assigned_by_user_page():
     """Assigning to a user stores page keys and records the authenticated assigner."""
@@ -517,8 +506,7 @@ def test_task_assignment_records_assigned_by_user_page():
     assert "assigned_by" not in task.db
 
 
-# @features task
-# @dimensions linked-pages related-files replacement unloaded-fallback
+# @matrix task : linked-pages related-files replacement unloaded-fallback
 @pytest.mark.unit
 def test_task_related_lists_replace_linked_pages_and_report_unloaded_files(
     monkeypatch,
@@ -583,8 +571,7 @@ def test_task_related_lists_replace_linked_pages_and_report_unloaded_files(
     assert context["keys"] == ["fil013"]
 
 
-# @features task
-# @dimensions model page details attach
+# @matrix task : attach details model page
 @pytest.mark.unit
 def test_task_model_and_page_details_attach_from_key_map():
     """Task model/page related properties expose filter and parent-detail contracts."""
@@ -612,8 +599,7 @@ def test_task_model_and_page_details_attach_from_key_map():
     assert task.properties.page.details_value == page.reference_details
 
 
-# @features task
-# @dimensions model-form inheritance
+# @matrix task : inheritance model-form
 @pytest.mark.unit
 def test_task_model_tracking_inherits_model_form(monkeypatch):
     """Tasks inherit loaded model forms without lazy-loading missing relations."""
@@ -657,8 +643,7 @@ def test_task_model_tracking_inherits_model_form(monkeypatch):
     assert lazy_task.form is None
 
 
-# @features task permissions
-# @dimensions assignee-override allowed
+# @matrix permissions task : allowed assignee-override
 @pytest.mark.unit
 def test_task_allowed_assigned_user_page_override():
     """Assigned users can view/edit tasks even when base permissions deny access."""
@@ -695,8 +680,7 @@ def test_task_allowed_assigned_user_page_override():
         assert not task.allowed(Action.VIEW, user=other)
 
 
-# @features task permissions
-# @dimensions stored-requires shallow-page lazy-parent-check
+# @matrix permissions task : lazy-parent-check shallow-page stored-requires
 @pytest.mark.unit
 def test_task_allowed_skips_unloaded_page_when_stored_permission_suffices():
     task = TestEntities.get(
@@ -712,8 +696,7 @@ def test_task_allowed_skips_unloaded_page_when_stored_permission_suffices():
     assert task.properties.page.is_set is False
 
 
-# @features task permissions
-# @dimensions restricted-access allowed parent-page
+# @matrix permissions task : allowed parent-page restricted-access
 @pytest.mark.unit
 def test_task_allowed_restricted_form_blocks_page_permission():
     """Task/form restrictions are a ceiling even when the parent page is visible."""
@@ -747,8 +730,7 @@ def test_task_allowed_restricted_form_blocks_page_permission():
         assert not task.allowed(Action.EDIT, user=outsider)
 
 
-# @features task permissions users
-# @dimensions models-scope user-page allowed
+# @matrix permissions task users : allowed models-scope user-page
 @pytest.mark.unit
 def test_task_allowed_models_view_requires_models_marker():
     """Models VIEW only grants task access when the task requirements include models."""
@@ -797,8 +779,7 @@ def test_task_allowed_models_view_requires_models_marker():
     assert category_task.allowed(Action.VIEW, user=model_viewer) is True
 
 
-# @features task permissions
-# @dimensions assignment restricted-access
+# @matrix permissions task : assignment restricted-access
 @pytest.mark.unit
 def test_task_update_rejects_assignee_without_restricted_task_access():
     """Assignment cannot grant access through a restricted task form."""
@@ -848,8 +829,7 @@ def test_task_update_rejects_assignee_without_restricted_task_access():
     assert "assigned_to" not in task.db
 
 
-# @features task task-scheduling
-# @dimensions postpone due-date
+# @matrix task task-scheduling : due-date postpone
 @pytest.mark.unit
 def test_task_postpone_preserves_original_due_date_once():
     """Postponing preserves the original due date across later postponements."""
@@ -870,8 +850,7 @@ def test_task_postpone_preserves_original_due_date_once():
     assert task.due_date == second_postponed
 
 
-# @features task
-# @dimensions update tracking uploaded-files
+# @matrix task : tracking update uploaded-files
 @pytest.mark.unit
 def test_task_update_tracks_project_model_and_uploaded_file():
     """Task updates track project/model transitions and uploaded file relations."""
@@ -944,8 +923,7 @@ def test_task_update_tracks_project_model_and_uploaded_file():
     assert task.model is None
 
 
-# @features task
-# @dimensions update file-assets uploaded-files preload file-details
+# @matrix task : file-assets file-details preload update uploaded-files
 @pytest.mark.unit
 def test_task_update_saves_file_relations_from_upload_assets():
     """Task upload saves file relations while preloading file details."""
@@ -987,8 +965,7 @@ def test_task_update_saves_file_relations_from_upload_assets():
     assert file_entity.details["id"] == file_entity.urlsafe_key
 
 
-# @features task
-# @dimensions entity-lifecycle create readonly save list-owner-fingerprint
+# @matrix task : create entity-lifecycle list-owner-fingerprint readonly save
 @pytest.mark.unit
 def test_task_entity_lifecycle_readonly_and_save_relations():
     """Task lifecycle helpers expose readonly and save relation contracts."""

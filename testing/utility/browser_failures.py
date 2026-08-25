@@ -61,8 +61,7 @@ class BrowserFailure:
 # @testable true
 # @tests tests_tooling/test_004_browser_failures.py
 # @tests tests_e2e/001_site/test_001a_environment.py::test_browser_failure_guard_detects_unhandled_page_errors
-# @features e2e browser-failures
-# @dimensions console pageerror requestfailed expectations
+# @matrix browser-failures e2e : console expectations pageerror requestfailed
 class BrowserFailureCollector:
     """Monitor every page in a test's browser contexts and retain failures."""
 

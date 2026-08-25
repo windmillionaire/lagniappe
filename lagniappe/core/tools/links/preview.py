@@ -276,8 +276,7 @@ def _external_preview(parsed):
 # @tests tests_unit/test_019_link_preview.py::test_external_preview_maps_metadata_and_falls_back
 # @tests tests_unit/test_019_link_preview.py::test_external_preview_rejects_unsafe_urls
 # @tests tests_e2e/004_projects/test_004e_document_forms.py::test_editor_preview_rejects_private_targets_without_disrupting_popover
-# @features editor link-preview
-# @dimensions internal external permissions metadata url-safety
+# @matrix editor link-preview : external internal metadata permissions url-safety
 def preview_for_url(url, user=None, base_url=None):
     value = str(url or "")
     if not value.strip():

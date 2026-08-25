@@ -157,8 +157,7 @@ def _organize_action_permission_context(user, allowed_actions):
 
 # @testable true
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_organize_prompt_includes_files_tools_instructions_and_high_limit
-# @features ai-report
-# @dimensions prompt files tools iteration-limit
+# @matrix ai-report : files iteration-limit prompt tools
 def organize_prompt(report, user, retrieval_context=None):
     """Build the AI prompt used to create an organize report proposal."""
     prompt = _organize_prompt_base(
@@ -184,8 +183,7 @@ to run it.
 
 # @testable true
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_revise_organize_prompt_includes_feedback_and_current_proposal
-# @features ai-report
-# @dimensions revision feedback proposal context
+# @matrix ai-report : context feedback proposal revision
 def revise_organize_prompt(report, user, feedback, retrieval_context=None):
     """Build the AI prompt used to revise an organize report proposal."""
     prompt = _organize_prompt_base(
@@ -359,8 +357,7 @@ def _input_file_context(report, user=None, retrieval_context=None):
 
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_organize_report_validates_ai_output
-# @features ai-report
-# @dimensions generate validate
+# @matrix ai-report : generate validate
 def generate_organize_plan(prompt):
     """Generate and structurally validate the Organize planning stage."""
     ai_debug(
@@ -397,12 +394,9 @@ def generate_organize_plan(prompt):
 
 # @testable true
 # @tests tests_unit/test_020f_ai_report_completion.py::test_generate_organize_report_completes_planned_submissions
-# @pair ai-report:generate
-# @pair ai-report:pipeline
-# @pair ai-report:submission-completion
+# @matrix ai-report : generate pipeline submission-completion
+# @matrix submission : evidence-mapping focused-prompt
 # @pair form-schema:structured-output
-# @pair submission:focused-prompt
-# @pair submission:evidence-mapping
 def generate_organize_report(prompt, report, user):
     """Generate, complete, and validate an Organize report proposal."""
     proposal = generate_organize_plan(prompt)

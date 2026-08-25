@@ -89,8 +89,7 @@ def _write_generation(root):
         (root / relative).chmod(0o600)
 
 
-# @features setup
-# @dimensions operator-summary secret-redaction
+# @matrix setup : operator-summary secret-redaction
 def test_redacted_install_summary_is_allowlisted():
     settings = {
         "APP_NAME": "Demo",
@@ -152,8 +151,7 @@ def test_redacted_install_summary_is_allowlisted():
     assert manual_lines[-1] == "After manual deployment: ./setup.sh jobs"
 
 
-# @features setup
-# @dimensions doctor adc keyless-config project-identity
+# @matrix setup : adc doctor keyless-config project-identity
 def test_doctor_reports_keyless_identity_drift():
     runtime_email = "runtime@demo-project.iam.gserviceaccount.com"
     assert doctor._keyless_identity_issues(
@@ -181,8 +179,7 @@ def test_doctor_reports_keyless_identity_drift():
     assert "RUNTIME_SERVICE_ACCOUNT_EMAIL is not configured" in issues
 
 
-# @features setup
-# @dimensions doctor read-only drift provider-identity
+# @matrix setup : doctor drift provider-identity read-only
 def test_doctor_reports_drift_without_writing(tmp_path, capsys):
     _write_generation(tmp_path)
     active_values = {
@@ -272,8 +269,7 @@ def test_doctor_reports_drift_without_writing(tmp_path, capsys):
     }
 
 
-# @features setup
-# @dimensions doctor adc provider-identity read-only
+# @matrix setup : adc doctor provider-identity read-only
 def test_doctor_reads_adc_identity_without_changing_it():
     events = []
     credentials = types.SimpleNamespace(
@@ -294,8 +290,7 @@ def test_doctor_reads_adc_identity_without_changing_it():
     assert events and "userinfo.email" in events[0][1]
 
 
-# @features setup
-# @dimensions doctor provider-discovery project-identity
+# @matrix setup : doctor project-identity provider-discovery
 def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
     calls = []
 
@@ -335,8 +330,7 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
     ]
 
 
-# @features setup
-# @dimensions repair explicit-mutation validation
+# @matrix setup : explicit-mutation repair validation
 def test_repair_runs_reconciliation_then_validation(monkeypatch):
     events = []
     monkeypatch.setattr(

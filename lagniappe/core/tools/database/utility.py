@@ -17,8 +17,7 @@ PREFIX = CONFIG.PREFIX
 
 # @testable true
 # @tests tests_unit/test_018b_database_migrations.py::test_database_initialize_only_marks_new_content_stores_as_fresh
-# @features database-migrations setup
-# @dimensions fresh-install detection reserved-seeding
+# @matrix database-migrations setup : detection fresh-install reserved-seeding
 def initialize():
     """Initialize data services and seed default reserved models if absent."""
     DATA.initialize()
@@ -109,8 +108,7 @@ class Fingerprint(Enum, metaclass=DefaultEnum):
 
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_save_persists_user_and_users_fingerprint_record
-# @features users caching
-# @dimensions site-fingerprint save
+# @matrix caching users : save site-fingerprint
 def save(*entities):
     """Persist entities to Datastore and update their site fingerprints."""
     to_save = {e.key: e.db for e in entities if getattr(e, "key", None)}
@@ -152,13 +150,8 @@ def _put_mutation(writer, entity, property_mask=None):
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_save_mutations_applies_property_masks_and_fingerprints
 # @tests tests_unit/test_018_database_utility.py::test_notification_save_and_delete_skip_site_fingerprints
-# @features mutations database
-# @dimensions property-mask update full-upsert site-fingerprint document-checkpoint
-# @pairs database:property-mask database:update database:full-upsert
-# @pairs database:site-fingerprint database:document-checkpoint
-# @pairs mutations:property-mask mutations:update mutations:full-upsert
-# @pairs mutations:site-fingerprint mutations:document-checkpoint
-# @pairs notifications:mutation notifications:site-fingerprint-isolation
+# @matrix database mutations : document-checkpoint full-upsert property-mask site-fingerprint update
+# @matrix notifications : mutation site-fingerprint-isolation
 def save_mutations(writes):
     """Persist full and property-masked entity writes in one Datastore batch.
 
@@ -197,8 +190,7 @@ def save_mutations(writes):
 
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_save_raw_persists_datastore_entities_without_typed_save_hooks
-# @features database migrations
-# @dimensions raw-save site-fingerprint
+# @matrix database migrations : raw-save site-fingerprint
 def save_raw(*entities):
     """Persist raw Datastore entities without running typed entity save hooks.
 
@@ -265,8 +257,7 @@ def delete_blobs(private_paths, public_paths):
 
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_update_site_fingerprints_upserts_missing_users_fingerprint
-# @features users caching
-# @dimensions site-fingerprint invalidation
+# @matrix caching users : invalidation site-fingerprint
 def update_site_fingerprints(*entities):
     fingerprints = set(Fingerprint[e.get("type")].value for e in entities)
     keys = [DATA.datastore.key("site", f) for f in fingerprints if f]
@@ -290,7 +281,7 @@ def site_fingerprint(path):
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
 # @tests tests_unit/test_018_database_utility.py::test_site_fingerprints_batch_reads_only_resolved_paths
-# @pairs polling:channel polling:batching polling:mounted-scope
+# @matrix polling : batching channel mounted-scope
 def site_fingerprints(paths):
     """Return fingerprints for ``paths`` through one bounded multi-read."""
     paths = tuple(dict.fromkeys(path for path in paths if isinstance(path, str)))

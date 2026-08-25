@@ -30,8 +30,7 @@ NPM_CLI = TOOL_PATHS["npm"]
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_portable_runtime_paths_commands_and_virtualenv_instructions
-# @features setup
-# @dimensions portability repository-root virtualenv
+# @matrix setup : portability repository-root virtualenv
 def project_virtualenv_active(*, prefix=None, base_prefix=None):
     """Return whether Python is running from this checkout's ``venv``."""
     prefix = Path(prefix or sys.prefix)
@@ -51,8 +50,7 @@ def project_virtualenv_active(*, prefix=None, base_prefix=None):
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_portable_runtime_paths_commands_and_virtualenv_instructions
-# @features setup
-# @dimensions portability generated-command
+# @matrix setup : generated-command portability
 def format_command(command, *, windows=None):
     """Render an argument-list command for the operator's supported shell."""
     command = [str(part) for part in command]
@@ -73,8 +71,7 @@ def python_command(script, *arguments, windows=None):
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_portable_runtime_paths_commands_and_virtualenv_instructions
-# @features setup
-# @dimensions portability generated-command
+# @matrix setup : generated-command portability
 def setup_command(*arguments, windows=None):
     """Return the supported setup launcher invocation for the user's platform."""
     windows = os.name == "nt" if windows is None else windows
@@ -84,8 +81,7 @@ def setup_command(*arguments, windows=None):
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_portable_runtime_paths_commands_and_virtualenv_instructions
-# @features setup
-# @dimensions portability virtualenv instructions
+# @matrix setup : instructions portability virtualenv
 def virtualenv_instructions():
     """Return both supported environment-bootstrap/setup command forms."""
     return (

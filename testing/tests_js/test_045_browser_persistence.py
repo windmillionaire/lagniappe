@@ -83,8 +83,7 @@ async function waitForRequests(tx, count) {
 '''
 
 
-# @features offline sync
-# @dimensions transaction-commit connection-lifecycle multi-delete readonly-result
+# @matrix offline sync : connection-lifecycle multi-delete readonly-result transaction-commit
 def test_indexeddb_operations_resolve_only_after_transaction_commit(run_node):
     run_node(
         _OFFLINE_HARNESS
@@ -152,8 +151,7 @@ def test_indexeddb_operations_resolve_only_after_transaction_commit(run_node):
     )
 
 
-# @features offline sync
-# @dimensions transaction-abort error-ownership connection-lifecycle
+# @matrix offline sync : connection-lifecycle error-ownership transaction-abort
 def test_indexeddb_abort_and_errors_reject_once_and_close_the_database(run_node):
     run_node(
         _OFFLINE_HARNESS
@@ -219,8 +217,7 @@ def test_indexeddb_abort_and_errors_reject_once_and_close_the_database(run_node)
     )
 
 
-# @features offline sync
-# @dimensions executor-error transaction-abort error-ownership
+# @matrix offline sync : error-ownership executor-error transaction-abort
 def test_indexeddb_executor_failures_abort_and_preserve_the_original_error(run_node):
     run_node(
         _OFFLINE_HARNESS
@@ -342,8 +339,7 @@ function makeDocument({ acknowledged = "<p>Saved</p>", current = acknowledged } 
 '''
 
 
-# @features editor html-field
-# @dimensions initial-load retry authoritative-content error-reporting
+# @matrix editor html-field : authoritative-content error-reporting initial-load retry
 def test_independent_editor_failed_load_stays_inert_and_retries(run_node):
     run_node(
         _EDITOR_HARNESS
@@ -402,8 +398,7 @@ def test_independent_editor_failed_load_stays_inert_and_retries(run_node):
     )
 
 
-# @features editor html-field
-# @dimensions server-acknowledgement retry error-reporting
+# @matrix editor html-field : error-reporting retry server-acknowledgement
 def test_independent_editor_failed_save_stays_dirty_and_retries(run_node):
     run_node(
         _EDITOR_HARNESS
@@ -447,8 +442,7 @@ def test_independent_editor_failed_save_stays_dirty_and_retries(run_node):
     )
 
 
-# @features editor html-field
-# @dimensions serialized-save concurrent-edit server-acknowledgement keepalive
+# @matrix editor html-field : concurrent-edit keepalive serialized-save server-acknowledgement
 def test_independent_editor_serializes_inflight_edits_and_acknowledges_in_order(
     run_node,
 ):
@@ -512,8 +506,7 @@ def test_independent_editor_serializes_inflight_edits_and_acknowledges_in_order(
     )
 
 
-# @features editor html-field
-# @dimensions intentional-clear server-acknowledgement
+# @matrix editor html-field : intentional-clear server-acknowledgement
 def test_independent_editor_saves_intentional_clear(run_node):
     run_node(
         _EDITOR_HARNESS
@@ -547,7 +540,7 @@ def test_independent_editor_saves_intentional_clear(run_node):
     )
 
 
-# @pairs editor:teardown html-field:teardown
+# @matrix editor html-field : teardown
 def test_builder_owns_independent_editor_lifecycle_flushes(run_node):
     run_node(
         r'''

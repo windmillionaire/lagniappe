@@ -208,8 +208,7 @@ def _listed_domain_mapping(mappings, project_id, domain):
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_reports_permanent_provider_failure
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_timeout_keeps_deployment_incomplete
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_managed_certificate_reports_missing_domain_mapping
-# @features setup
-# @dimensions gcp-domain managed-certificate deploy retry timeout operator-guidance https provider-status provider-failure incomplete-deployment missing-resource account-project success
+# @matrix setup : account-project deploy gcp-domain https incomplete-deployment managed-certificate missing-resource operator-guidance provider-failure provider-status retry success timeout
 def wait_for_managed_certificate(
     domain,
     *,
@@ -375,8 +374,7 @@ def _validated_mapping(mapping, project_id, domain):
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_empty_mapping_list_creates_managed_mapping
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_existing_domain_mapping_enables_managed_tls
 # @tests tests_tooling/test_001d_setup_drift.py::test_app_engine_discovery_has_domain_mapping_create
-# @features setup
-# @dimensions gcp-domain managed-certificate missing-resource reconciliation api-drift idempotence provider-records
+# @matrix setup : api-drift gcp-domain idempotence managed-certificate missing-resource provider-records reconciliation
 def create_gcp_domain_mapping(domain, sp, *, sleep=time.sleep):
     """Discover or create a mapping and return Google's exact DNS records."""
     from config import SETTINGS

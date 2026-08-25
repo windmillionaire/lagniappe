@@ -7,7 +7,6 @@ from .compensation import (
     _compensate_created_task,
     _manual_compensation,
     _noop_compensation,
-    _undo_result_action,
     _without_report,
 )
 from .entities import (
@@ -127,8 +126,7 @@ REPORT_ACTION_ADAPTERS = {
 
 # @testable true
 # @tests tests_unit/test_020h_ai_report_execution.py::test_report_action_registry_matches_proposal_contracts
-# @pair ai-report:action-registry
-# @pair ai-report:contract
+# @matrix ai-report : action-registry contract
 def validate_report_action_registry():
     if set(REPORT_ACTION_ADAPTERS) != set(REPORT_ACTION_DATA_CONTRACTS) or set(
         REPORT_ACTION_ADAPTERS

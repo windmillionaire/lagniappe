@@ -11,8 +11,7 @@ Category/project surfaces that attach forms are covered in ``012`` /
 import pytest
 
 
-# @features filters
-# @dimensions condition-definition string
+# @matrix filters : condition-definition string
 @pytest.mark.unit
 def test_form_string_filters(get_test_entities, get_schema, test_condition_definition):
     """Test STRING form fields (TextInput) with SUBSTRING and EQUALS comparators."""
@@ -22,8 +21,7 @@ def test_form_string_filters(get_test_entities, get_schema, test_condition_defin
     test_condition_definition(form)
 
 
-# @features filters
-# @dimensions condition-definition boolean
+# @matrix filters : boolean condition-definition
 @pytest.mark.unit
 def test_form_boolean_filters(get_test_entities, get_schema, test_condition_definition):
     """Test BOOLEAN form fields (Checkbox) with IS_TRUE and IS_FALSE comparators."""
@@ -33,8 +31,7 @@ def test_form_boolean_filters(get_test_entities, get_schema, test_condition_defi
     test_condition_definition(form)
 
 
-# @features filters
-# @dimensions condition-definition timestamp
+# @matrix filters : condition-definition timestamp
 @pytest.mark.unit
 def test_form_timestamp_filters(
     get_test_entities, get_schema, test_condition_definition
@@ -52,8 +49,7 @@ def test_form_timestamp_filters(
         test_condition_definition(form)
 
 
-# @features filters
-# @dimensions condition-definition entity-valued
+# @matrix filters : condition-definition entity-valued
 @pytest.mark.unit
 def test_form_internal_link_filters(
     get_test_entities, get_schema, test_condition_definition
@@ -66,8 +62,7 @@ def test_form_internal_link_filters(
     test_condition_definition(form, entity_map=entity_map)
 
 
-# @features filters
-# @dimensions condition-definition number
+# @matrix filters : condition-definition number
 @pytest.mark.unit
 def test_form_number_filters(get_test_entities, get_schema, test_condition_definition):
     """Test NUMBER form fields (NumberInput) with EQUALS, LT, GT, BETWEEN comparators."""
@@ -77,8 +72,7 @@ def test_form_number_filters(get_test_entities, get_schema, test_condition_defin
     test_condition_definition(form)
 
 
-# @features filters
-# @dimensions condition-definition categorical
+# @matrix filters : categorical condition-definition
 @pytest.mark.unit
 def test_form_categorical_filters(
     get_test_entities, get_schema, test_condition_definition
@@ -90,8 +84,7 @@ def test_form_categorical_filters(
     test_condition_definition(form)
 
 
-# @features filters status
-# @dimensions status-excluded form-filters
+# @matrix filters status : form-filters status-excluded
 @pytest.mark.unit
 def test_form_status_filters(get_test_entities, get_schema):
     """Status fields are computed columns, not form-level filter conditions."""
@@ -111,8 +104,7 @@ def test_form_status_filters(get_test_entities, get_schema):
         assert not condition_fields.intersection(status_ids)
 
 
-# @features filters select
-# @dimensions condition-definition select multiple
+# @matrix filters select : condition-definition multiple select
 @pytest.mark.unit
 def test_form_select_filters(get_test_entities, get_schema, test_condition_definition):
     """Test Select form fields - single-select (STRING) and multi-select (LIST)."""

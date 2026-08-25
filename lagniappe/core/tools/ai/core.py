@@ -81,8 +81,7 @@ DEFERRED_AI_RETRY_ATTEMPTS = 2
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_config_combines_search_tools_json_and_thinking_settings
-# @features ai
-# @dimensions retry-config
+# @pair ai:retry-config
 def retry_http_options(api_version=None, attempts=None, headers=None):
     """Build request-level retry settings and optional routing headers."""
     retry_options = types.HttpRetryOptions(
@@ -107,8 +106,7 @@ def retry_http_options(api_version=None, attempts=None, headers=None):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
 # @tests tests_unit/test_015_ai_tools.py::test_generate_ai_image_returns_clean_provider_message
-# @features ai
-# @dimensions image-generate config provider-errors user-message
+# @matrix ai : config image-generate provider-errors user-message
 def provider_error_message(error):
     """Extract the concise provider message from a GenAI exception."""
     details = provider_error_details(error)
@@ -120,8 +118,7 @@ def provider_error_message(error):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_text_generation
-# @features ai
-# @dimensions provider-errors quota
+# @matrix ai : provider-errors quota
 def provider_error_details(error):
     """Extract structured details from a GenAI provider exception."""
     message = getattr(error, "message", None)
@@ -146,8 +143,7 @@ def provider_error_details(error):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_text_generation
-# @features ai
-# @dimensions provider-errors quota
+# @matrix ai : provider-errors quota
 def is_provider_quota_error(error):
     """Return whether a provider exception represents retryable quota pressure."""
     details = provider_error_details(error)
@@ -163,8 +159,7 @@ def is_provider_quota_error(error):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_transient_error_classification
-# @features ai deferred-jobs
-# @dimensions provider-errors retry-classification
+# @matrix ai deferred-jobs : provider-errors retry-classification
 def is_provider_transient_error(error):
     """Return whether a provider error is safe for a deferred retry."""
     if isinstance(error, (httpx.TimeoutException, httpx.ConnectError)):
@@ -222,8 +217,7 @@ def _finish_reason_name(reason):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
-# @features ai
-# @dimensions cleanup citations
+# @matrix ai : citations cleanup
 def clean_json_references(obj):
     """Recursively remove numeric reference citations from JSON strings."""
     if isinstance(obj, dict):
@@ -237,8 +231,7 @@ def clean_json_references(obj):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
-# @features ai
-# @dimensions cleanup json-extraction
+# @matrix ai : cleanup json-extraction
 def extract_first_json_value(response_text):
     """Return the first balanced JSON object or array from model output."""
     start = next(
@@ -306,8 +299,7 @@ class GenAI:
 
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
-    # @features ai
-    # @dimensions cleanup citations
+    # @matrix ai : citations cleanup
     @staticmethod
     def cleanup(response_text, output_format):
         """Strip code fences and numeric reference citations from model output.
@@ -344,8 +336,7 @@ class GenAI:
     # @tests tests_unit/test_015_ai_tools.py::test_ai_config_combines_search_tools_json_and_thinking_settings
     # @tests tests_unit/test_015_ai_tools.py::test_deferred_ai_config_uses_short_sdk_retry_profile
     # @tests tests_unit/test_015_ai_tools.py::test_ai_model_tier_routes_generation_to_primary_or_utility_model
-    # @features ai
-    # @dimensions config search tools output-format thinking service-tier retry-config retry-ownership
+    # @matrix ai : config output-format retry-config retry-ownership search service-tier thinking tools
     @staticmethod
     def create_config(prompt, **overrides):
         """Build a GenerateContentConfig from a Prompt's settings."""
@@ -407,8 +398,7 @@ class GenAI:
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_ai_model_tier_routes_generation_to_primary_or_utility_model
     # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_json_generation_pins_runtime_model_through_structured_final_pass
-    # @features ai
-    # @dimensions model-routing runtime-settings request-pinning
+    # @matrix ai : model-routing request-pinning runtime-settings
     @staticmethod
     def _model_for_prompt(prompt, settings=None):
         """Choose the configured text model for a prompt's requested tier."""
@@ -419,8 +409,7 @@ class GenAI:
 
     # @testable true
     # @tests tests_unit/test_015b_ai_prompt_builders.py::test_prompt_tracks_context_output_examples_and_attachments
-    # @features ai
-    # @dimensions prompt attachments
+    # @matrix ai : attachments prompt
     def _build_contents(self, prompt):
         contents = [prompt.build()]
         for data in prompt.bytes:
@@ -436,8 +425,7 @@ class GenAI:
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_ai_model_cleanup_extracts_json_text_and_blocked_responses
     # @tests tests_unit/test_015_ai_tools.py::test_ai_accepts_empty_json_object_without_retry
-    # @features ai
-    # @dimensions response-extraction safety empty-json
+    # @matrix ai : empty-json response-extraction safety
     @staticmethod
     def _extract_text(response, output_format):
         if response.candidates:
@@ -476,10 +464,8 @@ class GenAI:
     # @tests tests_unit/test_015_ai_tools.py::test_autofill_accepts_summary_backed_json_without_tool_or_final_call
     # @tests tests_unit/test_015_ai_tools.py::test_ai_search_json_generation_keeps_provider_response_unconstrained
     # @tests tests_unit/test_015_ai_tools.py::test_ai_provider_quota_error_is_wrapped_for_tool_loop
-    # @features ai
-    # @dimensions model-routing empty-response-retry empty-json
-    # @pairs ai:provider-errors ai:quota ai:tool-loop
-    # @pairs ai:search ai:output-format
+    # @matrix ai : output-format provider-errors quota search tool-loop
+    # @matrix ai : empty-response-retry model-routing
     def generate_content(self, prompt, *, validator=None):
         """Generate and optionally validate text under one observable call boundary."""
         observer = GenerationObserver(prompt)
@@ -642,8 +628,7 @@ class GenAI:
 
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_loop_limit_exception_includes_trace
-    # @features ai
-    # @dimensions tool-dispatch trace error-context
+    # @matrix ai : error-context tool-dispatch trace
     def _tool_loop(
         self,
         response,
@@ -805,8 +790,7 @@ class GenAI:
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_json_generation_pins_runtime_model_through_structured_final_pass
     # @tests tests_unit/test_015_ai_tools.py::test_ai_tool_json_generation_preserves_no_call_response_in_structured_final
-    # @features ai
-    # @dimensions structured-output tool-loop config response-preservation
+    # @matrix ai : config response-preservation structured-output tool-loop
     def _generate_structured_final(
         self,
         contents,
@@ -886,8 +870,7 @@ class GenAI:
     # @testable true
     # @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
     # @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
-    # @features pages
-    # @dimensions image-generate
+    # @matrix ai pages : image-generate
     def generate_image(self, prompt, aspect_ratio=None):
         """Generate an image from a Prompt and return a BytesIO buffer."""
         model = runtime_ai_settings()["AI_IMAGE_MODEL"]
@@ -934,8 +917,7 @@ class GenAI:
 
     # @testable true
     # @tests tests_unit/test_015_ai_tools.py::test_ai_image_generation_config_and_provider_error
-    # @features ai
-    # @dimensions image-generate imagen config
+    # @matrix ai : config image-generate imagen
     def _generate_imagen_image(self, prompt, model, aspect_ratio=None):
         """Generate an image through Imagen's generate_images endpoint."""
         config_data = {"number_of_images": 1}

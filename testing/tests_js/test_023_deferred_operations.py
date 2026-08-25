@@ -1,8 +1,7 @@
 """Node-backed checks for deferred-operation poll subscriptions."""
 
 
-# @features deferred-jobs
-# @dimensions status revision polling progress timing backoff teardown decoration-opt-out visible-blur rendered-visibility lazy-watcher terminal-ownership
+# @matrix deferred-jobs : backoff decoration-opt-out lazy-watcher polling progress rendered-visibility revision status teardown terminal-ownership timing visible-blur
 def test_deferred_operation_manager_batches_orders_and_renders_status(run_node):
     run_node(
         r"""

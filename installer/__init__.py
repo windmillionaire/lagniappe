@@ -20,8 +20,7 @@ from runner.context import (
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_formatter_tracks_active_spinners
-# @features setup
-# @dimensions portability terminal-wrapping
+# @matrix setup : portability terminal-wrapping
 def wrap_text(message, width=None):
     """Word-wrap operator-facing prose while preserving intentional line breaks."""
     if width is None:
@@ -55,8 +54,7 @@ def wrap_text(message, width=None):
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
-# @features setup
-# @dimensions prerequisites portability python-version virtualenv
+# @matrix setup : portability prerequisites python-version virtualenv
 def verify_setup_runtime():
     """Require supported Python from this checkout's project virtualenv."""
     from installer.errors import SetupError
@@ -76,8 +74,7 @@ def verify_setup_runtime():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_formatter_tracks_active_spinners
-# @features setup
-# @dimensions portability encoding
+# @matrix setup : encoding portability
 def _supports_unicode(stream, text):
     encoding = getattr(stream, "encoding", None) or "ascii"
     try:
@@ -89,8 +86,7 @@ def _supports_unicode(stream, text):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_formatter_tracks_active_spinners
-# @features setup
-# @dimensions portability spinner
+# @matrix setup : portability spinner
 def _use_plain_progress(stream=None):
     """Use static progress on Windows and whenever stdout is not interactive."""
     stream = stream or sys.stdout
@@ -130,8 +126,7 @@ class _PlainSpinner:
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_config_status_save_and_gcloud_login_helpers
-# @features setup
-# @dimensions config-files
+# @pair setup:config-files
 def config_file_status():
     from config import File
 
@@ -143,8 +138,7 @@ def config_file_status():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_formatter_tracks_active_spinners
-# @features setup
-# @dimensions package-install spinner
+# @matrix setup : package-install spinner
 class Formatter:
     _initialized = False
 

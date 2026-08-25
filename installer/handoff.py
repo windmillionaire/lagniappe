@@ -11,8 +11,7 @@ OWNER_ROLE = "roles/owner"
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_handoff_operator_preparation_accepts_installer_or_owner
-# @pairs handoff:operator handoff:installer handoff:owner handoff:active-account
-# @pairs handoff:gcloud handoff:adc handoff:preconditions
+# @matrix handoff : active-account adc gcloud installer operator owner preconditions
 def prepare_handoff_operator():
     """Activate the saved project as either permitted handoff operator."""
     from config import SETTINGS
@@ -122,8 +121,7 @@ def _service_account_policy(client, project_id, runtime_email):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent
-# @pairs handoff:owner-add handoff:bucket handoff:service-account
-# @pairs handoff:idempotence handoff:verification
+# @matrix handoff : bucket idempotence owner-add service-account verification
 def _grant_owner_resource_access(context, project_id, runtime_email, owner_email):
     from google.iam.v1 import policy_pb2
 
@@ -179,8 +177,7 @@ def _grant_owner_resource_access(context, project_id, runtime_email, owner_email
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent
-# @pairs handoff:installer-removal handoff:bucket handoff:service-account
-# @pairs handoff:verification handoff:unrelated-members
+# @matrix handoff : bucket installer-removal service-account unrelated-members verification
 def _remove_installer_resource_access(
     context, project_id, runtime_email, installer_email
 ):
@@ -211,8 +208,7 @@ def _remove_installer_resource_access(
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent
-# @pairs handoff:project-role handoff:final-mutation handoff:owner-lockout
-# @pairs handoff:verification handoff:all-bindings
+# @matrix handoff : all-bindings final-mutation owner-lockout project-role verification
 def _remove_installer_project_access(
     context, project_id, installer_email, owner_email
 ):
@@ -239,10 +235,7 @@ def _remove_installer_project_access(
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_orders_mutations_preserves_unrelated_members_and_is_idempotent
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_delegated_handoff_rejects_owner_lockout_and_default_no_confirmation
-# @pairs handoff:preconditions handoff:preview handoff:confirmation handoff:ordering
-# @pairs handoff:resumable handoff:idempotence handoff:cleanup
-# @pairs handoff:settings handoff:deploy handoff:owner-lockout
-# @pairs handoff:default-no handoff:no-mutation
+# @matrix handoff : cleanup confirmation default-no deploy idempotence no-mutation ordering owner-lockout preconditions preview resumable settings
 def handoff(*, context=None, deploy=None, confirm=None, permission_check=None):
     """Transfer Lagniappe-managed operator access from installer to Owner."""
     from config import File, SETTINGS

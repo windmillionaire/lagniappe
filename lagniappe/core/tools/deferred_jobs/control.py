@@ -16,8 +16,7 @@ from .errors import (
 
 # @testable true
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_execution_control_renews_and_observes_lost_claim
-# @features deferred-jobs
-# @dimensions heartbeat deadline cancellation progress provider-boundary tool-boundary
+# @matrix deferred-jobs : cancellation deadline heartbeat progress provider-boundary tool-boundary
 class DeferredExecutionControl:
     """Lease, deadline, cancellation, and coarse progress for one attempt."""
 
@@ -101,8 +100,7 @@ class DeferredExecutionControl:
 
 # @testable true
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_execution_control_renews_and_observes_lost_claim
-# @features deferred-jobs
-# @dimensions heartbeat blocking-provider lease-loss
+# @matrix deferred-jobs : blocking-provider heartbeat lease-loss
 class _DeferredLeaseGuard:
     """Renew a claim while a blocking provider request owns the worker."""
 

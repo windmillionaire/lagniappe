@@ -1,7 +1,6 @@
 """Input-file preparation for Organize reports."""
 
-from lagniappe.core.definitions import Action, LARGE_ASSET_BYTES
-from lagniappe.core.entities import Entities
+from lagniappe.core.definitions import LARGE_ASSET_BYTES
 
 from ...summarize import (
     UNREADABLE_PDF_SUMMARY_ERROR,
@@ -84,8 +83,7 @@ def _set_oversized_report_summary(file):
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_summarize_report_input_files_saves_missing_summaries
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_summarize_report_input_files_falls_back_for_large_files
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_unreadable_pdf_is_saved_skipped_and_reported
-# @features ai-report
-# @dimensions summary-prepass quota search-opt-in large-file fallback active-request unreadable-pdf
+# @matrix ai-report : active-request fallback large-file quota search-opt-in summary-prepass unreadable-pdf
 def summarize_report_input_files(
     report,
     save=None,

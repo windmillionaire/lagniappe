@@ -111,8 +111,7 @@ def _bounded_text(value, path, *, allow_empty=False):
 
 # @testable true
 # @tests tests_unit/test_011c_filter_contract.py::test_parse_filter_request_distinguishes_malformed_and_semantic_errors
-# @features filters
-# @dimensions request-contract malformed legacy versioning limits
+# @matrix filters : legacy limits malformed request-contract versioning
 def parse_filter_request(contract_value, definition_values):
     """Parse one v1 request envelope or adapt repeated legacy definitions."""
     definition_values = list(definition_values or ())
@@ -161,8 +160,7 @@ def parse_filter_request(contract_value, definition_values):
 
 # @testable true
 # @tests tests_unit/test_011c_filter_contract.py::test_legacy_definitions_discard_client_type_flags
-# @features filters
-# @dimensions saved-filter legacy compatibility
+# @matrix filters : compatibility legacy saved-filter
 def legacy_definitions_to_contract(definitions):
     """Convert compact v0 definition lists without trusting their type flags."""
     if not isinstance(definitions, list):
@@ -306,7 +304,8 @@ def field_catalog(parent, user):
 # @testable true
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_preview_rejects_malformed_and_forged_contracts
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_attached_form_select_condition
-# @pairs filters:unavailable-source permissions:unavailable-source filters:attached-form
+# @matrix filters : attached-form unavailable-source
+# @pair permissions:unavailable-source
 def resolve_filter_field(parent, source_id, field_name, user):
     """Resolve a submitted source and field only through the authorized catalog."""
     catalog = field_catalog(parent, user)
@@ -333,7 +332,8 @@ def resolve_filter_field(parent, source_id, field_name, user):
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_attached_form_select_condition
-# @pairs filters:attached-form filters:selector permissions:relationship
+# @matrix filters : attached-form selector
+# @pair permissions:relationship
 def resolve_allowed_value(entry, value):
     """Resolve a dynamic selector value from an entry's exact allowed set."""
     normalized = str(value or "").removeprefix("hash:")
@@ -607,7 +607,8 @@ def _canonical_condition(entry, comparator, value):
 # @testable true
 # @tests tests_unit/test_011c_filter_contract.py::test_compile_filter_contract_rederives_types_authorizes_entities_and_bounds_input
 # @tests tests_unit/test_015c_ai_filter_query.py::test_compile_filter_definitions_normalizes_dates_numbers_and_booleans
-# @pairs filters:validation filters:authorization filters:compilation filters:normalization filters:limits ai-filter:compilation ai-filter:validation
+# @matrix ai-filter : compilation validation
+# @matrix filters : authorization compilation limits normalization validation
 def compile_filter_contract(parent, contract, user, *, allow_default_source=False):
     """Validate a v1 DTO against the current authorized field catalog."""
     _validate_parent(parent, user)

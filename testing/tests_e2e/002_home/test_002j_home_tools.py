@@ -411,8 +411,7 @@ def _needs_review_report(user):
     return report
 
 
-# @features ai-report
-# @dimensions upload-form multi-file instructions explain-button ask create tool-switcher
+# @matrix ai-report : ask create explain-button instructions multi-file tool-switcher upload-form
 # @template home/tools.html::create_report
 def test_tools_create_form_has_expected_controls(get_user):
     user = get_user(Users.OWNER)
@@ -474,7 +473,7 @@ def test_tools_create_form_has_expected_controls(get_user):
     expect(form.get_by_role("button", name="Start")).to_be_visible()
 
 
-# @pairs ai-access:authentication ai-access:route-gate
+# @matrix ai-access : authentication route-gate
 # @pair cache:invalidation-acknowledgement
 # @template home/home.html::main
 # @template home/tools.html::create_report
@@ -542,8 +541,7 @@ def test_ai_access_tiers_gate_tool_routes(get_user, browser_failures):
         assert statuses == expected_statuses
 
 
-# @pair ai-access:report-read
-# @pair cache:invalidation-acknowledgement
+# @pairs ai-access:report-read cache:invalidation-acknowledgement
 def test_ask_access_can_read_create_report_without_create_actions(get_user):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -587,8 +585,7 @@ def test_ask_access_can_read_create_report_without_create_actions(get_user):
     ).to_have_count(0)
 
 
-# @features ai-report
-# @dimensions create async persistence title-truncation
+# @matrix ai-report : async create persistence title-truncation
 # @template home/tools.html::create_report
 def test_create_tool_starts_pending_report(get_user):
     user = get_user(Users.OWNER)
@@ -629,8 +626,7 @@ def test_create_tool_starts_pending_report(get_user):
     assert report.pending is True
 
 
-# @features ai-report
-# @dimensions list lazy-load status-reconciliation
+# @matrix ai-report : lazy-load list status-reconciliation
 # @template home/tools.html::report_item
 def test_lazy_report_list_reconciles_active_job_status(get_user):
     user = get_user(Users.OWNER)
@@ -684,8 +680,7 @@ def test_lazy_report_list_reconciles_active_job_status(get_user):
     )
 
 
-# @features ai-report
-# @dimensions create async text-only ask-fallback
+# @matrix ai-report : ask-fallback async create text-only
 def test_text_only_organize_uses_ask(get_user):
     user = get_user(Users.OWNER)
     home = user.go(SitePages.HOME)
@@ -708,8 +703,7 @@ def test_text_only_organize_uses_ask(get_user):
     assert report.input_files == []
 
 
-# @features ai-report
-# @dimensions upload validation http-boundary
+# @matrix ai-report : http-boundary upload validation
 def test_organize_rejects_zero_byte_folder_placeholder(get_user, browser_failures):
     user = get_user(Users.OWNER)
     user.go(SitePages.HOME)
@@ -764,8 +758,7 @@ def _create_uploaded_report_item(user):
     return item, report
 
 
-# @features ai-report
-# @dimensions list deferred-refresh operation-poll stage-labels
+# @matrix ai-report : deferred-refresh list operation-poll stage-labels
 # @template home/tools.html::report_stage_label
 # @template home/tools.html::report_item
 def test_report_list_item_refreshes_stage_labels(get_user):
@@ -856,8 +849,7 @@ def test_report_list_item_refreshes_stage_labels(get_user):
     expect(item.locator("[data-role='report-stage']")).to_have_text("Answer ready")
 
 
-# @features ai-report
-# @dimensions list delete-modal file-cleanup
+# @matrix ai-report : delete-modal file-cleanup list
 # @template home/tools.html::report_item
 def test_report_list_item_delete_removes_report_only_file(get_user):
     user = get_user(Users.OWNER)
@@ -878,8 +870,7 @@ def test_report_list_item_delete_removes_report_only_file(get_user):
     assert Entities.fetch_one(uploaded_file.urlsafe_key, request=Fetch.root()) is None
 
 
-# @features ai-report
-# @dimensions detail deterministic-run result-json delete-modal repeat-run idempotent
+# @matrix ai-report : delete-modal detail deterministic-run idempotent repeat-run result-json
 def test_report_detail_runs_ready_report(get_user):
     user = get_user(Users.OWNER)
     report, category_name, page_name = _ready_report(user)
@@ -980,8 +971,7 @@ def test_email_report_detail_collapses_message_behind_subject_and_sender(get_use
     )
 
 
-# @features ai-report
-# @dimensions detail recovery retry failed-prefix undo deterministic-undo failure reload
+# @matrix ai-report : detail deterministic-undo failed-prefix failure recovery reload retry undo
 def test_failed_report_detail_offers_retry_and_partial_undo(get_user):
     user = get_user(Users.OWNER)
     report, project = _recoverable_failed_report(user)
@@ -1008,8 +998,7 @@ def test_failed_report_detail_offers_retry_and_partial_undo(get_user):
     assert Entities.fetch_one(project.urlsafe_key, request=Fetch.root()) is None
 
 
-# @features ai-report
-# @dimensions ask detail answer-html links no-actions
+# @matrix ai-report : answer-html ask detail links no-actions
 def test_ask_report_detail_shows_answer_without_duplicate_proposal(get_user):
     user = get_user(Users.OWNER)
     report = _ask_answer_report(user)
@@ -1032,8 +1021,7 @@ def test_ask_report_detail_shows_answer_without_duplicate_proposal(get_user):
     expect(report_page.execute_button).not_to_be_visible()
 
 
-# @features ai-report
-# @dimensions revision ready-state completed-state route-guard
+# @matrix ai-report : completed-state ready-state revision route-guard
 def test_report_revision_is_only_available_before_completion(
     get_user, browser_failures
 ):
@@ -1100,8 +1088,7 @@ def test_report_revision_is_only_available_before_completion(
         assert "Only reports with saved responses can be revised" in response["text"]
 
 
-# @features ai-report
-# @dimensions detail needs-review no-execute revision
+# @matrix ai-report : detail needs-review no-execute revision
 # @template tools/report.html::proposal_action_item
 def test_report_detail_shows_review_only_proposal_without_execute(get_user):
     user = get_user(Users.OWNER)
@@ -1123,8 +1110,7 @@ def test_report_detail_shows_review_only_proposal_without_execute(get_user):
     expect(user.page.get_by_role("button", name="Revise Plan")).to_be_visible()
 
 
-# @features ai-report
-# @dimensions create detail revision skip-action execute
+# @matrix ai-report : create detail execute revision skip-action
 def test_create_report_detail_shows_revision_and_manual_execution(get_user):
     user = get_user(Users.OWNER)
     report = _create_ready_report(user)
@@ -1142,13 +1128,11 @@ def test_create_report_detail_shows_revision_and_manual_execution(get_user):
     expect(proposal_json).to_contain_text('"type": "create_page"')
 
 
-# @features ai-report
-# @dimensions detail organize revision feedback async pending deferred-refresh live-submit
+# @matrix ai-report : async deferred-refresh detail feedback live-submit organize pending revision
 def test_organize_report_detail_refreshes_when_submitted_revision_completes(
     get_user,
 ):
     user = get_user(Users.OWNER)
-    owner = _owner(user)
     report, _category_name, _page_name = _ready_report(user)
 
     report_page = user.go(Report.for_entity(user, report))
@@ -1207,8 +1191,7 @@ def test_organize_report_detail_refreshes_when_submitted_revision_completes(
     ).not_to_be_attached()
 
 
-# @features ai-report
-# @dimensions detail skip-action dependencies result-json
+# @matrix ai-report : dependencies detail result-json skip-action
 def test_report_detail_skips_action_dependencies(get_user):
     user = get_user(Users.OWNER)
     report = _dependency_report(user)
@@ -1263,8 +1246,7 @@ def test_report_detail_skips_action_dependencies(get_user):
     ]
 
 
-# @features ai-report
-# @dimensions detail schema-update skip-action deterministic-run batch-field-patch
+# @matrix ai-report : batch-field-patch detail deterministic-run schema-update skip-action
 def test_report_detail_skips_schema_section_and_runs_submission_updates(get_user):
     user = get_user(Users.OWNER)
     report, form, page = _schema_section_report(user)

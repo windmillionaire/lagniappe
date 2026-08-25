@@ -30,8 +30,7 @@ def _allowed(entity, allowed):
     return entity
 
 
-# @features submitted-references
-# @dimensions batch kind action predicate generic-error
+# @matrix submitted-references : action batch generic-error kind predicate
 def test_submitted_reference_resolver_rejects_unavailable_targets():
     actor = UtilityTestUser()
     denied = _allowed(
@@ -67,8 +66,7 @@ def test_submitted_reference_resolver_rejects_unavailable_targets():
             )
 
 
-# @features submitted-references
-# @dimensions order dedup existing predicate
+# @matrix submitted-references : dedup existing order predicate
 def test_submitted_reference_resolver_preserves_authorized_order_and_existing_targets():
     actor = UtilityTestUser()
     first = _allowed(
@@ -95,8 +93,7 @@ def test_submitted_reference_resolver_preserves_authorized_order_and_existing_ta
     ) == [first, existing]
 
 
-# @features task-attachments
-# @dimensions signed-claim actor file scope expiry tamper validation
+# @matrix task-attachments : actor expiry file scope signed-claim tamper validation
 def test_task_attachment_claim_is_actor_file_scope_bound_and_expiring(monkeypatch):
     monkeypatch.setattr(CONFIG, "SECRET_KEY", "attachment-secret-" * 4)
     actor = TestEntities.get(
@@ -146,8 +143,7 @@ def test_task_attachment_claim_is_actor_file_scope_bound_and_expiring(monkeypatc
     )
 
 
-# @features submitted-references
-# @dimensions internal-link browser preflight preservation
+# @matrix submitted-references : browser internal-link preflight preservation
 def test_browser_submission_references_require_view_and_preserve_hidden_existing_values(
     get_schema,
 ):
@@ -203,8 +199,7 @@ def test_browser_submission_references_require_view_and_preserve_hidden_existing
         assert page.properties.submission.fields["top_link"].db_value == existing.details
 
 
-# @features submitted-references
-# @dimensions internal-link browser preflight table no-partial-mutation
+# @matrix submitted-references : browser internal-link no-partial-mutation preflight table
 def test_browser_submission_references_validate_table_links_before_mutation(get_schema):
     actor = UtilityTestUser()
     page = TestEntities.get(
@@ -247,8 +242,7 @@ def test_browser_submission_references_validate_table_links_before_mutation(get_
     assert "with_rows" not in page.properties.submission.db_value
 
 
-# @features task
-# @dimensions assignee-preservation
+# @pair task:assignee-preservation
 def test_task_update_preserves_unchanged_assignee_eligibility():
     task = TestEntities.get(
         "TASK",

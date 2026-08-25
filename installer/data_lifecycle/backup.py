@@ -56,7 +56,7 @@ def manifest_object_name(backup_id: str) -> str:
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_manifest_validation_rejects_foreign_or_uncontained_artifacts
-# @pairs data-lifecycle:manifest data-lifecycle:path-containment
+# @matrix data-lifecycle : manifest path-containment
 def load_backup(context: ProviderContext, backup_id: str) -> tuple[BackupManifest, Any]:
     backup_id = validate_backup_id(backup_id)
     payload, blob = context.load_json_object(manifest_object_name(backup_id))
@@ -198,7 +198,7 @@ def _publish_catalog(context, object_name, payload):
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_backup_resumes_provider_operation_and_publishes_manifest_last
 # @tests tests_tooling/test_008_data_lifecycle.py::test_backup_migrates_before_selecting_a_live_snapshot
-# @pairs data-lifecycle:backup data-lifecycle:resume data-lifecycle:manifest-last data-lifecycle:migration-gate data-lifecycle:point-in-time
+# @matrix data-lifecycle : backup manifest-last migration-gate point-in-time resume
 def create_backup(
     context: ProviderContext | None = None,
     *,
@@ -431,7 +431,7 @@ def create_backup(
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_backup_listing_ignores_invalid_incomplete_and_foreign_objects
-# @pairs data-lifecycle:backup-list data-lifecycle:manifest
+# @matrix data-lifecycle : backup-list manifest
 def list_backups(context: ProviderContext | None = None) -> list[BackupManifest]:
     context = context or ProviderContext.from_settings()
     manifests = []
@@ -463,7 +463,7 @@ def list_backups(context: ProviderContext | None = None) -> list[BackupManifest]
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_backup_delete_requires_typed_confirmation_and_manifest_first
-# @pairs data-lifecycle:backup-delete data-lifecycle:confirmation data-lifecycle:path-containment
+# @matrix data-lifecycle : backup-delete confirmation path-containment
 def delete_backup(
     backup_id: str,
     context: ProviderContext | None = None,
@@ -515,7 +515,7 @@ def delete_backup(
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_native_backup_materialization_uses_scratch_then_v3
-# @pairs data-lifecycle:native-materialization data-lifecycle:named-scratch-database
+# @matrix data-lifecycle : named-scratch-database native-materialization
 def materialize_native_backup(resource_name, context=None):
     """Convert one provider-native backup into a portable v3 recovery set."""
     context = context or ProviderContext.from_settings()

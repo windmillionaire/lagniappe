@@ -37,8 +37,7 @@ class _FilterExpression:
         return "$..filter-expression"
 
 
-# @features filters cache permissions
-# @dimensions shared-key restrictions
+# @matrix cache filters permissions : restrictions shared-key
 @pytest.mark.unit
 def test_filter_cache_uses_shared_cache_key_without_user_restrictions():
     parent = _parent("category")
@@ -50,8 +49,7 @@ def test_filter_cache_uses_shared_cache_key_without_user_restrictions():
     assert owner_cache.cache_key.endswith(":all-v2")
 
 
-# @features filters cache permissions
-# @dimensions query allowed related-load
+# @matrix cache filters permissions : allowed query related-load
 @pytest.mark.unit
 def test_filter_cache_query_filters_loaded_entities_by_view_permission():
     viewer = _user()
@@ -89,8 +87,7 @@ def test_filter_cache_query_filters_loaded_entities_by_view_permission():
     assert results == [visible]
 
 
-# @features filters cache
-# @dimensions validation query-boundary
+# @matrix cache filters : query-boundary validation
 @pytest.mark.unit
 def test_filter_cache_rejects_uncompiled_query_definitions():
     parent = _parent("project")
@@ -101,8 +98,7 @@ def test_filter_cache_rejects_uncompiled_query_definitions():
         )
 
 
-# @features filters
-# @dimensions cache category-pagination source-query restrictions
+# @matrix filters : cache category-pagination restrictions source-query
 @pytest.mark.unit
 def test_filter_cache_loads_category_pages_without_restrictions():
     parent = _parent("category")
@@ -181,8 +177,7 @@ class _FakeQuery:
         return ["active-task-key", "completed-task-key"]
 
 
-# @features filters cache project task
-# @dimensions source-query all-tasks completed restrictions
+# @matrix cache filters project task : all-tasks completed restrictions source-query
 @pytest.mark.unit
 def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filters():
     parent = _parent("project")

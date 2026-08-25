@@ -9,8 +9,7 @@ const INGRESS_DROPZONE_TEXT =
  * @tests tests_e2e/002_home/test_002g_home_import.py::test_open_import_form
  * @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_file_input
  * @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_drag_drop
- * @features ingress
- * @dimensions upload-form file-input drag-drop
+ * @matrix ingress : drag-drop file-input upload-form
  */
 export class IngressFileUpload extends BaseUpload {
 	constructor(attributes) {

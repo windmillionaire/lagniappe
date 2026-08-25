@@ -13,8 +13,7 @@ from . import users
 
 # @testable true
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
-# @features users
-# @dimensions index-mode-toggle table-row refresh
+# @matrix users : index-mode-toggle refresh table-row
 @users.route("/index", methods=["GET"])
 @permission(Resource.USERS, Action.RESTRICTED)
 def user_index():
@@ -26,8 +25,8 @@ def user_index():
 # @testable true
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
 # @tests tests_unit/test_009_user_index.py::test_user_index_loads_users_groups_public_group_and_append_cursor
-# @features users
-# @dimensions index-mode-toggle table-row refresh
+# @matrix users : index-mode-toggle refresh table-row
+# @pair user-index:public-group
 @users.route("/rows", methods=["GET"])
 @permission(Resource.USERS, Action.VIEW)
 def rows():
@@ -79,8 +78,7 @@ def _delete_identity_login_account(user):
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_owner_create_adopts_public_user_and_resets_form
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_non_owner_cannot_set_ai_access_when_creating_user
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_attached_to_existing_page_preserves_page_info_form
-# @features users
-# @dimensions create-submit created-row attach-existing-page page-form-preserved ai-access owner-only public-user-adoption submitted-form-data
+# @matrix users : ai-access attach-existing-page create-submit created-row owner-only page-form-preserved public-user-adoption submitted-form-data
 @users.route("/create", methods=["POST"])
 @permission(Resource.USERS, Action.CREATE)
 def create():
@@ -103,9 +101,7 @@ def create():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
-# @pairs users:delete users:default-cascade users:preserve-page
-# @pairs users:category-fallback pages:delete pages:default-cascade
-# @pairs pages:preserve-page pages:category-fallback
+# @matrix pages users : category-fallback default-cascade delete preserve-page
 @users.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.USERS, Action.DELETE)
 def delete(key, **kwargs):
@@ -142,6 +138,7 @@ def delete(key, **kwargs):
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_edit_user_settings_on_other_user_page
 # @tests tests_unit/test_009a_user.py::test_user_groups_membership_changes_recalculate_permissions
+# @pairs user-groups:membership-change user-settings:owner-other-page
 @users.route("<key>/add-groups", methods=["PUT"])
 @permission(Resource.USER, Action.PERMISSIONS)
 def add_groups(key, **kwargs):

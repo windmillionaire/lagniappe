@@ -28,8 +28,7 @@ from . import files
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_mobile_preview_uses_preview_tab
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_mobile_pdf_preview_renders_canvas
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_page_shows_linked_page_and_task_badges
-# @features file
-# @dimensions load tabs text-tab text-asset preview pdf-preview pdf-toolbar file-upload page-upload file-mobile linked-entities reverse-links badges
+# @matrix file : badges file-mobile file-upload linked-entities load page-upload pdf-preview pdf-toolbar preview reverse-links tabs text-asset text-tab
 @files.route("/<key>", methods=["GET"])
 @permission(Resource.FILE, Action.VIEW)
 def view(key, **kwargs):
@@ -49,8 +48,8 @@ def info(key, **kwargs):
 # @testable true
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_download_uses_original_filename_and_mimetype
 # @tests tests_unit/test_006_file_properties.py::test_uploaded_file_story_lists_pages_that_reference_it
-# @features file
-# @dimensions download filename mimetype
+# @matrix file : download filename mimetype
+# @pair file:attached-pages
 @files.route("/<key>/download", methods=["GET"])
 @permission(Resource.FILE, Action.VIEW)
 def download(key, **kwargs):
@@ -65,8 +64,7 @@ def download(key, **kwargs):
 # @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_file_input
 # @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_drag_drop
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_file_to_page
-# @features ingress pages
-# @dimensions delete
+# @matrix ingress pages : delete
 @files.route("/<key>/delete", methods=["DELETE"])
 @permission(Resource.FILE, Action.DELETE)
 def delete(key, **kwargs):
@@ -98,8 +96,7 @@ def delete(key, **kwargs):
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_info_page_links_can_be_added_and_removed
 # @tests tests_unit/test_006_file_properties.py::test_extract_process
 # @tests tests_unit/test_006_file_properties.py::test_summarize_process
-# @features file
-# @dimensions info-update display-name summary extract summarize linked-pages add remove reload
+# @matrix file : add display-name extract info-update linked-pages reload remove summarize summary
 @files.route("/<key>/update", methods=["PUT"])
 @permission(Resource.FILE, Action.EDIT)
 def update(key, **kwargs):
@@ -226,6 +223,7 @@ def _summarize_page_uploads(files):
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_as_html
 # @tests tests_unit/test_006_file_properties.py::test_text_asset_falls_back_to_original_text_file
+# @matrix file : html-preview text-asset
 @files.route("/<key>/html", methods=["GET"])
 @permission(Resource.FILE, Action.VIEW)
 def get_html(key, **kwargs):
@@ -241,17 +239,8 @@ def get_html(key, **kwargs):
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_text_file_renders_original_content_in_text_tab
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_image_shows_desktop_preview
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page
-# @pair file:file-upload
-# @pair file:page-upload
-# @pair file:multi-file
-# @pair pages:file-upload
-# @pair pages:page-upload
-# @pair pages:multi-file
-# @pair ai:batch-summary
-# @pair ai:access-gate
-# @pair ai:provider-boundary
-# @pair file:submitted-reference
-# @pair pages:submitted-reference
+# @matrix ai : access-gate batch-summary provider-boundary
+# @matrix file pages : file-upload multi-file page-upload submitted-reference
 @files.route("/<key>/upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def upload(key, **kwargs):

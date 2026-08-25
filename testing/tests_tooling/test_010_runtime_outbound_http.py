@@ -46,8 +46,7 @@ def _direct_http_imports(path):
     return frozenset(imports)
 
 
-# @features outbound-http tooling
-# @dimensions source-inventory provider-ownership direct-call-guard
+# @matrix outbound-http tooling : direct-call-guard provider-ownership source-inventory
 def test_runtime_direct_http_imports_match_shared_boundary_and_audited_providers():
     """New direct runtime HTTP dependencies require an explicit owner decision."""
     found = {}
@@ -59,8 +58,7 @@ def test_runtime_direct_http_imports_match_shared_boundary_and_audited_providers
     assert found == _AUDITED_DIRECT_IMPORTS
 
 
-# @features outbound-http tooling
-# @dimensions source-inventory import-syntax
+# @matrix outbound-http tooling : import-syntax source-inventory
 def test_direct_http_inventory_recognizes_supported_import_forms(tmp_path):
     source = tmp_path / "runtime_http.py"
     source.write_text(

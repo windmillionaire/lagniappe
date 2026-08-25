@@ -3,28 +3,18 @@
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
-import threading
 from types import SimpleNamespace
 
 from google.api_core import exceptions as google_exceptions
-from google.genai import errors as genai_errors
-import httpx
 import pytest
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import (
-    AI,
     DEFERRED_JOB_PAYLOAD_LIMIT_BYTES,
-    DeferredJobInspection,
-    DeferredJobPhase,
-    DeferredJobRunState,
-    DeferredJobSpec,
     DeferredJobStatus,
     DeferredJobType,
-    FetchReason,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.mixins.submitter import SubmitterMixin
 from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
 from lagniappe.core.properties.deferred_job_request import RequestFingerprint
 from lagniappe.core.properties import (
@@ -34,63 +24,29 @@ from lagniappe.core.properties import (
     deferred_job_request,
 )
 from lagniappe.core.tools import database
-from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.deferred_jobs import locks as deferred_locks
-from lagniappe.core.tools.ai.prompt import Prompt
-from lagniappe.core.tools.ai import observability
+from lagniappe.core.tools.deferred_jobs.adapters import autofill as autofill_adapters
 from lagniappe.core.tools.database import deferred_jobs as deferred_database
 from lagniappe.core.tools.database import notifications as notification_database
 from lagniappe.core.tools.database import transactions as database_transactions
-from lagniappe.core.tools.deferred_jobs import common as deferred_common
-from lagniappe.core.tools.deferred_jobs import retry as deferred_retry
-from lagniappe.core.tools.deferred_jobs.adapters.base import DeferredJobAdapter
-from lagniappe.core.tools.deferred_jobs.context import DeferredJobContext
-from lagniappe.core.tools.deferred_jobs.control import (
-    DeferredExecutionControl,
-    _DeferredLeaseGuard,
-)
-from lagniappe.core.tools.deferred_jobs.dispatch import DeferredJobDispatch
-from lagniappe.core.tools.deferred_jobs.errors import (
-    DeferredJobClaimLostError,
-    DeferredJobDeadlineError,
-    DeferredJobDependencyFailedError,
-    DeferredJobDependencyPendingError,
-    DeferredJobDriftError,
-    DeferredJobInfrastructureError,
-    DeferredJobLockedError,
-)
 from lagniappe.core.tools.deferred_jobs.locks import (
     AUTOFILL_FORM_LOCK_SCOPE,
-    active_deferred_job_lock,
     deferred_job_lock_descriptor,
     deferred_job_lock_descriptors,
     deferred_job_lock_key,
 )
-from lagniappe.core.tools.deferred_jobs.retry import MODEL_BUSY_MESSAGE
-from lagniappe.core.tools.deferred_jobs.runner import MISSING_INPUT_MESSAGE
-from lagniappe.core.tools.deferred_jobs.service import DeferredJobService, DeferredJobs
-from lagniappe.core.tools.files import extract as file_extract
 from testing.utility.deferred_job_fakes import (
     ContendedDatastore,
     FakeDatastore,
-    FakeTasksClient,
     KeyedDatastore,
     KeyedEntity,
-    RecordingAdapter,
-    RunnerJob,
-    fake_start_entities,
-    operation_projection,
-    runner,
-    terminal_delivery_runner,
 )
-from testing.utility.test_entities import TestEntities
 
 
 pytestmark = pytest.mark.unit
 
 
-# @features deferred-jobs
-# @dimensions persisted-schema property-ownership json-encoding index-exclusion
+# @matrix deferred-jobs : index-exclusion json-encoding persisted-schema property-ownership
 def test_deferred_job_property_split_preserves_persisted_schema():
     job = Entities.DEFERRED_JOB(testing=True)
     registry = job.properties._registry
@@ -171,9 +127,7 @@ def test_deferred_job_property_split_preserves_persisted_schema():
     )
 
 
-# @pair deferred-jobs:request-identity
-# @pair deferred-jobs:input-serialization
-# @pair deferred-jobs:payload-limit
+# @matrix deferred-jobs : input-serialization payload-limit request-identity
 def test_deferred_job_request_properties_own_identity_and_payload_validation(
     monkeypatch,
 ):
@@ -216,8 +170,7 @@ def test_deferred_job_request_properties_own_identity_and_payload_validation(
         )
 
 
-# @pair deferred-jobs:task-identity
-# @pair deferred-jobs:feedback-identity
+# @matrix deferred-jobs : feedback-identity task-identity
 def test_deferred_job_task_identity_is_deterministic_and_bounded():
     job = SimpleNamespace(idempotency_key="stable-operation")
     digest = hashlib.sha256(b"stable-operation").hexdigest()[:32]
@@ -234,8 +187,7 @@ def test_deferred_job_task_identity_is_deterministic_and_bounded():
     assert TaskIdentity.feedback(job) == f"job-{digest}-feedback"
 
 
-# @pair deferred-jobs:lock-identity
-# @pair deferred-jobs:browser-projection
+# @matrix deferred-jobs : browser-projection lock-identity
 def test_deferred_job_lock_properties_own_identity_and_projection():
     target = SimpleNamespace(urlsafe_key="target-key")
     expected = hashlib.sha256(b"form-autofill:target-key").hexdigest()
@@ -252,8 +204,7 @@ def test_deferred_job_lock_properties_own_identity_and_projection():
     }
 
 
-# @pair deferred-jobs:timestamp-normalization
-# @pair deferred-jobs:elapsed-time
+# @matrix deferred-jobs : elapsed-time timestamp-normalization
 def test_deferred_job_lifecycle_normalizes_timestamps_and_elapsed_time():
     now = datetime(2026, 8, 22, 12, tzinfo=timezone.utc)
     naive = datetime(2026, 8, 22, 11, 58)
@@ -270,12 +221,7 @@ def test_deferred_job_lifecycle_normalizes_timestamps_and_elapsed_time():
     assert deferred_job_lifecycle.elapsed_seconds(None, now) == 0
 
 
-from lagniappe.core.tools.deferred_jobs.adapters import autofill as autofill_adapters
-
-
-# @pairs deferred-jobs:user-write-isolation deferred-jobs:revision deferred-jobs:transaction
-# @source lagniappe/core/tools/database/utility.py::claim_deferred_job
-# @source lagniappe/core/tools/database/utility.py::update_claimed_deferred_job
+# @matrix deferred-jobs : revision transaction user-write-isolation
 def test_deferred_job_status_transactions_do_not_write_actor(monkeypatch):
     class JobKey:
         def __init__(self, parent):
@@ -339,8 +285,7 @@ def test_deferred_job_status_transactions_do_not_write_actor(monkeypatch):
     assert all(entity is not actor for entity in datastore.saved)
 
 
-# @features deferred-jobs
-# @dimensions lease claim duplicate-delivery checkpoint compare-and-set
+# @matrix deferred-jobs : checkpoint claim compare-and-set duplicate-delivery lease
 def test_deferred_job_claim_and_checkpoint_are_compare_and_set(monkeypatch):
     now = datetime(2026, 7, 16, tzinfo=timezone.utc)
     entity = {"status": "queued", "attempt": 0}
@@ -392,8 +337,7 @@ def test_deferred_job_claim_and_checkpoint_are_compare_and_set(monkeypatch):
     assert "next_attempt_at" not in entity
 
 
-# @features deferred-jobs
-# @dimensions transaction-contention retry
+# @matrix deferred-jobs : retry transaction-contention
 def test_deferred_job_transactions_retry_aborted_contention(monkeypatch):
     now = datetime(2026, 7, 20, tzinfo=timezone.utc)
     sleeps = []
@@ -468,11 +412,7 @@ def test_deferred_job_transactions_retry_aborted_contention(monkeypatch):
     assert sleeps[-3:] == [0.05, 0.1, 0.2]
 
 
-# @pair deferred-jobs:start
-# @pair deferred-jobs:get-or-create
-# @pair deferred-jobs:transactional-start
-# @pair deferred-jobs:notification
-# @pair deferred-jobs:idempotency
+# @matrix deferred-jobs : get-or-create idempotency notification start transactional-start
 # @pair notifications:aggregate-count
 def test_deferred_job_create_is_transactionally_idempotent(monkeypatch):
     datastore = FakeDatastore(None)
@@ -550,10 +490,7 @@ def test_deferred_job_create_is_transactionally_idempotent(monkeypatch):
     assert len(datastore.transaction_instance.saved) == 3
 
 
-# @features deferred-jobs
-# @dimensions form-lock transactional-start collision
-# @pair deferred-jobs:form-lock
-# @pair ai:autofill
+# @pairs ai:autofill deferred-jobs:form-lock
 def test_autofill_start_acquires_one_target_lock(monkeypatch):
     datastore = KeyedDatastore()
     monkeypatch.setattr(
@@ -634,10 +571,7 @@ def test_autofill_start_acquires_one_target_lock(monkeypatch):
     assert datastore.entities["target-form-lock"]["operation"] == "job-one"
 
 
-# @features deferred-jobs
-# @dimensions form-lock compare-and-delete stale-worker
-# @pair deferred-jobs:form-lock
-# @pair deferred-jobs:compare-and-set
+# @matrix deferred-jobs : compare-and-set form-lock
 def test_autofill_lock_cleanup_is_compare_and_delete(monkeypatch):
     lock = KeyedEntity("target-form-lock", operation="job-two")
     datastore = KeyedDatastore(lock)
@@ -667,9 +601,7 @@ def test_autofill_lock_cleanup_is_compare_and_delete(monkeypatch):
     assert datastore.deleted == ["target-form-lock"]
 
 
-# @pair deferred-jobs:form-lock
-# @pair deferred-jobs:deterministic-key
-# @pair deferred-jobs:stale-cleanup
+# @matrix deferred-jobs : deterministic-key form-lock stale-cleanup
 def test_deferred_job_lock_resolution_is_target_scoped(monkeypatch):
     named_keys = []
     monkeypatch.setattr(
@@ -738,8 +670,7 @@ def test_deferred_job_lock_resolution_is_target_scoped(monkeypatch):
     assert released == [("lock:terminal", "job-terminal")]
 
 
-# @features deferred-jobs
-# @dimensions form-lock browser-projection
+# @matrix deferred-jobs : browser-projection form-lock
 def test_deferred_job_lock_descriptor_is_browser_safe(monkeypatch):
     lock = SimpleNamespace(scope="form-autofill")
     job = SimpleNamespace(urlsafe_key="job-key", status_revision=7)
@@ -757,8 +688,7 @@ def test_deferred_job_lock_descriptor_is_browser_safe(monkeypatch):
     }
 
 
-# @features deferred-jobs
-# @dimensions reconciliation dispatch compare-and-set lease grace maximum-age worker-race
+# @matrix deferred-jobs : compare-and-set dispatch grace lease maximum-age reconciliation worker-race
 def test_deferred_job_recovery_claim_is_compare_and_set(monkeypatch):
     now = datetime(2026, 7, 19, tzinfo=timezone.utc)
     entity = {
@@ -835,8 +765,7 @@ def test_deferred_job_recovery_claim_is_compare_and_set(monkeypatch):
     assert recent["dispatch_state"] == "pending"
 
 
-# @features deferred-jobs
-# @dimensions cancellation tombstone lease compare-and-set terminal-race
+# @matrix deferred-jobs : cancellation compare-and-set lease terminal-race tombstone
 def test_deferred_job_terminal_transition_revokes_the_active_lease(monkeypatch):
     now = datetime(2026, 7, 19, tzinfo=timezone.utc)
     entity = {
@@ -879,8 +808,7 @@ def test_deferred_job_terminal_transition_revokes_the_active_lease(monkeypatch):
     assert entity["status"] == "cancelled"
 
 
-# @features deferred-jobs
-# @dimensions operation-fingerprint client-contract routing-identity
+# @matrix deferred-jobs : client-contract operation-fingerprint routing-identity
 def test_request_fingerprint_tracks_the_complete_client_contract():
     values = {
         "job_type": "autofill",
@@ -906,8 +834,7 @@ def test_request_fingerprint_tracks_the_complete_client_contract():
     assert first != rerouted
 
 
-# @features deferred-jobs
-# @dimensions status progress stale-state privacy timing
+# @matrix deferred-jobs : privacy progress stale-state status timing
 def test_status_projection_is_bounded_and_marks_stale_work():
     now = datetime(2026, 7, 19, 12, tzinfo=timezone.utc)
     job = SimpleNamespace(
@@ -942,8 +869,7 @@ def test_status_projection_is_bounded_and_marks_stale_work():
     assert "private authored content" not in json.dumps(status)
 
 
-# @pair deferred-jobs:diagnostics
-# @pair deferred-jobs:privacy
+# @matrix deferred-jobs : diagnostics privacy
 def test_admin_projection_exposes_diagnostics_without_payload_content():
     now = datetime(2026, 7, 19, 12, tzinfo=timezone.utc)
     job = SimpleNamespace(

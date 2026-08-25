@@ -3,7 +3,8 @@
 
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_sync_payload_validation_is_document_only_and_bounded
-# @pairs sync:validation sync:document-only sync:client-identity forms:no-live-sync
+# @matrix sync : client-identity document-only validation
+# @pair forms:no-live-sync
 def validate_sync_payload(payload):
     """Return a public validation error, or ``None`` for a valid sync payload."""
     if not isinstance(payload, dict):
@@ -58,7 +59,7 @@ def validate_sync_payload(payload):
 
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_offline_replay_conflict_requires_stale_origin_fingerprint
-# @pairs offline:replay-precondition forms:conflict-review
+# @pairs forms:conflict-review offline:replay-precondition
 def offline_replay_conflicts(entity, form):
     """Return whether an offline form targets an outdated entity revision."""
     expected = form.get("offline-fingerprint")
@@ -71,7 +72,7 @@ def offline_replay_conflicts(entity, form):
 
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_form_field_membership_uses_the_attached_schema
-# @pairs deferred-jobs:form-lock deferred-jobs:quick-edit
+# @matrix deferred-jobs : form-lock quick-edit
 def is_form_field(entity, field_id):
     """Return whether a quick-edit field belongs to an entity's form surface."""
     return bool(

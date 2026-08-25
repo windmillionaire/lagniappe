@@ -284,8 +284,7 @@ def _report_action_response_schema(action_type, include_submission_fields):
 # @testable true
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_report_prompts_attach_provider_json_schema
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_report_response_schema_uses_provider_compatible_any_of_nodes
-# @features ai-report
-# @dimensions structured-output schema allowed-actions provider-validation
+# @matrix ai-report : allowed-actions provider-validation schema structured-output
 def report_proposal_response_schema(
     allowed_actions=None,
     *,

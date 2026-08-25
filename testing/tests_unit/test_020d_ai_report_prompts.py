@@ -20,8 +20,7 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.mock_restrictions import MockRestrictions
 from testing.utility.test_entities import TestEntities
 
-# @features ai-report
-# @dimensions prompt files tools iteration-limit
+# @matrix ai-report : files iteration-limit prompt tools
 @pytest.mark.unit
 def test_organize_prompt_includes_files_tools_instructions_and_high_limit():
     user = _test_user("prompt-owner")
@@ -212,8 +211,7 @@ def test_organize_prompt_includes_files_tools_instructions_and_high_limit():
 
 
 
-# @features ai-report search
-# @dimensions summary-terms redis-search kinds limits fallback
+# @matrix ai-report search : fallback kinds limits redis-search summary-terms
 @pytest.mark.unit
 def test_prepare_organize_retrieval_context_searches_bounded_structure_candidates(
     monkeypatch,
@@ -283,8 +281,7 @@ def test_prepare_organize_retrieval_context_searches_bounded_structure_candidate
 
 
 
-# @features ai-report
-# @dimensions summary-prepass quota search-opt-in active-request
+# @matrix ai-report : active-request quota search-opt-in summary-prepass
 @pytest.mark.unit
 def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
     user = _test_user("summary-prepass-owner")
@@ -405,8 +402,7 @@ def test_summarize_report_input_files_saves_missing_summaries(monkeypatch):
 
 
 
-# @features ai-report
-# @dimensions summary-prepass large-file fallback
+# @matrix ai-report : fallback large-file summary-prepass
 @pytest.mark.unit
 def test_summarize_report_input_files_falls_back_for_large_files(monkeypatch):
     user = _test_user("large-summary-owner")
@@ -462,8 +458,7 @@ def test_summarize_report_input_files_falls_back_for_large_files(monkeypatch):
 
 
 
-# @features ai-report
-# @dimensions summary-prepass unreadable-pdf persistence issue
+# @matrix ai-report : issue persistence summary-prepass unreadable-pdf
 @pytest.mark.unit
 def test_unreadable_pdf_is_saved_skipped_and_reported(monkeypatch):
     user = _test_user("unreadable-pdf-owner")
@@ -524,8 +519,7 @@ def test_unreadable_pdf_is_saved_skipped_and_reported(monkeypatch):
 
 
 
-# @features ai-report
-# @dimensions revision feedback proposal context
+# @matrix ai-report : context feedback proposal revision
 @pytest.mark.unit
 def test_revise_organize_prompt_includes_feedback_and_current_proposal():
     user = _test_user("revision-owner")
@@ -599,8 +593,7 @@ def test_revise_organize_prompt_includes_feedback_and_current_proposal():
 
 
 
-# @features ai-report
-# @dimensions create prompt search tools actions
+# @matrix ai-report : actions create prompt search tools
 @pytest.mark.unit
 def test_create_prompt_builds_creation_proposal_without_file_actions():
     user = _test_user("create-owner")
@@ -648,8 +641,7 @@ def test_create_prompt_builds_creation_proposal_without_file_actions():
 
 
 
-# @features ai-report
-# @dimensions create revision feedback proposal context
+# @matrix ai-report : context create feedback proposal revision
 @pytest.mark.unit
 def test_revise_create_prompt_includes_feedback_and_current_proposal():
     user = _test_user("create-revision-owner")
@@ -697,8 +689,7 @@ def test_revise_create_prompt_includes_feedback_and_current_proposal():
 
 
 
-# @features ai-report
-# @dimensions structured-output schema allowed-actions
+# @matrix ai-report : allowed-actions schema structured-output
 @pytest.mark.unit
 def test_report_prompts_attach_provider_json_schema():
     user = _permissioned_user(
@@ -860,8 +851,7 @@ def test_report_prompts_attach_provider_json_schema():
 
 
 
-# @features ai-report
-# @dimensions structured-output schema provider-validation
+# @matrix ai-report : provider-validation schema structured-output
 @pytest.mark.unit
 def test_report_response_schema_uses_provider_compatible_any_of_nodes():
     """Gemini requires anyOf to be the only field at its schema node."""
@@ -911,8 +901,7 @@ def test_report_response_schema_uses_provider_compatible_any_of_nodes():
 
 
 
-# @features ai-report
-# @dimensions action-capabilities permissions
+# @matrix ai-report : action-capabilities permissions
 @pytest.mark.unit
 def test_report_prompts_filter_actions_by_user_permissions():
     user = _permissioned_user(

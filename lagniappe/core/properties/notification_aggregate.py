@@ -49,7 +49,7 @@ def counts(row):
 # @testable true
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
 # @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
-# @pairs notifications:ordinary-count notifications:aggregate-count notifications:revision
+# @matrix notifications : aggregate-count ordinary-count revision
 def apply_deltas(row, *, ordinary_delta=0, message_delta=0, now=None):
     row["ordinary_count"] = max(
         0, int(row.get("ordinary_count") or 0) + int(ordinary_delta)

@@ -106,8 +106,7 @@ def _control():
     return deferred_database.get_deferred_job_scheduler_control()
 
 
-# @features deferred-jobs cloud-scheduler
-# @dimensions durable-membership terminal-delivery idempotency transaction desired-state
+# @matrix cloud-scheduler deferred-jobs : desired-state durable-membership idempotency terminal-delivery transaction
 def test_tracking_membership_follows_recovery_required_state(scheduler_database):
     now = datetime(2026, 8, 5, tzinfo=timezone.utc)
     job_key = _job_key()
@@ -155,8 +154,7 @@ def test_tracking_membership_follows_recovery_required_state(scheduler_database)
     assert removed["desired_state"] == "paused"
 
 
-# @features deferred-jobs cloud-scheduler
-# @dimensions drift-repair optimistic-concurrency state-read defaults
+# @matrix cloud-scheduler deferred-jobs : defaults drift-repair optimistic-concurrency state-read
 def test_scheduler_control_repair_is_revision_checked(scheduler_database):
     now = datetime(2026, 8, 5, tzinfo=timezone.utc)
     job_key = _job_key()
@@ -199,8 +197,7 @@ def test_scheduler_control_repair_is_revision_checked(scheduler_database):
     assert repaired["control"]["tracked_jobs"] == _control()["tracked_jobs"]
 
 
-# @features deferred-jobs cloud-scheduler
-# @dimensions exact-resource provider-api pause resume idempotency
+# @matrix cloud-scheduler deferred-jobs : exact-resource idempotency pause provider-api resume
 def test_scheduler_provider_pause_and_resume_use_exact_job_resource():
     config = SimpleNamespace(
         GOOGLE_CLOUD_PROJECT="project-one",
@@ -233,8 +230,7 @@ def test_scheduler_provider_pause_and_resume_use_exact_job_resource():
     ]
 
 
-# @features deferred-jobs cloud-scheduler
-# @dimensions distributed-lease generation race convergence provider-state
+# @matrix cloud-scheduler deferred-jobs : convergence distributed-lease generation provider-state race
 def test_scheduler_sync_serializes_state_changes_and_converges_latest_generation(
     scheduler_database,
 ):
@@ -285,8 +281,7 @@ def test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
     ]
 
 
-# @features deferred-jobs cloud-scheduler
-# @dimensions distributed-lease provider-failure
+# @matrix cloud-scheduler deferred-jobs : distributed-lease provider-failure
 def test_scheduler_sync_releases_lease_after_provider_failure(scheduler_database):
     now = datetime(2026, 8, 5, tzinfo=timezone.utc)
     deferred_database.repair_deferred_job_scheduler_control([], 0, now)
@@ -313,8 +308,7 @@ def test_scheduler_sync_releases_lease_after_provider_failure(scheduler_database
     assert control["sync_lease_expires"] is None
 
 
-# @pairs deferred-jobs:datastore-read-isolation cloud-scheduler:datastore-read-isolation
-# @source lagniappe/core/tools/deferred_jobs/scheduler.py::synchronize_deferred_job_reconciler
+# @matrix cloud-scheduler deferred-jobs : datastore-read-isolation
 def test_scheduler_sync_uses_committed_control_hint_when_current(monkeypatch):
     control = {
         "desired_state": "enabled",
@@ -340,8 +334,7 @@ def test_scheduler_sync_uses_committed_control_hint_when_current(monkeypatch):
     }
 
 
-# @features deferred-jobs cloud-scheduler
-# @dimensions resume-failure pause-failure recovery-guarantee
+# @matrix cloud-scheduler deferred-jobs : pause-failure recovery-guarantee resume-failure
 def test_registry_requires_resume_but_tolerates_pause_failure(monkeypatch):
     registry = DeferredJobService()
     captured = []
@@ -369,8 +362,7 @@ def test_registry_requires_resume_but_tolerates_pause_failure(monkeypatch):
     assert len(captured) == 2
 
 
-# @features deferred-jobs cloud-scheduler
-# @dimensions drift-repair optimistic-concurrency self-pause
+# @matrix cloud-scheduler deferred-jobs : drift-repair optimistic-concurrency self-pause
 def test_reconciler_repairs_control_before_self_pausing(monkeypatch):
     registry = DeferredJobService()
     repaired = []

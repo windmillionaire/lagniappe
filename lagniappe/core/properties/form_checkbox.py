@@ -10,8 +10,7 @@ from .base_schema import SchemaProperty
 # @tests tests_unit/test_004e_submission_behavior.py::test_full_form_submit_missing_checkbox_persists_explicit_false
 # @tests tests_unit/test_004e_submission_behavior.py::test_stored_explicit_checkbox_false_survives_load_save
 # @tests tests_unit/test_004e_submission_behavior.py::test_stored_null_checkbox_normalizes_away_on_resave
-# @features checkbox
-# @dimensions ai-value, filter-value, import, missing-field, unset, projection, form-submit, explicit-false, stored-false, load-save, stored-null, normalization
+# @matrix checkbox : ai-value explicit-false filter-value form-submit import load-save missing-field normalization projection stored-false stored-null unset
 class Checkbox(ColumnMixin, AIMixin, FilterMixin, SchemaProperty):
     """Boolean checkbox field.
 

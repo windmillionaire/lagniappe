@@ -10,8 +10,7 @@ const FILE_DROPZONE_TEXT =
  * @testable true
  * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_file_to_page
  * @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_multiple_files_to_page_hides_existing_file_select
- * @features pages
- * @dimensions file-upload multi-file
+ * @matrix pages : file-upload multi-file
  */
 export class FileUpload extends BaseUpload {
 	constructor(attributes) {

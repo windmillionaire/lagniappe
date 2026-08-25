@@ -15,8 +15,7 @@ from testing.utility.ai_report_fakes import (
     _test_user,
 )
 
-# @features ai-report direct-upload
-# @dimensions upload-manifest validation normalization
+# @matrix ai-report direct-upload : normalization upload-manifest validation
 @pytest.mark.unit
 def test_prepare_report_upload_manifest_normalizes_browser_records():
     manifest = report_uploads.prepare_report_upload_manifest(
@@ -95,8 +94,7 @@ def test_prepare_report_upload_manifest_normalizes_browser_records():
 
 
 
-# @features ai-report direct-upload
-# @dimensions upload-manifest background-finalization resume progress active-request
+# @matrix ai-report direct-upload : active-request background-finalization progress resume upload-manifest
 @pytest.mark.unit
 def test_finalize_report_upload_manifest_resumes_and_checkpoints(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -181,8 +179,7 @@ def test_finalize_report_upload_manifest_resumes_and_checkpoints(monkeypatch):
 
 
 
-# @features ai-report direct-upload
-# @dimensions upload-manifest background-finalization checkpoint-failure
+# @matrix ai-report direct-upload : background-finalization checkpoint-failure upload-manifest
 @pytest.mark.unit
 def test_finalize_report_upload_manifest_retains_source_until_checkpoint(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -273,8 +270,7 @@ def test_finalize_report_upload_manifest_retains_source_until_checkpoint(monkeyp
 
 
 
-# @pair ai-report:large-file
-# @pair direct-upload:large-file
+# @matrix ai-report direct-upload : large-file
 @pytest.mark.unit
 def test_finalize_report_upload_manifest_accepts_actual_oversized_object():
     report = SimpleNamespace(
@@ -312,8 +308,7 @@ def test_finalize_report_upload_manifest_accepts_actual_oversized_object():
 
 
 
-# @features ai-report direct-upload
-# @dimensions upload-manifest cleanup partial-progress
+# @matrix ai-report direct-upload : cleanup partial-progress upload-manifest
 @pytest.mark.unit
 def test_cleanup_report_upload_manifest_deletes_only_pending_uploads(monkeypatch):
     _patch_fake_keys(monkeypatch)

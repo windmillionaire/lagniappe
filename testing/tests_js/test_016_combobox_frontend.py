@@ -436,7 +436,7 @@ def run_combobox_check(run_node, assertion: str):
     run_node(script)
 
 
-# @pairs location:initialization location:on-demand
+# @matrix location : initialization on-demand
 def test_location_combobox_starts_location_sync_on_init(run_node):
     script = r"""
 const fs = require("node:fs");
@@ -498,7 +498,7 @@ if (element.name !== "" || element.hiddenInput?.name !== "place:id") {
     run_node(script)
 
 
-# @pairs location:session-update location:request-ordering
+# @matrix location : request-ordering session-update
 def test_location_combobox_waits_for_session_sync_before_search(run_node):
     script = r"""
 const fs = require("node:fs");
@@ -574,8 +574,7 @@ vm.runInContext(source, context);
     run_node(script)
 
 
-# @pair combobox:positioning
-# @pair dropdown:positioning
+# @matrix combobox dropdown : positioning
 # @styles dropdown.panel dropdown.menu
 def test_combobox_positioning_uses_live_element_by_default_and_explicit_reference_when_configured(
     run_node,
@@ -673,10 +672,7 @@ if (JSON.stringify(panel.style) !== JSON.stringify(positioned)) {
     )
 
 
-# @features combobox
-# @dimensions positioning readiness
-# @pair combobox:positioning-readiness
-# @pair combobox:readiness
+# @matrix combobox : positioning-readiness readiness
 # @style dropdown.panel
 def test_combobox_exposes_initial_positioning_readiness(run_node):
     run_combobox_check(
@@ -728,10 +724,7 @@ if (
     )
 
 
-# @features combobox
-# @dimensions positioning readiness transition-race
-# @pair combobox:positioning-readiness
-# @pair combobox:transition-race
+# @matrix combobox : positioning-readiness transition-race
 # @style dropdown.panel
 def test_combobox_initial_position_ignores_superseded_transition_geometry(run_node):
     run_combobox_check(
@@ -774,8 +767,7 @@ if (
     )
 
 
-# @features combobox
-# @dimensions aria keyboard
+# @matrix combobox : aria keyboard
 # @style dropdown.panel
 def test_combobox_aria_and_keyboard_state_follow_the_open_panel(run_node):
     run_combobox_check(
@@ -860,8 +852,7 @@ if (
     )
 
 
-# @features combobox
-# @dimensions pointer dismissal
+# @matrix combobox : dismissal pointer
 # @style dropdown.panel
 def test_combobox_pointer_and_dismissal_events_preserve_trigger_focus(run_node):
     run_combobox_check(
@@ -973,8 +964,7 @@ if (
     )
 
 
-# @features combobox
-# @dimensions dataset-configuration
+# @pair combobox:dataset-configuration
 # @style dropdown.panel
 def test_combobox_copies_only_supported_dataset_configuration(run_node):
     run_combobox_check(
@@ -1059,8 +1049,7 @@ if (new Combobox(single.parent).multiple !== false) {
     )
 
 
-# @features combobox
-# @dimensions clear-notification
+# @pair combobox:clear-notification
 def test_submitter_clear_can_suppress_change_notification(run_node):
     run_combobox_check(
         run_node,
@@ -1087,8 +1076,7 @@ if (combobox.values.size !== 0 || updateModes[1] !== false) {
     )
 
 
-# @features dropdown
-# @dimensions dynamic-options rerender mixed-options callback-index
+# @matrix dropdown : callback-index dynamic-options mixed-options rerender
 # @style dropdown.panel
 def test_dynamic_dropdown_rerenders_each_open_and_keeps_mixed_option_indexes(run_node):
     run_combobox_check(
@@ -1143,8 +1131,7 @@ if (selected.join(",") !== "standard") {
     )
 
 
-# @features entity-menu
-# @dimensions title-menu title-positioning state-linking readiness
+# @matrix entity-menu : readiness state-linking title-menu title-positioning
 # @style dropdown.menu
 def test_entity_title_menu_anchors_to_the_title_bottom_left(run_node):
     script = ENTITY_MENU_HARNESS.replace(

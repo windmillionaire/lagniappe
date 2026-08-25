@@ -29,8 +29,7 @@ from testing.utility import manual_mutation_headers
 pytestmark = pytest.mark.e2e
 
 
-# @features projects
-# @dimensions permission-gates
+# @pair projects:permission-gates
 def test_project_is_forbidden_without_model_permission(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(owner)
@@ -41,8 +40,7 @@ def test_project_is_forbidden_without_model_permission(get_user, browser_failure
         expect(blocked.page).to_have_title("Error 403")
 
 
-# @features projects
-# @dimensions load readonly permission-gates
+# @matrix projects : load permission-gates readonly
 def test_project_viewer_reads_project_without_editing_controls(get_user):
     owner = get_user(Users.OWNER)
     model_task = ModelTasks.test_create_model_task.get(owner)
@@ -93,8 +91,7 @@ def test_project_viewer_reads_project_without_editing_controls(get_user):
     expect(condition).to_be_visible()
 
 
-# @features projects
-# @dimensions readonly document-tab
+# @matrix projects : document-tab readonly
 # @template projects/project.html::main
 def test_project_viewer_sees_document_tab_only_when_content_exists(get_user):
     owner = get_user(Users.OWNER)
@@ -123,8 +120,7 @@ def test_project_viewer_sees_document_tab_only_when_content_exists(get_user):
     expect(document).to_contain_text(marker)
 
 
-# @features model-tasks
-# @dimensions create permission-gates
+# @matrix model-tasks : create permission-gates
 def test_project_editor_can_open_model_task_creation(get_user):
     owner = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(owner)
@@ -138,8 +134,7 @@ def test_project_editor_can_open_model_task_creation(get_user):
     expect(create_form.locator("[data-role='form-select']")).to_be_visible()
 
 
-# @features model-tasks
-# @dimensions parent-membership
+# @pair model-tasks:parent-membership
 def test_model_task_mutations_require_route_project_membership(get_user):
     owner = get_user(Users.OWNER)
     route_project = Projects.test_create_project_manual_mode.get(owner)

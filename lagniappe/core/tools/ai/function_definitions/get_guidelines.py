@@ -116,8 +116,7 @@ GET_GUIDELINES = types.FunctionDeclaration(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_guidelines_returns_named_bundle
-# @features ai
-# @dimensions guidelines tool-dispatch
+# @matrix ai : guidelines tool-dispatch
 def execute_get_guidelines(args, _user):
     """Return one named guideline bundle without requiring a larger base prompt."""
     task = args.get("task")

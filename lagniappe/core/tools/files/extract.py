@@ -12,8 +12,7 @@ from .constants import DOCUMENT_AI_MIMETYPES
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_extract_update_completes_immediately_for_text_files
 # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-# @features file
-# @dimensions extract, text-asset, process-complete, deferred-dispatch
+# @matrix file : deferred-dispatch extract process-complete text-asset
 def get_file_text(file, *, dispatch=True):
     """Initiate text extraction for a file, dispatching to OCR or a background task.
 
@@ -42,8 +41,7 @@ def get_file_text(file, *, dispatch=True):
 
 # @testable true
 # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_start_file_extraction_uses_explicit_actor_and_identity
-# @features deferred-jobs file
-# @dimensions follow-up extraction idempotency
+# @matrix deferred-jobs file : extraction follow-up idempotency
 def start_file_extraction(
     file,
     *,

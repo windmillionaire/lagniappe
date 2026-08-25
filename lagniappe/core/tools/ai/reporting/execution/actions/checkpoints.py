@@ -2,7 +2,6 @@
 
 import copy
 
-from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
 
@@ -17,7 +16,6 @@ from .common import (
     _first_data_reference,
 )
 from .references import (
-    _fetch_report_entity,
     _file_attached_to_endpoint,
     _load_result_entity,
     _reference_key,
@@ -43,10 +41,7 @@ from .completed_tasks import (
 # @testable true
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_resumes_after_completed_create_without_duplicate
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_reconciles_applying_create_when_output_already_exists
-# @pair ai-report:recovery
-# @pair ai-report:create
-# @pair ai-report:idempotency
-# @pair ai-report:post-commit-checkpoint
+# @matrix ai-report : create idempotency post-commit-checkpoint recovery
 def _allocate_action_output_key(action, created, context):
     action_type = action.get("type")
     if not action_type.startswith("create_"):
@@ -216,9 +211,7 @@ def _capture_action_before(action, report, user, created, context=None):
 # @testable true
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_resumes_after_completed_create_without_duplicate
 # @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
-# @pair ai-report:recovery
-# @pair ai-report:idempotency
-# @pair ai-report:completed-task
+# @matrix ai-report : completed-task idempotency recovery
 def _prepare_action_checkpoint(action, report, user, created, context, record):
     record["before"] = _capture_action_before(
         action,
@@ -276,11 +269,7 @@ def _assign_preallocated_key(entity, record, context):
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
-# @pair ai-report:result
-# @pair ai-report:attachments
-# @pair ai-report:moves
-# @pair ai-report:batch-field-patch
-# @pair ai-report:schema-update
+# @matrix ai-report : attachments batch-field-patch moves result schema-update
 def _record_action_result(record, action, entity, to_save, metadata, created, context):
     metadata = _default_action_metadata(action, entity, metadata)
     if (

@@ -15,8 +15,7 @@ _REPORT_PROCESS_KEYS = (
 
 # @testable true
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_process_state_stores_report_metadata
-# @features ai-report
-# @dimensions process-state canonical-storage
+# @matrix ai-report : canonical-storage process-state
 class ReportProcess(ProcessProperty):
     """Process section containing an AI report's workflow state."""
 
@@ -203,8 +202,7 @@ class Pending(ReportProcessValue):
 
 # @testable true
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_create_and_file_cleanup
-# @features ai-report
-# @dimensions status
+# @pair ai-report:status
 class Note(Property):
     """User-facing note derived from the report process state."""
 

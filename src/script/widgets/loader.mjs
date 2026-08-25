@@ -288,8 +288,7 @@ function _headlessKind(sync_id) {
 /**
  * @testable true
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_headless_offline_replay_merges_concurrent_remote_edits
- * @features sync
- * @dimensions headless-widget document offline-replay concurrency
+ * @matrix sync : concurrency document headless-widget offline-replay
  *
  * Construct a sync-capable widget with no view or DOM chrome.
  * Caller runs init(), assigns remote/offlineRecord, then sync().

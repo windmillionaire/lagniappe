@@ -4,7 +4,6 @@ import copy
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action
-from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
 
 from .common import (
@@ -12,7 +11,6 @@ from .common import (
     SUBMISSION_UPDATE_ROWS_ERROR,
     TASK_FORM_TYPE_ERROR,
     _data,
-    _first_data_reference,
 )
 from .results import (
     _entity_result,
@@ -21,17 +19,10 @@ from .references import (
     _fetch_report_entity,
     _file_attached_to_endpoint,
     _load_result_entity,
-    _resolve_entity,
-    _resolve_file_endpoint,
-    _resolve_file_entity,
-    _resolve_report_file,
 )
 from .forms import _submission_previous_value
 from .completed_tasks import (
-    _completed_event_belongs_in_history,
     _is_completed_task_event,
-    _parse_completed_task_completed_on,
-    _should_archive_live_completion,
     _task_state_fingerprint,
     _value_fingerprint,
 )
@@ -117,13 +108,7 @@ def _urlsafe_key_value(value):
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_validates_completed_move_and_update_prefix[move]
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_validates_completed_move_and_update_prefix[update]
 # @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
-# @pair ai-report:recovery
-# @pair ai-report:permissions
-# @pair ai-report:completed-prefix
-# @pair ai-report:post-commit-checkpoint
-# @pair ai-report:moves
-# @pair ai-report:batch-field-patch
-# @pair ai-report:completed-task
+# @matrix ai-report : batch-field-patch completed-prefix completed-task moves permissions post-commit-checkpoint recovery
 def _inspect_action_applied(action, report, user, record):
     action_type = action.get("type")
     if record.get("status") == "skipped" or action_type in {
@@ -385,8 +370,7 @@ def _is_required_file_placement(action):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_marks_missing_file_placements_failed_and_continues
-# @pair ai-report:partial-result
-# @pair ai-report:attachments
+# @matrix ai-report : attachments partial-result
 def _record_required_file_placement_error(action_record, error):
     action_record["status"] = "failed"
     action_record["error"] = str(error)
@@ -427,11 +411,7 @@ def _recoverable_action_error_note(action_record, message):
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_skips_empty_submission_update_and_continues
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_invalid_completed_task_events_and_continues
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_task_that_references_page_form_and_continues
-# @pair ai-report:recoverable
-# @pair ai-report:continue
-# @pair ai-report:empty-update
-# @pair ai-report:completed-task
-# @pair ai-report:mismatched-form
+# @matrix ai-report : completed-task continue empty-update mismatched-form recoverable
 def _record_recoverable_action_error(action_record, error):
     message = str(error)
     action_record["status"] = "skipped"

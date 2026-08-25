@@ -57,8 +57,7 @@ from .core import DATA, KINDS
 
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_results_use_normal_list_indexing_and_keep_cursor_metadata
-# @features database
-# @dimensions query-results indexing slicing pagination
+# @matrix database : indexing pagination query-results slicing
 class Results:
     """
     Container for query results with optional pagination cursor.
@@ -111,8 +110,7 @@ _DENY_ALL_FILTER = object()
 
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_filter_preserves_explicit_deny_all_through_composition
-# @features database permissions
-# @dimensions deny-all filter-composition
+# @matrix database permissions : deny-all filter-composition
 class Filter:
     """
     Fluent builder for Datastore filters.
@@ -213,8 +211,7 @@ class Filter:
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_database_filter_requires_rejects_invalid_hashes_type
-    # @features database
-    # @dimensions filter validation
+    # @matrix database : filter validation
     def requires(self, hashes: Optional[list]) -> Filter:
         """
         Add a requires filter for permission-based access.
@@ -312,8 +309,7 @@ class Filter:
 
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_denied_query_terminals_do_not_create_datastore_query
-# @features database permissions
-# @dimensions deny-all query-short-circuit terminal-results
+# @matrix database permissions : deny-all query-short-circuit terminal-results
 class Query:
     """
     Fluent query builder for Datastore.

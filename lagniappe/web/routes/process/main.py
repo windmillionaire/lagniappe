@@ -24,8 +24,7 @@ from . import process
 # @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
 # @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
-# @features deferred-jobs
-# @dimensions cloud-tasks oidc provider-delivery hosted-e2e
+# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc provider-delivery
 def authenticate_task(request):
     auth_header = request.headers.get("Authorization", "")
     if not auth_header.startswith("Bearer "):
@@ -68,8 +67,7 @@ def authenticate_task(request):
 # @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
 # @tests tests_e2e/006_tasks/test_006g_task_autofill.py::test_task_autofill_runs_deferred_with_page_file_context
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
-# @features deferred-jobs
-# @dimensions process-route versioned-envelope cloud-tasks oidc provider-delivery hosted-e2e
+# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
 @process.route("/jobs", methods=["POST"])
 def deferred_job_process():
     """Run one durable job; Cloud Tasks carries only its Datastore key."""
@@ -96,8 +94,7 @@ def deferred_job_process():
 # @testable false
 # @manual true
 # @reason requires Cloud Tasks OIDC authentication and delayed delivery
-# @features deferred-jobs notifications
-# @dimensions long-running feedback
+# @matrix deferred-jobs notifications : feedback long-running
 @process.route("/jobs/feedback", methods=["POST"])
 def deferred_job_feedback():
     """Publish a user-facing update if a deferred job is still active."""
@@ -117,8 +114,7 @@ def deferred_job_feedback():
 # @testable false
 # @manual true
 # @reason requires Cloud Scheduler OIDC authentication and production queue state
-# @features deferred-jobs
-# @dimensions reconciliation scheduler recovery
+# @matrix deferred-jobs : reconciliation recovery scheduler
 @process.route("/jobs/reconcile", methods=["POST"])
 def deferred_job_reconcile():
     """Recover stranded deferred work from durable dispatch metadata."""
@@ -133,8 +129,7 @@ def deferred_job_reconcile():
 # @testable false
 # @manual true
 # @reason requires Cloud Tasks OIDC authentication and SMTP provider delivery
-# @features notification-email
-# @dimensions process-route delayed-delivery
+# @matrix notification-email : delayed-delivery process-route
 @process.route("/notification-email", methods=["POST"])
 def notification_email_delivery():
     """Deliver one opaque event-driven notification email task."""
@@ -162,6 +157,7 @@ def notification_email_delivery():
 # @testable true
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_uncomplete_after_complete
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
+# @pairs task-completion:uncomplete task-scheduling:schedule-queue
 @process.route("/uncomplete-task", methods=["POST"])
 def uncomplete_task():
     payload = authenticate_task(request)
@@ -225,6 +221,7 @@ def uncomplete_task():
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
 # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_save_persists_relations_process_payloads_and_cache
+# @pairs cache:redis-connection entities:save
 @process.route("/update-cache", methods=["POST"])
 def update_cache():
     payload = authenticate_task(request)
@@ -263,6 +260,7 @@ def update_cache():
 # @testable true
 # @tests tests_unit/test_006b_ingress_entity.py::test_importer_story_processes_page_rows_into_entities_and_results
 # @tests tests_unit/test_006b_ingress_entity.py::test_completed_ingress_shows_results
+# @pair ingress:row-results
 @process.route("/ingress", methods=["POST"])
 def ingress():
     payload = authenticate_task(request)

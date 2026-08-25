@@ -14,8 +14,7 @@ const REPORT_FORM_SELECTOR =
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_report_detail_shows_answer_without_duplicate_proposal
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_create_report_detail_shows_revision_and_manual_execution
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_organize_report_detail_refreshes_when_submitted_revision_completes
- * @features ai-report
- * @dimensions detail skip-action result-json ask answer-html links no-actions create revision execute failure reload deferred-refresh pending delete-modal
+ * @matrix ai-report : answer-html ask create deferred-refresh delete-modal detail execute failure links no-actions pending reload result-json revision skip-action
  */
 export default class Report extends Core {
 	async init() {

@@ -19,10 +19,8 @@ WRITE_EFFECTS = {MutationEffectType.UPSERT, MutationEffectType.UNLINK}
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_save_entities_updates_hash_before_requires
 # @tests tests_unit/test_002_entity_general_properties.py::test_save_entities_updates_and_persists_user_before_owned_page
-# @pair entities:save-order
-# @pair requires:hash-before-requires
-# @pair users:user-before-page
-# @pair requires:persisted-requires
+# @matrix requires : hash-before-requires persisted-requires
+# @pairs entities:save-order users:user-before-page
 def _prepare_write(effect):
     entity = effect.entity
     for name in effect.property_updates:
@@ -206,8 +204,7 @@ def execute_post_commit(plan):
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_executes_datastore_before_cache_and_reports_cache_failure
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
-# @features mutations
-# @dimensions save mutation-plan durable-first typed-intent-preservation post-commit-outcome cache-failure
+# @matrix mutations : cache-failure durable-first mutation-plan post-commit-outcome save typed-intent-preservation
 def execute_mutation(plan):
     """Execute durable effects before rebuildable cache and blob effects."""
     if not isinstance(plan, MutationPlan):

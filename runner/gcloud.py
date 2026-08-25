@@ -9,9 +9,7 @@ from runner.process import run_command
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_activation_uses_complete_saved_target
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_activation_skips_unconfigured_repository
 # @tests tests_tooling/test_007_run_py_test_command.py::test_runner_gcloud_activation_rejects_partial_saved_target
-# @features setup testing development auth
-# @dimensions gcloud-config activation unconfigured validation
-# @pair setup:gcloud-token
+# @matrix setup : gcloud-config gcloud-token unconfigured
 def activate_repository_gcloud(
     *,
     ensure_adc=False,
@@ -215,8 +213,7 @@ def ensure_configuration_properties(name, account, project):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_gcloud_switcher_exports_project_for_child_processes
-# @features setup
-# @dimensions gcloud-config env-export
+# @matrix setup : env-export gcloud-config
 def verify_active_configuration(name, account, project):
     active = get_active_configuration()
     active_account = get_configuration_value("account")
@@ -268,8 +265,7 @@ def display_configurations():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_gcloud_switcher_exports_project_for_child_processes
-# @features setup
-# @dimensions gcloud-config env-export
+# @matrix setup : env-export gcloud-config
 def config_gcloud():
     from config import SETTINGS
 

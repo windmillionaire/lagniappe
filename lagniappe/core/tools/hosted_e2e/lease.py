@@ -53,8 +53,7 @@ def _validate_run_id(run_id: str) -> str:
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_key_is_outside_test_cleanup_prefix
-# @features hosted-e2e
-# @dimensions lease prefix-isolation
+# @matrix hosted-e2e : lease prefix-isolation
 def e2e_lease_key(*, project_id=None, prefix=None) -> str:
     """Return a reserved key that cannot match ordinary test-data cleanup."""
     project_id = str(project_id or CONFIG.GOOGLE_CLOUD_PROJECT or "").strip()
@@ -67,8 +66,7 @@ def e2e_lease_key(*, project_id=None, prefix=None) -> str:
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
-# @features hosted-e2e
-# @dimensions lease concurrency expiry ownership
+# @matrix hosted-e2e : concurrency expiry lease ownership
 def acquire_e2e_lease(run_id: str, *, ttl=DEFAULT_LEASE_SECONDS, client=None) -> bool:
     run_id = _validate_run_id(run_id)
     return bool(
@@ -83,8 +81,7 @@ def acquire_e2e_lease(run_id: str, *, ttl=DEFAULT_LEASE_SECONDS, client=None) ->
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
-# @features hosted-e2e
-# @dimensions lease ownership
+# @matrix hosted-e2e : lease ownership
 def current_e2e_lease(*, client=None) -> str | None:
     value = _redis_client(client).get(e2e_lease_key())
     if isinstance(value, bytes):
@@ -94,8 +91,7 @@ def current_e2e_lease(*, client=None) -> str | None:
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
-# @features hosted-e2e
-# @dimensions lease ownership
+# @matrix hosted-e2e : lease ownership
 def e2e_lease_active(run_id: str, *, client=None) -> bool:
     return current_e2e_lease(client=client) == _validate_run_id(run_id)
 
@@ -116,8 +112,7 @@ def _deployment_lease_key(version: str, source: str) -> str:
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
-# @features hosted-e2e
-# @dimensions lease deployment-binding ownership
+# @matrix hosted-e2e : deployment-binding lease ownership
 def bind_e2e_deployment(
     run_id: str,
     version: str,
@@ -142,8 +137,7 @@ def bind_e2e_deployment(
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
-# @features hosted-e2e
-# @dimensions lease deployment-binding ownership
+# @matrix hosted-e2e : deployment-binding lease ownership
 def e2e_deployment_lease_active(
     version: str,
     source: str,
@@ -165,8 +159,7 @@ def e2e_deployment_lease_active(
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
-# @features hosted-e2e
-# @dimensions lease expiry ownership
+# @matrix hosted-e2e : expiry lease ownership
 def heartbeat_e2e_lease(
     run_id: str,
     *,
@@ -186,8 +179,7 @@ def heartbeat_e2e_lease(
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
-# @features hosted-e2e
-# @dimensions lease ownership
+# @matrix hosted-e2e : lease ownership
 def release_e2e_lease(run_id: str, *, client=None) -> bool:
     run_id = _validate_run_id(run_id)
     result = _redis_client(client).eval(
@@ -201,8 +193,7 @@ def release_e2e_lease(run_id: str, *, client=None) -> bool:
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
-# @features hosted-e2e
-# @dimensions lease authentication replay
+# @matrix hosted-e2e : authentication lease replay
 def consume_e2e_bootstrap_token(
     token_digest: str,
     run_id: str,
@@ -227,8 +218,7 @@ def consume_e2e_bootstrap_token(
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
-# @features hosted-e2e
-# @dimensions lease concurrency heartbeat ownership
+# @matrix hosted-e2e : concurrency heartbeat lease ownership
 class E2ELease:
     """Acquire, heartbeat, and owner-release the shared test-data lease."""
 
@@ -253,8 +243,7 @@ class E2ELease:
 
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
-    # @features hosted-e2e
-    # @dimensions lease concurrency heartbeat ownership
+    # @matrix hosted-e2e : concurrency heartbeat lease ownership
     def __enter__(self):
         if not acquire_e2e_lease(
             self.run_id,
@@ -293,8 +282,7 @@ class E2ELease:
 
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
-    # @features hosted-e2e
-    # @dimensions lease ownership
+    # @matrix hosted-e2e : lease ownership
     def assert_active(self):
         if self._lost.is_set() or not e2e_lease_active(
             self.run_id,
@@ -304,8 +292,7 @@ class E2ELease:
 
     # @testable true
     # @tests tests_unit/test_017_cache_query.py::test_e2e_lease_acquire_heartbeat_and_owner_release
-    # @features hosted-e2e
-    # @dimensions lease ownership
+    # @matrix hosted-e2e : lease ownership
     def __exit__(self, exc_type, exc_value, traceback):
         self._stop.set()
         if self._thread is not None:

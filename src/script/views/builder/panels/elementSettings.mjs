@@ -29,8 +29,7 @@ const _presentation = (schema) => {
 /**
  * @testable true
  * @tests tests_js/test_036_form_builder_frontend.py::test_builder_schema_lists_use_button_surfaces_and_centered_actions
- * @features forms
- * @dimensions builder-list-actions action-button-centering
+ * @matrix forms : action-button-centering builder-list-actions
  */
 const _toggle = (icon, role, kind = "form", disabled = false) => {
 	const toggle = primitives.toggle({
@@ -462,8 +461,7 @@ export class ElementSettings {
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_field_visibility
-	 * @features forms
-	 * @dimensions builder-select-options builder-field-visibility
+	 * @matrix forms : builder-field-visibility builder-select-options
 	 */
 	_click(e) {
 		const element = this.builder.selectedElement;

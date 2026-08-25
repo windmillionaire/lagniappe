@@ -23,8 +23,7 @@ def client_ip(request):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_identity_returns_rate_limit_response
-# @features login
-# @dimensions identity-platform rate-limit
+# @matrix login : identity-platform rate-limit
 def check_limit(scope, identifier, limit, window_seconds):
     """Increment and evaluate a fixed-window rate limit."""
     digest = hashlib.sha256(str(identifier).encode("utf-8")).hexdigest()[:16]

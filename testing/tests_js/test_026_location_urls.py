@@ -1,8 +1,7 @@
 """Node-backed checks for Location element Google Maps URLs."""
 
 
-# @features location
-# @dimensions maps-url place-id encoding
+# @matrix location : encoding maps-url place-id
 def test_location_maps_url_uses_search_contract_and_place_id(run_node):
     run_node(
         r"""

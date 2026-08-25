@@ -36,8 +36,7 @@ LIST_WORKSPACE_RESOURCES = types.FunctionDeclaration(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_list_workspace_resources_caches_inventory
-# @features ai
-# @dimensions resource-inventory redis-cache
+# @matrix ai : redis-cache resource-inventory
 def execute_list_workspace_resources(_args, user):
     """Return a cached, permission-filtered inventory of model resources."""
     cache_key = _resource_cache_key(user)
@@ -56,8 +55,7 @@ def execute_list_workspace_resources(_args, user):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_list_workspace_resources_caches_inventory
-# @features ai
-# @dimensions resource-inventory categories projects forms
+# @matrix ai : categories forms projects resource-inventory
 def build_workspace_resource_inventory(user):
     """Build a compact inventory of viewable model resources for an AI prompt."""
     models = [

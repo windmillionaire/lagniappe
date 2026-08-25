@@ -54,11 +54,7 @@ class DeleteCollector:
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_user_delete_can_preserve_page
     # @tests tests_e2e/008_users/test_008a_user_index.py::test_delete_user_can_preserve_page
-    # @pairs entities:delete entities:preserve-page entities:user-unlink
-    # @pairs entities:category-fallback entities:search-cache users:delete
-    # @pairs users:preserve-page users:user-unlink users:category-fallback
-    # @pairs users:search-cache pages:delete pages:preserve-page
-    # @pairs pages:user-unlink pages:category-fallback pages:search-cache
+    # @matrix entities pages users : category-fallback delete preserve-page search-cache user-unlink
     def preserve_user_page(self, user, page):
         users_model = (
             page.model if isinstance(page.model, self.entities.USERS) else None
@@ -98,8 +94,7 @@ class DeleteCollector:
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_entities_deletes_user_and_page_together
-    # @features entities
-    # @dimensions delete cascade user-page
+    # @matrix entities : cascade delete user-page
     def page(self, page, *, force=False):
         if force or not page.categories:
             self.page_notes(page)
@@ -172,8 +167,7 @@ class DeleteCollector:
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_task_delete_updates_task_list_owners
-    # @features entities tasks
-    # @dimensions delete cascade list-owner-fingerprint
+    # @matrix entities tasks : cascade delete list-owner-fingerprint
     def task_owners(self, task):
         owners = getattr(task, "task_list_owners", None)
         if owners is None:
@@ -190,8 +184,7 @@ class DeleteCollector:
 
     # @testable true
     # @tests tests_unit/test_002j_notes.py::test_note_delete_repairs_owners_and_parent_cascades
-    # @features notes mutations
-    # @dimensions delete owner-invalidation page-cascade user-cascade
+    # @matrix mutations notes : delete owner-invalidation page-cascade user-cascade
     def note(self, note):
         self.delete(note)
         owners = {owner.key: owner for owner in (note.parent, note.user) if owner}
@@ -224,7 +217,7 @@ class DeleteCollector:
 
     # @testable true
     # @tests tests_unit/test_027b_messaging_service.py::test_user_delete_preserves_or_purges_message_history_by_survivor
-    # @pairs messaging:deleted-peer messaging:history-retention
+    # @matrix messaging : deleted-peer history-retention
     def user_messages(self, user):
         if not user or user.key in self._message_users:
             return
@@ -239,7 +232,7 @@ class DeleteCollector:
 
     # @testable true
     # @tests tests_unit/test_027b_messaging_service.py::test_user_delete_preserves_or_purges_message_history_by_survivor
-    # @pairs messaging:history-retention messaging:orphan-purge
+    # @matrix messaging : history-retention orphan-purge
     def finalize_message_conversations(self):
         deleting_users = {
             entity.key
@@ -394,8 +387,7 @@ class ModelDeleteMutation(StandardDeleteMutation):
 class FormDeleteMutation(StandardDeleteMutation):
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_form_delete_updates_form_users
-    # @features entities forms
-    # @dimensions delete cascade forms list-owner-fingerprint
+    # @matrix entities forms : cascade delete forms list-owner-fingerprint
     def collect(self, entity, collector):
         collector.delete(entity)
         for owner in entity.used_by:
@@ -461,8 +453,7 @@ def _unique_entities(entities):
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_delete_survivor_merge_combines_relation_removals
-# @features mutations
-# @dimensions delete plan property-mask mergeable-unlinks overlapping-roots
+# @matrix mutations : delete mergeable-unlinks overlapping-roots plan property-mask
 def _merge_survivors(survivors):
     grouped = {}
     for survivor in survivors:
@@ -523,8 +514,7 @@ def _merge_survivors(survivors):
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_delete_accepts_batch_and_dedupes
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_collect_user_delete_can_preserve_page
 # @tests tests_unit/test_022_mutation_contracts.py::test_job_delete_removes_operation_projection_after_commit
-# @pairs mutations:delete mutations:batch mutations:dedupe
-# @pair mutations:preserve-user-pages
+# @matrix mutations : batch dedupe delete preserve-user-pages
 # @pair deferred-jobs:redis-projection
 def plan_delete(*entities, registry, preserve_user_pages=False):
     entities = tuple(entity for entity in entities if entity)

@@ -17,10 +17,7 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.test_entities import TestEntities
 
 
-# @pairs ai-report:deterministic-run ai-report:create-order ai-report:partial-result
-# @pairs ai-report:skip-action ai-report:default-category ai-report:result
-# @pairs ai-report:grouping ai-report:attachments ai-report:file-summary
-# @pairs ai-report:execute ai-report:persistence
+# @matrix ai-report : attachments create-order default-category deterministic-run execute file-summary grouping partial-result persistence result skip-action
 @pytest.mark.unit
 def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -205,8 +202,7 @@ def test_run_report_creates_form_category_page_and_project_chain(monkeypatch):
 
 
 
-# @features ai-report form-schema submission
-# @dimensions deterministic-run validation stale-proposal
+# @matrix ai-report form-schema submission : deterministic-run stale-proposal validation
 @pytest.mark.unit
 def test_run_report_rejects_saved_pending_submissions_before_execution():
     user = _test_user("runner-pending-submission-owner")
@@ -247,8 +243,7 @@ def test_run_report_rejects_saved_pending_submissions_before_execution():
 
 
 
-# @pair ai-report:deterministic-run
-# @pairs ai-report:submission-completion ai-report:persistence
+# @matrix ai-report : deterministic-run persistence submission-completion
 @pytest.mark.unit
 def test_run_report_uses_category_form_from_stored_key_for_page_submission(
     monkeypatch,
@@ -332,8 +327,7 @@ def test_run_report_uses_category_form_from_stored_key_for_page_submission(
 
 
 
-# @features ai-report
-# @dimensions deterministic-run moves batch-field-patch schema-update undo
+# @matrix ai-report : batch-field-patch deterministic-run moves schema-update undo
 @pytest.mark.unit
 def test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo(
     monkeypatch,
@@ -612,9 +606,7 @@ def test_run_report_moves_entities_updates_schema_and_patches_submissions_with_u
 
 
 
-# @pair ai-report:deterministic-run
-# @pair ai-report:rename
-# @pair ai-report:undo
+# @matrix ai-report : deterministic-run rename undo
 @pytest.mark.unit
 def test_run_report_renames_entity_without_submission_and_undoes(monkeypatch):
     user = _test_user("runner-rename-owner")
@@ -677,8 +669,7 @@ def test_run_report_renames_entity_without_submission_and_undoes(monkeypatch):
 
 
 
-# @features ai-report submission
-# @dimensions deterministic-run empty-update recoverable continue
+# @matrix ai-report submission : continue deterministic-run empty-update recoverable
 @pytest.mark.unit
 def test_run_report_skips_empty_submission_update_and_continues(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -735,8 +726,7 @@ def test_run_report_skips_empty_submission_update_and_continues(monkeypatch):
 
 
 
-# @features ai-report
-# @dimensions deterministic-run page-form idempotent undo
+# @matrix ai-report : deterministic-run idempotent page-form undo
 @pytest.mark.unit
 def test_run_report_adds_form_to_existing_page_with_undo(monkeypatch):
     user = _test_user("runner-add-page-form-owner")
@@ -840,8 +830,7 @@ def test_run_report_adds_form_to_existing_page_with_undo(monkeypatch):
 
 
 
-# @features ai-report form-schema
-# @dimensions deterministic-run permission-failure schema-update
+# @matrix ai-report form-schema : deterministic-run permission-failure schema-update
 @pytest.mark.unit
 def test_run_report_rejects_schema_update_without_form_edit_permission(monkeypatch):
     user = _permissioned_user(

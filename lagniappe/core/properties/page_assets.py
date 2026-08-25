@@ -7,8 +7,7 @@ from .base_property import UNSET
 
 # @testable true
 # @tests tests_unit/test_008_page_properties.py::test_page_image_asset_lifecycle_and_projections
-# @features page
-# @dimensions image asset-lifecycle column filter-value
+# @matrix page : asset-lifecycle column filter-value image
 class Image(ColumnMixin, FilterMixin, AssetProperty):
     """Entity image. Stored as an image asset.
 

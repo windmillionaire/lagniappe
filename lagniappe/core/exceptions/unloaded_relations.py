@@ -113,8 +113,7 @@ def _property_context(prop):
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_related_list_value_reports_unloaded_relation_without_loading
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_related_single_value_reports_unloaded_relation_without_loading
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_related_value_strict_mode_raises_after_reporting
-# @features relations
-# @dimensions unloaded-fallback diagnostics strict-mode
+# @matrix relations : diagnostics strict-mode unloaded-fallback
 def capture_unloaded_relation(prop, *, relation_type, keys):
     """Capture a diagnostic when relation access would have lazy-loaded."""
     if not _unloaded_relations_tracing_enabled():

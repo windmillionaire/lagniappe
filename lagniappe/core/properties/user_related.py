@@ -13,8 +13,7 @@ from .base_db import DBProperty
 # @tests tests_unit/test_009a_user.py::test_user_groups_membership_changes_recalculate_permissions
 # @tests tests_unit/test_009a_user.py::test_user_groups_reject_invalid_relation_inputs
 # @tests tests_unit/test_009a_user.py::test_public_user_groups_force_public_group_only
-# @features user-groups
-# @dimensions membership-change relation-storage permission-recalc public-user
+# @matrix user-groups : membership-change permission-recalc public-user relation-storage
 class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
     """Groups a user belongs to.
 
@@ -99,8 +98,8 @@ class Groups(RelatedEntityListMixin, FilterMixin, ColumnMixin, DBProperty):
 # @tests tests_unit/test_009a_user.py::test_user_page_auto_create_lazy_load_and_owner_link
 # @tests tests_unit/test_009a_user.py::test_user_page_missing_key_raises_runtime_error
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_owner_can_reassign_and_remove_user_from_page
-# @features user
-# @dimensions personal-page auto-create lazy-load owner-link
+# @matrix user : auto-create lazy-load owner-link personal-page
+# @pair user-settings:page-remove
 class UserPage(RelatedEntityMixin, DBProperty):
     """The page entity associated with a user.
 
@@ -159,8 +158,7 @@ class UserPage(RelatedEntityMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_009a_user.py::test_user_page_auto_create_lazy_load_and_owner_link
     # @tests tests_unit/test_009a_user.py::test_user_create_public_user_assigns_public_group
-    # @features public-users
-    # @dimensions personal-page limited-attrs
+    # @matrix public-users : limited-attrs personal-page
     def _public_user_page_attributes(self):
         return [
             attribute.value.name
@@ -186,8 +184,7 @@ class UserPage(RelatedEntityMixin, DBProperty):
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_file
 # @tests tests_unit/test_009a_user.py::test_user_starred_cleanup_removes_stale_keys
-# @features starred
-# @dimensions category project page file stale-cleanup
+# @matrix starred : category file page project stale-cleanup
 class Starred(RelatedEntityListMixin, DBProperty):
     """Entities the user has starred (bookmarked).
 

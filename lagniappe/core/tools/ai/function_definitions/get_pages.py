@@ -55,7 +55,7 @@ GET_CATEGORY_PAGES = types.FunctionDeclaration(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_category_pages_compact_returns_lightweight_page_refs
-# @pairs ai:tool-context ai:compact category-pages:tool-context category-pages:compact
+# @matrix ai category-pages : compact tool-context
 def execute_get_category_pages(args, user):
     identifier = args.get("id")
     form_identifier = args.get("form_id")

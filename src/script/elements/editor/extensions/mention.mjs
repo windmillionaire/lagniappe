@@ -19,7 +19,7 @@ import {
  * @testable true
  * @tests tests_js/test_042_messaging_frontend.py::test_mention_node_collection_insertion_and_keyboard_contract
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
- * @pairs mentions:node-attributes mentions:profile-link
+ * @matrix mentions : node-attributes profile-link
  */
 export const LagniappeMention = Node.create({
 	name: "lagniappeMention",
@@ -113,8 +113,7 @@ const queryKey = (active) =>
  * @testable true
  * @tests tests_js/test_042_messaging_frontend.py::test_mention_node_collection_insertion_and_keyboard_contract
  * @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
- * @pairs mentions:pending-occurrence mentions:keyboard mentions:mouse mentions:node-attributes
- * @pairs mentions:floating-menu mentions:empty-results mentions:profile-link
+ * @matrix mentions : empty-results floating-menu keyboard mouse node-attributes pending-occurrence profile-link
  */
 export class MentionSuggestions {
 	constructor(editor, { documentKey, onInsert = null }) {

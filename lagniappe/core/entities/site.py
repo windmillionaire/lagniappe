@@ -8,8 +8,7 @@ from ..tools.database import site as site_database
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_site_lazy_properties_database_key_and_error_context
 # @tests tests_unit/test_002_entity_general_properties.py::test_site_missing_key_raises_runtime_error
-# @features site
-# @dimensions lazy-properties db-key error-wrapping validation
+# @matrix site : db-key error-wrapping lazy-properties validation
 class Site:
     """Base class for non-Entity site-level objects (Home, Index).
 

@@ -49,10 +49,8 @@ def _open_visibility_panel(user, category):
     return panel
 
 
-# @pair categories:server-render
-# @pair categories:first-batch
-# @pair pages:cursor-pagination
-# @pair table-controls:cursor-continuation
+# @matrix categories : first-batch server-render
+# @pairs pages:cursor-pagination table-controls:cursor-continuation
 # @template categories/index.html::view
 # @template table.html::table
 def test_category_index_renders_first_batch_before_cursor_continuation(
@@ -128,8 +126,7 @@ def test_category_index_renders_first_batch_before_cursor_continuation(
         Entities.delete(*created)
 
 
-# @features pages
-# @dimensions create category-index
+# @matrix pages : category-index create
 def test_create_page_from_category_index(get_user):
     user = get_user(Users.OWNER)
     category = Categories.test_empty_category.get(user)
@@ -145,9 +142,8 @@ def test_create_page_from_category_index(get_user):
     expect(Table(user).get_row(page.name)).to_be_visible()
 
 
+# @matrix reconnect-refresh : category-index component-identity
 # @pair category-index:refresh
-# @pair reconnect-refresh:category-index
-# @pair reconnect-refresh:component-identity
 # @template table.html::row
 def test_category_index_reconnect_refreshes_external_page(get_user, browser_failures):
     user = get_user(Users.OWNER)
@@ -170,12 +166,8 @@ def test_category_index_reconnect_refreshes_external_page(get_user, browser_fail
         Entities.delete(external_page)
 
 
-# @features pages
-# @dimensions autofill create deferred deferred-submit
-# @pairs deferred-jobs:process-route deferred-jobs:versioned-envelope
-# @pairs deferred-jobs:cloud-tasks deferred-jobs:oidc
-# @pairs deferred-jobs:provider-delivery deferred-jobs:hosted-e2e
-# @pairs polling:operation polling:owner polling:progress polling:timing
+# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
+# @matrix polling : operation owner progress timing
 # @template categories/tools.html::create_page
 def test_create_page_autofill_is_deferred(get_user, monkeypatch):
     user = get_user(Users.OWNER)
@@ -244,11 +236,8 @@ def test_create_page_autofill_is_deferred(get_user, monkeypatch):
         assert expected_text in preview
         assert "input-textab12" in preview
 
-# @pair categories:info-form
-# @pair categories:update
-# @pair web-headers:local-save
-# @pair web-headers:acknowledgement
-# @pair web-headers:entity-revision
+# @matrix categories : info-form update
+# @matrix web-headers : acknowledgement entity-revision local-save
 # @template categories/index.html::view_header
 def test_update_category_info_from_tools(get_user):
     user = get_user(Users.OWNER)
@@ -284,8 +273,7 @@ def test_update_category_info_from_tools(get_user):
     Attributes(info_form).expect_selected("files", False)
 
 
-# @features pages
-# @dimensions create category-index related-forms
+# @matrix pages : category-index create related-forms
 def test_create_page_related_form_badge_selects_form(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_category_filter_related_form_registration_page.get(user)
@@ -325,8 +313,7 @@ def test_create_page_related_form_badge_selects_form(get_user):
     Table(user).new_row(created_name)
 
 
-# @features category-index
-# @dimensions quick-edit editable-cell
+# @matrix category-index : editable-cell quick-edit
 def test_category_index_quick_edit_updates_text_cell(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_basic_input_submission.get(user)
@@ -361,8 +348,7 @@ def test_category_index_quick_edit_updates_text_cell(get_user):
     expect(row.locator("td[data-column='name']")).to_contain_text(updated_name)
 
 
-# @features category-index
-# @dimensions quick-edit checkbox-cell
+# @matrix category-index : checkbox-cell quick-edit
 def test_category_index_quick_edit_renders_checkbox_cells(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_category_filter_match_page.get(user)
@@ -403,8 +389,7 @@ def test_category_index_quick_edit_renders_checkbox_cells(get_user):
     ).not_to_be_attached()
 
 
-# @features form-table table-controls
-# @dimensions table-cell-expand form-table-column
+# @matrix form-table table-controls : form-table-column table-cell-expand
 # @template cell.html::table_cell
 # @template controls.html::expand
 def test_category_index_expands_table_submission_cell(get_user):
@@ -436,8 +421,7 @@ def test_category_index_expands_table_submission_cell(get_user):
     expect(embedded).to_contain_text("Row one")
 
 
-# @features pages
-# @dimensions generate ai-form explain-button
+# @matrix pages : ai-form explain-button generate
 def test_generate_pages_explain_prompt_from_category_tools(get_user):
     user = get_user(Users.OWNER)
     category = Categories.test_create_page.get(user)
@@ -457,8 +441,7 @@ def test_generate_pages_explain_prompt_from_category_tools(get_user):
     expect(generate_form).to_be_visible()
 
 
-# @features pages
-# @dimensions generate ai-form deferred-submit success-state
+# @matrix pages : ai-form deferred-submit generate success-state
 def test_generate_pages_submit_marks_form_successful(get_user):
     user = get_user(Users.OWNER)
     category = Categories.test_create_page.get(user)

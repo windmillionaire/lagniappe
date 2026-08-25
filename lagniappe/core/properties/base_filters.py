@@ -90,8 +90,7 @@ class Filters(Property):
     # @testable true
     # @tests tests_unit/test_005_project_properties.py::test_project_filter_conditions_include_only_viewable_entity_fields
     # @tests tests_unit/test_007_category_properties.py::test_category_filter_conditions_include_only_viewable_forms
-    # @features filters permissions
-    # @dimensions entity-fields view-access
+    # @matrix filters permissions : entity-fields view-access
     @property
     def visible_entity_fields(self):
         user = current_context_user()

@@ -51,8 +51,7 @@ from testing.utility import expect_successful_response
 pytestmark = pytest.mark.e2e
 
 
-# @features projects
-# @dimensions manual-form ai-form create-help
+# @matrix projects : ai-form create-help manual-form
 # @template home/projects.html::create
 def test_create_project_form(get_user):
     """
@@ -107,8 +106,7 @@ def test_create_project_form(get_user):
     expect(form).not_to_be_visible()
 
 
-# @features projects
-# @dimensions create-manual navigate search
+# @matrix projects : create-manual navigate search
 # @template home/projects.html::create
 def test_create_project_manual_mode(get_user):
     """
@@ -131,8 +129,7 @@ def test_create_project_manual_mode(get_user):
     expect(user.page).to_have_title(re.compile(project.definition.name))
 
 
-# @features projects
-# @dimensions ai-form ai-create explain-button ai-generated
+# @matrix projects : ai-create ai-form ai-generated explain-button
 # @template home/projects.html::create
 # @template home/projects.html::project
 @pytest.mark.ai
@@ -175,8 +172,7 @@ def test_create_project_ai_mode(get_user, results):
     results.record("project", project.entity.db)
 
 
-# @features projects
-# @dimensions delete
+# @pair projects:delete
 # @template projects/project.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
@@ -194,8 +190,7 @@ def test_delete_project(get_user):
     expect(user.page).to_have_url(re.compile(r"/$"))
 
 
-# @features projects
-# @dimensions attribute-model-tasks
+# @pair projects:attribute-model-tasks
 # @template home/projects.html::create
 def test_create_project_without_tasks(get_user):
     """
@@ -217,8 +212,7 @@ def test_create_project_without_tasks(get_user):
     expect(model_card).to_be_hidden()
 
 
-# @features projects
-# @dimensions attribute-document
+# @pair projects:attribute-document
 # @template home/projects.html::create
 def test_create_project_without_document(get_user):
     """

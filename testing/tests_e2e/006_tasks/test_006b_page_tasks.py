@@ -146,8 +146,7 @@ def _clear_signature(form, field_id=SIGNATURE_FIELD_ID):
     expect(hidden_input).to_have_value("")
 
 
-# @features tasks
-# @dimensions create basic
+# @matrix tasks : basic create
 def test_create_basic_page_task(get_user):
     user = get_user(Users.OWNER)
 
@@ -165,7 +164,7 @@ def test_create_basic_page_task(get_user):
     expect(task.element).to_contain_text(task.definition.name)
 
 
-# @pairs tasks:create-close tasks:empty-state
+# @matrix tasks : create-close empty-state
 # @template pages/tasks.html::task_list
 # @template pages/tasks.html::task_empty
 def test_empty_page_task_list_shows_marker_only_after_create_closes(get_user):
@@ -189,8 +188,7 @@ def test_empty_page_task_list_shows_marker_only_after_create_closes(get_user):
     expect(empty).to_be_visible()
 
 
-# @features tasks
-# @dimensions create attach-form
+# @matrix tasks : attach-form create
 def test_create_page_task_with_form(get_user):
     user = get_user(Users.OWNER)
 
@@ -206,8 +204,7 @@ def test_create_page_task_with_form(get_user):
     task.key = _submit_create_task_form(user, page, task, create_form)
 
 
-# @features tasks
-# @dimensions complete
+# @pair tasks:complete
 def test_complete_page_task(get_user):
     user = get_user(Users.OWNER)
 
@@ -220,10 +217,7 @@ def test_complete_page_task(get_user):
     assert not task.completed
 
 
-# @features tasks
-# @dimensions create project-link badge
-# @pair tasks:project-link
-# @pair tasks:select-toggle-layout
+# @matrix tasks : project-link select-toggle-layout
 # @style select.button
 # @template pages/tasks.html::action_buttons
 def test_create_page_task_with_project(get_user):
@@ -269,8 +263,7 @@ def test_create_page_task_with_project(get_user):
     expect(project_input).to_have_css("height", "40px")
 
 
-# @features tasks
-# @dimensions create model-task-link attach-form badge
+# @matrix tasks : attach-form badge create model-task-link
 def test_create_page_task_with_model_task(get_user):
     user = get_user(Users.OWNER)
 
@@ -301,8 +294,7 @@ def test_create_page_task_with_model_task(get_user):
     Badges.MODEL_TASK.visible(task.element, model_beta)
 
 
-# @pairs tasks:create tasks:assignee
-# @pair tasks:badge
+# @matrix tasks : assignee badge create
 # @pair notifications:assignee-target
 # @template notifications.html::item
 def test_create_page_task_with_assigned_to(get_user):
@@ -337,8 +329,7 @@ def test_create_page_task_with_assigned_to(get_user):
     )
 
 
-# @features tasks
-# @dimensions create due-date badge
+# @matrix tasks : badge create due-date
 def test_create_page_task_with_due_date(get_user):
     user = get_user(Users.OWNER)
 
@@ -357,8 +348,7 @@ def test_create_page_task_with_due_date(get_user):
     expect(task.element.locator("[data-role='change-due-date']")).to_be_visible()
 
 
-# @features tasks
-# @dimensions update settings-form unsaved-marker
+# @matrix tasks : settings-form unsaved-marker update
 # @template controls.html::task_save
 # @template pages/tasks.html::task_title
 def test_update_page_task_settings_from_row(get_user):
@@ -399,8 +389,7 @@ def test_update_page_task_settings_from_row(get_user):
     expect(task.element).to_contain_text(updated_description)
 
 
-# @features tasks
-# @dimensions attach-form widget-identity merged-submission
+# @matrix tasks : attach-form merged-submission widget-identity
 # @template pages/tasks.html::task
 # @template pages/tasks.html::settings_form
 # @template pages/tasks.html::task_form
@@ -488,8 +477,7 @@ def test_adding_form_from_task_settings_preserves_widget_identity(get_user):
     )
 
 
-# @features tasks
-# @dimensions move completed title-menu
+# @matrix tasks : completed move title-menu
 # @template pages/tasks.html::task_title
 # @template pages/tasks.html::move_form
 # @template pages/tasks.html::move_page_select
@@ -532,8 +520,7 @@ def test_completed_task_can_move_to_another_page(get_user):
     expect(user.locate(f"[data-key='{task.key}']")).not_to_be_attached()
 
 
-# @features tasks
-# @dimensions delete
+# @pair tasks:delete
 # @template pages/tasks.html::task
 def test_delete_page_task_from_page_row(get_user):
     user = get_user(Users.OWNER)
@@ -552,8 +539,7 @@ def test_delete_page_task_from_page_row(get_user):
     expect(task.element).not_to_be_visible()
 
 
-# @features tasks
-# @dimensions attached-form submission autofill
+# @matrix tasks : attached-form autofill submission
 # @template pages/tasks.html::task_form
 def test_submit_attached_task_form(get_user):
     user = get_user(Users.OWNER)
@@ -595,11 +581,7 @@ def test_submit_attached_task_form(get_user):
         assert submission.verify_submission_value(task_form)
 
 
-# @pair tasks:update-state
-# @pair tasks:refresh
-# @pair tasks:complete
-# @pair tasks:readonly
-# @pair tasks:attached-form
+# @matrix tasks : attached-form complete readonly refresh update-state
 # @pair reconnect-refresh:page-tasks
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
@@ -648,8 +630,7 @@ def test_task_update_preserves_open_widget_and_completed_readonly_state(get_user
     expect(readonly_field.locator("input")).to_have_count(0)
 
 
-# @features tasks
-# @dimensions complete readonly attached-form empty-fields
+# @matrix tasks : attached-form complete empty-fields readonly
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
 # @template pages/tasks.html::settings_form
@@ -677,8 +658,7 @@ def test_completed_task_with_empty_form_is_readonly(get_user):
     expect(_open_page_task_form(page, task)).to_be_visible()
 
 
-# @features tasks
-# @dimensions complete readonly attached-form partial-submission empty-fields
+# @matrix tasks : attached-form complete empty-fields partial-submission readonly
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
 def test_completed_task_with_partial_submission_omits_empty_fields(get_user):
@@ -709,8 +689,7 @@ def test_completed_task_with_partial_submission_omits_empty_fields(get_user):
     expect(active_form.locator("[name='input-textab12']")).to_have_value("")
 
 
-# @features tasks
-# @dimensions create while-open list-state
+# @matrix tasks : create list-state while-open
 # @template pages/tasks.html::task_tab
 # @template pages/tasks.html::task_list
 # @template pages/tasks.html::task
@@ -746,8 +725,7 @@ def test_create_page_task_while_another_task_is_open_keeps_rows_clear(get_user):
     ).not_to_be_visible()
 
 
-# @features signature
-# @dimensions file-input asset-lifecycle form-value editable readonly reload clear
+# @matrix signature : asset-lifecycle clear editable file-input form-value readonly reload
 def test_signature_submission_draw_save_reload_and_clear(get_user):
     user = get_user(Users.OWNER)
     task = Tasks.test_signature_submission.get(user)
@@ -814,8 +792,7 @@ def test_signature_submission_draw_save_reload_and_clear(get_user):
     expect(reset_field.locator("[data-role='read']")).to_have_count(0)
 
 
-# @features tasks
-# @dimensions create file-upload async-upload remove attachment
+# @matrix tasks : async-upload attachment create file-upload remove
 # @template pages/tasks.html::action_buttons
 def test_create_page_task_with_file(get_user):
     user = get_user(Users.OWNER)

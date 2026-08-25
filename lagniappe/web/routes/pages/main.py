@@ -32,8 +32,7 @@ from . import pages
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_own_page_hides_photo_and_file_surfaces
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_file_and_photo_actions_are_forbidden
-# @features public-users
-# @dimensions own-page file-photo-gates
+# @matrix public-users : file-photo-gates own-page
 def _is_public_users_own_page(page):
     return bool(
         getattr(current_user, "is_public", False)
@@ -43,9 +42,7 @@ def _is_public_users_own_page(page):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_preloads_existing_groups
-# @pair user-settings:group-selector
-# @pair user-settings:preload
-# @pair user-settings:relation-loading
+# @matrix user-settings : group-selector preload relation-loading
 def _load_user_settings_groups(page):
     """Attach group relations needed by another user's settings selector."""
     is_own_page = getattr(getattr(current_user, "page", None), "key", None) == page.key
@@ -56,8 +53,7 @@ def _load_user_settings_groups(page):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_public_user_restricted_schedules_are_forbidden
-# @features public-users
-# @dimensions attribute-preservation
+# @pair public-users:attribute-preservation
 def _preserve_public_user_page_attributes(page, page_data):
     if not getattr(current_user, "is_public", False):
         return
@@ -76,8 +72,7 @@ def _preserve_public_user_page_attributes(page, page_data):
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_is_forbidden_without_model_or_page_permission
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_sees_document_tab_only_when_content_exists
-# @features pages
-# @dimensions load tabs permission-gates readonly document-tab
+# @matrix pages : document-tab load permission-gates readonly tabs
 @pages.route("<key>", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def view(key, **kwargs):
@@ -88,7 +83,7 @@ def view(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-# @pairs ai:autofill ai:deferred ai:completion-refresh
+# @matrix ai : autofill completion-refresh deferred
 @pages.route("<key>/info/replace", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def info(key, **kwargs):
@@ -126,8 +121,7 @@ def document_settings(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
-# @features tasks
-# @dimensions create basic
+# @matrix tasks : basic create
 @pages.route("<key>/tasks", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def tasks(key, **kwargs):
@@ -138,8 +132,7 @@ def tasks(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_sees_empty_files_tab_without_upload_affordances
-# @features files
-# @dimensions readonly empty-state permission-gates async-load
+# @matrix files : async-load empty-state permission-gates readonly
 @pages.route("<key>/files", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def files(key, **kwargs):
@@ -260,8 +253,7 @@ def _autofill_data(page, request, create=False):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_switch_page_form
-# @features pages
-# @dimensions form-switch info-form
+# @matrix pages : form-switch info-form
 def _page_form_submission_response(page):
     return responses.form_submission(page)
 
@@ -269,9 +261,7 @@ def _page_form_submission_response(page):
 # @testable true
 # @scaffolding testing/resources/page.py::Page.submit_and_verify_submission
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_submission_rejects_hidden_internal_link_target
-# @pairs pages:submission pages:default-form pages:basic-inputs
-# @pairs pages:selection-fields pages:link-field
-# @pair pages:submitted-reference
+# @matrix pages : basic-inputs default-form link-field selection-fields submission submitted-reference
 def _apply_page_submission(page, form):
     page.form_submission(form, actor=current_user)
 
@@ -279,8 +269,7 @@ def _apply_page_submission(page, form):
 # @testable true
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_add_category_to_page
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_remove_category_from_page
-# @features pages
-# @dimensions category-add category-remove
+# @matrix pages : category-add category-remove
 def _apply_page_metadata_update(page, page_data, user=None):
     page.update(page_data)
     if page.user:
@@ -289,8 +278,7 @@ def _apply_page_metadata_update(page, page_data, user=None):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_user_settings_submit_preserves_attached_form_and_categories
-# @features user-settings
-# @dimensions submit-boundary attached-form categories restrictions
+# @matrix user-settings : attached-form categories restrictions submit-boundary
 def _apply_user_settings_update(page, page_data, user=None):
     if not page.user:
         return
@@ -467,8 +455,7 @@ def _set_page_attribute(page, attribute, active):
 # @testable true
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_page_attribute_toggle_updates_tabs_without_reload
 # @tests tests_e2e/005_pages/test_005f_page_image.py::test_empty_page_photo_prompt_can_disable_photo_without_reload
-# @features pages
-# @dimensions attributes-live-toggle photo-prompt photo-disable tabs no-reload
+# @matrix pages : attributes-live-toggle no-reload photo-disable photo-prompt tabs
 @pages.route("<key>/attributes/<attribute>", methods=["PUT"])
 @permission(Resource.PAGE, Action.EDIT)
 def set_attribute(key, attribute, **kwargs):
@@ -493,8 +480,7 @@ def set_attribute(key, attribute, **kwargs):
 
 # @testable true
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_quick_edit_updates_text_cell
-# @features category-index
-# @dimensions quick-edit editable-cell
+# @matrix category-index : editable-cell quick-edit
 @pages.route("<key>/patch", methods=["PATCH"])
 @permission(Resource.PAGE, Action.EDIT)
 def patch(key, **kwargs):
@@ -543,8 +529,8 @@ def patch(key, **kwargs):
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_from_category_index
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_create_page_autofill_is_deferred
 # @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
-# @features pages
-# @dimensions create category-index mobile-tools
+# @matrix pages : category-index create mobile-tools
+# @pair deferred-jobs:hosted-e2e
 @pages.route("<key>/create", methods=["POST"])
 @permission(Resource.CATEGORY, Action.EDIT)
 def create(key, **kwargs):
@@ -626,8 +612,7 @@ def create_direct(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002k_home_pages.py::test_create_page_from_home
-# @features home pages
-# @dimensions create category-select default-category
+# @matrix home pages : category-select create default-category
 @pages.route("create", methods=["POST"])
 @logged_in
 def create_from_home():
@@ -675,8 +660,8 @@ def create_from_home():
 # @testable true
 # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_delete_page_from_title_menu
-# @features pages
-# @dimensions delete title-menu parentless
+# @matrix pages : delete parentless title-menu
+# @pair entities:delete
 @pages.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.PAGE, Action.DELETE)
 def delete(key, **kwargs):
@@ -705,8 +690,7 @@ def delete(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_document_visibility_can_toggle_public_private
-# @features pages
-# @dimensions document-visibility public private
+# @matrix pages : document-visibility private public
 @pages.route("<key>/visibility", methods=["PUT"])
 @permission(Resource.PAGE, Action.PUBLISH)
 def visibility(key, **kwargs):
@@ -724,8 +708,8 @@ def visibility(key, **kwargs):
 # @tests tests_unit/test_008_page_properties.py::test_page_public
 # @tests tests_unit/test_008_page_properties.py::test_page_to_cache_public_user
 # @tests tests_e2e/005_pages/test_005a_page_tabs.py::test_document_visibility_can_toggle_public_private
-# @features pages
-# @dimensions public-document
+# @matrix page : public public-user
+# @pair pages:public-document
 @pages.route("public/<public_id>", methods=["GET"])
 def public(public_id):
     public_pages = Entities.fetch(
@@ -741,16 +725,14 @@ def public(public_id):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_owner_can_open_page_permissions_panel
-# @features pages
-# @dimensions permissions-panel permission-gates
+# @matrix pages : permission-gates permissions-panel
 def _page_view_access_response(page):
     return responses.page_view_access(page)
 
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_owner_restricted_page_is_hidden_from_model_viewer
-# @features pages
-# @dimensions access-restrictions owner-restricted
+# @matrix pages : access-restrictions owner-restricted
 def _apply_owner_access_restriction(page, owner):
     if owner == "add":
         page.groups = None
@@ -761,8 +743,7 @@ def _apply_owner_access_restriction(page, owner):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_group_restricted_page_opens_for_member_only
-# @features pages
-# @dimensions access-restrictions group-restricted
+# @matrix pages : access-restrictions group-restricted
 def _apply_group_access_restriction(page, group_action, group_key):
     group = Entities.fetch_one(group_key, request=Fetch.direct())
     if not group:

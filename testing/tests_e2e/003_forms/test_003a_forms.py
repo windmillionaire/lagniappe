@@ -22,13 +22,9 @@ from testing.resources import Form
 from testing.utility import expect_reconnect_refresh
 
 
-# @pair forms:index
-# @pair forms:tools
-# @pair reconnect-refresh:root-fingerprint
-# @pair reconnect-refresh:fallback
-# @pair reconnect-refresh:manifest
-# @pair indexes:rendering
-# @pair indexes:fingerprint-gate
+# @matrix forms : index tools
+# @matrix indexes : fingerprint-gate rendering
+# @matrix reconnect-refresh : fallback manifest root-fingerprint
 # @template forms/index.html::view
 def test_forms_index_page(get_user, browser_failures):
     user = get_user(Users.OWNER)
@@ -58,8 +54,7 @@ def test_forms_index_page(get_user, browser_failures):
     tools.close()
 
 
-# @features forms
-# @dimensions delete-modal instance-query preview-limit
+# @matrix forms : delete-modal instance-query preview-limit
 # @template delete/form.html::instance_link
 def test_form_delete_modal_lists_page_and_task_users(get_user):
     user = get_user(Users.OWNER)
@@ -142,8 +137,7 @@ def _create_form(user, form, create_form):
     return new_row.get_attribute("data-key")
 
 
-# @features forms
-# @dimensions create page-form components
+# @matrix forms : components create page-form
 # @template forms/tools.html::create_form
 # @template forms/builder.html::main
 def test_create_page_form(get_user):
@@ -171,8 +165,7 @@ def test_create_page_form(get_user):
         expect(components.locator(element_type.value)).to_be_visible()
 
 
-# @features forms
-# @dimensions create task-form builder-defaults components
+# @matrix forms : builder-defaults components create task-form
 # @template forms/tools.html::create_form
 # @template forms/builder.html::main
 def test_create_task_form(get_user):
@@ -200,9 +193,9 @@ def test_create_task_form(get_user):
         expect(components.locator(element_type.value)).to_be_visible()
 
 
-# @pairs forms:builder-copy forms:schema forms:form-type forms:navigation forms:delete
-# @pairs forms:builder-form-name frontend-icons:material-icon-preservation
-# @pairs entity-menu:builder-copy entity-menu:title-menu
+# @matrix entity-menu : builder-copy title-menu
+# @matrix forms : builder-copy builder-form-name delete form-type navigation schema
+# @pair frontend-icons:material-icon-preservation
 # @template forms/builder.html::header
 def test_copy_form_from_builder_title_menu(get_user):
     user = get_user(Users.OWNER)
@@ -262,8 +255,7 @@ def test_copy_form_from_builder_title_menu(get_user):
     assert Builder(user).schema == source_schema
 
 
-# @features forms
-# @dimensions builder-add-inputs builder-save builder-reload
+# @matrix forms : builder-add-inputs builder-reload builder-save
 def test_add_inputs_to_form(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_add_inputs_to_form.get(user)
@@ -286,8 +278,7 @@ def test_add_inputs_to_form(get_user):
         expect(element).to_be_visible()
 
 
-# @features forms ai
-# @dimensions generate-schema live-ai saved-state reload
+# @matrix ai forms : generate-schema live-ai reload saved-state
 # @template forms/builder.html::generate
 @pytest.mark.ai
 def test_generate_form_schema_live_saved_state(get_user, request):
@@ -364,8 +355,7 @@ def test_generate_form_schema_live_saved_state(get_user, request):
     )
 
 
-# @features forms
-# @dimensions builder-add-fields builder-save builder-reload
+# @matrix forms : builder-add-fields builder-reload builder-save
 def test_add_fields_to_form(get_user):
     user = get_user(Users.OWNER)
     form = Forms.test_add_fields_to_form.get(user)

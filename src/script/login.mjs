@@ -21,8 +21,7 @@ const REMEMBER_COOKIE_NAME = "lagniappe_remember";
 /**
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_agent_access_login_form_creates_session
- * @features login
- * @dimensions agent-access
+ * @pair login:agent-access
  */
 function initializeAgentLoginForms(root = document) {
 	root.addEventListener("submit", async (event) => {
@@ -69,8 +68,7 @@ initializeAgentLoginForms();
 /**
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_login_page_loads
- * @features login
- * @dimensions page-load
+ * @pair login:page-load
  */
 async function initializeIdentityPlatform() {
 	try {
@@ -122,8 +120,7 @@ if (document.getElementById("emailCheck")) {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/001_site/test_001b_login.py::test_login_remember_preference_syncs_across_forms
-	 * @features login
-	 * @dimensions remember-preference
+	 * @pair login:remember-preference
 	 */
 	const setRememberPreference = (remember) => {
 		const secure = window.location.protocol === "https:" ? "; Secure" : "";
@@ -139,8 +136,8 @@ if (document.getElementById("emailCheck")) {
 	 * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
 	 * @tests tests_e2e/001_site/test_001b_login.py::test_reset_password_mode
 	 * @tests tests_e2e/001_site/test_001b_login.py::test_verify_email_mode
-	 * @features login
-	 * @dimensions email-check sign-in-transition query-mode owner-bootstrap
+	 * @matrix login : email-check owner-bootstrap query-mode sign-in-transition
+	 * @pair login:auth-method
 	 */
 	const showForm = (form) => {
 		withTransition(() => {

@@ -94,8 +94,7 @@ export class ImportData {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_stage_action_failure_restores_button_and_polling_for_retry
-	 * @features ingress ui-action
-	 * @dimensions stage-action single-flight retryable-action polling-recovery
+	 * @matrix ingress ui-action : polling-recovery retryable-action single-flight stage-action
 	 */
 	_runStageAction(
 		button,
@@ -183,8 +182,7 @@ export class ImportData {
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
 	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_next_waits_for_pending_stage_update
-	 * @features ingress
-	 * @dimensions choose-type stage-update serialization
+	 * @matrix ingress : choose-type serialization stage-update
 	 */
 	async _change(e) {
 		const form = e.target.closest("form");
@@ -211,8 +209,7 @@ export class ImportData {
 	 * @testable true
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-	 * @features ingress
-	 * @dimensions stage-wizard
+	 * @pair ingress:stage-wizard
 	 */
 	_setStage(resp) {
 		if (this._destroyed || !resp) return false;
@@ -336,8 +333,7 @@ export class ImportData {
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_ignored_columns_are_not_imported
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_task_page_form_lookup_updates_index_fields
-	 * @features ingress
-	 * @dimensions verify-import page-form-lookup
+	 * @matrix ingress : page-form-lookup verify-import
 	 */
 	_setVerifyImport() {
 		const target = this.stageSettings.target;
@@ -413,8 +409,7 @@ export class ImportData {
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_selects_existing_parent_and_form
-	 * @features ingress
-	 * @dimensions choose-form existing-form
+	 * @matrix ingress : choose-form existing-form
 	 */
 	_setChooseForm() {
 		const formElt = this.stageSettings.target;
@@ -430,8 +425,7 @@ export class ImportData {
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_selects_existing_parent_and_form
-	 * @features ingress
-	 * @dimensions choose-parent existing-parent
+	 * @matrix ingress : choose-parent existing-parent
 	 */
 	_setChooseParent() {
 		const parentElt = this.stageSettings.target;
@@ -471,8 +465,7 @@ export class ImportData {
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_ignored_columns_are_not_imported
-	 * @features ingress
-	 * @dimensions assign-columns ignored-columns
+	 * @matrix ingress : assign-columns ignored-columns
 	 */
 	_setAssignColumns() {
 		const target = this.stageSettings.target;
@@ -512,8 +505,8 @@ export class ImportData {
 	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_next_waits_for_pending_stage_update
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_page_import_stages
 	 * @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_advances_through_task_import_stages
-	 * @features ingress
-	 * @dimensions next-action stage-update serialization
+	 * @matrix ingress : next-action serialization stage-update
+	 * @pair ingress:verify-import
 	 */
 	async _next() {
 		await this._stageUpdate;
@@ -572,10 +565,7 @@ export class ImportData {
 	 *
 	 * @testable true
 	 * @tests tests_js/test_035_ingress_polling.py::test_ingress_polling_tracks_widget_visibility
-	 * @features ingress polling
-	 * @dimensions active-widget visibility subscription-lifecycle catch-up
-	 * @pairs ingress:active-widget ingress:visibility ingress:subscription-lifecycle ingress:catch-up
-	 * @pairs polling:active-widget polling:visibility polling:subscription-lifecycle polling:catch-up
+	 * @matrix ingress polling : active-widget catch-up subscription-lifecycle visibility
 	 */
 	async syncPollingSubscription() {
 		if (this._destroyed) return;

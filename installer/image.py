@@ -39,8 +39,7 @@ def get_storage_bucket():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_image_restore_uses_loaded_metadata_and_timeouts
-# @features setup
-# @dimensions image-restore
+# @pair setup:image-restore
 def get_images():
     f = FORMATTER.initialize()
 
@@ -95,8 +94,7 @@ def _swap_image_tree(staging, images_dir):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_image_restore_uses_loaded_metadata_and_timeouts
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_image_restore_rejects_unsafe_keys_and_never_swaps_partial_downloads
-# @features setup
-# @dimensions image-restore transactional-state path-validation
+# @matrix setup : image-restore path-validation transactional-state
 def save_images(sp, images_dict=None):
     """Stage and verify every remote image before replacing the live tree."""
     from installer import FORMATTER

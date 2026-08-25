@@ -7,7 +7,7 @@ import { primitives } from "./primitives";
 /**
  * @testable true
  * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_selection_submission
- * @pairs pages:submission pages:selection-fields pages:read-mode
+ * @matrix pages : read-mode selection-fields submission
  */
 export class SelectElement extends BaseElement {
 	get value() {

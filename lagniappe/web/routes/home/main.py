@@ -20,8 +20,7 @@ from . import home, internal
 
 # @testable true
 # @tests tests_e2e/002_home/test_002a_home.py::test_home_mobile_dashboard_smoke
-# @features home
-# @dimensions load layout mobile
+# @matrix home : layout load mobile
 @home.route("/")
 @home_permission()
 def home_page():
@@ -32,8 +31,7 @@ def home_page():
 # @testable true
 # @tests tests_e2e/002_home/test_002a_home.py::test_tasks_prefetch
 # @tests tests_e2e/002_home/test_002a_home.py::test_model_lists_load_on_toggle
-# @features home
-# @dimensions prefetch lazy-load task-list task-count project-list category-list
+# @matrix home : category-list lazy-load prefetch project-list task-count task-list
 @internal.route("/get/<kind>")
 @home_permission()
 def get(kind):
@@ -58,9 +56,8 @@ def get(kind):
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_notes_exclude_notifications
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes
-# @pairs activity:load activity:cached-response activity:notes-only
-# @pairs notes:load notes:cached-response notes:notes-only
-# @pair activity:notes-exclusion
+# @matrix activity : cached-response load notes-exclusion notes-only
+# @matrix notes : cached-response load notes-only
 @internal.route("/activity")
 @home_permission()
 def activity():
@@ -72,10 +69,8 @@ def activity():
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_renders_target_and_preserves_pending_state
 # @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_assigned_to
-# @pair notifications:dropdown-refresh
-# @pair notifications:target-link
-# @pair offline:dropdown-refresh
-# @pair offline:target-link
+# @matrix notifications offline : dropdown-refresh target-link
+# @pair notifications:assignee-target
 @internal.route("/notifications")
 @logged_in
 def notifications():
@@ -119,8 +114,7 @@ def notifications():
 
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_menu_deletes_and_clears
-# @features notifications
-# @dimensions clear-all ownership
+# @matrix notifications : clear-all ownership
 @internal.route("/notifications", methods=["DELETE"])
 @logged_in
 def clear_notifications():
@@ -135,23 +129,8 @@ def clear_notifications():
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_note_shared_visibility_is_owner_only
-# @features activity notes
-# @dimensions create body photo parent visibility scope
-# @pair activity:create
-# @pair activity:body
-# @pair activity:photo
-# @pair activity:parent
-# @pair activity:visibility
-# @pair activity:scope
-# @pair activity:owner-only-shared
-# @pair notes:create
-# @pair notes:body
-# @pair notes:photo
-# @pair notes:parent
-# @pair notes:visibility
-# @pair notes:scope
-# @pair notes:owner-only-shared
-# @pair notes:private-default
+# @matrix activity : body create owner-only-shared parent photo scope visibility
+# @matrix notes : body create owner-only-shared parent photo private-default scope visibility
 # @pair permissions:owner-only-shared
 @internal.route("/activity/notes", methods=["POST"])
 @logged_in
@@ -185,8 +164,7 @@ def create_note():
 
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_delete_activity_item_from_home
-# @features activity notes notifications
-# @dimensions delete ownership
+# @matrix activity notes notifications : delete ownership
 @internal.route("/activity/<key>", methods=["DELETE"])
 @logged_in
 def delete_activity(key):
@@ -222,8 +200,7 @@ def delete_activity(key):
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_file
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_route_rejects_inaccessible_and_missing_targets
-# @features starred
-# @dimensions category project page file authorization missing-target no-mutation
+# @matrix starred : authorization category file missing-target no-mutation page project
 @internal.route("/toggle-star/<key>", methods=["PATCH"])
 @permission(requested=Action.VIEW)
 def toggle_star(key, **kwargs):

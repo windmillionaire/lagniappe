@@ -22,8 +22,7 @@ from testing.utility.test_file import TestFile as UploadTestFile
 pytestmark = pytest.mark.e2e
 
 
-# @features entity-layout
-# @dimensions query-tab persistence
+# @matrix entity-layout : persistence query-tab
 def test_page_url_tab_overrides_saved_tab(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
@@ -48,8 +47,7 @@ def test_page_url_tab_overrides_saved_tab(get_user):
     )
 
 
-# @features pages
-# @dimensions attributes-live-toggle tabs no-reload
+# @matrix pages : attributes-live-toggle no-reload tabs
 # @template pages/page.html::main
 # @template pages/info.html::info_form
 def test_page_attribute_toggle_updates_tabs_without_reload(get_user):
@@ -77,8 +75,7 @@ def test_page_attribute_toggle_updates_tabs_without_reload(get_user):
     assert user.page.evaluate("window.__attributeToggleNoReload") is True
 
 
-# @features pages
-# @dimensions submission default-form
+# @matrix pages : default-form submission
 def test_page_with_default_category_form(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_page_with_default_category_form.get(user)
@@ -90,8 +87,7 @@ def test_page_with_default_category_form(get_user):
     page.submit_and_verify_submission(submission)
 
 
-# @features pages
-# @dimensions form-switch info-form
+# @matrix pages : form-switch info-form
 def test_switch_page_form(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_switch_page_form.get(user)
@@ -110,8 +106,7 @@ def test_switch_page_form(get_user):
         expect(field.locate(info_form)).to_be_visible()
 
 
-# @features pages
-# @dimensions form-clear info-form
+# @matrix pages : form-clear info-form
 def test_clear_page_info_form_selector_keeps_widget_stable(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_switch_page_form.get(user)
@@ -142,8 +137,7 @@ def _document_save_response(text):
     return predicate
 
 
-# @features pages
-# @dimensions document-visibility public private public-document
+# @matrix pages : document-visibility private public public-document
 def test_document_visibility_can_toggle_public_private(get_user, browser_failures):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_document_visibility_page)
@@ -193,8 +187,7 @@ def test_document_visibility_can_toggle_public_private(get_user, browser_failure
     assert private_response.status == 404
 
 
-# @features pages
-# @dimensions file-upload delete
+# @matrix pages : delete file-upload
 # @template pages/files.html::file_list_item
 def test_add_file_to_page(get_user):
     user = get_user(Users.OWNER)
@@ -232,8 +225,7 @@ def test_add_file_to_page(get_user):
     expect(file_list.locator("li").filter(has_text="editor_test_image")).to_have_count(0)
 
 
-# @features file pages
-# @dimensions file-upload page-upload multi-file
+# @matrix file pages : file-upload multi-file page-upload
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 def test_add_multiple_files_to_page_hides_existing_file_select(get_user):
@@ -278,8 +270,7 @@ def test_add_multiple_files_to_page_hides_existing_file_select(get_user):
         assert file_entity.name == expected_name
 
 
-# @features pages
-# @dimensions category-add
+# @pair pages:category-add
 def test_add_category_to_page(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_category_edit_page)
@@ -301,8 +292,7 @@ def test_add_category_to_page(get_user):
     expect(user.locate(page.PAGE_TITLE)).to_contain_text(page.definition.name)
 
 
-# @features pages
-# @dimensions delete title-menu parentless
+# @matrix pages : delete parentless title-menu
 # @template pages/page.html::view_header
 # @template menus.html::title
 # @template menus.html::delete
@@ -327,8 +317,7 @@ def test_delete_page_from_title_menu(get_user):
     assert Entities.fetch_one(page.key, request=Fetch.root()) is None
 
 
-# @features pages
-# @dimensions category-remove
+# @pair pages:category-remove
 def test_remove_category_from_page(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_category_edit_page)

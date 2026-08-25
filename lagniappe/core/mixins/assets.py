@@ -112,8 +112,7 @@ class AssetMixin:
 
     # @testable true
     # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_asset_mixin_copy_asset_copies_storage_and_updates_definition
-    # @features asset-storage
-    # @dimensions copy metadata visibility
+    # @matrix asset-storage : copy metadata visibility
     def copy_asset(self, asset, name=None):
         if not asset:
             return None

@@ -16,21 +16,9 @@ from testing.utility.test_entities import TestEntities
 pytestmark = pytest.mark.unit
 
 
-# @pairs messaging:entity-contract messaging:owner-opt-in messaging:index-exclusion
-# @pairs mentions:entity-contract mentions:idempotency mentions:index-exclusion
-# @pairs notifications:discriminator notifications:aggregate-count
-# @pairs notifications:revision notifications:generation
-# @pair messaging:polling-revision
-# @source lagniappe/core/entities/message.py::MessageConversation
-# @source lagniappe/core/entities/message.py::Message
-# @source lagniappe/core/entities/mention.py::MentionMarker
-# @source lagniappe/core/properties/notification.py::NotificationType.value
-# @source lagniappe/core/properties/notification_aggregate.py::OrdinaryCount.value
-# @source lagniappe/core/properties/notification_aggregate.py::UnreadMessageCount.value
-# @source lagniappe/core/properties/notification_aggregate.py::AggregateRevision.value
-# @source lagniappe/core/properties/notification_aggregate.py::MessageRevision.value
-# @source lagniappe/core/properties/notification_aggregate.py::AggregateGeneration.value
-# @source lagniappe/core/properties/user_entity.py::OwnerInboundToggle.value
+# @matrix mentions : entity-contract idempotency index-exclusion
+# @matrix messaging : entity-contract index-exclusion owner-opt-in polling-revision
+# @matrix notifications : aggregate-count discriminator generation revision
 def test_messaging_entities_and_owner_toggles_are_fail_closed():
     user = User(testing=True)
     assert user.allow_messages_and_mentions is False
@@ -68,8 +56,7 @@ def test_messaging_entities_and_owner_toggles_are_fail_closed():
     assert notification.aggregate_revision == 7
     assert notification.message_revision == 5
     assert notification.aggregate_generation == "generation-a"
-# @pairs migrations:notification-discriminator migrations:idempotency
-# @source lagniappe/core/tools/database/migration_steps/v0_1_messaging.py::canonicalize_notification_record
+# @matrix migrations : idempotency notification-discriminator
 def test_notification_discriminator_migration_is_idempotent():
     notification = {"type": "notification"}
     first = canonicalize_notification_record(notification)
@@ -79,8 +66,7 @@ def test_notification_discriminator_migration_is_idempotent():
     assert notification["notification_type"] == "ordinary"
     assert second.changed is False
     assert canonicalize_notification_record({"type": "note"}).changed is False
-# @pairs task-assignment:transition task-assignment:idempotency task-assignment:self-exclusion
-# @source lagniappe/core/entities/task.py::Task._add_assignment_notice
+# @matrix task-assignment : idempotency self-exclusion transition
 def test_task_assignment_notice_uses_stable_transition_identity(monkeypatch):
     task = TestEntities.get("TASK", {"name": "Review", "hash": "task-notice"})
     actor = TestEntities.get(

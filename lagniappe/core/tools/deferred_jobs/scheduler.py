@@ -32,8 +32,7 @@ def _utc():
 
 # @testable true
 # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_provider_pause_and_resume_use_exact_job_resource
-# @features deferred-jobs cloud-scheduler
-# @dimensions exact-resource provider-api
+# @matrix cloud-scheduler deferred-jobs : exact-resource provider-api
 def scheduler_job_url(config=CONFIG):
     """Return the exact Cloud Scheduler REST resource owned by this app."""
     project = str(getattr(config, "GOOGLE_CLOUD_PROJECT", None) or "").strip()
@@ -93,8 +92,7 @@ def _request_state(session, method, url):
 
 # @testable true
 # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_provider_pause_and_resume_use_exact_job_resource
-# @features deferred-jobs cloud-scheduler
-# @dimensions pause resume provider-api idempotency
+# @matrix cloud-scheduler deferred-jobs : idempotency pause provider-api resume
 def set_scheduler_state(desired_state, *, session, config=CONFIG):
     """Read and, when necessary, move the Scheduler job to one exact state."""
     if desired_state not in SCHEDULER_STATES:
@@ -131,10 +129,8 @@ def _control_converged(control):
 # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_serializes_state_changes_and_converges_latest_generation
 # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_releases_lease_after_provider_failure
 # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_scheduler_sync_uses_committed_control_hint_when_current
-# @features deferred-jobs cloud-scheduler
-# @dimensions distributed-lease generation convergence provider-failure
-# @pairs deferred-jobs:datastore-read-isolation cloud-scheduler:datastore-read-isolation
-# @pairs deferred-jobs:convergence cloud-scheduler:convergence
+# @matrix cloud-scheduler deferred-jobs : convergence datastore-read-isolation
+# @pair deferred-jobs:provider-failure
 def synchronize_deferred_job_reconciler(
     *,
     force=False,

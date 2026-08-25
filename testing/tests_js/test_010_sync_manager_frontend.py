@@ -1,13 +1,9 @@
 """Node-backed checks for the polling-based SyncManager."""
 
 
-# @features sync polling
-# @dimensions document collaboration offline-replay cursor-retention presence lifecycle batching active-widget visibility retry-boundary reconnect-generation
-# @pairs sync:active-widget sync:visibility sync:offline-replay
-# @pairs polling:active-widget polling:visibility polling:document
-# @pairs sync:checkpoint sync:persistence sync:dirty-state
-# @pairs offline:offline-replay offline:queue-preserved offline:reconnect-generation
-# @pairs offline:retry-boundary sync:reconnect-generation sync:retry-boundary
+# @matrix offline : offline-replay queue-preserved reconnect-generation retry-boundary
+# @matrix polling : active-widget document visibility
+# @matrix sync : active-widget checkpoint dirty-state offline-replay persistence reconnect-generation retry-boundary visibility
 def test_sync_manager_uses_polling_subscriptions(run_node):
     run_node(
         r"""

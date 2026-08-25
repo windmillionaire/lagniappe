@@ -219,8 +219,7 @@ def _source_digest(reader, contract, issues):
 # @testable true
 # @tests tests_tooling/test_005a_frontend_build.py::test_frontend_build_validator_checks_recursive_artifacts_and_source_identity
 # @tests tests_tooling/test_005a_frontend_build.py::test_frontend_build_validator_rejects_unsafe_and_incoherent_metadata
-# @features frontend-build
-# @dimensions artifact-integrity source-integrity build-metadata path-safety build-identity
+# @matrix frontend-build : artifact-integrity build-identity build-metadata path-safety source-integrity
 def inspect_frontend_build(
     reader,
     *,
@@ -386,8 +385,8 @@ def inspect_frontend_build(
 # @testable true
 # @tests tests_tooling/test_005a_frontend_build.py::test_verify_frontend_build_reports_actionable_failure
 # @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
-# @features frontend-build deploy
-# @dimensions validation safe-failure
+# @matrix deploy frontend-build : safe-failure validation
+# @pair deploy:build
 def verify_frontend_build(
     *,
     app_dir,

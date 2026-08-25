@@ -17,8 +17,7 @@ from .form_special import Signature, Status
 
 # @testable true
 # @tests tests_unit/test_010_task_index.py::test_task_index_status_column_derives_messages_from_mixed_forms
-# @features task-index status
-# @dimensions mixed-forms computed-column
+# @matrix status task-index : computed-column mixed-forms
 class TaskStatus(ColumnMixin, Property):
     """Task-level status column derived from the task's attached form."""
 
@@ -58,8 +57,7 @@ class TaskStatus(ColumnMixin, Property):
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_project_filters
 # @tests tests_unit/test_013_task_properties.py::test_task_categories_follow_parent_page_categories
-# @features task
-# @dimensions categories parent-derived filter-value
+# @matrix task : categories filter-value parent-derived
 class TaskCategories(
     RelatedEntityListMixin, FilterMixin, ColumnMixin, AIMixin, Property
 ):
@@ -106,8 +104,7 @@ class TaskCategories(
 
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_related_lists_replace_linked_pages_and_report_unloaded_files
-# @features task
-# @dimensions related-files unloaded-fallback
+# @matrix task : related-files unloaded-fallback
 class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
     """Files related to a task.
 
@@ -229,8 +226,7 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
 
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_has_signature_filter_value
-# @features task, signature, filters
-# @dimensions schema-field, filter-value
+# @matrix filters signature task : filter-value schema-field
 class HasSignature(FilterMixin, Property):
     """Whether a task's schema includes a signature and the task has one saved.
 
@@ -276,9 +272,8 @@ class HasSignature(FilterMixin, Property):
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_has_status_filter_value
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_has_status_renders_status_column
-# @pairs task:schema-field task:filter-value
-# @pairs status:schema-field status:filter-value status:boolean-condition status:run-results
-# @pairs filters:schema-field filters:filter-value filters:boolean-condition filters:run-results
+# @matrix filters status : boolean-condition filter-value run-results schema-field
+# @matrix task : filter-value schema-field
 class HasStatus(FilterMixin, Property):
     """Whether a task's schema includes status and any status is active.
 
@@ -324,8 +319,8 @@ class HasStatus(FilterMixin, Property):
 # @testable true
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_without_schedule
 # @tests tests_unit/test_013_task_properties.py::test_task_assignment_records_assigned_by_user_page
-# @features task
-# @dimensions assignee assignment assigned-by
+# @matrix task : assigned-by assignee assignment
+# @pair task-completion:assignee
 class AssignedTo(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProperty):
     """User that a task is assigned to.
 
@@ -377,8 +372,7 @@ class AssignedTo(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProper
 
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_assignment_records_assigned_by_user_page
-# @features task
-# @dimensions assigned-by
+# @pair task:assigned-by
 class AssignedBy(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProperty):
     """User who assigned the task. Only accepts authenticated users.
 
@@ -421,8 +415,7 @@ class AssignedBy(RelatedEntityMixin, ColumnMixin, FilterMixin, AIMixin, DBProper
 
 # @testable true
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_without_schedule
-# @features task-completion
-# @dimensions completed-by
+# @pair task-completion:completed-by
 class CompletedBy(RelatedEntityMixin, FilterMixin, AIMixin, ColumnMixin, DBProperty):
     """User who completed the task. Only accepts authenticated users.
 
@@ -464,8 +457,7 @@ class CompletedBy(RelatedEntityMixin, FilterMixin, AIMixin, ColumnMixin, DBPrope
 
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_related_lists_replace_linked_pages_and_report_unloaded_files
-# @features task
-# @dimensions linked-pages replacement
+# @matrix task : linked-pages replacement
 class LinkedPages(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
     """Pages linked to a task (beyond the parent page).
 
@@ -516,8 +508,7 @@ class LinkedPages(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
 
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_model_and_page_details_attach_from_key_map
-# @features task
-# @dimensions model
+# @pair task:model
 class TaskModel(RelatedEntityMixin, FilterMixin, AIMixin, DBProperty):
     """The model task (workflow stage) that a task belongs to within its project.
 
@@ -534,8 +525,7 @@ class TaskModel(RelatedEntityMixin, FilterMixin, AIMixin, DBProperty):
 
     # @testable true
     # @tests tests_unit/test_013_task_properties.py::test_task_model_tracking_inherits_model_form
-    # @features task
-    # @dimensions model-form inheritance
+    # @matrix task : inheritance model-form
     @property
     def value(self):
         return RelatedEntityMixin.value.fget(self)
@@ -572,8 +562,7 @@ class TaskModel(RelatedEntityMixin, FilterMixin, AIMixin, DBProperty):
 
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_model_and_page_details_attach_from_key_map
-# @features task
-# @dimensions page details attach
+# @matrix task : attach details page
 class TaskPage(RelatedEntityMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty):
     """Page for a task. Tasks inherit permissions from their page.
 

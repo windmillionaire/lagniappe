@@ -23,11 +23,9 @@ from .base import DeferredJobAdapter
 # @tests tests_unit/test_028_ai_email.py::test_email_ingest_adapter_starts_existing_report_job_idempotently
 # @tests tests_unit/test_028_ai_email.py::test_email_ingest_failure_surfaces_bounded_diagnostic
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_email_ingest_notification_is_created_only_for_failure
-# @pairs ai-email:report-handoff ai-email:idempotency ai-email:acceptance
-# @pairs deferred-jobs:report-handoff deferred-jobs:idempotency deferred-jobs:acceptance
-# @pairs ai-email:failure ai-email:diagnostics ai-email:privacy ai-email:terminal-delivery
-# @pairs deferred-jobs:failure deferred-jobs:diagnostics deferred-jobs:privacy deferred-jobs:terminal-delivery
-# @pairs feedback:failure feedback:diagnostics feedback:privacy feedback:terminal-delivery
+# @matrix ai-email deferred-jobs : acceptance diagnostics failure idempotency privacy report-handoff terminal-delivery
+# @matrix feedback : diagnostics failure privacy terminal-delivery
+# @pair deferred-jobs:failure-only-notification
 class EmailIngestAdapter(DeferredJobAdapter):
     """Finalize received attachments, then start the normal report adapter."""
 
@@ -194,8 +192,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_028_ai_email.py::test_email_ingest_adapter_routes_shared_address_once
-    # @features ai-email deferred-jobs
-    # @dimensions routing utility-model idempotency permissions
+    # @matrix ai-email deferred-jobs : idempotency permissions routing utility-model
     def _route_shared_address(self, report, actor, parameters, attachments):
         manifest = dict(report.inbound_manifest or {})
         requested_tool = (

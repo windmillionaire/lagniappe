@@ -15,10 +15,7 @@ from .base import MigrationDataError
 # @tests tests_unit/test_018b_database_migrations.py::test_form_schema_transform_is_idempotent_and_preserves_history_membership
 # @tests tests_unit/test_018b_database_migrations.py::test_form_schema_transform_repairs_invalid_legacy_fields
 # @tests tests_unit/test_018b_database_migrations.py::test_form_schema_transform_rejects_unreadable_rows_without_mutation
-# @pairs form-schema:canonicalization form-schema:idempotence
-# @pairs form-schema:legacy-repair form-schema:history-snapshot
-# @pair form-schema:malformed-data
-# @pair form-schema:copy-on-write
+# @matrix form-schema : canonicalization copy-on-write history-snapshot idempotence legacy-repair malformed-data
 def canonicalize_form_schema_record(entity, *, snapshot=False, repairs=None):
     """Canonicalize one raw form or form-history row, repairing legacy fields."""
 

@@ -386,7 +386,7 @@ def _queue_snapshot_descriptor(context, plan, payload, object_name):
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_queue_snapshot_preserves_full_task_definitions
-# @pairs data-lifecycle:queue-purge-audit data-lifecycle:immutable-restore-record
+# @matrix data-lifecycle : immutable-restore-record queue-purge-audit
 def capture_queue_snapshot(
     context,
     plan,
@@ -578,8 +578,7 @@ def _normalize_reference_details(value, *, project_id, source_database_id, targe
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_normalizes_persisted_keys_before_cache_rebuild
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_discards_deferred_execution_state
-# @pairs data-lifecycle:restore-key-normalization data-lifecycle:serialized-entity-details
-# @pair data-lifecycle:deferred-state-retirement
+# @matrix data-lifecycle : deferred-state-retirement restore-key-normalization serialized-entity-details
 def normalize_restored_entity(
     entity,
     *,
@@ -676,8 +675,7 @@ def _restore_query_pages(query, *, page_size):
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_normalizes_persisted_keys_before_cache_rebuild
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_discards_deferred_execution_state
-# @pairs data-lifecycle:restore-key-normalization data-lifecycle:bounded-restore-scan
-# @pair data-lifecycle:deferred-state-retirement
+# @matrix data-lifecycle : bounded-restore-scan deferred-state-retirement restore-key-normalization
 def normalize_restored_database(
     client,
     *,
@@ -784,7 +782,7 @@ def _compatible_locations(first, second):
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_target_validation_requires_owner_and_reserved_models
-# @pairs data-lifecycle:restore-validation data-lifecycle:owner-invariant
+# @matrix data-lifecycle : owner-invariant restore-validation
 def validate_restored_database(
     client,
     *,

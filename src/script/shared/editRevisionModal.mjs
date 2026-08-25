@@ -7,8 +7,7 @@ import { areEqual } from "./utilities";
  * @testable true
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_form_submission_reconciliation_uses_latest_schema
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_offline_submission_conflict_keeps_queue_until_choice
- * @features forms
- * @dimensions readonly-preview submission-choice latest-schema queued-conflict
+ * @matrix forms : latest-schema queued-conflict readonly-preview submission-choice
  */
 export class FormRevisionModal extends Modal {
 	constructor(reconciler, marker, widget, state) {

@@ -21,8 +21,7 @@ import { ModelElement, ModelPanel } from "./panels/model";
 /**
  * @testable true
  * @tests tests_js/test_046_async_query_lifecycle.py::test_builder_destroys_owned_search_modal_and_panels_during_startup
- * @features forms
- * @dimensions builder-lifecycle late-publication listener-teardown
+ * @matrix forms : builder-lifecycle late-publication listener-teardown
  */
 class FormBuilder {
 	constructor(node) {
@@ -92,8 +91,8 @@ class FormBuilder {
 	 * @testable true
 	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_sync_uses_shared_connectivity_without_orphaned_global_state
 	 * @tests tests_js/test_045_browser_persistence.py::test_builder_owns_independent_editor_lifecycle_flushes
-	 * @pairs forms:builder-lifecycle offline:builder-lifecycle
-	 * @pairs editor:teardown html-field:teardown
+	 * @matrix editor html-field : teardown
+	 * @matrix forms offline : builder-lifecycle
 	 */
 	async sync({ hidden = document.hidden } = {}) {
 		const wasOnline = this.online;
@@ -163,8 +162,7 @@ class FormBuilder {
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
-	 * @features forms
-	 * @dimensions page-form task-form builder-defaults
+	 * @matrix forms : builder-defaults page-form task-form
 	 */
 	async createFormElements() {
 		const recentSchema = this.schemaElt.value;
@@ -215,8 +213,8 @@ class FormBuilder {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
-	 * @pairs forms:builder-copy forms:schema forms:navigation
-	 * @pairs entity-menu:builder-copy
+	 * @matrix forms : builder-copy navigation schema
+	 * @pair entity-menu:builder-copy
 	 */
 	async copyForm(button) {
 		if (this._destroyed || !button?.dataset.route || button.disabled) return;
@@ -292,8 +290,7 @@ class FormBuilder {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_036_form_builder_frontend.py::test_table_creation_defaults_columns_for_unsaved_preview
-	 * @features forms form-table
-	 * @dimensions builder-defaults unsaved-preview empty-columns
+	 * @matrix form-table forms : builder-defaults empty-columns unsaved-preview
 	 */
 	createElement(schema) {
 		schema.id = schema.id ?? generateElementId(schema.type);
@@ -399,8 +396,7 @@ class FormBuilder {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_delete_components
-	 * @features forms
-	 * @dimensions builder-delete-components
+	 * @pair forms:builder-delete-components
 	 */
 	removeElement() {
 		if (this.selectedElement.destroy) this.selectedElement.destroy();

@@ -19,8 +19,7 @@ class HostedE2EAuthenticationError(ValueError):
 
 # @testable true
 # @tests tests_unit/test_030_hosted_e2e.py::test_validate_google_claims_requires_exact_verified_identity
-# @features hosted-e2e
-# @dimensions authentication audience issuer identity
+# @matrix hosted-e2e : audience authentication identity issuer
 def validate_google_claims(claims, *, audience: str, caller_email: str) -> dict:
     """Validate the identity-bound claims returned by Google's token verifier."""
     if not isinstance(claims, dict):
@@ -53,8 +52,7 @@ def _serializer(secret_key: str) -> URLSafeTimedSerializer:
 
 # @testable true
 # @tests tests_unit/test_030_hosted_e2e.py::test_hosted_e2e_cookie_is_signed_scoped_and_expiring
-# @features hosted-e2e
-# @dimensions authentication cookie expiry deployment-binding
+# @matrix hosted-e2e : authentication cookie deployment-binding expiry
 def sign_hosted_e2e_cookie(
     secret_key: str,
     *,
@@ -74,8 +72,7 @@ def sign_hosted_e2e_cookie(
 
 # @testable true
 # @tests tests_unit/test_030_hosted_e2e.py::test_hosted_e2e_cookie_is_signed_scoped_and_expiring
-# @features hosted-e2e
-# @dimensions authentication cookie expiry deployment-binding
+# @matrix hosted-e2e : authentication cookie deployment-binding expiry
 def load_hosted_e2e_cookie(
     secret_key: str,
     value: str,

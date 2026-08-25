@@ -18,8 +18,7 @@ AI_TASK_MAX_DELAY_SECONDS = 30
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_task_start_delay_is_bounded
-# @features ai
-# @dimensions queue-jitter
+# @pair ai:queue-jitter
 def ai_task_start_delay():
     """Return a small bounded delay for expensive background AI starts."""
     return random.randint(AI_TASK_MIN_DELAY_SECONDS, AI_TASK_MAX_DELAY_SECONDS)
@@ -28,8 +27,7 @@ def ai_task_start_delay():
 # @testable true
 # @tests tests_unit/test_023b_deferred_job_service.py::test_cloud_task_dispatch_uses_key_payload_stable_id_and_deadline
 # @tests tests_unit/test_023b_deferred_job_service.py::test_cancel_deletes_tasks_and_persists_a_tombstone
-# @features deferred-jobs
-# @dimensions deterministic-task-id cancellation
+# @matrix deferred-jobs : cancellation deterministic-task-id
 def task_name(task_id):
     """Return the fully qualified Cloud Task name for a deterministic id."""
     project = CONFIG.GOOGLE_CLOUD_PROJECT
@@ -42,8 +40,7 @@ def task_name(task_id):
 
 # @testable true
 # @tests tests_unit/test_023b_deferred_job_service.py::test_cloud_task_dispatch_uses_key_payload_stable_id_and_deadline
-# @features deferred-jobs
-# @dimensions task-payload deterministic-task-id dispatch-deadline
+# @matrix deferred-jobs : deterministic-task-id dispatch-deadline task-payload
 def create_task(
     endpoint,
     payload=None,

@@ -44,8 +44,7 @@ def _get_access_token():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_gcp_domain_mapping_and_ai_cache_commands
-# @features setup
-# @dimensions ai-cache
+# @pair setup:ai-cache
 def _api_request(session, method, url, headers, json_data=None, allow_codes=None):
     """Make an API request, returning (response, json) or None on error."""
     from installer import FORMATTER
@@ -88,8 +87,7 @@ def print_ai_cache_instructions(project_id):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_gcp_domain_mapping_and_ai_cache_commands
 # @tests tests_tooling/test_001d_setup_drift.py::test_vertex_discovery_has_cache_config_disable_cache
-# @features setup
-# @dimensions ai-cache api-drift
+# @matrix setup : ai-cache api-drift
 def _configure_ai_cache(sp):
     """Disable AI data caching in Vertex AI."""
     from config import SETTINGS
@@ -150,8 +148,7 @@ def _configure_ai_cache(sp):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_ai_setup_mode_configures_observability
-# @features setup ai-observability
-# @dimensions ai-cache privacy-consent settings-save
+# @matrix ai-observability setup : ai-cache privacy-consent settings-save
 def configure_ai():
     """Entry point for AI configuration.
 

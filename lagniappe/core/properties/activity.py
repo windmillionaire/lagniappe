@@ -12,8 +12,7 @@ NOTE_SCOPES = frozenset({"home", "page"})
 
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_note_visibility_and_scope_validate_values
-# @features notes
-# @dimensions visibility persistence validation
+# @matrix notes : persistence validation visibility
 class Visibility(DBProperty):
     """Who may see a note within its owning surface."""
 
@@ -33,8 +32,7 @@ class Visibility(DBProperty):
 
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_note_visibility_and_scope_validate_values
-# @features notes
-# @dimensions scope persistence validation
+# @matrix notes : persistence scope validation
 class Scope(DBProperty):
     """Surface that owns and displays a note."""
 
@@ -90,8 +88,7 @@ class Instructions(DBProperty):
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes
-# @features activity notes notifications
-# @dimensions body html-stripping
+# @matrix activity notes notifications : body html-stripping
 class Body(DBProperty):
     """Plain-text body for notes and notifications."""
 
@@ -110,8 +107,7 @@ class Body(DBProperty):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_create_note_body_and_photo_from_home
-# @features activity notes
-# @dimensions photo asset-lifecycle
+# @matrix activity notes : asset-lifecycle photo
 class Photo(AssetProperty):
     """Optional image asset attached to a note."""
 

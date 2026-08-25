@@ -20,8 +20,7 @@ def _todo_field():
     )
 
 
-# @features form-todo
-# @dimensions submission db-value form-value ai-value search-value column
+# @matrix form-todo : ai-value column db-value form-value search-value submission
 @pytest.mark.unit
 def test_todo_list_submission_projections():
     field = _todo_field()
@@ -56,8 +55,7 @@ def test_todo_list_submission_projections():
     assert field.value == expected
 
 
-# @features form-todo
-# @dimensions validation import ai-value normalization
+# @matrix form-todo : ai-value import normalization validation
 @pytest.mark.unit
 def test_todo_list_validation_and_import():
     field = _todo_field()
@@ -124,7 +122,7 @@ def _todo_task(hash_suffix):
     return task
 
 
-# @pairs submission:repeating-default form-todo:repeating-default
+# @matrix form-todo submission : repeating-default
 @pytest.mark.unit
 def test_todo_list_cannot_be_saved_as_repeating_default():
     task = _todo_task("default")
@@ -138,7 +136,7 @@ def test_todo_list_cannot_be_saved_as_repeating_default():
     assert task.default_submission == {}
 
 
-# @pairs task-completion:history task-completion:repeating-default
+# @matrix task-completion : history repeating-default
 # @pair form-todo:field-reset
 @pytest.mark.unit
 def test_uncomplete_archives_then_clears_todo_items():

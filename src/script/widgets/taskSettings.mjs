@@ -27,8 +27,7 @@ export class BaseTaskSettings extends FormElement {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_model_task
-	 * @features tasks
-	 * @dimensions create model-task-link attach-form
+	 * @matrix tasks : attach-form create model-task-link
 	 */
 	_formUpdatedListener(e) {
 		const project = e.detail.options
@@ -76,8 +75,7 @@ export class BaseTaskSettings extends FormElement {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_task_settings_awaits_action_controls_and_cleans_up
-	 * @features tasks
-	 * @dimensions action-control-lifecycle teardown
+	 * @matrix tasks : action-control-lifecycle teardown
 	 */
 	async _initActions() {
 		const actions = this.actions;
@@ -173,8 +171,7 @@ export class BaseTaskSettings extends FormElement {
 /**
  * @testable true
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_update_page_task_settings_from_row
- * @features tasks
- * @dimensions update settings-form
+ * @matrix tasks : settings-form update
  */
 export class TaskSettings extends BaseTaskSettings {
 	constructor(attributes) {
@@ -190,8 +187,7 @@ export class TaskSettings extends BaseTaskSettings {
 /**
  * @testable true
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_can_move_to_another_page
- * @features tasks
- * @dimensions move completed title-menu
+ * @matrix tasks : completed move title-menu
  */
 export class TaskMove extends BaseTaskSettings {
 	constructor(attributes) {
@@ -212,7 +208,7 @@ export class TaskMove extends BaseTaskSettings {
  * @testable true
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
  * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
- * @pairs task-combine:lazy-form task-combine:checkbox-submit task-combine:delta
+ * @matrix task-combine : checkbox-submit delta lazy-form
  */
 export class TaskCombine extends FormElement {
 	constructor(attributes) {
@@ -230,8 +226,7 @@ export class TaskCombine extends FormElement {
  * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_create_task_form
  * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_create_personal_task_due_today
  * @tests tests_e2e/002_home/test_002d_home_tasks.py::test_create_personal_task_due_in_four_days
- * @features tasks
- * @dimensions create-form create-personal due-date
+ * @matrix tasks : create-form create-personal due-date
  */
 export class CreateUserTask extends BaseTaskSettings {
 	constructor(attributes) {
@@ -271,8 +266,7 @@ export class CreateUserTask extends BaseTaskSettings {
  * @testable true
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_basic_page_task
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_while_another_task_is_open_keeps_rows_clear
- * @features tasks
- * @dimensions create basic while-open list-state
+ * @matrix tasks : basic create list-state while-open
  */
 export class CreateTask extends BaseTaskSettings {
 	constructor(attributes) {

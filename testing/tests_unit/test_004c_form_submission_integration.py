@@ -16,8 +16,7 @@ from testing.utility.mock_submission import WebFormSubmission
 from testing.utility.test_entities import TestEntities
 
 
-# @features submission
-# @dimensions fields cache stale-db
+# @matrix submission : cache fields stale-db
 @pytest.mark.unit
 def test_submission_fields_stale_when_db_submission_changes(
     get_test_entities, get_schema
@@ -33,8 +32,7 @@ def test_submission_fields_stale_when_db_submission_changes(
         assert submission.fields["note"].db_value == spec["expected_stale_note"]
 
 
-# @features submission form-table
-# @dimensions links internal row-submission derived-page-keys
+# @matrix form-table submission : derived-page-keys internal links row-submission
 @pytest.mark.unit
 def test_submission_links_internal_top_level_and_table_row(
     get_test_entities, get_schema
@@ -85,8 +83,7 @@ def test_submission_links_internal_top_level_and_table_row(
         assert hashes == spec["expected_link_hashes"]
 
 
-# @features submission link
-# @dimensions internal stale-target
+# @matrix link submission : internal stale-target
 @pytest.mark.unit
 def test_submission_internal_link_missing_target_clears_value(get_schema):
     entity = TestEntities.get(

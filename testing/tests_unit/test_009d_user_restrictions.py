@@ -33,11 +33,8 @@ def _app():
     return app
 
 
-# @pairs restrictions:search permissions:search
-# @pairs restrictions:assign permissions:assign
-# @pairs restrictions:facets permissions:facets
-# @pair restrictions:page-list
-# @pairs restrictions:category-edit permissions:category-edit
+# @matrix permissions : assign category-edit facets search
+# @matrix restrictions : assign category-edit facets page-list search
 @pytest.mark.unit
 def test_restrictions(get_permissions_test_data):
     """Test restrictions property for various user permission configurations.
@@ -150,8 +147,7 @@ def test_restrictions(get_permissions_test_data):
                 )
 
 
-# @pairs restrictions:session-blob restrictions:stale-session restrictions:empty-access
-# @pairs permissions:session-blob permissions:stale-session permissions:empty-access
+# @matrix permissions restrictions : empty-access session-blob stale-session
 # @pair messaging:compose-eligibility
 @pytest.mark.unit
 def test_restrictions_session_blob_and_fingerprint(monkeypatch):
@@ -241,9 +237,8 @@ def test_restrictions_session_blob_and_fingerprint(monkeypatch):
         assert session["restrictions"]["fingerprint"] != "stale"
 
 
+# @matrix permissions : group-membership stored-requires
 # @pair restrictions:root-fetch
-# @pair permissions:stored-requires
-# @pair permissions:group-membership
 @pytest.mark.unit
 def test_restrictions_builds_group_membership_from_stored_requires(monkeypatch):
     user = TestEntities.get(
@@ -269,8 +264,7 @@ def test_restrictions_builds_group_membership_from_stored_requires(monkeypatch):
             assert user.properties.restrictions.belongs_to == ["group-one"]
 
 
-# @pairs restrictions:empty-access restrictions:loaded-state
-# @pairs permissions:empty-access permissions:loaded-state
+# @matrix permissions restrictions : empty-access loaded-state
 # @pair messaging:compose-eligibility
 @pytest.mark.unit
 def test_restrictions_empty_list_is_loaded_state():
@@ -300,8 +294,7 @@ def test_restrictions_empty_list_is_loaded_state():
     assert details.call_count == 0
 
 
-# @features restrictions permissions
-# @dimensions clear session-blob
+# @matrix permissions restrictions : clear session-blob
 @pytest.mark.unit
 def test_restrictions_clear_removes_session_blob():
     user = TestEntities.get(

@@ -69,8 +69,7 @@ const normalizeLinkMarks = (type) =>
 
 // @testable true
 // @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
-// @features editor
-// @dimensions link internal-link click-navigation popover
+// @matrix editor : click-navigation internal-link link popover
 const linkFromEvent = (editor, event) => {
 	const target = event.target;
 	const AnchorElement = globalThis.HTMLAnchorElement;
@@ -89,8 +88,7 @@ const linkFromEvent = (editor, event) => {
 
 // @testable true
 // @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
-// @features editor
-// @dimensions link internal-link click-navigation popover
+// @matrix editor : click-navigation internal-link link popover
 const opensInCurrentTab = (href) =>
 	Boolean(href) &&
 	!String(href).startsWith("//") &&
@@ -197,8 +195,7 @@ const linkRangeFromClick = (editor, pos, event, link) => {
 
 // @testable true
 // @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
-// @features editor
-// @dimensions link internal-link click-navigation popover
+// @matrix editor : click-navigation internal-link link popover
 const navigateLink = (link) => {
 	const attributes = normalizeLinkAttributes({
 		href: link.getAttribute("href"),
@@ -253,9 +250,8 @@ const editableMentionClickGuard = (editor) =>
 // @testable true
 // @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
 // @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
-// @features editor
-// @dimensions link popover click-navigation
-// @pairs mentions:link-popover mentions:unlink
+// @matrix mentions : link-popover unlink
+// @pair editor:unlink
 class LinkPopover {
 	constructor(editor) {
 		this.editor = editor;
@@ -530,8 +526,7 @@ class LinkPopover {
  * @testable true
  * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
  * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_space_exits_link_at_document_end
- * @features editor
- * @dimensions link internal-link click-navigation popover paste readonly delimiter
+ * @matrix editor : click-navigation delimiter internal-link link paste popover readonly
  */
 export const CustomLink = Link.extend({
 	addStorage() {

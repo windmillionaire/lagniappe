@@ -1,8 +1,7 @@
 """Node-backed checks for ingress polling ownership and stage actions."""
 
 
-# @features ingress ui-action
-# @dimensions stage-action single-flight retryable-action polling-recovery
+# @matrix ingress ui-action : polling-recovery retryable-action single-flight stage-action
 def test_ingress_stage_action_failure_restores_button_and_polling_for_retry(run_node):
     run_node(
         r'''
@@ -127,8 +126,7 @@ await retry;
     )
 
 
-# @features ingress
-# @dimensions stage-update serialization next-action
+# @matrix ingress : next-action serialization stage-update
 def test_ingress_next_waits_for_pending_stage_update(run_node):
     run_node(
         r'''
@@ -221,8 +219,7 @@ if (calls.join(",") !== "patch:start,patch:finish,next:true") {
     )
 
 
-# @pairs ingress:active-widget ingress:visibility ingress:subscription-lifecycle ingress:catch-up
-# @pairs polling:active-widget polling:visibility polling:subscription-lifecycle polling:catch-up
+# @matrix ingress polling : active-widget catch-up subscription-lifecycle visibility
 def test_ingress_polling_tracks_widget_visibility(run_node):
     run_node(
         r'''

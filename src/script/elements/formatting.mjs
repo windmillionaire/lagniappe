@@ -54,8 +54,7 @@ const tel = (telValue) => {
 /**
  * @testable true
  * @tests tests_js/test_023_entity_name_formatting.py::test_group_name_uses_canonical_user_index_url
- * @features user-groups
- * @dimensions query-route
+ * @pair user-groups:query-route
  */
 const url = (data) => {
 	let url = null;
@@ -149,9 +148,7 @@ const iconLabel = ({
  * @testable true
  * @tests tests_js/test_023_entity_name_formatting.py::test_formatting_name_uses_a_text_separator_and_shared_wrapping_structure
  * @tests tests_js/test_023_entity_name_formatting.py::test_recent_combobox_results_reuse_shared_parent_name_formatting
- * @pair entity-name:accessibility
- * @pair entity-name:parent-separator
- * @pair entity-name:wrapping
+ * @matrix entity-name : accessibility parent-separator wrapping
  */
 const name = (data) => {
 	const kind = data.kind || data.index || data.type;

@@ -144,8 +144,7 @@ def _open_combine_form(user, task):
     return combine_form
 
 
-# @features tasks
-# @dimensions history completion-cycle name description attachments
+# @matrix tasks : attachments completion-cycle description history name
 # @template cell.html::cell
 def test_task_history_appears_after_completion_cycle(get_user):
     user = get_user(Users.OWNER)
@@ -191,8 +190,8 @@ def test_task_history_appears_after_completion_cycle(get_user):
     expect(attachment_link).to_have_attribute("href", re.compile(r"/files/.+"))
 
 
-# @pairs tasks:history tasks:reload
-# @pairs table-controls:column-visibility table-controls:persistence
+# @matrix table-controls : column-visibility persistence
+# @matrix tasks : history reload
 # @template pages/tasks.html::task_tab
 def test_task_history_visibility_persists_after_reload(get_user):
     user = get_user(Users.OWNER)
@@ -228,8 +227,7 @@ def test_task_history_visibility_persists_after_reload(get_user):
     ).to_be_checked()
 
 
-# @features tasks
-# @dimensions history-fill latest-submission repeating-default patch live-update
+# @matrix tasks : history-fill latest-submission live-update patch repeating-default
 # @template pages/tasks.html::task_form
 def test_task_form_field_fills_from_latest_history(get_user):
     user = get_user(Users.OWNER)
@@ -285,7 +283,7 @@ def test_task_form_field_fills_from_latest_history(get_user):
     expect(task_form.locator("[name='input-numgh78']")).to_have_value("42")
 
 
-# @pairs tasks:history-fill tasks:latest-submission tasks:live-update tasks:element-matrix
+# @matrix tasks : element-matrix history-fill latest-submission live-update
 # @template pages/tasks.html::task_form
 def test_task_history_fill_controls_cover_submission_elements(get_user):
     user = get_user(Users.OWNER)
@@ -469,8 +467,7 @@ def test_task_history_fill_controls_cover_submission_elements(get_user):
         Entities.delete(form)
 
 
-# @features embedded-table
-# @dimensions table-cell-expand
+# @pair embedded-table:table-cell-expand
 # @template cell.html::table_cell
 # @template controls.html::expand
 def test_task_history_expands_table_submission_cell(get_user):
@@ -502,12 +499,8 @@ def test_task_history_expands_table_submission_cell(get_user):
     expect(embedded).to_contain_text("History row")
 
 
-# @pairs task-combine:compatible task-combine:same-page
-# @pairs task-combine:same-model task-combine:no-model
-# @pairs task-combine:checkbox-form task-combine:lazy-form
-# @pairs task-combine:lazy-reload
-# @pairs task-combine:view-page task-combine:linked-page
-# @pairs web-headers:no-store
+# @matrix task-combine : checkbox-form compatible lazy-form lazy-reload linked-page no-model same-model same-page view-page
+# @pair web-headers:no-store
 # @template pages/tasks.html::combine_form
 def test_combine_task_form_filters_compatible_tasks(get_user):
     user = get_user(Users.OWNER)
@@ -583,12 +576,7 @@ def test_combine_task_form_filters_compatible_tasks(get_user):
         combine_form.get_by_role("checkbox", name=no_model_peer.entity.name)
     ).to_have_count(0)
 
-# @pairs task-combine:winner task-combine:completed-on
-# @pairs task-combine:attachments task-combine:migrate-history task-combine:delete
-# @pairs task-combine:current-snapshot task-combine:existing-history
-# @pairs task-combine:upsert task-combine:remove task-combine:ordering
-# @pairs task-combine:delta task-combine:checkbox-submit task-combine:isolated-form
-# @pairs task-combine:no-reload
+# @matrix task-combine : attachments checkbox-submit completed-on current-snapshot delete delta existing-history isolated-form migrate-history no-reload ordering remove upsert winner
 # @template pages/tasks.html::combine_form
 # @template pages/tasks.html::task
 def test_combine_tasks_migrates_history_and_reconciles_task_delta(get_user):

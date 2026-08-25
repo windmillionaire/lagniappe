@@ -8,7 +8,7 @@ from ..tools import database
 
 # @testable true
 # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-# @pairs messaging:entity-contract messaging:polling-revision
+# @matrix messaging : entity-contract polling-revision
 class MessageConversation(Entity):
     """Durable participant state and cursors for a direct-message thread."""
 

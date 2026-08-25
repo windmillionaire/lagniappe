@@ -65,8 +65,7 @@ class SchemaFields(Enum):
     # @testable true
     # @tests tests_unit/test_004b_schema_core.py::test_schema_create_field_unknown_returns_none
     # @tests tests_unit/test_004b_schema_core.py::test_schema_create_field_known_text_input
-    # @features form-schema
-    # @dimensions field-factory, unknown-type
+    # @matrix form-schema : field-factory unknown-type
     @classmethod
     def create_field(cls, definition, entity):
         """Create a field instance from a schema definition."""
@@ -80,8 +79,7 @@ class SchemaFields(Enum):
 
     # @testable true
     # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_filters_invalid_top_level
-    # @features form-schema
-    # @dimensions validation
+    # @pair form-schema:validation
     @classmethod
     def validate_type(cls, definition):
         if not isinstance(definition, dict):
@@ -334,9 +332,7 @@ def _canonical_field(definition, *, table_column=False, discard_invalid=False):
 # @tests tests_unit/test_004b_schema_core.py::test_schema_canonicalizer_rejects_ambiguous_durable_shapes
 # @tests tests_unit/test_004b_schema_core.py::test_schema_canonicalizer_preserves_snapshot_membership
 # @tests tests_unit/test_003g_todo_lists.py::test_todo_schema_is_task_only
-# @pairs form-schema:canonicalization form-schema:versioning
-# @pairs form-schema:membership form-schema:validation
-# @pairs form-schema:history-snapshot form-schema:form-type
+# @matrix form-schema : canonicalization form-type history-snapshot membership validation versioning
 # @pair form-todo:task-only
 def canonicalize_schema(
     value,
@@ -432,8 +428,7 @@ class Schema(AIMixin, DBProperty):
     # @tests tests_unit/test_004b_schema_core.py::test_schema_previous_and_fields_cache
     # @tests tests_unit/test_004_form_properties.py::test_form_schema
     # @tests tests_unit/test_004_form_properties.py::test_form_schema_change_refreshes_table_fields_and_filter_conditions
-    # @features form-schema
-    # @dimensions property, cache
+    # @matrix form-schema : cache property
     @property
     def value(self):
         value = super().value or []
@@ -470,8 +465,7 @@ class Schema(AIMixin, DBProperty):
 
     # @testable true
     # @tests tests_unit/test_004b_schema_core.py::test_schema_previous_and_fields_cache
-    # @features form-schema
-    # @dimensions previous
+    # @pair form-schema:previous
     @property
     def previous(self):
         return self._previous
@@ -480,8 +474,7 @@ class Schema(AIMixin, DBProperty):
     # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_filters_invalid_top_level
     # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_html_calls_set_html_field
     # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_table_filters_bad_columns
-    # @features form-schema, form-table
-    # @dimensions ai-value, validation, columns
+    # @matrix form-schema form-table : ai-value columns validation
     def validate_ai(self, value):
         candidates = deepcopy(value)
         valid = []
@@ -517,8 +510,7 @@ class Schema(AIMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_004b_schema_core.py::test_schema_previous_and_fields_cache
     # @tests tests_unit/test_004_form_properties.py::test_form_schema
-    # @features form-schema
-    # @dimensions fields, cache, property
+    # @matrix form-schema : cache fields property
     @property
     def fields(self):
         if getattr(self, "_fields", None) is not None:
@@ -536,8 +528,7 @@ class Schema(AIMixin, DBProperty):
 
     # @testable true
     # @tests tests_unit/test_004_form_properties.py::test_form_table_fields
-    # @features form-schema, form-table
-    # @dimensions table-fields
+    # @matrix form-schema form-table : table-fields
     @property
     def table_fields(self):
         if getattr(self, "_table_fields", None) is not None:
@@ -553,16 +544,14 @@ class Schema(AIMixin, DBProperty):
 
     # @testable true
     # @tests tests_unit/test_004_form_properties.py::test_form_html_fields
-    # @features form-schema, html-field
-    # @dimensions html-fields
+    # @matrix form-schema html-field : html-fields
     @property
     def html_fields(self):
         return [f for f in self.fields.values() if isinstance(f, HTML)]
 
     # @testable true
     # @tests tests_unit/test_004b_schema_core.py::test_schema_required_fields
-    # @features form-schema
-    # @dimensions required-fields
+    # @pair form-schema:required-fields
     @property
     def required_fields(self):
         return [

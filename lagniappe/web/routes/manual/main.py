@@ -89,8 +89,7 @@ VALID_SECTIONS = {s["key"] for s in MANUAL_SECTIONS}
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_security_section_loads
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_public_manual_loads_without_login_or_auth_bootstrap
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_manual_keeps_account_addresses_authenticated
-# @features manual
-# @dimensions page-load section-navigation direct-section anonymous-access no-auth-bootstrap ai-email address-redaction
+# @matrix manual : address-redaction ai-email anonymous-access direct-section no-auth-bootstrap page-load section-navigation
 @manual.route("/", methods=["GET"])
 @manual.route("/<section>", methods=["GET"])
 @manual_permission()
@@ -106,8 +105,8 @@ def index(section=None):
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_navigate_to_manual_from_home_button
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_security_section_loads
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_ai_manual_keeps_account_addresses_authenticated
-# @features manual
-# @dimensions section-navigation ajax-section anonymous-access ai-email address-redaction
+# @matrix manual : address-redaction ai-email ajax-section anonymous-access section-navigation
+# @pair manual:page-load
 @manual.route("/section/<section>", methods=["GET"])
 @manual_permission()
 def content(section):

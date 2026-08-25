@@ -30,8 +30,7 @@ _EXPORTS = {
 
 # @testable true
 # @tests testing/tests_tooling/test_009_hosted_e2e.py::test_traceability_common_import_does_not_require_playwright
-# @features hosted-e2e
-# @dimensions ci-import
+# @pair hosted-e2e:ci-import
 def __getattr__(name):
     """Load public test helpers without importing browser dependencies eagerly."""
     try:

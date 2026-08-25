@@ -90,7 +90,8 @@ def _values(operation):
 
 # @testable true
 # @tests tests_unit/test_025b_operation_state.py::test_operation_projection_is_revisioned_and_slides_ttl
-# @pairs deferred-jobs:redis-projection deferred-jobs:ttl polling:batching
+# @matrix deferred-jobs : redis-projection ttl
+# @pair polling:batching
 def peek_operation_states(operations):
     """Read known job revisions in one Redis round trip and slide their TTLs."""
     identifiers = list(dict.fromkeys(filter(None, map(_operation_id, operations or ()))))
@@ -110,6 +111,7 @@ def peek_operation_states(operations):
 
 # @testable true
 # @tests tests_unit/test_025b_operation_state.py::test_operation_projection_is_revisioned_and_slides_ttl
+# @pair deferred-jobs:ttl
 def operation_state_current(state, revision, *, now=None):
     """Return whether a cached revision is equal and recently durable."""
     if not state or state["revision"] != revision:
@@ -120,7 +122,7 @@ def operation_state_current(state, revision, *, now=None):
 
 # @testable true
 # @tests tests_unit/test_025b_operation_state.py::test_operation_projection_rejects_delayed_older_revision
-# @pairs deferred-jobs:redis-projection deferred-jobs:revision deferred-jobs:concurrency
+# @matrix deferred-jobs : concurrency redis-projection revision
 def update_operation_projection(*operations, now=None):
     """Publish committed job revisions without allowing an older writer to win."""
     observed_at = time.time() if now is None else float(now)
@@ -189,7 +191,8 @@ def delete_operation_projection(*operations):
 
 # @testable true
 # @tests tests_unit/test_025b_operation_state.py::test_poll_state_read_batches_notifications_and_operations
-# @pairs polling:batching notifications:redis-projection deferred-jobs:redis-projection
+# @matrix deferred-jobs notifications : redis-projection
+# @pair polling:batching
 def peek_poll_states(user, operations):
     """Read notification and operation projections through one Redis pipeline."""
     from .notifications import (

@@ -92,8 +92,7 @@ def _authenticated_smtp(
 
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_auth_email_connection_preflight_is_address_independent
-# @features login
-# @dimensions authentication-email smtp availability account-enumeration
+# @matrix login : account-enumeration authentication-email availability smtp
 def check_auth_email_connection(
     *,
     config=None,
@@ -119,8 +118,7 @@ def check_auth_email_connection(
 
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_send_auth_email_supports_generic_smtp_transports
-# @features login
-# @dimensions authentication-email smtp tls
+# @matrix login : authentication-email smtp tls
 def send_auth_email(
     recipient,
     subject,
@@ -147,8 +145,7 @@ def send_auth_email(
 
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_send_auth_email_supports_generic_smtp_transports
-# @features login
-# @dimensions authentication-email smtp tls
+# @matrix login : authentication-email smtp tls
 def send_email(
     recipient,
     subject,
@@ -194,8 +191,7 @@ def send_email(
 
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_auth_action_message_escapes_content_and_links
-# @features login
-# @dimensions authentication-email action-link templates
+# @matrix login : action-link authentication-email templates
 def auth_action_message(action, app_name, action_url):
     """Build the plain-text and HTML bodies for one authentication action."""
     app_name = str(app_name or "").strip() or "Lagniappe"

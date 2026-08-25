@@ -382,7 +382,7 @@ def _cleanup_successful_archive(context, checkpoint, output):
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_archive_build_publishes_manifest_last_and_retains_failed_scratch_state
-# @pairs portable-archive:workflow portable-archive:publication portable-archive:cleanup
+# @matrix portable-archive : cleanup publication workflow
 def build_archive(
     backup_id=None,
     *,

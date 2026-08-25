@@ -20,8 +20,7 @@ class ProposalDisplayProjector:
 
     # @testable true
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_decision_details
-    # @pair ai-report:proposal
-    # @pair ai-report:details
+    # @matrix ai-report : details proposal
     @property
     def display_actions(self):
         if not isinstance(self.value, dict):
@@ -72,10 +71,8 @@ class ProposalDisplayProjector:
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_existing_page_category_for_attachments
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_completed_task_events
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_schema_updates_separately
-    # @pair ai-report:grouped-display
-    # @pair files:grouped-display
-    # @pair categories:grouped-display
-    # @pair form-schema:schema-section
+    # @matrix ai-report categories files : grouped-display
+    # @pairs ai-report:existing-page-category form-schema:schema-section
     def _group_proposal_display_actions(self, actions, action_labels, file_labels):
         by_id = {action["id"]: action for action in actions if action.get("id")}
         for action in actions:

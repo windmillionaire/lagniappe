@@ -8,8 +8,8 @@ from . import Entities
 # @testable true
 # @tests tests_unit/test_009e_user_groups.py::test_group_permissions
 # @tests tests_unit/test_009e_user_groups.py::test_user_group_create_rejects_public_and_initializes_permissions
-# @features user-groups
-# @dimensions permissions create reserved-name save
+# @matrix user-groups : create permissions reserved-name save
+# @pair user-groups:views
 class UserGroup(Entity):
     entity_kind = "group"
 
@@ -48,8 +48,7 @@ class UserGroup(Entity):
 
     # @testable true
     # @tests tests_unit/test_009e_user_groups.py::test_save_permissions_refreshes_member_users_with_current_group
-    # @features user-groups permissions
-    # @dimensions permission-update member-refresh cache-invalidation
+    # @matrix permissions user-groups : cache-invalidation member-refresh permission-update
     def save_permissions(self, form_data=None):
         self.properties.permissions.create(form_data)
 
@@ -65,8 +64,7 @@ class UserGroup(Entity):
 # @testable true
 # @tests tests_unit/test_009e_user_groups.py::test_public_permissions
 # @tests tests_unit/test_009e_user_groups.py::test_public_group_get_create_and_enabled_state
-# @features public-groups
-# @dimensions permissions get create enabled
+# @matrix public-groups : create enabled get permissions
 class PublicGroup(UserGroup):
     entity_kind = "public_group"
 

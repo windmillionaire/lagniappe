@@ -94,7 +94,7 @@ class KINDS(Enum):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_data_services_initialize_uses_shared_adc
-# @features database storage
+# @matrix database storage : adc
 class DataServices:
     """Lazy-initialized singleton for Datastore and Cloud Storage clients."""
 
@@ -106,8 +106,7 @@ class DataServices:
 
     # @testable true
     # @tests tests_unit/test_018_database_assets.py::test_data_services_initialize_uses_shared_adc
-    # @features database storage
-    # @dimensions adc
+    # @matrix database storage : adc
     def initialize(self):
         """Create project-bound Datastore and Storage clients with shared ADC."""
         if self._datastore_client and self._storage_client:
@@ -138,8 +137,7 @@ class DataServices:
 
     # @testable true
     # @tests tests_unit/test_018_database_assets.py::test_runtime_storage_only_reads_setup_provisioned_buckets
-    # @features storage iam
-    # @dimensions runtime provisioning-boundary
+    # @matrix iam storage : provisioning-boundary runtime
     def _create_bucket(self, name):
         bucket_name = f"{PREFIX}{name}"
 
@@ -167,8 +165,7 @@ class DataServices:
 
     # @testable true
     # @tests tests_unit/test_018_database_assets.py::test_runtime_storage_only_reads_setup_provisioned_buckets
-    # @features storage
-    # @dimensions runtime provisioning-boundary
+    # @matrix storage : provisioning-boundary runtime
     def bucket(self, name):
         """Return the named storage bucket (history, private, or public)."""
         if name == "history":
@@ -182,8 +179,7 @@ class DataServices:
 
     # @testable true
     # @tests tests_unit/test_018_database_assets.py::test_test_cleanup_deletes_objects_without_deleting_buckets
-    # @features storage iam
-    # @dimensions test-cleanup provisioning-boundary
+    # @matrix iam storage : provisioning-boundary test-cleanup
     def delete_buckets(self):
         """Delete test objects while preserving setup-owned bucket resources."""
         self.initialize()

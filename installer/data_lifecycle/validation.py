@@ -278,7 +278,7 @@ def _key_audit(path, payload):
 # @tests tests_tooling/test_008_data_lifecycle.py::test_archive_validation_rejects_traversal_extra_files_bad_checksums_and_keys
 # @tests tests_tooling/test_008_data_lifecycle.py::test_archive_validation_accepts_canonical_directory_and_zip
 # @tests tests_tooling/test_008_data_lifecycle.py::test_archive_validation_counts_children_without_separate_identity_pages
-# @pairs portable-archive:validation portable-archive:path-safety portable-archive:key-audit portable-archive:owner-scoped-children
+# @matrix portable-archive : key-audit owner-scoped-children path-safety validation
 def validate_archive(path) -> dict:
     """Validate a complete directory/ZIP bundle without provider access."""
     reader = _reader(path)

@@ -9,8 +9,7 @@ UNSET = object()
 # @tests tests_unit/test_002_entity_general_properties.py::test_property_contract_errors_are_explicit
 # @tests tests_unit/test_002_entity_general_properties.py::test_property_unset_state_is_distinct_from_explicit_values
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_property_defaults_to_config_test_user
-# @features property
-# @dimensions initialization validation unset explicit-false explicit-none current-user propagation
+# @matrix property : current-user explicit-false explicit-none initialization propagation unset validation
 class Property:
     """Base property class. Most entity properties inherit from this.
 
@@ -39,8 +38,7 @@ class Property:
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_property_getattribute_wraps_descriptor_attribute_error
-    # @features property
-    # @dimensions error-wrapping, descriptor
+    # @matrix property : descriptor error-wrapping
     def __getattribute__(self, name):
         try:
             return object.__getattribute__(self, name)

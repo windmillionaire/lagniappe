@@ -118,10 +118,7 @@ def _fetch(user, path, method="GET", data=None):
     )
 
 
-# @pairs mentions:floating-menu mentions:empty-results mentions:profile-link
-# @pairs mentions:node-attributes mentions:mouse
-# @pairs mentions:link-popover mentions:unlink
-# @pairs mentions:recipient-search mentions:document-view
+# @matrix mentions : document-view empty-results floating-menu link-popover mouse node-attributes profile-link recipient-search unlink
 def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
     owner = get_user(Users.OWNER)
     recipient = get_user(
@@ -248,12 +245,8 @@ def test_document_mentions_use_anchored_menu_and_profile_links(get_user):
     expect(editor.text_entry).to_contain_text(f"@{recipient.name}")
 
 
-# @pairs messaging:compose-modal messaging:conversation-page messaging:history-page
-# @pairs messaging:read-race messaging:unread-count messaging:per-copy-delete
-# @pairs messaging:clear-horizon messaging:new-after-clear messaging:permission
-# @pair messaging:clear-confirmation
-# @pairs messaging:polling-revision messaging:active-polling
-# @pairs notifications:aggregate-count notifications:exact-count
+# @matrix messaging : active-polling clear-confirmation clear-horizon compose-modal conversation-page history-page new-after-clear per-copy-delete permission polling-revision read-race unread-count
+# @matrix notifications : aggregate-count exact-count
 def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     get_user,
     browser_failures,
@@ -398,9 +391,7 @@ def test_direct_message_lifecycle_is_private_and_restores_after_clear(
     assert denied["status"] == 404
 
 
-# @pairs messaging:responsive-peer-selector messaging:inline-reply
-# @pairs messaging:selection-race messaging:preserve-selection
-# @pair messaging:unread-peer
+# @matrix messaging : inline-reply preserve-selection responsive-peer-selector selection-race unread-peer
 def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
     owner = get_user(Users.OWNER)
     user = get_user(_managed_definition("Mobile"), creator=owner, has_touch=True)
@@ -483,8 +474,8 @@ def test_messages_page_uses_mobile_peer_selector_with_inline_reply(get_user):
     expect(delete_modal).not_to_be_attached()
 
 
-# @pairs messaging:compose-eligibility messaging:reply-permission
-# @pairs messaging:inline-reply notifications:menu-open
+# @matrix messaging : compose-eligibility inline-reply reply-permission
+# @pair notifications:menu-open
 def test_inbound_message_allows_reply_without_compose_permission(get_user):
     owner = get_user(Users.OWNER)
     recipient = get_user(_restricted_definition("Reply Only"), creator=owner)

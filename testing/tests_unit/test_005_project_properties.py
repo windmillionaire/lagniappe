@@ -33,8 +33,7 @@ from lagniappe.core.mutations import plan_mutation
 from testing.utility.test_entities import TestEntities, TestUser as UtilityTestUser
 
 
-# @features project
-# @dimensions description cache column ai-value filter-value html-stripping
+# @matrix project : ai-value cache column description filter-value html-stripping
 @pytest.mark.unit
 def test_project_description(get_test_entities):
     """Test Description property with CacheMixin, ColumnMixin, AIMixin, FilterMixin.
@@ -87,8 +86,7 @@ def test_project_description(get_test_entities):
             assert project.properties.description.cache_value is None
 
 
-# @features project
-# @dimensions document cache ai-value filter-value
+# @matrix project : ai-value cache document filter-value
 @pytest.mark.unit
 def test_project_document(get_test_entities):
     """Test Document property with CacheMixin, FilterMixin, AIMixin.
@@ -115,8 +113,7 @@ def test_project_document(get_test_entities):
             assert project.to_filter_index()["has_document"] is False
 
 
-# @features project
-# @dimensions document-state markup-fallback
+# @matrix project : document-state markup-fallback
 @pytest.mark.unit
 def test_project_document_state_uses_markup_when_no_ydoc():
     """Project document state falls back to saved HTML when no YDoc snapshot exists."""
@@ -133,8 +130,7 @@ def test_project_document_state_uses_markup_when_no_ydoc():
     assert state["markup"] == "<p>Readonly project document content marker</p>"
 
 
-# @features project
-# @dimensions public filter-value
+# @matrix project : filter-value public
 @pytest.mark.unit
 def test_project_is_public(get_test_entities):
     """Test IsPublic property with FilterMixin.
@@ -158,8 +154,7 @@ def test_project_is_public(get_test_entities):
         assert project.to_filter_index()["is_public"] is is_public
 
 
-# @features project
-# @dimensions attributes defaults
+# @matrix project : attributes defaults
 @pytest.mark.unit
 def test_project_attributes(get_test_entities):
     """Test Attributes property with FilterMixin.
@@ -181,8 +176,7 @@ def test_project_attributes(get_test_entities):
         assert project.has("document") == ("document" in project.db["attributes"])
 
 
-# @features project
-# @dimensions attributes blank-persistence
+# @matrix project : attributes blank-persistence
 @pytest.mark.unit
 def test_project_attributes_empty_list_stays_persisted():
     """An explicit empty attributes list is distinct from missing attributes."""
@@ -203,8 +197,7 @@ def test_project_attributes_empty_list_stays_persisted():
     assert project.has("document") is False
 
 
-# @features project filters task
-# @dimensions conditions entity-fields filter-value
+# @matrix filters project task : conditions entity-fields filter-value
 @pytest.mark.unit
 def test_project_filters(get_test_entities, get_schema):
     """Test ProjectFilters produces filter conditions and tasks have correct filter values.
@@ -318,8 +311,7 @@ def test_project_filters(get_test_entities, get_schema):
                         )
 
 
-# @features project filters permissions
-# @dimensions conditions entity-fields view-access
+# @matrix filters permissions project : conditions entity-fields view-access
 @pytest.mark.unit
 def test_project_filter_conditions_include_only_viewable_entity_fields(monkeypatch):
     viewer = UtilityTestUser(
@@ -375,8 +367,7 @@ def test_project_filter_conditions_include_only_viewable_entity_fields(monkeypat
     assert hidden_form.hash not in entity_hashes
 
 
-# @features project model-task permissions
-# @dimensions attached-form restricted-access
+# @matrix model-task permissions project : attached-form restricted-access
 @pytest.mark.unit
 def test_model_task_allowed_inherits_attached_form_restrictions():
     viewer = UtilityTestUser(
@@ -405,8 +396,7 @@ def test_model_task_allowed_inherits_attached_form_restrictions():
     assert not model.allowed(Action.VIEW, user=viewer)
 
 
-# @features project
-# @dimensions model-tasks db-load relation-attach ordering
+# @matrix project : db-load model-tasks ordering relation-attach
 @pytest.mark.unit
 def test_model_tasks_load_attach_and_order_from_database():
     """ModelTasks lazy-loads project children, attaches parent, and orders appends."""
@@ -450,8 +440,7 @@ def test_model_tasks_load_attach_and_order_from_database():
     assert model_two.order == 2
 
 
-# @features project
-# @dimensions update identity attributes description
+# @matrix project : attributes description identity update
 @pytest.mark.unit
 def test_project_update_sets_identity_description_and_attributes():
     """Project.update owns identity, description normalization, and attributes."""
@@ -472,8 +461,7 @@ def test_project_update_sets_identity_description_and_attributes():
     assert not project.has("document")
 
 
-# @features project model-task
-# @dimensions create update relation-save ordering
+# @matrix model-task project : create ordering relation-save update
 @pytest.mark.unit
 def test_model_task_entity_create_update_order_and_save_relations():
     """ModelTask.create/update/order/save remain focused on model-task relations."""
@@ -530,8 +518,7 @@ def test_model_task_entity_create_update_order_and_save_relations():
     assert writes[form.key].property_mask == ("modified",)
 
 
-# @features project
-# @dimensions model-task-parent details attach
+# @matrix project : attach details model-task-parent
 @pytest.mark.unit
 def test_model_task_project_parent_details_and_attach():
     """ModelTaskProject resolves stored project keys for details/attach."""

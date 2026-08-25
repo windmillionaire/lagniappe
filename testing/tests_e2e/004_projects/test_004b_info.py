@@ -34,8 +34,7 @@ def _wait_for_services_ready(user):
     )
 
 
-# @features projects
-# @dimensions info-form update metadata-sync
+# @matrix projects : info-form metadata-sync update
 # @template projects/project.html::view_header
 # @template projects/info.html::info_tab
 def test_project_info_form(get_user):
@@ -81,10 +80,7 @@ def test_project_info_form(get_user):
     expect(description).to_contain_text(new_description)
 
 
-# @pairs edited-entity-notice:timestamp-only edited-entity-notice:replacement
-# @pairs edited-entity-notice:info-form edited-entity-notice:side-effect-free
-# @pairs projects:timestamp-only projects:replacement projects:info-form
-# @pair projects:side-effect-free
+# @matrix edited-entity-notice projects : info-form replacement side-effect-free timestamp-only
 # @template projects/info.html::info_form
 def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revision(
     get_user,
@@ -148,10 +144,8 @@ def test_project_info_replacement_is_side_effect_free_for_timestamp_only_revisio
     assert after_probe.modified == modified_before_probe
 
 
-# @pairs edited-entity-notice:staged-reset edited-entity-notice:no-reload
-# @pairs edited-entity-notice:dirty-state edited-entity-notice:replacement
-# @pairs projects:staged-reset projects:no-reload projects:dirty-state
-# @pairs projects:replacement projects:info-form
+# @matrix edited-entity-notice : dirty-state no-reload replacement staged-reset
+# @matrix projects : dirty-state info-form no-reload replacement staged-reset
 # @template projects/info.html::info_form
 def test_project_revision_notice_only_resets_changed_form(
     get_user,
@@ -240,8 +234,7 @@ def test_project_revision_notice_only_resets_changed_form(
     assert owner.page.evaluate("window.__revisionResetSentinel") == "mounted"
 
 
-# @features projects
-# @dimensions attributes-live-toggle attribute-model-tasks no-reload
+# @matrix projects : attribute-model-tasks attributes-live-toggle no-reload
 # @template projects/info.html::info_form
 def test_toggle_tasks_attribute(get_user):
     user = get_user(Users.OWNER)
@@ -267,8 +260,7 @@ def test_toggle_tasks_attribute(get_user):
     assert user.page.evaluate("window.__projectAttributeNoReload") is True
 
 
-# @features projects
-# @dimensions attributes-live-toggle attribute-document no-reload
+# @matrix projects : attribute-document attributes-live-toggle no-reload
 # @template projects/info.html::info_form
 def test_toggle_document_attribute(get_user):
     user = get_user(Users.OWNER)

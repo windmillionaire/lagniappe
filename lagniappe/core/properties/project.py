@@ -21,8 +21,7 @@ from .task_related import AssignedTo, HasSignature, HasStatus, TaskCategories
 
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_model_tasks_load_attach_and_order_from_database
-# @features project
-# @dimensions model-tasks db-load relation-attach ordering
+# @matrix project : db-load model-tasks ordering relation-attach
 class ModelTasks(RelatedEntityListMixin, Property):
     """Model tasks (workflow stages) belonging to a project.
 
@@ -61,8 +60,7 @@ class ModelTasks(RelatedEntityListMixin, Property):
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_project_filters
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_project_filter_conditions_include_task_fields
-# @features filters
-# @dimensions conditions, entity-fields, filter-value, completed
+# @matrix filters : completed conditions entity-fields filter-value
 class ProjectFilters(Filters):
     def __init__(self, *args, entity=None, **kwargs):
         super().__init__(*args, entity=entity, **kwargs)
@@ -95,8 +93,7 @@ class ProjectFilters(Filters):
 
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_model_task_project_parent_details_and_attach
-# @features project
-# @dimensions model-task-parent details attach
+# @matrix project : attach details model-task-parent
 class ModelTaskProject(
     RelatedEntityMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty
 ):
@@ -127,8 +124,7 @@ class ModelTaskProject(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_entity_returns_model_task_form_schema_for_ai_autofill
-# @features ai form-schema
-# @dimensions model-task attached-form schema
+# @matrix ai form-schema : attached-form model-task schema
 class ModelTaskForm(AttachedForm, DetailsMixin):
     """The form attached to a model task.
 

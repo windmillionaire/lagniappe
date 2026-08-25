@@ -47,14 +47,8 @@ def summary_details(details, data, action=None):
 # @testable true
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_move_files_under_target_page
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_existing_page_category_for_attachments
-# @pair ai-report:details
-# @pair ai-report:move-file
-# @pair ai-report:proposal
-# @pair files:details
-# @pair files:existing-page-category
-# @pair files:move-file
-# @pair files:proposal
-# @pair files:attachment-grouping
+# @matrix ai-report : details move-file proposal
+# @matrix files : attachment-grouping details existing-page-category move-file proposal
 def file_action_displays():
     return (
         ProposalActionDisplay(

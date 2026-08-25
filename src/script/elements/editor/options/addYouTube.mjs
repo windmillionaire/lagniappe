@@ -5,8 +5,7 @@ import { primitives } from "../../primitives";
 /**
  * @testable true
  * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_youtube
- * @features editor
- * @dimensions youtube-embed
+ * @pair editor:youtube-embed
  */
 class AddYouTube {
 	constructor(toolbar) {

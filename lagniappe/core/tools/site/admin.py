@@ -26,8 +26,7 @@ class CacheRebuildResult:
 
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_deployment_settings_merge_live_values_over_runtime_defaults
-# @features admin
-# @dimensions deployment-settings metadata config
+# @matrix admin : config deployment-settings metadata
 def load_deployment_settings(*, config=None):
     """Load normalized deployment settings with live values taking precedence."""
     config = config or CONFIG
@@ -49,8 +48,7 @@ def load_deployment_settings(*, config=None):
 
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_ai_settings_payload_normalizes_runtime_settings_against_discovery
-# @features admin
-# @dimensions ai-settings metadata config
+# @matrix admin : ai-settings config metadata
 def load_ai_settings_payload(settings=None, *, config=None):
     """Load normalized runtime AI settings and current model options."""
     config = config or CONFIG
@@ -73,8 +71,7 @@ def load_ai_settings_payload(settings=None, *, config=None):
 
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_site_updates_return_the_migration_report
-# @features admin
-# @dimensions site-update audit
+# @matrix admin : audit site-update
 def run_site_updates():
     """Run data migrations and return their complete status report."""
     return database_migrations.run_data_migrations()
@@ -84,8 +81,7 @@ def run_site_updates():
 # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_is_blocked_until_migrations_are_current
 # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_rehydrates_entities_in_bounded_chunks
 # @tests tests_unit/test_026_site_admin.py::test_cache_rebuild_materializes_nested_relations_across_batch_boundaries
-# @features cache
-# @dimensions migration-gate current pending batching nested-relations
+# @matrix cache : batching current migration-gate nested-relations pending
 def rebuild_application_cache(*, chunk_size=100):
     """Rebuild cached entities only when migration state allows it."""
     migration_status = database_migrations.get_migration_status()

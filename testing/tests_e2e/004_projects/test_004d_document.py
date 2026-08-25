@@ -39,10 +39,7 @@ MARKDOWN_TABLE_PASTE_FIXTURE = "\n".join(
 )
 
 
-# @pair sync:initialization
-# @pair sync:empty-content
-# @pair sync:save-guard
-# @pair sync:parent-modified
+# @matrix sync : empty-content initialization parent-modified save-guard
 def test_untouched_document_does_not_save_or_touch_project(get_user):
     user = get_user(Users.OWNER)
     # The shared toolbar project is intentionally edited by the earlier offline
@@ -81,8 +78,7 @@ def test_untouched_document_does_not_save_or_touch_project(get_user):
     )
 
 
-# @features editor
-# @dimensions text-save reload
+# @matrix editor : reload text-save
 def test_editor_loads_and_saves_text(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_toolbar_loads.get(user)
@@ -102,8 +98,7 @@ def test_editor_loads_and_saves_text(get_user):
     assert editor.get_text() == test_text
 
 
-# @features editor
-# @dimensions formatting reload
+# @matrix editor : formatting reload
 @pytest.mark.filterwarnings("ignore:.*[tiptap warn].*")
 def test_formatting_persists(get_user):
     user = get_user(Users.OWNER)
@@ -143,8 +138,7 @@ def test_formatting_persists(get_user):
     expect(editor.get_element("ul")).to_contain_text("Second item")
 
 
-# @features editor
-# @dimensions paste-markdown-table reload
+# @matrix editor : paste-markdown-table reload
 def test_pasting_markdown_table_preserves_table_after_reload(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_editor_markdown_table_paste.get(user)
@@ -167,8 +161,7 @@ def test_pasting_markdown_table_preserves_table_after_reload(get_user):
     expect(editor.get_element("td").filter(has_text="response_mime_type")).to_be_visible()
 
 
-# @features editor
-# @dimensions paste-html sanitization
+# @matrix editor : paste-html sanitization
 def test_pasting_plain_html_inserts_safe_formatted_content(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_editor_plain_html_paste.get(user)
@@ -207,8 +200,7 @@ def test_pasting_plain_html_inserts_safe_formatted_content(get_user):
     assert "alert" not in markup
 
 
-# @features editor
-# @dimensions paste-markdown reload
+# @matrix editor : paste-markdown reload
 def test_pasting_common_markdown_preserves_formatting(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_editor_common_markdown_paste.get(user)
@@ -263,8 +255,7 @@ raw <script> stays text
     expect(editor.get_element("pre code")).to_contain_text("raw <script> stays text")
 
 
-# @features editor
-# @dimensions task-list reload
+# @matrix editor : reload task-list
 def test_task_list_persists(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_editor_task_list.get(user)

@@ -42,7 +42,7 @@ def preference_epoch(user):
 
 # @testable true
 # @tests tests_unit/test_029a_notification_email_policy.py::test_notification_email_preference_defaults_and_eligibility
-# @pairs notification-email:eligibility notification-email:public-user notification-email:never-logged-in
+# @matrix notification-email : eligibility never-logged-in public-user
 def eligible_user(user):
     """Return whether a user may receive notification email."""
     return bool(

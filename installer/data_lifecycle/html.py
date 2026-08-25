@@ -54,7 +54,7 @@ nav a{margin-right:1rem}.badges span{display:inline-block;border-radius:1rem;bac
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_html_sanitizer_removes_active_and_remote_content
-# @pairs portable-archive:html-sanitization portable-archive:no-network
+# @matrix portable-archive : html-sanitization no-network
 def sanitize_stored_html(value: str, *, page_path: str, identities: set[tuple[str, str, str]], assets=None) -> str:
     """Keep inert document markup and rewrite known portable links locally."""
     from bs4 import BeautifulSoup, Comment
@@ -113,7 +113,7 @@ def _rewrite_reference_url(value, page_path, identities):
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_html_archive_renders_owner_sections_and_local_navigation
-# @pairs portable-archive:offline-html portable-archive:owner-content portable-archive:navigation
+# @matrix portable-archive : navigation offline-html owner-content
 class OfflineHTMLBuilder:
     """Render presentation pages using only already-portable records and assets."""
 

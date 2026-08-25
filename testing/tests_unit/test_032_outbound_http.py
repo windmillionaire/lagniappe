@@ -112,7 +112,8 @@ def _user_response(monkeypatch, responses, *, addresses=("93.184.216.34",)):
     return calls, sessions
 
 
-# @pairs link:metadata bookmark:metadata link:relative-image link:fallback outbound-http:privacy
+# @matrix link : fallback metadata relative-image
+# @pairs bookmark:metadata outbound-http:privacy
 def test_link_metadata_uses_typed_fetch_and_resolves_relative_images(monkeypatch):
     body = b"""
         <html><head>
@@ -170,7 +171,7 @@ def test_link_metadata_uses_typed_fetch_and_resolves_relative_images(monkeypatch
     assert parser_response.closed
 
 
-# @pairs outbound-http:typed-outcome outbound-http:privacy outbound-http:immutable outbound-http:url-structure outbound-http:diagnostics
+# @matrix outbound-http : diagnostics immutable privacy typed-outcome url-structure
 def test_outbound_result_repr_and_diagnostic_never_expose_url_or_body():
     secret = "query-token-must-not-appear"
     fragment = "fragment-token-must-not-appear"
@@ -206,7 +207,7 @@ def test_outbound_result_repr_and_diagnostic_never_expose_url_or_body():
         result.size = 0
 
 
-# @pairs outbound-http:user-policy outbound-http:validation
+# @matrix outbound-http : user-policy validation
 def test_user_policy_rejects_invalid_configuration():
     with pytest.raises(ValueError, match="Invalid user fetch policy"):
         replace(HTML_METADATA_POLICY, max_addresses=5)
@@ -214,7 +215,7 @@ def test_user_policy_rejects_invalid_configuration():
         replace(HTML_METADATA_POLICY, schemes=frozenset({"file"}))
 
 
-# @pairs outbound-http:trusted-policy outbound-http:validation outbound-http:retry
+# @matrix outbound-http : retry trusted-policy validation
 def test_trusted_policy_requires_explicit_retry_contract():
     with pytest.raises(ValueError, match="Retries require"):
         TrustedProviderPolicy(
@@ -270,7 +271,7 @@ def test_trusted_policy_requires_explicit_retry_contract():
         )
 
 
-# @pairs outbound-http:dns-pinning outbound-http:host-header outbound-http:sni outbound-http:certificate-hostname outbound-http:proxy-isolation
+# @matrix outbound-http : certificate-hostname dns-pinning host-header proxy-isolation sni
 def test_pinned_adapter_connects_to_address_with_original_host_and_tls_identity(
     monkeypatch,
 ):
@@ -335,7 +336,7 @@ def test_user_fetch_rejects_malformed_urls_before_resolution(monkeypatch, url):
     assert called == []
 
 
-# @pairs outbound-http:url-validation outbound-http:dns-pinning
+# @matrix outbound-http : dns-pinning url-validation
 @pytest.mark.parametrize(
     "url,resolved",
     [
@@ -398,7 +399,7 @@ def test_user_fetch_rejects_mixed_dns_and_degrades_resolution_failure(monkeypatc
     )
 
 
-# @pairs outbound-http:redirects outbound-http:closure outbound-http:dns-pinning
+# @matrix outbound-http : closure dns-pinning redirects
 def test_user_fetch_pins_redirects_bounds_and_closes_every_response(monkeypatch):
     first = FakeResponse(302, {"Location": "/next"})
     second = FakeResponse(302, {"Location": "https://other.example/final"})
@@ -450,7 +451,7 @@ def test_user_fetch_pins_redirects_bounds_and_closes_every_response(monkeypatch)
     assert malformed.closed
 
 
-# @pairs outbound-http:redirects outbound-http:address-failover outbound-http:closure outbound-http:privacy
+# @matrix outbound-http : address-failover closure privacy redirects
 def test_user_fetch_redirect_and_address_attempt_limits(monkeypatch):
     overflow_policy = replace(HTML_METADATA_POLICY, max_redirects=1)
     first = FakeResponse(302, {"Location": "/one"})
@@ -482,7 +483,7 @@ def test_user_fetch_redirect_and_address_attempt_limits(monkeypatch):
     assert "private" not in repr(result)
 
 
-# @pairs outbound-http:bounds outbound-http:streaming outbound-http:deadline outbound-http:media outbound-http:closure outbound-http:raster
+# @matrix outbound-http : bounds closure deadline media raster streaming
 def test_user_fetch_validates_media_deadline_and_raster_content(monkeypatch):
     small_policy = replace(HTML_METADATA_POLICY, max_bytes=4)
     declared = FakeResponse(
@@ -614,7 +615,7 @@ def test_profile_image_policy_is_https_only(monkeypatch):
     assert request == []
 
 
-# @pairs outbound-http:trusted-provider outbound-http:fixed-host outbound-http:redirects outbound-http:streaming outbound-http:bounds outbound-http:deadline outbound-http:closure outbound-http:proxy-isolation outbound-http:privacy
+# @matrix outbound-http : bounds closure deadline fixed-host privacy proxy-isolation redirects streaming trusted-provider
 def test_trusted_client_enforces_fixed_host_bounds_deadline_and_closure(monkeypatch):
     response = FakeResponse(
         headers={"Content-Type": "application/json"},
@@ -711,7 +712,7 @@ def test_trusted_client_enforces_fixed_host_bounds_deadline_and_closure(monkeypa
     assert "private cleanup text" not in repr(cleanup_result)
 
 
-# @pairs outbound-http:trusted-provider outbound-http:retry outbound-http:closure
+# @matrix outbound-http : closure retry trusted-provider
 def test_trusted_client_retries_only_explicit_method_and_status(monkeypatch):
     first = FakeResponse(503, {"Content-Type": "application/json"})
     second = FakeResponse(

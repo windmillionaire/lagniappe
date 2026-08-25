@@ -9,8 +9,7 @@ import { captureError, request } from "../shared";
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_empty_form_is_readonly
  * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_partial_submission_omits_empty_fields
  * @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_empty_form_structure_without_edit_controls
- * @features tasks
- * @dimensions attached-form submission autofill readonly complete empty-fields partial-submission permission-gates
+ * @matrix tasks : attached-form autofill complete empty-fields partial-submission permission-gates readonly submission
  */
 export class TaskForm extends FormElement {
 	constructor(attributes) {
@@ -47,8 +46,7 @@ export class TaskForm extends FormElement {
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_history_fill_controls_cover_submission_elements
-	 * @features tasks
-	 * @dimensions history-fill live-update
+	 * @matrix tasks : history-fill live-update
 	 */
 	get hasHistory() {
 		return Boolean(
@@ -139,8 +137,7 @@ export class TaskForm extends FormElement {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
-	 * @features tasks
-	 * @dimensions history-fill repeating-default patch
+	 * @matrix tasks : history-fill patch repeating-default
 	 */
 	async saveDefaultField(fieldId) {
 		if (!this.saveDefaultFieldRoute || !fieldId) return;
@@ -161,8 +158,7 @@ export class TaskForm extends FormElement {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006f_task_history.py::test_task_form_field_fills_from_latest_history
-	 * @features tasks
-	 * @dimensions history-fill latest-submission
+	 * @matrix tasks : history-fill latest-submission
 	 */
 	async loadHistoryFill() {
 		if (!this.historyFillEnabled || !this.form?.renderer) return;

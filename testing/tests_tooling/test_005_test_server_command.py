@@ -92,7 +92,8 @@ def make_demo_app(tmp_path: Path) -> Path:
     return app_dir
 
 
-# @pairs test-server:freshness frontend-build:freshness frontend-build:no-op
+# @matrix frontend-build : freshness no-op
+# @pair test-server:freshness
 def test_test_frontend_bundle_skips_current_build(
     import_config_testing,
     monkeypatch,
@@ -125,8 +126,8 @@ def test_test_frontend_bundle_skips_current_build(
     assert testing.ensure_test_frontend_bundle() is False
 
 
-# @pairs test-server:freshness frontend-build:freshness frontend-build:rebuild
-# @pair frontend-build:output-validation
+# @matrix frontend-build : freshness output-validation rebuild
+# @pair test-server:freshness
 def test_test_frontend_bundle_rebuilds_stale_build(
     import_config_testing,
     monkeypatch,
@@ -170,8 +171,8 @@ def test_test_frontend_bundle_rebuilds_stale_build(
     }
 
 
-# @pairs test-server:freshness frontend-build:freshness frontend-build:no-op
-# @pair frontend-build:e2e-session-isolation
+# @matrix frontend-build : e2e-session-isolation freshness no-op
+# @pair test-server:freshness
 def test_test_frontend_bundle_defers_build_during_active_e2e_session(
     import_config_testing,
     monkeypatch,
@@ -206,8 +207,8 @@ def test_test_frontend_bundle_defers_build_during_active_e2e_session(
         assert "preflight deferred" in capsys.readouterr().out
 
 
-# @pairs test-server:freshness frontend-build:freshness frontend-build:no-op
-# @pair frontend-build:production-preservation
+# @matrix frontend-build : freshness no-op production-preservation
+# @pair test-server:freshness
 def test_test_frontend_bundle_preserves_current_production_build(
     import_config_testing,
     monkeypatch,
@@ -243,8 +244,8 @@ def test_test_frontend_bundle_preserves_current_production_build(
     assert "Current production frontend bundle detected" in capsys.readouterr().out
 
 
-# @pairs test-server:freshness frontend-build:freshness frontend-build:rebuild
-# @pair frontend-build:production-preservation
+# @matrix frontend-build : freshness production-preservation rebuild
+# @pair test-server:freshness
 def test_test_frontend_bundle_replaces_stale_production_build(
     import_config_testing,
     monkeypatch,
@@ -344,8 +345,7 @@ def test_run_py_test_server_adc_mismatch_points_to_auth(monkeypatch, capsys):
     assert "run.py auth" in output
 
 
-# @features test-server
-# @dimensions readiness slow-start
+# @matrix test-server : readiness slow-start
 def test_wait_for_server_allows_slow_local_startup(
     import_config_testing, monkeypatch, tmp_path
 ):
@@ -382,8 +382,7 @@ def test_wait_for_server_allows_slow_local_startup(
     assert sleeps == [0.5] * 10
 
 
-# @features test-server
-# @dimensions readiness deadline stalled-response diagnostics
+# @matrix test-server : deadline diagnostics readiness stalled-response
 def test_wait_for_server_bounds_stalled_requests_by_one_deadline(
     import_config_testing, monkeypatch, tmp_path, capsys
 ):
@@ -414,8 +413,7 @@ def test_wait_for_server_bounds_stalled_requests_by_one_deadline(
     assert "ReadTimeout" in output
 
 
-# @features test-server
-# @dimensions readiness http-state diagnostics
+# @matrix test-server : diagnostics http-state readiness
 def test_wait_for_server_reports_last_http_state(
     import_config_testing, monkeypatch, tmp_path, capsys
 ):
@@ -626,8 +624,7 @@ def test_start_managed_test_server_detaches_and_records_pid(
     assert kwargs["stdout"].name == str(testing.File.MANAGED_TEST_SERVER_LOG.value)
 
 
-# @features test-server
-# @dimensions teardown process-management
+# @matrix test-server : process-management teardown
 def test_teardown_managed_test_server_stops_before_cleaning(
     import_config_testing, monkeypatch, tmp_path
 ):

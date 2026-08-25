@@ -10,8 +10,7 @@ const IMAGE_DROPZONE_TEXT =
  * @testable true
  * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image_generate_toggle
  * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image
- * @features editor
- * @dimensions image-generate-toggle image-upload image-selection
+ * @matrix editor : image-generate-toggle image-selection image-upload
  */
 class Image extends BaseUpload {
 	constructor(toolbar) {

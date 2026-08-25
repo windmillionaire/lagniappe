@@ -91,14 +91,8 @@ def _refresh_target(view, target, refresh_view):
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_reconnect_refreshes_external_page
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
-# @pair reconnect-refresh:batched-request
-# @pair reconnect-refresh:fallback
-# @pair reconnect-refresh:component-identity
-# @pair reconnect-refresh:page-tasks
-# @pair reconnect-refresh:category-index
-# @pair category-index:refresh
-# @pair reconnect-refresh:root-fingerprint
-# @pair permissions:authorization
+# @matrix reconnect-refresh : batched-request category-index component-identity fallback page-tasks root-fingerprint
+# @pairs category-index:refresh permissions:authorization
 @internal.route("/refresh", methods=["POST"])
 @logged_in
 def refresh():

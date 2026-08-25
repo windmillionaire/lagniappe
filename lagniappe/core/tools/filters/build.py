@@ -61,8 +61,7 @@ class FilterExpression:
     # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_number_condition
     # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_checkbox_condition
     # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_select_condition
-    # @features filters
-    # @dimensions string-condition boolean-condition number-condition select-condition entity-condition compound attached-form scalar-list run-results description public document jsonpath escaping punctuation regex-literal field-name
+    # @matrix filters : attached-form boolean-condition compound description document entity-condition escaping field-name jsonpath number-condition public punctuation regex-literal run-results scalar-list select-condition string-condition
     def build(self):
         """Convert filter definitions into a single JSONPath query."""
         if not self.definitions:

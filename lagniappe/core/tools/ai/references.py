@@ -12,8 +12,7 @@ HASH_TOKEN_REGEX = re.compile(r"\bhash:([A-Za-z0-9_-]+)\b")
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_hash_reference_normalizer_batches_lookup
-# @features ai
-# @dimensions hash-reference normalization batched-cache
+# @matrix ai : batched-cache hash-reference normalization
 def hash_reference(entity):
     """Return the explicit AI reference token for an entity hash."""
     entity_hash = getattr(entity, "hash", None)
@@ -22,8 +21,7 @@ def hash_reference(entity):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_hash_reference_normalizer_batches_lookup
-# @features ai
-# @dimensions hash-reference normalization batched-cache
+# @matrix ai : batched-cache hash-reference normalization
 def normalize_hash_references(value, *, resolved_details=None):
     """Replace known ``hash:...`` tokens with executable entity ids.
 

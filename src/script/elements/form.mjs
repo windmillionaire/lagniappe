@@ -4,8 +4,7 @@ import { BaseForm } from "./base/baseForm";
 /**
  * @testable true
  * @tests tests_js/test_024_edit_watcher.py::test_form_revision_snapshot_is_canonical_and_memory_only
- * @features forms edited-entity-notice
- * @dimensions formdata canonicalization repeated-values revision-only-state
+ * @matrix edited-entity-notice forms : canonicalization formdata repeated-values revision-only-state
  */
 export class FormElement {
 	constructor(attributes) {
@@ -239,8 +238,7 @@ export class FormElement {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_028_form_state_split.py::test_form_submit_is_guarded_only_by_durable_autofill_lock
-	 * @features forms submission deferred-jobs
-	 * @dimensions deliberate-submit form-lock no-live-sync
+	 * @matrix deferred-jobs forms submission : deliberate-submit form-lock no-live-sync
 	 */
 	async prepareSubmit(options) {
 		if (this.deferredLocked) return false;
@@ -535,8 +533,8 @@ export class FormElement {
 	 * @testable true
 	 * @tests tests_js/test_032_task_settings_lifecycle.py::test_form_response_metadata_stays_with_renderer_widget
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_adding_form_from_task_settings_preserves_widget_identity
-	 * @pairs forms:schema-ownership forms:sibling-widgets
-	 * @pairs tasks:attach-form tasks:widget-identity tasks:merged-submission
+	 * @matrix forms : schema-ownership sibling-widgets
+	 * @matrix tasks : attach-form merged-submission widget-identity
 	 */
 	updated(response) {
 		const updatedTarget = response.html?.querySelector(

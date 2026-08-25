@@ -36,8 +36,7 @@ ENTITY_PAIR_ACTION_REFERENCES = {
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_accepts_rename_and_move_task_target_aliases
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_requires_every_report_file_attachment
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_treats_action_like_submission_fields_as_content
-# @features ai-report
-# @dimensions proposal validation dependencies schema-update page-form no-category move-references rename canonical-target legacy-target file-placement explicit-task-identity submission action-reference-namespace
+# @matrix ai-report : action-reference-namespace canonical-target dependencies explicit-task-identity file-placement legacy-target move-references no-category page-form proposal rename schema-update submission validation
 def validate_proposal(
     proposal,
     allowed_actions=None,
@@ -378,9 +377,7 @@ def _validate_create_form_action_data(data, action_label):
 
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_validate_proposal_rejects_unsafe_schema_update_operations
-# @pair form-schema:proposal
-# @pair form-schema:schema-update
-# @pair form-schema:validation
+# @matrix form-schema : proposal schema-update validation
 def _validate_update_form_schema_action_data(data, action_label):
     if not _first_data_reference(data, "form"):
         raise exceptions.AIException(f"Action {action_label} requires data.form.")
@@ -532,12 +529,7 @@ def _is_completed_task_action_data(data):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_rejects_saved_pending_submissions_before_execution
-# @pair form-schema:deterministic-run
-# @pair form-schema:stale-proposal
-# @pair form-schema:validation
-# @pair submission:deterministic-run
-# @pair submission:stale-proposal
-# @pair submission:validation
+# @matrix form-schema submission : deterministic-run stale-proposal validation
 def _validate_form_submission_action_data(data, action_label, allow_pending=True):
     if not _has_form_reference_or_label(data):
         return

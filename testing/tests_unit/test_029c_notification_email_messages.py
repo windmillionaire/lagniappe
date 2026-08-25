@@ -20,10 +20,7 @@ from testing.utility.notification_email_fakes import (
 pytestmark = pytest.mark.unit
 
 
-# @source lagniappe/core/tools/email/notifications/capture.py::record_message
-# @source lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @pairs notification-email:message notification-email:quiet-window notification-email:latest-only
-# @pair notification-email:read-suppression
+# @matrix notification-email : latest-only message quiet-window read-suppression
 def test_immediate_messages_wait_for_conversation_quiet(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
     store = MemoryDatastore()

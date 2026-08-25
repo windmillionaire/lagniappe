@@ -30,8 +30,7 @@ from testing.utility import assert_lagniappe_error_response
 pytestmark = pytest.mark.e2e
 
 
-# @features editor
-# @dimensions history-list
+# @pair editor:history-list
 def test_document_history_created_on_save(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_document_history_created)
@@ -70,8 +69,7 @@ def test_document_history_created_on_save(get_user):
     expect(panel.locator("[role='option']").nth(3)).to_be_visible()
 
 
-# @features editor
-# @dimensions history-restore
+# @pair editor:history-restore
 def test_document_history_restore(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_document_history_restore)
@@ -102,8 +100,7 @@ def test_document_history_restore(get_user):
     expect(editor.text_entry).to_contain_text("Original content to preserve")
 
 
-# @pairs editor:history-pin editor:history-clear editor:current-content
-# @pairs editor:validation editor:parent-scope editor:confirmation
+# @matrix editor : confirmation current-content history-clear history-pin parent-scope validation
 # @pair request-errors:plain-validation
 # @template delete/document_history.html::confirmation
 def test_pin_and_clear_document_history(get_user, browser_failures):

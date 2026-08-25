@@ -26,8 +26,7 @@ def document_save_response(text):
     return predicate
 
 
-# @pairs sync:document sync:collaboration sync:persistence
-# @pairs sync:revision sync:delta sync:checkpoint
+# @matrix sync : checkpoint collaboration delta document persistence revision
 def test_two_users_see_document_edits_without_reload(
     get_user,
     browser_failures,
@@ -66,7 +65,7 @@ def test_two_users_see_document_edits_without_reload(
     expect(project.editor.text_entry).to_contain_text(text)
 
 
-# @pairs sync:document sync:presence sync:lifecycle
+# @matrix sync : document lifecycle presence
 def test_document_presence_appears_and_clears(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     collaborator = get_user(Users.admin, creator=owner)

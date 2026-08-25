@@ -6,7 +6,6 @@ from uuid import uuid4
 import pytest
 from playwright.sync_api import expect
 
-from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Tasks, Users
 from testing.resources import Page, Task
@@ -59,9 +58,8 @@ def _create_reconciliation_page(user):
     return page, form
 
 
-# @pairs edited-entity-notice:submission-choice forms:submission-choice
-# @pairs forms:latest-schema forms:readonly-preview
-# @pairs reconnect-refresh:dirty-form-preservation form-schema:notice
+# @matrix forms : latest-schema readonly-preview submission-choice
+# @pairs edited-entity-notice:submission-choice form-schema:notice reconnect-refresh:dirty-form-preservation
 # @template controls.html::edited_marker
 # @template pages/info.html::info_form
 def test_form_submission_reconciliation_uses_latest_schema(

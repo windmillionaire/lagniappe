@@ -46,7 +46,7 @@ class DataLifecycleError(SetupError):
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_identifiers_and_storage_paths_are_strict
-# @pairs data-lifecycle:identifier-validation data-lifecycle:path-containment
+# @matrix data-lifecycle : identifier-validation path-containment
 def validate_backup_id(value: str) -> str:
     """Return one canonical user-facing backup ID or raise."""
     value = str(value or "").strip()
@@ -179,7 +179,7 @@ class BackupManifest:
 
     # @testable true
     # @tests tests_tooling/test_008_data_lifecycle.py::test_manifest_validation_rejects_foreign_or_uncontained_artifacts
-    # @pairs data-lifecycle:manifest data-lifecycle:path-containment
+    # @matrix data-lifecycle : manifest path-containment
     @classmethod
     def from_dict(
         cls,
@@ -487,7 +487,7 @@ class ProviderContext:
 
     # @testable true
     # @tests tests_tooling/test_008_data_lifecycle.py::test_operation_polling_resumes_and_reports_provider_failure
-    # @pairs data-lifecycle:operation-polling data-lifecycle:failure-propagation
+    # @matrix data-lifecycle : failure-propagation operation-polling
     def wait_for_operation(self, name: str, *, database_id=None, timeout=None):
         deadline = self.monotonic() + (timeout or OPERATION_TIMEOUT_SECONDS)
         attempt = 0
@@ -565,7 +565,7 @@ class ProviderContext:
 
     # @testable true
     # @tests tests_tooling/test_008_data_lifecycle.py::test_queue_snapshot_preserves_full_task_definitions
-    # @pairs data-lifecycle:queue-purge-audit data-lifecycle:provider-pagination
+    # @matrix data-lifecycle : provider-pagination queue-purge-audit
     def list_queue_tasks(self, queue_name: str, location: str) -> list[dict[str, Any]]:
         """Return every task using FULL view so a pre-purge audit keeps payloads."""
         from google.cloud.tasks_v2.types import Task

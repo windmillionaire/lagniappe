@@ -234,8 +234,7 @@ class MutationPlanBuilder:
 
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_scheduled_uncomplete_dispatch_is_planned_after_task_write
-    # @features mutations task-scheduling
-    # @dimensions durable-first post-commit
+    # @matrix mutations task-scheduling : durable-first post-commit
     def dispatch_scheduled_uncomplete(self, entity, *, reason):
         self._add_entity_cache_effect(
             MutationEffectType.SCHEDULED_UNCOMPLETE_DISPATCH,

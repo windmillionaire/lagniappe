@@ -22,7 +22,7 @@ GENERATION_RETRY_LIMIT = 3
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_asset_collection_is_generation_bound_resumable_and_deduplicated
-# @pairs portable-archive:assets portable-archive:generation-binding portable-archive:resume
+# @matrix portable-archive : assets generation-binding resume
 class AssetCollector:
     """Download only staged references and publish verified content-addressed bytes."""
 

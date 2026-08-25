@@ -22,8 +22,7 @@ POLL_CHANNELS = frozenset(CHANNEL_REVISION_PATHS)
 # @testable true
 # @tests tests_unit/test_026_polling_contract.py::test_poll_contract_accepts_each_descriptor_type
 # @tests tests_unit/test_026_polling_contract.py::test_poll_contract_reports_exact_invalid_field
-# @features polling
-# @dimensions protocol validation diagnostics
+# @matrix polling : diagnostics protocol validation
 class PollContractError(ValueError):
     """A safe, field-addressed public polling contract failure."""
 
@@ -227,11 +226,8 @@ def _notification_state(raw):
 # @tests tests_unit/test_026_polling_contract.py::test_poll_contract_accepts_each_descriptor_type
 # @tests tests_unit/test_026_polling_contract.py::test_poll_contract_reports_exact_invalid_field
 # @tests tests_unit/test_026_polling_contract.py::test_poll_contract_rejects_invalid_notification_and_close_state
-# @features polling
-# @dimensions protocol descriptors notification-state presence validation diagnostics bounds duplicates strict-fields cursor-types
-# @pairs polling:protocol polling:descriptors polling:notification-state polling:presence polling:validation
-# @pairs polling:diagnostics polling:bounds polling:duplicates polling:strict-fields polling:cursor-types
-# @pairs notifications:notification-state notifications:presence notifications:validation notifications:duplicates
+# @matrix notifications : duplicates notification-state presence validation
+# @matrix polling : bounds cursor-types descriptors diagnostics duplicates notification-state presence protocol strict-fields validation
 def parse_poll_request(payload):
     """Parse one exact version-1 request or raise a safe contract error."""
     value = _object(payload, "request")

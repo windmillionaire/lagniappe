@@ -109,7 +109,7 @@ class DecodedEntity:
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_portable_names_and_reference_strings_are_lossless
-# @pairs portable-json:path-safety portable-json:reference-escaping
+# @matrix portable-json : path-safety reference-escaping
 def portable_name(value: str) -> str:
     """Encode arbitrary display text as one collision-stable portable component."""
     value = str(value or "")
@@ -130,7 +130,7 @@ def portable_name(value: str) -> str:
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_portable_names_and_reference_strings_are_lossless
-# @pairs portable-json:path-safety portable-json:reference-escaping
+# @matrix portable-json : path-safety reference-escaping
 def unportable_name(value: str) -> str:
     """Decode one component produced by :func:`portable_name`."""
     value = str(value or "")
@@ -215,7 +215,7 @@ def unescape_reference_string(value: str) -> str:
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_value_codec_round_trips_every_supported_value
-# @pairs portable-json:value-codec portable-json:round-trip
+# @matrix portable-json : round-trip value-codec
 class ValueCodec:
     """Canonical JSON codec for every supported Datastore value."""
 
@@ -413,7 +413,7 @@ def canonical_json(value: Any) -> bytes:
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_shard_writer_enforces_count_bytes_and_ordering
-# @pairs portable-json:sharding portable-json:deterministic-order
+# @matrix portable-json : deterministic-order sharding
 class ShardWriter:
     """Stream sorted per-type JSON-array shards within both v1 limits."""
 
@@ -553,7 +553,7 @@ def validate_entity_record(record: dict[str, Any]) -> PortableIdentity:
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_history_and_messages_are_nested_and_replanned_under_their_owners
 # @tests tests_tooling/test_008_data_lifecycle.py::test_archive_validation_counts_children_without_separate_identity_pages
-# @pairs portable-json:owner-scoped-children portable-archive:owner-scoped-children
+# @matrix portable-archive portable-json : owner-scoped-children
 def validate_child_record(child_type: str, child: dict[str, Any]) -> dict[str, Any]:
     """Validate one task-owned history or conversation-owned message row."""
     if child_type not in {"task_history", "message"} or not isinstance(child, dict):
@@ -584,7 +584,7 @@ def validate_child_record(child_type: str, child: dict[str, Any]) -> dict[str, A
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_import_planner_is_source_independent_and_resolves_two_pass_references
 # @tests tests_tooling/test_008_data_lifecycle.py::test_history_and_messages_are_nested_and_replanned_under_their_owners
-# @pairs portable-json:import-planner portable-json:two-pass-resolution portable-json:natural-identity portable-json:owner-scoped-children
+# @matrix portable-json : import-planner natural-identity owner-scoped-children two-pass-resolution
 class ImportPlanner:
     """Prove a validated v1 bundle can be represented without mutating a target."""
 

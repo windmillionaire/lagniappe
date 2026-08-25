@@ -88,6 +88,7 @@ class OOXMLTruncationReason(Enum):
 
 # @testable true
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_output_budget_returns_typed_partial_result
+# @pair files:partial-result
 @dataclass(frozen=True)
 class OOXMLExtractionResult:
     """Extracted text and explicit partial-result metadata."""
@@ -97,6 +98,7 @@ class OOXMLExtractionResult:
 
     # @testable true
     # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_output_budget_returns_typed_partial_result
+    # @pair files:partial-result
     @property
     def truncated(self):
         return self.truncation_reason is not None
@@ -123,7 +125,7 @@ class _PartialExtraction(Exception):
 # @testable true
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_returns_partial_text_for_worksheet_work_limits
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_production_policy_defaults_are_fixed
-# @pairs files:ooxml files:partial-result files:policy
+# @matrix files : ooxml partial-result policy
 @dataclass
 class _ExtractionBudget:
     policy: OOXMLPolicy
@@ -183,7 +185,7 @@ class _ExtractionBudget:
 
 # @testable true
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_output_limit_does_not_parse_later_worksheets
-# @pairs files:ooxml files:partial-result files:output-budget
+# @matrix files : ooxml output-budget partial-result
 class _TextOutput:
     def __init__(self, max_characters):
         self.max_characters = max_characters
@@ -252,8 +254,7 @@ class _CappedText:
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_summary_generation_uses_docx_text_fallback
 # @tests tests_unit/test_015_ai_tools.py::test_ooxml_xlsx_extraction_preserves_rows_tabs_and_shared_strings
-# @features files ai
-# @dimensions ooxml summary-fallback
+# @matrix ai files : ooxml summary-fallback
 def is_supported_ooxml(filename=None, mimetype=None):
     """Return whether filename or MIME type identifies a supported OOXML file."""
     return _ooxml_kind(filename=filename, mimetype=mimetype) is not None
@@ -264,7 +265,7 @@ def is_supported_ooxml(filename=None, mimetype=None):
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_output_budget_returns_typed_partial_result
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_unsafe_archive_members_before_parsing
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_forbidden_or_malformed_xml
-# @pairs files:ooxml files:docx files:xlsx files:partial-result files:bounded-resources
+# @matrix files : bounded-resources docx ooxml partial-result xlsx
 def extract_ooxml(content, filename=None, mimetype=None, *, max_characters=None):
     """Extract bounded rough text and partial-result metadata from DOCX/XLSX."""
     kind = _ooxml_kind(filename=filename, mimetype=mimetype)
@@ -324,7 +325,8 @@ def extract_ooxml(content, filename=None, mimetype=None, *, max_characters=None)
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_reports_ooxml_extraction_errors
 # @tests tests_unit/test_015_ai_tools.py::test_ooxml_xlsx_extraction_preserves_rows_tabs_and_shared_strings
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_happy_paths_preserve_docx_and_xlsx_order
-# @pairs files:ooxml files:docx files:xlsx files:summary-fallback files:compatibility
+# @matrix files : compatibility docx ooxml summary-fallback xlsx
+# @pair ai:ooxml
 def extract_ooxml_text(content, filename=None, mimetype=None):
     """Compatibility wrapper returning only bounded extracted text."""
     result = extract_ooxml(content, filename=filename, mimetype=mimetype)
@@ -346,7 +348,7 @@ def _ooxml_kind(filename=None, mimetype=None):
 
 # @testable true
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_bounds_input_streams_and_preserves_seekable_ownership
-# @pairs files:ooxml files:input-stream files:compressed-limit
+# @matrix files : compressed-limit input-stream ooxml
 @contextmanager
 def _content_source(content, budget):
     policy = budget.policy
@@ -412,7 +414,7 @@ def _content_source(content, budget):
 
 # @testable true
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_central_directory_count_mismatch
-# @pairs files:ooxml files:archive-safety files:central-directory
+# @matrix files : archive-safety central-directory ooxml
 def _preflight_central_directory(stream, size, budget):
     policy = budget.policy
     if size < EOCD_STRUCT.size:
@@ -507,7 +509,7 @@ def _preflight_central_directory(stream, size, budget):
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_unsafe_archive_members_before_parsing
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_unsupported_compression_and_expansion
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_stream_reader_rejects_bytes_beyond_member_declaration
-# @pairs files:ooxml files:archive-safety files:expansion files:streamed-member
+# @matrix files : archive-safety expansion ooxml streamed-member
 def _inspect_archive(archive, expected_count, budget):
     policy = budget.policy
     infos = archive.infolist()
@@ -572,7 +574,7 @@ def _canonical_member_name(info):
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_excessive_xml_depth
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_returns_partial_text_for_xml_work_limits
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_returns_partial_text_when_deadline_expires
-# @pairs files:ooxml files:xml-safety files:partial-result files:deadline
+# @matrix files : deadline ooxml partial-result xml-safety
 def _parse_xml_member(archive, info, handler, budget):
     policy = budget.policy
     parser = expat.ParserCreate(namespace_separator="}")
@@ -1067,7 +1069,7 @@ def _extract_xlsx_text(archive, members, output, budget):
 # @testable true
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_unsafe_worksheet_relationships
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_fallback_worksheets_use_natural_order
-# @pairs files:ooxml files:xlsx files:relationships files:fallback
+# @matrix files : fallback ooxml relationships xlsx
 # @reason workbook relationship policy is exercised through XLSX extraction tests
 def _workbook_sheet_paths(archive, members, budget):
     workbook_info = members.get("xl/workbook.xml")
@@ -1145,7 +1147,7 @@ def _worksheet_target_path(target):
 
 # @testable true
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_bounds_shared_string_storage_and_fanout
-# @pairs files:ooxml files:xlsx files:shared-strings
+# @matrix files : ooxml shared-strings xlsx
 def _shared_strings(archive, members, budget):
     info = members.get("xl/sharedStrings.xml")
     if info is None:
@@ -1168,7 +1170,7 @@ def _natural_key(value):
 # @testable true
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_rejects_out_of_domain_cell_references
 # @tests tests_unit/test_015d_ooxml_extraction.py::test_ooxml_accepts_xfd_without_unbounded_padding
-# @pairs files:ooxml files:xlsx files:cell-reference files:sparse-row
+# @matrix files : cell-reference ooxml sparse-row xlsx
 def _column_index(cell_ref):
     if cell_ref in (None, ""):
         return None

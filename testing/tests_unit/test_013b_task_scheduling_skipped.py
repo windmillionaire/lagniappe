@@ -1,8 +1,7 @@
 import pytest
 
 
-# @features task-scheduling
-# @dimensions skipped recurring periodic
+# @matrix task-scheduling : periodic recurring skipped
 @pytest.mark.unit
 def test_skipped_recurring(get_test_entities):
     """Test skipped calculation for recurring/periodic schedules.
@@ -50,8 +49,7 @@ def test_skipped_recurring(get_test_entities):
                 )
 
 
-# @features task-scheduling
-# @dimensions skipped scheduled
+# @matrix task-scheduling : scheduled skipped
 @pytest.mark.unit
 def test_skipped_scheduled(get_test_entities):
     """Test skipped calculation for scheduled schedules.

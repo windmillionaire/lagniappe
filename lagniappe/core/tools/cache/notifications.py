@@ -6,7 +6,6 @@ from redis import WatchError
 
 from .core import cache
 from .notification_state import (
-    clear_recorded_notification_states,
     decode as _decode,
     group_mutations as _group_mutations,
     member_ids as _member_ids,
@@ -14,7 +13,6 @@ from .notification_state import (
     public_notification_state,
     record as _record,
     redis_keys as _redis_keys,
-    take_recorded_notification_state,
     user_id as _user_id,
     write_mapping as _write_mapping,
 )
@@ -27,8 +25,7 @@ MAX_TRANSACTION_ATTEMPTS = 8
 # @testable true
 # @tests tests_unit/test_025_notification_state.py::test_warm_notification_state_is_redis_only_and_refreshes_ttl
 # @tests tests_unit/test_025_notification_state.py::test_expired_notification_state_gets_a_new_generation
-# @pairs notifications:redis-projection notifications:ttl notifications:generation
-# @pairs notifications:datastore-read-isolation notifications:expiry notifications:cold-seed
+# @matrix notifications : cold-seed datastore-read-isolation expiry generation redis-projection ttl
 def peek_notification_state(user):
     """Read warm notification state and slide its expiration without seeding."""
     state_key, epoch_key = _redis_keys(user)
@@ -50,8 +47,7 @@ def _default_keys_loader(user):
 # @testable true
 # @tests tests_unit/test_025_notification_state.py::test_cold_seed_runs_one_keys_only_query_and_is_race_safe
 # @tests tests_unit/test_025_notification_state.py::test_notification_list_keys_repair_warm_projection
-# @pairs notifications:cold-seed notifications:race-safety notifications:authoritative-repair
-# @pairs notifications:revision notifications:membership
+# @matrix notifications : authoritative-repair cold-seed membership race-safety revision
 def seed_notification_state(
     user,
     notification_keys=None,
@@ -168,8 +164,7 @@ def repair_notification_state(user, notification_keys, aggregate=None):
 # @testable true
 # @tests tests_unit/test_025_notification_state.py::test_notification_mutations_are_idempotent_and_advance_once
 # @tests tests_unit/test_025_notification_state.py::test_absent_projection_mutation_updates_epoch_without_querying
-# @pairs notifications:mutation notifications:idempotent-count notifications:revision
-# @pairs notifications:cold-cache notifications:datastore-read-isolation
+# @matrix notifications : cold-cache datastore-read-isolation idempotent-count mutation revision
 def update_notification_projection(*, upserts=(), deletes=(), aggregates=None):
     """Apply one logical committed mutation per affected user's projection."""
     results = {}
@@ -242,7 +237,7 @@ def update_notification_projection(*, upserts=(), deletes=(), aggregates=None):
 
 # @testable true
 # @tests tests_unit/test_025_notification_state.py::test_durable_aggregate_publish_preserves_members_and_exact_combined_count
-# @pairs notifications:aggregate-count notifications:redis-projection notifications:revision
+# @matrix notifications : aggregate-count redis-projection revision
 def publish_notification_aggregate(user, aggregate):
     """Mirror canonical durable counts without reading notification history."""
     identifier = _user_id(user)

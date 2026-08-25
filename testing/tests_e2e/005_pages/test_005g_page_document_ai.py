@@ -91,8 +91,7 @@ def _assert_ordered(text, first, second):
     assert text.index(first) < text.index(second)
 
 
-# @features editor ai
-# @dimensions generate-text insert-mode
+# @matrix ai editor : generate-text insert-mode
 def test_generate_text_inserts_ai_markup_with_insert_modes(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_document_generation_page)
@@ -172,8 +171,7 @@ def test_generate_text_inserts_ai_markup_with_insert_modes(get_user):
     expect(page.editor.text_entry).to_contain_text("Generated cursor marker")
 
 
-# @features editor ai
-# @dimensions generate-text selected-text replace-selection
+# @matrix ai editor : generate-text replace-selection selected-text
 def test_generate_text_replaces_selection_and_posts_selected_text(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_document_generation_selection_page)
@@ -215,8 +213,7 @@ def test_generate_text_replaces_selection_and_posts_selected_text(get_user):
         expect(selection_highlight).to_have_count(0)
 
 
-# @features editor ai
-# @dimensions generate-text selected-text explain
+# @matrix ai editor : explain generate-text selected-text
 def test_generate_text_explain_includes_selected_text_context(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_document_generation_selection_page)
@@ -249,8 +246,7 @@ def test_generate_text_explain_includes_selected_text_context(get_user):
         modal.close()
 
 
-# @features editor ai
-# @dimensions generate-text error
+# @matrix ai editor : error generate-text
 def test_generate_text_provider_error_surfaces_in_form(
     get_user,
     browser_failures,
@@ -294,8 +290,7 @@ def test_generate_text_provider_error_surfaces_in_form(
                 re.compile(error)
             )
 
-# @features ai
-# @dimensions generate-text live-provider page-context document-context
+# @matrix ai : document-context generate-text live-provider page-context
 @pytest.mark.ai
 def test_generate_text_live_page_context_with_tasks_and_files(get_user, request):
     """

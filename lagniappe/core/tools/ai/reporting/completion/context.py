@@ -6,11 +6,9 @@ from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 
-from ...autofill import validate_submission
 from ...references import hash_reference
 from ..proposals.references import (
     _first_data_reference,
-    _has_form_reference_or_label,
     _proposal_file_refs,
     _strip_action_reference,
 )
@@ -317,8 +315,7 @@ def _index_completion_file_context(files, file, item, user):
 
 # @testable true
 # @tests tests_unit/test_020f_ai_report_completion.py::test_complete_organize_submissions_uses_target_task_form
-# @features ai-report
-# @dimensions submission-completion explicit-task-identity inherited-form
+# @matrix ai-report : explicit-task-identity inherited-form submission-completion
 def _completion_form_info(action, context):
     action_type = action.get("type")
     data = action.get("data") or {}

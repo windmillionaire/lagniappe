@@ -65,8 +65,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
 
     # @testable true
     # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_registry_requires_resume_but_tolerates_pause_failure
-    # @features deferred-jobs cloud-scheduler
-    # @dimensions resume-failure pause-failure recovery-guarantee
+    # @matrix cloud-scheduler deferred-jobs : pause-failure recovery-guarantee resume-failure
     def _sync_reconciler(self, *, required=False, force=False, control=None):
         """Converge recovery scheduling, optionally requiring success to start."""
         try:
@@ -164,14 +163,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
     # @tests tests_unit/test_023b_deferred_job_service.py::test_start_rejects_operation_id_reuse_for_different_request
     # @tests tests_unit/test_023b_deferred_job_service.py::test_start_retains_generic_intent_after_dispatch_failure
     # @tests tests_unit/test_023b_deferred_job_service.py::test_start_dispatch_marker_does_not_overwrite_a_fast_worker
-    # @pair deferred-jobs:transactional-start
-    # @pair deferred-jobs:start
-    # @pair deferred-jobs:operation-fingerprint
-    # @pair deferred-jobs:mismatch
-    # @pair deferred-jobs:transient-dispatch
-    # @pair deferred-jobs:dispatch-worker-race
-    # @pair deferred-jobs:compare-and-set
-    # @pair deferred-jobs:no-apply
+    # @matrix deferred-jobs : compare-and-set dispatch-worker-race mismatch no-apply operation-fingerprint start transactional-start transient-dispatch
     # @pair notifications:pending-state
     def start(self, spec):
         if not isinstance(spec, DeferredJobSpec):
@@ -434,8 +426,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
 
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_cancel_deletes_tasks_and_persists_a_tombstone
-    # @features deferred-jobs
-    # @dimensions cancellation deterministic-task-id
+    # @matrix deferred-jobs : cancellation deterministic-task-id
     def cancel(
         self,
         job,
@@ -536,8 +527,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
 
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_long_running_feedback_updates_pending_notification
-    # @features deferred-jobs notifications
-    # @dimensions long-running feedback terminal-safety
+    # @matrix deferred-jobs notifications : feedback long-running terminal-safety
     def feedback(self, job_key):
         """Publish a progress message when a job remains queued or running."""
         job = Entities.fetch_one(job_key, request=Fetch.direct())
@@ -562,8 +552,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_statuses_returns_only_jobs_visible_to_the_actor
     # @tests tests_unit/test_023b_deferred_job_service.py::test_statuses_rejects_more_than_fifty_jobs
-    # @features deferred-jobs
-    # @dimensions status owner batching progress timing
+    # @matrix deferred-jobs : batching owner progress status timing
     def statuses(self, job_keys, actor, *, now=None):
         """Project a bounded owner-safe status list for browser reconciliation."""
         actor_key = getattr(actor, "urlsafe_key", None)
@@ -596,8 +585,7 @@ class DeferredJobService(DeferredJobDispatch, DeferredJobRecovery, DeferredJobRu
 
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_delete_terminal_jobs_preserves_active_and_incomplete_delivery
-    # @pair deferred-jobs:retention
-    # @pair deferred-jobs:terminal-delivery
+    # @matrix deferred-jobs : retention terminal-delivery
     def delete_terminal(self, *, before=None, batch_size=500):
         """Delete retained terminal jobs without interrupting unfinished work."""
         before = _utc(before) if before is not None else None

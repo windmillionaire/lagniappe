@@ -43,8 +43,7 @@ export class FormSettings {
 	/**
 	 * @testable true
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_group
-	 * @features forms
-	 * @dimensions access-restrictions group-restricted
+	 * @matrix forms : access-restrictions group-restricted
 	 */
 	init() {
 		if (this._destroyed) return;
@@ -80,8 +79,7 @@ export class FormSettings {
 	/**
 	 * @testable true
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
-	 * @features forms
-	 * @dimensions access-restrictions owner-restricted
+	 * @matrix forms : access-restrictions owner-restricted
 	 */
 	_input(event) {
 		if (event.target.name === "description" && this.generateForm?.target) {
@@ -125,8 +123,7 @@ export class FormSettings {
 	 * @testable true
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
 	 * @scaffolding testing/resources/form.py::Builder.restrict_to_group
-	 * @features forms
-	 * @dimensions access-restrictions owner-restricted group-restricted
+	 * @matrix forms : access-restrictions group-restricted owner-restricted
 	 */
 	async _addRestriction(data) {
 		if (this._destroyed || !this.restrictions) return;
@@ -209,8 +206,7 @@ export class FormSettings {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_generation_failure_stays_visible_and_releases_submitter
-	 * @features forms ui-action
-	 * @dimensions schema-generation single-flight retryable-action persistent-error
+	 * @matrix forms ui-action : persistent-error retryable-action schema-generation single-flight
 	 */
 	_generateSchema(event) {
 		event.preventDefault();

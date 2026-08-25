@@ -7,7 +7,7 @@ from ..tools import database
 
 # @testable true
 # @tests tests_unit/test_027a_messaging_properties.py::test_messaging_entities_and_owner_toggles_are_fail_closed
-# @pairs mentions:idempotency mentions:entity-contract
+# @matrix mentions : entity-contract idempotency
 class MentionMarker(Entity):
     entity_kind = "mention_marker"
 

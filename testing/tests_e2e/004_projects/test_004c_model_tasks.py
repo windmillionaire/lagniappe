@@ -43,8 +43,7 @@ from testing.definitions import Forms, ModelTasks, SubmissionFields, Tasks, User
 from testing.elements import Buttons, FormSelect, Modal, SpinnerButtons
 
 
-# @features model-tasks
-# @dimensions info-form
+# @pair model-tasks:info-form
 def test_click_model_opens_info(get_user):
     user = get_user(Users.OWNER)
     model_task = ModelTasks.test_create_model_task.get(user)
@@ -61,8 +60,7 @@ def test_click_model_opens_info(get_user):
     expect(model_task.info_form).to_be_hidden()
 
 
-# @features model-tasks
-# @dimensions update name
+# @matrix model-tasks : name update
 def test_edit_model_task_name(get_user):
     user = get_user(Users.OWNER)
     model_task = ModelTasks.test_edit_model_task_name.get(user)
@@ -89,8 +87,7 @@ def test_edit_model_task_name(get_user):
     expect(title).to_contain_text(new_name)
 
 
-# @features model-tasks
-# @dimensions update form-change
+# @matrix model-tasks : form-change update
 def test_change_model_task_form(get_user):
     user = get_user(Users.OWNER)
 
@@ -115,8 +112,7 @@ def test_change_model_task_form(get_user):
     expect(form_button).to_contain_text(new_form.name)
 
 
-# @features model-tasks
-# @dimensions update form-clear
+# @matrix model-tasks : form-clear update
 def test_delete_model_task_form(get_user):
     user = get_user(Users.OWNER)
     model_task = ModelTasks.test_delete_model_task_form.get(user)
@@ -162,8 +158,7 @@ def _click_status_filter(model_task, label):
     return results
 
 
-# @features model-tasks
-# @dimensions status-filter completed
+# @matrix model-tasks : completed status-filter
 def test_completed_button(get_user):
     user = get_user(Users.OWNER)
     model_task, completed_task, in_progress_task = _status_filter_context(user)
@@ -176,8 +171,7 @@ def test_completed_button(get_user):
     ).not_to_be_visible()
 
 
-# @features model-tasks
-# @dimensions status-filter in-progress
+# @matrix model-tasks : in-progress status-filter
 def test_in_progress_button(get_user):
     user = get_user(Users.OWNER)
     model_task, completed_task, in_progress_task = _status_filter_context(user)
@@ -190,8 +184,7 @@ def test_in_progress_button(get_user):
     ).not_to_be_visible()
 
 
-# @features model-tasks
-# @dimensions delete
+# @pair model-tasks:delete
 def test_delete_model_task(get_user):
     user = get_user(Users.OWNER)
     model_task = ModelTasks.test_delete_model_task.get(user)

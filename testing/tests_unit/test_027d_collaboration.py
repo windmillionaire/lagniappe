@@ -16,13 +16,9 @@ from testing.utility.messaging_fakes import HashRedis, managed_user
 pytestmark = pytest.mark.unit
 
 
-# @pairs messaging:permission messaging:self-exclusion messaging:public-exclusion
-# @pairs messaging:owner-opt-in messaging:managed-user messaging:recipient-resolution
-# @pairs mentions:document-view mentions:permission task-assignment:permission
-# @source lagniappe/core/tools/collaboration.py::managed_user
-# @source lagniappe/core/tools/collaboration.py::can_initiate_messages
-# @source lagniappe/core/tools/collaboration.py::recipient_allowed
-# @source lagniappe/core/tools/collaboration.py::mention_recipient_allowed
+# @matrix mentions : document-view permission
+# @matrix messaging : managed-user owner-opt-in permission public-exclusion recipient-resolution self-exclusion
+# @pair task-assignment:permission
 def test_collaboration_permissions_use_current_recipient_and_document_access(
     monkeypatch,
 ):
@@ -76,12 +72,7 @@ def test_collaboration_permissions_use_current_recipient_and_document_access(
     )
     assert collaboration.resolve_user("user") is stored_user
     assert collaboration.resolve_user("page") is stored_user
-# @pairs owner-projection:normalization owner-projection:repair owner-projection:request-memo
-# @pairs owner-projection:fail-closed owner-projection:selector-shape owner-projection:revision
-# @source lagniappe/core/tools/cache/owner.py::normalize_owner_name
-# @source lagniappe/core/tools/cache/owner.py::update_owner_projection
-# @source lagniappe/core/tools/cache/owner.py::get_owner_projection
-# @source lagniappe/core/tools/cache/owner.py::owner_search_result
+# @matrix owner-projection : fail-closed normalization repair request-memo revision selector-shape
 def test_owner_projection_normalizes_and_round_trips(monkeypatch):
     redis = HashRedis()
     monkeypatch.setattr(owner.cache, "_redis", redis)
@@ -104,10 +95,9 @@ def test_owner_projection_normalizes_and_round_trips(monkeypatch):
     assert result["id"] == page_key.to_legacy_urlsafe().decode()
 
 
-# @pairs messaging:owner-search messaging:self-exclusion messaging:recipient-key
+# @matrix messaging : owner-search recipient-key self-exclusion
+# @matrix owner-projection : deduplication normalization
 # @pair mentions:recipient-search
-# @pairs owner-projection:normalization owner-projection:deduplication
-# @source lagniappe/core/tools/collaboration.py::collaboration_user_results
 def test_collaboration_search_excludes_self_owner_and_stale_rows(monkeypatch):
     class SearchPage:
         def __init__(self, identifier, user):

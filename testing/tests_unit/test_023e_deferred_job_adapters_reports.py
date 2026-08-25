@@ -19,8 +19,7 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 pytestmark = pytest.mark.unit
 
 
-# @features deferred-jobs
-# @dimensions service-tier quota retry
+# @matrix deferred-jobs : quota retry service-tier
 def test_organize_retry_uses_priority_for_every_generation_stage(monkeypatch):
     adapter = report_adapters.OrganizeReportAdapter()
     report = SimpleNamespace(summary=None)
@@ -126,8 +125,7 @@ def test_organize_prepare_stops_before_report_save_after_cancellation(monkeypatc
     assert saved == []
 
 
-# @pair deferred-jobs:report-execution
-# @pair deferred-jobs:cancellation
+# @matrix deferred-jobs : cancellation report-execution
 # @pair ai-report:deterministic-run
 def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
     adapter = report_adapters.ReportExecutionAdapter()
@@ -254,8 +252,7 @@ def test_report_execution_adapter_runs_the_reviewed_proposal(monkeypatch):
     assert saved
 
 
-# @pair deferred-jobs:report-execution
-# @pair ai-report:recovery
+# @pairs ai-report:recovery deferred-jobs:report-execution
 def test_report_execution_failure_preserves_a_retryable_ledger(monkeypatch):
     adapter = report_adapters.ReportExecutionAdapter()
 
@@ -316,9 +313,8 @@ def test_report_execution_failure_preserves_a_retryable_ledger(monkeypatch):
     assert report.result["failed_at"] == 2
 
 
+# @matrix ai-report : active-operation failure-isolation
 # @pair deferred-jobs:superseded
-# @pair ai-report:active-operation
-# @pair ai-report:failure-isolation
 def test_report_replacement_supersedes_old_job_and_ignores_old_failure(monkeypatch):
     adapter = report_adapters.OrganizeReportAdapter()
     events = []
@@ -380,10 +376,7 @@ def test_report_replacement_supersedes_old_job_and_ignores_old_failure(monkeypat
     ]
 
 
-# @pair ai-report:ask
-# @pair ai-report:revision
-# @pair ai-report:status
-# @pair ai-report:proposal-publication
+# @matrix ai-report : ask proposal-publication revision status
 # @pair deferred-jobs:checkpoint
 @pytest.mark.parametrize(
     ("parameters", "response", "expected_prompt", "expected_status"),
@@ -525,11 +518,8 @@ def test_ask_report_adapter_prepares_and_applies_checkpointed_response(
     assert saved == [(report, actor)]
 
 
+# @matrix ai-report : plan-resume proposal-publication status submission-completion
 # @pair deferred-jobs:checkpoint
-# @pair ai-report:plan-resume
-# @pair ai-report:submission-completion
-# @pair ai-report:status
-# @pair ai-report:proposal-publication
 def test_organize_resumes_plan_checkpoint_without_second_planning_call(monkeypatch):
     adapter = report_adapters.OrganizeReportAdapter()
     proposal = {"summary": "Planned", "actions": []}

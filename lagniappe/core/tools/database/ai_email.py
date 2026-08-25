@@ -15,8 +15,7 @@ AI_EMAIL_EVENT_PREFIX = "ai-email-event:"
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
-# @features ai-email webhook
-# @dimensions replay transaction lease privacy
+# @matrix ai-email webhook : lease privacy replay transaction
 @retry_aborted
 def claim_ai_email_event(digest, lease_token, now, *, lease_seconds=300):
     """Claim one HMAC-digested provider event without storing its raw ID."""
@@ -58,8 +57,7 @@ def claim_ai_email_event(digest, lease_token, now, *, lease_seconds=300):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
-# @features ai-email webhook
-# @dimensions replay terminal-compaction transaction
+# @matrix ai-email webhook : replay terminal-compaction transaction
 @retry_aborted
 def finish_ai_email_event(digest, lease_token, state, now):
     """Compact an owned event claim to a minimal permanent tombstone."""
@@ -87,8 +85,7 @@ def finish_ai_email_event(digest, lease_token, state, now):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_ai_email_event_claim_is_durable_and_replay_safe
-# @features ai-email webhook
-# @dimensions replay transient-release transaction
+# @matrix ai-email webhook : replay transaction transient-release
 @retry_aborted
 def release_ai_email_event(digest, lease_token, now):
     """Release an owned claim so a provider retry may resume it immediately."""

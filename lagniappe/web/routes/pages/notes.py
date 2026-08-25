@@ -13,8 +13,7 @@ from . import pages
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_notes_visibility_and_title_menu
-# @features notes pages
-# @dimensions attribute-gate
+# @matrix notes pages : attribute-gate
 def _notes_enabled(page):
     if not page.has("notes"):
         abort(404)
@@ -22,8 +21,7 @@ def _notes_enabled(page):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_notes_visibility_and_title_menu
-# @features notes pages permissions
-# @dimensions load shared private viewer owner
+# @matrix notes pages permissions : load owner private shared viewer
 @pages.route("<key>/notes", methods=["GET"])
 @permission(Resource.PAGE, Action.VIEW)
 def get_notes(key, **kwargs):
@@ -46,8 +44,7 @@ def get_notes(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_note_text_photo_and_delete_modal
-# @features notes pages
-# @dimensions create body photo visibility scope validation
+# @matrix notes pages : body create photo scope validation visibility
 @pages.route("<key>/notes", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def create_note(key, **kwargs):

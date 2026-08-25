@@ -30,9 +30,7 @@ MODEL_BUSY_MESSAGE = "The model is too busy right now. Try again later."
 # @testable true
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_retries_sdk_timeout
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_retries_sdk_5xx_and_persists_clean_terminal_message
-# @pair deferred-jobs:provider-timeout
-# @pair deferred-jobs:provider-errors
-# @pair deferred-jobs:retry
+# @matrix deferred-jobs : provider-errors provider-timeout retry
 def _retryable(error):
     transient = (
         DeferredJobDeadlineError,
@@ -82,8 +80,7 @@ def _retry_delays(error):
 
 # @testable true
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_waits_for_dependency_without_consuming_provider_retry
-# @features deferred-jobs
-# @dimensions dependency-wait provider-attempt-isolation
+# @matrix deferred-jobs : dependency-wait provider-attempt-isolation
 def _provider_retry_attempt(job):
     """Return the provider attempt number after excluding dependency-only runs."""
     parameters = getattr(job, "parameters", None) or {}
@@ -116,7 +113,7 @@ def _terminal_error(error, *, requires_ai=False):
 
 # @testable true
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_increases_later_quota_backoff_without_adding_attempts
-# @pairs deferred-jobs:quota deferred-jobs:backoff deferred-jobs:jitter
+# @matrix deferred-jobs : backoff jitter quota
 def _retry_delay(error, attempt):
     delays = _retry_delays(error)
     delay = delays[int(attempt) - 1]

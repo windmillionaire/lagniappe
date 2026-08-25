@@ -9,8 +9,7 @@ import {
 /**
  * @testable true
  * @tests tests_js/test_034_login_buttons.py::test_login_action_button_uses_fixed_icon_and_text_slots
- * @features login
- * @dimensions submit-button loading-state
+ * @matrix login : loading-state submit-button
  */
 const setLoginActionButton = (button, text, icon = null) => {
 	if (!button) return;
@@ -165,8 +164,7 @@ class LoginForms {
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_login_defaults_to_auth_method_form
  * @tests tests_e2e/001_site/test_001b_login.py::test_unregistered_google_error_returns_to_method_chooser
- * @features login
- * @dimensions auth-method google-oauth email-signin authorization-error
+ * @matrix login : auth-method authorization-error email-signin google-oauth
  */
 class AuthMethodForm extends LoginForms {
 	init() {
@@ -189,8 +187,8 @@ class AuthMethodForm extends LoginForms {
  * @tests tests_e2e/001_site/test_001b_login.py::test_unknown_email_transitions_to_sign_in_without_leaking_existence
  * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
  * @tests tests_e2e/001_site/test_001b_login.py::test_login_responsive_design
- * @features login
- * @dimensions email-check sign-in-transition account-enumeration responsive-layout
+ * @matrix login : account-enumeration email-check responsive-layout sign-in-transition
+ * @pair login:auth-method
  */
 class EmailCheckForm extends LoginForms {
 	init() {
@@ -216,8 +214,7 @@ class EmailCheckForm extends LoginForms {
 	 * @tests tests_e2e/001_site/test_001b_login.py::test_unknown_email_transitions_to_sign_in_without_leaking_existence
 	 * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
 	 * @tests tests_e2e/001_site/test_001b_login.py::test_email_input_validation
-	 * @features login
-	 * @dimensions email-check sign-in-transition account-enumeration email-validation
+	 * @matrix login : account-enumeration email-check email-validation sign-in-transition
 	 */
 	handleSignIn() {
 		const email = this.email.value.trim();
@@ -235,8 +232,7 @@ class EmailCheckForm extends LoginForms {
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_uninitialized_owner_starts_google_first_setup
  * @tests tests_js/test_034_login_buttons.py::test_owner_setup_supports_password_only_mode
- * @features login
- * @dimensions owner-bootstrap verify-email password-validation auth-errors disabled-provider
+ * @matrix login : auth-errors disabled-provider owner-bootstrap password-validation verify-email
  */
 class OwnerSetupForm extends LoginForms {
 	init() {
@@ -312,8 +308,7 @@ class OwnerSetupForm extends LoginForms {
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_first_time_setup_form_creates_password_and_can_return_to_email_check
  * @tests tests_e2e/001_site/test_001b_login.py::test_login_auth_error_messages_are_user_safe
- * @features login
- * @dimensions first-time-setup account-create form-state existing-account recovery
+ * @matrix login : account-create existing-account first-time-setup form-state recovery
  */
 class FirstTimeSetupForm extends LoginForms {
 	init() {
@@ -364,8 +359,7 @@ class FirstTimeSetupForm extends LoginForms {
  * @tests tests_e2e/001_site/test_001b_login.py::test_login_auth_error_messages_are_user_safe
  * @tests tests_e2e/001_site/test_001b_login.py::test_verification_delivery_failure_recovers_safely
  * @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
- * @features login
- * @dimensions sign-in-transition forgot-password existing-account recovery delivery-failure safe-error identity-platform hosted-e2e
+ * @matrix login : delivery-failure existing-account forgot-password hosted-e2e identity-platform recovery safe-error sign-in-transition
  */
 class SignInForm extends LoginForms {
 	init() {
@@ -432,8 +426,7 @@ class SignInForm extends LoginForms {
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_forgot_password_form_opens_from_sign_in
  * @tests tests_e2e/001_site/test_001b_login.py::test_password_reset_delivery_failure_recovers_safely
- * @features login
- * @dimensions forgot-password delivery-failure recovery safe-error
+ * @matrix login : delivery-failure forgot-password recovery safe-error
  */
 class ForgotPasswordForm extends LoginForms {
 	init() {
@@ -490,8 +483,7 @@ class ForgotPasswordForm extends LoginForms {
 /**
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_reset_password_mode
- * @features login
- * @dimensions reset-password query-mode action-code-validation expired-link
+ * @matrix login : action-code-validation expired-link query-mode reset-password
  */
 class ResetPasswordForm extends LoginForms {
 	init() {
@@ -564,8 +556,7 @@ class ResetPasswordForm extends LoginForms {
 /**
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_verify_email_mode
- * @features login
- * @dimensions verify-email query-mode
+ * @matrix login : query-mode verify-email
  */
 class VerifyEmailForm extends LoginForms {
 	init() {

@@ -61,7 +61,7 @@ STOPWORDS = frozenset(
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_search_prunes_stale_rows_without_entity_details
-# @pairs search:stale-row cache:self-repair
+# @pairs cache:self-repair search:stale-row
 def _current_search_results(results):
     """Hydrate results and remove projections whose entity details are gone."""
     hydrated = hydrate_search_results(results)
@@ -141,8 +141,7 @@ def _highlighted_html(text):
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_partial_match
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_special_characters
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_primary_name_matches_rank_above_file_name_and_description_matches
-# @features search
-# @dimensions term-normalization stopwords exact-match partial-match special-characters primary-name-ranking
+# @matrix search : exact-match partial-match primary-name-ranking special-characters stopwords term-normalization
 def _build_term_list(user_query, expanded=False):
     normalized = SUBSTITUTE.sub(" ", user_query)
     terms = [t for t in normalized.split() if len(t) > 1 and t.lower() not in STOPWORDS]
@@ -167,8 +166,7 @@ def _build_term_list(user_query, expanded=False):
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_search_permission_fragments_require_lists
-# @features search
-# @dimensions permissions validation
+# @matrix search : permissions validation
 def _add_required(required):
     if not isinstance(required, list):
         raise TypeError("Required must be a list of hashes")
@@ -179,8 +177,7 @@ def _add_required(required):
 
 # @testable true
 # @tests tests_unit/test_017_cache_query.py::test_search_permission_fragments_require_lists
-# @features search
-# @dimensions permissions validation
+# @matrix search : permissions validation
 def _add_restricted_to(restricted_to):
     if not isinstance(restricted_to, list):
         raise TypeError("Restricted to must be a list of hashes")
@@ -216,8 +213,7 @@ def _format_result(doc, snippets=False):
 # @tests tests_unit/test_017_cache_query.py::test_search_snippet_extracts_highlighted_text_and_form_values
 # @tests tests_unit/test_017_cache_query.py::test_search_snippet_skips_highlighted_value_without_matching_key
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_result_snippets
-# @features search
-# @dimensions snippets highlighted-text form-value pipe-escaping html-escaping malformed-cache
+# @matrix search : form-value highlighted-text html-escaping malformed-cache pipe-escaping snippets
 def _add_snippet(result, doc):
     if hasattr(doc, "desc"):
         if _split_first_highlight(doc.desc):
@@ -265,8 +261,7 @@ def _add_snippet(result, doc):
 
 # @testable true
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_task_facet_includes_task_and_model_results_with_links
-# @features search
-# @dimensions facet-filter task-model
+# @matrix search : facet-filter task-model
 def _expand_result_kinds(kinds):
     """Return cache kinds represented by the requested search facets."""
     expanded = []
@@ -322,8 +317,7 @@ def _add_models(results, project_hashes):
 
 # @testable infrastructure
 # @tests tests_unit/test_017_cache_query.py::test_search_queries_use_redis_cloud_compatible_tag_syntax
-# @features search
-# @dimensions redis-cloud tag-syntax permissions empty-access
+# @matrix search : empty-access permissions redis-cloud tag-syntax
 def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
     """Search cached entities filtered by kind and optional form type."""
     term_list = _build_term_list(query_string) if query_string else []
@@ -366,8 +360,7 @@ def kind_search(query_string, kind, restrictions, belongs_to, **kwargs):
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_returns_results
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_no_results
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_primary_name_matches_rank_above_file_name_and_description_matches
-# @features search
-# @dimensions results no-results redis-cloud tag-syntax permissions empty-access primary-name-ranking
+# @matrix search : empty-access no-results permissions primary-name-ranking redis-cloud results tag-syntax
 def search(user_query, required, belongs_to, kinds=None, page=1, limit=10):
     """Run a full-text search with highlighting, snippets, and pagination."""
     term_list = _build_term_list(user_query, expanded=True)

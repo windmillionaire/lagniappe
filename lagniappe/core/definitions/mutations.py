@@ -68,8 +68,7 @@ class DeletePolicy(Enum):
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
-# @features mutations
-# @dimensions contract serialization
+# @matrix mutations : contract serialization
 @dataclass(frozen=True)
 class RelationMutationContract:
     """Declared storage and lifecycle behavior for one entity relation."""
@@ -107,8 +106,7 @@ class RelationMutationContract:
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_mutation_contract_registry_covers_persisted_entities_and_relations
-# @features mutations
-# @dimensions contract completeness
+# @matrix mutations : completeness contract
 @dataclass(frozen=True)
 class EntityMutationContract:
     """Mutation inventory for one persisted entity kind."""
@@ -152,8 +150,7 @@ def _entity_kind(entity):
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
-# @features mutations
-# @dimensions plan serialization
+# @matrix mutations : plan serialization
 @dataclass(frozen=True)
 class MutationEffect:
     """Serializable description of one planned mutation effect."""
@@ -220,8 +217,8 @@ class MutationEffect:
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_entity_add_mutation_intents_requires_typed_intents_and_dedupes
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
-# @features entity
-# @dimensions typed-intent validation dedupe
+# @matrix entity : dedupe typed-intent validation
+# @pair mutations:save
 @dataclass(frozen=True)
 class MutationIntent:
     """Typed related or post-commit work awaiting a root mutation."""
@@ -308,8 +305,7 @@ class MutationIntent:
     @classmethod
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_scheduled_uncomplete_dispatch_is_planned_after_task_write
-    # @features mutations task-scheduling
-    # @dimensions durable-first post-commit
+    # @matrix mutations task-scheduling : durable-first post-commit
     def dispatch_scheduled_uncomplete(cls, entity, *, reason):
         """Dispatch one tokenized uncompletion only after ``entity`` commits."""
         return cls(
@@ -322,8 +318,7 @@ class MutationIntent:
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_plan_is_serializable_and_preserves_intents_until_commit
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_root_persists_full_exclusions_without_lifecycle_intents_or_cache
-# @features mutations
-# @dimensions plan serialization
+# @matrix mutations : plan serialization
 @dataclass
 class MutationPlan:
     """Executable entity mutation and its ordered public effect inventory."""
@@ -344,8 +339,7 @@ class MutationPlan:
 
 # @testable true
 # @tests tests_unit/test_022_mutation_contracts.py::test_save_executes_datastore_before_cache_and_reports_cache_failure
-# @features mutations
-# @dimensions post-commit-outcome cache-failure
+# @matrix mutations : cache-failure post-commit-outcome
 @dataclass
 class MutationOutcome:
     """Progress boundary returned after executing a mutation plan."""

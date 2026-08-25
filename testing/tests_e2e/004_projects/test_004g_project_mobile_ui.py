@@ -41,8 +41,7 @@ def test_project_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_user
     expect(user.locate(project.MOBILE_NAV)).to_be_hidden()
 
 
-# @features entity-layout
-# @dimensions project-mobile nav visibility
+# @matrix entity-layout : nav project-mobile visibility
 # @template projects/project.html::toggles
 def test_mobile_nav_visibility_changes_with_viewport(get_user):
     user = get_user(Users.OWNER)
@@ -65,8 +64,7 @@ def test_mobile_nav_visibility_changes_with_viewport(get_user):
     assert mobile_nav.get_section_title() == "Info"
 
 
-# @features entity-layout
-# @dimensions project-mobile flipper
+# @matrix entity-layout : flipper project-mobile
 def test_mobile_flipper_reveals_section_toggles(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
@@ -87,8 +85,7 @@ def test_mobile_flipper_reveals_section_toggles(get_user):
     assert mobile_nav.is_tab_slider_open() is False
 
 
-# @features entity-layout
-# @dimensions project-mobile section-switch
+# @matrix entity-layout : project-mobile section-switch
 def test_mobile_section_switching_updates_visible_cards_and_title(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
@@ -107,9 +104,8 @@ def test_mobile_section_switching_updates_visible_cards_and_title(get_user):
     assert mobile_nav.get_section_title() == "Task Filters"
 
 
-# @pairs projects:attribute-model-tasks entity-layout:dynamic-secondary
-# @pair entity-layout:project-mobile
-# @pair projects:mobile-model-tasks
+# @matrix entity-layout : dynamic-secondary project-mobile
+# @matrix projects : attribute-model-tasks mobile-model-tasks
 # @template projects/project.html::main
 def test_mobile_enabled_model_tasks_rejoins_section_switching(get_user):
     user = get_user(Users.OWNER)
@@ -135,8 +131,7 @@ def test_mobile_enabled_model_tasks_rejoins_section_switching(get_user):
     expect(model_tasks).to_be_hidden()
 
 
-# @features entity-layout
-# @dimensions project-mobile secondary-create
+# @matrix entity-layout : project-mobile secondary-create
 def test_mobile_create_model_form_opens_from_model_tasks_section(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
@@ -153,8 +148,7 @@ def test_mobile_create_model_form_opens_from_model_tasks_section(get_user):
     expect(create_form.locator(FormElements.NAME)).to_be_visible()
 
 
-# @features entity-layout
-# @dimensions project-mobile secondary-info
+# @matrix entity-layout : project-mobile secondary-info
 def test_mobile_model_task_info_still_opens_in_models_section(get_user):
     user = get_user(Users.OWNER)
     model_task = ModelTasks.test_create_model_task.get(user)
@@ -171,8 +165,7 @@ def test_mobile_model_task_info_still_opens_in_models_section(get_user):
     expect(model_task.info_form).to_be_hidden()
 
 
-# @features entity-layout
-# @dimensions project-mobile resize secondary-card
+# @matrix entity-layout : project-mobile resize secondary-card
 def test_resize_from_mobile_models_to_desktop_restores_dual_card_layout(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
@@ -190,8 +183,7 @@ def test_resize_from_mobile_models_to_desktop_restores_dual_card_layout(get_user
     expect(user.locate(Tabs.INFO_TAB)).to_be_visible()
 
 
-# @features entity-layout
-# @dimensions project-mobile resize persistence
+# @matrix entity-layout : persistence project-mobile resize
 def test_resize_from_mobile_filters_to_desktop_preserves_selected_tab(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
@@ -206,8 +198,7 @@ def test_resize_from_mobile_filters_to_desktop_preserves_selected_tab(get_user):
     expect(user.locate(project.FILTERS_TAB)).to_be_visible()
 
 
-# @features entity-layout
-# @dimensions project-mobile reload persistence
+# @matrix entity-layout : persistence project-mobile reload
 def test_mobile_selected_section_persists_after_reload(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)

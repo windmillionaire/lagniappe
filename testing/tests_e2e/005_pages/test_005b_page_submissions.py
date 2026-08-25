@@ -41,8 +41,8 @@ def _add_table_row(user, table, note):
     expect(form).not_to_be_attached()
 
 
-# @pairs template-formatting:date template-formatting:time
-# @pairs template-formatting:phone template-formatting:number pages:basic-inputs
+# @matrix template-formatting : date number phone time
+# @pair pages:basic-inputs
 def test_basic_input_submission(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_basic_input_submission.get(user)
@@ -53,8 +53,7 @@ def test_basic_input_submission(get_user):
     page.submit_and_verify_submission(submission)
 
 
-# @features pages
-# @dimensions submission selection-fields read-mode
+# @matrix pages : read-mode selection-fields submission
 def test_selection_submission(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_selection_submission.get(user)
@@ -78,7 +77,8 @@ def test_selection_submission(get_user):
             expect(read_value).to_contain_text(label)
 
 
-# @pairs pages:submission pages:link-field form-link:read-layout
+# @matrix pages : link-field submission
+# @pair form-link:read-layout
 # @style form.linkLabel
 def test_link_submission(get_user):
     user = get_user(Users.OWNER)
@@ -105,8 +105,7 @@ def test_link_submission(get_user):
     assert layout["lineHeight"] == pytest.approx(layout["iconHeight"])
 
 
-# @features form-table
-# @dimensions row-actions reorder edit delete reload
+# @matrix form-table : delete edit reload reorder row-actions
 def test_table_submission_row_actions(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_table_submission.get(user)
@@ -160,8 +159,7 @@ def test_table_submission_row_actions(get_user):
     expect(rows.first).to_contain_text("Row two edited")
 
 
-# @features form-table
-# @dimensions row-actions mobile touch-gesture
+# @matrix form-table : mobile row-actions touch-gesture
 def test_table_submission_mobile_row_action_gestures(get_user):
     user = get_user(Users.OWNER, has_touch=True)
     page = Pages.test_table_submission.get(user)

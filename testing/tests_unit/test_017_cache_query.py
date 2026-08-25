@@ -14,8 +14,7 @@ from lagniappe.core.tools.cache.keys import SEARCH_SCORE_FIELD, Keys, Search
 from lagniappe.core.tools.hosted_e2e import lease as e2e_lease
 
 
-# @features cache
-# @dimensions redis-connection redis-tls
+# @matrix cache : redis-connection redis-tls
 def test_runtime_redis_client_uses_shared_tls_options(monkeypatch):
     settings = SimpleNamespace(REDIS_TLS=True)
     calls = []
@@ -63,8 +62,7 @@ class _FakeDetailsCache:
         ]
 
 
-# @features search
-# @dimensions term-normalization stopwords exact-match partial-match special-characters
+# @matrix search : exact-match partial-match special-characters stopwords term-normalization
 @pytest.mark.unit
 def test_search_term_list_normalizes_stopwords_and_special_characters():
     assert query._build_term_list("The A+ R&D plan, in 2024!") == [
@@ -82,8 +80,7 @@ def test_search_term_list_normalizes_stopwords_and_special_characters():
     assert query._build_term_list("a an the x y") == []
 
 
-# @features search
-# @dimensions snippets highlighted-text form-value pipe-escaping html-escaping
+# @matrix search : form-value highlighted-text html-escaping pipe-escaping snippets
 @pytest.mark.unit
 def test_search_snippet_extracts_highlighted_text_and_form_values():
     result = {}
@@ -135,8 +132,7 @@ def test_search_snippet_extracts_highlighted_text_and_form_values():
     )
 
 
-# @features search
-# @dimensions snippets malformed-cache
+# @matrix search : malformed-cache snippets
 @pytest.mark.unit
 def test_search_snippet_skips_highlighted_value_without_matching_key():
     result = {}
@@ -152,8 +148,7 @@ def test_search_snippet_skips_highlighted_value_without_matching_key():
     assert "form_value" not in result
 
 
-# @features cache
-# @dimensions details parent-key redis-storage
+# @matrix cache : details parent-key redis-storage
 @pytest.mark.unit
 def test_redis_details_store_parent_key_not_parent_blob():
     entity = SimpleNamespace(
@@ -182,8 +177,7 @@ def test_redis_details_store_parent_key_not_parent_blob():
     }
 
 
-# @features cache
-# @dimensions search-ranking kind-score
+# @matrix cache : kind-score search-ranking
 @pytest.mark.unit
 def test_kind_search_score_prioritizes_high_level_entities():
     assert cache_add._kind_search_score("category") == "1.0"
@@ -195,8 +189,7 @@ def test_kind_search_score_prioritizes_high_level_entities():
     assert cache_add._kind_search_score("form") == "0.75"
 
 
-# @features cache
-# @dimensions details parent-key redis-storage
+# @matrix cache : details parent-key redis-storage
 @pytest.mark.unit
 def test_cache_update_writes_pointer_search_rows_and_parent_free_details(monkeypatch):
     hset_calls = []
@@ -273,7 +266,6 @@ def test_cache_update_writes_pointer_search_rows_and_parent_free_details(monkeyp
 
 
 # @pairs cache:delete search:user-projection
-# @source lagniappe/core/tools/cache/utility.py::delete
 def test_cache_delete_removes_page_and_user_search_projections(monkeypatch):
     deleted = []
 
@@ -317,8 +309,7 @@ def test_cache_delete_removes_page_and_user_search_projections(monkeypatch):
     }
 
 
-# @features cache
-# @dimensions details-hydration parent-key string-input missing-parent
+# @matrix cache : details-hydration missing-parent parent-key string-input
 @pytest.mark.unit
 def test_get_details_by_hash_hydrates_parent_and_hides_internal_keys(monkeypatch):
     fake_cache = _FakeDetailsCache(
@@ -372,8 +363,7 @@ def test_get_details_by_hash_hydrates_parent_and_hides_internal_keys(monkeypatch
     assert "parent_key" not in details["orphan-hash"]
 
 
-# @features search cache
-# @dimensions details-hydration parent-key snippets
+# @matrix cache search : details-hydration parent-key snippets
 @pytest.mark.unit
 def test_search_results_are_hydrated_from_details_hashes(monkeypatch):
     doc = SimpleNamespace(
@@ -424,8 +414,7 @@ def test_search_results_are_hydrated_from_details_hashes(monkeypatch):
     assert str(full_results[0]["text"]) == "Page description <b>needle</b>"
 
 
-# @pairs search:stale-row cache:self-repair
-# @source lagniappe/core/tools/cache/query.py::_current_search_results
+# @pairs cache:self-repair search:stale-row
 def test_search_prunes_stale_rows_without_entity_details(monkeypatch):
     deleted = []
     monkeypatch.setattr(
@@ -456,8 +445,7 @@ def test_search_prunes_stale_rows_without_entity_details(monkeypatch):
     assert deleted == [Search.user.value.format("deleted-user-page")]
 
 
-# @features search
-# @dimensions redis-cloud tag-syntax permissions empty-access
+# @matrix search : empty-access permissions redis-cloud tag-syntax
 @pytest.mark.unit
 def test_search_queries_use_redis_cloud_compatible_tag_syntax(monkeypatch):
     calls = []
@@ -508,8 +496,7 @@ def test_search_queries_use_redis_cloud_compatible_tag_syntax(monkeypatch):
     assert ":{}" not in calls[0]
 
 
-# @features search
-# @dimensions permissions validation
+# @matrix search : permissions validation
 @pytest.mark.unit
 def test_search_permission_fragments_require_lists():
     with pytest.raises(TypeError, match="Required must be a list"):
@@ -522,8 +509,7 @@ def test_search_permission_fragments_require_lists():
         query.search("Alpha", False, [])
 
 
-# @features cache
-# @dimensions index-schema redis-cloud tag-syntax empty-requires search-ranking
+# @matrix cache : empty-requires index-schema redis-cloud search-ranking tag-syntax
 @pytest.mark.unit
 def test_search_index_indexes_empty_requires_tags():
     captured = {}
@@ -562,8 +548,7 @@ def test_search_index_indexes_empty_requires_tags():
     assert SEARCH_SCORE_FIELD in captured["definition"].args
 
 
-# @features search
-# @dimensions redis-py redis-cloud parser
+# @matrix search : parser redis-cloud redis-py
 @pytest.mark.unit
 def test_cache_search_delegates_to_redisearch_client():
     captured = {}
@@ -589,15 +574,13 @@ def test_cache_search_delegates_to_redisearch_client():
     assert captured == {"index": cache.INDEX, "query": redis_query}
 
 
-# @features cache
-# @dimensions parent-index redis-cloud tag-syntax empty-parent-lookup
+# @matrix cache : empty-parent-lookup parent-index redis-cloud tag-syntax
 @pytest.mark.unit
 def test_json_parent_lookup_skips_empty_parent_query():
     assert CacheJSON().get_new_parents([]) == []
 
 
-# @features cache
-# @dimensions rebuild flush-db
+# @matrix cache : flush-db rebuild
 @pytest.mark.unit
 def test_delete_cache_flushes_db_and_recreates_indexes(monkeypatch):
     calls = []
@@ -630,8 +613,7 @@ def test_delete_cache_flushes_db_and_recreates_indexes(monkeypatch):
     ]
 
 
-# @features cache
-# @dimensions rebuild prefix-isolation
+# @matrix cache : prefix-isolation rebuild
 @pytest.mark.unit
 def test_delete_cache_clears_only_prefixed_keys_and_recreates_indexes(monkeypatch):
     calls = []
@@ -677,8 +659,7 @@ def test_delete_cache_clears_only_prefixed_keys_and_recreates_indexes(monkeypatc
     ]
 
 
-# @features cache
-# @dimensions cleanup missing-search-index
+# @matrix cache : cleanup missing-search-index
 @pytest.mark.unit
 def test_cleanup_test_data_ignores_redis_missing_search_index_errors(monkeypatch):
     missing_index_messages = (
@@ -721,8 +702,7 @@ def test_cleanup_test_data_ignores_redis_missing_search_index_errors(monkeypatch
         ]
 
 
-# @features cache
-# @dimensions cleanup redis-errors
+# @matrix cache : cleanup redis-errors
 @pytest.mark.unit
 def test_cleanup_test_data_reraises_unexpected_drop_index_errors(monkeypatch):
     class FakeCache:
@@ -765,8 +745,7 @@ class _LeaseRedis:
         return 1
 
 
-# @features hosted-e2e
-# @dimensions lease prefix-isolation
+# @matrix hosted-e2e : lease prefix-isolation
 def test_e2e_lease_key_is_outside_test_cleanup_prefix(monkeypatch):
     monkeypatch.setattr(
         e2e_lease,
@@ -780,8 +759,7 @@ def test_e2e_lease_key_is_outside_test_cleanup_prefix(monkeypatch):
     assert not key.startswith("test-")
 
 
-# @features hosted-e2e
-# @dimensions lease concurrency expiry ownership authentication replay heartbeat deployment-binding
+# @matrix hosted-e2e : authentication concurrency deployment-binding expiry heartbeat lease ownership replay
 def test_e2e_lease_acquire_heartbeat_and_owner_release(monkeypatch):
     monkeypatch.setattr(
         e2e_lease,

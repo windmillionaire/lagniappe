@@ -6,8 +6,7 @@ import { primitives } from "../../primitives";
 /**
  * @testable true
  * @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
- * @features editor
- * @dimensions history-pin current-content validation
+ * @matrix editor : current-content history-pin validation
  */
 class PinVersion {
 	constructor(toolbar) {

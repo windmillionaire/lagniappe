@@ -58,8 +58,7 @@ class TaskHistoryMutation(StandardMutation):
 class UserMutation(StandardMutation):
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_existing_user_save_does_not_implicitly_mutate_canonical_page
-    # @features mutations user
-    # @dimensions save canonical-page intent-isolation
+    # @matrix mutations user : canonical-page intent-isolation save
     def plan_save(self, entity, builder, *, reason, depends_on=()):
         # A newly assigned canonical page is an explicit STANDARD intent from
         # UserPage. Ordinary permission/profile saves do not mutate that page.
@@ -75,8 +74,7 @@ class UserMutation(StandardMutation):
 class FormMutation(StandardMutation):
     # @testable true
     # @tests tests_unit/test_004_form_properties.py::test_form_save_records_schema_history_on_version_change
-    # @features form
-    # @dimensions save schema-history relations
+    # @matrix form : relations save schema-history
     def plan_save(self, entity, builder, *, reason, depends_on=()):
         previous_version = entity.version
         entity.properties.version.update()
@@ -174,8 +172,7 @@ class NoteMutation(StandardMutation):
 class NotificationMutation(StandardMutation):
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_notification_save_updates_projection_without_touching_user
-    # @pairs notifications:personal-activity notifications:mutation notifications:cache-isolation
-    # @pair notifications:cache-failure-isolation
+    # @matrix notifications : cache-failure-isolation cache-isolation mutation personal-activity
     def plan_save(self, entity, builder, *, reason, depends_on=()):
         entity._notification_count_delta = (
             1
@@ -199,7 +196,7 @@ class NotificationMutation(StandardMutation):
 class JobMutation(StandardMutation):
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_job_save_updates_operation_projection_without_touching_relations
-    # @pairs deferred-jobs:redis-projection deferred-jobs:mutation deferred-jobs:cache-isolation
+    # @matrix deferred-jobs : cache-isolation mutation redis-projection
     def plan_save(self, entity, builder, *, reason, depends_on=()):
         super().plan_save(
             entity,

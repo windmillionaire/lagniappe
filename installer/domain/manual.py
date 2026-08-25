@@ -5,8 +5,7 @@ from installer import FORMATTER
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_domain_ownership_instructions_name_selected_gcloud_account
-# @features setup
-# @dimensions custom-domain ownership account-identity interactive-input
+# @matrix setup : account-identity custom-domain interactive-input ownership
 def confirm_domain_ownership(domain):
     """Explain Google ownership verification and require confirmation."""
     from config import SETTINGS
@@ -37,8 +36,7 @@ def confirm_domain_ownership(domain):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_custom_domain_supports_manual_dns
-# @features setup
-# @dimensions custom-domain provider-records manual-dns
+# @matrix setup : custom-domain manual-dns provider-records
 def print_manual_dns_instructions(domain, resource_records):
     """Print the exact records returned by App Engine."""
     f = FORMATTER.initialize()

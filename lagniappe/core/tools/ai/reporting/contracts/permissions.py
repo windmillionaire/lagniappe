@@ -5,8 +5,7 @@ from .actions import ACTION_ORDER
 
 # @testable true
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_report_prompts_filter_actions_by_user_permissions
-# @features ai-report
-# @dimensions action-capabilities permissions
+# @matrix ai-report : action-capabilities permissions
 def allowed_report_actions(user):
     """Return report action types this user may ask the runner to execute."""
     capabilities = user.properties.restrictions.ai_action_capabilities

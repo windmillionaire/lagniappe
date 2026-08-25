@@ -1,8 +1,7 @@
 """Node-backed checks for login action-button state."""
 
 
-# @features login
-# @dimensions submit-button loading-state
+# @matrix login : loading-state submit-button
 def test_login_action_button_uses_fixed_icon_and_text_slots(run_node):
     run_node(
         r"""
@@ -100,8 +99,7 @@ if (
     )
 
 
-# @features login
-# @dimensions owner-bootstrap disabled-provider
+# @matrix login : disabled-provider owner-bootstrap
 def test_owner_setup_supports_password_only_mode(run_node):
     run_node(
         r"""

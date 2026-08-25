@@ -260,7 +260,7 @@ def event_is_actionable(row):
 
 # @testable true
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_query_retains_recipient_and_bucket_scope
-# @pairs notification-email:digest-query notification-email:recipient-scope
+# @matrix notification-email : digest-query recipient-scope
 def digest_events(batch):
     return list(
         Query(KINDS.email_deliveries)

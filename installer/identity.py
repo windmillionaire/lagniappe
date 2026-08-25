@@ -33,8 +33,7 @@ IDENTITY_INITIALIZATION_DELAYS = (2, 4, 8, 15, 20, 30, 30)
 
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
-# @features setup
-# @dimensions identity-platform provider-state
+# @matrix setup : identity-platform provider-state
 def get_identity_platform_config(session, project_id, headers):
     """Read the live project-level Identity Platform configuration."""
     url = (
@@ -52,8 +51,7 @@ def get_identity_platform_config(session, project_id, headers):
 
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
-# @features setup
-# @dimensions identity-platform authorized-domain
+# @matrix setup : authorized-domain identity-platform
 def identity_platform_target(app_url):
     """Return the application domain and local email action-handler URL."""
     app_url = str(app_url or "").strip().rstrip("/")
@@ -92,8 +90,7 @@ def _core_matches(config, app_url):
 
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
-# @features setup
-# @dimensions identity-platform provider-state authorized-domain
+# @matrix setup : authorized-domain identity-platform provider-state
 def identity_platform_config_matches(config, app_url):
     """Return whether the live standalone provider matches Lagniappe's contract."""
     return _core_matches(config, app_url)
@@ -121,8 +118,7 @@ def _wait_for_config(session, project_id, headers, predicate):
 
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_verification_preserves_standalone_subtype
-# @features setup
-# @dimensions identity-platform provider-state auth-separation
+# @matrix setup : auth-separation identity-platform provider-state
 def _ensure_standalone_subtype(config, project_id):
     subtype = str((config or {}).get("subtype") or "").strip()
     if subtype != IDENTITY_PLATFORM_SUBTYPE:
@@ -138,8 +134,7 @@ def _ensure_standalone_subtype(config, project_id):
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_initialization_retries_api_activation
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_initialization_accepts_existing_provider
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_initialization_accepts_already_enabled_http_400
-# @features setup
-# @dimensions identity-platform provider-state authorized-domain provider-convergence retry diagnostics idempotency
+# @matrix setup : authorized-domain diagnostics idempotency identity-platform provider-convergence provider-state retry
 def reconcile_identity_platform(session, project_id, headers, app_url):
     """Initialize standalone Identity Platform and reconcile email authentication."""
     config = get_identity_platform_config(session, project_id, headers)
@@ -260,8 +255,7 @@ def _public_client_config(config, project_id):
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_is_idempotent_for_matching_provider_state
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_setup_finishes_spinner_before_reporting_error
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
-# @features setup
-# @dimensions identity-platform settings-save provider-state authorized-domain diagnostics spinner error-reporting
+# @matrix setup : authorized-domain diagnostics error-reporting identity-platform provider-state settings-save spinner
 def setup_identity_platform(app_url=None):
     """Set up standalone Identity Platform email/password authentication."""
     from config import SETTINGS
@@ -339,8 +333,7 @@ def google_provider_matches(config, client_id):
 
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_google_provider_reconciliation
-# @features setup
-# @dimensions identity-platform google-oauth provider-state secrets
+# @matrix setup : google-oauth identity-platform provider-state secrets
 def setup_google_provider(client_id, client_secret=None):
     """Configure the Google provider without persisting its OAuth secret."""
     from config import SETTINGS

@@ -33,7 +33,8 @@ from testing.elements import (
 from testing.utility import expect_successful_response
 
 
-# @pairs editor:url-safety link-preview:url-safety outbound-http:url-validation outbound-http:privacy
+# @matrix editor link-preview : url-safety
+# @matrix outbound-http : privacy url-validation
 def test_editor_preview_rejects_private_targets_without_disrupting_popover(
     get_user,
     browser_failures,
@@ -93,8 +94,7 @@ def test_editor_preview_rejects_private_targets_without_disrupting_popover(
         expect(popover).not_to_be_visible()
 
 
-# @features editor
-# @dimensions color reload
+# @matrix editor : color reload
 def test_color_picker(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -115,8 +115,7 @@ def test_color_picker(get_user):
     expect(editor.get_element("span[style*='color']")).to_contain_text(text)
 
 
-# @features editor
-# @dimensions font-family reload
+# @matrix editor : font-family reload
 def test_font_family(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -137,8 +136,7 @@ def test_font_family(get_user):
     expect(editor.get_element("span[style*='font-family']")).to_contain_text(text)
 
 
-# @features editor
-# @dimensions link reload external-link shortcut search unlink
+# @matrix editor : external-link link reload search shortcut unlink
 def test_external_link_persists_searches_and_unlinks(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -186,8 +184,7 @@ def test_external_link_persists_searches_and_unlinks(get_user):
     expect(editor.text_entry).to_contain_text(search_text)
 
 
-# @features editor
-# @dimensions link delimiter
+# @matrix editor : delimiter link
 def test_space_exits_link_at_document_end(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -210,8 +207,7 @@ def test_space_exits_link_at_document_end(get_user):
     expect(editor.text_entry).to_have_text(f"{link_text} outside")
 
 
-# @features editor
-# @dimensions link form-dismissal selection
+# @matrix editor : form-dismissal link selection
 def test_link_form_dismissal_preserves_selection_interactions(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -238,8 +234,7 @@ def test_link_form_dismissal_preserves_selection_interactions(get_user):
     expect(link_form.form).not_to_be_visible()
 
 
-# @features editor
-# @dimensions link reload internal-link click-navigation shortcut popover readonly paste unlink
+# @matrix editor : click-navigation internal-link link paste popover readonly reload shortcut unlink
 def test_internal_links_normalize_paste_and_popover_navigation(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -443,8 +438,7 @@ def test_links_colorize_properly(get_user):
     assert colors["external"] == colors["defaultExpected"]
 
 
-# @features editor
-# @dimensions youtube-embed
+# @pair editor:youtube-embed
 def test_add_youtube(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -461,8 +455,7 @@ def test_add_youtube(get_user):
     expect(player).to_be_attached()
 
 
-# @features editor
-# @dimensions image-generate-toggle
+# @pair editor:image-generate-toggle
 def test_add_image_generate_toggle(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)
@@ -480,8 +473,7 @@ def test_add_image_generate_toggle(get_user):
     expect(form.locator(EditorAddImage.PROMPT)).to_be_hidden()
 
 
-# @features editor
-# @dimensions image-upload image-selection
+# @matrix editor : image-selection image-upload
 def test_add_image(get_user):
     user = get_user(Users.OWNER)
     project = user.go(Projects.test_editor_forms)

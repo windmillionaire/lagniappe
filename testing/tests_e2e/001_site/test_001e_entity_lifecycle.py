@@ -141,8 +141,7 @@ def _assert_hash_cached(entity):
     assert details[entity.hash]["id"] == entity.urlsafe_key
 
 
-# @features entities
-# @dimensions save dependent-owner process-state cache database
+# @matrix entities : cache database dependent-owner process-state save
 def test_entity_save_persists_relations_process_payloads_and_cache():
     form = _create_form("save-form")
     category = _create_category("save-category", form=form)
@@ -181,8 +180,7 @@ def test_entity_save_persists_relations_process_payloads_and_cache():
     assert reloaded.submission[FIELD_ID] == "persisted submission"
 
 
-# @features entities
-# @dimensions delete cascade assets cache database
+# @matrix entities : assets cache cascade database delete
 def test_entity_delete_cascades_dependents_assets_and_cache():
     creator = _create_page("category-filter-creator", [])
     page_form = _create_form("category-page-form")
@@ -269,8 +267,7 @@ def test_entity_delete_cascades_dependents_assets_and_cache():
     assert {p.key for p in reloaded_file.pages} == {survivor_page.key}
 
 
-# @features entities
-# @dimensions delete cascade forms cache database
+# @matrix entities : cache cascade database delete forms
 def test_entity_delete_project_cascades_models_forms_filters_and_cache():
     creator = _create_page("project-filter-creator", [])
     model_only_project = Entities.PROJECT.create(

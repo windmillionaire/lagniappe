@@ -16,14 +16,8 @@ import { withTransition } from "../shared";
  * @tests tests_e2e/010_sync/test_010d_form_state_split.py::test_task_collection_refresh_preserves_active_form_for_revision_review
  * @tests tests_js/test_028_form_state_split.py::test_task_list_empty_marker_requires_closed_create_form_and_no_tasks
  * @tests tests_js/test_028_form_state_split.py::test_task_list_reconciliation_rejects_incomplete_structure
- * @features tasks
- * @dimensions readonly assignee permission-gates refresh update-state stale-widget create while-open list-state dedupe unsaved-marker active-form-preservation dirty-form-preservation initial-render
- * @pair tasks:active-form-preservation
- * @pair tasks:dirty-form-preservation
- * @pairs tasks:completed-only tasks:empty-state tasks:create-close
- * @pairs tasks:create tasks:refresh tasks:dedupe
- * @pair tasks:unsaved-marker
- * @pair tasks:detached-structure
+ * @matrix tasks : active-form-preservation completed-only create create-close dedupe detached-structure dirty-form-preservation empty-state refresh unsaved-marker
+ * @matrix tasks : initial-render permission-gates readonly
  */
 export class PageTaskList extends BaseList {
 	constructor(attributes) {
@@ -61,8 +55,7 @@ export class PageTaskList extends BaseList {
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_complete_page_task
 	 * @tests tests_js/test_028_form_state_split.py::test_task_completion_keeps_component_update_route_when_history_is_active
-	 * @features tasks
-	 * @dimensions complete active-widget route-override
+	 * @matrix tasks : active-widget complete route-override
 	 */
 	_click(e) {
 		const submitter = e.target.closest(
@@ -347,8 +340,7 @@ export class PageTaskList extends BaseList {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_task_update_preserves_open_widget_and_completed_readonly_state
-	 * @features tasks
-	 * @dimensions refresh update-state
+	 * @matrix tasks : refresh update-state
 	 */
 	async prepareRefresh(response) {
 		if (!this._queueRefresh(response)) return;
@@ -411,8 +403,7 @@ export class PageTaskList extends BaseList {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_028_form_state_split.py::test_task_list_refresh_preserves_rows_with_local_form_state
-	 * @pairs tasks:active-form-preservation tasks:dirty-form-preservation
-	 * @pair tasks:stale-widget
+	 * @matrix tasks : active-form-preservation dirty-form-preservation stale-widget
 	 */
 	_hasPendingLocalFormState(component, replacement = null) {
 		return Object.values(component?.widgets ?? {}).some((widget) => {

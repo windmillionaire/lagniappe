@@ -42,8 +42,7 @@ class EntityRegistry:
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_reuses_cached_attached_relations
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_preserves_explicit_root_over_shallow_attached_copy
-    # @features entities relations
-    # @dimensions load attached-cache no-extra-read
+    # @matrix entities relations : attached-cache load no-extra-read
     def _load(self, *identifiers, related=True, _fetch=None, _fetch_stage=None):
         """Batch-load typed entities and attach resolved relationships."""
         if not identifiers:
@@ -135,11 +134,8 @@ class EntityRegistry:
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_batches_unresolved_roots_once
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_deduplicates_mixed_roots_and_skips_missing
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_reuses_attached_direct_relations
-    # @pair entities:explicit-fetch-depth
-    # @pair entities:batch
-    # @pair relations:root
-    # @pair relations:direct
-    # @pair relations:nested
+    # @matrix entities : batch explicit-fetch-depth
+    # @matrix relations : direct nested root
     def fetch(self, *identifiers, request):
         """Load roots and expand only to the requested total relationship depth."""
         if not isinstance(request, Fetch):
@@ -166,8 +162,7 @@ class EntityRegistry:
 
     # @testable true
     # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_fetch_one_returns_entity_or_none
-    # @pair entities:explicit-fetch-depth
-    # @pair relations:root
+    # @pairs entities:explicit-fetch-depth relations:root
     def fetch_one(self, identifier, *, request):
         fetched = self.fetch(identifier, request=request)
         return fetched[0] if fetched else None
@@ -175,8 +170,7 @@ class EntityRegistry:
     # @testable true
     # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
     # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_project_cascades_models_forms_filters_and_cache
-    # @features entities
-    # @dimensions delete cascade assets cache database forms
+    # @matrix entities : assets cache cascade database delete forms
     def delete(self, *entities, preserve_user_pages=False):
         return execute_mutation(
             plan_delete(
@@ -188,8 +182,7 @@ class EntityRegistry:
 
     # @testable true
     # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_save_persists_relations_process_payloads_and_cache
-    # @features entities
-    # @dimensions save dependent-owner process-state cache database
+    # @matrix entities : cache database dependent-owner process-state save
     def save(self, *entities):
         return execute_mutation(
             plan_mutation(MutationOperation.SAVE, *entities, registry=self)
@@ -197,20 +190,14 @@ class EntityRegistry:
 
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_save_root_persists_full_exclusions_without_lifecycle_intents_or_cache
-    # @pair mutations:root-save
-    # @pair mutations:exclusions
-    # @pair mutations:direct-save
-    # @pair mutations:lifecycle-isolation
-    # @pair mutations:intent-isolation
-    # @pair mutations:cache-isolation
+    # @matrix mutations : cache-isolation direct-save exclusions intent-isolation lifecycle-isolation root-save
     def save_root(self, entity, *, property_mask=None):
         """Persist one root, optionally updating only selected properties."""
         return execute_mutation(plan_root(entity, property_mask=property_mask))
 
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_touch_uses_masked_root_save_and_only_updates_modified
-    # @features mutations
-    # @dimensions touch root-save modified exclusions property-mask
+    # @matrix mutations : exclusions modified property-mask root-save touch
     def touch(self, *entities):
         entities = tuple(entity for entity in entities if hasattr(entity, "db"))
         return execute_mutation(
@@ -223,8 +210,7 @@ class EntityRegistry:
 
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_document_checkpoint_masks_parent_state_and_optionally_advances_lists
-    # @features mutations sync
-    # @dimensions document checkpoint property-mask history parent-fingerprint
+    # @matrix mutations sync : checkpoint document history parent-fingerprint property-mask
     def save_document_checkpoint(self, entity, *, advance_parent=False):
         """Persist a document checkpoint without rewriting sibling state."""
         return execute_mutation(
@@ -237,8 +223,7 @@ class EntityRegistry:
 
     # @testable true
     # @tests tests_unit/test_022_mutation_contracts.py::test_document_parent_touch_only_advances_parent_and_list_fingerprints
-    # @features mutations sync
-    # @dimensions document parent-fingerprint property-mask list-owner
+    # @matrix mutations sync : document list-owner parent-fingerprint property-mask
     def advance_document_parent(self, entity):
         """Advance document ownership metadata through masked writes."""
         return execute_mutation(
@@ -250,7 +235,6 @@ Entities = EntityRegistry()
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_entities_initialized
-# @features entities
-# @dimensions initialization
+# @pair entities:initialization
 def initialize():
     Entities.initialize()

@@ -92,10 +92,7 @@ EXCLUDE_FROM_INDEXES = (
 
 # @testable true
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
-# @pair observability:job-type
-# @pair observability:attempt
-# @pair observability:contract-version
-# @pair observability:no-job-key
+# @matrix observability : attempt contract-version job-type no-job-key
 @dataclass(frozen=True)
 class AIExecutionContext:
     """Allowlisted deferred-job metadata available during one preparation pass."""
@@ -151,9 +148,8 @@ def current_execution_control():
 # @testable true
 # @tests tests_unit/test_015c_ai_observability.py::test_summary_persistence_uses_uuid_key_and_bounded_pruning
 # @tests tests_unit/test_015c_ai_observability.py::test_generation_summary_aggregates_visible_calls_and_redacts_payload
+# @matrix datastore : index-exclusions uuid-key
 # @pair observability:privacy
-# @pair datastore:uuid-key
-# @pair datastore:index-exclusions
 @dataclass
 class GenerationSummaryV1:
     """Exact allowlist for the version-1 persisted summary contract."""
@@ -228,7 +224,7 @@ def diagnostic_record(record):
 
 # @testable true
 # @tests tests_unit/test_015c_ai_observability.py::test_operation_diagnostic_payload_is_correlated_and_privacy_bounded
-# @pairs ai-observability:job-correlation ai-observability:privacy
+# @matrix ai-observability : job-correlation privacy
 def operation_diagnostic_payload(operation, records, *, query_limit=QUERY_LIMIT):
     """Build a transferable, privacy-bounded job/provider snapshot."""
     telemetry_id = operation.get("telemetry_id")
@@ -339,25 +335,7 @@ def _error_category(error):
 # @tests tests_unit/test_015c_ai_observability.py::test_nested_model_repair_gets_its_own_summary
 # @tests tests_unit/test_015c_ai_observability.py::test_observability_failures_never_change_generation_result_or_error
 # @tests tests_unit/test_015c_ai_observability.py::test_deferred_generation_overwrites_correlated_live_snapshots
-# @pair observability:privacy
-# @pair observability:provider-calls
-# @pair observability:tools
-# @pair observability:tokens
-# @pair observability:validation
-# @pair observability:cache
-# @pair observability:deferred-context
-# @pair observability:empty-response
-# @pair observability:quota
-# @pair observability:error-normalization
-# @pair observability:nested-generation
-# @pair observability:correlation
-# @pair observability:review-fallback
-# @pair observability:disabled
-# @pair observability:persistence-failure
-# @pair observability:pruning-failure
-# @pair observability:exception-transparency
-# @pair observability:in-flight
-# @pair observability:provider-stage
+# @matrix observability : cache correlation deferred-context disabled empty-response error-normalization exception-transparency in-flight nested-generation persistence-failure privacy provider-calls provider-stage pruning-failure quota review-fallback tokens tools validation
 class GenerationObserver:
     """Mutable in-memory reducer for one public ``generate_content`` call."""
 
@@ -606,8 +584,7 @@ def current_observer():
 
 # @testable true
 # @tests tests_unit/test_015c_ai_observability.py::test_nested_model_repair_gets_its_own_summary
-# @pair observability:model-repair
-# @pair observability:review-fallback
+# @matrix observability : model-repair review-fallback
 def mark_outcome(value):
     observer = current_observer()
     if observer is not None:
@@ -616,8 +593,7 @@ def mark_outcome(value):
 
 # @testable true
 # @tests tests_unit/test_015c_ai_observability.py::test_summary_persistence_uses_uuid_key_and_bounded_pruning
-# @pair datastore:uuid-key
-# @pair datastore:index-exclusions
+# @matrix datastore : index-exclusions uuid-key
 def _write_summary(summary):
     return analytics_database.create_ai_observability(
         summary.correlation_id,
@@ -640,10 +616,8 @@ def prune_old_records(*, now=None, limit=PRUNE_LIMIT):
 
 # @testable true
 # @tests tests_unit/test_015c_ai_observability.py::test_ai_observability_dashboard_aggregation
+# @matrix analytics : groups outcomes query-limit
 # @pair observability:aggregation
-# @pair analytics:groups
-# @pair analytics:outcomes
-# @pair analytics:query-limit
 def aggregate_records(records, *, query_limit=QUERY_LIMIT):
     """Build the owner dashboard view model from already-windowed summaries."""
     records = list(records)

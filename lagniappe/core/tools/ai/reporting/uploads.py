@@ -24,8 +24,7 @@ DIRECT_UPLOAD_RECORD_KEYS = (
 
 # @testable true
 # @tests tests_unit/test_020c_ai_report_uploads.py::test_prepare_report_upload_manifest_normalizes_browser_records
-# @features ai-report direct-upload
-# @dimensions upload-manifest validation normalization
+# @matrix ai-report direct-upload : normalization upload-manifest validation
 def prepare_report_upload_manifest(records, input_name="tool-files"):
     """Return bounded signed-upload metadata safe to persist on a report."""
     manifest = []
@@ -89,8 +88,7 @@ def prepare_report_upload_manifest(records, input_name="tool-files"):
 # @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_resumes_and_checkpoints
 # @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_retains_source_until_checkpoint
 # @tests tests_unit/test_020c_ai_report_uploads.py::test_finalize_report_upload_manifest_accepts_actual_oversized_object
-# @features ai-report direct-upload
-# @dimensions upload-manifest background-finalization resume progress checkpoint-failure large-file active-request
+# @matrix ai-report direct-upload : active-request background-finalization checkpoint-failure large-file progress resume upload-manifest
 def finalize_report_upload_manifest(
     report,
     user,
@@ -172,8 +170,7 @@ def finalize_report_upload_manifest(
 
 # @testable true
 # @tests tests_unit/test_020c_ai_report_uploads.py::test_cleanup_report_upload_manifest_deletes_only_pending_uploads
-# @features ai-report direct-upload
-# @dimensions upload-manifest cleanup partial-progress
+# @matrix ai-report direct-upload : cleanup partial-progress upload-manifest
 def cleanup_report_upload_manifest(report, delete_upload=None):
     """Delete temporary objects that were not finalized into File entities."""
     delete_upload = delete_upload or storage_assets.delete_direct_upload

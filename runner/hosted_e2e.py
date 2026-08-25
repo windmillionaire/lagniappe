@@ -160,8 +160,7 @@ def _json_result(result, label):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_provider_describe_distinguishes_absence_from_operational_errors
-# @features hosted-e2e
-# @dimensions provider-errors deletion-safety
+# @matrix hosted-e2e : deletion-safety provider-errors
 def _describe(arguments):
     result = _gcloud(*arguments, "--format=json", check=False)
     if result.returncode != 0:
@@ -193,8 +192,7 @@ def _project_number(project):
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_cloud_build_identity_waits_for_first_setup_propagation
 # @tests tests_tooling/test_009_hosted_e2e.py::test_cloud_build_identity_rejects_legacy_cloud_build_account
-# @features hosted-e2e
-# @dimensions first-setup api-propagation build-identity
+# @matrix hosted-e2e : api-propagation build-identity first-setup
 def _cloud_build_service_account(infrastructure):
     """Return the build identity after bounded first-enable propagation."""
     expected_account = (
@@ -275,8 +273,7 @@ def _load_json(path: Path):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_e2e_requires_a_clean_committed_source
-# @features hosted-e2e
-# @dimensions lifecycle source-integrity generated-assets
+# @matrix hosted-e2e : generated-assets lifecycle source-integrity
 def require_clean_source(repo_root=APP_DIR):
     """Return HEAD when authored and runtime source exactly match the commit."""
     status = run_command(
@@ -314,8 +311,7 @@ def require_clean_source(repo_root=APP_DIR):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_e2e_requires_a_committed_production_build
-# @features hosted-e2e traceability
-# @dimensions source-integrity build-metadata shared-build
+# @matrix hosted-e2e traceability : build-metadata shared-build source-integrity
 def _require_committed_production_build(
     source,
     *,
@@ -350,8 +346,7 @@ def _require_committed_production_build(
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_create_preflight_runs_before_provider_activation
-# @features hosted-e2e traceability release
-# @dimensions source-quality provider-mutation release-base
+# @matrix hosted-e2e release traceability : provider-mutation release-base source-quality
 def _resolve_create_preflight_base(requested=None):
     """Resolve the release base to one exact commit for the create preflight."""
     candidates = [requested] if requested else ["origin/main", "main"]
@@ -370,8 +365,7 @@ def _resolve_create_preflight_base(requested=None):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_create_preflight_runs_before_provider_activation
-# @features hosted-e2e traceability release
-# @dimensions source-quality provider-mutation release-base
+# @matrix hosted-e2e release traceability : provider-mutation release-base source-quality
 def _run_create_preflight(source, *, base_ref=None):
     """Validate the HEAD candidate before hosted create can touch the provider."""
     if not NPM_CLI:
@@ -431,8 +425,7 @@ def _run_create_preflight(source, *, base_ref=None):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_committed_source_export_ignores_generated_worktree_churn
-# @features hosted-e2e
-# @dimensions source-integrity generated-assets deployment-source
+# @matrix hosted-e2e : deployment-source generated-assets source-integrity
 @contextmanager
 def _committed_source_tree(source, *, repo_root=APP_DIR):
     """Yield a temporary source tree exported from one exact Git commit."""
@@ -606,8 +599,7 @@ def _ensure_artifact_bucket(infrastructure):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_ci_invoker_can_only_read_the_result_bucket
-# @features hosted-e2e
-# @dimensions identity least-privilege artifact-download
+# @matrix hosted-e2e : artifact-download identity least-privilege
 def _grant_ci_result_access(infrastructure, invoker_member):
     """Let the CI invoker read only the dedicated hosted-result bucket."""
     _gcloud(
@@ -623,8 +615,7 @@ def _grant_ci_result_access(infrastructure, invoker_member):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_anchor_redeploys_only_when_its_contract_is_stale
-# @features hosted-e2e
-# @dimensions anchor reconciliation soft-routing deletion-safety
+# @matrix hosted-e2e : anchor deletion-safety reconciliation soft-routing
 def _ensure_anchor(infrastructure):
     existing = _describe(
         [
@@ -773,8 +764,7 @@ def _ensure_workload_identity(infrastructure, github_repository):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_runtime_identity_roles_include_deployer_signing
-# @features hosted-e2e
-# @dimensions identity runtime-impersonation
+# @matrix hosted-e2e : identity runtime-impersonation
 def _grant_runtime_identity_roles(infrastructure, runtime_member, deployer_member):
     """Grant only the runtime impersonation roles required by hosted tests."""
     for role in (
@@ -967,8 +957,7 @@ def _version_url(infrastructure, version):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_soft_routing_guard_preflight_requires_marker
-# @features hosted-e2e
-# @dimensions soft-routing deletion-safety production-preflight
+# @matrix hosted-e2e : deletion-safety production-preflight soft-routing
 def _verify_soft_routing_guard(infrastructure):
     """Prove deleted E2E hostnames cannot soft-route into production."""
     import requests
@@ -997,8 +986,7 @@ def _verify_soft_routing_guard(infrastructure):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_descriptor_preserves_native_static_handlers
-# @features hosted-e2e
-# @dimensions authentication static-assets performance zero-traffic deployment-binding deterministic-topology
+# @matrix hosted-e2e : authentication deployment-binding deterministic-topology performance static-assets zero-traffic
 def _hosted_app_descriptor(
     infrastructure,
     *,
@@ -1095,8 +1083,7 @@ def _change_test_bucket_cors(infrastructure, origin, *, present):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_runner_image_uses_the_exported_commit
-# @features hosted-e2e
-# @dimensions image-boundary deployment-source
+# @matrix hosted-e2e : deployment-source image-boundary
 def _build_runner_image(infrastructure, source, source_root):
     """Start a resumable image build from the exported committed tree."""
     container_root = Path(source_root) / CONTAINER_RELATIVE_ROOT
@@ -1130,8 +1117,7 @@ def _build_runner_image(infrastructure, source, source_root):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_runner_image_build_waits_for_recorded_cloud_build
-# @features hosted-e2e
-# @dimensions build-resume provider-status failure-recovery
+# @matrix hosted-e2e : build-resume failure-recovery provider-status
 def _wait_runner_image_build(
     infrastructure,
     cloud_build_id,
@@ -1242,8 +1228,7 @@ def _wait_hosted_health(state, *, attempts=60):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_settings_and_redis_ca_use_separate_secret_versions
-# @features hosted-e2e
-# @dimensions secrets redis-tls image-boundary
+# @matrix hosted-e2e : image-boundary redis-tls secrets
 def _sync_settings_secret(infrastructure):
     redis_ca_path = None
     if SETTINGS.APP.get("REDIS_TLS"):
@@ -1280,8 +1265,7 @@ def _sync_settings_secret(infrastructure):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_job_grants_only_job_scoped_ci_permissions
-# @features hosted-e2e
-# @dimensions identity least-privilege invocation-overrides
+# @matrix hosted-e2e : identity invocation-overrides least-privilege
 def _update_job(infrastructure, state):
     environment = {
         "FLASK_ENV": "testing",
@@ -1380,8 +1364,7 @@ def _update_job(infrastructure, state):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_create_resumes_only_the_same_committed_lifecycle
-# @features hosted-e2e
-# @dimensions lifecycle resume source-integrity failure-recovery
+# @matrix hosted-e2e : failure-recovery lifecycle resume source-integrity
 def _resumable_create_state(
     previous,
     infrastructure,
@@ -1437,8 +1420,7 @@ def _resumable_create_state(
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_app_resume_requires_exact_deployment_metadata
-# @features hosted-e2e
-# @dimensions lifecycle resume deployment-source failure-recovery
+# @matrix hosted-e2e : deployment-source failure-recovery lifecycle resume
 def _hosted_app_version_present(infrastructure, state):
     """Report whether the state-owned version already has exact metadata."""
     existing = _describe(
@@ -1637,8 +1619,7 @@ def _state_ready(infrastructure):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_recovers_failed_execution_name_from_gcloud_stderr
-# @features hosted-e2e
-# @dimensions execution-name failure-recovery
+# @matrix hosted-e2e : execution-name failure-recovery
 def _execution_name(payload, *output):
     metadata = payload.get("metadata") if isinstance(payload, dict) else None
     name = metadata.get("name") if isinstance(metadata, dict) else None
@@ -1662,8 +1643,7 @@ def _execution_name(payload, *output):
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execution_wait_reports_progress_and_failure
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execution_wait_recognizes_success
-# @features hosted-e2e
-# @dimensions execution-status progress failure-reporting success
+# @matrix hosted-e2e : execution-status failure-reporting progress success
 def _wait_for_execution(
     infrastructure,
     execution,
@@ -1792,8 +1772,8 @@ def _wait_for_execution(
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_summary_reports_unique_junit_failures
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_command_defaults_to_all_and_imports
-# @features hosted-e2e
-# @dimensions result-summary junit duration artifact-location
+# @matrix hosted-e2e : artifact-location duration junit result-summary
+# @pair hosted-e2e:suite-scope
 def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
     """Format an operator-facing summary for one hosted execution result."""
     execution = str(payload.get("execution") or "unknown")
@@ -1932,8 +1912,7 @@ def format_execute_summary(payload, *, imported=True, state_root=STATE_ROOT):
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_dispatches_validated_focused_targets
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
-# @features hosted-e2e
-# @dimensions focused-execution cloud-run override local-dispatch target-validation argument-injection
+# @matrix hosted-e2e : argument-injection cloud-run focused-execution local-dispatch override target-validation
 def execute(*, suite="all", targets=(), import_results=True, progress=True):
     """Execute the shared Cloud Run job and normally import its evidence."""
     from testing.utility.hosted_e2e_job import validate_focused_targets
@@ -2026,8 +2005,7 @@ def _latest_execution(infrastructure):
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_remote_evidence_merges_tests_and_snapshot_provenance
-# @features hosted-e2e traceability
-# @dimensions evidence merge provenance
+# @matrix hosted-e2e traceability : evidence merge provenance
 def merge_remote_evidence(local, remote):
     """Merge a hosted pytest manifest into the normal latest evidence file."""
     from testing.utility.traceability_common import (
@@ -2084,8 +2062,7 @@ def merge_remote_evidence(local, remote):
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_result_directory_import_requires_the_exact_source
 # @tests tests_tooling/test_009_hosted_e2e.py::test_traceability_common_import_does_not_require_playwright
-# @features hosted-e2e traceability
-# @dimensions evidence merge provenance source-integrity ci-import
+# @matrix hosted-e2e traceability : ci-import evidence merge provenance source-integrity
 def import_result_directory(directory, *, expected_execution=None):
     """Validate and merge an already-downloaded hosted result directory."""
     from testing.utility.traceability_common import (
@@ -2130,9 +2107,8 @@ def import_result_directory(directory, *, expected_execution=None):
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_release_evidence_validation_requires_exact_candidate_parent_and_snapshot
 # @tests tests_tooling/test_009_hosted_e2e.py::test_release_evidence_validation_rejects_failed_or_focused_results
-# @pairs hosted-e2e:source-integrity hosted-e2e:branch-movement
-# @pairs hosted-e2e:failure-retention hosted-e2e:suite-scope
-# @pairs hosted-e2e:target-validation traceability:evidence release:continuation
+# @matrix hosted-e2e : branch-movement failure-retention source-integrity suite-scope target-validation
+# @pairs release:continuation traceability:evidence
 def validate_release_evidence(
     candidate,
     evidence,
@@ -2246,8 +2222,7 @@ def validate_release_evidence(
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_results_can_skip_large_report_archive
-# @features hosted-e2e traceability
-# @dimensions artifact-download selective-download progress
+# @matrix hosted-e2e traceability : artifact-download progress selective-download
 def results(
     *,
     execution=None,
@@ -2377,8 +2352,7 @@ def _clear_local_result_artifacts():
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_teardown_removes_downloaded_results_after_success
-# @features hosted-e2e
-# @dimensions teardown local-artifacts evidence-retention deletion-safety
+# @matrix hosted-e2e : deletion-safety evidence-retention local-artifacts teardown
 def teardown(*, force=False):
     """Delete ephemeral resources and downloaded artifacts for the lifecycle."""
     (APP_DIR / ".hosted-e2e-app.yaml").unlink(missing_ok=True)
@@ -2523,8 +2497,7 @@ def status():
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_command_defaults_to_all_and_imports
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_create_command_routes_preflight_base
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_release_evidence_command_routes_validation
-# @features hosted-e2e
-# @dimensions cli-routing suite-scope evidence-import
+# @matrix hosted-e2e : cli-routing evidence-import suite-scope
 def run_hosted_e2e_command(arguments):
     parser = argparse.ArgumentParser(
         prog="run.py hosted-e2e",

@@ -69,8 +69,7 @@ def _signed_headers(raw_body, *, event_id="event-1", timestamp=1_700_000_000):
     }
 
 
-# @features ai-email webhook
-# @dimensions webhook signature raw-body timestamp rotation
+# @matrix ai-email webhook : raw-body rotation signature timestamp webhook
 def test_svix_signature_verification_uses_raw_body_timestamp_and_any_v1_signature():
     raw_body = b'{"type":"email.received","data":{"email_id":"one"}}'
     assert (
@@ -84,8 +83,7 @@ def test_svix_signature_verification_uses_raw_body_timestamp_and_any_v1_signatur
     )
 
 
-# @features ai-email webhook
-# @dimensions webhook signature invalid stale raw-body timestamp rotation
+# @matrix ai-email webhook : invalid raw-body rotation signature stale timestamp webhook
 def test_svix_signature_verification_rejects_invalid_or_stale_requests():
     raw_body = b"{}"
     headers = _signed_headers(raw_body)
@@ -105,8 +103,7 @@ def test_svix_signature_verification_rejects_invalid_or_stale_requests():
         )
 
 
-# @features ai-email webhook
-# @dimensions webhook event-shape json malformed
+# @matrix ai-email webhook : event-shape json malformed webhook
 def test_parse_resend_event_rejects_malformed_shapes():
     assert parse_resend_event(b'{"type":"email.received","data":{}}') == {
         "type": "email.received",
@@ -128,8 +125,7 @@ class _HTTPResponse:
         return self.payload
 
 
-# @features ai-email provider-adapter
-# @dimensions provider-adapter authorization retrieval attachments outbound-email idempotency
+# @matrix ai-email provider-adapter : attachments authorization idempotency outbound-email provider-adapter retrieval
 def test_resend_runtime_client_retrieves_with_full_key_and_sends_with_scoped_key():
     calls = []
 
@@ -156,8 +152,7 @@ def test_resend_runtime_client_retrieves_with_full_key_and_sends_with_scoped_key
     assert calls[3][2]["headers"]["Idempotency-Key"] == "feedback/one"
 
 
-# @features ai-email provider-adapter attachments
-# @dimensions provider-adapter signed-url bounded-stream size
+# @matrix ai-email attachments provider-adapter : bounded-stream provider-adapter signed-url size
 def test_resend_attachment_download_is_bounded_and_does_not_return_signed_url():
     closed = []
 
@@ -201,8 +196,7 @@ def test_resend_attachment_download_is_bounded_and_does_not_return_signed_url():
     assert closed == [True, True]
 
 
-# @features ai-email sender-auth
-# @dimensions sender-auth authentication-results dmarc alignment telemetry
+# @matrix ai-email sender-auth : alignment authentication-results dmarc sender-auth telemetry
 def test_authentication_results_candidates_require_aligned_dmarc_pass():
     assert authentication_results_candidates(
         {
@@ -227,8 +221,7 @@ def test_authentication_results_candidates_require_aligned_dmarc_pass():
     )
 
 
-# @features ai-email sender-auth
-# @dimensions sender-auth folding comments multiple-results telemetry
+# @matrix ai-email sender-auth : comments folding multiple-results sender-auth telemetry
 def test_authentication_results_candidates_handle_folding_comments_and_multiple_values():
     headers = {
         "Authentication-Results": [
@@ -244,8 +237,7 @@ def test_authentication_results_candidates_handle_folding_comments_and_multiple_
     )
 
 
-# @features ai-email normalization
-# @dimensions sender exact-local routing reply-marker html-fallback attachments
+# @matrix ai-email normalization : attachments exact-local html-fallback reply-marker routing sender
 def test_inbound_message_normalization_routes_alias_and_strips_reply_marker():
     message, tool = normalize_resend_message(
         {
@@ -296,8 +288,7 @@ def test_inbound_message_normalization_routes_alias_and_strips_reply_marker():
             parse_mailbox(malformed)
 
 
-# @features ai-email
-# @dimensions attachments content-disposition content-id inline
+# @matrix ai-email : attachments content-disposition content-id inline
 def test_inbound_attachment_disposition_overrides_content_id():
     attachment = InboundAttachment(
         "attachment-1",
@@ -325,8 +316,7 @@ def test_inbound_attachment_disposition_overrides_content_id():
     ).inline
 
 
-# @features ai-email
-# @dimensions attachments inline image-only signature quoted-content routing
+# @matrix ai-email : attachments image-only inline quoted-content routing signature
 def test_inline_attachment_selection_keeps_user_content_and_filters_signature_art(
     monkeypatch,
 ):
@@ -426,8 +416,7 @@ def test_inline_attachment_selection_keeps_user_content_and_filters_signature_ar
     assert [attachment.id for attachment in attachments] == ["photo-only"]
 
 
-# @features ai-email ai-report
-# @dimensions origin legacy-default inbound-manifest privacy
+# @matrix ai-email ai-report : inbound-manifest legacy-default origin privacy
 def test_email_report_shape_preserves_safe_inbound_display_fields():
     user = TestEntities.get("USER", {"name": "Owner", "owner": False})
     report = TestEntities.get(
@@ -456,8 +445,7 @@ def test_email_report_shape_preserves_safe_inbound_display_fields():
     assert legacy.origin == "web"
 
 
-# @features ai-email
-# @dimensions routing utility-model structured-output attachments privacy generation validation
+# @matrix ai-email : attachments generation privacy routing structured-output utility-model validation
 def test_ai_email_router_uses_utility_model_and_safe_metadata(monkeypatch):
     prompts = []
 
@@ -503,8 +491,7 @@ def test_ai_email_router_uses_utility_model_and_safe_metadata(monkeypatch):
     assert "download_url" not in built
 
 
-# @features ai-email
-# @dimensions routing validation attachment-contract
+# @matrix ai-email : attachment-contract routing validation
 def test_ai_email_router_normalizes_attachment_create_to_organize():
     assert ai_tools.validate_ai_email_route(
         {
@@ -521,8 +508,7 @@ def test_ai_email_router_normalizes_attachment_create_to_organize():
     }
 
 
-# @features ai-email
-# @dimensions routing inline attachment-only deterministic
+# @matrix ai-email : attachment-only deterministic inline routing
 def test_ai_email_router_routes_attachment_only_message_to_organize(monkeypatch):
     monkeypatch.setattr(
         ai_tools.ai_model,
@@ -552,8 +538,7 @@ def test_ai_email_router_routes_attachment_only_message_to_organize(monkeypatch)
     }
 
 
-# @features ai-email files
-# @dimensions temporary-view-ownership
+# @matrix ai-email files : temporary-view-ownership
 def test_email_report_file_is_viewable_only_by_submitter_or_owner():
     submitter = TestEntities.get(
         "USER", {"name": "Submitter", "email": "submitter@example.com", "owner": False}
@@ -567,8 +552,7 @@ def test_email_report_file_is_viewable_only_by_submitter_or_owner():
     assert not file.allowed(Action.VIEW, user=stranger)
 
 
-# @features ai-email
-# @dimensions acceptance terminal-link reply-to idempotency disabled-completion
+# @matrix ai-email : acceptance disabled-completion idempotency reply-to terminal-link
 def test_report_feedback_links_to_report_and_remains_available_after_disable(
     monkeypatch,
 ):
@@ -614,8 +598,7 @@ def test_report_feedback_links_to_report_and_remains_available_after_disable(
     assert idempotency_key.startswith("ai-email/success/")
 
 
-# @source lagniappe/core/tools/deferred_jobs/adapters/base.py::DeferredJobAdapter.external_delivery_required
-# @pairs ai-email:generic-delivery ai-email:terminal-delivery
+# @matrix ai-email : generic-delivery terminal-delivery
 def test_report_terminal_feedback_uses_generic_notification_delivery():
     from lagniappe.core.tools.deferred_jobs.adapters.reports import ReportAdapter
 
@@ -642,8 +625,7 @@ def test_report_terminal_feedback_uses_generic_notification_delivery():
     assert not adapter.external_delivery_required(context(browser_report, {}))
 
 
-# @features ai-email webhook
-# @dimensions replay transient-release transaction lease privacy terminal-compaction
+# @matrix ai-email webhook : lease privacy replay terminal-compaction transaction transient-release
 def test_ai_email_event_claim_is_durable_and_replay_safe(monkeypatch):
     from lagniappe.core.tools.database import ai_email as email_database
 
@@ -712,8 +694,7 @@ class _InboundClient:
         return []
 
 
-# @features ai-email webhook
-# @dimensions replay sender exact-match user-policy report-handoff
+# @matrix ai-email webhook : exact-match replay report-handoff sender user-policy
 def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch):
     from lagniappe.core.entities import Entities
     from lagniappe.core.tools import database
@@ -767,8 +748,7 @@ def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch)
     assert states == ["accepted"]
 
 
-# @features ai-email
-# @dimensions report-handoff routing idempotency privacy
+# @matrix ai-email : idempotency privacy report-handoff routing
 def test_create_shared_address_email_report_preserves_routing_input(monkeypatch):
     from lagniappe.core.entities import Entities
     from lagniappe.core.tools import database
@@ -829,8 +809,7 @@ def test_create_shared_address_email_report_preserves_routing_input(monkeypatch)
     assert starts[0].parameters["attachments"] == [attachment.job_record()]
 
 
-# @features ai-email deferred-jobs
-# @dimensions report-handoff idempotency acceptance
+# @matrix ai-email deferred-jobs : acceptance idempotency report-handoff
 def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatch):
     from lagniappe import CONFIG
     from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
@@ -894,8 +873,7 @@ def test_email_ingest_adapter_starts_existing_report_job_idempotently(monkeypatc
     assert feedback == [(report, "acceptance")]
 
 
-# @features ai-email deferred-jobs
-# @dimensions routing utility-model idempotency permissions
+# @matrix ai-email deferred-jobs : idempotency permissions routing utility-model
 def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
     from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
 
@@ -965,8 +943,7 @@ def test_email_ingest_adapter_routes_shared_address_once(monkeypatch):
     assert len(saved) == 2
 
 
-# @features ai-email deferred-jobs feedback
-# @dimensions failure diagnostics privacy terminal-delivery
+# @matrix ai-email deferred-jobs feedback : diagnostics failure privacy terminal-delivery
 def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
     from lagniappe.core.tools.deferred_jobs.adapters import email as email_adapters
 
@@ -1031,8 +1008,7 @@ def test_email_ingest_failure_surfaces_bounded_diagnostic(monkeypatch):
     assert context.parameters == {"_diagnostic_message": expected}
 
 
-# @features ai-email
-# @dimensions access attachment-contract body-contract rate-limit
+# @matrix ai-email : access attachment-contract body-contract rate-limit
 def test_submission_contract_keeps_create_and_organize_report_only(monkeypatch):
     monkeypatch.setattr(
         "lagniappe.core.tools.cache.rate_limit.check_limit",

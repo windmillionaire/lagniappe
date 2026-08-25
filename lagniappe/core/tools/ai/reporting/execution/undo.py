@@ -15,8 +15,7 @@ from .ledger import REPORT_LEDGER_VERSION
 # @tests tests_unit/test_020h_ai_report_execution.py::test_undo_report_compensates_completed_prefix_of_failed_report
 # @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_renames_entity_without_submission_and_undoes
-# @features ai-report
-# @dimensions deterministic-run undo delete-links report-files page-form idempotent idempotency compensation failed-prefix recovery completed-task reuse created-entities file-links rename
+# @matrix ai-report : compensation completed-task created-entities delete-links deterministic-run failed-prefix file-links idempotency idempotent page-form recovery rename report-files reuse undo
 def undo_report(report, user):
     """Compensate a complete report or the completed prefix of a failed report."""
     result = report.result if isinstance(report.result, dict) else {}

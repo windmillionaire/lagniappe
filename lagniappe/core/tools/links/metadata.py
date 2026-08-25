@@ -77,7 +77,8 @@ def _broken_link_label(url: str) -> str:
 
 # @testable true
 # @tests tests_unit/test_032_outbound_http.py::test_link_metadata_uses_typed_fetch_and_resolves_relative_images
-# @pairs link:metadata bookmark:metadata link:relative-image link:fallback outbound-http:privacy
+# @matrix link : fallback metadata relative-image
+# @pairs bookmark:metadata outbound-http:privacy
 def get_link_attributes(url):
     """Fetch page metadata (title, description, image) from a URL via meta tags.
 

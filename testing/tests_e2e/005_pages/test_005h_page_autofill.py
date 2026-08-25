@@ -31,14 +31,10 @@ def _attach_evidence(page):
     return file
 
 
-# @pairs ai:autofill ai:deferred ai:attached-files ai:completion-refresh
-# @pairs pages:autofill pages:deferred
-# @pairs notifications:autofill notifications:deferred
-# @pairs deferred-jobs:form-lock deferred-jobs:conflict deferred-jobs:reload
-# @pairs deferred-jobs:refresh deferred-jobs:form-schema
-# @pairs deferred-jobs:process-route deferred-jobs:cloud-tasks deferred-jobs:oidc
-# @pairs deferred-jobs:provider-delivery deferred-jobs:hosted-e2e
-# @pairs pages:refresh pages:form-schema
+# @matrix ai : attached-files autofill completion-refresh deferred
+# @matrix deferred-jobs : cloud-tasks conflict form-lock form-schema hosted-e2e oidc process-route provider-delivery refresh reload
+# @matrix notifications : autofill deferred
+# @matrix pages : autofill deferred form-schema refresh
 # @template pages/info.html::info_form
 @pytest.mark.ai
 def test_page_autofill_runs_deferred_with_attached_file_context(

@@ -22,8 +22,7 @@ class RecoverySnapshotUnavailable(RuntimeError):
 # @testable true
 # @tests tests_unit/test_026_site_admin.py::test_recovery_snapshot_merges_live_settings
 # @tests tests_unit/test_026_site_admin.py::test_recovery_snapshot_failures_use_safe_public_messages
-# @features admin
-# @dimensions recovery-export failure-isolation live-settings
+# @matrix admin : failure-isolation live-settings recovery-export
 def load_recovery_snapshot(persisted):
     """Return a canonical snapshot or a safe typed failure."""
     try:

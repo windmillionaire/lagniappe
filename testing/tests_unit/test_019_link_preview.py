@@ -26,8 +26,7 @@ def _project(allowed=True):
     return project
 
 
-# @features editor link-preview
-# @dimensions internal metadata permissions
+# @matrix editor link-preview : internal metadata permissions
 def test_internal_preview_returns_allowed_entity_metadata(monkeypatch):
     entity = _entity()
     monkeypatch.setattr(
@@ -52,8 +51,7 @@ def test_internal_preview_returns_allowed_entity_metadata(monkeypatch):
     }
 
 
-# @features editor link-preview
-# @dimensions internal metadata permissions
+# @matrix editor link-preview : internal metadata permissions
 def test_internal_status_preview_uses_project_permission(monkeypatch):
     project = _project()
     monkeypatch.setattr(
@@ -84,8 +82,7 @@ def test_internal_status_preview_uses_project_permission(monkeypatch):
     }
 
 
-# @features editor link-preview
-# @dimensions internal permissions
+# @matrix editor link-preview : internal permissions
 def test_internal_preview_hides_missing_or_forbidden_entities(monkeypatch):
     monkeypatch.setattr(link_preview.Entities, "fetch_one", lambda key, request: None)
 
@@ -111,8 +108,7 @@ def test_internal_preview_hides_missing_or_forbidden_entities(monkeypatch):
     assert denied["description"] == "You do not have access to preview this link."
 
 
-# @features editor link-preview
-# @dimensions external metadata
+# @matrix editor link-preview : external metadata
 def test_external_preview_maps_metadata_and_falls_back(monkeypatch):
     monkeypatch.setattr(
         link_preview,
@@ -143,8 +139,7 @@ def test_external_preview_maps_metadata_and_falls_back(monkeypatch):
     assert fallback["description"] is None
 
 
-# @features editor link-preview
-# @dimensions external url-safety
+# @matrix editor link-preview : external url-safety
 def test_external_preview_rejects_unsafe_urls(monkeypatch):
     for url in [
         "javascript:alert(1)",

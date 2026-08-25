@@ -21,8 +21,7 @@ from lagniappe.core.entities import category as category_module
 from testing.utility.test_entities import TestEntities, TestUser as UtilityTestUser
 
 
-# @features category
-# @dimensions attributes defaults
+# @matrix category : attributes defaults
 @pytest.mark.unit
 def test_category_attributes(get_test_entities):
     """Test Attributes property for Category entities.
@@ -44,8 +43,7 @@ def test_category_attributes(get_test_entities):
                 assert category.has(attr) is True
 
 
-# @features category filters page
-# @dimensions conditions entity-fields filter-value
+# @matrix category filters page : conditions entity-fields filter-value
 @pytest.mark.unit
 def test_category_filters(get_test_entities, get_schema):
     """Test CategoryFilters conditions and page filter index values.
@@ -129,8 +127,7 @@ def test_category_filters(get_test_entities, get_schema):
                         )
 
 
-# @features category form-schema
-# @dimensions schema delegation
+# @matrix category form-schema : delegation schema
 @pytest.mark.unit
 def test_category_schema(get_test_entities, get_schema):
     """Category.schema mirrors attached form.schema when a form exists; else None."""
@@ -142,8 +139,7 @@ def test_category_schema(get_test_entities, get_schema):
             assert category.schema is None
 
 
-# @features category permissions form
-# @dimensions restricted-access attached-form cache
+# @matrix category form permissions : attached-form cache restricted-access
 @pytest.mark.unit
 def test_category_restricted_to_follows_attached_form():
     viewer = UtilityTestUser(
@@ -170,8 +166,7 @@ def test_category_restricted_to_follows_attached_form():
     assert category.to_cache["restricted_to"] == "secret_group,owner"
 
 
-# @features category pages
-# @dimensions default-category get-create
+# @matrix category pages : default-category get-create
 @pytest.mark.unit
 def test_uncategorized_pages_get_create():
     existing = datastore.Entity(
@@ -210,8 +205,7 @@ def test_uncategorized_pages_get_create():
     created.save.assert_called_once_with()
 
 
-# @features category filters form
-# @dimensions entity-fields related-forms
+# @matrix category filters form : entity-fields related-forms
 @pytest.mark.unit
 def test_category_filters_related_forms(get_test_entities, get_schema):
     """entity_fields adds RelatedForm rows for primary form plus forms from ``forms``."""
@@ -236,8 +230,7 @@ def test_category_filters_related_forms(get_test_entities, get_schema):
     assert len(category.filters.conditions) == 7 + 2
 
 
-# @features category filters permissions
-# @dimensions conditions entity-fields view-access
+# @matrix category filters permissions : conditions entity-fields view-access
 @pytest.mark.unit
 def test_category_filter_conditions_include_only_viewable_forms():
     category = Category(testing=True)
@@ -271,8 +264,7 @@ def test_category_filter_conditions_include_only_viewable_forms():
     assert hidden.hash not in entity_hashes
 
 
-# @features category form
-# @dimensions related-forms add duplicate-primary relation-registration
+# @matrix category form : add duplicate-primary related-forms relation-registration
 @pytest.mark.unit
 def test_related_forms_add_skips_primary_form_and_registers_relation():
     category = TestEntities.get(
@@ -306,8 +298,7 @@ def test_related_forms_add_skips_primary_form_and_registers_relation():
     assert category.mutation_intents[0].entity is related
 
 
-# @features category form
-# @dimensions related-forms validation
+# @matrix category form : related-forms validation
 @pytest.mark.unit
 def test_related_forms_add_rejects_value_without_key():
     category = TestEntities.get(

@@ -18,8 +18,7 @@ REDIS_CLOUD_CONSOLE_URL = "https://cloud.redis.io/"
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_connection_uses_shared_tls_settings_and_exits_on_failure
-# @features setup
-# @dimensions redis-connection redis-tls
+# @matrix setup : redis-connection redis-tls
 def test_redis_connection(settings=None, *, exit_on_failure=True):
     """Test Redis connection."""
     from config import SETTINGS
@@ -113,8 +112,7 @@ def eviction_policy_instructions():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cloud_instructions_open_console_and_locate_credentials
-# @features setup
-# @dimensions redis browser operator-guidance
+# @matrix setup : browser operator-guidance redis
 def redis_cloud_instructions():
     """Open Redis Cloud and explain how to copy its Redis CLI command."""
     f = FORMATTER.initialize()
@@ -167,8 +165,7 @@ def redis_cloud_instructions():
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_parser_extracts_connection_details
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_parser_rejects_invalid_commands
-# @features setup
-# @dimensions redis credential-parsing validation
+# @matrix setup : credential-parsing redis validation
 def _parse_redis_cli_command(value):
     """Extract host, port, and password from pasted Redis connection input."""
     try:
@@ -245,8 +242,7 @@ def _parse_redis_cli_command(value):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_parser_rejects_invalid_commands
-# @features setup
-# @dimensions redis credential-parsing validation
+# @matrix setup : credential-parsing redis validation
 def _is_redis_cli_command(value):
     try:
         _parse_redis_cli_command(value)
@@ -257,8 +253,7 @@ def _is_redis_cli_command(value):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cli_command_uses_visible_standard_input
-# @features setup
-# @dimensions redis interactive-input cancellation credential-parsing
+# @matrix setup : cancellation credential-parsing interactive-input redis
 @validate_input(
     "Paste copied Redis CLI command",
     validation_fn=_is_redis_cli_command,
@@ -285,8 +280,7 @@ def _managed_redis_ca_path():
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_tls_enablement_uses_managed_ca
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_tls_enablement_requires_managed_ca
-# @features setup
-# @dimensions redis-tls settings-save certificate-validation failure-isolation missing-file operator-guidance
+# @matrix setup : certificate-validation failure-isolation missing-file operator-guidance redis-tls settings-save
 def _enable_redis_tls():
     """Guide the operator through verified server-side Redis TLS enablement."""
     from config import SETTINGS, constants
@@ -397,8 +391,7 @@ def _enable_redis_tls():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_tls_disablement_is_transactional
-# @features setup
-# @dimensions redis-tls rollback settings-save failure-isolation
+# @matrix setup : failure-isolation redis-tls rollback settings-save
 def _disable_redis_tls():
     """Guide the operator through a tested Redis TLS rollback."""
     from config import SETTINGS
@@ -461,8 +454,7 @@ def _disable_redis_tls():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
-# @features setup
-# @dimensions redis-tls optional settings-save
+# @matrix setup : optional redis-tls settings-save
 def _offer_redis_tls_for_fresh_install():
     """Offer Redis TLS while the initial Redis connection is being configured."""
     f = FORMATTER.initialize()
@@ -491,8 +483,7 @@ def _offer_redis_tls_for_fresh_install():
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_settings_mutation_flows
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_redis_clears_failed_credentials_and_retries
-# @features setup
-# @dimensions redis settings-save retry rollback failure-isolation
+# @matrix setup : failure-isolation redis retry rollback settings-save
 def setup_redis():
     """Configure Redis connection details."""
     from config import SETTINGS

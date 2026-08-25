@@ -20,8 +20,7 @@ from .form_table import Table
 
 # @testable true
 # @tests tests_unit/test_004_form_properties.py::test_form_type
-# @features form-type
-# @dimensions property, column, details, cache
+# @matrix form-type : cache column details property
 class FormType(AIMixin, ColumnMixin, DetailsMixin, CacheMixin, DBProperty):
     """Form type classification (e.g. "page", "task").
 
@@ -67,8 +66,7 @@ class FormFilters(Filters):
 
     # @testable true
     # @tests tests_unit/test_004_form_properties.py::test_form_filters
-    # @features form, filters
-    # @dimensions schema-fields
+    # @matrix filters form : schema-fields
     @property
     def fields(self):
         return {
@@ -87,8 +85,7 @@ class FormFilters(Filters):
 
     # @testable true
     # @tests tests_unit/test_004_form_properties.py::test_form_filters
-    # @features form, filters
-    # @dimensions conditions, schema-fields, exclude-table-fields
+    # @matrix filters form : conditions exclude-table-fields schema-fields
     @property
     def conditions(self):
         if getattr(self, "_conditions", None):
@@ -100,8 +97,7 @@ class FormFilters(Filters):
 
 # @testable true
 # @tests tests_unit/test_004_form_properties.py::test_schema_version_update_changes_when_schema_changes
-# @features form
-# @dimensions schema-version, update
+# @matrix form : schema-version update
 class SchemaVersion(DBProperty):
     _id = "version"
 

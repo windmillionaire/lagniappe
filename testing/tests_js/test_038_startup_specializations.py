@@ -1,8 +1,7 @@
 """Node-backed checks for startup-sensitive view specialization."""
 
 
-# @pair startup:mobile-only-dropdown
-# @pair manual:responsive-navigation
+# @pairs manual:responsive-navigation startup:mobile-only-dropdown
 def test_manual_dropdown_loads_only_in_mobile_mode(run_node):
     run_node(
         r'''
@@ -80,7 +79,7 @@ const createRoot = () => {
     )
 
 
-# @pairs manual:command-copy manual:clipboard-fallback
+# @matrix manual : clipboard-fallback command-copy
 def test_manual_copy_command_falls_back_when_clipboard_is_unavailable(run_node):
     run_node(
         r'''
@@ -160,9 +159,7 @@ manual.copyResetTimers = new Map();
     )
 
 
-# @pair table-controls:eager-column-state
-# @pair table-controls:lazy-checkbox-panel
-# @pair table-controls:persistence
+# @matrix table-controls : eager-column-state lazy-checkbox-panel persistence
 def test_column_visibility_state_applies_before_lazy_panel(run_node):
     run_node(
         r'''
@@ -246,8 +243,7 @@ if (!styles[0].removed || toggleListener) {
     )
 
 
-# @pair pages:photo-lazy-activation
-# @pair pages:photo-visible-startup
+# @matrix pages : photo-lazy-activation photo-visible-startup
 def test_page_photo_initializes_only_when_selected_or_visible(run_node):
     run_node(
         r'''
@@ -321,8 +317,7 @@ const createPage = ({ active = null, visible = false } = {}) => {
     )
 
 
-# @pair ai-report:lazy-form-runtime
-# @pair ai-report:concurrent-form-init
+# @matrix ai-report : concurrent-form-init lazy-form-runtime
 def test_report_loads_base_form_only_for_present_forms_and_in_parallel(run_node):
     run_node(
         r'''

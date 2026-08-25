@@ -349,10 +349,8 @@ def _acknowledge_user_cache_invalidation(user, destination=None):
     return response
 
 
-# @pairs user-settings:personal-page user-settings:readonly-email
-# @pairs user-settings:sign-out user-settings:group-selector-hidden
-# @pair user-settings:field-order
-# @pairs notification-email:user-setting notification-email:default-daily
+# @matrix notification-email : default-daily user-setting
+# @matrix user-settings : field-order group-selector-hidden personal-page readonly-email sign-out
 # @template pages/info.html::user_settings
 def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
     owner = get_user(Users.OWNER)
@@ -427,9 +425,7 @@ def test_user_settings_panel_opens_from_my_page(get_user, browser_failures):
     )
 
 
-# @pairs user-settings:owner-own-page user-settings:readonly-email
-# @pairs user-settings:sign-out user-settings:group-selector-hidden
-# @pair user-settings:field-order
+# @matrix user-settings : field-order group-selector-hidden owner-own-page readonly-email sign-out
 # @pair notification-email:default-daily
 # @template pages/info.html::user_settings
 def test_owner_settings_hides_group_selector_on_own_page(get_user):
@@ -473,10 +469,8 @@ def test_owner_settings_hides_group_selector_on_own_page(get_user):
     expect(controls.locator(Buttons.LP_CLOSE)).to_be_visible()
 
 
-# @pairs public-users:own-page public-users:file-photo-gates
-# @pair user-settings:field-order
-# @pair notification-email:public-user
-# @pair public-users:email-consent
+# @matrix public-users : email-consent file-photo-gates own-page
+# @pairs notification-email:public-user user-settings:field-order
 # @template pages/page.html::main
 # @template pages/info.html::user_settings
 def test_public_user_own_page_hides_photo_and_file_surfaces(limited_public_user):
@@ -528,8 +522,7 @@ def test_public_user_own_page_hides_photo_and_file_surfaces(limited_public_user)
     assert Entities.USER.load(scenario.entity.email).allow_site_email is True
 
 
-# @features sync
-# @dimensions document
+# @pair sync:document
 # @template pages/document.html::document_tab
 def test_public_user_edits_document_without_ai_or_image_tools(limited_public_user):
     scenario = limited_public_user
@@ -561,8 +554,7 @@ def test_public_user_edits_document_without_ai_or_image_tools(limited_public_use
     user.page.keyboard.press("Escape")
 
 
-# @features tasks
-# @dimensions create
+# @pair tasks:create
 # @template pages/tasks.html::action_buttons
 def test_public_user_creates_task_with_reduced_schedule_options(limited_public_user):
     scenario = limited_public_user
@@ -614,8 +606,7 @@ def _assert_routes_forbidden(user, routes, browser_failures):
         assert result["status"] == 403, f"{method} {path}: {result}"
 
 
-# @features public-users
-# @dimensions metered-actions restriction-gate
+# @matrix public-users : metered-actions restriction-gate
 def test_public_user_ai_actions_are_forbidden(limited_public_user, browser_failures):
     scenario = limited_public_user
     page_key = scenario.entity.page.urlsafe_key
@@ -665,7 +656,7 @@ def test_public_user_ai_actions_are_forbidden(limited_public_user, browser_failu
     )
 
 
-# @pairs ai:batch-summary ai:access-gate ai:provider-boundary
+# @matrix ai : access-gate batch-summary provider-boundary
 def test_page_editor_without_ai_create_is_rejected_before_batch_summary(
     get_user,
     browser_failures,
@@ -702,8 +693,7 @@ def test_page_editor_without_ai_create_is_rejected_before_batch_summary(
     assert result == 403
 
 
-# @features public-users
-# @dimensions file-photo-gates restriction-gate
+# @matrix public-users : file-photo-gates restriction-gate
 def test_public_user_file_and_photo_actions_are_forbidden(
     limited_public_user, browser_failures
 ):
@@ -728,8 +718,7 @@ def test_public_user_file_and_photo_actions_are_forbidden(
     )
 
 
-# @features public-users
-# @dimensions attribute-preservation ai-schedule-guard restriction-gate
+# @matrix public-users : ai-schedule-guard attribute-preservation restriction-gate
 def test_public_user_restricted_schedules_are_forbidden(
     limited_public_user, browser_failures
 ):
@@ -797,14 +786,8 @@ def test_public_user_restricted_schedules_are_forbidden(
     )
 
 
-# @pair user-settings:owner-other-page
-# @pair user-settings:editable-email
-# @pair user-settings:group-selector
-# @pair user-settings:edit-groups
-# @pair user-settings:ai-access
-# @pair user-settings:field-order
-# @pair cache:invalidation-acknowledgement
-# @pair notification-email:user-only
+# @matrix user-settings : ai-access edit-groups editable-email field-order group-selector owner-other-page
+# @pairs cache:invalidation-acknowledgement notification-email:user-only
 # @template pages/info.html::user_settings
 def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     owner = get_user(Users.OWNER)
@@ -905,9 +888,7 @@ def test_owner_can_edit_user_settings_on_other_user_page(get_user):
     expect(created_user.page).to_have_title("Home")
 
 
-# @pair user-settings:group-selector
-# @pair user-settings:preload
-# @pair user-settings:relation-loading
+# @matrix user-settings : group-selector preload relation-loading
 # @template pages/info.html::user_settings
 def test_user_settings_preloads_existing_groups(get_user):
     owner = get_user(Users.OWNER)
@@ -947,11 +928,8 @@ def test_user_settings_preloads_existing_groups(get_user):
         )
 
 
-# @pair user-settings:owner-other-page
-# @pair user-settings:page-reassign
-# @pair user-settings:page-remove
-# @pair cache:invalidation-acknowledgement
-# @pair auth:canonical-page
+# @matrix user-settings : owner-other-page page-reassign page-remove
+# @pairs auth:canonical-page cache:invalidation-acknowledgement
 # @template pages/info.html::user_settings
 def test_owner_can_reassign_and_remove_user_from_page(get_user):
     owner = get_user(Users.OWNER)
@@ -1026,8 +1004,7 @@ def test_owner_can_reassign_and_remove_user_from_page(get_user):
     assert _session_page_key(created_user) == replacement_page.urlsafe_key
 
 
-# @pairs user-settings:submit-boundary user-settings:attached-form
-# @pairs user-settings:categories user-settings:restrictions
+# @matrix user-settings : attached-form categories restrictions submit-boundary
 # @pair cache:invalidation-acknowledgement
 def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     owner = get_user(Users.OWNER)
@@ -1158,7 +1135,7 @@ def test_user_settings_submit_preserves_attached_form_and_categories(get_user):
     user_page.submit_and_verify_submission(updated_submission)
 
 
-# @pairs admin:site-settings admin:admin-only admin:route admin:page-load
+# @matrix admin : admin-only page-load route site-settings
 # @pair cache:invalidation-acknowledgement
 # @template home/admin.html::main
 def test_site_settings_requires_administrator(get_user, browser_failures):
@@ -1197,12 +1174,9 @@ def test_site_settings_requires_administrator(get_user, browser_failures):
         _acknowledge_user_cache_invalidation(user)
 
 
-# @pairs admin:roster admin:managed-user-search admin:promotion admin:demotion
-# @pairs admin:read-only admin:privileged-account admin:responsive admin:failure-state
-# @pairs admin:managed-users admin:account-preservation admin:owner-only
-# @pairs owner:role-controls owner:awaiting-first-sign-in owner:owner-only
-# @pair cache:cache-invalidation
-# @pair cache:invalidation-acknowledgement
+# @matrix admin : account-preservation demotion failure-state managed-user-search managed-users owner-only privileged-account promotion read-only responsive roster
+# @matrix cache : cache-invalidation invalidation-acknowledgement
+# @matrix owner : awaiting-first-sign-in owner-only role-controls
 # @template home/site_settings.html::site_settings
 def test_site_administrator_roster_and_owner_controls(get_user, browser_failures):
     owner = get_user(Users.OWNER)
@@ -1303,8 +1277,8 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
     assert response.status == 403
 
 
-# @pairs admin:site-settings owner:sensitive-configuration
-# @pairs owner:recovery-export owner:route-gate owner:configuration
+# @matrix owner : configuration recovery-export route-gate sensitive-configuration
+# @pair admin:site-settings
 def test_additional_admin_cannot_access_owner_configuration(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     suffix = uuid4().hex
@@ -1371,11 +1345,7 @@ def test_additional_admin_cannot_access_owner_configuration(get_user, browser_fa
         _acknowledge_user_cache_invalidation(administrator)
 
 
-# @features admin
-# @dimensions site-settings sections configuration-modal environment-variables service-providers external-links
-# @pairs admin:configuration-display admin:recovery-export admin:secrets admin:web-headers
-# @pairs admin:site-settings admin:sections admin:configuration-modal
-# @pairs admin:environment-variables admin:service-providers admin:external-links
+# @matrix admin : configuration-display configuration-modal environment-variables external-links recovery-export secrets sections service-providers site-settings web-headers
 # @template home/admin.html::main
 # @template home/site_settings.html::site_settings
 def test_site_settings_sections_expand_help_and_configuration(get_user):
@@ -1471,8 +1441,7 @@ def test_site_settings_sections_expand_help_and_configuration(get_user):
     modal.close()
 
 
-# @features admin
-# @dimensions deployment-settings metadata scaling-controls validation
+# @matrix admin : deployment-settings metadata scaling-controls validation
 # @template home/site_settings.html::site_settings
 def test_site_settings_deployment_form_saves_and_updates_summary(
     get_user,
@@ -1540,8 +1509,7 @@ def test_site_settings_deployment_form_saves_and_updates_summary(
     assert "Worker count" in rejected["text"]
 
 
-# @features admin
-# @dimensions ai-settings metadata validation model-selection saved-values
+# @matrix admin : ai-settings metadata model-selection saved-values validation
 # @template home/site_settings.html::site_settings
 def test_site_settings_ai_form_saves_current_models_through_route(
     get_user,
@@ -1612,7 +1580,8 @@ def test_site_settings_ai_form_saves_current_models_through_route(
     assert "global" in rejected["text"]
 
 
-# @pairs admin:site-update admin:success cache:current
+# @matrix admin : site-update success
+# @pair cache:current
 # @template home/site_settings.html::site_settings
 def test_site_maintenance_update_and_cache_refresh_use_real_routes(get_user):
     owner = get_user(Users.OWNER)
@@ -1631,8 +1600,7 @@ def test_site_maintenance_update_and_cache_refresh_use_real_routes(get_user):
     expect(cache_button).to_contain_text("Cache Refreshed")
 
 
-# @features admin
-# @dimensions site-image-upload generated-images public-preview metadata lazy-initialization
+# @matrix admin : generated-images lazy-initialization metadata public-preview site-image-upload
 # @template home/site_settings.html::site_settings
 def test_site_settings_image_upload_generates_and_persists_site_images(get_user):
     owner = get_user(Users.OWNER)

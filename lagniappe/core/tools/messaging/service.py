@@ -12,8 +12,7 @@ from . import views
 # @testable true
 # @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_direct_message_lifecycle_is_private_and_restores_after_clear
-# @pairs messaging:idempotency messaging:compose-eligibility messaging:reply-permission
-# @pair messaging:new-after-clear
+# @matrix messaging : compose-eligibility idempotency new-after-clear reply-permission
 def send_message(
     actor,
     recipient_identifier,

@@ -87,7 +87,7 @@ def _mapping(user, revision):
 
 # @testable true
 # @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
-# @pairs owner-projection:revision owner-projection:fail-closed
+# @matrix owner-projection : fail-closed revision
 def update_owner_projection(*users):
     """Publish an owner row only after its durable mutation has committed."""
     owner = next((user for user in users if getattr(user, "is_owner", False)), None)
@@ -103,7 +103,7 @@ def update_owner_projection(*users):
 
 # @testable true
 # @tests tests_unit/test_027d_collaboration.py::test_owner_projection_normalizes_and_round_trips
-# @pairs owner-projection:repair owner-projection:request-memo
+# @matrix owner-projection : repair request-memo
 def get_owner_projection(*, repair=True):
     """Read the request memo/Redis projection and repair from User on a miss."""
     memo = _REQUEST_OWNER.get()

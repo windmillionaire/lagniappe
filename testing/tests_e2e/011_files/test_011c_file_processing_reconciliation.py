@@ -23,8 +23,7 @@ from testing.utility import expect_poll_result, expect_successful_response
 pytestmark = pytest.mark.e2e
 
 
-# @features file
-# @dimensions summarize polling status summary active-reset
+# @matrix file : active-reset polling status summarize summary
 def test_file_summary_completion_stages_authoritative_info_until_reset(
     get_user,
     browser_failures,

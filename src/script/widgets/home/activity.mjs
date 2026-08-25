@@ -43,8 +43,7 @@ export class HomeActivityList extends BaseList {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_delete_activity_item_from_home
-	 * @features activity notes notifications
-	 * @dimensions delete
+	 * @matrix activity notes notifications : delete
 	 */
 	async deleteActivity(button) {
 		const key = button.dataset.key;
@@ -156,8 +155,7 @@ export class HomeActivityList extends BaseList {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_reload_uses_server_state_until_replay
-	 * @features offline
-	 * @dimensions optimistic-mutation
+	 * @pair offline:optimistic-mutation
 	 */
 	_commitRemoveItem(item) {
 		const list = item.closest("ul");

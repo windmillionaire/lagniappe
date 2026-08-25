@@ -33,7 +33,7 @@ def publish_notification_aggregate(user, aggregate):
 
 # @testable true
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @pairs notifications:ordinary-count notifications:revision notifications:idempotency
+# @matrix notifications : idempotency ordinary-count revision
 def apply_ordinary_mutations(*, upserts=(), deletes=()):
     """Advance durable aggregate rows for committed entity mutations."""
     deltas = defaultdict(int)
@@ -64,7 +64,7 @@ def apply_ordinary_mutations(*, upserts=(), deletes=()):
 
 # @testable true
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @pairs notifications:ordinary-create notifications:idempotency notifications:aggregate-count
+# @matrix notifications : aggregate-count idempotency ordinary-create
 def create_ordinary_notification(user, *, identifier, body, target=None):
     from ...definitions import Fetch
     from ...entities import Entities
@@ -96,7 +96,7 @@ def create_ordinary_notification(user, *, identifier, body, target=None):
 
 # @testable true
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @pairs notifications:ordinary-delete notifications:aggregate-count
+# @matrix notifications : aggregate-count ordinary-delete
 def delete_ordinary_notification(user, notification_key):
     deleted, _aggregate = database.delete_ordinary_notification_record(
         user, notification_key
@@ -106,7 +106,7 @@ def delete_ordinary_notification(user, notification_key):
 
 # @testable true
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @pairs notifications:ordinary-clear notifications:aggregate-count
+# @matrix notifications : aggregate-count ordinary-clear
 def clear_ordinary_notifications(user, keys):
     cleared, _aggregate = database.clear_ordinary_notification_records(user, keys)
     return cleared
@@ -114,7 +114,7 @@ def clear_ordinary_notifications(user, keys):
 
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_process_notification_requires_a_valid_user
-# @pairs notifications:create notifications:body notifications:task-queue
+# @matrix notifications : body create task-queue
 def create_process_notification(payload, body):
     """Create a notification for the valid user named by a process payload."""
     from ...definitions import Fetch

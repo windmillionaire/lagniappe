@@ -312,8 +312,7 @@ def _node_version_from_output(output: str) -> str:
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_dependency_upgrade_updates_node_version_pin
-# @features dependencies
-# @dimensions node-version upgrade pinning
+# @matrix dependencies : node-version pinning upgrade
 def update_node_version_pin(
     version: str,
     report: UpgradeReport,
@@ -334,8 +333,7 @@ def update_node_version_pin(
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_dependency_upgrade_updates_node_version_pin
-# @features dependencies
-# @dimensions node-version upgrade pinning
+# @matrix dependencies : node-version pinning upgrade
 def upgrade_node(report: UpgradeReport | None = None) -> bool:
     """Upgrade Node.js to the latest version using nvm when available."""
     report = report or UpgradeReport()
@@ -575,8 +573,7 @@ def record_pip_version_changes(
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_dependency_upgrade_resolves_and_rewrites_all_requirement_files
-# @features dependencies
-# @dimensions upgrade-requirements
+# @pair dependencies:upgrade-requirements
 def upgrade_pip_packages(report: UpgradeReport | None = None) -> bool:
     """Resolve setup, runtime, and development requirements in one transaction."""
     report = report or UpgradeReport()
@@ -699,8 +696,7 @@ def _update_requirements_file(
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_dependency_upgrade_resolves_and_rewrites_all_requirement_files
-# @features dependencies
-# @dimensions upgrade-requirements
+# @pair dependencies:upgrade-requirements
 def update_requirements_files(report: UpgradeReport | None = None) -> bool:
     """Update setup, runtime, and development pins from the environment."""
     report = report or UpgradeReport()
@@ -883,8 +879,7 @@ def _render_warnings(report: UpgradeReport) -> list[str]:
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_dependency_upgrade_report_includes_setup_pins
-# @features dependencies
-# @dimensions upgrade-report
+# @pair dependencies:upgrade-report
 def render_upgrade_report(report: UpgradeReport) -> str:
     """Render the captured upgrade run as Markdown."""
     status = "completed with errors" if report.errors else "completed"
@@ -1020,8 +1015,7 @@ def _print_console_group(title: str, changes: list[VersionChange]) -> None:
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_dependency_upgrade_report_includes_setup_pins
-# @features dependencies
-# @dimensions upgrade-report
+# @pair dependencies:upgrade-report
 def print_upgrade_summary(
     report: UpgradeReport,
     success: bool,

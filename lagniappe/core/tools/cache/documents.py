@@ -66,8 +66,7 @@ def _author_projection(author):
 # @testable true
 # @tests tests_unit/test_010_sync_cache.py::test_document_transactions_are_key_isolated_and_expiring
 # @tests tests_unit/test_010_sync_cache.py::test_document_poll_initialization_conflict_keeps_winning_generation
-# @features sync polling
-# @dimensions document concurrency isolation ttl
+# @matrix polling sync : concurrency document isolation ttl
 def _mutate(sync_id, seed, transform):
     """Apply ``transform`` under an isolated optimistic document transaction."""
     document_key = Sync.DOCUMENTS.key(sync_id)
@@ -97,8 +96,7 @@ def _mutate(sync_id, seed, transform):
 # @tests tests_unit/test_010_sync_cache.py::test_document_poll_does_not_overwrite_a_concurrent_update
 # @tests tests_unit/test_010_sync_cache.py::test_missing_document_poll_initializes_from_durable_seed
 # @tests tests_unit/test_010_sync_cache.py::test_document_poll_initialization_conflict_keeps_winning_generation
-# @pairs polling:document polling:read-path polling:initialization
-# @pairs polling:concurrency polling:ttl polling:write-amplification
+# @matrix polling : concurrency document initialization read-path ttl write-amplification
 def _read_document_state(sync_id, seed):
     """Read existing state with a sliding TTL, initializing only on a miss."""
     document_key = Sync.DOCUMENTS.key(sync_id)
@@ -128,8 +126,7 @@ def _presence_payload(client_id, user):
 
 # @testable true
 # @tests tests_unit/test_010_sync_cache.py::test_presence_uses_expiring_client_hash_fields
-# @features sync polling
-# @dimensions presence ttl hash-field
+# @matrix polling sync : hash-field presence ttl
 def _register_presence(sync_id, client_id, user):
     presence_key = Sync.PRESENCE.key(sync_id)
     with cache.pipeline() as pipe:
@@ -165,8 +162,7 @@ def _register_presence(sync_id, client_id, user):
 # @tests tests_unit/test_010_sync_cache.py::test_revisioned_document_poll_returns_snapshot_then_deltas
 # @tests tests_unit/test_010_sync_cache.py::test_existing_document_poll_refreshes_ttl_without_full_write
 # @tests tests_unit/test_010_sync_cache.py::test_document_poll_does_not_overwrite_a_concurrent_update
-# @features sync polling
-# @dimensions document revision snapshot delta presence author-attribution
+# @matrix polling sync : author-attribution delta document presence revision snapshot
 def poll_document(
     sync_id,
     *,
@@ -236,8 +232,7 @@ def poll_document(
 # @testable true
 # @tests tests_unit/test_010_sync_cache.py::test_revisioned_document_update_preserves_stale_branch_delta
 # @tests tests_unit/test_010_sync_cache.py::test_revisioned_document_poll_returns_snapshot_then_deltas
-# @features sync polling
-# @dimensions document revision concurrency compaction author-attribution
+# @matrix polling sync : author-attribution compaction concurrency document revision
 def apply_document_update(
     sync_id,
     *,
@@ -309,8 +304,7 @@ def apply_document_update(
 
 # @testable true
 # @tests tests_unit/test_010_sync_cache.py::test_revisioned_document_asset_refresh_keeps_live_generation
-# @features sync polling
-# @dimensions document persistence fingerprint
+# @matrix polling sync : document fingerprint persistence
 def update_document_asset(sync_id, *, seed):
     """Refresh durable document metadata without discarding live revisions."""
 
@@ -328,8 +322,7 @@ def update_document_asset(sync_id, *, seed):
 
 # @testable true
 # @tests tests_unit/test_010_sync_cache.py::test_revisioned_presence_close_removes_client
-# @features sync polling
-# @dimensions document presence lifecycle
+# @matrix polling sync : document lifecycle presence
 def close_presence(client_id, sync_ids):
     """Remove a browser client from the supplied collaborative documents."""
     if not client_id:

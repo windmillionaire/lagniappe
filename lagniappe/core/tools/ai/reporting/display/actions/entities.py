@@ -24,19 +24,8 @@ def page_details(details, data, action=None):
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_existing_page_category_for_attachments
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_resolve_normalized_entity_refs
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_rename_entity_details
-# @pair ai-report:add-category
-# @pair ai-report:attachment-grouping
-# @pair ai-report:details
-# @pair ai-report:display-labels
-# @pair ai-report:existing-page-category
-# @pair ai-report:normalized-references
-# @pair ai-report:proposal
-# @pair ai-report:rename
-# @pair categories:add-category
-# @pair categories:attachment-grouping
-# @pair categories:details
-# @pair categories:existing-page-category
-# @pair categories:proposal
+# @matrix ai-report : add-category attachment-grouping details display-labels existing-page-category normalized-references proposal rename
+# @matrix categories : add-category attachment-grouping details existing-page-category proposal
 def entity_reference_details(details, data, action=None):
     action_type = action.get("type")
     if action_type == "add_category":

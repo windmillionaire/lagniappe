@@ -28,11 +28,7 @@ from .errors import DeferredJobInfrastructureError
 class DeferredJobRecovery:
     # @testable true
     # @tests tests_unit/test_023f_deferred_job_scheduler.py::test_reconciler_repairs_control_before_self_pausing
-    # @features deferred-jobs cloud-scheduler
-    # @dimensions drift-repair optimistic-concurrency self-pause
-    # @pairs deferred-jobs:self-pause cloud-scheduler:self-pause
-    # @pairs deferred-jobs:drift-repair cloud-scheduler:drift-repair
-    # @pairs deferred-jobs:optimistic-concurrency cloud-scheduler:optimistic-concurrency
+    # @matrix cloud-scheduler deferred-jobs : drift-repair optimistic-concurrency self-pause
     def _repair_reconciler_control(self, now, *, attempts=4):
         """Scan durable recovery work and publish it without losing raced changes."""
         if not CONFIG.production:
@@ -61,13 +57,7 @@ class DeferredJobRecovery:
     # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_redispatches_one_cas_claimed_stale_job
     # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_resumes_stale_terminal_delivery_after_grace
     # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_completes_terminal_delivery_when_input_was_deleted
-    # @pair deferred-jobs:reconciliation
-    # @pair deferred-jobs:redispatch
-    # @pair deferred-jobs:compare-and-set
-    # @pair deferred-jobs:deterministic-task-id
-    # @pair deferred-jobs:terminal-delivery
-    # @pair deferred-jobs:grace
-    # @pair deferred-jobs:orphaned-input
+    # @matrix deferred-jobs : compare-and-set deterministic-task-id grace orphaned-input reconciliation redispatch terminal-delivery
     # @pair notifications:terminal-delivery
     def reconcile(self, *, now=None, limit=250):
         """Redispatch stranded work and bound the age of every operation."""

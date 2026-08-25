@@ -397,8 +397,7 @@ def _open_sign_in_form(user, login_page, email):
     return sign_in_form
 
 
-# @features login
-# @dimensions page-load form-state
+# @matrix login : form-state page-load
 # @template users/login.html::button
 # @template users/login.html::heading
 # @template users/login.html::subheading
@@ -496,8 +495,7 @@ def test_login_page_loads(get_user):
         expect(confirmation).to_have_class(re.compile(r".*\bborder-kind-default\b.*"))
 
 
-# @features login
-# @dimensions test-user session
+# @matrix login : session test-user
 def test_user_login_success(get_user):
     """
     Verify test user authentication and home page access.
@@ -526,8 +524,7 @@ def test_user_login_success(get_user):
     expect(user.page).to_have_title("Home")
 
 
-# @pairs auth:session-user auth:switch auth:invalidation auth:session-keys
-# @pairs auth:user-key auth:page-key
+# @matrix auth : invalidation page-key session-keys session-user switch user-key
 # @pair cache:invalidation-acknowledgement
 def test_switching_session_user_requests_client_cache_invalidation(get_user):
     owner = get_user(Users.OWNER)
@@ -561,8 +558,7 @@ def test_switching_session_user_requests_client_cache_invalidation(get_user):
     assert payload[CONFIG.LOGIN_USER_PAGE_KEY] == target.entity.page.urlsafe_key
 
 
-# @features auth
-# @dimensions stale-session fallback clear session-preload session-keys user-key page-key flask-login-skip batch-load
+# @matrix auth : batch-load clear fallback flask-login-skip page-key session-keys session-preload stale-session user-key
 def test_stale_preloaded_session_keys_fall_back_to_flask_login_user(get_user):
     owner = get_user(Users.OWNER)
     stale = get_user(Users.create_user_from_index, creator=owner)
@@ -590,8 +586,7 @@ def test_stale_preloaded_session_keys_fall_back_to_flask_login_user(get_user):
         assert stale_key not in refreshed
 
 
-# @features login
-# @dimensions redirect-target
+# @pair login:redirect-target
 def test_login_returns_to_requested_url_after_redirect(get_user):
     user = get_user(Users.ANONYMOUS)
 
@@ -604,8 +599,7 @@ def test_login_returns_to_requested_url_after_redirect(get_user):
     expect(user.page).to_have_url(_site_url("/tasks/index"))
 
 
-# @features login
-# @dimensions redirect-target
+# @pair login:redirect-target
 def test_login_google_buttons_carry_safe_next_state(get_user):
     user = get_user(Users.ANONYMOUS)
     target = "/pages/public-target?from=public#notes"
@@ -620,8 +614,7 @@ def test_login_google_buttons_carry_safe_next_state(get_user):
     )
 
 
-# @features login
-# @dimensions authentication-email redirect-target
+# @matrix login : authentication-email redirect-target
 def test_auth_action_url_preserves_safe_login_destination(monkeypatch):
     target = "/tasks/index?from=email#details"
     delivered = {}
@@ -672,12 +665,8 @@ def test_auth_action_url_preserves_safe_login_destination(monkeypatch):
     }
 
 
+# @matrix csrf : double-submit match mismatch missing-body missing-cookie
 # @pair login:google-signin
-# @pair csrf:double-submit
-# @pair csrf:missing-cookie
-# @pair csrf:missing-body
-# @pair csrf:mismatch
-# @pair csrf:match
 def test_google_signin_enforces_double_submit_csrf_before_provider_auth(get_user):
     user = get_user(Users.ANONYMOUS)
     url = _site_url("/users/google-signin")
@@ -707,8 +696,7 @@ def test_google_signin_enforces_double_submit_csrf_before_provider_auth(get_user
     assert "remember_token" not in cookie_names
 
 
-# @features login
-# @dimensions redirect-target
+# @pair login:redirect-target
 def test_login_accepts_google_state_redirect_target(get_user):
     user = get_user(Users.ANONYMOUS)
     target = "/tasks/index?from=google"
@@ -721,8 +709,7 @@ def test_login_accepts_google_state_redirect_target(get_user):
     expect(user.page).to_have_url(_site_url(target))
 
 
-# @features login
-# @dimensions agent-access session user-page
+# @matrix login : agent-access session user-page
 # @template users/agent_login.html::agent_login_form
 # @style login.heading
 def test_agent_access_login_form_creates_session(get_user, browser_failures):
@@ -767,8 +754,7 @@ def test_agent_access_login_form_creates_session(get_user, browser_failures):
     expect(user.locate("[data-widget='UserSettings']")).to_be_attached()
 
 
-# @features login
-# @dimensions owner-bootstrap verify-email password-validation auth-errors
+# @matrix login : auth-errors owner-bootstrap password-validation verify-email
 # @template users/login.html::google_signin
 # @style login.heading
 # @style login.subheading
@@ -856,8 +842,7 @@ def test_uninitialized_owner_starts_google_first_setup(get_user, browser_failure
         assert not identity_calls["unexpected"]
 
 
-# @features login
-# @dimensions auth-method google-oauth email-signin
+# @matrix login : auth-method email-signin google-oauth
 def test_login_defaults_to_auth_method_form(get_user):
     """
     Verify ordinary login starts with a Google-or-email method choice.
@@ -882,8 +867,7 @@ def test_login_defaults_to_auth_method_form(get_user):
     expect(email_form.locator(".g_id_signin")).to_have_count(0)
 
 
-# @features login
-# @dimensions google-oauth authorization-error auth-method
+# @matrix login : auth-method authorization-error google-oauth
 def test_unregistered_google_error_returns_to_method_chooser(get_user):
     """A verified but unprovisioned Google account gets a useful login error."""
     _ensure_owner_initialized()
@@ -902,8 +886,7 @@ def test_unregistered_google_error_returns_to_method_chooser(get_user):
     expect(auth_method.locator(PASSWORD)).to_have_count(0)
 
 
-# @features login
-# @dimensions google-oauth disabled-account auth-method safe-error
+# @matrix login : auth-method disabled-account google-oauth safe-error
 def test_disabled_google_error_returns_to_method_chooser(get_user):
     """A disabled Identity Platform account gets a useful, provider-safe error."""
     _ensure_owner_initialized()
@@ -924,8 +907,7 @@ def test_disabled_google_error_returns_to_method_chooser(get_user):
     expect(auth_method.locator(PASSWORD)).to_have_count(0)
 
 
-# @features login
-# @dimensions google-oauth disabled-provider auth-method
+# @matrix login : auth-method disabled-provider google-oauth
 # @template users/login.html::google_signin
 def test_login_hides_google_when_provider_is_disabled(monkeypatch):
     """Production login omits Google controls when the live provider is off."""
@@ -961,8 +943,7 @@ def test_login_hides_google_when_provider_is_disabled(monkeypatch):
     assert 'data-role="back-to-owner-google"' not in owner_html
 
 
-# @features login
-# @dimensions google-oauth disabled-provider operator-intent auth-method
+# @matrix login : auth-method disabled-provider google-oauth operator-intent
 def test_google_signin_setting_disables_ui_and_callback(monkeypatch):
     """The persisted opt-out hides Google and rejects direct callback posts."""
     _ensure_owner_initialized()
@@ -1001,8 +982,9 @@ def test_google_signin_setting_disables_ui_and_callback(monkeypatch):
     }
 
 
-# @pairs login:bootstrap login:owner-first-login login:provisioning
-# @pairs admin:exact-email admin:google-only owner:provisioning
+# @matrix admin : exact-email google-only
+# @matrix login : bootstrap owner-first-login provisioning
+# @pair owner:provisioning
 def test_delegated_bootstrap_admin_requires_exact_google_email_and_closes_after_owner_login(
     monkeypatch,
 ):
@@ -1106,8 +1088,7 @@ def test_delegated_bootstrap_admin_requires_exact_google_email_and_closes_after_
         ("OPERATION_NOT_ALLOWED", None),
     ],
 )
-# @features login
-# @dimensions google-oauth disabled-account disabled-provider safe-error redirect-target
+# @matrix login : disabled-account disabled-provider google-oauth redirect-target safe-error
 def test_google_provider_rejections_return_safely(
     monkeypatch,
     provider_code,
@@ -1160,8 +1141,7 @@ def test_google_provider_rejections_return_safely(
     assert provider_code not in response.headers["Location"]
 
 
-# @features login
-# @dimensions account-enumeration sign-in-transition
+# @matrix login : account-enumeration sign-in-transition
 def test_unknown_email_transitions_to_sign_in_without_leaking_existence(
     get_user,
     browser_failures,
@@ -1200,8 +1180,7 @@ def test_unknown_email_transitions_to_sign_in_without_leaking_existence(
         )
 
 
-# @features login
-# @dimensions account-enumeration endpoint
+# @matrix login : account-enumeration endpoint
 def test_check_user_status_endpoint_does_not_enumerate_accounts(get_user):
     """Unknown accounts should receive the generic sign-in next step."""
     _ensure_owner_initialized()
@@ -1225,8 +1204,7 @@ def test_check_user_status_endpoint_does_not_enumerate_accounts(get_user):
     expect(user.locate(login_page.SIGN_IN_FORM)).to_be_visible()
 
 
-# @features login
-# @dimensions first-time-setup endpoint
+# @matrix login : endpoint first-time-setup
 def test_check_user_status_endpoint_returns_first_time_setup(get_user):
     """Provisioned users without a prior login should get first-time setup."""
     from lagniappe.core.entities import Entities
@@ -1262,8 +1240,7 @@ def test_check_user_status_endpoint_returns_first_time_setup(get_user):
     expect(user.locate(login_page.FIRST_TIME_SETUP_FORM)).to_be_visible()
 
 
-# @features login
-# @dimensions reset-password query-mode action-code-validation expired-link
+# @matrix login : action-code-validation expired-link query-mode reset-password
 def test_reset_password_mode(get_user, browser_failures):
     """
     Verify reset password form displays with correct query parameters.
@@ -1337,8 +1314,7 @@ def test_reset_password_mode(get_user, browser_failures):
     assert not identity_calls["unexpected"]
 
 
-# @features login
-# @dimensions verify-email query-mode
+# @matrix login : query-mode verify-email
 def test_verify_email_mode(get_user):
     """
     Verify email verification form displays with correct query parameters.
@@ -1369,8 +1345,7 @@ def test_verify_email_mode(get_user):
     assert not identity_calls["unexpected"]
 
 
-# @features login
-# @dimensions email-validation
+# @pair login:email-validation
 def test_email_input_validation(get_user):
     """
     Verify HTML5 email validation prevents invalid submissions.
@@ -1403,8 +1378,7 @@ def test_email_input_validation(get_user):
     expect(email_form).to_be_visible()
 
 
-# @features login
-# @dimensions responsive-layout
+# @pair login:responsive-layout
 def test_login_responsive_design(get_user):
     """
     Verify login page displays correctly across device sizes.
@@ -1478,7 +1452,7 @@ def test_csrf_failure_is_identified_for_targeted_retry(get_user, browser_failure
     assert response["body"]
 
 
-# @pairs login:logout login:session login:redirect login:session-keys login:clear
+# @matrix login : clear logout redirect session session-keys
 # @pair cache:invalidation-acknowledgement
 # @style login.heading
 def test_logout_clears_session_and_returns_login(get_user):
@@ -1529,7 +1503,7 @@ def test_logout_clears_session_and_returns_login(get_user):
     expect(user.page).to_have_title("Home")
 
 
-# @pairs login:logout login:invalidation login:redirect login:ajax
+# @matrix login : ajax invalidation logout redirect
 # @pair cache:invalidation-acknowledgement
 def test_logout_flags_user_cache_invalidation(get_user):
     """The logout control should expose invalidation and navigate to login."""
@@ -1575,8 +1549,7 @@ def test_logout_flags_user_cache_invalidation(get_user):
     expect(user.page).to_have_title("Home")
 
 
-# @features login
-# @dimensions cookie-hardening remember-cookie
+# @matrix login : cookie-hardening remember-cookie
 def test_login_sets_hardened_auth_cookies(get_user):
     """Test login should issue hardened session and remember-me cookies."""
     owner = get_user(Users.OWNER)
@@ -1614,8 +1587,7 @@ def test_login_sets_hardened_auth_cookies(get_user):
     expect(user.page).to_have_title("Home")
 
 
-# @features login
-# @dimensions email-check sign-in-transition
+# @matrix login : email-check sign-in-transition
 def test_known_registered_email_shows_sign_in(get_user):
     """
     check-user-status returns ``signin`` for existing users who have logged in
@@ -1631,8 +1603,7 @@ def test_known_registered_email_shows_sign_in(get_user):
     expect(user.locate(login_page.SIGN_IN_FORM)).to_be_visible()
 
 
-# @features login
-# @dimensions forgot-password sign-in-transition
+# @matrix login : forgot-password sign-in-transition
 # @template users/login.html::success
 # @style login.success
 def test_forgot_password_form_opens_from_sign_in(get_user):
@@ -1669,8 +1640,7 @@ def test_forgot_password_form_opens_from_sign_in(get_user):
     assert reset_email_calls == [{"email": SETTINGS.test_config["ADMIN_EMAIL"]}]
 
 
-# @features login
-# @dimensions forgot-password delivery-failure recovery safe-error
+# @matrix login : delivery-failure forgot-password recovery safe-error
 def test_password_reset_delivery_failure_recovers_safely(
     get_user,
     browser_failures,
@@ -1720,8 +1690,7 @@ def test_password_reset_delivery_failure_recovers_safely(
     ]
 
 
-# @features login
-# @dimensions identity-platform rate-limit
+# @matrix login : identity-platform rate-limit
 def test_login_identity_returns_rate_limit_response(get_user, browser_failures):
     """The live Identity Platform login route should propagate limiter 429 responses."""
     user = get_user(Users.ANONYMOUS)
@@ -1776,8 +1745,7 @@ def test_login_identity_returns_rate_limit_response(get_user, browser_failures):
         _clear_auth_rate_limit_scope("login-identity")
 
 
-# @features login
-# @dimensions remember-preference
+# @pair login:remember-preference
 def test_login_remember_preference_syncs_across_forms(get_user):
     """Changing remember-me in one login form updates later remember forms."""
     user = get_user(Users.ANONYMOUS)
@@ -1836,8 +1804,7 @@ def test_login_remember_preference_syncs_across_forms(get_user):
     assert "lagniappe_remember=1" in user.page.evaluate("document.cookie")
 
 
-# @features login
-# @dimensions first-time-setup account-create form-state
+# @matrix login : account-create first-time-setup form-state
 def test_first_time_setup_form_creates_password_and_can_return_to_email_check(
     get_user,
     browser_failures,
@@ -1904,8 +1871,7 @@ def test_first_time_setup_form_creates_password_and_can_return_to_email_check(
     assert not identity_calls["unexpected"]
 
 
-# @features login
-# @dimensions identity-platform redirect verify-email remember-preference
+# @matrix login : identity-platform redirect remember-preference verify-email
 def test_login_identity_client_handoff_redirects_or_requires_verification(
     get_user,
     browser_failures,
@@ -2007,8 +1973,7 @@ def test_login_identity_client_handoff_redirects_or_requires_verification(
     assert not identity_calls["unexpected"]
 
 
-# @features login
-# @dimensions identity-platform verify-email delivery-failure recovery safe-error
+# @matrix login : delivery-failure identity-platform recovery safe-error verify-email
 def test_verification_delivery_failure_recovers_safely(
     get_user,
     browser_failures,
@@ -2087,8 +2052,7 @@ def test_verification_delivery_failure_recovers_safely(
     assert not identity_calls["unexpected"]
 
 
-# @features login
-# @dimensions auth-errors first-time-setup existing-account recovery sign-in-transition
+# @matrix login : auth-errors existing-account first-time-setup recovery sign-in-transition
 def test_login_auth_error_messages_are_user_safe(get_user, browser_failures):
     """Identity Platform error codes should render safe messages, not provider internals."""
     _ensure_owner_initialized()

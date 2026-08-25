@@ -87,8 +87,7 @@ def _post_form_status(user, path, data):
     )
 
 
-# @features users
-# @dimensions index-mode-toggle disabled
+# @matrix users : disabled index-mode-toggle
 # @template users/index.html::public_users_toggle
 def test_users_index_public_toggle_hidden_when_public_users_disabled(get_user):
     owner = get_user(Users.OWNER)
@@ -99,11 +98,8 @@ def test_users_index_public_toggle_hidden_when_public_users_disabled(get_user):
     expect(owner.locate(user_index.PUBLIC_USERS_TOGGLE)).to_have_count(0)
 
 
-# @pair users:index-mode-toggle
-# @pair users:table-row
-# @pair users:refresh
-# @pair reconnect-refresh:batched-request
-# @pair reconnect-refresh:root-fingerprint
+# @matrix reconnect-refresh : batched-request root-fingerprint
+# @matrix users : index-mode-toggle refresh table-row
 # @pair permissions:authorization
 # @template users/index.html::public_users_toggle
 def test_users_index_public_toggle_shows_public_users(get_user, browser_failures):
@@ -172,8 +168,7 @@ def _create_user(user, create_form, definition):
     return new_row
 
 
-# @features users
-# @dimensions create-form create-submit created-row ai-access create-form-reset
+# @matrix users : ai-access create-form create-form-reset create-submit created-row
 # @template users/index.html::tools_section
 # @template users/tools.html::create_user
 def test_create_user_from_index(get_user):
@@ -214,8 +209,8 @@ def test_create_user_from_index(get_user):
     ).to_be_checked()
 
 
-# @pairs user:public-adoption user:submitted-create-data user:page-reassign
-# @pairs users:public-user-adoption users:create-form-reset users:submitted-form-data
+# @matrix user : page-reassign public-adoption submitted-create-data
+# @matrix users : create-form-reset public-user-adoption submitted-form-data
 # @template users/tools.html::create_user
 def test_owner_create_adopts_public_user_and_resets_form(get_user):
     owner = get_user(Users.OWNER)
@@ -292,8 +287,7 @@ def test_owner_create_adopts_public_user_and_resets_form(get_user):
     expect(reset_group_select.input).to_have_value("")
 
 
-# @features users
-# @dimensions owner-only
+# @pair users:owner-only
 # @template users/tools.html::create_user
 def test_non_owner_cannot_set_ai_access_when_creating_user(
     get_user, browser_failures
@@ -326,8 +320,7 @@ def test_non_owner_cannot_set_ai_access_when_creating_user(
     assert Entities.USER.load(email) is None
 
 
-# @pair users:group-selector
-# @pair users:multiple
+# @matrix users : group-selector multiple
 # @template users/tools.html::create_user
 def test_create_user_group_selector_accepts_multiple_groups(get_user):
     owner = get_user(Users.OWNER)
@@ -381,9 +374,7 @@ def test_create_user_group_selector_accepts_multiple_groups(get_user):
         )
 
 
-# @pair table-controls:mobile-startup
-# @pair table-controls:mobile-tools
-# @pair table-controls:sorting
+# @matrix table-controls : mobile-startup mobile-tools sorting
 # @template users/index.html::view_header
 # @template table.html::mobile_toggles
 def test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load(get_user):
@@ -411,8 +402,7 @@ def test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load(get_user
     ).to_be_visible()
 
 
-# @features users
-# @dimensions attach-existing-page page-form-preserved
+# @matrix users : attach-existing-page page-form-preserved
 def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user):
     owner = get_user(Users.OWNER)
     category = Categories.test_basic_inputs_submission.get(owner)
@@ -473,11 +463,9 @@ def test_create_user_attached_to_existing_page_preserves_page_info_form(get_user
     )
 
 
-# @pairs users:delete users:default-cascade users:preserve-page
-# @pairs users:category-fallback users:options
+# @matrix pages : category-fallback default-cascade delete preserve-page
+# @matrix users : category-fallback default-cascade delete options preserve-page
 # @pair user-groups:unrelated-delete
-# @pairs pages:delete pages:default-cascade pages:preserve-page
-# @pair pages:category-fallback
 # @template table.html::row
 def test_delete_user_can_preserve_page(get_user):
     owner = get_user(Users.OWNER)

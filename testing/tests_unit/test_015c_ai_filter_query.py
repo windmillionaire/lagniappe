@@ -160,8 +160,7 @@ def _workspace_filter_fixture():
     return project, model, form, hidden_form
 
 
-# @features ai-filter
-# @dimensions schema permissions
+# @matrix ai-filter : permissions schema
 @pytest.mark.unit
 def test_describe_filter_fields_exposes_parent_relations_and_form_fields():
     user = object()
@@ -201,8 +200,7 @@ def test_describe_filter_fields_exposes_parent_relations_and_form_fields():
     )
 
 
-# @features ai-filter
-# @dimensions schema integration
+# @matrix ai-filter : integration schema
 @pytest.mark.unit
 def test_describe_filter_fields_uses_real_project_and_form_filter_surfaces():
     user = object()
@@ -254,8 +252,7 @@ def test_describe_filter_fields_uses_real_project_and_form_filter_surfaces():
     assert fields[("hash:real-form", "input-amount")]["type"] == "number"
 
 
-# @features ai-filter
-# @dimensions compilation validation
+# @matrix ai-filter : compilation validation
 @pytest.mark.unit
 def test_compile_filter_definitions_normalizes_dates_numbers_and_booleans(monkeypatch):
     user = object()
@@ -314,8 +311,7 @@ def test_compile_filter_definitions_normalizes_dates_numbers_and_booleans(monkey
     assert definitions[4].value == ["paid"]
 
 
-# @features ai-filter
-# @dimensions compilation validation permissions
+# @matrix ai-filter : compilation permissions validation
 @pytest.mark.unit
 def test_compile_filter_definitions_rejects_unknown_fields_comparators_and_values(
     monkeypatch,
@@ -374,8 +370,7 @@ def test_compile_filter_definitions_rejects_unknown_fields_comparators_and_value
         )
 
 
-# @features ai-filter
-# @dimensions cache-query permissions output
+# @matrix ai-filter : cache-query output permissions
 @pytest.mark.unit
 def test_query_workspace_filter_uses_shared_cache_and_permission_filters_results(
     monkeypatch,
@@ -445,8 +440,7 @@ def test_query_workspace_filter_uses_shared_cache_and_permission_filters_results
     assert inactive.to_ai_users == []
 
 
-# @features ai-filter
-# @dimensions tool-handler permissions validation
+# @matrix ai-filter : permissions tool-handler validation
 @pytest.mark.unit
 def test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors(
     monkeypatch,

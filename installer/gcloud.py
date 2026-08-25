@@ -29,8 +29,7 @@ APP_ENGINE_CREATE_TIMEOUT = 300
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_reuses_confirmed_preflight
-# @features setup
-# @dimensions gcloud-command provider-apis preflight timeout
+# @matrix setup : gcloud-command preflight provider-apis timeout
 def enable_gcloud_apis():
     """Enable only APIs missing from the confirmed target preflight."""
     from config import SETTINGS
@@ -104,8 +103,7 @@ def enable_gcloud_apis():
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_service_account_waits_for_newly_enabled_iam
-# @features setup
-# @dimensions service-account provider-convergence
+# @matrix setup : provider-convergence service-account
 def configure_service_account():
     """Create or update the explicit keyless runtime service account."""
     from config import SETTINGS
@@ -274,8 +272,7 @@ def configure_service_account():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_storage_provisioning_is_bucket_scoped_and_idempotent
-# @features setup storage iam
-# @dimensions provisioning bucket-scope idempotence bucket-location storage-class
+# @matrix iam setup storage : bucket-location bucket-scope idempotence provisioning storage-class
 def configure_storage_buckets(*, include_production=True, include_test=False):
     """Provision the selected production or developer bucket families."""
     from config import SETTINGS
@@ -462,8 +459,7 @@ def configure_storage_buckets(*, include_production=True, include_test=False):
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_app_engine_persists_provider_location_hostname_and_oidc_subject
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_app_engine_creation_prompt_and_bounded_failures
-# @features setup
-# @dimensions app-engine immutable-location provider-state interactive-input timeout
+# @matrix setup : app-engine immutable-location interactive-input provider-state timeout
 def create_app_engine_app():
     """Get the immutable App Engine application or create it after confirmation."""
     from config import SETTINGS
@@ -612,8 +608,7 @@ def create_app_engine_app():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
-# @features setup
-# @dimensions cloud-tasks
+# @pair setup:cloud-tasks
 def create_task_queue():
     """Creates a Cloud Tasks queue named 'lagniappe-tasks' if it doesn't exist."""
     from config import SETTINGS
@@ -696,8 +691,7 @@ def create_task_queue():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_deferred_job_reconciler_contract
-# @features setup deferred-jobs
-# @dimensions cloud-scheduler recovery oidc iam runtime-isolation
+# @matrix deferred-jobs setup : cloud-scheduler iam oidc recovery runtime-isolation
 def create_deferred_job_reconciler():
     """Create or update the five-minute durable-job recovery schedule."""
     from config import SETTINGS
@@ -820,8 +814,7 @@ def create_deferred_job_reconciler():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_data_protection_contract
-# @features setup disaster-recovery
-# @dimensions pitr native-backups retention idempotent runtime-isolation
+# @matrix disaster-recovery setup : idempotent native-backups pitr retention runtime-isolation
 def configure_data_protection():
     """Enable PITR and reconcile daily/weekly native backup schedules."""
     import json
@@ -914,8 +907,7 @@ def configure_data_protection():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
-# @features setup
-# @dimensions ocr
+# @pair setup:ocr
 def create_ocr_processor():
     from config import SETTINGS
 
@@ -1018,8 +1010,7 @@ def create_ocr_processor():
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_gcloud_resource_client_contracts
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_app_engine_persists_provider_location_hostname_and_oidc_subject
-# @features setup
-# @dimensions service-account app-engine immutable-location provider-state oidc keyless-config
+# @matrix setup : app-engine immutable-location keyless-config oidc provider-state service-account
 def setup_app_engine():
     """Configure App Engine and service account."""
     from config import SETTINGS

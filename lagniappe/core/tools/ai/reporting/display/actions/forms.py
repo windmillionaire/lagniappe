@@ -16,14 +16,7 @@ def page_form_details(details, data, action=None):
 
 # @testable true
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_schema_updates_separately
-# @pair ai-report:details
-# @pair ai-report:proposal
-# @pair ai-report:schema-section
-# @pair ai-report:skip-grouping
-# @pair form-schema:details
-# @pair form-schema:proposal
-# @pair form-schema:schema-section
-# @pair form-schema:skip-grouping
+# @matrix ai-report form-schema : details proposal schema-section skip-grouping
 def schema_details(details, data, action=None):
     details.reference("Form", data, "form")
     operations = data.get("operations")

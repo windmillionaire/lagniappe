@@ -61,8 +61,7 @@ const internalLinkDetails = (href) => {
 /**
  * @testable true
  * @tests tests_e2e/004_projects/test_004e_document_forms.py::test_internal_links_normalize_paste_and_popover_navigation
- * @features editor
- * @dimensions link internal-link
+ * @matrix editor : internal-link link
  */
 export const normalizeLinkAttributes = (attributes = {}) => {
 	const details = internalLinkDetails(attributes.href);

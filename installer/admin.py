@@ -24,8 +24,7 @@ OAUTH_CLIENT_FILE = (
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_instructions_open_current_project_clients_page
-# @features setup
-# @dimensions oauth browser provider-apis
+# @matrix setup : browser oauth provider-apis
 def print_oauth_instructions():
     """Print instructions for setting up OAuth credentials."""
     from config import SETTINGS
@@ -125,8 +124,7 @@ def print_oauth_instructions():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_validators_cover_expected_inputs
-# @features setup
-# @dimensions validation
+# @pair setup:validation
 def validate_oauth_client_id(client_id):
     """Validate OAuth client ID format."""
     return bool(re.match(r"^\d+[-\w]+\.apps\.googleusercontent\.com$", client_id))
@@ -135,8 +133,7 @@ def validate_oauth_client_id(client_id):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_web_client_probe_accepts_exact_callback
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_web_client_probe_rejects_redirect_mismatch
-# @features setup
-# @dimensions oauth client-type redirect-uri validation provider-apis failure-isolation
+# @matrix setup : client-type failure-isolation oauth provider-apis redirect-uri validation
 def verify_oauth_web_client(client_id, redirect_uri, *, request_get=None):
     """Verify that Google accepts Lagniappe's callback for an OAuth client."""
     client_id = str(client_id or "").strip()
@@ -250,8 +247,7 @@ def _oauth_uri_values(value):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_credentials_file_requires_web_project_and_exact_urls
-# @features setup
-# @dimensions oauth credential-file client-type project-isolation javascript-origin redirect-uri secrets validation
+# @matrix setup : client-type credential-file javascript-origin oauth project-isolation redirect-uri secrets validation
 def load_oauth_client_credentials(
     credential_path,
     *,
@@ -328,8 +324,7 @@ def load_oauth_client_credentials(
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_credentials_file_retry_reloads_or_waits_for_propagation
-# @features setup
-# @dimensions oauth credential-file propagation interactive-retry secrets
+# @matrix setup : credential-file interactive-retry oauth propagation secrets
 def _get_verified_oauth_credentials(settings, credential_path=OAUTH_CLIENT_FILE):
     """Load exact local OAuth settings and keep setup active through propagation."""
     from installer import FORMATTER
@@ -443,8 +438,7 @@ def _verify_saved_oauth_client(client_id, redirect_uri):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_credential_retention_message
-# @features setup
-# @dimensions oauth credential-file secrets retention rotation
+# @matrix setup : credential-file oauth retention rotation secrets
 def _print_oauth_file_retention_message(credential_path=OAUTH_CLIENT_FILE):
     """Explain the local credential file's post-setup retention choices."""
     print(
@@ -478,8 +472,7 @@ def _get_admin_email(value):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_google_signin_is_an_explicit_preserved_setup_choice
-# @features setup
-# @dimensions google-oauth optional settings-save rerun
+# @matrix setup : google-oauth optional rerun settings-save
 def configure_google_signin_choice():
     """Read or collect the persisted operator choice for Google sign-in."""
     from config import SETTINGS
@@ -516,7 +509,8 @@ def configure_google_signin_choice():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_setup_collects_owner_and_requires_google_before_confirmation
-# @pairs setup:owner setup:preconfirmation admin:google-oauth admin:interactive-input
+# @matrix admin : google-oauth interactive-input
+# @matrix setup : owner preconfirmation
 def collect_owner_and_signin_choice():
     """Collect permanent application ownership before cloud-change confirmation."""
     from config import SETTINGS
@@ -533,8 +527,7 @@ def collect_owner_and_signin_choice():
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_disabled_google_signin_skips_oauth_setup
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_admin_oauth_rejection_precedes_provider_update
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_existing_admin_oauth_can_replace_rejected_saved_client
-# @features setup
-# @dimensions admin oauth settings-save client-type redirect-uri failure-isolation identity-platform interactive-retry optional disabled-provider
+# @matrix setup : admin client-type disabled-provider failure-isolation identity-platform interactive-retry oauth optional redirect-uri settings-save
 def setup_admin_and_oauth():
     """Configure the admin and Identity Platform's Google provider."""
     from config import SETTINGS
@@ -594,8 +587,7 @@ def setup_admin_and_oauth():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_oauth_cli_replaces_settings_and_deploys
-# @features setup
-# @dimensions oauth cli client-type redirect-uri identity-platform settings-save deploy
+# @matrix setup : cli client-type deploy identity-platform oauth redirect-uri settings-save
 def configure_oauth():
     """Replace Google Sign-In OAuth settings for an existing installation."""
     from .verify import prepare_existing_installation

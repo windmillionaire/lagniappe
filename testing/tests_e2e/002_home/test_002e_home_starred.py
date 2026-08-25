@@ -91,8 +91,7 @@ def _patch_star(user, key):
     )
 
 
-# @features starred
-# @dimensions category title-menu
+# @matrix starred : category title-menu
 # @template menus.html::star
 @pytest.mark.e2e
 def test_star_category(get_user):
@@ -144,8 +143,7 @@ def test_star_category(get_user):
     expect(starred_category).to_be_visible()
 
 
-# @features starred
-# @dimensions project title-menu
+# @matrix starred : project title-menu
 # @template menus.html::star
 @pytest.mark.e2e
 def test_star_project(get_user):
@@ -200,7 +198,7 @@ def test_star_project(get_user):
     assert star_button.is_starred is True
 
 
-# @pairs starred:page starred:accessible-state starred:title-menu
+# @matrix starred : accessible-state page title-menu
 # @pair view-transition:navigation
 # @template menus.html::star
 @pytest.mark.e2e
@@ -243,8 +241,7 @@ def test_star_page(get_user):
     _title_star_action(user, "Page actions", "Star")
 
 
-# @features starred
-# @dimensions file title-menu
+# @matrix starred : file title-menu
 # @template menus.html::star
 @pytest.mark.e2e
 def test_star_file(get_user):
@@ -268,8 +265,7 @@ def test_star_file(get_user):
     _title_star_action(user, "File actions", "Star")
 
 
-# @pairs starred:authorization starred:missing-target starred:no-mutation
-# @pair starred:retained-inaccessible
+# @matrix starred : authorization missing-target no-mutation retained-inaccessible
 @pytest.mark.e2e
 def test_star_route_rejects_inaccessible_and_missing_targets(
     get_user, browser_failures

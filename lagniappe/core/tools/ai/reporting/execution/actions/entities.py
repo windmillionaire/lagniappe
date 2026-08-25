@@ -142,10 +142,7 @@ def _create_model_task(action, _report, user, created):
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_creates_form_category_page_and_project_chain
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_uses_category_form_from_stored_key_for_page_submission
-# @pair ai-report:create-order
-# @pair ai-report:default-category
-# @pair ai-report:submission-completion
-# @pair ai-report:persistence
+# @matrix ai-report : create-order default-category persistence submission-completion
 def _create_page(action, _report, user, created):
     data = _data(action)
     category = _resolve_entity(
@@ -203,8 +200,7 @@ def _create_page(action, _report, user, created):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_adds_form_to_existing_page_with_undo
-# @pair ai-report:page-form
-# @pair ai-report:idempotent
+# @matrix ai-report : idempotent page-form
 def _add_form_to_page(action, _report, user, created):
     data = _data(action)
     page = _resolve_entity(
@@ -264,13 +260,8 @@ def _add_form_to_page(action, _report, user, created):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_entities.py::test_run_report_adds_page_category_without_changing_primary_with_undo
-# @pair ai-report:add-category
-# @pair ai-report:deterministic-run
-# @pair ai-report:idempotent
-# @pair categories:add-category
-# @pair categories:deterministic-run
-# @pair categories:idempotent
-# @pair categories:undo
+# @matrix ai-report : add-category deterministic-run idempotent
+# @matrix categories : add-category deterministic-run idempotent undo
 def _add_category(action, _report, user, created):
     data = _data(action)
     page = _resolve_entity(

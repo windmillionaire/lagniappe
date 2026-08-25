@@ -247,8 +247,7 @@ def _is_stdlib_module(root):
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirements
 # @tests tests_tooling/test_003_config.py::test_runtime_upload_boundary_has_no_local_orchestration_imports
-# @features deploy
-# @dimensions deploy-surface imports requirements gcloudignore package-boundary
+# @matrix deploy : deploy-surface gcloudignore imports package-boundary requirements
 def runtime_deploy_surface_issues(app_dir=None):
     """Return import issues that would break after App Engine upload/install."""
     app_dir = Path(app_dir or Directory.APP.value)
@@ -300,8 +299,7 @@ def runtime_deploy_surface_issues(app_dir=None):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirements
-# @features deploy
-# @dimensions deploy-surface imports requirements gcloudignore
+# @matrix deploy : deploy-surface gcloudignore imports requirements
 def verify_runtime_deploy_surface(app_dir=None):
     issues = runtime_deploy_surface_issues(app_dir)
     if not issues:
@@ -315,8 +313,7 @@ def verify_runtime_deploy_surface(app_dir=None):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_deploy_version_update_keeps_package_lock_in_sync
-# @features deploy
-# @dimensions version package-lock transactional-state utf8
+# @matrix deploy : package-lock transactional-state utf8 version
 def update_package_lock_version(version, lock_path=None):
     """Keep package-lock root metadata aligned with package.json."""
     path = lock_path or File.PACKAGE_JSON.value.with_name("package-lock.json")
@@ -383,8 +380,7 @@ def _deploy_app_yaml(file_ref, quiet=False):
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
-# @features deploy
-# @dimensions version build app-yaml index-yaml
+# @matrix deploy : app-yaml build index-yaml version
 def deploy(
     *,
     build_assets=True,

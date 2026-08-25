@@ -36,9 +36,8 @@ GET_ENTITY = types.FunctionDeclaration(
 # @tests tests_unit/test_015_ai_tools.py::test_get_entity_returns_full_form_schema_for_ai_autofill
 # @tests tests_unit/test_015_ai_tools.py::test_get_entity_returns_model_task_form_schema_for_ai_autofill
 # @tests tests_unit/test_015_ai_tools.py::test_get_entity_loads_model_task_form_schema_from_stored_key
-# @pairs ai:tool-context ai:autofill form-schema:schema
-# @pairs form-schema:model-task form-schema:attached-form form-schema:stored-key
-# @pair form-schema:autofill
+# @matrix ai : autofill tool-context
+# @matrix form-schema : attached-form autofill model-task schema stored-key
 def execute_get_entity(args, user):
     identifier = args.get("id")
     if not identifier:

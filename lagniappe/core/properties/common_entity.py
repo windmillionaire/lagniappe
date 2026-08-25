@@ -26,8 +26,7 @@ from .base_db import DBProperty
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_entity_name
 # @tests tests_unit/test_002_entity_general_properties.py::test_entity_name_list_values_normalized_on_write_and_import
-# @features name
-# @dimensions property, details, filter, list-normalization, import
+# @matrix name : details filter import list-normalization property
 class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProperty):
     """Entity name. Primary display and search identifier.
 
@@ -79,16 +78,14 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_name
-    # @features name
-    # @dimensions sort
+    # @pair name:sort
     @property
     def sort_value(self):
         return self.value.replace("The ", "").lower() if self.value else None
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_name
-    # @features name
-    # @dimensions column
+    # @pair name:column
     @property
     def column_value(self):
         return self.entity.details
@@ -96,8 +93,7 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
     # AI Attributes
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_name
-    # @features name
-    # @dimensions ai
+    # @pair name:ai
     @property
     def ai_key(self):
         return f"{self.entity.entity_kind}_name"
@@ -139,8 +135,7 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
     # Cache Attributes
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_name
-    # @features name
-    # @dimensions cache
+    # @pair name:cache
     @property
     def cache_value(self):
         return self.value
@@ -167,8 +162,7 @@ class Name(CacheMixin, ColumnMixin, DetailsMixin, AIMixin, FilterMixin, DBProper
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_project_description
 # @tests tests_unit/test_013_task_properties.py::test_task_description
-# @features project, task
-# @dimensions column
+# @matrix project task : column
 class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty):
     """Entity description. HTML tags are stripped on set.
 
@@ -193,8 +187,7 @@ class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_005_project_properties.py::test_project_description
     # @tests tests_unit/test_013_task_properties.py::test_task_description
-    # @features project, task
-    # @dimensions description, html-stripping
+    # @matrix project task : description html-stripping
     @property
     def value(self):
         return super().value
@@ -236,8 +229,7 @@ class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_005_project_properties.py::test_project_description
     # @tests tests_unit/test_013_task_properties.py::test_task_description
-    # @features project, task
-    # @dimensions filter-value
+    # @matrix project task : filter-value
     @property
     def filter_value(self):
         return self.value if self.value else None
@@ -248,8 +240,7 @@ class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_005_project_properties.py::test_project_description
     # @tests tests_unit/test_013_task_properties.py::test_task_description
-    # @features project, task
-    # @dimensions cache
+    # @matrix project task : cache
     @property
     def cache_value(self):
         return self.value
@@ -258,8 +249,7 @@ class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_005_project_properties.py::test_project_description
     # @tests tests_unit/test_013_task_properties.py::test_task_description
-    # @features project, task
-    # @dimensions ai-value
+    # @matrix project task : ai-value
     @property
     def ai_key(self):
         if isinstance(self.entity, Entities.PAGE):
@@ -271,8 +261,7 @@ class Description(CacheMixin, ColumnMixin, AIMixin, FilterMixin, DBProperty):
 
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_entity_created_update_initializes_once
-# @features created
-# @dimensions update, initialized-once
+# @matrix created : initialized-once update
 class Created(DateMixin, ColumnMixin, FilterMixin, DBProperty):
     """Entity creation timestamp. Read-only after creation.
 
@@ -304,8 +293,7 @@ class Created(DateMixin, ColumnMixin, FilterMixin, DBProperty):
 
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_entity_modified
-# @features modified
-# @dimensions property, date, column, filter
+# @matrix modified : column date filter property
 class Modified(DateMixin, ColumnMixin, FilterMixin, DBProperty):
     """Entity last-modified timestamp.
 
@@ -375,8 +363,7 @@ class Kind(DetailsMixin, CacheMixin, DBProperty):
     # DB Attributes
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_kind
-    # @features kind
-    # @dimensions property, db-key
+    # @matrix kind : db-key property
     @property
     def db_key(self):
         return "type"
@@ -384,8 +371,7 @@ class Kind(DetailsMixin, CacheMixin, DBProperty):
     # Details Attributes
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_kind
-    # @features kind
-    # @dimensions details
+    # @pair kind:details
     @property
     def details_value(self):
         if isinstance(self.entity, Entities.PAGE) and self.entity.db.get("user"):
@@ -396,8 +382,7 @@ class Kind(DetailsMixin, CacheMixin, DBProperty):
     # Cache Attributes
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_kind
-    # @features kind
-    # @dimensions cache
+    # @pair kind:cache
     @property
     def cache_value(self):
         return self.details_value
@@ -429,8 +414,7 @@ class Requires(CacheMixin, DetailsMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_requires
     # @tests tests_unit/test_006b_ingress_entity.py::test_model_task_required_reports_unloaded_project_relation
-    # @features requires
-    # @dimensions property validation
+    # @matrix requires : property validation
     @property
     def value(self):
         value = super().value
@@ -480,8 +464,7 @@ class Requires(CacheMixin, DetailsMixin, DBProperty):
     # Cache Attributes
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_requires
-    # @features requires
-    # @dimensions cache
+    # @pair requires:cache
     @property
     def cache_value(self):
         if isinstance(self.entity, Entities.PAGE) and self.entity.user:
@@ -492,8 +475,7 @@ class Requires(CacheMixin, DetailsMixin, DBProperty):
     # Details Attributes
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_requires
-    # @features requires
-    # @dimensions details
+    # @pair requires:details
     @property
     def details_value(self):
         return self.value
@@ -531,8 +513,7 @@ class Hash(DetailsMixin, CacheMixin, FilterMixin, AIMixin, DBProperty):
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_hash
-    # @features hash
-    # @dimensions property, details, cache
+    # @matrix hash : cache details property
     @property
     def value(self):
         value = super().value
@@ -560,8 +541,7 @@ class Hash(DetailsMixin, CacheMixin, FilterMixin, AIMixin, DBProperty):
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_hash
-    # @features hash
-    # @dimensions filter
+    # @pair hash:filter
     @property
     def filter_key(self):
         return "cache_key"
@@ -569,8 +549,7 @@ class Hash(DetailsMixin, CacheMixin, FilterMixin, AIMixin, DBProperty):
 
 # @testable true
 # @tests tests_unit/test_005_project_properties.py::test_project_attributes_empty_list_stays_persisted
-# @features project
-# @dimensions attributes blank-persistence
+# @matrix project : attributes blank-persistence
 class Attributes(DBProperty):
     """Configurable entity attributes (e.g. scheduling, document features).
 
@@ -597,8 +576,7 @@ class Attributes(DBProperty):
     # @tests tests_unit/test_005_project_properties.py::test_project_attributes
     # @tests tests_unit/test_007_category_properties.py::test_category_attributes
     # @tests tests_unit/test_008_page_properties.py::test_page_attributes
-    # @features project, category, page
-    # @dimensions attributes, defaults
+    # @matrix category page project : attributes defaults
     @property
     def value(self):
         if self.is_set:
@@ -659,8 +637,7 @@ class DeferredJobReference(DBProperty):
 
 # @testable true
 # @tests tests_unit/test_002_entity_general_properties.py::test_public_id_generation_is_unique_and_persisted
-# @features public-id
-# @dimensions generation, uniqueness, persistence
+# @matrix public-id : generation persistence uniqueness
 class PublicID(DBProperty):
     """Public URL identifier for publicly visible entities.
 
@@ -717,8 +694,7 @@ class IsPublic(FilterMixin, DBProperty):
     # @tests tests_unit/test_005_project_properties.py::test_project_is_public
     # @tests tests_unit/test_008_page_properties.py::test_page_public
     # @tests tests_unit/test_009a_user.py::test_user_is_public
-    # @features project, page, user
-    # @dimensions public
+    # @matrix page project user : public
     @property
     def value(self):
         return self.entity.db.get("public", False)
@@ -737,8 +713,7 @@ class IsPublic(FilterMixin, DBProperty):
     # @testable true
     # @tests tests_unit/test_005_project_properties.py::test_project_is_public
     # @tests tests_unit/test_008_page_properties.py::test_page_public
-    # @features project, page
-    # @dimensions filter-value
+    # @matrix page project : filter-value
     @property
     def filter_value(self):
         return True if self.value else False
@@ -763,8 +738,7 @@ class IsPublic(FilterMixin, DBProperty):
 # @testable true
 # @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
 # @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode
-# @features projects, categories
-# @dimensions ai-generated, ai-create
+# @matrix categories projects : ai-create ai-generated
 class AiGenerated(DBProperty):
     """Flag indicating whether an entity was generated by AI."""
 
@@ -805,8 +779,7 @@ class Active(DBProperty):
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_active
     # @tests tests_unit/test_002_entity_general_properties.py::test_entity_active_rejects_non_bool
-    # @features active
-    # @dimensions property, public-user validation
+    # @matrix active : property public-user validation
     @property
     def value(self):
         if getattr(self.entity, "user", None) and self.entity.user.is_public:
@@ -894,8 +867,7 @@ class RestrictedTo(CacheMixin, DBProperty):
     # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_group_restricted_form_opens_for_group_member_only
     # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_index_lists_group_restricted_form_only_for_group_member
     # @tests tests_unit/test_002_entity_general_properties.py::test_restricted_to_effective_projection_does_not_alias_sources
-    # @features forms
-    # @dimensions access-restrictions owner-restricted group-restricted index-filter inheritance side-effect-free stable-order
+    # @matrix forms : access-restrictions group-restricted index-filter inheritance owner-restricted side-effect-free stable-order
     @property
     def value(self):
         if self.is_set:
@@ -921,8 +893,7 @@ class RestrictedTo(CacheMixin, DBProperty):
 
     # @testable true
     # @tests tests_unit/test_002_entity_general_properties.py::test_restricted_to_effective_projection_does_not_alias_sources
-    # @features forms
-    # @dimensions access-restrictions stored-projection side-effect-free
+    # @matrix forms : access-restrictions side-effect-free stored-projection
     @property
     def stored(self):
         value = self.entity.db.get(self.id)
@@ -931,8 +902,7 @@ class RestrictedTo(CacheMixin, DBProperty):
     # @testable true
     # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_owner_can_restrict_form_to_site_owner
     # @tests tests_unit/test_002_entity_general_properties.py::test_restricted_to_add_preserves_first_seen_order
-    # @features forms
-    # @dimensions access-restrictions owner-restricted stable-order side-effect-free
+    # @matrix forms : access-restrictions owner-restricted side-effect-free stable-order
     def add(self, value):
         existing = self.stored
 

@@ -17,8 +17,7 @@ from lagniappe.core.tools.site import recovery
 pytestmark = pytest.mark.unit
 
 
-# @features admin
-# @dimensions deployment-settings metadata config
+# @matrix admin : config deployment-settings metadata
 def test_deployment_settings_merge_live_values_over_runtime_defaults(monkeypatch):
     config = SimpleNamespace(
         **{key: value for key, value in site_admin.DEFAULT_DEPLOYMENT_SETTINGS.items()}
@@ -37,8 +36,7 @@ def test_deployment_settings_merge_live_values_over_runtime_defaults(monkeypatch
     assert "version" not in settings
 
 
-# @features admin
-# @dimensions ai-settings metadata config
+# @matrix admin : ai-settings config metadata
 def test_ai_settings_payload_normalizes_runtime_settings_against_discovery(monkeypatch):
     config = SimpleNamespace(
         GOOGLE_CLOUD_PROJECT="demo-project",
@@ -68,8 +66,7 @@ def test_ai_settings_payload_normalizes_runtime_settings_against_discovery(monke
     assert discovered[0]["current_settings"] is settings
 
 
-# @features admin
-# @dimensions site-update audit
+# @matrix admin : audit site-update
 def test_site_updates_return_the_migration_report(monkeypatch):
     report = {"status": "current", "counts": {"complete": 2}}
     monkeypatch.setattr(
@@ -81,8 +78,7 @@ def test_site_updates_return_the_migration_report(monkeypatch):
     assert site_admin.run_site_updates() is report
 
 
-# @features cache
-# @dimensions migration-gate pending
+# @matrix cache : migration-gate pending
 def test_cache_rebuild_is_blocked_until_migrations_are_current(monkeypatch):
     report = {"status": "pending", "cache_refresh_allowed": False}
     monkeypatch.setattr(
@@ -102,8 +98,7 @@ def test_cache_rebuild_is_blocked_until_migrations_are_current(monkeypatch):
     assert result.migration_status is report
 
 
-# @features cache
-# @dimensions migration-gate current batching
+# @matrix cache : batching current migration-gate
 def test_cache_rebuild_rehydrates_entities_in_bounded_chunks(monkeypatch):
     report = {"status": "current", "cache_refresh_allowed": True}
     deleted = []
@@ -167,8 +162,7 @@ def _stored_entity(entity_class, key, **values):
     return entity
 
 
-# @features cache
-# @dimensions current batching nested-relations
+# @matrix cache : batching current nested-relations
 def test_cache_rebuild_materializes_nested_relations_across_batch_boundaries(
     monkeypatch,
 ):
@@ -233,8 +227,7 @@ def test_cache_rebuild_materializes_nested_relations_across_batch_boundaries(
     assert projections[page_key]["requires"] == "users,grouped-viewers"
 
 
-# @features admin
-# @dimensions recovery-export live-settings
+# @matrix admin : live-settings recovery-export
 def test_recovery_snapshot_merges_live_settings(monkeypatch):
     persisted = {"SECRET_KEY": "application-secret"}
     monkeypatch.setattr(
@@ -265,8 +258,7 @@ def test_recovery_snapshot_merges_live_settings(monkeypatch):
     assert snapshot["AI_MODEL"] == "live-model"
 
 
-# @features admin
-# @dimensions recovery-export failure-isolation
+# @matrix admin : failure-isolation recovery-export
 def test_recovery_snapshot_failures_use_safe_public_messages(monkeypatch):
     monkeypatch.setattr(
         recovery.site_database,

@@ -164,7 +164,7 @@ const remoteTransactionFlashes = (transaction, userColor, author) => {
  * @testable true
  * @tests tests_js/test_041_editor_decorations.py::test_remote_change_flash_decorations_map_and_expire
  * @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
- * @pair editor:remote-highlight
+ * @pairs editor:remote-highlight sync:document
  */
 export const FlashRemoteChanges = Extension.create({
 	name: "flashRemoteChanges",
@@ -191,14 +191,19 @@ export const FlashRemoteChanges = Extension.create({
 	},
 
 	onTransaction({ editor, transaction, appendedTransactions }) {
+		// @pair sync:document
 		const storage = this.storage;
+		// @pair sync:document
 		const transactions = [transaction, ...appendedTransactions];
+		// @pair sync:document
 		let addedFlashes = false;
 
+		// @pair sync:document
 		for (const tr of transactions) {
 			storage.flashes = mapFlashes(storage.flashes, tr);
 			if (!tr.getMeta("y-sync$") || !storage.color) continue;
 
+			// @pair sync:document
 			const newFlashes = remoteTransactionFlashes(
 				tr,
 				storage.color,
@@ -208,9 +213,11 @@ export const FlashRemoteChanges = Extension.create({
 
 			storage.flashes.push(...newFlashes);
 			addedFlashes = true;
+			// @pair sync:document
 			for (const decorationId of new Set(newFlashes.map(({ id }) => id))) {
 				const timeout = setTimeout(() => {
 					storage.timeouts.delete(decorationId);
+					// @pair sync:document
 					const remaining = storage.flashes.filter(
 						({ id }) => id !== decorationId,
 					);
@@ -231,6 +238,7 @@ export const FlashRemoteChanges = Extension.create({
 	},
 
 	onDestroy() {
+		// @pair sync:document
 		for (const timeout of this.storage.timeouts.values()) {
 			clearTimeout(timeout);
 		}

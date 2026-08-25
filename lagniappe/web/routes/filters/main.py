@@ -74,8 +74,7 @@ def _definition_is_entity_valued(definition):
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_number_condition
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_checkbox_condition
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_select_condition
-# @features filters
-# @dimensions string-condition boolean-condition number-condition select-condition attached-form run-results
+# @matrix filters : attached-form boolean-condition number-condition run-results select-condition string-condition
 def _filter_results_response(entity, compiled):
     new_filter = Entities.FILTER.create(entity, compiled, temporary=True)
     cache = FilterCache(new_filter.parent)
@@ -90,24 +89,21 @@ def _filter_results_response(entity, compiled):
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name_exact
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_no_results
-# @features filters
-# @dimensions string-condition exact-match empty-results run-results
+# @matrix filters : empty-results exact-match run-results string-condition
 def _string_filter_results_response(entity, definitions):
     return _filter_results_response(entity, definitions)
 
 
 # @testable false
 # @reason status branch delegates to common filter result rendering
-# @features filters
-# @dimensions boolean-condition completed in-progress run-results
+# @matrix filters : boolean-condition completed in-progress run-results
 def _status_filter_results_response(entity, definitions):
     return _filter_results_response(entity, definitions)
 
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_due_date
-# @features filters
-# @dimensions date-condition run-results
+# @matrix filters : date-condition run-results
 def _date_filter_results_response(entity, definitions):
     return _filter_results_response(entity, definitions)
 
@@ -117,16 +113,14 @@ def _date_filter_results_response(entity, definitions):
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_category
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_model_task
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_additional_category
-# @features filters
-# @dimensions entity-condition category model-task run-results
+# @matrix filters : category entity-condition model-task run-results
 def _entity_filter_results_response(entity, definitions):
     return _filter_results_response(entity, definitions)
 
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_multiple_conditions
-# @features filters
-# @dimensions compound run-results
+# @matrix filters : compound run-results
 def _compound_filter_results_response(entity, definitions):
     return _filter_results_response(entity, definitions)
 
@@ -180,9 +174,7 @@ def test(key, **kwargs):
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_save
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_saved_in_progress_filter_removes_completed_task_after_back_navigation
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filter_save_and_run
-# @features filters
-# @dimensions save saved-filter reload-persistence
-# @pair filters:saved-filter
+# @matrix filters : save saved-filter saved-filters
 @filters.route("<key>/save", methods=["POST"])
 @permission(requested=Action.EDIT)
 def save(key, **kwargs):
@@ -201,8 +193,7 @@ def save(key, **kwargs):
 # @testable true
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_save
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_saved_filter_save_and_run
-# @features filters
-# @dimensions saved-filters reload-persistence shared-viewer
+# @matrix filters : reload-persistence saved-filters shared-viewer
 @filters.route("<key>/get", methods=["GET"])
 @permission(requested=Action.VIEW)
 def get(key, **kwargs):
@@ -227,8 +218,7 @@ def get(key, **kwargs):
 # @testable true
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_category
-# @features filters
-# @dimensions run-results
+# @pair filters:run-results
 @filters.route("/<key>", methods=["GET"])
 @permission(requested=Action.VIEW)
 def run(key, **kwargs):
@@ -271,24 +261,21 @@ def _condition_options_response(updates, condition):
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name_exact
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_page_name
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_page_description
-# @features filters
-# @dimensions string-condition exact-match
+# @matrix filters : exact-match string-condition
 def _string_condition_options_response(updates, condition):
     return _condition_options_response(updates, condition)
 
 
 # @testable false
 # @reason status branch delegates to common condition option rendering
-# @features filters
-# @dimensions boolean-condition completed in-progress
+# @matrix filters : boolean-condition completed in-progress
 def _status_condition_options_response(updates, condition):
     return _condition_options_response(updates, condition)
 
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_due_date
-# @features filters
-# @dimensions date-condition
+# @pair filters:date-condition
 def _date_condition_options_response(updates, condition):
     return _condition_options_response(updates, condition)
 
@@ -297,16 +284,14 @@ def _date_condition_options_response(updates, condition):
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_category
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_assigned_user
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_additional_category
-# @features filters
-# @dimensions entity-condition category assigned-user
+# @matrix filters : assigned-user category entity-condition
 def _entity_condition_options_response(updates, condition):
     return _condition_options_response(updates, condition)
 
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_model_task
-# @features filters
-# @dimensions entity-condition model-task
+# @matrix filters : entity-condition model-task
 def _dynamic_entity_condition_response(updates, condition, related_entity):
     if isinstance(related_entity, Entities.FORM):
         updates["form"] = related_entity.urlsafe_key
@@ -435,8 +420,7 @@ def _options_values(condition, field, comparator):
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_number_condition
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_checkbox_condition
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_attached_form_select_condition
-# @features filters
-# @dimensions string-condition boolean-condition number-condition select-condition attached-form
+# @matrix filters : attached-form boolean-condition number-condition select-condition string-condition
 def _filter_options_response(updates, condition, values, comparator):
     if comparator == "BETWEEN" and len(values) < 2:
         return responses.error(f"{updates['field']} must have both a from and to value")
@@ -459,24 +443,21 @@ def _filter_options_response(updates, condition, values, comparator):
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_task_name_exact
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_page_name
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_page_description
-# @features filters
-# @dimensions string-condition exact-match
+# @matrix filters : exact-match string-condition
 def _string_filter_options_response(updates, condition, values, comparator):
     return _filter_options_response(updates, condition, values, comparator)
 
 
 # @testable false
 # @reason status branch delegates to common filter option rendering
-# @features filters
-# @dimensions boolean-condition completed in-progress
+# @matrix filters : boolean-condition completed in-progress
 def _status_filter_options_response(updates, condition, values, comparator):
     return _filter_options_response(updates, condition, values, comparator)
 
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_due_date
-# @features filters
-# @dimensions date-condition
+# @pair filters:date-condition
 def _date_filter_options_response(updates, condition, values, comparator):
     return _filter_options_response(updates, condition, values, comparator)
 
@@ -485,8 +466,7 @@ def _date_filter_options_response(updates, condition, values, comparator):
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_category
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_assigned_user
 # @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_filter_by_additional_category
-# @features filters
-# @dimensions entity-condition category assigned-user
+# @matrix filters : assigned-user category entity-condition
 def _entity_filter_options_response(updates, condition, values, comparator):
     return _filter_options_response(updates, condition, values, comparator)
 
@@ -549,8 +529,7 @@ def options(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_save
-# @features filters
-# @dimensions delete saved-filters reload-persistence
+# @matrix filters : delete reload-persistence saved-filters
 @filters.route("/<key>/delete", methods=["DELETE"])
 @permission(requested=Action.EDIT)
 def delete(key, **kwargs):

@@ -16,8 +16,7 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.test_entities import TestEntities
 
 
-# @features ai-report permissions
-# @dimensions creator owner unrelated-user delete view
+# @matrix ai-report permissions : creator delete owner unrelated-user view
 @pytest.mark.unit
 def test_ai_report_permissions_follow_creator_ownership():
     creator = _permissioned_user("report-creator", {})
@@ -40,8 +39,7 @@ def test_ai_report_permissions_follow_creator_ownership():
     assert not report.allowed(Action.VIEW, user=unrelated)
 
 
-# @features ai-report
-# @dimensions create files status delete ask answer-html html-sanitization upload-manifest proposal
+# @matrix ai-report : answer-html ask create delete files html-sanitization proposal status upload-manifest
 @pytest.mark.unit
 def test_ai_report_create_and_file_cleanup(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -119,8 +117,7 @@ def test_ai_report_create_and_file_cleanup(monkeypatch):
     assert [f for f in report.input_files if not f.has_references] == []
 
 
-# @features ai-report
-# @dimensions process-state canonical-storage
+# @matrix ai-report : canonical-storage process-state
 @pytest.mark.unit
 def test_ai_report_process_state_stores_report_metadata(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -222,15 +219,13 @@ def test_ai_report_process_state_stores_report_metadata(monkeypatch):
     assert ask_report.note == "Model returned no text content."
 
 
-# @features ai-report
-# @dimensions display-registry action-contracts
+# @matrix ai-report : action-contracts display-registry
 @pytest.mark.unit
 def test_ai_report_display_registry_covers_action_contracts():
     assert set(ACTION_DISPLAY_REGISTRY) == ALLOWED_ACTIONS
 
 
-# @features ai-report
-# @dimensions proposal details classification feedback
+# @matrix ai-report : classification details feedback proposal
 @pytest.mark.unit
 def test_ai_report_proposal_display_actions_show_decision_details(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -420,9 +415,7 @@ def test_ai_report_proposal_display_actions_show_decision_details(monkeypatch):
     ]
 
 
-# @pair ai-report:proposal
-# @pair ai-report:details
-# @pair ai-report:rename
+# @matrix ai-report : details proposal rename
 @pytest.mark.unit
 def test_ai_report_proposal_display_actions_show_rename_entity_details():
     user = _test_user("proposal-rename-owner")
@@ -458,8 +451,7 @@ def test_ai_report_proposal_display_actions_show_rename_entity_details():
     ]
 
 
-# @features ai-report
-# @dimensions proposal details submission-empty-reason
+# @matrix ai-report : details proposal submission-empty-reason
 @pytest.mark.unit
 def test_ai_report_proposal_display_actions_show_empty_submission_reason():
     user = _test_user("proposal-empty-submission-owner")
@@ -504,8 +496,7 @@ def test_ai_report_proposal_display_actions_show_empty_submission_reason():
     ]
 
 
-# @features ai-report files
-# @dimensions proposal details move-file grouped-display
+# @matrix ai-report files : details grouped-display move-file proposal
 @pytest.mark.unit
 def test_ai_report_proposal_display_actions_group_move_files_under_target_page(
     monkeypatch,
@@ -587,8 +578,7 @@ def test_ai_report_proposal_display_actions_group_move_files_under_target_page(
     ]
 
 
-# @features ai-report files
-# @dimensions proposal details fallback-labels
+# @matrix ai-report files : details fallback-labels proposal
 @pytest.mark.unit
 def test_ai_report_proposal_display_actions_humanize_generated_action_ids(
     monkeypatch,
@@ -632,8 +622,7 @@ def test_ai_report_proposal_display_actions_humanize_generated_action_ids(
     assert actions[0]["support"][0]["value"] == "Richardson"
 
 
-# @features ai-report categories
-# @dimensions proposal details grouped-display add-category
+# @matrix ai-report categories : add-category details grouped-display proposal
 @pytest.mark.unit
 def test_ai_report_proposal_display_actions_groups_added_categories_under_page(
     monkeypatch,
@@ -687,8 +676,7 @@ def test_ai_report_proposal_display_actions_groups_added_categories_under_page(
     ]
 
 
-# @features ai-report categories files
-# @dimensions proposal details existing-page-category attachment-grouping
+# @matrix ai-report categories files : attachment-grouping details existing-page-category proposal
 @pytest.mark.unit
 def test_ai_report_proposal_display_actions_show_existing_page_category_for_attachments(
     monkeypatch,
@@ -752,8 +740,7 @@ def test_ai_report_proposal_display_actions_show_existing_page_category_for_atta
     ]
 
 
-# @features ai-report
-# @dimensions proposal details normalized-references display-labels
+# @matrix ai-report : details display-labels normalized-references proposal
 @pytest.mark.unit
 def test_ai_report_proposal_display_actions_resolve_normalized_entity_refs(
     monkeypatch,
@@ -843,8 +830,7 @@ def test_ai_report_proposal_display_actions_resolve_normalized_entity_refs(
     ]
 
 
-# @features ai-report
-# @dimensions proposal completed-task grouped-display
+# @matrix ai-report : completed-task grouped-display proposal
 @pytest.mark.unit
 def test_ai_report_proposal_display_actions_group_completed_task_events(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -939,8 +925,7 @@ def test_ai_report_proposal_display_actions_group_completed_task_events(monkeypa
     )
 
 
-# @features ai-report form-schema
-# @dimensions proposal details schema-section skip-grouping
+# @matrix ai-report form-schema : details proposal schema-section skip-grouping
 @pytest.mark.unit
 def test_ai_report_proposal_display_actions_group_schema_updates_separately(
     monkeypatch,

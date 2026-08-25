@@ -64,8 +64,8 @@ def _project_model(project, task_key):
 # @tests tests_e2e/004_projects/test_004a_project.py::test_create_model_task_with_form
 # @tests tests_e2e/004_projects/test_004g_project_mobile_ui.py::test_mobile_create_model_form_opens_from_model_tasks_section
 # @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_project_editor_can_open_model_task_creation
-# @features model-tasks
-# @dimensions create attach-form permission-gates
+# @matrix model-tasks : attach-form create permission-gates
+# @pair entity-layout:project-mobile
 @projects.route("<key>/create-model", methods=["POST"])
 @permission(Resource.PROJECT, Action.EDIT)
 def create_model(key, **kwargs):
@@ -99,8 +99,7 @@ def model_info(key, task_key, **kwargs):
 # @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_change_model_task_form
 # @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task_form
 # @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_model_task_mutations_require_route_project_membership
-# @features model-tasks
-# @dimensions update name form-change form-clear parent-membership
+# @matrix model-tasks : form-change form-clear name parent-membership update
 @projects.route("<key>/update-model/<task_key>", methods=["PUT"])
 @permission(Resource.PROJECT, Action.EDIT)
 def update_model(key, task_key, **kwargs):
@@ -123,8 +122,7 @@ def update_model(key, task_key, **kwargs):
 # @testable true
 # @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task
 # @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_model_task_mutations_require_route_project_membership
-# @features model-tasks
-# @dimensions delete parent-membership
+# @matrix model-tasks : delete parent-membership
 @projects.route("<key>/delete-model/<task_key>", methods=["DELETE"])
 @permission(Resource.PROJECT, Action.EDIT)
 def delete_model(key, task_key, **kwargs):
@@ -181,8 +179,7 @@ def _status_filter(project, model, completed):
 # @testable true
 # @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_completed_button
 # @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_in_progress_button
-# @features model-tasks
-# @dimensions status-filter completed in-progress
+# @matrix model-tasks : completed in-progress status-filter
 @projects.route("<key>/status/<task_key>", methods=["GET"])
 @permission(Resource.PROJECT, Action.VIEW)
 def status(key, task_key, **kwargs):

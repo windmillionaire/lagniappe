@@ -10,7 +10,7 @@ let invalidStateReported = false;
  *
  * @testable true
  * @tests tests_js/test_036_notification_state.py::test_notification_state_updates_badge_and_reports_cache_miss
- * @pairs notifications:badge notifications:accessible-state
+ * @matrix notifications : accessible-state badge
  */
 export const renderNotificationBadge = (count) => {
 	const normalized = Number.isInteger(Number(count)) ? Number(count) : 0;
@@ -69,7 +69,7 @@ const _normalized = (raw) => {
  *
  * @testable true
  * @tests tests_js/test_036_notification_state.py::test_notification_state_updates_badge_and_reports_cache_miss
- * @pairs notifications:badge notifications:redis-projection notifications:cold-seed
+ * @matrix notifications : badge cold-seed redis-projection
  */
 export const applyNotificationState = (raw) => {
 	const state = _normalized(raw);

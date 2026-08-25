@@ -13,8 +13,7 @@ SCHEDULE_PATTERN_TYPES = frozenset(
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_report_task_schedule_contract_validates_supported_patterns
-# @features ai-report task-scheduling
-# @dimensions structured-output recurring scheduled periodic validation
+# @matrix ai-report task-scheduling : periodic recurring scheduled structured-output validation
 def task_schedule_response_schema():
     """Return the provider schema for one reviewed task schedule."""
     return {
@@ -99,8 +98,7 @@ def _optional_text(schedule, key):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_report_task_schedule_contract_validates_supported_patterns
-# @features ai-report task-scheduling
-# @dimensions recurring scheduled periodic validation normalization
+# @matrix ai-report task-scheduling : normalization periodic recurring scheduled validation
 def validate_task_schedule(schedule):
     """Validate and normalize a report ``create_task.data.schedule`` object."""
     if not isinstance(schedule, dict):
@@ -181,8 +179,7 @@ def validate_task_schedule(schedule):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_creates_task_with_reviewed_schedule
-# @features ai-report task-scheduling
-# @dimensions persistence recurring
+# @matrix ai-report task-scheduling : persistence recurring
 def apply_task_schedule(task, schedule):
     """Apply an already validated schedule without making another model call."""
     normalized = validate_task_schedule(schedule)

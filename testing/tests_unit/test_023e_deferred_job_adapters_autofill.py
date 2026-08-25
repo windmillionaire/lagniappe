@@ -21,10 +21,7 @@ from lagniappe.core.tools.deferred_jobs.errors import (
 pytestmark = pytest.mark.unit
 
 
-# @features deferred-jobs
-# @dimensions form-revision form-only drift
-# @pair deferred-jobs:form-revision
-# @pair ai:autofill
+# @pairs ai:autofill deferred-jobs:form-revision
 def test_autofill_revision_tracks_only_form_apply_state():
     class Target(SubmitterMixin):
         pass
@@ -62,10 +59,7 @@ def test_autofill_revision_tracks_only_form_apply_state():
     assert target.autofill_revision != original
 
 
-# @features deferred-jobs
-# @dimensions target-editor status authorization
-# @pair deferred-jobs:status
-# @pair ai:collaboration
+# @pairs ai:collaboration deferred-jobs:status
 def test_autofill_status_is_visible_to_target_editor(monkeypatch):
     actor = SimpleNamespace(urlsafe_key="editor-key")
     checked = []
@@ -93,7 +87,7 @@ def test_autofill_status_is_visible_to_target_editor(monkeypatch):
     assert fetches[0].reason is FetchReason.PERMISSION_REQUIREMENTS_MATERIALIZATION
 
 
-# @pairs deferred-jobs:terminal-cleanup deferred-jobs:form-lock
+# @matrix deferred-jobs : form-lock terminal-cleanup
 def test_autofill_terminal_cleanup_releases_target_lock(monkeypatch):
     target = SimpleNamespace(urlsafe_key="page-key", deferred_job=None)
     context = SimpleNamespace(
@@ -147,8 +141,8 @@ def test_autofill_terminal_cleanup_releases_target_lock(monkeypatch):
     assert released[-1] == ("lock:deleted-page-key", "missing-job-key")
 
 
-# @pairs deferred-jobs:active-operation pages:create-autofill
-# @pairs deferred-jobs:terminal-cleanup deferred-jobs:compare-and-delete
+# @matrix deferred-jobs : active-operation compare-and-delete terminal-cleanup
+# @pair pages:create-autofill
 def test_autofill_page_operation_reference_is_persisted_and_compare_cleared(
     monkeypatch,
 ):
@@ -221,8 +215,7 @@ def test_autofill_page_operation_reference_is_persisted_and_compare_cleared(
     assert saved[-1] == (page, {"property_mask": ("deferred_job",)})
 
 
-# @features deferred-jobs ai files
-# @dimensions autofill summary-dependency pending failed
+# @matrix ai deferred-jobs files : autofill failed pending summary-dependency
 def test_autofill_prepare_waits_for_attached_file_summaries(monkeypatch):
     adapter = autofill_adapters.AutofillAdapter()
     phases = []
@@ -276,8 +269,7 @@ def test_autofill_prepare_waits_for_attached_file_summaries(monkeypatch):
         adapter.prepare(context)
 
 
-# @features deferred-jobs ai files
-# @dimensions autofill upload checkpoint resume
+# @matrix ai deferred-jobs files : autofill checkpoint resume upload
 def test_autofill_upload_checkpoint_records_durable_attachment(monkeypatch):
     adapter = autofill_adapters.AutofillAdapter()
     target = SimpleNamespace()
@@ -345,8 +337,7 @@ def test_autofill_upload_checkpoint_records_durable_attachment(monkeypatch):
     assert phases == [(DeferredJobPhase.PREPARING_INPUTS, {})]
 
 
-# @features deferred-jobs ai files pages tasks
-# @dimensions autofill upload attachment naming idempotency inspection
+# @matrix ai deferred-jobs files pages tasks : attachment autofill idempotency inspection naming upload
 @pytest.mark.parametrize("target_kind", ["page", "task"])
 def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
     class Relation:

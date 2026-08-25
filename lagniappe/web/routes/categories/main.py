@@ -26,13 +26,7 @@ from . import categories
 # @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_page_acl_user_sees_one_page_on_category_index_home_and_search
 # @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_create_scoped_to_one_category
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
-# @features categories
-# @dimensions permission-gates index-filter create-control server-render first-batch
-# @pair categories:permission-gates
-# @pair categories:index-filter
-# @pair categories:create-control
-# @pair categories:server-render
-# @pair categories:first-batch
+# @matrix categories : create-control first-batch index-filter permission-gates server-render
 @categories.route("/<key>", methods=["GET"])
 @timed(profile=True)
 @permission(Resource.CATEGORY, Action.RESTRICTED)
@@ -49,8 +43,7 @@ def index(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_page_acl_user_sees_one_page_on_category_index_home_and_search
-# @features categories
-# @dimensions index-filter permission-gates
+# @matrix categories : index-filter permission-gates
 @categories.route("/<key>/rows", methods=["GET"])
 @permission(Resource.CATEGORY, Action.RESTRICTED)
 def rows(key, **kwargs):
@@ -100,7 +93,7 @@ def _category_data(form, category=None):
 # @testable true
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
 # @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_viewer_opens_readonly_settings
-# @pairs categories:update categories:permission-gates
+# @matrix categories : permission-gates update
 @categories.route("<key>/update", methods=["PUT"])
 @permission(Resource.CATEGORY, Action.EDIT)
 def update(key, **kwargs):
@@ -143,8 +136,7 @@ def _generate_category(generated_data):
 # @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_manual_mode
 # @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_ai_mode
 # @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_with_form
-# @features categories
-# @dimensions explain-button create-manual ai-create attach-form
+# @matrix categories : ai-create attach-form create-manual explain-button
 @categories.route("create", methods=["POST"])
 @permission(Resource.MODELS, Action.CREATE)
 def create():
@@ -184,8 +176,7 @@ def create():
 
 # @testable true
 # @tests tests_e2e/002_home/test_002c_home_categories.py::test_delete_category
-# @features categories
-# @dimensions delete
+# @pair categories:delete
 @categories.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.MODELS, Action.DELETE)
 def delete(key, **kwargs):
@@ -216,8 +207,7 @@ def page_generation_data(category, form, form_data, user):
 
 # @testable true
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_generate_pages_explain_prompt_from_category_tools
-# @features pages
-# @dimensions generate ai-form explain-button
+# @matrix pages : ai-form explain-button generate
 @categories.route("<key>/generate-pages", methods=["POST"])
 @permission(Resource.CATEGORY, Action.EDIT)
 def create_pages(key, **kwargs):

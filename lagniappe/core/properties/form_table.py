@@ -50,8 +50,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
     # @tests tests_unit/test_003e_tables.py::test_table_form_single_row
     # @tests tests_unit/test_003e_tables.py::test_table_form_empty
     # @tests tests_unit/test_003e_tables.py::test_table_form_mixed_column_types
-    # @features form-table
-    # @dimensions form-submission, db-value, empty, mixed-columns
+    # @matrix form-table : db-value empty form-submission mixed-columns
     @property
     def value(self):
         if self.is_set:
@@ -84,8 +83,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
 
     # @testable true
     # @tests tests_unit/test_004_form_properties.py::test_form_table_fields
-    # @features form-table
-    # @dimensions table-fields
+    # @pair form-table:table-fields
     @property
     def fields(self):
         if self._fields is not None:
@@ -98,8 +96,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
 
     # @testable true
     # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_links_internal_top_level_and_table_row
-    # @features form-table
-    # @dimensions links, internal, row-submission
+    # @matrix form-table : internal links row-submission
     @property
     def links(self):
         return [
@@ -126,8 +123,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_exact_match
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_fuzzy_match_warning
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_no_match_records_error
-    # @features form-table
-    # @dimensions import, validation, internal, fuzzy-match, no-match
+    # @matrix form-table : fuzzy-match import internal no-match validation
     def validate_import(self, rows):
         # rows should be a list of lists, each list containing the values for a single row
         # rows should be in the same order as the column fields
@@ -153,8 +149,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
     # AI Attributes
     # @testable true
     # @tests tests_unit/test_003e_tables.py::test_table_ai_multiple_rows
-    # @features form-table
-    # @dimensions ai-value, multiple-rows
+    # @matrix form-table : ai-value multiple-rows
     def validate_ai(self, ai_submission):
         self.reset()
         if not ai_submission:
@@ -171,8 +166,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
     # @testable true
     # @tests tests_unit/test_003e_tables.py::test_table_ai_multiple_rows
     # @tests tests_unit/test_003e_tables.py::test_table_import_multiple_rows
-    # @features form-table
-    # @dimensions ai-value, multiple-rows
+    # @matrix form-table : ai-value multiple-rows
     @property
     def ai_value(self):
         rows = []
@@ -190,8 +184,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
     # @tests tests_unit/test_003e_tables.py::test_table_row_submission_text_email_checkbox
     # @tests tests_unit/test_003e_tables.py::test_table_row_submission_external_link_column
     # @tests tests_unit/test_003e_tables.py::test_table_row_submission_internal_link_column
-    # @features form-table
-    # @dimensions row-submission
+    # @matrix form-table link : row-submission
     def validate_row_submission(self, values):
         # values are sent from the frontend as a single row submission
         # they are returned and the form is submitted with a complete "rows" list
@@ -200,8 +193,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
 
     # @testable true
     # @tests tests_unit/test_003e_tables.py::test_table_validate_submission_invalid_json
-    # @features form-table
-    # @dimensions form-submission, validation
+    # @matrix form-table : form-submission validation
     def validate_submission(self, value):
         # values are sent from the frontend as a complete "rows" list from a json-formatted hidden input
         # the rows have already been validated, so we can just add them to the list
@@ -219,8 +211,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
     # @tests tests_unit/test_003e_tables.py::test_table_form_single_row
     # @tests tests_unit/test_003e_tables.py::test_table_form_empty
     # @tests tests_unit/test_003e_tables.py::test_table_form_mixed_column_types
-    # @features form-table
-    # @dimensions column, empty, mixed-columns
+    # @matrix form-table : column empty mixed-columns
     @property
     def column_value(self):
         num_rows = len(self.value.get("rows", []))
@@ -231,8 +222,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
     # Filter Attributes
     # @testable true
     # @tests tests_unit/test_003e_tables.py::test_table_import_multiple_rows
-    # @features form-table
-    # @dimensions filter-value, multiple-rows
+    # @matrix form-table : filter-value multiple-rows
     @property
     def filter_value(self):
         # returns a dict with the field ids as keys and a list of filter values for each row
@@ -261,8 +251,7 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
     # @tests tests_unit/test_003e_tables.py::test_table_form_mixed_column_types
     # @tests tests_unit/test_004e_submission_behavior.py::test_submission_search_value_merges_table_column_labels
     # @tests tests_unit/test_004e_submission_behavior.py::test_table_search_keys_match_multiple_row_values
-    # @features form-table
-    # @dimensions search-value, multiple-rows
+    # @matrix form-table : multiple-rows search-value
     @property
     def search_value(self):
         return [value for _key, value in self._search_pairs()]
@@ -278,16 +267,14 @@ class Table(AIMixin, FilterMixin, ColumnMixin, SearchMixin, SchemaProperty):
 
     # @testable true
     # @tests tests_unit/test_003e_tables.py::test_table_form_empty
-    # @features form-table
-    # @dimensions form-submission, empty
+    # @matrix form-table : empty form-submission
     @property
     def form_value(self):
         return {"rows": [r.form_value for r in self.rows]} if self.rows else None
 
     # @testable true
     # @tests tests_unit/test_003e_tables.py::test_table_form_single_row
-    # @features form-table
-    # @dimensions db-value
+    # @pair form-table:db-value
     @property
     def db_value(self):
         rows = []

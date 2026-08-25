@@ -54,8 +54,7 @@ def print_summary():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_validate_input_retries_allows_empty_and_exits
-# @features setup
-# @dimensions interactive-input
+# @pair setup:interactive-input
 def validate_input(
     prompt,
     validation_fn=None,
@@ -109,8 +108,7 @@ def validate_input(
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_prerequisite_gcloud_and_deploy_helpers
-# @features setup
-# @dimensions gcloud-command
+# @pair setup:gcloud-command
 def check_gcloud_cli():
     if not GCLOUD_CLI:
         print(
@@ -123,8 +121,7 @@ def check_gcloud_cli():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_prerequisite_gcloud_and_deploy_helpers
-# @features setup
-# @dimensions gcloud-command
+# @pair setup:gcloud-command
 def run_gcloud_command(command, check=True, timeout=GCLOUD_TIMEOUT):
     """Run a shell command and return the result."""
     try:
@@ -159,8 +156,7 @@ def run_gcloud_command(command, check=True, timeout=GCLOUD_TIMEOUT):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_prerequisite_gcloud_and_deploy_helpers
-# @features setup
-# @dimensions deploy gcloud-command
+# @matrix setup : deploy gcloud-command
 def deploy_to_app_engine(*, print_final_summary=True):
     from config import SETTINGS
     from runner.deploy import deploy

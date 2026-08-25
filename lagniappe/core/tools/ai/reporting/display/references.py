@@ -181,12 +181,7 @@ class ProposalReferenceResolver:
 
     # @testable true
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_humanize_generated_action_ids
-    # @pair ai-report:details
-    # @pair ai-report:fallback-labels
-    # @pair ai-report:proposal
-    # @pair files:details
-    # @pair files:fallback-labels
-    # @pair files:proposal
+    # @matrix ai-report files : details fallback-labels proposal
     def action_id_label(self, action):
         action_id = action.get("id")
         if not isinstance(action_id, str) or not action_id.strip():
@@ -266,8 +261,7 @@ class ProposalReferenceResolver:
     # @testable true
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_show_existing_page_category_for_attachments
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_resolve_normalized_entity_refs
-    # @pair ai-report:existing-page-category
-    # @pair ai-report:normalized-references
+    # @matrix ai-report : existing-page-category normalized-references
     def entity_details(self, value):
         if not isinstance(value, str):
             return None

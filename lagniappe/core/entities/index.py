@@ -11,8 +11,7 @@ from .site import Site
 
 # @testable true
 # @tests tests_unit/test_010_task_index.py::test_index_base_cursor_limit_user_and_append_state
-# @features index
-# @dimensions pagination state user-scope
+# @matrix index : pagination state user-scope
 class Index(Site):
     """Paginated list view for an entity type. Provides cursor-based
     pagination, user-scoped permission filtering, and table column config.
@@ -62,8 +61,7 @@ class Index(Site):
 
 # @testable true
 # @tests tests_unit/test_010_task_index.py::test_task_index
-# @features task-index
-# @dimensions table
+# @pair task-index:table
 class TaskIndex(Index):
     """Task list view for a project or global task index.
 
@@ -79,9 +77,7 @@ class TaskIndex(Index):
     # @testable true
     # @tests tests_unit/test_010_task_index.py::test_task_index_paginates_dated_then_undated_tasks_with_restrictions
     # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
-    # @features task-index
-    # @dimensions restrictions
-    # @pair task-index:assignee-visibility
+    # @matrix task-index : assignee-visibility undated
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._undated = bool(kwargs.get("undated"))
@@ -103,8 +99,8 @@ class TaskIndex(Index):
     # @testable true
     # @tests tests_unit/test_010_task_index.py::test_task_index_paginates_dated_then_undated_tasks_with_restrictions
     # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
-    # @features task-index
-    # @dimensions pagination undated restrictions
+    # @matrix task-index : pagination restrictions undated
+    # @pair task-index:assignee-visibility
     def undated_tasks(self):
         db = database.get.tasks_without_due_dates(
             start_cursor=self.cursor,
@@ -129,8 +125,8 @@ class TaskIndex(Index):
     # @testable true
     # @tests tests_unit/test_010_task_index.py::test_task_index_paginates_dated_then_undated_tasks_with_restrictions
     # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_assigned_tasks_on_hidden_page_appear_on_home_and_task_index
-    # @features task-index
-    # @dimensions pagination dated undated restrictions
+    # @matrix task-index : dated pagination restrictions undated
+    # @pair task-index:assignee-visibility
     def dated_tasks(self):
         db = database.get.tasks_with_due_dates(
             start_cursor=self.cursor,
@@ -154,8 +150,7 @@ class TaskIndex(Index):
 
     # @testable true
     # @tests tests_unit/test_010_task_index.py::test_task_index_paginates_dated_then_undated_tasks_with_restrictions
-    # @features task-index
-    # @dimensions pagination
+    # @pair task-index:pagination
     @property
     def tasks(self):
         if self._tasks is not None:
@@ -170,8 +165,7 @@ class TaskIndex(Index):
 
     # @testable true
     # @tests tests_unit/test_021_refresh.py::test_task_index_refresh_roots_uses_both_ordered_query_streams
-    # @features reconnect-refresh task-index
-    # @dimensions root-depth ordering
+    # @matrix reconnect-refresh task-index : ordering root-depth
     def refresh_roots(self):
         """Return the complete task-index membership without relationships.
 
@@ -235,11 +229,7 @@ class PageIndex(Index):
     # @testable true
     # @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_restricted_page_is_not_listed_for_outsider_on_category_index
     # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
-    # @features pages
-    # @dimensions access-restrictions index-filter cursor-pagination
-    # @pair pages:access-restrictions
-    # @pair pages:index-filter
-    # @pair pages:cursor-pagination
+    # @matrix pages : access-restrictions cursor-pagination index-filter
     @property
     def pages(self):
         if self._pages is not None:
@@ -272,8 +262,7 @@ class PageIndex(Index):
 
     # @testable true
     # @tests tests_unit/test_021_refresh.py::test_page_index_refresh_roots_reuses_restricted_collection_query
-    # @features reconnect-refresh category-index
-    # @dimensions root-depth membership
+    # @matrix category-index reconnect-refresh : membership root-depth
     def refresh_roots(self):
         """Return every page in this category at root depth."""
         restrictions = self.user.properties.restrictions.unrestricted_pages(self.entity)
@@ -310,8 +299,7 @@ class FormIndex(Index):
     # @testable true
     # @tests tests_e2e/003_forms/test_003c_access_restrictions.py::test_form_index_lists_group_restricted_form_only_for_group_member
     # @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_form_index_lists_forms_but_hides_create_without_forms_create
-    # @features forms
-    # @dimensions index-view index-filter
+    # @matrix forms : index-filter index-view
     @property
     def forms(self):
         if self._forms is not None:
@@ -364,8 +352,7 @@ class FormIndex(Index):
 
 # @testable true
 # @tests tests_unit/test_009_user_index.py::test_user_index
-# @features user-index
-# @dimensions table
+# @pair user-index:table
 class UserIndex(Index):
     """User list view with group management."""
 
@@ -398,15 +385,8 @@ class UserIndex(Index):
     # @tests tests_unit/test_009_user_index.py::test_user_index_regular_mode_excludes_public_users
     # @tests tests_unit/test_009_user_index.py::test_user_index_public_mode_loads_public_group_users_and_preserves_append_mode
     # @tests tests_unit/test_009_user_index.py::test_user_index_public_mode_returns_empty_when_public_users_disabled
-    # @pair user-index:pagination
-    # @pair user-index:restrictions
-    # @pair user-index:public-users
-    # @pair user-index:mode
-    # @pair user-index:regular-mode
-    # @pair user-index:public-mode
-    # @pair public-users:mode
-    # @pair public-users:pagination
-    # @pair public-users:public-mode
+    # @matrix public-users : mode pagination public-mode
+    # @matrix user-index : mode pagination public-mode public-users regular-mode restrictions
     @property
     def users(self):
         if self._users is not None:
@@ -467,8 +447,7 @@ class UserIndex(Index):
 
     # @testable true
     # @tests tests_unit/test_021_refresh.py::test_user_index_refresh_roots_preserves_regular_and_public_modes
-    # @features reconnect-refresh user-index
-    # @dimensions root-depth mode
+    # @matrix reconnect-refresh user-index : mode root-depth
     def refresh_roots(self):
         """Return the selected user-index mode without relationship expansion."""
         if self.mode == self._public_mode:
@@ -500,8 +479,7 @@ class UserIndex(Index):
 
     # @testable true
     # @tests tests_unit/test_009_user_index.py::test_user_index_public_mode_returns_empty_when_public_users_disabled
-    # @features user-index
-    # @dimensions public-users enabled
+    # @matrix user-index : enabled public-users
     @property
     def public_users_enabled(self):
         if getattr(self, "_public_users_enabled", None) is not None:
@@ -513,8 +491,7 @@ class UserIndex(Index):
 
     # @testable true
     # @tests tests_unit/test_009_user_index.py::test_user_index_loads_users_groups_public_group_and_append_cursor
-    # @features user-index
-    # @dimensions restrictions groups
+    # @matrix user-index : groups restrictions
     @property
     def groups(self):
         if getattr(self, "_groups", None):
@@ -540,8 +517,7 @@ class UserIndex(Index):
 
     # @testable true
     # @tests tests_unit/test_009_user_index.py::test_user_index_loads_users_groups_public_group_and_append_cursor
-    # @features user-index
-    # @dimensions public-group
+    # @pair user-index:public-group
     @property
     def public_group(self):
         if getattr(self, "_public_group", None) is not None:

@@ -242,9 +242,9 @@ export class SectionToggle {
  * @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_viewer_reads_page_without_page_editing_affordances
  * @tests tests_e2e/007_categories/test_007e_category_permissions.py::test_category_viewer_opens_readonly_settings
  * @tests tests_e2e/006_tasks/test_006a_page_task_scheduling.py::test_page_task_add_due_date
- * @pairs pages:readonly pages:form-switch
- * @pairs categories:readonly categories:default-form
- * @pairs task-assignment:assignee-preservation task-scheduling:due-date
+ * @matrix categories : default-form readonly
+ * @matrix pages : form-switch readonly
+ * @pairs pages:category-add task-assignment:assignee-preservation task-scheduling:due-date
  */
 class FacetControl {
 	constructor(widget, element) {

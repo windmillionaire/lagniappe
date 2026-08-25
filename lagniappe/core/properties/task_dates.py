@@ -8,8 +8,7 @@ from .base_db import DBProperty
 
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_completed
-# @features task
-# @dimensions completed details
+# @matrix task : completed details
 class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty):
     """Task completion status. Stored and exposed as a boolean.
 
@@ -49,8 +48,7 @@ class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty):
 
     # @testable true
     # @tests tests_unit/test_013_task_properties.py::test_task_completed
-    # @features task
-    # @dimensions column
+    # @pair task:column
     @property
     def column_value(self):
         return self.filter_value
@@ -67,8 +65,7 @@ class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty):
 
     # @testable true
     # @tests tests_unit/test_013_task_properties.py::test_task_completed
-    # @features task
-    # @dimensions details filter-value
+    # @matrix task : details filter-value
     @property
     def filter_value(self):
         return self.value
@@ -95,8 +92,7 @@ class Completed(ColumnMixin, DetailsMixin, FilterMixin, AIMixin, DBProperty):
 
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_completed_on_stores_timestamp
-# @features task
-# @dimensions completed-on
+# @pair task:completed-on
 class CompletedOn(DateMixin, AIMixin, ColumnMixin, DBProperty):
     """Task completion date. Stored as a UTC datetime, exposed as date.
 
@@ -135,8 +131,7 @@ class CompletedOn(DateMixin, AIMixin, ColumnMixin, DBProperty):
 
 # @testable true
 # @tests tests_unit/test_013_task_properties.py::test_task_due_date
-# @features task
-# @dimensions column, ai-value, filter-value
+# @matrix task : ai-value column filter-value
 class DueDate(DateMixin, AIMixin, ColumnMixin, FilterMixin, DBProperty):
     """Task due date. Stored as UTC, displayed in user timezone.
 
@@ -169,8 +164,7 @@ class DueDate(DateMixin, AIMixin, ColumnMixin, FilterMixin, DBProperty):
 
     # @testable true
     # @tests tests_unit/test_013_task_properties.py::test_task_due_date
-    # @features task
-    # @dimensions due-date, date
+    # @matrix task : date due-date
     @property
     def value(self):
         return super().value

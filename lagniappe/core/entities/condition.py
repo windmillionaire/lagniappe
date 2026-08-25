@@ -16,8 +16,7 @@ from ..tools import cache
 # @testable true
 # @tests tests_unit/test_011_filters.py::test_filter_conditions_multiple_types
 # @tests tests_unit/test_011_filters.py::test_condition_create_skips_missing_entity_reference
-# @features filter
-# @dimensions conditions mixed-types missing-entity
+# @matrix filter : conditions missing-entity mixed-types
 class Condition:
     """A single filter condition: entity + field + comparator + value.
 
@@ -172,8 +171,7 @@ class Condition:
     # @tests tests_unit/test_012_category_conditions.py::*
     # @tests tests_unit/test_012a_project_conditions.py::*
     # @tests tests_unit/test_012b_form_conditions.py::*
-    # @features filters
-    # @dimensions condition-definition string boolean timestamp entity-valued model-task number categorical select multiple
+    # @matrix filters : boolean categorical condition-definition entity-valued model-task multiple number select string timestamp
     def set_value(self, form_values, default_comparator=None):
         """Set condition value from form input and create the FilterDefinition."""
         form_values = form_values if isinstance(form_values, list) else [form_values]
@@ -217,8 +215,7 @@ class Condition:
 
     # @testable true
     # @tests tests_unit/test_011_filters.py::test_condition_requires_field_for_type_and_definition
-    # @features filters
-    # @dimensions condition-definition validation
+    # @matrix filters : condition-definition validation
     @property
     def field_type(self):
         if not self.field:
@@ -235,8 +232,7 @@ class Condition:
 
     # @testable true
     # @tests tests_unit/test_011_filters.py::test_condition_requires_field_for_type_and_definition
-    # @features filters
-    # @dimensions condition-definition validation
+    # @matrix filters : condition-definition validation
     def _create_definition(self):
         if not self.field:
             raise ValueError("Field not set")

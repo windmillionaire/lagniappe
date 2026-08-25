@@ -12,13 +12,9 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database, dates
 
 from ....debug import ai_debug
-from ...schedules import apply_task_schedule
 from .common import (
-    TASK_FORM_TYPE_ERROR,
-    _data,
     _first_data_reference,
     _require_allowed,
-    _require_form_type,
     _safe_entity_relation,
     _stored_relation_key,
     _unique_entities,
@@ -26,7 +22,6 @@ from .common import (
 from .results import (
     _capture_missing_task_submission,
     _diagnostic_entity,
-    _diagnostic_file_refs,
     _entity_result,
     _submission_result,
     _task_structure_result,
@@ -165,8 +160,7 @@ def _is_completed_task_event(data):
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_automatically_reuses_dated_completed_task_family
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_keeps_ambiguous_completed_task_families_distinct
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_rejects_completed_task_target_from_another_page
-# @features ai-report tasks task-completion
-# @dimensions completed-task older-event name description attachments submission explicit-task-identity automatic-task-family period-name same-report ambiguity duplicate-task-prevention newest-completion live-task history-name model-form lazy-load distinct-task same-model existing-task
+# @matrix ai-report task-completion tasks : ambiguity attachments automatic-task-family completed-task description distinct-task duplicate-task-prevention existing-task explicit-task-identity history-name lazy-load live-task model-form name newest-completion older-event period-name same-model same-report submission
 def _record_completed_task_event(
     action,
     data,
@@ -550,10 +544,8 @@ def _page_task_candidates(page):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_rejects_completed_task_target_from_another_page
-# @pair ai-report:page-validation
-# @pair tasks:page-validation
-# @pair task-completion:page-validation
-# @pair ai-report:explicit-task-identity
+# @matrix ai-report : explicit-task-identity page-validation
+# @matrix task-completion tasks : page-validation
 def _resolve_completed_task_target(
     data,
     created,
@@ -722,8 +714,7 @@ def _ensure_task_form_from_model(task, model=None):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_invalid_completed_task_events_and_continues
-# @pair ai-report:validation
-# @pair ai-report:completed-task
+# @matrix ai-report : completed-task validation
 def _parse_completed_task_completed_on(data):
     raw = data.get("completed_on") or data.get("completed-on")
     if not raw and data.get("completed") is True:
@@ -788,9 +779,7 @@ def _restore_task_checkpoint_assets(task, state, histories):
 
 # @testable true
 # @tests tests_unit/test_020h_ai_report_execution.py::test_completed_task_retry_and_undo_restore_reused_task
-# @pair ai-report:completed-task
-# @pair ai-report:reuse
-# @pair ai-report:compensation
+# @matrix ai-report : compensation completed-task reuse
 def _undo_reused_completed_task(action, user):
     before = action.get("before") or {}
     state = before.get("task") or {}

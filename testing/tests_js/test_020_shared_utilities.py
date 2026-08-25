@@ -126,7 +126,6 @@ vm.runInContext(source, context);
 
 
 # @pair async-query:debounce-teardown
-# @source src/script/shared/utilities.mjs::debounce
 def test_debounce_cancel_prevents_delayed_callback(run_node):
     run_utility_check(
         run_node,
@@ -143,7 +142,7 @@ if (calls !== 0) {
     )
 
 
-# @pairs frontend-utilities:mutation-observer frontend-utilities:cleanup
+# @matrix frontend-utilities : cleanup mutation-observer
 def test_wait_for_attribute_resolves_and_cleans_up_observers(run_node):
     run_utility_check(
         run_node,
@@ -173,7 +172,7 @@ if (!observers[1].disconnected) throw new Error("timed-out observer leaked");
     )
 
 
-# @pairs frontend-utilities:deep-equality frontend-utilities:array-order
+# @matrix frontend-utilities : array-order deep-equality
 def test_are_equal_normalizes_object_keys_but_preserves_array_order(run_node):
     run_utility_check(
         run_node,
@@ -194,7 +193,7 @@ if (context.areEqual({ values: [1, 2] }, { values: [2, 1] })) {
     )
 
 
-# @pairs browser-storage:availability browser-storage:json
+# @matrix browser-storage : availability json
 def test_safe_storage_adapters_handle_browser_failures_and_json(run_node):
     run_node(
         """
@@ -245,8 +244,8 @@ assert.equal(sessionStore.setJSON("quota", { active: true }), false);
     )
 
 
+# @matrix timezone : page-load session-update
 # @pair location:permission-deferral
-# @pairs timezone:page-load timezone:session-update
 def test_user_data_sync_posts_timezone_without_requesting_location(run_node):
     run_user_check(
         run_node,
@@ -278,8 +277,8 @@ if (
     )
 
 
-# @pairs location:geolocation location:on-demand location:session-update
-# @pairs location:deduplication timezone:serialized-update
+# @matrix location : deduplication geolocation on-demand session-update
+# @pair timezone:serialized-update
 def test_user_location_sync_starts_on_demand_and_deduplicates(run_node):
     run_user_check(
         run_node,
@@ -312,7 +311,7 @@ if (
     )
 
 
-# @pairs location:session-update location:retry
+# @matrix location : retry session-update
 def test_user_location_sync_retries_failed_session_update(run_node):
     run_user_check(
         run_node,

@@ -49,9 +49,7 @@ PROTOCOL_EXPORTS = [
 ]
 
 
-# @pair browser-protocol:connectivity-only
-# @pair browser-protocol:version
-# @pair browser-protocol:envelope
+# @matrix browser-protocol : connectivity-only envelope version
 def test_browser_protocol_contains_only_connectivity_messages(run_node):
     run_shared_module_check(
         run_node,
@@ -66,8 +64,7 @@ if (Object.keys(context.WORKER_MESSAGES).length !== 1 ||
     )
 
 
-# @features browser-protocol
-# @dimensions connectivity validation version producer
+# @matrix browser-protocol : connectivity producer validation version
 def test_connectivity_messages_are_versioned_and_validated(run_node):
     run_shared_module_check(
         run_node,
@@ -111,8 +108,7 @@ if (!threw) throw new Error("Invalid connectivity producer state was not rejecte
     )
 
 
-# @features connectivity
-# @dimensions startup browser-state server-health polling-recovery visibility controller
+# @matrix connectivity : browser-state controller polling-recovery server-health startup visibility
 def test_connectivity_state_table_covers_lifecycle_transitions(run_node):
     run_shared_module_check(
         run_node,

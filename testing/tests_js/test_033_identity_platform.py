@@ -1,8 +1,7 @@
 """Node-backed checks for the focused Identity Platform browser client."""
 
 
-# @features login
-# @dimensions identity-platform email-password action-codes auth-errors browser-fetch
+# @matrix login : action-codes auth-errors browser-fetch email-password identity-platform
 def test_identity_platform_rest_client_contract(run_node):
     run_node(
         r"""

@@ -22,18 +22,7 @@ from .base_property import Property
 # @tests tests_unit/test_006b_ingress_entity.py::test_next_advances_after_finalize
 # @tests tests_unit/test_006b_ingress_entity.py::test_stage_status
 # @tests tests_unit/test_006b_ingress_entity.py::test_import_wizard_story_reports_stage_errors_without_advancing
-# @pair ingress:stage
-# @pair ingress:presentation
-# @pair ingress:property
-# @pair ingress:enum
-# @pair ingress:string
-# @pair ingress:validation
-# @pair ingress:default
-# @pair ingress:navigation
-# @pair ingress:back
-# @pair ingress:first-stage
-# @pair ingress:finalize
-# @pair ingress:status
+# @matrix ingress : back default enum finalize first-stage navigation presentation property stage status string validation
 class Stage(Property):
     """Thin presentation facade over ``IngressService`` workflow state."""
 

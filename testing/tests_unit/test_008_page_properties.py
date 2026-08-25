@@ -34,8 +34,7 @@ class _EditablePageColumn(ColumnMixin):
     _editable = True
 
 
-# @features page
-# @dimensions details parent kind
+# @matrix page : details kind parent
 @pytest.mark.unit
 def test_page_details(get_test_entities):
     """Test details property for Page entities.
@@ -97,8 +96,7 @@ def test_page_deferred_job_reference_round_trips():
     assert "deferred_job" not in page.db
 
 
-# @features page
-# @dimensions table-editability task-load
+# @matrix page : table-editability task-load
 @pytest.mark.unit
 def test_column_editable_does_not_load_page_tasks():
     """Generic table editability should not treat Page.completed as task state."""
@@ -111,8 +109,7 @@ def test_column_editable_does_not_load_page_tasks():
     page._load_tasks.assert_not_called()
 
 
-# @features page
-# @dimensions document cache ai-value filter-value
+# @matrix page : ai-value cache document filter-value
 @pytest.mark.unit
 def test_page_document(get_test_entities):
     """Test Document property with CacheMixin, FilterMixin, AIMixin.
@@ -140,8 +137,7 @@ def test_page_document(get_test_entities):
             assert page.to_filter_index()["has_document"] is False
 
 
-# @features page
-# @dimensions attributes inheritance defaults
+# @matrix page : attributes defaults inheritance
 @pytest.mark.unit
 def test_page_attributes(get_test_entities):
     """Test Attributes property for Page entities.
@@ -179,8 +175,7 @@ def test_page_attributes(get_test_entities):
                 assert page.has(attr) is True
 
 
-# @features page
-# @dimensions public filter-value
+# @matrix page : filter-value public
 @pytest.mark.unit
 def test_page_public(get_test_entities):
     """Test IsPublic property with FilterMixin.
@@ -203,8 +198,7 @@ def test_page_public(get_test_entities):
         assert page.to_filter_index()["is_public"] is is_public
 
 
-# @features page cache
-# @dimensions public-user
+# @matrix cache page : public-user
 @pytest.mark.unit
 def test_page_to_cache_public_user(get_test_entities):
     """Page.to_cache returns {} when the page has a user with is_public (profile page)."""
@@ -224,8 +218,7 @@ def test_page_to_cache_public_user(get_test_entities):
                 assert page.to_cache.get("doc") == text
 
 
-# @features page
-# @dimensions categories model-category restrictions cache-invalidation default-category
+# @matrix page : cache-invalidation categories default-category model-category restrictions
 @pytest.mark.unit
 def test_page_categories_model_restricted_and_cache_invalidation(monkeypatch):
     page = TestEntities.get("PAGE", {"name": "Categorized", "hash": "pagecat"})
@@ -288,8 +281,7 @@ def test_page_categories_model_restricted_and_cache_invalidation(monkeypatch):
     assert page.properties.categories.value == [uncategorized]
 
 
-# @features page
-# @dimensions categories model-removal users-model default-category
+# @matrix page : categories default-category model-removal users-model
 @pytest.mark.unit
 def test_page_categories_preserve_users_model_and_default_after_removing_only_model(
     monkeypatch,
@@ -324,8 +316,7 @@ def test_page_categories_preserve_users_model_and_default_after_removing_only_mo
     assert page.categories == [uncategorized]
 
 
-# @features page category filters
-# @dimensions form-registration related-forms
+# @matrix category filters page : form-registration related-forms
 @pytest.mark.unit
 def test_page_update_registers_form_with_model_category_for_filters():
     """A page-specific form is registered on its parent category for filters."""
@@ -350,8 +341,7 @@ def test_page_update_registers_form_with_model_category_for_filters():
     assert any(c["label"] == form.name for c in category.filters.conditions)
 
 
-# @features page
-# @dimensions default-category
+# @pair page:default-category
 @pytest.mark.unit
 def test_page_update_defaults_empty_category_state_to_uncategorized(monkeypatch):
     uncategorized = TestEntities.get(
@@ -375,8 +365,7 @@ def test_page_update_defaults_empty_category_state_to_uncategorized(monkeypatch)
     assert page.categories == [uncategorized]
 
 
-# @features page category filters
-# @dimensions save-relations form-registration
+# @matrix category filters page : form-registration save-relations
 @pytest.mark.unit
 def test_page_update_tracks_old_and_current_category_owners_for_save():
     old_model = TestEntities.get(
@@ -501,8 +490,7 @@ def test_page_update_keeps_current_user_before_page_without_dependency_cycle():
     assert by_key[page.key].depends_on == (user,)
 
 
-# @features page
-# @dimensions categories validation
+# @matrix page : categories validation
 @pytest.mark.unit
 def test_page_categories_reject_invalid_related_values():
     page = TestEntities.get("PAGE", {"name": "Invalid Categories", "hash": "pgbadcat"})
@@ -520,8 +508,7 @@ def test_page_categories_reject_invalid_related_values():
         page.properties.categories.remove(SimpleNamespace())
 
 
-# @features page
-# @dimensions files db-load
+# @matrix page : db-load files
 @pytest.mark.unit
 def test_page_files_loads_database_files():
     page = TestEntities.get("PAGE", {"name": "Files Page", "hash": "filespage"})
@@ -561,8 +548,7 @@ def test_page_files_loads_database_files():
     assert page.properties.files.sort_value == 1
 
 
-# @features page
-# @dimensions files stale-query db-load
+# @matrix page : db-load files stale-query
 @pytest.mark.unit
 def test_page_files_reloads_query_results_and_skips_unlinked_files():
     page = TestEntities.get("PAGE", {"name": "Fresh Files Page", "hash": "freshpage"})
@@ -598,8 +584,7 @@ def test_page_files_reloads_query_results_and_skips_unlinked_files():
     assert files == [linked_file]
 
 
-# @features page
-# @dimensions user-key details attach fallback-parent cache-parent
+# @matrix page : attach cache-parent details fallback-parent user-key
 @pytest.mark.unit
 def test_page_user_and_model_category_parent_keys():
     page = TestEntities.get("PAGE", {"name": "Parent Keys", "hash": "parentkeys"})
@@ -644,8 +629,7 @@ def test_page_user_and_model_category_parent_keys():
     assert page.to_cache["parent_key"] == fallback.hash
 
 
-# @features page
-# @dimensions image asset-lifecycle column filter-value
+# @matrix page : asset-lifecycle column filter-value image
 @pytest.mark.unit
 def test_page_image_asset_lifecycle_and_projections():
     class FakePage:

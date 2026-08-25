@@ -10,15 +10,8 @@ import { captureError } from "./errors";
  * @tests tests_js/test_028_form_state_split.py::test_owned_deferred_completion_replaces_clean_active_form
  * @tests tests_e2e/004_projects/test_004b_info.py::test_project_revision_notice_only_resets_changed_form
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
- * @features edited-entity-notice deferred-jobs polling
- * @dimensions entity-ancestor batching per-form acknowledgement acknowledgement-no-probe active-state visibility subscription-lifecycle owned-deferred-completion freshness
- * @pairs edited-entity-notice:entity-ancestor edited-entity-notice:batching
- * @pairs edited-entity-notice:per-form edited-entity-notice:acknowledgement
- * @pairs edited-entity-notice:acknowledgement-no-probe
- * @pairs edited-entity-notice:active-state
- * @pairs edited-entity-notice:visibility edited-entity-notice:subscription-lifecycle
- * @pairs edited-entity-notice:owned-deferred-completion deferred-jobs:owned-deferred-completion
- * @pairs polling:freshness
+ * @matrix edited-entity-notice : acknowledgement acknowledgement-no-probe active-state batching entity-ancestor owned-deferred-completion per-form subscription-lifecycle visibility
+ * @pairs deferred-jobs:owned-deferred-completion edited-entity-notice:staged-reset polling:freshness
  */
 export class EditWatcher {
 	constructor(view) {
@@ -142,8 +135,7 @@ export class EditWatcher {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_028_form_state_split.py::test_owned_deferred_completion_replaces_clean_active_form
-	 * @pair deferred-jobs:owned-deferred-completion
-	 * @pair edited-entity-notice:owned-deferred-completion
+	 * @matrix deferred-jobs edited-entity-notice : owned-deferred-completion
 	 */
 	_ownedDeferredCompletion(marker, widget) {
 		const key = marker.closest?.("[lp-entity]")?.dataset?.key;
@@ -230,8 +222,7 @@ export class EditWatcher {
 	 * @testable true
 	 * @tests tests_js/test_028_form_state_split.py::test_edit_watcher_restores_active_autofill_without_form_sync
 	 * @tests tests_e2e/005_pages/test_005h_page_autofill.py::test_page_autofill_runs_deferred_with_attached_file_context
-	 * @features edited-entity-notice deferred-jobs
-	 * @dimensions active-operation reload form-lock
+	 * @matrix deferred-jobs edited-entity-notice : active-operation form-lock reload
 	 */
 	async _lockEntity(entity, descriptor) {
 		if (!entity || !descriptor?.operation) return;

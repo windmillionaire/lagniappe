@@ -7,8 +7,7 @@ import sys
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_routes_every_mode_and_returns_status
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_rejects_multiple_or_dashed_commands
-# @features setup
-# @dimensions cli-routing argument-validation
+# @matrix setup : argument-validation cli-routing
 def _parser():
     parser = argparse.ArgumentParser(description="Lagniappe Setup Tool")
     commands = parser.add_subparsers(
@@ -114,14 +113,14 @@ def _mode(args):
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_lifecycle_cli_routes_nested_commands_and_read_only_boundaries
-# @pairs data-lifecycle:cli-routing data-lifecycle:read-only
+# @matrix data-lifecycle : cli-routing read-only
 def _local_only(args):
     return args.command == "archive" and args.archive_target == "validate"
 
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_lifecycle_cli_routes_nested_commands_and_read_only_boundaries
-# @pairs data-lifecycle:cli-routing data-lifecycle:read-only
+# @matrix data-lifecycle : cli-routing read-only
 def _read_only(args):
     return (
         _local_only(args)
@@ -133,8 +132,7 @@ def _read_only(args):
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_routes_every_mode_and_returns_status
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_treats_none_cancellation_as_failure
-# @features setup
-# @dimensions cli-status failure-propagation
+# @matrix setup : cli-status failure-propagation
 def _status(result):
     """Normalize every setup entry point to an honest process status."""
     if result is True:
@@ -153,8 +151,7 @@ def _status(result):
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_stale_gcloud_token_stops_with_setup_auth_instruction
-# @features setup
-# @dimensions prerequisites dependency-bootstrap focused-mode gcloud-token safe-failure
+# @matrix setup : dependency-bootstrap focused-mode gcloud-token prerequisites safe-failure
 def _prepare_setup_dependencies(args):
     """Bootstrap focused modes before importing their dependency-backed handlers."""
     if _mode(args) == "install":
@@ -208,8 +205,7 @@ def _prepare_setup_dependencies(args):
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_routes_every_mode_and_returns_status
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_provider_failures_are_nonzero
-# @features setup
-# @dimensions cli-routing lazy-imports failure-propagation
+# @matrix setup : cli-routing failure-propagation lazy-imports
 def _dispatch(args):
     command = args.command
     if command == "auth":
@@ -332,8 +328,7 @@ def _dispatch(args):
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_setup_python_runtime_gate_precedes_every_cli_mode
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_rejects_multiple_or_dashed_commands
-# @features setup
-# @dimensions cli-routing prerequisites operation-journal
+# @matrix setup : cli-routing operation-journal prerequisites
 def main(argv=None):
     arguments = list(sys.argv[1:] if argv is None else argv)
     parser = _parser()
@@ -368,8 +363,7 @@ def main(argv=None):
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_provider_failures_are_nonzero
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_cli_subprocess_treats_none_cancellation_as_failure
-# @features setup
-# @dimensions cli-status failure-propagation unexpected-errors
+# @matrix setup : cli-status failure-propagation unexpected-errors
 def cli(argv=None):
     from installer.errors import SetupError
 

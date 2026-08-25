@@ -100,8 +100,7 @@ def _reconnect_with_sync(user, sync_id):
     wait_for_offline_sync_records(user, sync_id=sync_id, exact=0)
 
 
-# @features sync
-# @dimensions offline-replay replay-order queue-clear
+# @matrix sync : offline-replay queue-clear replay-order
 def test_offline_document_edits_replay_in_order(get_user, browser_failures):
     user = get_user(Users.OWNER)
     project = Projects.test_offline_document_replay.get(user)
@@ -127,7 +126,7 @@ def test_offline_document_edits_replay_in_order(get_user, browser_failures):
     assert replayed.index(first) < replayed.index(second)
 
 
-# @pairs sync:offline-replay sync:queue-preserved
+# @matrix sync : offline-replay queue-preserved
 def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failures):
     user = get_user(Users.OWNER)
     project = Projects.test_offline_document_retry.get(user)
@@ -189,9 +188,8 @@ def test_failed_offline_replay_keeps_queue_and_retries(get_user, browser_failure
     expect(project.editor.text_entry).to_contain_text(text)
 
 
-# @pairs sync:offline-replay sync:headless sync:concurrency sync:merge
-# @pairs sync:queue-clear sync:document sync:headless-widget
-# @pairs polling:document polling:current-state polling:cursor
+# @matrix polling : current-state cursor document
+# @matrix sync : concurrency document headless headless-widget merge offline-replay queue-clear
 def test_headless_offline_replay_merges_concurrent_remote_edits(
     get_user, browser_failures
 ):

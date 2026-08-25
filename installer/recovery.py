@@ -51,8 +51,7 @@ def _provider_error_state(error):
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_provider_states_distinguish_absent_from_unavailable
-# @features setup
-# @dimensions recovery provider-discovery failure-isolation
+# @matrix setup : failure-isolation provider-discovery recovery
 def _probe_gcloud_json(command):
     """Return a three-state observation for an explicitly targeted gcloud lookup."""
     result = run_gcloud_command(command, check=False)
@@ -240,8 +239,7 @@ def _probe_ocr(project_id, location, processor_name):
 
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_identity_platform_recovery_gets_live_config
-# @features setup
-# @dimensions identity-platform recovery
+# @matrix setup : identity-platform recovery
 def _probe_identity_platform(project_id):
     try:
         import requests
@@ -310,8 +308,7 @@ def _require_observable(name, observation):
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_provider_discovery_targets_only_recovered_project
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_reports_missing_signing_setup_as_repairable_drift
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_provider_mismatch_or_unavailable_stops_before_mutation
-# @features setup
-# @dimensions recovery provider-discovery project-identity project-number failure-isolation repair keyless-config
+# @matrix setup : failure-isolation keyless-config project-identity project-number provider-discovery recovery repair
 def verify_recovery_resources(settings, project_id, *, project_details=None):
     """Discover saved resource markers without mutating or replacing the snapshot."""
     runtime_email = settings["RUNTIME_SERVICE_ACCOUNT_EMAIL"]

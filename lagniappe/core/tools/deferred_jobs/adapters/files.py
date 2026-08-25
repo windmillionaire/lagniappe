@@ -30,8 +30,7 @@ class FileAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_adapter_drift_tracks_the_original_asset
-    # @features deferred-jobs file
-    # @dimensions authorization original-asset fingerprint metadata-isolation
+    # @matrix deferred-jobs file : authorization fingerprint metadata-isolation original-asset
     def authorization(self, spec):
         authorization = super().authorization(spec)
         file = spec.inputs.get("file")
@@ -46,8 +45,7 @@ class FileAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_adapter_drift_tracks_the_original_asset
-    # @features deferred-jobs file
-    # @dimensions validation original-asset fingerprint metadata-isolation
+    # @matrix deferred-jobs file : fingerprint metadata-isolation original-asset validation
     def validate_apply(self, context):
         expected = (context.job.authorization or {}).get("file_asset_fingerprint")
         if expected is None:
@@ -89,7 +87,8 @@ class FileExtractAdapter(FileAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_extract_adapter_checkpoints_and_applies_text_asset
-    # @pairs deferred-jobs:checkpoint file:extraction file:text-asset
+    # @matrix file : extraction text-asset
+    # @pair deferred-jobs:checkpoint
     def prepare(self, context):
         context.set_phase(DeferredJobPhase.PREPARING_INPUTS)
         file = context.input("file")
@@ -125,7 +124,8 @@ class FileExtractAdapter(FileAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_extract_adapter_checkpoints_and_applies_text_asset
-    # @pairs deferred-jobs:checkpoint file:extraction file:text-asset
+    # @matrix file : extraction text-asset
+    # @pair deferred-jobs:checkpoint
     def apply(self, context):
         context.ensure_active()
         file = context.input("file")
@@ -164,8 +164,7 @@ class FileSummarizeAdapter(FileAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_summary_expected_rejection_is_not_reported_twice
-    # @features deferred-jobs file
-    # @dimensions summary expected-failure no-duplicate-capture
+    # @matrix deferred-jobs file : expected-failure no-duplicate-capture summary
     def prepare(self, context):
         context.set_phase(DeferredJobPhase.SUMMARIZING)
         file = context.input("file")
@@ -213,8 +212,7 @@ class FileSummarizeAdapter(FileAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_files.py::test_file_summary_terminal_cleanup_starts_extraction_once
-    # @features deferred-jobs file
-    # @dimensions terminal follow-up extraction idempotency summary-first
+    # @matrix deferred-jobs file : extraction follow-up idempotency summary-first terminal
     def cleanup(self, context, *, terminal):
         if (
             not terminal

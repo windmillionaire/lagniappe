@@ -27,8 +27,7 @@ def key(identifier):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @features admin
-# @dimensions metadata public-preview
+# @matrix admin : metadata public-preview
 def image():
     """Fetch the stored site image metadata entity."""
     return DATA.datastore.get(key("image"))
@@ -36,8 +35,7 @@ def image():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
-# @features admin
-# @dimensions deployment-settings metadata
+# @matrix admin : deployment-settings metadata
 def deployment():
     """Fetch the stored deployment settings metadata entity."""
     return DATA.datastore.get(key("deployment"))
@@ -45,8 +43,7 @@ def deployment():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
-# @features admin
-# @dimensions ai-settings metadata
+# @matrix admin : ai-settings metadata
 def ai():
     """Fetch the stored AI model settings metadata entity."""
     return DATA.datastore.get(key("ai"))
@@ -55,8 +52,7 @@ def ai():
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @tests tests_unit/test_018_database_assets.py::test_save_site_image_persists_version_without_mutating_input
-# @features admin
-# @dimensions site-image-upload metadata
+# @matrix admin : metadata site-image-upload
 def save_image(data):
     """Persist site image metadata and increment its version."""
     image_key = key("image")
@@ -71,8 +67,7 @@ def save_image(data):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_save_site_deployment_persists_canonical_payload_and_prunes_old_keys
-# @features admin
-# @dimensions deployment-settings metadata
+# @matrix admin : deployment-settings metadata
 def save_deployment(data):
     """Persist canonical deployment settings and increment their version."""
     deployment_key = key("deployment")
@@ -91,8 +86,7 @@ def save_deployment(data):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_save_site_ai_persists_canonical_payload_and_prunes_old_keys
-# @features admin
-# @dimensions ai-settings metadata
+# @matrix admin : ai-settings metadata
 def save_ai(data):
     """Persist canonical AI settings and increment their version."""
     ai_key = key("ai")

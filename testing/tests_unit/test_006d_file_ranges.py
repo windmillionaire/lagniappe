@@ -3,8 +3,7 @@ import pytest
 from lagniappe.core.tools import files
 
 
-# @features file preview
-# @dimensions byte-range
+# @matrix file preview : byte-range
 @pytest.mark.unit
 def test_parse_byte_range_standard_and_suffix_forms():
     byte_range = files.parse_byte_range("bytes=10-19", 100)
@@ -27,8 +26,7 @@ def test_parse_byte_range_standard_and_suffix_forms():
     assert oversized_suffix.end == 99
 
 
-# @features file preview
-# @dimensions byte-range invalid-header
+# @matrix file preview : byte-range invalid-header
 @pytest.mark.unit
 def test_parse_byte_range_rejects_invalid_headers():
     assert files.parse_byte_range(None, 100) is None
@@ -41,8 +39,7 @@ def test_parse_byte_range_rejects_invalid_headers():
     assert files.parse_byte_range("bytes=0-10", 0) is None
 
 
-# @features file preview
-# @dimensions byte-range unsatisfiable
+# @matrix file preview : byte-range unsatisfiable
 @pytest.mark.unit
 def test_parse_byte_range_raises_for_unsatisfiable_ranges():
     with pytest.raises(files.UnsatisfiableByteRange):

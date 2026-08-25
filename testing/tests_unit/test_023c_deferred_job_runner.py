@@ -51,11 +51,8 @@ from testing.utility.test_entities import TestEntities
 pytestmark = pytest.mark.unit
 
 
+# @matrix observability : attempt contract-version job-type no-job-key
 # @pair deferred-jobs:preparation-context
-# @pair observability:job-type
-# @pair observability:attempt
-# @pair observability:contract-version
-# @pair observability:no-job-key
 @pytest.mark.unit
 def test_runner_supplies_bounded_ai_observability_context_during_prepare(monkeypatch):
     job = RunnerJob(attempt=3)
@@ -89,12 +86,8 @@ def _registered_ai_job_types():
     )
 
 
+# @matrix deferred-jobs : adapter-lookup adapter-registration adapter-registry domain-strategy tier-declaration
 # @pair ai-access:tier-declaration
-# @pair deferred-jobs:tier-declaration
-# @pair deferred-jobs:adapter-registry
-# @pair deferred-jobs:domain-strategy
-# @pair deferred-jobs:adapter-registration
-# @pair deferred-jobs:adapter-lookup
 @pytest.mark.unit
 def test_registered_adapters_declare_required_ai_tiers():
     registry = DeferredJobService()
@@ -118,7 +111,7 @@ def test_registered_adapters_declare_required_ai_tiers():
     } == expected
 
 
-# @pairs deferred-jobs:adapter-registry deferred-jobs:adapter-registration
+# @matrix deferred-jobs : adapter-registration adapter-registry
 def test_adapter_registry_rejects_duplicate_job_types():
     registry = DeferredJobAdapterRegistry()
     registry.register(RecordingAdapter())
@@ -127,7 +120,7 @@ def test_adapter_registry_rejects_duplicate_job_types():
         registry.register(RecordingAdapter())
 
 
-# @pairs deferred-jobs:adapter-registry deferred-jobs:failure-isolation
+# @matrix deferred-jobs : adapter-registry failure-isolation
 def test_adapter_registry_rolls_back_failed_default_loading(monkeypatch):
     registry = DeferredJobAdapterRegistry()
     adapter = RecordingAdapter()
@@ -154,7 +147,7 @@ def test_adapter_registry_rolls_back_failed_default_loading(monkeypatch):
     assert registry._defaults_loaded is True
 
 
-# @pairs deferred-jobs:adapter-registry deferred-jobs:concurrency
+# @matrix deferred-jobs : adapter-registry concurrency
 def test_adapter_registry_loads_defaults_once_across_threads(monkeypatch):
     registry = DeferredJobAdapterRegistry()
     started = threading.Event()
@@ -191,10 +184,8 @@ def test_adapter_registry_loads_defaults_once_across_threads(monkeypatch):
     assert registry._defaults_loaded is True
 
 
+# @matrix ai : access-gate authorization provider-boundary
 # @pair deferred-jobs:authorization
-# @pair ai:authorization
-# @pair ai:access-gate
-# @pair ai:provider-boundary
 @pytest.mark.parametrize(
     "job_type",
     _registered_ai_job_types(),
@@ -234,8 +225,7 @@ def test_registered_ai_adapters_reject_restricted_actor_before_prepare(
     assert prepare_calls == []
 
 
-# @features deferred-jobs
-# @dimensions reauthorization
+# @pair deferred-jobs:reauthorization
 @pytest.mark.unit
 def test_runner_rechecks_ai_access_before_apply(monkeypatch):
     class RevokedBeforeApplyAdapter(DeferredJobAdapter):
@@ -284,8 +274,7 @@ def test_runner_rechecks_ai_access_before_apply(monkeypatch):
     assert job.actor.checks == 2
 
 
-# @features deferred-jobs
-# @dimensions checkpoint recovery
+# @matrix deferred-jobs : checkpoint recovery
 def test_runner_checkpoints_before_apply_and_resumes_without_prepare(monkeypatch):
     job = RunnerJob()
     adapter = RecordingAdapter()
@@ -356,8 +345,7 @@ def test_runner_checkpoints_before_apply_and_resumes_without_prepare(monkeypatch
     assert "started" not in legacy_adapter.calls
 
 
-# @pair deferred-jobs:target-fingerprint
-# @pair deferred-jobs:no-apply
+# @matrix deferred-jobs : no-apply target-fingerprint
 def test_runner_rejects_changed_target_fingerprint_before_apply(monkeypatch):
     job = RunnerJob(checkpoint={"prepared": True})
     target = SimpleNamespace(fingerprint="new-target-state")
@@ -380,8 +368,7 @@ def test_runner_rejects_changed_target_fingerprint_before_apply(monkeypatch):
     assert "apply" not in adapter.calls
 
 
-# @features deferred-jobs
-# @dimensions heartbeat deadline cancellation progress provider-boundary tool-boundary blocking-provider lease-loss
+# @matrix deferred-jobs : blocking-provider cancellation deadline heartbeat lease-loss progress provider-boundary tool-boundary
 def test_execution_control_renews_and_observes_lost_claim(monkeypatch):
     progress = []
     boundary_control = DeferredExecutionControl(
@@ -436,8 +423,7 @@ def test_execution_control_renews_and_observes_lost_claim(monkeypatch):
         expired.ensure_active()
 
 
-# @features deferred-jobs
-# @dimensions retry
+# @pair deferred-jobs:retry
 def test_runner_classifies_wrapped_transient_errors_and_schedules_retry(monkeypatch):
     provider_error = google_exceptions.TooManyRequests("busy")
     wrapped = RuntimeError("provider wrapper")
@@ -462,8 +448,7 @@ def test_runner_classifies_wrapped_transient_errors_and_schedules_retry(monkeypa
     assert dispatched == [(job, 2, 60)]
 
 
-# @features deferred-jobs
-# @dimensions dependency-wait retry provider-attempt-isolation
+# @matrix deferred-jobs : dependency-wait provider-attempt-isolation retry
 def test_runner_waits_for_dependency_without_consuming_provider_retry(monkeypatch):
     job = RunnerJob(attempt=2)
     job.parameters = {"_dependency_waits": 1}
@@ -497,8 +482,7 @@ def test_runner_waits_for_dependency_without_consuming_provider_retry(monkeypatc
     assert deferred_retry._provider_retry_attempt(job) == 1
 
 
-# @features deferred-jobs
-# @dimensions dependency-failure terminal no-duplicate-capture
+# @matrix deferred-jobs : dependency-failure no-duplicate-capture terminal
 def test_runner_fails_cleanly_when_dependency_failed(monkeypatch):
     error = DeferredJobDependencyFailedError("attached file summary failed")
     job = RunnerJob(attempt=1)
@@ -519,8 +503,7 @@ def test_runner_fails_cleanly_when_dependency_failed(monkeypatch):
     assert captured == []
 
 
-# @features deferred-jobs
-# @dimensions provider-timeout retry
+# @matrix deferred-jobs : provider-timeout retry
 def test_runner_retries_sdk_timeout(monkeypatch):
     job = RunnerJob(attempt=1)
 
@@ -547,8 +530,7 @@ def test_runner_retries_sdk_timeout(monkeypatch):
     assert dispatched == [(job, 2, 60)]
 
 
-# @features deferred-jobs
-# @dimensions provider-errors terminal-message
+# @matrix deferred-jobs : provider-errors terminal-message
 def test_runner_retries_sdk_5xx_and_persists_clean_terminal_message(monkeypatch):
     provider_error = genai_errors.ServerError(
         503,
@@ -572,8 +554,7 @@ def test_runner_retries_sdk_5xx_and_persists_clean_terminal_message(monkeypatch)
     assert job.error["message"] == MODEL_BUSY_MESSAGE
 
 
-# @features deferred-jobs
-# @dimensions quota retry backoff jitter
+# @matrix deferred-jobs : backoff jitter quota retry
 def test_runner_increases_later_quota_backoff_without_adding_attempts(monkeypatch):
     quota_error = exceptions.AIQuotaError("quota exhausted")
     transient_error = google_exceptions.ServiceUnavailable("unavailable")
@@ -660,8 +641,6 @@ def test_runner_persists_terminal_domain_failure_without_provider_retry(monkeypa
     ]
 
 
-# @source lagniappe/core/tools/deferred_jobs/runner.py::DeferredJobRunner._finish_terminal_delivery
-# @source lagniappe/core/tools/deferred_jobs/adapters/email.py::EmailIngestAdapter
 # @pair deferred-jobs:failure-only-notification
 def test_email_ingest_notification_is_created_only_for_failure(monkeypatch):
     registry = DeferredJobService()

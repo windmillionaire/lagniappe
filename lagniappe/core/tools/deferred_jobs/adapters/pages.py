@@ -98,7 +98,8 @@ class PageGenerationAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_pages.py::test_page_generation_apply_uses_direct_fields_and_form_fallbacks
-    # @pairs ai:page-generation pages:form-defaults pages:no-form
+    # @matrix pages : form-defaults no-form
+    # @pair ai:page-generation
     def apply(self, context):
         context.ensure_active()
         category = context.input("category")

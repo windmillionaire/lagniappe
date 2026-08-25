@@ -13,8 +13,7 @@ from lagniappe.core.tools.hosted_e2e.auth import (
 pytestmark = pytest.mark.unit
 
 
-# @features hosted-e2e
-# @dimensions authentication audience issuer identity
+# @matrix hosted-e2e : audience authentication identity issuer
 def test_validate_google_claims_requires_exact_verified_identity():
     expected = {
         "iss": "https://accounts.google.com",
@@ -47,8 +46,7 @@ def test_validate_google_claims_requires_exact_verified_identity():
             )
 
 
-# @features hosted-e2e
-# @dimensions authentication cookie expiry deployment-binding
+# @matrix hosted-e2e : authentication cookie deployment-binding expiry
 def test_hosted_e2e_cookie_is_signed_scoped_and_expiring():
     secret = "s" * 48
     value = sign_hosted_e2e_cookie(

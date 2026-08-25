@@ -12,7 +12,7 @@ from config.datastore import decode_urlsafe_key, encode_urlsafe_key
 
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_empty_results_has_no_items_or_cursor
-# @pairs database:restricted-results database:empty-page
+# @matrix database : empty-page restricted-results
 def _empty_results():
     return Results([], None)
 
@@ -139,8 +139,7 @@ def users(start_cursor=None, hashes=Restriction.UNRESTRICTED, group=None, limit=
 
 # @testable true
 # @tests tests_unit/test_018_database_utility.py::test_groups_with_denied_hashes_does_not_query_datastore
-# @features database permissions
-# @dimensions group-query deny-all
+# @matrix database permissions : deny-all group-query
 def groups(hashes=Restriction.UNRESTRICTED):
     """Fetch all group models, optionally restricted to the given hashes."""
     return (
@@ -412,8 +411,7 @@ _TASK_DUE_MIN = datetime(1, 1, 1, tzinfo=timezone.utc)
 # @testable true
 # @tests tests_unit/test_010_task_index.py::test_task_query_filter_uses_completed_status_not_active_status
 # @tests tests_unit/test_010_task_index.py::test_task_query_filter_includes_assignee_visibility_branch
-# @features task-index
-# @dimensions query-filter completed active assignee-visibility
+# @matrix task-index : active assignee-visibility completed query-filter
 def _tasks_filter(
     project=None,
     model=None,
@@ -578,8 +576,7 @@ def user_task_count(page):
 
 # @testable true
 # @tests tests_unit/test_010_task_index.py::test_due_tasks_does_not_add_requires_filter_for_unrestricted
-# @features home task-index
-# @dimensions due-tasks restrictions unrestricted
+# @matrix home task-index : due-tasks restrictions unrestricted
 def due_tasks(hashes=Restriction.UNRESTRICTED, assigned_to=None):
     """Fetch incomplete active tasks due within the next seven days."""
     if Restriction.is_denied(hashes) and assigned_to is None:
@@ -702,8 +699,7 @@ def form_instance_users(form_key):
 
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_activity_query_filters_requested_types
-# @features activity
-# @dimensions query ancestor type-order
+# @matrix activity : ancestor query type-order
 def activity(parent, types=("note", "notification")):
     """Fetch activity items belonging to ``parent``."""
     parent_key = datastore_key(parent)
@@ -729,8 +725,7 @@ def activity(parent, types=("note", "notification")):
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_home_notes_return_only_visible_notes
 # @tests tests_e2e/002_home/test_002i_home_activity.py::test_home_note_visibility_across_users
-# @features notes permissions
-# @dimensions home shared private owner ordering
+# @matrix notes permissions : home ordering owner private shared
 def home_notes(user):
     """Fetch Home-scope notes visible to ``user``."""
     note_filter = Filter().eq("type", "note").eq("scope", "home")
@@ -781,8 +776,7 @@ def notes_by_user(user):
 
 # @testable true
 # @tests tests_unit/test_002i_home_properties.py::test_home_note_ingress_and_tool_lists_load_database_entities
-# @features home ai-report
-# @dimensions query list
+# @matrix ai-report home : list query
 def ai_reports(user_key):
     """Fetch AI report activity records belonging to a user."""
     return activity(user_key, types=("report",))

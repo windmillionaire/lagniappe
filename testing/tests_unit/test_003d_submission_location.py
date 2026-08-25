@@ -46,8 +46,7 @@ def _location_field(existing=None):
     )
 
 
-# @features location
-# @dimensions session-bias validation coordinates
+# @matrix location : coordinates session-bias validation
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "value",
@@ -71,29 +70,25 @@ def test_normalize_location_coordinates_rejects_malformed_values(value):
     ) == {"latitude": 29.0, "longitude": -90.0}
 
 
-# @features location
-# @dimensions suite-stripping
+# @pair location:suite-stripping
 def test_simplify_address_for_search_comma_suite():
     """Comma-separated suite clause should be stripped for retry."""
     out = loc.simplify_address_for_search("123 Main St, Suite 400, City, ST")
     assert out == "123 Main St"
 
 
-# @features location
-# @dimensions suite-stripping
+# @pair location:suite-stripping
 def test_simplify_address_for_search_trailing_suite():
     out = loc.simplify_address_for_search("123 Main St Suite 4")
     assert out == "123 Main St"
 
 
-# @features location
-# @dimensions suite-stripping
+# @pair location:suite-stripping
 def test_simplify_address_for_search_no_change():
     assert loc.simplify_address_for_search("123 Main St") is None
 
 
-# @features location
-# @dimensions retry suite-stripping
+# @matrix location : retry suite-stripping
 def test_resolve_location_query_retries_after_simplify():
     """Second search uses simplified query when first returns empty."""
     with patch.object(
@@ -103,8 +98,7 @@ def test_resolve_location_query_retries_after_simplify():
     assert result == {"id": "p1", "name": "Hit"}
 
 
-# @features location
-# @dimensions first-hit
+# @pair location:first-hit
 def test_resolve_location_query_first_hit_wins():
     with patch.object(
         loc,
@@ -115,8 +109,7 @@ def test_resolve_location_query_first_hit_wins():
     assert result == {"id": "p1", "name": "First"}
 
 
-# @features location
-# @dimensions api-cache oauth
+# @matrix location : api-cache oauth
 @pytest.mark.unit
 def test_get_places_access_token_reuses_cached_token_until_refresh_window(monkeypatch):
     """OAuth credentials should refresh only when the cached token is near expiry."""
@@ -156,8 +149,7 @@ def test_get_places_access_token_reuses_cached_token_until_refresh_window(monkey
     ]
 
 
-# @features location
-# @dimensions api-request session-bias response-mapping
+# @matrix location : api-request response-mapping session-bias
 @pytest.mark.unit
 def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypatch):
     """Autocomplete should send a biased request and return compact suggestions."""
@@ -221,8 +213,7 @@ def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypat
     )
 
 
-# @features location
-# @dimensions api-request address2 name-normalization
+# @matrix location : address2 api-request name-normalization
 @pytest.mark.unit
 def test_get_place_details_formats_address2_and_meaningful_name():
     response = _outbound(
@@ -262,8 +253,7 @@ def test_get_place_details_formats_address2_and_meaningful_name():
     )
 
 
-# @features location
-# @dimensions name-normalization
+# @pair location:name-normalization
 @pytest.mark.unit
 def test_get_place_details_omits_street_address_display_name():
     response = _outbound(
@@ -290,8 +280,7 @@ def test_get_place_details_omits_street_address_display_name():
     }
 
 
-# @features location
-# @dimensions provider-failure deadline diagnostics degradation
+# @matrix location : deadline degradation diagnostics provider-failure
 @pytest.mark.unit
 def test_places_provider_failures_capture_once_and_degrade(monkeypatch):
     captured = []
@@ -335,8 +324,7 @@ def test_places_provider_failures_capture_once_and_degrade(monkeypatch):
     }
 
 
-# @features location
-# @dimensions provider-contract diagnostics degradation
+# @matrix location : degradation diagnostics provider-contract
 @pytest.mark.unit
 def test_places_malformed_provider_payload_captures_once(monkeypatch):
     captured = []
@@ -378,8 +366,7 @@ def test_places_malformed_provider_payload_captures_once(monkeypatch):
     assert captured[0][1] == {"context": "get_place_details", "method": "GET"}
 
 
-# @features location
-# @dimensions column free-text
+# @matrix location : column free-text
 @pytest.mark.unit
 def test_location_address_only_value_and_column():
     field = _location_field()
@@ -393,8 +380,7 @@ def test_location_address_only_value_and_column():
     assert cv["title"] == "123 Main St Suite 4"
 
 
-# @features location
-# @dimensions address2 column filter-value ai-value
+# @matrix location : address2 ai-value column filter-value
 @pytest.mark.unit
 def test_location_place_value_preserves_address2():
     field = _location_field()
@@ -419,8 +405,7 @@ def test_location_place_value_preserves_address2():
     assert field.ai_value == "Mock Place, 123 Main St, Suite 400, City"
 
 
-# @features location
-# @dimensions address2 column free-text
+# @matrix location : address2 column free-text
 @pytest.mark.unit
 def test_location_free_text_value_preserves_address2():
     field = _location_field()
@@ -439,8 +424,7 @@ def test_location_free_text_value_preserves_address2():
     assert field.column_value["title"] == "123 Main St, Apt 5"
 
 
-# @features location
-# @dimensions address2 no-refetch
+# @matrix location : address2 no-refetch
 @pytest.mark.unit
 def test_location_same_id_updates_address2_without_refetch():
     field = _location_field(
@@ -468,8 +452,7 @@ def test_location_same_id_updates_address2_without_refetch():
     }
 
 
-# @features location
-# @dimensions provider-failure free-text fallback warnings
+# @matrix location : fallback free-text provider-failure warnings
 @pytest.mark.unit
 def test_location_place_detail_failure_falls_back_to_submitted_text():
     field = _location_field()
@@ -492,8 +475,7 @@ def test_location_place_detail_failure_falls_back_to_submitted_text():
     assert field.warnings
 
 
-# @features location
-# @dimensions fallback warnings
+# @matrix location : fallback warnings
 @pytest.mark.unit
 def test_location_validate_ai_fallback():
     field = _location_field()
@@ -503,8 +485,7 @@ def test_location_validate_ai_fallback():
     assert field.warnings
 
 
-# @features location
-# @dimensions import fallback
+# @matrix location : fallback import
 @pytest.mark.unit
 def test_location_validate_import_fallback():
     field = _location_field()

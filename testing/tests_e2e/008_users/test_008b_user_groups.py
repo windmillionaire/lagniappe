@@ -54,8 +54,7 @@ def _create_group(user, user_index, group):
     return title
 
 
-# @features user-groups
-# @dimensions column-link query-route same-page-navigation reload
+# @matrix user-groups : column-link query-route reload same-page-navigation
 # @template common.html::format_name
 # @template users/tools.html::group_permissions
 def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
@@ -90,8 +89,7 @@ def test_group_column_link_opens_group_tools_and_tracks_url(get_user):
     expect(owner.page).to_have_url(re.compile(r"/users/index$"))
 
 
-# @features user-groups
-# @dimensions group-create nav permission-update general-permissions
+# @matrix user-groups : general-permissions group-create nav permission-update
 # @template users/tools.html::create_user_group
 # @template users/tools.html::group_permissions
 def test_set_general_permissions(get_user):
@@ -108,8 +106,7 @@ def test_set_general_permissions(get_user):
     _set_and_verify_permissions(user, group, permissions)
 
 
-# @features user-groups
-# @dimensions group-create nav permission-update entity-permissions selection-render responsive-layout
+# @matrix user-groups : entity-permissions group-create nav permission-update responsive-layout selection-render
 # @template users/tools.html::create_user_group
 # @template users/tools.html::group_permissions
 def test_set_entity_specific_permissions(get_user):
@@ -126,7 +123,7 @@ def test_set_entity_specific_permissions(get_user):
     _set_and_verify_permissions(user, group, permissions)
 
 
-# @pairs user-groups:rename user-groups:permission-update
+# @matrix user-groups : permission-update rename
 # @template users/tools.html::group_permissions
 # @template users/tools.html::group_selector
 def test_rename_group(get_user):
@@ -159,8 +156,7 @@ def test_rename_group(get_user):
     expect(name_input).to_have_value(renamed)
 
 
-# @features public-groups permissions
-# @dimensions public active permission-update
+# @matrix permissions public-groups : active permission-update public
 # @template users/tools.html::public_permissions
 def test_set_public_permissions(get_user):
     owner = get_user(Users.OWNER)
@@ -216,8 +212,7 @@ def test_set_public_permissions(get_user):
         permissions_form.submit()
 
 
-# @features user-groups
-# @dimensions group-delete nav-refresh polling
+# @matrix user-groups : group-delete nav-refresh polling
 # @template users/tools.html::group_nav
 def test_delete_group_refreshes_group_navigation(get_user):
     user = get_user(Users.OWNER)

@@ -20,8 +20,7 @@ from . import assets
 # @testable true
 # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
 # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
-# @features html-field
-# @dimensions render-fetch submitter-key form-asset retry authoritative-content
+# @matrix html-field : authoritative-content form-asset render-fetch retry submitter-key
 @assets.route("<key>/html/<field_id>", methods=["GET"])
 @permission(requested=Action.VIEW)
 def html_field(key, field_id, **kwargs):
@@ -37,8 +36,8 @@ def html_field(key, field_id, **kwargs):
 # @testable true
 # @tests tests_unit/test_004_form_properties.py::test_form_html_fields
 # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
-# @features html-field
-# @dimensions server-acknowledgement intentional-clear form-asset
+# @matrix html-field : form-asset intentional-clear server-acknowledgement
+# @pair html-field:html-fields
 @assets.route("<key>/form-html/<field_id>", methods=["PUT"])
 @permission(requested=Action.EDIT)
 def form_html(key, field_id, **kwargs):
@@ -54,6 +53,7 @@ def form_html(key, field_id, **kwargs):
 
 # @testable true
 # @tests tests_e2e/010_sync/test_010a_document_sync.py::test_two_users_see_document_edits_without_reload
+# @pair sync:document
 @assets.route("<key>/document/state", methods=["GET"])
 @permission(requested=Action.VIEW)
 def get_document_state(key, **kwargs):
@@ -68,8 +68,7 @@ def get_document_state(key, **kwargs):
 # @testable true
 # @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image_generate_toggle
 # @tests tests_e2e/004_projects/test_004e_document_forms.py::test_add_image
-# @features editor
-# @dimensions image-generate-toggle image-upload
+# @matrix editor : image-generate-toggle image-upload
 @assets.route("<key>/document/image", methods=["POST"])
 @permission(requested=Action.EDIT)
 def add_document_image(key, **kwargs):
@@ -139,8 +138,7 @@ def add_document_image_direct(key, **kwargs):
 # @testable true
 # @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_explain_includes_selected_text_context
 # @tests tests_e2e/005_pages/test_005g_page_document_ai.py::test_generate_text_live_page_context_with_tasks_and_files
-# @features ai
-# @dimensions generate-text selected-text explain live-provider page-context document-context
+# @matrix ai : document-context explain generate-text live-provider page-context selected-text
 @assets.route("<key>/document/generate", methods=["POST"])
 @permission(requested=Action.EDIT)
 def generate_text(key, **kwargs):
@@ -183,7 +181,7 @@ def generate_text(key, **kwargs):
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_created_on_save
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @pair editor:history-list
+# @matrix editor : history-list history-pin history-restore
 @assets.route("<key>/document/history", methods=["GET"])
 @permission(requested=Action.VIEW)
 def list_document_history(key, **kwargs):
@@ -204,8 +202,7 @@ def list_document_history(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @features editor
-# @dimensions history-pin current-content validation
+# @matrix editor : current-content history-pin validation
 @assets.route("<key>/document/history/pin", methods=["POST"])
 @permission(requested=Action.EDIT)
 def pin_document_history(key, **kwargs):
@@ -229,7 +226,7 @@ def pin_document_history(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @pairs editor:history-clear editor:confirmation
+# @matrix editor : confirmation history-clear
 @assets.route("<key>/document/history/unpinned", methods=["GET", "DELETE"])
 @permission(requested=Action.EDIT)
 def unpinned_document_history(key, **kwargs):
@@ -254,8 +251,7 @@ def unpinned_document_history(key, **kwargs):
 # @testable true
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_document_history_restore
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
-# @features editor
-# @dimensions history-restore parent-scope
+# @matrix editor : history-restore parent-scope
 @assets.route("<key>/document/history/<history_key>", methods=["GET"])
 @permission(requested=Action.VIEW)
 def get_document_history(key, history_key, **kwargs):

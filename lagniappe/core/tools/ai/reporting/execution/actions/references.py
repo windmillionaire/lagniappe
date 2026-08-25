@@ -40,8 +40,7 @@ def _resolve_file_entity(data, created, source=None):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_moves_file_by_exact_source_attachment_name
-# @pair ai-report:readable-file-fallback
-# @pair files:readable-file-fallback
+# @matrix ai-report files : readable-file-fallback
 def _resolve_file_from_source(data, source, reference=None):
     labels = _move_file_label_candidates(data, reference)
     if not labels or source is None:
@@ -175,23 +174,9 @@ def _add_file_to_endpoint(file, endpoint):
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_resolves_attachment_page_from_single_prior_task_when_reference_is_file
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_resolves_attachment_page_by_exact_page_name_when_reference_missing
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_rejects_category_used_as_attachment_page
-# @pair tasks:page-reference
-# @pair tasks:repair
-# @pair files:page-reference
-# @pair files:repair
-# @pair files:prior-task-page
-# @pair files:exact-page-name
-# @pair ai-report:attachment
-# @pair ai-report:exact-page-name
-# @pair ai-report:page-reference
-# @pair ai-report:prior-task-page
-# @pair ai-report:repair
-# @pair ai-report:task-history
-# @pair ai-report:validation
-# @pair task-completion:page-reference
-# @pair task-completion:repair
-# @pair task-completion:task-history
-# @pair tasks:task-history
+# @matrix ai-report : attachment exact-page-name page-reference prior-task-page repair task-history validation
+# @matrix files : exact-page-name page-reference prior-task-page repair
+# @matrix task-completion tasks : page-reference repair task-history
 def _resolve_action_page(data, created, user):
     reference = (
         data.get("page")
@@ -383,12 +368,7 @@ def _reference_key(reference):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_files.py::test_run_report_resolves_report_file_by_exact_url_and_file_prefix
-# @pair ai-report:deterministic-run
-# @pair ai-report:exact-id
-# @pair ai-report:report-file-reference
-# @pair files:deterministic-run
-# @pair files:exact-id
-# @pair files:report-file-reference
+# @matrix ai-report files : deterministic-run exact-id report-file-reference
 def _resolve_report_file(reference, report):
     if isinstance(reference, dict):
         reference = (

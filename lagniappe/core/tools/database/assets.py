@@ -136,8 +136,7 @@ def _direct_upload_serializer():
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_create_direct_upload_session_uses_private_tmp_object
-# @features storage
-# @dimensions direct-upload session token
+# @matrix storage : direct-upload session token
 def create_direct_upload_session(
     filename,
     content_type=None,
@@ -182,8 +181,7 @@ def create_direct_upload_session(
 # @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_bad_token
 # @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_mismatched_size
 # @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_generation_mismatch
-# @features storage
-# @dimensions direct-upload token validation
+# @matrix storage : direct-upload token validation
 def load_direct_upload_token(token, max_age=DIRECT_UPLOAD_TOKEN_MAX_AGE):
     """Load and validate a direct-upload token payload."""
     try:
@@ -217,8 +215,7 @@ def _content_types_match(expected, actual):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_mismatched_size
 # @tests tests_unit/test_018_database_assets.py::test_verify_direct_upload_rejects_generation_mismatch
-# @features storage
-# @dimensions direct-upload object validation
+# @matrix storage : direct-upload object validation
 def verify_direct_upload(
     record,
     max_age=DIRECT_UPLOAD_TOKEN_MAX_AGE,
@@ -279,8 +276,7 @@ def direct_upload_file(record, *, consumer=None):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_copy_direct_upload_file_copies_and_deletes_temp_object
-# @features storage
-# @dimensions direct-upload final-copy
+# @matrix storage : direct-upload final-copy
 def copy_direct_upload_file(
     upload,
     path,
@@ -345,8 +341,7 @@ def save_file(file, path, content_type, visibility):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_download_file_passes_optional_byte_range
-# @features file storage
-# @dimensions byte-range
+# @matrix file storage : byte-range
 def download_file(path, visibility, start=None, end=None):
     """Download a blob's contents as bytes from the specified bucket."""
     bucket = DATA.bucket(visibility)
@@ -361,8 +356,7 @@ def download_file(path, visibility, start=None, end=None):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_file_size_reloads_blob_metadata
-# @features file storage
-# @dimensions byte-range metadata
+# @matrix file storage : byte-range metadata
 def file_size(path, visibility):
     """Return a blob's byte size from storage metadata."""
     bucket = DATA.bucket(visibility)
@@ -425,8 +419,7 @@ def list_files(prefix, visibility):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_signed_url_uses_remote_iam_signing
-# @features storage
-# @dimensions signed-url adc iam-signing token-refresh
+# @matrix storage : adc iam-signing signed-url token-refresh
 def get_signed_url(
     path,
     expires_in=3600,
@@ -463,8 +456,7 @@ def delete_file(path, visibility):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @features admin
-# @dimensions site-image-upload
+# @pair admin:site-image-upload
 def upload_site_image(filename, image_data):
     """Upload a site image and return its path and immutable generation."""
     if filename.endswith(".png"):

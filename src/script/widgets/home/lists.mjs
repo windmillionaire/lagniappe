@@ -29,7 +29,7 @@ class LoadedHomeList extends BaseList {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002h_home_permissions.py::test_empty_home_model_lists_settle_to_disabled_zero_state
-	 * @pairs home:lazy-empty-list home:unavailable-toggle
+	 * @matrix home : lazy-empty-list unavailable-toggle
 	 */
 	_syncUnavailableToggle() {
 		if (!this.constructor.disableToggleWhenUnavailable || !this._listToggle) {
@@ -74,8 +74,7 @@ class LoadedHomeList extends BaseList {
  * @testable true
  * @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_manual_mode
  * @tests tests_e2e/002_home/test_002b_home_projects.py::test_create_project_ai_mode
- * @features projects
- * @dimensions create-manual ai-create
+ * @matrix projects : ai-create create-manual
  */
 export class HomeProjectList extends LoadedHomeList {
 	static disableToggleWhenUnavailable = true;
@@ -85,8 +84,7 @@ export class HomeProjectList extends LoadedHomeList {
  * @testable true
  * @tests tests_e2e/002_home/test_002c_home_categories.py::test_create_category_manual_mode
  * @tests tests_e2e/002_home/test_002c_home_categories.py::test_navigate_to_category
- * @features categories
- * @dimensions create-manual navigate
+ * @matrix categories : create-manual navigate
  */
 export class HomeCategoryList extends LoadedHomeList {
 	static disableToggleWhenUnavailable = true;
@@ -95,8 +93,7 @@ export class HomeCategoryList extends LoadedHomeList {
 /**
  * @testable true
  * @tests tests_e2e/002_home/test_002k_home_pages.py::test_home_page_list_loads_recent_pages
- * @features home pages
- * @dimensions list load
+ * @matrix home pages : list load
  */
 export class HomePageList extends LoadedHomeList {
 	static unlockToggleWhenPopulated = true;
@@ -107,8 +104,7 @@ export class HomePageList extends LoadedHomeList {
  * @testable true
  * @tests tests_e2e/002_home/test_002a_home.py::test_directory_list
  * @tests tests_e2e/002_home/test_002f_home_directory.py::test_directory_links_present
- * @features home
- * @dimensions directory-list
+ * @pair home:directory-list
  */
 export class DirectoryList extends LoadedHomeList {
 	static unlockToggleWhenPopulated = true;
@@ -118,8 +114,7 @@ export class DirectoryList extends LoadedHomeList {
  * @testable true
  * @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_file_input
  * @tests tests_e2e/002_home/test_002g_home_import.py::test_import_csv_via_drag_drop
- * @features ingress
- * @dimensions upload-counts delete
+ * @matrix ingress : delete upload-counts
  */
 export class IngressList extends LoadedHomeList {
 	static unlockToggleWhenPopulated = true;
@@ -130,8 +125,7 @@ export class IngressList extends LoadedHomeList {
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_refreshes_stage_labels
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_list_item_delete_removes_report_only_file
  * @tests tests_e2e/002_home/test_002j_home_tools.py::test_lazy_report_list_reconciles_active_job_status
- * @features ai-report
- * @dimensions list delete-modal deferred-refresh operation-poll stage-labels lazy-load status-reconciliation
+ * @matrix ai-report : deferred-refresh delete-modal lazy-load list operation-poll stage-labels status-reconciliation
  */
 export class ToolReportList extends BaseList {
 	constructor(attributes) {
@@ -156,8 +150,7 @@ export class ToolReportList extends BaseList {
  * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_category
  * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
  * @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
- * @features starred
- * @dimensions category project page
+ * @matrix starred : category page project
  */
 export class StarredList extends BaseList {
 	constructor(attributes) {

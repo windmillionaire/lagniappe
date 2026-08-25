@@ -30,8 +30,7 @@ class ReportAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_replacement_supersedes_old_job_and_ignores_old_failure
-    # @pair deferred-jobs:superseded
-    # @pair ai-report:active-operation
+    # @pairs ai-report:active-operation deferred-jobs:superseded
     def started(self, context):
         report = context.input("report")
         current = Entities.fetch_one(report.urlsafe_key, request=Fetch.direct())
@@ -93,8 +92,7 @@ class ReportAdapter(DeferredJobAdapter):
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_ask_report_adapter_prepares_and_applies_checkpointed_response
     # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_resumes_plan_checkpoint_without_second_planning_call
-    # @pair ai-report:status
-    # @pair ai-report:proposal-publication
+    # @matrix ai-report : proposal-publication status
     def apply(self, context):
         context.ensure_active()
         self.validate_apply(context)
@@ -168,13 +166,8 @@ class ReportAdapter(DeferredJobAdapter):
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_retry_uses_priority_for_every_generation_stage
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_prepare_stops_before_report_save_after_cancellation
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_organize_resumes_plan_checkpoint_without_second_planning_call
-# @pair deferred-jobs:service-tier
-# @pair deferred-jobs:quota
-# @pair deferred-jobs:retry
-# @pair deferred-jobs:cancellation
-# @pair deferred-jobs:checkpoint
-# @pair ai-report:plan-resume
-# @pair ai-report:submission-completion
+# @matrix ai-report : plan-resume submission-completion
+# @matrix deferred-jobs : cancellation checkpoint quota retry service-tier
 class OrganizeReportAdapter(ReportAdapter):
     job_type = DeferredJobType.REPORT_ORGANIZE
     required_ai_access = AI.CREATE
@@ -289,10 +282,7 @@ class OrganizeReportAdapter(ReportAdapter):
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_ask_report_adapter_prepares_and_applies_checkpointed_response
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_answers_from_attached_corpus_receipt
 # @tests tests_e2e/002_home/test_002m_home_ask_ai.py::test_ask_uses_structured_filter_for_form_submission_query
-# @pair ai-report:ask
-# @pair ai-report:revision
-# @pair ai-report:status
-# @pairs ai-report:async ai-report:persistence ai-report:live-provider
+# @matrix ai-report : ask async live-provider persistence revision status
 # @pair deferred-jobs:checkpoint
 class AskReportAdapter(ReportAdapter):
     job_type = DeferredJobType.REPORT_ASK
@@ -353,10 +343,8 @@ class CreateReportAdapter(ReportAdapter):
 # @testable true
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_adapter_runs_the_reviewed_proposal
 # @tests tests_unit/test_023e_deferred_job_adapters_reports.py::test_report_execution_failure_preserves_a_retryable_ledger
-# @pair deferred-jobs:report-execution
-# @pair deferred-jobs:cancellation
-# @pair ai-report:deterministic-run
-# @pair ai-report:recovery
+# @matrix ai-report : deterministic-run recovery
+# @matrix deferred-jobs : cancellation report-execution
 class ReportExecutionAdapter(DeferredJobAdapter):
     """Durably execute a reviewed report through its per-action ledger."""
 

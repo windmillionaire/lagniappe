@@ -31,25 +31,8 @@ from ..proposals.references import _first_data_reference, _has_form_reference_or
 # @tests tests_unit/test_020f_ai_report_completion.py::test_complete_organize_submissions_preserves_empty_form_records
 # @tests tests_unit/test_020f_ai_report_completion.py::test_complete_organize_submissions_updates_existing_task_submission
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_unreadable_pdf_is_saved_skipped_and_reported
-# @features ai-report
-# @dimensions submission-completion focused-prompt evidence-mapping persistence unreadable-pdf issue existing-task partial-update
-# @pair ai-report:submission-completion
-# @pair ai-report:focused-prompt
-# @pair ai-report:evidence-mapping
-# @pair ai-report:persistence
-# @pair ai-report:unreadable-pdf
-# @pair ai-report:issue
-# @pair ai-report:existing-task
-# @pair ai-report:partial-update
-# @pair ai-report:preservation
-# @pair form-schema:empty
-# @pair form-schema:issue
-# @pair form-schema:preservation
-# @pair form-schema:submission-completion
-# @pair submission:empty
-# @pair submission:issue
-# @pair submission:preservation
-# @pair submission:submission-completion
+# @matrix ai-report : evidence-mapping existing-task focused-prompt issue partial-update persistence preservation submission-completion unreadable-pdf
+# @matrix form-schema submission : empty issue preservation submission-completion
 def complete_organize_submissions(
     proposal,
     report,

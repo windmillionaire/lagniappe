@@ -17,8 +17,7 @@ from testing.utility.ai_report_fakes import (
 from testing.utility.test_entities import TestEntities
 
 
-# @features ai-report files
-# @dimensions deterministic-run report-file-reference exact-id
+# @matrix ai-report files : deterministic-run exact-id report-file-reference
 @pytest.mark.unit
 def test_run_report_resolves_report_file_by_exact_url_and_file_prefix(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -87,8 +86,7 @@ def test_run_report_resolves_report_file_by_exact_url_and_file_prefix(monkeypatc
 
 
 
-# @features ai-report files
-# @dimensions deterministic-run move-file manual-cleanup undo
+# @matrix ai-report files : deterministic-run manual-cleanup move-file undo
 @pytest.mark.unit
 def test_run_report_moves_file_and_records_manual_page_cleanup_with_undo(monkeypatch):
     user = _test_user("runner-file-move-owner")
@@ -184,8 +182,7 @@ def test_run_report_moves_file_and_records_manual_page_cleanup_with_undo(monkeyp
 
 
 
-# @features ai-report files
-# @dimensions deterministic-run move-file readable-file-fallback
+# @matrix ai-report files : deterministic-run move-file readable-file-fallback
 @pytest.mark.unit
 def test_run_report_moves_file_by_exact_source_attachment_name(monkeypatch):
     user = _test_user("runner-file-move-name-owner")
@@ -255,8 +252,7 @@ def test_run_report_moves_file_by_exact_source_attachment_name(monkeypatch):
 
 
 
-# @features ai-report files
-# @dimensions attachment page-reference repair exact-page-name
+# @matrix ai-report files : attachment exact-page-name page-reference repair
 @pytest.mark.unit
 def test_run_report_resolves_attachment_page_by_exact_page_name_when_reference_missing(
     monkeypatch,
@@ -334,8 +330,7 @@ def test_run_report_resolves_attachment_page_by_exact_page_name_when_reference_m
 
 
 
-# @features ai-report
-# @dimensions deterministic-run partial-result recoverable continue attachments
+# @matrix ai-report : attachments continue deterministic-run partial-result recoverable
 @pytest.mark.unit
 def test_run_report_marks_missing_file_placements_failed_and_continues(monkeypatch):
     _patch_fake_keys(monkeypatch)
@@ -493,8 +488,7 @@ def test_run_report_marks_missing_file_placements_failed_and_continues(monkeypat
 
 
 
-# @features ai-report
-# @dimensions deterministic-run validation partial-result attachments
+# @matrix ai-report : attachments deterministic-run partial-result validation
 @pytest.mark.unit
 def test_run_report_rejects_category_used_as_attachment_page(monkeypatch):
     _patch_fake_keys(monkeypatch)

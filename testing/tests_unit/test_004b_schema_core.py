@@ -17,8 +17,7 @@ from lagniappe.core.properties.schema import (
 )
 
 
-# @features form-schema
-# @dimensions ai-value validation
+# @matrix form-schema : ai-value validation
 @pytest.mark.unit
 def test_schema_validate_ai_filters_invalid_top_level(get_test_entities):
     for entity in get_test_entities():
@@ -27,8 +26,7 @@ def test_schema_validate_ai_filters_invalid_top_level(get_test_entities):
         assert [e["id"] for e in schema.value] == entity.test_spec["expected_ids"]
 
 
-# @features form-schema html-field
-# @dimensions ai-value validation
+# @matrix form-schema html-field : ai-value validation
 @pytest.mark.unit
 def test_schema_validate_ai_html_calls_set_html_field(get_test_entities):
     for entity in get_test_entities():
@@ -41,8 +39,7 @@ def test_schema_validate_ai_html_calls_set_html_field(get_test_entities):
         assert "html" not in schema.value[0]
 
 
-# @features form-schema form-table
-# @dimensions ai-value validation columns
+# @matrix form-schema form-table : ai-value columns validation
 @pytest.mark.unit
 def test_schema_validate_ai_table_filters_bad_columns(get_test_entities):
     for entity in get_test_entities():
@@ -55,8 +52,7 @@ def test_schema_validate_ai_table_filters_bad_columns(get_test_entities):
         ]
 
 
-# @features form-schema
-# @dimensions previous cache fields
+# @matrix form-schema : cache fields previous
 @pytest.mark.unit
 def test_schema_previous_and_fields_cache(get_test_entities):
     for entity in get_test_entities():
@@ -69,8 +65,7 @@ def test_schema_previous_and_fields_cache(get_test_entities):
         assert list(schema.fields.keys()) == ["b"]
 
 
-# @features form-schema
-# @dimensions required-fields
+# @pair form-schema:required-fields
 @pytest.mark.unit
 def test_schema_required_fields(get_test_entities):
     for entity in get_test_entities():
@@ -80,8 +75,7 @@ def test_schema_required_fields(get_test_entities):
         assert got == entity.test_spec["expected_required_ids"]
 
 
-# @features form-schema
-# @dimensions field-factory unknown-type
+# @matrix form-schema : field-factory unknown-type
 @pytest.mark.unit
 def test_schema_create_field_unknown_returns_none(get_test_entities):
     for entity in get_test_entities():
@@ -92,8 +86,7 @@ def test_schema_create_field_unknown_returns_none(get_test_entities):
         assert field is None
 
 
-# @features form-schema text-input
-# @dimensions field-factory
+# @matrix form-schema text-input : field-factory
 @pytest.mark.unit
 def test_schema_create_field_known_text_input(get_test_entities):
     for entity in get_test_entities():
@@ -105,8 +98,7 @@ def test_schema_create_field_known_text_input(get_test_entities):
         assert field.id == "t"
 
 
-# @features form-schema
-# @dimensions canonicalization versioning membership
+# @matrix form-schema : canonicalization membership versioning
 @pytest.mark.unit
 def test_schema_canonicalizer_unifies_creation_paths_without_changing_membership():
     builder = [{"id": "notes", "type": "input"}]
@@ -129,8 +121,7 @@ def test_schema_canonicalizer_unifies_creation_paths_without_changing_membership
     assert builder == [{"id": "notes", "type": "input"}]
 
 
-# @features form-schema
-# @dimensions canonicalization validation
+# @matrix form-schema : canonicalization validation
 @pytest.mark.unit
 def test_schema_canonicalizer_rejects_ambiguous_durable_shapes():
     with pytest.raises(SchemaValidationError, match="Duplicate schema field id"):
@@ -158,8 +149,7 @@ def test_schema_canonicalizer_rejects_ambiguous_durable_shapes():
         )
 
 
-# @features form-schema
-# @dimensions canonicalization history-snapshot membership
+# @matrix form-schema : canonicalization history-snapshot membership
 @pytest.mark.unit
 def test_schema_canonicalizer_preserves_snapshot_membership():
     raw = [{"id": "historical", "type": "textarea"}]

@@ -26,13 +26,8 @@ from .references import (
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_skips_empty_submission_update_and_continues
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_report_detail_skips_schema_section_and_runs_submission_updates
-# @pair ai-report:batch-field-patch
-# @pair ai-report:deterministic-run
-# @pair ai-report:empty-update
-# @pair submission:continue
-# @pair submission:deterministic-run
-# @pair submission:empty-update
-# @pair submission:recoverable
+# @matrix ai-report : batch-field-patch deterministic-run empty-update
+# @matrix submission : continue deterministic-run empty-update recoverable
 def _update_submission_fields(action, _report, user, created):
     data = _data(action)
     updates = data.get("updates") or []
@@ -119,12 +114,7 @@ def _update_submission_fields(action, _report, user, created):
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_rejects_schema_update_without_form_edit_permission
-# @pair ai-report:schema-update
-# @pair ai-report:deterministic-run
-# @pair ai-report:permission-failure
-# @pair form-schema:deterministic-run
-# @pair form-schema:schema-update
-# @pair form-schema:permission-failure
+# @matrix ai-report form-schema : deterministic-run permission-failure schema-update
 def _update_form_schema(action, _report, user, created):
     data = _data(action)
     form = _resolve_entity(
@@ -353,8 +343,7 @@ def _update_summary_note(prefix, applied, skipped):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
-# @pair ai-report:batch-field-patch
-# @pair ai-report:undo
+# @matrix ai-report : batch-field-patch undo
 def _undo_submission_updates(action, user):
     restored = []
     skipped = []
@@ -420,8 +409,7 @@ def _restore_submission_field(entity, schema_id, had_value, previous_value):
 
 # @testable true
 # @tests tests_unit/test_020g_ai_report_actions_forms.py::test_run_report_moves_entities_updates_schema_and_patches_submissions_with_undo
-# @pair ai-report:schema-update
-# @pair ai-report:undo
+# @matrix ai-report : schema-update undo
 def _undo_form_schema_update(action, user):
     form = _load_result_entity(action.get("entity")) or _load_result_entity(
         action.get("form")

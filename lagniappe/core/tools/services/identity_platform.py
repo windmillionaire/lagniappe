@@ -77,8 +77,7 @@ def _client_config(config):
 
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_verify_identity_token_enforces_project_issuer_and_subject
-# @features login
-# @dimensions identity-platform token-verification issuer audience
+# @matrix login : audience identity-platform issuer token-verification
 def verify_identity_token(token, project_id, request_adapter=None):
     """Verify a Secure Token ID token for exactly one Identity Platform project."""
     project_id = str(project_id or "").strip()
@@ -101,8 +100,7 @@ def verify_identity_token(token, project_id, request_adapter=None):
 
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_verify_google_credential_enforces_client_and_verified_email
-# @features login
-# @dimensions google-oauth token-verification audience email-verification
+# @matrix login : audience email-verification google-oauth token-verification
 def verify_google_credential(credential, client_id, request_adapter=None):
     """Verify a Google Identity Services credential before account exchange."""
     client_id = str(client_id or "").strip()
@@ -124,8 +122,7 @@ def verify_google_credential(credential, client_id, request_adapter=None):
 
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_exchange_google_credential_uses_identity_platform_idp_endpoint
-# @features login
-# @dimensions identity-platform google-oauth token-exchange provider-error-code
+# @matrix login : google-oauth identity-platform provider-error-code token-exchange
 def exchange_google_credential(
     credential,
     client_config,
@@ -179,8 +176,7 @@ def exchange_google_credential(
 
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_google_provider_enabled_reads_live_provider_state
-# @features login
-# @dimensions identity-platform google-oauth provider-state
+# @matrix login : google-oauth identity-platform provider-state
 def google_provider_enabled(
     *,
     project_id=None,
@@ -239,8 +235,7 @@ def _admin_headers(access_token):
 
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_generate_email_action_code_returns_provider_code_without_sending
-# @features login
-# @dimensions identity-platform authentication-email action-codes
+# @matrix login : action-codes authentication-email identity-platform
 def generate_email_action_code(
     request_type,
     email,
@@ -305,8 +300,7 @@ def generate_email_action_code(
 
 # @testable true
 # @tests tests_unit/test_025_identity_platform.py::test_delete_account_by_email_looks_up_and_deletes_identity_user
-# @features users
-# @dimensions identity-platform account-delete
+# @matrix users : account-delete identity-platform
 def delete_account_by_email(
     email,
     *,

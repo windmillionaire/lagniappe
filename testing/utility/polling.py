@@ -12,8 +12,7 @@ from .network import expect_successful_response
 # @testable true
 # @tests tests_tooling/test_004_network_waits.py::test_poll_wait_matches_subscription_and_validates_result
 # @tests tests_tooling/test_004_network_waits.py::test_poll_wait_reports_missing_or_unexpected_result
-# @features e2e polling
-# @dimensions network-wait subscription result-status
+# @matrix e2e polling : network-wait result-status subscription
 @contextmanager
 def expect_poll_result(
     page: Any,

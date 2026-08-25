@@ -12,7 +12,7 @@ AUTOFILL_FORM_LOCK_SCOPE = Scope.AUTOFILL_FORM
 
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lock_resolution_is_target_scoped
-# @pairs deferred-jobs:form-lock deferred-jobs:deterministic-key
+# @matrix deferred-jobs : deterministic-key form-lock
 def deferred_job_lock_key(target, scope=AUTOFILL_FORM_LOCK_SCOPE):
     """Return the deterministic lock key for one target mutation surface."""
     identifier = Scope.identifier(target, scope)
@@ -29,7 +29,7 @@ def active_deferred_job_lock(target, scope=AUTOFILL_FORM_LOCK_SCOPE):
 
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lock_resolution_is_target_scoped
-# @pairs deferred-jobs:form-lock deferred-jobs:stale-cleanup
+# @matrix deferred-jobs : form-lock stale-cleanup
 def deferred_job_lock_descriptors(targets, scope=AUTOFILL_FORM_LOCK_SCOPE):
     """Batch-resolve active locks keyed by target urlsafe key."""
     targets = [target for target in targets or () if target]
@@ -60,7 +60,7 @@ def deferred_job_lock_descriptors(targets, scope=AUTOFILL_FORM_LOCK_SCOPE):
 
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_lock_descriptor_is_browser_safe
-# @pairs deferred-jobs:form-lock deferred-jobs:browser-projection
+# @matrix deferred-jobs : browser-projection form-lock
 def deferred_job_lock_descriptor(target, scope=AUTOFILL_FORM_LOCK_SCOPE):
     """Return the browser-safe active-operation descriptor for ``target``."""
     active = active_deferred_job_lock(target, scope)

@@ -58,8 +58,7 @@ def _validate_model(value, kind, model_options, current_value, label):
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_settings_normalize_validates_models_and_keeps_current_custom
-# @features ai
-# @dimensions model-settings validation custom-current
+# @matrix ai : custom-current model-settings validation
 def normalize_ai_settings(ai_settings=None, current_settings=None, model_options=None):
     """Return canonical AI settings after validating model names and location."""
     from config import constants
@@ -106,8 +105,7 @@ def normalize_ai_settings(ai_settings=None, current_settings=None, model_options
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_ai_settings_apply_preserves_unowned_app_config
-# @features config
-# @dimensions ai-settings app-yaml
+# @matrix config : ai-settings app-yaml
 def apply_ai_settings(app_settings=None, updated_settings=None):
     """Apply canonical AI settings to SETTINGS.APP or the provided mapping."""
     try:

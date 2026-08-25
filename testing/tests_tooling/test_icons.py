@@ -38,6 +38,7 @@ def test_material_icons_are_direct_children_of_icon_only_controls():
     assert layout_classes == set()
 
 
+# @pair icons:subset-request
 def test_material_symbol_subset_request_uses_unique_sorted_registry_glyphs(tmp_path):
     from runner import icons
 
@@ -64,6 +65,7 @@ def test_material_symbol_subset_request_uses_unique_sorted_registry_glyphs(tmp_p
     assert query["family"] == [icons.FONT_FAMILY_QUERY]
 
 
+# @pair icons:subset-update
 def test_update_icons_writes_official_subset_metadata_and_rebuilds(
     tmp_path, monkeypatch
 ):

@@ -14,8 +14,7 @@ from .verify import activate_installation
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_update_reloads_config_and_setup_helpers
-# @features setup
-# @dimensions config-files storage-buckets deferred-jobs post-deploy
+# @matrix setup : config-files deferred-jobs post-deploy storage-buckets
 def update():
     """Apply app-saved configuration without replacing repository code."""
     activate_installation()
@@ -24,8 +23,7 @@ def update():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_replaces_source_then_applies_update
-# @features setup
-# @dimensions git-upgrade branch config-files post-deploy
+# @matrix setup : branch config-files git-upgrade post-deploy
 def upgrade(branch=None):
     """Replace tracked source from a remote branch, then apply and deploy it."""
     activate_installation()
@@ -71,8 +69,7 @@ def upgrade(branch=None):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_update_reloads_config_and_setup_helpers
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_replaces_source_then_applies_update
-# @features setup
-# @dimensions config-files storage-buckets deferred-jobs post-deploy git-upgrade
+# @matrix setup : config-files deferred-jobs git-upgrade post-deploy storage-buckets
 def _apply_update(*, upgrade):
     """Apply current-checkout generation and app-saved settings."""
 
@@ -135,8 +132,7 @@ def _apply_update(*, upgrade):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_post_deploy_deferred_job_recovery_failure_is_nonfatal
-# @features setup deferred-jobs
-# @dimensions recovery post-deploy failure-isolation
+# @matrix deferred-jobs setup : failure-isolation post-deploy recovery
 def _configure_deferred_job_recovery(f, gcloud):
     """Provision recovery without invalidating an otherwise successful deploy."""
     try:
@@ -157,8 +153,7 @@ def _configure_deferred_job_recovery(f, gcloud):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_images_installs_storage_before_restore_spinner
-# @features setup
-# @dimensions site-image image-restore
+# @matrix setup : image-restore site-image
 def _update_custom_images(f):
     """Restore site images uploaded through the app, if any are present."""
     from config import SETTINGS
@@ -212,8 +207,7 @@ def _update_custom_images(f):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_deployment_settings_applies_saved_app_config
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_deployment_settings_continues_when_unavailable
-# @features setup
-# @dimensions deployment-settings app-yaml
+# @matrix setup : app-yaml deployment-settings
 def _update_deployment_settings(f):
     """Apply deployment settings saved from the app, if available."""
     from config.deployment import apply_deployment_settings
@@ -251,8 +245,7 @@ def _update_deployment_settings(f):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_ai_settings_applies_saved_app_config
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_restore_ai_settings_continues_when_unavailable
-# @features setup
-# @dimensions ai-settings app-yaml
+# @matrix setup : ai-settings app-yaml
 def _update_ai_settings(f):
     """Apply AI model settings saved from the app, if available."""
     from config.ai_settings import apply_ai_settings
@@ -287,8 +280,7 @@ def _update_ai_settings(f):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_refreshes_setup_dependencies_from_replaced_checkout
-# @features setup
-# @dimensions git-upgrade dependency-bootstrap
+# @matrix setup : dependency-bootstrap git-upgrade
 def _refresh_setup_dependencies():
     """Reload dependency bootstrap code from the replaced checkout and reconcile it."""
     from installer import package_install
@@ -312,8 +304,7 @@ def _reset_target_for_branch(branch):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_repository_preserves_report_before_branch_reset
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_repository_handles_clean_status_and_status_failure
-# @features setup
-# @dimensions git-upgrade branch local-change-report failure-propagation
+# @matrix setup : branch failure-propagation git-upgrade local-change-report
 def _update_repository(spinner, branch="main"):
     """Fetch remotes and replace tracked files with the requested remote ref."""
     from installer import FORMATTER

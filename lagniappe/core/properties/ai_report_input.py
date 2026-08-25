@@ -4,8 +4,7 @@ from .base_db import DBProperty
 
 # @testable true
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_create_and_file_cleanup
-# @features ai-report
-# @dimensions upload-manifest
+# @pair ai-report:upload-manifest
 class UploadManifest(DBProperty):
     """Signed direct-upload records awaiting background finalization."""
 
@@ -15,8 +14,7 @@ class UploadManifest(DBProperty):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_email_report_shape_preserves_safe_inbound_display_fields
-# @features ai-email ai-report
-# @dimensions origin legacy-default
+# @matrix ai-email ai-report : legacy-default origin
 class Origin(DBProperty):
     """How the initial report was submitted; legacy reports are web-origin."""
 
@@ -36,8 +34,7 @@ class Origin(DBProperty):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_email_report_shape_preserves_safe_inbound_display_fields
-# @features ai-email ai-report
-# @dimensions inbound-manifest privacy
+# @matrix ai-email ai-report : inbound-manifest privacy
 class InboundManifest(DBProperty):
     """Safe normalized email fields displayed with an email-origin report."""
 

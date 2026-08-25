@@ -67,10 +67,7 @@ class ReportActionAdapter:
 # @testable true
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_retry_resumes_after_completed_create_without_duplicate
 # @tests tests_unit/test_020h_ai_report_execution.py::test_run_report_reconciles_applying_create_when_output_already_exists
-# @pair ai-report:recovery
-# @pair ai-report:create
-# @pair ai-report:idempotency
-# @pair ai-report:post-commit-checkpoint
+# @matrix ai-report : create idempotency post-commit-checkpoint recovery
 
 
 # @testable false

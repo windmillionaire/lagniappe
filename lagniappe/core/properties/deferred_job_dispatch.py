@@ -11,8 +11,7 @@ class DispatchState(DBProperty):
 
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_task_identity_is_deterministic_and_bounded
-# @pair deferred-jobs:task-identity
-# @pair deferred-jobs:feedback-identity
+# @matrix deferred-jobs : feedback-identity task-identity
 class TaskIdentity(DBProperty):
     _id = "task_identity"
 

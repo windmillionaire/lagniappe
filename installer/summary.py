@@ -52,8 +52,7 @@ def _bucket_names(settings):
 
 # @testable true
 # @tests tests_tooling/test_001g_setup_release_readiness.py::test_redacted_install_summary_is_allowlisted
-# @features setup
-# @dimensions operator-summary secret-redaction
+# @matrix setup : operator-summary secret-redaction
 def install_summary_lines(
     settings,
     *,

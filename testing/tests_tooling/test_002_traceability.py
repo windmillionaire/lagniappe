@@ -5,7 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from testing.utility import traceability, traceability_common
+from testing.utility import (
+    migrate_traceability_annotations,
+    traceability,
+    traceability_common,
+)
 
 pytestmark = pytest.mark.tooling
 
@@ -31,8 +35,6 @@ class Thing:
 
     # @testable true
     # @tests tests_unit/test_sample.py::test_method
-    # @features widget
-    # @dimensions edit
     # @pair widget:edit
     def method(self):
         pass
@@ -84,6 +86,84 @@ def test_metadata_rejects_malformed_exact_pairs():
     ]
 
 
+def test_metadata_unions_matrices_pairs_and_source_links():
+    metadata = traceability.parse_metadata(
+        "@matrix home search : load permissions\n"
+        "@pair search:keyboard\n"
+        "@source pkg/search.py::Search\n"
+    )
+
+    assert traceability.feature_dimension_pairs(metadata) == {
+        "home:load",
+        "home:permissions",
+        "search:load",
+        "search:permissions",
+        "search:keyboard",
+    }
+    assert metadata.sources == ["pkg/search.py::Search"]
+    assert metadata.issues == []
+
+
+def test_metadata_rejects_legacy_feature_dimension_tags():
+    metadata = traceability.parse_metadata(
+        "@features home search\n@dimensions load permissions"
+    )
+
+    assert metadata.features == []
+    assert metadata.dimensions == []
+    assert metadata.issues == [
+        "@features is no longer supported; use @matrix FEATURES : DIMENSIONS",
+        "@dimensions is no longer supported; use @matrix FEATURES : DIMENSIONS",
+    ]
+
+
+def test_metadata_rejects_malformed_and_duplicate_matrices():
+    metadata = traceability.parse_metadata(
+        "@matrix home search\n"
+        "@matrix home :\n"
+        "@matrix home : load\n"
+        "@matrix home : load\n"
+    )
+
+    assert metadata.matrices == [
+        traceability.MatrixClause(features=("home",), dimensions=("load",))
+    ]
+    assert metadata.issues == [
+        "@matrix must use FEATURES : DIMENSIONS",
+        "@matrix must use FEATURES : DIMENSIONS",
+        "duplicate @matrix clause: home : load",
+    ]
+
+
+def test_legacy_annotation_migration_is_lossless_and_idempotent():
+    path = Path("pkg/sample.py")
+    original = (
+        "# @testable true\n"
+        "# @features home search\n"
+        "# @dimensions load permissions\n"
+        "# @tests tests_unit/test_sample.py::test_all\n"
+        "def all_cells():\n"
+        "    pass\n\n"
+        "# @features ignored\n"
+        "# @dimensions ignored\n"
+        "# @pairs home:permissions search:load\n"
+        "def sparse_cells():\n"
+        "    pass\n"
+    ).splitlines(keepends=True)
+
+    rewritten, issues = migrate_traceability_annotations.rewrite_lines(original, path)
+    repeated, repeated_issues = migrate_traceability_annotations.rewrite_lines(
+        rewritten, path
+    )
+
+    assert issues == []
+    assert repeated_issues == []
+    assert repeated == rewritten
+    assert "# @matrix home search : load permissions\n" in rewritten
+    assert "# @pairs home:permissions search:load\n" in rewritten
+    assert not any("@features" in line or "@dimensions" in line for line in rewritten)
+
+
 def test_metadata_tracks_semantic_style_evidence():
     metadata = traceability.parse_metadata(
         "@style combobox.panel\n@styles input.default, dropdown.panel"
@@ -95,6 +175,40 @@ def test_metadata_tracks_semantic_style_evidence():
         "dropdown.panel",
     ]
     assert metadata.issues == []
+
+
+def test_structured_report_serializes_matrix_and_source_metadata():
+    nodeid = "tests_unit/test_search.py::test_load"
+    source = source_symbol(
+        "pkg/search.py",
+        "Search.load",
+        True,
+        tests=[nodeid],
+        matrices=[matrix(["search"], ["load"])],
+    )
+    tests = {
+        nodeid: make_test_case(
+            nodeid,
+            runnable=True,
+            pairs=["search:load"],
+            sources=[source.source_id],
+        )
+    }
+    report = traceability.classify([source], tests, suppress_orphan_tests=True)
+    traceability.attach_source_explanations(report, [source], tests, None, Path.cwd())
+
+    payload = json.loads(traceability.report_to_json(report))
+
+    assert payload["schema_version"] == traceability_common.TRACEABILITY_SCHEMA_VERSION
+    assert payload["kind"] == "traceability-report"
+    explanation = payload["report"]["source_explanations"][0]
+    assert explanation["matrices"] == [
+        {"features": ["search"], "dimensions": ["load"]}
+    ]
+    assert explanation["tests"][0]["metadata"]["sources"] == [source.source_id]
+    assert payload["report"]["source_link_issues"][0]["kind"] == (
+        "duplicate-direct-link"
+    )
 
 
 @pytest.mark.parametrize(
@@ -663,8 +777,7 @@ def test_test_metadata_reads_comments_docstrings_and_parameter_nodeids(tmp_path)
     test_file.parent.mkdir(parents=True)
     test_file.write_text(
         '''
-# @features login
-# @dimensions a11y mobile
+# @matrix login : a11y mobile
 # @todo cover locked account state
 def test_login():
     pass
@@ -672,8 +785,7 @@ def test_login():
 
 def test_profile():
     """
-    @features profile
-    @dimensions desktop
+    # @pair profile:desktop
     @todo cover avatar update
     """
     pass
@@ -702,9 +814,21 @@ def test_classify_reports_traceability_states():
     gap = "tests_unit/test_trace.py::test_gap"
     symbols = [
         source_symbol("pkg/source.py", "missing", None),
-        source_symbol("pkg/source.py", "covered", True, tests=[selected]),
+        source_symbol(
+            "pkg/source.py",
+            "covered",
+            True,
+            tests=[selected],
+            pairs=["traceability:selected"],
+        ),
         source_symbol("pkg/source.py", "no_tests", True),
-        source_symbol("pkg/source.py", "planned", True, tests=[planned]),
+        source_symbol(
+            "pkg/source.py",
+            "planned",
+            True,
+            tests=[planned],
+            pairs=["traceability:planned"],
+        ),
         source_symbol("pkg/source.py", "stale", True, tests=[stale]),
         source_symbol("pkg/source.py", "bad_false", False),
         source_symbol(
@@ -733,10 +857,12 @@ def test_classify_reports_traceability_states():
         selected: make_test_case(
             selected,
             runnable=True,
-            features=["login"],
+            pairs=["traceability:selected"],
             todos=["cover logout flow"],
         ),
-        planned: make_test_case(planned, runnable=False),
+        planned: make_test_case(
+            planned, runnable=False, pairs=["traceability:planned"]
+        ),
         orphan: make_test_case(orphan, runnable=True),
         gap: make_test_case(
             gap, runnable=True, features=["profile"], dimensions=["desktop"]
@@ -772,18 +898,14 @@ def test_classify_reports_traceability_states():
     assert report.covered_by_missing[0]["covered_by"] == ["pkg/source.py::not_found"]
     assert report.feature_dimension_gaps[0]["source"].qualname == "gap"
     assert report.feature_dimension_gaps[0]["missing"] == [
-        {
-            "kind": "pair",
-            "feature": "login",
-            "dimension": "mobile",
-            "name": "login:mobile",
-        }
+        {"kind": "feature", "name": "login"},
+        {"kind": "dimension", "name": "mobile"},
     ]
     assert report.test_todos[0]["todos"] == ["cover logout flow"]
     assert orphan in report.orphan_runnable_tests
 
 
-def test_classify_checks_feature_dimension_pairs():
+def test_classify_source_matrix_requires_axes_not_every_cell():
     home_permissions = "tests_e2e/002_home/test_home.py::test_permissions"
     search_load = "tests_e2e/002_home/test_home.py::test_search_load"
     symbols = [
@@ -813,9 +935,13 @@ def test_classify_checks_feature_dimension_pairs():
 
     report = traceability.classify(symbols, tests)
 
-    missing = report.feature_dimension_gaps[0]["missing"]
-    assert {gap["name"] for gap in missing} == {"home:load", "search:permissions"}
-    assert {gap["kind"] for gap in missing} == {"pair"}
+    assert report.feature_dimension_gaps == []
+    assert traceability.feature_dimension_pairs(symbols[0].metadata) == {
+        "home:load",
+        "home:permissions",
+        "search:load",
+        "search:permissions",
+    }
 
 
 def test_classify_exact_pairs_do_not_imply_a_cartesian_product():
@@ -852,7 +978,7 @@ def test_classify_exact_pairs_do_not_imply_a_cartesian_product():
     }
 
 
-def test_classify_keeps_single_tag_family_checks_independent():
+def test_classify_reports_missing_matrix_axes_independently():
     feature_test = "tests_unit/test_tags.py::test_feature"
     dimension_test = "tests_unit/test_tags.py::test_dimension"
     symbols = [
@@ -862,12 +988,14 @@ def test_classify_keeps_single_tag_family_checks_independent():
             True,
             tests=[feature_test],
             features=["home", "search"],
+            dimensions=["page"],
         ),
         source_symbol(
             "pkg/source.py",
             "DimensionOnly",
             True,
             tests=[dimension_test],
+            features=["task"],
             dimensions=["load", "layout"],
         ),
     ]
@@ -876,10 +1004,12 @@ def test_classify_keeps_single_tag_family_checks_independent():
             feature_test,
             runnable=True,
             features=["home"],
+            dimensions=["page"],
         ),
         dimension_test: make_test_case(
             dimension_test,
             runnable=True,
+            features=["task"],
             dimensions=["load"],
         ),
     }
@@ -903,6 +1033,7 @@ def test_classify_expands_glob_tests_and_file_level_covered_by():
             "Home",
             True,
             tests=["tests_e2e/002_home/*"],
+            pairs=["home:view"],
         ),
         source_symbol("pkg/home.py", "Framework", traceability.TESTABLE_INFRASTRUCTURE),
         source_symbol(
@@ -925,8 +1056,8 @@ def test_classify_expands_glob_tests_and_file_level_covered_by():
         ),
     ]
     tests = {
-        home_a: make_test_case(home_a, runnable=True),
-        home_b: make_test_case(home_b, runnable=False),
+        home_a: make_test_case(home_a, runnable=True, pairs=["home:view"]),
+        home_b: make_test_case(home_b, runnable=False, pairs=["home:view"]),
     }
 
     report = traceability.classify(
@@ -949,14 +1080,167 @@ def test_classify_expands_glob_tests_and_file_level_covered_by():
     assert report.stale_test_references[0]["tests"] == ["tests_e2e/999_missing/*"]
 
 
+def test_direct_links_are_qualified_by_realized_behavior_cells():
+    matching = "tests_unit/test_search.py::test_load"
+    unrelated = "tests_unit/test_search.py::test_export"
+    source = source_symbol(
+        "pkg/search.py",
+        "Search.load",
+        True,
+        tests=["tests_unit/test_search.py::*"],
+        matrices=[matrix(["search"], ["load", "permissions"])],
+    )
+    tests = {
+        matching: make_test_case(
+            matching,
+            runnable=True,
+            pairs=["search:load"],
+        ),
+        unrelated: make_test_case(
+            unrelated,
+            runnable=True,
+            pairs=["export:download"],
+        ),
+    }
+
+    expansion = traceability.expand_test_references([source], tests)
+
+    assert expansion.links == [(source.source_id, matching)]
+    assert expansion.realized_pairs == {
+        (source.source_id, matching): {"search:load"}
+    }
+    assert expansion.fallback_links == set()
+    assert expansion.issues == []
+
+
+def test_bad_exact_link_remains_conservative_and_is_an_error():
+    nodeid = "tests_unit/test_search.py::test_export"
+    source = source_symbol(
+        "pkg/search.py",
+        "Search.load",
+        True,
+        tests=[nodeid],
+        pairs=["search:load"],
+    )
+    tests = {
+        nodeid: make_test_case(
+            nodeid,
+            runnable=True,
+            pairs=["export:download"],
+        )
+    }
+
+    expansion = traceability.expand_test_references([source], tests)
+
+    assert expansion.links == [(source.source_id, nodeid)]
+    assert expansion.realized_pairs == {}
+    assert expansion.fallback_links == {(source.source_id, nodeid)}
+    assert [issue["kind"] for issue in expansion.issues] == [
+        "disjoint-direct-link"
+    ]
+    assert traceability.source_test_dependency_paths(
+        [source], tests, None, Path.cwd()
+    ) == {nodeid: {"pkg/search.py"}}
+
+
+def test_test_side_source_declares_one_normalized_direct_edge():
+    nodeid = "tests_unit/test_search.py::test_load"
+    source = source_symbol(
+        "pkg/search.py",
+        "Search.load",
+        True,
+        matrices=[matrix(["search"], ["load"])],
+    )
+    tests = {
+        nodeid: make_test_case(
+            nodeid,
+            runnable=True,
+            pairs=["search:load"],
+            sources=[source.source_id],
+        )
+    }
+
+    report = traceability.classify([source], tests)
+    references = traceability.source_reference_matches_for_tests(
+        [source], tests, [tests[nodeid]]
+    )
+
+    assert report.summary["testable_without_tests"] == 0
+    assert report.summary["source_test_links_known"] == 1
+    assert report.feature_dimension_gaps == []
+    assert references == [{"source": source, "tests": [nodeid]}]
+
+
+def test_reciprocal_direct_declarations_warn_without_duplicate_edges():
+    nodeid = "tests_unit/test_search.py::test_load"
+    source = source_symbol(
+        "pkg/search.py",
+        "Search.load",
+        True,
+        tests=[nodeid],
+        pairs=["search:load"],
+    )
+    tests = {
+        nodeid: make_test_case(
+            nodeid,
+            runnable=True,
+            pairs=["search:load"],
+            sources=[source.source_id],
+        )
+    }
+
+    expansion = traceability.expand_test_references([source], tests)
+
+    assert expansion.links == [(source.source_id, nodeid)]
+    assert [issue["kind"] for issue in expansion.issues] == [
+        "duplicate-direct-link"
+    ]
+
+
+def test_related_tests_are_soft_and_do_not_join_required_evidence():
+    direct = "tests_unit/test_search.py::test_load"
+    related = "tests_e2e/test_search.py::test_load_workflow"
+    source = source_symbol(
+        "pkg/search.py",
+        "Search.load",
+        True,
+        tests=[direct],
+        pairs=["search:load"],
+    )
+    tests = {
+        direct: make_test_case(direct, runnable=True, pairs=["search:load"]),
+        related: make_test_case(related, runnable=True, pairs=["search:load"]),
+    }
+    rows = traceability.source_explanation_rows([source], tests, None, Path.cwd())
+    report = traceability.classify(
+        [source], tests, suppress_orphan_tests=True
+    )
+    report.source_explanations = rows
+    report.summary["changed_scope"] = True
+
+    dependencies = traceability.source_test_dependency_paths(
+        [source], tests, None, Path.cwd()
+    )
+    findings = traceability.report_findings(report)
+
+    assert [test.nodeid for test in rows[0]["tests"]] == [direct]
+    assert [item["test"].nodeid for item in rows[0]["related_tests"]] == [related]
+    assert rows[0]["related_tests"][0]["pairs"] == ["search:load"]
+    assert dependencies == {direct: {"pkg/search.py"}}
+    assert {
+        finding["location"]
+        for finding in findings
+        if finding["kind"] == "referenced-test-not-run"
+    } == {direct}
+
+
 def test_classify_resolves_test_scaffold_references(tmp_path):
     owner = "tests_e2e/003_forms/test_access.py::test_owner"
     test_file = tmp_path / "testing" / "tests_e2e" / "003_forms" / "test_access.py"
     test_file.parent.mkdir(parents=True)
     test_file.write_text(
         """
-# @features forms
-# @dimensions owner-restricted
+# @pair forms:owner-restricted
 def test_owner():
     form.builder.restrict_to_owner()
 """.lstrip()
@@ -982,7 +1266,7 @@ def test_owner():
             dimensions=["owner-restricted"],
             path="tests_e2e/003_forms/test_access.py",
             qualname="test_owner",
-            lineno=3,
+            lineno=2,
         )
     }
 
@@ -1096,8 +1380,20 @@ def test_classify_reports_broad_source_owners():
 
 def test_markdown_report_can_be_saved(tmp_path):
     selected = "tests_unit/test_trace.py::test_selected"
-    symbols = [source_symbol("pkg/source.py", "covered", True, tests=[selected])]
-    tests = {selected: make_test_case(selected, runnable=True)}
+    symbols = [
+        source_symbol(
+            "pkg/source.py",
+            "covered",
+            True,
+            tests=[selected],
+            pairs=["traceability:report"],
+        )
+    ]
+    tests = {
+        selected: make_test_case(
+            selected, runnable=True, pairs=["traceability:report"]
+        )
+    }
     report = traceability.classify(symbols, tests)
     report.summary["source_scope"] = "configured source roots"
 
@@ -1360,8 +1656,7 @@ def route():
         """
 # @testable true
 # @tests tests_unit/test_sample.py::test_explicit
-# @features search
-# @dimensions query-display
+# @pair search:query-display
 def explicit_render():
     pass
 
@@ -1375,8 +1670,7 @@ def unannotated_explicit_helper():
         """
 # @testable true
 # @tests tests_unit/test_sample.py::test_covered
-# @features search
-# @dimensions result-title
+# @pair search:result-title
 def covered_render():
     pass
 
@@ -1450,8 +1744,7 @@ exclude:
         """
 # @testable true
 # @tests tests_unit/test_sample.py::test_route
-# @features server
-# @dimensions route
+# @pair server:route
 def route():
     pass
 """.lstrip()
@@ -1462,8 +1755,7 @@ def route():
         """
 # @testable true
 # @tests tests_unit/test_sample.py::test_switcher
-# @features setup
-# @dimensions gcloud-config
+# @pair setup:gcloud-config
 def config_gcloud():
     pass
 
@@ -1517,8 +1809,7 @@ exclude: []
         """
 # @testable true
 # @tests tests_unit/test_sample.py::test_covered
-# @features submission
-# @dimensions db
+# @pair submission:db
 def covered():
     pass
 """.lstrip()
@@ -1530,8 +1821,7 @@ def covered():
 from src.mod import covered
 
 
-# @features submission
-# @dimensions db
+# @pair submission:db
 # @template home/sample.html::create
 # @todo cover blank submission
 def test_covered():
@@ -1577,7 +1867,7 @@ def test_covered():
     assert report.focused_source_tag_gaps == []
     assert "Traceability Test Focus Report" in formatted
     assert "Focused test feature:dimension mappings: 1" in formatted
-    assert "source: src/mod.py::covered:5" in formatted
+    assert "source: src/mod.py::covered:4" in formatted
     assert "Annotated tests missing feature:dimension source tags" not in formatted
     assert "Source Tag-Overlap Candidates" not in markdown
     assert "Imported source files" not in formatted
@@ -1604,8 +1894,7 @@ export class Results {
     /**
      * @testable true
      * @tests tests_e2e/009_search/test_search.py::test_result_titles
-     * @features search
-     * @dimensions url-state
+     * @pair search:url-state
      * @template search/results.html::search_results
      */
     handleFacetClick() {}
@@ -1677,8 +1966,7 @@ export class FormSettings {
     /**
      * @testable true
      * @scaffolding testing/resources/form.py::Builder.restrict_to_owner
-     * @features forms
-     * @dimensions owner-restricted
+     * @pair forms:owner-restricted
      */
     _input() {}
 }
@@ -1697,8 +1985,7 @@ class Builder:
     test_file.parent.mkdir(parents=True)
     test_file.write_text(
         """
-# @features forms
-# @dimensions owner-restricted
+# @pair forms:owner-restricted
 def test_owner():
     form.builder.restrict_to_owner()
 """.lstrip()
@@ -1718,7 +2005,7 @@ def test_owner():
                 ),
                 path="tests_e2e/003_forms/test_access.py",
                 qualname="test_owner",
-                lineno=3,
+                lineno=2,
             )
         },
     )
@@ -1754,23 +2041,20 @@ exclude: []
     source.write_text(
         """
 # @testable true
-# @features submission
-# @dimensions db
+# @pair submission:db
 def unlinked_submission_owner():
     pass
 
 
 # @testable true
 # @tests tests_unit/test_sample.py::test_covered
-# @features submission
-# @dimensions db
+# @pair submission:db
 def covered():
     pass
 
 
 # @testable true
-# @features profile
-# @dimensions desktop
+# @pair profile:desktop
 def unrelated_profile_owner():
     pass
 """.lstrip()
@@ -1782,8 +2066,7 @@ def unrelated_profile_owner():
 from src.mod import covered
 
 
-# @features submission
-# @dimensions db api
+# @matrix submission : api db
 def test_covered():
     covered()
 """.lstrip()
@@ -1848,8 +2131,7 @@ exclude: []
         f"""
 # @testable true
 # @tests {save_nodeid}
-# @features document
-# @dimensions save
+# @pair document:save
 # @template pages/document.html::editor
 def save_document():
     pass
@@ -1857,8 +2139,7 @@ def save_document():
 
 # @testable true
 # @tests {load_nodeid}
-# @features document
-# @dimensions load
+# @pair document:load
 # @template pages/document.html::editor
 def load_document():
     pass
@@ -1945,29 +2226,25 @@ exclude: []
         """
 # @testable true
 # @tests tests_unit/test_sample.py::test_covered
-# @features submission
-# @dimensions db
+# @pair submission:db
 def covered():
     pass
 
 
 # @testable true
-# @features submission
-# @dimensions db fallback
+# @matrix submission : db fallback
 def nearby_candidate():
     pass
 
 
 # @testable true
-# @features submission
-# @dimensions api
+# @pair submission:api
 def missing_api_candidate():
     pass
 
 
 # @testable true
-# @features submission
-# @dimensions fallback
+# @pair submission:fallback
 def feature_only_candidate():
     pass
 """.lstrip()
@@ -2043,8 +2320,7 @@ exclude: []
     source.write_text(
         """
 # @testable true
-# @features projects
-# @dimensions update
+# @pair projects:update
 def update():
     pass
 """.lstrip()
@@ -2115,8 +2391,7 @@ exclude: []
         f"""
 # @testable true
 # @tests {existing}
-# @features projects
-# @dimensions metadata
+# @pair projects:metadata
 def create_update_data():
     pass
 """.lstrip()
@@ -2187,8 +2462,7 @@ def add_image(image):
     test_file.write_text(
         """
 # lagniappe/core/properties/common_assets.py
-# @features editor
-# @dimensions image-upload
+# @pair editor:image-upload
 def test_add_image():
     document.add_image(upload)
 """.lstrip()
@@ -2378,23 +2652,27 @@ def test_report_compacts_planned_and_todo_roadmap_by_default():
             "planned_widget",
             True,
             tests=["testing/tests_e2e/005_pages/test_005z_gap.py::test_page_gap"],
+            pairs=["roadmap:planned"],
         ),
         source_symbol(
             "pkg/source.py",
             "planned_task",
             True,
             tests=["testing/tests_e2e/006_tasks/test_006z_gap.py::test_task_gap"],
+            pairs=["roadmap:planned"],
         ),
     ]
     tests = {
         symbols[0].metadata.tests[0]: make_test_case(
             symbols[0].metadata.tests[0],
             runnable=False,
+            pairs=["roadmap:planned"],
             todos=["cover page gap"],
         ),
         symbols[1].metadata.tests[0]: make_test_case(
             symbols[1].metadata.tests[0],
             runnable=False,
+            pairs=["roadmap:planned"],
             todos=["cover task gap"],
         ),
     }
@@ -2548,6 +2826,7 @@ def source_symbol(
     testable,
     *,
     tests=None,
+    matrices=None,
     features=None,
     dimensions=None,
     pairs=None,
@@ -2572,6 +2851,7 @@ def source_symbol(
             tests=tests or [],
             test_scaffolds=test_scaffolds or [],
             templates=templates or [],
+            matrices=matrices or [],
             features=features or [],
             dimensions=dimensions or [],
             pairs=pairs or [],
@@ -2586,6 +2866,7 @@ def make_test_case(
     nodeid,
     *,
     runnable,
+    matrices=None,
     features=None,
     dimensions=None,
     pairs=None,
@@ -2594,21 +2875,31 @@ def make_test_case(
     path="",
     qualname="",
     lineno=0,
+    sources=None,
 ):
     return traceability.TestCase(
         nodeid=nodeid,
         runnable=runnable,
         unfinished=not runnable,
         metadata=traceability.Metadata(
+            matrices=matrices or [],
             features=features or [],
             dimensions=dimensions or [],
             pairs=pairs or [],
             todos=todos or [],
             templates=templates or [],
+            sources=sources or [],
         ),
         path=path,
         qualname=qualname,
         lineno=lineno,
+    )
+
+
+def matrix(features, dimensions):
+    return traceability.MatrixClause(
+        features=tuple(features),
+        dimensions=tuple(dimensions),
     )
 
 

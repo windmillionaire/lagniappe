@@ -4,7 +4,7 @@
  *
  * @testable true
  * @tests tests_js/test_020_shared_utilities.py::test_safe_storage_adapters_handle_browser_failures_and_json
- * @pairs browser-storage:availability browser-storage:json
+ * @matrix browser-storage : availability json
  */
 class StorageAdapter {
 	constructor(name) {

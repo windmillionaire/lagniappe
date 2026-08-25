@@ -19,8 +19,7 @@ from . import assets
 # @testable true
 # @tests tests_unit/test_008_page_properties.py::test_page_image_asset_lifecycle_and_projections
 # @tests tests_e2e/005_pages/test_005f_page_image.py::test_add_image_to_page
-# @features pages
-# @dimensions image-add
+# @pairs page:asset-lifecycle pages:image-add
 @assets.route("<key>/add-page-image", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def add_page_image(key, **kwargs):
@@ -59,8 +58,7 @@ def add_page_image_direct(key, **kwargs):
 # @testable true
 # @tests tests_unit/test_008_page_properties.py::test_page_image_asset_lifecycle_and_projections
 # @tests tests_e2e/005_pages/test_005f_page_image.py::test_remove_image_from_page
-# @features pages
-# @dimensions image-remove
+# @pairs page:asset-lifecycle pages:image-remove
 @assets.route("<key>/remove-page-image", methods=["DELETE"])
 @permission(Resource.PAGE, Action.EDIT)
 def remove_page_image(key, **kwargs):
@@ -77,8 +75,7 @@ def remove_page_image(key, **kwargs):
 # @testable true
 # @tests tests_unit/test_008_page_properties.py::test_page_image_asset_lifecycle_and_projections
 # @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
-# @features pages
-# @dimensions image-generate
+# @pairs page:asset-lifecycle pages:image-generate
 @assets.route("<key>/generate-page-image", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def generate_page_image(key, **kwargs):

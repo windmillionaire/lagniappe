@@ -98,8 +98,7 @@ def elapsed_seconds(start, now):
 
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_status_projection_is_bounded_and_marks_stale_work
-# @features deferred-jobs
-# @dimensions status progress timing stale-state privacy
+# @matrix deferred-jobs : privacy progress stale-state status timing
 def status_projection(job, *, now):
     progress = dict(getattr(job, "progress", None) or {})
     client = dict(getattr(job, "client", None) or {})
@@ -142,8 +141,7 @@ def status_projection(job, *, now):
 
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_admin_projection_exposes_diagnostics_without_payload_content
-# @pair deferred-jobs:diagnostics
-# @pair deferred-jobs:privacy
+# @matrix deferred-jobs : diagnostics privacy
 def admin_projection(job, *, now):
     """Extend owner-visible status with bounded operational diagnostics."""
     projection = status_projection(job, now=now)

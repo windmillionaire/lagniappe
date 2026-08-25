@@ -103,8 +103,7 @@ def _ooxml_summary_file(filename="source.docx", mimetype=DOCX_MIMETYPE):
     return file
 
 
-# @features ai
-# @dimensions prompt context output-format attachments tools tool-batching service-tier cache-prefix
+# @matrix ai : attachments cache-prefix context output-format prompt service-tier tool-batching tools
 @pytest.mark.unit
 def test_prompt_tracks_context_output_examples_and_attachments():
     user = SimpleNamespace(email="owner@example.com")
@@ -215,8 +214,7 @@ def test_prompt_tracks_context_output_examples_and_attachments():
         prompt.set_model_tier("tiny")
 
 
-# @features ai
-# @dimensions prompt-builders search tools output-format thinking file-context project-context structured-output submission
+# @matrix ai : file-context output-format project-context prompt-builders search structured-output submission thinking tools
 @pytest.mark.unit
 def test_ai_prompt_builders_capture_product_context_and_tool_choices():
     user = SimpleNamespace(email="owner@example.com")
@@ -447,8 +445,7 @@ def test_ai_prompt_builders_capture_product_context_and_tool_choices():
     }
 
 
-# @features ai files pages tasks
-# @dimensions autofill shared-context attached-files entity-specific partial-submission
+# @matrix ai files pages tasks : attached-files autofill entity-specific partial-submission shared-context
 @pytest.mark.unit
 def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
     user = SimpleNamespace(email="owner@example.com", is_authenticated=True)
@@ -550,8 +547,7 @@ def test_autofill_prompt_data_keeps_attachment_context_entity_specific():
     assert page_file.to_ai(user) not in _context_json(task_prompt, "Attached Files")
 
 
-# @features ai files
-# @dimensions autofill summary-dependency pending failed complete
+# @matrix ai files : autofill complete failed pending summary-dependency
 @pytest.mark.unit
 def test_autofill_summary_dependencies_track_enabled_processing():
     user = SimpleNamespace(is_authenticated=True)
@@ -589,10 +585,8 @@ def test_autofill_summary_dependencies_track_enabled_processing():
     }
 
 
-# @pair ai:summary-prompt
-# @pair ai:summary-fallback
-# @pair files:ooxml
-# @pair files:docx
+# @matrix ai : summary-fallback summary-prompt
+# @matrix files : docx ooxml
 @pytest.mark.unit
 def test_ai_summary_generation_uses_docx_text_fallback(monkeypatch):
     generated_prompts = []
@@ -618,8 +612,7 @@ def test_ai_summary_generation_uses_docx_text_fallback(monkeypatch):
     assert "Left cell\tRight cell" in extracted_text
 
 
-# @pair ai:summary-prompt
-# @pair ai:ooxml
+# @matrix ai : ooxml summary-prompt
 @pytest.mark.unit
 def test_ai_summary_generation_marks_partial_ooxml_context(monkeypatch):
     generated_prompts = []
@@ -657,6 +650,7 @@ def test_ai_summary_generation_marks_partial_ooxml_context(monkeypatch):
     ]
 
 
+# @pair ai:tools
 @pytest.mark.unit
 def test_prompt_rejects_oversized_inline_file_before_read():
     class OversizedUpload:
@@ -676,6 +670,7 @@ def test_prompt_rejects_oversized_inline_file_before_read():
         Prompt().add_bytes(OversizedUpload(), "application/pdf")
 
 
+# @pair ai:summary-prompt
 @pytest.mark.unit
 def test_ai_summary_generation_rejects_oversized_ooxml_before_download():
     file = _ooxml_summary_file(filename="oversized.docx")

@@ -31,8 +31,7 @@ def _required_environment(name: str) -> str:
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
-# @features hosted-e2e
-# @dimensions focused-execution target-validation argument-injection
+# @matrix hosted-e2e : argument-injection focused-execution target-validation
 def validate_focused_targets(targets) -> tuple[str, ...]:
     """Return bounded existing E2E paths/nodeids safe for job arg overrides."""
     normalized = tuple(str(target).strip() for target in targets or ())
@@ -81,8 +80,7 @@ def validate_focused_targets(targets) -> tuple[str, ...]:
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_focused_targets_require_existing_e2e_nodeids
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_all_scope_runs_every_complete_suite_and_opt_in_contract
-# @features hosted-e2e
-# @dimensions focused-execution target-validation argument-injection
+# @matrix hosted-e2e : argument-injection focused-execution target-validation
 def _pytest_command(suite: str, targets=()) -> list[str]:
     if suite == "all":
         if targets:

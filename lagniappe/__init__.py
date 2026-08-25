@@ -47,15 +47,8 @@ def _sample_rate(value, name):
 # @tests tests_unit/test_016_config.py::test_config_honors_ai_observability_setting
 # @tests tests_unit/test_016_config.py::test_config_honors_configured_source_url
 # @tests tests_unit/test_016_config.py::test_config_normalizes_and_validates_sentry_sample_rates
-# @pair config:build-id
-# @pair config:constants
-# @pair config:error-reporting
-# @pair config:stale-settings
-# @pair config:observability-setting
-# @pair config:google-signin
-# @pair config:source-link
-# @pair ai:observability
-# @pair error-reporting:sampling
+# @matrix config : build-id constants error-reporting google-signin observability-setting source-link stale-settings
+# @pairs ai:observability error-reporting:sampling
 class Config:
     """Application configuration."""
 
@@ -249,8 +242,7 @@ class Config:
     @property
     # @testable true
     # @tests tests_unit/test_016_config.py::test_hosted_e2e_overrides_require_exact_runtime_identity
-    # @features hosted-e2e
-    # @dimensions configuration role
+    # @matrix hosted-e2e : configuration role
     def hosted_e2e(self):
         """Return whether this is a validated Google-hosted test process."""
         return self.testing and bool(getattr(self, "HOSTED_E2E", False))
@@ -258,16 +250,14 @@ class Config:
     @property
     # @testable true
     # @tests tests_unit/test_016_config.py::test_hosted_e2e_server_rejects_wrong_app_engine_version
-    # @features hosted-e2e
-    # @dimensions configuration role
+    # @matrix hosted-e2e : configuration role
     def hosted_e2e_server(self):
         return self.hosted_e2e and getattr(self, "HOSTED_E2E_ROLE", None) == "server"
 
     @property
     # @testable true
     # @tests tests_unit/test_016_config.py::test_hosted_e2e_overrides_require_exact_runtime_identity
-    # @features hosted-e2e
-    # @dimensions configuration role
+    # @matrix hosted-e2e : configuration role
     def hosted_e2e_runner(self):
         return self.hosted_e2e and getattr(self, "HOSTED_E2E_ROLE", None) == "runner"
 
@@ -286,9 +276,8 @@ class Config:
     # @testable true
     # @tests tests_unit/test_016_config.py::test_google_credentials_are_shared_and_project_bound
     # @tests tests_unit/test_016_config.py::test_local_google_credentials_impersonate_runtime_identity
-    # @pairs config:adc config:project-identity config:credential-cache
-    # @pairs testing:adc testing:project-identity testing:credential-cache testing:runtime-impersonation
-    # @pairs development:adc development:project-identity development:credential-cache development:runtime-impersonation
+    # @matrix config : adc credential-cache project-identity
+    # @matrix development testing : adc credential-cache project-identity runtime-impersonation
     @property
     def google_credentials(self):
         """Return one project- and runtime-bound credential for Google clients."""
@@ -349,8 +338,7 @@ class Config:
 
     # @testable true
     # @tests tests_unit/test_016_config.py::test_google_access_token_refreshes_adc_when_stale
-    # @features config
-    # @dimensions adc token-refresh
+    # @matrix config : adc token-refresh
     def google_access_token(self):
         """Return a fresh shared ADC token for direct Google REST operations."""
         from google.auth.transport.requests import Request

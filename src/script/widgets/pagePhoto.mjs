@@ -7,8 +7,7 @@ import { createIcon } from "../shared/icons";
 /**
  * @testable true
  * @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
- * @features pages
- * @dimensions image-generate
+ * @pair pages:image-generate
  */
 export class PagePhoto extends BaseUpload {
 	constructor(attributes) {
@@ -191,8 +190,7 @@ export class PagePhoto extends BaseUpload {
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_add_image_to_page
 	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_replace_image_on_page
-	 * @features pages
-	 * @dimensions image-add image-replace
+	 * @matrix pages : image-add image-replace
 	 */
 	async uploadImage() {
 		withTransition(() => {
@@ -220,8 +218,7 @@ export class PagePhoto extends BaseUpload {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_remove_image_from_page
-	 * @features pages
-	 * @dimensions image-remove
+	 * @pair pages:image-remove
 	 */
 	async _removeImage() {
 		const response = await request.delete(this.endpoints.remove);
@@ -235,8 +232,7 @@ export class PagePhoto extends BaseUpload {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005f_page_image.py::test_generate_image_on_page
-	 * @features pages
-	 * @dimensions image-generate
+	 * @pair pages:image-generate
 	 */
 	async _generateImage() {
 		const response = await request.post(this.endpoints.generate, this.formData);

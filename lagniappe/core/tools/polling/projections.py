@@ -34,7 +34,7 @@ CHANNEL_REVISION_PATHS = {
 
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
-# @pairs polling:channel polling:revision polling:permissions polling:mounted-scope
+# @matrix polling : channel mounted-scope permissions revision
 def channel_paths(channel):
     """Return the durable fingerprint paths owned by one polling channel."""
     return CHANNEL_REVISION_PATHS.get(channel, (f"/{channel}/index",))
@@ -95,7 +95,7 @@ _NOTIFICATION_STATE_UNSET = object()
 
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_channel_revisions_batch_only_requested_site_fingerprints
-# @pairs polling:channel polling:batching polling:mounted-scope
+# @matrix polling : batching channel mounted-scope
 # @pair messaging:polling-revision
 def channel_revisions(
     channels,
@@ -139,8 +139,8 @@ def channel_revisions(
 
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_operation_statuses_skip_fresh_cached_jobs_and_batch_stale_jobs
-# @pairs polling:revision polling:batching polling:permissions
-# @pairs deferred-jobs:redis-projection deferred-jobs:owner deferred-jobs:cache-failure-isolation
+# @matrix deferred-jobs : cache-failure-isolation owner redis-projection
+# @matrix polling : batching permissions revision
 def operation_statuses(
     descriptors,
     user,
@@ -204,7 +204,8 @@ def operation_statuses(
 
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_render_operation_statuses_batches_and_attaches_known_jobs
-# @pairs deferred-jobs:server-render deferred-jobs:status polling:batching
+# @matrix deferred-jobs : server-render status
+# @pair polling:batching
 def render_operation_statuses(entities, user, *, status_loader=None):
     """Attach current status projections to server-rendered operation owners."""
     status_loader = status_loader or DeferredJobs.statuses

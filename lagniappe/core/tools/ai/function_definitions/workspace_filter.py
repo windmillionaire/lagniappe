@@ -131,8 +131,7 @@ QUERY_WORKSPACE_FILTER = types.FunctionDeclaration(
 
 # @testable true
 # @tests tests_unit/test_015c_ai_filter_query.py::test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors
-# @features ai-filter
-# @dimensions tool-handler permissions validation
+# @matrix ai-filter : permissions tool-handler validation
 def execute_get_filter_schema(args, user):
     """Return a permission-filtered filter schema for a project/category."""
     parent, error = _filter_parent(args, user)
@@ -146,8 +145,7 @@ def execute_get_filter_schema(args, user):
 
 # @testable true
 # @tests tests_unit/test_015c_ai_filter_query.py::test_filter_tool_handlers_load_viewable_parents_and_return_validation_errors
-# @features ai-filter
-# @dimensions tool-handler permissions validation
+# @matrix ai-filter : permissions tool-handler validation
 def execute_query_workspace_filter(args, user):
     """Compile and execute a permission-filtered shared-cache query."""
     parent, error = _filter_parent(args, user)

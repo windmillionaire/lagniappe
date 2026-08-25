@@ -36,8 +36,7 @@ def _ingress_execution(entity):
 # @testable true
 # @tests tests_unit/test_006d_ingress_service.py::test_ingress_status_update_is_cursor_checked
 # @tests tests_unit/test_006d_ingress_service.py::test_ingress_stop_is_durable_and_preserves_current_row_boundary
-# @features ingress
-# @dimensions status cursor compare-and-set stop failure
+# @matrix ingress : compare-and-set cursor failure status stop
 def update_ingress_status(identifier, status, now, *, expected_cursor=None, error=None):
     """Atomically stop or fail active ingress work without replacing its cursor."""
     key = _ingress_key(identifier)
@@ -85,8 +84,7 @@ def update_ingress_status(identifier, status, now, *, expected_cursor=None, erro
 # @testable true
 # @tests tests_unit/test_006d_ingress_service.py::test_ingress_row_commit_requires_expected_cursor_and_applies_masks
 # @tests tests_unit/test_006d_ingress_service.py::test_ingress_row_commit_rejects_duplicate_cursor
-# @features ingress
-# @dimensions cursor compare-and-set durable-commit property-mask duplicate-delivery
+# @matrix ingress : compare-and-set cursor duplicate-delivery durable-commit property-mask
 def commit_ingress_row(identifier, expected_cursor, ingress_entity, writes, now):
     """Commit one planned row and advance its ingress cursor atomically."""
     key = _ingress_key(identifier)

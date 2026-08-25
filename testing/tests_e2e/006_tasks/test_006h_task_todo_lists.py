@@ -14,9 +14,7 @@ from testing.utility import expect_successful_response
 pytestmark = pytest.mark.e2e
 
 
-# @pairs form-todo:add form-todo:edit form-todo:rename form-todo:delete
-# @pairs form-todo:check form-todo:history-fill form-todo:reset
-# @pair form-todo:default-persistence
+# @matrix form-todo : add check default-persistence delete edit history-fill rename reset
 # @template pages/tasks.html::task_form
 def test_task_todo_list_editing_and_history_restore(get_user):
     user = get_user(Users.OWNER)

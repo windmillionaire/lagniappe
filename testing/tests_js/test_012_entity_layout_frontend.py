@@ -250,8 +250,7 @@ vm.runInContext(source, context);
     run_node(script)
 
 
-# @features entity-layout
-# @dimensions nested-layout reconcile-callback
+# @matrix entity-layout : nested-layout reconcile-callback
 def test_entity_layout_ignores_already_consumed_reconcile_callback(run_node):
     run_entity_layout_check(
         run_node,
@@ -285,8 +284,6 @@ if (tabs.reconcile !== null) {
 
 
 # @pair startup:view-ready
-# @features entity-layout startup
-# @dimensions structural-selection initial-transition atomic-enhancement
 def test_initial_entity_layout_prepares_widget_before_one_transition(run_node):
     run_entity_layout_check(
         run_node,

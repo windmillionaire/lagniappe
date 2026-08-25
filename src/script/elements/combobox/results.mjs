@@ -213,10 +213,8 @@ export class Results {
 	 * @testable true
 	 * @tests tests_js/test_023_entity_name_formatting.py::test_recent_combobox_results_reuse_shared_parent_name_formatting
 	 * @tests tests_js/test_023_entity_name_formatting.py::test_recent_search_snippets_allow_only_highlight_markup
-	 * @pair combobox:parent-separator
-	 * @pair combobox:recent-results
-	 * @pair entity-name:recent-results
-	 * @pair search:snippet-safety
+	 * @matrix combobox : parent-separator recent-results
+	 * @pairs entity-name:recent-results search:snippet-safety
 	 */
 	create(items = []) {
 		let options = items;

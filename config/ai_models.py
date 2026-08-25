@@ -301,8 +301,7 @@ def _options_response(options, current_settings=None):
 # @tests tests_unit/test_015_ai_tools.py::test_ai_model_discovery_falls_back_to_catalog_and_preserves_custom
 # @tests tests_unit/test_015_ai_tools.py::test_ai_model_discovery_uses_agent_platform_catalog_and_filters_specialized_models
 # @tests tests_unit/test_015_ai_tools.py::test_ai_model_discovery_limits_options_and_preserves_current_models
-# @features ai
-# @dimensions model-discovery provider-filtering ordering api-version option-limit fallback custom-current
+# @matrix ai : api-version custom-current fallback model-discovery option-limit ordering provider-filtering
 def discover_model_options(
     project=None,
     location="global",
@@ -383,8 +382,7 @@ def discover_model_options(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_ai_model_discovery_falls_back_to_catalog_and_preserves_custom
-# @features ai
-# @dimensions model-discovery validation
+# @matrix ai : model-discovery validation
 def known_model_ids(model_options=None, kind=None):
     """Return known model ids from a discovery response or the curated catalog."""
     model_options = model_options or discover_model_options(use_cache=False)

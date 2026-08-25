@@ -22,7 +22,8 @@ from lagniappe.core.tools.files import extract as file_extract
 pytestmark = pytest.mark.unit
 
 
-# @pairs deferred-jobs:checkpoint file:extraction file:text-asset
+# @matrix file : extraction text-asset
+# @pair deferred-jobs:checkpoint
 def test_file_extract_adapter_checkpoints_and_applies_text_asset(monkeypatch):
     adapter = file_adapters.FileExtractAdapter()
     process = SimpleNamespace(
@@ -85,8 +86,7 @@ def test_file_extract_adapter_checkpoints_and_applies_text_asset(monkeypatch):
     assert saved == [True]
 
 
-# @features deferred-jobs file
-# @dimensions authorization validation original-asset fingerprint metadata-isolation
+# @matrix deferred-jobs file : authorization fingerprint metadata-isolation original-asset validation
 def test_file_adapter_drift_tracks_the_original_asset():
     adapter = file_adapters.FileSummarizeAdapter()
     original = SimpleNamespace(fingerprint="original-asset")
@@ -120,8 +120,7 @@ def test_file_adapter_drift_tracks_the_original_asset():
         adapter.validate_apply(context)
 
 
-# @features deferred-jobs file
-# @dimensions terminal follow-up extraction idempotency summary-first
+# @matrix deferred-jobs file : extraction follow-up idempotency summary-first terminal
 @pytest.mark.parametrize("status", ["succeeded", "failed"])
 def test_file_summary_terminal_cleanup_starts_extraction_once(monkeypatch, status):
     adapter = file_adapters.FileSummarizeAdapter()
@@ -158,8 +157,7 @@ def test_file_summary_terminal_cleanup_starts_extraction_once(monkeypatch, statu
     assert parameters == {}
 
 
-# @features deferred-jobs file
-# @dimensions summary expected-failure no-duplicate-capture
+# @matrix deferred-jobs file : expected-failure no-duplicate-capture summary
 def test_file_summary_expected_rejection_is_not_reported_twice(monkeypatch):
     file = SimpleNamespace(
         properties=SimpleNamespace(
@@ -186,8 +184,7 @@ def test_file_summary_expected_rejection_is_not_reported_twice(monkeypatch):
         file_adapters.FileSummarizeAdapter().prepare(context)
 
 
-# @features deferred-jobs file
-# @dimensions follow-up extraction idempotency
+# @matrix deferred-jobs file : extraction follow-up idempotency
 def test_start_file_extraction_uses_explicit_actor_and_identity(monkeypatch):
     actor = SimpleNamespace(urlsafe_key="actor-key")
     file = SimpleNamespace(urlsafe_key="file-key")

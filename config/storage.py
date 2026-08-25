@@ -67,8 +67,7 @@ def _bucket_name(settings, kind):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_storage_bucket_names_match_runtime_contract
-# @features storage setup
-# @dimensions naming
+# @matrix setup storage : naming
 def storage_bucket_names(settings):
     """Return Lagniappe's three runtime bucket names for app settings."""
     return {kind: _bucket_name(settings, kind) for kind in BUCKET_KINDS}
@@ -77,8 +76,7 @@ def storage_bucket_names(settings):
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_storage_bucket_names_match_runtime_contract
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_storage_provisioning_is_bucket_scoped_and_idempotent
-# @features disaster-recovery
-# @dimensions naming
+# @pairs disaster-recovery:naming storage:provisioning
 def recovery_bucket_name(settings):
     """Return the operator-only disaster-recovery bucket name."""
     return _bucket_name(settings, RECOVERY_BUCKET_KIND)
@@ -101,8 +99,7 @@ def _origin(value):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_storage_cors_origins_include_configured_urls
-# @features storage
-# @dimensions cors origins
+# @matrix storage : cors origins
 def expected_storage_cors_origins(config):
     """Return the browser origins allowed to upload/download bucket objects."""
     origins = []
@@ -131,8 +128,7 @@ def expected_storage_cors_origins(config):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_expected_storage_cors_shape
-# @features storage
-# @dimensions cors
+# @pair storage:cors
 def expected_storage_cors(config):
     """Return the expected Cloud Storage CORS rule for Lagniappe buckets."""
     origins = expected_storage_cors_origins(config)
@@ -240,8 +236,7 @@ def _patch_bucket_metadata(bucket):
 # @tests tests_unit/test_018_database_assets.py::test_configure_bucket_repairs_cors_drift
 # @tests tests_unit/test_018_database_assets.py::test_configure_bucket_enables_versioning_and_reconciles_noncurrent_lifecycle
 # @tests tests_unit/test_018_database_assets.py::test_configure_bucket_retries_transient_patch_failure
-# @features storage
-# @dimensions cors idempotent bucket-metadata transient-retry storage-class object-versioning lifecycle-preservation
+# @matrix storage : bucket-metadata cors idempotent lifecycle-preservation object-versioning storage-class transient-retry
 def configure_storage_bucket(bucket, config):
     """Reconcile runtime metadata and the setup-owned version-retention rule."""
     changed = False
@@ -286,8 +281,7 @@ def configure_storage_bucket(bucket, config):
 
 # @testable true
 # @tests tests_unit/test_018_database_assets.py::test_configure_recovery_bucket_removes_cors_and_is_idempotent
-# @features disaster-recovery
-# @dimensions bucket-metadata lifecycle-preservation
+# @matrix disaster-recovery : bucket-metadata lifecycle-preservation
 def configure_recovery_bucket(bucket):
     """Reconcile recovery-bucket metadata without browser-facing CORS."""
     changed = False

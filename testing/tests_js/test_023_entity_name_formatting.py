@@ -157,8 +157,7 @@ def run_entity_name_check(run_node, assertion: str):
     run_node(ENTITY_NAME_HARNESS.replace("__ASSERTION__", assertion))
 
 
-# @features entity-name
-# @dimensions parent-separator wrapping accessibility
+# @matrix entity-name : accessibility parent-separator wrapping
 # @styles entity.name.wrapper entity.name.parent entity.name.separator
 def test_formatting_name_uses_a_text_separator_and_shared_wrapping_structure(run_node):
     run_entity_name_check(
@@ -209,8 +208,7 @@ if (String(name.href) !== "https://example.test/pages/task-1") {
     )
 
 
-# @features user-groups
-# @dimensions query-route
+# @pair user-groups:query-route
 def test_group_name_uses_canonical_user_index_url(run_node):
     run_entity_name_check(
         run_node,
@@ -229,8 +227,7 @@ if (String(link.href) !== "https://example.test/users/index?group=group-1") {
     )
 
 
-# @features combobox entity-name
-# @dimensions recent-results parent-separator
+# @matrix combobox entity-name : parent-separator recent-results
 # @styles entity.name.wrapper entity.name.parent entity.name.separator
 def test_recent_combobox_results_reuse_shared_parent_name_formatting(run_node):
     run_entity_name_check(

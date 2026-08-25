@@ -15,8 +15,7 @@ def model_task_details(details, data, action=None):
 
 # @testable true
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_proposal_display_actions_group_completed_task_events
-# @pair ai-report:completed-task
-# @pair ai-report:proposal
+# @matrix ai-report : completed-task proposal
 def task_details(details, data, action=None):
     details.reference("Task", data, "task")
     details.reference("Page", data, "page")

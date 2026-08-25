@@ -30,8 +30,7 @@ class Action(Enum, metaclass=DefaultEnum):
 
     # @testable true
     # @tests tests_unit/test_009b_user_permissions.py::test_resource_allowed_direct_contract
-    # @features permissions
-    # @dimensions action-lattice
+    # @pair permissions:action-lattice
     def implies(self, action):
         """Check if this action implies (includes) another action."""
         return self.value >= action.value if self.value else False
@@ -105,8 +104,7 @@ class Resource(Enum):
 
     # @testable true
     # @tests tests_unit/test_009b_user_permissions.py::test_resource_allowed_direct_contract
-    # @features permissions
-    # @dimensions resource-gates anonymous default-deny
+    # @matrix permissions : anonymous default-deny resource-gates
     def allowed(self, action, user=None):
         """Check if the user has at least the given action on this resource."""
         user = current_context_user(user)
@@ -128,7 +126,7 @@ class Resource(Enum):
     # @testable true
     # @tests tests_unit/test_009b_user_permissions.py::test_resource_allowed_direct_contract
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_admin_permissions
-    # @pair permissions:admin
+    # @matrix permissions : admin owner
     def _admin_resource_allowed(self, user):
         return bool(getattr(user, "is_admin", getattr(user, "is_owner", False)))
 
@@ -149,8 +147,7 @@ class Resource(Enum):
     # @tests tests_unit/test_009b_user_permissions.py::test_global_resources
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_directory_general_models_view_only
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_create_toggles_require_global_models_create
-    # @features permissions
-    # @dimensions global-resources aliases
+    # @matrix permissions : aliases global-resources
     def _models_resource_allowed(self, action, user):
         return self._global_resource_allowed(action, user)
 
@@ -159,8 +156,7 @@ class Resource(Enum):
     # @tests tests_unit/test_009b_user_permissions.py::test_global_resources
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_directory_general_forms_view_only
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_create_category_hides_form_picker_without_forms_view
-    # @features permissions
-    # @dimensions global-resources
+    # @matrix permissions : global-resources resource-gates
     def _forms_resource_allowed(self, action, user):
         return self._global_resource_allowed(action, user)
 
@@ -168,8 +164,7 @@ class Resource(Enum):
     # @tests tests_unit/test_009b_user_permissions.py::test_global_resources
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_admin_permissions
     # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_directory_general_users_view_only
-    # @features permissions
-    # @dimensions global-resources
+    # @pair permissions:global-resources
     def _users_resource_allowed(self, action, user):
         return self._global_resource_allowed(action, user)
 

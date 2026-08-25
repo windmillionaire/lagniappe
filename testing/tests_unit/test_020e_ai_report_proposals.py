@@ -13,8 +13,7 @@ from testing.utility.ai_report_fakes import (
     _with_validator,
 )
 
-# @features ai-report
-# @dimensions generate validate
+# @matrix ai-report : generate validate
 @pytest.mark.unit
 def test_generate_organize_report_validates_ai_output(monkeypatch):
     proposal = {
@@ -34,8 +33,7 @@ def test_generate_organize_report_validates_ai_output(monkeypatch):
 
 
 
-# @features ai-report
-# @dimensions generate validate repair
+# @matrix ai-report : generate repair validate
 @pytest.mark.unit
 def test_generate_organize_report_repairs_invalid_action_type_once(monkeypatch):
     invalid = {
@@ -93,8 +91,7 @@ def test_generate_organize_report_repairs_invalid_action_type_once(monkeypatch):
 
 
 
-# @features ai-report
-# @dimensions repair file-placement
+# @matrix ai-report : file-placement repair
 @pytest.mark.unit
 def test_generate_organize_report_repairs_missing_file_attachments(monkeypatch):
     invalid = {
@@ -180,8 +177,7 @@ def test_generate_organize_report_repairs_missing_file_attachments(monkeypatch):
 
 
 
-# @features ai-report
-# @dimensions fallback file-placement
+# @matrix ai-report : fallback file-placement
 @pytest.mark.unit
 def test_generate_organize_report_reviews_files_missing_after_repair(monkeypatch):
     incomplete = {
@@ -236,8 +232,7 @@ def test_generate_organize_report_reviews_files_missing_after_repair(monkeypatch
 
 
 
-# @features ai-report
-# @dimensions repair references
+# @matrix ai-report : references repair
 @pytest.mark.unit
 def test_generate_organize_report_repairs_invalid_action_references_once(monkeypatch):
     invalid = {
@@ -308,8 +303,7 @@ def test_generate_organize_report_repairs_invalid_action_references_once(monkeyp
 
 
 
-# @features ai-report
-# @dimensions repair references
+# @matrix ai-report : references repair
 @pytest.mark.unit
 def test_generate_organize_report_repairs_category_used_as_page_reference(monkeypatch):
     invalid = {
@@ -400,8 +394,7 @@ def test_generate_organize_report_repairs_category_used_as_page_reference(monkey
 
 
 
-# @features ai-report
-# @dimensions repair required-data
+# @matrix ai-report : repair required-data
 @pytest.mark.unit
 def test_generate_organize_report_repairs_invalid_action_data_shape(monkeypatch):
     invalid = {
@@ -488,8 +481,7 @@ def test_generate_organize_report_repairs_invalid_action_data_shape(monkeypatch)
 
 
 
-# @features ai-report
-# @dimensions repair add-category required-data
+# @matrix ai-report : add-category repair required-data
 @pytest.mark.unit
 def test_generate_organize_report_repairs_missing_add_category_target(monkeypatch):
     invalid = {
@@ -565,8 +557,7 @@ def test_generate_organize_report_repairs_missing_add_category_target(monkeypatc
 
 
 
-# @features ai-report
-# @dimensions validate submission
+# @matrix ai-report : submission validate
 @pytest.mark.unit
 def test_generate_organize_plan_leaves_form_submission_for_completion(monkeypatch):
     invalid = {
@@ -631,8 +622,7 @@ def test_generate_organize_plan_leaves_form_submission_for_completion(monkeypatc
 
 
 
-# @features ai-report
-# @dimensions repair empty-form capture
+# @matrix ai-report : capture empty-form repair
 @pytest.mark.unit
 def test_generate_organize_report_repairs_empty_form_schema_without_capture(monkeypatch):
     invalid = {
@@ -710,8 +700,7 @@ def test_generate_organize_report_repairs_empty_form_schema_without_capture(monk
 
 
 
-# @features ai-report
-# @dimensions deterministic-repair schema-field-id
+# @matrix ai-report : deterministic-repair schema-field-id
 @pytest.mark.unit
 def test_generate_organize_report_repairs_create_form_field_missing_id(monkeypatch):
     invalid = {
@@ -772,10 +761,7 @@ def test_generate_organize_report_repairs_create_form_field_missing_id(monkeypat
 
 
 
-# @pair ai-report:deterministic-repair
-# @pair ai-report:schema-update
-# @pair form-schema:deterministic-repair
-# @pair form-schema:schema-update
+# @matrix ai-report form-schema : deterministic-repair schema-update
 @pytest.mark.unit
 def test_generate_organize_report_completes_additive_schema_field(monkeypatch):
     proposal = {
@@ -834,8 +820,7 @@ def test_generate_organize_report_completes_additive_schema_field(monkeypatch):
 
 
 
-# @pair ai-report:deterministic-repair
-# @pair ai-report:form-type
+# @matrix ai-report : deterministic-repair form-type
 # @pair form-schema:form-type
 @pytest.mark.unit
 def test_generate_organize_report_infers_create_form_type_from_usage(monkeypatch):
@@ -894,8 +879,7 @@ def test_generate_organize_report_infers_create_form_type_from_usage(monkeypatch
 
 
 
-# @features ai-report
-# @dimensions deterministic-repair page-form references
+# @matrix ai-report : deterministic-repair page-form references
 @pytest.mark.unit
 def test_generate_organize_report_infers_unambiguous_add_form_reference(monkeypatch):
     proposal = {
@@ -972,8 +956,7 @@ def test_generate_organize_report_infers_unambiguous_add_form_reference(monkeypa
 
 
 
-# @features ai-report
-# @dimensions needs-review references page-form per-action-fallback fallback
+# @matrix ai-report : fallback needs-review page-form per-action-fallback references
 @pytest.mark.unit
 def test_generate_organize_report_reviews_ambiguous_missing_add_form_reference(
     monkeypatch,
@@ -1088,8 +1071,7 @@ def test_generate_organize_report_reviews_ambiguous_missing_add_form_reference(
 
 
 
-# @features ai-report
-# @dimensions needs-review references per-action-fallback
+# @matrix ai-report : needs-review per-action-fallback references
 @pytest.mark.unit
 def test_generate_organize_report_reviews_unresolved_references_after_failed_repair(
     monkeypatch,
@@ -1151,8 +1133,7 @@ def test_generate_organize_report_reviews_unresolved_references_after_failed_rep
 
 
 
-# @features ai-report
-# @dimensions needs-review per-action-fallback malformed-data
+# @matrix ai-report : malformed-data needs-review per-action-fallback
 @pytest.mark.unit
 def test_generate_organize_report_downgrades_malformed_action_after_failed_repair(
     monkeypatch,
@@ -1215,8 +1196,7 @@ def test_generate_organize_report_downgrades_malformed_action_after_failed_repai
 
 
 
-# @features ai-report
-# @dimensions needs-review references per-action-fallback
+# @matrix ai-report : needs-review per-action-fallback references
 @pytest.mark.unit
 def test_generate_organize_report_downgrades_missing_category_without_sentry_capture(
     monkeypatch,
@@ -1292,8 +1272,7 @@ def test_generate_organize_report_downgrades_missing_category_without_sentry_cap
 
 
 
-# @features ai-report form-schema
-# @dimensions proposal validation schema-update
+# @matrix ai-report form-schema : proposal schema-update validation
 @pytest.mark.unit
 def test_validate_proposal_rejects_unsafe_schema_update_operations():
     proposal = {
@@ -1320,8 +1299,7 @@ def test_validate_proposal_rejects_unsafe_schema_update_operations():
 
 
 
-# @features ai-report
-# @dimensions proposal validation move-references
+# @matrix ai-report : move-references proposal validation
 @pytest.mark.unit
 @pytest.mark.parametrize(
     ("action_type", "data", "missing"),
@@ -1360,8 +1338,7 @@ def test_validate_proposal_requires_move_entity_references(
 
 
 
-# @features ai-report
-# @dimensions proposal validation rename canonical-target legacy-target
+# @matrix ai-report : canonical-target legacy-target proposal rename validation
 @pytest.mark.unit
 def test_validate_proposal_accepts_rename_and_move_task_target_aliases():
     proposal = {
@@ -1411,8 +1388,7 @@ def test_validate_proposal_accepts_rename_and_move_task_target_aliases():
 
 
 
-# @features ai-report
-# @dimensions create generate validate
+# @matrix ai-report : create generate validate
 @pytest.mark.unit
 def test_generate_create_report_validates_non_empty_actions(monkeypatch):
     monkeypatch.setattr(
@@ -1446,8 +1422,7 @@ def test_generate_create_report_validates_non_empty_actions(monkeypatch):
 
 
 
-# @features ai-report
-# @dimensions proposal validation explicit-task-identity
+# @matrix ai-report : explicit-task-identity proposal validation
 @pytest.mark.unit
 def test_validate_proposal_requires_completed_root_task_targets():
     with pytest.raises(
@@ -1518,8 +1493,7 @@ def test_validate_proposal_requires_completed_root_task_targets():
 
 
 
-# @features ai-report
-# @dimensions proposal validation dependencies
+# @matrix ai-report : dependencies proposal validation
 @pytest.mark.unit
 def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypatch):
     hash_lookups = []
@@ -2021,8 +1995,7 @@ def test_validate_proposal_rejects_unknown_actions_and_bad_dependencies(monkeypa
 
 
 
-# @features ai-report
-# @dimensions proposal validation submission action-reference-namespace
+# @matrix ai-report : action-reference-namespace proposal submission validation
 @pytest.mark.unit
 def test_validate_proposal_treats_action_like_submission_fields_as_content():
     proposal = {
@@ -2063,8 +2036,7 @@ def test_validate_proposal_treats_action_like_submission_fields_as_content():
 
 
 
-# @features ai-report
-# @dimensions proposal validation file-placement
+# @matrix ai-report : file-placement proposal validation
 @pytest.mark.unit
 def test_validate_proposal_requires_every_report_file_attachment():
     proposal = {
@@ -2105,8 +2077,7 @@ def test_validate_proposal_requires_every_report_file_attachment():
 
 
 
-# @features ai-report
-# @dimensions proposal skip dependencies
+# @matrix ai-report : dependencies proposal skip
 @pytest.mark.unit
 def test_skip_proposal_actions_marks_dependencies():
     proposal = {
@@ -2141,8 +2112,7 @@ def test_skip_proposal_actions_marks_dependencies():
 
 
 
-# @features ai-report
-# @dimensions proposal skip grouped-display restore dependencies
+# @matrix ai-report : dependencies grouped-display proposal restore skip
 @pytest.mark.unit
 def test_toggle_proposal_action_skip_restores_dependencies():
     proposal = {

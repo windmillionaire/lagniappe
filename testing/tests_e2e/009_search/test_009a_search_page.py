@@ -92,8 +92,7 @@ def _go_to_search_page(user, query):
     expect(results_view).to_have_attribute("initialized", "")
 
 
-# @features search
-# @dimensions anonymous-access
+# @pair search:anonymous-access
 def test_search_page_requires_login(get_user):
     anonymous = get_user(Users.ANONYMOUS)
     base_url = SETTINGS.test_config["BASE_URL"].rstrip("/")
@@ -104,8 +103,7 @@ def test_search_page_requires_login(get_user):
     )
 
 
-# @features search
-# @dimensions navbar-submit page-navigation results
+# @matrix search : navbar-submit page-navigation results
 # @template nav.html::navbar
 def test_search_from_navbar(get_user):
     user = get_user(Users.OWNER)
@@ -127,8 +125,7 @@ def test_search_from_navbar(get_user):
     )
 
 
-# @features search
-# @dimensions query-display
+# @pair search:query-display
 # @template search/search.html::main
 def test_search_page_shows_query(get_user):
     user = get_user(Users.OWNER)
@@ -140,8 +137,7 @@ def test_search_page_shows_query(get_user):
     )
 
 
-# @features search
-# @dimensions results
+# @pair search:results
 def test_search_returns_results(get_user):
     user = get_user(Users.OWNER)
     project = Projects.test_create_project_manual_mode.get(user)
@@ -150,8 +146,7 @@ def test_search_returns_results(get_user):
     expect(user.locate(SEARCH_RESULTS)).to_contain_text(project.definition.name)
 
 
-# @features search
-# @dimensions no-results
+# @pair search:no-results
 # @template search/results.html::search_results
 def test_search_no_results(get_user):
     user = get_user(Users.OWNER)
@@ -160,8 +155,7 @@ def test_search_no_results(get_user):
     expect(user.locate(SEARCH_RESULTS)).to_contain_text("No matches")
 
 
-# @features search
-# @dimensions result-title
+# @pair search:result-title
 # @template search/results.html::search_results
 def test_search_result_titles(get_user):
     user = get_user(Users.OWNER)
@@ -175,8 +169,7 @@ def test_search_result_titles(get_user):
     expect(title).to_have_attribute("data-kind", "project")
 
 
-# @features search
-# @dimensions primary-name-ranking
+# @pair search:primary-name-ranking
 # @template search/results.html::search_results
 def test_primary_name_matches_rank_above_file_name_and_description_matches(get_user):
     user = get_user(Users.OWNER)
@@ -202,8 +195,7 @@ def test_primary_name_matches_rank_above_file_name_and_description_matches(get_u
     expect(titles.nth(3)).to_have_attribute("data-kind", "file")
 
 
-# @features search
-# @dimensions details-hydration parent-refresh
+# @matrix search : details-hydration parent-refresh
 # @template search/results.html::search_results
 def test_search_result_parent_details_refresh_after_category_rename(get_user):
     user = get_user(Users.OWNER)
@@ -224,8 +216,7 @@ def test_search_result_parent_details_refresh_after_category_rename(get_user):
     expect(user.locate(SEARCH_RESULTS)).not_to_contain_text(original_parent_name)
 
 
-# @features search
-# @dimensions snippets
+# @pair search:snippets
 # @template search/results.html::search_results
 def test_search_result_snippets(get_user):
     user = get_user(Users.OWNER)
@@ -245,8 +236,7 @@ def test_search_result_snippets(get_user):
     expect(result.locator("b").filter(has_text=snippet_term)).to_be_visible()
 
 
-# @features search
-# @dimensions facets
+# @pair search:facets
 # @template search/search.html::facet_button
 def test_facets_displayed(get_user):
     user = get_user(Users.OWNER)
@@ -257,8 +247,7 @@ def test_facets_displayed(get_user):
     expect(user.locate(SEARCH_FACET)).not_to_have_count(0)
 
 
-# @features search
-# @dimensions facet-filter url-state results
+# @matrix search : facet-filter results url-state
 # @template search/search.html::facet_button
 def test_click_facet_filters_results(get_user):
     user = get_user(Users.OWNER)
@@ -276,8 +265,7 @@ def test_click_facet_filters_results(get_user):
     expect(user.locate(SEARCH_RESULTS)).to_be_visible()
 
 
-# @features search
-# @dimensions facet-state
+# @pair search:facet-state
 # @template search/search.html::facet_button
 def test_facet_selection_visual_state(get_user):
     user = get_user(Users.OWNER)
@@ -297,8 +285,7 @@ def test_facet_selection_visual_state(get_user):
     expect(category_facet).to_have_attribute("data-selected", "false")
 
 
-# @features search
-# @dimensions clear-facet
+# @pair search:clear-facet
 # @template search/search.html::main
 def test_clear_facet_filter(get_user):
     user = get_user(Users.OWNER)
@@ -329,8 +316,7 @@ def test_clear_facet_filter(get_user):
     )
 
 
-# @features search
-# @dimensions facet-filter task-model result-links
+# @matrix search : facet-filter result-links task-model
 # @template search/search.html::facet_button
 # @template search/results.html::search_results
 def test_task_facet_includes_task_and_model_results_with_links(get_user):
@@ -383,11 +369,8 @@ def test_task_facet_includes_task_and_model_results_with_links(get_user):
     expect(completed_row.locator("span[data-icon='selected']")).to_have_count(1)
     expect(completed_row.locator("span[data-icon='unselected']")).to_have_count(0)
 
-# @pair search:navbar-results
-# @pair search:task-model
-# @pair search:result-links
-# @pair template-formatting:tojson
-# @pair template-formatting:safe-json
+# @matrix search : navbar-results result-links task-model
+# @matrix template-formatting : safe-json tojson
 # @template nav.html::search_results
 # @template common.html::format_name
 def test_navbar_task_results_render_current_completion_state(get_user):
@@ -428,8 +411,7 @@ def test_navbar_task_results_render_current_completion_state(get_user):
     expect(completed_option.locator("span[data-icon='selected']")).to_have_count(1)
 
 
-# @features search
-# @dimensions result-navigation
+# @pair search:result-navigation
 # @template search/results.html::search_results
 def test_click_result_navigates(get_user):
     user = get_user(Users.OWNER)
@@ -447,8 +429,7 @@ def test_click_result_navigates(get_user):
     expect(user.locate("[data-nav='view'] [data-role='title']")).to_contain_text(name)
 
 
-# @features search
-# @dimensions result-links
+# @pair search:result-links
 # @template search/results.html::search_results
 def test_result_links_correct(get_user):
     user = get_user(Users.OWNER)
@@ -464,8 +445,7 @@ def test_result_links_correct(get_user):
     )
 
 
-# @features search
-# @dimensions pagination
+# @pair search:pagination
 # @template search/results.html::footer
 def test_pagination_controls_visible(get_user):
     user = get_user(Users.OWNER)
@@ -485,8 +465,7 @@ def test_pagination_controls_visible(get_user):
     expect(user.locate(f"{PAGINATION_BUTTON}[data-page='1']")).to_be_visible()
 
 
-# @features search
-# @dimensions pagination-next
+# @pair search:pagination-next
 # @template search/results.html::footer
 def test_next_page(get_user):
     user = get_user(Users.OWNER)
@@ -507,8 +486,7 @@ def test_next_page(get_user):
     )
 
 
-# @features search
-# @dimensions pagination-previous
+# @pair search:pagination-previous
 # @template search/results.html::footer
 def test_previous_page(get_user):
     user = get_user(Users.OWNER)
@@ -532,8 +510,7 @@ def test_previous_page(get_user):
     )
 
 
-# @features search
-# @dimensions exact-match
+# @pair search:exact-match
 def test_search_exact_match(get_user):
     user = get_user(Users.OWNER)
     name = _unique("exact")
@@ -544,8 +521,7 @@ def test_search_exact_match(get_user):
     expect(_result_titles(user).filter(has_text=name)).to_be_visible()
 
 
-# @features search
-# @dimensions partial-match
+# @pair search:partial-match
 def test_search_partial_match(get_user):
     user = get_user(Users.OWNER)
     token = f"partial{uuid4().hex[:10]}"
@@ -557,8 +533,7 @@ def test_search_partial_match(get_user):
     expect(_result_titles(user).filter(has_text=name)).to_be_visible()
 
 
-# @features search
-# @dimensions special-characters
+# @pair search:special-characters
 def test_search_special_characters(get_user):
     user = get_user(Users.OWNER)
     token = uuid4().hex[:8]

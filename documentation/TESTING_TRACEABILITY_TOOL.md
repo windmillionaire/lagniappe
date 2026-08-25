@@ -93,8 +93,9 @@ to that table; the reporter reconstructs the same path maps before checking
 currentness.
 
 This dependency graph is deliberately declared rather than guessed. Keep
-`@tests`, `@scaffolding`, and `@template` links accurate; a shared helper with
-meaningful behavior should be represented by one of those ownership paths.
+`@tests`, `@source`, `@scaffolding`, and `@template` links accurate; a shared
+helper with meaningful behavior should be represented by one of those
+ownership paths.
 
 A useful handoff sequence is:
 
@@ -123,8 +124,7 @@ Tested behavior:
 ```python
 # @testable true
 # @tests tests_unit/test_example.py::test_normalizes_value
-# @features normalization
-# @dimensions blank-value
+# @matrix normalization : blank-value
 def normalize_value(value):
     ...
 ```
@@ -153,12 +153,12 @@ Supported tags are:
 
 - `@testable true|false|infrastructure`
 - `@tests <pytest nodeid or glob>`
+- `@source <source path>::<qualified symbol>` on a test
 - `@scaffolding <helper path>::<symbol>`
 - `@covered-by <source path>::<symbol>`
 - `@reason <why direct testing is inappropriate>`
 - `@manual`
-- `@features <names>`
-- `@dimensions <names>`
+- `@matrix <features> : <dimensions>` for one allowed Cartesian region
 - `@pair <feature>:<dimension>` for one exact, repeatable pair
 - `@pairs <feature>:<dimension> [...]` for several exact pairs on one line
 - `@template <template.html>::<macro>` on tests
@@ -169,21 +169,55 @@ Supported tags are:
 reason or source owner. Ownership links must exist, cannot point to themselves,
 cannot form cycles, and should ultimately reach tested or infrastructure code.
 
-Tests use `@features` and `@dimensions` to describe the behavior they prove.
-When both tag families are present without `@pair`, they retain the concise
-Cartesian-product meaning: every feature combines with every dimension. Use
-repeated exact pairs when only specific combinations are intended:
+Use `@matrix` and `@pair` together as one additive behavior language. A matrix
+declares one Cartesian region; exact pairs add individual cells. Repeating
+either tag unions its cells with the others:
 
 ```python
+# @matrix home search : permissions
+# @matrix search : load
 # @pair home:permissions
-# @pair search:load
+# @pair export:empty-value
 ```
 
-Once any `@pair` or `@pairs` tag is present on a symbol or test, its declared
-pairs are exactly those listed; the parser still derives the feature and
-dimension vocabularies for search and taxonomy summaries. Do not mix exact
-pairs with unpaired tags to try to express a hybrid. Large implicit
-cross-products and near-duplicate taxonomy terms remain advisory review items.
+This example declares `home:permissions`, `search:permissions`, `search:load`,
+and `export:empty-value`. It does not create a product across separate matrix
+clauses. This makes compact regular regions and sparse exceptions equally
+natural.
+
+Source and test annotations interpret the same cells at different stages:
+
+- A source matrix describes an allowed behavior territory. Each feature and
+  dimension axis must be realized by at least one directly linked test; every
+  Cartesian cell need not have its own test.
+- A source `@pair` is a precise obligation and must be realized exactly by a
+  directly linked test.
+- A test matrix or pair is exhaustive: it claims the cells its assertions
+  actually prove.
+- The realized cells of a source-to-test link are the intersection of those
+  source and test declarations.
+
+## Direct and related test links
+
+A direct edge may be declared from either end: use source-side `@tests` when
+the source owner is the clearest editing point, or test-side `@source` when the
+test is the clearest place to maintain the pointer. Do not declare both ends of
+the same edge; the reporter synthesizes the reverse view and warns about a
+duplicate declaration.
+
+Exact nodeids remain conservative safety rails: an exact direct edge with
+missing or disjoint behavior cells is retained for retesting but reported as an
+error. Globs and `@scaffolding` first locate candidates, then keep only tests
+whose behavior cells overlap the source. A broad declaration that realizes no
+edge is an error. This prevents a file or folder pointer from turning every
+test it contains into a cascade.
+
+Direct realized edges are hard dependencies. They invalidate semantic test
+evidence when their source changes and are required by `--changed --check`.
+Other tests that share one of a source's realized cells are shown as soft
+related tests, with the matching cells, but do not become owners, dependencies,
+or required evidence. Related matching is global and one hop only: another
+test's unrelated cells do not expand the graph further.
 
 Unknown or nearly misspelled traceability tags are diagnosed. `@suggestion` is
 not a supported tag; use `@todo` when a missing behavior should remain visible.

@@ -11,7 +11,8 @@ from .utility import create_named_key
 
 # @testable true
 # @tests tests_unit/test_027c_mentions.py::test_mention_delivery_ledger_survives_notification_replay
-# @pairs mentions:delivery-ledger mentions:idempotency notifications:aggregate-count
+# @matrix mentions : delivery-ledger idempotency
+# @pair notifications:aggregate-count
 @retry_aborted
 def create_mention_delivery(
     actor,

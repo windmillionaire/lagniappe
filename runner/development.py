@@ -36,8 +36,7 @@ def _stop_process_group(process):
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_dev_server_adc_mismatch_stops_before_flask
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_dev_server_forwards_signals_and_restores_handlers
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_dev_server_cleans_up_process_group_after_runner_failure
-# @features development
-# @dimensions gcloud-config adc launch-order noninteractive process-ownership signals lifecycle exceptional-cleanup escalation
+# @matrix development : adc escalation exceptional-cleanup gcloud-config launch-order lifecycle noninteractive process-ownership signals
 def run_dev_server():
     try:
         activate_repository_gcloud(

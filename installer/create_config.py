@@ -48,8 +48,8 @@ GOOGLE_AUTH_PERMISSION_GUIDANCE = (
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_setup_collects_owner_and_requires_google_before_confirmation
-# @pairs setup:delegated-install setup:existing-project setup:billing
-# @pairs admin:google-signin admin:bootstrap-email admin:preserved-empty
+# @matrix admin : bootstrap-email google-signin preserved-empty
+# @matrix setup : billing delegated-install existing-project
 def _configure_delegated_bootstrap(preflight, account, google_signin_enabled):
     """Validate and persist the temporary application Admin bootstrap window."""
     from config import SETTINGS
@@ -112,8 +112,7 @@ def _adc_credentials_path():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_authentication_is_kept_only_after_project_permission_confirmation
-# @features setup
-# @dimensions adc transactional-state permissions
+# @matrix setup : adc permissions transactional-state
 class _AdcCredentialTransaction:
     """Restore or remove ADC when setup cannot confirm the selected operator."""
 
@@ -170,8 +169,7 @@ class _AdcCredentialTransaction:
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_authentication_is_kept_only_after_project_permission_confirmation
-# @features setup
-# @dimensions adc transactional-state permissions
+# @matrix setup : adc permissions transactional-state
 @contextmanager
 def _adc_auth_transaction():
     global _ACTIVE_ADC_TRANSACTION
@@ -216,8 +214,7 @@ def _commit_adc_credentials():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_config_status_save_and_gcloud_login_helpers
-# @features setup
-# @dimensions gcloud-config
+# @pair setup:gcloud-config
 def _gcloud_debug_value(command):
     """Return a structured gcloud value without promoting errors to values."""
     result = run_gcloud_command(command, check=False)
@@ -258,8 +255,7 @@ def _display_gcloud_value(result):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_config_status_save_and_gcloud_login_helpers
-# @features setup
-# @dimensions gcloud-config
+# @pair setup:gcloud-config
 def _adc_login_command(account, project_id, *, force=False):
     command = [GCLOUD_CLI, "auth", "application-default", "login"]
     if account and not force:
@@ -330,8 +326,7 @@ def _get_current_account_email(credentials=None):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_identity_reports_principal_project_and_quota
-# @features setup
-# @dimensions gcloud-config adc
+# @matrix setup : adc gcloud-config
 def _adc_identity():
     """Return a secret-free structured view of Application Default Credentials."""
     from installer.utils import install_if_missing
@@ -369,8 +364,7 @@ def _adc_identity():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_config_status_save_and_gcloud_login_helpers
-# @features setup
-# @dimensions gcloud-config
+# @pair setup:gcloud-config
 def _get_gcloud_account(account):
     from installer import FORMATTER
     from runner.gcloud import check_account_authentication
@@ -436,8 +430,7 @@ def _get_gcloud_account(account):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_prefers_requested_name_and_suffixes_collisions
-# @features setup
-# @dimensions project-id interactive-input
+# @matrix setup : interactive-input project-id
 def _project_id_from_app_name(sanitized_app_name):
     base = re.sub(r"[^a-z0-9-]", "-", sanitized_app_name.lower()).strip("-")
     if not base or not base[0].isalpha():
@@ -455,8 +448,7 @@ def _randomized_project_id(sanitized_app_name):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_validate_project_id_and_project_state_are_non_mutating
-# @features setup
-# @dimensions project-id
+# @pair setup:project-id
 def _project_state(project_id):
     result = run_gcloud_command(
         ["projects", "describe", project_id, "--format=json"],
@@ -499,8 +491,7 @@ def _project_state(project_id):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_prefers_requested_name_and_suffixes_collisions
-# @features setup
-# @dimensions project-id interactive-input
+# @matrix setup : interactive-input project-id
 def _confirm_project_candidate(project_id, state, formatter):
     if state["state"] == "unavailable":
         print(
@@ -526,8 +517,7 @@ def _confirm_project_candidate(project_id, state, formatter):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_project_id_selection_prefers_requested_name_and_suffixes_collisions
-# @features setup
-# @dimensions project-id interactive-input
+# @matrix setup : interactive-input project-id
 def _get_gcloud_project(project_id, sanitized_app_name):
     from installer import FORMATTER
 
@@ -609,8 +599,7 @@ def _gcloud_configuration_name(name):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_validate_project_id_and_project_state_are_non_mutating
-# @features setup
-# @dimensions project-id
+# @pair setup:project-id
 def validate_project_id(project_id):
     """Validate the provider's project-ID syntax without mutating state."""
     if not PROJECT_ID_PATTERN.fullmatch(str(project_id or "")):
@@ -629,8 +618,7 @@ def validate_project_id(project_id):
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_new_project_forces_transactional_adc_refresh
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_refreshes_adc_login_after_quota_failure
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_exits_when_adc_login_refresh_fails
-# @features setup
-# @dimensions gcloud-config
+# @matrix setup : gcloud-config new-project
 def _set_adc_quota_project(project_id, sp):
     from installer import FORMATTER
     from config import SETTINGS
@@ -813,8 +801,7 @@ def _set_adc_quota_project(project_id, sp):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_principal_mismatch_requires_explicit_reauthentication
-# @features setup
-# @dimensions gcloud-config adc identity
+# @matrix setup : adc gcloud-config identity
 def _ensure_adc_principal(account, project_id=None):
     """Authenticate ADC explicitly when it is not the selected CLI principal."""
     from installer import FORMATTER
@@ -866,8 +853,7 @@ def _ensure_adc_principal(account, project_id=None):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_target_preflight_selects_billing_and_reports_required_apis
-# @features setup
-# @dimensions preflight billing provider-apis
+# @matrix setup : billing preflight provider-apis
 def _load_gcloud_json(command, description):
     result = run_gcloud_command(command, check=False)
     if result.returncode != 0:
@@ -882,8 +868,7 @@ def _load_gcloud_json(command, description):
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_billing_selection_defers_to_project_console_when_cli_returns_no_open_account
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_target_preflight_selects_billing_and_reports_required_apis
-# @features setup
-# @dimensions billing interactive-input gcloud-config
+# @matrix setup : billing gcloud-config interactive-input
 def _select_billing_account(accounts):
     from installer import FORMATTER
 
@@ -929,8 +914,7 @@ def _select_billing_account(accounts):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_project_billing_authorization_uses_existing_account_and_project_console
-# @features setup
-# @dimensions billing interactive-input browser
+# @matrix setup : billing browser interactive-input
 def _authorize_project_billing(project_id):
     """Open the target's billing page and verify its existing-account link."""
     from installer import FORMATTER
@@ -983,8 +967,7 @@ def _authorize_project_billing(project_id):
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_target_preflight_selects_billing_and_reports_required_apis
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_target_preflight_defers_billing_discovery_until_new_project_exists
-# @features setup
-# @dimensions preflight billing provider-apis project-create
+# @matrix setup : billing preflight project-create provider-apis
 def _target_preflight(project_id):
     """Run read-only target, billing, and Service Usage checks."""
     from config import constants
@@ -1051,8 +1034,7 @@ def _target_preflight(project_id):
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_apply_target_preflight_creates_and_bills_confirmed_project
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_apply_target_preflight_authorizes_billing_after_project_creation_when_cli_list_is_empty
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_apply_target_preflight_rediscovers_and_links_existing_billing_account
-# @features setup
-# @dimensions preflight project-create billing browser provider-apis
+# @matrix setup : billing browser preflight project-create provider-apis
 def _apply_target_preflight(project_id, preflight, project_ready=None):
     """Apply the already-confirmed project creation and billing mutations."""
     from config import constants
@@ -1201,8 +1183,7 @@ def _require_operator_permissions(
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_adc_authentication_is_kept_only_after_project_permission_confirmation
-# @features setup
-# @dimensions adc transactional-state permissions
+# @matrix setup : adc permissions transactional-state
 def _confirm_operator_permissions(
     project_id,
     *,
@@ -1266,8 +1247,7 @@ def _display_install_identity_summary(preflight, adc_identity):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_build_app_settings_refreshes_agent_access_defaults
-# @features setup
-# @dimensions config-files agent-access ai-defaults source-link
+# @matrix setup : agent-access ai-defaults config-files source-link
 def _build_app_settings():
     from config import SETTINGS, constants
 
@@ -1447,8 +1427,7 @@ def _build_manifest():
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_deep_copies_templates
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_generates_fresh_settings
-# @features setup
-# @dimensions config-files
+# @pair setup:config-files
 def _set_default_config():
     from config import SETTINGS
 
@@ -1464,8 +1443,7 @@ def _set_default_config():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_update_config_sets_application_version_from_package
-# @features setup
-# @dimensions config-files config-version
+# @matrix setup : config-files config-version
 def update_config():
     """Refresh generated config defaults and return the active package version."""
     from config import SETTINGS, constants
@@ -1485,8 +1463,7 @@ def update_config():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_app_name_validation_rejects_control_characters_and_long_names
-# @features setup
-# @dimensions validation app-name
+# @matrix setup : app-name validation
 def _validate_app_name(value):
     value = str(value or "").strip()
     return bool(value) and len(value) <= 80 and all(
@@ -1508,8 +1485,7 @@ def _get_app_name(value):
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_cli_identity_snapshot_fails_closed_on_unset_or_error
-# @features setup
-# @dimensions gcloud-config identity
+# @matrix setup : gcloud-config identity
 def _active_cli_identity():
     values = {
         "configuration": _gcloud_debug_value(
@@ -1542,8 +1518,7 @@ def _active_cli_identity():
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_exits_when_adc_login_refresh_fails
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_set_application_defaults_persists_prompted_name_before_cloud_change
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_write
-# @features setup
-# @dimensions config-files interactive-input gcloud-config recovery
+# @matrix setup : config-files gcloud-config interactive-input recovery
 def set_application_defaults():
     with _adc_auth_transaction():
         return _set_application_defaults()
@@ -1736,8 +1711,7 @@ def _set_application_defaults():
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_requires_google_client_only_when_enabled
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_rejects_keyless_identity_mismatch
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_verify_application_config_reports_invalid_redis_tls
-# @features setup
-# @dimensions config-files validation redis-tls keyless-config project-identity google-oauth optional
+# @matrix setup : config-files google-oauth keyless-config optional project-identity redis-tls validation
 def verify_application_config(upgrade=False):
     from installer import FORMATTER
 

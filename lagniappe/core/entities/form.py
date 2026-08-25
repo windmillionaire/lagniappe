@@ -67,15 +67,13 @@ class Form(Entity, AssetMixin):
 
     # @testable true
     # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_html_calls_set_html_field
-    # @features html-field
-    # @dimensions ai-value, validation
+    # @matrix html-field : ai-value validation
     def set_html_field(self, field_id, html):
         return self.save_asset(html, field_id, "html")
 
     # @testable true
     # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
-    # @features html-field
-    # @dimensions image-upload unsaved-schema asset-lifecycle
+    # @matrix html-field : asset-lifecycle image-upload unsaved-schema
     def add_html_field_image(self, field_id, image, visibility="private"):
         field = self.fields.get(field_id)
         if not field:
@@ -103,8 +101,7 @@ class Form(Entity, AssetMixin):
 
     # @testable true
     # @tests tests_unit/test_004_form_properties.py::test_form_schema_write_gateway_canonicalizes_without_adding_page_fields
-    # @features form-schema
-    # @dimensions canonicalization write-gateway membership
+    # @matrix form-schema : canonicalization membership write-gateway
     def set_schema(self, value):
         """Apply the one canonical durable schema write contract."""
 
@@ -113,8 +110,7 @@ class Form(Entity, AssetMixin):
 
     # @testable true
     # @tests tests_unit/test_004_form_properties.py::test_form_update_sets_name_form_type_and_schema
-    # @features form
-    # @dimensions update, schema, form-type
+    # @matrix form : form-type schema update
     def update(self, data):
         if data.get("name"):
             self.name = data["name"]

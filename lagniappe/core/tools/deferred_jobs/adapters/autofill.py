@@ -42,8 +42,7 @@ class AutofillAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_upload_checkpoint_records_durable_attachment
-    # @features deferred-jobs ai files
-    # @dimensions autofill upload checkpoint resume
+    # @matrix ai deferred-jobs files : autofill checkpoint resume upload
     def checkpoint_ready(self, context):
         if not super().checkpoint_ready(context):
             return False
@@ -72,7 +71,7 @@ class AutofillAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_revision_tracks_only_form_apply_state
-    # @pairs deferred-jobs:form-revision ai:autofill
+    # @pairs ai:autofill deferred-jobs:form-revision
     def authorization(self, spec):
         authorization = super().authorization(spec)
         target = spec.inputs.get("target")
@@ -86,7 +85,7 @@ class AutofillAdapter(DeferredJobAdapter):
     # @testable true
     # @tests tests_unit/test_023a_deferred_job_properties.py::test_autofill_start_acquires_one_target_lock
     # @tests tests_unit/test_024_autofill_form_state.py::test_autofill_explicit_lock_opt_out_skips_target_lock
-    # @pairs deferred-jobs:form-lock ai:autofill
+    # @pairs ai:autofill deferred-jobs:form-lock
     def start_lock(self, spec, job):
         if spec.parameters.get("lock_target", True) is False:
             return None
@@ -108,7 +107,7 @@ class AutofillAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_status_is_visible_to_target_editor
-    # @pairs deferred-jobs:status ai:collaboration
+    # @pairs ai:collaboration deferred-jobs:status
     def can_view_status(self, job, actor):
         try:
             target = (job.inputs or {}).get("target")
@@ -153,7 +152,8 @@ class AutofillAdapter(DeferredJobAdapter):
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_revision_tracks_only_form_apply_state
     # @tests tests_unit/test_023a_deferred_job_properties.py::test_autofill_lock_cleanup_is_compare_and_delete
     # @tests tests_unit/test_024_autofill_form_state.py::test_lockless_autofill_keeps_revision_drift_guard
-    # @pairs deferred-jobs:form-revision deferred-jobs:form-lock ai:autofill
+    # @matrix deferred-jobs : form-lock form-revision
+    # @pair ai:autofill
     def validate_apply(self, context):
         target = context.input("target")
         if context.parameters.get("lock_target", True):
@@ -171,8 +171,7 @@ class AutofillAdapter(DeferredJobAdapter):
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_prepare_waits_for_attached_file_summaries
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_upload_checkpoint_records_durable_attachment
-    # @features deferred-jobs ai files
-    # @dimensions autofill summary-dependency pending failed upload checkpoint
+    # @matrix ai deferred-jobs files : autofill checkpoint failed pending summary-dependency upload
     def prepare(self, context):
         context.set_phase(DeferredJobPhase.PREPARING_INPUTS)
         existing_checkpoint = getattr(context, "checkpoint", None) or {}
@@ -236,8 +235,7 @@ class AutofillAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_uploaded_file_is_attached_to_target
-    # @features deferred-jobs ai files pages tasks
-    # @dimensions autofill upload attachment idempotency inspection
+    # @matrix ai deferred-jobs files pages tasks : attachment autofill idempotency inspection upload
     def inspect(self, context):
         target = context.input("target")
         current = target.properties.submission.value
@@ -266,8 +264,7 @@ class AutofillAdapter(DeferredJobAdapter):
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_uploaded_file_is_attached_to_target
-    # @features deferred-jobs ai files pages tasks
-    # @dimensions autofill upload attachment naming idempotency
+    # @matrix ai deferred-jobs files pages tasks : attachment autofill idempotency naming upload
     def apply(self, context):
         context.ensure_active()
         target = context.input("target")
@@ -333,8 +330,7 @@ class AutofillAdapter(DeferredJobAdapter):
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_terminal_cleanup_releases_target_lock
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_page_operation_reference_is_persisted_and_compare_cleared
-    # @pairs deferred-jobs:terminal-cleanup deferred-jobs:form-lock
-    # @pair deferred-jobs:compare-and-delete
+    # @matrix deferred-jobs : compare-and-delete form-lock terminal-cleanup
     def cleanup(self, context, *, terminal):
         record = context.parameters.pop("upload_record", None)
         context.job.parameters = context.parameters

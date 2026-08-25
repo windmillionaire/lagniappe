@@ -7,8 +7,7 @@ import { Condition } from "./base";
 /**
  * @testable true
  * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_table_column_condition_editor
- * @features forms
- * @dimensions builder-table-column
+ * @pair forms:builder-table-column
  */
 export default class Columns extends Condition {
 	constructor(builder) {

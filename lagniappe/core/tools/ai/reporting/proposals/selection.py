@@ -8,8 +8,7 @@ from .validation import validate_proposal
 
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_skip_proposal_actions_marks_dependencies
-# @features ai-report
-# @dimensions proposal skip dependencies
+# @matrix ai-report : dependencies proposal skip
 def skip_proposal_actions(proposal, index):
     """Mark one proposal action and all dependent actions as skipped."""
     proposal = validate_proposal(proposal)
@@ -26,8 +25,7 @@ def skip_proposal_actions(proposal, index):
 
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_toggle_proposal_action_skip_restores_dependencies
-# @features ai-report
-# @dimensions proposal skip restore dependencies
+# @matrix ai-report : dependencies proposal restore skip
 def toggle_proposal_action_skip(proposal, index):
     """Toggle skipped state for an action and its dependent actions."""
     proposal = validate_proposal(proposal)
@@ -42,15 +40,7 @@ def toggle_proposal_action_skip(proposal, index):
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_toggle_proposal_action_skip_restores_dependencies
 # @tests tests_unit/test_020g_ai_report_actions_entities.py::test_toggle_proposal_action_indexes_can_skip_exact_indexes_without_dependencies
-# @features ai-report
-# @dimensions proposal skip grouped-display restore dependencies
-# @pair ai-report:proposal
-# @pair ai-report:skip
-# @pair ai-report:grouped-display
-# @pair ai-report:restore
-# @pair ai-report:dependencies
-# @pair ai-report:exact-indexes
-# @pair ai-report:schema-section
+# @matrix ai-report : dependencies exact-indexes grouped-display proposal restore schema-section skip
 def toggle_proposal_action_indexes(proposal, index, indexes, include_dependencies=True):
     """Toggle skipped state for a display group of proposal actions."""
     proposal = validate_proposal(proposal)

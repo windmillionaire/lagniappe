@@ -461,8 +461,7 @@ const _filterNotificationBlockingSpans = (event) => {
  * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_drops_malformed_breadcrumb_container
  * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_uses_installation_dsn_without_default_pii
  * @tests tests_js/test_015_error_tracking_frontend.py::test_configure_sentry_does_not_initialize_without_dsn
- * @features error-tracking
- * @dimensions malformed-blocking-operation malformed-breadcrumbs sentry-context trace-normalization blocking-operation notification-transaction privacy redaction request-context payload-bounds configured-dsn disabled
+ * @matrix error-tracking : blocking-operation configured-dsn disabled malformed-blocking-operation malformed-breadcrumbs notification-transaction payload-bounds privacy redaction request-context sentry-context trace-normalization
  */
 export const configureSentry = () => {
 	const Sentry = typeof window !== "undefined" ? window.Sentry : null;
@@ -563,8 +562,7 @@ export const isTransientNetworkError = (error) => {
 /**
  * @testable true
  * @tests tests_js/test_015_error_tracking_frontend.py::test_capture_error_normalizes_sentry_context_values
- * @features error-tracking
- * @dimensions sentry-context normalization
+ * @matrix error-tracking : normalization sentry-context
  */
 export const captureError = (error, element, context) => {
 	if (isSkippedViewTransitionError(error)) {

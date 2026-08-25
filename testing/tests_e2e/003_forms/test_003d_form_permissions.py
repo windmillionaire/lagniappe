@@ -14,8 +14,7 @@ from testing.utility import manual_mutation_headers
 pytestmark = pytest.mark.e2e
 
 
-# @features forms
-# @dimensions permission-gates index-view
+# @matrix forms : index-view permission-gates
 # @template forms/index.html::view
 def test_form_index_forbidden_without_forms_view(get_user, browser_failures):
     user = get_user(Users.user_one_category)
@@ -26,8 +25,7 @@ def test_form_index_forbidden_without_forms_view(get_user, browser_failures):
         expect(user.page).to_have_title("Error 403")
 
 
-# @features forms
-# @dimensions index-view create-control
+# @matrix forms : create-control index-view
 # @template forms/index.html::view
 def test_form_index_lists_forms_but_hides_create_without_forms_create(get_user):
     owner = get_user(Users.OWNER)
@@ -41,8 +39,7 @@ def test_form_index_lists_forms_but_hides_create_without_forms_create(get_user):
     expect(viewer.locate(FormIndex.CREATE_FORM_BUTTON)).not_to_be_attached()
 
 
-# @features forms
-# @dimensions index-view create-control
+# @matrix forms : create-control index-view
 # @template forms/index.html::view
 def test_form_index_shows_create_for_user_with_forms_create(get_user):
     user = get_user(Users.admin)
@@ -54,8 +51,7 @@ def test_form_index_shows_create_for_user_with_forms_create(get_user):
     expect(user.locate(FormIndex.CREATE_FORM_BUTTON)).to_be_visible()
 
 
-# @features forms
-# @dimensions builder-edit permission-gates
+# @matrix forms : builder-edit permission-gates
 # @template forms/builder.html::main
 def test_form_builder_hides_edit_affordances_without_forms_edit(get_user):
     owner = get_user(Users.OWNER)
@@ -78,8 +74,7 @@ def test_form_builder_hides_edit_affordances_without_forms_edit(get_user):
     expect(viewer.locate("[data-role='generate']")).not_to_be_attached()
 
 
-# @features forms
-# @dimensions builder-edit permission-gates
+# @matrix forms : builder-edit permission-gates
 # @template forms/builder.html::main
 def test_form_builder_shows_edit_affordances_with_forms_edit(get_user):
     owner = get_user(Users.OWNER)
@@ -95,8 +90,7 @@ def test_form_builder_shows_edit_affordances_with_forms_edit(get_user):
     expect(user.locate("[data-role='generate']")).to_be_attached()
 
 
-# @features forms
-# @dimensions restriction-control permission-gates
+# @matrix forms : permission-gates restriction-control
 # @template forms/restrictions.html::restrict_access
 def test_form_builder_restrictions_visible_only_for_site_owner(get_user):
     owner = get_user(Users.OWNER)
@@ -112,8 +106,7 @@ def test_form_builder_restrictions_visible_only_for_site_owner(get_user):
     expect(owner.locate("[data-role='restrict-access']")).to_be_attached()
 
 
-# @features forms ai
-# @dimensions submitted-reference
+# @matrix ai forms : submitted-reference
 def test_schema_generation_requires_edit_access_to_submitted_form(get_user):
     owner = get_user(Users.OWNER)
     form = Forms.test_owner_restricted_form.get(owner)

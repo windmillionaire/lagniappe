@@ -133,13 +133,7 @@ def _deliver_digest(batch, now):
 # @tests tests_unit/test_029c_notification_email_messages.py::test_immediate_messages_wait_for_conversation_quiet
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_uses_next_local_eight_and_batches
 # @tests tests_unit/test_029d_notification_email_digest.py::test_daily_digest_groups_messages_and_uses_named_completion_links
-# @pairs notification-email:immediate notification-email:message notification-email:digest
-# @pairs notification-email:html notification-email:presence-suppression
-# @pairs notification-email:read-suppression notification-email:idempotency
-# @pair notification-email:item-cap
-# @pair notification-email:document-mention
-# @pair notification-email:task-assignment
-# @pair notification-email:message-grouping
+# @matrix notification-email : digest document-mention html idempotency immediate item-cap message message-grouping presence-suppression read-suppression task-assignment
 def deliver(delivery_identifier, *, now=None):
     """Deliver, suppress, or reschedule one opaque queued delivery."""
     now = policy.utc(now)

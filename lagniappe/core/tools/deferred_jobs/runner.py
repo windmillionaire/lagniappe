@@ -59,8 +59,8 @@ class DeferredJobRunner:
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_treats_deleted_active_job_as_cancellation
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_supplies_bounded_ai_observability_context_during_prepare
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_rechecks_ai_access_before_apply
-    # @features deferred-jobs
-    # @dimensions checkpoint recovery retry cancellation reauthorization
+    # @matrix deferred-jobs : cancellation checkpoint reauthorization recovery retry
+    # @pair deferred-jobs:preparation-context
     def run(self, job_key, *, now=None):
         now = _utc(now)
         lease_token = uuid.uuid4().hex
@@ -434,7 +434,7 @@ class DeferredJobRunner:
 
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_terminal_release_reuses_committed_scheduler_control
-    # @pairs deferred-jobs:terminal-delivery cloud-scheduler:datastore-read-isolation
+    # @pairs cloud-scheduler:datastore-read-isolation deferred-jobs:terminal-delivery
     def _release(self, job, lease_token):
         values = {
             "lease_token": None,
@@ -461,7 +461,7 @@ class DeferredJobRunner:
 
     # @testable true
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_increases_later_quota_backoff_without_adding_attempts
-    # @pairs deferred-jobs:retry
+    # @pair deferred-jobs:retry
     def _schedule_retry(self, job, adapter, context, lease_token, error, now):
         attempt = int(job.attempt or 0)
         delay = _retry_delay(error, _provider_retry_attempt(job))
@@ -521,8 +521,7 @@ class DeferredJobRunner:
 
     # @testable true
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_waits_for_dependency_without_consuming_provider_retry
-    # @features deferred-jobs
-    # @dimensions dependency-wait retry provider-attempt-isolation
+    # @matrix deferred-jobs : dependency-wait provider-attempt-isolation retry
     def _schedule_dependency_wait(
         self,
         job,
@@ -595,8 +594,7 @@ class DeferredJobRunner:
 
     # @testable true
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_fails_cleanly_when_dependency_failed
-    # @features deferred-jobs
-    # @dimensions dependency-failure terminal no-duplicate-capture
+    # @matrix deferred-jobs : dependency-failure no-duplicate-capture terminal
     def _fail(
         self,
         job,
@@ -675,8 +673,7 @@ class DeferredJobRunner:
     # @testable true
     # @tests tests_unit/test_023d_deferred_job_recovery.py::test_reconciler_completes_terminal_delivery_when_input_was_deleted
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_email_ingest_notification_is_created_only_for_failure
-    # @pair deferred-jobs:orphaned-input
-    # @pair deferred-jobs:failure-only-notification
+    # @matrix deferred-jobs : failure-only-notification orphaned-input
     def _finish_terminal_delivery(
         self,
         job,

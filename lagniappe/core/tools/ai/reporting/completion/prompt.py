@@ -1,9 +1,7 @@
 """Prompt and response contract for Organize submission completion."""
 
-from lagniappe.core import exceptions
 
 from ...autofill import validate_submission
-from ...core import ai_model
 from ...guidelines import SCHEMA_TYPE_GUIDELINES
 from ...prompt import Prompt
 from .context import _proposal_text
@@ -54,14 +52,12 @@ Return one result for every record:
 
 # @testable true
 # @tests tests_unit/test_020f_ai_report_completion.py::test_complete_organize_submissions_uses_one_focused_prompt
-# @features ai-report
-# @dimensions submission-completion prompt json-output
+# @matrix ai-report : json-output prompt submission-completion
 
 
 # @testable true
 # @tests tests_unit/test_020f_ai_report_completion.py::test_complete_organize_submissions_uses_one_focused_prompt
-# @features ai-report
-# @dimensions submission-completion prompt json-output
+# @matrix ai-report : json-output prompt submission-completion
 def organize_submission_completion_prompt(context, service_tier=None):
     """Build the single summary-based form completion prompt for Organize."""
     prompt = Prompt(
@@ -84,8 +80,7 @@ def organize_submission_completion_prompt(context, service_tier=None):
 # @testable true
 # @tests tests_unit/test_020f_ai_report_completion.py::test_complete_organize_submissions_uses_one_focused_prompt
 # @tests tests_unit/test_020f_ai_report_completion.py::test_complete_organize_submissions_preserves_empty_form_records
-# @features ai-report
-# @dimensions submission-completion validation partial empty
+# @matrix ai-report : empty partial submission-completion validation
 def validate_organize_submission_results(result, targets):
     """Return action-keyed, schema-filtered completion results."""
     target_map = {target["action_id"]: target for target in targets}

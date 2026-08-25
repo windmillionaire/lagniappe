@@ -4,7 +4,6 @@ import hashlib
 
 from lagniappe.core import exceptions
 
-from lagniappe.core.properties.ai_report_proposal import proposal_fingerprint
 from .actions.references import (
     _load_result_entity,
 )

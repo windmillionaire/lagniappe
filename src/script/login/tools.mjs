@@ -5,8 +5,7 @@ import { request } from "../shared/request";
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_check_user_status_endpoint_does_not_enumerate_accounts
  * @tests tests_e2e/001_site/test_001b_login.py::test_check_user_status_endpoint_returns_first_time_setup
- * @features login
- * @dimensions endpoint account-enumeration first-time-setup
+ * @matrix login : account-enumeration endpoint first-time-setup
  */
 async function getUserStatus(email) {
 	const response = await fetch(
@@ -19,8 +18,7 @@ async function getUserStatus(email) {
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_unknown_email_transitions_to_sign_in_without_leaking_existence
  * @tests tests_e2e/001_site/test_001b_login.py::test_known_registered_email_shows_sign_in
- * @features login
- * @dimensions account-enumeration sign-in-transition
+ * @matrix login : account-enumeration sign-in-transition
  */
 async function checkUserStatus(email, form) {
 	try {
@@ -55,8 +53,7 @@ async function checkUserStatus(email, form) {
  * @tests tests_e2e/001_site/test_001g_setup_provider_contracts.py::test_runtime_identity_platform_sign_in_reaches_hosted_home
  * @tests tests_js/test_009_request_csrf.py::test_login_handoff_refreshes_csrf_before_submit_and_retries_once
  * @tests tests_js/test_009_request_csrf.py::test_login_verification_email_reuses_refreshed_csrf
- * @features login
- * @dimensions identity-platform redirect verify-email remember-preference csrf-refresh owner-bootstrap delivery-failure recovery safe-error email-password token-verification hosted-e2e
+ * @matrix login : csrf-refresh delivery-failure email-password hosted-e2e identity-platform owner-bootstrap recovery redirect remember-preference safe-error token-verification verify-email
  */
 async function handleIdentityUser(user, form) {
 	const body = JSON.stringify({
@@ -126,8 +123,7 @@ async function handleIdentityUser(user, form) {
 /**
  * @testable true
  * @tests tests_e2e/001_site/test_001b_login.py::test_login_auth_error_messages_are_user_safe
- * @features login
- * @dimensions auth-errors
+ * @pair login:auth-errors
  */
 function getAuthErrorMessage(error) {
 	switch (error.code) {

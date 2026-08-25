@@ -100,8 +100,7 @@ def _select_file_page_link(info_form, file, page):
     select.input.press("Escape")
 
 
-# @features file
-# @dimensions load tabs text-tab text-asset
+# @matrix file : load tabs text-asset text-tab
 # @template files/file.html::main
 # @template files/text.html::text_tab
 def test_file_text_tab_renders_uploaded_text_content(get_user):
@@ -120,8 +119,7 @@ def test_file_text_tab_renders_uploaded_text_content(get_user):
     expect(text_content).to_contain_text("Engineering")
 
 
-# @features file
-# @dimensions page-upload file-upload
+# @matrix file : file-upload page-upload
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
@@ -146,8 +144,7 @@ def test_page_uploaded_text_file_renders_original_content_in_text_tab(get_user):
     expect(text_content).to_contain_text("not through the ingress import flow")
 
 
-# @features file
-# @dimensions linked-entities reverse-links badges
+# @matrix file : badges linked-entities reverse-links
 # @template files/file.html::main
 # @template files/file.html::linked_badges
 # @template badge.html::entity_badge
@@ -174,8 +171,7 @@ def test_file_page_shows_linked_page_and_task_badges(get_user):
     expect(linked.locator("a[href*='/tasks/']")).to_contain_text(task_entity.name)
 
 
-# @features file
-# @dimensions linked-pages add remove reload
+# @matrix file : add linked-pages reload remove
 # @template files/info.html::info_form
 # @template files/file.html::linked_badges
 def test_file_info_page_links_can_be_added_and_removed(get_user):
@@ -208,8 +204,7 @@ def test_file_info_page_links_can_be_added_and_removed(get_user):
     assert {page.key for page in file_entity.pages} == {source_page.entity.key}
 
 
-# @features file
-# @dimensions page-upload file-upload preview text-tab
+# @matrix file : file-upload page-upload preview text-tab
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
@@ -236,8 +231,7 @@ def test_page_uploaded_image_shows_desktop_preview(get_user):
     expect(info_form).to_contain_text("image/jpeg")
 
 
-# @features file
-# @dimensions page-upload file-upload preview pdf-preview text-tab
+# @matrix file : file-upload page-upload pdf-preview preview text-tab
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
@@ -268,8 +262,7 @@ def test_page_uploaded_pdf_renders_pdf_preview_widget(get_user):
     expect(info_form).to_contain_text("application/pdf")
 
 
-# @features file
-# @dimensions pdf-preview loading-state view-transition
+# @matrix file : loading-state pdf-preview view-transition
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
@@ -304,8 +297,7 @@ def test_pdf_preview_loading_state_paints_before_document_render(get_user):
         expect(first_page).not_to_have_attribute("width", "0")
         expect(first_page).not_to_have_attribute("height", "0")
 
-# @features file
-# @dimensions page-upload file-upload preview pdf-preview pdf-toolbar
+# @matrix file : file-upload page-upload pdf-preview pdf-toolbar preview
 # @template pages/files.html::files_form
 # @template pages/files.html::file_list_item
 # @template files/file.html::main
@@ -376,8 +368,7 @@ def test_page_uploaded_pdf_toolbar_navigates_pages(get_user):
     expect(focus).to_have_attribute("aria-pressed", "false")
 
 
-# @features file
-# @dimensions file-mobile tabs preview
+# @matrix file : file-mobile preview tabs
 # @template files/file.html::mobile_nav
 # @template files/preview.html::preview_tab
 def test_file_mobile_preview_uses_preview_tab(get_user):
@@ -406,8 +397,7 @@ def test_file_mobile_preview_uses_preview_tab(get_user):
     assert mobile_nav.get_section_title() == "Preview"
 
 
-# @features file
-# @dimensions file-mobile tabs preview pdf-preview
+# @matrix file : file-mobile pdf-preview preview tabs
 # @template files/file.html::mobile_nav
 # @template files/preview.html::preview_tab
 def test_file_mobile_pdf_preview_renders_canvas(get_user):
@@ -433,8 +423,7 @@ def test_file_mobile_pdf_preview_renders_canvas(get_user):
     assert mobile_nav.get_section_title() == "Preview"
 
 
-# @features file
-# @dimensions info-update display-name summary
+# @matrix file : display-name info-update summary
 # @template files/file.html::view_header
 def test_file_info_update_persists_name_and_summary(get_user):
     user = get_user(Users.OWNER)
@@ -475,8 +464,7 @@ def test_file_info_update_persists_name_and_summary(get_user):
     )
 
 
-# @features file
-# @dimensions download filename mimetype
+# @matrix file : download filename mimetype
 def test_file_download_uses_original_filename_and_mimetype(get_user):
     user = get_user(Users.OWNER)
     upload = Uploads.plain_text_file

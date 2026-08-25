@@ -69,8 +69,7 @@ class AIEmailRejection(ValueError):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_inbound_attachment_disposition_overrides_content_id
-# @features ai-email
-# @dimensions attachments
+# @pair ai-email:attachments
 @dataclass(frozen=True)
 class InboundAttachment:
     """Provider-neutral attachment metadata with no signed URL."""
@@ -85,8 +84,7 @@ class InboundAttachment:
 
     # @testable true
     # @tests tests_unit/test_028_ai_email.py::test_inbound_attachment_disposition_overrides_content_id
-    # @features ai-email
-    # @dimensions attachments content-disposition content-id inline
+    # @matrix ai-email : attachments content-disposition content-id inline
     @property
     def inline(self):
         if self.content_disposition:
@@ -182,10 +180,7 @@ def _svix_secret_bytes(secret):
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_uses_raw_body_timestamp_and_any_v1_signature
 # @tests tests_unit/test_028_ai_email.py::test_svix_signature_verification_rejects_invalid_or_stale_requests
-# @features ai-email
-# @dimensions webhook signature raw-body timestamp rotation
-# @pairs ai-email:webhook ai-email:signature ai-email:raw-body ai-email:timestamp ai-email:rotation
-# @pairs webhook:webhook webhook:signature webhook:raw-body webhook:timestamp webhook:rotation
+# @matrix ai-email webhook : raw-body rotation signature timestamp webhook
 def verify_svix_signature(
     raw_body,
     headers,
@@ -234,8 +229,7 @@ def verify_svix_signature(
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_parse_resend_event_rejects_malformed_shapes
-# @features ai-email
-# @dimensions webhook event-shape json
+# @matrix ai-email : event-shape json webhook
 def parse_resend_event(raw_body):
     """Decode one signed Resend event without retaining its raw payload."""
     try:
@@ -301,12 +295,7 @@ def _parameter_domain(value):
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_authentication_results_candidates_require_aligned_dmarc_pass
 # @tests tests_unit/test_028_ai_email.py::test_authentication_results_candidates_handle_folding_comments_and_multiple_values
-# @features ai-email
-# @dimensions sender-auth authentication-results dmarc alignment telemetry
-# @pairs ai-email:sender-auth ai-email:authentication-results ai-email:dmarc
-# @pairs ai-email:alignment ai-email:telemetry
-# @pairs sender-auth:sender-auth sender-auth:authentication-results
-# @pairs sender-auth:dmarc sender-auth:alignment sender-auth:telemetry
+# @matrix ai-email sender-auth : alignment authentication-results dmarc sender-auth telemetry
 def authentication_results_candidates(headers, visible_from_domain):
     """Return authserv IDs reporting aligned DMARC pass as optional telemetry."""
     expected_domain = _parameter_domain(visible_from_domain)
@@ -346,13 +335,7 @@ def _provider_id(value, label):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_resend_runtime_client_retrieves_with_full_key_and_sends_with_scoped_key
-# @features ai-email
-# @dimensions provider-adapter authorization retrieval attachments outbound-email idempotency
-# @pairs ai-email:provider-adapter ai-email:authorization ai-email:retrieval
-# @pairs ai-email:attachments ai-email:outbound-email ai-email:idempotency
-# @pairs provider-adapter:provider-adapter provider-adapter:authorization
-# @pairs provider-adapter:retrieval provider-adapter:attachments
-# @pairs provider-adapter:outbound-email provider-adapter:idempotency
+# @matrix ai-email provider-adapter : attachments authorization idempotency outbound-email provider-adapter retrieval
 class ResendAIEmailClient:
     """Small runtime Resend adapter for received messages, files, and feedback."""
 
@@ -514,8 +497,7 @@ class ResendAIEmailClient:
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_inbound_message_normalization_routes_alias_and_strips_reply_marker
-# @features ai-email
-# @dimensions sender routing reply-marker html-fallback
+# @matrix ai-email : html-fallback reply-marker routing sender
 def parse_mailbox(value):
     """Return one normalized mailbox while preserving exact local-part spelling."""
     if not isinstance(value, str) or any(ord(character) < 32 for character in value):
@@ -570,8 +552,7 @@ def _html_to_text(value):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_inbound_message_normalization_routes_alias_and_strips_reply_marker
-# @features ai-email
-# @dimensions reply-marker html-fallback
+# @matrix ai-email : html-fallback reply-marker
 def normalize_message_body(text, html=None):
     """Normalize provider text without broad reply or quote heuristics."""
     source = text if isinstance(text, str) and text.strip() else _html_to_text(html)
@@ -657,8 +638,7 @@ def _matching_inline_images(attachment, html):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_inline_attachment_selection_keeps_user_content_and_filters_signature_art
-# @features ai-email
-# @dimensions attachments inline image-only signature quoted-content routing
+# @matrix ai-email : attachments image-only inline quoted-content routing signature
 def _select_inline_attachments(attachments, body, html):
     """Select intentional inline content while filtering signature and reply art."""
     ordinary = tuple(item for item in attachments if not item.inline)
@@ -751,8 +731,7 @@ def _normalize_attachment(value):
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_inbound_message_normalization_routes_alias_and_strips_reply_marker
 # @tests tests_unit/test_028_ai_email.py::test_inline_attachment_selection_keeps_user_content_and_filters_signature_art
-# @features ai-email
-# @dimensions attachments inline
+# @matrix ai-email : attachments inline
 def normalize_resend_message(message, attachments, config):
     """Validate a Resend response and return only provider-neutral fields."""
     if not isinstance(message, dict):
@@ -828,8 +807,8 @@ def _instructions(subject, body):
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_submission_contract_keeps_create_and_organize_report_only
 # @tests tests_unit/test_028_ai_email.py::test_inline_attachment_selection_keeps_user_content_and_filters_signature_art
-# @features ai-email
-# @dimensions access attachment-contract body-contract rate-limit
+# @matrix ai-email : access attachment-contract body-contract rate-limit
+# @pair ai-email:signature
 def _preflight_submission(message, tool, user, config):
     from lagniappe.core.definitions import AI
     from lagniappe.core.tools.cache.rate_limit import check_limit
@@ -902,6 +881,7 @@ def _preflight_submission(message, tool, user, config):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_create_shared_address_email_report_preserves_routing_input
+# @pair ai-email:routing
 def _compact_report_name(tool, message, attachments):
     if tool == "organize":
         if len(attachments) == 1:
@@ -947,8 +927,7 @@ def _stored_email(user):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_report_feedback_links_to_report_and_remains_available_after_disable
-# @features ai-email
-# @dimensions acceptance terminal-link reply-to idempotency disabled-completion
+# @matrix ai-email : acceptance disabled-completion idempotency reply-to terminal-link
 def _feedback_payload(config, user, tool, kind, *, report=None, message=None):
     label = tool.title()
     link = report_url(report) if report is not None else None
@@ -1023,8 +1002,7 @@ def _feedback_digest(value):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_report_feedback_links_to_report_and_remains_available_after_disable
-# @features ai-email
-# @dimensions terminal-link reply-to idempotency disabled-completion
+# @matrix ai-email : disabled-completion idempotency reply-to terminal-link
 def send_report_feedback(report, kind, *, message=None, client=None):
     """Send one idempotent acceptance/result email for an email-origin report."""
     from lagniappe import CONFIG
@@ -1073,8 +1051,7 @@ def _send_rejection(config, user, tool, rejection, digest, client):
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_create_shared_address_email_report_preserves_routing_input
-# @features ai-email
-# @dimensions report-handoff routing idempotency privacy
+# @matrix ai-email : idempotency privacy report-handoff routing
 def _create_email_report(
     message, tool, user, instructions, attachments, digest, config
 ):
@@ -1133,12 +1110,7 @@ def _create_email_report(
 
 # @testable true
 # @tests tests_unit/test_028_ai_email.py::test_process_resend_email_hands_off_to_existing_report_pipeline
-# @features ai-email
-# @dimensions replay sender exact-match user-policy report-handoff
-# @pairs ai-email:replay ai-email:sender ai-email:exact-match ai-email:user-policy
-# @pair ai-email:report-handoff
-# @pairs webhook:replay webhook:sender webhook:exact-match webhook:user-policy
-# @pair webhook:report-handoff
+# @matrix ai-email webhook : exact-match replay report-handoff sender user-policy
 def process_resend_email(event, event_id, config, digest_secret, *, client=None):
     """Retrieve, authorize, and durably hand one signed event to report ingestion."""
     from lagniappe.core.definitions import Fetch

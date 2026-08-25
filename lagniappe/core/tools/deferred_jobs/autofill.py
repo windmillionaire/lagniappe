@@ -29,7 +29,8 @@ def _destination(entity):
 
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_autofill_job_spec_contains_only_durable_inputs
-# @pairs ai:autofill ai:deferred pages:autofill tasks:autofill
+# @matrix ai : autofill deferred
+# @matrix pages tasks : autofill
 def autofill_job_spec(
     entity,
     user,
@@ -69,7 +70,8 @@ def autofill_job_spec(
 
 # @testable true
 # @tests tests_unit/test_024_autofill_form_state.py::test_autofill_upload_is_validated_before_job_start
-# @pairs ai:autofill ai:deferred notifications:autofill
+# @matrix ai : autofill deferred
+# @pair notifications:autofill
 def start_autofill_job(entity, user, form, *, upload_record=None, **options):
     """Validate any direct upload before creating a job or notification."""
     if upload_record:

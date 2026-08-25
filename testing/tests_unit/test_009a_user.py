@@ -24,8 +24,7 @@ from lagniappe.core.properties.user_related import Starred
 from testing.utility.test_entities import TestEntities
 
 
-# @features user
-# @dimensions email column sort
+# @matrix user : column email sort
 @pytest.mark.unit
 def test_user_email(get_test_entities):
     """Test Email property with ColumnMixin.
@@ -50,8 +49,7 @@ def test_user_email(get_test_entities):
         assert user.properties.email.sort_value == expected_sort
 
 
-# @features user
-# @dimensions last-login date column
+# @matrix user : column date last-login
 @pytest.mark.unit
 def test_user_last_login(get_test_entities):
     """Test LastLogin property with DateMixin, ColumnMixin.
@@ -76,8 +74,7 @@ def test_user_last_login(get_test_entities):
             assert column_val == utc_dt.astimezone(test_tz)
 
 
-# @features user cache
-# @dimensions invalidation test-user
+# @matrix cache user : invalidation test-user
 @pytest.mark.unit
 def test_user_invalidate_cache(get_test_entities):
     """Test InvalidateCache property.
@@ -97,8 +94,7 @@ def test_user_invalidate_cache(get_test_entities):
         assert user.invalidate_cache is False
 
 
-# @features user
-# @dimensions public
+# @pair user:public
 @pytest.mark.unit
 def test_user_is_public(get_test_entities):
     """Test IsPublic property with FilterMixin.
@@ -121,8 +117,7 @@ def test_user_is_public(get_test_entities):
             user.is_public = "yes"
 
 
-# @features user
-# @dimensions owner property
+# @matrix user : owner property
 @pytest.mark.unit
 def test_user_is_owner(get_test_entities):
     """Test IsOwner property.
@@ -142,8 +137,8 @@ def test_user_is_owner(get_test_entities):
         assert user.properties.is_owner.value is False
 
 
-# @pairs admin:role admin:legacy-default admin:ai-independent
-# @pairs owner:singleton cache:cache-invalidation user:property
+# @matrix admin : ai-independent legacy-default role
+# @pairs cache:cache-invalidation owner:singleton user:property
 @pytest.mark.unit
 def test_user_admin_role_is_separate_from_owner_and_invalidates_cache():
     """An additional Admin never becomes Owner and keeps independent AI access."""
@@ -198,8 +193,7 @@ def test_user_admin_role_is_separate_from_owner_and_invalidates_cache():
             other.is_owner = True
 
 
-# @features user
-# @dimensions profile-photo default-image asset-lifecycle google-download
+# @matrix user : asset-lifecycle default-image google-download profile-photo
 @pytest.mark.unit
 def test_user_profile_photo_value_asset_lifecycle_and_google_download():
     """ProfilePhoto handles fallback image, asset save/delete, and Google import."""
@@ -249,8 +243,7 @@ def test_user_profile_photo_value_asset_lifecycle_and_google_download():
     assert (name, asset_type) == ("photo", "image")
 
 
-# @features user-groups
-# @dimensions membership-change relation-storage permission-recalc
+# @matrix user-groups : membership-change permission-recalc relation-storage
 @pytest.mark.unit
 def test_user_groups_membership_changes_recalculate_permissions():
     """User group changes persist keys and recalculate permissions once per change."""
@@ -282,8 +275,7 @@ def test_user_groups_membership_changes_recalculate_permissions():
     assert create_permissions.call_count == 2
 
 
-# @features user-groups
-# @dimensions relation-storage validation
+# @matrix user-groups : relation-storage validation
 @pytest.mark.unit
 def test_user_groups_reject_invalid_relation_inputs():
     user = User(testing=True)
@@ -302,8 +294,7 @@ def test_user_groups_reject_invalid_relation_inputs():
         user.properties.groups.remove(SimpleNamespace())
 
 
-# @features user-groups
-# @dimensions public-user public-group-only sync
+# @matrix user-groups : public-group-only public-user sync
 @pytest.mark.unit
 def test_public_user_groups_force_public_group_only():
     user = User(testing=True)
@@ -342,8 +333,7 @@ def test_public_user_groups_force_public_group_only():
         assert user.db["groups"] == [public_group.key]
 
 
-# @features public-users permissions
-# @dimensions public-group-defaults own-page no-group-mutation
+# @matrix permissions public-users : no-group-mutation own-page public-group-defaults
 @pytest.mark.unit
 def test_public_user_permissions_inherit_public_group_defaults_without_mutating_group():
     page = TestEntities.get(
@@ -378,12 +368,9 @@ def test_public_user_permissions_inherit_public_group_defaults_without_mutating_
     assert page.hash not in public_group.db["permissions"]
 
 
-# @pairs user-settings:email-edit user-settings:ai-access user-settings:owner-own-page
-# @pairs user-settings:owner-other-page user-settings:page-preservation
-# @pairs notification-email:preference notification-email:user-only
-# @pair public-users:email-consent
-# @pair user-settings:page-reassign
-# @pair permissions:permission-recalc
+# @matrix notification-email : preference user-only
+# @matrix user-settings : ai-access email-edit owner-other-page owner-own-page page-preservation page-reassign
+# @pairs permissions:permission-recalc public-users:email-consent
 @pytest.mark.unit
 def test_page_update_user_authorization_rules():
     group = TestEntities.get("USER_GROUP", {"name": "Editors", "hash": "grp009u"})
@@ -603,8 +590,7 @@ def test_page_update_user_authorization_rules():
     assert public_user.page is public_page
 
 
-# @features user-settings
-# @dimensions default-form email-canonical submission-preservation
+# @matrix user-settings : default-form email-canonical submission-preservation
 @pytest.mark.unit
 def test_user_page_default_form_submission_keeps_email_on_user():
     users_model = TestEntities.get(
@@ -658,8 +644,7 @@ def test_user_page_default_form_submission_keeps_email_on_user():
     assert submission["email"] == "form-only@example.test"
 
 
-# @features user public-users
-# @dimensions personal-page auto-create lazy-load owner-link public-user limited-attrs
+# @matrix public-users user : auto-create lazy-load limited-attrs owner-link personal-page public-user
 @pytest.mark.unit
 def test_user_page_auto_create_lazy_load_and_owner_link():
     """UserPage auto-creates missing pages and links loaded pages back to the user."""
@@ -758,8 +743,7 @@ def test_user_page_auto_create_lazy_load_and_owner_link():
     assert loaded_page.user is loaded_user
 
 
-# @features user
-# @dimensions personal-page validation
+# @matrix user : personal-page validation
 @pytest.mark.unit
 def test_user_page_missing_key_raises_runtime_error():
     user = User(testing=True)
@@ -768,8 +752,7 @@ def test_user_page_missing_key_raises_runtime_error():
         _ = user.page
 
 
-# @features starred
-# @dimensions stale-cleanup
+# @pair starred:stale-cleanup
 @pytest.mark.unit
 def test_user_starred_cleanup_removes_stale_keys():
     user = SimpleNamespace(
@@ -782,8 +765,7 @@ def test_user_starred_cleanup_removes_stale_keys():
     assert user.db["starred"] == ["keep-before", "keep-after"]
 
 
-# @features user
-# @dimensions entity-lifecycle create owner page groups save load search-cache page-canonical
+# @matrix user : create entity-lifecycle groups load owner page page-canonical save search-cache
 @pytest.mark.unit
 def test_user_entity_create_save_load_owner_page_and_groups():
     """User create/save/load handles owner, page, groups, photo import, and reuse."""
@@ -931,8 +913,7 @@ def test_user_entity_create_save_load_owner_page_and_groups():
     assert result is loaded
 
 
-# @pair user:create
-# @pair user:cache-invalidation
+# @matrix user : cache-invalidation create
 @pytest.mark.unit
 def test_user_create_does_not_leave_initial_cache_invalidation():
     page = TestEntities.get(
@@ -986,8 +967,7 @@ def test_user_create_does_not_leave_initial_cache_invalidation():
     assert user.invalidate_cache is False
 
 
-# @features user public-users
-# @dimensions create public-user public-group personal-page limited-attrs
+# @matrix public-users user : create limited-attrs personal-page public-group public-user
 @pytest.mark.unit
 def test_user_create_public_user_assigns_public_group():
     page = TestEntities.get("PAGE", {"name": "Public Page", "hash": "pg009f"})

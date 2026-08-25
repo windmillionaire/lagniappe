@@ -211,8 +211,7 @@ const executeTransition = async (entries) => {
  * @tests tests_js/test_011_view_transitions_frontend.py::test_transition_resolves_after_update_without_waiting_for_animation
  * @tests tests_js/test_011_view_transitions_frontend.py::test_same_turn_commits_share_one_transition_and_run_once
  * @tests tests_js/test_011_view_transitions_frontend.py::test_ready_rejection_does_not_replay_commit
- * @features view-transition
- * @dimensions nested-callback error-reporting exact-once ready-rejection coalescing animation-lifecycle queueing update-completion
+ * @matrix view-transition : animation-lifecycle coalescing error-reporting exact-once nested-callback queueing ready-rejection update-completion
  */
 export const withTransition = (callback, { label = "unlabeled" } = {}) => {
 	if (transitionDepth > 0) {
@@ -306,7 +305,7 @@ export const debounce = (func, wait) => {
 /**
  * @testable true
  * @tests tests_js/test_020_shared_utilities.py::test_wait_for_attribute_resolves_and_cleans_up_observers
- * @pairs frontend-utilities:mutation-observer frontend-utilities:cleanup
+ * @matrix frontend-utilities : cleanup mutation-observer
  */
 export function waitForAttribute(element, attributeName, timeout = 10000) {
 	if (element.hasAttribute(attributeName)) {
@@ -369,7 +368,7 @@ function _sortObject(obj) {
 /**
  * @testable true
  * @tests tests_js/test_020_shared_utilities.py::test_are_equal_normalizes_object_keys_but_preserves_array_order
- * @pairs frontend-utilities:deep-equality frontend-utilities:array-order
+ * @matrix frontend-utilities : array-order deep-equality
  */
 export const areEqual = (a, b) => {
 	return JSON.stringify(_sortObject(a)) === JSON.stringify(_sortObject(b));

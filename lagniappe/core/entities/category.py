@@ -9,8 +9,7 @@ UNCATEGORIZED_PAGES_NAME = "Uncategorized Pages"
 
 # @testable true
 # @tests tests_unit/test_007_category_properties.py::test_category_schema
-# @features category, form-schema
-# @dimensions schema, delegation
+# @matrix category form-schema : delegation schema
 class Category(Entity):
     entity_kind = "category"
 
@@ -61,8 +60,7 @@ class Category(Entity):
     # @tests tests_unit/test_012_category_conditions.py::test_category_boolean_filters
     # @tests tests_unit/test_012_category_conditions.py::test_category_timestamp_filters
     # @tests tests_unit/test_012_category_conditions.py::test_category_entity_filters
-    # @features category
-    # @dimensions condition-definition, string, boolean, timestamp, entity-valued
+    # @matrix category : boolean condition-definition entity-valued string timestamp
     def update(self, data):
         self.form = data.get("form")
         self.name = data.get("name")
@@ -71,8 +69,7 @@ class Category(Entity):
 
     # @testable true
     # @tests tests_unit/test_007_category_properties.py::test_uncategorized_pages_get_create
-    # @features category pages
-    # @dimensions default-category get-create
+    # @matrix category pages : default-category get-create
     @classmethod
     def get_uncategorized_pages(cls):
         exists = database.get.category_by_name(UNCATEGORIZED_PAGES_NAME)
@@ -86,8 +83,7 @@ class Category(Entity):
 
 # @testable true
 # @tests tests_unit/test_009b_user_permissions.py::test_users_category_uses_users_scope_not_models_scope
-# @features category, permissions, users
-# @dimensions users-category, models-scope
+# @matrix category permissions users : models-scope users-category
 class UserCategory(Category):
     entity_kind = "users"
 

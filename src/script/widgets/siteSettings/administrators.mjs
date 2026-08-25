@@ -7,8 +7,8 @@ import { SiteSetting } from "./base";
  *
  * @testable true
  * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
- * @pairs admin:roster admin:responsive admin:promotion admin:demotion
- * @pairs admin:failure-state admin:read-only owner:role-controls
+ * @matrix admin : demotion failure-state promotion read-only responsive roster
+ * @pair owner:role-controls
  */
 export class SiteAdministrators extends SiteSetting {
 	constructor(attributes) {

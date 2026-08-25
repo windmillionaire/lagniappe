@@ -23,18 +23,8 @@ from testing.utility.messaging_fakes import MemoryDatastore, managed_user
 pytestmark = pytest.mark.unit
 
 
-# @pairs messaging:deterministic-key messaging:idempotency messaging:unread-count
-# @pairs messaging:read-race messaging:per-copy-delete messaging:clear-horizon
-# @pairs messaging:conversation-page messaging:compose-eligibility messaging:history-page
-# @pairs messaging:chronological-display messaging:new-after-clear
-# @pairs messaging:body-validation messaging:reply-permission
-# @pairs notifications:aggregate-count notifications:revision
-# @source lagniappe/core/tools/messaging/service.py::send_message
-# @source lagniappe/core/tools/messaging/service.py::mark_read
-# @source lagniappe/core/tools/messaging/service.py::hide_message
-# @source lagniappe/core/tools/messaging/service.py::clear_conversation
-# @source lagniappe/core/properties/notification_aggregate.py::counts
-# @source lagniappe/core/tools/database/notifications.py::mutate_notification_aggregate
+# @matrix messaging : body-validation chronological-display clear-horizon compose-eligibility conversation-page deterministic-key history-page idempotency new-after-clear per-copy-delete read-race reply-permission unread-count
+# @matrix notifications : aggregate-count revision
 def test_message_transactions_are_idempotent_and_keep_exact_unread_counts(monkeypatch):
     store = MemoryDatastore()
     monkeypatch.setattr(messaging_database.DATA, "_datastore_client", store)
@@ -218,9 +208,7 @@ def test_message_transactions_are_idempotent_and_keep_exact_unread_counts(monkey
         message_values.normalize_body("x" * 1001)
 
 
-# @pairs messaging:deleted-peer messaging:history-retention messaging:orphan-purge
-# @source lagniappe/core/mutations/delete.py::DeleteCollector.user_messages
-# @source lagniappe/core/mutations/delete.py::DeleteCollector.finalize_message_conversations
+# @matrix messaging : deleted-peer history-retention orphan-purge
 def test_user_delete_preserves_or_purges_message_history_by_survivor(monkeypatch):
     deleted_user = managed_user("deleted", "Deleted User")
     survivor = managed_user("survivor", "Surviving User")

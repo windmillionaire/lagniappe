@@ -261,12 +261,9 @@ def _medical_project(owner, case, slug):
     return project, matching, distractor
 
 
-# @pairs ai-report:ask ai-report:live-provider ai-report:workspace-tools
-# @pairs ai-report:usable-answer ai-report:async ai-report:persistence
-# @pairs deferred-jobs:process-route deferred-jobs:versioned-envelope
-# @pairs deferred-jobs:cloud-tasks deferred-jobs:oidc
-# @pairs deferred-jobs:provider-delivery deferred-jobs:hosted-e2e
-# @pairs polling:operation polling:owner polling:progress polling:timing
+# @matrix ai-report : ask async live-provider persistence usable-answer workspace-tools
+# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
+# @matrix polling : operation owner progress timing
 def test_ask_answers_from_attached_corpus_receipt(get_user, request):
     user = get_user(Users.OWNER)
     owner = _owner(user)
@@ -311,13 +308,9 @@ def test_ask_answers_from_attached_corpus_receipt(get_user, request):
     expect(report_page.execute_button).not_to_be_visible()
 
 
-# @pairs ai-report:ask ai-report:live-provider ai-report:workspace-tools
-# @pairs ai-report:structured-filter ai-report:usable-answer ai-report:async
-# @pair ai-report:persistence
-# @pairs deferred-jobs:process-route deferred-jobs:versioned-envelope
-# @pairs deferred-jobs:cloud-tasks deferred-jobs:oidc
-# @pairs deferred-jobs:provider-delivery deferred-jobs:hosted-e2e
-# @pairs polling:operation polling:owner polling:progress polling:timing
+# @matrix ai-report : ask async live-provider persistence structured-filter usable-answer workspace-tools
+# @matrix deferred-jobs : cloud-tasks hosted-e2e oidc process-route provider-delivery versioned-envelope
+# @matrix polling : operation owner progress timing
 def test_ask_uses_structured_filter_for_form_submission_query(
     get_user,
     request,

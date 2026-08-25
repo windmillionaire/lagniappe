@@ -11,10 +11,8 @@ import { RadioElement } from "../elements/radio";
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_attached_to_existing_page_preserves_page_info_form
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_create_user_group_selector_accepts_multiple_groups
  * @tests tests_js/test_044_user_widget_frontend.py::test_create_user_focuses_on_open_and_reset_without_stealing_live_field_focus
- * @features users
- * @dimensions create-form create-submit created-row attach-existing-page page-form-preserved create-form-reset submitted-form-data focus-preservation
- * @pairs users:group-selector users:multiple
- * @pairs users:create-form-reset users:submitted-form-data
+ * @matrix users : create-form-reset group-selector multiple submitted-form-data
+ * @pair users:page-form-preserved
  */
 export class CreateUser extends FormElement {
 	init() {
@@ -119,8 +117,7 @@ export class CreateUser extends FormElement {
  * @testable true
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_general_permissions
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
- * @features user-groups
- * @dimensions group-create nav
+ * @matrix user-groups : group-create nav
  */
 export class CreateUserGroup extends FormElement {
 	constructor(attributes) {
@@ -182,8 +179,7 @@ export class CreateUserGroup extends FormElement {
 /**
  * @testable true
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_public_permissions
- * @features public-groups permissions
- * @dimensions public active permission-update
+ * @matrix permissions public-groups : active permission-update public
  */
 export class PublicPermissions extends PermissionsForm {
 	init() {
@@ -202,8 +198,7 @@ export class PublicPermissions extends PermissionsForm {
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_set_entity_specific_permissions
  * @tests tests_e2e/008_users/test_008b_user_groups.py::test_rename_group
  * @tests tests_js/test_044_user_widget_frontend.py::test_group_permissions_tracks_rename_draft_after_target_rebuild
- * @features user-groups
- * @dimensions permission-update general-permissions entity-permissions rename reset-rebinding
+ * @matrix user-groups : entity-permissions general-permissions permission-update rename reset-rebinding
  */
 export class GroupPermissions extends PermissionsForm {
 	constructor(attributes) {

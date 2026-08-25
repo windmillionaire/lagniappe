@@ -18,8 +18,7 @@ from ..tools.auth.references import (
 # @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_multipart_keys_merge_under_field_id
 # @tests tests_unit/test_003f_submission_normalize_patch.py::test_normalize_drops_falsy_entries_in_lists
 # @tests tests_unit/test_004d_submitter.py::test_normalize_list_drops_numeric_zero_keeps_string_zero
-# @features submission
-# @dimensions normalize, unknown-keys, multipart, list-filtering, zero
+# @matrix submission : list-filtering multipart normalize unknown-keys zero
 def normalize_submission_values(values, fields):
     updated = {}
 
@@ -134,8 +133,7 @@ class SubmitterMixin:
     # @tests tests_unit/test_004e_submission_behavior.py::test_full_form_submit_missing_checkbox_persists_explicit_false
     # @tests tests_unit/test_004e_submission_behavior.py::test_empty_submission_pops_submission_db_key
     # @tests tests_unit/test_004e_submission_behavior.py::test_html_field_is_ignored_by_form_submission
-    # @features submission
-    # @dimensions form-submit explicit-false empty-submission blank-persistence submit-boundary asset-isolation
+    # @matrix submission : asset-isolation blank-persistence empty-submission explicit-false form-submit submit-boundary
     def form_submission(self, values, *, actor=None):
         submission = self.properties.submission
         form_values = getattr(values, "form", values)
@@ -169,8 +167,7 @@ class SubmitterMixin:
     # @testable true
     # @tests tests_unit/test_031_submitted_references.py::test_browser_submission_references_require_view_and_preserve_hidden_existing_values
     # @tests tests_unit/test_031_submitted_references.py::test_browser_submission_references_validate_table_links_before_mutation
-    # @features submitted-references
-    # @dimensions internal-link browser preflight table preservation no-partial-mutation
+    # @matrix submitted-references : browser internal-link no-partial-mutation preflight preservation table
     def validate_browser_submission_references(
         self,
         values,
@@ -251,8 +248,7 @@ class SubmitterMixin:
     # @tests tests_unit/test_003f_submission_normalize_patch.py::test_patch_submission_merges_single_field
     # @tests tests_unit/test_003f_submission_normalize_patch.py::test_patch_submission_accepts_json_string
     # @tests tests_unit/test_004d_submitter.py::test_patch_submission_merges_multiple_fields
-    # @features submission
-    # @dimensions patch, single-field, json-payload, multiple-fields
+    # @matrix submission : json-payload multiple-fields patch single-field
     def patch_submission(self, update, *, actor=None):
         updated = json.loads(update) if isinstance(update, str) else update
         if actor is not None:
@@ -279,8 +275,7 @@ class SubmitterMixin:
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_preserves_table_row_lists_during_input_list_normalization
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_internal_link_fuzzy_match_warning
     # @tests tests_unit/test_004d_submitter.py::test_import_submission_table_internal_link_fuzzy_match_warning
-    # @features submission, form-table
-    # @dimensions import, validation, error-message, list-normalization, fuzzy-match
+    # @matrix form-table submission : error-message fuzzy-match import list-normalization validation
     def import_submission(self, imported_submission, import_process):
         for field_id, field in self.properties.submission.fields.items():
             try:
@@ -313,8 +308,7 @@ class SubmitterMixin:
     # @testable true
     # @tests tests_unit/test_004d_submitter.py::test_save_default_field_copies_db_value_and_saves_only_submitter
     # @tests tests_unit/test_004d_submitter.py::test_save_submission_removes_changed_repeating_defaults
-    # @features submission
-    # @dimensions repeating-default storage
+    # @matrix submission : repeating-default storage
     @property
     def default_submission(self):
         value = self.db.get("default_submission")
@@ -338,7 +332,7 @@ class SubmitterMixin:
     # @testable true
     # @tests tests_unit/test_004d_submitter.py::test_save_default_field_copies_db_value_and_saves_only_submitter
     # @tests tests_unit/test_003g_todo_lists.py::test_todo_list_cannot_be_saved_as_repeating_default
-    # @pairs submission:repeating-default submission:field-copy submission:direct-save
+    # @matrix submission : direct-save field-copy repeating-default
     # @pair form-todo:repeating-default
     def save_default_field(self, field_id, submission=None):
         """Persist one field's DB value as a repeating submission default."""
@@ -366,8 +360,7 @@ class SubmitterMixin:
     # @tests tests_unit/test_004e_submission_behavior.py::test_stored_null_checkbox_normalizes_away_on_resave
     # @tests tests_unit/test_004e_submission_behavior.py::test_empty_submission_pops_submission_db_key
     # @tests tests_unit/test_004d_submitter.py::test_save_submission_removes_changed_repeating_defaults
-    # @features submission
-    # @dimensions stored-false load-save stored-null normalization empty-submission blank-persistence repeating-default reconciliation
+    # @matrix submission : blank-persistence empty-submission load-save normalization reconciliation repeating-default stored-false stored-null
     def save_submission(self):
         submission_value = self.properties.submission.db_value
         self.properties.submission.value = submission_value
@@ -386,8 +379,7 @@ class SubmitterMixin:
 
     # @testable true
     # @tests tests_unit/test_004c_form_submission_integration.py::test_submission_links_internal_top_level_and_table_row
-    # @features submission
-    # @dimensions derived-page-keys
+    # @pair submission:derived-page-keys
     @property
     def derived_page_keys(self):
         keys = []
@@ -413,7 +405,7 @@ class SubmitterMixin:
 
     # @testable true
     # @tests tests_unit/test_023e_deferred_job_adapters_autofill.py::test_autofill_revision_tracks_only_form_apply_state
-    # @pairs deferred-jobs:form-revision ai:autofill
+    # @pairs ai:autofill deferred-jobs:form-revision
     @property
     def autofill_revision(self):
         """Stable revision for state that autofill reads and may overwrite."""

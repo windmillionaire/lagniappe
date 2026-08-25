@@ -5,8 +5,7 @@ import { Condition } from "./base";
 /**
  * @testable true
  * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_change_select_options
- * @features forms
- * @dimensions builder-select-options
+ * @pair forms:builder-select-options
  */
 export default class Options extends Condition {
 	constructor(builder) {

@@ -9,15 +9,7 @@ import Core from "./core";
  * @tests tests_e2e/003_forms/test_003e_form_index_mobile_ui.py::test_form_index_mobile_tools_and_column_controls_are_exclusive
  * @tests tests_e2e/008_users/test_008a_user_index.py::test_user_index_initializes_mobile_tools_and_sorting_on_mobile_load
  * @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
- * @features table-controls
- * @dimensions mobile-controls columns mobile-tools mutual-exclusion mobile-startup sorting cursor-continuation
- * @pair table-controls:mobile-controls
- * @pair table-controls:columns
- * @pair table-controls:mobile-tools
- * @pair table-controls:mutual-exclusion
- * @pair table-controls:mobile-startup
- * @pair table-controls:sorting
- * @pair table-controls:cursor-continuation
+ * @matrix table-controls : columns cursor-continuation mobile-controls mobile-startup mobile-tools mutual-exclusion sorting
  */
 export default class EntityIndex extends Core {
 	constructor(node) {
@@ -148,8 +140,7 @@ export default class EntityIndex extends Core {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/007_categories/test_007b_category_filters.py::test_category_url_tool_opens_saved_filters
-	 * @features filters
-	 * @dimensions saved-filters query-tool
+	 * @matrix filters : query-tool saved-filters
 	 */
 	_defaultToolTarget(tools) {
 		const tool = this._defaultToolSlug();
@@ -211,8 +202,7 @@ export default class EntityIndex extends Core {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/003_forms/test_003e_form_index_mobile_ui.py::test_form_index_mobile_tools_and_column_controls_are_exclusive
-	 * @features table-controls
-	 * @dimensions mobile-controls mobile-tools mutual-exclusion
+	 * @matrix table-controls : mobile-controls mobile-tools mutual-exclusion
 	 */
 	_setMobileControlsDropdownOpen(open) {
 		const mobileControls = this.elt.querySelector("#mobile-controls");
@@ -226,8 +216,8 @@ export default class EntityIndex extends Core {
 	 * @testable true
 	 * @tests tests_e2e/007_categories/test_007d_category_mobile_ui.py::test_category_mobile_tools_dropdown_opens_new_page_form
 	 * @tests tests_e2e/003_forms/test_003e_form_index_mobile_ui.py::test_form_index_mobile_tools_and_column_controls_are_exclusive
-	 * @pairs pages:create pages:category-index pages:mobile-tools
-	 * @pairs table-controls:mobile-controls table-controls:mobile-tools table-controls:mutual-exclusion
+	 * @matrix pages : category-index create mobile-tools
+	 * @matrix table-controls : mobile-controls mobile-tools mutual-exclusion
 	 */
 	async _createDropdown() {
 		if (this.dropdown) return;

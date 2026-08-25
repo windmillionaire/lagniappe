@@ -11,12 +11,8 @@ from .base_property import UNSET
 # @tests tests_unit/test_003c_submission_complex.py::test_signature_field_projections_reflect_asset_presence
 # @tests tests_unit/test_013_task_properties.py::test_task_signature_form_submission_saves_asset_id
 # @tests tests_unit/test_013_task_properties.py::test_task_signature_form_submission_saves_multiple_assets_by_field_id
-# @features signature
-# @dimensions asset-lifecycle, db-value, form-value, filter-value, ai-value, column, sort
-# @pairs signature:asset-lifecycle signature:db-value
-# @pairs submission:asset-lifecycle submission:db-value task:asset-lifecycle task:db-value
-# @pairs signature:multiple-fields signature:schema-id submission:multiple-fields submission:schema-id
-# @pairs task:multiple-fields task:schema-id
+# @matrix signature submission task : asset-lifecycle db-value multiple-fields schema-id
+# @pair signature:form-value
 class Signature(AssetProperty, FilterMixin, AIMixin, ColumnMixin, SchemaProperty):
     """Signature image field. Stored as an image asset.
 
@@ -90,8 +86,7 @@ class Signature(AssetProperty, FilterMixin, AIMixin, ColumnMixin, SchemaProperty
 # @tests tests_unit/test_004_form_properties.py::test_form_html_fields
 # @tests tests_unit/test_004e_submission_behavior.py::test_html_field_is_ignored_by_form_submission
 # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
-# @features html-field
-# @dimensions html-fields, submit-boundary, asset-isolation, asset-lifecycle, render-fetch
+# @matrix html-field : asset-isolation asset-lifecycle html-fields render-fetch submit-boundary
 class HTML(AssetProperty, SchemaProperty):
     """Rich HTML content field. Stored as an HTML text asset.
 
@@ -178,8 +173,7 @@ class Status(AIMixin, ColumnMixin, SchemaProperty):
     # Property Attributes
     # @testable true
     # @tests tests_unit/test_003c_submission_complex.py::test_submission_status
-    # @features status
-    # @dimensions computed
+    # @pair status:computed
     @property
     def status_conditions(self):
         """Return the status conditions from the schema."""
@@ -226,8 +220,7 @@ class Status(AIMixin, ColumnMixin, SchemaProperty):
     # @testable true
     # @tests tests_unit/test_003c_submission_complex.py::test_submission_status
     # @tests tests_e2e/004_projects/test_004f_project_filters.py::test_filter_by_has_status_renders_status_column
-    # @features status
-    # @dimensions column computed-column
+    # @matrix status : column computed-column
     @property
     def column_value(self):
         return self.value
@@ -239,8 +232,7 @@ class Status(AIMixin, ColumnMixin, SchemaProperty):
     # AI Attributes
     # @testable true
     # @tests tests_unit/test_003c_submission_complex.py::test_submission_status
-    # @features status
-    # @dimensions ai-value, computed
+    # @matrix status : ai-value computed
     @property
     def ai_value(self):
         return [status_element["text"] for status_element in self.active_statuses]

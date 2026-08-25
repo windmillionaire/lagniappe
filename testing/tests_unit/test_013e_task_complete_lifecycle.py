@@ -23,8 +23,7 @@ from testing.utility.test_entities import TestEntities
 _USER_TZ = "lagniappe.core.mixins.date.dates.user_timezone"
 
 
-# @features task-completion
-# @dimensions complete no-schedule assignee completed-by
+# @matrix task-completion : assignee complete completed-by no-schedule
 @pytest.mark.unit
 def test_task_complete_without_schedule(get_test_entities):
     """No schedule: completion status/date, assignee retained, due date cleared."""
@@ -54,8 +53,7 @@ def test_task_complete_without_schedule(get_test_entities):
     assert task.due_date is None
 
 
-# @features task-completion submission
-# @dimensions required-fields validation
+# @matrix submission task-completion : required-fields validation
 @pytest.mark.unit
 def test_task_complete_raises_when_required_submission_missing(get_test_entities):
     """``TaskCompletionError`` when form exists and required fields are incomplete."""
@@ -86,8 +84,7 @@ def test_task_complete_raises_when_required_submission_missing(get_test_entities
                     task.complete()
 
 
-# @features task-completion signature
-# @dimensions uncomplete history asset-cleanup
+# @matrix signature task-completion : asset-cleanup history uncomplete
 @pytest.mark.unit
 def test_task_uncomplete_after_complete(get_test_entities):
     """``uncomplete`` clears completion state and reactivates; history entry is created when was completed."""
@@ -139,8 +136,7 @@ def test_task_uncomplete_after_complete(get_test_entities):
     assert task.db.get("history") is True
 
 
-# @features task-completion
-# @dimensions uncomplete repeating-default assignment
+# @matrix task-completion : assignment repeating-default uncomplete
 @pytest.mark.unit
 def test_task_uncomplete_restores_default_submission_and_assignment(get_schema):
     assignee = TestEntities.get(
@@ -182,8 +178,7 @@ def test_task_uncomplete_restores_default_submission_and_assignment(get_schema):
     assert task.db["assigned_by"] == assigner.key
 
 
-# @features task-completion
-# @dimensions history legacy name description
+# @matrix task-completion : description history legacy name
 @pytest.mark.unit
 def test_legacy_task_history_snapshot_text_defaults_to_none():
     """Legacy history rows without snapshot text remain readable."""
@@ -193,8 +188,7 @@ def test_legacy_task_history_snapshot_text_defaults_to_none():
     assert history.description is None
 
 
-# @features task-completion
-# @dimensions immutable-fingerprint
+# @pair task-completion:immutable-fingerprint
 @pytest.mark.unit
 def test_task_history_fingerprint_ignores_later_form_versions():
     """An immutable history row keeps its creation-based entity fingerprint."""
@@ -214,8 +208,7 @@ def test_task_history_fingerprint_ignores_later_form_versions():
     assert history.fingerprint == original
 
 
-# @features tasks
-# @dimensions history attached-page parent-details
+# @matrix tasks : attached-page history parent-details
 @pytest.mark.unit
 def test_task_history_attached_page_details_key_uses_parent():
     """Task history page details use the same parent payload key as live tasks."""
@@ -230,9 +223,8 @@ def test_task_history_attached_page_details_key_uses_parent():
     assert history.properties.page.column_value == page.reference_details
 
 
-# @pairs task-completion:history task-completion:snapshot task-completion:name
-# @pairs task-completion:description task-completion:submission task-completion:schema-version
-# @pairs task-completion:linked-pages task-completion:asset-copy signature:asset-copy
+# @matrix task-completion : asset-copy description history linked-pages name schema-version snapshot submission
+# @pair signature:asset-copy
 @pytest.mark.unit
 def test_task_history_create_snapshots_completed_task_state():
     """``TaskHistory.create`` snapshots the task state being archived."""
@@ -319,8 +311,7 @@ def test_task_history_create_snapshots_completed_task_state():
     copy_asset.assert_called_once_with(signature_asset)
 
 
-# @features task-combine
-# @dimensions winner completed-on modified deterministic-tie
+# @matrix task-combine : completed-on deterministic-tie modified winner
 @pytest.mark.unit
 def test_task_combine_selects_completed_then_modified_main():
     page = TestEntities.get("PAGE", {"name": "Combine Page", "hash": "pgcmb1"})
@@ -348,9 +339,8 @@ def test_task_combine_selects_completed_then_modified_main():
     assert select_main_task((active, older, newer)) is expected
 
 
-# @pairs task-combine:source-snapshot task-combine:existing-history
-# @pairs task-combine:schema-version task-combine:metadata
-# @pairs task-combine:attachments task-combine:asset-copy signature:asset-copy
+# @matrix task-combine : asset-copy attachments existing-history metadata schema-version source-snapshot
+# @pair signature:asset-copy
 @pytest.mark.unit
 def test_task_history_create_clones_another_task_and_existing_history():
     main_page = TestEntities.get("PAGE", {"name": "Main Page", "hash": "pgcmb2"})
@@ -414,8 +404,7 @@ def test_task_history_create_clones_another_task_and_existing_history():
     assert copy_asset.call_count == 3
 
 
-# @features asset-storage
-# @dimensions copy metadata visibility
+# @matrix asset-storage : copy metadata visibility
 @pytest.mark.unit
 def test_asset_mixin_copy_asset_copies_storage_and_updates_definition(monkeypatch):
     page = TestEntities.get("PAGE", {"name": "Parent Page", "hash": "pgasset1"})
@@ -475,8 +464,7 @@ def test_asset_mixin_copy_asset_copies_storage_and_updates_definition(monkeypatc
     assert json.loads(target.db["assets"]) == target.assets
 
 
-# @features document-history
-# @dimensions asset-copy
+# @pair document-history:asset-copy
 @pytest.mark.unit
 def test_document_history_create_copies_document_asset():
     page = TestEntities.get(
@@ -510,8 +498,7 @@ def test_document_history_create_copies_document_asset():
     assert copied_name == DocumentHistory.DOCUMENT_ASSET
 
 
-# @features document-history
-# @dimensions named current-content asset-path validation legacy ordering batch-delete
+# @matrix document-history : asset-path batch-delete current-content legacy named ordering validation
 @pytest.mark.unit
 def test_document_history_named_versions_order_and_delete_in_bounded_batches():
     page = TestEntities.get("PAGE", {"name": "Document Page", "hash": "pgdoch2"})
@@ -573,8 +560,7 @@ def test_document_history_named_versions_order_and_delete_in_bounded_batches():
     assert deleted_batches == [[legacy], [automatic]]
 
 
-# @features document-history
-# @dimensions validation
+# @pair document-history:validation
 @pytest.mark.unit
 @pytest.mark.parametrize(
     ("name", "html"),
@@ -594,8 +580,7 @@ def test_document_history_named_version_rejects_invalid_name_or_content(name, ht
     assert str(error.value)
 
 
-# @features task-completion
-# @dimensions history explicit-overrides name description attachments submission live-task
+# @matrix task-completion : attachments description explicit-overrides history live-task name submission
 @pytest.mark.unit
 def test_task_create_history_entry_accepts_completion_overrides(
     get_schema,
@@ -656,9 +641,8 @@ def test_task_create_history_entry_accepts_completion_overrides(
     }
 
 
-# @features task-completion task-scheduling
-# @dimensions complete schedule-queue next-due-date durable-uncomplete post-commit timezone
-# @pairs task-completion:complete task-completion:schedule-queue task-completion:next-due-date task-scheduling:complete task-scheduling:schedule-queue task-scheduling:next-due-date task-scheduling:durable-uncomplete task-scheduling:post-commit task-scheduling:timezone
+# @matrix task-completion : complete next-due-date schedule-queue
+# @matrix task-scheduling : complete durable-uncomplete next-due-date post-commit schedule-queue timezone
 @pytest.mark.unit
 def test_task_complete_with_schedule_queues_uncomplete():
     """With an active schedule, ``complete`` advances due date then queues uncomplete (patched)."""
@@ -706,8 +690,7 @@ def test_task_complete_with_schedule_queues_uncomplete():
     assert task.due_date is not None
 
 
-# @features task-completion task-scheduling
-# @dimensions complete schedule-queue
+# @matrix task-completion task-scheduling : complete schedule-queue
 @pytest.mark.unit
 def test_task_complete_with_near_term_schedule_uncompletes_immediately():
     """A near-term recurring completion reactivates immediately with its calculated next due date."""
@@ -765,9 +748,9 @@ def test_task_complete_with_near_term_schedule_uncompletes_immediately():
     assert task.db.get("postponed_from") is None
 
 
-# @features task-completion task-scheduling cloud-tasks
-# @dimensions schedule-queue durable-uncomplete post-commit idempotency
-# @pairs task-completion:schedule-queue task-scheduling:schedule-queue task-scheduling:durable-uncomplete task-scheduling:post-commit task-scheduling:idempotency cloud-tasks:durable-uncomplete cloud-tasks:post-commit cloud-tasks:idempotency
+# @matrix cloud-tasks : durable-uncomplete idempotency post-commit
+# @matrix task-scheduling : durable-uncomplete idempotency post-commit schedule-queue
+# @pair task-completion:schedule-queue
 @pytest.mark.unit
 def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
     """A future recurrence persists intent before its tokenized queue dispatch."""
@@ -832,8 +815,7 @@ def test_add_uncomplete_task_to_queue_future_due_queues_in_production():
     assert task.due_date == next_due
 
 
-# @features task-completion task-scheduling
-# @dimensions stale-delivery idempotency
+# @matrix task-completion task-scheduling : idempotency stale-delivery
 @pytest.mark.unit
 def test_manual_uncomplete_clears_pending_scheduled_delivery():
     task = TestEntities.get(

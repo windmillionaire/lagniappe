@@ -12,8 +12,7 @@ from ..errors import DeferredJobDriftError
 
 # @testable true
 # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_adapters_declare_required_ai_tiers
-# @pair deferred-jobs:tier-declaration
-# @pair ai-access:tier-declaration
+# @matrix ai-access deferred-jobs : tier-declaration
 class DeferredJobAdapter:
     """Domain boundary plugged into the shared job lifecycle."""
 
@@ -57,10 +56,8 @@ class DeferredJobAdapter:
 
     # @testable true
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_registered_ai_adapters_reject_restricted_actor_before_prepare
+    # @matrix ai : access-gate authorization provider-boundary
     # @pair deferred-jobs:authorization
-    # @pair ai:authorization
-    # @pair ai:access-gate
-    # @pair ai:provider-boundary
     def authorize(self, context):
         required = self.required_ai_access
         if required and not getattr(
@@ -74,8 +71,7 @@ class DeferredJobAdapter:
 
     # @testable true
     # @tests tests_unit/test_023c_deferred_job_runner.py::test_runner_rejects_changed_target_fingerprint_before_apply
-    # @pair deferred-jobs:target-fingerprint
-    # @pair deferred-jobs:no-apply
+    # @matrix deferred-jobs : no-apply target-fingerprint
     def validate_apply(self, context):
         """Reject generated output when an apply target changed in the queue."""
         expected = (context.job.authorization or {}).get("fingerprints") or {}
@@ -140,7 +136,7 @@ class DeferredJobAdapter:
 
     # @testable true
     # @tests tests_unit/test_028_ai_email.py::test_report_terminal_feedback_uses_generic_notification_delivery
-    # @pairs ai-email:generic-delivery ai-email:terminal-delivery
+    # @matrix ai-email : generic-delivery terminal-delivery
     def external_delivery_required(self, context):
         """Return whether this terminal job owns an external delivery step."""
         return False

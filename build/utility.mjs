@@ -75,7 +75,7 @@ const atomicWriteFileSync = (pathValue, content) => {
  * @testable true
  * @tests tests_js/test_032_build_configuration.py::test_interaction_preloads_have_stable_manual_chunks
  * @tests tests_js/test_032_build_configuration.py::test_templates_preload_registered_view_and_interaction_foundations
- * @pairs frontend-build:chunking frontend-build:modulepreload frontend-build:interaction-foundation
+ * @matrix frontend-build : chunking interaction-foundation modulepreload
  */
 const interactionFoundationChunk = (id) => {
 	const normalized = id.replaceAll("\\", "/");
@@ -180,8 +180,7 @@ const iconsYaml = normalizeIconRegistry(rawIconsYaml);
  * @testable true
  * @tests tests_js/test_018_style_pipeline.py::test_virtual_and_python_style_payloads_share_one_runtime_value
  * @tests tests_js/test_018_style_pipeline.py::test_style_registry_rejects_untyped_and_unknown_leaves
- * @pair style-build:runtime-parity
- * @pair style-build:schema-validation
+ * @matrix style-build : runtime-parity schema-validation
  */
 const normalizeStyleRegistry = (value, path = "styles") => {
 	const records = new Map();
@@ -522,8 +521,7 @@ const resolvedChunkFileName = (importerFileName, specifier) => {
  * @testable true
  * @tests tests_js/test_022_build_chunk_versioning.py::test_rollup_versions_generated_chunk_imports_and_precache_urls
  * @tests tests_tooling/test_003_config.py::test_app_engine_chunk_handler_uses_immutable_cache_before_general_js
- * @features frontend-build cache
- * @dimensions chunk-versioning bundle-consistency
+ * @matrix cache frontend-build : bundle-consistency chunk-versioning
  */
 const versionChunkImports = (buildId) => ({
 	name: "version-chunk-imports",
@@ -600,8 +598,7 @@ const updateConstantsBuildId = (buildId) => {
 /**
  * @testable true
  * @tests tests_js/test_022_build_chunk_versioning.py::test_service_worker_records_the_build_identity
- * @features frontend-build
- * @dimensions service-worker build-identity
+ * @matrix frontend-build : build-identity service-worker
  */
 const updateServiceWorker = (buildId) => {
 	return {
@@ -658,8 +655,7 @@ const emitPdfWorker = () => {
  *
  * @testable true
  * @tests tests_js/test_022_build_chunk_versioning.py::test_third_party_notices_are_emitted_with_browser_assets
- * @features frontend-build licensing
- * @dimensions browser-notice-delivery
+ * @matrix frontend-build licensing : browser-notice-delivery
  */
 const emitThirdPartyLicenses = () => {
 	return {
@@ -696,8 +692,7 @@ const materialSymbolsFontFileName = `fonts/material-symbols-rounded.${materialSy
  *
  * @testable true
  * @tests tests_js/test_022_build_chunk_versioning.py::test_material_symbols_css_points_to_the_content_hashed_font
- * @features frontend-build icons
- * @dimensions font-delivery css-url-resolution
+ * @matrix frontend-build icons : css-url-resolution font-delivery
  */
 const resolveMaterialSymbolsFont = () => ({
 	postcssPlugin: "resolve-material-symbols-font",
@@ -717,8 +712,7 @@ const resolveMaterialSymbolsFont = () => ({
  *
  * @testable true
  * @tests tests_js/test_022_build_chunk_versioning.py::test_material_symbols_subset_font_is_emitted_with_content_hash
- * @features frontend-build icons
- * @dimensions font-delivery subset cache stale-cleanup
+ * @matrix frontend-build icons : cache font-delivery stale-cleanup subset
  */
 const emitMaterialSymbols = () => {
 	return {

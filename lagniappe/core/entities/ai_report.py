@@ -10,8 +10,7 @@ from ..tools.auth.context import current_context_user
 
 # @testable true
 # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_create_and_file_cleanup
-# @features ai-report
-# @dimensions create files status delete
+# @matrix ai-report : create delete files status
 class AIReport(Entity):
     """AI-generated report containing an ordered, deterministic action proposal."""
 
@@ -63,8 +62,7 @@ class AIReport(Entity):
 
     # @testable true
     # @tests tests_unit/test_020a_ai_report_properties.py::test_ai_report_permissions_follow_creator_ownership
-    # @features ai-report permissions
-    # @dimensions creator owner unrelated-user delete view
+    # @matrix ai-report permissions : creator delete owner unrelated-user view
     def allowed(self, action, user=None):
         user = current_context_user(user)
         if not user or not user.is_authenticated:

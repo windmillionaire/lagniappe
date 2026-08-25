@@ -11,8 +11,7 @@ export class FacetsBox extends Submitter(RemoteQueryCombobox) {
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002k_home_pages.py::test_home_page_create_visible_for_category_editor
 	 * @tests tests_e2e/009_search/test_009b_facet_quick_create.py::test_user_assign_search_permission_filter_returns_assignable_users
-	 * @features combobox
-	 * @dimensions permission-filter
+	 * @pair combobox:permission-filter
 	 */
 	constructor(element, args = {}) {
 		super(element);

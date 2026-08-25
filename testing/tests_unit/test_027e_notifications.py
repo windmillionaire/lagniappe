@@ -15,13 +15,7 @@ from testing.utility.messaging_fakes import MemoryDatastore, managed_user
 pytestmark = pytest.mark.unit
 
 
-# @pairs notifications:ordinary-create notifications:ordinary-delete notifications:ordinary-count
-# @pairs notifications:ordinary-clear notifications:idempotency notifications:aggregate-count
-# @pairs notifications:transaction-retry notifications:aggregate-repair notifications:revision
-# @pair notifications:cache-failure-isolation
-# @source lagniappe/core/tools/notifications/service.py::create_ordinary_notification
-# @source lagniappe/core/tools/notifications/service.py::delete_ordinary_notification
-# @source lagniappe/core/tools/notifications/service.py::clear_ordinary_notifications
+# @matrix notifications : aggregate-count aggregate-repair cache-failure-isolation idempotency ordinary-clear ordinary-count ordinary-create ordinary-delete revision transaction-retry
 def test_ordinary_notification_service_mutates_aggregate_once(monkeypatch):
     store = MemoryDatastore()
     monkeypatch.setattr(notification_database.DATA, "_datastore_client", store)

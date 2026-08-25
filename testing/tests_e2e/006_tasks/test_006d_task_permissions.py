@@ -82,8 +82,8 @@ def _browser_http_context(user):
     return cookies, headers
 
 
-# @pairs permissions:etag permissions:authorization-before-cache
-# @pairs permissions:resource-gates cache:permissions
+# @matrix permissions : authorization-before-cache etag resource-gates
+# @pair cache:permissions
 def test_task_route_is_forbidden_without_model_or_page_permission(
     get_user, browser_failures
 ):
@@ -124,7 +124,7 @@ def test_task_route_is_forbidden_without_model_or_page_permission(
     assert _task_side_effect_state(task, owner, blocked) == state_before
 
 
-# @pairs tasks:history task-combine:authorization
+# @pairs task-combine:authorization tasks:history
 def test_task_history_routes_are_forbidden_without_permission(get_user):
     owner = get_user(Users.OWNER)
     task = Tasks.test_create_page_task.get(owner)
@@ -150,7 +150,7 @@ def test_task_history_routes_are_forbidden_without_permission(get_user):
     assert _task_side_effect_state(task, owner, blocked) == state_before
 
 
-# @pairs tasks:readonly tasks:permission-gates
+# @matrix tasks : permission-gates readonly
 def test_page_task_viewer_sees_task_without_edit_controls(get_user):
     owner = get_user(Users.OWNER)
     task = Tasks.test_view_only_page_task.get(owner)
@@ -170,7 +170,7 @@ def test_page_task_viewer_sees_task_without_edit_controls(get_user):
     ).not_to_be_attached()
 
 
-# @pairs tasks:completed-only tasks:empty-state
+# @matrix tasks : completed-only empty-state
 # @template pages/tasks.html::task_list
 def test_completed_only_task_list_hides_empty_marker(get_user):
     owner = get_user(Users.OWNER)
@@ -187,8 +187,7 @@ def test_completed_only_task_list_hides_empty_marker(get_user):
     expect(task_list.locator("[data-role='empty']")).not_to_be_visible()
 
 
-# @features tasks
-# @dimensions readonly attached-form empty-fields permission-gates
+# @matrix tasks : attached-form empty-fields permission-gates readonly
 # @template pages/tasks.html::task
 # @template pages/tasks.html::task_form
 def test_page_task_viewer_sees_empty_form_structure_without_edit_controls(get_user):
@@ -221,7 +220,7 @@ def test_page_task_viewer_sees_empty_form_structure_without_edit_controls(get_us
     expect(readonly_field.locator("input")).to_have_count(0)
 
 
-# @pairs tasks:assignee tasks:permission-gates
+# @matrix tasks : assignee permission-gates
 def test_assigned_user_can_work_their_assigned_task(get_user):
     owner = get_user(Users.OWNER)
     assignee = get_user(Users.create_user)
@@ -236,7 +235,7 @@ def test_assigned_user_can_work_their_assigned_task(get_user):
     expect(task_row.locator(Task.SETTINGS_FORM)).to_be_visible()
 
 
-# @pairs tasks:submitted-reference file:submitted-reference pages:submitted-reference
+# @matrix file pages tasks : submitted-reference
 def test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page(get_user):
     owner = get_user(Users.OWNER)
     category = Categories.test_create_category_manual_mode.get(owner)
@@ -325,8 +324,7 @@ def test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page(get_us
     assert not persisted_file.allowed(Action.VIEW, user=actor.entity)
 
 
-# @features tasks
-# @dimensions signed-claim
+# @pair tasks:signed-claim
 def test_new_task_attachment_claim_is_required_and_scope_bound(get_user):
     owner = get_user(Users.OWNER)
     category = Categories.test_create_category_manual_mode.get(owner)

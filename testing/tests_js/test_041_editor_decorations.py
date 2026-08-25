@@ -3,7 +3,7 @@
 import textwrap
 
 
-# @pairs editor:selected-text editor:replace-selection
+# @matrix editor : replace-selection selected-text
 def test_selection_highlight_decorations_and_range_mapping(run_node):
     run_node(
         textwrap.dedent(

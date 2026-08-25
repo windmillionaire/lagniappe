@@ -1,6 +1,5 @@
 """Task creation report action."""
 
-from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action
 from lagniappe.core.entities import Entities
 
@@ -14,13 +13,11 @@ from .completed_tasks import (
 from .common import (
     TASK_FORM_TYPE_ERROR,
     _data,
-    _first_data_reference,
     _require_allowed,
     _require_form_type,
     _unique_entities,
 )
 from .results import (
-    _capture_missing_task_submission,
     _diagnostic_entity,
     _diagnostic_file_refs,
     _entity_result,
@@ -37,29 +34,10 @@ from .references import (
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_warns_but_continues_when_task_form_submission_missing
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_skips_task_that_references_page_form_and_continues
 # @tests tests_unit/test_020g_ai_report_actions_tasks.py::test_run_report_attach_file_to_task_targets_created_task
-# @pair ai-report:task-form
-# @pair ai-report:completed-task
-# @pair ai-report:continue
-# @pair ai-report:deterministic-run
-# @pair tasks:task-form
-# @pair tasks:completed-task
-# @pair tasks:continue
-# @pair tasks:deterministic-run
-# @pair tasks:missing-submission
-# @pair tasks:recoverable
-# @pair task-completion:task-form
-# @pair task-completion:completed-task
-# @pair task-completion:continue
-# @pair ai-report:missing-submission
-# @pair task-completion:missing-submission
-# @pair ai-report:mismatched-form
-# @pair tasks:mismatched-form
-# @pair forms:continue
-# @pair forms:deterministic-run
-# @pair forms:mismatched-form
-# @pair forms:recoverable
-# @pair ai-report:submission-completion
-# @pair ai-report:persistence
+# @matrix ai-report : completed-task continue deterministic-run mismatched-form missing-submission persistence submission-completion task-form
+# @matrix forms : continue deterministic-run mismatched-form recoverable
+# @matrix task-completion : completed-task continue missing-submission task-form
+# @matrix tasks : completed-task continue deterministic-run mismatched-form missing-submission recoverable task-form
 def _create_task(action, _report, user, created, context=None):
     data = _data(action)
     page = _resolve_action_page(data, created, user)

@@ -51,8 +51,7 @@ export class LinkElement extends BaseElement {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/005_pages/test_005b_page_submissions.py::test_link_submission
-	 * @features form-link
-	 * @dimensions read-layout
+	 * @pair form-link:read-layout
 	 */
 	get read() {
 		if (this._read) return this._read;

@@ -1,8 +1,7 @@
 """Node-backed checks for table element behavior."""
 
 
-# @features form-table
-# @dimensions detached-revision-preview validation-route
+# @matrix form-table : detached-revision-preview validation-route
 def test_table_validation_uses_form_key_for_detached_preview(run_node):
     run_node(
         r'''
@@ -59,8 +58,7 @@ if (table._validate !== "/forms/page-key/validate-row/contacts") {
     )
 
 
-# @features form-table
-# @dimensions touch-gesture
+# @pair form-table:touch-gesture
 def test_table_touch_movement_threshold_distinguishes_tap_from_swipe(run_node):
     run_node(
         r'''

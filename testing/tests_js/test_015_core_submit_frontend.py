@@ -56,8 +56,7 @@ const SubmissionManager = context.SubmissionManager;
     run_node(script)
 
 
-# @features submit
-# @dimensions stale-widget direct-upload-navigation
+# @matrix submit : direct-upload-navigation stale-widget
 def test_submit_abandons_stale_widget_after_async_prepare(run_node):
     run_submission_manager_check(
         run_node,
@@ -182,8 +181,7 @@ if (capturedErrors.length !== 0) {
     )
 
 
-# @features submit
-# @dimensions stale-widget direct-upload-error
+# @matrix submit : direct-upload-error stale-widget
 def test_submit_does_not_show_upload_error_after_stale_prepare(run_node):
     run_submission_manager_check(
         run_node,
@@ -285,8 +283,7 @@ if (capturedErrors.length !== 0) {
     )
 
 
-# @features submit
-# @dimensions missing-form-data
+# @pair submit:missing-form-data
 def test_submit_stops_before_appending_when_form_data_is_missing(run_node):
     run_submission_manager_check(
         run_node,
@@ -357,8 +354,7 @@ if (submitter.disabled) {
     )
 
 
-# @features submit
-# @dimensions route-override active-widget
+# @matrix submit : active-widget route-override
 def test_submit_uses_explicit_action_route_over_active_widget_route(run_node):
     run_submission_manager_check(
         run_node,
@@ -422,8 +418,7 @@ if (updateRoute !== "/tasks/task/update") {
     )
 
 
-# @features submit deferred-jobs
-# @dimensions deferred-create background destination-row
+# @matrix deferred-jobs submit : background deferred-create destination-row
 def test_deferred_background_create_does_not_decorate_source_form(run_node):
     run_submission_manager_check(
         run_node,

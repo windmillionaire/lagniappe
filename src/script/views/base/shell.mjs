@@ -230,9 +230,8 @@ export default class ShellView {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_029_core_startup.py::test_lazy_search_replays_the_latest_live_input_after_loading
-	 * @features search startup
-	 * @dimensions navbar-results first-interaction single-flight
-	 * @pairs search:navbar-results startup:first-interaction startup:single-flight
+	 * @matrix startup : first-interaction single-flight
+	 * @pair search:navbar-results
 	 */
 	_activateSearchBox(box) {
 		if (!box) return;

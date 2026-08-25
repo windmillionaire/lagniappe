@@ -20,8 +20,7 @@ def _enabled_flag(value):
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_agent_access_config_and_user_helpers
-# @features login
-# @dimensions agent-access config
+# @matrix login : agent-access config
 def enabled():
     code = str(getattr(CONFIG, "AGENT_ACCESS_CODE", "") or "").strip()
     email = str(getattr(CONFIG, "AGENT_ACCESS_EMAIL", "") or "").strip()
@@ -32,8 +31,7 @@ def enabled():
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_agent_access_config_and_user_helpers
-# @features login
-# @dimensions agent-access code-validation
+# @matrix login : agent-access code-validation
 def code_matches(code):
     expected = str(getattr(CONFIG, "AGENT_ACCESS_CODE", ""))
     submitted = str(code or "").strip()
@@ -55,8 +53,7 @@ def _ensure_own_page_access(user):
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_agent_access_user_helper_creates_or_loads_user_with_groups
-# @features login
-# @dimensions agent-access user groups user-page
+# @matrix login : agent-access groups user user-page
 def get_or_create_user():
     email = str(getattr(CONFIG, "AGENT_ACCESS_EMAIL", "")).strip().lower()
     name = str(getattr(CONFIG, "AGENT_ACCESS_NAME", "") or "Agent").strip() or "Agent"

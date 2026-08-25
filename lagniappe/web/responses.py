@@ -43,8 +43,6 @@ def offline():
 # @tests tests_e2e/004_projects/test_004h_document_history.py::test_pin_and_clear_document_history
 # @tests tests_e2e/005_pages/test_005j_page_notes.py::test_page_note_text_photo_and_delete_modal
 # @tests tests_e2e/011_files/test_011b_file_ingress_wizard.py::test_import_wizard_rejects_non_csv_upload
-# @features request-errors
-# @dimensions plain-validation
 # @pair request-errors:plain-validation
 def error(error, exception=None):
     if exception:
@@ -80,7 +78,7 @@ def cell(field, entity, column=None, embedded=False):
 
 # @testable true
 # @tests tests_e2e/007_categories/test_007c_category_visibility_and_sorting.py::test_visibility_panel_includes_category_form_columns
-# @pairs category-index:mixed-form category-index:missing-field category-index:render
+# @matrix category-index : missing-field mixed-form render
 # @template cell.html::cell
 def table(entities, parent):
     template = get_template_attribute("table.html", "table")
@@ -133,9 +131,7 @@ def publish_notification_state(state):
 
 # @testable true
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_update_category_info_from_tools
-# @pair web-headers:local-save
-# @pair web-headers:acknowledgement
-# @pair web-headers:entity-revision
+# @matrix web-headers : acknowledgement entity-revision local-save
 def entity_response(response, *entities):
     """Annotate a successful response with committed entity revisions."""
     revisions = getattr(g, "ENTITY_RESPONSE_REVISIONS", {})
@@ -154,8 +150,7 @@ def entity_response(response, *entities):
 # @testable false
 # @manual true
 # @reason pending/completed notification replacement is exercised through notification workflows
-# @features notifications
-# @dimensions item-html pending target
+# @matrix notifications : item-html pending target
 def notification_item(notification):
     template = get_template_attribute("notifications.html", "item")
     return template(notification).strip()
@@ -169,8 +164,7 @@ def notification_item(notification):
 # @tests tests_e2e/006_tasks/test_006c_task_index.py::test_tasks_table_columns
 # @tests tests_e2e/008_users/test_008a_user_index.py::test_users_index_public_toggle_shows_public_users
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_renders_first_batch_before_cursor_continuation
-# @pair reconnect-refresh:root-fingerprint
-# @pair indexes:rendering
+# @pairs categories:first-batch indexes:rendering reconnect-refresh:root-fingerprint task-index:columns
 def index(name, index, **context):
     fingerprint = (
         database.site_fingerprint(f"/{name}/index")
@@ -282,7 +276,7 @@ def task_settings(task):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_task_form_filters_compatible_tasks
-# @pairs task-combine:compatible task-combine:checkbox-form
+# @matrix task-combine : checkbox-form compatible
 def task_combine_form(task, compatible):
     template = get_template_attribute("pages/tasks.html", "combine_form")
     return template(task, compatible), 200
@@ -290,8 +284,7 @@ def task_combine_form(task, compatible):
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006f_task_history.py::test_combine_tasks_migrates_history_and_reconciles_task_delta
-# @pairs task-combine:delta task-combine:upsert
-# @pairs task-combine:remove task-combine:ordering
+# @matrix task-combine : delta ordering remove upsert
 def task_combine_delta(main, removed, page):
     task_template = get_template_attribute("pages/tasks.html", "task")
     empty_template = get_template_attribute("pages/tasks.html", "task_empty")
@@ -517,8 +510,7 @@ def file_info(file):
 
 # @testable true
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_file_download_uses_original_filename_and_mimetype
-# @features file
-# @dimensions download filename mimetype
+# @matrix file : download filename mimetype
 def file_download(file_entity):
     g.NO_CACHE = True
     asset = file_entity.properties.file.value
@@ -659,8 +651,7 @@ def home_page(home):
 # @testable true
 # @tests tests_e2e/002_home/test_002f_home_directory.py::test_admin_directory_link_opens_admin_settings
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
-# @features admin
-# @dimensions page-load site-settings
+# @matrix admin : page-load site-settings
 def admin_page():
     from lagniappe.core.tools.site.data_protection import data_protection_status
 
@@ -877,8 +868,7 @@ def created_index_result(result):
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_click_result_navigates
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_result_links_correct
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_navbar_task_results_render_current_completion_state
-# @features search
-# @dimensions result-navigation result-links navbar-results task-model
+# @matrix search : navbar-results result-links result-navigation task-model
 def search_results(query, results, total):
     template = get_template_attribute("nav.html", "search_results")
     return {"results": template(query, results, total)}, 200
@@ -889,8 +879,7 @@ def search_results(query, results, total):
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_no_results
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_search_result_titles
 # @tests tests_e2e/009_search/test_009a_search_page.py::test_task_facet_includes_task_and_model_results_with_links
-# @features search
-# @dimensions query-display no-results result-title result-links
+# @matrix search : no-results query-display result-links result-title
 def search_page(q, results, pagination):
     return render_template(
         "search/search.html",
@@ -911,8 +900,7 @@ def location_results(results, total):
 
 # @testable true
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_form_delete_modal_lists_page_and_task_users
-# @features forms
-# @dimensions delete-modal instance-query preview-limit
+# @matrix forms : delete-modal instance-query preview-limit
 def delete_entity(entity=None, key=None):
     if not entity:
         return render_template("delete/dne.html", key=key), 200
@@ -972,7 +960,7 @@ def reference_topic(section):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @pairs admin:recovery-export admin:configuration-display admin:secrets admin:web-headers
+# @matrix admin : configuration-display recovery-export secrets web-headers
 def reference_environment_variables(variables, download=False):
     if download:
         display_variables = variables
@@ -1004,7 +992,7 @@ def reference_environment_variables(variables, download=False):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
-# @pairs admin:configuration-display admin:secrets
+# @matrix admin : configuration-display secrets
 def site_configuration(variables):
     from config.recovery import redact_settings_for_display
 

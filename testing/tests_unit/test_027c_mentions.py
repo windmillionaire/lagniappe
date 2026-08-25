@@ -5,7 +5,6 @@ from types import SimpleNamespace
 from google.cloud.datastore import Key
 import pytest
 
-from lagniappe.core.entities import Entities
 from lagniappe.core.tools.database import mentions as mention_database
 from lagniappe.core.tools.database import notifications as notification_database
 from lagniappe.core.tools.mentions import content as mention_content
@@ -16,12 +15,7 @@ from testing.utility.messaging_fakes import MemoryDatastore, managed_user
 pytestmark = pytest.mark.unit
 
 
-# @pairs mentions:payload-validation mentions:saved-occurrence mentions:idempotency mentions:permission
-# @pair mentions:document-view
-# @pair mentions:public-sanitization
-# @source lagniappe/core/tools/mentions/content.py::validate_mentions_payload
-# @source lagniappe/core/tools/mentions/content.py::sanitize_mentions
-# @source lagniappe/core/tools/mentions/service.py::deliver_mentions
+# @matrix mentions : document-view idempotency payload-validation permission public-sanitization saved-occurrence
 def test_mentions_validate_saved_occurrences_dedupe_and_sanitize(monkeypatch):
     occurrence = {
         "occurrence_id": "mention_1234",
@@ -100,8 +94,8 @@ def test_mentions_validate_saved_occurrences_dedupe_and_sanitize(monkeypatch):
     assert email_deliveries == []
 
 
-# @pairs mentions:delivery-ledger mentions:idempotency notifications:aggregate-count
-# @source lagniappe/core/tools/database/mentions.py::create_mention_delivery
+# @matrix mentions : delivery-ledger idempotency
+# @pair notifications:aggregate-count
 def test_mention_delivery_ledger_survives_notification_replay(monkeypatch):
     store = MemoryDatastore()
     monkeypatch.setattr(mention_database.DATA, "_datastore_client", store)

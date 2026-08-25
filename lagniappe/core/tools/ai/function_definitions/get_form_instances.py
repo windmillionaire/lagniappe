@@ -67,8 +67,7 @@ GET_FORM_INSTANCES = types.FunctionDeclaration(
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_get_form_instances_filters_permissions_status_and_truncates
-# @features ai form-schema
-# @dimensions form-instances permissions status truncation submission
+# @matrix ai form-schema : form-instances permissions status submission truncation
 def execute_get_form_instances(args, user):
     """Return viewable page/task instances attached to a form."""
     form_id = args.get("form_id")

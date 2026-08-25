@@ -1,8 +1,7 @@
 """Node-backed checks for form-builder schema defaults."""
 
 
-# @features forms
-# @dimensions builder-save single-flight retryable-action stale-acknowledgement
+# @matrix forms : builder-save retryable-action single-flight stale-acknowledgement
 def test_builder_save_releases_for_retry_and_only_acknowledges_submitted_state(
     run_node,
 ):
@@ -167,8 +166,7 @@ if (await late !== false) {
     )
 
 
-# @features forms ui-action
-# @dimensions schema-generation single-flight retryable-action persistent-error
+# @matrix forms ui-action : persistent-error retryable-action schema-generation single-flight
 def test_builder_generation_failure_stays_visible_and_releases_submitter(run_node):
     run_node(
         r'''
@@ -264,8 +262,7 @@ if (submitter.disabled || attributes["aria-busy"] !== undefined) {
     )
 
 
-# @features forms form-table
-# @dimensions builder-defaults unsaved-preview empty-columns
+# @matrix form-table forms : builder-defaults empty-columns unsaved-preview
 def test_table_creation_defaults_columns_for_unsaved_preview(run_node):
     run_node(
         r'''
@@ -318,7 +315,7 @@ if (element.id !== schema.id) {
     )
 
 
-# @pairs forms:builder-lifecycle offline:builder-lifecycle
+# @matrix forms offline : builder-lifecycle
 def test_builder_sync_uses_shared_connectivity_without_orphaned_global_state(
     run_node,
 ):
@@ -403,7 +400,7 @@ if (Object.hasOwn(context.window, "__LP_OFFLINE__")) {
     )
 
 
-# @pairs forms:builder-list-actions forms:action-button-centering
+# @matrix forms : action-button-centering builder-list-actions
 def test_builder_schema_lists_use_button_surfaces_and_centered_actions(run_node):
     run_node(
         r'''

@@ -11,8 +11,7 @@ from ..properties import (
 
 # @testable true
 # @tests tests_unit/test_023a_deferred_job_properties.py::test_deferred_job_property_split_preserves_persisted_schema
-# @features deferred-jobs
-# @dimensions persisted-schema property-ownership json-encoding index-exclusion
+# @matrix deferred-jobs : index-exclusion json-encoding persisted-schema property-ownership
 class DeferredJob(Entity):
     """Internal versioned job record; domain entities remain the UI contract."""
 

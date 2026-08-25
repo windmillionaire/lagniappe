@@ -12,35 +12,20 @@ pytestmark = pytest.mark.e2e
 
 
 def _fail_next_browser_fetch(page, *, method, path_prefix, error):
-    page.evaluate(
-        """([method, pathPrefix, error]) => {
-            const originalFetch = window.fetch.bind(window);
-            let pending = true;
-            window.fetch = (input, options = {}) => {
-                const url = typeof input === "string" ? input : input.url;
-                const requestMethod = (
-                    options.method || (typeof input === "string" ? "GET" : input.method)
-                ).toUpperCase();
-                const pathname = new URL(url, window.location.href).pathname;
-                if (pending && requestMethod === method && pathname.startsWith(pathPrefix)) {
-                    pending = false;
-                    return Promise.resolve(new Response(
-                        JSON.stringify({ error }),
-                        {
-                            status: 503,
-                            headers: { "Content-Type": "application/json" },
-                        },
-                    ));
-                }
-                return originalFetch(input, options);
-            };
-        }""",
-        [method, path_prefix, error],
+    def fail_request(route):
+        if route.request.method.upper() != method:
+            route.fallback()
+            return
+        route.fulfill(status=503, json={"error": error})
+
+    page.route(
+        f"**{path_prefix}*",
+        fail_request,
+        times=1,
     )
 
 
-# @features forms
-# @dimensions builder-save retryable-action persistent-error focus-recovery
+# @matrix forms : builder-save focus-recovery persistent-error retryable-action
 # @template forms/builder.html::header
 def test_builder_save_failure_releases_control_for_retry(get_user):
     user = get_user(Users.OWNER)

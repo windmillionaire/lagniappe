@@ -23,11 +23,7 @@ from testing.utility.notification_email_fakes import (
 pytestmark = pytest.mark.unit
 
 
-# @source lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @source lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @pairs notification-email:immediate notification-email:html notification-email:idempotency
-# @pair notification-email:presence-suppression
-# @pairs notification-email:notification notification-email:pending-filter
+# @matrix notification-email : html idempotency immediate notification pending-filter presence-suppression
 def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
     store = MemoryDatastore()
@@ -169,8 +165,6 @@ def test_immediate_notification_is_delayed_escaped_and_delivered(monkeypatch):
     assert len(sent) == 1
 
 
-# @source lagniappe/core/tools/email/notifications/capture.py::record_document_mention
-# @source lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @pair notification-email:document-mention
 def test_document_mention_email_uses_concise_copy_and_document_tab(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)
@@ -243,8 +237,6 @@ def test_document_mention_email_uses_concise_copy_and_document_tab(monkeypatch):
     )
 
 
-# @source lagniappe/core/tools/email/notifications/capture.py::record_notification
-# @source lagniappe/core/tools/email/notifications/delivery.py::deliver
 # @pair notification-email:task-assignment
 def test_task_assignment_email_uses_task_copy_without_headers(monkeypatch):
     now = datetime(2026, 8, 15, 12, tzinfo=timezone.utc)

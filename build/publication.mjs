@@ -129,8 +129,7 @@ const filesUnder = (root, relativeRoot) => {
  *
  * @testable true
  * @tests tests_js/test_022_build_chunk_versioning.py::test_frontend_publication_records_recursive_artifacts_and_source_identity
- * @features frontend-build
- * @dimensions source-integrity
+ * @pair frontend-build:source-integrity
  */
 const frontendSourceIdentity = (root = process.cwd()) => {
 	const contract = publicationContract(root);
@@ -175,8 +174,7 @@ const outputArtifactPath = (outputOptions, fileName) => {
  *
  * @testable true
  * @tests tests_js/test_022_build_chunk_versioning.py::test_frontend_publication_records_recursive_artifacts_and_source_identity
- * @features frontend-build
- * @dimensions artifact-inventory nested-chunks
+ * @matrix frontend-build : artifact-inventory nested-chunks
  */
 const recordBuildArtifacts = ({
 	final = false,
@@ -238,8 +236,7 @@ const artifactRecord = (root, pathValue) => {
  * @testable true
  * @tests tests_js/test_022_build_chunk_versioning.py::test_frontend_publication_records_recursive_artifacts_and_source_identity
  * @tests tests_js/test_022_build_chunk_versioning.py::test_frontend_publication_rejects_missing_outputs_and_source_drift
- * @features frontend-build
- * @dimensions completion-marker artifact-integrity source-integrity safe-failure
+ * @matrix frontend-build : artifact-integrity completion-marker safe-failure source-integrity
  */
 const publishFrontendBuild = ({
 	root = process.cwd(),

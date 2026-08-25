@@ -190,7 +190,7 @@ def _normalize_conversation_ids(state: ArchiveState) -> None:
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_staging_selects_durable_types_and_builds_typed_identity_map
-# @pairs portable-json:entity-selection portable-json:portable-identity portable-json:bounded-scan
+# @matrix portable-json : bounded-scan entity-selection portable-identity
 def stage_database(
     client,
     state: ArchiveState,
@@ -471,7 +471,7 @@ def _asset_tags(state, owner, raw_assets):
 # @tests tests_tooling/test_008_data_lifecycle.py::test_staging_selects_durable_types_and_builds_typed_identity_map
 # @tests tests_tooling/test_008_data_lifecycle.py::test_staging_replaces_source_and_scratch_keys_recursively
 # @tests tests_tooling/test_008_data_lifecycle.py::test_history_and_messages_are_nested_and_replanned_under_their_owners
-# @pairs portable-json:entity-envelope portable-json:key-replacement portable-json:typed-references portable-json:owner-scoped-children portable-json:natural-identity
+# @matrix portable-json : entity-envelope key-replacement natural-identity owner-scoped-children typed-references
 def portable_records(state: ArchiveState) -> list[dict[str, Any]]:
     """Build top-level records with task history and messages nested under owners."""
     if state.connection is None:

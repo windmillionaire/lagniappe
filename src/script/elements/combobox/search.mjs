@@ -7,9 +7,8 @@ import { Results } from "./results";
  * @testable true
  * @tests tests_e2e/009_search/test_009a_search_page.py::test_search_from_navbar
  * @tests tests_js/test_046_async_query_lifecycle.py::test_search_threshold_settles_stale_work_and_restores_recent_results
- * @features search
- * @dimensions navbar-submit page-navigation
- * @pairs search:threshold search:recent-results search:stale-publication
+ * @matrix search : recent-results stale-publication threshold
+ * @pair search:page-navigation
  */
 export class SearchBox extends RemoteQueryCombobox {
 	constructor(element) {
@@ -65,8 +64,7 @@ export class SearchBox extends RemoteQueryCombobox {
 	 * @testable true
 	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_click_result_navigates
 	 * @tests tests_e2e/009_search/test_009a_search_page.py::test_result_links_correct
-	 * @features search
-	 * @dimensions result-navigation result-links
+	 * @matrix search : result-links result-navigation
 	 * @template nav.html::search_results
 	 */
 	selectOption(option) {

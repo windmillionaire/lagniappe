@@ -43,10 +43,7 @@ def poll(user, subscriptions):
     )
 
 
-# @pairs polling:protocol polling:entity polling:channel polling:batching
-# @pairs polling:identifiers polling:fingerprint polling:revision
-# @pairs polling:unavailable polling:authorization polling:validation
-# @pair polling:permissions
+# @matrix polling : authorization batching channel entity fingerprint identifiers permissions protocol revision unavailable validation
 def test_poll_endpoint_batches_entity_changes(get_user, browser_failures):
     owner = get_user(Users.OWNER)
     page = Pages.test_sync_form_page.get(owner)
@@ -177,8 +174,9 @@ def test_poll_endpoint_batches_entity_changes(get_user, browser_failures):
         assert oversized["status"] == 422
 
 
-# @pairs notifications:cold-seed notifications:ping notifications:redis-projection
-# @pairs polling:personal-state polling:piggyback web-headers:notification-state
+# @matrix notifications : cold-seed ping redis-projection
+# @matrix polling : personal-state piggyback
+# @pair web-headers:notification-state
 def test_cold_notification_state_seeds_through_one_poll(get_user):
     owner = get_user(Users.OWNER)
     actor = Entities.USER.load(owner.email)

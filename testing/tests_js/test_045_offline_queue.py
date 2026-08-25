@@ -49,7 +49,7 @@ def run_offline_queue_check(run_node, script):
     run_node(OFFLINE_QUEUE_HARNESS + script)
 
 
-# @pairs offline:replay-order offline:queue-preserved
+# @matrix offline : queue-preserved replay-order
 def test_offline_replay_blocks_later_records_after_the_oldest_record_fails(
     run_node,
 ):
@@ -119,7 +119,7 @@ def test_offline_replay_blocks_later_records_after_the_oldest_record_fails(
     )
 
 
-# @pairs offline:replay-order offline:queue-preserved offline:retry-boundary
+# @matrix offline : queue-preserved replay-order retry-boundary
 def test_offline_replay_returns_the_completed_prefix_and_retries_the_oldest_record(
     run_node,
 ):
@@ -195,7 +195,7 @@ def test_offline_replay_returns_the_completed_prefix_and_retries_the_oldest_reco
     )
 
 
-# @pairs offline:conflict-rebase offline:replay-order
+# @matrix offline : conflict-rebase replay-order
 def test_offline_replay_retries_rebased_record_before_later_record(run_node):
     run_offline_queue_check(
         run_node,
@@ -253,7 +253,7 @@ def test_offline_replay_retries_rebased_record_before_later_record(run_node):
     )
 
 
-# @pairs offline:replay-order offline:queue-preserved offline:retry-boundary
+# @matrix offline : queue-preserved replay-order retry-boundary
 def test_offline_replay_releases_ownership_after_handler_errors(run_node):
     run_offline_queue_check(
         run_node,

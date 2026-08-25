@@ -69,8 +69,7 @@ class _ValidatedURL:
 
 # @testable true
 # @tests tests_unit/test_032_outbound_http.py::test_pinned_adapter_connects_to_address_with_original_host_and_tls_identity
-# @features outbound-http
-# @dimensions dns-pinning host-header sni certificate-hostname
+# @matrix outbound-http : certificate-hostname dns-pinning host-header sni
 class _PinnedAddressAdapter(HTTPAdapter):
     """Requests adapter that verifies an IP connection as the original host."""
 
@@ -359,8 +358,7 @@ def _user_request(target, address, headers, timeout):
 # @tests tests_unit/test_032_outbound_http.py::test_user_fetch_assigns_verified_raster_media_type
 # @tests tests_unit/test_032_outbound_http.py::test_profile_image_policy_is_https_only
 # @tests tests_e2e/004_projects/test_004e_document_forms.py::test_editor_preview_rejects_private_targets_without_disrupting_popover
-# @features outbound-http
-# @dimensions url-validation dns-pinning redirects streaming deadline media raster closure privacy address-failover https-only bounds proxy-isolation
+# @matrix outbound-http : address-failover bounds closure deadline dns-pinning https-only media privacy proxy-isolation raster redirects streaming url-validation
 def fetch_user_content(
     url: str,
     policy: UserFetchPolicy,
@@ -559,8 +557,7 @@ def _trusted_url(policy: TrustedProviderPolicy, path: str) -> str:
 # @testable true
 # @tests tests_unit/test_032_outbound_http.py::test_trusted_client_enforces_fixed_host_bounds_deadline_and_closure
 # @tests tests_unit/test_032_outbound_http.py::test_trusted_client_retries_only_explicit_method_and_status
-# @features outbound-http
-# @dimensions trusted-provider fixed-host redirects streaming deadline retry closure privacy bounds proxy-isolation
+# @matrix outbound-http : bounds closure deadline fixed-host privacy proxy-isolation redirects retry streaming trusted-provider
 def request_trusted_content(
     method: str,
     path: str,

@@ -10,8 +10,7 @@ from lagniappe import CONFIG
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_current_user_prefers_explicit_user
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_current_user_uses_config_test_user_without_request
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_current_user_prefers_flask_user_over_config
-# @features users, testing
-# @dimensions current-user resolver config-mutable flask-request
+# @matrix testing users : config-mutable current-user flask-request resolver
 def current_context_user(user=None):
     """Return explicit user, Flask-Login user in requests, then test config user."""
     if user is not None:

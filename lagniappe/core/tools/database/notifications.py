@@ -63,7 +63,7 @@ def _ordinary_count(user):
 
 # @testable true
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @pairs notifications:aggregate-repair notifications:idempotency
+# @matrix notifications : aggregate-repair idempotency
 @retry_aborted
 def repair_notification_aggregate(user, *, ordinary_count=None):
     key = aggregate_key(user)
@@ -91,7 +91,7 @@ def ensure_notification_aggregate(user):
 # @testable true
 # @tests tests_unit/test_027b_messaging_service.py::test_message_transactions_are_idempotent_and_keep_exact_unread_counts
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @pairs notifications:aggregate-count notifications:revision
+# @matrix notifications : aggregate-count revision
 def mutate_notification_aggregate(
     transaction,
     user,
@@ -158,7 +158,7 @@ def prepare_ordinary_notification(key, user, *, body, target=None):
 
 # @testable true
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @pairs notifications:ordinary-create notifications:idempotency notifications:aggregate-count
+# @matrix notifications : aggregate-count idempotency ordinary-create
 @retry_aborted
 def create_ordinary_notification_record(user, *, identifier, body, target=None):
     ensure_notification_aggregate(user)
@@ -179,7 +179,7 @@ def create_ordinary_notification_record(user, *, identifier, body, target=None):
 
 # @testable true
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @pairs notifications:ordinary-delete notifications:aggregate-count
+# @matrix notifications : aggregate-count ordinary-delete
 @retry_aborted
 def delete_ordinary_notification_record(user, notification_key):
     ensure_notification_aggregate(user)
@@ -201,7 +201,7 @@ def delete_ordinary_notification_record(user, notification_key):
 
 # @testable true
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
-# @pairs notifications:ordinary-clear notifications:aggregate-count
+# @matrix notifications : aggregate-count ordinary-clear
 @retry_aborted
 def clear_ordinary_notification_records(user, keys):
     ensure_notification_aggregate(user)
@@ -227,7 +227,7 @@ def clear_ordinary_notification_records(user, keys):
 
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_notification_keys_query_returns_only_ancestor_keys
-# @pairs notifications:cold-seed notifications:keys-only
+# @matrix notifications : cold-seed keys-only
 def notification_keys(parent):
     parent_key = datastore_key(parent)
     if not parent_key:
@@ -246,7 +246,7 @@ def notification_keys(parent):
 
 # @testable true
 # @tests tests_unit/test_002j_notes.py::test_notification_page_is_bounded_and_excludes_aggregate_rows
-# @pairs notifications:bounded-page notifications:ordinary-discriminator notifications:cursor
+# @matrix notifications : bounded-page cursor ordinary-discriminator
 def notifications_page(parent, start_cursor=None, limit=25):
     parent_key = datastore_key(parent)
     if not parent_key:

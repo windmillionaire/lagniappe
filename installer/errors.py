@@ -12,8 +12,7 @@ PLAYWRIGHT_TIMEOUT = 1200
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
-# @features setup
-# @dimensions errors exit-status
+# @matrix setup : errors exit-status
 class SetupError(RuntimeError):
     """Base failure mapped to a nonzero process status by ``python -m installer``."""
 
@@ -85,8 +84,7 @@ def _status_code(error):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
-# @features setup
-# @dimensions provider-errors classification
+# @matrix setup : classification provider-errors
 def classify_provider_error(error, *, message=None, status_code=None):
     """Return one typed provider failure without confusing access with absence."""
     if isinstance(error, ProviderError):
@@ -142,8 +140,7 @@ def classify_provider_error(error, *, message=None, status_code=None):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
-# @features setup
-# @dimensions provider-errors retry timeout
+# @matrix setup : provider-errors retry timeout
 def retry_provider_call(
     operation,
     *,

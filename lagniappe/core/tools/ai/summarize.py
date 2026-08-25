@@ -50,8 +50,7 @@ PDF_PAGE_LIMIT_SUMMARY_ERROR = (
 
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_summary_eligibility_includes_ooxml_fallback
-# @features ai
-# @dimensions summary-prompt ooxml eligibility
+# @matrix ai : eligibility ooxml summary-prompt
 def can_summarize_file(file):
     """Return whether a file has an AI-readable original or OOXML fallback."""
     if _file_part(file):
@@ -66,7 +65,8 @@ def can_summarize_file(file):
 # @testable true
 # @tests tests_unit/test_015_ai_tools.py::test_summary_eligibility_includes_ooxml_fallback
 # @tests tests_unit/test_006_file_properties.py::test_file_processing_dispatches_summary_before_extraction
-# @pairs ai:summary-prompt ai:ooxml ai:eligibility ai:task-queue
+# @matrix ai : eligibility ooxml summary-prompt task-queue
+# @pair file:summary-first
 def summarize_file(
     file,
     *,
@@ -226,8 +226,7 @@ def _is_pdf_page_limit_error(file, error):
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_marks_pdf_page_limit_without_capture
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_ai_summary_generation_rejects_oversized_ooxml_before_download
 # @tests tests_unit/test_015_ai_tools.py::test_ai_summary_generation_populates_file_search_cache
-# @features ai
-# @dimensions summary-prompt status errors cache quota ooxml docx unreadable-pdf pdf-page-limit
+# @matrix ai : cache docx errors ooxml pdf-page-limit quota status summary-prompt unreadable-pdf
 def generate_summary(
     file,
     raise_quota=False,

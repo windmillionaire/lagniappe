@@ -6,8 +6,7 @@ const MUTATION_STORE = "mutations";
 /**
  * @testable true
  * @tests tests_js/test_028_form_state_split.py::test_offline_database_upgrade_discards_legacy_activity_records
- * @features offline
- * @dimensions database-upgrade legacy-record-discard mutation-store
+ * @matrix offline : database-upgrade legacy-record-discard mutation-store
  */
 function openDB() {
 	return new Promise((resolve, reject) => {
@@ -45,8 +44,7 @@ function openDB() {
  * @tests tests_js/test_045_browser_persistence.py::test_indexeddb_operations_resolve_only_after_transaction_commit
  * @tests tests_js/test_045_browser_persistence.py::test_indexeddb_abort_and_errors_reject_once_and_close_the_database
  * @tests tests_js/test_045_browser_persistence.py::test_indexeddb_executor_failures_abort_and_preserve_the_original_error
- * @features offline sync
- * @dimensions transaction-commit transaction-abort error-ownership connection-lifecycle executor-error multi-delete readonly-result
+ * @matrix offline sync : connection-lifecycle error-ownership executor-error multi-delete readonly-result transaction-abort transaction-commit
  */
 function withTransaction(storeNames, mode, executor) {
 	return openDB().then(
@@ -175,8 +173,7 @@ function promisify(request) {
  * @testable true
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_failed_offline_replay_keeps_queue_and_retries
- * @features sync
- * @dimensions offline-replay replay-order queue-preserved
+ * @matrix sync : offline-replay queue-preserved replay-order
  */
 export function updateSyncRecord(record) {
 	const timestamp = Date.now();
@@ -213,8 +210,7 @@ export function getSyncRecord(sync_id) {
  * @testable true
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_failed_offline_replay_keeps_queue_and_retries
- * @features sync
- * @dimensions offline-replay replay-order queue-preserved
+ * @matrix sync : offline-replay queue-preserved replay-order
  */
 export function getAllOfflineRecords() {
 	return withTransaction(
@@ -244,8 +240,7 @@ export function deleteSyncRecord(sync_id) {
 /**
  * @testable true
  * @tests tests_e2e/010_sync/test_010c_offline_replay.py::test_offline_document_edits_replay_in_order
- * @features sync
- * @dimensions offline-replay queue-clear
+ * @matrix sync : offline-replay queue-clear
  */
 export function deleteSyncRecords(sync_ids) {
 	if (!sync_ids?.length) return Promise.resolve();
@@ -259,7 +254,7 @@ export function deleteSyncRecords(sync_ids) {
  * @testable true
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_create_mutations_persist_after_reload
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
- * @pairs offline:queue-create offline:queue-submit offline:reload
+ * @matrix offline : queue-create queue-submit reload
  */
 export function setOfflineMutation(record) {
 	return withTransaction(MUTATION_STORE, "readwrite", async (tx) => {
@@ -272,8 +267,7 @@ export function setOfflineMutation(record) {
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_reload_uses_server_state_until_replay
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutations_replay_when_online
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
- * @features offline
- * @dimensions durable-queue server-first replay queue-submit
+ * @matrix offline : durable-queue queue-submit replay server-first
  */
 export function getOfflineMutations() {
 	return withTransaction(MUTATION_STORE, "readonly", async (tx) => {
@@ -285,7 +279,7 @@ export function getOfflineMutations() {
  * @testable true
  * @tests tests_e2e/002_home/test_002i_home_activity.py::test_offline_home_mutations_replay_when_online
  * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_lp_offline_submit_replays_and_notifies
- * @pairs offline:replay offline:queue-clear offline:notification
+ * @matrix offline : notification queue-clear replay
  */
 export function deleteOfflineMutations(ids) {
 	if (!ids?.length) return Promise.resolve();

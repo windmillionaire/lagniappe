@@ -53,7 +53,8 @@ def _site_image_response(paths):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
-# @pairs admin:roster owner:awaiting-first-sign-in admin:managed-users owner:role-controls
+# @matrix admin : managed-users roster
+# @matrix owner : awaiting-first-sign-in role-controls
 def _administrator_payload():
     """Return the canonical Owner, additional Admins, and promotion choices."""
     rows = database.get.users(limit=None).results
@@ -125,6 +126,7 @@ def _role_target(identifier):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001e_entity_lifecycle.py::test_entity_delete_cascades_dependents_assets_and_cache
+# @pair entities:delete
 @internal.route("/delete/<key>", methods=["GET"])
 @permission(requested=Action.DELETE)
 def delete(key, **kwargs):
@@ -140,8 +142,7 @@ def delete(key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001d_offline.py::test_offline_indicator_toggles
-# @features offline
-# @dimensions indicator
+# @pair offline:indicator
 @home.route("/offline", methods=["GET"])
 def offline():
     g.NO_CACHE = True
@@ -151,7 +152,7 @@ def offline():
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_cache_setup
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_maintenance_update_and_cache_refresh_use_real_routes
-# @pairs cache:redis-connection cache:current
+# @matrix cache : current redis-connection
 @internal.route("/rebuild-cache", methods=["POST"])
 @permission(Resource.SITE)
 def rebuild_cache():
@@ -166,7 +167,7 @@ def rebuild_cache():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_maintenance_update_and_cache_refresh_use_real_routes
-# @pairs admin:site-update admin:success
+# @matrix admin : site-update success
 @internal.route("/site-update", methods=["POST"])
 @permission(Resource.SITE)
 def site_update():
@@ -182,8 +183,7 @@ def site_update():
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
-# @features admin
-# @dimensions site-settings admin-only public-preview metadata
+# @matrix admin : admin-only metadata public-preview site-settings
 @internal.route("/site-settings", methods=["GET"])
 @permission(Resource.SITE)
 def site_settings():
@@ -303,7 +303,7 @@ def site_settings():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
-# @pairs admin:promotion owner:owner-only cache:cache-invalidation
+# @pairs admin:promotion cache:cache-invalidation owner:owner-only
 @internal.route("/site-administrators", methods=["POST"])
 @owner_only
 def promote_site_administrator():
@@ -328,8 +328,8 @@ def promote_site_administrator():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_administrator_roster_and_owner_controls
-# @pairs admin:demotion owner:owner-only cache:cache-invalidation
-# @pair admin:account-preservation
+# @matrix admin : account-preservation demotion
+# @pairs cache:cache-invalidation owner:owner-only
 @internal.route("/site-administrators/<key>", methods=["DELETE"])
 @owner_only
 def demote_site_administrator(key):
@@ -350,8 +350,7 @@ def demote_site_administrator(key):
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
-# @features admin
-# @dimensions deployment-settings metadata validation
+# @matrix admin : deployment-settings metadata validation
 @internal.route("/set-deployment-settings", methods=["POST"])
 @permission(Resource.SITE)
 def set_deployment_settings():
@@ -368,8 +367,7 @@ def set_deployment_settings():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_ai_form_saves_current_models_through_route
-# @features admin
-# @dimensions ai-settings validation
+# @matrix admin : ai-settings validation
 @internal.route("/set-ai-settings", methods=["POST"])
 @permission(Resource.SITE)
 def set_ai_settings():
@@ -398,7 +396,8 @@ def set_ai_settings():
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_sections_expand_help_and_configuration
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
-# @pairs owner:sensitive-configuration owner:configuration
+# @matrix owner : configuration sensitive-configuration
+# @pair admin:site-settings
 @internal.route("/site-configuration", methods=["GET"])
 @owner_only
 def site_configuration():
@@ -408,8 +407,7 @@ def site_configuration():
 
 # @testable true
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_image_upload_generates_and_persists_site_images
-# @features admin
-# @dimensions site-image-upload generated-images public-preview metadata
+# @matrix admin : generated-images metadata public-preview site-image-upload
 @internal.route("/set-site-image", methods=["POST"])
 @permission(Resource.SITE)
 def set_site_image():
@@ -444,8 +442,8 @@ def set_site_image_direct():
 # @tests tests_e2e/001_site/test_001a_environment.py::test_ping_notification_state_is_redis_only_and_optional
 # @tests tests_e2e/001_site/test_001d_offline.py::test_failed_ping_marks_view_offline_until_next_sync_event
 # @tests tests_e2e/001_site/test_001d_offline.py::test_offline_poll_recovers_without_online_event
-# @pairs notifications:ping notifications:redis-projection
-# @pair web-headers:notification-state
+# @matrix notifications : ping redis-projection
+# @pairs offline:server-health server:initialization web-headers:notification-state
 @internal.route("/ping")
 def ping():
     g.NO_CACHE = True
@@ -462,8 +460,7 @@ def ping():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_privacy_policy_is_public
-# @features privacy public-pages
-# @dimensions anonymous-access document-load
+# @matrix privacy public-pages : anonymous-access document-load
 @home.route("/privacy-policy", methods=["GET"])
 def privacy_policy():
     return responses.privacy_policy()
@@ -471,8 +468,7 @@ def privacy_policy():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_reporting_privacy_notice_is_public
-# @features privacy public-pages error-reporting
-# @dimensions anonymous-access document-load maintainer-destination
+# @matrix error-reporting privacy public-pages : anonymous-access document-load maintainer-destination
 @home.route("/reporting_privacy", methods=["GET"])
 def reporting_privacy():
     return responses.reporting_privacy()
@@ -480,6 +476,7 @@ def reporting_privacy():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
+# @pair login:remember-cookie
 @internal.route("/token")
 def refresh_token():
     g.NO_CACHE = True
@@ -488,8 +485,7 @@ def refresh_token():
 
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_page_loads
-# @features login
-# @dimensions page-load form-state
+# @matrix login : form-state page-load
 @internal.route("/identity-config")
 def identity_config():
     g.NO_CACHE = True
@@ -499,8 +495,8 @@ def identity_config():
 # @testable true
 # @tests tests_e2e/001_site/test_001b_login.py::test_login_sets_hardened_auth_cookies
 # @tests tests_e2e/001_site/test_001a_environment.py::test_update_session_rejects_invalid_timezone_and_location_atomically
-# @features session location timezone
-# @dimensions validation atomic-update coordinates
+# @matrix location session timezone : atomic-update coordinates validation
+# @pair login:remember-cookie
 @internal.route("/update-session", methods=["POST"])
 @logged_in
 def update_session():
@@ -550,8 +546,7 @@ def update_session():
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ai_access_tiers_gate_tool_routes
 # @tests tests_e2e/002_home/test_002j_home_tools.py::test_ask_access_can_read_create_report_without_create_actions
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_requires_administrator
-# @features cache
-# @dimensions invalidation-acknowledgement
+# @pair cache:invalidation-acknowledgement
 @internal.route("/validate-user", methods=["POST"])
 @logged_in
 def validate_user():

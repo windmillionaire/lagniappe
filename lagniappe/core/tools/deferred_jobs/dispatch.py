@@ -24,9 +24,7 @@ _feedback_task_id = TaskIdentity.feedback
 class DeferredJobDispatch:
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_production_dispatch_rejects_disabled_task_queue
-    # @pair deferred-jobs:dispatch
-    # @pair deferred-jobs:disabled-queue
-    # @pair deferred-jobs:task-identity
+    # @matrix deferred-jobs : disabled-queue dispatch task-identity
     def dispatch(self, job, *, attempt, delay_seconds=0, task_suffix=None):
         adapter = self.adapter(job.job_type)
         if CONFIG.production:
@@ -62,8 +60,7 @@ class DeferredJobDispatch:
 
     # @testable true
     # @tests tests_unit/test_023b_deferred_job_service.py::test_long_running_feedback_dispatch_is_delayed_and_deterministic
-    # @features deferred-jobs notifications
-    # @dimensions long-running feedback scheduling
+    # @matrix deferred-jobs notifications : feedback long-running scheduling
     def dispatch_feedback(self, job):
         """Schedule a bounded user-facing update for unusually long work."""
         if (

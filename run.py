@@ -45,8 +45,7 @@ def hosted_e2e_enabled() -> bool:
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_configure_test_environment_prepares_frontend_only_for_e2e
 # @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
-# @features testing hosted-e2e
-# @dimensions cli-routing frontend-build
+# @matrix hosted-e2e testing : frontend-build
 def configure_test_environment(*, includes_e2e: bool) -> None:
     """Set test env vars before pytest imports the app package."""
     os.environ["FLASK_ENV"] = "testing"
@@ -123,8 +122,7 @@ def _run_pytest_subprocess(command: list[str]) -> int:
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_e2e_aligns_adc_before_pytest
 # @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
-# @features testing hosted-e2e
-# @dimensions cli-routing provider-auth
+# @pairs hosted-e2e:frontend-build testing:adc
 def run_tests(test_args: list[str]) -> int:
     """Run pytest through the repo wrapper.
 
@@ -250,8 +248,7 @@ def run_test_server_command(command_args: list[str]) -> int:
 # @testable true
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_auth_runs_interactive_human_adc_alignment
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_auth_reports_alignment_failure
-# @features auth
-# @dimensions adc runtime-identity interactive explicit-command
+# @matrix auth : explicit-command interactive
 def run_auth_command(command_args: list[str]) -> int:
     """Interactively align human ADC for local runtime impersonation."""
     parser = argparse.ArgumentParser(
@@ -351,8 +348,7 @@ def _update_reporting_privacy_version(version: str) -> tuple[Path, ...]:
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_version_show_uses_package_only_before_generated_settings_exist
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_version_note_appends_concise_release_entry
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_version_set_updates_package_settings_and_release_file
-# @features version
-# @dimensions cli-routing
+# @pair version:cli-routing
 def run_version_command(command_args: list[str]) -> int:
     parser = argparse.ArgumentParser(
         prog="run.py version",
@@ -505,8 +501,7 @@ def _read_release_json(
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_accepts_complete_release
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_development_build
 # @tests tests_tooling/test_007_run_py_test_command.py::test_run_py_release_check_rejects_incomplete_release
-# @features release
-# @dimensions delivery-tree build-mode
+# @matrix release : build-mode delivery-tree
 def release_readiness_issues(
     repo_root: Path,
     base_ref: str,

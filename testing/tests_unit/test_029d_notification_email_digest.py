@@ -26,8 +26,7 @@ from testing.utility.test_entities import TestEntities
 pytestmark = pytest.mark.unit
 
 
-# @source lagniappe/core/tools/database/notification_email.py::digest_events
-# @pairs notification-email:digest-query notification-email:recipient-scope
+# @matrix notification-email : digest-query recipient-scope
 def test_daily_digest_query_retains_recipient_and_bucket_scope(monkeypatch):
     captured = {}
 
@@ -75,11 +74,7 @@ def test_daily_digest_query_retains_recipient_and_bucket_scope(monkeypatch):
     }
 
 
-# @source lagniappe/core/tools/email/notifications/capture.py::record_notification
-# @source lagniappe/core/tools/email/notifications/capture.py::record_message
-# @source lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @pairs notification-email:digest notification-email:message-grouping
-# @pairs notification-email:target-title notification-email:target-link
+# @matrix notification-email : digest message-grouping target-link target-title
 def test_daily_digest_groups_messages_and_uses_named_completion_links(monkeypatch):
     now = datetime(2026, 8, 15, 14, tzinfo=timezone.utc)
     store = MemoryDatastore()
@@ -261,11 +256,7 @@ def test_daily_digest_groups_messages_and_uses_named_completion_links(monkeypatc
     assert report_url in html_body
 
 
-# @source lagniappe/core/tools/email/notifications/capture.py::record_notification_event
-# @source lagniappe/core/tools/email/notifications/delivery.py::deliver
-# @pairs notification-email:digest notification-email:timezone notification-email:full-roundup
-# @pair notification-email:future-only-switch
-# @pair notification-email:item-cap
+# @matrix notification-email : digest full-roundup future-only-switch item-cap timezone
 def test_daily_digest_uses_next_local_eight_and_batches(monkeypatch):
     now = datetime(2026, 8, 15, 14, tzinfo=timezone.utc)
     store = MemoryDatastore()

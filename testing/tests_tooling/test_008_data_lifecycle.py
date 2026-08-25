@@ -175,8 +175,7 @@ class _Bucket:
         return copied
 
 
-# @features data-lifecycle
-# @dimensions identifier-validation path-containment
+# @matrix data-lifecycle : identifier-validation path-containment
 def test_identifiers_and_storage_paths_are_strict():
     assert validate_backup_id(BACKUP_ID) == BACKUP_ID
     assert validate_database_id("archive-db") == "archive-db"
@@ -196,8 +195,7 @@ def test_identifiers_and_storage_paths_are_strict():
             parse_gs_uri(invalid)
 
 
-# @features data-lifecycle
-# @dimensions manifest path-containment
+# @matrix data-lifecycle : manifest path-containment
 def test_manifest_validation_rejects_foreign_or_uncontained_artifacts():
     valid = _manifest().as_dict()
     assert BackupManifest.from_dict(
@@ -215,8 +213,7 @@ def test_manifest_validation_rejects_foreign_or_uncontained_artifacts():
         BackupManifest.from_dict({**valid, "credential": "secret"})
 
 
-# @features data-lifecycle
-# @dimensions provider-context
+# @pair data-lifecycle:provider-context
 def test_provider_context_always_uses_default_database_and_recovery_bucket():
     settings = SimpleNamespace(
         APP={
@@ -234,8 +231,7 @@ def test_provider_context_always_uses_default_database_and_recovery_bucket():
     assert context.recovery_bucket.startswith("test-recovery-")
 
 
-# @features data-lifecycle
-# @dimensions queue-purge-audit provider-pagination immutable-restore-record
+# @matrix data-lifecycle : immutable-restore-record provider-pagination queue-purge-audit
 def test_queue_snapshot_preserves_full_task_definitions():
     class TasksClient:
         def __init__(self):
@@ -330,8 +326,7 @@ def test_cutover_waits_for_dispatched_task_attempts_to_settle():
     assert delays == [1]
 
 
-# @features data-lifecycle
-# @dimensions operation-polling failure-propagation
+# @matrix data-lifecycle : failure-propagation operation-polling
 def test_operation_polling_resumes_and_reports_provider_failure(monkeypatch):
     states = iter([{"done": False}, {"done": True, "metadata": {"common": {"state": "SUCCESSFUL"}}}])
     context = ProviderContext(PROJECT_ID, "(default)", BUCKET, "0.3", sleep=lambda _delay: None)
@@ -342,8 +337,7 @@ def test_operation_polling_resumes_and_reports_provider_failure(monkeypatch):
         context.wait_for_operation(OPERATION)
 
 
-# @features data-lifecycle
-# @dimensions private-state resume
+# @matrix data-lifecycle : private-state resume
 def test_secure_directory_and_checkpoint_exact_resume(tmp_path):
     private = secure_directory(tmp_path / "private")
     if os.name != "nt":
@@ -357,8 +351,7 @@ def test_secure_directory_and_checkpoint_exact_resume(tmp_path):
     assert different.load() is None
 
 
-# @features data-lifecycle
-# @dimensions resume sqlite-staging
+# @matrix data-lifecycle : resume sqlite-staging
 def test_archive_state_is_private_transactional_and_resumable(tmp_path):
     path = tmp_path / "private" / "archive.sqlite3"
     with ArchiveState(path) as state:
@@ -429,8 +422,7 @@ def _backup_context():
     return context
 
 
-# @features data-lifecycle
-# @dimensions backup resume manifest-last
+# @matrix data-lifecycle : backup manifest-last resume
 def test_backup_resumes_provider_operation_and_publishes_manifest_last(tmp_path):
     context = _backup_context()
     checkpoint = LifecycleCheckpoint(PROJECT_ID, ["backup", "create"], state_root=tmp_path)
@@ -468,8 +460,7 @@ def test_backup_resumes_provider_operation_and_publishes_manifest_last(tmp_path)
     assert fresh.load() is None
 
 
-# @features data-lifecycle
-# @dimensions backup migration-gate point-in-time
+# @matrix data-lifecycle : backup migration-gate point-in-time
 def test_backup_migrates_before_selecting_a_live_snapshot(tmp_path):
     context = _backup_context()
     context.expected_snapshot = datetime(2026, 8, 23, 12, 1, tzinfo=timezone.utc)
@@ -493,8 +484,7 @@ def test_backup_migrates_before_selecting_a_live_snapshot(tmp_path):
     assert calls == [("migrate", "(default)"), ("sleep", 41.0)]
 
 
-# @features data-lifecycle
-# @dimensions backup-list manifest
+# @matrix data-lifecycle : backup-list manifest
 def test_backup_listing_ignores_invalid_incomplete_and_foreign_objects():
     valid = _manifest()
     blobs = [
@@ -510,8 +500,7 @@ def test_backup_listing_ignores_invalid_incomplete_and_foreign_objects():
     assert list_backups(context) == [valid]
 
 
-# @features data-lifecycle
-# @dimensions backup-delete confirmation path-containment
+# @matrix data-lifecycle : backup-delete confirmation path-containment
 def test_backup_delete_requires_typed_confirmation_and_manifest_first():
     manifest_blob = _Blob(
         f"{BACKUP_ROOT_PREFIX}/{BACKUP_ID}/manifest.json",
@@ -535,8 +524,7 @@ def test_backup_delete_requires_typed_confirmation_and_manifest_first():
     assert data_blob.deleted == [{}]
 
 
-# @features data-lifecycle
-# @dimensions native-materialization named-scratch-database
+# @matrix data-lifecycle : named-scratch-database native-materialization
 def test_native_backup_materialization_uses_scratch_then_v3(monkeypatch, tmp_path):
     native = f"projects/{PROJECT_ID}/locations/nam5/backups/native-1"
     calls = []
@@ -596,8 +584,7 @@ def test_native_backup_materialization_uses_scratch_then_v3(monkeypatch, tmp_pat
     assert not checkpoint.path.exists()
 
 
-# @features portable-json
-# @dimensions path-safety reference-escaping
+# @matrix portable-json : path-safety reference-escaping
 def test_portable_names_and_reference_strings_are_lossless():
     for value in ("simple", "UPPER / café", "ref:literal"):
         assert unportable_name(portable_name(value)) == value
@@ -611,8 +598,7 @@ def test_portable_names_and_reference_strings_are_lossless():
     assert encoded["literal"] == "literal:ref:page:abc123"
 
 
-# @features portable-json
-# @dimensions value-codec round-trip canonical-encoding
+# @matrix portable-json : canonical-encoding round-trip value-codec
 def test_value_codec_round_trips_every_supported_value():
     key = Key("users", "one", project=PROJECT_ID)
     nested = Entity(key=key, exclude_from_indexes=("secret",))
@@ -640,8 +626,7 @@ def test_value_codec_round_trips_every_supported_value():
         codec.encode({1: "invalid"})
 
 
-# @features portable-json
-# @dimensions sharding deterministic-order entity-envelope
+# @matrix portable-json : deterministic-order entity-envelope sharding
 def test_shard_writer_enforces_count_bytes_and_ordering(tmp_path, monkeypatch):
     from installer.data_lifecycle import portable
 
@@ -654,8 +639,7 @@ def test_shard_writer_enforces_count_bytes_and_ordering(tmp_path, monkeypatch):
         ShardWriter(tmp_path / "bad").write_type("page", reversed(records))
 
 
-# @features portable-json
-# @dimensions import-planner two-pass-resolution
+# @matrix portable-json : import-planner two-pass-resolution
 def test_import_planner_is_source_independent_and_resolves_two_pass_references(tmp_path):
     user = _record("user", "userhash0001", {"name": "Owner"})
     user_reference = PortableReference("user", "userhash0001")
@@ -705,8 +689,7 @@ class _ScanClient:
         return _Query(self.rows.get((namespace or "", kind), []))
 
 
-# @features data-lifecycle disaster-recovery
-# @dimensions point-in-time inventory asset-generation
+# @matrix data-lifecycle disaster-recovery : asset-generation inventory point-in-time
 def test_recovery_inventory_uses_one_read_time_and_requires_asset_generations():
     snapshot = datetime(2026, 8, 24, 12, tzinfo=timezone.utc)
     page = _entity(
@@ -735,8 +718,7 @@ def test_recovery_inventory_uses_one_read_time_and_requires_asset_generations():
         inventory_database(_ScanClient(rows), snapshot_time=snapshot)
 
 
-# @features data-lifecycle disaster-recovery file
-# @dimensions uploaded-file asset-generation
+# @matrix data-lifecycle disaster-recovery file : asset-generation uploaded-file
 def test_recovery_inventory_includes_uploaded_file_asset_generations():
     snapshot = datetime(2026, 8, 24, 12, tzinfo=timezone.utc)
     uploaded_file = _entity(
@@ -774,8 +756,7 @@ def test_recovery_inventory_includes_uploaded_file_asset_generations():
     assert all(asset["owners"][0]["name"] in {"file", "text"} for asset in assets)
 
 
-# @features data-lifecycle storage
-# @dimensions asset-generation immutable-copy checksum
+# @matrix data-lifecycle storage : asset-generation checksum immutable-copy
 def test_capture_recovery_assets_copies_exact_generation_create_only():
     source = _Bucket([_Blob("documents/page.html", b"hello", generation=7)])
     recovery = _Bucket()
@@ -804,8 +785,7 @@ def test_capture_recovery_assets_copies_exact_generation_create_only():
         capture_assets(context, BACKUP_ID, assets, {"private": source})
 
 
-# @features data-lifecycle disaster-recovery
-# @dimensions scheduled-uncomplete queue-reconciliation
+# @matrix data-lifecycle disaster-recovery : queue-reconciliation scheduled-uncomplete
 def test_restore_requeues_only_durable_scheduled_uncompletion():
     task = _entity(
         Key("instances", "task", project=PROJECT_ID),
@@ -850,8 +830,7 @@ def test_restore_requeues_only_durable_scheduled_uncompletion():
     )
 
 
-# @features data-lifecycle disaster-recovery
-# @dimensions restore-assets asset-generation
+# @matrix data-lifecycle disaster-recovery : asset-generation restore-assets
 def test_restore_assets_rebinds_owner_to_new_generation(monkeypatch):
     from config import SETTINGS
     from config.storage import storage_bucket_names
@@ -924,8 +903,7 @@ def _entity(key, **values):
     return row
 
 
-# @features portable-json
-# @dimensions bounded-scan entity-selection portable-identity entity-envelope key-replacement typed-references
+# @matrix portable-json : bounded-scan entity-envelope entity-selection key-replacement portable-identity typed-references
 def test_staging_selects_durable_types_and_builds_typed_identity_map(tmp_path):
     user = _entity(Key("users", "owner", project=PROJECT_ID, database="scratch-db"), type="user", hash="userhash0001")
     excluded = _entity(Key("activity", "notice", project=PROJECT_ID, database="scratch-db"), type="notification")
@@ -952,8 +930,7 @@ def test_staging_selects_durable_types_and_builds_typed_identity_map(tmp_path):
         assert portable_records(state)[0]["identity"]["type"] == "user"
 
 
-# @features portable-json
-# @dimensions entity-envelope key-replacement typed-references
+# @matrix portable-json : entity-envelope key-replacement typed-references
 def test_staging_replaces_source_and_scratch_keys_recursively(tmp_path):
     scratch_user = Key("users", "owner", project=PROJECT_ID, database="scratch-db")
     source_user = Key("users", "owner", project=PROJECT_ID, database="source-db")
@@ -995,8 +972,7 @@ def test_staging_replaces_source_and_scratch_keys_recursively(tmp_path):
         assert encode_urlsafe_key(source_user) not in payload
 
 
-# @features portable-json
-# @dimensions owner-scoped-children natural-identity import-planner
+# @matrix portable-json : import-planner natural-identity owner-scoped-children
 def test_history_and_messages_are_nested_and_replanned_under_their_owners(tmp_path):
     partition = {"project": PROJECT_ID, "database": "scratch-db"}
     actor_key = Key("users", "actor", **partition)
@@ -1105,8 +1081,7 @@ class _AssetBucket:
         return _Blob(name, payload or b"", generation=4, exists=payload is not None, content_type="application/octet-stream")
 
 
-# @features portable-archive
-# @dimensions assets generation-binding resume
+# @matrix portable-archive : assets generation-binding resume
 def test_asset_collection_is_generation_bound_resumable_and_deduplicated(tmp_path):
     with ArchiveState(tmp_path / "assets.sqlite3") as state:
         owner = canonical_json(
@@ -1168,8 +1143,7 @@ def test_asset_collection_is_generation_bound_resumable_and_deduplicated(tmp_pat
         assert "assets/sha256" in canonical
 
 
-# @features portable-archive
-# @dimensions html-sanitization no-network
+# @matrix portable-archive : html-sanitization no-network
 def test_html_sanitizer_removes_active_and_remote_content():
     source = "<script>alert(1)</script><a href='https://example.com'>remote</a><a href='ref:page:abc123'>local</a><img src='javascript:alert(1)'>"
     sanitized = sanitize_stored_html(
@@ -1183,8 +1157,7 @@ def test_html_sanitizer_removes_active_and_remote_content():
     assert "../abc123/index.html" in sanitized
 
 
-# @features portable-archive
-# @dimensions navigation offline-html owner-content
+# @matrix portable-archive : navigation offline-html owner-content
 def test_html_archive_renders_owner_sections_and_local_navigation(tmp_path):
     records = [
         _record("page", "pagehash0001", {"name": "Private page", "public": False}),
@@ -1252,8 +1225,7 @@ def _archive_bundle(root, *, records=None):
     return manifest
 
 
-# @features portable-archive
-# @dimensions validation path-safety key-audit
+# @matrix portable-archive : key-audit path-safety validation
 def test_archive_validation_accepts_canonical_directory_and_zip(tmp_path):
     bundle = tmp_path / "bundle"
     manifest = _archive_bundle(bundle)
@@ -1263,8 +1235,7 @@ def test_archive_validation_accepts_canonical_directory_and_zip(tmp_path):
     assert validate_archive(output)["archive_id"] == BACKUP_ID
 
 
-# @features portable-archive
-# @dimensions owner-scoped-children validation
+# @matrix portable-archive : owner-scoped-children validation
 def test_archive_validation_counts_children_without_separate_identity_pages(tmp_path):
     bundle = tmp_path / "nested-bundle"
     task = _record(
@@ -1290,8 +1261,7 @@ def test_archive_validation_counts_children_without_separate_identity_pages(tmp_
     assert not (bundle / "site" / "task_history").exists()
 
 
-# @features portable-archive
-# @dimensions validation path-safety key-audit
+# @matrix portable-archive : key-audit path-safety validation
 def test_archive_validation_rejects_traversal_extra_files_bad_checksums_and_keys(tmp_path):
     bundle = tmp_path / "bundle"
     manifest = _archive_bundle(bundle)
@@ -1317,8 +1287,7 @@ def test_archive_validation_rejects_traversal_extra_files_bad_checksums_and_keys
         validate_archive(unsafe)
 
 
-# @features portable-archive
-# @dimensions workflow publication cleanup
+# @matrix portable-archive : cleanup publication workflow
 def test_archive_build_publishes_manifest_last_and_retains_failed_scratch_state(tmp_path, monkeypatch):
     real_checkpoint = LifecycleCheckpoint
 
@@ -1409,8 +1378,7 @@ class _RestoreContext:
         raise AssertionError(arguments)
 
 
-# @features data-lifecycle
-# @dimensions restore-key-normalization serialized-entity-details bounded-restore-scan
+# @matrix data-lifecycle : bounded-restore-scan restore-key-normalization serialized-entity-details
 def test_restore_normalizes_persisted_keys_before_cache_rebuild():
     source_key = Key(
         "instances",
@@ -1498,8 +1466,7 @@ def test_restore_normalizes_persisted_keys_before_cache_rebuild():
     assert repeated["serialized_ids"] == 0
 
 
-# @features data-lifecycle
-# @dimensions deferred-state-retirement bounded-restore-scan
+# @matrix data-lifecycle : bounded-restore-scan deferred-state-retirement
 def test_restore_discards_deferred_execution_state():
     def target_key(kind, name):
         return Key(kind, name, project=PROJECT_ID, database="target-db")
@@ -1620,8 +1587,7 @@ def test_in_place_restore_rejects_legacy_named_database_checkpoint(tmp_path):
             )
 
 
-# @features data-lifecycle
-# @dimensions dry-run restore-preflight in-place-merge
+# @matrix data-lifecycle : dry-run in-place-merge restore-preflight
 def test_restore_dry_run_is_deterministic_and_read_only(monkeypatch):
     monkeypatch.setattr(restore_in_place, "load_backup", lambda *_args: (_manifest(), object()))
     monkeypatch.setattr(
@@ -1653,8 +1619,7 @@ def test_restore_dry_run_is_deterministic_and_read_only(monkeypatch):
     assert any("purge the configured" in step for step in first["sequence"])
 
 
-# @features data-lifecycle
-# @dimensions restore-validation owner-invariant
+# @matrix data-lifecycle : owner-invariant restore-validation
 def test_target_validation_requires_owner_and_reserved_models():
     class Query:
         def __init__(self, rows):
@@ -1699,7 +1664,7 @@ def test_target_validation_requires_owner_and_reserved_models():
         )
 
 
-# @pairs data-lifecycle:restore data-lifecycle:confirmation data-lifecycle:resume data-lifecycle:queue-purge-audit data-lifecycle:remote-journal data-lifecycle:in-place-merge
+# @matrix data-lifecycle : confirmation in-place-merge queue-purge-audit remote-journal restore resume
 def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
     monkeypatch, tmp_path
 ):
@@ -1916,8 +1881,7 @@ def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
     assert context.calls == calls
 
 
-# @features data-lifecycle
-# @dimensions cli-routing read-only
+# @matrix data-lifecycle : cli-routing read-only
 def test_lifecycle_cli_routes_nested_commands_and_read_only_boundaries():
     from installer.__main__ import _local_only, _parser, _read_only
 

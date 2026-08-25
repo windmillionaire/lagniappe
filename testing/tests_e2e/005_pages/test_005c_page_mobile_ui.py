@@ -33,8 +33,7 @@ def test_page_mobile_desktop_tabs_start_hidden_before_ui_initializes(get_user):
     expect(user.locate(page.MOBILE_NAV)).to_be_hidden()
 
 
-# @features entity-layout
-# @dimensions page-mobile nav visibility
+# @matrix entity-layout : nav page-mobile visibility
 def test_page_mobile_nav_replaces_desktop_tabs(get_user):
     user = get_user(Users.OWNER)
     page = user.go(Pages.test_page_loads)
@@ -51,8 +50,7 @@ def test_page_mobile_nav_replaces_desktop_tabs(get_user):
     assert mobile_nav.get_section_title() == "Info"
 
 
-# @features entity-layout
-# @dimensions page-mobile flipper
+# @matrix entity-layout : flipper page-mobile
 def test_page_mobile_flipper_reveals_sections(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
@@ -70,8 +68,7 @@ def test_page_mobile_flipper_reveals_sections(get_user):
     expect(user.locate(Tabs.FILES_TOGGLE_MOBILE)).to_be_visible()
 
 
-# @features entity-layout
-# @dimensions page-mobile section-switch
+# @matrix entity-layout : page-mobile section-switch
 def test_page_mobile_section_switching_updates_visible_panel_and_title(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
@@ -95,8 +92,7 @@ def test_page_mobile_section_switching_updates_visible_panel_and_title(get_user)
     assert mobile_nav.get_section_title() == "Info"
 
 
-# @features entity-layout
-# @dimensions page-mobile task-create
+# @matrix entity-layout : page-mobile task-create
 def test_page_mobile_create_task_opens_from_tasks_section(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)
@@ -109,8 +105,7 @@ def test_page_mobile_create_task_opens_from_tasks_section(get_user):
     expect(create_form.locator(FormElements.NAME)).to_be_visible()
 
 
-# @features entity-layout
-# @dimensions page-mobile reload persistence
+# @matrix entity-layout : page-mobile persistence reload
 def test_page_mobile_selection_persists_after_reload(get_user):
     user = get_user(Users.OWNER)
     page = Pages.test_page_loads.get(user)

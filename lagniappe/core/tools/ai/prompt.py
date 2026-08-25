@@ -65,8 +65,7 @@ TOOL_CALL_PLANNING = """
 # @testable true
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_prompt_tracks_context_output_examples_and_attachments
 # @tests tests_unit/test_015b_ai_prompt_builders.py::test_prompt_rejects_oversized_inline_file_before_read
-# @features ai
-# @dimensions prompt context output-format attachments tools tool-batching service-tier cache-prefix
+# @matrix ai : attachments cache-prefix context output-format prompt service-tier tool-batching tools
 class Prompt:
     """Composable prompt that assembles context, instructions, and output format into a single request."""
 

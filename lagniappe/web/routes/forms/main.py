@@ -18,8 +18,7 @@ from lagniappe.web import responses
 # @testable true
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_forms_index_page
 # @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_form_index_*
-# @features forms
-# @dimensions index tools permission-gates index-view create-control
+# @matrix forms : create-control index index-view permission-gates tools
 @forms.route("/index", methods=["GET"])
 @permission(Resource.FORMS, Action.VIEW)
 def form_index():
@@ -30,8 +29,7 @@ def form_index():
 
 # @testable true
 # @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_form_index_lists_forms_*
-# @features forms
-# @dimensions index-view
+# @pair forms:index-view
 @forms.route("/rows", methods=["GET"])
 @permission(Resource.FORMS, Action.VIEW)
 def rows():
@@ -43,8 +41,7 @@ def rows():
 
 # @testable true
 # @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_form_builder_*
-# @features forms
-# @dimensions builder-edit permission-gates restriction-control
+# @matrix forms : builder-edit permission-gates restriction-control
 @forms.route("/<key>", methods=["GET"])
 @permission(Resource.FORM, Action.VIEW)
 def view(key, **kwargs):
@@ -56,8 +53,7 @@ def view(key, **kwargs):
 # @testable true
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
-# @features forms
-# @dimensions builder-add-inputs builder-add-fields builder-save builder-reload
+# @matrix forms : builder-add-fields builder-add-inputs builder-reload builder-save
 @forms.route("<key>/update", methods=["PUT"])
 @permission(Resource.FORM, Action.EDIT)
 def update(key, **kwargs):
@@ -71,8 +67,7 @@ def update(key, **kwargs):
 # @testable true
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
-# @features forms
-# @dimensions create page-form task-form
+# @matrix forms : create page-form task-form
 @forms.route("/create", methods=["POST"])
 @permission(Resource.FORM, Action.CREATE)
 def create():
@@ -84,8 +79,7 @@ def create():
 
 # @testable true
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_copy_form_from_builder_title_menu
-# @features forms
-# @dimensions builder-copy schema form-type navigation
+# @matrix forms : builder-copy form-type navigation schema
 @forms.route("<key>/copy", methods=["POST"])
 @permission(Resource.FORM, Action.CREATE)
 def copy_form(key, **kwargs):
@@ -111,6 +105,7 @@ def copy_form(key, **kwargs):
 # @testable true
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
+# @matrix forms : page-form task-form
 @forms.route("<key>/delete", methods=["DELETE"])
 @permission(Resource.FORM, Action.DELETE)
 def delete(key, **kwargs):
@@ -123,6 +118,7 @@ def delete(key, **kwargs):
 # @testable true
 # @tests tests_unit/test_003e_tables.py::test_table_row_submission_text_email_checkbox
 # @tests tests_unit/test_003e_tables.py::test_table_form_mixed_column_types
+# @matrix form-table : mixed-columns row-submission
 @forms.route("<key>/validate-row/<table_id>", methods=["GET"])
 @permission(requested=Action.EDIT)
 def validate_row(key, table_id, **kwargs):
@@ -150,8 +146,8 @@ def validate_row(key, table_id, **kwargs):
 # @tests tests_unit/test_003e_tables.py::test_table_form_single_row
 # @tests tests_unit/test_003e_tables.py::test_table_row_submission_text_email_checkbox
 # @tests tests_e2e/007_categories/test_007a_category_index.py::test_category_index_expands_table_submission_cell
-# @features form-table table-controls
-# @dimensions table-cell-expand form-table-column
+# @matrix form-table table-controls : form-table-column table-cell-expand
+# @matrix form-table : form-submission row-submission
 @forms.route("<key>/expand-table-cell/<table_id>", methods=["GET"])
 @permission(requested=Action.VIEW)
 def expand_table_cell(key, table_id, **kwargs):
@@ -172,8 +168,7 @@ def expand_table_cell(key, table_id, **kwargs):
 # @testable true
 # @scaffolding testing/resources/form.py::Builder.restrict_to_owner
 # @scaffolding testing/resources/form.py::Builder.restrict_to_group
-# @features forms
-# @dimensions access-restrictions owner-restricted group-restricted
+# @matrix forms : access-restrictions group-restricted owner-restricted
 @forms.route("<key>/restrictions", methods=["PUT"])
 @permission(Resource.FORM, Action.EDIT)
 def restrictions(key, **kwargs):
@@ -210,8 +205,8 @@ def restrictions(key, **kwargs):
 # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_table_filters_bad_columns
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_generate_form_schema_live_saved_state
 # @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_schema_generation_requires_edit_access_to_submitted_form
-# @features forms ai
-# @dimensions generate-schema live-ai saved-state reload submitted-reference
+# @matrix ai forms : generate-schema live-ai reload saved-state submitted-reference
+# @pairs categories:create-manual form-schema:ai-value form-table:columns
 @forms.route("/create-schema", methods=["POST"])
 @permission(Resource.FORMS, Action.EDIT)
 def create_schema():
@@ -247,6 +242,7 @@ def create_schema():
 
 # @testable true
 # @tests tests_unit/test_004_form_properties.py::test_form_schema
+# @pair form-schema:property
 @forms.route("<key>/schema", methods=["GET"])
 @permission(Resource.FORM, Action.VIEW)
 def schema(key, **kwargs):

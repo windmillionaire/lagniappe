@@ -9,8 +9,7 @@ from .base_schema import SchemaProperty
 
 # @testable true
 # @tests tests_unit/test_003g_todo_lists.py::test_todo_list_validation_and_import
-# @features form-todo
-# @dimensions normalization validation
+# @matrix form-todo : normalization validation
 def _todo_items(value, *, allow_scalar=False):
     """Return canonical ordered todo items from a supported value shape."""
 
@@ -55,8 +54,7 @@ def _todo_items(value, *, allow_scalar=False):
 # @testable true
 # @tests tests_unit/test_003g_todo_lists.py::test_todo_list_submission_projections
 # @tests tests_unit/test_003g_todo_lists.py::test_todo_list_validation_and_import
-# @features form-todo
-# @dimensions submission db-value form-value ai-value search-value column import validation
+# @matrix form-todo : ai-value column db-value form-value import search-value submission validation
 class TodoList(SearchMixin, AIMixin, ColumnMixin, SchemaProperty):
     """Ordered single-line checklist stored as text/checked item objects."""
 

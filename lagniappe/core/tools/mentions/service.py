@@ -11,8 +11,7 @@ from .content import saved_mentions
 # @testable true
 # @tests tests_unit/test_027c_mentions.py::test_mentions_validate_saved_occurrences_dedupe_and_sanitize
 # @tests tests_e2e/012_messaging/test_012a_direct_messages.py::test_document_mentions_use_anchored_menu_and_profile_links
-# @pairs mentions:idempotency mentions:permission mentions:document-view
-# @pair mentions:saved-occurrence
+# @matrix mentions : document-view idempotency permission saved-occurrence
 def deliver_mentions(actor, document, html, occurrences):
     """Deliver still-present eligible occurrences after a saved checkpoint."""
     if (

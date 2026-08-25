@@ -21,8 +21,7 @@ export class ComponentsPanel {
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_page_form
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_create_task_form
 	 * @tests tests_js/test_032_todo_element_frontend.py::test_todo_builder_registration_is_task_only
-	 * @features forms
-	 * @dimensions page-form task-form components
+	 * @matrix forms : components page-form task-form
 	 */
 	init() {
 		const componentConfig =
@@ -90,8 +89,7 @@ export class ComponentsPanel {
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_inputs_to_form
 	 * @tests tests_e2e/003_forms/test_003a_forms.py::test_add_fields_to_form
 	 * @tests tests_e2e/003_forms/test_003b_form_builder.py::test_signature_field_builder_unique_component
-	 * @features forms
-	 * @dimensions builder-add-inputs builder-add-fields unique-component
+	 * @matrix forms : builder-add-fields builder-add-inputs unique-component
 	 */
 	_click(event) {
 		const button = event.target.closest("[data-role]");

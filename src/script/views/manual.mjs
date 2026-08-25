@@ -7,7 +7,7 @@ import ShellView from "./base/shell";
  * @testable true
  * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
  * @tests tests_js/test_038_startup_specializations.py::test_manual_dropdown_loads_only_in_mobile_mode
- * @pairs manual:section-navigation manual:popstate manual:responsive-navigation
+ * @matrix manual : popstate responsive-navigation section-navigation
  * @pair startup:mobile-only-dropdown
  */
 export default class Manual extends ShellView {
@@ -108,8 +108,7 @@ export default class Manual extends ShellView {
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_installation_commands_are_copyable_and_scroll_on_mobile
 	 * @tests tests_js/test_038_startup_specializations.py::test_manual_copy_command_falls_back_when_clipboard_is_unavailable
-	 * @features manual
-	 * @dimensions command-copy clipboard-fallback
+	 * @matrix manual : clipboard-fallback command-copy
 	 */
 	async copyCommand(button) {
 		const command = button
@@ -166,8 +165,7 @@ export default class Manual extends ShellView {
 	/**
 	 * @testable true
 	 * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
-	 * @features manual
-	 * @dimensions section-navigation popstate
+	 * @matrix manual : popstate section-navigation
 	 */
 	async fetchSection(key, pushState) {
 		if (this.loading) return;

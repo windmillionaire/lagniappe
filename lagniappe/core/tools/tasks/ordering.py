@@ -7,8 +7,7 @@ from .. import database
 
 # @testable true
 # @tests tests_unit/test_001_test_general_and_utilities.py::test_sort_tasks
-# @features utility
-# @dimensions task-sorting
+# @pair utility:task-sorting
 def sort_tasks(tasks):
     """Sort due tasks ascending, then undated tasks by recent modification."""
     with_due_date = [task for task in tasks if task.due_date]

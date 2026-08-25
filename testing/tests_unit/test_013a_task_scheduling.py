@@ -8,8 +8,7 @@ _AI_PATCH = "lagniappe.core.properties.task_scheduling.ai.generate_schedule"
 _USER_TZ_PATCH = "lagniappe.core.tools.dates.user_timezone"
 
 
-# @features task-scheduling
-# @dimensions recurring update validation
+# @matrix task-scheduling : recurring update validation
 @pytest.mark.unit
 def test_task_recurring(get_test_entities):
     """Test Recurring schedule property (ProcessProperty).
@@ -40,8 +39,7 @@ def test_task_recurring(get_test_entities):
             assert section.get("unit") == expected.get("unit")
 
 
-# @features task-scheduling
-# @dimensions scheduled update ai-generation validation
+# @matrix task-scheduling : ai-generation scheduled update validation
 @pytest.mark.unit
 def test_task_scheduled(get_test_entities):
     """Test Scheduled schedule property (ProcessProperty).
@@ -109,8 +107,7 @@ def test_task_scheduled(get_test_entities):
                 assert scheduled.error == expected["error"]
 
 
-# @features task-scheduling
-# @dimensions periodic update ai-generation validation
+# @matrix task-scheduling : ai-generation periodic update validation
 @pytest.mark.unit
 def test_task_periodic(get_test_entities):
     """Test Periodic schedule property (ProcessProperty).
@@ -163,8 +160,7 @@ def test_task_periodic(get_test_entities):
                     assert periodic.user_prompt == expected["user_prompt"]
 
 
-# @features task-scheduling
-# @dimensions coordinator update active-process
+# @matrix task-scheduling : active-process coordinator update
 @pytest.mark.unit
 def test_task_schedule(get_test_entities):
     """Test Schedule coordinator: update() routes by checkbox; active is the ProcessProperty."""

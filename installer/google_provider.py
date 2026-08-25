@@ -20,8 +20,7 @@ PROVIDER_REQUEST_ATTEMPTS = 4
 
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_google_provider_access_token_refresh_retries_connection_resets
-# @features setup
-# @dimensions google-provider authentication retry
+# @matrix setup : authentication google-provider retry
 def _get_access_token():
     """Get an OAuth2 access token for Google provider management APIs."""
     f = FORMATTER.initialize()
@@ -50,8 +49,7 @@ def _get_access_token():
 
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_google_provider_helpers_use_timeouts_and_report_errors
-# @pair setup:google-provider-api
-# @pair google-provider-api:quota-project
+# @pairs google-provider-api:quota-project setup:google-provider-api
 def _google_request_headers(access_token, project_id, *, json_content=False):
     """Build quota-project-bound Google provider REST headers."""
     headers = {
@@ -66,8 +64,7 @@ def _google_request_headers(access_token, project_id, *, json_content=False):
 # @testable true
 # @tests tests_tooling/test_001b_setup_providers.py::test_google_provider_helpers_use_timeouts_and_report_errors
 # @tests tests_tooling/test_001b_setup_providers.py::test_google_provider_api_request_reports_reason_and_retries_service_activation
-# @features setup
-# @dimensions google-provider-api diagnostics retry
+# @matrix setup : diagnostics google-provider-api retry
 def _api_request(
     session,
     method,

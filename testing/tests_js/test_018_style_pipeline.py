@@ -1,8 +1,7 @@
 """Node-backed checks for the shared style build contract."""
 
 
-# @features style-build
-# @dimensions runtime-parity
+# @pair style-build:runtime-parity
 def test_virtual_and_python_style_payloads_share_one_runtime_value(run_node):
     run_node(
         r"""
@@ -52,8 +51,7 @@ assert.deepEqual(virtualStyles.STYLES, pythonPayload);
     )
 
 
-# @features style-build
-# @dimensions schema-validation
+# @pair style-build:schema-validation
 def test_style_registry_rejects_untyped_and_unknown_leaves(run_node):
     run_node(
         r"""
@@ -104,8 +102,7 @@ assert.throws(
     )
 
 
-# @features style-build
-# @dimensions icon-schema-validation
+# @pair style-build:icon-schema-validation
 def test_icon_registry_rejects_invalid_ids_and_material_symbol_records(run_node):
     run_node(
         r"""
@@ -161,8 +158,7 @@ assert.throws(
     )
 
 
-# @features style-build
-# @dimensions pipeline-contract
+# @pair style-build:pipeline-contract
 # @style button.submit
 # @style dropdown.option.action
 # @style dropdown.option.flow
@@ -239,8 +235,7 @@ assert.equal(
     )
 
 
-# @features ui-action
-# @dimensions loading-state fixed-layout
+# @matrix ui-action : fixed-layout loading-state
 # @style button.submit
 def test_active_action_buttons_preserve_full_width_icon_slots(run_node):
     run_node(
@@ -335,8 +330,7 @@ assert.equal(textSlot.textContent, "Cache Refreshed");
     )
 
 
-# @features frontend-icons
-# @dimensions registry lookup nested-ids semantic-markup fill weight animation accessibility element-creation
+# @matrix frontend-icons : accessibility animation element-creation fill lookup nested-ids registry semantic-markup weight
 def test_frontend_icon_helpers_render_structured_material_symbols(run_node):
     run_node(
         r"""

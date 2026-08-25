@@ -10,7 +10,6 @@ from ..dates import (
     beginning_of_day,
     user_timezone,
     user_today,
-    utc_datetime_to_utc_date_string,
 )
 from ..services import task_queue
 
@@ -29,8 +28,7 @@ def user_tomorrow_in_seconds():
 
 # @testable true
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
-# @features task-scheduling
-# @dimensions durable-uncomplete timezone
+# @matrix task-scheduling : durable-uncomplete timezone
 def scheduled_uncomplete_time():
     """Return the next user-local midnight as an absolute UTC timestamp."""
     now_user = datetime.now(user_timezone())
@@ -104,8 +102,7 @@ def calculate_next_scheduled_due_date(due_date, scheduled):
 
 # @testable true
 # @tests tests_unit/test_013d_date_utilities.py::test_find_ordinal_weekday_in_month
-# @features dates
-# @dimensions ordinal-weekday
+# @pair dates:ordinal-weekday
 def find_ordinal_weekday_in_month(month_start, ordinal, weekday):
     """Find the nth weekday in a month, or last if ordinal is -1"""
     if ordinal == -1:
@@ -134,8 +131,7 @@ def find_ordinal_weekday_in_month(month_start, ordinal, weekday):
 
 # @testable true
 # @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_monthly_occurrence
-# @features dates
-# @dimensions monthly-occurrence
+# @pair dates:monthly-occurrence
 def calculate_next_monthly_occurrence(due_date, scheduled):
     """Find the next monthly occurrence after due_date (specific day, first/last, or ordinal weekday)."""
     schedule_type = scheduled.get("type")
@@ -197,8 +193,7 @@ def calculate_next_monthly_occurrence(due_date, scheduled):
 
 # @testable true
 # @tests tests_unit/test_013d_date_utilities.py::test_calculate_next_yearly_occurrence
-# @features dates
-# @dimensions yearly-occurrence
+# @pair dates:yearly-occurrence
 def calculate_next_yearly_occurrence(due_date, scheduled):
     """Find the next yearly occurrence after due_date."""
     tz = user_timezone()
@@ -250,8 +245,7 @@ def calculate_next_yearly_occurrence(due_date, scheduled):
 
 # @testable true
 # @tests tests_unit/test_013d_date_utilities.py::test_calculate_postponed_due_date
-# @features dates
-# @dimensions postponement
+# @pair dates:postponement
 def calculate_postponed_due_date(value):
     """Calculate a new due date from one of the home-page postpone options."""
     now_user = datetime.now(user_timezone())
@@ -313,8 +307,7 @@ def due_in_home_task_window(due_date):
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_schedule_queues_uncomplete
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_task_complete_with_near_term_schedule_uncompletes_immediately
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_add_uncomplete_task_to_queue_future_due_queues_in_production
-# @features task-completion task-scheduling
-# @dimensions complete schedule-queue
+# @matrix task-completion task-scheduling : complete schedule-queue
 def add_uncomplete_task_to_queue(task):
     """Record an uncompletion intent or apply a near-term recurrence now."""
     next_due = task.due_date
@@ -335,8 +328,7 @@ def add_uncomplete_task_to_queue(task):
 
 # @testable true
 # @tests tests_unit/test_013e_task_complete_lifecycle.py::test_add_uncomplete_task_to_queue_future_due_queues_in_production
-# @features task-scheduling cloud-tasks
-# @dimensions durable-uncomplete post-commit idempotency
+# @matrix cloud-tasks task-scheduling : durable-uncomplete idempotency post-commit
 def dispatch_scheduled_uncomplete(task, *, task_id_suffix=None):
     """Dispatch the durable marker currently persisted on ``task``."""
     token = task.scheduled_uncomplete_token
@@ -357,8 +349,7 @@ def dispatch_scheduled_uncomplete(task, *, task_id_suffix=None):
 
 # @testable true
 # @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_recurring
-# @features task-scheduling
-# @dimensions next-due-date recurring
+# @matrix task-scheduling : next-due-date recurring
 def get_next_recurring_date(recurring, starting_due_date=None):
     """Get the next recurring date from today (or a starting date)."""
     if starting_due_date is None:
@@ -381,8 +372,7 @@ def get_starting_due_date(task):
 
 # @testable true
 # @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_scheduled
-# @features task-scheduling
-# @dimensions next-due-date scheduled postponed
+# @matrix task-scheduling : next-due-date postponed scheduled
 def get_next_scheduled_date(starting_due_date, scheduled):
     """Get the next scheduled date that falls after today."""
     next_due_date = calculate_next_scheduled_due_date(starting_due_date, scheduled)
@@ -394,8 +384,7 @@ def get_next_scheduled_date(starting_due_date, scheduled):
 
 # @testable true
 # @tests tests_unit/test_013c_task_scheduling_set_next_due_date.py::test_next_due_date_periodic
-# @features task-scheduling
-# @dimensions next-due-date periodic postponed
+# @matrix task-scheduling : next-due-date periodic postponed
 def get_next_periodic_date(starting_due_date, periodic):
     """Get the next periodic date that falls after today."""
     next_due_date = calculate_next_recurring_due_date(starting_due_date, periodic)
@@ -407,8 +396,7 @@ def get_next_periodic_date(starting_due_date, periodic):
 
 # @testable true
 # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_scheduled
-# @features task-scheduling
-# @dimensions skipped scheduled
+# @matrix task-scheduling : scheduled skipped
 def calculate_skipped_scheduled_tasks(task, scheduled):
     """Calculate how many times a scheduled task should have been completed between the starting due date and today"""
     if not scheduled:
@@ -460,8 +448,7 @@ def calculate_skipped_scheduled_tasks(task, scheduled):
 
 # @testable true
 # @tests tests_unit/test_013b_task_scheduling_skipped.py::test_skipped_recurring
-# @features task-scheduling
-# @dimensions skipped recurring periodic
+# @matrix task-scheduling : periodic recurring skipped
 def calculate_skipped_recurring_tasks(task, periodic):
     """Calculate how many times a recurring task should have been completed between the starting due date and today"""
     if not periodic:

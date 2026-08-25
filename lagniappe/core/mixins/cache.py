@@ -1,7 +1,6 @@
 # @testable true
 # @tests tests_unit/test_006_file_properties.py::test_summary
-# @features file
-# @dimensions cache
+# @pair file:cache
 class CacheMixin:
     """Adds entity cache output. Collected by Entity.to_cache.
 

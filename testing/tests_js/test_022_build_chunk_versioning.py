@@ -1,8 +1,7 @@
 """Node-backed checks for stable frontend chunk versioning."""
 
 
-# @features frontend-build cache
-# @dimensions chunk-versioning bundle-consistency
+# @matrix cache frontend-build : bundle-consistency chunk-versioning
 def test_rollup_versions_generated_chunk_imports_and_precache_urls(run_node):
     run_node(
         r"""
@@ -83,8 +82,7 @@ assert.deepEqual(precacheUrls(precacheBundle, buildId), [
     )
 
 
-# @features frontend-build
-# @dimensions service-worker build-identity
+# @matrix frontend-build : build-identity service-worker
 def test_service_worker_records_the_build_identity(run_node):
     run_node(
         r"""
@@ -132,8 +130,7 @@ try {
     )
 
 
-# @features frontend-build
-# @dimensions source-integrity artifact-inventory nested-chunks completion-marker
+# @matrix frontend-build : artifact-inventory completion-marker nested-chunks source-integrity
 def test_frontend_publication_records_recursive_artifacts_and_source_identity(run_node):
     run_node(
         r"""
@@ -244,8 +241,7 @@ try {
     )
 
 
-# @features frontend-build
-# @dimensions source-integrity artifact-integrity safe-failure
+# @matrix frontend-build : artifact-integrity safe-failure source-integrity
 def test_frontend_publication_rejects_missing_outputs_and_source_drift(run_node):
     run_node(
         r"""
@@ -335,8 +331,7 @@ try {
     )
 
 
-# @features frontend-build icons
-# @dimensions font-delivery subset cache stale-cleanup
+# @matrix frontend-build icons : cache font-delivery stale-cleanup subset
 def test_material_symbols_subset_font_is_emitted_with_content_hash(run_node):
     run_node(
         r"""
@@ -407,8 +402,7 @@ rmSync(outputDirectory, { recursive: true });
     )
 
 
-# @features frontend-build icons
-# @dimensions font-delivery css-url-resolution
+# @matrix frontend-build icons : css-url-resolution font-delivery
 def test_material_symbols_css_points_to_the_content_hashed_font(run_node):
     run_node(
         r"""
@@ -436,8 +430,7 @@ assert.doesNotMatch(
     )
 
 
-# @features frontend-build licensing
-# @dimensions browser-notice-delivery
+# @matrix frontend-build licensing : browser-notice-delivery
 def test_third_party_notices_are_emitted_with_browser_assets(run_node):
     run_node(
         r"""

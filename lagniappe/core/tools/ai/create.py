@@ -188,8 +188,7 @@ action list later if the user chooses to run it.
 
 # @testable true
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_create_prompt_builds_creation_proposal_without_file_actions
-# @features ai-report
-# @dimensions create prompt search tools actions
+# @matrix ai-report : actions create prompt search tools
 def create_prompt(report, user):
     """Build the AI prompt used to create a Create report proposal."""
     prompt = _create_prompt_base(
@@ -205,8 +204,7 @@ def create_prompt(report, user):
 
 # @testable true
 # @tests tests_unit/test_020d_ai_report_prompts.py::test_revise_create_prompt_includes_feedback_and_current_proposal
-# @features ai-report
-# @dimensions create revision feedback proposal context
+# @matrix ai-report : context create feedback proposal revision
 def revise_create_prompt(report, user, feedback):
     """Build the AI prompt used to revise a Create report proposal."""
     prompt = _create_prompt_base(
@@ -237,8 +235,7 @@ partial actions.
 
 # @testable true
 # @tests tests_unit/test_020e_ai_report_proposals.py::test_generate_create_report_validates_non_empty_actions
-# @features ai-report
-# @dimensions create generate validate
+# @matrix ai-report : create generate validate
 def generate_create_report(prompt):
     """Generate and validate a Create report proposal."""
     proposal = generate_validated_proposal(prompt, report_label="Create")
