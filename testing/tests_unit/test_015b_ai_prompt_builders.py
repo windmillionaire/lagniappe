@@ -22,6 +22,7 @@ from lagniappe.core.tools.ai.guidelines import (
     SUBMISSION_OUTPUT_REQUIREMENTS,
 )
 from lagniappe.core.tools.ai.prompt import Prompt
+from lagniappe.core.tools.files import OOXMLExtractionResult, OOXMLTruncationReason
 
 
 DOCX_MIMETYPE = (
@@ -615,6 +616,45 @@ def test_ai_summary_generation_uses_docx_text_fallback(monkeypatch):
     assert "quarterly.docx" in extracted_text
     assert "Alpha paragraph" in extracted_text
     assert "Left cell\tRight cell" in extracted_text
+
+
+# @pair ai:summary-prompt
+# @pair ai:ooxml
+@pytest.mark.unit
+def test_ai_summary_generation_marks_partial_ooxml_context(monkeypatch):
+    generated_prompts = []
+    extraction_limits = []
+
+    def generate_content(prompt, *, validator=None):
+        generated_prompts.append(prompt)
+        result = "Partial Office summary."
+        return validator(result) if validator else result
+
+    def extract(content, filename=None, mimetype=None, *, max_characters=None):
+        extraction_limits.append(max_characters)
+        return OOXMLExtractionResult(
+            "x" * summarize.EXTRACTED_CONTEXT_LIMIT,
+            OOXMLTruncationReason.ROWS,
+        )
+
+    monkeypatch.setattr(
+        summarize, "ai_model", SimpleNamespace(generate_content=generate_content)
+    )
+    monkeypatch.setattr(summarize, "extract_ooxml", extract)
+
+    file = _ooxml_summary_file(filename="large.xlsx")
+    result = summarize.generate_summary(file)
+
+    assert result.complete is True
+    context = _context_text(generated_prompts[0], "Extracted File Text")
+    assert len(context) <= summarize.EXTRACTED_CONTEXT_LIMIT
+    assert context.endswith(
+        "[Extracted text is partial because the worksheet row limit was reached.]"
+    )
+    assert extraction_limits == [
+        summarize.EXTRACTED_CONTEXT_LIMIT
+        - len(summarize._extracted_context_header("large.xlsx"))
+    ]
 
 
 @pytest.mark.unit

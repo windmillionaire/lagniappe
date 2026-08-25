@@ -74,6 +74,28 @@ Storage copies do not materialize the object; MIME sampling reads only an 8 KiB
 prefix; application extraction and AI-inline consumers use their declared
 bounded limits.
 
+DOCX/XLSX fallback extraction applies a second, OOXML-specific boundary after
+the 30 MiB compressed-file check. It preflights the ZIP central directory and
+every member before parsing, rejects encrypted, ambiguous, traversal, ZIP64,
+unsupported-compression, excessive-expansion, and unsafe relationship shapes,
+then streams only the document/workbook XML parts through an entity- and
+DTD-rejecting parser.
+
+| OOXML boundary | Limit |
+| --- | ---: |
+| Central directory / members / member name | 4 MiB / 4,096 / 1,024 bytes |
+| Uncompressed member / archive | 64 MiB / 256 MiB |
+| Large-member compression ratio | 1,000:1 |
+| Parsed XML / depth / elements / elapsed time | 64 MiB / 128 / 1,000,000 / 5 seconds |
+| Worksheets / rows / cells | 256 / 100,000 / 250,000 |
+| Shared strings / retained characters | 100,000 / 4,000,000 |
+| Output text | 200,000 characters |
+
+Unsafe archive, XML, relationship, coordinate, or shared-string structures fail
+the extraction. Safe traversal ceilings return `OOXMLExtractionResult` with a
+truncation reason once useful text exists; the AI summary prompt includes that
+reason and never exceeds its 200,000-character extracted-context ceiling.
+
 Durable CSV workflow state lives in `tools/ingress.py` and
 `database/ingress.py`, not in the general file utilities. See
 [BACKEND_INGRESS.md](BACKEND_INGRESS.md).

@@ -107,6 +107,12 @@ options are durable. If summary and extraction are both selected, terminal
 delivery starts one deterministic extraction successor even when summary
 fails.
 
+DOCX/XLSX files without a provider-readable attachment use the bounded OOXML
+text fallback. Unsafe packages fail before the model call. When safe XML,
+worksheet, row, cell, time, or prompt-text traversal reaches its fixed ceiling
+after producing useful text, the model receives that prefix with an explicit
+partial-extraction note.
+
 ## Reviewed report execution
 
 Ask and Organize proposals may include reviewed create, move, rename, attach,
