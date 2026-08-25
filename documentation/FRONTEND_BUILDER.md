@@ -174,6 +174,12 @@ Conditions are property editors that open in the ConditionPanel. Each condition 
 | `Columns` | `columns` | `Condition` | Add/edit table columns. Select for column type (from `CONFIG.TABLE_COLUMNS`), input for column name, auto-generates a hashed ID. |
 | `HtmlEditor` | `html` | `Condition` | Opens an `IndependentDocument` editor for rich text content. Expands the builder layout. Only initializes once. |
 
+`HtmlEditor` registers its `IndependentDocument` with `FormBuilder`. The builder
+owns hidden-view and reconnect flushes, while condition destruction unregisters
+the document before cleanup. This keeps teardown from initiating an untracked
+save and gives pending HTML one explicit keepalive flush opportunity when the
+page is hidden.
+
 ### Progressive Disclosure
 
 Conditions use a progressive UI pattern -- each step reveals the next input:

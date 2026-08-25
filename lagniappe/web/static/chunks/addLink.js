@@ -1,18 +1,18 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { g as getMarkRange, n as normalizeLinkAttributes } from './toolbar.js?v=b4b0f2eb';
-import { STYLES } from './styles.js?v=b4b0f2eb';
-import { E as ENDPOINTS, d as debounce, r as request } from './foundation.js?v=b4b0f2eb';
-import './connectivity.js?v=b4b0f2eb';
-import { B as BaseForm } from './baseForm.js?v=b4b0f2eb';
-import { b as buttons } from './buttons.js?v=b4b0f2eb';
-import { C as Combobox } from './combobox.js?v=b4b0f2eb';
-import { R as Results } from './results.js?v=b4b0f2eb';
-import { p as primitives } from './primitives.js?v=b4b0f2eb';
-import './icons.js?v=b4b0f2eb';
-import './dropdown.js?v=b4b0f2eb';
-import './loader.js?v=b4b0f2eb';
-import './formatting.js?v=b4b0f2eb';
-import './storage.js?v=b4b0f2eb';
+import { g as getMarkRange, n as normalizeLinkAttributes } from './toolbar.js?v=b66dffd0';
+import { STYLES } from './styles.js?v=b66dffd0';
+import { E as ENDPOINTS, d as debounce, r as request } from './foundation.js?v=b66dffd0';
+import './connectivity.js?v=b66dffd0';
+import { B as BaseForm } from './baseForm.js?v=b66dffd0';
+import { b as buttons } from './buttons.js?v=b66dffd0';
+import { C as Combobox } from './combobox.js?v=b66dffd0';
+import { R as Results } from './results.js?v=b66dffd0';
+import { p as primitives } from './primitives.js?v=b66dffd0';
+import './icons.js?v=b66dffd0';
+import './dropdown.js?v=b66dffd0';
+import './loader.js?v=b66dffd0';
+import './formatting.js?v=b66dffd0';
+import './storage.js?v=b66dffd0';
 
 const ABSOLUTE_URL_PATTERN = /^[a-z][a-z0-9+.-]*:/i;
 const BARE_DOMAIN_PATTERN = /^[^\s/]+\.[^\s]+(?:\/.*)?$/;

@@ -29,6 +29,7 @@ class FormBuilder {
 	constructor(node) {
 		this.elt = node;
 		this.elements = new Map();
+		this._independentDocuments = new Set();
 		this.selectedElement = null;
 		this.schemaElt = document.querySelector('input[name="schema"]');
 		this.key = node.dataset.key;
@@ -77,12 +78,38 @@ class FormBuilder {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_sync_uses_shared_connectivity_without_orphaned_global_state
+	 * @tests tests_js/test_045_browser_persistence.py::test_builder_owns_independent_editor_lifecycle_flushes
 	 * @pairs forms:builder-lifecycle offline:builder-lifecycle
+	 * @pairs editor:teardown html-field:teardown
 	 */
 	async sync({ hidden = document.hidden } = {}) {
+		const wasOnline = this.online;
 		this.hidden = hidden;
 		this.online = connectivity.online;
 		this.offline(!this.online);
+		if (this.online && (hidden || !wasOnline)) {
+			await this.flushIndependentDocuments({ keepalive: hidden });
+		}
+	}
+
+	registerIndependentDocument(document) {
+		this._independentDocuments.add(document);
+		return document;
+	}
+
+	unregisterIndependentDocument(document) {
+		this._independentDocuments.delete(document);
+	}
+
+	async flushIndependentDocuments(options = {}) {
+		const results = await Promise.allSettled(
+			[...this._independentDocuments].map((document) =>
+				Promise.resolve().then(() => document.flush(options)),
+			),
+		);
+		return results.every(
+			(result) => result.status === "fulfilled" && result.value === true,
+		);
 	}
 
 	/**
@@ -332,6 +359,7 @@ class FormBuilder {
 			if (element.destroy) element.destroy();
 		});
 		this.elements.clear();
+		this._independentDocuments.clear();
 
 		document.removeEventListener("click", this.click);
 	}

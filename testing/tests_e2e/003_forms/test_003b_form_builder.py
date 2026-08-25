@@ -6,9 +6,10 @@ from playwright.sync_api import expect
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Forms, Pages, Schemas, Uploads, Users
+from testing.definitions.form_definitions import FormDefinition
 from testing.definitions.schema_fields import SchemaFields
 from testing.elements import EditorAddImage, Select, SpinnerButtons
-from testing.resources.form import Builder
+from testing.resources.form import Builder, Form
 from testing.resources.task import Task as TaskResource
 
 pytestmark = pytest.mark.e2e
@@ -60,6 +61,34 @@ def _html_editor_text_entry(builder):
     text_entry = editor.locator(".ProseMirror")
     expect(text_entry).to_have_attribute("contenteditable", "true")
     return text_entry
+
+
+def _fail_next_browser_fetch(page, *, method, path_prefix, error):
+    page.evaluate(
+        """([method, pathPrefix, error]) => {
+            const originalFetch = window.fetch.bind(window);
+            let pending = true;
+            window.fetch = (input, options = {}) => {
+                const url = typeof input === "string" ? input : input.url;
+                const requestMethod = (
+                    options.method || (typeof input === "string" ? "GET" : input.method)
+                ).toUpperCase();
+                const pathname = new URL(url, window.location.href).pathname;
+                if (pending && requestMethod === method && pathname.startsWith(pathPrefix)) {
+                    pending = false;
+                    return Promise.resolve(new Response(
+                        JSON.stringify({ error }),
+                        {
+                            status: 503,
+                            headers: { "Content-Type": "application/json" },
+                        },
+                    ));
+                }
+                return originalFetch(input, options);
+            };
+        }""",
+        [method, path_prefix, error],
+    )
 
 
 # @features forms
@@ -472,6 +501,87 @@ def test_html_field(get_user):
     html_content = task_form.locator(".html-content")
     expect(html_content).to_contain_text(text)
     expect(html_content.locator("img")).to_be_visible()
+
+
+# @pairs editor:initial-load editor:retry editor:authoritative-content
+# @pairs editor:error-reporting editor:server-acknowledgement editor:intentional-clear
+# @pairs html-field:initial-load html-field:retry html-field:authoritative-content
+# @pairs html-field:error-reporting html-field:server-acknowledgement
+# @pairs html-field:intentional-clear html-field:form-asset html-field:builder-html-field
+# @style message
+# @style editor.container
+def test_html_editor_recovers_from_failed_load_and_save(get_user):
+    user = get_user(Users.OWNER)
+    form = Form(
+        user=user,
+        definition=FormDefinition(
+            name="Builder HTML Persistence Recovery",
+            form_type="task",
+        ),
+    ).create()
+    builder = form.builder
+    html = SchemaFields.HTML.get(title="Resilient instructions")
+    _fail_next_browser_fetch(
+        user.page,
+        method="GET",
+        path_prefix=f"/assets/{form.key}/html/",
+        error="Test-only HTML load failure",
+    )
+    builder.add_field(html)
+
+    status = builder.condition.locator("[data-role='editor-status']")
+    editor = builder.condition.locator("[data-role='editor']")
+    expect(status).to_be_visible()
+    expect(status).to_contain_text("Test-only HTML load failure")
+    expect(editor).to_have_attribute("inert", "")
+    expect(editor).not_to_have_attribute("aria-busy", "true")
+    expect(editor.locator(".ProseMirror")).to_have_count(0)
+
+    load_path = f"/assets/{form.key}/html/{html.id}"
+    with user.page.expect_response(
+        lambda response: response.url.endswith(load_path)
+        and response.status == 200
+    ):
+        status.locator("[data-role='retry']").click()
+
+    text_entry = _html_editor_text_entry(builder)
+    expect(status).to_be_hidden()
+
+    save_path = f"/assets/{form.key}/form-html/{html.id}"
+    text = "Retry this durable text."
+    text_entry.press_sequentially(text)
+    _fail_next_browser_fetch(
+        user.page,
+        method="PUT",
+        path_prefix=save_path,
+        error="Test-only HTML save failure",
+    )
+    text_entry.blur()
+
+    expect(status).to_be_visible()
+    expect(status).to_contain_text("Test-only HTML save failure")
+
+    with user.page.expect_response(
+        lambda response: response.url.endswith(save_path)
+        and response.status == 200
+    ):
+        status.locator("[data-role='retry']").click()
+    expect(status).to_be_hidden()
+
+    saved_form = Entities.fetch_one(form.key, request=Fetch.root())
+    assert text in saved_form.get_html_field(html.id)
+
+    text_entry.click()
+    text_entry.press("Control+A")
+    text_entry.press("Backspace")
+    with user.page.expect_response(
+        lambda response: response.url.endswith(save_path)
+        and response.status == 200
+    ):
+        text_entry.blur()
+
+    cleared_form = Entities.fetch_one(form.key, request=Fetch.root())
+    assert cleared_form.get_html_field(html.id) is None
 
 
 # @features forms

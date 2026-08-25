@@ -1,16 +1,16 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b4b0f2eb';
-import './styles.js?v=b4b0f2eb';
-import './foundation.js?v=b4b0f2eb';
-import './connectivity.js?v=b4b0f2eb';
-import './icons.js?v=b4b0f2eb';
-import './buttons.js?v=b4b0f2eb';
-import './formatting.js?v=b4b0f2eb';
-import './dropdown.js?v=b4b0f2eb';
-import './combobox.js?v=b4b0f2eb';
-import './primitives.js?v=b4b0f2eb';
-import './baseForm.js?v=b4b0f2eb';
-import './loader.js?v=b4b0f2eb';
+import { B as BaseUpload, u as uploadElement, U as UploadMenu } from './baseUpload.js?v=b66dffd0';
+import './styles.js?v=b66dffd0';
+import './foundation.js?v=b66dffd0';
+import './connectivity.js?v=b66dffd0';
+import './icons.js?v=b66dffd0';
+import './buttons.js?v=b66dffd0';
+import './formatting.js?v=b66dffd0';
+import './dropdown.js?v=b66dffd0';
+import './combobox.js?v=b66dffd0';
+import './primitives.js?v=b66dffd0';
+import './baseForm.js?v=b66dffd0';
+import './loader.js?v=b66dffd0';
 
 const ORGANIZE_DROPZONE_TEXT =
 	"Drop files here, click to upload, or paste a screenshot.";

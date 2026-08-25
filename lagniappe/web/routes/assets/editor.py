@@ -19,8 +19,9 @@ from . import assets
 
 # @testable true
 # @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_field
+# @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
 # @features html-field
-# @dimensions render-fetch submitter-key form-asset
+# @dimensions render-fetch submitter-key form-asset retry authoritative-content
 @assets.route("<key>/html/<field_id>", methods=["GET"])
 @permission(requested=Action.VIEW)
 def html_field(key, field_id, **kwargs):
@@ -35,6 +36,9 @@ def html_field(key, field_id, **kwargs):
 
 # @testable true
 # @tests tests_unit/test_004_form_properties.py::test_form_html_fields
+# @tests tests_e2e/003_forms/test_003b_form_builder.py::test_html_editor_recovers_from_failed_load_and_save
+# @features html-field
+# @dimensions server-acknowledgement intentional-clear form-asset
 @assets.route("<key>/form-html/<field_id>", methods=["PUT"])
 @permission(requested=Action.EDIT)
 def form_html(key, field_id, **kwargs):

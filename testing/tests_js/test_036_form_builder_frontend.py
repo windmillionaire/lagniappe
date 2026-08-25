@@ -94,6 +94,9 @@ source = source.replace(
 vm.runInContext(source, context);
 
 const builder = {
+  _independentDocuments: new Set(),
+  flushIndependentDocuments:
+    context.FormBuilder.prototype.flushIndependentDocuments,
   header: { saveButton },
   hidden: false,
   offline: context.FormBuilder.prototype.offline,

@@ -1,21 +1,21 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { SearchBox } from './search.js?v=b4b0f2eb';
-import { EntityMenu } from './entityMenu.js?v=b4b0f2eb';
-import { w as withTransition, r as request, E as ENDPOINTS, g as generateElementId } from './foundation.js?v=b4b0f2eb';
-import { c as connectivity } from './connectivity.js?v=b4b0f2eb';
-import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b4b0f2eb';
-import { STYLES } from './styles.js?v=b4b0f2eb';
-import { s as setIcon } from './icons.js?v=b4b0f2eb';
-import { p as primitives } from './primitives.js?v=b4b0f2eb';
-import { B as BaseForm, R as Renderer } from './baseForm.js?v=b4b0f2eb';
-import { F as FacetsBox } from './facets.js?v=b4b0f2eb';
+import { SearchBox } from './search.js?v=b66dffd0';
+import { EntityMenu } from './entityMenu.js?v=b66dffd0';
+import { w as withTransition, r as request, E as ENDPOINTS, g as generateElementId } from './foundation.js?v=b66dffd0';
+import { c as connectivity } from './connectivity.js?v=b66dffd0';
+import { Modal, OfflineModal, DeleteModal, HelpModal } from './modal.js?v=b66dffd0';
+import { STYLES } from './styles.js?v=b66dffd0';
+import { s as setIcon } from './icons.js?v=b66dffd0';
+import { p as primitives } from './primitives.js?v=b66dffd0';
+import { B as BaseForm, R as Renderer } from './baseForm.js?v=b66dffd0';
+import { F as FacetsBox } from './facets.js?v=b66dffd0';
 
 const CONDITION_REGISTRY = {
-	html: () => import('./html.js?v=b4b0f2eb'),
-	status: () => import('./status.js?v=b4b0f2eb'),
-	visibility: () => import('./visibility.js?v=b4b0f2eb'),
-	columns: () => import('./columns.js?v=b4b0f2eb'),
-	options: () => import('./options.js?v=b4b0f2eb'),
+	html: () => import('./html.js?v=b66dffd0'),
+	status: () => import('./status.js?v=b66dffd0'),
+	visibility: () => import('./visibility.js?v=b66dffd0'),
+	columns: () => import('./columns.js?v=b66dffd0'),
+	options: () => import('./options.js?v=b66dffd0'),
 };
 
 /**
@@ -4434,6 +4434,7 @@ class FormBuilder {
 	constructor(node) {
 		this.elt = node;
 		this.elements = new Map();
+		this._independentDocuments = new Set();
 		this.selectedElement = null;
 		this.schemaElt = document.querySelector('input[name="schema"]');
 		this.key = node.dataset.key;
@@ -4482,12 +4483,38 @@ class FormBuilder {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_036_form_builder_frontend.py::test_builder_sync_uses_shared_connectivity_without_orphaned_global_state
+	 * @tests tests_js/test_045_browser_persistence.py::test_builder_owns_independent_editor_lifecycle_flushes
 	 * @pairs forms:builder-lifecycle offline:builder-lifecycle
+	 * @pairs editor:teardown html-field:teardown
 	 */
 	async sync({ hidden = document.hidden } = {}) {
+		const wasOnline = this.online;
 		this.hidden = hidden;
 		this.online = connectivity.online;
 		this.offline(!this.online);
+		if (this.online && (hidden || !wasOnline)) {
+			await this.flushIndependentDocuments({ keepalive: hidden });
+		}
+	}
+
+	registerIndependentDocument(document) {
+		this._independentDocuments.add(document);
+		return document;
+	}
+
+	unregisterIndependentDocument(document) {
+		this._independentDocuments.delete(document);
+	}
+
+	async flushIndependentDocuments(options = {}) {
+		const results = await Promise.allSettled(
+			[...this._independentDocuments].map((document) =>
+				Promise.resolve().then(() => document.flush(options)),
+			),
+		);
+		return results.every(
+			(result) => result.status === "fulfilled" && result.value === true,
+		);
 	}
 
 	/**
@@ -4737,6 +4764,7 @@ class FormBuilder {
 			if (element.destroy) element.destroy();
 		});
 		this.elements.clear();
+		this._independentDocuments.clear();
 
 		document.removeEventListener("click", this.click);
 	}

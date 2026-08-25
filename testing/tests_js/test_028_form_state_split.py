@@ -26,7 +26,7 @@ const db = {
   deleteObjectStore(name) { stores.delete(name); },
   transaction(storeNames) {
     const names = Array.isArray(storeNames) ? storeNames : [storeNames];
-    return {
+    const tx = {
       objectStore(name) {
         if (!names.includes(name) || !stores.has(name)) {
           throw new Error(`Unknown store ${name}`);
@@ -37,12 +37,14 @@ const db = {
             queueMicrotask(() => {
               request.result = [...stores.get(name)];
               request.onsuccess?.();
+              queueMicrotask(() => tx.oncomplete?.());
             });
             return request;
           },
         };
       },
     };
+    return tx;
   },
 };
 const indexedDB = {

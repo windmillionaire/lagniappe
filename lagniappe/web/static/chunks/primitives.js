@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b4b0f2eb';
-import { s as setIcon } from './icons.js?v=b4b0f2eb';
+import { STYLES } from './styles.js?v=b66dffd0';
+import { s as setIcon } from './icons.js?v=b66dffd0';
 
 /**
  * @testable infrastructure

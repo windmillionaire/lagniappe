@@ -1,11 +1,11 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { STYLES } from './styles.js?v=b4b0f2eb';
-import { r as request, E as ENDPOINTS, w as withTransition, f as renderNotificationBadge } from './foundation.js?v=b4b0f2eb';
-import './connectivity.js?v=b4b0f2eb';
-import { c as createIcon } from './icons.js?v=b4b0f2eb';
-import { Dropdown } from './dropdown.js?v=b4b0f2eb';
-import './combobox.js?v=b4b0f2eb';
-import './primitives.js?v=b4b0f2eb';
+import { STYLES } from './styles.js?v=b66dffd0';
+import { r as request, E as ENDPOINTS, w as withTransition, f as renderNotificationBadge } from './foundation.js?v=b66dffd0';
+import './connectivity.js?v=b66dffd0';
+import { c as createIcon } from './icons.js?v=b66dffd0';
+import { Dropdown } from './dropdown.js?v=b66dffd0';
+import './combobox.js?v=b66dffd0';
+import './primitives.js?v=b66dffd0';
 
 const CLEAR_ALL_KEY = "__clear_all_notifications__";
 
@@ -209,7 +209,7 @@ class Notifications {
 		const action = option?.dataset?.action;
 		if (action === "message-user") {
 			event?.preventDefault();
-			const { ensureMessageComposer } = await import('./messageComposer.js?v=b4b0f2eb');
+			const { ensureMessageComposer } = await import('./messageComposer.js?v=b66dffd0');
 			ensureMessageComposer(this.view).open();
 			return;
 		}

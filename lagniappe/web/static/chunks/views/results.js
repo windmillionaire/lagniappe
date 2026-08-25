@@ -1,6 +1,6 @@
 /*! Third-party licenses: /third-party-licenses.txt */
-import { S as ShellView, r as request, w as withTransition } from '../foundation.js?v=b4b0f2eb';
-import '../connectivity.js?v=b4b0f2eb';
+import { S as ShellView, r as request, w as withTransition } from '../foundation.js?v=b66dffd0';
+import '../connectivity.js?v=b66dffd0';
 
 /**
  * @testable infrastructure

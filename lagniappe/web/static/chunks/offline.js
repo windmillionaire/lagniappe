@@ -14,11 +14,7 @@ function openDB() {
 	return new Promise((resolve, reject) => {
 		const request = indexedDB.open(DB_NAME, DB_VERSION);
 		request.onerror = () => reject(request.error);
-		request.onsuccess = () => {
-			const db = request.result;
-			db.onversionchange = () => db.close();
-			resolve(db);
-		};
+		request.onsuccess = () => resolve(request.result);
 		request.onupgradeneeded = (event) => {
 			const db = event.target.result;
 			if (event.oldVersion < 2) {
@@ -46,26 +42,119 @@ function openDB() {
 }
 
 /**
- * @testable false
- * @covered-by src/script/shared/offline.mjs::updateSyncRecord
- * @covered-by src/script/shared/offline.mjs::getAllOfflineRecords
- * @reason transaction wrapper is exercised through the offline record API
+ * @testable true
+ * @tests tests_js/test_045_browser_persistence.py::test_indexeddb_operations_resolve_only_after_transaction_commit
+ * @tests tests_js/test_045_browser_persistence.py::test_indexeddb_abort_and_errors_reject_once_and_close_the_database
+ * @tests tests_js/test_045_browser_persistence.py::test_indexeddb_executor_failures_abort_and_preserve_the_original_error
+ * @features offline sync
+ * @dimensions transaction-commit transaction-abort error-ownership connection-lifecycle executor-error multi-delete readonly-result
  */
 function withTransaction(storeNames, mode, executor) {
 	return openDB().then(
 		(db) =>
 			new Promise((resolve, reject) => {
-				const tx = db.transaction(storeNames, mode);
-				tx.oncomplete = () => db.close();
-				tx.onerror = () => {
+				let tx = null;
+				let operationComplete = false;
+				let transactionComplete = false;
+				let operationResult;
+				let firstError = null;
+				let settled = false;
+				let databaseClosed = false;
+
+				/**
+				 * @testable false
+				 * @covered-by src/script/shared/offline.mjs::withTransaction
+				 * @reason connection closure is private transaction settlement plumbing
+				 */
+				const closeDatabase = () => {
+					if (databaseClosed) return;
+					databaseClosed = true;
+					db.onclose = null;
 					db.close();
-					reject(tx.error);
 				};
+				/**
+				 * @testable false
+				 * @covered-by src/script/shared/offline.mjs::withTransaction
+				 * @reason first-error retention is private transaction settlement plumbing
+				 */
+				const rememberError = (error) => {
+					firstError ||=
+						error || tx?.error || new Error("IndexedDB transaction failed");
+					return firstError;
+				};
+				/**
+				 * @testable false
+				 * @covered-by src/script/shared/offline.mjs::withTransaction
+				 * @reason rejection ownership is private transaction settlement plumbing
+				 */
+				const rejectOnce = (error) => {
+					if (settled) return;
+					settled = true;
+					closeDatabase();
+					reject(rememberError(error));
+				};
+				/**
+				 * @testable false
+				 * @covered-by src/script/shared/offline.mjs::withTransaction
+				 * @reason commit gating is private transaction settlement plumbing
+				 */
+				const resolveAfterCommit = () => {
+					if (settled || !operationComplete || !transactionComplete) return;
+					settled = true;
+					closeDatabase();
+					resolve(operationResult);
+				};
+				/**
+				 * @testable false
+				 * @covered-by src/script/shared/offline.mjs::withTransaction
+				 * @reason executor abort handling is private transaction settlement plumbing
+				 */
+				const abortWithError = (error) => {
+					rememberError(error);
+					try {
+						tx?.abort();
+					} catch {
+						// A transaction that already completed cannot be aborted. The
+						// original executor error remains the useful failure.
+					}
+					rejectOnce(firstError);
+				};
+
+				db.onversionchange = closeDatabase;
+				db.onclose = () => {
+					rejectOnce(new Error("IndexedDB database closed unexpectedly"));
+				};
+
 				try {
-					executor(tx, resolve, reject);
+					tx = db.transaction(storeNames, mode);
 				} catch (e) {
-					reject(e);
+					rejectOnce(e);
+					return;
 				}
+
+				tx.oncomplete = () => {
+					transactionComplete = true;
+					resolveAfterCommit();
+				};
+				tx.onerror = (event) => {
+					rejectOnce(event.target?.error || tx.error);
+				};
+				tx.onabort = () => {
+					rejectOnce(tx.error || new Error("IndexedDB transaction aborted"));
+				};
+
+				let operation;
+				try {
+					operation = executor(tx);
+				} catch (e) {
+					abortWithError(e);
+					return;
+				}
+				Promise.resolve(operation).then((result) => {
+					operationResult = result;
+					operationComplete = true;
+					resolveAfterCommit();
+				}, abortWithError);
 			}),
 	);
 }
@@ -92,31 +181,21 @@ function promisify(request) {
  */
 function updateSyncRecord(record) {
 	const timestamp = Date.now();
-	return withTransaction(
-		SYNC_STORE,
-		"readwrite",
-		async (tx, resolve, reject) => {
-			const store = tx.objectStore(SYNC_STORE);
-			try {
-				const existing = await promisify(store.get(record.sync_id));
-				const merged = existing
-					? {
-							...existing,
-							...record,
-							save: existing.save || record.save,
-							timestamp,
-						}
-					: { ...record, timestamp };
-				if (existing && !Object.hasOwn(record, "html")) delete merged.html;
-				if (existing && !Object.hasOwn(record, "mentions"))
-					delete merged.mentions;
-				await promisify(store.put(merged));
-				resolve();
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction(SYNC_STORE, "readwrite", async (tx) => {
+		const store = tx.objectStore(SYNC_STORE);
+		const existing = await promisify(store.get(record.sync_id));
+		const merged = existing
+			? {
+					...existing,
+					...record,
+					save: existing.save || record.save,
+					timestamp,
+				}
+			: { ...record, timestamp };
+		if (existing && !Object.hasOwn(record, "html")) delete merged.html;
+		if (existing && !Object.hasOwn(record, "mentions")) delete merged.mentions;
+		await promisify(store.put(merged));
+	});
 }
 
 /**
@@ -125,18 +204,10 @@ function updateSyncRecord(record) {
  * @reason single-record lookup is owned by the widget state sync path
  */
 function getSyncRecord(sync_id) {
-	return withTransaction(
-		[SYNC_STORE],
-		"readonly",
-		async (tx, resolve, reject) => {
-			try {
-				const record = await promisify(tx.objectStore(SYNC_STORE).get(sync_id));
-				resolve(record ?? null);
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction([SYNC_STORE], "readonly", async (tx) => {
+		const record = await promisify(tx.objectStore(SYNC_STORE).get(sync_id));
+		return record ?? null;
+	});
 }
 
 /**
@@ -150,16 +221,12 @@ function getAllOfflineRecords() {
 	return withTransaction(
 		[SYNC_STORE, MUTATION_STORE],
 		"readonly",
-		async (tx, resolve, reject) => {
-			try {
-				const sync = await promisify(tx.objectStore(SYNC_STORE).getAll());
-				const mutations = await promisify(
-					tx.objectStore(MUTATION_STORE).getAll(),
-				);
-				resolve({ sync, mutations });
-			} catch (e) {
-				reject(e);
-			}
+		async (tx) => {
+			const sync = await promisify(tx.objectStore(SYNC_STORE).getAll());
+			const mutations = await promisify(
+				tx.objectStore(MUTATION_STORE).getAll(),
+			);
+			return { sync, mutations };
 		},
 	);
 }
@@ -170,18 +237,9 @@ function getAllOfflineRecords() {
  * @reason single-record deletion is owned by successful state reconciliation
  */
 function deleteSyncRecord(sync_id) {
-	return withTransaction(
-		SYNC_STORE,
-		"readwrite",
-		async (tx, resolve, reject) => {
-			try {
-				await promisify(tx.objectStore(SYNC_STORE).delete(sync_id));
-				resolve();
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction(SYNC_STORE, "readwrite", async (tx) => {
+		await promisify(tx.objectStore(SYNC_STORE).delete(sync_id));
+	});
 }
 
 /**
@@ -192,19 +250,10 @@ function deleteSyncRecord(sync_id) {
  */
 function deleteSyncRecords(sync_ids) {
 	if (!sync_ids?.length) return Promise.resolve();
-	return withTransaction(
-		SYNC_STORE,
-		"readwrite",
-		async (tx, resolve, reject) => {
-			try {
-				const store = tx.objectStore(SYNC_STORE);
-				await Promise.all(sync_ids.map((id) => promisify(store.delete(id))));
-				resolve();
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction(SYNC_STORE, "readwrite", async (tx) => {
+		const store = tx.objectStore(SYNC_STORE);
+		await Promise.all(sync_ids.map((id) => promisify(store.delete(id))));
+	});
 }
 
 /**
@@ -214,18 +263,9 @@ function deleteSyncRecords(sync_ids) {
  * @pairs offline:queue-create offline:queue-submit offline:reload
  */
 function setOfflineMutation(record) {
-	return withTransaction(
-		MUTATION_STORE,
-		"readwrite",
-		async (tx, resolve, reject) => {
-			try {
-				await promisify(tx.objectStore(MUTATION_STORE).put(record));
-				resolve();
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction(MUTATION_STORE, "readwrite", async (tx) => {
+		await promisify(tx.objectStore(MUTATION_STORE).put(record));
+	});
 }
 
 /**
@@ -237,20 +277,9 @@ function setOfflineMutation(record) {
  * @dimensions durable-queue server-first replay queue-submit
  */
 function getOfflineMutations() {
-	return withTransaction(
-		MUTATION_STORE,
-		"readonly",
-		async (tx, resolve, reject) => {
-			try {
-				const records = await promisify(
-					tx.objectStore(MUTATION_STORE).getAll(),
-				);
-				resolve(records);
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction(MUTATION_STORE, "readonly", async (tx) => {
+		return await promisify(tx.objectStore(MUTATION_STORE).getAll());
+	});
 }
 
 /**
@@ -261,19 +290,10 @@ function getOfflineMutations() {
  */
 function deleteOfflineMutations(ids) {
 	if (!ids?.length) return Promise.resolve();
-	return withTransaction(
-		MUTATION_STORE,
-		"readwrite",
-		async (tx, resolve, reject) => {
-			try {
-				const store = tx.objectStore(MUTATION_STORE);
-				await Promise.all(ids.map((id) => promisify(store.delete(id))));
-				resolve();
-			} catch (e) {
-				reject(e);
-			}
-		},
-	);
+	return withTransaction(MUTATION_STORE, "readwrite", async (tx) => {
+		const store = tx.objectStore(MUTATION_STORE);
+		await Promise.all(ids.map((id) => promisify(store.delete(id))));
+	});
 }
 
 export { deleteOfflineMutations, deleteSyncRecord, deleteSyncRecords, getAllOfflineRecords, getOfflineMutations, getSyncRecord, setOfflineMutation, updateSyncRecord };

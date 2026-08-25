@@ -37,6 +37,13 @@ Only a create/update form with `lp-offline` and a widget
 
 Local drafts are not durable until the User submits them.
 
+Every IndexedDB helper resolves only after both its requested operation has
+finished and the containing transaction emits `complete`. Request-level
+success is not a durability acknowledgement. Transaction errors, aborts,
+executor failures, and unexpected database closure reject once with the first
+useful error and close the database connection. Read-only helpers use the same
+boundary so callers always observe results from a completed transaction.
+
 Reconnect replays commands in order. A revision mismatch retains the command
 and opens the same reconciliation path used for an external edit. If current
 schema/state can safely rebase the queued submission, the queue saves the new
