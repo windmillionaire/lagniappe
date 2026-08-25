@@ -1,0 +1,36 @@
+{
+	"schema": 1,
+	"source_roots": [
+		"THIRD_PARTY_LICENSES",
+		"build",
+		"src/fonts",
+		"src/script",
+		"src/style"
+	],
+	"source_files": [
+		"config/browser_protocol.json",
+		"package-lock.json",
+		"package.json"
+	],
+	"exclusive_artifact_roots": [
+		"lagniappe/web/static/chunks",
+		"lagniappe/web/static/pdfjs/wasm"
+	],
+	"required_artifacts": [
+		"lagniappe/web/start/styles/icons.py",
+		"lagniappe/web/start/styles/styles.py",
+		"lagniappe/web/static/login.js",
+		"lagniappe/web/static/pdf.worker.min.mjs",
+		"lagniappe/web/static/script.js",
+		"lagniappe/web/static/sentry.js",
+		"lagniappe/web/static/style.css",
+		"lagniappe/web/static/sw.js",
+		"lagniappe/web/static/third-party-licenses.txt"
+	],
+	"required_artifact_prefixes": [
+		"lagniappe/web/static/chunks/",
+		"lagniappe/web/static/chunks/views/",
+		"lagniappe/web/static/fonts/material-symbols-rounded.",
+		"lagniappe/web/static/pdfjs/wasm/"
+	]
+}

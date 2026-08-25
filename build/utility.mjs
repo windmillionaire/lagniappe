@@ -3,6 +3,8 @@ import {
 	existsSync,
 	readdirSync,
 	readFileSync,
+	renameSync,
+	rmSync,
 	unlinkSync,
 	writeFileSync,
 } from "node:fs";
@@ -27,7 +29,6 @@ const rawStylesYaml = yaml.load(
 );
 const constantsPath = "./config/constants.py";
 const browserProtocolPath = "./config/browser_protocol.json";
-const buildMetadataPath = "./lagniappe/web/static/build.json";
 const BOOT_CONNECTIVITY_MODULE = "shared/connectivity.mjs";
 const INTERACTION_FOUNDATION_MODULES = new Set([
 	"shared/endpoints.mjs",
@@ -50,6 +51,21 @@ const INDEX_FOUNDATION_MODULES = new Set([
 	"views/base/index.mjs",
 	"widgets/tableVisibilityState.mjs",
 ]);
+
+/**
+ * @testable false
+ * @covered-by build/utility.mjs::updateConstantsBuildId
+ * @reason private durability helper exercised through generated build outputs
+ */
+const atomicWriteFileSync = (pathValue, content) => {
+	const temporary = `${pathValue}.tmp-${process.pid}`;
+	try {
+		writeFileSync(temporary, content);
+		renameSync(temporary, pathValue);
+	} finally {
+		rmSync(temporary, { force: true });
+	}
+};
 
 /**
  * Keep the interaction-critical view graph in stable chunks so templates can
@@ -430,11 +446,11 @@ const buildStyles = () => {
 			return virtualModules.get(id) ?? null;
 		},
 		generateBundle() {
-			writeFileSync(
+			atomicWriteFileSync(
 				`./${STYLE_PIPELINE.registry.python_icons}`,
 				pythonStyleModuleSource("ICONS", iconsYaml),
 			);
-			writeFileSync(
+			atomicWriteFileSync(
 				`./${STYLE_PIPELINE.registry.python_styles}`,
 				pythonStyleModuleSource("STYLES", stylesYaml),
 			);
@@ -578,28 +594,16 @@ const updateConstantsBuildId = (buildId) => {
 	} else {
 		content = `${content.replace(/\s*$/, "\n")}${line}\n`;
 	}
-	writeFileSync(constantsPath, content);
-};
-
-/**
- * @testable false
- * @covered-by build/utility.mjs::updateServiceWorker
- * @reason private metadata serializer exercised through service-worker output
- */
-const writeBuildMetadata = (buildId, version, mode) => {
-	writeFileSync(
-		buildMetadataPath,
-		`${JSON.stringify({ build_id: buildId, mode, version }, null, 2)}\n`,
-	);
+	atomicWriteFileSync(constantsPath, content);
 };
 
 /**
  * @testable true
- * @tests tests_js/test_022_build_chunk_versioning.py::test_build_metadata_records_release_mode
+ * @tests tests_js/test_022_build_chunk_versioning.py::test_service_worker_records_the_build_identity
  * @features frontend-build
- * @dimensions build-metadata
+ * @dimensions service-worker build-identity
  */
-const updateServiceWorker = (buildId, version, mode) => {
+const updateServiceWorker = (buildId) => {
 	return {
 		name: "update-service-worker",
 		writeBundle(_options, bundle) {
@@ -618,8 +622,7 @@ const updateServiceWorker = (buildId, version, mode) => {
 				JSON.stringify(precacheUrls(bundle, buildId), null, "\t"),
 			);
 
-			writeBuildMetadata(buildId, version, mode);
-			writeFileSync("./lagniappe/web/static/sw.js", swContent);
+			atomicWriteFileSync("./lagniappe/web/static/sw.js", swContent);
 		},
 	};
 };

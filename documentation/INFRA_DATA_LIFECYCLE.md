@@ -117,6 +117,19 @@ versions available for diagnosis. Restore does not automatically roll back.
 The Admin **Backups & Archives** tab is informational; restore and delete remain
 exact-confirmation operator commands.
 
+## Restore journal compatibility
+
+Restore journals are resumable only when they describe the current in-place
+`(default)` database workflow and match the exact application version. Released
+versions `v0.1.0` and `v0.2.0` did not include lifecycle restore journals, so
+there is no released named-database cutover format to migrate.
+
+Pre-release journals that target a separate named database or describe rollback
+are never executed. The installer rejects them before confirmation or provider
+mutation with guidance to inspect and archive the obsolete journal before
+starting a current in-place restore. Named databases remain part of the active
+design only as temporary, targeted safety clones and archive scratch databases.
+
 ## Change checklist
 
 - Keep the recovery bucket outside runtime credentials.

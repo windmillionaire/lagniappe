@@ -100,13 +100,21 @@ def test_test_frontend_bundle_skips_current_build(
 ):
     testing = import_config_testing(make_demo_app(tmp_path))
     state_path = tmp_path / "test-frontend-bundle.json"
-    state = {"schema": 1, "inputs": "inputs-1", "outputs": "outputs-1"}
+    state = {"schema": 2, "inputs": "inputs-1", "outputs": "outputs-1"}
     state_path.write_text(json.dumps(state))
 
     monkeypatch.setattr(testing, "_TEST_FRONTEND_BUNDLE_STATE", state_path)
     monkeypatch.setattr(testing, "_test_frontend_input_fingerprint", lambda: "inputs-1")
     monkeypatch.setattr(
-        testing, "_test_frontend_output_fingerprint", lambda: "outputs-1"
+        testing,
+        "_inspect_test_frontend_bundle",
+        lambda **_kwargs: (
+            types.SimpleNamespace(
+                metadata={"mode": "development"},
+                output_fingerprint="outputs-1",
+            ),
+            [],
+        ),
     )
     monkeypatch.setattr(
         testing.subprocess,
@@ -135,8 +143,14 @@ def test_test_frontend_bundle_rebuilds_stale_build(
     )
     monkeypatch.setattr(
         testing,
-        "_test_frontend_output_fingerprint",
-        lambda: next(output_fingerprints),
+        "_inspect_test_frontend_bundle",
+        lambda **_kwargs: (
+            types.SimpleNamespace(
+                metadata={"mode": "development"},
+                output_fingerprint=next(output_fingerprints),
+            ),
+            [],
+        ),
     )
 
     def fake_run(command, **kwargs):
@@ -150,7 +164,7 @@ def test_test_frontend_bundle_rebuilds_stale_build(
         ([testing.NPM_CLI, "run", "dev"], {"cwd": testing.APP_DIR, "check": False})
     ]
     assert json.loads(state_path.read_text()) == {
-        "schema": 1,
+        "schema": 2,
         "inputs": "inputs-new",
         "outputs": "outputs-new",
     }
@@ -194,16 +208,24 @@ def test_test_frontend_bundle_defers_build_during_active_e2e_session(
 
 # @pairs test-server:freshness frontend-build:freshness frontend-build:no-op
 # @pair frontend-build:production-preservation
-def test_test_frontend_bundle_preserves_production_build(
+def test_test_frontend_bundle_preserves_current_production_build(
     import_config_testing,
     monkeypatch,
     tmp_path,
     capsys,
 ):
     testing = import_config_testing(make_demo_app(tmp_path))
-    metadata_path = tmp_path / "build.json"
-    metadata_path.write_text(json.dumps({"mode": "production"}))
-    monkeypatch.setattr(testing, "_TEST_FRONTEND_BUILD_METADATA", metadata_path)
+    monkeypatch.setattr(
+        testing,
+        "_inspect_test_frontend_bundle",
+        lambda **_kwargs: (
+            types.SimpleNamespace(
+                metadata={"mode": "production"},
+                output_fingerprint="production-outputs",
+            ),
+            [],
+        ),
+    )
     monkeypatch.setattr(
         testing,
         "_test_frontend_input_fingerprint",
@@ -218,7 +240,57 @@ def test_test_frontend_bundle_preserves_production_build(
     )
 
     assert testing.ensure_test_frontend_bundle() is False
-    assert "Production frontend bundle detected" in capsys.readouterr().out
+    assert "Current production frontend bundle detected" in capsys.readouterr().out
+
+
+# @pairs test-server:freshness frontend-build:freshness frontend-build:rebuild
+# @pair frontend-build:production-preservation
+def test_test_frontend_bundle_replaces_stale_production_build(
+    import_config_testing,
+    monkeypatch,
+    tmp_path,
+):
+    testing = import_config_testing(make_demo_app(tmp_path))
+    state_path = tmp_path / "test-frontend-bundle.json"
+    calls = []
+    inspections = iter(
+        [
+            (None, ["Frontend build was created from different source inputs."]),
+            (
+                types.SimpleNamespace(
+                    metadata={"mode": "development"},
+                    output_fingerprint="development-outputs",
+                ),
+                [],
+            ),
+        ]
+    )
+    monkeypatch.setattr(testing, "_TEST_FRONTEND_BUNDLE_STATE", state_path)
+    monkeypatch.setattr(
+        testing, "_test_frontend_input_fingerprint", lambda: "inputs-new"
+    )
+    monkeypatch.setattr(
+        testing,
+        "_inspect_test_frontend_bundle",
+        lambda **_kwargs: next(inspections),
+    )
+    monkeypatch.setattr(
+        testing.subprocess,
+        "run",
+        lambda command, **kwargs: (
+            calls.append((command, kwargs)) or types.SimpleNamespace(returncode=0)
+        ),
+    )
+
+    assert testing.ensure_test_frontend_bundle() is True
+    assert calls == [
+        ([testing.NPM_CLI, "run", "dev"], {"cwd": testing.APP_DIR, "check": False})
+    ]
+    assert json.loads(state_path.read_text()) == {
+        "schema": 2,
+        "inputs": "inputs-new",
+        "outputs": "development-outputs",
+    }
 
 
 def test_run_py_test_server_command_dispatches_start(monkeypatch, capsys):

@@ -13,6 +13,7 @@ from config import (
     _atomic_write_text,
     verify_generation_manifest,
 )
+from runner.frontend_build import verify_frontend_build
 from runner.process import run_command
 
 PACKAGE_IMPORTS = {
@@ -399,11 +400,14 @@ def deploy(
         SETTINGS.save()
 
     if build_assets:
-        Directory.JS_CHUNKS.clean()
-
         print("Building static files...")
         run_command([NPM_CLI, "run", "build"], check=True, capture_output=False)
 
+    verify_frontend_build(
+        app_dir=Directory.APP.value,
+        expected_mode="production",
+        expected_version=str(SETTINGS.APP["VERSION"]),
+    )
     verify_generation_manifest()
     print(
         "Deployment includes config/files/lagniappe_settings.yaml and, when "

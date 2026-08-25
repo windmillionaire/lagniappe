@@ -1,6 +1,7 @@
 """Tooling tests for the ``run.py test`` command wrapper."""
 
 import ast
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -2091,6 +2092,67 @@ def _git(repo: Path, *args: str):
     )
 
 
+def _release_frontend_contract():
+    return {
+        "schema": 1,
+        "source_roots": ["src/script"],
+        "source_files": [
+            "build/publication.json",
+            "package-lock.json",
+            "package.json",
+        ],
+        "exclusive_artifact_roots": ["lagniappe/web/static/chunks"],
+        "required_artifacts": [
+            "lagniappe/web/static/script.js",
+            "lagniappe/web/static/sw.js",
+        ],
+        "required_artifact_prefixes": ["lagniappe/web/static/"],
+    }
+
+
+def _write_release_frontend_metadata(repo, *, build_id, mode, version):
+    contract = _release_frontend_contract()
+    contract_path = repo / "build/publication.json"
+    contract_path.parent.mkdir(parents=True, exist_ok=True)
+    contract_path.write_text(f"{json.dumps(contract, sort_keys=True)}\n")
+
+    source_paths = set()
+    for relative_root in contract["source_roots"]:
+        source_paths.update(
+            path.relative_to(repo).as_posix()
+            for path in (repo / relative_root).rglob("*")
+            if path.is_file()
+        )
+    source_paths.update(contract["source_files"])
+    source_digest = hashlib.sha256(b"frontend-source-v1\0")
+    for relative in sorted(source_paths):
+        source_digest.update(relative.encode())
+        source_digest.update(b"\0")
+        source_digest.update((repo / relative).read_bytes())
+        source_digest.update(b"\0")
+
+    artifacts = []
+    for relative in contract["required_artifacts"]:
+        content = (repo / relative).read_bytes()
+        artifacts.append(
+            {
+                "path": relative,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "size": len(content),
+            }
+        )
+    metadata = {
+        "schema": 1,
+        "build_id": build_id,
+        "mode": mode,
+        "version": version,
+        "source": {"sha256": source_digest.hexdigest()},
+        "artifacts": artifacts,
+    }
+    metadata_path = repo / "lagniappe/web/static/build.json"
+    metadata_path.write_text(f"{json.dumps(metadata, indent=2)}\n")
+
+
 def _release_check_repository(tmp_path: Path) -> Path:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -2116,6 +2178,11 @@ def _release_check_repository(tmp_path: Path) -> Path:
                 encoding="utf-8"
             )
         ),
+        "runner/frontend_build.py": (
+            (Path(run.__file__).parent / "runner" / "frontend_build.py").read_text(
+                encoding="utf-8"
+            )
+        ),
         "runner/pytest_routing.py": (
             (
                 Path(run.__file__).parent / "runner" / "pytest_routing.py"
@@ -2132,10 +2199,6 @@ def _release_check_repository(tmp_path: Path) -> Path:
         ),
         "src/script/example.mjs": "export const value = 1;\n",
         "lagniappe/web/static/script.js": "built-main\n",
-        "lagniappe/web/static/build.json": (
-            '{"build_id": "base1234", "mode": "production", '
-            '"version": "0.1.0"}\n'
-        ),
         "lagniappe/web/static/sw.js": 'const BUILD_ID = "base1234";\n',
         "lagniappe/web/start/styles/icons.py": "ICONS = {}\n",
         "lagniappe/web/start/styles/styles.py": "STYLES = {}\n",
@@ -2145,6 +2208,13 @@ def _release_check_repository(tmp_path: Path) -> Path:
         path = repo / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
+
+    _write_release_frontend_metadata(
+        repo,
+        build_id="base1234",
+        mode="production",
+        version="0.1.0",
+    )
 
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "Base")
@@ -2167,19 +2237,19 @@ def _write_release_candidate(
         "documentation/releases/0.2.0.md": (
             "# Version 0.2.0\n\n- Added the release workflow.\n"
         ),
-        "lagniappe/web/static/build.json": (
-            f'{{"build_id": "{build_id}", "mode": "{mode}", '
-            f'"version": "0.2.0"}}\n'
-        ),
         "lagniappe/web/static/sw.js": f'const BUILD_ID = "{build_id}";\n',
-        "config/constants.py": (
-            f'SENTRY_DSN = "test"\nBUILD_ID = "{build_id}"\n'
-        ),
+        "config/constants.py": (f'SENTRY_DSN = "test"\nBUILD_ID = "{build_id}"\n'),
     }
     for relative, content in updates.items():
         path = repo / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
+    _write_release_frontend_metadata(
+        repo,
+        build_id=build_id,
+        mode=mode,
+        version="0.2.0",
+    )
     _git(repo, "add", ".")
     _git(repo, "commit", "-m", "Prepare release")
 

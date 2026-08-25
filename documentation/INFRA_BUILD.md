@@ -45,9 +45,19 @@ Chunk filenames are stable. Generated imports carry `?v=<build-id>`, so an
 entry point and all of its static and dynamic imports use one cache generation.
 The service worker warms those exact URLs after an update.
 
-`build.json` records the application version, build ID, and build mode.
-`config/constants.py` receives the same build ID for template URLs and ETags.
-Local application settings must not define `BUILD_ID`.
+`build.json` is the build completion marker. It records the application
+version, build ID, build mode, a digest of all declared frontend sources, and
+the path, size, and digest of every published artifact. The inventory includes
+nested chunks, fonts, PDF.js assets, the service worker, and the generated
+Python style/icon registries. `config/constants.py` receives the same build ID
+for template URLs and ETags. Local application settings must not define
+`BUILD_ID`.
+
+The build wrapper removes the previous completion marker before Rollup starts.
+It publishes `BUILD_ID` and a new `build.json` only after every Rollup entry,
+optional Sentry upload, and output check succeeds, and only if the authored
+source digest is unchanged. A failed or interrupted build therefore leaves no
+apparently complete marker; the next managed build repairs it.
 
 ## Entry points and chunks
 
@@ -69,7 +79,7 @@ The main startup path has four measured closures:
 | `main` | Main entry alone | 32 |
 | `shell` | Main plus a shell view | 64 |
 | `core` | Main plus a Core view | 120 |
-| `builder` | Builder view | 200 |
+| `builder` | Builder view | 224 |
 
 `build/startupBudget.mjs` measures deduplicated minified static imports and
 fails when a closure exceeds its budget. It also prevents heavy interactive
@@ -98,11 +108,13 @@ and upload plugins are disabled. CSS source maps are not emitted.
 Sentry upload, and writes `reports/bundle-stats-dev.html`. Its timestamp version
 is a frontend constant only; the configured application version is unchanged.
 
-Managed test startup hashes authored inputs and generated output. It runs the
-development build only when the bundle is incomplete or stale, records the
-state in `reports/test-frontend-bundle.json`, and preserves a complete
-production build. The same interprocess lock guards build preflight and browser
-test sessions.
+Managed test startup validates the shared source/artifact manifest and records
+the accepted development state in `reports/test-frontend-bundle.json`. It
+preserves a coherent, current production build. Missing, corrupt, or stale
+output—including an old production build after source changes—is replaced by a
+development build. The source contract includes fonts and third-party license
+inputs as well as scripts, styles, and build configuration. The same
+interprocess lock guards build preflight and browser test sessions.
 
 ## Build plugins
 
@@ -110,9 +122,11 @@ The custom plugins in `build/utility.mjs` enforce one artifact contract:
 
 - `versionChunkImports(buildId)` adds the build query to generated imports
   without renaming files.
-- `updateServiceWorker(buildId, version, mode)` injects the browser protocol,
-  dynamic precache URLs, and build constants into `sw.template.mjs`, then
-  writes `sw.js` and `build.json`.
+- `updateServiceWorker(buildId)` injects the browser protocol, dynamic precache
+  URLs, and build ID into `sw.template.mjs`, then writes `sw.js` atomically.
+- `recordBuildArtifacts(...)` collects every Rollup output across all entry
+  configurations. The build wrapper validates that inventory and publishes the
+  completion marker last.
 - `emitMaterialSymbols()` emits the vendored glyph subset under a filename
   derived from its digest.
 - `resolveMaterialSymbolsFont()` rewrites the stable authored font URL to that
@@ -137,8 +151,10 @@ venv/bin/python run.py release-check --base origin/main
 ```
 
 Commit the generated output and test the complete candidate before merging its
-release pull request. The release gate requires committed production metadata;
-a development build cannot pass.
+release pull request. The release gate verifies the exact Git index rather than
+the working tree: its source digest and every recorded artifact digest must
+match committed production metadata and the settings version. A development,
+partial, or stale build cannot pass.
 
 Hosted E2E exports an exact clean commit with production output, deploys that
 commit without rebuilding, and imports evidence for the same source tree. See

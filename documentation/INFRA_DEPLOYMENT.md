@@ -11,9 +11,10 @@ use one reviewed source/build generation.
 1. deploy-surface validation for excluded local-package imports and runtime
    dependencies missing from `requirements.txt`;
 2. production frontend build;
-3. PWA manifest update;
-4. Datastore index deployment when requested; and
-5. `gcloud app deploy` with the generated descriptor.
+3. source and artifact manifest validation for one complete production build;
+4. PWA manifest update;
+5. Datastore index deployment when requested; and
+6. `gcloud app deploy` with the generated descriptor.
 
 When `SENTRY_AUTH_TOKEN` is set, production source maps are generated, uploaded,
 and removed from static output. Without it, no source maps or upload plugins are
@@ -21,7 +22,9 @@ enabled.
 
 Installer deployment calls the same helper in publish-only mode. It uses the
 generated assets already present in the checkout and does not run npm or change
-the application version.
+the application version. The same manifest validation runs before any gcloud
+operation, so a missing, partial, corrupt, or stale prebuilt frontend is
+rejected.
 
 ## Release preparation
 
@@ -37,6 +40,8 @@ Commit the complete source and generated release output. `release-check`
 requires a `next/*` or `hotfix/*` candidate, rejects installation-local files,
 and checks that package metadata, lockfile, production build metadata,
 `BUILD_ID`, settings version, and release note agree on one `X.Y.Z` version.
+It computes source and artifact digests from the exact Git index, preventing an
+unstaged working-tree build from validating a different committed candidate.
 
 Hosted E2E exports that exact commit for both its App Engine version and Cloud
 Run runner image and never rebuilds it. `hosted-e2e create` runs source-quality,

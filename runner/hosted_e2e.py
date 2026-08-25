@@ -35,6 +35,7 @@ from config.storage import (
     storage_bucket_names,
 )
 from runner.context import GCLOUD_CLI, GIT_CLI, NPM_CLI
+from runner.frontend_build import GitFrontendBuildReader, inspect_frontend_build
 from runner.gcloud import activate_repository_gcloud
 from runner.process import run_command
 
@@ -72,10 +73,6 @@ HOSTED_APIS = (
 )
 VERSION_RE = re.compile(r"^e2e-[0-9a-f]{16}$")
 EXECUTION_RE = re.compile(r"^[a-z][a-z0-9-]{0,62}$")
-BUILD_ID_RE = re.compile(r"^b[0-9a-f]{7}$")
-BUILD_METADATA_PATH = Path("lagniappe/web/static/build.json")
-BUILD_CONSTANTS_PATH = Path("config/constants.py")
-BUILD_SERVICE_WORKER_PATH = Path("lagniappe/web/static/sw.js")
 CLOUD_BUILD_IDENTITY_RETRY_DELAYS = (2, 4, 8, 16)
 CLOUD_BUILD_ID_RE = re.compile(
     r"^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$",
@@ -315,25 +312,6 @@ def require_clean_source(repo_root=APP_DIR):
     return source
 
 
-# @testable false
-# @covered-by runner/hosted_e2e.py::_require_committed_production_build
-# @reason shared fail-closed Git object reader for committed build metadata
-def _committed_text(source, relative_path, *, repo_root=APP_DIR):
-    result = run_command(
-        [GIT_CLI, "show", f"{source}:{Path(relative_path).as_posix()}"],
-        cwd=Path(repo_root),
-        check=False,
-        timeout=60,
-    )
-    if result.returncode != 0:
-        detail = result.stderr.strip() or result.stdout.strip()
-        raise HostedE2EError(
-            f"The committed production build is missing {relative_path}: "
-            f"{detail or 'Git could not read the file.'}"
-        )
-    return result.stdout
-
-
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_e2e_requires_a_committed_production_build
 # @features hosted-e2e traceability
@@ -345,74 +323,29 @@ def _require_committed_production_build(
     expected_version=None,
 ):
     """Validate and return the production build ID stored in ``source``."""
-    metadata_text = _committed_text(
-        source,
-        BUILD_METADATA_PATH,
-        repo_root=repo_root,
-    )
-    try:
-        metadata = json.loads(metadata_text)
-    except json.JSONDecodeError as error:
-        raise HostedE2EError(
-            f"{BUILD_METADATA_PATH} is not valid JSON in the committed source."
-        ) from error
-    if not isinstance(metadata, dict):
-        raise HostedE2EError(f"{BUILD_METADATA_PATH} must contain a JSON object.")
-    if metadata.get("mode") != "production":
-        raise HostedE2EError(
-            "Hosted E2E create requires an already committed production "
-            "frontend build. Run `npm run build`, stage the generated output, "
-            "and commit it first."
-        )
-
-    constants = _committed_text(
-        source,
-        BUILD_CONSTANTS_PATH,
-        repo_root=repo_root,
-    )
-    match = re.search(
-        r'^BUILD_ID\s*=\s*"([^"]+)"\s*$',
-        constants,
-        flags=re.MULTILINE,
-    )
-    build_id = match.group(1) if match else ""
-    if not BUILD_ID_RE.fullmatch(build_id):
-        raise HostedE2EError(
-            f"{BUILD_CONSTANTS_PATH} does not contain a valid production build ID."
-        )
-    if metadata.get("build_id") != build_id:
-        raise HostedE2EError(
-            f"{BUILD_METADATA_PATH} and {BUILD_CONSTANTS_PATH} do not identify "
-            "the same committed build."
-        )
-
     configured_version = (
         SETTINGS.APP.get("VERSION") if expected_version is None else expected_version
     )
     expected_version = (
         str(configured_version).strip() if configured_version is not None else ""
     )
-    metadata_version = metadata.get("version")
-    metadata_version = (
-        str(metadata_version).strip() if metadata_version is not None else ""
-    )
-    if not expected_version or metadata_version != expected_version:
+    if not expected_version:
         raise HostedE2EError(
-            f"{BUILD_METADATA_PATH} does not match configured version "
-            f"{expected_version or '<missing>'}."
+            "Hosted E2E create requires a configured frontend build version."
         )
-
-    service_worker = _committed_text(
-        source,
-        BUILD_SERVICE_WORKER_PATH,
-        repo_root=repo_root,
+    validation, issues = inspect_frontend_build(
+        GitFrontendBuildReader(repo_root, revision=source),
+        expected_mode="production",
+        expected_version=expected_version,
     )
-    if build_id not in service_worker:
+    if issues:
+        detail = "; ".join(issues)
         raise HostedE2EError(
-            f"{BUILD_SERVICE_WORKER_PATH} does not contain committed build ID "
-            f"{build_id}."
+            "Hosted E2E create requires a coherent committed production frontend "
+            f"build. Run `npm run build`, commit every generated artifact, and "
+            f"retry. {detail}"
         )
-    return build_id
+    return validation.metadata["build_id"]
 
 
 # @testable true

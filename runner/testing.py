@@ -18,6 +18,10 @@ from runner.context import GCLOUD_CLI, NPM_CLI
 from config import APP_DIR, Directory, Environment, File, SETTINGS
 from config.constants import DEFAULT_TEST_PREFIX
 from runner.gcloud import activate_repository_gcloud
+from runner.frontend_build import (
+    FilesystemFrontendBuildReader,
+    inspect_frontend_build,
+)
 from runner.process import run_command
 
 # Cursor/agent sandboxes may set PLAYWRIGHT_BROWSERS_PATH to an empty cache.
@@ -60,11 +64,12 @@ FILTERED_PATTERNS = re.compile(
     r')[^"]*"'
 )
 
-_TEST_FRONTEND_BUNDLE_SCHEMA = 1
+_TEST_FRONTEND_BUNDLE_SCHEMA = 2
 _TEST_FRONTEND_BUNDLE_STATE = Directory.REPORTS.value / "test-frontend-bundle.json"
-_TEST_FRONTEND_BUILD_METADATA = APP_DIR / "lagniappe/web/static/build.json"
 _TEST_FRONTEND_INPUT_ROOTS = (
+    Path("THIRD_PARTY_LICENSES"),
     Path("build"),
+    Path("src/fonts"),
     Path("src/script"),
     Path("src/style"),
 )
@@ -74,13 +79,6 @@ _TEST_FRONTEND_INPUT_FILES = (
     Path("package.json"),
     Path("package-lock.json"),
     Path("node_modules/.package-lock.json"),
-)
-_TEST_FRONTEND_OUTPUT_FILES = (
-    Path("lagniappe/web/static/build.json"),
-    Path("lagniappe/web/static/login.js"),
-    Path("lagniappe/web/static/script.js"),
-    Path("lagniappe/web/static/style.css"),
-    Path("lagniappe/web/static/sw.js"),
 )
 
 
@@ -161,26 +159,6 @@ def _test_frontend_input_fingerprint():
 
 # @testable false
 # @covered-by runner/testing.py::ensure_test_frontend_bundle
-# @reason private generated-output fingerprint detects missing, partial, or restored bundles
-def _test_frontend_output_fingerprint():
-    paths = [APP_DIR / relative for relative in _TEST_FRONTEND_OUTPUT_FILES]
-    chunks = Directory.JS_CHUNKS.value
-    chunk_paths = sorted(chunks.glob("*.js")) if chunks.is_dir() else []
-    if any(not path.is_file() for path in paths) or not chunk_paths:
-        return None
-
-    digest = hashlib.sha256()
-    for path in [*paths, *chunk_paths]:
-        relative = path.relative_to(APP_DIR).as_posix()
-        digest.update(relative.encode("utf-8"))
-        digest.update(b"\0")
-        digest.update(path.read_bytes())
-        digest.update(b"\0")
-    return digest.hexdigest()
-
-
-# @testable false
-# @covered-by runner/testing.py::ensure_test_frontend_bundle
 # @reason private tolerant state reader treats missing or malformed local metadata as stale
 def _read_test_frontend_bundle_state():
     try:
@@ -194,25 +172,21 @@ def _read_test_frontend_bundle_state():
 
 # @testable false
 # @covered-by runner/testing.py::ensure_test_frontend_bundle
-# @reason tolerant metadata read preserves intentional production builds without trusting malformed output
-def _test_frontend_bundle_mode():
-    try:
-        metadata = json.loads(
-            _TEST_FRONTEND_BUILD_METADATA.read_text(encoding="utf-8")
-        )
-    except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return None
-    if not isinstance(metadata, dict):
-        return None
-    mode = metadata.get("mode")
-    return mode if isinstance(mode, str) else None
+# @reason shared validator adapter for the managed test-server preflight
+def _inspect_test_frontend_bundle(*, expected_mode=None):
+    return inspect_frontend_build(
+        FilesystemFrontendBuildReader(APP_DIR),
+        expected_mode=expected_mode,
+        expected_version=str(SETTINGS.APP["VERSION"]),
+    )
 
 
 # @testable true
 # @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_skips_current_build
 # @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_rebuilds_stale_build
 # @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_defers_build_during_active_e2e_session
-# @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_preserves_production_build
+# @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_preserves_current_production_build
+# @tests tests_tooling/test_005_test_server_command.py::test_test_frontend_bundle_replaces_stale_production_build
 # @pair test-server:freshness
 # @pair frontend-build:freshness
 # @pair frontend-build:no-op
@@ -222,16 +196,22 @@ def _test_frontend_bundle_mode():
 # @pair frontend-build:production-preservation
 def ensure_test_frontend_bundle():
     """Build development assets when test-server inputs or outputs changed."""
-    if _test_frontend_bundle_mode() == "production":
-        print("Production frontend bundle detected; preserving it.", flush=True)
-        return False
-
     with _test_frontend_bundle_session_guard() as may_build:
         if not may_build:
             return False
 
+        validation, issues = _inspect_test_frontend_bundle()
+        output_fingerprint = (
+            validation.output_fingerprint if validation is not None else None
+        )
+        if validation is not None and validation.metadata["mode"] == "production":
+            print(
+                "Current production frontend bundle detected; preserving it.",
+                flush=True,
+            )
+            return False
+
         input_fingerprint = _test_frontend_input_fingerprint()
-        output_fingerprint = _test_frontend_output_fingerprint()
         state = _read_test_frontend_bundle_state()
         if output_fingerprint is not None and state == {
             "schema": _TEST_FRONTEND_BUNDLE_SCHEMA,
@@ -240,7 +220,13 @@ def ensure_test_frontend_bundle():
         }:
             return False
 
-        print("Frontend test bundle is stale; running npm run dev.", flush=True)
+        if issues:
+            print(
+                f"Frontend test bundle is stale ({issues[0]}); running npm run dev.",
+                flush=True,
+            )
+        else:
+            print("Frontend test bundle is stale; running npm run dev.", flush=True)
         try:
             result = subprocess.run(
                 [NPM_CLI, "run", "dev"],
@@ -256,11 +242,14 @@ def ensure_test_frontend_bundle():
                 f"Frontend test bundle build failed with exit code {result.returncode}."
             )
 
-        output_fingerprint = _test_frontend_output_fingerprint()
-        if output_fingerprint is None:
+        validation, issues = _inspect_test_frontend_bundle(expected_mode="development")
+        if validation is None:
+            detail = issues[0] if issues else "unknown publication error"
             raise RuntimeError(
-                "Frontend test bundle build completed without required outputs."
+                "Frontend test bundle build completed without a valid development "
+                f"publication: {detail}"
             )
+        output_fingerprint = validation.output_fingerprint
 
         Directory.REPORTS.create()
         state = {

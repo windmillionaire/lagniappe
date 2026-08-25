@@ -1,6 +1,7 @@
 """Offline contracts for the hosted-E2E lifecycle and evidence bridge."""
 
 from datetime import datetime, timezone
+import hashlib
 import json
 import subprocess
 import sys
@@ -1526,17 +1527,72 @@ def test_hosted_e2e_requires_a_committed_production_build(tmp_path):
     _git(tmp_path, "config", "user.name", "Hosted E2E Test")
     _git(tmp_path, "config", "user.email", "hosted-e2e@example.test")
     files = {
+        "build/publication.json": f"{
+            json.dumps(
+                {
+                    'schema': 1,
+                    'source_roots': ['src/script'],
+                    'source_files': ['build/publication.json', 'package.json'],
+                    'exclusive_artifact_roots': ['lagniappe/web/static/chunks'],
+                    'required_artifacts': [
+                        'lagniappe/web/static/chunks/views/home.js',
+                        'lagniappe/web/static/script.js',
+                        'lagniappe/web/static/sw.js',
+                    ],
+                    'required_artifact_prefixes': [
+                        'lagniappe/web/static/chunks/',
+                        'lagniappe/web/static/chunks/views/',
+                    ],
+                },
+                sort_keys=True,
+            )
+        }\n",
         "config/constants.py": 'BUILD_ID = "b1234567"\n',
-        "lagniappe/web/static/build.json": (
-            '{"build_id": "b1234567", "mode": "production", '
-            '"version": "1.2.3"}\n'
-        ),
+        "lagniappe/web/static/chunks/views/home.js": "export const home = true;\n",
+        "lagniappe/web/static/script.js": "export const main = true;\n",
         "lagniappe/web/static/sw.js": 'const BUILD_ID = "b1234567";\n',
+        "package.json": '{"version": "1.2.3"}\n',
+        "src/script/main.mjs": "export const main = true;\n",
     }
     for relative, content in files.items():
         path = tmp_path / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
+    source_paths = [
+        "build/publication.json",
+        "package.json",
+        "src/script/main.mjs",
+    ]
+    source_digest = hashlib.sha256(b"frontend-source-v1\0")
+    for relative in source_paths:
+        source_digest.update(relative.encode())
+        source_digest.update(b"\0")
+        source_digest.update((tmp_path / relative).read_bytes())
+        source_digest.update(b"\0")
+    artifact_paths = [
+        "lagniappe/web/static/chunks/views/home.js",
+        "lagniappe/web/static/script.js",
+        "lagniappe/web/static/sw.js",
+    ]
+    metadata = {
+        "schema": 1,
+        "build_id": "b1234567",
+        "mode": "production",
+        "version": "1.2.3",
+        "source": {"sha256": source_digest.hexdigest()},
+        "artifacts": [],
+    }
+    for relative in artifact_paths:
+        content = (tmp_path / relative).read_bytes()
+        metadata["artifacts"].append(
+            {
+                "path": relative,
+                "sha256": hashlib.sha256(content).hexdigest(),
+                "size": len(content),
+            }
+        )
+    metadata_path = tmp_path / "lagniappe/web/static/build.json"
+    metadata_path.write_text(f"{json.dumps(metadata, indent=2)}\n", encoding="utf-8")
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-m", "production build")
     source = _git(tmp_path, "rev-parse", "HEAD").stdout.strip()
@@ -1550,7 +1606,6 @@ def test_hosted_e2e_requires_a_committed_production_build(tmp_path):
         == "b1234567"
     )
 
-    metadata_path = tmp_path / "lagniappe/web/static/build.json"
     metadata_path.write_text(
         '{"build_id": "local", "mode": "development", "version": "local"}\n',
         encoding="utf-8",

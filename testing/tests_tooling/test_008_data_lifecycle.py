@@ -331,70 +331,6 @@ def test_cutover_waits_for_dispatched_task_attempts_to_settle():
 
 
 # @features data-lifecycle
-# @dimensions queue-purge-audit restore-completion
-def test_successful_restore_record_references_purged_task_snapshot():
-    bucket = _Bucket()
-    context = ProviderContext(
-        PROJECT_ID,
-        "(default)",
-        BUCKET,
-        "0.3.0",
-        storage_client=SimpleNamespace(bucket=lambda _name: bucket),
-    )
-    plan = {
-        "restore_id": "20260823-deadbeef",
-        "backup_id": BACKUP_ID,
-        "old_database": "(default)",
-        "target_database": "lag-restore-20260823-deadbeef",
-        "queue": "lagniappe-tasks",
-        "queue_location": "us-central1",
-        "reconciler": "lagniappe-deferred-jobs-reconciler",
-        "candidate_version": "restore-20260823-deadbeef",
-        "maintenance_version": "maintenance-20260823-deadbeef",
-        "original_traffic": {"current": 1.0},
-        "traffic_split_by": "random",
-        "provider_observations": {
-            "queue_state": "RUNNING",
-            "reconciler_state": "PAUSED",
-        },
-    }
-    snapshot_name = "lagniappe-data/v3/restores/20260823-deadbeef/purged-tasks.json"
-    snapshot = {
-        "object_name": snapshot_name,
-        "uri": f"gs://{BUCKET}/{snapshot_name}",
-        "sha256": "a" * 64,
-        "task_count": 3,
-        "captured_at": "2026-08-23T12:00:00Z",
-    }
-    record = restore_module.publish_successful_restore_record(
-        context,
-        plan,
-        snapshot,
-        purge_requested_at=datetime(2026, 8, 23, 12, 1, tzinfo=timezone.utc),
-        completed_at=datetime(2026, 8, 23, 12, 5, tzinfo=timezone.utc),
-    )
-
-    assert record["status"] == "complete"
-    assert record["queue"] == "lagniappe-tasks"
-    assert record["reconciler_state_before"] == "PAUSED"
-    assert record["purged_tasks"] == snapshot
-    record_blob = bucket.blob(
-        "lagniappe-data/v3/restores/20260823-deadbeef/record.json"
-    )
-    assert json.loads(record_blob.download_as_text()) == record
-    assert (
-        restore_module.publish_successful_restore_record(
-            context,
-            plan,
-            snapshot,
-            purge_requested_at=datetime(2026, 8, 23, 12, 1, tzinfo=timezone.utc),
-            completed_at=datetime(2026, 8, 23, 12, 5, tzinfo=timezone.utc),
-        )
-        == record
-    )
-
-
-# @features data-lifecycle
 # @dimensions operation-polling failure-propagation
 def test_operation_polling_resumes_and_reports_provider_failure(monkeypatch):
     states = iter([{"done": False}, {"done": True, "metadata": {"common": {"state": "SUCCESSFUL"}}}])
@@ -920,6 +856,7 @@ def test_restore_assets_rebinds_owner_to_new_generation(monkeypatch):
     from config import SETTINGS
     from config.storage import storage_bucket_names
 
+    monkeypatch.setitem(SETTINGS.APP, "GIBBERISH", "restore-assets-test")
     owner_key = Key("instances", "page", project=PROJECT_ID)
     owner = _entity(
         owner_key,
@@ -1622,12 +1559,13 @@ def test_restore_discards_deferred_execution_state():
     counts = restore_module.normalize_restored_database(
         client,
         project_id=PROJECT_ID,
-        source_database_id="source-db",
+        source_database_id="target-db",
         target_database_id="target-db",
         kind_prefix="",
     )
     assert counts["deferred_records_deleted"] == 3
     assert counts["deferred_references_cleared"] == 2
+    assert counts["native_keys"] == 0
     assert {key.kind for key in client.deleted} == {"job_locks", "jobs", "site"}
     assert "deferred_job" not in page
     assert "deferred-job" not in json.loads(report["process"])["report"]
@@ -1635,13 +1573,51 @@ def test_restore_discards_deferred_execution_state():
     repeated = restore_module.normalize_restored_database(
         client,
         project_id=PROJECT_ID,
-        source_database_id="source-db",
+        source_database_id="target-db",
         target_database_id="target-db",
         kind_prefix="",
     )
     assert repeated["deferred_records_deleted"] == 0
     assert repeated["deferred_references_cleared"] == 0
     assert repeated["entities_written"] == 0
+
+
+# @pair data-lifecycle:legacy-journal-rejection
+def test_in_place_restore_rejects_legacy_named_database_checkpoint(tmp_path):
+    for complete in (False, True):
+        checkpoint = LifecycleCheckpoint(
+            PROJECT_ID,
+            ["restore", BACKUP_ID],
+            state_root=tmp_path / f"legacy-restore-state-{complete}",
+        )
+        checkpoint.start(
+            "legacy-restore",
+            backup_id=BACKUP_ID,
+            plan={
+                "restore_id": "legacy-restore",
+                "backup_id": BACKUP_ID,
+                "project_id": PROJECT_ID,
+                "application_version": "0.3.0",
+                "old_database": "(default)",
+                "target_database": "lag-restore-legacy",
+            },
+        )
+        if complete:
+            checkpoint.finish()
+        context = SimpleNamespace(
+            project_id=PROJECT_ID,
+            application_version="0.3.0",
+        )
+
+        with pytest.raises(DataLifecycleError, match="Legacy named-database"):
+            restore_module.restore_backup(
+                BACKUP_ID,
+                context=context,
+                checkpoint=checkpoint,
+                confirmation=lambda _prompt: pytest.fail(
+                    "legacy checkpoints must fail before confirmation"
+                ),
+            )
 
 
 # @features data-lifecycle

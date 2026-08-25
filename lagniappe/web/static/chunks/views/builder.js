@@ -1,21 +1,2 @@
+!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="25a414bf-39e6-4075-8b5b-36e0ac4cc469",e._sentryDebugIdIdentifier="sentry-dbid-25a414bf-39e6-4075-8b5b-36e0ac4cc469");}catch(e){}}();import"../search.js?v=b42f0e02";import"../entityMenu.js?v=b42f0e02";import"../foundation.js?v=b42f0e02";import"../connectivity.js?v=b42f0e02";import"../modal.js?v=b42f0e02";import{F as n}from"../builder.js?v=b42f0e02";import"../styles.js?v=b42f0e02";import"../remote.js?v=b42f0e02";import"../queryLifecycle.js?v=b42f0e02";import"../combobox.js?v=b42f0e02";import"../primitives.js?v=b42f0e02";import"../icons.js?v=b42f0e02";import"../results.js?v=b42f0e02";import"../storage.js?v=b42f0e02";import"../formatting.js?v=b42f0e02";import"../dropdown.js?v=b42f0e02";import"../baseForm.js?v=b42f0e02";import"../loader.js?v=b42f0e02";import"../facets.js?v=b42f0e02";import"../submitter.js?v=b42f0e02";export{n as default};
 /*! Third-party licenses: /third-party-licenses.txt */
-import '../search.js?v=bb2fbed3';
-import '../entityMenu.js?v=bb2fbed3';
-import '../foundation.js?v=bb2fbed3';
-import '../connectivity.js?v=bb2fbed3';
-import '../modal.js?v=bb2fbed3';
-export { F as default } from '../builder.js?v=bb2fbed3';
-import '../styles.js?v=bb2fbed3';
-import '../remote.js?v=bb2fbed3';
-import '../queryLifecycle.js?v=bb2fbed3';
-import '../combobox.js?v=bb2fbed3';
-import '../primitives.js?v=bb2fbed3';
-import '../icons.js?v=bb2fbed3';
-import '../results.js?v=bb2fbed3';
-import '../storage.js?v=bb2fbed3';
-import '../formatting.js?v=bb2fbed3';
-import '../dropdown.js?v=bb2fbed3';
-import '../baseForm.js?v=bb2fbed3';
-import '../loader.js?v=bb2fbed3';
-import '../facets.js?v=bb2fbed3';
-import '../submitter.js?v=bb2fbed3';

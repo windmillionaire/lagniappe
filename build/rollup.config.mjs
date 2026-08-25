@@ -10,6 +10,7 @@ import { minify } from "rollup-plugin-esbuild";
 import postcss from "rollup-plugin-postcss";
 import { visualizer } from "rollup-plugin-visualizer";
 import { VIEW_ENTRIES } from "../src/script/viewRegistry.mjs";
+import { recordBuildArtifacts } from "./publication.mjs";
 import { resolveSentryBuild } from "./sentry.mjs";
 import { startupBudget } from "./startupBudget.mjs";
 import {
@@ -21,7 +22,6 @@ import {
 	interactionFoundationChunk,
 	resolveMaterialSymbolsFont,
 	STYLE_PIPELINE,
-	updateConstantsBuildId,
 	updateServiceWorker,
 	versionChunkImports,
 } from "./utility.mjs";
@@ -58,8 +58,7 @@ const sentryPlugins = (project, sourcemaps) =>
 				telemetry: false,
 			})
 		: [];
-const buildId = generateBuildId();
-updateConstantsBuildId(buildId);
+const buildId = process.env.LAGNIAPPE_FRONTEND_BUILD_ID || generateBuildId();
 
 export default [
 	// Login bundle
@@ -90,6 +89,7 @@ export default [
 				},
 			}),
 			...sentryPlugins("lagniappe-frontend", {}),
+			recordBuildArtifacts(),
 		],
 		onwarn(warning, warn) {
 			if (warning.code === "EVAL" && warning.id.includes("node_modules"))
@@ -124,6 +124,7 @@ export default [
 				},
 			}),
 			...sentryPlugins("lagniappe-frontend", {}),
+			recordBuildArtifacts(),
 		],
 		onwarn(warning, warn) {
 			if (warning.code === "EVAL" && warning.id.includes("node_modules"))
@@ -183,7 +184,7 @@ export default [
 			emitPdfWorker(),
 			emitThirdPartyLicenses(),
 			startupBudget(),
-			updateServiceWorker(buildId, settings.VERSION, "production"),
+			updateServiceWorker(buildId),
 			...sentryPlugins("lagniappe-frontend", {
 				filesToDeleteAfterUpload: uploadedSourceMaps,
 			}),
@@ -192,6 +193,17 @@ export default [
 				gzipSize: true,
 				brotliSize: true,
 				template: "treemap", // or "sunburst", "network"
+			}),
+			recordBuildArtifacts({
+				final: true,
+				buildId,
+				mode: "production",
+				version: settings.VERSION,
+				extraArtifacts: [
+					"lagniappe/web/start/styles/icons.py",
+					"lagniappe/web/start/styles/styles.py",
+					"lagniappe/web/static/sw.js",
+				],
 			}),
 		],
 		onwarn(warning, warn) {

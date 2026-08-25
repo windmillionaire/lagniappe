@@ -21,7 +21,7 @@ from .provider import (
     validate_database_id,
 )
 from .recovery_set import _blob_sha256, inventory_database
-from .restore import (
+from .restore_support import (
     MirroredRestoreCheckpoint,
     _compatible_locations,
     _confirm_mutation,
@@ -29,6 +29,7 @@ from .restore import (
     _remote_restore_for_backup,
     _restore_query_pages,
     _traffic_observation,
+    _validate_in_place_restore_plan,
     capture_queue_snapshot,
     normalize_restored_database,
     validate_restored_database,
@@ -420,7 +421,9 @@ def _completion_record(context, plan, checkpoint):
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_in_place_restore_is_confirmed_resumable_and_has_no_rollback
+# @tests tests_tooling/test_008_data_lifecycle.py::test_in_place_restore_rejects_legacy_named_database_checkpoint
 # @pairs data-lifecycle:restore data-lifecycle:resume data-lifecycle:in-place-merge data-lifecycle:confirmation data-lifecycle:queue-purge-audit data-lifecycle:remote-journal
+# @pair data-lifecycle:legacy-journal-rejection
 def restore_backup(
     backup_id,
     *,
@@ -450,9 +453,14 @@ def restore_backup(
     else:
         plan = None
     if state and state.get("status") == "complete":
-        print(f"Restore {state['plan']['restore_id']} is already complete.")
-        return state["plan"]
-    plan = (state or {}).get("plan") or plan or restore_plan(backup_id, context=context)
+        completed_plan = _validate_in_place_restore_plan(state.get("plan"))
+        print(f"Restore {completed_plan['restore_id']} is already complete.")
+        return completed_plan
+    plan = _validate_in_place_restore_plan(
+        (state or {}).get("plan")
+        or plan
+        or restore_plan(backup_id, context=context)
+    )
     if plan.get("application_version") != context.application_version:
         raise DataLifecycleError("Restore checkpoint belongs to another application version.")
     _print_plan(plan)

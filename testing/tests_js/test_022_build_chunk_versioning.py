@@ -84,8 +84,8 @@ assert.deepEqual(precacheUrls(precacheBundle, buildId), [
 
 
 # @features frontend-build
-# @dimensions build-metadata
-def test_build_metadata_records_release_mode(run_node):
+# @dimensions service-worker build-identity
+def test_service_worker_records_the_build_identity(run_node):
     run_node(
         r"""
 import assert from "node:assert/strict";
@@ -117,26 +117,217 @@ try {
   );
   writeFileSync("config/browser_protocol.json", '{"version": 1}\n');
 
-  updateServiceWorker(
-    "b1234567",
-    "1.2.3",
-    "production",
-  ).writeBundle({}, {});
+  updateServiceWorker("b1234567").writeBundle({}, {});
 
-  assert.deepEqual(
-    JSON.parse(readFileSync("lagniappe/web/static/build.json", "utf8")),
-    {
-      build_id: "b1234567",
-      mode: "production",
-      version: "1.2.3",
-    },
-  );
   assert.match(
     readFileSync("lagniappe/web/static/sw.js", "utf8"),
     /b1234567/,
   );
 } finally {
   process.chdir(originalDirectory);
+  rmSync(outputDirectory, { recursive: true });
+}
+""",
+        module=True,
+    )
+
+
+# @features frontend-build
+# @dimensions source-integrity artifact-inventory nested-chunks completion-marker
+def test_frontend_publication_records_recursive_artifacts_and_source_identity(run_node):
+    run_node(
+        r"""
+import assert from "node:assert/strict";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const originalDirectory = process.cwd();
+const outputDirectory = mkdtempSync(join(tmpdir(), "lagniappe-publication-"));
+const inventoryPath = join(outputDirectory, "inventory.json");
+process.env.LAGNIAPPE_FRONTEND_ARTIFACT_INVENTORY = inventoryPath;
+const publication = await import(`./build/publication.mjs?test=${Date.now()}`);
+
+const write = (relative, content) => {
+  const path = join(outputDirectory, relative);
+  mkdirSync(join(path, ".."), { recursive: true });
+  writeFileSync(path, content);
+};
+
+try {
+  process.chdir(outputDirectory);
+  const contract = {
+    schema: 1,
+    source_roots: ["build", "src/script"],
+    source_files: ["package.json"],
+    exclusive_artifact_roots: ["lagniappe/web/static/chunks"],
+    required_artifacts: [
+      "lagniappe/web/static/login.js",
+      "lagniappe/web/static/script.js",
+      "lagniappe/web/static/sw.js",
+    ],
+    required_artifact_prefixes: [
+      "lagniappe/web/static/chunks/",
+      "lagniappe/web/static/chunks/views/",
+    ],
+  };
+  write("build/publication.json", `${JSON.stringify(contract)}\n`);
+  write("src/script/main.mjs", "export const current = true;\n");
+  write("package.json", '{"version":"1.2.3"}\n');
+  write("lagniappe/web/static/login.js", "login\n");
+  write("lagniappe/web/static/script.js", "script\n");
+  write("lagniappe/web/static/chunks/shared.js", "shared\n");
+  write("lagniappe/web/static/chunks/views/home.js", "home\n");
+  write("lagniappe/web/static/sw.js", "b1234567\n");
+
+  const sourceIdentity = publication.frontendSourceIdentity(outputDirectory);
+  publication.recordBuildArtifacts().generateBundle(
+    { file: "./lagniappe/web/static/login.js" },
+    { "login.js": { fileName: "login.js" } },
+  );
+  const final = publication.recordBuildArtifacts({
+    final: true,
+    buildId: "b1234567",
+    mode: "production",
+    version: "1.2.3",
+    extraArtifacts: ["lagniappe/web/static/sw.js"],
+  });
+  final.generateBundle(
+    { dir: "./lagniappe/web/static" },
+    {
+      "script.js": { fileName: "script.js" },
+      "chunks/shared.js": { fileName: "chunks/shared.js" },
+      "chunks/views/home.js": { fileName: "chunks/views/home.js" },
+      "script.js.map": { fileName: "script.js.map" },
+    },
+  );
+  final.writeBundle();
+
+  const inventory = JSON.parse(readFileSync(inventoryPath, "utf8"));
+  assert.deepEqual(inventory.artifacts, [
+    "lagniappe/web/static/chunks/shared.js",
+    "lagniappe/web/static/chunks/views/home.js",
+    "lagniappe/web/static/login.js",
+    "lagniappe/web/static/script.js",
+    "lagniappe/web/static/sw.js",
+  ]);
+  const metadata = publication.publishFrontendBuild({
+    root: outputDirectory,
+    buildId: inventory.build_id,
+    mode: inventory.mode,
+    version: inventory.version,
+    artifacts: inventory.artifacts,
+    sourceIdentity,
+    beforePublish: () => write("published-last", "yes\n"),
+  });
+  assert.equal(metadata.schema, 1);
+  assert.equal(metadata.source.sha256, sourceIdentity);
+  assert.equal(metadata.artifacts.length, 5);
+  assert.equal(readFileSync("published-last", "utf8"), "yes\n");
+  assert.deepEqual(
+    JSON.parse(readFileSync("lagniappe/web/static/build.json", "utf8")),
+    metadata,
+  );
+} finally {
+  process.chdir(originalDirectory);
+  delete process.env.LAGNIAPPE_FRONTEND_ARTIFACT_INVENTORY;
+  rmSync(outputDirectory, { recursive: true });
+}
+""",
+        module=True,
+    )
+
+
+# @features frontend-build
+# @dimensions source-integrity artifact-integrity safe-failure
+def test_frontend_publication_rejects_missing_outputs_and_source_drift(run_node):
+    run_node(
+        r"""
+import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  frontendSourceIdentity,
+  publishFrontendBuild,
+} from "./build/publication.mjs";
+
+const outputDirectory = mkdtempSync(join(tmpdir(), "lagniappe-publication-failure-"));
+const write = (relative, content) => {
+  const path = join(outputDirectory, relative);
+  mkdirSync(join(path, ".."), { recursive: true });
+  writeFileSync(path, content);
+};
+
+try {
+  write("build/publication.json", `${JSON.stringify({
+    schema: 1,
+    source_roots: ["build", "src/script"],
+    source_files: ["package.json"],
+    exclusive_artifact_roots: ["lagniappe/web/static/chunks"],
+    required_artifacts: ["lagniappe/web/static/script.js"],
+    required_artifact_prefixes: ["lagniappe/web/static/chunks/"],
+  })}\n`);
+  write("src/script/main.mjs", "export const current = true;\n");
+  write("package.json", '{"version":"1.2.3"}\n');
+  write("lagniappe/web/static/script.js", "script\n");
+  const sourceIdentity = frontendSourceIdentity(outputDirectory);
+  let published = false;
+
+  assert.throws(
+    () => publishFrontendBuild({
+      root: outputDirectory,
+      buildId: "b1234567",
+      mode: "production",
+      version: "1.2.3",
+      artifacts: [],
+      sourceIdentity,
+      beforePublish: () => { published = true; },
+    }),
+    /required artifact/,
+  );
+  assert.equal(published, false);
+
+  write("lagniappe/web/static/chunks/shared.js", "shared\n");
+  write("lagniappe/web/static/chunks/stale.js", "stale\n");
+  assert.throws(
+    () => publishFrontendBuild({
+      root: outputDirectory,
+      buildId: "b1234567",
+      mode: "production",
+      version: "1.2.3",
+      artifacts: [
+        "lagniappe/web/static/chunks/shared.js",
+        "lagniappe/web/static/script.js",
+      ],
+      sourceIdentity,
+      beforePublish: () => { published = true; },
+    }),
+    /not in the artifact inventory/,
+  );
+  assert.equal(published, false);
+
+  write("src/script/main.mjs", "export const current = false;\n");
+  assert.throws(
+    () => publishFrontendBuild({
+      root: outputDirectory,
+      buildId: "b1234567",
+      mode: "production",
+      version: "1.2.3",
+      artifacts: ["lagniappe/web/static/script.js"],
+      sourceIdentity,
+      beforePublish: () => { published = true; },
+    }),
+    /sources changed/,
+  );
+  assert.equal(published, false);
+} finally {
   rmSync(outputDirectory, { recursive: true });
 }
 """,

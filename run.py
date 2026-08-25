@@ -16,6 +16,7 @@ from runner.context import (
     format_command,
 )
 from runner.gcloud import activate_repository_gcloud
+from runner.frontend_build import GitFrontendBuildReader, inspect_frontend_build
 from runner.pytest_routing import (
     PYTEST_CONFIG,
     PYTEST_ROUTING_PLUGIN,
@@ -604,6 +605,13 @@ def release_readiness_issues(
         issues.append(
             f"{RELEASE_BUILD_METADATA_PATH} must identify a production build."
         )
+
+    _frontend_validation, frontend_issues = inspect_frontend_build(
+        GitFrontendBuildReader(repo_root, index=True),
+        expected_mode="production",
+        expected_version=version,
+    )
+    issues.extend(f"Frontend build: {issue}" for issue in frontend_issues)
 
     if version:
         release_note_relative = f"documentation/releases/{version}.md"

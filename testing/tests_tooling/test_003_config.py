@@ -1379,6 +1379,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
         commands = []
         preflight_snapshots = []
         build_versions = []
+        frontend_verifications = []
 
         def fake_preflight(app_dir=None):
             preflight_snapshots.append(
@@ -1392,6 +1393,11 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
 
         monkeypatch.setattr(
             deploy_module, "verify_runtime_deploy_surface", fake_preflight
+        )
+        monkeypatch.setattr(
+            deploy_module,
+            "verify_frontend_build",
+            lambda **kwargs: frontend_verifications.append(kwargs) or True,
         )
 
         def fake_run_command(command, **kwargs):
@@ -1443,9 +1449,17 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
             ),
         ]
         assert build_versions == []
+        assert frontend_verifications == [
+            {
+                "app_dir": app_dir,
+                "expected_mode": "production",
+                "expected_version": "1.23",
+            }
+        ]
 
         commands.clear()
         preflight_snapshots.clear()
+        frontend_verifications.clear()
 
         assert deploy_app()
         assert preflight_snapshots == [
@@ -1454,7 +1468,14 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
         assert SETTINGS.NODE["version"] == "1.23"
         assert SETTINGS.APP["VERSION"] == "1.23"
         assert build_versions == ["1.23"]
-        assert not chunks_dir.exists()
+        assert chunks_dir.exists()
+        assert frontend_verifications == [
+            {
+                "app_dir": app_dir,
+                "expected_mode": "production",
+                "expected_version": "1.23",
+            }
+        ]
         assert commands == [
             (
                 [deploy_module.NPM_CLI, "run", "build"],
@@ -1470,6 +1491,18 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
                 {"check": False, "capture_output": False},
             ),
         ]
+
+        commands.clear()
+        monkeypatch.setattr(
+            deploy_module,
+            "verify_frontend_build",
+            lambda **_kwargs: (_ for _ in ()).throw(
+                RuntimeError("Frontend build is incomplete or stale")
+            ),
+        )
+        with pytest.raises(RuntimeError, match="Frontend build is incomplete"):
+            deploy_app(build_assets=False)
+        assert commands == []
     finally:
         for name in [
             name

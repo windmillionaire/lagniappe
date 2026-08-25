@@ -69,11 +69,13 @@ that group if the foreground runner exits exceptionally.
 
 ## Test server
 
-E2E startup checks the authored frontend inputs against
-`reports/test-frontend-bundle.json` and runs `npm run dev` only when generated
-development output is absent, incomplete, or stale. It performs this check
-before pytest imports application configuration so the test and Flask
-processes share one `BUILD_ID`.
+E2E startup validates `build.json` against all declared frontend sources and
+every recorded generated artifact, then consults
+`reports/test-frontend-bundle.json`. It preserves a coherent current production
+build; missing, partial, corrupt, or stale output is replaced with
+`npm run dev`, including an old production build after source changes. It
+performs this check before pytest imports application configuration so the test
+and Flask processes share one `BUILD_ID`.
 
 The managed server records PID/log files under `reports/`, resets browser
 artifact folders at start, and stops the server before cleaning test-prefixed
