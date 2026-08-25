@@ -1,6 +1,7 @@
 from flask import abort, request
 from flask_login import current_user
 
+from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
 from lagniappe.core.definitions import (
     AI,
@@ -9,6 +10,10 @@ from lagniappe.core.definitions import (
     enforce_file_consumer,
 )
 from lagniappe.core.tools import ai, database
+from lagniappe.core.tools.auth.references import (
+    SubmittedReferenceResolver,
+    UNAVAILABLE_REFERENCE_ERROR,
+)
 from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
 from lagniappe.core.definitions import PageAttributes, Action, Fetch, Resource
 from lagniappe.web.auth import (
@@ -158,23 +163,54 @@ def _page_data(form, page=None, category=None):
     # nested fetch.
     if page and isinstance(page.model, Entities.USERS):
         entities.extend((page.model, page.user))
-    for e in ["category", "form", "model", "group", "reassign-page"]:
+    for e in ["model", "group", "reassign-page"]:
         entities.extend(form.getlist(e))
     loaded = {
         e.urlsafe_key: e for e in Entities.fetch(*entities, request=Fetch.direct())
     }
 
     attributes = [a.name for a in PageAttributes if form.get(a.name)]
+    category_keys = form.getlist("category")
+    form_key = form.get("form")
+    resolver = SubmittedReferenceResolver(
+        current_user,
+        *category_keys,
+        form_key,
+    )
+    current_categories = list(page.categories) if page else []
+    categories = resolver.many(
+        category_keys,
+        expected=Entities.CATEGORY,
+        action=Action.VIEW,
+        existing=current_categories,
+    )
+    selected_category_keys = {selected.key for selected in categories}
+    categories.extend(
+        current
+        for current in current_categories
+        if current.key not in selected_category_keys
+        and not current.allowed(Action.VIEW, user=current_user)
+    )
+    current_form = page.form if page else None
+    selected_form = resolver.one(
+        form_key,
+        expected=Entities.FORM,
+        action=Action.VIEW,
+        existing=current_form,
+        predicate=lambda candidate: candidate.form_type == "page",
+    )
+    if not form_key and current_form and not current_form.allowed(
+        Action.VIEW, user=current_user
+    ):
+        selected_form = current_form
 
     page_data = {
         "name": form.get("name"),
         "description": form.get("description"),
         "email": form.get("email"),
         "attributes": attributes,
-        "categories": [
-            loaded.get(k) for k in form.getlist("category") if loaded.get(k)
-        ],
-        "form": loaded.get(form.get("form")),
+        "categories": categories,
+        "form": selected_form,
         "model": loaded.get(category.urlsafe_key) if category else None,
         "groups": [loaded.get(k) for k in form.getlist("group") if loaded.get(k)],
     }
@@ -232,10 +268,12 @@ def _page_form_submission_response(page):
 
 # @testable true
 # @scaffolding testing/resources/page.py::Page.submit_and_verify_submission
+# @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_page_submission_rejects_hidden_internal_link_target
 # @pairs pages:submission pages:default-form pages:basic-inputs
 # @pairs pages:selection-fields pages:link-field
+# @pair pages:submitted-reference
 def _apply_page_submission(page, form):
-    page.form_submission(form)
+    page.form_submission(form, actor=current_user)
 
 
 # @testable true
@@ -294,9 +332,19 @@ def update(key, **kwargs):
 
     if request.method == "GET":
         if request.values.get("form"):
-            page.form = Entities.fetch_one(
-                request.values.get("form"), request=Fetch.direct()
-            )
+            try:
+                page.form = SubmittedReferenceResolver(
+                    current_user,
+                    request.values.get("form"),
+                ).one(
+                    request.values.get("form"),
+                    expected=Entities.FORM,
+                    action=Action.VIEW,
+                    predicate=lambda candidate: candidate.form_type == "page",
+                    required=True,
+                )
+            except exceptions.ValidationError:
+                abort(404)
         return _page_form_submission_response(page)
     elif not page.allowed(Action.EDIT):
         abort(403)
@@ -318,7 +366,10 @@ def update(key, **kwargs):
     old_attributes = [a.name for a in page.attributes if page.has(a.name)]
     old_image = page.image.path if page.image else None
 
-    page_data = _page_data(request.form, page=page)
+    try:
+        page_data = _page_data(request.form, page=page)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     _preserve_public_user_page_attributes(page, page_data)
 
     if role == "user-settings":
@@ -337,7 +388,10 @@ def update(key, **kwargs):
         require_ai_access(AI.CREATE)
         _apply_page_metadata_update(page, page_data, user=current_user)
         if page.form:
-            _apply_page_submission(page, request)
+            try:
+                _apply_page_submission(page, request)
+            except exceptions.ValidationError as error:
+                return responses.error(str(error))
         if role == "explain":
             try:
                 prompt = ai.form_autofill_prompt(**_autofill_data(page, request))
@@ -359,7 +413,10 @@ def update(key, **kwargs):
         )
     else:
         _apply_page_metadata_update(page, page_data, user=current_user)
-        _apply_page_submission(page, request)
+        try:
+            _apply_page_submission(page, request)
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
 
     page.save()
     if _is_offline_replay(request.form):
@@ -462,6 +519,14 @@ def patch(key, **kwargs):
         field = page.properties.submission.fields.get(schema_id)
         if not field or not field.editable:
             return responses.error("Field cannot be edited")
+        try:
+            page.validate_browser_submission_references(
+                {schema_id: value},
+                actor=current_user,
+                normalized=True,
+            )
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
         field = page.properties.submission.patch(schema_id, value)
         page.save_submission()
 
@@ -486,8 +551,11 @@ def create(key, **kwargs):
     """Create a page within a category. Key is the category key, not a page key."""
     category = kwargs["entity"]
 
-    create_data = _page_data(request.form, category=category)
-    page = Entities.PAGE.create(create_data)
+    try:
+        create_data = _page_data(request.form, category=category)
+        page = Entities.PAGE.create(create_data)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     role = request.form.get("role")
 
     if role == "autofill-submit" and request.files.get("autofill-file"):
@@ -509,7 +577,10 @@ def create(key, **kwargs):
                 )
 
         if page.form:
-            _apply_page_submission(page, request)
+            try:
+                _apply_page_submission(page, request)
+            except exceptions.ValidationError as error:
+                return responses.error(str(error))
         page.save()
         deferred_response = deferred_autofill.start_deferred_autofill(
             page,
@@ -579,12 +650,20 @@ def create_from_home():
         if not category.allowed(Action.EDIT, current_user):
             return responses.error("Choose a category before creating this page.")
 
-    create_data = _page_data(request.form, category=category)
+    try:
+        create_data = _page_data(request.form, category=category)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     create_data["model"] = category
     create_data["categories"] = [
         c for c in create_data.get("categories", []) if c and c.key != category.key
     ]
     if not create_data.get("form") and category.form:
+        if (
+            category.form.form_type != "page"
+            or not category.form.allowed(Action.VIEW, user=current_user)
+        ):
+            return responses.error(UNAVAILABLE_REFERENCE_ERROR)
         create_data["form"] = category.form
 
     page = Entities.PAGE.create(create_data)

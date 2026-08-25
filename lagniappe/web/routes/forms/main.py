@@ -4,9 +4,11 @@ from flask import render_template, request, url_for
 from flask_login import current_user
 
 from lagniappe.core.definitions import AI, Action, Fetch, Resource
+from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.mixins.submitter import normalize_submission_values
 from lagniappe.core.tools import ai
+from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.web.auth import permission, require_ai_access
 
 from . import forms
@@ -132,6 +134,14 @@ def validate_row(key, table_id, **kwargs):
     field.user = current_user
 
     values = normalize_submission_values(request.values, field.fields)
+    try:
+        entity.validate_browser_submission_references(
+            {table_id: {"rows": [values]}},
+            actor=current_user,
+            normalized=True,
+        )
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     row_submission = field.validate_row_submission(values)
     return responses.json_response({"row": row_submission})
 
@@ -199,18 +209,27 @@ def restrictions(key, **kwargs):
 # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_filters_invalid_top_level
 # @tests tests_unit/test_004b_schema_core.py::test_schema_validate_ai_table_filters_bad_columns
 # @tests tests_e2e/003_forms/test_003a_forms.py::test_generate_form_schema_live_saved_state
+# @tests tests_e2e/003_forms/test_003d_form_permissions.py::test_schema_generation_requires_edit_access_to_submitted_form
 # @features forms ai
-# @dimensions generate-schema live-ai saved-state reload
+# @dimensions generate-schema live-ai saved-state reload submitted-reference
 @forms.route("/create-schema", methods=["POST"])
 @permission(Resource.FORMS, Action.EDIT)
 def create_schema():
+    description = request.form.get("description", "")
+    form_key = request.form.get("form-key")
+    try:
+        form = SubmittedReferenceResolver(current_user, form_key).one(
+            form_key,
+            expected=Entities.FORM,
+            action=Action.EDIT,
+            required=True,
+        )
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
+
     require_ai_access(AI.CREATE)
 
-    description = request.form.get("description", "")
-    form_type = request.form.get("form-type", "task")
-    form = Entities.FORM(request.form.get("form-key"))
-
-    prompt = ai.form_generation_prompt(form_type, description=description)
+    prompt = ai.form_generation_prompt(form.form_type, description=description)
 
     if request.form.get("explain"):
         return responses.explain(prompt)

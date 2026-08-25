@@ -1,10 +1,15 @@
 import pytest
+import requests
 from playwright.sync_api import expect
 
+from config import SETTINGS
+from lagniappe.core.definitions import Action, Fetch
+from lagniappe.core.entities import Entities
 from testing.definitions import Categories, Forms, SitePages, Users
 from testing.elements import Tools
 from testing.resources.form import Builder
 from testing.resources.site import FormIndex
+from testing.utility import manual_mutation_headers
 
 pytestmark = pytest.mark.e2e
 
@@ -105,3 +110,43 @@ def test_form_builder_restrictions_visible_only_for_site_owner(get_user):
     form.user = owner
     form.builder
     expect(owner.locate("[data-role='restrict-access']")).to_be_attached()
+
+
+# @features forms ai
+# @dimensions submitted-reference
+def test_schema_generation_requires_edit_access_to_submitted_form(get_user):
+    owner = get_user(Users.OWNER)
+    form = Forms.test_owner_restricted_form.get(owner)
+    form.builder.restrict_to_owner()
+
+    admin = get_user(Users.admin)
+    admin.go(SitePages.FORM_INDEX)
+    persisted_before = Entities.fetch_one(form.key, request=Fetch.direct())
+    assert not persisted_before.allowed(Action.EDIT, user=admin.entity)
+    before = (persisted_before.schema, persisted_before.modified)
+    cookies = {
+        cookie["name"]: cookie["value"] for cookie in admin.page.context.cookies()
+    }
+    headers = manual_mutation_headers(
+        admin.page.url,
+        admin.locate("#token").input_value(),
+    )
+
+    response = requests.post(
+        f"{SETTINGS.test_config['BASE_URL']}/forms/create-schema",
+        data={
+            "form-key": form.key,
+            "form-type": "task",
+            "description": "Attempt to overwrite a restricted form.",
+            "explain": "true",
+        },
+        cookies=cookies,
+        headers=headers,
+        allow_redirects=False,
+        timeout=10,
+    )
+    assert response.status_code == 422
+    assert response.text == "One or more selected items are unavailable."
+
+    persisted_after = Entities.fetch_one(form.key, request=Fetch.direct())
+    assert (persisted_after.schema, persisted_after.modified) == before

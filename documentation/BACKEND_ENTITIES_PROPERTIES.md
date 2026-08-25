@@ -84,6 +84,11 @@ Aggregate projections are intentionally separate:
 Internal form links store compact entity-detail snapshots inside the
 submission. A Task separately maintains `linked_pages` for live relationship
 and permission behavior. Task history keeps its submission snapshot immutable.
+Browser form submission and row-validation routes preflight changed internal
+links against target `VIEW` permission before mutating any field. AI, import,
+and other trusted service callers do not implicitly acquire browser-session
+policy; see the submitted-reference boundary in
+[BACKEND_WEB_PERMISSIONS.md](BACKEND_WEB_PERMISSIONS.md#submitted-reference-boundary).
 
 Checkboxes illustrate the unset contract: an absent stored checkbox projects
 as `None`; a complete submit without the checkbox input validates it to

@@ -7,6 +7,10 @@ import json
 from ..exceptions import ValidationError
 from ..entities import Entities
 from ..tools import database
+from ..tools.auth.references import (
+    SubmittedReferenceResolver,
+    UNAVAILABLE_REFERENCE_ERROR,
+)
 
 
 # @testable true
@@ -42,6 +46,69 @@ def normalize_submission_values(values, fields):
     return updated
 
 
+# @testable false
+# @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.validate_browser_submission_references
+# @reason link identifier extraction is exercised through browser submission preflight
+def _link_identifier(value):
+    if isinstance(value, str):
+        return value or None
+    if isinstance(value, dict):
+        identifier = value.get("id")
+        return identifier if isinstance(identifier, str) and identifier else None
+    return None
+
+
+# @testable false
+# @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.validate_browser_submission_references
+# @reason recursive link discovery is exercised through browser submission preflight
+def _internal_link_ids(field, value) -> set[str]:
+    """Extract internal Link identifiers without resolving or mutating fields."""
+    from ..properties.form_links import Link
+    from ..properties.form_table import Table
+
+    if isinstance(field, Link):
+        if not field.is_entity_valued:
+            return set()
+        identifier = _link_identifier(value)
+        return {identifier} if identifier else set()
+
+    if not isinstance(field, Table):
+        return set()
+
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (TypeError, json.JSONDecodeError) as error:
+            raise ValidationError(UNAVAILABLE_REFERENCE_ERROR) from error
+    if value is None:
+        return set()
+    if isinstance(value, list):
+        rows = value
+    elif isinstance(value, dict) and isinstance(value.get("rows", []), list):
+        rows = value.get("rows", [])
+    else:
+        raise ValidationError(UNAVAILABLE_REFERENCE_ERROR)
+
+    internal_columns = {
+        field_id
+        for field_id, column in field.fields.items()
+        if isinstance(column, Link) and column.is_entity_valued
+    }
+    identifiers = set()
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValidationError(UNAVAILABLE_REFERENCE_ERROR)
+        for field_id in internal_columns:
+            value = row.get(field_id)
+            column = field.fields[field_id]
+            if isinstance(value, list) and not column.multiple and value:
+                value = value[0]
+            identifier = _link_identifier(value)
+            if identifier:
+                identifiers.add(identifier)
+    return identifiers
+
+
 # @testable infrastructure
 # @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.form_submission
 # @covered-by lagniappe/core/mixins/submitter.py::SubmitterMixin.patch_submission
@@ -69,13 +136,24 @@ class SubmitterMixin:
     # @tests tests_unit/test_004e_submission_behavior.py::test_html_field_is_ignored_by_form_submission
     # @features submission
     # @dimensions form-submit explicit-false empty-submission blank-persistence submit-boundary asset-isolation
-    def form_submission(self, values):
+    def form_submission(self, values, *, actor=None):
         submission = self.properties.submission
         form_values = getattr(values, "form", values)
         files = getattr(values, "files", None)
         updated = normalize_submission_values(form_values, submission.fields)
+        preserved = (
+            self.validate_browser_submission_references(
+                updated,
+                actor=actor,
+                normalized=True,
+            )
+            if actor is not None
+            else set()
+        )
 
         for field_id, field in submission.fields.items():
+            if field_id in preserved:
+                continue
             value = updated.get(field_id)
             if isinstance(value, list) and not field.multiple and value:
                 value = value[0]
@@ -89,13 +167,100 @@ class SubmitterMixin:
         self.save_submission()
 
     # @testable true
+    # @tests tests_unit/test_031_submitted_references.py::test_browser_submission_references_require_view_and_preserve_hidden_existing_values
+    # @tests tests_unit/test_031_submitted_references.py::test_browser_submission_references_validate_table_links_before_mutation
+    # @features submitted-references
+    # @dimensions internal-link browser preflight table preservation no-partial-mutation
+    def validate_browser_submission_references(
+        self,
+        values,
+        *,
+        actor,
+        normalized=False,
+    ) -> set[str]:
+        """Authorize changed internal Link values before applying a browser form."""
+        from ..definitions import Action
+        from ..properties.form_links import Link
+        from ..properties.form_table import Table
+
+        submission = self.properties.submission
+        updated = (
+            values
+            if normalized
+            else normalize_submission_values(values, submission.fields)
+        )
+        submitted_by_field = {}
+        existing_by_field = {}
+
+        for field_id, field in submission.fields.items():
+            if not isinstance(field, (Link, Table)):
+                continue
+
+            value = updated.get(field_id)
+            if isinstance(value, list) and not field.multiple and value:
+                value = value[0]
+            submitted_by_field[field_id] = _internal_link_ids(field, value)
+            existing_by_field[field_id] = _internal_link_ids(field, field.db_value)
+
+        all_ids = {
+            identifier
+            for identifiers in [*submitted_by_field.values(), *existing_by_field.values()]
+            for identifier in identifiers
+        }
+        if not all_ids:
+            return set()
+
+        expected = (
+            Entities.CATEGORY,
+            Entities.PAGE,
+            Entities.USER,
+            Entities.GROUP,
+            Entities.PROJECT,
+            Entities.TASK,
+            Entities.MODEL_TASK,
+            Entities.FILE,
+            Entities.FORM,
+        )
+        resolver = SubmittedReferenceResolver(actor, *all_ids)
+        preserved = set()
+
+        for field_id, submitted_ids in submitted_by_field.items():
+            field = submission.fields[field_id]
+            existing_ids = existing_by_field[field_id]
+            changed_ids = submitted_ids - existing_ids
+            resolver.many(changed_ids, expected=expected, action=Action.VIEW)
+
+            if field_id in updated or not existing_ids:
+                continue
+
+            for identifier in existing_ids:
+                try:
+                    resolver.one(
+                        identifier,
+                        expected=expected,
+                        action=Action.VIEW,
+                        required=True,
+                    )
+                except ValidationError:
+                    preserved.add(field_id)
+                    break
+
+        return preserved
+
+    # @testable true
     # @tests tests_unit/test_003f_submission_normalize_patch.py::test_patch_submission_merges_single_field
     # @tests tests_unit/test_003f_submission_normalize_patch.py::test_patch_submission_accepts_json_string
     # @tests tests_unit/test_004d_submitter.py::test_patch_submission_merges_multiple_fields
     # @features submission
     # @dimensions patch, single-field, json-payload, multiple-fields
-    def patch_submission(self, update):
+    def patch_submission(self, update, *, actor=None):
         updated = json.loads(update) if isinstance(update, str) else update
+        if actor is not None:
+            self.validate_browser_submission_references(
+                updated,
+                actor=actor,
+                normalized=True,
+            )
         for field_id, field_value in updated.items():
             self.properties.submission.patch(field_id, field_value)
 

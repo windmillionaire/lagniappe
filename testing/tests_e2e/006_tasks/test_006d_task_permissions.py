@@ -8,6 +8,7 @@ Verified against:
 """
 
 import hashlib
+import json
 
 import pytest
 import requests
@@ -15,12 +16,16 @@ from playwright.sync_api import expect
 
 from config import SETTINGS
 from lagniappe import CONFIG
-from lagniappe.core.definitions import Fetch
+from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
-from testing.definitions import Tasks, Users
-from testing.resources import Task
-from testing.utility import assert_lagniappe_error_response, assert_same_etag
+from testing.definitions import Categories, Pages, Tasks, Uploads, Users
+from testing.resources import File, Task
+from testing.utility import (
+    assert_lagniappe_error_response,
+    assert_same_etag,
+    manual_mutation_headers,
+)
 
 pytestmark = pytest.mark.e2e
 
@@ -49,6 +54,32 @@ def _task_side_effect_state(task, *users):
         history_keys,
         notification_keys,
     )
+
+
+def _submitted_reference_page(category, suffix):
+    page = Entities.PAGE.create(
+        {
+            "name": f"Submitted reference page {suffix}",
+            "description": "Submitted reference authorization coverage.",
+            "attributes": ["tasks", "files"],
+            "categories": [],
+            "model": category.entity,
+            "form": None,
+        }
+    )
+    page.save()
+    return page
+
+
+def _browser_http_context(user):
+    cookies = {
+        cookie["name"]: cookie["value"] for cookie in user.page.context.cookies()
+    }
+    headers = manual_mutation_headers(
+        user.page.url,
+        user.locate("#token").input_value(),
+    )
+    return cookies, headers
 
 
 # @pairs permissions:etag permissions:authorization-before-cache
@@ -203,3 +234,156 @@ def test_assigned_user_can_work_their_assigned_task(get_user):
     expect(task_row).to_be_visible()
     expect(task_row.locator(Task.COMPLETE_TASK_CHECKBOX)).to_be_visible()
     expect(task_row.locator(Task.SETTINGS_FORM)).to_be_visible()
+
+
+# @pairs tasks:submitted-reference file:submitted-reference pages:submitted-reference
+def test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page(get_user):
+    owner = get_user(Users.OWNER)
+    category = Categories.test_create_category_manual_mode.get(owner)
+    hidden_file_resource = File.upload_from_page(
+        owner,
+        Pages.test_file_upload_page,
+        Uploads.plain_text_file,
+    )
+    hidden_file = Entities.fetch_one(
+        hidden_file_resource.key,
+        request=Fetch.direct(),
+    )
+    page = _submitted_reference_page(category, "forgery")
+    task = Entities.TASK.create(
+        {
+            "name": "Submitted reference forgery task",
+            "description": "Must reject hidden File keys.",
+            "page": page,
+            "form": None,
+            "model": None,
+            "project": None,
+            "assigned_to": None,
+            "due_date": None,
+        }
+    )
+    task.save()
+
+    actor = get_user(Users.user_one_category)
+    actor.navigate(
+        f"{SETTINGS.test_config['BASE_URL']}/pages/{page.urlsafe_key}"
+    )
+    assert page.allowed(Action.EDIT, user=actor.entity)
+    assert task.allowed(Action.EDIT, user=actor.entity)
+    assert not hidden_file.allowed(Action.VIEW, user=actor.entity)
+    cookies, headers = _browser_http_context(actor)
+
+    persisted_file = Entities.fetch_one(hidden_file.key, request=Fetch.direct())
+    persisted_task = Entities.fetch_one(task.key, request=Fetch.direct())
+    before = {
+        "file_tasks": tuple(persisted_file.db.get("tasks", [])),
+        "file_pages": tuple(persisted_file.db.get("pages", [])),
+        "file_requires": tuple(persisted_file.db.get("requires", [])),
+        "file_modified": persisted_file.modified,
+        "task_files": tuple(persisted_task.db.get("files", [])),
+        "task_modified": persisted_task.modified,
+    }
+    forged_assets = json.dumps({"forged": hidden_file.details})
+
+    task_response = requests.put(
+        f"{SETTINGS.test_config['BASE_URL']}/tasks/{task.urlsafe_key}/update",
+        data={
+            "active": "TaskSettings",
+            "name": task.name,
+            "description": task.description,
+            "assets": forged_assets,
+        },
+        cookies=cookies,
+        headers=headers,
+        allow_redirects=False,
+        timeout=10,
+    )
+    assert task_response.status_code == 422
+    assert task_response.text == "One or more selected items are unavailable."
+
+    page_response = requests.post(
+        f"{SETTINGS.test_config['BASE_URL']}/files/{page.urlsafe_key}/upload",
+        data={"existing-file": hidden_file.urlsafe_key},
+        cookies=cookies,
+        headers=headers,
+        allow_redirects=False,
+        timeout=10,
+    )
+    assert page_response.status_code == 422
+    assert page_response.text == "One or more selected items are unavailable."
+
+    persisted_file = Entities.fetch_one(hidden_file.key, request=Fetch.direct())
+    persisted_task = Entities.fetch_one(task.key, request=Fetch.direct())
+    assert {
+        "file_tasks": tuple(persisted_file.db.get("tasks", [])),
+        "file_pages": tuple(persisted_file.db.get("pages", [])),
+        "file_requires": tuple(persisted_file.db.get("requires", [])),
+        "file_modified": persisted_file.modified,
+        "task_files": tuple(persisted_task.db.get("files", [])),
+        "task_modified": persisted_task.modified,
+    } == before
+    assert not persisted_file.allowed(Action.VIEW, user=actor.entity)
+
+
+# @features tasks
+# @dimensions signed-claim
+def test_new_task_attachment_claim_is_required_and_scope_bound(get_user):
+    owner = get_user(Users.OWNER)
+    category = Categories.test_create_category_manual_mode.get(owner)
+    upload_page = _submitted_reference_page(category, "upload")
+    other_page = _submitted_reference_page(category, "other-scope")
+
+    actor = get_user(Users.user_one_category)
+    actor.navigate(
+        f"{SETTINGS.test_config['BASE_URL']}/pages/{upload_page.urlsafe_key}"
+    )
+    cookies, headers = _browser_http_context(actor)
+
+    upload_response = requests.post(
+        f"{SETTINGS.test_config['BASE_URL']}/tasks/{upload_page.urlsafe_key}/upload-file",
+        data={"assets": "{}", "mimetype": "text/plain"},
+        files={"task-file": ("claim.txt", b"claim-bound attachment", "text/plain")},
+        cookies=cookies,
+        headers=headers,
+        allow_redirects=False,
+        timeout=10,
+    )
+    assert upload_response.status_code == 200
+    uploaded = upload_response.json()
+    asset = next(iter(uploaded["assets"].values()))
+    assert asset["attachment_claim"]
+    uploaded_file = Entities.fetch_one(asset["id"], request=Fetch.direct())
+    assert not uploaded_file.allowed(Action.VIEW, user=actor.entity)
+
+    wrong_scope = requests.post(
+        f"{SETTINGS.test_config['BASE_URL']}/tasks/{other_page.urlsafe_key}/create",
+        data={
+            "name": "Wrong-scope attachment task",
+            "description": "Must not be created.",
+            "assets": json.dumps(uploaded["assets"]),
+        },
+        cookies=cookies,
+        headers=headers,
+        allow_redirects=False,
+        timeout=10,
+    )
+    assert wrong_scope.status_code == 422
+    assert wrong_scope.text == "One or more selected items are unavailable."
+
+    accepted = requests.post(
+        f"{SETTINGS.test_config['BASE_URL']}/tasks/{upload_page.urlsafe_key}/create",
+        data={
+            "name": "Claim-authorized attachment task",
+            "description": "Created with a scope-bound upload claim.",
+            "assets": json.dumps(uploaded["assets"]),
+        },
+        cookies=cookies,
+        headers=headers,
+        allow_redirects=False,
+        timeout=10,
+    )
+    assert accepted.status_code == 200
+
+    linked_file = Entities.fetch_one(asset["id"], request=Fetch.direct())
+    assert linked_file.db.get("tasks")
+    assert linked_file.allowed(Action.VIEW, user=actor.entity)

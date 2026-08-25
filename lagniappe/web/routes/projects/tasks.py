@@ -3,8 +3,10 @@ import json
 from flask import request
 from flask_login import current_user
 
+from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
 from lagniappe.core.tools import database
+from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.core.tools.tasks.ordering import sort_tasks
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.web.auth import permission
@@ -17,13 +19,45 @@ from . import projects
 # @covered-by lagniappe/web/routes/projects/tasks.py::create_model
 # @covered-by lagniappe/web/routes/projects/tasks.py::update_model
 # @reason form parsing helper owned by model-task create/update routes
-def create_update_data(form):
+def create_update_data(form, model_task=None):
     form_id = form.get("form")
+    current_form = model_task.form if model_task else None
+    selected_form = SubmittedReferenceResolver(current_user, form_id).one(
+        form_id,
+        expected=Entities.FORM,
+        action=Action.VIEW,
+        existing=current_form,
+        predicate=lambda candidate: candidate.form_type == "task",
+    )
+    if not form_id and current_form and not current_form.allowed(
+        Action.VIEW, user=current_user
+    ):
+        selected_form = current_form
     data = {
         "name": form.get("name"),
-        "form": Entities.FORM(form_id) if form_id else None,
+        "form": selected_form,
     }
     return data
+
+
+# @testable false
+# @covered-by lagniappe/web/routes/projects/tasks.py::update_model
+# @covered-by lagniappe/web/routes/projects/tasks.py::delete_model
+# @covered-by lagniappe/web/routes/projects/tasks.py::status
+# @reason route-scoped model resolution is exercised through model-task routes
+def _project_model(project, task_key):
+    try:
+        return SubmittedReferenceResolver(current_user, task_key).one(
+            task_key,
+            expected=Entities.MODEL_TASK,
+            action=Action.VIEW,
+            predicate=lambda candidate: bool(
+                candidate.project and candidate.project.key == project.key
+            ),
+            required=True,
+        )
+    except exceptions.ValidationError:
+        return None
 
 
 # @testable true
@@ -37,7 +71,10 @@ def create_update_data(form):
 @permission(Resource.PROJECT, Action.EDIT)
 def create_model(key, **kwargs):
     project = kwargs["entity"]
-    update_data = create_update_data(request.form)
+    try:
+        update_data = create_update_data(request.form)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     model_task = Entities.MODEL_TASK.create(project, update_data)
 
     model_task.save()
@@ -51,10 +88,8 @@ def create_model(key, **kwargs):
 @permission(Resource.PROJECT, Action.VIEW)
 def model_info(key, task_key, **kwargs):
     project = kwargs["entity"]
-    model_task = Entities.fetch_one(task_key, request=Fetch.direct())
-    if not isinstance(model_task, Entities.MODEL_TASK):
-        return responses.not_found("Model task not found")
-    if not model_task.project or model_task.project.key != project.key:
+    model_task = _project_model(project, task_key)
+    if not model_task:
         return responses.not_found("Model task not found")
 
     return responses.new_model_task(model_task)
@@ -64,14 +99,21 @@ def model_info(key, task_key, **kwargs):
 # @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_edit_model_task_name
 # @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_change_model_task_form
 # @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task_form
+# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_model_task_mutations_require_route_project_membership
 # @features model-tasks
-# @dimensions update name form-change form-clear
+# @dimensions update name form-change form-clear parent-membership
 @projects.route("<key>/update-model/<task_key>", methods=["PUT"])
 @permission(Resource.PROJECT, Action.EDIT)
 def update_model(key, task_key, **kwargs):
-    model_task = Entities.fetch_one(task_key, request=Fetch.direct())
+    project = kwargs["entity"]
+    model_task = _project_model(project, task_key)
+    if not model_task:
+        return responses.not_found("Model task not found")
 
-    data = create_update_data(request.form)
+    try:
+        data = create_update_data(request.form, model_task=model_task)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     model_task.update(data)
 
     model_task.save()
@@ -81,13 +123,16 @@ def update_model(key, task_key, **kwargs):
 
 # @testable true
 # @tests tests_e2e/004_projects/test_004c_model_tasks.py::test_delete_model_task
+# @tests tests_e2e/004_projects/test_004i_project_permissions.py::test_model_task_mutations_require_route_project_membership
 # @features model-tasks
-# @dimensions delete
+# @dimensions delete parent-membership
 @projects.route("<key>/delete-model/<task_key>", methods=["DELETE"])
 @permission(Resource.PROJECT, Action.EDIT)
 def delete_model(key, task_key, **kwargs):
     project = kwargs["entity"]
-    model_task = Entities.fetch_one(task_key, request=Fetch.direct())
+    model_task = _project_model(project, task_key)
+    if not model_task:
+        return responses.not_found("Model task not found")
 
     updated_tasks = [t for t in project.model_tasks if t.order > model_task.order]
     for t in updated_tasks:
@@ -128,7 +173,9 @@ def _status_filter(project, model, completed):
 @permission(Resource.PROJECT, Action.VIEW)
 def status(key, task_key, **kwargs):
     project = kwargs["entity"]
-    model = next(m for m in project.model_tasks if m.urlsafe_key == task_key)
+    model = _project_model(project, task_key)
+    if not model:
+        return responses.not_found("Model task not found")
     completed = True if request.args.get("completed") == "true" else False
     filter = _status_filter(project, model, completed)
 

@@ -4,6 +4,7 @@ from flask_login import current_user
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.tools import ai, filters
+from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from lagniappe.core.definitions import (
     AI,
@@ -11,7 +12,6 @@ from lagniappe.core.definitions import (
     CategoryAttributes,
     DeferredJobSpec,
     DeferredJobType,
-    Fetch,
     MutationIntent,
     Resource,
 )
@@ -74,15 +74,25 @@ def info(key, **kwargs):
 # @covered-by lagniappe/web/routes/categories/main.py::create
 # @covered-by lagniappe/web/routes/categories/main.py::update
 # @reason form parsing helper owned by category create/update routes
-def _category_data(form):
+def _category_data(form, category=None):
+    form_key = form.get("form")
+    current_form = category.form if category else None
+    selected_form = SubmittedReferenceResolver(current_user, form_key).one(
+        form_key,
+        expected=Entities.FORM,
+        action=Action.VIEW,
+        existing=current_form,
+        predicate=lambda candidate: candidate.form_type == "page",
+    )
+    if not form_key and current_form and not current_form.allowed(
+        Action.VIEW, user=current_user
+    ):
+        selected_form = current_form
+
     return {
         "name": form.get("name"),
         "description": form.get("description"),
-        "form": (
-            Entities.fetch_one(form.get("form"), request=Fetch.direct())
-            if form.get("form")
-            else None
-        ),
+        "form": selected_form,
         "attributes": [a.name for a in CategoryAttributes if form.get(a.name)],
     }
 
@@ -96,7 +106,10 @@ def _category_data(form):
 def update(key, **kwargs):
     category = kwargs["entity"]
 
-    category.update(_category_data(request.form))
+    try:
+        category.update(_category_data(request.form, category=category))
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     Entities.save(category)
 
     return responses.category_info(category)
@@ -159,7 +172,10 @@ def create():
             )
         )
     else:
-        category = Entities.CATEGORY().create(_category_data(request.form))
+        try:
+            category = Entities.CATEGORY().create(_category_data(request.form))
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
 
     category.save()
 
@@ -209,7 +225,16 @@ def create_pages(key, **kwargs):
 
     category = kwargs["entity"]
     explain = request.form.get("role") == "explain"
-    form = Entities.fetch_one(request.form.get("form"), request=Fetch.direct())
+    form_key = request.form.get("form")
+    try:
+        form = SubmittedReferenceResolver(current_user, form_key).one(
+            form_key,
+            expected=Entities.FORM,
+            action=Action.VIEW,
+            predicate=lambda candidate: candidate.form_type == "page",
+        )
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     fields = request.form.to_dict(flat=True)
     operation_id = fields.pop("operation-id", None)
 

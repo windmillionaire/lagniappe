@@ -183,6 +183,11 @@ class TaskFiles(RelatedEntityListMixin, ColumnMixin, AIMixin, DBProperty):
         preload = {}
 
         for file in self.value:
+            if (
+                not file.allowed(Action.VIEW, user=self.user)
+                or file.reserved
+            ):
+                continue
             details = dict(file.details)
             details["attached"] = True
             preload[self._file_asset_preload_key(file)] = details

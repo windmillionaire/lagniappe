@@ -9,8 +9,12 @@ Verified against:
 """
 
 import pytest
+import requests
 from playwright.sync_api import expect
 
+from config import SETTINGS
+from lagniappe.core.definitions import Fetch
+from lagniappe.core.entities import Entities
 from testing.definitions import ModelTasks, Projects, Users
 from testing.elements import (
     Dropdown,
@@ -20,6 +24,7 @@ from testing.elements import (
     SpinnerButtons,
     Tabs,
 )
+from testing.utility import manual_mutation_headers
 
 pytestmark = pytest.mark.e2e
 
@@ -131,3 +136,49 @@ def test_project_editor_can_open_model_task_creation(get_user):
     expect(create_form).to_be_visible()
     expect(create_form.locator(FormElements.NAME)).to_be_visible()
     expect(create_form.locator("[data-role='form-select']")).to_be_visible()
+
+
+# @features model-tasks
+# @dimensions parent-membership
+def test_model_task_mutations_require_route_project_membership(get_user):
+    owner = get_user(Users.OWNER)
+    route_project = Projects.test_create_project_manual_mode.get(owner)
+    foreign_model = ModelTasks.test_multi_model_alpha.get(owner)
+    assert foreign_model.entity.project.key != route_project.entity.key
+
+    owner.go(route_project)
+    cookies = {
+        cookie["name"]: cookie["value"] for cookie in owner.page.context.cookies()
+    }
+    headers = manual_mutation_headers(
+        owner.page.url,
+        owner.locate("#token").input_value(),
+    )
+    original_name = foreign_model.entity.name
+    base_url = SETTINGS.test_config["BASE_URL"]
+
+    update_response = requests.put(
+        f"{base_url}/projects/{route_project.key}/update-model/{foreign_model.key}",
+        data={"name": "Forged cross-project update"},
+        cookies=cookies,
+        headers=headers,
+        allow_redirects=False,
+        timeout=10,
+    )
+    assert update_response.status_code == 404
+    assert update_response.text == "Model task not found"
+
+    delete_response = requests.delete(
+        f"{base_url}/projects/{route_project.key}/delete-model/{foreign_model.key}",
+        cookies=cookies,
+        headers=headers,
+        allow_redirects=False,
+        timeout=10,
+    )
+    assert delete_response.status_code == 404
+    assert delete_response.text == "Model task not found"
+
+    persisted = Entities.fetch_one(foreign_model.key, request=Fetch.direct())
+    assert persisted is not None
+    assert persisted.name == original_name
+    assert persisted.project.key == foreign_model.entity.project.key

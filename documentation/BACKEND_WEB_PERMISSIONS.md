@@ -59,6 +59,43 @@ Authentication provider flows are documented in
 [AUTHENTICATION.md](AUTHENTICATION.md). Backend permission enums and entity
 rules are documented in [BACKEND_DEFINITIONS.md](BACKEND_DEFINITIONS.md).
 
+## Submitted reference boundary
+
+The route decorator authorizes only the primary entity identified by the URL.
+Entity keys in a request body are a separate authorization boundary; a key
+being present in a permission-filtered facet is useful UI behavior, but is not
+proof that the submitted request came from that facet.
+
+Browser mutation handlers use `SubmittedReferenceResolver` to batch-load these
+secondary keys and declare the expected entity type, required action, and any
+relationship or domain predicate. Missing, malformed, wrong-kind, and denied
+body references all return the same `422` response: `One or more selected items
+are unavailable.` Route-path and route-parent mismatches continue to return
+`404`, so they do not disclose whether a known key exists elsewhere.
+
+The current policies are:
+
+| Reference | Required boundary |
+| --- | --- |
+| Category, Page, Project, or ModelTask selection | Target `VIEW`, plus the route-parent relationship where applicable. |
+| Attached Form | Target `VIEW` and the expected Page/Task form type. Schema generation requires target `EDIT`. |
+| Task assignee | A user-backed Page accepted by the collaboration assignment policy. |
+| Existing File attached to a Page or Task | Target `VIEW`. |
+| Newly uploaded Task File | A short-lived signed claim bound to the actor, File, and authorized Task/Page upload scope. |
+| Internal form Link submitted by a browser | Target `VIEW` before any submission field is mutated. |
+
+An ordinary edit preserves an existing relation that the actor can no longer
+view when the hidden field is omitted. It does not silently erase the relation,
+and preservation does not authorize replacing it with another hidden target.
+Task attachment selectors and attached-Form preload data are also
+permission-filtered to avoid exposing stored details in the browser.
+
+The internal Link preflight is deliberately enabled by browser route callers.
+Trusted AI, import, migration, and background-service flows keep their existing
+service-owned policy instead of depending on Flask session state. Filter DTOs
+remain a separate validation project because their parent, field, comparator,
+and value contracts are broader than entity-key resolution alone.
+
 ## ETags and collection fingerprints
 
 Entity permission decorators set `g.fingerprint`. The response hook combines
@@ -115,8 +152,10 @@ When changing route authorization or freshness:
 
 1. Keep authentication and authorization ahead of conditional responses.
 2. Express extra entity scope through a registered `FetchReason`.
-3. Keep poll payloads bounded and typed.
-4. Batch keys and relations before adding per-descriptor reads.
-5. Update focused unit tests and E2E coverage for observable browser behavior.
-6. Run the changed-source traceability and template-contract checks when their
+3. Treat request-body entity keys as submitted references with an explicit
+   type, action, and relationship policy.
+4. Keep poll payloads bounded and typed.
+5. Batch keys and relations before adding per-descriptor reads.
+6. Update focused unit tests and E2E coverage for observable browser behavior.
+7. Run the changed-source traceability and template-contract checks when their
    respective contracts move.

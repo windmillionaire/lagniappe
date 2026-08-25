@@ -1,10 +1,13 @@
 from types import SimpleNamespace
 
 from flask import request
+from flask_login import current_user
 
 from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core.entities import Entities
+from lagniappe.core import exceptions
 from lagniappe.core.tools import ai, database
+from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.web.auth import (
     abort_public_user_action,
     permission,
@@ -237,6 +240,7 @@ def get_html(key, **kwargs):
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_page_editor_without_ai_create_is_rejected_before_batch_summary
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_text_file_renders_original_content_in_text_tab
 # @tests tests_e2e/011_files/test_011a_file_tabs.py::test_page_uploaded_image_shows_desktop_preview
+# @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page
 # @pair file:file-upload
 # @pair file:page-upload
 # @pair file:multi-file
@@ -246,6 +250,8 @@ def get_html(key, **kwargs):
 # @pair ai:batch-summary
 # @pair ai:access-gate
 # @pair ai:provider-boundary
+# @pair file:submitted-reference
+# @pair pages:submitted-reference
 @files.route("/<key>/upload", methods=["POST"])
 @permission(Resource.PAGE, Action.EDIT)
 def upload(key, **kwargs):
@@ -280,7 +286,19 @@ def upload(key, **kwargs):
         ]
         _summarize_page_uploads(uploaded_files)
     elif existing_file:
-        uploaded_files = [Entities.FILE(existing_file)]
+        try:
+            existing = SubmittedReferenceResolver(
+                current_user,
+                existing_file,
+            ).one(
+                existing_file,
+                expected=Entities.FILE,
+                action=Action.VIEW,
+                required=True,
+            )
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
+        uploaded_files = [existing]
         uploaded_files[0].properties.pages.add(page)
 
     Entities.save(*uploaded_files, page)

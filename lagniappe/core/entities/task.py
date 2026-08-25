@@ -390,9 +390,11 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     # @testable true
     # @tests tests_unit/test_013_task_properties.py::test_task_update_tracks_project_model_and_uploaded_file
     # @tests tests_unit/test_013_task_properties.py::test_task_update_saves_file_relations_from_upload_assets
+    # @tests tests_unit/test_031_submitted_references.py::test_task_update_preserves_unchanged_assignee_eligibility
     # @features task
-    # @dimensions update, tracking, uploaded-files
+    # @dimensions update, tracking, uploaded-files, assignee-preservation
     def update(self, data):
+        previous_form_key = self.properties.form.key
         self.page = data.get("page", self.page)
         self.form = data.get("form")
         self.description = data.get("description")
@@ -401,20 +403,31 @@ class Task(AssetMixin, SubmitterMixin, Entity):
 
         tracking = data.get("model") or data.get("project")
         self._update_tracking(tracking)
+        form_changed = previous_form_key != self.properties.form.key
 
         previous_assignee_key = self.properties.assigned_to.key
         assigned_to = data.get("assigned_to")
         actor = current_context_user()
-        self.validate_assignment(assigned_to, actor=actor)
-        self.assigned_to = assigned_to
-        next_assignee_key = self.properties.assigned_to.key
+        next_assignee_key = getattr(assigned_to, "key", None)
         if previous_assignee_key != next_assignee_key:
+            self.validate_assignment(assigned_to, actor=actor)
+            self.assigned_to = assigned_to
             self.db["assignment_revision"] = (
                 int(self.db.get("assignment_revision") or 0) + 1
             )
             if actor and getattr(actor, "page", None):
                 self.assigned_by = actor.page
             self._add_assignment_notice(actor, self.assigned_to)
+        elif form_changed and assigned_to:
+            assigned_user = (
+                assigned_to
+                if isinstance(assigned_to, Entities.USER)
+                else getattr(assigned_to, "user", None)
+            )
+            if assigned_user and self.restricted_access(assigned_user):
+                raise ValidationError(
+                    "Assigned user does not have access to this task's restricted form."
+                )
 
         if "asset_files" in data:
             self.files = data.get("asset_files")

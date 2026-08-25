@@ -270,7 +270,7 @@
         </div>
       {% endif %}
     {% endif %}
-    {% set form_preload = page.form.details if page.form else none %}
+    {% set form_preload = page.properties.form.column_value if page.form else none %}
     {% if Resource.FORMS.allowed(Action.VIEW) and (page.allowed(Action.EDIT) or form_preload) %}
       <div data-role="form-select" class="{{ styles.select.container }}">
         <h3 class="{{ styles.label.sectionHeading }}">Attached Form</h3>

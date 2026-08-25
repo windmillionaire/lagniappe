@@ -16,6 +16,15 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities, index
 from lagniappe.core.tools import ai, database
+from lagniappe.core.tools import collaboration
+from lagniappe.core.tools.auth.references import (
+    SubmittedReferenceResolver,
+    UNAVAILABLE_REFERENCE_ERROR,
+)
+from lagniappe.core.tools.auth.task_attachments import (
+    sign_task_attachment_claim,
+    valid_task_attachment_claim,
+)
 from lagniappe.core.tools.tasks import combine as task_combine
 from lagniappe.core.tools.tasks import scheduling
 from lagniappe.core.tools.polling.forms import is_form_field, offline_replay_conflicts
@@ -223,10 +232,12 @@ def _upload_assets_payload(request):
 
     try:
         assets = json.loads(raw_assets or "{}")
-    except json.JSONDecodeError:
-        return {}
+    except json.JSONDecodeError as error:
+        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR) from error
 
-    return assets if isinstance(assets, dict) else {}
+    if not isinstance(assets, dict):
+        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
+    return assets
 
 
 # @testable false
@@ -253,10 +264,26 @@ def _asset_file_keys(assets):
 # @testable false
 # @covered-by lagniappe/web/routes/tasks/main.py::upload_file
 # @reason upload route response shaping owns task asset entry creation
-def _add_file_to_assets(assets, file):
+def _add_file_to_assets(assets, file, *, attachment_claim=None):
     assets = dict(assets or {})
-    assets[file.filename or file.name or file.hash] = file.details
+    details = dict(file.details)
+    if attachment_claim:
+        details["attachment_claim"] = attachment_claim
+    assets[file.filename or file.name or file.hash] = details
     return assets
+
+
+# @testable false
+# @covered-by lagniappe/web/routes/tasks/main.py::task_data
+# @reason claim lookup is exercised through task mutation data assembly
+def _asset_claims(assets, file_key):
+    return [
+        definition.get("attachment_claim")
+        for definition in (assets or {}).values()
+        if isinstance(definition, dict)
+        and (definition.get("key") or definition.get("id")) == file_key
+        and definition.get("attachment_claim")
+    ]
 
 
 # @testable false
@@ -356,59 +383,195 @@ def task_data(request, page, task=None):
     """Resolve form data into a dict suitable for Task.create() or Task.update()."""
     assets = _upload_assets_payload(request)
     asset_file_keys = _asset_file_keys(assets)
-    submitted_page_key = request.form.get("page")
+    if "page" in request.form:
+        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
 
-    entities = [page, task]
-    for e in ["form", "assigned_to", "project", "model"]:
-        entities.extend(request.form.getlist(e))
-    if submitted_page_key:
-        entities.append(submitted_page_key)
-    entities.extend(asset_file_keys)
-    loaded = {
-        e.urlsafe_key: e for e in Entities.fetch(*entities, request=Fetch.direct())
-    }
+    form_key = request.form.get("form")
+    assignee_key = request.form.get("assigned_to")
+    project_key = request.form.get("project")
+    model_key = request.form.get("model")
+    resolver = SubmittedReferenceResolver(
+        current_user,
+        form_key,
+        assignee_key,
+        project_key,
+        model_key,
+        *asset_file_keys,
+    )
 
-    if submitted_page_key:
-        page = loaded.get(submitted_page_key)
-    elif page and page.urlsafe_key in loaded:
-        page = loaded[page.urlsafe_key]
+    current_form = task.form if task else None
+    form = resolver.one(
+        form_key,
+        expected=Entities.FORM,
+        action=Action.VIEW,
+        existing=current_form,
+        predicate=lambda selected: selected.form_type == "task",
+    )
+    if not form_key and current_form and not current_form.allowed(
+        Action.VIEW, user=current_user
+    ):
+        form = current_form
+
+    current_tracking = (task.model or task.project) if task else None
+
+    # @testable false
+    # @covered-by lagniappe/web/routes/tasks/main.py::task_data
+    # @reason tracking constraints are part of aggregate task reference validation
+    def tracking_reference_valid(selected):
+        if not isinstance(selected, Entities.MODEL_TASK) or not selected.form:
+            return True
+        return bool(
+            selected.form.form_type == "task"
+            and selected.form.allowed(Action.VIEW, user=current_user)
+        )
+
+    project_selection = resolver.one(
+        project_key,
+        expected=(Entities.PROJECT, Entities.MODEL_TASK),
+        action=Action.VIEW,
+        existing=[task.model, task.project] if task else None,
+        predicate=tracking_reference_valid,
+    )
+    model_selection = resolver.one(
+        model_key,
+        expected=Entities.MODEL_TASK,
+        action=Action.VIEW,
+        existing=task.model if task else None,
+        predicate=tracking_reference_valid,
+    )
+    model = (
+        project_selection
+        if isinstance(project_selection, Entities.MODEL_TASK)
+        else model_selection
+    )
+    project = (
+        project_selection
+        if isinstance(project_selection, Entities.PROJECT)
+        else model.project if model else None
+    )
+    if model_selection and model and model_selection.key != model.key:
+        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
+    model = model_selection or model
+    if model and project and (
+        not model.project or model.project.key != project.key
+    ):
+        raise exceptions.ValidationError(UNAVAILABLE_REFERENCE_ERROR)
+    if not model_key and not project_key and current_tracking and not current_tracking.allowed(
+        Action.VIEW, user=current_user
+    ):
+        model = task.model
+        project = task.project
+
+    current_assignee = task.assigned_to if task else None
+
+    # @testable false
+    # @covered-by lagniappe/web/routes/tasks/main.py::task_data
+    # @reason assignment policy is part of aggregate task reference validation
+    def assignee_authorized(selected):
+        return bool(
+            selected.user
+            and collaboration.recipient_allowed(
+                current_user,
+                selected.user,
+                channel="assign",
+            )
+        )
+
+    assigned_to = resolver.one(
+        assignee_key,
+        expected=Entities.PAGE,
+        existing=current_assignee,
+        predicate=lambda selected: bool(selected.user),
+        authorize=assignee_authorized,
+    )
+    if (
+        not assignee_key
+        and current_assignee
+        and (
+            not current_assignee.allowed(Action.VIEW, user=current_user)
+            or not assignee_authorized(current_assignee)
+        )
+    ):
+        assigned_to = current_assignee
 
     task_data = {
         **_task_base_data(request),
         "page": page,
-        "task": loaded.get(request.form.get("task")),
-        **_task_form_data(loaded, request),
-        **_task_project_data(loaded, request),
-        **_task_assignee_data(loaded, request),
+        "task": None,
+        "form": form,
+        "model": model,
+        "project": project,
+        "assigned_to": assigned_to,
         "due_date": _task_create_due_date_data(request),
     }
 
     if assets is not None:
-        task_data["asset_files"] = [
-            loaded[key]
-            for key in asset_file_keys
-            if key in loaded and isinstance(loaded[key], Entities.FILE)
+        existing_files = list(task.files) if task else []
+        scope = task or page
+
+        def file_authorized(file):
+            return file.allowed(Action.VIEW, user=current_user) or any(
+                valid_task_attachment_claim(
+                    claim,
+                    actor=current_user,
+                    file=file,
+                    scope=scope,
+                )
+                for claim in _asset_claims(assets, file.urlsafe_key)
+            )
+
+        selected_files = resolver.many(
+            asset_file_keys,
+            expected=Entities.FILE,
+            existing=existing_files,
+            authorize=file_authorized,
+        )
+        selected_keys = {file.key for file in selected_files}
+        preserved_files = [
+            file
+            for file in existing_files
+            if file.key not in selected_keys
+            and not file.allowed(Action.VIEW, user=current_user)
         ]
+        task_data["asset_files"] = [*selected_files, *preserved_files]
 
     return task_data
 
 
 # @testable true
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_create_page_task_with_file
+# @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_new_task_attachment_claim_is_required_and_scope_bound
 # @features tasks
-# @dimensions file-upload async-upload
+# @dimensions file-upload async-upload signed-claim
 @tasks.route("<key>/upload-file", methods=["POST"])
 @permission(requested=Action.EDIT)
 def upload_file(key, **kwargs):
     abort_public_user_action()
 
+    try:
+        existing_assets = _upload_assets_payload(request)
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
+
     file = _create_task_file()
     if not file:
         return responses.error("No file uploaded")
 
-    assets = _add_file_to_assets(_upload_assets_payload(request), file)
+    scope = kwargs["entity"]
+    attachment_claim = sign_task_attachment_claim(
+        actor=current_user,
+        file=file,
+        scope=scope,
+    )
+    assets = _add_file_to_assets(
+        existing_assets,
+        file,
+        attachment_claim=attachment_claim,
+    )
+    details = dict(file.details)
+    details["attachment_claim"] = attachment_claim
 
-    return responses.json_response({"assets": assets, "file": file.details})
+    return responses.json_response({"assets": assets, "file": details})
 
 
 # @testable false
@@ -464,10 +627,12 @@ def _should_submit_task_form(active, role, task):
 # @tests tests_e2e/006_tasks/test_006b_page_tasks.py::test_completed_task_with_partial_submission_omits_empty_fields
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_page_task_viewer_sees_task_without_edit_controls
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_assigned_user_can_work_their_assigned_task
+# @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_forged_hidden_file_key_cannot_be_linked_to_editable_task_or_page
 # @features tasks
 # @dimensions complete due-date readonly assignee permission-gates attached-form empty-fields partial-submission
 # @pairs tasks:complete tasks:due-date tasks:readonly tasks:assignee
 # @pairs tasks:permission-gates tasks:attached-form tasks:empty-fields tasks:partial-submission
+# @pair tasks:submitted-reference
 @tasks.route("<key>/update", methods=["PUT", "GET"])
 @permission(Resource.TASK, Action.EDIT)
 def update(key, **kwargs):
@@ -497,11 +662,20 @@ def update(key, **kwargs):
             "The autofill attachment was not uploaded. Try attaching it again."
         )
 
+    update_data = None
+    if "TaskSettings" in active:
+        try:
+            update_data = task_data(request, task.page, task)
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
+
     if _should_submit_task_form(active, role, task):
-        task.form_submission(request)
+        try:
+            task.form_submission(request, actor=current_user)
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
 
     if "TaskSettings" in active:
-        update_data = task_data(request, task.page, task)
         try:
             task.update(update_data)
         except exceptions.ValidationError as e:
@@ -625,8 +799,8 @@ def create_direct(key, **kwargs):
 def personal(key, **kwargs):
     """Create a quick task on the current user's own page (from home)."""
     page = kwargs["entity"]
-    create_data = task_data(request, page)
     try:
+        create_data = task_data(request, page)
         task = Entities.TASK.create(create_data)
     except exceptions.ValidationError as e:
         return responses.error(str(e))
@@ -739,10 +913,17 @@ def delete_file(key, file_key, **kwargs):
         request=Fetch.nested(because=FetchReason.TASK_SAVE_REQUIREMENTS),
     )
     file = Entities.fetch_one(file_key, request=Fetch.direct())
-    if not file or file.key not in task.properties.files.keys:
+    if (
+        not isinstance(file, Entities.FILE)
+        or file.key not in task.properties.files.keys
+        or not file.allowed(Action.VIEW, user=current_user)
+    ):
         return responses.not_found("File not found")
 
-    assets = _upload_assets_payload(request) or task.properties.files.preload
+    try:
+        assets = _upload_assets_payload(request) or task.properties.files.preload
+    except exceptions.ValidationError as error:
+        return responses.error(str(error))
     assets = _remove_file_from_assets(assets, file.urlsafe_key)
     task.properties.files.remove(file)
     task.save()
@@ -806,6 +987,14 @@ def patch(key, **kwargs):
             return responses.error("Field cannot be edited")
         if not field.editable:
             return responses.error("Field cannot be edited")
+        try:
+            task.validate_browser_submission_references(
+                {schema_id: value},
+                actor=current_user,
+                normalized=True,
+            )
+        except exceptions.ValidationError as error:
+            return responses.error(str(error))
         field = task.properties.submission.patch(schema_id, value)
         task.save_submission()
 
