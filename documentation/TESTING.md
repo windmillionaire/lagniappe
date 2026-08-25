@@ -49,8 +49,23 @@ venv/bin/python run.py test -v --tb=long
 ```
 
 Suite aliases expand only the documented suite names. Focused runs use real
-pytest paths or nodeids. When an alias and path are both present, the explicit
-path is the target.
+pytest paths or nodeids. Multiple aliases may be combined, but an alias and an
+explicit path/nodeid in the same command is rejected as ambiguous. Use only the
+path when narrowing an alias to one file or test.
+
+The runner asks pytest's configured built-in and installed-plugin parser which
+arguments are collection targets, so valued options such as `--color yes`,
+`--durations 10`, and `--browser chromium` cannot be mistaken for paths. Short,
+long, repeated, and `--name=value` forms follow pytest's normal parsing rules.
+An option-only command such as `test -k category` has no explicit target and
+therefore uses configured full-suite discovery, including E2E preflight.
+
+One `--` is accepted as the runner-to-pytest separator and is removed before
+pytest parsing. Use two (`-- --`) when pytest itself must receive an option
+terminator for a dash-prefixed path. Collection targets must be supplied
+directly: `--pyargs`, pytest argument files, and targets injected through
+`PYTEST_ADDOPTS` or config are rejected because they cannot form a reviewable
+runner selection.
 
 E2E targets enable strict unloaded-relation checks automatically. For another
 suite:

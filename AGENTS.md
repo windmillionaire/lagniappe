@@ -30,6 +30,9 @@ These instructions apply to the whole repository unless a more specific
   `venv/bin/python run.py test testing/tests_e2e/.../test_file.py::test_name`;
   do not use legacy numeric/domain shorthand like `003b`, `003b::test_name`,
   or `home`.
+- Do not combine a suite alias with an explicit path or nodeid in one command;
+  the runner rejects that selection as ambiguous. Use the path/nodeid alone for
+  focused checks.
 - Keep long or risky test runs cancellable: prefer focused real nodeids or one
   file at a time, expand only after probes pass, and avoid starting broad
   E2E/full suite runs unless the user explicitly asks for them.

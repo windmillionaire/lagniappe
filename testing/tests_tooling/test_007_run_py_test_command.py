@@ -1,5 +1,6 @@
 """Tooling tests for the ``run.py test`` command wrapper."""
 
+import ast
 import json
 import os
 from pathlib import Path
@@ -11,6 +12,7 @@ import pytest
 import yaml
 
 import run
+from runner import pytest_routing
 from testing.utility import traceability_common, traceability_results
 
 pytestmark = pytest.mark.tooling
@@ -566,32 +568,87 @@ def test_behavior_snapshot_fingerprints_style_records_independently(tmp_path):
     assert before["@style/label.default"] == after["@style/label.default"]
 
 
-def test_normalize_test_args_expands_supported_suite_aliases_only():
-    assert run.normalize_test_args(["unit"]) == (
-        False,
-        ["testing/tests_unit/"],
+# @pairs testing:cli-routing testing:pytest-options testing:target-selection
+@pytest.mark.parametrize(
+    ("arguments", "expected_args", "expected_targets", "includes_e2e"),
+    (
+        (
+            ["unit"],
+            ("testing/tests_unit/",),
+            ("testing/tests_unit/",),
+            False,
+        ),
+        (
+            ["--color", "yes"],
+            ("--color", "yes"),
+            (str(Path(run.__file__).parent),),
+            True,
+        ),
+        (
+            ["--durations", "10", "unit"],
+            ("--durations", "10", "testing/tests_unit/"),
+            ("testing/tests_unit/",),
+            False,
+        ),
+        (
+            ["e2e", "--browser", "chromium"],
+            ("--browser", "chromium", "testing/tests_e2e/"),
+            ("testing/tests_e2e/",),
+            True,
+        ),
+        (
+            ["--browser=chromium", "e2e"],
+            ("--browser=chromium", "testing/tests_e2e/"),
+            ("testing/tests_e2e/",),
+            True,
+        ),
+        (
+            ["--browser-failure-diagnostics", "e2e"],
+            ("--browser-failure-diagnostics", "testing/tests_e2e/"),
+            ("testing/tests_e2e/",),
+            True,
+        ),
+        (
+            ["unit", "-k", "unit"],
+            ("-k", "unit", "testing/tests_unit/"),
+            ("testing/tests_unit/",),
+            False,
+        ),
+        (
+            ["-k", "unit"],
+            ("-k", "unit"),
+            (str(Path(run.__file__).parent),),
+            True,
+        ),
+        (
+            ["-k=-unit", "unit"],
+            ("-k=-unit", "testing/tests_unit/"),
+            ("testing/tests_unit/",),
+            False,
+        ),
+        (
+            ["unit", "tooling", "-m", "not unfinished"],
+            (
+                "-m",
+                "not unfinished",
+                "testing/tests_unit/",
+                "testing/tests_tooling/",
+            ),
+            ("testing/tests_unit/", "testing/tests_tooling/"),
+            False,
+        ),
+    ),
+)
+def test_normalize_pytest_invocation_routes_registered_option_values(
+    arguments, expected_args, expected_targets, includes_e2e
+):
+    invocation = pytest_routing.normalize_pytest_invocation(
+        arguments, Path(run.__file__).parent
     )
-    assert run.normalize_test_args(["e2e"]) == (
-        False,
-        ["testing/tests_e2e/"],
-    )
-    assert run.normalize_test_args(["js"]) == (
-        False,
-        ["testing/tests_js/"],
-    )
-    assert run.normalize_test_args(["tooling"]) == (
-        False,
-        ["testing/tests_tooling/"],
-    )
-    assert run.normalize_test_args(["setup"]) == (
-        False,
-        run.TEST_SUITE_ALIASES["setup"],
-    )
-    assert all("setup_drift" not in path for path in run.TEST_SUITE_ALIASES["setup"])
-    opt_in_targets = {
-        target for targets in run.SETUP_OPT_IN_TESTS.values() for target in targets
-    }
-    assert opt_in_targets.isdisjoint(run.TEST_SUITE_ALIASES["setup"])
+
+    assert invocation.pytest_args == expected_args
+    assert invocation.collection_targets == expected_targets
+    assert invocation.includes_e2e is includes_e2e
 
 
 def test_setup_suite_inventory_classifies_every_setup_module_once():
@@ -604,7 +661,7 @@ def test_setup_suite_inventory_classifies_every_setup_module_once():
     }
     configured = [
         target
-        for targets in run.SETUP_TEST_GROUPS.values()
+        for targets in pytest_routing.SETUP_TEST_GROUPS.values()
         for target in targets
     ]
     configured_tooling = {
@@ -616,8 +673,23 @@ def test_setup_suite_inventory_classifies_every_setup_module_once():
     assert all((repository_root / target).is_file() for target in configured)
     assert (
         "testing/tests_tooling/test_001h_setup_ai_email.py"
-        in run.TEST_SUITE_ALIASES["setup"]
+        in pytest_routing.TEST_SUITE_ALIASES["setup"]
     )
+
+
+def test_pytest_cli_options_are_not_registered_in_suite_conftests():
+    repository_root = Path(run.__file__).parent
+    violations = []
+    for path in (repository_root / "testing").rglob("conftest.py"):
+        module = ast.parse(path.read_text(encoding="utf-8"))
+        if any(
+            isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef))
+            and node.name == "pytest_addoption"
+            for node in ast.walk(module)
+        ):
+            violations.append(path.relative_to(repository_root).as_posix())
+
+    assert violations == []
 
 
 # @features testing setup
@@ -634,68 +706,304 @@ def test_setup_suite_inventory_classifies_every_setup_module_once():
         ("provider", ("setup_drift", "setup_provider")),
     ),
 )
-def test_normalize_test_args_adds_setup_opt_in_targets_without_filenames(
+def test_normalize_pytest_invocation_adds_setup_opt_in_targets_without_filenames(
     marker_expression, expected_markers
 ):
-    _, normalized = run.normalize_test_args(["setup", "-m", marker_expression])
+    invocation = pytest_routing.normalize_pytest_invocation(
+        ["setup", "-m", marker_expression], Path(run.__file__).parent
+    )
 
-    expected_targets = [
+    expected_targets = tuple(pytest_routing.TEST_SUITE_ALIASES["setup"]) + tuple(
         target
         for marker in expected_markers
-        for target in run.SETUP_OPT_IN_TESTS[marker]
-    ]
-    assert normalized[: len(run.TEST_SUITE_ALIASES["setup"])] == (
-        run.TEST_SUITE_ALIASES["setup"]
+        for target in pytest_routing.SETUP_OPT_IN_TESTS[marker]
     )
-    assert normalized[
-        len(run.TEST_SUITE_ALIASES["setup"]) : -2
-    ] == expected_targets
-    assert normalized[-2] == "-m"
-    assert normalized[-1] == (
-        "setup_drift or setup_provider"
-        if marker_expression == "provider"
-        else marker_expression
-    )
+    assert invocation.collection_targets == expected_targets
+    assert invocation.pytest_args[:2] == ("-m", marker_expression)
+    assert invocation.pytest_args[2:] == expected_targets
+    assert invocation.includes_e2e is ("setup_provider" in expected_markers)
 
 
-def test_normalize_test_args_preserves_real_nodeids_and_drops_redundant_scope():
+def test_normalize_pytest_invocation_preserves_real_nodeids():
     target = "testing/tests_tooling/test_007_run_py_test_command.py::test_example"
 
-    assert run.normalize_test_args([target]) == (False, [target])
-    assert run.normalize_test_args(["tooling", target, "--tb=short"]) == (
-        False,
-        [target, "--tb=short"],
+    invocation = pytest_routing.normalize_pytest_invocation(
+        [target, "--tb=short"], Path(run.__file__).parent
+    )
+    assert invocation.pytest_args == ("--tb=short", target)
+    assert invocation.collection_targets == (target,)
+    assert invocation.includes_e2e is False
+
+
+def test_normalize_pytest_invocation_handles_strict_and_pytest_separator():
+    strict = pytest_routing.normalize_pytest_invocation(
+        ["--strict", "unit", "--tb=short"], Path(run.__file__).parent
+    )
+    assert strict.strict_relations is True
+    assert strict.pytest_args == ("--tb=short", "testing/tests_unit/")
+
+    passthrough = pytest_routing.normalize_pytest_invocation(
+        ["--", "-k", "category"], Path(run.__file__).parent
+    )
+    assert passthrough.pytest_args == ("-k", "category")
+    assert passthrough.includes_e2e is True
+
+    literal_target = pytest_routing.normalize_pytest_invocation(
+        ["--", "--", "--strict"], Path(run.__file__).parent
+    )
+    assert literal_target.strict_relations is False
+    assert literal_target.pytest_args == ("--", "--strict")
+    assert literal_target.collection_targets == ("--strict",)
+
+
+# @pairs testing:cli-routing testing:pytest-options testing:target-selection
+@pytest.mark.parametrize(
+    "arguments",
+    (
+        ["tooling", "testing/tests_tooling/test_007_run_py_test_command.py"],
+        ["--pyargs", "testing.tests_unit"],
+        ["@test-targets.txt"],
+        ["-p", "no:runner.pytest_routing", "unit"],
+    ),
+)
+def test_normalize_pytest_invocation_rejects_ambiguous_or_indirect_targets(
+    arguments,
+):
+    with pytest.raises(pytest_routing.PytestRoutingError):
+        pytest_routing.normalize_pytest_invocation(
+            arguments, Path(run.__file__).parent
+        )
+
+
+def test_normalize_pytest_invocation_rejects_hidden_addopts_targets(monkeypatch):
+    monkeypatch.setenv("PYTEST_ADDOPTS", "testing/tests_unit/")
+
+    with pytest.raises(pytest_routing.PytestRoutingError, match="PYTEST_ADDOPTS"):
+        pytest_routing.normalize_pytest_invocation([], Path(run.__file__).parent)
+
+
+def _configured_value_option_cases(tmp_path):
+    from _pytest.config import _prepareconfig
+
+    repository_root = Path(run.__file__).parent
+    config = _prepareconfig(
+        ["-c", pytest_routing.PYTEST_CONFIG, "--noconftest"],
+        plugins=[pytest_routing, traceability_results],
+        prog="run.py test",
+    )
+    special_values = {
+        "basetemp": str(tmp_path / "pytest-base"),
+        "base_url": "https://example.test",
+        "cacheshow": "*",
+        "confcutdir": str(repository_root),
+        "debug": str(tmp_path / "pytest-debug.log"),
+        "inifilename": str(repository_root / pytest_routing.PYTEST_CONFIG),
+        "keyword": "unit-value",
+        "log_auto_indent": "1",
+        "log_cli_level": "INFO",
+        "log_file": str(tmp_path / "pytest.log"),
+        "log_file_level": "INFO",
+        "log_level": "INFO",
+        "markexpr": "not unfinished",
+        "override_ini": "addopts=",
+        "plugins": "no:terminalprogress",
+        "pythonwarnings": "default",
+        "rootdir": str(repository_root),
+        "usepdb_cls": "pdb:Pdb",
+        "xmlpath": str(tmp_path / "junit.xml"),
+    }
+    try:
+        cases = []
+        for action in config._parser.optparser._actions:
+            if not action.option_strings or action.nargs == 0:
+                continue
+            option = next(
+                (
+                    candidate
+                    for candidate in action.option_strings
+                    if candidate.startswith("--")
+                ),
+                action.option_strings[0],
+            )
+            if action.dest in special_values:
+                value = special_values[action.dest]
+            elif action.choices:
+                value = str(next(iter(action.choices)))
+            elif action.type is int:
+                value = "1"
+            elif action.type is float:
+                value = "0.1"
+            else:
+                value = "routing-value"
+            cases.append((option, value, action.nargs))
+        return cases
+    finally:
+        config._ensure_unconfigure()
+
+
+def test_normalize_pytest_invocation_routes_every_registered_valued_option(
+    tmp_path,
+):
+    repository_root = Path(run.__file__).parent
+    cases = _configured_value_option_cases(tmp_path)
+    option_names = {option for option, _value, _nargs in cases}
+
+    assert {
+        "--base-url",
+        "--browser",
+        "--color",
+        "--durations",
+    }.issubset(option_names)
+    assert len(cases) >= 50
+
+    for option, value, nargs in cases:
+        invocation = pytest_routing.normalize_pytest_invocation(
+            [option, value, "unit"], repository_root
+        )
+        assert invocation.collection_targets == ("testing/tests_unit/",), option
+        assert invocation.pytest_args[-1] == "testing/tests_unit/", option
+        assert invocation.includes_e2e is False, option
+
+        if option.startswith("--") and nargs in {None, "?"}:
+            equals_invocation = pytest_routing.normalize_pytest_invocation(
+                [f"{option}={value}", "unit"], repository_root
+            )
+            assert equals_invocation.collection_targets == (
+                "testing/tests_unit/",
+            ), option
+
+
+def test_normalize_pytest_invocation_isolates_parser_imports_and_cwd(
+    monkeypatch, tmp_path
+):
+    repository_root = Path(run.__file__).parent
+    monkeypatch.chdir(tmp_path)
+    before = set(sys.modules)
+
+    invocation = pytest_routing.normalize_pytest_invocation(
+        ["--color", "yes", "unit"], repository_root
+    )
+
+    assert Path.cwd() == tmp_path
+    assert invocation.collection_targets == ("testing/tests_unit/",)
+    imported = set(sys.modules) - before
+    assert not any(
+        module == "config"
+        or module.startswith("lagniappe")
+        or module.startswith("testing.tests_e2e.conftest")
+        or module.startswith("testing.tests_unit.conftest")
+        for module in imported
     )
 
 
-def test_normalize_test_args_handles_strict_and_pytest_separator():
-    assert run.normalize_test_args(["--strict", "unit"]) == (
-        True,
-        ["testing/tests_unit/"],
+# @pairs testing:cli-routing testing:target-selection
+def test_normalized_targets_control_actual_pytest_collection(
+    monkeypatch, tmp_path
+):
+    (tmp_path / "testing/tests_unit").mkdir(parents=True)
+    (tmp_path / "testing/tests_e2e").mkdir(parents=True)
+    (tmp_path / "pytest.ini").write_text(
+        "[pytest]\n"
+        "testpaths =\n"
+        "    testing/tests_unit\n"
+        "    testing/tests_e2e\n",
+        encoding="utf-8",
     )
-    assert run.normalize_test_args(["--", "-k", "category"]) == (
-        False,
-        ["-k", "category"],
+    (tmp_path / "testing/tests_unit/test_unit_sample.py").write_text(
+        "def test_unit_sample():\n    pass\n", encoding="utf-8"
     )
-    assert run.normalize_test_args(["-k", "unit"]) == (
-        False,
-        ["-k", "unit"],
+    (tmp_path / "testing/tests_e2e/test_e2e_sample.py").write_text(
+        "def test_e2e_sample():\n    pass\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(pytest_routing, "PYTEST_CONFIG", "pytest.ini")
+
+    requests = (
+        (
+            ["--color", "no", "unit"],
+            "test_unit_sample.py::test_unit_sample",
+            "test_e2e_sample.py::test_e2e_sample",
+            False,
+        ),
+        (
+            ["e2e", "--browser", "chromium"],
+            "test_e2e_sample.py::test_e2e_sample",
+            "test_unit_sample.py::test_unit_sample",
+            True,
+        ),
+    )
+    environment = os.environ.copy()
+    environment.pop("PYTEST_ADDOPTS", None)
+    repository_root = Path(run.__file__).parent
+    existing_pythonpath = environment.get("PYTHONPATH")
+    environment["PYTHONPATH"] = os.pathsep.join(
+        part
+        for part in (str(repository_root), existing_pythonpath)
+        if part
+    )
+    for arguments, selected, excluded, includes_e2e in requests:
+        invocation = pytest_routing.normalize_pytest_invocation(
+            arguments, tmp_path
+        )
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "-c",
+                "pytest.ini",
+                "-p",
+                pytest_routing.PYTEST_ROUTING_PLUGIN,
+                "--collect-only",
+                "-q",
+                *invocation.pytest_args,
+            ],
+            cwd=tmp_path,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, result.stderr + result.stdout
+        assert selected in result.stdout
+        assert excluded not in result.stdout
+        assert invocation.includes_e2e is includes_e2e
+
+
+# @pairs testing:pytest-markers setup:pytest-markers
+def test_pytest_routing_plugin_normalizes_provider_marker_tokens():
+    config = types.SimpleNamespace(
+        option=types.SimpleNamespace(markexpr="provider and not ai_provider")
+    )
+
+    pytest_routing.pytest_configure(config)
+
+    assert config.option.markexpr == (
+        "(setup_drift or setup_provider) and not ai_provider"
     )
 
 
-def test_normalize_test_args_does_not_expand_legacy_shorthand():
-    legacy_args = [
-        "003b",
-        "003b::test_preview_panel",
-        "home",
-        "pages",
-        "-unit",
-        "-e2e",
-        "-js",
-        "-tooling",
-    ]
+def test_run_py_test_argument_errors_stop_before_preflight(monkeypatch, capsys):
+    monkeypatch.setattr(
+        run,
+        "configure_test_environment",
+        lambda **kwargs: pytest.fail("argument errors must skip environment setup"),
+    )
+    monkeypatch.setattr(
+        run,
+        "activate_repository_gcloud",
+        lambda **kwargs: pytest.fail("argument errors must skip gcloud setup"),
+    )
+    monkeypatch.setattr(
+        run,
+        "_run_pytest_subprocess",
+        lambda command: pytest.fail("argument errors must skip pytest"),
+    )
 
-    assert run.normalize_test_args(legacy_args) == (False, legacy_args)
+    assert run.run_tests(
+        ["tooling", "testing/tests_tooling/test_007_run_py_test_command.py"]
+    ) == 4
+    assert "suite aliases cannot be combined" in capsys.readouterr().err
 
 
 def test_configure_test_environment_prepares_frontend_only_for_e2e(monkeypatch):
@@ -708,13 +1016,11 @@ def test_configure_test_environment_prepares_frontend_only_for_e2e(monkeypatch):
     monkeypatch.setitem(sys.modules, "config", config_module)
     monkeypatch.setitem(sys.modules, "runner.testing", testing_module)
 
-    run.configure_test_environment(["testing/tests_unit/"])
+    run.configure_test_environment(includes_e2e=False)
     assert calls == []
 
-    run.configure_test_environment(
-        ["testing/tests_e2e/001_site/test_001d_offline.py::test_offline"]
-    )
-    run.configure_test_environment([])
+    run.configure_test_environment(includes_e2e=True)
+    run.configure_test_environment(includes_e2e=True)
 
     assert calls == ["bundle", "bundle"]
 
@@ -817,12 +1123,9 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
     )
     monkeypatch.setattr(run.subprocess, "Popen", fake_popen)
 
-    assert (
-        run.run_tests(
-            ["tooling", "testing/tests_tooling/test_007_run_py_test_command.py"]
-        )
-        == 3
-    )
+    assert run.run_tests(
+        ["testing/tests_tooling/test_007_run_py_test_command.py"]
+    ) == 3
 
     command, kwargs = calls[0]
     assert command == [
@@ -833,6 +1136,8 @@ def test_run_py_test_invokes_pytest_subprocess_with_shared_config(monkeypatch, c
         "testing/pytest.ini",
         "-p",
         "testing.utility.traceability_results",
+        "-p",
+        "runner.pytest_routing",
         "testing/tests_tooling/test_007_run_py_test_command.py",
     ]
     assert kwargs == {
@@ -855,7 +1160,7 @@ def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
     monkeypatch.setattr(
         run,
         "configure_test_environment",
-        lambda args: calls.append(("environment", args)),
+        lambda **kwargs: calls.append(("environment", kwargs)),
     )
     monkeypatch.setattr(
         run,
@@ -871,7 +1176,7 @@ def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
 
     assert run.run_tests(["e2e"]) == 0
     assert calls[:2] == [
-        ("environment", ["testing/tests_e2e/"]),
+        ("environment", {"includes_e2e": True}),
         (
             "gcloud",
             {
@@ -884,7 +1189,7 @@ def test_run_py_e2e_aligns_adc_before_pytest(monkeypatch):
 
 
 def test_run_py_e2e_adc_mismatch_stops_before_pytest(monkeypatch, capsys):
-    monkeypatch.setattr(run, "configure_test_environment", lambda args: None)
+    monkeypatch.setattr(run, "configure_test_environment", lambda **kwargs: None)
     monkeypatch.setattr(
         run,
         "activate_repository_gcloud",
@@ -1810,6 +2115,11 @@ def _release_check_repository(tmp_path: Path) -> Path:
             (Path(run.__file__).parent / "runner" / "gcloud.py").read_text(
                 encoding="utf-8"
             )
+        ),
+        "runner/pytest_routing.py": (
+            (
+                Path(run.__file__).parent / "runner" / "pytest_routing.py"
+            ).read_text(encoding="utf-8")
         ),
         "run.py": Path(run.__file__).read_text(encoding="utf-8"),
         "package.json": '{"name": "lagniappe", "version": "0.1.0"}\n',

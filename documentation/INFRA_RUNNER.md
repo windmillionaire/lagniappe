@@ -36,7 +36,7 @@ provider provisioning.
 
 | Command | Owner |
 | --- | --- |
-| `run.py test ...` | `runner/testing.py` and pytest configuration. |
+| `run.py test ...` | `runner/pytest_routing.py`, `runner/testing.py`, and pytest configuration. |
 | `run.py test-server ...` | Managed Flask server and test-data lifecycle. |
 | `run.py browser-review ...` | Browser evidence and curated report tools. |
 | `run.py traceability ...` | Source/test/template/style evidence. |
@@ -50,6 +50,13 @@ provider provisioning.
 
 Testing commands and server concurrency rules are in [TESTING.md](TESTING.md).
 Hosted infrastructure is in [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md).
+
+`run.py test` resolves targets with pytest's configured built-in and installed
+plugin parser while suppressing conftest loading during this preflight parse.
+The resulting immutable target selection drives alias expansion, strict-load
+policy, frontend preparation, ADC requirements, and the final pytest command.
+Project CLI options that must participate in routing are registered by the
+lightweight `runner.pytest_routing` plugin rather than suite conftests.
 
 ## Development server
 

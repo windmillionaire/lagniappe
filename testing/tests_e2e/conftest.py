@@ -170,15 +170,6 @@ def _hosted_e2e_browser_cookie(run_id):
     }
 
 
-def pytest_addoption(parser):
-    group = parser.getgroup("lagniappe-e2e")
-    group.addoption(
-        "--browser-failure-diagnostics",
-        action="store_true",
-        help="Record browser failures without making them teardown failures.",
-    )
-
-
 @contextmanager
 def _e2e_session_lock():
     """Prevent overlapping E2E sessions from sharing one test server."""

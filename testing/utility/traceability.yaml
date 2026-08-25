@@ -49,6 +49,7 @@ annotated_source_roots:
   - runner/gcloud.py
   - runner/icons.py
   - runner/process.py
+  - runner/pytest_routing.py
   - runner/testing.py
   - runner/upgrade.py
   - runner/hosted_e2e.py

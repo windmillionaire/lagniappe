@@ -16,25 +16,16 @@ from runner.context import (
     format_command,
 )
 from runner.gcloud import activate_repository_gcloud
+from runner.pytest_routing import (
+    PYTEST_CONFIG,
+    PYTEST_ROUTING_PLUGIN,
+    TRACEABILITY_RESULTS_PLUGIN,
+    PytestRoutingError,
+    normalize_pytest_invocation,
+)
 
 if len(sys.argv) > 1 and sys.argv[1] in {"browser-review", "test", "test-server"}:
     os.environ["FLASK_ENV"] = "testing"
-
-
-def includes_e2e_tests(test_args: list[str]) -> bool:
-    """Return whether normalized pytest arguments include the E2E suite."""
-    target_indexes = _positional_arg_indexes(test_args)
-    targets = [test_args[index] for index in sorted(target_indexes)]
-    normalized_targets = [
-        target.replace("\\", "/").split("::", 1)[0].rstrip("/")
-        for target in targets
-    ]
-    return not normalized_targets or any(
-        target == "testing/tests_e2e"
-        or target.startswith("testing/tests_e2e/")
-        or "/testing/tests_e2e/" in target
-        for target in normalized_targets
-    )
 
 
 # @testable false
@@ -55,76 +46,15 @@ def hosted_e2e_enabled() -> bool:
 # @tests tests_tooling/test_007_run_py_test_command.py::test_hosted_e2e_runner_skips_local_build_and_gcloud_activation
 # @features testing hosted-e2e
 # @dimensions cli-routing frontend-build
-def configure_test_environment(test_args: list[str]) -> None:
+def configure_test_environment(*, includes_e2e: bool) -> None:
     """Set test env vars before pytest imports the app package."""
     os.environ["FLASK_ENV"] = "testing"
-    if includes_e2e_tests(test_args) and not hosted_e2e_enabled():
+    if includes_e2e and not hosted_e2e_enabled():
         from runner.testing import ensure_test_frontend_bundle
 
         ensure_test_frontend_bundle()
 
 
-PYTEST_CONFIG = "testing/pytest.ini"
-TRACEABILITY_RESULTS_PLUGIN = "testing.utility.traceability_results"
-SETUP_TEST_GROUPS = {
-    "ordinary": (
-        "testing/tests_tooling/test_001a_setup_validation_config.py",
-        "testing/tests_tooling/test_001b_setup_providers.py",
-        "testing/tests_tooling/test_001c_setup_runtime_resources.py",
-        "testing/tests_tooling/test_001e_setup_orchestration.py",
-        "testing/tests_tooling/test_001f_setup_portability.py",
-        "testing/tests_tooling/test_001g_setup_release_readiness.py",
-        "testing/tests_tooling/test_001h_setup_ai_email.py",
-    ),
-    "setup_drift": ("testing/tests_tooling/test_001d_setup_drift.py",),
-    "setup_provider": (
-        "testing/tests_e2e/001_site/test_001g_setup_provider_contracts.py",
-    ),
-}
-TEST_SUITE_ALIASES = {
-    "unit": ["testing/tests_unit/"],
-    "e2e": ["testing/tests_e2e/"],
-    "js": ["testing/tests_js/"],
-    "tooling": ["testing/tests_tooling/"],
-    "setup": list(SETUP_TEST_GROUPS["ordinary"]),
-}
-SETUP_OPT_IN_TESTS = {
-    marker: targets
-    for marker, targets in SETUP_TEST_GROUPS.items()
-    if marker != "ordinary"
-}
-PYTEST_OPTIONS_WITH_VALUES = {
-    "-c",
-    "-k",
-    "-m",
-    "-o",
-    "--basetemp",
-    "--confcutdir",
-    "--deselect",
-    "--ignore",
-    "--ignore-glob",
-    "--import-mode",
-    "--junit-prefix",
-    "--junit-xml",
-    "--junitxml",
-    "--lfnf",
-    "--log-cli-date-format",
-    "--log-cli-format",
-    "--log-cli-level",
-    "--log-date-format",
-    "--log-file",
-    "--log-file-date-format",
-    "--log-file-format",
-    "--log-file-level",
-    "--log-format",
-    "--log-level",
-    "--maxfail",
-    "--override-ini",
-    "--pastebin",
-    "--rootdir",
-    "--tb",
-    "--verbosity",
-}
 RELEASES_DIR = REPOSITORY_ROOT / "documentation/releases"
 REPORTING_PRIVACY_MARKDOWN_PATH = REPOSITORY_ROOT / "ERROR_REPORTING_PRIVACY.md"
 REPORTING_PRIVACY_TEMPLATE_PATH = (
@@ -144,89 +74,6 @@ RELEASE_VERSION_PATTERN = re.compile(
 RELEASE_BUILD_ID_PATTERN = re.compile(r"^b[0-9a-f]{7}$")
 
 
-def _strip_runner_args(test_args: list[str]) -> tuple[bool, list[str]]:
-    strict_relations = "--strict" in test_args
-    pytest_args = [arg for arg in test_args if arg not in {"--strict", "--"}]
-    return strict_relations, pytest_args
-
-
-def _positional_arg_indexes(args: list[str]) -> set[int]:
-    indexes = set()
-    skip_next = False
-    for index, arg in enumerate(args):
-        if skip_next:
-            skip_next = False
-            continue
-        if arg in PYTEST_OPTIONS_WITH_VALUES:
-            skip_next = True
-            continue
-        if arg.startswith("-"):
-            continue
-        indexes.add(index)
-    return indexes
-
-
-# @testable true
-# @tests tests_tooling/test_007_run_py_test_command.py::test_normalize_test_args_adds_setup_opt_in_targets_without_filenames
-# @features testing setup
-# @dimensions cli-routing pytest-markers opt-in
-def _resolve_setup_opt_in_args(args: list[str]) -> tuple[list[str], list[str]]:
-    """Resolve setup opt-in markers to their otherwise uncollected test files."""
-    resolved_args = list(args)
-    selected_markers = set()
-
-    for index, arg in enumerate(resolved_args[:-1]):
-        if arg != "-m":
-            continue
-
-        marker_expression = resolved_args[index + 1]
-        if marker_expression == "provider":
-            marker_expression = "setup_drift or setup_provider"
-            resolved_args[index + 1] = marker_expression
-
-        marker_tokens = set(
-            re.findall(r"[A-Za-z_][A-Za-z0-9_]*", marker_expression)
-        )
-        selected_markers.update(marker_tokens.intersection(SETUP_OPT_IN_TESTS))
-
-    targets = []
-    for marker in SETUP_OPT_IN_TESTS:
-        if marker in selected_markers:
-            targets.extend(SETUP_OPT_IN_TESTS[marker])
-
-    return resolved_args, targets
-
-
-def normalize_test_args(test_args: list[str]) -> tuple[bool, list[str]]:
-    """Normalize runner-only flags and suite aliases for pytest."""
-    strict_relations, pytest_args = _strip_runner_args(test_args)
-    positional_indexes = _positional_arg_indexes(pytest_args)
-    setup_alias_requested = any(
-        pytest_args[index] == "setup" for index in positional_indexes
-    )
-    setup_opt_in_targets = []
-    if setup_alias_requested:
-        pytest_args, setup_opt_in_targets = _resolve_setup_opt_in_args(pytest_args)
-        positional_indexes = _positional_arg_indexes(pytest_args)
-
-    has_explicit_target = any(
-        pytest_args[index] not in TEST_SUITE_ALIASES for index in positional_indexes
-    )
-
-    normalized = []
-    for index, arg in enumerate(pytest_args):
-        if index in positional_indexes and arg in TEST_SUITE_ALIASES:
-            if has_explicit_target:
-                continue
-            normalized.extend(TEST_SUITE_ALIASES[arg])
-            if arg == "setup":
-                normalized.extend(setup_opt_in_targets)
-            continue
-        normalized.append(arg)
-
-    return strict_relations, normalized
-
-
 def pytest_command(pytest_args: list[str]) -> list[str]:
     return [
         sys.executable,
@@ -236,6 +83,8 @@ def pytest_command(pytest_args: list[str]) -> list[str]:
         PYTEST_CONFIG,
         "-p",
         TRACEABILITY_RESULTS_PLUGIN,
+        "-p",
+        PYTEST_ROUTING_PLUGIN,
         *pytest_args,
     ]
 
@@ -289,17 +138,21 @@ def run_tests(test_args: list[str]) -> int:
         python run.py test --strict unit
         python run.py test -- -k "keyword"
     """
-    strict_relations, pytest_args = normalize_test_args(test_args)
-    if strict_relations or includes_e2e_tests(pytest_args):
+    try:
+        invocation = normalize_pytest_invocation(test_args, REPOSITORY_ROOT)
+    except PytestRoutingError as error:
+        print(f"Test argument error: {error}", file=sys.stderr)
+        return 4
+
+    if invocation.strict_relations or invocation.includes_e2e:
         os.environ["STRICT_RELATION_LOADS"] = "1"
 
-    configure_test_environment(pytest_args)
-    e2e_tests = includes_e2e_tests(pytest_args)
+    configure_test_environment(includes_e2e=invocation.includes_e2e)
     if not hosted_e2e_enabled():
         try:
             activate_repository_gcloud(
-                ensure_adc=e2e_tests,
-                allow_runtime_adc=e2e_tests,
+                ensure_adc=invocation.includes_e2e,
+                allow_runtime_adc=invocation.includes_e2e,
                 allow_adc_login=False,
             )
         except RuntimeError as error:
@@ -311,7 +164,7 @@ def run_tests(test_args: list[str]) -> int:
         [sys.executable, str(REPOSITORY_ROOT / "run.py"), "test", *test_args]
     )
     try:
-        return _run_pytest_subprocess(pytest_command(pytest_args))
+        return _run_pytest_subprocess(pytest_command(list(invocation.pytest_args)))
     finally:
         if previous_command is None:
             os.environ.pop(command_variable, None)
