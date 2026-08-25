@@ -6,6 +6,7 @@ from redis import WatchError
 
 from .core import cache
 from .notification_state import (
+    clear_recorded_notification_states as clear_recorded_notification_states,
     decode as _decode,
     group_mutations as _group_mutations,
     member_ids as _member_ids,
@@ -13,6 +14,7 @@ from .notification_state import (
     public_notification_state,
     record as _record,
     redis_keys as _redis_keys,
+    take_recorded_notification_state as take_recorded_notification_state,
     user_id as _user_id,
     write_mapping as _write_mapping,
 )
