@@ -183,8 +183,8 @@ class UserPage(RelatedEntityMixin, DBProperty):
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_project
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_file
-# @tests tests_unit/test_009a_user.py::test_user_starred_cleanup_removes_stale_keys
-# @matrix starred : category file page project stale-cleanup
+# @tests tests_unit/test_009a_user.py::test_user_starred_key_removal_preserves_order
+# @matrix starred : category file key-removal page project
 class Starred(RelatedEntityListMixin, DBProperty):
     """Entities the user has starred (bookmarked).
 

@@ -12,7 +12,7 @@ from lagniappe.core.tools.polling.projections import (
     render_operation_statuses,
 )
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
-from lagniappe.web.auth import home_permission, logged_in, permission, require_ai_access
+from lagniappe.web.auth import home_permission, logged_in, require_ai_access
 from lagniappe.web import responses
 
 from . import home, internal
@@ -200,17 +200,28 @@ def delete_activity(key):
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_page
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_file
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_route_rejects_inaccessible_and_missing_targets
-# @matrix starred : authorization category file missing-target no-mutation page project
+# @matrix starred : add-authorization category file missing-target no-mutation page project unavailable-removal
 @internal.route("/toggle-star/<key>", methods=["PATCH"])
-@permission(requested=Action.VIEW)
-def toggle_star(key, **kwargs):
+@logged_in
+def toggle_star(key):
     """Toggle starred status for an entity.
 
-    Returns JSON with the new starred status. Client updates
-    the star control state.
+    Removing a stored key mutates only the authenticated user's own starred
+    list, so it remains available when the target is inaccessible or missing.
+    Adding a key still requires VIEW access to an existing entity.
     """
-    entity = kwargs["entity"]
-    starred = current_user.properties.starred.toggle_star(entity)
+    stored_key = database.get.datastore_key(key)
+    if stored_key in current_user.properties.starred.keys:
+        current_user.properties.starred.delete_starred_keys([stored_key])
+        starred = False
+    else:
+        entity = Entities.fetch_one(key, request=Fetch.direct())
+        if entity is None:
+            abort(404)
+        if not entity.allowed(Action.VIEW, user=current_user):
+            abort(403)
+        starred = current_user.properties.starred.add(entity)
+
     current_user.save()
 
     return responses.json_response({"starred": starred})

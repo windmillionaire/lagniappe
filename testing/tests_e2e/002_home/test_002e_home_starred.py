@@ -28,11 +28,14 @@ PATCH to /l/toggle-star/<key>. The client updates both the hidden title-menu
 source and its portal clone so an already-created menu stays current.
 """
 
+from uuid import uuid4
+
 import pytest
 from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
+from lagniappe.core.tools import database
 from testing.definitions import (
     Categories,
     Pages,
@@ -265,7 +268,8 @@ def test_star_file(get_user):
     _title_star_action(user, "File actions", "Star")
 
 
-# @matrix starred : authorization missing-target no-mutation retained-inaccessible
+# @matrix starred : add-authorization inaccessible-placeholder missing-placeholder missing-target no-mutation retained-inaccessible unavailable-removal
+# @template home/starred.html::list
 @pytest.mark.e2e
 def test_star_route_rejects_inaccessible_and_missing_targets(
     get_user, browser_failures
@@ -306,24 +310,48 @@ def test_star_route_rejects_inaccessible_and_missing_targets(
     assert target_after.fingerprint == target_fingerprint
     assert target_after.modified == target_modified
 
-    saved_user.db["starred"] = [target_after.key]
+    deleted_key = database.create_named_key(
+        "page", f"missing-star-{uuid4().hex}"
+    )
+    deleted_urlsafe_key = database.get.urlsafe_key(deleted_key)
+    deleted_path = f"/l/toggle-star/{deleted_urlsafe_key}"
+    saved_user.db["starred"] = [target_after.key, deleted_key]
     saved_user.save()
 
     home = restricted.go(SitePages.HOME)
-    expect(restricted.locate(home.STARRED_COUNT)).to_have_text("1")
+    expect(restricted.locate(home.STARRED_COUNT)).to_have_text("2")
     toggle = restricted.locate(home.STARRED_LIST_TOGGLE)
     with restricted.page.expect_response("**/l/get/starred"):
         toggle.click()
     starred = restricted.locate(home.STARRED_LIST)
     expect(starred).to_have_attribute("loaded", "")
-    expect(starred).not_to_be_visible()
-    expect(
-        starred.locator(f"li[lp-entity][data-key='{target.key}']")
-    ).not_to_be_attached()
+    expect(starred).to_be_visible()
+    inaccessible = starred.locator(
+        f"li[data-role='unavailable-starred-item'][data-key='{target.key}']"
+    )
+    expect(inaccessible).to_have_attribute("data-state", "inaccessible")
+    expect(inaccessible).to_contain_text("no longer accessible")
+    missing = starred.locator(
+        "li[data-role='unavailable-starred-item']"
+        f"[data-key='{deleted_urlsafe_key}']"
+    )
+    expect(missing).to_have_attribute("data-state", "missing")
+    expect(missing).to_contain_text("no longer exists")
+
+    with restricted.page.expect_response(f"**{forbidden_path}"):
+        inaccessible.get_by_role("button", name="Unstar").click()
+    expect(inaccessible).not_to_be_attached()
+    expect(restricted.locate(home.STARRED_COUNT)).to_have_text("1")
+
+    with restricted.page.expect_response(f"**{deleted_path}"):
+        missing.get_by_role("button", name="Unstar").click()
+    expect(missing).not_to_be_attached()
     expect(restricted.locate(home.STARRED_COUNT)).to_have_text("0")
+    expect(starred).not_to_be_visible()
     expect(toggle).to_contain_class("pointer-events-none")
     saved_user = Entities.USER.load(restricted.email)
-    assert target_after.key in saved_user.db.get("starred", [])
+    assert target_after.key not in saved_user.db.get("starred", [])
+    assert deleted_key not in saved_user.db.get("starred", [])
 
     saved_user.db["starred"] = starred_before
     saved_user.save()

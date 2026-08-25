@@ -177,10 +177,10 @@ class TaskList(HomeProperty):
 
 
 # @testable true
-# @tests tests_unit/test_002i_home_properties.py::test_home_starred_list_paginates_and_cleans_stale_keys
+# @tests tests_unit/test_002i_home_properties.py::test_home_starred_list_paginates_and_marks_missing_keys
 # @tests tests_unit/test_002i_home_properties.py::test_home_starred_list_hides_but_retains_inaccessible_keys
 # @tests tests_e2e/002_home/test_002e_home_starred.py::test_star_route_rejects_inaccessible_and_missing_targets
-# @matrix starred : pagination retained-inaccessible stale-cleanup view-authorization
+# @matrix starred : inaccessible-placeholder missing-placeholder pagination retained-inaccessible view-authorization
 class StarredList(HomeProperty):
     _id = "starred"
     _label = "Starred"
@@ -205,19 +205,40 @@ class StarredList(HomeProperty):
 
         loaded = Entities.fetch(*starred, request=Fetch.direct())
 
-        loaded_keys = {entity.key for entity in loaded}
-        deleted = [s for s in starred if s not in loaded_keys]
-        if deleted:
-            current_user.properties.starred.delete_starred_keys(deleted)
-            current_user.save()
-
-        self._list = [
-            entity
-            for entity in loaded
-            if entity.allowed(Action.VIEW, user=current_user)
-        ]
+        loaded_by_key = {entity.key: entity for entity in loaded}
+        self._list = []
+        self._items = []
+        for key in starred:
+            entity = loaded_by_key.get(key)
+            urlsafe_key = database.get.urlsafe_key(key)
+            if entity is None:
+                item = {
+                    "key": urlsafe_key,
+                    "state": "missing",
+                    "message": "This starred item no longer exists.",
+                }
+                self._items.append(item)
+            elif entity.allowed(Action.VIEW, user=current_user):
+                self._list.append(entity)
+                self._items.append({"entity": entity, "key": urlsafe_key})
+            else:
+                kind = str(getattr(entity, "kind", None) or "item").replace(
+                    "_", " "
+                )
+                item = {
+                    "key": urlsafe_key,
+                    "state": "inaccessible",
+                    "message": f"This {kind} is no longer accessible.",
+                }
+                self._items.append(item)
         self._cursor = next_cursor
         return self._list
+
+    @property
+    def items(self):
+        if super().list is UNSET:
+            _ = self.list
+        return self._items
 
     @property
     def count(self):

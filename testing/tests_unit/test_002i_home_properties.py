@@ -241,9 +241,9 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
     assert count_requests == ["user-page"]
 
 
-# @matrix starred : pagination stale-cleanup view-authorization
+# @matrix starred : missing-placeholder pagination view-authorization
 @pytest.mark.unit
-def test_home_starred_list_paginates_and_cleans_stale_keys(monkeypatch):
+def test_home_starred_list_paginates_and_marks_missing_keys(monkeypatch):
     class FakeStarred:
         def __init__(self, keys):
             self.keys = list(keys)
@@ -283,6 +283,11 @@ def test_home_starred_list_paginates_and_cleans_stale_keys(monkeypatch):
 
     monkeypatch.setattr(home_properties, "current_user", user)
     monkeypatch.setattr(home_properties.Entities, "fetch", load_entities)
+    monkeypatch.setattr(
+        home_properties.database.get,
+        "urlsafe_key",
+        lambda key: f"urlsafe:{key}",
+    )
 
     section = home_properties.StarredList()
     loaded = section.list
@@ -291,18 +296,28 @@ def test_home_starred_list_paginates_and_cleans_stale_keys(monkeypatch):
     assert [entity.key for entity in loaded] == [
         key for key in starred_keys[:10] if key != stale_key
     ]
-    assert starred.deleted == [stale_key]
-    assert stale_key not in starred.keys
+    assert [item for item in section.items if "entity" not in item] == [
+        {
+            "key": f"urlsafe:{stale_key}",
+            "state": "missing",
+            "message": "This starred item no longer exists.",
+        }
+    ]
+    assert [item.get("key") for item in section.items] == [
+        f"urlsafe:{key}" for key in starred_keys[:10]
+    ]
+    assert starred.deleted == []
+    assert stale_key in starred.keys
     assert section.cursor == 1
-    assert section.count == 11
-    assert user.saved is True
+    assert section.count == 12
+    assert user.saved is False
     assert all(
         entity.allowed_requests == [(home_properties.Action.VIEW, user)]
         for entity in loaded
     )
 
 
-# @matrix starred : retained-inaccessible view-authorization
+# @matrix starred : inaccessible-placeholder retained-inaccessible view-authorization
 @pytest.mark.unit
 def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
     class FakeEntity:
@@ -339,13 +354,35 @@ def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
         "fetch",
         lambda *keys, request: [visible, restricted],
     )
+    monkeypatch.setattr(
+        home_properties.database.get,
+        "urlsafe_key",
+        lambda key: f"urlsafe:{key}",
+    )
 
     section = home_properties.StarredList()
 
     assert section.list == [visible]
-    assert starred.deleted == ["missing"]
-    assert starred.keys == ["visible", "restricted"]
-    assert section.count == 2
+    assert [item for item in section.items if "entity" not in item] == [
+        {
+            "key": "urlsafe:restricted",
+            "state": "inaccessible",
+            "message": "This item is no longer accessible.",
+        },
+        {
+            "key": "urlsafe:missing",
+            "state": "missing",
+            "message": "This starred item no longer exists.",
+        },
+    ]
+    assert [item.get("entity", item.get("key")) for item in section.items] == [
+        visible,
+        "urlsafe:restricted",
+        "urlsafe:missing",
+    ]
+    assert starred.deleted == []
+    assert starred.keys == ["visible", "restricted", "missing"]
+    assert section.count == 3
 
 
 # @matrix ai-report home : ingress list notes query tools

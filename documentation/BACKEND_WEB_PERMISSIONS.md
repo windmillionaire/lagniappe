@@ -49,11 +49,14 @@ Other access decorators:
 | `@logged_in` | Authentication without a resource-wide permission check. |
 | `@home_permission()` | Home access plus the route or starred fingerprint. |
 
-Star mutation is an entity route protected by `@permission(requested=VIEW)`:
-missing targets return 404 and existing targets the user cannot view return
-403 before either the User or target can be touched. Starred-list rendering
-rechecks VIEW as defense in depth. A temporarily inaccessible saved key is
-hidden but retained; only keys whose entities no longer exist are cleaned up.
+Star mutation is asymmetric. Adding a new key requires an existing target with
+`VIEW` access. Removing an already stored key is a mutation of the authenticated
+user's own starred list, so it remains available when the target is inaccessible
+or no longer exists. Starred-list rendering rechecks `VIEW` as defense in depth
+and represents unavailable keys with removable placeholder rows; it does not
+expose the entity's saved name or other details. The relation remains stored as
+native Datastore keys; templates encode those keys only at the route/DOM
+boundary.
 
 Authentication provider flows are documented in
 [AUTHENTICATION.md](AUTHENTICATION.md). Backend permission enums and entity

@@ -752,9 +752,9 @@ def test_user_page_missing_key_raises_runtime_error():
         _ = user.page
 
 
-# @pair starred:stale-cleanup
+# @pair starred:key-removal
 @pytest.mark.unit
-def test_user_starred_cleanup_removes_stale_keys():
+def test_user_starred_key_removal_preserves_order():
     user = SimpleNamespace(
         db={"starred": ["keep-before", "stale-page", "keep-after", "stale-project"]}
     )
