@@ -1,28 +1,14 @@
 """Text-only metadata previews for editor links."""
 
-from ipaddress import ip_address
-import socket
 from urllib.parse import parse_qs, urljoin, urlparse, urlunparse
-
-import requests
 
 from lagniappe import CONFIG
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
+from ..http import HTML_METADATA_POLICY, OutboundStatus, fetch_user_content
 from . import metadata as link_metadata
 
 ALLOWED_EXTERNAL_SCHEMES = {"http", "https"}
-MAX_REDIRECTS = 5
-MAX_METADATA_BYTES = 262_144
-METADATA_TIMEOUT = 0.5
-METADATA_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) "
-        "Gecko/20100101 Firefox/125.0"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-}
 DIRECT_ENTITY_ROUTES = {
     "categories": ("category",),
     "files": ("file",),
@@ -60,7 +46,7 @@ def _parse_url(value, base_url=None):
 def _is_internal_url(parsed, base_url=None):
     base = urlparse(base_url or "")
     if not parsed.netloc:
-        return True
+        return not parsed.scheme
     return (
         parsed.scheme in ALLOWED_EXTERNAL_SCHEMES
         and bool(base.netloc)
@@ -234,109 +220,28 @@ def _internal_preview(parsed, user=None, route_preview=None):
 
 # @testable false
 # @covered-by lagniappe/core/tools/links/preview.py::preview_for_url
-# @reason external URL safety is owned by the preview workflow
-def _safe_ip(value):
-    address = ip_address(value)
-    return not (
-        address.is_loopback
-        or address.is_link_local
-        or address.is_private
-        or address.is_reserved
-        or address.is_multicast
-        or address.is_unspecified
-    )
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/links/preview.py::preview_for_url
-# @reason external URL safety is owned by the preview workflow
-def _safe_host(host):
-    value = (host or "").strip().lower().rstrip(".")
-    if not value or value == "localhost":
-        return False
-
-    try:
-        return _safe_ip(value)
-    except ValueError:
-        pass
-
-    try:
-        addresses = socket.getaddrinfo(value, None, type=socket.SOCK_STREAM)
-    except socket.gaierror:
-        return False
-
-    return bool(addresses) and all(_safe_ip(address[4][0]) for address in addresses)
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/links/preview.py::preview_for_url
-# @reason external URL safety is owned by the preview workflow
-def _validate_external_url(url):
-    parsed = urlparse(url)
-    if parsed.scheme not in ALLOWED_EXTERNAL_SCHEMES:
-        raise PreviewError("Preview URL must use http or https")
-    if parsed.username or parsed.password:
-        raise PreviewError("Preview URL is not allowed")
-    if not parsed.hostname or not _safe_host(parsed.hostname):
-        raise PreviewError("Preview URL is not allowed")
-    return parsed
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/links/preview.py::preview_for_url
-# @reason response size limiting is owned by the preview fetch workflow
-def _read_limited_response(response):
-    chunks = []
-    total = 0
-    for chunk in response.iter_content(8192):
-        if not chunk:
-            continue
-        total += len(chunk)
-        chunks.append(chunk)
-        if total >= MAX_METADATA_BYTES:
-            break
-
-    content = b"".join(chunks)
-    encoding = response.encoding or response.apparent_encoding or "utf-8"
-    return content.decode(encoding, errors="replace")
-
-
-# @testable false
-# @covered-by lagniappe/core/tools/links/preview.py::preview_for_url
 # @reason external metadata fetch is owned by preview_for_url
 def _external_metadata(url):
-    current_url = url
-    for redirect_count in range(MAX_REDIRECTS + 1):
-        _validate_external_url(current_url)
-        response = requests.get(
-            current_url,
-            headers=METADATA_HEADERS,
-            allow_redirects=False,
-            timeout=METADATA_TIMEOUT,
-            stream=True,
+    result = fetch_user_content(
+        url,
+        HTML_METADATA_POLICY,
+        headers=link_metadata.METADATA_HEADERS,
+    )
+    if result.status is OutboundStatus.REJECTED:
+        raise PreviewError("Preview URL is not allowed")
+    if not result.ok:
+        return {}
+
+    parsed = urlparse(result.final_url or "")
+    if parsed.path.startswith("/users/login") or parsed.path == "/login":
+        return {"name": RESTRICTED_TITLE, "description": None}
+    try:
+        return link_metadata.extract_link_metadata(
+            result.body,
+            base_url=result.final_url,
         )
-        try:
-            if response.is_redirect and response.headers.get("Location"):
-                if redirect_count >= MAX_REDIRECTS:
-                    raise PreviewError("Too many preview redirects")
-                current_url = urljoin(current_url, response.headers["Location"])
-                parsed = _validate_external_url(current_url)
-                if parsed.path.startswith("/users/login") or parsed.path == "/login":
-                    return {"name": RESTRICTED_TITLE, "description": None}
-                continue
-
-            response.raise_for_status()
-            content_type = response.headers.get("content-type", "")
-            if content_type and "html" not in content_type and "xml" not in content_type:
-                return {}
-
-            return link_metadata.extract_link_metadata(_read_limited_response(response))
-        except requests.RequestException:
-            return {}
-        finally:
-            response.close()
-
-    return {}
+    except Exception:
+        return {}
 
 
 # @testable false
@@ -352,7 +257,6 @@ def _external_title(parsed):
 # @reason external preview formatting is owned by preview_for_url
 def _external_preview(parsed):
     url = _external_url(parsed)
-    _validate_external_url(url)
     metadata = _external_metadata(url)
 
     return {
@@ -371,12 +275,15 @@ def _external_preview(parsed):
 # @tests tests_unit/test_019_link_preview.py::test_internal_preview_hides_missing_or_forbidden_entities
 # @tests tests_unit/test_019_link_preview.py::test_external_preview_maps_metadata_and_falls_back
 # @tests tests_unit/test_019_link_preview.py::test_external_preview_rejects_unsafe_urls
+# @tests tests_e2e/004_projects/test_004e_document_forms.py::test_editor_preview_rejects_private_targets_without_disrupting_popover
 # @features editor link-preview
 # @dimensions internal external permissions metadata url-safety
 def preview_for_url(url, user=None, base_url=None):
-    value = str(url or "").strip()
-    if not value:
+    value = str(url or "")
+    if not value.strip():
         raise PreviewError("URL is required")
+    if value != value.strip():
+        raise PreviewError("Preview URL is not allowed")
 
     parsed = _parse_url(value, base_url=base_url)
     route_preview = _route_preview(parsed) if _is_app_url(parsed, base_url) else None

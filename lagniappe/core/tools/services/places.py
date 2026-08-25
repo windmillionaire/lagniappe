@@ -9,16 +9,17 @@ from urllib.parse import quote
 from google.auth.exceptions import GoogleAuthError
 from flask import session
 from google.auth.transport.requests import Request
-import requests
 
 from lagniappe import CONFIG
 
 from ... import exceptions
+from ..http import (
+    PLACES_AUTOCOMPLETE_POLICY,
+    PLACES_DETAILS_POLICY,
+    request_trusted_content,
+)
 
 _token_cache = {"token": None, "expires_at": 0}
-_PLACES_BASE_URL = "https://places.googleapis.com/v1"
-PLACES_AUTOCOMPLETE_TIMEOUT = (2.0, 4.0)
-PLACES_DETAILS_TIMEOUT = (3.0, 7.0)
 
 # Trailing secondary unit (suite, apt, etc.) without a preceding comma.
 _TRAILING_UNIT = re.compile(
@@ -75,7 +76,7 @@ def normalize_location_coordinates(value):
 # @covered-by lagniappe/core/tools/services/places.py::search_places
 # @covered-by lagniappe/core/tools/services/places.py::get_place_details
 # @reason fixed-host provider transport is exercised through both public Places operations
-def _request_places_json(method, path, *, operation, timeout, params=None, data=None):
+def _request_places_json(method, path, *, operation, policy, params=None, data=None):
     status = None
     try:
         access_token = get_places_access_token()
@@ -83,41 +84,31 @@ def _request_places_json(method, path, *, operation, timeout, params=None, data=
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json",
         }
-        url = f"{_PLACES_BASE_URL}/{path.lstrip('/')}"
-        if method == "GET":
-            response = requests.get(
-                url,
-                headers=headers,
-                params=params,
-                timeout=timeout,
-            )
-        else:
-            response = requests.post(
-                url,
-                headers=headers,
-                json=data,
-                timeout=timeout,
-            )
-        status = response.status_code
-        if status != 200:
-            raise exceptions.NetworkError(
-                f"Places {method} request returned HTTP {status}."
-            )
-        payload = response.json()
+        result = request_trusted_content(
+            method,
+            path,
+            policy,
+            headers=headers,
+            params=params,
+            json_body=data,
+        )
+        status = result.http_status
+        if not result.ok:
+            raise exceptions.NetworkError("Places request failed.")
+        payload = json.loads(result.body)
         if not isinstance(payload, dict):
-            raise exceptions.NetworkError(
-                f"Places {method} response was not a JSON object."
-            )
+            raise exceptions.NetworkError("Places response did not match its contract.")
         return payload
     except (
         GoogleAuthError,
         RuntimeError,
+        UnicodeError,
         ValueError,
-        requests.RequestException,
+        json.JSONDecodeError,
         exceptions.NetworkError,
-    ) as error:
+    ):
         exceptions.capture(
-            error,
+            exceptions.NetworkError("Places provider operation failed."),
             {
                 "context": operation,
                 "method": method,
@@ -313,7 +304,7 @@ def get_place_details(place_id):
         "GET",
         f"places/{quote(str(place_id), safe='')}",
         operation="get_place_details",
-        timeout=PLACES_DETAILS_TIMEOUT,
+        policy=PLACES_DETAILS_POLICY,
         params={
             "fields": (
                 "id,displayName,formattedAddress,addressComponents,location,"
@@ -397,7 +388,7 @@ def search_places(query):
         "POST",
         "places:autocomplete",
         operation="search_places",
-        timeout=PLACES_AUTOCOMPLETE_TIMEOUT,
+        policy=PLACES_AUTOCOMPLETE_POLICY,
         data=data,
     )
     if payload is None:

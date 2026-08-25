@@ -16,6 +16,7 @@ authorization and transport adapters.
 | `messaging/`, `mentions/`, `notifications/`, `email/notifications/` | User communication and supplementary email. | [BACKEND_COMMUNICATIONS.md](BACKEND_COMMUNICATIONS.md) |
 | `polling/` | Versioned poll descriptors, projections, form state, and refresh deltas. | [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md) |
 | `files/` | File inspection, extraction, download, and HTML conversion. | This guide |
+| `http/` | Shared user-directed and fixed-provider outbound HTTP policy. | This guide |
 | `filters/` | Redis JSON filter cache and JSONPath expression building. | [BACKEND_FILTERS.md](BACKEND_FILTERS.md) |
 | `services/` | Identity Platform, Places, and Cloud Tasks clients. | This guide |
 | `site/` | Site settings, exports, branding images, and recovery snapshots. | [INFRA_CONFIG.md](INFRA_CONFIG.md) |
@@ -79,6 +80,53 @@ Durable CSV workflow state lives in `tools/ingress.py` and
 
 ## External services
 
+### Outbound HTTP boundary
+
+Runtime code uses `tools/http/` for application-owned HTTP. It returns an
+immutable `OutboundResult` with one of `ok`, `rejected`, `timeout`,
+`http_error`, `too_large`, or `wrong_type`; neither body bytes nor the final URL
+appear in its representation. Diagnostics may include only outcome,
+scheme/host/port, HTTP status, size, and booleans describing URL structure.
+They never include a path, query, fragment, credentials, response content, or
+transport exception text.
+
+User-directed profiles validate URLs up front and at every redirect, resolve a
+hostname once per hop, reject the complete answer set if any address is not
+global unicast, and try at most four validated addresses within one operation
+deadline. Connections are pinned to the selected IP while the canonical Host,
+TLS SNI, and certificate hostname remain the original host. Environment
+proxies and automatic redirects are disabled. Every response is streamed
+through the decoded-byte limit and closed, including redirects and failures.
+
+| Profile | Scheme and accepted body | Limit | Redirects | Connect/read/deadline |
+| --- | --- | ---: | ---: | --- |
+| HTML metadata | Public HTTP/HTTPS; HTML or XHTML | 256 KiB | 5 | 0.5s / 1s / 2s |
+| Bookmark image | Public HTTP/HTTPS; verified JPEG, PNG, GIF, WebP, or BMP | 10 MiB | 5 | 1s / 2s / 6s |
+| Google profile image | Public HTTPS; the same verified raster formats | 10 MiB | 5 | 1s / 2s / 4s |
+| Places autocomplete | Fixed `places.googleapis.com`; JSON | 1 MiB | 0 | 2s / 4s / 6s |
+| Places details | Fixed `places.googleapis.com`; JSON | 1 MiB | 0 | 3s / 7s / 10s |
+
+All current profiles make one application attempt. A trusted-provider profile
+may add retries only by naming allowed methods, transient statuses, a finite
+attempt count, and every backoff interval. User-directed metadata remains
+synchronous and best-effort; stored URL and frontend payload contracts are
+unchanged.
+
+Some provider transports remain deliberately owned by their existing adapters
+and are audited by the runtime source-inventory test:
+
+| Owner | Transport rationale |
+| --- | --- |
+| `services/identity_platform.py` | Fixed Google Identity Toolkit endpoints plus Google-auth token verification; adapter operations retain their explicit deadlines. |
+| `email/ai.py` | Fixed Resend API calls and provider-issued attachment downloads, bounded by the Resend adapter's timeout and attachment policy. |
+| `deferred_jobs/scheduler.py` | Google-auth `AuthorizedSession` for the fixed Cloud Scheduler API. |
+| `ai/core.py` | The Google Gen AI SDK owns network calls; direct `httpx` use is limited to classifying SDK transport failures. |
+| Runtime credential and process/test-token adapters | Google-auth owns metadata/credential and token-verification traffic. |
+
+Do not add a direct runtime `requests`, `urllib.request`, or `httpx` import for a
+new feature. Extend the shared boundary, or document and add a narrowly owned
+provider adapter to the audited inventory.
+
 `tools/services/task_queue.py` creates deterministic OIDC-authenticated Cloud
 Tasks and deletes known task names. Shared deferred work targets
 `/process/jobs`; ingress, filter-cache refresh, notification email, and task
@@ -88,9 +136,10 @@ when the provider returns a task identity.
 `tools/services/identity_platform.py` owns server-side account and token
 operations; see [AUTHENTICATION.md](AUTHENTICATION.md). `places.py` owns Places
 autocomplete/detail calls and uses the requesting user's validated location
-when present. Autocomplete uses a 2-second connect/4-second read deadline;
-details use 3/7 seconds. Expected credential, transport, HTTP, and provider-
-shape failures are captured once without response content and degrade to an
+when present. Autocomplete uses 2-second connect/4-second read limits within a
+6-second operation deadline; details use 3/7 seconds within 10 seconds.
+Expected credential, transport, HTTP, size, media, JSON, and provider-shape
+failures are captured once without response content or URLs and degrade to an
 empty result rather than failing the request.
 
 ## Cross-domain modules

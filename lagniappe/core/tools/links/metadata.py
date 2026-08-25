@@ -1,15 +1,26 @@
 """External URL metadata extraction (title, description, image)."""
 
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
-import requests
+
+from ..http import HTML_METADATA_POLICY, fetch_user_content
+
+
+METADATA_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) "
+        "Gecko/20100101 Firefox/125.0"
+    ),
+    "Accept": "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+}
 
 
 # @testable false
 # @covered-by lagniappe/core/tools/links/metadata.py::get_link_attributes
 # @reason metadata parsing is owned by the external link metadata fetch workflow
-def extract_link_metadata(content):
+def extract_link_metadata(content, *, base_url=None):
     """Extract page metadata (title, description, image) from HTML content."""
     soup = BeautifulSoup(content, "html.parser")
     meta = {
@@ -41,6 +52,8 @@ def extract_link_metadata(content):
 
     if meta["image"]:
         meta["image"] = meta["image"].get("content")
+        if meta["image"] and base_url:
+            meta["image"] = urljoin(base_url, meta["image"])
 
     return meta
 
@@ -54,7 +67,7 @@ def _broken_link_label(url: str) -> str:
         parsed = urlparse(url.strip())
     except Exception:
         return "Broken link"
-    host = (parsed.netloc or "").lower()
+    host = (parsed.hostname or "").lower()
     if host.startswith("www."):
         host = host[4:]
     if not host:
@@ -62,9 +75,9 @@ def _broken_link_label(url: str) -> str:
     return f"Broken link - {host}"
 
 
-# @testable false
-# @covered-by lagniappe/core/properties/form_links.py::Link.value
-# @reason external URL metadata fetch is owned by link field workflows
+# @testable true
+# @tests tests_unit/test_032_outbound_http.py::test_link_metadata_uses_typed_fetch_and_resolves_relative_images
+# @pairs link:metadata bookmark:metadata link:relative-image link:fallback outbound-http:privacy
 def get_link_attributes(url):
     """Fetch page metadata (title, description, image) from a URL via meta tags.
 
@@ -72,25 +85,17 @@ def get_link_attributes(url):
     metadata with a synthetic ``name`` from :func:`_broken_link_label` so callers
     can still show that a URL was stored.
     """
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
+    result = fetch_user_content(url, HTML_METADATA_POLICY, headers=METADATA_HEADERS)
+    if result.ok:
+        try:
+            return extract_link_metadata(result.body, base_url=result.final_url)
+        except Exception:
+            pass
+    return {
+        "name": _broken_link_label(url),
+        "description": None,
+        "image": None,
     }
-
-    try:
-        response = requests.get(
-            url, headers=headers, allow_redirects=True, timeout=0.5, stream=True
-        )
-        response.raise_for_status()
-
-        return extract_link_metadata(response.text)
-    except requests.RequestException:
-        return {
-            "name": _broken_link_label(url),
-            "description": None,
-            "image": None,
-        }
 
 
 # @testable false

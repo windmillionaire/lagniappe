@@ -13,6 +13,11 @@ from lagniappe.core.definitions import Fetch, General, Levels
 from lagniappe.core.entities.page import Page
 from lagniappe.core.tools import database
 from lagniappe.core.tools.database.defaults import DEFAULT_USER_SCHEMA
+from lagniappe.core.tools.http import (
+    PROFILE_IMAGE_POLICY,
+    OutboundResult,
+    OutboundStatus,
+)
 from lagniappe.core.entities.user import User
 from lagniappe.core.properties.user_related import Starred
 
@@ -217,20 +222,31 @@ def test_user_profile_photo_value_asset_lifecycle_and_google_download():
     user.db["photo"] = "https://example.test/google-photo.jpg"
     with patch(
         "lagniappe.core.properties.user_entity.download_image",
-        return_value={"success": False},
+        return_value=OutboundResult(OutboundStatus.HTTP_ERROR),
     ) as download:
         user.properties.photo.save_google_photo()
 
-    download.assert_called_once_with("https://example.test/google-photo.jpg")
+    download.assert_called_once_with(
+        "https://example.test/google-photo.jpg",
+        policy=PROFILE_IMAGE_POLICY,
+    )
     assert user.save_asset.call_count == 1
 
     with patch(
         "lagniappe.core.properties.user_entity.download_image",
-        return_value={"success": True, "file": b"downloaded-photo"},
+        return_value=OutboundResult(
+            OutboundStatus.OK,
+            body=b"downloaded-photo",
+            media_type="image/jpeg",
+            size=len(b"downloaded-photo"),
+        ),
     ):
         user.properties.photo.save_google_photo()
 
-    assert user.save_asset.call_args.args == (b"downloaded-photo", "photo", "image")
+    saved_photo, name, asset_type = user.save_asset.call_args.args
+    assert saved_photo.getvalue() == b"downloaded-photo"
+    assert saved_photo.content_type == "image/jpeg"
+    assert (name, asset_type) == ("photo", "image")
 
 
 # @features user-groups

@@ -78,6 +78,24 @@ shorter delivery deadline.
 settings used by setup and Site Settings. Provider discovery is cached and
 falls back to the curated catalog on failure.
 
+## Outbound network boundary
+
+The generated App Engine descriptor does not create a VPC connector, NAT,
+egress firewall, or all-traffic routing. Application-level outbound URL policy
+is therefore the default SSRF boundary for user-directed metadata and image
+fetches. App Engine also intentionally exposes its metadata service to each
+runtime instance, including service-account credential endpoints; see Google's
+[Python runtime metadata contract](https://docs.cloud.google.com/appengine/docs/standard/python3/runtime#metadata_server).
+
+Operators who need defense in depth can separately provision VPC connectivity,
+route `all-traffic`, and apply DNS, routing, and firewall controls. That setup
+is not generated or reconciled by Lagniappe and has separate capacity and cost
+implications. In particular, Serverless VPC connectors can incur charges even
+while disconnected. Review Google's
+[Serverless VPC egress guidance](https://docs.cloud.google.com/appengine/docs/standard/connecting-vpc#manage_your_connector)
+before opting in, and preserve runtime access required by Google credential
+libraries.
+
 ## Configuration update
 
 `./setup.sh update` keeps tracked source in place and:

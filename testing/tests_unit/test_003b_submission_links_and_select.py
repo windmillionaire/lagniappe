@@ -7,6 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
+from lagniappe.core.tools.http import OutboundResult, OutboundStatus
+
 pytestmark = pytest.mark.unit
 
 
@@ -80,7 +82,12 @@ def test_submission_bookmark_replace_flags_update_entity_fields(
         "description": "Fetched bookmark description",
         "image": "https://images.example/bookmark.png",
     }
-    downloaded = {"success": True, "file": "image-content"}
+    downloaded = OutboundResult(
+        OutboundStatus.OK,
+        body=b"image-content",
+        media_type="image/png",
+        size=len(b"image-content"),
+    )
 
     with (
         patch(
@@ -106,9 +113,15 @@ def test_submission_bookmark_replace_flags_update_entity_fields(
 
             assert entity.name == metadata["name"]
             assert entity.description == metadata["description"]
-            assert saved_assets == [
-                ("image-content", "bookmark-ab12", "image", "private")
-            ]
+            assert len(saved_assets) == 1
+            saved_image, saved_name, saved_type, visibility = saved_assets[0]
+            assert saved_image.getvalue() == b"image-content"
+            assert saved_image.content_type == "image/png"
+            assert (saved_name, saved_type, visibility) == (
+                "bookmark-ab12",
+                "image",
+                "private",
+            )
             get_metadata.assert_called_once_with(
                 {
                     "url": "https://bookmark.example.com",

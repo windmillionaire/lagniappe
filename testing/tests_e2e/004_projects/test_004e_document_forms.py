@@ -15,6 +15,7 @@ Related Files:
 """
 
 import re
+from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import expect
 
@@ -30,6 +31,66 @@ from testing.elements import (
     Tabs,
 )
 from testing.utility import expect_successful_response
+
+
+# @pairs editor:url-safety link-preview:url-safety outbound-http:url-validation outbound-http:privacy
+def test_editor_preview_rejects_private_targets_without_disrupting_popover(
+    get_user,
+    browser_failures,
+):
+    user = get_user(Users.OWNER)
+    project = user.go(Projects.test_editor_forms)
+    editor = project.editor
+    private_targets = [
+        (
+            "Metadata target",
+            "http://metadata.google.internal/computeMetadata/v1/instance/"
+            "service-accounts/default/token?marker=metadata-secret#credential",
+        ),
+        (
+            "Loopback target",
+            "http://127.0.0.1/private/loopback-secret?marker=query-secret#fragment",
+        ),
+    ]
+
+    for title, target in private_targets:
+        editor.text_entry.evaluate(
+            """(element, link) => {
+                const widget = element.closest('[data-widget]')._lp_widget;
+                widget.editor.commands.setContent(
+                    `<p><a href="${link.url}">${link.title}</a></p>`,
+                );
+            }""",
+            {"title": title, "url": target},
+        )
+        editor.wait_for_render()
+        link = editor.get_element("a")
+
+        with browser_failures.expect_http_error(
+            user,
+            status=422,
+            path="/l/preview",
+        ):
+            with user.page.expect_response(
+                lambda response: (
+                    urlsplit(response.url).path == "/l/preview"
+                    and parse_qs(urlsplit(response.url).query).get("url") == [target]
+                )
+            ) as response_info:
+                link.click()
+            response = response_info.value
+            assert response.status == 422
+            payload = response.json()
+
+        assert payload == {"error": "Preview URL is not allowed"}
+        assert "metadata-secret" not in repr(payload)
+        assert "loopback-secret" not in repr(payload)
+        popover = editor.link_popover
+        expect(popover).to_be_visible()
+        expect(popover.locator("[data-role='link-preview-title']")).to_have_text(title)
+        expect(popover.get_by_role("button", name="Edit", exact=True)).to_be_visible()
+        editor.text_entry.click()
+        expect(popover).not_to_be_visible()
 
 
 # @features editor

@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from lagniappe.core.tools.http import OutboundResult, OutboundStatus
 from lagniappe.core.tools.links import preview as link_preview
 
 
@@ -115,11 +116,6 @@ def test_internal_preview_hides_missing_or_forbidden_entities(monkeypatch):
 def test_external_preview_maps_metadata_and_falls_back(monkeypatch):
     monkeypatch.setattr(
         link_preview,
-        "_validate_external_url",
-        lambda url: link_preview._parse_url(url),
-    )
-    monkeypatch.setattr(
-        link_preview,
         "_external_metadata",
         lambda url: {"name": "Example Title", "description": "Example summary"},
     )
@@ -165,22 +161,13 @@ def test_external_preview_rejects_unsafe_urls(monkeypatch):
                 base_url="https://app.test/",
             )
 
-    class RedirectResponse:
-        is_redirect = True
-        headers = {"Location": "http://127.0.0.1/"}
-
-        def close(self):
-            pass
-
     monkeypatch.setattr(
         link_preview,
-        "_safe_host",
-        lambda host: host == "example.com",
-    )
-    monkeypatch.setattr(
-        link_preview.requests,
-        "get",
-        lambda *args, **kwargs: RedirectResponse(),
+        "fetch_user_content",
+        lambda *args, **kwargs: OutboundResult(
+            OutboundStatus.REJECTED,
+            final_url="http://127.0.0.1/",
+        ),
     )
 
     with pytest.raises(link_preview.PreviewError):
@@ -190,17 +177,18 @@ def test_external_preview_rejects_unsafe_urls(monkeypatch):
             base_url="https://app.test/",
         )
 
-    class LoginRedirectResponse:
-        is_redirect = True
-        headers = {"Location": "https://example.com/users/login?next=/projects/key"}
-
-        def close(self):
-            pass
-
     monkeypatch.setattr(
-        link_preview.requests,
-        "get",
-        lambda *args, **kwargs: LoginRedirectResponse(),
+        link_preview,
+        "fetch_user_content",
+        lambda *args, **kwargs: OutboundResult(
+            OutboundStatus.OK,
+            body=b"<html><title>Sign in</title></html>",
+            media_type="text/html",
+            http_status=200,
+            size=36,
+            redirect_count=1,
+            final_url="https://example.com/users/login?next=/projects/key",
+        ),
     )
 
     restricted = link_preview.preview_for_url(

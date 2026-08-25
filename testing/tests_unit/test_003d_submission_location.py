@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from lagniappe.core.properties.form_links import Location
+from lagniappe.core.tools.http import OutboundResult, OutboundStatus
 from lagniappe.core.tools.services import places as loc
 
 
@@ -25,13 +26,16 @@ class _FakeCredentials:
         self.token = next(self.tokens)
 
 
-class _FakeResponse:
-    def __init__(self, data, status_code=200):
-        self._data = data
-        self.status_code = status_code
-
-    def json(self):
-        return self._data
+def _outbound(data, *, status=OutboundStatus.OK, http_status=200):
+    body = json.dumps(data).encode()
+    return OutboundResult(
+        status=status,
+        body=body if status is OutboundStatus.OK else b"",
+        media_type="application/json",
+        http_status=http_status,
+        size=len(body),
+        final_url="https://places.googleapis.com/v1/redacted",
+    )
 
 
 def _location_field(existing=None):
@@ -157,7 +161,7 @@ def test_get_places_access_token_reuses_cached_token_until_refresh_window(monkey
 @pytest.mark.unit
 def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypatch):
     """Autocomplete should send a biased request and return compact suggestions."""
-    response = _FakeResponse(
+    response = _outbound(
         {
             "suggestions": [
                 {
@@ -187,7 +191,7 @@ def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypat
         patch.object(
             loc, "get_places_access_token", return_value="access-token"
         ) as token,
-        patch.object(loc.requests, "post", return_value=response) as post,
+        patch.object(loc, "request_trusted_content", return_value=response) as request,
     ):
         results = loc.search_places("coffee")
 
@@ -196,13 +200,16 @@ def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypat
         {"id": "place-2", "name": "Test Market"},
     ]
     token.assert_called_once_with()
-    post.assert_called_once_with(
-        "https://places.googleapis.com/v1/places:autocomplete",
+    request.assert_called_once_with(
+        "POST",
+        "places:autocomplete",
+        loc.PLACES_AUTOCOMPLETE_POLICY,
         headers={
             "Authorization": "Bearer access-token",
             "Content-Type": "application/json",
         },
-        json={
+        params=None,
+        json_body={
             "input": "coffee",
             "locationBias": {
                 "circle": {
@@ -211,7 +218,6 @@ def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypat
                 }
             },
         },
-        timeout=loc.PLACES_AUTOCOMPLETE_TIMEOUT,
     )
 
 
@@ -219,7 +225,7 @@ def test_search_places_uses_session_location_bias_and_maps_suggestions(monkeypat
 # @dimensions api-request address2 name-normalization
 @pytest.mark.unit
 def test_get_place_details_formats_address2_and_meaningful_name():
-    response = _FakeResponse(
+    response = _outbound(
         {
             "id": "place-1",
             "displayName": {"text": "Cafe Du Test"},
@@ -234,7 +240,7 @@ def test_get_place_details_formats_address2_and_meaningful_name():
 
     with (
         patch.object(loc, "get_places_access_token", return_value="access-token"),
-        patch.object(loc.requests, "get", return_value=response) as get,
+        patch.object(loc, "request_trusted_content", return_value=response) as request,
     ):
         result = loc.get_place_details("place-1")
 
@@ -244,9 +250,13 @@ def test_get_place_details_formats_address2_and_meaningful_name():
         "address": "123 Main St, New Orleans, LA 70112, USA",
         "address2": "Unit 400",
     }
-    get.assert_called_once()
-    assert get.call_args.kwargs["timeout"] == loc.PLACES_DETAILS_TIMEOUT
-    assert get.call_args.kwargs["params"]["fields"] == (
+    request.assert_called_once()
+    assert request.call_args.args == (
+        "GET",
+        "places/place-1",
+        loc.PLACES_DETAILS_POLICY,
+    )
+    assert request.call_args.kwargs["params"]["fields"] == (
         "id,displayName,formattedAddress,addressComponents,location,"
         "nationalPhoneNumber,websiteUri,regularOpeningHours"
     )
@@ -256,7 +266,7 @@ def test_get_place_details_formats_address2_and_meaningful_name():
 # @dimensions name-normalization
 @pytest.mark.unit
 def test_get_place_details_omits_street_address_display_name():
-    response = _FakeResponse(
+    response = _outbound(
         {
             "id": "place-1",
             "displayName": {"text": "123 Main St"},
@@ -270,7 +280,7 @@ def test_get_place_details_omits_street_address_display_name():
 
     with (
         patch.object(loc, "get_places_access_token", return_value="access-token"),
-        patch.object(loc.requests, "get", return_value=response),
+        patch.object(loc, "request_trusted_content", return_value=response),
     ):
         result = loc.get_place_details("place-1")
 
@@ -290,11 +300,17 @@ def test_places_provider_failures_capture_once_and_degrade(monkeypatch):
 
     with (
         patch.object(loc, "get_places_access_token", return_value="access-token"),
-        patch.object(loc.requests, "post", side_effect=loc.requests.Timeout) as post,
+        patch.object(
+            loc,
+            "request_trusted_content",
+            return_value=OutboundResult(OutboundStatus.TIMEOUT),
+        ) as request,
     ):
         assert loc.search_places("coffee") == []
 
-    assert post.call_args.kwargs["timeout"] == loc.PLACES_AUTOCOMPLETE_TIMEOUT
+    assert request.call_args.args[2] is loc.PLACES_AUTOCOMPLETE_POLICY
+    assert loc.PLACES_AUTOCOMPLETE_POLICY.attempts == 1
+    assert loc.PLACES_AUTOCOMPLETE_POLICY.max_redirects == 0
     assert len(captured) == 1
     assert captured[0][1] == {"context": "search_places", "method": "POST"}
 
@@ -302,9 +318,11 @@ def test_places_provider_failures_capture_once_and_degrade(monkeypatch):
     with (
         patch.object(loc, "get_places_access_token", return_value="access-token"),
         patch.object(
-            loc.requests,
-            "get",
-            return_value=_FakeResponse({}, status_code=503),
+            loc,
+            "request_trusted_content",
+            return_value=_outbound(
+                {}, status=OutboundStatus.HTTP_ERROR, http_status=503
+            ),
         ),
     ):
         assert loc.get_place_details("place-1") is None
@@ -328,9 +346,9 @@ def test_places_malformed_provider_payload_captures_once(monkeypatch):
     with (
         patch.object(loc, "get_places_access_token", return_value="access-token"),
         patch.object(
-            loc.requests,
-            "post",
-            return_value=_FakeResponse({"suggestions": {"not": "a list"}}),
+            loc,
+            "request_trusted_content",
+            return_value=_outbound({"suggestions": {"not": "a list"}}),
         ),
     ):
         assert loc.search_places("coffee") == []
@@ -342,9 +360,9 @@ def test_places_malformed_provider_payload_captures_once(monkeypatch):
     with (
         patch.object(loc, "get_places_access_token", return_value="access-token"),
         patch.object(
-            loc.requests,
-            "get",
-            return_value=_FakeResponse(
+            loc,
+            "request_trusted_content",
+            return_value=_outbound(
                 {
                     "id": "place-1",
                     "displayName": {"text": {"not": "text"}},

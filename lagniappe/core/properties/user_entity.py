@@ -3,7 +3,8 @@ from ..mixins import ColumnMixin, DateMixin
 from .base_db import DBProperty
 from .base_asset import AssetProperty
 from .base_property import UNSET
-from ..tools.files.downloads import download_image
+from ..tools.files.downloads import download_image, downloaded_image_file
+from ..tools.http import PROFILE_IMAGE_POLICY
 
 
 # @testable true
@@ -81,9 +82,12 @@ class ProfilePhoto(AssetProperty):
 
     def save_google_photo(self):
         if self.entity.db.get("photo"):
-            image = download_image(self.entity.db["photo"])
-            if image["success"]:
-                self.value = image["file"]
+            result = download_image(
+                self.entity.db["photo"], policy=PROFILE_IMAGE_POLICY
+            )
+            image = downloaded_image_file(result)
+            if image is not None:
+                self.value = image
 
 
 # @testable false

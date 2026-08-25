@@ -2,10 +2,10 @@ from urllib.parse import urlencode, urlparse
 
 from ..definitions import Fetch, FieldType, FilterOptions, Ordering
 from ..entities import Entities
-from ..exceptions import ValidationError, capture
+from ..exceptions import ValidationError
 from ..mixins import AIMixin, ColumnMixin, FilterMixin
 from ..tools import files
-from ..tools.files.downloads import download_image
+from ..tools.files.downloads import download_image, downloaded_image_file
 from ..tools.links import metadata as external
 from ..tools.services import places as location
 from .base_schema import SchemaProperty
@@ -293,13 +293,10 @@ class Bookmark(Link):
 
         metadata = external.get_bookmark_metadata(value)
         if value.get("replace-image") and metadata.get("image"):
-            try:
-                image = download_image(metadata["image"])
-                if image["success"]:
-                    self.entity.save_asset(image["file"], self.id, "image")
-            except Exception as e:
-                self.warnings.append(f"Error downloading image: {e}")
-                capture(e, {"function": "download_image", "url": metadata["image"]})
+            result = download_image(metadata["image"])
+            image = downloaded_image_file(result)
+            if image is not None:
+                self.entity.save_asset(image, self.id, "image")
 
         if value.get("replace-name"):
             self.entity.name = metadata.get("name")
