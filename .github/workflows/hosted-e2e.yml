@@ -168,63 +168,9 @@ jobs:
           echo "pull_request=$pull_request" >> "$GITHUB_OUTPUT"
           echo "suite=$suite" >> "$GITHUB_OUTPUT"
 
-  preflight:
-    needs: request
-    if: ${{ needs.request.outputs.execute == 'true' && github.event_name != 'workflow_dispatch' }}
-    name: Validate the unprivileged release candidate
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
-    permissions:
-      contents: read
-
-    steps:
-      - name: Check out the exact candidate
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ needs.request.outputs.candidate_sha }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Set up Python
-        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
-        with:
-          python-version: "3.14"
-
-      - name: Install Python dependencies
-        run: |
-          python -m venv venv
-          venv/bin/python -m pip install --disable-pip-version-check -r requirements-dev.txt
-
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Run source quality and traceability gates
-        env:
-          BASE_SHA: ${{ needs.request.outputs.base_sha }}
-        run: |
-          npm run check
-          venv/bin/python -m ruff check .
-          venv/bin/python run.py traceability --check --fail-on warning --no-report --no-manifest
-          venv/bin/python run.py traceability --changed "$BASE_SHA" --check --fail-on warning --no-report --no-manifest
-          venv/bin/python run.py release-check --base "$BASE_SHA"
-
   execute:
-    needs: [request, preflight]
-    if: >-
-      ${{
-        always() &&
-        needs.request.outputs.execute == 'true' &&
-        (
-          (github.event_name == 'workflow_dispatch' && inputs.mode == 'manual') ||
-          needs.preflight.result == 'success'
-        )
-      }}
+    needs: request
+    if: ${{ needs.request.outputs.execute == 'true' }}
     name: ${{ github.event_name == 'workflow_dispatch' && 'Execute hosted suite' || 'Prepare hosted release evidence' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 130

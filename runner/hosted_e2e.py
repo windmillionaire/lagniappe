@@ -14,6 +14,7 @@ from pathlib import Path
 import re
 import secrets
 import shutil
+import sys
 import tempfile
 import time
 import xml.etree.ElementTree as ElementTree
@@ -33,7 +34,7 @@ from config.storage import (
     BUCKET_CORS_METHODS,
     storage_bucket_names,
 )
-from runner.context import GCLOUD_CLI, GIT_CLI
+from runner.context import GCLOUD_CLI, GIT_CLI, NPM_CLI
 from runner.gcloud import activate_repository_gcloud
 from runner.process import run_command
 
@@ -412,6 +413,86 @@ def _require_committed_production_build(
             f"{build_id}."
         )
     return build_id
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_create_preflight_runs_before_provider_activation
+# @features hosted-e2e traceability release
+# @dimensions source-quality provider-mutation release-base
+def _resolve_create_preflight_base(requested=None):
+    """Resolve the release base to one exact commit for the create preflight."""
+    candidates = [requested] if requested else ["origin/main", "main"]
+    for candidate in candidates:
+        result = _git("rev-parse", "--verify", f"{candidate}^{{commit}}", check=False)
+        revision = (result.stdout or "").strip().casefold()
+        if result.returncode == 0 and re.fullmatch(r"[0-9a-f]{40}", revision):
+            return revision
+    if requested:
+        raise HostedE2EError(f"Git base ref does not exist: {requested}")
+    raise HostedE2EError(
+        "Could not find origin/main or main. Pass the hosted create release "
+        "base with --base REF."
+    )
+
+
+# @testable true
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_create_preflight_runs_before_provider_activation
+# @features hosted-e2e traceability release
+# @dimensions source-quality provider-mutation release-base
+def _run_create_preflight(source, *, base_ref=None):
+    """Validate the HEAD candidate before hosted create can touch the provider."""
+    if not NPM_CLI:
+        raise HostedE2EError("npm is required for the hosted E2E create preflight.")
+    base_revision = _resolve_create_preflight_base(base_ref)
+    python = sys.executable
+    run_py = APP_DIR / "run.py"
+    traceability_options = [
+        "--check",
+        "--fail-on",
+        "warning",
+        "--no-report",
+        "--no-manifest",
+    ]
+    gates = (
+        ("authored frontend source", [NPM_CLI, "run", "check"]),
+        ("Python source", [python, "-m", "ruff", "check", "."]),
+        (
+            "full source traceability",
+            [python, run_py, "traceability", *traceability_options],
+        ),
+        (
+            "changed source traceability",
+            [
+                python,
+                run_py,
+                "traceability",
+                "--changed",
+                base_revision,
+                *traceability_options,
+            ],
+        ),
+        (
+            "complete release tree",
+            [python, run_py, "release-check", "--base", base_revision],
+        ),
+    )
+    print(
+        f"Running hosted E2E create preflight for HEAD {source} "
+        f"against comparison base {base_revision}."
+    )
+    for label, command in gates:
+        result = run_command(
+            command,
+            check=False,
+            capture_output=False,
+            timeout=1800,
+            cwd=APP_DIR,
+        )
+        if result.returncode != 0:
+            raise HostedE2EError(
+                f"Hosted E2E create preflight failed while checking {label}."
+            )
+    return base_revision
 
 
 # @testable true
@@ -1457,10 +1538,11 @@ def _hosted_app_version_present(infrastructure, state):
 
 
 # @testable infrastructure
-def create():
+def create(*, base_ref=None):
     """Deploy one committed production build as a test app and runner."""
     source = require_clean_source()
     build_id = _require_committed_production_build(source)
+    _run_create_preflight(source, base_ref=base_ref)
     from testing.utility.traceability_common import behavior_snapshot
 
     source_snapshot, _source_paths = behavior_snapshot(APP_DIR)
@@ -2505,6 +2587,7 @@ def status():
 
 # @testable true
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_execute_command_defaults_to_all_and_imports
+# @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_create_command_routes_preflight_base
 # @tests tests_tooling/test_009_hosted_e2e.py::test_hosted_release_evidence_command_routes_validation
 # @features hosted-e2e
 # @dimensions cli-routing suite-scope evidence-import
@@ -2518,9 +2601,18 @@ def run_hosted_e2e_command(arguments):
         "setup", help="Provision stable hosted-E2E resources."
     )
     setup_parser.add_argument("--github-repository", metavar="OWNER/REPOSITORY")
-    commands.add_parser(
+    create_parser = commands.add_parser(
         "create",
         help="Deploy the committed production build as a matching app version and job.",
+    )
+    create_parser.add_argument(
+        "--base",
+        dest="base_ref",
+        metavar="REF",
+        help=(
+            "Comparison base for changed traceability and release checks. "
+            "Defaults to origin/main, then main."
+        ),
     )
     execute_parser = commands.add_parser("execute", help="Run the Cloud Run E2E job.")
     execute_scope = execute_parser.add_mutually_exclusive_group()
@@ -2577,7 +2669,7 @@ def run_hosted_e2e_command(arguments):
                 "documentation/TESTING_HOSTED_E2E.md before dispatching CI."
             )
         elif args.action == "create":
-            payload = create()
+            payload = create(base_ref=args.base_ref)
             print(f"Hosted E2E version ready: {payload['base_url']}")
         elif args.action == "execute":
             suite = args.suite or ("focused" if args.targets else "all")

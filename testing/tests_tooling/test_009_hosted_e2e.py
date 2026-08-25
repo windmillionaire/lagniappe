@@ -280,6 +280,93 @@ def test_hosted_e2e_requires_a_clean_committed_source(tmp_path):
         require_clean_source(tmp_path)
 
 
+# @features hosted-e2e traceability release
+# @dimensions source-quality provider-mutation release-base
+def test_hosted_create_preflight_runs_before_provider_activation(monkeypatch):
+    revision = "a" * 40
+    commands = []
+
+    monkeypatch.setattr(hosted_e2e, "NPM_CLI", "npm")
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_git",
+        lambda *arguments, **options: subprocess.CompletedProcess(
+            arguments,
+            returncode=0,
+            stdout=f"{revision}\n",
+            stderr="",
+        ),
+    )
+    monkeypatch.setattr(
+        hosted_e2e,
+        "run_command",
+        lambda command, **options: commands.append((command, options))
+        or subprocess.CompletedProcess(command, returncode=0),
+    )
+
+    assert (
+        hosted_e2e._run_create_preflight(revision, base_ref="release-base")
+        == revision
+    )
+
+    command_arguments = [list(map(str, command)) for command, _options in commands]
+    assert command_arguments[0] == ["npm", "run", "check"]
+    assert command_arguments[1][1:] == ["-m", "ruff", "check", "."]
+    assert command_arguments[2][2:4] == ["traceability", "--check"]
+    assert command_arguments[3][2:5] == [
+        "traceability",
+        "--changed",
+        revision,
+    ]
+    assert command_arguments[4][2:] == [
+        "release-check",
+        "--base",
+        revision,
+    ]
+    assert all(
+        options
+        == {
+            "check": False,
+            "capture_output": False,
+            "timeout": 1800,
+            "cwd": hosted_e2e.APP_DIR,
+        }
+        for _command, options in commands
+    )
+
+    events = []
+    monkeypatch.setattr(
+        hosted_e2e,
+        "require_clean_source",
+        lambda: events.append("source") or revision,
+    )
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_require_committed_production_build",
+        lambda _source: events.append("build") or "b1234567",
+    )
+
+    def stop_preflight(source, *, base_ref):
+        events.append(("preflight", source, base_ref))
+        raise HostedE2EError("preflight stopped")
+
+    monkeypatch.setattr(hosted_e2e, "_run_create_preflight", stop_preflight)
+    monkeypatch.setattr(
+        hosted_e2e,
+        "_activate",
+        lambda **_options: events.append("provider"),
+    )
+
+    with pytest.raises(HostedE2EError, match="preflight stopped"):
+        hosted_e2e.create(base_ref="release-base")
+
+    assert events == [
+        "source",
+        "build",
+        ("preflight", revision, "release-base"),
+    ]
+
+
 def _evidence(snapshot, paths, test_name, outcome="passed"):
     pairs, snapshots = encode_test_run_snapshots({snapshot: paths})
     return {
@@ -863,6 +950,24 @@ def test_hosted_execute_command_defaults_to_all_and_imports(
 
 
 # @pair hosted-e2e:cli-routing
+def test_hosted_create_command_routes_preflight_base(monkeypatch, capsys):
+    calls = []
+    monkeypatch.setattr(
+        hosted_e2e,
+        "create",
+        lambda **options: calls.append(options)
+        or {"base_url": "https://e2e.example.test"},
+    )
+
+    assert hosted_e2e.run_hosted_e2e_command(
+        ["create", "--base", "release-base"]
+    ) == 0
+
+    assert calls == [{"base_ref": "release-base"}]
+    assert "Hosted E2E version ready" in capsys.readouterr().out
+
+
+# @pair hosted-e2e:cli-routing
 def test_hosted_release_evidence_command_routes_validation(monkeypatch, capsys):
     candidate = "a" * 40
     evidence = "b" * 40
@@ -1252,13 +1357,11 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert dispatch["suite"]["options"] == ["all", "full"]
     assert {"pull_request", "candidate_sha", "evidence_sha"} <= set(dispatch)
     request = workflow["jobs"]["request"]
-    preflight = workflow["jobs"]["preflight"]
     execute = workflow["jobs"]["execute"]
     quality = workflow["jobs"]["quality"]
     attest = workflow["jobs"]["attest"]
     assert workflow["permissions"] == {}
     assert request["permissions"] == {"pull-requests": "read"}
-    assert preflight["permissions"] == {"contents": "read"}
     assert execute["permissions"] == {
         "contents": "write",
         "actions": "write",
@@ -1270,13 +1373,9 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     }
     assert attest["permissions"] == {"statuses": "write"}
     assert request["name"] == "Resolve hosted release request"
-    assert preflight["needs"] == "request"
-    assert "github.event_name != 'workflow_dispatch'" in preflight["if"]
-    assert "environment" not in preflight
-    assert execute["needs"] == ["request", "preflight"]
-    assert "always()" in execute["if"]
-    assert "inputs.mode == 'manual'" in execute["if"]
-    assert "needs.preflight.result == 'success'" in execute["if"]
+    assert "preflight" not in workflow["jobs"]
+    assert execute["needs"] == "request"
+    assert "needs.request.outputs.execute == 'true'" in execute["if"]
     assert execute["environment"] == "hosted-e2e"
     assert "environment" not in quality
     assert "Prepare hosted release evidence" in execute["name"]
@@ -1312,19 +1411,6 @@ def test_hosted_workflow_consolidates_candidate_and_continuation_validation():
     assert 'statuses/$EVIDENCE_SHA' in workflow_text
     assert "Exact hosted evidence and release gates passed" in workflow_text
     assert "EVIDENCE_SHA: ${{ needs.quality.outputs.evidence_sha }}" in workflow_text
-
-    preflight_text = yaml.dump(preflight, sort_keys=False)
-    assert "ref: ${{ needs.request.outputs.candidate_sha }}" in preflight_text
-    assert "persist-credentials: 'false'" in preflight_text
-    assert "npm ci" in preflight_text
-    assert "npm run check" in preflight_text
-    assert "ruff check ." in preflight_text
-    assert preflight_text.count("run.py traceability") == 2
-    assert "traceability --changed \"$BASE_SHA\"" in preflight_text
-    assert preflight_text.count("--no-report --no-manifest") == 2
-    assert "release-check --base \"$BASE_SHA\"" in preflight_text
-    assert "google-github-actions" not in preflight_text
-    assert "gcloud" not in preflight_text
 
     quality_text = yaml.dump(quality, sort_keys=False)
     assert "gh api" in quality_text

@@ -10,6 +10,7 @@ normal traceability evidence without exposing application secrets to GitHub.
 ```text
 trusted clean commit with production build
   -> hosted-e2e create
+       run source-quality, traceability, and release gates
        export exact commit
        deploy zero-traffic App Engine e2e version
        build/update matching Cloud Run job
@@ -83,14 +84,18 @@ Freeze and commit the complete candidate first:
 npm ci
 npm run build
 # Commit source and generated release output.
-venv/bin/python run.py hosted-e2e create
+venv/bin/python run.py hosted-e2e create --base origin/main
 ```
 
 `create` requires a clean committed production build. It exports that exact
 commit for both artifacts, never rebuilds, never edits canonical
-`lagniappe.yaml`, and deploys with `--no-promote`. Interrupted create state is
-recorded under `reports/hosted-e2e/state.json`; rerunning from the same commit
-resumes completed phases. A different commit requires teardown first.
+`lagniappe.yaml`, and deploys with `--no-promote`. Before gcloud activation or
+provider mutation, it runs npm source checks, Ruff, full and changed
+traceability, and the release check against the clean local HEAD. `--base`
+selects the comparison point and defaults to `origin/main`, then `main`.
+Interrupted create state is recorded under `reports/hosted-e2e/state.json`;
+rerunning from the same commit resumes completed phases. A different commit
+requires teardown first.
 
 Run all complete suites:
 
@@ -129,11 +134,9 @@ Do not run local E2E, hosted E2E, test-server, or browser review concurrently.
 
 `.github/workflows/hosted-e2e.yml` accepts trusted manual dispatch and release
 pull-request candidates. It resolves the exact pull-request head commit,
-then runs npm source checks, Ruff, full and changed traceability, and the release
-check in an unprivileged job. Only a passing automatic candidate proceeds to
-the protected environment, where the workflow verifies that the Cloud Run job
-was created from that source, invokes through WIF, and waits for the result
-bucket's last-uploaded `manifest.json` completion marker.
+then enters the protected environment, verifies that the already-preflighted
+Cloud Run job was created from that source, invokes through WIF, and waits for
+the result bucket's last-uploaded `manifest.json` completion marker.
 
 The workflow validates and merges evidence, confirms that no tracked file other
 than `testing/evidence/latest.json` changed, and non-force pushes an
@@ -144,10 +147,9 @@ publishes the required **Source quality and traceability** status on the exact
 evidence head.
 
 Only the execution job enters the protected environment and can mint the GCP
-identity or write the branch. Resolver, preflight, continuation, and status jobs
-receive smaller job-specific permissions. A manual dispatch may bypass the
-automatic preflight for diagnosis, but manual/local results cannot publish or
-replace the release-pull-request status.
+identity or write the branch. Resolver, continuation, and status jobs receive
+smaller job-specific permissions. Manual/local results remain diagnostic and
+cannot publish or replace the release-pull-request status.
 
 ## Artifacts and evidence
 

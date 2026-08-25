@@ -39,10 +39,11 @@ and checks that package metadata, lockfile, production build metadata,
 `BUILD_ID`, settings version, and release note agree on one `X.Y.Z` version.
 
 Hosted E2E exports that exact commit for both its App Engine version and Cloud
-Run runner image and never rebuilds it. Automatic release candidates must pass
-an unprivileged source-quality, traceability, and release-check job before the
-workflow can enter the protected hosted environment. Manual diagnostic runs
-may bypass that preflight but cannot publish release attestation. See
+Run runner image and never rebuilds it. `hosted-e2e create` runs source-quality,
+full and changed traceability, and release checks before gcloud activation or
+provider mutation. The GitHub workflow then requires the prepared Cloud Run job
+to identify the exact release candidate. Manual diagnostic runs cannot publish
+release attestation. See
 [TESTING_HOSTED_E2E.md](TESTING_HOSTED_E2E.md).
 
 ## App Engine upload boundary
