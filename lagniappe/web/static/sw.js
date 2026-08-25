@@ -1,131 +1,132 @@
 // biome-ignore lint/correctness/noUnusedVariables: build input replaced with the release build ID
-const SW_VERSION = "bd27c637";
+const SW_VERSION = "b4b0f2eb";
 const CACHE = `static-cache`;
 const RESPONSE_CACHE = `response-cache`;
 const PRECACHE_URLS = [
-	"/chunks/activity.js?v=bd27c637",
-	"/chunks/addImage.js?v=bd27c637",
-	"/chunks/addLink.js?v=bd27c637",
-	"/chunks/addYouTube.js?v=bd27c637",
-	"/chunks/administrators.js?v=bd27c637",
-	"/chunks/aiModels.js?v=bd27c637",
-	"/chunks/analytics.js?v=bd27c637",
-	"/chunks/base.js?v=bd27c637",
-	"/chunks/base2.js?v=bd27c637",
-	"/chunks/baseElement.js?v=bd27c637",
-	"/chunks/baseForm.js?v=bd27c637",
-	"/chunks/baseList.js?v=bd27c637",
-	"/chunks/baseUpload.js?v=bd27c637",
-	"/chunks/bookmark.js?v=bd27c637",
-	"/chunks/builder.js?v=bd27c637",
-	"/chunks/buttons.js?v=bd27c637",
-	"/chunks/category.js?v=bd27c637",
-	"/chunks/checkbox.js?v=bd27c637",
-	"/chunks/collaborative.js?v=bd27c637",
-	"/chunks/columns.js?v=bd27c637",
-	"/chunks/combobox.js?v=bd27c637",
-	"/chunks/connectivity.js?v=bd27c637",
-	"/chunks/core-foundation.js?v=bd27c637",
-	"/chunks/deferredOperations.js?v=bd27c637",
-	"/chunks/deployment.js?v=bd27c637",
-	"/chunks/documentHistory.js?v=bd27c637",
-	"/chunks/documentSettings.js?v=bd27c637",
-	"/chunks/dropdown.js?v=bd27c637",
-	"/chunks/editWatcher.js?v=bd27c637",
-	"/chunks/entity-foundation.js?v=bd27c637",
-	"/chunks/entityMenu.js?v=bd27c637",
-	"/chunks/facets.js?v=bd27c637",
-	"/chunks/fileInfo.js?v=bd27c637",
-	"/chunks/filePdfPreview.js?v=bd27c637",
-	"/chunks/filters.js?v=bd27c637",
-	"/chunks/form.js?v=bd27c637",
-	"/chunks/form2.js?v=bd27c637",
-	"/chunks/formatting.js?v=bd27c637",
-	"/chunks/foundation.js?v=bd27c637",
-	"/chunks/generateText.js?v=bd27c637",
-	"/chunks/html.js?v=bd27c637",
-	"/chunks/html2.js?v=bd27c637",
-	"/chunks/icons.js?v=bd27c637",
-	"/chunks/image.js?v=bd27c637",
-	"/chunks/index-foundation.js?v=bd27c637",
-	"/chunks/ingress.js?v=bd27c637",
-	"/chunks/ingressUpload.js?v=bd27c637",
-	"/chunks/input.js?v=bd27c637",
-	"/chunks/link.js?v=bd27c637",
-	"/chunks/lists.js?v=bd27c637",
-	"/chunks/loader.js?v=bd27c637",
-	"/chunks/location.js?v=bd27c637",
-	"/chunks/logout.js?v=bd27c637",
-	"/chunks/maintenance.js?v=bd27c637",
-	"/chunks/menuItems.js?v=bd27c637",
-	"/chunks/messageComposer.js?v=bd27c637",
-	"/chunks/mobileTableControls.js?v=bd27c637",
-	"/chunks/modal.js?v=bd27c637",
-	"/chunks/modelTasks.js?v=bd27c637",
-	"/chunks/note.js?v=bd27c637",
-	"/chunks/notifications.js?v=bd27c637",
-	"/chunks/offline.js?v=bd27c637",
-	"/chunks/offlineQueue.js?v=bd27c637",
-	"/chunks/offlineReplay.js?v=bd27c637",
-	"/chunks/offlineWork.js?v=bd27c637",
-	"/chunks/options.js?v=bd27c637",
-	"/chunks/pageInfo.js?v=bd27c637",
-	"/chunks/pagePermissions.js?v=bd27c637",
-	"/chunks/pagePhoto.js?v=bd27c637",
-	"/chunks/pageTaskList.js?v=bd27c637",
-	"/chunks/pinVersion.js?v=bd27c637",
-	"/chunks/polling.js?v=bd27c637",
-	"/chunks/primitives.js?v=bd27c637",
-	"/chunks/projectInfo.js?v=bd27c637",
-	"/chunks/providers.js?v=bd27c637",
-	"/chunks/radio.js?v=bd27c637",
-	"/chunks/results.js?v=bd27c637",
-	"/chunks/search.js?v=bd27c637",
-	"/chunks/sectionToggle.js?v=bd27c637",
-	"/chunks/sections.js?v=bd27c637",
-	"/chunks/select.js?v=bd27c637",
-	"/chunks/select2.js?v=bd27c637",
-	"/chunks/setColor.js?v=bd27c637",
-	"/chunks/setFontFamily.js?v=bd27c637",
-	"/chunks/setImage.js?v=bd27c637",
-	"/chunks/signature.js?v=bd27c637",
-	"/chunks/siteSettings.js?v=bd27c637",
-	"/chunks/status.js?v=bd27c637",
-	"/chunks/status2.js?v=bd27c637",
-	"/chunks/styles.js?v=bd27c637",
-	"/chunks/submission.js?v=bd27c637",
-	"/chunks/submitter.js?v=bd27c637",
-	"/chunks/sync.js?v=bd27c637",
-	"/chunks/table.js?v=bd27c637",
-	"/chunks/tableEditor.js?v=bd27c637",
-	"/chunks/tableSorting.js?v=bd27c637",
-	"/chunks/tableVisibility.js?v=bd27c637",
-	"/chunks/tables.js?v=bd27c637",
-	"/chunks/taskForm.js?v=bd27c637",
-	"/chunks/taskSettings.js?v=bd27c637",
-	"/chunks/tasks.js?v=bd27c637",
-	"/chunks/textarea.js?v=bd27c637",
-	"/chunks/todo.js?v=bd27c637",
-	"/chunks/toolbar.js?v=bd27c637",
-	"/chunks/toolbarButtons.js?v=bd27c637",
-	"/chunks/tools.js?v=bd27c637",
-	"/chunks/uploadFile.js?v=bd27c637",
-	"/chunks/user.js?v=bd27c637",
-	"/chunks/user2.js?v=bd27c637",
-	"/chunks/views/admin.js?v=bd27c637",
-	"/chunks/views/analytics.js?v=bd27c637",
-	"/chunks/views/builder.js?v=bd27c637",
-	"/chunks/views/file.js?v=bd27c637",
-	"/chunks/views/home.js?v=bd27c637",
-	"/chunks/views/index.js?v=bd27c637",
-	"/chunks/views/manual.js?v=bd27c637",
-	"/chunks/views/messages.js?v=bd27c637",
-	"/chunks/views/page.js?v=bd27c637",
-	"/chunks/views/project.js?v=bd27c637",
-	"/chunks/views/report.js?v=bd27c637",
-	"/chunks/views/results.js?v=bd27c637",
-	"/chunks/views/user.js?v=bd27c637",
-	"/chunks/visibility.js?v=bd27c637"
+	"/chunks/activity.js?v=b4b0f2eb",
+	"/chunks/addImage.js?v=b4b0f2eb",
+	"/chunks/addLink.js?v=b4b0f2eb",
+	"/chunks/addYouTube.js?v=b4b0f2eb",
+	"/chunks/administrators.js?v=b4b0f2eb",
+	"/chunks/aiModels.js?v=b4b0f2eb",
+	"/chunks/analytics.js?v=b4b0f2eb",
+	"/chunks/base.js?v=b4b0f2eb",
+	"/chunks/base2.js?v=b4b0f2eb",
+	"/chunks/baseElement.js?v=b4b0f2eb",
+	"/chunks/baseForm.js?v=b4b0f2eb",
+	"/chunks/baseList.js?v=b4b0f2eb",
+	"/chunks/baseUpload.js?v=b4b0f2eb",
+	"/chunks/bookmark.js?v=b4b0f2eb",
+	"/chunks/builder.js?v=b4b0f2eb",
+	"/chunks/buttons.js?v=b4b0f2eb",
+	"/chunks/category.js?v=b4b0f2eb",
+	"/chunks/checkbox.js?v=b4b0f2eb",
+	"/chunks/collaborative.js?v=b4b0f2eb",
+	"/chunks/columns.js?v=b4b0f2eb",
+	"/chunks/combobox.js?v=b4b0f2eb",
+	"/chunks/connectivity.js?v=b4b0f2eb",
+	"/chunks/core-foundation.js?v=b4b0f2eb",
+	"/chunks/deferredOperations.js?v=b4b0f2eb",
+	"/chunks/deployment.js?v=b4b0f2eb",
+	"/chunks/documentHistory.js?v=b4b0f2eb",
+	"/chunks/documentSettings.js?v=b4b0f2eb",
+	"/chunks/dropdown.js?v=b4b0f2eb",
+	"/chunks/editWatcher.js?v=b4b0f2eb",
+	"/chunks/entity-foundation.js?v=b4b0f2eb",
+	"/chunks/entityMenu.js?v=b4b0f2eb",
+	"/chunks/facets.js?v=b4b0f2eb",
+	"/chunks/fileInfo.js?v=b4b0f2eb",
+	"/chunks/filePdfPreview.js?v=b4b0f2eb",
+	"/chunks/filters.js?v=b4b0f2eb",
+	"/chunks/form.js?v=b4b0f2eb",
+	"/chunks/form2.js?v=b4b0f2eb",
+	"/chunks/formatting.js?v=b4b0f2eb",
+	"/chunks/foundation.js?v=b4b0f2eb",
+	"/chunks/generateText.js?v=b4b0f2eb",
+	"/chunks/html.js?v=b4b0f2eb",
+	"/chunks/html2.js?v=b4b0f2eb",
+	"/chunks/icons.js?v=b4b0f2eb",
+	"/chunks/image.js?v=b4b0f2eb",
+	"/chunks/index-foundation.js?v=b4b0f2eb",
+	"/chunks/ingress.js?v=b4b0f2eb",
+	"/chunks/ingressUpload.js?v=b4b0f2eb",
+	"/chunks/input.js?v=b4b0f2eb",
+	"/chunks/link.js?v=b4b0f2eb",
+	"/chunks/lists.js?v=b4b0f2eb",
+	"/chunks/loader.js?v=b4b0f2eb",
+	"/chunks/location.js?v=b4b0f2eb",
+	"/chunks/logout.js?v=b4b0f2eb",
+	"/chunks/maintenance.js?v=b4b0f2eb",
+	"/chunks/menuItems.js?v=b4b0f2eb",
+	"/chunks/messageComposer.js?v=b4b0f2eb",
+	"/chunks/mobileTableControls.js?v=b4b0f2eb",
+	"/chunks/modal.js?v=b4b0f2eb",
+	"/chunks/modelTasks.js?v=b4b0f2eb",
+	"/chunks/note.js?v=b4b0f2eb",
+	"/chunks/notifications.js?v=b4b0f2eb",
+	"/chunks/offline.js?v=b4b0f2eb",
+	"/chunks/offlineQueue.js?v=b4b0f2eb",
+	"/chunks/offlineReplay.js?v=b4b0f2eb",
+	"/chunks/offlineWork.js?v=b4b0f2eb",
+	"/chunks/options.js?v=b4b0f2eb",
+	"/chunks/pageInfo.js?v=b4b0f2eb",
+	"/chunks/pagePermissions.js?v=b4b0f2eb",
+	"/chunks/pagePhoto.js?v=b4b0f2eb",
+	"/chunks/pageTaskList.js?v=b4b0f2eb",
+	"/chunks/pinVersion.js?v=b4b0f2eb",
+	"/chunks/polling.js?v=b4b0f2eb",
+	"/chunks/primitives.js?v=b4b0f2eb",
+	"/chunks/projectInfo.js?v=b4b0f2eb",
+	"/chunks/providers.js?v=b4b0f2eb",
+	"/chunks/radio.js?v=b4b0f2eb",
+	"/chunks/results.js?v=b4b0f2eb",
+	"/chunks/search.js?v=b4b0f2eb",
+	"/chunks/sectionToggle.js?v=b4b0f2eb",
+	"/chunks/sections.js?v=b4b0f2eb",
+	"/chunks/select.js?v=b4b0f2eb",
+	"/chunks/select2.js?v=b4b0f2eb",
+	"/chunks/setColor.js?v=b4b0f2eb",
+	"/chunks/setFontFamily.js?v=b4b0f2eb",
+	"/chunks/setImage.js?v=b4b0f2eb",
+	"/chunks/signature.js?v=b4b0f2eb",
+	"/chunks/siteSettings.js?v=b4b0f2eb",
+	"/chunks/status.js?v=b4b0f2eb",
+	"/chunks/status2.js?v=b4b0f2eb",
+	"/chunks/storage.js?v=b4b0f2eb",
+	"/chunks/styles.js?v=b4b0f2eb",
+	"/chunks/submission.js?v=b4b0f2eb",
+	"/chunks/submitter.js?v=b4b0f2eb",
+	"/chunks/sync.js?v=b4b0f2eb",
+	"/chunks/table.js?v=b4b0f2eb",
+	"/chunks/tableEditor.js?v=b4b0f2eb",
+	"/chunks/tableSorting.js?v=b4b0f2eb",
+	"/chunks/tableVisibility.js?v=b4b0f2eb",
+	"/chunks/tables.js?v=b4b0f2eb",
+	"/chunks/taskForm.js?v=b4b0f2eb",
+	"/chunks/taskSettings.js?v=b4b0f2eb",
+	"/chunks/tasks.js?v=b4b0f2eb",
+	"/chunks/textarea.js?v=b4b0f2eb",
+	"/chunks/todo.js?v=b4b0f2eb",
+	"/chunks/toolbar.js?v=b4b0f2eb",
+	"/chunks/toolbarButtons.js?v=b4b0f2eb",
+	"/chunks/tools.js?v=b4b0f2eb",
+	"/chunks/uploadFile.js?v=b4b0f2eb",
+	"/chunks/user.js?v=b4b0f2eb",
+	"/chunks/user2.js?v=b4b0f2eb",
+	"/chunks/views/admin.js?v=b4b0f2eb",
+	"/chunks/views/analytics.js?v=b4b0f2eb",
+	"/chunks/views/builder.js?v=b4b0f2eb",
+	"/chunks/views/file.js?v=b4b0f2eb",
+	"/chunks/views/home.js?v=b4b0f2eb",
+	"/chunks/views/index.js?v=b4b0f2eb",
+	"/chunks/views/manual.js?v=b4b0f2eb",
+	"/chunks/views/messages.js?v=b4b0f2eb",
+	"/chunks/views/page.js?v=b4b0f2eb",
+	"/chunks/views/project.js?v=b4b0f2eb",
+	"/chunks/views/report.js?v=b4b0f2eb",
+	"/chunks/views/results.js?v=b4b0f2eb",
+	"/chunks/views/user.js?v=b4b0f2eb",
+	"/chunks/visibility.js?v=b4b0f2eb"
 ];
 const UPDATED_HEADER = "X-Lagniappe-Updated";
 const BROWSER_PROTOCOL = {
@@ -214,10 +215,40 @@ async function precacheStaticAssets() {
  * @reason validate-user confirmation is exercised through the cache invalidation owner
  */
 const _validateUser = async (cacheConfirmation = {}) => {
+	/**
+	 * @testable false
+	 * @covered-by src/script/sw.template.mjs::_validateUser
+	 * @reason validation failures share one safe diagnostic shape
+	 */
+	const failed = (stage, status = null) => {
+		captureError(new Error("User validation acknowledgement failed."), {
+			context: "validate_user",
+			stage,
+			...(Number.isInteger(status) ? { status } : {}),
+		});
+		return false;
+	};
+
+	let tokenResponse;
 	try {
-		const response = await fetch("/l/token", TOKEN_REQUEST);
-		const newToken = await response.text();
-		await fetch("/l/validate-user", {
+		tokenResponse = await fetch("/l/token", TOKEN_REQUEST);
+	} catch {
+		return failed("token-request");
+	}
+	if (!tokenResponse?.ok)
+		return failed("token-response", tokenResponse?.status);
+
+	let newToken;
+	try {
+		newToken = (await tokenResponse.text()).trim();
+	} catch {
+		return failed("token-body", tokenResponse.status);
+	}
+	if (!newToken) return failed("token-empty", tokenResponse.status);
+
+	let validationResponse;
+	try {
+		validationResponse = await fetch("/l/validate-user", {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -231,12 +262,23 @@ const _validateUser = async (cacheConfirmation = {}) => {
 				cacheGeneration: cacheConfirmation.cacheGeneration,
 			}),
 		});
-	} catch (error) {
-		captureError(error, {
-			context: "validate_user",
-		});
-		return null;
+	} catch {
+		return failed("validation-request");
 	}
+	if (!validationResponse?.ok) {
+		return failed("validation-response", validationResponse?.status);
+	}
+
+	let acknowledgement;
+	try {
+		acknowledgement = await validationResponse.json();
+	} catch {
+		return failed("validation-body", validationResponse.status);
+	}
+	if (acknowledgement?.cacheCleared !== true) {
+		return failed("validation-acknowledgement", validationResponse.status);
+	}
+	return true;
 };
 
 let _cacheGeneration = 0;
@@ -299,14 +341,20 @@ function validateUserOnce(cacheConfirmation) {
 /**
  * @testable true
  * @tests tests_js/test_008_service_worker.py::test_cache_invalidation_confirmation_posts_after_local_clear
+ * @tests tests_js/test_008_service_worker.py::test_cache_invalidation_requires_explicit_server_acknowledgement
  * @features cache
- * @dimensions invalidation service-worker
+ * @dimensions invalidation service-worker acknowledgement failure retry
  */
 async function checkForCacheInvalidation(response, options = {}) {
 	if (!responseInvalidatesCache(response)) return { invalidated: false };
 	const confirmation = await clearClientCache();
-	if (options.validate !== false) await validateUserOnce(confirmation);
-	return { invalidated: true, ...confirmation };
+	const acknowledged =
+		options.validate !== false ? await validateUserOnce(confirmation) : null;
+	return {
+		invalidated: true,
+		...confirmation,
+		...(acknowledged === null ? {} : { acknowledged }),
+	};
 }
 
 /**

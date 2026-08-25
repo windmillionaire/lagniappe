@@ -5,6 +5,12 @@ import {
 } from "./offline";
 import { request } from "./request";
 
+const REPLAY_RESULT = Object.freeze({
+	BLOCKED: "blocked",
+	COMPLETED: "completed",
+	REBASED: "rebased",
+});
+
 /**
  * @testable false
  * @covered-by src/script/shared/offlineQueue.mjs::OfflineQueue
@@ -221,76 +227,96 @@ export class OfflineQueue {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_028_form_state_split.py::test_offline_replay_polls_mounted_form_without_direct_acknowledgement
+	 * @tests tests_js/test_045_offline_queue.py::test_offline_replay_blocks_later_records_after_the_oldest_record_fails
+	 * @tests tests_js/test_045_offline_queue.py::test_offline_replay_returns_the_completed_prefix_and_retries_the_oldest_record
+	 * @tests tests_js/test_045_offline_queue.py::test_offline_replay_retries_rebased_record_before_later_record
+	 * @tests tests_js/test_045_offline_queue.py::test_offline_replay_releases_ownership_after_handler_errors
 	 * @tests tests_js/test_028_form_state_split.py::test_offline_replay_retries_a_conflict_rebased_by_the_form
 	 * @tests tests_e2e/005_pages/test_005i_page_info_offline.py::test_page_info_replay_reconciles_after_reload
 	 * @features offline edited-entity-notice
-	 * @dimensions replay replay-reconciliation conflict-rebase queue-submit reload replayed-response
+	 * @dimensions replay replay-reconciliation conflict-rebase queue-submit reload replayed-response replay-order queue-preserved retry-boundary
 	 * @pairs offline:replay offline:replay-reconciliation offline:conflict-rebase
 	 * @pairs offline:queue-submit offline:reload
+	 * @pairs offline:replay-order offline:queue-preserved offline:retry-boundary
 	 * @pairs edited-entity-notice:replayed-response
 	 */
 	async replay() {
 		if (!this.view.online || this._replaying) return 0;
 
 		this._replaying = true;
-		const completed = [];
+		let completed = 0;
 
 		try {
 			for (const record of this._sortedRecords()) {
 				let current = record;
 				while (current) {
-					const response = await this._send(current);
-					if (response?.conflict) {
-						const attemptedFingerprint = current.fingerprint;
-						current.conflictResponse = response;
-						await this._dispatch({
-							phase: "conflict",
-							queue: this,
-							record: current,
-							response,
-						});
-						const rebased = this.records.find(
-							(queued) => queued.id === current.id,
-						);
-						if (!rebased || rebased.fingerprint === attemptedFingerprint) {
-							break;
-						}
-						current = rebased;
+					const result = await this._replayRecord(current);
+					if (result.state === REPLAY_RESULT.REBASED) {
+						current = result.record;
 						continue;
 					}
-					if (!response?.ok || response.error) break;
-
-					await deleteOfflineMutations([current.id]);
-					this.records = this.records.filter(
-						(queued) => queued.id !== current.id,
-					);
-					completed.push(current.id);
-					const targets = this.targets;
-					const mountedUpdateTargets =
-						current.method === "PUT"
-							? this._mountedUpdateTargets(current, targets)
-							: [];
-					this._finalize(current, response);
-					await this._dispatch(
-						{
-							phase: "replayed",
-							queue: this,
-							record: current,
-							response,
-						},
-						targets.filter((target) => !mountedUpdateTargets.includes(target)),
-					);
-					if (current.method === "PUT") {
-						await this._pollMountedUpdate(current, mountedUpdateTargets);
+					if (result.state === REPLAY_RESULT.BLOCKED) return completed;
+					if (result.state === REPLAY_RESULT.COMPLETED) {
+						completed += 1;
+						break;
 					}
-					break;
+					throw new TypeError(`Unknown replay result: ${result.state}`);
 				}
 			}
 		} finally {
 			this._replaying = false;
 		}
 
-		return completed.length;
+		return completed;
+	}
+
+	/**
+	 * @testable false
+	 * @covered-by src/script/shared/offlineQueue.mjs::OfflineQueue.replay
+	 * @reason one-record replay outcomes are exercised through the ordered queue boundary
+	 */
+	async _replayRecord(record) {
+		const response = await this._send(record);
+		if (response?.conflict) {
+			const attemptedFingerprint = record.fingerprint;
+			record.conflictResponse = response;
+			await this._dispatch({
+				phase: "conflict",
+				queue: this,
+				record,
+				response,
+			});
+			const rebased = this.records.find((queued) => queued.id === record.id);
+			if (!rebased || rebased.fingerprint === attemptedFingerprint) {
+				return { state: REPLAY_RESULT.BLOCKED };
+			}
+			return { state: REPLAY_RESULT.REBASED, record: rebased };
+		}
+		if (!response?.ok || response.error) {
+			return { state: REPLAY_RESULT.BLOCKED };
+		}
+
+		await deleteOfflineMutations([record.id]);
+		this.records = this.records.filter((queued) => queued.id !== record.id);
+		const targets = this.targets;
+		const mountedUpdateTargets =
+			record.method === "PUT"
+				? this._mountedUpdateTargets(record, targets)
+				: [];
+		this._finalize(record, response);
+		await this._dispatch(
+			{
+				phase: "replayed",
+				queue: this,
+				record,
+				response,
+			},
+			targets.filter((target) => !mountedUpdateTargets.includes(target)),
+		);
+		if (record.method === "PUT") {
+			await this._pollMountedUpdate(record, mountedUpdateTargets);
+		}
+		return { state: REPLAY_RESULT.COMPLETED };
 	}
 
 	/**

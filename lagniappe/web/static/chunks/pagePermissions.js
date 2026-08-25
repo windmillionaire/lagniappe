@@ -1,2 +1,158 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="54f694cc-f14d-471f-8ec1-c03386cdfdce",e._sentryDebugIdIdentifier="sentry-dbid-54f694cc-f14d-471f-8ec1-c03386cdfdce");}catch(e){}}();import{r,w as o}from"./foundation.js?v=bd27c637";import"./connectivity.js?v=bd27c637";import{p as a}from"./primitives.js?v=bd27c637";import{F as n}from"./facets.js?v=bd27c637";import{F as c}from"./form2.js?v=bd27c637";import"./styles.js?v=bd27c637";import"./icons.js?v=bd27c637";import"./combobox.js?v=bd27c637";import"./results.js?v=bd27c637";import"./formatting.js?v=bd27c637";import"./submitter.js?v=bd27c637";import"./baseForm.js?v=bd27c637";import"./loader.js?v=bd27c637";class d extends c{constructor(t){super(t),this.messages={submit:"Update Page Permissions",submitting:"Updating Page Permissions",submitted:"Page Permissions Updated"},this.restrictAccessSelect=null,this._input=this._input.bind(this),this._click=this._click.bind(this),this._addGroup=this._addGroup.bind(this)}async init(){await super.init();const t=this.restrictAccess;if(t){const e=this.target.querySelector("[data-role='restrict-group-input']");if(this.restrictAccessSelect=new n(e),this.restrictAccessSelect.init(),!this.revisionPreview){const s=await r.get(this.endpoints.viewAccess);this._replaceBadges(s.viewers)}t.addEventListener("input",this._input),t.addEventListener("updated",this._addGroup),t.addEventListener("click",this._click)}}get revisionEntries(){const t=this.target.querySelector("[name='owner']")?.checked?"true":"false",e=Array.from(this.target.querySelectorAll("[data-role='remove-restriction'][data-key]"),s=>["__revision-restricted-group",s.dataset.key]);return[["__revision-owner",t],...e]}_input(t){if(t.target.name==="owner"){const e=new FormData;e.set("owner",t.target.checked?"add":"remove"),this._addRestriction(e)}}_click(t){const e=t.target.closest("[data-role='remove-restriction']");if(!e)return;const s=new FormData;s.set("group","remove"),s.set("group-key",e.dataset.key),this._addRestriction(s)}_addGroup(t){const e=new FormData;e.set("group","add"),Object.keys(t.detail.options).forEach(s=>{e.append("group-key",s)}),this._addRestriction(e),this.restrictAccessSelect.clear({notify:!1})}async _addRestriction(t){const e=this.endpoints.viewAccess,s=await r.put(e,t);s.ok&&await o(()=>{this._replaceBadges(s.viewers),this._replaceGroupList(s.group_list)},{label:"page-permissions:update-restrictions"})}_replaceBadges(t){if(!t)return;const e=this.badgeContainer,s=t.map(i=>a.badge(i));e.replaceChildren(...s)}_replaceGroupList(t){const e=this.target.querySelector("[data-role='restricted-group-list']");e.innerHTML=t}get badgeContainer(){return this.target.querySelector("[data-role='badges']")}get visibleTo(){return this.target.querySelector("[data-role='visible-to']")}get restrictAccess(){return this.target.querySelector("[data-role='restrict-access']")}get html(){return[this.visibleTo,this.restrictAccess]}}export{d as PagePermissions};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { r as request, w as withTransition } from './foundation.js?v=b4b0f2eb';
+import './connectivity.js?v=b4b0f2eb';
+import { p as primitives } from './primitives.js?v=b4b0f2eb';
+import { F as FacetsBox } from './facets.js?v=b4b0f2eb';
+import { F as FormElement } from './form2.js?v=b4b0f2eb';
+import './styles.js?v=b4b0f2eb';
+import './icons.js?v=b4b0f2eb';
+import './combobox.js?v=b4b0f2eb';
+import './results.js?v=b4b0f2eb';
+import './storage.js?v=b4b0f2eb';
+import './formatting.js?v=b4b0f2eb';
+import './submitter.js?v=b4b0f2eb';
+import './baseForm.js?v=b4b0f2eb';
+import './loader.js?v=b4b0f2eb';
+
+/**
+ * @testable true
+ * @tests tests_e2e/005_pages/test_005d_page_permissions.py::test_owner_can_open_page_permissions_panel
+ * @features pages
+ * @dimensions permissions-panel permission-gates
+ */
+class PagePermissions extends FormElement {
+	constructor(attributes) {
+		super(attributes);
+		this.messages = {
+			submit: "Update Page Permissions",
+			submitting: "Updating Page Permissions",
+			submitted: "Page Permissions Updated",
+		};
+		this.restrictAccessSelect = null;
+
+		this._input = this._input.bind(this);
+		this._click = this._click.bind(this);
+		this._addGroup = this._addGroup.bind(this);
+	}
+
+	async init() {
+		await super.init();
+		const restrictAccess = this.restrictAccess;
+
+		if (restrictAccess) {
+			const input = this.target.querySelector(
+				"[data-role='restrict-group-input']",
+			);
+			this.restrictAccessSelect = new FacetsBox(input);
+			this.restrictAccessSelect.init();
+
+			if (!this.revisionPreview) {
+				const response = await request.get(this.endpoints.viewAccess);
+				this._replaceBadges(response.viewers);
+			}
+			restrictAccess.addEventListener("input", this._input);
+			restrictAccess.addEventListener("updated", this._addGroup);
+			restrictAccess.addEventListener("click", this._click);
+		}
+	}
+
+	get revisionEntries() {
+		const owner = this.target.querySelector("[name='owner']")?.checked
+			? "true"
+			: "false";
+		const groups = Array.from(
+			this.target.querySelectorAll(
+				"[data-role='remove-restriction'][data-key]",
+			),
+			(button) => ["__revision-restricted-group", button.dataset.key],
+		);
+		return [["__revision-owner", owner], ...groups];
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_owner_restricted_page_is_hidden_from_model_viewer
+	 * @features pages
+	 * @dimensions access-restrictions owner-restricted
+	 */
+	_input(event) {
+		if (event.target.name === "owner") {
+			const data = new FormData();
+			data.set("owner", event.target.checked ? "add" : "remove");
+			this._addRestriction(data);
+		}
+	}
+
+	_click(event) {
+		const button = event.target.closest("[data-role='remove-restriction']");
+		if (!button) return;
+
+		const data = new FormData();
+		data.set("group", "remove");
+		data.set("group-key", button.dataset.key);
+		this._addRestriction(data);
+	}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/005_pages/test_005e_page_access_restrictions.py::test_group_restricted_page_opens_for_member_only
+	 * @features pages
+	 * @dimensions access-restrictions group-restricted
+	 */
+	_addGroup(event) {
+		const data = new FormData();
+		data.set("group", "add");
+		Object.keys(event.detail.options).forEach((key) => {
+			data.append("group-key", key);
+		});
+		this._addRestriction(data);
+		this.restrictAccessSelect.clear({ notify: false });
+	}
+
+	async _addRestriction(data) {
+		const route = this.endpoints.viewAccess;
+		const response = await request.put(route, data);
+		if (response.ok) {
+			await withTransition(
+				() => {
+					this._replaceBadges(response.viewers);
+					this._replaceGroupList(response.group_list);
+				},
+				{ label: "page-permissions:update-restrictions" },
+			);
+		}
+	}
+
+	_replaceBadges(badges) {
+		if (!badges) return;
+
+		const badgeContainer = this.badgeContainer;
+		const newBadges = badges.map((badge) => primitives.badge(badge));
+		badgeContainer.replaceChildren(...newBadges);
+	}
+
+	_replaceGroupList(newGroupList) {
+		const groupList = this.target.querySelector(
+			"[data-role='restricted-group-list']",
+		);
+		groupList.innerHTML = newGroupList;
+	}
+
+	get badgeContainer() {
+		return this.target.querySelector("[data-role='badges']");
+	}
+
+	get visibleTo() {
+		return this.target.querySelector("[data-role='visible-to']");
+	}
+
+	get restrictAccess() {
+		return this.target.querySelector("[data-role='restrict-access']");
+	}
+
+	get html() {
+		return [this.visibleTo, this.restrictAccess];
+	}
+}
+
+export { PagePermissions };

@@ -1,2 +1,233 @@
-!function(){try{var e="undefined"!=typeof window?window:"undefined"!=typeof global?global:"undefined"!=typeof globalThis?globalThis:"undefined"!=typeof self?self:{};e.SENTRY_RELEASE={id:"0.3.0"};var n=(new e.Error).stack;n&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[n]="f05ee267-79bc-4256-b85f-bf9eeefe33d5",e._sentryDebugIdIdentifier="sentry-dbid-f05ee267-79bc-4256-b85f-bf9eeefe33d5");}catch(e){}}();import{b as m}from"./buttons.js?v=bd27c637";import{r as p}from"./foundation.js?v=bd27c637";import"./connectivity.js?v=bd27c637";import{S as u}from"./select2.js?v=bd27c637";import{S as d}from"./base.js?v=bd27c637";import"./styles.js?v=bd27c637";import"./icons.js?v=bd27c637";import"./formatting.js?v=bd27c637";import"./combobox.js?v=bd27c637";import"./primitives.js?v=bd27c637";import"./results.js?v=bd27c637";import"./submitter.js?v=bd27c637";const c={automatic:["F1","F2","F4","F4_1G"],basic:["B1","B2","B4","B4_1G","B8"]},y={automatic:"F2",basic:"B2"};class _ extends d{constructor(t){super(t),this._deployment=null,this._saveDeployment=this._saveDeployment.bind(this)}init(){this.deploymentForm=this.target.querySelector("[data-role='deployment-settings']"),this.deploymentForm&&(this.deploymentButton=m.active({existingButton:this.deploymentForm.querySelector("button[type='submit']"),text:"Save Deployment Settings",processingText:"Saving Deployment Settings",completedText:"Deployment Settings Saved",processingIcon:"spinner",completedIcon:"check"}),this.deploymentForm.addEventListener("submit",this._saveDeployment),this.deploymentForm.querySelectorAll("[data-role='deployment-select']").forEach(t=>{const e=new u(t);e.init(),this.destroyables.push(e)}),this.deploymentForm.querySelector("[name='DEPLOY_SCALING_TYPE']")?.addEventListener("change",()=>{this._syncInstanceClassOptions(),this._syncInstanceControls()}))}updated(t){this._deployment=t.deployment}postreconcile(){this._deployment&&this._renderDeployment(this._deployment)}_renderDeployment(t){if(!this.deploymentForm||!t)return;const e=this._normalizeDeployment(t);this._setDeploymentField("DEPLOY_SCALING_TYPE",e.scalingType),this._setDeploymentField("DEPLOY_WORKER_COUNT",e.workerCount),this._setDeploymentField("DEPLOY_INSTANCE_CLASS",e.instanceClass),this._setDeploymentField("DEPLOY_MAX_INSTANCES",e.maxInstances),this._setDeploymentField("DEPLOY_MIN_IDLE_INSTANCES",e.minIdleInstances),this._setDeploymentField("DEPLOY_IDLE_TIMEOUT",e.idleTimeout),this._syncInstanceClassOptions({preserveCurrent:!0}),this._syncInstanceControls(),this._updateDeploymentSummary(e)}_updateDeploymentSummary(t){const e=t.scalingType==="automatic"?"Automatic":"Basic",s=Number(t.workerCount)===1?"worker":"workers",n=Number(t.maxInstances)===1?"max instance":"max instances",o=t.scalingType==="automatic"?`${t.minIdleInstances} min idle \xB7 ${t.maxInstances} ${n}`:`${t.maxInstances} ${n}`;this.updateSummary(`${e} \xB7 ${t.workerCount} ${s} \xB7 ${t.instanceClass} \xB7 ${o}`)}_normalizeDeployment(t){const e=(...s)=>s.find(n=>n!=null&&n!=="");return{scalingType:e(t.DEPLOY_SCALING_TYPE,"basic"),workerCount:e(t.DEPLOY_WORKER_COUNT,3),instanceClass:e(t.DEPLOY_INSTANCE_CLASS,"B2"),maxInstances:e(t.DEPLOY_MAX_INSTANCES,1),minIdleInstances:e(t.DEPLOY_MIN_IDLE_INSTANCES,1),idleTimeout:e(t.DEPLOY_IDLE_TIMEOUT,"15m")}}_setDeploymentField(t,e){this.deploymentForm.querySelectorAll(`[name='${t}']`).forEach(s=>{s.value=e,s.matches("select")&&this.syncSelectBox(s,e)})}_syncInstanceClassOptions({preserveCurrent:t=!1}={}){if(!this.deploymentForm)return;const e=this.deploymentForm.querySelector("[name='DEPLOY_SCALING_TYPE']"),s=this.deploymentForm.querySelector("[name='DEPLOY_INSTANCE_CLASS']"),n=e?.value||"basic",o=c[n]||c.basic,r=Array.from(s.querySelectorAll("option"));r.forEach(i=>{const l=o.includes(i.value);i.disabled=!l,i.hidden=!l});const a=s.closest("[lp-select]")?._lp_combobox;a&&(a.items=r.filter(i=>o.includes(i.value)).map(i=>({id:i.value,name:i.textContent,kind:s.dataset.kind||"default",...JSON.parse(i.dataset.details||"{}")})),a.updatePanel(a.results.create(a.items))),!t||!o.includes(s.value)?this._setDeploymentField("DEPLOY_INSTANCE_CLASS",y[n]):this.syncSelectBox(s,s.value)}_syncInstanceControls(){const e=this.deploymentForm.querySelector("[name='DEPLOY_SCALING_TYPE']")?.value==="automatic",s=this.deploymentForm.querySelector("[data-role='basic-instance-count']"),n=this.deploymentForm.querySelector("[data-role='automatic-instance-counts']");!s||!n||(s.dataset.visible=e?"false":"true",n.dataset.visible=e?"true":"false",s.querySelectorAll("input").forEach(o=>{o.disabled=e}),n.querySelectorAll("input").forEach(o=>{o.disabled=!e}))}_showDeploymentError(t){const e=this.deploymentForm?.querySelector("[data-role='deployment-error']");e&&(e.textContent=t||"",e.dataset.visible=t?"true":"false")}async _saveDeployment(t){t.preventDefault(),t.stopPropagation(),this._showDeploymentError(""),this.deploymentButton.activate();const e=await p.post(this.endpoints.setDeploymentSettings,new FormData(this.deploymentForm));if(!e.ok){this._showDeploymentError(e.error||"Unable to save deployment."),this.deploymentButton.deactivate("Save Deployment Settings");return}this._deployment=e.deployment,this._renderDeployment(e.deployment),this.deploymentButton.deactivate()}}export{_ as SiteDeployment};
 /*! Third-party licenses: /third-party-licenses.txt */
+import { b as buttons } from './buttons.js?v=b4b0f2eb';
+import { r as request } from './foundation.js?v=b4b0f2eb';
+import './connectivity.js?v=b4b0f2eb';
+import { S as SelectBox } from './select2.js?v=b4b0f2eb';
+import { S as SiteSetting } from './base.js?v=b4b0f2eb';
+import './styles.js?v=b4b0f2eb';
+import './icons.js?v=b4b0f2eb';
+import './formatting.js?v=b4b0f2eb';
+import './combobox.js?v=b4b0f2eb';
+import './primitives.js?v=b4b0f2eb';
+import './results.js?v=b4b0f2eb';
+import './storage.js?v=b4b0f2eb';
+import './submitter.js?v=b4b0f2eb';
+
+const INSTANCE_CLASSES = {
+	automatic: ["F1", "F2", "F4", "F4_1G"],
+	basic: ["B1", "B2", "B4", "B4_1G", "B8"],
+};
+const DEFAULT_INSTANCE_CLASS = {
+	automatic: "F2",
+	basic: "B2",
+};
+
+/**
+ * @testable true
+ * @tests tests_e2e/008_users/test_008c_user_settings.py::test_site_settings_deployment_form_saves_and_updates_summary
+ * @features admin
+ * @dimensions deployment-settings metadata scaling-controls
+ */
+class SiteDeployment extends SiteSetting {
+	constructor(attributes) {
+		super(attributes);
+		this._deployment = null;
+		this._saveDeployment = this._saveDeployment.bind(this);
+	}
+
+	init() {
+		this.deploymentForm = this.target.querySelector(
+			"[data-role='deployment-settings']",
+		);
+		if (!this.deploymentForm) return;
+
+		this.deploymentButton = buttons.active({
+			existingButton: this.deploymentForm.querySelector(
+				"button[type='submit']",
+			),
+			text: "Save Deployment Settings",
+			processingText: "Saving Deployment Settings",
+			completedText: "Deployment Settings Saved",
+			processingIcon: "spinner",
+			completedIcon: "check",
+		});
+
+		this.deploymentForm.addEventListener("submit", this._saveDeployment);
+		this.deploymentForm
+			.querySelectorAll("[data-role='deployment-select']")
+			.forEach((element) => {
+				const select = new SelectBox(element);
+				select.init();
+				this.destroyables.push(select);
+			});
+		this.deploymentForm
+			.querySelector("[name='DEPLOY_SCALING_TYPE']")
+			?.addEventListener("change", () => {
+				this._syncInstanceClassOptions();
+				this._syncInstanceControls();
+			});
+	}
+
+	updated(response) {
+		this._deployment = response.deployment;
+	}
+
+	postreconcile() {
+		if (this._deployment) this._renderDeployment(this._deployment);
+	}
+
+	_renderDeployment(deployment) {
+		if (!this.deploymentForm || !deployment) return;
+
+		const data = this._normalizeDeployment(deployment);
+
+		this._setDeploymentField("DEPLOY_SCALING_TYPE", data.scalingType);
+		this._setDeploymentField("DEPLOY_WORKER_COUNT", data.workerCount);
+		this._setDeploymentField("DEPLOY_INSTANCE_CLASS", data.instanceClass);
+		this._setDeploymentField("DEPLOY_MAX_INSTANCES", data.maxInstances);
+		this._setDeploymentField(
+			"DEPLOY_MIN_IDLE_INSTANCES",
+			data.minIdleInstances,
+		);
+		this._setDeploymentField("DEPLOY_IDLE_TIMEOUT", data.idleTimeout);
+
+		this._syncInstanceClassOptions({ preserveCurrent: true });
+		this._syncInstanceControls();
+		this._updateDeploymentSummary(data);
+	}
+
+	_updateDeploymentSummary(deployment) {
+		const scaling =
+			deployment.scalingType === "automatic" ? "Automatic" : "Basic";
+		const workers = Number(deployment.workerCount) === 1 ? "worker" : "workers";
+		const maxInstances =
+			Number(deployment.maxInstances) === 1 ? "max instance" : "max instances";
+		const instanceText =
+			deployment.scalingType === "automatic"
+				? `${deployment.minIdleInstances} min idle · ${deployment.maxInstances} ${maxInstances}`
+				: `${deployment.maxInstances} ${maxInstances}`;
+		this.updateSummary(
+			`${scaling} · ${deployment.workerCount} ${workers} · ${deployment.instanceClass} · ${instanceText}`,
+		);
+	}
+
+	_normalizeDeployment(deployment) {
+		const first = (...values) =>
+			values.find(
+				(value) => value !== undefined && value !== null && value !== "",
+			);
+		return {
+			scalingType: first(deployment.DEPLOY_SCALING_TYPE, "basic"),
+			workerCount: first(deployment.DEPLOY_WORKER_COUNT, 3),
+			instanceClass: first(deployment.DEPLOY_INSTANCE_CLASS, "B2"),
+			maxInstances: first(deployment.DEPLOY_MAX_INSTANCES, 1),
+			minIdleInstances: first(deployment.DEPLOY_MIN_IDLE_INSTANCES, 1),
+			idleTimeout: first(deployment.DEPLOY_IDLE_TIMEOUT, "15m"),
+		};
+	}
+
+	_setDeploymentField(name, value) {
+		this.deploymentForm
+			.querySelectorAll(`[name='${name}']`)
+			.forEach((field) => {
+				field.value = value;
+				if (field.matches("select")) this.syncSelectBox(field, value);
+			});
+	}
+
+	_syncInstanceClassOptions({ preserveCurrent = false } = {}) {
+		if (!this.deploymentForm) return;
+		const scaling = this.deploymentForm.querySelector(
+			"[name='DEPLOY_SCALING_TYPE']",
+		);
+		const instanceClass = this.deploymentForm.querySelector(
+			"[name='DEPLOY_INSTANCE_CLASS']",
+		);
+		const scalingType = scaling?.value || "basic";
+		const allowed = INSTANCE_CLASSES[scalingType] || INSTANCE_CLASSES.basic;
+
+		const options = Array.from(instanceClass.querySelectorAll("option"));
+		options.forEach((option) => {
+			const visible = allowed.includes(option.value);
+			option.disabled = !visible;
+			option.hidden = !visible;
+		});
+
+		const combobox = instanceClass.closest("[lp-select]")?._lp_combobox;
+		if (combobox) {
+			combobox.items = options
+				.filter((option) => allowed.includes(option.value))
+				.map((option) => ({
+					id: option.value,
+					name: option.textContent,
+					kind: instanceClass.dataset.kind || "default",
+					...JSON.parse(option.dataset.details || "{}"),
+				}));
+			combobox.updatePanel(combobox.results.create(combobox.items));
+		}
+
+		if (!preserveCurrent || !allowed.includes(instanceClass.value)) {
+			this._setDeploymentField(
+				"DEPLOY_INSTANCE_CLASS",
+				DEFAULT_INSTANCE_CLASS[scalingType],
+			);
+		} else {
+			this.syncSelectBox(instanceClass, instanceClass.value);
+		}
+	}
+
+	_syncInstanceControls() {
+		const scaling = this.deploymentForm.querySelector(
+			"[name='DEPLOY_SCALING_TYPE']",
+		);
+		const automatic = scaling?.value === "automatic";
+		const basicGroup = this.deploymentForm.querySelector(
+			"[data-role='basic-instance-count']",
+		);
+		const automaticGroup = this.deploymentForm.querySelector(
+			"[data-role='automatic-instance-counts']",
+		);
+		if (!basicGroup || !automaticGroup) return;
+
+		basicGroup.dataset.visible = automatic ? "false" : "true";
+		automaticGroup.dataset.visible = automatic ? "true" : "false";
+		basicGroup.querySelectorAll("input").forEach((input) => {
+			input.disabled = automatic;
+		});
+		automaticGroup.querySelectorAll("input").forEach((input) => {
+			input.disabled = !automatic;
+		});
+	}
+
+	_showDeploymentError(message) {
+		const error = this.deploymentForm?.querySelector(
+			"[data-role='deployment-error']",
+		);
+		if (!error) return;
+		error.textContent = message || "";
+		error.dataset.visible = message ? "true" : "false";
+	}
+
+	async _saveDeployment(event) {
+		event.preventDefault();
+		event.stopPropagation();
+
+		this._showDeploymentError("");
+		this.deploymentButton.activate();
+		const response = await request.post(
+			this.endpoints.setDeploymentSettings,
+			new FormData(this.deploymentForm),
+		);
+		if (!response.ok) {
+			this._showDeploymentError(response.error || "Unable to save deployment.");
+			this.deploymentButton.deactivate("Save Deployment Settings");
+			return;
+		}
+
+		this._deployment = response.deployment;
+		this._renderDeployment(response.deployment);
+		this.deploymentButton.deactivate();
+	}
+}
+
+export { SiteDeployment };
