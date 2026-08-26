@@ -682,10 +682,11 @@ def _bind_key_to_client_database(client, key):
     client_database_value = getattr(client, "database", key.database)
     if str(key.project or "") != str(client_project or ""):
         raise DataLifecycleError("Datastore write key belongs to another project.")
-    key_database = str(key.database or "")
-    client_database = str(client_database_value or "")
-    if key_database == client_database:
+    key_database_value = key.database
+    if key_database_value == client_database_value:
         return key
+    key_database = str(key_database_value or "")
+    client_database = str(client_database_value or "")
     if {key_database, client_database}.issubset({"", DEFAULT_DATABASE_ID}):
         return Key(
             *key.flat_path,
@@ -704,6 +705,12 @@ def _bind_entities_to_client_database(client, entities):
     entities = list(entities)
     for entity in entities:
         entity.key = _bind_key_to_client_database(client, entity.key)
+        if entity.key.database != getattr(client, "database", entity.key.database):
+            raise DataLifecycleError(
+                "Datastore write key could not be bound to the active client "
+                f"database: key={entity.key.database!r}, "
+                f"client={getattr(client, 'database', None)!r}."
+            )
     return entities
 
 

@@ -1109,12 +1109,13 @@ def test_restore_assets_rebinds_owner_to_new_generation(monkeypatch):
 
 
 # @matrix data-lifecycle : default-database-write-partition restore-key-normalization
-def test_restore_default_database_writes_use_client_partition():
+@pytest.mark.parametrize("key_database", [None, "(default)"])
+def test_restore_default_database_writes_use_client_partition(key_database):
     explicit_default_key = Key(
         "instances",
         "page",
         project=PROJECT_ID,
-        database="(default)",
+        database=key_database,
     )
     row = _entity(
         explicit_default_key,
