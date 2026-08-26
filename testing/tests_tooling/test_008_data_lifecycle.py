@@ -231,6 +231,45 @@ def test_provider_context_always_uses_default_database_and_recovery_bucket():
     assert context.recovery_bucket.startswith("test-recovery-")
 
 
+# @matrix data-lifecycle migrations : read-only asset-generation prerequisite
+def test_lifecycle_requires_completed_asset_generation_migration(monkeypatch):
+    from config import SETTINGS
+    from config.data_migrations import ASSET_GENERATION_MIGRATION_ID
+
+    records = {}
+
+    class Client:
+        def key(self, kind, identifier):
+            return kind, identifier
+
+        def get(self, key):
+            return records.get(key)
+
+    client = Client()
+    context = ProviderContext(
+        PROJECT_ID,
+        "(default)",
+        BUCKET,
+        "0.3.0",
+        datastore_client_factory=lambda **_kwargs: client,
+    )
+    monkeypatch.setattr(SETTINGS, "APP", {"PREFIX": "test-"})
+    key = (
+        "test-site",
+        f"data-migration:{ASSET_GENERATION_MIGRATION_ID}",
+    )
+
+    with pytest.raises(DataLifecycleError, match="select Apply Updates"):
+        context.require_asset_generation_migration()
+
+    records[key] = {
+        "ledger_schema": 1,
+        "migration_id": ASSET_GENERATION_MIGRATION_ID,
+        "state": "complete",
+    }
+    assert context.require_asset_generation_migration() == records[key]
+
+
 # @matrix data-lifecycle : cache-invalidation framework-neutral restore
 def test_restore_cache_invalidation_uses_setup_redis_connection(monkeypatch):
     from config import SETTINGS
@@ -421,6 +460,7 @@ def _backup_context():
         bucket=bucket,
         starts=0,
         expected_snapshot=datetime(2026, 8, 23, 12, tzinfo=timezone.utc),
+        require_asset_generation_migration=lambda database: database == "(default)",
     )
 
     def start_export(output, *, snapshot_time):
@@ -500,18 +540,13 @@ def test_backup_resumes_provider_operation_and_publishes_manifest_last(tmp_path)
     assert fresh.load() is None
 
 
-# @matrix data-lifecycle : backup migration-gate point-in-time
-def test_backup_migrates_before_selecting_a_live_snapshot(tmp_path):
+# @matrix data-lifecycle : backup point-in-time framework-neutral
+def test_backup_selects_completed_whole_minute_without_runtime_action(tmp_path):
     context = _backup_context()
-    context.expected_snapshot = datetime(2026, 8, 23, 12, 1, tzinfo=timezone.utc)
-    calls = []
-    context.run_runtime_action = lambda action, database: (
-        calls.append((action, database)) or {"status": "current"}
-    )
+    context.expected_snapshot = datetime(2026, 8, 23, 11, 59, tzinfo=timezone.utc)
     context.now = lambda: datetime(
         2026, 8, 23, 12, 0, 20, tzinfo=timezone.utc
     )
-    context.sleep = lambda seconds: calls.append(("sleep", seconds))
     checkpoint = LifecycleCheckpoint(
         PROJECT_ID,
         ["backup", "create", "live"],
@@ -520,8 +555,7 @@ def test_backup_migrates_before_selecting_a_live_snapshot(tmp_path):
 
     manifest = create_backup(context, backup_id=BACKUP_ID, checkpoint=checkpoint)
 
-    assert manifest.snapshot_time == "2026-08-23T12:01:00Z"
-    assert calls == [("migrate", "(default)"), ("sleep", 41.0)]
+    assert manifest.snapshot_time == "2026-08-23T11:59:00Z"
 
 
 # @matrix data-lifecycle : backup-list manifest
@@ -1393,6 +1427,10 @@ class _RestoreContext:
     application_version = "0.3.0"
     recovery_bucket = BUCKET
 
+    def require_asset_generation_migration(self, database_id):
+        assert database_id == "(default)"
+        return {"migration_id": "AST-001", "state": "complete"}
+
     def database(self, database_id=None):
         if database_id not in {None, "(default)"}:
             raise ProviderNotFound("absent")
@@ -1806,10 +1844,6 @@ def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
         def datastore_client(self, database):
             self.calls.append(("client", database))
             return object()
-
-        def run_runtime_action(self, action, database):
-            self.calls.append((action, database))
-            return {"status": "current"}
 
         def invalidate_cache(self):
             self.calls.append(("invalidate-cache",))

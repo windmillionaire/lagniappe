@@ -13,6 +13,11 @@ from uuid import uuid4
 
 from google.api_core import exceptions as google_exceptions
 from google.cloud.datastore import Entity as DatastoreEntity
+from config.data_migrations import (
+    ASSET_GENERATION_MIGRATION_ID,
+    LEDGER_SCHEMA_VERSION,
+    migration_status_identifier,
+)
 from config.datastore import encode_urlsafe_key
 
 from lagniappe import CONFIG
@@ -28,10 +33,8 @@ from .migration_steps import (
 )
 
 
-LEDGER_SCHEMA_VERSION = 1
 MIGRATION_CHUNK_SIZE = 100
 MIGRATION_LEASE_SECONDS = 600
-MIGRATION_STATUS_PREFIX = "data-migration:"
 MIGRATION_CONTROL_ID = "data-migrations-control"
 MAX_RECORDED_ATTEMPTS = 5
 MAX_RECORDED_ERRORS = 25
@@ -284,7 +287,7 @@ MIGRATION_CATALOG = (
     ),
     MigrationDefinition(
         sequence=3,
-        id="AST-001",
+        id=ASSET_GENERATION_MIGRATION_ID,
         introduced_in="0.3",
         label="Asset generation metadata",
         runner=_run_asset_generation_migration,
@@ -514,7 +517,7 @@ def _parse_iso(value):
 # @covered-by lagniappe/core/tools/database/migrations.py::run_data_migrations
 # @reason deterministic site key construction is exercised through ledger tests
 def _migration_key(datastore, migration_id):
-    return datastore.key("site", f"{MIGRATION_STATUS_PREFIX}{migration_id}")
+    return datastore.key(KINDS.site.value, migration_status_identifier(migration_id))
 
 
 # @testable false

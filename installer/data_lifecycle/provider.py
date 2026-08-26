@@ -6,11 +6,8 @@ from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import hashlib
 import json
-import os
 from pathlib import Path
 import re
-import subprocess
-import sys
 import tempfile
 import time
 from typing import Any, Callable
@@ -298,7 +295,6 @@ class ProviderContext:
     storage_client: Any = None
     datastore_client_factory: Callable[..., Any] | None = None
     cloud_tasks_client: Any = None
-    subprocess_runner: Callable[..., Any] | None = None
     sleep: Callable[[float], None] = time.sleep
     monotonic: Callable[[], float] = time.monotonic
     now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)
@@ -562,6 +558,39 @@ class ProviderContext:
 
             factory = datastore.Client
         return factory(project=self.project_id, database=database_id)
+
+    # @testable true
+    # @tests tests_tooling/test_008_data_lifecycle.py::test_lifecycle_requires_completed_asset_generation_migration
+    # @matrix data-lifecycle migrations : read-only asset-generation prerequisite
+    def require_asset_generation_migration(self, database_id="(default)"):
+        """Require the application-owned asset-generation update without running it."""
+        from config import SETTINGS
+        from config.data_migrations import (
+            ASSET_GENERATION_MIGRATION_ID,
+            LEDGER_SCHEMA_VERSION,
+            migration_status_identifier,
+        )
+
+        client = self.datastore_client(database_id)
+        prefix = str(SETTINGS.APP.get("PREFIX") or "")
+        key = client.key(
+            f"{prefix}site",
+            migration_status_identifier(ASSET_GENERATION_MIGRATION_ID),
+        )
+        record = client.get(key)
+        valid = (
+            record is not None
+            and record.get("ledger_schema") == LEDGER_SCHEMA_VERSION
+            and record.get("migration_id") == ASSET_GENERATION_MIGRATION_ID
+            and record.get("state") == "complete"
+        )
+        if not valid:
+            raise DataLifecycleError(
+                f"Asset generation update {ASSET_GENERATION_MIGRATION_ID} is not "
+                "complete. Sign in as the Owner, open Admin → Site Settings → "
+                "Maintenance, select Apply Updates, and retry this command."
+            )
+        return record
 
     # @testable true
     # @tests tests_tooling/test_008_data_lifecycle.py::test_queue_snapshot_preserves_full_task_definitions
@@ -1005,43 +1034,6 @@ class ProviderContext:
                 )
             self.sleep(POLL_DELAYS[min(attempt, len(POLL_DELAYS) - 1)])
             attempt += 1
-
-    def run_runtime_action(self, action: str, database_id: str):
-        action = str(action or "").strip()
-        if action != "migrate":
-            raise DataLifecycleError("Data-lifecycle runtime action is invalid.")
-        runner = self.subprocess_runner or subprocess.run
-
-        if validate_database_id(database_id) != "(default)":
-            raise DataLifecycleError("Runtime recovery actions only support (default).")
-        environment = os.environ.copy()
-        environment["FLASK_ENV"] = "production"
-        environment["TASK_QUEUE_ENABLED"] = "false"
-        result = runner(
-            [
-                sys.executable,
-                "-m",
-                "installer.data_lifecycle.runtime",
-                action,
-            ],
-            cwd=str(Path(__file__).resolve().parents[2]),
-            env=environment,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=OPERATION_TIMEOUT_SECONDS,
-        )
-        if result.returncode != 0:
-            detail = str(result.stderr or result.stdout or "").strip()
-            raise DataLifecycleError(
-                f"Data-lifecycle runtime action {action} failed: {detail}"
-            )
-        try:
-            return json.loads(str(result.stdout or "").splitlines()[-1])
-        except (IndexError, json.JSONDecodeError) as error:
-            raise DataLifecycleError(
-                f"Data-lifecycle runtime action {action} returned malformed output."
-            ) from error
 
     # @testable true
     # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_cache_invalidation_uses_setup_redis_connection

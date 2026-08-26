@@ -112,7 +112,7 @@ def data_protection_status(admin_client=None):
 
     recovery_sets = []
     try:
-        raw = DATA.public_bucket.blob(RUNTIME_CATALOG_OBJECT).download_as_text(
+        raw = DATA.private_bucket.blob(RUNTIME_CATALOG_OBJECT).download_as_text(
             encoding="utf-8"
         )
         catalog = json.loads(raw)

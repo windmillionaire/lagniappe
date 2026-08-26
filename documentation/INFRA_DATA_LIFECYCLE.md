@@ -24,9 +24,11 @@ Setup enables the Cloud Firestore API before configuring a seven-day Firestore
 PITR window, daily native backups retained for 14 days, Sunday backups retained
 for 14 weeks, and 14-week noncurrent generation retention on runtime buckets.
 Provider data protection is reconciled as its own setup step; deferred-job
-Scheduler setup does not import or execute the application runtime. Creating an
-exact recovery set runs pending data migrations immediately before choosing its
-snapshot so the set contains current asset-generation metadata.
+Scheduler setup does not import or execute the application runtime. Lifecycle
+commands preserve stored application records as they exist and never run the
+Owner-controlled data migration catalog. Backup and restore fail read-only if
+the official asset-generation migration is not complete, with directions to
+the Owner's **Apply Updates** action.
 
 The recovery bucket has no browser CORS and no runtime-account access. The
 human installer/deployer has object administration. `GIBBERISH` deterministically
@@ -42,7 +44,9 @@ are neither listed nor consumed.
 
 `backup materialize` converts a selected native backup into the same
 self-contained recovery-set format. Delete invalidates the manifest before
-removing the exact prefix.
+removing the exact prefix. A sanitized summary is projected into the private
+runtime bucket for the authenticated Admin view; recovery objects and provider
+URIs remain confined to the operator-only recovery bucket.
 
 ## Portable archives
 
@@ -95,19 +99,20 @@ A mutating restore:
 6. rebinds entity asset descriptors to the copied generations;
 7. discards nonterminal jobs, locks, Scheduler control, and active operation
    pointers;
-8. runs data migrations and relation-aware validation, then clears Redis so no
-   pre-restore cache entry can survive the database merge;
+8. performs relation-aware validation, then clears Redis so no pre-restore
+   cache entry can survive the database merge;
 9. regenerates only task-uncompletion deliveries represented by durable Task
    markers; and
 10. restores traffic and queue/Scheduler state, writes an audit, and deletes
     the safety clone.
 
 After a successful restore, the console directs the Owner to **Admin → Site
-Settings → Maintenance → Refresh Cache**. That explicit application-owned
-rebuild must complete before cache-backed search and navigation are treated as
-verified. The installer clears Redis using the saved setup connection, but it
-does not import Flask or application authorization to rebuild user-scoped cache
-projections.
+Settings → Maintenance**, where the Owner applies any pending updates and then
+selects **Refresh Cache**. Those explicit application-owned actions must complete
+before cache-backed search and navigation are treated as verified. The installer
+clears Redis using the saved setup connection, but it does not import application
+migrations, Flask, or authorization to transform records or rebuild user-scoped
+cache projections.
 
 Cloud Tasks has no atomic list-and-purge receipt; the queue audit is an
 observation after producers are paused. Ordinary purged deliveries are not

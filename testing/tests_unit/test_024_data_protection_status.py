@@ -72,7 +72,7 @@ def test_data_protection_status_is_sanitized_and_read_only(monkeypatch):
     monkeypatch.setattr(protection.CONFIG, "GOOGLE_CLOUD_PROJECT", "project-1")
     monkeypatch.setattr(
         protection.DATA,
-        "_public_bucket",
+        "_private_bucket",
         SimpleNamespace(blob=lambda name: _Blob()),
     )
 

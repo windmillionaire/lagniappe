@@ -149,8 +149,8 @@ def _refresh_runtime_catalog(context):
         }
         for item in list_backups(context)
     ]
-    public_name = storage_bucket_names(SETTINGS.APP)["public"]
-    blob = context.storage.bucket(public_name).blob(RUNTIME_CATALOG_OBJECT)
+    private_name = storage_bucket_names(SETTINGS.APP)["private"]
+    blob = context.storage.bucket(private_name).blob(RUNTIME_CATALOG_OBJECT)
     blob.upload_from_string(
         json.dumps(
             {
@@ -197,8 +197,8 @@ def _publish_catalog(context, object_name, payload):
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_backup_resumes_provider_operation_and_publishes_manifest_last
-# @tests tests_tooling/test_008_data_lifecycle.py::test_backup_migrates_before_selecting_a_live_snapshot
-# @matrix data-lifecycle : backup manifest-last migration-gate point-in-time resume
+# @tests tests_tooling/test_008_data_lifecycle.py::test_backup_selects_completed_whole_minute_without_runtime_action
+# @matrix data-lifecycle : backup manifest-last point-in-time resume
 def create_backup(
     context: ProviderContext | None = None,
     *,
@@ -223,6 +223,7 @@ def create_backup(
         if manifest_blob.exists():
             manifest, _blob = load_backup(context, backup_id)
             return manifest
+    context.require_asset_generation_migration(source_database_id)
     if state:
         backup_id = validate_backup_id(state["backup_id"])
         if state.get("manifest"):
@@ -230,20 +231,8 @@ def create_backup(
             return manifest
     else:
         backup_id = validate_backup_id(backup_id or new_backup_id())
-        if (
-            snapshot_time is None
-            and point_in_time_read
-            and source_database_id == "(default)"
-        ):
-            record_step("run current data migrations before selecting the backup snapshot")
-            migration = context.run_runtime_action("migrate", "(default)")
-            if migration.get("status") != "current":
-                raise DataLifecycleError("Database migrations are not current for backup.")
-            current = context.now().astimezone(timezone.utc)
-            snapshot_time = current.replace(second=0, microsecond=0) + timedelta(
-                minutes=1
-            )
-            context.sleep(max(0.0, (snapshot_time - current).total_seconds()) + 1.0)
+        if snapshot_time is None:
+            snapshot_time = context.now().astimezone(timezone.utc) - timedelta(minutes=1)
         selected_snapshot = _snapshot_time(snapshot_time)
         checkpoint.start(
             backup_id,

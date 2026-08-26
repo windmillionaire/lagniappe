@@ -82,6 +82,8 @@ def restore_plan(backup_id, context=None):
     if validate_database_id(context.database_id) != DEFAULT_DATABASE:
         raise DataLifecycleError("In-place restore requires the canonical (default) database.")
 
+    context.require_asset_generation_migration(DEFAULT_DATABASE)
+
     backup, _blob = load_backup(context, backup_id)
     active = context.database(DEFAULT_DATABASE)
     mode = str(active.get("type") or active.get("databaseType") or "").casefold().replace("_", "-")
@@ -193,7 +195,7 @@ def restore_plan(backup_id, context=None):
             "clone the quiescent default database and catalog its asset generations",
             "import snapshot keys into (default), overwriting matches and restoring missing keys",
             "restore exact asset bytes and bind entities to the new object generations",
-            "discard nonterminal execution state, migrate, invalidate caches, and validate",
+            "discard nonterminal execution state, validate restored data, and invalidate caches",
             "regenerate durable scheduled-task uncompletion wake-ups from merged data",
             "restore traffic and prior queue/scheduler state",
             "delete the temporary safety clone and publish the completion audit record",
@@ -562,9 +564,6 @@ def restore_backup(
             kind_prefix=plan["kind_prefix"],
         )
         checkpoint.update("normalized", normalized=True, normalization=result)
-    if not checkpoint.payload.get("migrated"):
-        result = context.run_runtime_action("migrate", DEFAULT_DATABASE)
-        checkpoint.update("migrated", migrated=True, migration=result)
     if not checkpoint.payload.get("target_validated"):
         result = validate_restored_database(
             context.datastore_client(DEFAULT_DATABASE),
@@ -608,7 +607,8 @@ def restore_backup(
     )
     print(
         "Cache data was cleared. Sign in as the Owner, then open "
-        "Admin → Site Settings → Maintenance and select Refresh Cache."
+        "Admin → Site Settings → Maintenance. Select Apply Updates, then "
+        "Refresh Cache."
     )
     return plan
 
