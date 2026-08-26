@@ -1527,6 +1527,14 @@ def test_html_archive_renders_owner_sections_and_local_navigation(tmp_path):
         backup_id=BACKUP_ID,
         created_at="2026-08-23T12:00:00Z",
         consistency="eventually consistent",
+        warnings=[
+            {
+                "id": "site-notice",
+                "code": "unknown-kind",
+                "category": "unknown-kind:site",
+                "count": 12,
+            }
+        ],
     ).build(records)
     assert result["pages"] == 12
     index = (tmp_path / "site" / "index.html").read_text()
@@ -1551,8 +1559,11 @@ def test_html_archive_renders_owner_sections_and_local_navigation(tmp_path):
         / "index.html"
     ).read_text()
     assert "Projects (1)" in index and "Categories (1)" in index
-    assert "Pages (1)" in index and "Conversations (private) (1)" in index
+    assert "Conversations (private) (1)" in index
+    assert "<h2>Pages (" not in index and "<h2>Model tasks (" not in index
     assert "<h2>Tasks (" not in index and "<h2>Files (" not in index
+    assert "1 conversion notice category was recorded" in index
+    assert "No archived file failed to download" in index
     assert "Users" not in index and "Owner profile" not in index
     assert (tmp_path / "site" / "users" / "reservedusers" / "index.html").is_file()
     assert (tmp_path / "site" / "form" / "reservedform1" / "index.html").is_file()
@@ -1573,17 +1584,18 @@ def test_html_archive_renders_owner_sections_and_local_navigation(tmp_path):
     assert "Archive home" in conversation
 
 
-def _archive_bundle(root, *, records=None):
+def _archive_bundle(root, *, records=None, warnings=None):
     root.mkdir(parents=True)
     backup = _manifest()
     records = list(records or [_record()])
+    warnings = list(warnings or [])
     created = "2026-08-23T12:02:00Z"
     catalog, html_result = _write_bundle(
         root,
         backup=backup,
         records=records,
         assets=[],
-        warnings=[],
+        warnings=warnings,
         asset_window={"started_at": created, "completed_at": created, "consistency": "recovery-set-generations"},
         created_at=created,
     )
@@ -1591,7 +1603,7 @@ def _archive_bundle(root, *, records=None):
         root,
         backup=backup,
         catalog=catalog,
-        warnings=[],
+        warnings=warnings,
         html_result=html_result,
         created_at=created,
     )
@@ -1607,6 +1619,55 @@ def test_archive_validation_accepts_canonical_directory_and_zip(tmp_path):
     output = tmp_path / "bundle.zip"
     archive_module._publish_zip(bundle, output, manifest)
     assert validate_archive(output)["archive_id"] == BACKUP_ID
+
+
+# @matrix portable-archive : conversion-notices owner-readable-readme
+def test_archive_readme_explains_conversion_notices(tmp_path):
+    bundle = tmp_path / "notices-bundle"
+    warnings = [
+        {
+            "id": "analytics",
+            "code": "unknown-kind",
+            "category": "unknown-kind:analytics",
+            "count": 1,
+        },
+        {
+            "id": "history-identity",
+            "code": "invalid-hash",
+            "category": "invalid-hash:document_history",
+            "count": 5,
+        },
+        {
+            "id": "site",
+            "code": "unknown-kind",
+            "category": "unknown-kind:site",
+            "count": 12,
+        },
+        {
+            "id": "notification",
+            "code": "excluded-type",
+            "category": "excluded-type:notification",
+            "count": 1,
+        },
+        {
+            "id": "history-excluded",
+            "code": "excluded-type",
+            "category": "excluded-type:document_history",
+            "count": 5,
+        },
+    ]
+    manifest = _archive_bundle(bundle, warnings=warnings)
+    readme = (bundle / "README.md").read_text()
+
+    assert manifest["archive_status"] == "degraded"
+    assert "Status: `complete with 5 conversion notice categories`" in readme
+    assert "not a count of missing files" in readme
+    assert "1 operational analytics record was omitted" in readme
+    assert "12 internal site/configuration records were omitted" in readme
+    assert "1 transient notification record was intentionally omitted" in readme
+    assert "same 5 omitted document-history records" in readme
+    assert "5 historical document revisions were intentionally omitted" in readme
+    assert validate_archive(bundle)["status"] == "degraded"
 
 
 # @matrix portable-archive : owner-scoped-children validation

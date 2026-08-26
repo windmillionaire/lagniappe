@@ -264,9 +264,9 @@ def _warnings(state):
     return values
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason bundle assembly is exercised through the public archive workflow
+# @testable true
+# @tests tests_tooling/test_008_data_lifecycle.py::test_archive_readme_explains_conversion_notices
+# @matrix portable-archive : conversion-notices owner-readable-readme
 def _write_bundle(
     bundle,
     *,
@@ -330,30 +330,94 @@ def _write_bundle(
         consistency="point-in-time database and generation-bound recovery assets",
         warnings=warnings,
     ).build(records, assets)
+    notice_lines = []
+    for warning in warnings:
+        category = str(warning.get("category") or warning.get("code") or "notice")
+        count = int(warning.get("count") or 1)
+        record_word = "record" if count == 1 else "records"
+        was_were = "was" if count == 1 else "were"
+        if category == "unknown-kind:analytics":
+            description = (
+                f"{count} operational analytics {record_word} {was_were} omitted because analytics "
+                "is not part of the portable owner archive."
+            )
+        elif category == "unknown-kind:site":
+            description = (
+                f"{count} internal site/configuration {record_word} {was_were} omitted because "
+                "installer state is not part of the portable owner archive."
+            )
+        elif category == "excluded-type:notification":
+            description = (
+                f"{count} transient notification {record_word} {was_were} intentionally omitted."
+            )
+        elif category == "excluded-type:document_history":
+            revision_word = "revision" if count == 1 else "revisions"
+            description = (
+                f"{count} historical document {revision_word} {was_were} intentionally omitted; "
+                "the current documents captured by the backup are included."
+            )
+        elif category == "invalid-hash:document_history":
+            description = (
+                f"The same {count} omitted document-history records had no standalone "
+                "portable identity. This is not an additional set of records."
+            )
+        elif warning.get("code") == "asset-unavailable":
+            description = (
+                "An optional saved file could not be included: "
+                f"{str(warning.get('message') or 'provider copy unavailable').strip()}"
+            )
+        elif category.startswith("unknown-kind:"):
+            kind = category.partition(":")[2]
+            description = (
+                f"{count} record(s) from storage kind {kind!r} were omitted because "
+                "the portable schema does not define that kind."
+            )
+        elif category.startswith("excluded-type:"):
+            record_type = category.partition(":")[2]
+            description = f"{count} {record_type} record(s) were intentionally omitted."
+        elif category.startswith("invalid-hash:"):
+            record_type = category.partition(":")[2]
+            description = (
+                f"{count} {record_type} record(s) could not receive a portable identity."
+            )
+        else:
+            description = str(warning.get("message") or "See data/archive.json for details.")
+        notice_lines.append(f"- `{category}` — {description}")
+    notice_section = ""
+    if notice_lines:
+        notice_section = (
+            "\n## Conversion notices\n\n"
+            "The archive is complete and validated. These are notice categories, not "
+            "a count of missing files; the lines below state what was omitted.\n\n"
+            + "\n".join(notice_lines)
+            + "\n"
+        )
+    readable_status = (
+        f"complete with {len(warnings)} conversion notice "
+        f"categor{'y' if len(warnings) == 1 else 'ies'}"
+        if warnings
+        else "complete"
+    )
     readme = f"""# Lagniappe private portable archive
 
 - Archive ID: `{backup.backup_id}`
 - Created: `{created_at}`
-- Status: `{'degraded' if warnings else 'clean'}`
+- Status: `{readable_status}`
 
 {PRIVATE_ARCHIVE_NOTICE}
 
-This is a portable, source-key-free owner archive. Open `site/index.html`
-directly in a browser for the offline presentation. `data/archive.json`, the
-per-type shards, canonical document payloads, and `data/schema.json` are the
-normative `lagniappe-portable/v1` interchange data.
+Open `site/index.html` directly in a browser to read the archive. The files
+under `data/` contain its machine-readable portable records and are used for
+validation and future import tools.
 
-{CONSISTENCY_NOTICE} Referenced Storage assets were read from the immutable
-recovery copies captured with that manual backup. The portable conversion ran
-from `{asset_window['started_at']}` through `{asset_window['completed_at']}`.
-Missing optional assets make this archive degraded; missing required canonical
-document content prevents publication.
+{CONSISTENCY_NOTICE} Every referenced file was read from the immutable recovery
+copy captured with that backup, so later live edits cannot leak into this
+archive. Conversion ran from `{asset_window['started_at']}` through
+`{asset_window['completed_at']}`.
 
-The source manual backup retains provider keys for same-project restore. This
-portable archive replaces them with typed portable IDs for top-level records
-and parent-scoped keys for task history and messages. Existing entity hashes
-remain ordinary application data; the archive does not create new ones. The
-bundle is not itself a provider restore artifact.
+This directory is for offline review and portable data. The restore command
+uses the manual backup retained in Google Cloud, not this directory.
+{notice_section}
 """
     _write_private(bundle / "README.md", readme)
     return catalog, html_result

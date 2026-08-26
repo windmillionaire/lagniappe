@@ -17,8 +17,6 @@ from .provider import DataLifecycleError
 INDEX_SECTIONS = (
     ("project", "Projects"),
     ("category", "Categories"),
-    ("page", "Pages"),
-    ("model", "Model tasks"),
     ("note", "Notes"),
     ("report", "Reports"),
     ("form", "Forms"),
@@ -27,7 +25,7 @@ INDEX_SECTIONS = (
     ("public_group", "Public groups"),
     ("message_conversation", "Conversations (private)"),
 )
-DETAIL_TYPES = {"task", "file"}
+LINKED_TYPES = {"page", "model", "task", "file"}
 REFERENCE_PATTERN = re.compile(
     r"\Aref:(?:(?P<namespace>[^:]+):)?(?P<type>[^:]+):(?P<id>[^:]+)\Z"
 )
@@ -191,10 +189,19 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
             "<div class='search'><label>Search <input id='search' type='search'></label><ul id='search-results'></ul></div>",
         ]
         if self.warnings:
+            asset_failure = any(
+                warning.get("code") == "asset-unavailable"
+                for warning in self.warnings
+            )
+            explanation = (
+                "One or more optional files could not be included."
+                if asset_failure
+                else "No archived file failed to download."
+            )
             content.append(
-                f"<p class='warning'>{len(self.warnings)} conversion notice(s). "
-                "Some internal or optional records were omitted; "
-                "<a href='../README.md'>review the archive notes</a>.</p>"
+                f"<p class='warning'>{len(self.warnings)} conversion notice "
+                f"categor{'y was' if len(self.warnings) == 1 else 'ies were'} recorded. "
+                f"{explanation} <a href='../README.md'>Review the details</a>.</p>"
             )
         cards = []
         for semantic_type, label in INDEX_SECTIONS:
@@ -595,7 +602,7 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
                 return False
         return identity["type"] in {
             *(value[0] for value in INDEX_SECTIONS),
-            *DETAIL_TYPES,
+            *LINKED_TYPES,
         }
 
     def _record_link(self, record, page_path):
