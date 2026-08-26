@@ -115,6 +115,13 @@ installer. On a private site, that exact address can be provisioned as an
 additional Administrator through the Google callback only until the owner has
 a `last_login`. The setting is not an address pattern, does not authorize the
 password handoff, and does not delete an administrator account when cleared.
+The permanent Owner address collected by setup must likewise be the exact
+Google account that will sign in, rather than a forwarding alias. Delegated
+setup also verifies that account's direct Project Owner binding before asking
+whether to enable the temporary application Administrator; the binding is a
+handoff prerequisite, not a source of Lagniappe application authority. This is
+an IAM-policy read performed by the installer session and does not require the
+Owner to authenticate on the installer's computer.
 
 After owner initialization:
 

@@ -457,7 +457,7 @@ def _print_oauth_file_retention_message(credential_path=OAUTH_CLIENT_FILE):
 # @testable false
 # @covered-by installer/admin.py::setup_admin_and_oauth
 # @reason interactive input wrapper owned by the admin/OAuth setup flow
-@validate_input("Enter admin name", default="Admin")
+@validate_input("Enter permanent site Owner name", default="Owner")
 def _get_admin_name(value):
     return value
 
@@ -465,7 +465,7 @@ def _get_admin_name(value):
 # @testable false
 # @covered-by installer/admin.py::setup_admin_and_oauth
 # @reason interactive input wrapper owned by the admin/OAuth setup flow
-@validate_input("Enter admin email")
+@validate_input("Enter permanent site Owner Google account email")
 def _get_admin_email(value):
     return value
 
@@ -509,12 +509,28 @@ def configure_google_signin_choice():
 
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_setup_collects_owner_and_requires_google_before_confirmation
-# @matrix admin : google-oauth interactive-input
+# @matrix admin : google-oauth interactive-input prompt-clarity
 # @matrix setup : owner preconfirmation
 def collect_owner_and_signin_choice():
     """Collect permanent application ownership before cloud-change confirmation."""
     from config import SETTINGS
 
+    if not all(
+        str(SETTINGS.APP.get(key) or "").strip()
+        for key in ("ADMIN_NAME", "ADMIN_EMAIL")
+    ):
+        print("\nPermanent site Owner")
+        print(
+            wrap_text(
+                "This person will own the Lagniappe site and its singleton "
+                "Owner account. Enter their exact Google account email, not a "
+                "forwarding alias. For a delegated installation, that Google "
+                "account must already have a direct Owner role on the selected "
+                "Google Cloud project. The Owner does not need to sign in on "
+                "this computer; setup reads the existing project IAM policy "
+                "through the installer's gcloud session."
+            )
+        )
     if not str(SETTINGS.APP.get("ADMIN_NAME") or "").strip():
         SETTINGS.APP["ADMIN_NAME"] = _get_admin_name()
     if not str(SETTINGS.APP.get("ADMIN_EMAIL") or "").strip():

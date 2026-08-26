@@ -179,7 +179,7 @@ def test_doctor_reports_keyless_identity_drift():
     assert "RUNTIME_SERVICE_ACCOUNT_EMAIL is not configured" in issues
 
 
-# @matrix setup : doctor drift provider-identity read-only
+# @matrix setup : doctor drift independent-provider-check provider-identity read-only
 def test_doctor_reports_drift_without_writing(tmp_path, capsys):
     _write_generation(tmp_path)
     active_values = {
@@ -253,7 +253,7 @@ def test_doctor_reports_drift_without_writing(tmp_path, capsys):
         )
         == 1
     )
-    assert provider_calls == []
+    assert provider_calls == [("Demo", "demo-project")]
     assert constants_path.read_bytes() == drift_before
     assert "Local generated state: DRIFT" in capsys.readouterr().out
 
@@ -290,7 +290,7 @@ def test_doctor_reads_adc_identity_without_changing_it():
     assert events and "userinfo.email" in events[0][1]
 
 
-# @matrix setup : doctor project-identity provider-discovery
+# @matrix setup : doctor operator-permissions project-identity provider-discovery
 def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
     calls = []
 
@@ -306,15 +306,28 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
         calls.append((settings, project, project_details))
         return {"app-engine": {"state": "AVAILABLE"}}
 
+    def inspect_permissions(project):
+        calls.append(("permissions", project))
+        return {"installer": [], "billing": [], "deployer": []}
+
     monkeypatch.setattr("installer.utils.run_gcloud_command", gcloud)
     monkeypatch.setattr(
         "installer.recovery.verify_recovery_resources",
         verify_resources,
     )
+    monkeypatch.setattr(
+        "installer.iam.inspect_operator_permissions",
+        inspect_permissions,
+    )
 
     settings = {"APP_NAME": "Demo"}
     assert doctor._default_provider_checker(settings, "demo-project") == {
-        "app-engine": {"state": "AVAILABLE"}
+        "app-engine": {"state": "AVAILABLE"},
+        "operator-permissions": {
+            "state": "AVAILABLE",
+            "details": {"installer": [], "billing": [], "deployer": []},
+            "error": None,
+        },
     }
     assert calls == [
         (
@@ -327,6 +340,7 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
             False,
         ),
         (settings, "demo-project", {"projectNumber": "123456"}),
+        ("permissions", "demo-project"),
     ]
 
 

@@ -49,8 +49,16 @@ GOOGLE_AUTH_PERMISSION_GUIDANCE = (
 # @testable true
 # @tests tests_tooling/test_001a_setup_validation_config.py::test_delegated_setup_collects_owner_and_requires_google_before_confirmation
 # @matrix admin : bootstrap-email google-signin preserved-empty
-# @matrix setup : billing delegated-install existing-project
-def _configure_delegated_bootstrap(preflight, account, google_signin_enabled):
+# @matrix setup : billing delegated-install existing-project project-iam
+def _configure_delegated_bootstrap(
+    preflight,
+    account,
+    google_signin_enabled,
+    *,
+    project_id=None,
+    project_client=None,
+    owner_checker=None,
+):
     """Validate and persist the temporary application Admin bootstrap window."""
     from config import SETTINGS
 
@@ -74,14 +82,45 @@ def _configure_delegated_bootstrap(preflight, account, google_signin_enabled):
             "bootstrap Administrator."
         )
 
+    if not project_id:
+        project_id = str(
+            (preflight["project"].get("details") or {}).get("projectId") or ""
+        ).strip()
+    if not project_id:
+        raise RuntimeError(
+            "Delegated installation requires a positively identified existing "
+            "Google Cloud project."
+        )
+    if owner_checker is None:
+        from installer.iam import require_permanent_owner_binding
+
+        owner_checker = require_permanent_owner_binding
+    owner_checker(project_id, owner_email, client=project_client)
+
     print(
         f"Delegated installation detected: the active installer ({account}) "
         f"differs from the permanent Owner ({owner_email})."
     )
+    print(
+        wrap_text(
+            "The permanent Owner binding was read from the project's existing "
+            "IAM policy through the installer session; no Owner login or Owner "
+            "Application Default Credentials are needed on this computer."
+        )
+    )
+    print(
+        wrap_text(
+            "The installer's gcloud CLI login and project permissions are "
+            "already verified. Temporary Administrator access applies only to "
+            "signing in to the Lagniappe application before the permanent "
+            "Owner completes their first login; it does not sign in to Google "
+            "Cloud or grant cloud permissions."
+        )
+    )
     if "BOOTSTRAP_ADMIN_EMAIL" not in SETTINGS.APP:
         bootstrap = input(
-            "Temporarily allow the installer to sign in as an application "
-            "Administrator? [Y/n]: "
+            "Allow this installer account temporary Lagniappe application "
+            "Administrator access? [Y/n]: "
         ).strip().casefold()
         SETTINGS.APP["BOOTSTRAP_ADMIN_EMAIL"] = (
             "" if bootstrap in {"n", "no"} else account
@@ -1171,6 +1210,7 @@ def _require_operator_permissions(
     *,
     billing_account=None,
     require_billing_link=False,
+    client=None,
 ):
     from installer.iam import require_operator_permissions
 
@@ -1178,7 +1218,59 @@ def _require_operator_permissions(
         project_id,
         billing_account=billing_account,
         require_billing_link=require_billing_link,
+        client=client,
     )
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_gcloud_project_client_uses_selected_cli_account_without_adc
+# @matrix setup : adc gcloud-token identity
+def _gcloud_project_client(account):
+    """Create a Resource Manager client from the already-authenticated CLI login."""
+    result = run_gcloud_command(
+        ["auth", "print-access-token", account],
+        check=False,
+        timeout=60,
+    )
+    token = str(result.stdout or "").strip()
+    if result.returncode != 0 or not token:
+        raise RuntimeError(
+            f"The gcloud CLI login for installer '{account}' is unavailable. "
+            f"Run {setup_command('auth')}, then retry setup."
+        )
+
+    from installer.utils import install_if_missing
+
+    install_if_missing(
+        "google.cloud.resourcemanager_v3",
+        "Google Resource Manager API",
+        package_name="google-cloud-resource-manager",
+    )
+    from google.cloud import resourcemanager_v3
+    from google.oauth2.credentials import Credentials
+
+    return resourcemanager_v3.ProjectsClient(credentials=Credentials(token=token))
+
+
+# @testable true
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_existing_project_checks_cli_installer_permissions_before_adc_authentication
+# @matrix setup : adc gcloud-token operator-permissions preflight
+def _preflight_operator_authority(account, project_id, *, client=None):
+    """Verify the selected CLI installer before opening or changing ADC."""
+    client = client or _gcloud_project_client(account)
+    try:
+        _require_operator_permissions(project_id, client=client)
+    except Exception as error:
+        raise RuntimeError(
+            f"The gcloud CLI installer '{account}' is signed in, but setup "
+            f"could not verify its required access to project '{project_id}' "
+            "before ADC authentication. Application Default Credentials were "
+            f"not changed. {error}"
+        ) from error
+    print(
+        f"[OK] gcloud CLI installer access is ready ({account}, {project_id})"
+    )
+    return client
 
 
 # @testable true
@@ -1631,11 +1723,20 @@ def _set_application_defaults():
             "cross-check Cloud Storage ownership."
         )
     SETTINGS.GCLOUD_CONFIG["BILLING_ACCOUNT"] = preflight["billing_account"]
+    project_client = None
+    if preflight["project"]["state"] == "available":
+        project_client = _preflight_operator_authority(account, project_id)
     if not recovery_mode:
         from installer.admin import collect_owner_and_signin_choice
 
         google_signin_enabled = collect_owner_and_signin_choice()
-        _configure_delegated_bootstrap(preflight, account, google_signin_enabled)
+        _configure_delegated_bootstrap(
+            preflight,
+            account,
+            google_signin_enabled,
+            project_id=project_id,
+            project_client=project_client,
+        )
     if preflight["project"]["state"] == "available":
         adc_identity = _ensure_adc_principal(account, project_id)
     else:

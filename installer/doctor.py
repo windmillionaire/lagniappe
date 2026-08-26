@@ -200,8 +200,9 @@ def _read_adc_identity(
 
 # @testable true
 # @tests tests_tooling/test_001g_setup_release_readiness.py::test_default_doctor_provider_checker_targets_saved_project
-# @matrix setup : doctor project-identity provider-discovery
+# @matrix setup : doctor operator-permissions project-identity provider-discovery
 def _default_provider_checker(settings, project):
+    from installer.iam import inspect_operator_permissions
     from installer.recovery import verify_recovery_resources
     from installer.utils import run_gcloud_command
 
@@ -215,11 +216,22 @@ def _default_provider_checker(settings, project):
         project_details = json.loads(result.stdout or "{}")
     except json.JSONDecodeError as error:
         raise RuntimeError("target project returned invalid data") from error
-    return verify_recovery_resources(
+    report = verify_recovery_resources(
         settings,
         project,
         project_details=project_details,
     )
+    missing_permissions = inspect_operator_permissions(project)
+    report["operator-permissions"] = {
+        "state": (
+            "UNAVAILABLE"
+            if any(missing_permissions.values())
+            else "AVAILABLE"
+        ),
+        "details": missing_permissions,
+        "error": None,
+    }
+    return report
 
 
 # @testable false
@@ -282,7 +294,7 @@ def _keyless_identity_issues(settings, deploy):
 
 # @testable true
 # @tests tests_tooling/test_001g_setup_release_readiness.py::test_doctor_reports_drift_without_writing
-# @matrix setup : doctor drift provider-identity read-only
+# @matrix setup : doctor drift independent-provider-check provider-identity read-only
 def run_doctor(
     *,
     root=REPOSITORY_ROOT,
@@ -292,30 +304,32 @@ def run_doctor(
 ):
     """Inspect setup state and expected providers without repairing anything."""
     root = Path(root)
-    documents, issues = _local_state(root)
+    documents, local_issues = _local_state(root)
     settings = documents.get("config/files/lagniappe_settings.yaml") or {}
     deploy = documents.get("lagniappe.yaml") or {}
     node = documents.get("package.json") or {}
     dev = documents.get("config/files/lagniappe_dev.yaml") or {}
     saved_gcloud = dev.get("gcloud_config") or {}
-    issues.extend(_keyless_identity_issues(settings, deploy))
+    local_issues.extend(_keyless_identity_issues(settings, deploy))
+    issues = list(local_issues)
 
     print("=== Lagniappe setup doctor (read-only) ===")
-    if issues:
+    if local_issues:
         print("Local generated state: DRIFT")
-        for issue in issues:
+        for issue in local_issues:
             print(f"- {issue}")
     else:
         print("Local generated state: OK")
 
     active = {}
+    identity_issues = []
     if settings and saved_gcloud:
         if gcloud_runner is None:
             from installer.utils import run_gcloud_command
 
             gcloud_runner = run_gcloud_command
         active = _active_cli_identity(gcloud_runner)
-        identity_issues = _identity_issues(saved_gcloud, active)
+        identity_issues.extend(_identity_issues(saved_gcloud, active))
         adc = (adc_checker or _read_adc_identity)()
         if adc.get("state") != "success":
             identity_issues.append("Application Default Credentials are unavailable")
@@ -374,7 +388,8 @@ def run_doctor(
         else:
             print("Identity state: OK")
     else:
-        issues.append("saved setup identity is unavailable")
+        identity_issues.append("saved setup identity is unavailable")
+        issues.extend(identity_issues)
         print("Identity state: UNAVAILABLE")
 
     print("Expected target and provider resources:")
@@ -388,12 +403,13 @@ def run_doctor(
 
     project = settings.get("GOOGLE_CLOUD_PROJECT") or saved_gcloud.get("PROJECT")
     provider_report = {}
-    if not issues and project:
+    provider_issues = []
+    if settings and project and not identity_issues:
         try:
             checker = provider_checker or _default_provider_checker
             provider_report = checker(settings, project)
         except Exception as error:
-            issues.append(
+            provider_issues.append(
                 f"provider drift or unavailable state ({type(error).__name__})"
             )
         else:
@@ -403,13 +419,18 @@ def run_doctor(
                 if observation.get("state") != "AVAILABLE"
             ]
             if unavailable:
-                issues.append(
+                provider_issues.append(
                     "provider resources not available: "
                     + ", ".join(sorted(unavailable))
                 )
 
-    if provider_report and not issues:
-        print("Provider state: OK")
+    issues.extend(provider_issues)
+    if provider_report:
+        print(
+            "Provider state: DRIFT OR UNAVAILABLE"
+            if provider_issues
+            else "Provider state: OK"
+        )
         for name in sorted(provider_report):
             print(f"- {name}: {provider_report[name].get('state')}")
     elif project:

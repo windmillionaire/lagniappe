@@ -696,8 +696,18 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
         create_config,
         "_require_operator_permissions",
         lambda project_id, **kwargs: events.append(
-            ("permissions", project_id)
+            (
+                "permissions",
+                project_id,
+                "cli" if kwargs.get("client") is project_client else "adc",
+            )
         ),
+    )
+    project_client = object()
+    monkeypatch.setattr(
+        create_config,
+        "_gcloud_project_client",
+        lambda account: events.append(("cli-token", account)) or project_client,
     )
     monkeypatch.setattr(
         create_config,
@@ -724,17 +734,17 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
         "_target_preflight",
         lambda project_id: events.append(("preflight", project_id)) or preflight,
     )
-    monkeypatch.setattr(
-        create_config,
-        "_ensure_adc_principal",
-        lambda account, project_id=None: {
+    def ensure_adc(account, project_id=None):
+        events.append(("adc-auth", account, project_id))
+        return {
             "state": "success",
             "principal": deployer,
             "project": recovered_project,
             "quota_project": recovered_project,
             "error": None,
-        },
-    )
+        }
+
+    monkeypatch.setattr(create_config, "_ensure_adc_principal", ensure_adc)
     monkeypatch.setattr(
         create_config,
         "_display_install_identity_summary",
@@ -794,9 +804,13 @@ def test_recovery_uses_saved_project_preserves_owner_and_verifies_before_dev_wri
         f"runtime@{recovered_project}.iam.gserviceaccount.com"
     )
     assert ("preflight", recovered_project) in events
-    assert ("permissions", recovered_project) in events
+    assert ("permissions", recovered_project, "cli") in events
+    assert ("permissions", recovered_project, "adc") in events
     assert ("verify", recovered_project, {"projectNumber": "123456"}) in events
-    assert events.index(("permissions", recovered_project)) < events.index(
+    assert events.index(
+        ("permissions", recovered_project, "cli")
+    ) < events.index(("adc-auth", deployer, recovered_project))
+    assert events.index(("permissions", recovered_project, "adc")) < events.index(
         ("verify", recovered_project, {"projectNumber": "123456"})
     )
     assert events.index(

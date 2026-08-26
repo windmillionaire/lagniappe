@@ -64,8 +64,9 @@ The default flow is deliberately ordered:
 
 1. verify Python, project virtualenv, pip, gcloud, exact installer pins, and
    `pip check`;
-2. choose and re-read the application name, project, gcloud account, ADC,
-   billing, Owner, and Google sign-in intent;
+2. choose and re-read the application name, project, and gcloud account; for an
+   existing project, verify that CLI account's permissions before ADC, then
+   collect the permanent Owner and Google sign-in intent and align ADC;
 3. save a non-secret resume draft and show a default-no mutation summary;
 4. create or verify the project, link billing, and enable required APIs;
 5. create App Engine, the runtime service account/IAM, Storage buckets, Cloud

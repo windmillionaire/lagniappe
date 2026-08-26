@@ -501,6 +501,7 @@ INSTALLER_PROJECT_PERMISSIONS = [
     "serviceusage.services.enable",
     "serviceusage.services.get",
     "serviceusage.services.list",
+    "serviceusage.services.use",
     "storage.buckets.create",
 ]
 
@@ -519,7 +520,6 @@ DEPLOYER_PROJECT_PERMISSIONS = [
     "appengine.applications.get",
     "appengine.operations.get",
     "appengine.services.get",
-    "appengine.services.updateTraffic",
     "appengine.versions.create",
     "appengine.versions.get",
     "cloudbuild.builds.create",

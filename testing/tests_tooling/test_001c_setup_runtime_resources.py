@@ -4565,6 +4565,53 @@ def test_operator_permission_preflight_reports_missing_boundaries(monkeypatch):
     assert "active installer/deployer account" in message
 
 
+# @matrix setup : delegated-install owner preflight project-iam
+def test_permanent_owner_preflight_requires_direct_project_owner_binding(
+    monkeypatch,
+):
+    from installer import iam
+
+    requests = []
+    policy = types.SimpleNamespace(
+        bindings=[
+            {
+                "role": "roles/owner",
+                "members": ["user:owner@example.test"],
+            }
+        ]
+    )
+
+    def get_policy(request, timeout=None):
+        requests.append((request, timeout))
+        return policy
+
+    monkeypatch.setattr(iam, "install_if_missing", lambda *args, **kwargs: None)
+    client = types.SimpleNamespace(get_iam_policy=get_policy)
+
+    assert iam.require_permanent_owner_binding(
+        "project-1",
+        "OWNER@example.test",
+        client=client,
+    )
+    assert requests == [
+        (
+            {
+                "resource": "projects/project-1",
+                "options": {"requested_policy_version": 3},
+            },
+            30,
+        )
+    ]
+
+    with pytest.raises(RuntimeError, match="not a forwarding alias") as error:
+        iam.require_permanent_owner_binding(
+            "project-1",
+            "alias@example.test",
+            client=client,
+        )
+    assert "direct roles/owner binding" in str(error.value)
+
+
 # @matrix iam setup storage : bucket-scope failure-reporting installer preflight
 def test_installer_bucket_permission_preflight_uses_bucket_resource(monkeypatch):
     from installer import iam
@@ -4607,8 +4654,14 @@ def test_runtime_role_plan_limits_administration_to_owned_scheduler_lifecycle():
         "cloudtasks.tasks.fullView",
         "cloudtasks.tasks.list",
     }.issubset(constants.INSTALLER_PROJECT_PERMISSIONS)
-    assert "appengine.services.updateTraffic" in (
+    assert "appengine.services.update" not in (
         constants.DEPLOYER_PROJECT_PERMISSIONS
+    )
+    assert "appengine.services.updateTraffic" not in (
+        constants.DEPLOYER_PROJECT_PERMISSIONS
+    )
+    assert "serviceusage.services.use" in (
+        constants.INSTALLER_PROJECT_PERMISSIONS
     )
     assert "iam.serviceAccountKeys.create" not in (
         constants.INSTALLER_PROJECT_PERMISSIONS

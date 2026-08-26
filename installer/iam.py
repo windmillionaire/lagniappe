@@ -4,6 +4,9 @@ from config import constants
 from installer.package_install import install_if_missing
 
 
+PROJECT_OWNER_ROLE = "roles/owner"
+
+
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_iam_principal_member_classifies_google_identities
 # @matrix iam setup : identity
@@ -152,6 +155,41 @@ def policy_member_roles(policy, member, *, include_conditions=True):
         if member in (_binding_value(binding, "members", ()) or ())
         and (include_conditions or not _is_conditional(binding))
     }
+
+
+# @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_permanent_owner_preflight_requires_direct_project_owner_binding
+# @matrix setup : delegated-install owner preflight project-iam
+def require_permanent_owner_binding(project_id, owner_email, *, client=None):
+    """Require the delegated site's permanent Owner to own the project directly."""
+    install_if_missing(
+        "google.cloud.resourcemanager_v3",
+        "Google Resource Manager API",
+        package_name="google-cloud-resource-manager",
+    )
+    if client is None:
+        from google.cloud import resourcemanager_v3
+
+        client = resourcemanager_v3.ProjectsClient()
+
+    policy = client.get_iam_policy(
+        request={
+            "resource": f"projects/{project_id}",
+            "options": {"requested_policy_version": 3},
+        },
+        timeout=30,
+    )
+    member = principal_member(str(owner_email or "").strip().casefold())
+    roles = policy_member_roles(policy, member, include_conditions=False)
+    if PROJECT_OWNER_ROLE in roles:
+        return True
+
+    raise RuntimeError(
+        f"Permanent site Owner {owner_email} must already have a direct "
+        f"{PROJECT_OWNER_ROLE} binding on project {project_id}. Enter the "
+        "Owner's exact Google account email, not a forwarding alias, and have "
+        "a project administrator grant that account Owner before retrying setup."
+    )
 
 
 # @testable true

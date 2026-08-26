@@ -21,10 +21,22 @@ permissions, and GCP permissions do not grant a Lagniappe session.
 ## Project and billing
 
 Setup re-reads the active gcloud configuration, account, project, ADC project,
-and quota project before mutation. An existing project receives a read-only
-permission preflight. A new project is created only after default-no
-confirmation, then management APIs and billing are established before general
-provider work.
+and quota project before mutation. For an existing project, it first uses a
+short-lived token from the already selected gcloud CLI login to run the
+read-only installer/deployer permission preflight. Only after that account is
+proven usable does setup inspect or open Application Default Credentials (ADC),
+which are a separate credential used by the Python provider clients. A new
+project is created only after default-no confirmation, then management APIs and
+billing are established before general provider work.
+
+During delegated setup, the permanent site Owner email must be the exact Google
+account address, not a forwarding alias, and that account must already have a
+direct Project Owner binding. Setup verifies that binding before offering the
+selected installer temporary Lagniappe application Administrator access. That
+bootstrap access affects application login only; it does not authenticate the
+installer to gcloud or add Cloud IAM permissions. The binding check reads the
+existing policy with the installer credential; it never asks the permanent
+Owner to log in or configure ADC on the installer's computer.
 
 Billing association is checked through Cloud Billing and Resource Manager
 permissions. Setup may select the sole accessible open billing account; if none

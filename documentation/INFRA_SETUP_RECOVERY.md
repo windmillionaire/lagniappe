@@ -76,9 +76,11 @@ Run after installation, recovery, or a manual configuration edit:
 ```
 
 `doctor` is read-only. It checks generated-file completeness and source marker,
-file permissions, saved gcloud/ADC identity, required APIs/resources, runtime
-IAM, buckets, Identity Platform, Redis, and focused provider state. It returns
-nonzero for drift and prints the repair command.
+file permissions, saved gcloud/ADC identity, active operator permissions,
+required APIs/resources, runtime IAM, buckets, Identity Platform, Redis, and
+focused provider state. Independent provider checks still run when only local
+generated files have drifted. It returns nonzero for drift and prints the
+repair command.
 
 `./setup.sh repair` is the mutating path. Confirm the reported project and
 identities before running it. Repair uses the normal setup lock and journal,
