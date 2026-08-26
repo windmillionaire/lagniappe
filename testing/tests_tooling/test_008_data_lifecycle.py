@@ -1290,6 +1290,17 @@ def test_asset_collection_is_generation_bound_resumable_and_deduplicated(tmp_pat
         assert len({item["path"] for item in available}) == 1
         assert all(item["generation"] == "4" for item in available)
         assert len(warnings) == 1
+        assert state.connection.execute(
+            "SELECT COUNT(*) FROM warnings WHERE code='asset-unavailable'"
+        ).fetchone()[0] == 1
+
+        collector.buckets["private"].payloads["missing"] = b"now available"
+        descriptors, warnings = collector.collect()
+        assert warnings == []
+        assert all(item["status"] == "available" for item in descriptors)
+        assert state.connection.execute(
+            "SELECT COUNT(*) FROM warnings WHERE code='asset-unavailable'"
+        ).fetchone()[0] == 0
     with ArchiveState(tmp_path / "documents.sqlite3") as state:
         owner = canonical_json(
             {"type": "page", "id": "pagehash0001", "namespace": ""}
@@ -1396,8 +1407,106 @@ def test_html_sanitizer_removes_active_and_remote_content():
 
 # @matrix portable-archive : navigation offline-html owner-content
 def test_html_archive_renders_owner_sections_and_local_navigation(tmp_path):
+    project = _record(
+        "project",
+        "project00001",
+        {
+            "name": "House project",
+            "description": "Project description",
+            "hash": "project00001",
+            "requires": ["models", "project00001"],
+        },
+    )
+    model = _record(
+        "model",
+        "model0000001",
+        {
+            "name": "Monthly review",
+            "project": {"$ref": {"type": "project", "id": "project00001"}},
+        },
+    )
+    category = _record(
+        "category",
+        "category0001",
+        {"name": "Recovery Pages", "attributes": ["tasks", "files"]},
+    )
+    page = _record(
+        "page",
+        "pagehash0001",
+        {
+            "name": "Task test",
+            "description": "Human-readable page description",
+            "model": {"$ref": {"type": "category", "id": "category0001"}},
+            "created": {"$datetime": "2026-08-23T12:00:00Z"},
+            "hash": "pagehash0001",
+            "requires": ["models", "pagehash0001", "category0001"],
+        },
+    )
+    page_task = _record(
+        "task",
+        "taskhash0001",
+        {
+            "name": "Completed page task",
+            "completed": True,
+            "page": {"$ref": {"type": "page", "id": "pagehash0001"}},
+            "completed_by": {
+                "$ref": {"type": "page", "id": "profile000001"}
+            },
+            "completed_on": {"$datetime": "2026-08-23T12:30:00Z"},
+        },
+    )
+    tracked_task = _record(
+        "task",
+        "taskhash0002",
+        {
+            "name": "Tracked model task",
+            "completed": False,
+            "model": {"$ref": {"type": "model", "id": "model0000001"}},
+            "project": {"$ref": {"type": "project", "id": "project00001"}},
+        },
+    )
+    attached_file = _record(
+        "file",
+        "filehash0001",
+        {
+            "name": "Baseline attachment",
+            "pages": [
+                {"$ref": {"type": "page", "id": "pagehash0001"}},
+                {"$ref": {"type": "task", "id": "taskhash0001"}},
+            ],
+        },
+    )
+    reserved_users = _record(
+        "users",
+        "reservedusers",
+        {"name": "Users", "reserved": True},
+    )
+    reserved_users["identity"]["reserved_role"] = "users"
+    reserved_form = _record(
+        "form",
+        "reservedform1",
+        {"name": "User", "reserved": True},
+    )
+    reserved_form["identity"]["reserved_role"] = "form"
+    profile_page = _record(
+        "page",
+        "profile000001",
+        {
+            "name": "Owner profile",
+            "model": {"$ref": {"type": "users", "id": "reservedusers"}},
+        },
+    )
     records = [
-        _record("page", "pagehash0001", {"name": "Private page", "public": False}),
+        project,
+        model,
+        category,
+        page,
+        page_task,
+        tracked_task,
+        attached_file,
+        reserved_users,
+        reserved_form,
+        profile_page,
         _record(
             "message_conversation",
             "conversation-" + "a" * 64,
@@ -1419,9 +1528,21 @@ def test_html_archive_renders_owner_sections_and_local_navigation(tmp_path):
         created_at="2026-08-23T12:00:00Z",
         consistency="eventually consistent",
     ).build(records)
-    assert result["pages"] == 3
+    assert result["pages"] == 9
     index = (tmp_path / "site" / "index.html").read_text()
     search = (tmp_path / "site" / "search-index.js").read_text()
+    category_page = (
+        tmp_path / "site" / "category" / "category0001" / "index.html"
+    ).read_text()
+    archived_page = (
+        tmp_path / "site" / "page" / "pagehash0001" / "index.html"
+    ).read_text()
+    project_page = (
+        tmp_path / "site" / "project" / "project00001" / "index.html"
+    ).read_text()
+    task_page = (
+        tmp_path / "site" / "task" / "taskhash0001" / "index.html"
+    ).read_text()
     conversation = (
         tmp_path
         / "site"
@@ -1429,7 +1550,20 @@ def test_html_archive_renders_owner_sections_and_local_navigation(tmp_path):
         / ("conversation-" + "a" * 64)
         / "index.html"
     ).read_text()
+    assert "Projects (1)" in index and "Categories (1)" in index
     assert "Pages (1)" in index and "Conversations (private) (1)" in index
+    assert "<h2>Tasks (" not in index and "<h2>Files (" not in index
+    assert "Users" not in index and "Owner profile" not in index
+    assert "Task test" in category_page
+    assert "Completed page task" in archived_page
+    assert "Baseline attachment" in archived_page
+    assert "Monthly review" in project_page and "Tracked model task" in project_page
+    assert "Owner profile" in task_page and "Unavailable reference" not in task_page
+    assert "Baseline attachment" in task_page
+    for human_page in (category_page, archived_page, project_page):
+        assert "requires" not in human_page
+        assert "$datetime" not in human_page
+        assert ">hash<" not in human_page
     assert index.count("<script") == 1 and "addEventListener" in search
     assert "sensitive private content" in conversation
     assert "Messages (1)" in conversation and "Private message" in conversation

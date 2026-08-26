@@ -178,6 +178,10 @@ class AssetCollector:
                 "WHERE logical_id=?",
                 (generation, media_type, archive_size, payload_digest, relative.as_posix(), row["logical_id"]),
             )
+            self.state.connection.execute(
+                "DELETE FROM warnings WHERE id=?",
+                (f"asset-{row['logical_id'][:12]}",),
+            )
             if canonical_path:
                 self.state.set_metadata(f"canonical:{row['logical_id']}", canonical_path)
             else:
