@@ -2,7 +2,7 @@ from urllib.parse import urlsplit
 
 from playwright.sync_api import expect
 
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 
 from .combobox import Select
 from .forms_common import SpinnerButtons

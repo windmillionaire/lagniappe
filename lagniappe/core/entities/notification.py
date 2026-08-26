@@ -1,6 +1,7 @@
 from .entity import Entity
 from ..properties import activity, notification, notification_aggregate
-from ..tools import database
+from lagniappe.core.tools.database import notifications as database_notifications
+from lagniappe.core.tools.database import utility as database_utility
 
 
 # @testable false
@@ -46,7 +47,7 @@ class Notification(Entity):
     # @reason notification ownership and deletion are exercised through the route
     @classmethod
     def keys_for_parent(cls, parent):
-        return database.notification_keys(parent)
+        return database_notifications.notification_keys(parent)
 
     # @testable true
     # @tests tests_e2e/002_home/test_002i_home_activity.py::test_notification_channel_uses_menu_not_home_notes
@@ -61,10 +62,10 @@ class Notification(Entity):
         target = data.get("target")
 
         if data.get("identifier"):
-            key = database.create_named_key(
+            key = database_utility.create_named_key(
                 "notification", data["identifier"], parent=parent
             )
-            new_notification = cls(database.create_entity(key))
+            new_notification = cls(database_utility.create_entity(key))
         else:
             new_notification = cls(parent=parent)
         new_notification.kind = cls.entity_kind

@@ -231,6 +231,46 @@ def test_provider_context_always_uses_default_database_and_recovery_bucket():
     assert context.recovery_bucket.startswith("test-recovery-")
 
 
+# @matrix data-lifecycle : cache-invalidation framework-neutral restore
+def test_restore_cache_invalidation_uses_setup_redis_connection(monkeypatch):
+    from config import SETTINGS
+
+    observed = {}
+
+    class RedisClient:
+        def flushdb(self):
+            observed["flushed"] = True
+
+    monkeypatch.setattr(
+        SETTINGS,
+        "APP",
+        {
+            "REDIS_HOST": "redis.example.test",
+            "REDIS_PORT": 16379,
+            "REDIS_PASSWORD": "test-password",
+            "REDIS_TLS": False,
+        },
+    )
+
+    def redis_client(**options):
+        observed["options"] = options
+        return RedisClient()
+
+    monkeypatch.setattr("redis.Redis", redis_client)
+    context = ProviderContext(PROJECT_ID, "(default)", BUCKET, "0.3.0")
+
+    context.invalidate_cache()
+
+    assert observed["flushed"] is True
+    assert observed["options"] == {
+        "host": "redis.example.test",
+        "port": 16379,
+        "password": "test-password",
+        "socket_connect_timeout": 10,
+        "socket_timeout": 30,
+    }
+
+
 # @matrix data-lifecycle : immutable-restore-record provider-pagination queue-purge-audit
 def test_queue_snapshot_preserves_full_task_definitions():
     class TasksClient:
@@ -1771,6 +1811,9 @@ def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
             self.calls.append((action, database))
             return {"status": "current"}
 
+        def invalidate_cache(self):
+            self.calls.append(("invalidate-cache",))
+
         def disable_database_delete_protection(self, database):
             self.calls.append(("unprotect", database))
 
@@ -1849,6 +1892,7 @@ def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
     assert checkpoint.load()["status"] == "complete"
     assert ("import", plan["export_metadata_uri"], "(default)") in context.calls
     assert ("resume-queue", "lagniappe-tasks", "us-central1") in context.calls
+    assert ("invalidate-cache",) in context.calls
     assert ("delete", "lag-safety-test") in context.calls
     assert not hasattr(restore_module, "rollback_restore")
     assert "rollback_restore" not in restore_module.__all__

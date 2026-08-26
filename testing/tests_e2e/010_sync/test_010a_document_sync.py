@@ -5,7 +5,8 @@ from playwright.sync_api import expect
 
 from testing.definitions import Projects, Users
 from testing.elements import Tabs
-from testing.utility import expect_poll_result, expect_successful_response
+from testing.utility.network import expect_successful_response
+from testing.utility.polling import expect_poll_result
 
 pytestmark = pytest.mark.e2e
 

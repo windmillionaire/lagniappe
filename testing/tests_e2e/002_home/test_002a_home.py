@@ -43,7 +43,7 @@ from playwright.sync_api import expect
 
 from testing.definitions import Categories, Projects, SitePages, Users
 from testing.elements import List
-from testing.utility import TestFile as _TestFile
+from testing.utility.test_file import TestFile as _TestFile
 
 pytestmark = pytest.mark.e2e
 

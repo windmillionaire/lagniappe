@@ -43,7 +43,7 @@ from testing.elements import (
     Attributes,
     SpinnerButtons,
 )
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 
 
 def _create_category(user, home, definition):

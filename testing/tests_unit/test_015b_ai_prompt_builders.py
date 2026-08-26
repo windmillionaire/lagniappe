@@ -22,7 +22,10 @@ from lagniappe.core.tools.ai.guidelines import (
     SUBMISSION_OUTPUT_REQUIREMENTS,
 )
 from lagniappe.core.tools.ai.prompt import Prompt
-from lagniappe.core.tools.files import OOXMLExtractionResult, OOXMLTruncationReason
+from lagniappe.core.tools.files.ooxml import (
+    OOXMLExtractionResult,
+    OOXMLTruncationReason,
+)
 
 
 DOCX_MIMETYPE = (

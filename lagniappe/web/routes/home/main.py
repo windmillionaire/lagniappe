@@ -5,7 +5,9 @@ from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
 from lagniappe.core.properties.notification_aggregate import counts as aggregate_counts
-from lagniappe.core.tools import cache, collaboration, database
+from lagniappe.core.tools import cache, collaboration
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import notifications as database_notifications
 from lagniappe.core.tools.notifications import service as notification_service
 from lagniappe.core.tools.polling.projections import (
     channel_revisions,
@@ -74,13 +76,13 @@ def activity():
 @internal.route("/notifications")
 @logged_in
 def notifications():
-    page = database.notifications_page(
+    page = database_notifications.notifications_page(
         current_user,
         start_cursor=request.args.get("cursor"),
         limit=25,
     )
     notification_keys = [row.key for row in page]
-    aggregate = database.repair_notification_aggregate(
+    aggregate = database_notifications.repair_notification_aggregate(
         current_user,
     )
 
@@ -118,9 +120,9 @@ def notifications():
 @internal.route("/notifications", methods=["DELETE"])
 @logged_in
 def clear_notifications():
-    notification_keys = database.notification_keys(current_user)
+    notification_keys = database_notifications.notification_keys(current_user)
     notification_service.clear_ordinary_notifications(current_user, notification_keys)
-    aggregate = database.get_notification_aggregate(current_user)
+    aggregate = database_notifications.get_notification_aggregate(current_user)
     notification_service.publish_notification_aggregate(current_user, aggregate)
 
     return responses.ok()
@@ -186,7 +188,7 @@ def delete_activity(key):
         if activity.notification_type != "ordinary":
             abort(403)
         notification_service.delete_ordinary_notification(current_user, activity.key)
-        aggregate = database.get_notification_aggregate(current_user)
+        aggregate = database_notifications.get_notification_aggregate(current_user)
         notification_service.publish_notification_aggregate(current_user, aggregate)
     else:
         Entities.delete(activity)
@@ -210,7 +212,7 @@ def toggle_star(key):
     list, so it remains available when the target is inaccessible or missing.
     Adding a key still requires VIEW access to an existing entity.
     """
-    stored_key = database.get.datastore_key(key)
+    stored_key = database_get.datastore_key(key)
     if stored_key in current_user.properties.starred.keys:
         current_user.properties.starred.delete_starred_keys([stored_key])
         starred = False

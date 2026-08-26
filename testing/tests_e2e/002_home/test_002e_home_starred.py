@@ -35,7 +35,8 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 from testing.definitions import (
     Categories,
     Pages,
@@ -310,10 +311,10 @@ def test_star_route_rejects_inaccessible_and_missing_targets(
     assert target_after.fingerprint == target_fingerprint
     assert target_after.modified == target_modified
 
-    deleted_key = database.create_named_key(
+    deleted_key = database_utility.create_named_key(
         "page", f"missing-star-{uuid4().hex}"
     )
-    deleted_urlsafe_key = database.get.urlsafe_key(deleted_key)
+    deleted_urlsafe_key = database_get.urlsafe_key(deleted_key)
     deleted_path = f"/l/toggle-star/{deleted_urlsafe_key}"
     saved_user.db["starred"] = [target_after.key, deleted_key]
     saved_user.save()

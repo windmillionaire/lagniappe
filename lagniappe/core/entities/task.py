@@ -18,7 +18,7 @@ from ..properties import (
 )
 from .entity import Entity
 from . import Entities
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
 from ..tools.tasks import scheduling
 from ..tools.auth.context import current_context_user
 
@@ -183,7 +183,7 @@ class Task(AssetMixin, SubmitterMixin, Entity):
     @property
     def history(self):
         return sorted(
-            Entities.fetch(*database.get.task_history(self), request=Fetch.direct()),
+            Entities.fetch(*database_get.task_history(self), request=Fetch.direct()),
             key=lambda h: h.completed_on or datetime.min.replace(tzinfo=timezone.utc),
             reverse=True,
         )

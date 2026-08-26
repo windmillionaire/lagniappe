@@ -9,13 +9,13 @@ import zipfile
 
 import pytest
 
-from lagniappe.core.tools.files import (
+from lagniappe.core.tools.files.ooxml import (
     OOXMLExtractionResult,
+    OOXMLExtractionError,
     OOXMLTruncationReason,
     extract_ooxml,
     extract_ooxml_text,
 )
-from lagniappe.core.tools.files.ooxml import OOXMLExtractionError
 import lagniappe.core.tools.files.ooxml as ooxml
 
 

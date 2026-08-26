@@ -14,7 +14,8 @@ from .file_consumers import (
     LARGE_ASSET_BYTES,
     enforce_file_consumer,
 )
-from ..tools import database
+from lagniappe.core.tools.database import assets as database_assets
+from lagniappe.core.tools.database import get as database_get
 from ..tools.files.html import strip_tags
 from .default import DefaultEnum
 
@@ -212,16 +213,16 @@ class Asset:
         return None
 
     def get(self):
-        return database.assets.get_text(self.path, self.visibility.value)
+        return database_assets.get_text(self.path, self.visibility.value)
 
     def delete(self):
-        database.assets.delete_file(self.path, self.visibility.value)
+        database_assets.delete_file(self.path, self.visibility.value)
 
     def save(self, content):
         if not content:
             return False
 
-        blob = database.assets.save_text(
+        blob = database_assets.save_text(
             content, self.path, self.content_type, self.visibility.value
         )
         self._record_saved_blob(blob)
@@ -243,7 +244,7 @@ class FileAsset(Asset):
         if self.visibility == AssetVisibility.public:
             return f"{public_url()}/{self.path}"
         elif self.visibility == AssetVisibility.private:
-            key = database.get.urlsafe_key(self.entity.key)
+            key = database_get.urlsafe_key(self.entity.key)
             identifier = (
                 f"{self.name}.{self.extension}" if self.extension else self.name
             )
@@ -251,10 +252,10 @@ class FileAsset(Asset):
         return None
 
     def get(self):
-        return database.assets.download_file(self.path, self.visibility.value)
+        return database_assets.download_file(self.path, self.visibility.value)
 
     def text(self):
-        return database.assets.get_text(
+        return database_assets.get_text(
             self.path, self.visibility.value, self.entity.encoding
         )
 
@@ -264,7 +265,7 @@ class FileAsset(Asset):
 
         if not getattr(content, "lagniappe_direct_upload", False):
             content.seek(0)
-        blob = database.assets.save_file(
+        blob = database_assets.save_file(
             content, self.path, self.content_type, self.visibility.value
         )
         self._record_saved_blob(blob)

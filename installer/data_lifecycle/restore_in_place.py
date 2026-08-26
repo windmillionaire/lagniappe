@@ -193,7 +193,7 @@ def restore_plan(backup_id, context=None):
             "clone the quiescent default database and catalog its asset generations",
             "import snapshot keys into (default), overwriting matches and restoring missing keys",
             "restore exact asset bytes and bind entities to the new object generations",
-            "discard nonterminal execution state, migrate, repair caches, and validate",
+            "discard nonterminal execution state, migrate, invalidate caches, and validate",
             "regenerate durable scheduled-task uncompletion wake-ups from merged data",
             "restore traffic and prior queue/scheduler state",
             "delete the temporary safety clone and publish the completion audit record",
@@ -579,9 +579,9 @@ def restore_backup(
             scheduled_tasks_reconciled=True,
             scheduled_task_result=result,
         )
-    if not checkpoint.payload.get("cache_rebuilt"):
-        result = context.run_runtime_action("rebuild-cache", DEFAULT_DATABASE)
-        checkpoint.update("cache-rebuilt", cache_rebuilt=True, cache_result=result)
+    if not checkpoint.payload.get("cache_invalidated"):
+        context.invalidate_cache()
+        checkpoint.update("cache-invalidated", cache_invalidated=True)
     if not checkpoint.payload.get("traffic_restored"):
         context.set_traffic(plan["original_traffic"], split_by=plan["traffic_split_by"])
         checkpoint.update("traffic-restored", traffic_restored=True)
@@ -605,6 +605,10 @@ def restore_backup(
         f"Restore {plan['restore_id']} merged into (default): "
         f"{plan['merge']['overwritten']} keys reset and "
         f"{plan['merge']['restored_missing']} missing keys restored."
+    )
+    print(
+        "Cache data was cleared. Sign in as the Owner, then open "
+        "Admin → Site Settings → Maintenance and select Refresh Cache."
     )
     return plan
 

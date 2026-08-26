@@ -23,7 +23,7 @@ from testing.definitions import Pages, Uploads, Users
 from testing.definitions.page_definitions import PageDefinition
 from testing.elements import MobileNav, Select, SpinnerButtons, Tabs
 from testing.resources import File, Page
-from testing.utility import scoped_browser_route
+from testing.utility.network import scoped_browser_route
 
 pytestmark = pytest.mark.e2e
 

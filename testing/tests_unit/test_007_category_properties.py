@@ -181,7 +181,7 @@ def test_uncategorized_pages_get_create():
     )
 
     with patch.object(
-        category_module.database.get,
+        category_module.database_get,
         "category_by_name",
         return_value=existing,
     ):
@@ -193,7 +193,7 @@ def test_uncategorized_pages_get_create():
     created = Mock()
     with (
         patch.object(
-            category_module.database.get,
+            category_module.database_get,
             "category_by_name",
             return_value=None,
         ),

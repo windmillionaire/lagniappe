@@ -64,9 +64,9 @@ def _patch_fake_keys(monkeypatch):
         counter["value"] += 1
         return FakeKey(f"{kind}-{counter['value']}")
 
-    monkeypatch.setattr(entity_module.database, "create_key", create_key)
+    monkeypatch.setattr(entity_module.database_utility, "create_key", create_key)
     monkeypatch.setattr(
-        entity_module.database.get,
+        entity_module.database_get,
         "urlsafe_key",
         lambda key: getattr(key, "name", str(key)),
     )
@@ -75,7 +75,7 @@ def _patch_fake_keys(monkeypatch):
         lambda value: False,
     )
     monkeypatch.setattr(
-        "lagniappe.core.entities.page.database.get.page_tasks",
+        "lagniappe.core.entities.page.database_get.page_tasks",
         lambda page: [],
     )
     monkeypatch.setattr(

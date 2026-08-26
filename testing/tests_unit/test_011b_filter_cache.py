@@ -114,7 +114,7 @@ def test_filter_cache_loads_category_pages_without_restrictions():
     }
 
     with patch(
-        "lagniappe.core.tools.filters.cache.database.get.pages",
+        "lagniappe.core.tools.filters.cache.database_get.pages",
         side_effect=[
             SimpleNamespace(results=["page-key-1"], next_cursor="cursor-2"),
             SimpleNamespace(results=["page-key-2"], next_cursor=None),
@@ -194,7 +194,7 @@ def test_filter_cache_loads_all_project_tasks_without_active_or_restriction_filt
     with patch("lagniappe.core.tools.filters.cache.Filter", _FakeFilter):
         with patch("lagniappe.core.tools.filters.cache.Query", _FakeQuery):
             with patch(
-                "lagniappe.core.tools.filters.cache.database.get.datastore_key",
+                "lagniappe.core.tools.filters.cache.database_get.datastore_key",
                 return_value=parent.key,
             ) as datastore_key:
                 with patch(

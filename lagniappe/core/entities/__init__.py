@@ -8,7 +8,7 @@ from ..mutations import (
     plan_root,
 )
 from ..mutations.delete import plan_delete
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
 
 
 # @testable infrastructure
@@ -61,7 +61,7 @@ class EntityRegistry:
             {
                 key: None
                 for key in [
-                    database.get.datastore_key(identifier)
+                    database_get.datastore_key(identifier)
                     for identifier in identifiers
                     if not hasattr(identifier, "key")
                 ]
@@ -79,7 +79,7 @@ class EntityRegistry:
         secondary_keys = [key for key, value in entities.items() if value is None]
         secondary_entities = {
             entity.key: self._typed_entity(entity)
-            for entity in database.get.entities(secondary_keys)
+            for entity in database_get.entities(secondary_keys)
             if entity
         }
         entities.update(secondary_entities)
@@ -100,7 +100,7 @@ class EntityRegistry:
             ]
             related_entities = {
                 entity.key: self._typed_entity(entity)
-                for entity in database.get.entities(related_keys)
+                for entity in database_get.entities(related_keys)
                 if entity
             }
             entities.update(related_entities)

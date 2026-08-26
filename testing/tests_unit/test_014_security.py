@@ -3,7 +3,8 @@
 import pytest
 
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import files
+from lagniappe.core.tools.files import constants as file_constants
+from lagniappe.core.tools.files import html as file_html
 
 
 # @matrix files security : html-sanitization markdown
@@ -15,7 +16,7 @@ def test_htmlize_sanitizes_markdown_html():
 <a href="javascript:alert('bad')">Bad</a>
 <a href="https://example.com">Good</a>"""
 
-    html = files.htmlize(content, "text/markdown")
+    html = file_html.htmlize(content, "text/markdown")
 
     assert "<script" not in html
     assert 'href="https://example.com"' in html
@@ -34,7 +35,7 @@ def test_htmlize_preserves_markdown_tables_and_sanitizes_cells():
 <script>alert("xss")</script>
 """
 
-    html = files.htmlize(content, "text/markdown")
+    html = file_html.htmlize(content, "text/markdown")
 
     assert "<table>" in html
     assert "<thead>" in html
@@ -60,7 +61,7 @@ def test_htmlize_sanitizes_text_html():
     <a href="mailto:test@example.com" onclick="alert('xss')">Mail</a>
     """
 
-    html = files.htmlize(content, "text/html")
+    html = file_html.htmlize(content, "text/html")
 
     assert "<iframe" not in html
     assert "<img" not in html
@@ -72,7 +73,7 @@ def test_htmlize_sanitizes_text_html():
 @pytest.mark.unit
 def test_svg_removed_from_preview_mimetypes():
     """SVG should no longer be previewable inline."""
-    assert "image/svg+xml" not in files.PREVIEW_MIMETYPES
+    assert "image/svg+xml" not in file_constants.PREVIEW_MIMETYPES
 
 
 # @matrix file security : html-stripping summary

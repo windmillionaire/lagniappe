@@ -1,6 +1,6 @@
 from flask import url_for
 from ..properties import category, common_entity, common_related
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
 from .entity import Entity
 from .index import PageIndex
 
@@ -72,7 +72,7 @@ class Category(Entity):
     # @matrix category pages : default-category get-create
     @classmethod
     def get_uncategorized_pages(cls):
-        exists = database.get.category_by_name(UNCATEGORIZED_PAGES_NAME)
+        exists = database_get.category_by_name(UNCATEGORIZED_PAGES_NAME)
         if exists:
             return cls(exists)
 
@@ -93,4 +93,4 @@ class UserCategory(Category):
 
     @classmethod
     def get(cls):
-        return cls(database.get.reserved("users"))
+        return cls(database_get.reserved("users"))

@@ -294,8 +294,8 @@ def test_run_report_reconciles_applying_create_when_output_already_exists(monkey
     )
     fingerprint = report_ledger.proposal_fingerprint(report.proposal)
     ledger = report_ledger._new_report_ledger(report, report.proposal, fingerprint)
-    output_key = entity_module.database.create_key("project", None)
-    output_id = entity_module.database.get.urlsafe_key(output_key)
+    output_key = entity_module.database_utility.create_key("project", None)
+    output_id = entity_module.database_get.urlsafe_key(output_key)
     project = TestEntities.get(
         "PROJECT", {"name": "Recovered Project", "hash": "recovered-project"}
     )

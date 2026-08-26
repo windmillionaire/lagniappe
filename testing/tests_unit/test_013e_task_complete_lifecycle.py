@@ -276,7 +276,7 @@ def test_task_history_create_snapshots_completed_task_state():
     history_key = "histth1"
     with (
         patch(
-            "lagniappe.core.entities.entity.database.create_key",
+            "lagniappe.core.entities.entity.database_utility.create_key",
             return_value=history_key,
         ),
         patch.object(TaskHistory, "copy_asset") as copy_asset,
@@ -370,7 +370,7 @@ def test_task_history_create_clones_another_task_and_existing_history():
 
     with (
         patch(
-            "lagniappe.core.entities.entity.database.create_key",
+            "lagniappe.core.entities.entity.database_utility.create_key",
             side_effect=("source-history", "current-clone", "history-clone"),
         ),
         patch.object(TaskHistory, "copy_asset") as copy_asset,
@@ -439,7 +439,7 @@ def test_asset_mixin_copy_asset_copies_storage_and_updates_definition(monkeypatc
         return SimpleNamespace(size=256)
 
     monkeypatch.setattr(
-        "lagniappe.core.mixins.assets.database.copy_file",
+        "lagniappe.core.mixins.assets.database_assets.copy_file",
         copy_file,
     )
 
@@ -481,7 +481,7 @@ def test_document_history_create_copies_document_asset():
 
     with (
         patch(
-            "lagniappe.core.entities.entity.database.create_key",
+            "lagniappe.core.entities.entity.database_utility.create_key",
             return_value="dochist1",
         ),
         patch.object(DocumentHistory, "copy_asset") as copy_asset,
@@ -505,7 +505,7 @@ def test_document_history_named_versions_order_and_delete_in_bounded_batches():
 
     with (
         patch(
-            "lagniappe.core.entities.entity.database.create_key",
+            "lagniappe.core.entities.entity.database_utility.create_key",
             side_effect=["dochist2", "dochist3"],
         ),
         patch.object(DocumentHistory, "save_asset") as save_asset,
@@ -603,7 +603,7 @@ def test_task_create_history_entry_accepts_completion_overrides(
     task.files = [live_file]
 
     with patch(
-        "lagniappe.core.entities.entity.database.create_key",
+        "lagniappe.core.entities.entity.database_utility.create_key",
         return_value="histth3",
     ):
         history = task.create_history_entry(

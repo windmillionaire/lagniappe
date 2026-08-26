@@ -183,8 +183,8 @@ def test_file_size_and_large_use_asset_metadata():
 # @matrix file : html-preview text-asset
 @pytest.mark.unit
 def test_as_html(get_test_entities):
-    """Test AsHTML property converts text to HTML using files.htmlize."""
-    with patch("lagniappe.core.properties.file_assets.files.htmlize") as mock_htmlize:
+    """Test AsHTML property converts text to HTML using the focused helper."""
+    with patch("lagniappe.core.properties.file_assets.file_html.htmlize") as mock_htmlize:
         for file in get_test_entities():
             expected = file.test_spec["expected"]
 
@@ -217,7 +217,7 @@ def test_text_asset_falls_back_to_original_text_file():
     file.mimetype = "text/markdown"
     file.encoding = "utf-8"
 
-    with patch("lagniappe.core.properties.file_assets.files.htmlize") as mock_htmlize:
+    with patch("lagniappe.core.properties.file_assets.file_html.htmlize") as mock_htmlize:
         mock_htmlize.return_value = "<h1>Markdown Content</h1>"
 
         assert file.properties.text.value is True
@@ -562,11 +562,11 @@ def test_uploaded_file_story_records_metadata_before_asset_save():
 
     with (
         patch(
-            "lagniappe.core.properties.file_assets.files.determine_mimetype",
+            "lagniappe.core.properties.file_assets.file_utility.determine_mimetype",
             return_value="text/plain",
         ) as determine_mimetype,
         patch(
-            "lagniappe.core.properties.file_assets.files.determine_encoding",
+            "lagniappe.core.properties.file_assets.file_utility.determine_encoding",
             return_value="utf-8",
         ) as determine_encoding,
     ):
@@ -600,10 +600,10 @@ def test_uploaded_file_story_records_metadata_before_asset_save():
 
     with (
         patch(
-            "lagniappe.core.properties.file_assets.files.determine_mimetype",
+            "lagniappe.core.properties.file_assets.file_utility.determine_mimetype",
             return_value="image/png",
         ),
-        patch("lagniappe.core.properties.file_assets.files.determine_encoding")
+        patch("lagniappe.core.properties.file_assets.file_utility.determine_encoding")
         as determine_encoding,
     ):
         image_asset.value = image_upload
@@ -714,7 +714,7 @@ def test_file_asset_definition_records_size_and_large_flag(monkeypatch):
     stored_size = asset_defs.LARGE_ASSET_BYTES + 1
 
     with patch(
-        "lagniappe.core.definitions.asset.database.assets.save_file",
+        "lagniappe.core.definitions.asset.database_assets.save_file",
         return_value=SimpleNamespace(size=stored_size),
     ):
         assert asset.save(upload) is True
@@ -760,7 +760,7 @@ def test_file_asset_direct_upload_uses_storage_copy_without_seek_or_read():
 
     upload = DirectUpload()
     with patch(
-        "lagniappe.core.definitions.asset.database.assets.save_file",
+        "lagniappe.core.definitions.asset.database_assets.save_file",
         return_value=SimpleNamespace(size=LARGE_ASSET_BYTES + 1),
     ) as save_file:
         assert asset.save(upload) is True
@@ -778,7 +778,7 @@ def test_file_asset_direct_upload_uses_storage_copy_without_seek_or_read():
 @pytest.mark.unit
 def test_private_asset_url_uses_asset_name_for_shared_storage_path(monkeypatch):
     monkeypatch.setattr(
-        asset_defs.database.get,
+        asset_defs.database_get,
         "urlsafe_key",
         lambda key: "history-key",
     )

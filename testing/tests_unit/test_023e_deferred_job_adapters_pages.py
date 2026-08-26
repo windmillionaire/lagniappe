@@ -48,7 +48,7 @@ def test_page_generation_apply_uses_direct_fields_and_form_fallbacks(monkeypatch
         lambda *entities: saved.append(entities),
     )
     monkeypatch.setattr(
-        page_adapters.database.get,
+        page_adapters.database_get,
         "datastore_key",
         lambda key: f"datastore:{key}",
     )

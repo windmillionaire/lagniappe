@@ -3,7 +3,8 @@
 from dataclasses import dataclass, field
 
 from ..definitions import Fetch, MutationEffectType, MutationOperation, Restriction
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import messaging as database_messaging
 from .base import MutationPlanBuilder
 
 
@@ -118,7 +119,7 @@ class DeleteCollector:
         files = [
             entity
             for entity in self.entities.fetch(
-                *database.get.page_files(page.key),
+                *database_get.page_files(page.key),
                 request=Fetch.direct(),
             )
             if isinstance(entity, self.entities.FILE)
@@ -141,7 +142,7 @@ class DeleteCollector:
         tasks = [
             entity
             for entity in self.entities.fetch(
-                *database.get.page_tasks_with_history(page),
+                *database_get.page_tasks_with_history(page),
                 request=Fetch.direct(),
             )
             if isinstance(entity, (self.entities.TASK, self.entities.TASK_HISTORY))
@@ -196,7 +197,7 @@ class DeleteCollector:
     # @reason relation loading delegates each attached note to the tested note collector
     def page_notes(self, page):
         notes = self.entities.fetch(
-            *database.get.page_notes(page),
+            *database_get.page_notes(page),
             request=Fetch.direct(),
         )
         for note in notes:
@@ -208,7 +209,7 @@ class DeleteCollector:
     # @reason relation loading delegates each authored note to the tested note collector
     def user_notes(self, user):
         notes = self.entities.fetch(
-            *database.get.notes_by_user(user),
+            *database_get.notes_by_user(user),
             request=Fetch.direct(),
         )
         for note in notes:
@@ -223,7 +224,7 @@ class DeleteCollector:
             return
         self._message_users.add(user.key)
         conversations = self.entities.fetch(
-            *database.message_conversation_keys(user),
+            *database_messaging.message_conversation_keys(user),
             request=Fetch.direct(),
         )
         for conversation in conversations:
@@ -264,7 +265,7 @@ class DeleteCollector:
                 continue
 
             self.delete(conversation)
-            for message_key in database.message_keys(conversation):
+            for message_key in database_messaging.message_keys(conversation):
                 self.delete(self.entities.MESSAGE(message_key))
 
     # @testable infrastructure
@@ -279,7 +280,7 @@ class DeleteCollector:
     def model_forms(self, *models):
         forms = {model.form.key: model.form for model in models if model.form}
         model_keys = {model.key for model in models}
-        form_users = list(database.get.form_users(*forms.values()))
+        form_users = list(database_get.form_users(*forms.values()))
         used_by = {
             form_key: [
                 model.key for model in form_users if model.get("form") == form_key
@@ -294,12 +295,12 @@ class DeleteCollector:
 
     # @testable infrastructure
     def filters(self, entity):
-        for filter_key in database.get.filters(entity):
+        for filter_key in database_get.filters(entity):
             self.delete(self.entities.FILTER(filter_key))
 
     # @testable infrastructure
     def category_pages(self, category):
-        entities = database.get.pages(
+        entities = database_get.pages(
             category.key,
             limit=None,
             hashes=Restriction.UNRESTRICTED,

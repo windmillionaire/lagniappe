@@ -183,7 +183,7 @@ def test_browser_submission_references_require_view_and_preserve_hidden_existing
             return_value=[existing, denied],
         ),
         patch(
-            "lagniappe.core.tools.auth.references.database.get.datastore_key",
+            "lagniappe.core.tools.auth.references.database_get.datastore_key",
             side_effect=datastore_key,
         ),
     ):
@@ -229,7 +229,7 @@ def test_browser_submission_references_validate_table_links_before_mutation(get_
             return_value=[denied],
         ),
         patch(
-            "lagniappe.core.tools.auth.references.database.get.datastore_key",
+            "lagniappe.core.tools.auth.references.database_get.datastore_key",
             return_value=denied.key,
         ),
     ):

@@ -4,7 +4,7 @@ from flask_login import current_user
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.filters import (
     FilterCache,
     FilterContractError,
@@ -201,7 +201,7 @@ def get(key, **kwargs):
     filters = []
     can_edit = entity.allowed(Action.EDIT, user=current_user)
     for entity_filter in Entities.fetch(
-        *database.get.filters(entity), request=Fetch.direct()
+        *database_get.filters(entity), request=Fetch.direct()
     ):
         try:
             entity_filter.compile(current_user)

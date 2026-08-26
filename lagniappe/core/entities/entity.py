@@ -9,7 +9,8 @@ from ..definitions import Action, MutationIntent
 from ..entities import Entities
 from ..exceptions import PropertyError
 from ..properties import common_entity
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 from ..tools.auth.context import current_context_user
 
 
@@ -118,9 +119,9 @@ class Entity:
         self._db = identifier if isinstance(identifier, datastore.Entity) else {}
 
         if identifier is not None:
-            self._key = database.get.datastore_key(identifier)
+            self._key = database_get.datastore_key(identifier)
         elif not kwargs.get("temporary") and not kwargs.get("testing"):
-            self._key = database.create_key(self.entity_kind, kwargs.get("parent"))
+            self._key = database_utility.create_key(self.entity_kind, kwargs.get("parent"))
 
         self._temporary = kwargs.get("temporary")
         self._testing = kwargs.get("testing")
@@ -275,7 +276,7 @@ class Entity:
 
         if getattr(self, "entity_kind", None) == "user":
             page = self.properties.get("page")
-            details["id"] = database.get.urlsafe_key(page.key) if page else None
+            details["id"] = database_get.urlsafe_key(page.key) if page else None
         else:
             details["id"] = self.urlsafe_key
         return details
@@ -426,7 +427,7 @@ class Entity:
         if getattr(self, "_urlsafe_key", None):
             return self._urlsafe_key
 
-        self._urlsafe_key = database.get.urlsafe_key(self.key)
+        self._urlsafe_key = database_get.urlsafe_key(self.key)
         return self._urlsafe_key
 
     # @testable true
@@ -440,10 +441,10 @@ class Entity:
         if not self.key:
             raise RuntimeError("no key assigned")
 
-        self._db = database.get.entity(self.key)
+        self._db = database_get.entity(self.key)
 
         if not self._db:
-            self._db = database.create_entity(self.key)
+            self._db = database_utility.create_entity(self.key)
 
         return self._db
 

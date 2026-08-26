@@ -9,7 +9,7 @@ from google.auth.transport.requests import AuthorizedSession
 
 from config import constants
 from lagniappe import CONFIG
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import deferred_jobs as database_deferred_jobs
 
 
 SCHEDULER_API_ROOT = "https://cloudscheduler.googleapis.com/v1"
@@ -151,7 +151,7 @@ def synchronize_deferred_job_reconciler(
     initial = (
         initial_control
         if initial_control is not None
-        else database.get_deferred_job_scheduler_control()
+        else database_deferred_jobs.get_deferred_job_scheduler_control()
     )
     if not force and _control_converged(initial):
         return {"synchronized": True, "reason": "current", "control": initial}
@@ -159,7 +159,7 @@ def synchronize_deferred_job_reconciler(
     lease_token = uuid.uuid4().hex
     acquired = None
     for delay in (*SCHEDULER_SYNC_WAIT_DELAYS, None):
-        acquired = database.acquire_deferred_job_scheduler_sync(
+        acquired = database_deferred_jobs.acquire_deferred_job_scheduler_sync(
             lease_token,
             now_fn(),
             lease_seconds=SCHEDULER_SYNC_LEASE_SECONDS,
@@ -189,7 +189,7 @@ def synchronize_deferred_job_reconciler(
                 session=provider_session,
                 config=config,
             )
-            recorded = database.record_deferred_job_scheduler_sync(
+            recorded = database_deferred_jobs.record_deferred_job_scheduler_sync(
                 lease_token,
                 actual_state,
                 now_fn(),
@@ -210,4 +210,4 @@ def synchronize_deferred_job_reconciler(
             "Cloud Scheduler intent changed too frequently to converge."
         )
     finally:
-        database.release_deferred_job_scheduler_sync(lease_token, now_fn())
+        database_deferred_jobs.release_deferred_job_scheduler_sync(lease_token, now_fn())

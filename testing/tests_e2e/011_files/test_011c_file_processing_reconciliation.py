@@ -18,7 +18,8 @@ from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Uploads, Users
 from testing.definitions.page_definitions import PageDefinition
 from testing.resources import File, Page
-from testing.utility import expect_poll_result, expect_successful_response
+from testing.utility.network import expect_successful_response
+from testing.utility.polling import expect_poll_result
 
 pytestmark = pytest.mark.e2e
 

@@ -15,7 +15,10 @@ from lagniappe.core.definitions import (
     FileConsumer,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai, database, dates
+from lagniappe.core.tools import ai, dates
+from lagniappe.core.tools.database import deferred_jobs as database_deferred_jobs
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.database import assets as storage_assets
 
 from .base import DeferredJobAdapter
@@ -224,9 +227,9 @@ class AutofillAdapter(DeferredJobAdapter):
             identity = hashlib.sha256(
                 str(context.job.urlsafe_key).encode("utf-8")
             ).hexdigest()
-            file_key = database.create_named_key("file", f"autofill-{identity}")
+            file_key = database_utility.create_named_key("file", f"autofill-{identity}")
             checkpoint["attachment"] = {
-                "key": database.get.urlsafe_key(file_key),
+                "key": database_get.urlsafe_key(file_key),
                 "name": f"{dates.user_today(context.actor):%Y-%m-%d}-autofill",
                 "filename": upload.filename,
                 "mimetype": upload.content_type,
@@ -293,7 +296,7 @@ class AutofillAdapter(DeferredJobAdapter):
                     consumer=FileConsumer.AI_INLINE,
                 )
                 upload.lagniappe_preserve_source = True
-                file_key = database.get.datastore_key(attachment.get("key"))
+                file_key = database_get.datastore_key(attachment.get("key"))
                 if file_key is None:
                     raise exceptions.ValidationError(
                         "The autofill attachment key is invalid."
@@ -348,7 +351,7 @@ class AutofillAdapter(DeferredJobAdapter):
             operation = getattr(context.job, "urlsafe_key", None)
             if context.parameters.get("lock_target", True) and target_key and operation:
                 lock_key = deferred_job_lock_key(target_key)
-                database.release_deferred_job_lock(lock_key, operation)
+                database_deferred_jobs.release_deferred_job_lock(lock_key, operation)
             if target_key and operation:
                 current = Entities.fetch_one(target_key, request=Fetch.direct())
                 if (

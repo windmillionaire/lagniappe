@@ -3,7 +3,7 @@
 import json
 
 from ..definitions import AssetTypes
-from ..tools import database
+from lagniappe.core.tools.database import assets as database_assets
 
 
 # @testable infrastructure
@@ -135,7 +135,7 @@ class AssetMixin:
         if not copied.extension and source_extension:
             copied._path = f"{self.hash}_{name}.{source_extension}"
 
-        blob = database.copy_file(
+        blob = database_assets.copy_file(
             source_path,
             source_visibility,
             copied.path,

@@ -4,8 +4,8 @@ from ..definitions import Fetch, FieldType, FilterOptions, Ordering
 from ..entities import Entities
 from ..exceptions import ValidationError
 from ..mixins import AIMixin, ColumnMixin, FilterMixin
-from ..tools import files
 from ..tools.files.downloads import download_image, downloaded_image_file
+from ..tools.files.find_page import find_page
 from ..tools.links import metadata as external
 from ..tools.services import places as location
 from .base_schema import SchemaProperty
@@ -138,7 +138,7 @@ class Link(FilterMixin, ColumnMixin, AIMixin, SchemaProperty):
             self.value = None
             return False
 
-        match = files.find_page(value, fuzzy=self.fuzzy_match, error_label=self.label)
+        match = find_page(value, fuzzy=self.fuzzy_match, error_label=self.label)
         self.warnings.extend(match["warnings"])
         if match["id"]:
             self.value = match["id"]

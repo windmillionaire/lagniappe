@@ -14,7 +14,8 @@ from lagniappe.core.definitions import (
     DeferredJobType,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import deferred_jobs as database_deferred_jobs
+from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.ai import observability
 from lagniappe.core.tools.deferred_jobs import common as deferred_common
 from lagniappe.core.tools.deferred_jobs.adapters.base import DeferredJobAdapter
@@ -211,7 +212,7 @@ def runner(monkeypatch, job, adapter):
     service.adapter_registry._defaults_loaded = True
     service.register(adapter)
     monkeypatch.setattr(
-        database,
+        database_deferred_jobs,
         "claim_deferred_job",
         lambda *_args: {"claimed": True, "reason": "claimed", "entity": job},
     )
@@ -252,7 +253,7 @@ def terminal_delivery_runner(monkeypatch, job, adapter, persist=None):
         for name, value in values.items():
             setattr(current, name, value)
 
-    monkeypatch.setattr(database, "claim_deferred_job", claim)
+    monkeypatch.setattr(database_deferred_jobs, "claim_deferred_job", claim)
     monkeypatch.setattr(Entities, "DEFERRED_JOB", lambda raw: raw)
     monkeypatch.setattr(Entities, "fetch_one", lambda value, request: value)
     monkeypatch.setattr(Entities, "save", lambda *_entities: None)
@@ -313,12 +314,12 @@ def fake_start_entities(monkeypatch):
         lambda *entities: state["saved"].append(entities),
     )
     monkeypatch.setattr(
-        database,
+        database_utility,
         "create_named_key",
         lambda *_args, **_kwargs: "job-datastore-key",
     )
     monkeypatch.setattr(
-        database,
+        database_deferred_jobs,
         "create_deferred_job_if_absent",
         lambda *_args, **_kwargs: {"created": True, "entity": state.get("job")},
     )
@@ -334,7 +335,7 @@ def fake_start_entities(monkeypatch):
         return True
 
     monkeypatch.setattr(
-        database,
+        database_deferred_jobs,
         "update_deferred_job_recovery_dispatch",
         update_dispatch,
     )

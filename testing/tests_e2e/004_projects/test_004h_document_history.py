@@ -24,7 +24,7 @@ import requests
 from playwright.sync_api import expect
 
 from testing.definitions import Projects, Users
-from testing.utility import assert_lagniappe_error_response
+from testing.utility.network import assert_lagniappe_error_response
 
 
 pytestmark = pytest.mark.e2e

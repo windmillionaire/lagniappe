@@ -4,7 +4,9 @@ from ..definitions import (
     FileConsumerLimitError,
     enforce_file_consumer,
 )
-from ..tools import files
+from ..tools.files import constants as file_constants
+from ..tools.files import html as file_html
+from ..tools.files import utility as file_utility
 from .base_asset import AssetProperty
 from .base_property import UNSET
 
@@ -41,12 +43,12 @@ class FileAsset(AssetProperty):
     @value.setter
     def value(self, upload):
         mimetype = upload.content_type or self.entity.mimetype
-        self.entity.mimetype = files.determine_mimetype(
+        self.entity.mimetype = file_utility.determine_mimetype(
             upload, self.entity.filename, mimetype, self.entity.encoding
         )
 
-        if self.entity.mimetype in files.TEXT_MIMETYPES.values():
-            self.entity.encoding = files.determine_encoding(upload)
+        if self.entity.mimetype in file_constants.TEXT_MIMETYPES.values():
+            self.entity.encoding = file_utility.determine_encoding(upload)
 
         upload.lagniappe_content_type = self.entity.mimetype
         AssetProperty.value.fset(self, upload)
@@ -61,14 +63,14 @@ class FileAsset(AssetProperty):
     @property
     def preview(self):
         mimetype = self.entity.mimetype
-        if mimetype and mimetype in files.PREVIEW_MIMETYPES:
+        if mimetype and mimetype in file_constants.PREVIEW_MIMETYPES:
             return self.url
         return None
 
     @property
     def image(self):
         mimetype = self.entity.mimetype
-        if mimetype and mimetype in files.IMAGE_MIMETYPES:
+        if mimetype and mimetype in file_constants.IMAGE_MIMETYPES:
             return self.url
         return None
 
@@ -128,7 +130,9 @@ class TextAsset(CacheMixin, AssetProperty):
     @property
     def is_text_file(self):
         mimetype = self.entity.mimetype
-        return bool(mimetype and mimetype in files.TEXT_MIMETYPES.values())
+        return bool(
+            mimetype and mimetype in file_constants.TEXT_MIMETYPES.values()
+        )
 
     # @testable true
     # @tests tests_unit/test_006_file_properties.py::test_text_asset_extractable_only_for_non_text_document_ai_mimetypes
@@ -139,7 +143,7 @@ class TextAsset(CacheMixin, AssetProperty):
         return bool(
             mimetype
             and not self.is_text_file
-            and mimetype in files.DOCUMENT_AI_MIMETYPES
+            and mimetype in file_constants.DOCUMENT_AI_MIMETYPES
         )
 
     # @testable true
@@ -212,7 +216,9 @@ class TextAsset(CacheMixin, AssetProperty):
             return self._markup
 
         text = self.asset
-        self._markup = files.htmlize(text, self.entity.mimetype) if text else None
+        self._markup = (
+            file_html.htmlize(text, self.entity.mimetype) if text else None
+        )
         return self._markup
 
     @property

@@ -2,7 +2,7 @@
 
 from .entity import Entity
 from ..properties import mention
-from ..tools import database
+from lagniappe.core.tools.database import utility as database_utility
 
 
 # @testable true
@@ -43,7 +43,7 @@ class MentionMarker(Entity):
         key,
         now,
     ):
-        marker = cls(database.create_entity(key))
+        marker = cls(database_utility.create_entity(key))
         marker.db.exclude_from_indexes = marker.exclude_from_index
         marker.db.update(
             {

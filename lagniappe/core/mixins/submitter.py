@@ -6,7 +6,7 @@ import json
 
 from ..exceptions import ValidationError
 from ..entities import Entities
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
 from ..tools.auth.references import (
     SubmittedReferenceResolver,
     UNAVAILABLE_REFERENCE_ERROR,
@@ -387,7 +387,7 @@ class SubmitterMixin:
             if not isinstance(link, dict) or link.get("kind") not in ("page", "user"):
                 continue
 
-            key = database.get.datastore_key(link.get("id"))
+            key = database_get.datastore_key(link.get("id"))
             if key and key not in keys:
                 keys.append(key)
 

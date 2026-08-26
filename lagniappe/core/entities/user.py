@@ -13,7 +13,7 @@ from ..properties import (
     user_entity,
 )
 from ..mixins import AssetMixin
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
 from ..tools.auth.context import current_context_user
 from .entity import Entity
 from . import Entities
@@ -191,7 +191,7 @@ class User(AssetMixin, UserMixin, Entity):
         if not data.get("email"):
             raise ValueError("email is required")
 
-        exists = database.get.user(data.get("email"))
+        exists = database_get.user(data.get("email"))
         adopting_public = bool(exists and adopt_public and exists.get("public", False))
         if exists and not adopting_public:
             return cls(exists)
@@ -274,7 +274,7 @@ class User(AssetMixin, UserMixin, Entity):
     # @pair user:load
     @classmethod
     def load(cls, email):
-        user = database.get.user(email)
+        user = database_get.user(email)
         if user:
             return Entities.fetch_one(user, request=Fetch.direct())
         return None

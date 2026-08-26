@@ -57,7 +57,7 @@ from lagniappe.core.tools.ai.function_definitions import (
     get_page_tasks as ai_get_page_tasks,
 )
 from lagniappe.core.tools.ai.prompt import Prompt
-from lagniappe.core.tools.files import extract_ooxml_text
+from lagniappe.core.tools.files.ooxml import extract_ooxml_text
 from testing.utility.test_entities import TestEntities
 
 
@@ -1084,7 +1084,7 @@ def test_list_workspace_resources_caches_inventory(monkeypatch):
         ),
     )
     monkeypatch.setattr(
-        ai_list_resources.database.get,
+        ai_list_resources.database_get,
         "all_models",
         lambda: ["raw-model-row"],
     )
@@ -1271,7 +1271,7 @@ def test_get_form_instances_filters_permissions_status_and_truncates(monkeypatch
         ),
     )
     monkeypatch.setattr(
-        ai_get_form_instances.database.get,
+        ai_get_form_instances.database_get,
         "form_instance_users",
         lambda form_key: ["raw-instance"],
     )
@@ -1557,7 +1557,7 @@ def test_get_category_pages_compact_returns_lightweight_page_refs(monkeypatch):
 
     monkeypatch.setattr(ai_get_pages.Entities, "fetch", fake_load)
     monkeypatch.setattr(
-        ai_get_pages.database.get,
+        ai_get_pages.database_get,
         "pages",
         lambda *args, **kwargs: SimpleNamespace(results=["page-key"]),
     )

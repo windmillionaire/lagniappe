@@ -4,7 +4,8 @@ from ...definitions import Fetch
 from ...entities import Entities
 from ...properties import message as message_values
 from ...properties import message_conversation as conversation_values
-from .. import collaboration, database
+from .. import collaboration
+from lagniappe.core.tools.database import messaging as database_messaging
 from ..database import messaging as message_database
 
 
@@ -97,7 +98,7 @@ def serialize_message(message, viewer):
 def conversations(user, cursor=None, limit=CONVERSATION_PAGE_SIZE):
     if not collaboration.managed_user(user):
         raise PermissionError("Messaging is available to managed users only.")
-    page = database.conversations_page(user, cursor, limit)
+    page = database_messaging.conversations_page(user, cursor, limit)
     rows = list(page)
     peer_status = _peer_status(rows, user)
     unavailable = {
@@ -124,7 +125,7 @@ def conversations(user, cursor=None, limit=CONVERSATION_PAGE_SIZE):
 # @covered-by lagniappe/core/tools/messaging/views.py::conversation_history
 # @reason authorized lookup is exercised through history
 def get_conversation(user, conversation_identifier):
-    conversation = database.get_conversation(conversation_identifier)
+    conversation = database_messaging.get_conversation(conversation_identifier)
     message_database.require_participant(conversation, user)
     return conversation
 
@@ -156,7 +157,7 @@ def conversation_history(
     exhausted = False
     while len(visible) < limit and not exhausted:
         requested = max(limit, limit - len(visible))
-        page = database.messages_page(conversation, next_cursor, requested)
+        page = database_messaging.messages_page(conversation, next_cursor, requested)
         next_cursor = page.next_cursor
         for row in page:
             if int(row.get("sequence") or 0) <= cleared:

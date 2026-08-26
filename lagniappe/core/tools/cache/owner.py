@@ -116,9 +116,9 @@ def get_owner_projection(*, repair=True):
 
     from lagniappe.core.entities import Entities
     from lagniappe.core.definitions import Fetch
-    from lagniappe.core.tools import database
+    from lagniappe.core.tools.database import get as database_get
 
-    raw = database.get.user(CONFIG.ADMIN_EMAIL)
+    raw = database_get.user(CONFIG.ADMIN_EMAIL)
     owner = Entities.fetch_one(raw, request=Fetch.root()) if raw else None
     if owner and not owner.is_owner and not owner.db.get("owner"):
         # Schema-compatible repair for an old canonical row that predates the

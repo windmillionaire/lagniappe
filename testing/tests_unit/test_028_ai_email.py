@@ -697,8 +697,8 @@ class _InboundClient:
 # @matrix ai-email webhook : exact-match replay report-handoff sender user-policy
 def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch):
     from lagniappe.core.entities import Entities
-    from lagniappe.core.tools import database
     from lagniappe.core.tools.database import ai_email as email_database
+    from lagniappe.core.tools.database import get as database_get
 
     user = TestEntities.get(
         "USER",
@@ -718,7 +718,7 @@ def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch)
     )
     monkeypatch.setattr(email_database, "release_ai_email_event", lambda *_args: None)
     monkeypatch.setattr(
-        database.get, "user", lambda email: "raw-user" if email == user.email else None
+        database_get, "user", lambda email: "raw-user" if email == user.email else None
     )
     monkeypatch.setattr(
         Entities,
@@ -751,7 +751,7 @@ def test_process_resend_email_hands_off_to_existing_report_pipeline(monkeypatch)
 # @matrix ai-email : idempotency privacy report-handoff routing
 def test_create_shared_address_email_report_preserves_routing_input(monkeypatch):
     from lagniappe.core.entities import Entities
-    from lagniappe.core.tools import database
+    from lagniappe.core.tools.database import utility as database_utility
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
     user = SimpleNamespace(urlsafe_key="user-one")
@@ -770,7 +770,9 @@ def test_create_shared_address_email_report_preserves_routing_input(monkeypatch)
     saved = []
     starts = []
 
-    monkeypatch.setattr(database, "create_named_key", lambda *_args: "report-key")
+    monkeypatch.setattr(
+        database_utility, "create_named_key", lambda *_args: "report-key"
+    )
     monkeypatch.setattr(Entities, "fetch_one", lambda *_args, **_kwargs: None)
 
     def create_report(data, *, key):

@@ -23,12 +23,12 @@ from lagniappe.core.properties import (
     deferred_job_lock,
     deferred_job_request,
 )
-from lagniappe.core.tools import database
 from lagniappe.core.tools.deferred_jobs import locks as deferred_locks
 from lagniappe.core.tools.deferred_jobs.adapters import autofill as autofill_adapters
 from lagniappe.core.tools.database import deferred_jobs as deferred_database
 from lagniappe.core.tools.database import notifications as notification_database
 from lagniappe.core.tools.database import transactions as database_transactions
+from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.deferred_jobs.locks import (
     AUTOFILL_FORM_LOCK_SCOPE,
     deferred_job_lock_descriptor,
@@ -605,7 +605,7 @@ def test_autofill_lock_cleanup_is_compare_and_delete(monkeypatch):
 def test_deferred_job_lock_resolution_is_target_scoped(monkeypatch):
     named_keys = []
     monkeypatch.setattr(
-        database,
+        database_utility,
         "create_named_key",
         lambda kind, identifier: (
             named_keys.append((kind, identifier)) or f"lock:{identifier}"
@@ -655,7 +655,7 @@ def test_deferred_job_lock_resolution_is_target_scoped(monkeypatch):
     released = []
     monkeypatch.setattr(deferred_locks.Entities, "fetch", fetch)
     monkeypatch.setattr(
-        database,
+        deferred_database,
         "release_deferred_job_lock",
         lambda *values: released.append(values),
     )

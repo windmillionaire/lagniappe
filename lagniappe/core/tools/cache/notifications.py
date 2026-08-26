@@ -41,9 +41,9 @@ def peek_notification_state(user):
 
 # @testable infrastructure
 def _default_keys_loader(user):
-    from .. import database
+    from lagniappe.core.tools.database import notifications as database_notifications
 
-    return database.notification_keys(user)
+    return database_notifications.notification_keys(user)
 
 
 # @testable true
@@ -84,11 +84,11 @@ def seed_notification_state(
                     aggregate = aggregate_loader(user)
                 else:
                     try:
-                        from .. import database
+                        from lagniappe.core.tools.database import notifications as database_notifications
 
-                        aggregate = database.get_notification_aggregate(user)
+                        aggregate = database_notifications.get_notification_aggregate(user)
                         if aggregate is None:
-                            aggregate = database.repair_notification_aggregate(
+                            aggregate = database_notifications.repair_notification_aggregate(
                                 user, ordinary_count=len(members)
                             )
                     except Exception:

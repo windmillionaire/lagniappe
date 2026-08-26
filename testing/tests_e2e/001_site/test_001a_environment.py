@@ -45,7 +45,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools import cache, database
 
 from testing.definitions import SitePages, Users
-from testing.utility import assert_same_etag
+from testing.utility.network import assert_same_etag
 
 pytestmark = pytest.mark.e2e
 

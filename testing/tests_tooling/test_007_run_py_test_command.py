@@ -14,7 +14,10 @@ import yaml
 
 import run
 from runner import pytest_routing
-from testing.utility import traceability_common, traceability_results
+from testing.utility import (
+    traceability_common,
+    traceability_results,
+)
 
 pytestmark = pytest.mark.tooling
 

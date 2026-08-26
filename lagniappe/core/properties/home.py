@@ -2,7 +2,7 @@ from flask_login import current_user
 
 from ..definitions import Action, EntityAttributes, Fetch
 from ..entities import Entities
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
 from .base_property import UNSET
 
 
@@ -64,7 +64,7 @@ class ProjectList(HomeProperty):
             return super().list
 
         hashes = current_user.properties.restrictions.project
-        db = database.get.models(
+        db = database_get.models(
             "project",
             start_cursor=self.cursor,
             hashes=hashes,
@@ -94,7 +94,7 @@ class CategoryList(HomeProperty):
             return super().list
 
         hashes = current_user.properties.restrictions.category
-        db = database.get.models(
+        db = database_get.models(
             "category",
             start_cursor=self.cursor,
             hashes=hashes,
@@ -122,7 +122,7 @@ class PageList(HomeProperty):
             return super().list
 
         hashes = current_user.properties.restrictions.page
-        db = database.get.recent_pages(start_cursor=self.cursor, hashes=hashes)
+        db = database_get.recent_pages(start_cursor=self.cursor, hashes=hashes)
         self._list = [
             page
             for page in Entities.fetch(*db.results, request=Fetch.direct())
@@ -150,7 +150,7 @@ class TaskList(HomeProperty):
             return super().list
 
         hashes = current_user.properties.restrictions.task
-        tasks = database.get.due_tasks(
+        tasks = database_get.due_tasks(
             hashes=hashes,
             assigned_to=current_user.page,
         )
@@ -173,7 +173,7 @@ class TaskList(HomeProperty):
 
     @property
     def count(self):
-        return database.get.user_task_count(current_user.page)
+        return database_get.user_task_count(current_user.page)
 
 
 # @testable true
@@ -210,7 +210,7 @@ class StarredList(HomeProperty):
         self._items = []
         for key in starred:
             entity = loaded_by_key.get(key)
-            urlsafe_key = database.get.urlsafe_key(key)
+            urlsafe_key = database_get.urlsafe_key(key)
             if entity is None:
                 item = {
                     "key": urlsafe_key,
@@ -257,7 +257,7 @@ class NoteList(HomeProperty):
         if super().list is not UNSET:
             return super().list
 
-        notes = database.get.notes(current_user)
+        notes = database_get.notes(current_user)
         self._list = Entities.fetch(*notes, request=Fetch.direct())
         return self._list
 
@@ -274,7 +274,7 @@ class IngressList(HomeProperty):
         if super().list is not UNSET:
             return super().list
 
-        files = database.get.ingress_files()
+        files = database_get.ingress_files()
         self._list = Entities.fetch(*files, request=Fetch.direct())
         return self._list
 
@@ -291,6 +291,6 @@ class ToolsList(HomeProperty):
         if super().list is not UNSET:
             return super().list
 
-        reports = database.get.ai_reports(current_user)
+        reports = database_get.ai_reports(current_user)
         self._list = Entities.fetch(*reports, request=Fetch.direct())
         return self._list

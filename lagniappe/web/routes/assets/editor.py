@@ -4,7 +4,8 @@ from flask_login import current_user
 from lagniappe.core.definitions import AI, Action, Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
-from lagniappe.core.tools import ai, database
+from lagniappe.core.tools import ai
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.files.html import clean_html
 from lagniappe.web.auth import (
     abort_public_user_action,
@@ -189,7 +190,7 @@ def list_document_history(key, **kwargs):
         kwargs["entity"],
         request=Fetch.direct(),
     )
-    results = database.get.document_history(entity)
+    results = database_get.document_history(entity)
     entries = Entities.fetch(*results, request=Fetch.root()) if results else []
     entries = Entities.DOCUMENT_HISTORY.ordered(entries)
     return responses.json_response(
@@ -234,7 +235,7 @@ def unpinned_document_history(key, **kwargs):
         kwargs["entity"],
         request=Fetch.direct(),
     )
-    results = database.get.document_history(entity)
+    results = database_get.document_history(entity)
     entries = Entities.fetch(*results, request=Fetch.root()) if results else []
     unpinned_count = sum(not entry.pinned for entry in entries)
 

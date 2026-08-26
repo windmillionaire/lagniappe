@@ -8,7 +8,7 @@ from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.cache.core import cache as redis_cache
 from lagniappe.core.tools.cache.keys import Keys
 from ..references import hash_reference
@@ -60,7 +60,7 @@ def build_workspace_resource_inventory(user):
     """Build a compact inventory of viewable model resources for an AI prompt."""
     models = [
         entity
-        for entity in Entities.fetch(*database.get.all_models(), request=Fetch.direct())
+        for entity in Entities.fetch(*database_get.all_models(), request=Fetch.direct())
         if _can_list(entity, user)
     ]
 

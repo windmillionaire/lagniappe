@@ -4,7 +4,7 @@ import hmac
 from lagniappe import CONFIG
 from lagniappe.core.definitions import Action, Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 
 
 # @testable false
@@ -58,7 +58,7 @@ def get_or_create_user():
     email = str(getattr(CONFIG, "AGENT_ACCESS_EMAIL", "")).strip().lower()
     name = str(getattr(CONFIG, "AGENT_ACCESS_NAME", "") or "Agent").strip() or "Agent"
 
-    exists = database.get.user(email)
+    exists = database_get.user(email)
     if exists:
         user = Entities.fetch_one(
             exists,

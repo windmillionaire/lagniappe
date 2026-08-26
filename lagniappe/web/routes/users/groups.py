@@ -2,7 +2,7 @@ from flask import request
 
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.web.auth import permission
 from lagniappe.web import responses
 
@@ -73,7 +73,7 @@ def group_permissions(key, **kwargs):
 def delete_group(key, **kwargs):
     group = kwargs["entity"]
 
-    users_in_group = database.get.users(group=group.key, limit=None)
+    users_in_group = database_get.users(group=group.key, limit=None)
     users = Entities.fetch(*users_in_group.results, request=Fetch.direct())
     for user in users:
         user.properties.groups.remove(group)

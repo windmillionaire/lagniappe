@@ -134,7 +134,7 @@ export class SiteMaintenance extends SiteSetting {
 	/**
 	 * @testable true
 	 * @tests tests_js/test_019_form_sync_frontend.py::test_site_settings_migration_status_uses_generic_release_states
-	 * @matrix admin database-migrations : actionable-links audit-error cache-gate current failed pending repairs running version-history
+	 * @matrix admin database-migrations : actionable-links audit-error cache-gate current failed fresh-install pending repairs running version-history
 	 */
 	_renderMigrationStatus(status) {
 		const panel = this.target.querySelector("[data-role='migration-status']");
@@ -184,10 +184,16 @@ export class SiteMaintenance extends SiteSetting {
 		const version = status?.current_version
 			? `Version ${status.current_version}. `
 			: "";
+		const visibleMigrations = (status?.migrations || []).filter(
+			(migration) => migration.source !== "fresh-install",
+		);
+		const visibleCompleted = visibleMigrations.filter(
+			(migration) => migration.state === "complete",
+		).length;
 		switch (state) {
 			case "pending":
 				title.textContent = "Site updates are ready";
-				summary.textContent = `${version}${pendingCount} pending, ${counts.complete || 0} previously completed.`;
+				summary.textContent = `${version}${pendingCount} pending site ${pendingCount === 1 ? "update" : "updates"}.`;
 				break;
 			case "running":
 				title.textContent = "Site updates are running";
@@ -203,7 +209,9 @@ export class SiteMaintenance extends SiteSetting {
 				break;
 			default:
 				title.textContent = "Site updates are current";
-				summary.textContent = `${version}${counts.complete || 0} ${counts.complete === 1 ? "update" : "updates"} completed.`;
+				summary.textContent = visibleCompleted
+					? `${version}${visibleCompleted} site ${visibleCompleted === 1 ? "update" : "updates"} completed.`
+					: `${version}No site updates are required.`;
 		}
 
 		const appendDetail = (list, migrationId, detail) => {
@@ -232,7 +240,7 @@ export class SiteMaintenance extends SiteSetting {
 			"audit-error": "Audit error",
 		};
 		const releases = new Map();
-		for (const migration of status?.migrations || []) {
+		for (const migration of visibleMigrations) {
 			const release = migration.introduced_in || "Unknown";
 			if (!releases.has(release)) releases.set(release, []);
 			releases.get(release).push(migration);

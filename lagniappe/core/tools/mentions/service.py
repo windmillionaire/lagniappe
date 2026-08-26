@@ -2,7 +2,9 @@
 
 from ...definitions import Fetch
 from ...entities import Entities
-from .. import collaboration, database
+from .. import collaboration
+from lagniappe.core.tools.database import mentions as database_mentions
+from lagniappe.core.tools.database import notifications as database_notifications
 from ..email.notifications import capture as email_capture
 from ..notifications import service as notification_service
 from .content import saved_mentions
@@ -53,8 +55,8 @@ def deliver_mentions(actor, document, html, occurrences):
             actor, recipient, document
         ):
             continue
-        database.ensure_notification_aggregate(recipient)
-        created, aggregate, notification_key = database.create_mention_delivery(
+        database_notifications.ensure_notification_aggregate(recipient)
+        created, aggregate, notification_key = database_mentions.create_mention_delivery(
             actor,
             recipient,
             document,

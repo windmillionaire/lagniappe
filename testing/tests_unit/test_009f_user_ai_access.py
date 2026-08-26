@@ -148,17 +148,17 @@ def test_user_create_defaults_non_owner_to_none():
             "lagniappe.core.entities.user.CONFIG.ADMIN_EMAIL",
             "owner@example.test",
         ),
-        patch("lagniappe.core.entities.user.database.get.user", return_value=None),
+        patch("lagniappe.core.entities.user.database_get.user", return_value=None),
         patch(
-            "lagniappe.core.entities.entity.database.create_key",
+            "lagniappe.core.entities.entity.database_utility.create_key",
             return_value=new_key,
         ),
         patch(
-            "lagniappe.core.entities.entity.database.get.entity",
+            "lagniappe.core.entities.entity.database_get.entity",
             return_value=None,
         ),
         patch(
-            "lagniappe.core.entities.entity.database.create_entity",
+            "lagniappe.core.entities.entity.database_utility.create_entity",
             return_value=new_entity,
         ),
         patch(

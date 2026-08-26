@@ -19,7 +19,8 @@ from lagniappe.core.entities import Entities
 from testing.definitions import Projects, SubmissionFields, Users
 from testing.elements import SpinnerButtons, Attributes, Tabs
 from testing.resources import Project
-from testing.utility import expect_poll_result, expect_successful_response
+from testing.utility.network import expect_successful_response
+from testing.utility.polling import expect_poll_result
 
 
 def _wait_for_services_ready(user):

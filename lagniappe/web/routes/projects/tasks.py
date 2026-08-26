@@ -3,7 +3,7 @@ from flask_login import current_user
 
 from lagniappe.core import exceptions
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.core.tools.filters import compile_filter_contract
 from lagniappe.core.tools.tasks.ordering import sort_tasks
@@ -190,7 +190,7 @@ def status(key, task_key, **kwargs):
     completed = True if request.args.get("completed") == "true" else False
     filter = _status_filter(project, model, completed)
 
-    db = database.get.tasks(
+    db = database_get.tasks(
         model=model,
         completed=completed,
         hashes=current_user.properties.restrictions.task,

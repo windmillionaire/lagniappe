@@ -319,7 +319,7 @@ def test_task_signature_form_submission_saves_asset_id(get_schema):
         files={"signature-signop": upload},
     )
 
-    with patch("lagniappe.core.definitions.asset.database.assets.save_file"):
+    with patch("lagniappe.core.definitions.asset.database_assets.save_file"):
         task.form_submission(request)
 
     assert json.loads(task.db["submission"]) == {"signature-signop": "signature-signop"}
@@ -377,7 +377,7 @@ def test_task_signature_form_submission_saves_multiple_assets_by_field_id():
         return True
 
     with patch(
-        "lagniappe.core.definitions.asset.database.assets.save_file",
+        "lagniappe.core.definitions.asset.database_assets.save_file",
         side_effect=_capture_save_file,
     ):
         task.form_submission(request)
@@ -985,14 +985,14 @@ def test_task_entity_lifecycle_readonly_and_save_relations():
     created_db = {"created": datetime(2025, 1, 1, tzinfo=timezone.utc)}
 
     with patch(
-        "lagniappe.core.entities.entity.database.create_key",
+        "lagniappe.core.entities.entity.database_utility.create_key",
         return_value="tsk015created",
     ):
         with patch(
-            "lagniappe.core.entities.entity.database.get.entity", return_value=None
+            "lagniappe.core.entities.entity.database_get.entity", return_value=None
         ):
             with patch(
-                "lagniappe.core.entities.entity.database.create_entity",
+                "lagniappe.core.entities.entity.database_utility.create_entity",
                 return_value=created_db,
             ):
                 created = Task.create(

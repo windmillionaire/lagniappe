@@ -19,7 +19,7 @@ from testing.elements import Buttons, FormElements, Modal, SpinnerButtons, Table
 from testing.resources.form import Builder
 from testing.definitions.form_definitions import FormDefinition
 from testing.resources import Form
-from testing.utility import expect_reconnect_refresh
+from testing.utility.reconnect import expect_reconnect_refresh
 
 
 # @matrix forms : index tools

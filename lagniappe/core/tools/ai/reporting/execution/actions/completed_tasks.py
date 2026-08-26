@@ -9,7 +9,8 @@ from datetime import datetime
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, MutationIntent
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database, dates
+from lagniappe.core.tools import dates
+from lagniappe.core.tools.database import get as database_get
 
 from ....debug import ai_debug
 from .common import (
@@ -236,7 +237,7 @@ def _record_completed_task_event(
             action_record.get("idempotency_key")
         )
         if history_key is None and action_record.get("output_key"):
-            history_key = database.get.datastore_key(action_record["output_key"])
+            history_key = database_get.datastore_key(action_record["output_key"])
         history = task.create_history_entry(
             completed_on=completed_on,
             files=[],
@@ -268,7 +269,7 @@ def _record_completed_task_event(
             f"{action_record.get('idempotency_key')}:history"
         )
         if history_key is None and action_record.get("history_output_key"):
-            history_key = database.get.datastore_key(
+            history_key = database_get.datastore_key(
                 action_record["history_output_key"]
             )
         task.uncomplete(history_key=history_key)

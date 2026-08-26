@@ -9,7 +9,7 @@ from testing.definitions import Categories, Pages, Uploads, Users
 from testing.definitions.schema_definitions import load_schema
 from testing.elements import FormElements, Tabs
 from testing.resources import File, Page
-from testing.utility import manual_mutation_headers
+from testing.utility.network import manual_mutation_headers
 
 pytestmark = pytest.mark.e2e
 

@@ -10,7 +10,8 @@ from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Users
 from testing.elements import Tabs
 from testing.resources import Page
-from testing.utility import expect_successful_response, wait_for_offline_mutations
+from testing.utility.network import expect_successful_response
+from testing.utility.offline import wait_for_offline_mutations
 
 
 pytestmark = pytest.mark.e2e

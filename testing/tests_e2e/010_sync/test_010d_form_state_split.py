@@ -9,7 +9,8 @@ from playwright.sync_api import expect
 from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Tasks, Users
 from testing.resources import Page, Task
-from testing.utility import expect_poll_result, expect_successful_response
+from testing.utility.network import expect_successful_response
+from testing.utility.polling import expect_poll_result
 
 
 pytestmark = pytest.mark.e2e

@@ -123,13 +123,13 @@ def test_user_index_loads_users_groups_public_group_and_append_cursor():
 
     with patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for):
         with patch(
-            "lagniappe.core.entities.index.database.get.users",
+            "lagniappe.core.entities.index.database_get.users",
             return_value=SimpleNamespace(
                 results=["usr-key-1", "usr-key-2"], next_cursor="next-users"
             ),
         ) as user_query:
             with patch(
-                "lagniappe.core.entities.index.database.get.groups",
+                "lagniappe.core.entities.index.database_get.groups",
                 return_value=["grp-key-1", "grp-key-2"],
             ) as group_query:
                 with patch(
@@ -220,7 +220,7 @@ def test_user_index_regular_mode_excludes_public_users():
 
     with patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for):
         with patch(
-            "lagniappe.core.entities.index.database.get.users",
+            "lagniappe.core.entities.index.database_get.users",
             return_value=SimpleNamespace(
                 results=["usr-key-3", "usr-key-4"], next_cursor="next-regular"
             ),
@@ -302,7 +302,7 @@ def test_user_index_public_mode_loads_public_group_users_and_preserves_append_mo
                 return_value=public_group,
             ) as get_public_group:
                 with patch(
-                    "lagniappe.core.entities.index.database.get.users",
+                    "lagniappe.core.entities.index.database_get.users",
                     return_value=SimpleNamespace(
                         results=["usr-key-5", "usr-key-6", "usr-key-7"],
                         next_cursor="next-public",
@@ -347,7 +347,7 @@ def test_user_index_public_mode_returns_empty_when_public_users_disabled():
         return_value=False,
     ) as enabled:
         with patch(
-            "lagniappe.core.entities.index.database.get.users",
+            "lagniappe.core.entities.index.database_get.users",
         ) as user_query:
             index = UserIndex(mode="public", user=index_user)
             users = index.users

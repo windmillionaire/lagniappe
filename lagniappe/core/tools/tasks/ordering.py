@@ -2,7 +2,7 @@
 
 from ...definitions import Fetch
 from ...entities import Entities
-from .. import database
+from lagniappe.core.tools.database import get as database_get
 
 
 # @testable true
@@ -26,7 +26,7 @@ def sort_tasks(tasks):
 def page_task_roots(page):
     """Load one page's root tasks in canonical active/completed order."""
     roots = Entities.fetch(
-        *database.get.page_tasks(page),
+        *database_get.page_tasks(page),
         request=Fetch.root(),
     )
     tasks = [task for task in roots if isinstance(task, Entities.TASK)]

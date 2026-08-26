@@ -4,7 +4,7 @@ from flask_login import current_user
 from lagniappe.core.definitions import Action, Fetch, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.activity import NOTE_VISIBILITIES
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.web import responses
 from lagniappe.web.auth import permission
 
@@ -29,7 +29,7 @@ def get_notes(key, **kwargs):
     _notes_enabled(page)
 
     loaded = Entities.fetch(
-        *database.get.page_notes(page),
+        *database_get.page_notes(page),
         request=Fetch.direct(),
     )
     notes = [

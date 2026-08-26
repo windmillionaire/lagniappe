@@ -159,7 +159,7 @@ def test_form_save_records_schema_history_on_version_change(get_schema):
             "create",
             return_value=history,
         ) as create_history,
-        patch.object(form_module.database.get, "form_users", return_value=[]),
+        patch.object(form_module.database_get, "form_users", return_value=[]),
         patch.object(form_module.Entities, "fetch", return_value=[]),
     ):
         plan = plan_mutation(MutationOperation.SAVE, form, registry=Entities)

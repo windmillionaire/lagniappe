@@ -42,8 +42,9 @@ from runner.testing import (
     prepare_test_artifacts,
 )
 
-from ..utility import TestResults, capture_on_failure
 from ..utility.browser_failures import BrowserFailureCollector, write_diagnostic_report
+from ..utility.error_tracking import capture_on_failure
+from ..utility.test_reporting import TestResults
 
 os.environ["FLASK_ENV"] = "testing"
 

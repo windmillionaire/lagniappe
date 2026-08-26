@@ -24,7 +24,7 @@ from testing.elements import (
     SpinnerButtons,
     Tabs,
 )
-from testing.utility import manual_mutation_headers
+from testing.utility.network import manual_mutation_headers
 
 pytestmark = pytest.mark.e2e
 

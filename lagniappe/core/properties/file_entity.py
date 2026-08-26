@@ -1,5 +1,5 @@
 from ..mixins import AIMixin, CacheMixin
-from ..tools import files
+from ..tools.files import constants as file_constants
 from ..tools.files.html import strip_tags
 from .base_db import DBProperty
 from .base_property import Property
@@ -186,7 +186,7 @@ class Preview(Property):
             return self._value
 
         mimetype = self.entity.mimetype
-        if mimetype and mimetype in files.PREVIEW_MIMETYPES:
+        if mimetype and mimetype in file_constants.PREVIEW_MIMETYPES:
             file = self.entity.get_asset("file")
             if file:
                 self._value = file.url

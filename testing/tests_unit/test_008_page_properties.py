@@ -530,7 +530,7 @@ def test_page_files_loads_database_files():
     )
 
     with (
-        patch.object(page_related.database.get, "page_files", return_value=[raw_file])
+        patch.object(page_related.database_get, "page_files", return_value=[raw_file])
         as page_files,
         patch.object(
             page_related.Entities,
@@ -566,7 +566,7 @@ def test_page_files_reloads_query_results_and_skips_unlinked_files():
 
     with (
         patch.object(
-            page_related.database.get,
+            page_related.database_get,
             "page_files",
             return_value=[stale_query_result, linked_query_result],
         ),
@@ -592,7 +592,7 @@ def test_page_user_and_model_category_parent_keys():
     page.db["user"] = user_key
 
     with patch.object(
-        page_related.database.get,
+        page_related.database_get,
         "urlsafe_key",
         return_value="safe-user",
     ) as urlsafe_key:

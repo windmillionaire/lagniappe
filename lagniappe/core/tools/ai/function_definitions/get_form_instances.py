@@ -4,7 +4,7 @@ from google.genai import types
 
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from ..references import hash_reference
 
 
@@ -103,7 +103,7 @@ def execute_get_form_instances(args, user):
     instances = [
         entity
         for entity in Entities.fetch(
-            *database.get.form_instance_users(form.key),
+            *database_get.form_instance_users(form.key),
             request=Fetch.direct(),
         )
         if _include_instance(entity, user, kinds, task_completed)

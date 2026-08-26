@@ -6,7 +6,11 @@ import types
 
 import pytest
 
-from testing.utility import browser_review, error_tracking, test_reporting
+from testing.utility import (
+    browser_review,
+    error_tracking,
+    test_reporting,
+)
 from testing.utility.artifacts import (
     BROWSER_REVIEWS_DIR,
     TEST_FAILURES_DIR,

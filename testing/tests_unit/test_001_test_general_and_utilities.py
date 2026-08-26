@@ -417,9 +417,9 @@ def test_entities_delete_accepts_batch_and_dedupes(monkeypatch):
         captured["delete"] = to_delete
 
     monkeypatch.setattr(delete_module, "delete_planner_for", lambda _entity: Planner())
-    monkeypatch.setattr(mutation_executor.database, "delete_entities", database_delete)
+    monkeypatch.setattr(mutation_executor.database_utility, "delete_entities", database_delete)
     monkeypatch.setattr(
-        mutation_executor.database,
+        mutation_executor.database_utility,
         "save_mutations",
         lambda writes: (
             events.append("survivors"),
@@ -666,7 +666,7 @@ def test_collect_form_delete_updates_form_users(monkeypatch):
     )
 
     monkeypatch.setattr(
-        entities_module.database.get,
+        entities_module.database_get,
         "form_users",
         lambda *forms: [category, project],
     )
@@ -814,11 +814,7 @@ def test_agent_access_user_helper_creates_or_loads_user_with_groups(monkeypatch)
         events.append(("get", email))
         return existing_user
 
-    monkeypatch.setattr(
-        agent_access,
-        "database",
-        SimpleNamespace(get=SimpleNamespace(user=fake_get_user)),
-    )
+    monkeypatch.setattr(agent_access.database_get, "user", fake_get_user)
     monkeypatch.setattr(agent_access, "Entities", FakeEntities)
 
     created = agent_access.get_or_create_user()
@@ -878,7 +874,7 @@ def test_entities_fetch_root_reuses_typed_entity_without_database_fetch(monkeypa
     def fail_database_read(identifier):
         raise AssertionError(f"unexpected database read for {identifier!r}")
 
-    monkeypatch.setattr(entities_module.database.get, "entity", fail_database_read)
+    monkeypatch.setattr(entities_module.database_get, "entity", fail_database_read)
 
     assert Entities.fetch_one(entity, request=Fetch.root()) is entity
 
@@ -930,7 +926,7 @@ def test_entities_fetch_reuses_cached_attached_relations(monkeypatch):
             raise AssertionError(f"unexpected database read for {keys!r}")
         return []
 
-    monkeypatch.setattr(entities_module.database.get, "entities", fail_database_read)
+    monkeypatch.setattr(entities_module.database_get, "entities", fail_database_read)
 
     assert Entities.fetch(page, request=Fetch.direct()) == [page]
 
@@ -968,7 +964,7 @@ def test_entities_fetch_preserves_explicit_root_over_shallow_attached_copy(monke
             raise AssertionError(f"unexpected database read for {keys!r}")
         return []
 
-    monkeypatch.setattr(entities_module.database.get, "entities", fail_database_read)
+    monkeypatch.setattr(entities_module.database_get, "entities", fail_database_read)
 
     loaded = Entities.fetch(task, authoritative_page, request=Fetch.direct())
 
@@ -1037,7 +1033,7 @@ def test_entities_fetch_applies_total_depth_to_key_and_typed_entity(
     calls = []
 
     monkeypatch.setattr(
-        entities_module.database.get,
+        entities_module.database_get,
         "datastore_key",
         lambda identifier: identifier,
     )
@@ -1046,7 +1042,7 @@ def test_entities_fetch_applies_total_depth_to_key_and_typed_entity(
         calls.append(list(keys))
         return [entities[key] for key in keys if key in entities]
 
-    monkeypatch.setattr(entities_module.database.get, "entities", load_entities)
+    monkeypatch.setattr(entities_module.database_get, "entities", load_entities)
 
     identifier = page if identifier_kind == "typed" else page.key
     assert Entities.fetch(identifier, request=fetch) == [page]
@@ -1083,7 +1079,7 @@ def test_entities_fetch_attaches_survivors_from_fully_resolved_relation(monkeypa
         calls.append(list(keys))
         return [entity for entity in (model, category) if entity.key in keys]
 
-    monkeypatch.setattr(entities_module.database.get, "entities", load_entities)
+    monkeypatch.setattr(entities_module.database_get, "entities", load_entities)
 
     assert Entities.fetch(page, request=Fetch.direct()) == [page]
     assert len(calls) == 1
@@ -1105,7 +1101,7 @@ def test_entities_fetch_batches_unresolved_roots_once(monkeypatch):
     calls = []
 
     monkeypatch.setattr(
-        entities_module.database.get,
+        entities_module.database_get,
         "datastore_key",
         lambda identifier: identifier,
     )
@@ -1114,7 +1110,7 @@ def test_entities_fetch_batches_unresolved_roots_once(monkeypatch):
         calls.append(list(keys))
         return [entities[key] for key in keys]
 
-    monkeypatch.setattr(entities_module.database.get, "entities", load_entities)
+    monkeypatch.setattr(entities_module.database_get, "entities", load_entities)
 
     loaded = Entities.fetch(first.key, second.key, request=Fetch.root())
 
@@ -1137,7 +1133,7 @@ def test_entities_fetch_deduplicates_mixed_roots_and_skips_missing(monkeypatch):
     calls = []
 
     monkeypatch.setattr(
-        entities_module.database.get,
+        entities_module.database_get,
         "datastore_key",
         lambda identifier: identifier,
     )
@@ -1146,7 +1142,7 @@ def test_entities_fetch_deduplicates_mixed_roots_and_skips_missing(monkeypatch):
         calls.append(list(keys))
         return [second] if second.key in keys else []
 
-    monkeypatch.setattr(entities_module.database.get, "entities", load_entities)
+    monkeypatch.setattr(entities_module.database_get, "entities", load_entities)
 
     loaded = Entities.fetch(
         first,
@@ -1180,7 +1176,7 @@ def test_entities_fetch_root_does_not_attach_cross_root_relations(monkeypatch):
     page.properties.categories.unset()
 
     monkeypatch.setattr(
-        entities_module.database.get,
+        entities_module.database_get,
         "entities",
         lambda keys: (_ for _ in ()).throw(
             AssertionError(f"unexpected database read for {keys!r}")
@@ -1226,7 +1222,7 @@ def test_entities_fetch_reuses_attached_direct_relations(monkeypatch):
             raise AssertionError(f"unexpected database read for {keys!r}")
         return []
 
-    monkeypatch.setattr(entities_module.database.get, "entities", fail_database_read)
+    monkeypatch.setattr(entities_module.database_get, "entities", fail_database_read)
 
     assert Entities.fetch(page, request=Fetch.direct()) == [page]
     assert page.model is category
@@ -1239,12 +1235,12 @@ def test_entities_fetch_one_returns_entity_or_none(monkeypatch):
         {"name": "One Form", "hash": "one-form"},
     )
     monkeypatch.setattr(
-        entities_module.database.get,
+        entities_module.database_get,
         "datastore_key",
         lambda identifier: identifier,
     )
     monkeypatch.setattr(
-        entities_module.database.get,
+        entities_module.database_get,
         "entities",
         lambda keys: [form] if form.key in keys else [],
     )

@@ -12,7 +12,8 @@ from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action, Fetch, FetchReason, Resource
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import cache, collaboration, database
+from lagniappe.core.tools import cache, collaboration
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.site import images as site_image
 from lagniappe.core.tools.services import places
 from lagniappe.core.tools.ai.settings import runtime_ai_settings
@@ -21,9 +22,9 @@ from lagniappe.core.tools.database import migrations as database_migrations
 from lagniappe.core.tools.site.admin import (
     load_ai_settings_payload,
     load_deployment_settings,
-    rebuild_application_cache,
     run_site_updates,
 )
+from lagniappe.core.tools.site.cache_rebuild import rebuild_application_cache
 from lagniappe.web import responses
 from lagniappe.web import direct_uploads
 from lagniappe.web.auth import (
@@ -57,7 +58,7 @@ def _site_image_response(paths):
 # @matrix owner : awaiting-first-sign-in role-controls
 def _administrator_payload():
     """Return the canonical Owner, additional Admins, and promotion choices."""
-    rows = database.get.users(limit=None).results
+    rows = database_get.users(limit=None).results
     users = [
         user
         for user in Entities.fetch(*rows, request=Fetch.direct())

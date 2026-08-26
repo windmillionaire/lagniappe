@@ -18,10 +18,10 @@ from config import SETTINGS
 from lagniappe import CONFIG
 from lagniappe.core.definitions import Action, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from testing.definitions import Categories, Pages, Tasks, Uploads, Users
 from testing.resources import File, Task
-from testing.utility import (
+from testing.utility.network import (
     assert_lagniappe_error_response,
     assert_same_etag,
     manual_mutation_headers,
@@ -33,14 +33,14 @@ pytestmark = pytest.mark.e2e
 def _task_side_effect_state(task, *users):
     persisted = Entities.fetch_one(task.key, request=Fetch.direct())
     history_keys = tuple(
-        row.key for row in database.get.task_history(persisted)
+        row.key for row in database_get.task_history(persisted)
     )
     notification_keys = tuple(
         (
             user.entity.key,
             tuple(
                 row.key
-                for row in database.get.activity(
+                for row in database_get.activity(
                     user.entity,
                     types="notification",
                 )

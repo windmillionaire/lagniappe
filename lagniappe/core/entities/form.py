@@ -11,7 +11,7 @@ from ..properties import (
 )
 from .entity import Entity
 from . import Entities
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
 
 
 # @testable false
@@ -89,7 +89,7 @@ class Form(Entity, AssetMixin):
 
     @property
     def used_by(self):
-        return Entities.fetch(*database.get.form_users(self), request=Fetch.direct())
+        return Entities.fetch(*database_get.form_users(self), request=Fetch.direct())
 
     @classmethod
     def create(cls, data):

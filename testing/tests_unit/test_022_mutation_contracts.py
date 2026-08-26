@@ -119,7 +119,7 @@ def test_save_plan_is_serializable_and_preserves_intents_until_commit(monkeypatc
     assert serialized["effects"][0]["reasons"] == ["explicit-root"]
 
     monkeypatch.setattr(
-        mutation_executor.database,
+        mutation_executor.database_utility,
         "save_mutations",
         lambda _writes: (_ for _ in ()).throw(RuntimeError("datastore down")),
     )
@@ -154,7 +154,7 @@ def test_save_root_persists_full_exclusions_without_lifecycle_intents_or_cache(
     def save_mutations(writes):
         events.append(("database", list(writes)))
 
-    monkeypatch.setattr(mutation_executor.database, "save_mutations", save_mutations)
+    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations", save_mutations)
     monkeypatch.setattr(
         mutation_executor.cache,
         "update",
@@ -188,7 +188,7 @@ def test_touch_uses_masked_root_save_and_only_updates_modified(monkeypatch):
     def save_mutations(writes):
         saved.extend(writes)
 
-    monkeypatch.setattr(mutation_executor.database, "save_mutations", save_mutations)
+    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations", save_mutations)
 
     outcome = Entities.touch(category)
 
@@ -224,7 +224,7 @@ def test_document_checkpoint_masks_parent_state_and_optionally_advances_lists(
     )
     saved = []
     monkeypatch.setattr(
-        mutation_executor.database,
+        mutation_executor.database_utility,
         "save_mutations",
         lambda writes: saved.extend(writes),
     )
@@ -278,7 +278,7 @@ def test_document_parent_touch_only_advances_parent_and_list_fingerprints(
     page._db = SaveDB(page.db)
     saved = []
     monkeypatch.setattr(
-        mutation_executor.database,
+        mutation_executor.database_utility,
         "save_mutations",
         lambda writes: saved.extend(writes),
     )
@@ -324,7 +324,7 @@ def test_notification_save_updates_projection_without_touching_user(monkeypatch)
     saved = []
 
     monkeypatch.setattr(
-        mutation_executor.database,
+        mutation_executor.database_utility,
         "save_mutations",
         lambda writes: saved.extend(writes),
     )
@@ -410,7 +410,7 @@ def test_job_save_updates_operation_projection_without_touching_relations(monkey
 
     saved = []
     monkeypatch.setattr(
-        mutation_executor.database,
+        mutation_executor.database_utility,
         "save_mutations",
         lambda writes: saved.extend(writes),
     )
@@ -442,7 +442,7 @@ def test_job_delete_removes_operation_projection_after_commit(monkeypatch):
     deleted = []
     projected = []
     monkeypatch.setattr(
-        mutation_executor.database,
+        mutation_executor.database_utility,
         "delete_entities",
         lambda entities: deleted.extend(entities),
     )
@@ -472,7 +472,7 @@ def test_save_executes_datastore_before_cache_and_reports_cache_failure(monkeypa
         assert list(writes) == [(entity, None)]
         events.append("datastore")
 
-    monkeypatch.setattr(mutation_executor.database, "save_mutations", save_mutations)
+    monkeypatch.setattr(mutation_executor.database_utility, "save_mutations", save_mutations)
 
     def fail_cache(*entities):
         events.append("cache")

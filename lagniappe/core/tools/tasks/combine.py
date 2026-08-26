@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from ...definitions import Action, Fetch, FetchReason
 from ...entities import Entities
 from ...exceptions import ValidationError
-from .. import database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 from .ordering import page_task_roots
 
 
@@ -106,7 +107,7 @@ def _history_key(main, source):
     source_key = source.urlsafe_key.encode("utf-8")
     digest = hashlib.sha256(source_key).hexdigest()
     identifier = f"combined-{source.entity_kind}-{digest}"
-    return database.create_named_key("task_history", identifier, parent=main)
+    return database_utility.create_named_key("task_history", identifier, parent=main)
 
 
 # @testable false
@@ -116,7 +117,7 @@ def _source_histories(tasks):
     keys = [
         history_key
         for task in tasks
-        for history_key in database.get.task_history(task)
+        for history_key in database_get.task_history(task)
     ]
     if not keys:
         return ()

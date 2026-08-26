@@ -6,9 +6,9 @@ from playwright.sync_api import expect
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Projects, SitePages, Users
-from testing.utility import (
+from testing.utility.network import expect_successful_response
+from testing.utility.offline import (
     expect_offline_sync_replay,
-    expect_successful_response,
     wait_for_connectivity_replay,
     wait_for_offline_sync_records,
 )

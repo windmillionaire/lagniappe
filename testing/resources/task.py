@@ -38,7 +38,7 @@ from playwright.sync_api import expect
 
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 from testing.utility.local_time import local_date_iso, local_date_plus_days_iso
 from ..elements import DateSelect, SpinnerButtons
 from .core import SiteResource

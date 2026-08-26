@@ -11,7 +11,7 @@ from ..properties import (
     page_assets,
     page_related,
 )
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
 from ..tools.auth.context import current_context_user
 from ..tools.tasks.ordering import sort_tasks
 from .entity import Entity
@@ -125,7 +125,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
     # @tests tests_unit/test_009f_page_view_access.py::test_page_tasks_filtered_by_task_allowed
     # @matrix page permissions task : restricted-access task-visibility
     def _load_tasks(self):
-        results = database.get.page_tasks(self)
+        results = database_get.page_tasks(self)
         entities = {
             e.key: e for e in Entities.fetch(*results, self, request=Fetch.direct())
         }
@@ -185,7 +185,7 @@ class Page(AssetMixin, SubmitterMixin, Entity):
             return self.groups
         else:
             return Entities.fetch(
-                *database.get.group_view_access(self.required),
+                *database_get.group_view_access(self.required),
                 request=Fetch.direct(),
             )
 

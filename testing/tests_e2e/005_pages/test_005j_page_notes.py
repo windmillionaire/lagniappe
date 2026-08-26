@@ -7,7 +7,7 @@ from playwright.sync_api import expect
 from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Users
 from testing.elements import Buttons, Modal
-from testing.utility import TestFile as _TestFile
+from testing.utility.test_file import TestFile as _TestFile
 
 
 pytestmark = pytest.mark.e2e

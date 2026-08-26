@@ -7,7 +7,7 @@ from collections.abc import Callable, Iterable
 from ...definitions import Action, Fetch
 from ...entities import Entities
 from ...exceptions import ValidationError
-from .. import database
+from lagniappe.core.tools.database import get as database_get
 
 
 UNAVAILABLE_REFERENCE_ERROR = "One or more selected items are unavailable."
@@ -21,7 +21,7 @@ def _entity_key(value):
         return None
     if getattr(value, "key", None):
         return value.key
-    return database.get.datastore_key(value)
+    return database_get.datastore_key(value)
 
 
 # @testable false

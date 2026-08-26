@@ -14,7 +14,7 @@ from playwright.sync_api import expect
 from testing.definitions import ModelTasks, Projects, Users
 from testing.elements import Attributes, FormElements, MobileNav, Tabs
 from testing.resources import Project
-from testing.utility import scoped_browser_route
+from testing.utility.network import scoped_browser_route
 
 
 def _empty_main_script(route):

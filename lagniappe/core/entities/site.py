@@ -1,7 +1,8 @@
 from google.cloud import datastore
 
 from ..exceptions import PropertyError
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 from ..tools.database import site as site_database
 
 
@@ -77,7 +78,7 @@ class Site:
         if getattr(self, "_urlsafe_key", None):
             return self._urlsafe_key
 
-        self._urlsafe_key = database.get.urlsafe_key(self.key)
+        self._urlsafe_key = database_get.urlsafe_key(self.key)
         return self._urlsafe_key
 
     @property
@@ -93,4 +94,4 @@ class Site:
         return self._db
 
     def save(self):
-        database.save(self)
+        database_utility.save(self)

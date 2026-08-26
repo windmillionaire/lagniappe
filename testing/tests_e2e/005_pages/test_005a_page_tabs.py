@@ -16,7 +16,7 @@ from testing.elements import (
     Table,
     Tabs,
 )
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 from testing.utility.test_file import TestFile as UploadTestFile
 
 pytestmark = pytest.mark.e2e

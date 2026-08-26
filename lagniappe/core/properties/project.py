@@ -9,7 +9,7 @@ from ..mixins import (
     RelatedEntityListMixin,
     RelatedEntityMixin,
 )
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
 from .base_db import DBProperty
 from .base_property import Property
 from .base_filters import Filters
@@ -42,7 +42,7 @@ class ModelTasks(RelatedEntityListMixin, Property):
             return self._value
 
         model_tasks = Entities.fetch(
-            *database.get.model_tasks(self.entity),
+            *database_get.model_tasks(self.entity),
             self.entity,
             request=Fetch.direct(),
         )

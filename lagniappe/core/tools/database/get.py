@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 from google.cloud.datastore import Entity, Key
 
-from ...definitions import Restriction
+from ...restrictions import Restriction
 from .core import DATA, KINDS
 from .filter import Filter, Query, Results
 from config.datastore import decode_urlsafe_key, encode_urlsafe_key

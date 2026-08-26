@@ -51,7 +51,7 @@ from typing import Any, Iterator, Optional, Union
 
 from google.cloud.datastore import Key, query as datastore_query
 
-from ...definitions import Restriction
+from ...restrictions import Restriction
 from .core import DATA, KINDS
 
 

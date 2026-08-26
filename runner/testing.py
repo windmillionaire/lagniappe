@@ -524,9 +524,10 @@ def cleanup_test_data(authority):
     from lagniappe import CONFIG
 
     _require_test_cleanup_scope(CONFIG)
-    from lagniappe.core.tools import database, cache
+    from lagniappe.core.tools import cache
+    from lagniappe.core.tools.database import utility as database_utility
 
-    database.cleanup_test_data()
+    database_utility.cleanup_test_data()
     cache.cleanup_test_data()
     authority.assert_active()
 

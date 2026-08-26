@@ -11,6 +11,7 @@ from lagniappe.core.entities.group import UserGroup
 from lagniappe.core.entities.page import Page
 from lagniappe.core.entities.user import User
 from lagniappe.core.tools.site import admin as site_admin
+from lagniappe.core.tools.site import cache_rebuild
 from lagniappe.core.tools.site import recovery
 
 
@@ -70,7 +71,7 @@ def test_ai_settings_payload_normalizes_runtime_settings_against_discovery(monke
 def test_site_updates_return_the_migration_report(monkeypatch):
     report = {"status": "current", "counts": {"complete": 2}}
     monkeypatch.setattr(
-        site_admin.database_migrations,
+        cache_rebuild.database_migrations,
         "run_data_migrations",
         lambda: report,
     )
@@ -87,12 +88,12 @@ def test_cache_rebuild_is_blocked_until_migrations_are_current(monkeypatch):
         lambda: report,
     )
     monkeypatch.setattr(
-        site_admin.cache,
+        cache_rebuild.cache,
         "delete_cache",
         lambda: (_ for _ in ()).throw(AssertionError("blocked rebuild deleted cache")),
     )
 
-    result = site_admin.rebuild_application_cache()
+    result = cache_rebuild.rebuild_application_cache()
 
     assert result.rebuilt is False
     assert result.migration_status is report
@@ -105,33 +106,33 @@ def test_cache_rebuild_rehydrates_entities_in_bounded_chunks(monkeypatch):
     fetches = []
     updates = []
     monkeypatch.setattr(
-        site_admin.database_migrations,
+        cache_rebuild.database_migrations,
         "get_migration_status",
         lambda: report,
     )
-    monkeypatch.setattr(site_admin.cache, "delete_cache", lambda: deleted.append(True))
+    monkeypatch.setattr(cache_rebuild.cache, "delete_cache", lambda: deleted.append(True))
     monkeypatch.setattr(
-        site_admin.database.get, "all_models", lambda: iter(["one", "two"])
+        cache_rebuild.database_get, "all_models", lambda: iter(["one", "two"])
     )
     monkeypatch.setattr(
-        site_admin.database.get, "all_instances", lambda: iter(["three"])
+        cache_rebuild.database_get, "all_instances", lambda: iter(["three"])
     )
-    monkeypatch.setattr(site_admin.database.get, "all_files", lambda: iter(()))
-    monkeypatch.setattr(site_admin.database.get, "all_users", lambda: iter(()))
+    monkeypatch.setattr(cache_rebuild.database_get, "all_files", lambda: iter(()))
+    monkeypatch.setattr(cache_rebuild.database_get, "all_users", lambda: iter(()))
     monkeypatch.setattr(
-        site_admin.Entities,
+        cache_rebuild.Entities,
         "fetch",
         lambda *keys, request: (
             fetches.append((list(keys), request)) or [f"loaded:{key}" for key in keys]
         ),
     )
     monkeypatch.setattr(
-        site_admin.cache,
+        cache_rebuild.cache,
         "update",
         lambda *entities, update: updates.append((list(entities), update)),
     )
 
-    result = site_admin.rebuild_application_cache(chunk_size=2)
+    result = cache_rebuild.rebuild_application_cache(chunk_size=2)
 
     assert result.rebuilt is True
     assert deleted == [True]
@@ -197,17 +198,17 @@ def test_cache_rebuild_materializes_nested_relations_across_batch_boundaries(
     projections = {}
 
     monkeypatch.setattr(
-        site_admin.database_migrations,
+        cache_rebuild.database_migrations,
         "get_migration_status",
         lambda: {"status": "current", "cache_refresh_allowed": True},
     )
-    monkeypatch.setattr(site_admin.cache, "delete_cache", lambda: None)
-    monkeypatch.setattr(site_admin.database.get, "all_models", lambda: iter([group]))
-    monkeypatch.setattr(site_admin.database.get, "all_instances", lambda: iter([page]))
-    monkeypatch.setattr(site_admin.database.get, "all_files", lambda: iter(()))
-    monkeypatch.setattr(site_admin.database.get, "all_users", lambda: iter([user]))
+    monkeypatch.setattr(cache_rebuild.cache, "delete_cache", lambda: None)
+    monkeypatch.setattr(cache_rebuild.database_get, "all_models", lambda: iter([group]))
+    monkeypatch.setattr(cache_rebuild.database_get, "all_instances", lambda: iter([page]))
+    monkeypatch.setattr(cache_rebuild.database_get, "all_files", lambda: iter(()))
+    monkeypatch.setattr(cache_rebuild.database_get, "all_users", lambda: iter([user]))
     monkeypatch.setattr(
-        site_admin.database.get,
+        cache_rebuild.database_get,
         "entities",
         lambda keys: [stored[key] for key in keys if key in stored],
     )
@@ -217,9 +218,9 @@ def test_cache_rebuild_materializes_nested_relations_across_batch_boundaries(
         for entity in entities:
             projections[entity.key] = dict(entity.to_cache)
 
-    monkeypatch.setattr(site_admin.cache, "update", materialize)
+    monkeypatch.setattr(cache_rebuild.cache, "update", materialize)
 
-    result = site_admin.rebuild_application_cache(chunk_size=1)
+    result = cache_rebuild.rebuild_application_cache(chunk_size=1)
 
     assert result.rebuilt is True
     assert page.user is user

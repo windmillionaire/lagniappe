@@ -9,7 +9,7 @@ from playwright.sync_api import expect
 from testing.definitions import Pages, Tasks, Uploads, Users
 from testing.elements import EditorGenerateText, EditorGenerateTextMode, Modal
 from testing.resources import File
-from testing.utility import (
+from testing.utility.network import (
     expect_successful_response,
     multipart_form_fields,
     scoped_browser_route,

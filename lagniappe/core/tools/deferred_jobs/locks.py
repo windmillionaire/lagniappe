@@ -4,7 +4,8 @@ from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.deferred_job_lifecycle import ACTIVE_STATUSES
 from lagniappe.core.properties.deferred_job_lock import Operation, Scope
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import deferred_jobs as database_deferred_jobs
+from lagniappe.core.tools.database import utility as database_utility
 
 
 AUTOFILL_FORM_LOCK_SCOPE = Scope.AUTOFILL_FORM
@@ -16,7 +17,7 @@ AUTOFILL_FORM_LOCK_SCOPE = Scope.AUTOFILL_FORM
 def deferred_job_lock_key(target, scope=AUTOFILL_FORM_LOCK_SCOPE):
     """Return the deterministic lock key for one target mutation surface."""
     identifier = Scope.identifier(target, scope)
-    return database.create_named_key("job_lock", identifier) if identifier else None
+    return database_utility.create_named_key("job_lock", identifier) if identifier else None
 
 
 # @testable infrastructure
@@ -54,7 +55,7 @@ def deferred_job_lock_descriptors(targets, scope=AUTOFILL_FORM_LOCK_SCOPE):
         if lock and job and job.status in ACTIVE_STATUSES:
             active[target_key] = (lock, job)
         elif lock:
-            database.release_deferred_job_lock(lock.key, lock.operation)
+            database_deferred_jobs.release_deferred_job_lock(lock.key, lock.operation)
     return active
 
 

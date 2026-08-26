@@ -3,7 +3,7 @@
 from collections import defaultdict
 
 from ...properties import notification_aggregate
-from .. import database
+from lagniappe.core.tools.database import notifications as database_notifications
 
 
 # @testable false
@@ -52,11 +52,11 @@ def apply_ordinary_mutations(*, upserts=(), deletes=()):
     aggregates = {}
     for user_id, delta in deltas.items():
         user = users[user_id]
-        existing = database.get_notification_aggregate(user)
+        existing = database_notifications.get_notification_aggregate(user)
         aggregate = (
-            database.change_notification_aggregate(user, ordinary_delta=delta)
+            database_notifications.change_notification_aggregate(user, ordinary_delta=delta)
             if existing is not None
-            else database.repair_notification_aggregate(user)
+            else database_notifications.repair_notification_aggregate(user)
         )
         aggregates[user_id] = aggregate
     return aggregates
@@ -69,7 +69,7 @@ def create_ordinary_notification(user, *, identifier, body, target=None):
     from ...definitions import Fetch
     from ...entities import Entities
 
-    row, created, _aggregate = database.create_ordinary_notification_record(
+    row, created, _aggregate = database_notifications.create_ordinary_notification_record(
         user,
         identifier=identifier,
         body=body,
@@ -98,7 +98,7 @@ def create_ordinary_notification(user, *, identifier, body, target=None):
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
 # @matrix notifications : aggregate-count ordinary-delete
 def delete_ordinary_notification(user, notification_key):
-    deleted, _aggregate = database.delete_ordinary_notification_record(
+    deleted, _aggregate = database_notifications.delete_ordinary_notification_record(
         user, notification_key
     )
     return deleted
@@ -108,7 +108,7 @@ def delete_ordinary_notification(user, notification_key):
 # @tests tests_unit/test_027e_notifications.py::test_ordinary_notification_service_mutates_aggregate_once
 # @matrix notifications : aggregate-count ordinary-clear
 def clear_ordinary_notifications(user, keys):
-    cleared, _aggregate = database.clear_ordinary_notification_records(user, keys)
+    cleared, _aggregate = database_notifications.clear_ordinary_notification_records(user, keys)
     return cleared
 
 

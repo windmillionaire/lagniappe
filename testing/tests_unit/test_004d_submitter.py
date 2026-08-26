@@ -111,7 +111,7 @@ def test_save_default_field_copies_db_value_and_saves_only_submitter():
 
     with (
         patch.object(
-            mutation_executor.database,
+            mutation_executor.database_utility,
             "save_mutations",
         ) as database_save,
         patch.object(task, "save") as task_save,
@@ -234,7 +234,7 @@ def test_import_submission_internal_link_exact_match(get_schema, monkeypatch):
         return {"id": "target_a", "warnings": [], "errors": []}
 
     monkeypatch.setattr(
-        "lagniappe.core.properties.form_links.files.find_page", find_page
+        "lagniappe.core.properties.form_links.find_page", find_page
     )
     monkeypatch.setattr(
         "lagniappe.core.properties.form_links.Entities.fetch_one",
@@ -267,7 +267,7 @@ def test_ai_submission_internal_link_plaintext_resolves(get_schema, monkeypatch)
         return {"id": "target_ai", "warnings": [], "errors": []}
 
     monkeypatch.setattr(
-        "lagniappe.core.properties.form_links.files.find_page", find_page
+        "lagniappe.core.properties.form_links.find_page", find_page
     )
     monkeypatch.setattr(
         "lagniappe.core.properties.form_links.Entities.fetch_one",
@@ -299,7 +299,7 @@ def test_ai_submission_internal_link_falls_back_to_value_setter(
         return {"id": None, "warnings": [], "errors": ["No page match."]}
 
     monkeypatch.setattr(
-        "lagniappe.core.properties.form_links.files.find_page", find_page
+        "lagniappe.core.properties.form_links.find_page", find_page
     )
     monkeypatch.setattr(
         "lagniappe.core.properties.form_links.Entities.fetch_one",
@@ -333,7 +333,7 @@ def test_import_submission_internal_link_fuzzy_match_warning(
         }
 
     monkeypatch.setattr(
-        "lagniappe.core.properties.form_links.files.find_page", find_page
+        "lagniappe.core.properties.form_links.find_page", find_page
     )
     monkeypatch.setattr(
         "lagniappe.core.properties.form_links.Entities.fetch_one",
@@ -358,7 +358,7 @@ def test_import_submission_internal_link_no_match_records_error(
     entity = _links_import_entity(get_schema, "Import missing link", "missing")
 
     monkeypatch.setattr(
-        "lagniappe.core.properties.form_links.files.find_page",
+        "lagniappe.core.properties.form_links.find_page",
         lambda *args, **kwargs: {
             "id": None,
             "warnings": [],
@@ -387,7 +387,7 @@ def test_import_submission_table_internal_link_exact_match(get_schema, monkeypat
         return {"id": "target_b", "warnings": [], "errors": []}
 
     monkeypatch.setattr(
-        "lagniappe.core.properties.form_links.files.find_page", find_page
+        "lagniappe.core.properties.form_links.find_page", find_page
     )
     monkeypatch.setattr(
         "lagniappe.core.properties.form_links.Entities.fetch_one",
@@ -431,7 +431,7 @@ def test_import_submission_table_internal_link_fuzzy_match_warning(
         }
 
     monkeypatch.setattr(
-        "lagniappe.core.properties.form_links.files.find_page", find_page
+        "lagniappe.core.properties.form_links.find_page", find_page
     )
     monkeypatch.setattr(
         "lagniappe.core.properties.form_links.Entities.fetch_one",
@@ -456,7 +456,7 @@ def test_import_submission_table_internal_link_no_match_records_error(
     entity = _links_import_entity(get_schema, "Import table missing link", "table_missing")
 
     monkeypatch.setattr(
-        "lagniappe.core.properties.form_links.files.find_page",
+        "lagniappe.core.properties.form_links.find_page",
         lambda *args, **kwargs: {
             "id": None,
             "warnings": [],

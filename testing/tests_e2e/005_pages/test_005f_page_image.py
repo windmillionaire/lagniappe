@@ -7,7 +7,7 @@ from playwright.sync_api import expect
 from testing.definitions import Pages, Uploads, Users
 from testing.elements import Attributes, UploadDropdown
 from testing.resources import Page
-from testing.utility import (
+from testing.utility.network import (
     expect_successful_response,
     scoped_browser_route,
 )

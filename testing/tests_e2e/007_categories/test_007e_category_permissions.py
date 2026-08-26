@@ -7,7 +7,10 @@ from playwright.sync_api import expect
 from testing.definitions import Categories, Pages, SitePages, Users
 from testing.elements import FormElements, HeaderSearch, Table, Tools
 from testing.resources.category import Category
-from testing.utility import assert_lagniappe_error_response, manual_mutation_headers
+from testing.utility.network import (
+    assert_lagniappe_error_response,
+    manual_mutation_headers,
+)
 
 pytestmark = pytest.mark.e2e
 

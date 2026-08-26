@@ -18,7 +18,8 @@ from testing.elements import (
     SpinnerButtons,
     Table,
 )
-from testing.utility import expect_reconnect_refresh, scoped_browser_route
+from testing.utility.network import scoped_browser_route
+from testing.utility.reconnect import expect_reconnect_refresh
 from testing.utility.hosted_deferred_jobs import dispatch_hosted_deferred_job
 
 

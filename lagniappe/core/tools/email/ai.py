@@ -1057,10 +1057,11 @@ def _create_email_report(
 ):
     from lagniappe.core.definitions import DeferredJobSpec, DeferredJobType, Fetch
     from lagniappe.core.entities import Entities
-    from lagniappe.core.tools import database
+    from lagniappe.core.tools.database import get as database_get
+    from lagniappe.core.tools.database import utility as database_utility
     from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
-    key = database.create_named_key("report", f"email-{digest}", user)
+    key = database_utility.create_named_key("report", f"email-{digest}", user)
     report = Entities.fetch_one(key, request=Fetch.direct())
     if not isinstance(report, Entities.REPORT):
         effective_tool = "ask" if tool == "ai" else tool
@@ -1115,7 +1116,8 @@ def process_resend_email(event, event_id, config, digest_secret, *, client=None)
     """Retrieve, authorize, and durably hand one signed event to report ingestion."""
     from lagniappe.core.definitions import Fetch
     from lagniappe.core.entities import Entities
-    from lagniappe.core.tools import database
+    from lagniappe.core.tools.database import get as database_get
+    from lagniappe.core.tools.database import utility as database_utility
     from lagniappe.core.tools.database import ai_email as email_database
 
     if event.get("type") != "email.received":
@@ -1144,7 +1146,7 @@ def process_resend_email(event, event_id, config, digest_secret, *, client=None)
         attachment_rows = client.list_received_attachments(email_id)
         message, tool = normalize_resend_message(raw_message, attachment_rows, config)
 
-        raw_user = database.get.user(message.sender)
+        raw_user = database_get.user(message.sender)
         user = (
             Entities.fetch_one(raw_user, request=Fetch.direct()) if raw_user else None
         )

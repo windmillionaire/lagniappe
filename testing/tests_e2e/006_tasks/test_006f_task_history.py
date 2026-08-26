@@ -21,7 +21,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.tasks.ordering import page_task_roots
 from testing.definitions import ModelTasks, Pages, Tasks, Users
 from testing.resources import Task
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 
 pytestmark = pytest.mark.e2e
 

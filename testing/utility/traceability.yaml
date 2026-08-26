@@ -7,6 +7,7 @@ source_roots:
   - lagniappe/core/mixins
   - lagniappe/core/mutations
   - lagniappe/core/properties
+  - lagniappe/core/restrictions.py
   - lagniappe/core/tools
   - lagniappe/web/routes
   - lagniappe/web/start
@@ -46,6 +47,7 @@ annotated_source_roots:
   - config/ai_email.py
   - config/ai_models.py
   - config/ai_settings.py
+  - config/form_schema.py
   - run.py
   - runner/context.py
   - runner/adc.py

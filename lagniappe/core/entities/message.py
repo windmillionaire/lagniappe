@@ -3,7 +3,7 @@
 from .entity import Entity
 from ..properties import message as message_properties
 from ..properties import message_conversation
-from ..tools import database
+from lagniappe.core.tools.database import utility as database_utility
 
 
 # @testable true
@@ -51,7 +51,7 @@ class MessageConversation(Entity):
 
     @classmethod
     def create(cls, actor, recipient, *, key, now):
-        conversation = cls(database.create_entity(key))
+        conversation = cls(database_utility.create_entity(key))
         conversation.db.exclude_from_indexes = conversation.exclude_from_index
         conversation.db.update(message_conversation.initial_values(actor, recipient, now))
         return conversation
@@ -113,7 +113,7 @@ class Message(Entity):
         sequence,
         now,
     ):
-        message = cls(database.create_entity(key))
+        message = cls(database_utility.create_entity(key))
         message.db.exclude_from_indexes = message.exclude_from_index
         message.db.update(
             message_properties.initial_values(

@@ -15,7 +15,11 @@ from testing.utility.network import (
     multipart_form_fields,
     scoped_browser_route,
 )
-from testing.utility import offline, polling, reconnect
+from testing.utility import (
+    offline,
+    polling,
+    reconnect,
+)
 
 
 pytestmark = pytest.mark.tooling

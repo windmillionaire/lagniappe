@@ -9,7 +9,8 @@ from lagniappe.core.definitions import (
     FileConsumerLimitError,
     enforce_file_consumer,
 )
-from lagniappe.core.tools import ai, database
+from lagniappe.core.tools import ai
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.auth.references import (
     SubmittedReferenceResolver,
     UNAVAILABLE_REFERENCE_ERROR,
@@ -713,7 +714,7 @@ def visibility(key, **kwargs):
 @pages.route("public/<public_id>", methods=["GET"])
 def public(public_id):
     public_pages = Entities.fetch(
-        *database.get.public_pages(public_id), request=Fetch.root()
+        *database_get.public_pages(public_id), request=Fetch.root()
     )
     page = next((page for page in public_pages if page.is_public), None)
 

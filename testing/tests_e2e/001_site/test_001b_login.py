@@ -55,7 +55,8 @@ from playwright.sync_api import expect
 from config import SETTINGS, Environment, constants
 from lagniappe import CONFIG
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.cache.core import cache as redis_cache
 from lagniappe.core.tools.cache.keys import Keys
 from lagniappe.core.tools.email import smtp as auth_email
@@ -64,7 +65,10 @@ from lagniappe.web import app
 
 from testing.definitions import SitePages, Users
 from testing.elements import Buttons, FormElements, Roles
-from testing.utility import assert_lagniappe_error_response, expect_successful_response
+from testing.utility.network import (
+    assert_lagniappe_error_response,
+    expect_successful_response,
+)
 
 pytestmark = pytest.mark.e2e
 
@@ -335,7 +339,7 @@ def _create_first_time_user(email, name="First Time User"):
 def _ensure_owner_initialized():
     """Ensure ordinary login tests do not enter the owner bootstrap state."""
     email = SETTINGS.test_config["ADMIN_EMAIL"]
-    exists = database.get.user(email)
+    exists = database_get.user(email)
     owner = (
         Entities.USER(exists)
         if exists
@@ -355,12 +359,12 @@ def _ensure_owner_initialized():
 def _owner_waiting_for_first_login():
     """Temporarily place an existing test owner back into first-login state."""
     email = SETTINGS.test_config["ADMIN_EMAIL"]
-    exists = database.get.user(email)
+    exists = database_get.user(email)
     had_last_login = bool(exists and "last_login" in exists)
     previous_last_login = exists.get("last_login") if exists else None
     if exists:
         exists.pop("last_login", None)
-        database.save_raw(exists)
+        database_utility.save_raw(exists)
     try:
         yield
     finally:
@@ -369,7 +373,7 @@ def _owner_waiting_for_first_login():
                 exists["last_login"] = previous_last_login
             else:
                 exists.pop("last_login", None)
-            database.save_raw(exists)
+            database_utility.save_raw(exists)
 
 
 def _open_email_check_form(user, login_page):
@@ -1009,7 +1013,7 @@ def test_delegated_bootstrap_admin_requires_exact_google_email_and_closes_after_
             return None
 
     fake_user = BootstrapUser()
-    monkeypatch.setattr(login_module.database.get, "user", lambda email: None)
+    monkeypatch.setattr(login_module.database_get, "user", lambda email: None)
     monkeypatch.setattr(
         login_module,
         "Entities",

@@ -10,7 +10,7 @@ from lagniappe.core.entities import Entities
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from testing.definitions import Pages, Users
 from testing.resources import Page
-from testing.utility import expect_poll_result
+from testing.utility.polling import expect_poll_result
 from testing.utility.hosted_deferred_jobs import dispatch_hosted_deferred_job
 
 

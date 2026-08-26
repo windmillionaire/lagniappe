@@ -10,7 +10,8 @@ from playwright.sync_api import expect
 from config import SETTINGS
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import notifications as database_notifications
 from lagniappe.core.tools.notifications.service import (
     create_ordinary_notification,
     publish_notification_aggregate,
@@ -20,12 +21,12 @@ from testing.definitions.task_definitions import TaskDefinition
 from testing.definitions.user_definitions import UserDefinition
 from testing.elements import Buttons, FormElements, List, Modal
 from testing.resources import Task
-from testing.utility import (
-    TestFile as _TestFile,
+from testing.utility.network import (
     assert_lagniappe_error_response,
     manual_mutation_headers,
-    wait_for_offline_mutations,
 )
+from testing.utility.offline import wait_for_offline_mutations
+from testing.utility.test_file import TestFile as _TestFile
 from testing.utility.local_time import local_date_from_utc_datetime
 
 pytestmark = pytest.mark.e2e
@@ -79,7 +80,7 @@ def _save_notification(user, body, target=None, pending=False):
     assert created
     publish_notification_aggregate(
         user.entity,
-        database.get_notification_aggregate(user.entity),
+        database_notifications.get_notification_aggregate(user.entity),
     )
     if pending:
         notification.pending = True
@@ -273,7 +274,7 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
     expect(private_item).to_contain_text("Private")
 
     activity_before = tuple(
-        item.key for item in database.get.activity(user.entity)
+        item.key for item in database_get.activity(user.entity)
     )
     forbidden_body = _unique("Forbidden Home note")
     cookies = {
@@ -293,7 +294,7 @@ def test_home_note_shared_visibility_is_owner_only(get_user):
 
     assert_lagniappe_error_response(response, status=403)
     assert forbidden_body not in response.text
-    assert tuple(item.key for item in database.get.activity(user.entity)) == (
+    assert tuple(item.key for item in database_get.activity(user.entity)) == (
         activity_before
     )
 

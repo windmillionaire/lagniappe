@@ -254,7 +254,7 @@ def test_save_entities_updates_hash_before_requires():
     with (
         patch.object(mutation_executor.cache, "update") as cache_update,
         patch.object(
-            mutation_executor.database, "save_mutations"
+            mutation_executor.database_utility, "save_mutations"
         ) as database_save,
     ):
         Entities.save(entity)
@@ -292,7 +292,7 @@ def test_save_entities_updates_and_persists_user_before_owned_page():
         patch.object(Entities, "fetch", return_value=[user]),
         patch.object(mutation_executor.cache, "update"),
         patch.object(
-            mutation_executor.database, "save_mutations"
+            mutation_executor.database_utility, "save_mutations"
         ) as database_save,
     ):
         Entities.save(page, user)
@@ -808,7 +808,7 @@ def test_public_id_generation_is_unique_and_persisted():
             side_effect=["duplicate-id", "unique-id"],
         ) as short_uuid,
         patch.object(
-            common_entity.database.get,
+            common_entity.database_get,
             "public_pages",
             side_effect=[object(), None],
         ) as public_pages,
@@ -864,7 +864,7 @@ def test_site_lazy_properties_database_key_and_error_context():
 
     with (
         patch.object(site_module.site_database, "key", return_value=site_key),
-        patch.object(site_module.database.get, "urlsafe_key", return_value="safe-site"),
+        patch.object(site_module.database_get, "urlsafe_key", return_value="safe-site"),
         patch.object(site_module.site_database, "get_or_create", return_value=site_db),
     ):
         site = _TestSite("main")

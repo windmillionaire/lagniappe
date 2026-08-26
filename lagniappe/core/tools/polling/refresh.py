@@ -6,7 +6,7 @@ from lagniappe.core import exceptions
 
 from ...definitions import Action, Fetch, Resource
 from ...entities import Entities, index
-from .. import database
+from lagniappe.core.tools.database import utility as database_utility
 from ..filters import FilterCache
 from ..tasks.ordering import page_task_roots, sort_tasks
 
@@ -79,7 +79,7 @@ def load_refresh_view(view):
         return RefreshView(None, None)
     return RefreshView(
         None,
-        database.site_fingerprint(f"/{view_index}/index"),
+        database_utility.site_fingerprint(f"/{view_index}/index"),
     )
 
 

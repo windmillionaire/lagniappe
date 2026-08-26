@@ -5,7 +5,7 @@ from flask_login import current_user
 from ... import exceptions
 from ...definitions import FileConsumer, enforce_file_consumer
 from ..database import assets as storage_assets
-from ..files import extract_ooxml, is_supported_ooxml
+from ..files.ooxml import extract_ooxml, is_supported_ooxml
 from ..files.ooxml import OOXMLExtractionError, OOXMLTruncationReason
 from .core import ai_model, provider_error_details
 from .guidelines import SUMMARY_GENERATION_GUIDELINES

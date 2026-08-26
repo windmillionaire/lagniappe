@@ -25,7 +25,7 @@ def test_home_project_list_restrictions_and_cursor(monkeypatch):
         return SimpleNamespace(key=f"wrapped-{model}")
 
     monkeypatch.setattr(home_properties, "current_user", user)
-    monkeypatch.setattr(home_properties.database.get, "models", get_models)
+    monkeypatch.setattr(home_properties.database_get, "models", get_models)
     monkeypatch.setattr(home_properties.Entities, "PROJECT", wrap_project)
 
     section = home_properties.ProjectList(cursor="start-page")
@@ -76,7 +76,7 @@ def test_home_category_list_restrictions_and_cursor(monkeypatch):
         return categories
 
     monkeypatch.setattr(home_properties, "current_user", user)
-    monkeypatch.setattr(home_properties.database.get, "models", get_models)
+    monkeypatch.setattr(home_properties.database_get, "models", get_models)
     monkeypatch.setattr(home_properties.Entities, "fetch", fetch_categories)
 
     section = home_properties.CategoryList(cursor="category-start")
@@ -135,7 +135,7 @@ def test_home_page_list_restrictions_and_cursor(monkeypatch):
         return pages
 
     monkeypatch.setattr(home_properties, "current_user", user)
-    monkeypatch.setattr(home_properties.database.get, "recent_pages", recent_pages)
+    monkeypatch.setattr(home_properties.database_get, "recent_pages", recent_pages)
     monkeypatch.setattr(home_properties.Entities, "fetch", load_entities)
 
     section = home_properties.PageList(cursor="p1")
@@ -207,10 +207,10 @@ def test_home_task_list_restrictions_visibility_and_count(monkeypatch):
         return 7
 
     monkeypatch.setattr(home_properties, "current_user", user)
-    monkeypatch.setattr(home_properties.database.get, "due_tasks", due_tasks)
+    monkeypatch.setattr(home_properties.database_get, "due_tasks", due_tasks)
     monkeypatch.setattr(home_properties.Entities, "fetch", load_entities)
     monkeypatch.setattr(
-        home_properties.database.get, "user_task_count", user_task_count
+        home_properties.database_get, "user_task_count", user_task_count
     )
 
     section = home_properties.TaskList()
@@ -284,7 +284,7 @@ def test_home_starred_list_paginates_and_marks_missing_keys(monkeypatch):
     monkeypatch.setattr(home_properties, "current_user", user)
     monkeypatch.setattr(home_properties.Entities, "fetch", load_entities)
     monkeypatch.setattr(
-        home_properties.database.get,
+        home_properties.database_get,
         "urlsafe_key",
         lambda key: f"urlsafe:{key}",
     )
@@ -355,7 +355,7 @@ def test_home_starred_list_hides_but_retains_inaccessible_keys(monkeypatch):
         lambda *keys, request: [visible, restricted],
     )
     monkeypatch.setattr(
-        home_properties.database.get,
+        home_properties.database_get,
         "urlsafe_key",
         lambda key: f"urlsafe:{key}",
     )
@@ -411,11 +411,11 @@ def test_home_note_ingress_and_tool_lists_load_database_entities(monkeypatch):
         return [SimpleNamespace(key=key) for key in keys]
 
     monkeypatch.setattr(home_properties, "current_user", user)
-    monkeypatch.setattr(home_properties.database.get, "notes", get_notes)
+    monkeypatch.setattr(home_properties.database_get, "notes", get_notes)
     monkeypatch.setattr(
-        home_properties.database.get, "ingress_files", get_ingress_files
+        home_properties.database_get, "ingress_files", get_ingress_files
     )
-    monkeypatch.setattr(home_properties.database.get, "ai_reports", get_ai_reports)
+    monkeypatch.setattr(home_properties.database_get, "ai_reports", get_ai_reports)
     monkeypatch.setattr(home_properties.Entities, "fetch", load_entities)
 
     note_section = home_properties.NoteList()

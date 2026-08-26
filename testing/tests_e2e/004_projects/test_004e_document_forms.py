@@ -30,7 +30,7 @@ from testing.elements import (
     SpinnerButtons,
     Tabs,
 )
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 
 
 # @matrix editor link-preview : url-safety

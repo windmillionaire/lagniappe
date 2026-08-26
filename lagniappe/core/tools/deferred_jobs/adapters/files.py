@@ -15,7 +15,8 @@ from lagniappe.core.definitions import (
     Fetch,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai, files
+from lagniappe.core.tools import ai
+from lagniappe.core.tools.files import extract as files
 
 from .base import DeferredJobAdapter
 from ..errors import (

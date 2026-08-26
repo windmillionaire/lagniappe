@@ -46,7 +46,7 @@ from testing.elements import (
     Tabs,
     SpinnerButtons,
 )
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 
 pytestmark = pytest.mark.e2e
 

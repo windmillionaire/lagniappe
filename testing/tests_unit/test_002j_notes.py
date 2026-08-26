@@ -51,7 +51,7 @@ def test_note_create_persists_body_photo_visibility_and_scope(monkeypatch):
     photo = SimpleNamespace(filename="note.jpg")
 
     monkeypatch.setattr(
-        entity_module.database,
+        entity_module.database_utility,
         "create_key",
         lambda kind, parent=None: f"created-{kind}",
     )

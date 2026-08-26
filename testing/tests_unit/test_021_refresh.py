@@ -62,7 +62,7 @@ def test_load_refresh_view_uses_entity_or_site_index_fingerprint():
             side_effect=[category, None],
         ) as load_entity,
         patch(
-            "lagniappe.core.tools.polling.refresh.database.site_fingerprint",
+            "lagniappe.core.tools.polling.refresh.database_utility.site_fingerprint",
             return_value="tasks-fingerprint",
         ) as site_fingerprint,
     ):
@@ -85,11 +85,11 @@ def test_task_index_refresh_roots_uses_both_ordered_query_streams():
 
     with (
         patch(
-            "lagniappe.core.entities.index.database.get.tasks_with_due_dates",
+            "lagniappe.core.entities.index.database_get.tasks_with_due_dates",
             return_value=SimpleNamespace(results=["dated"]),
         ) as dated_query,
         patch(
-            "lagniappe.core.entities.index.database.get.tasks_without_due_dates",
+            "lagniappe.core.entities.index.database_get.tasks_without_due_dates",
             return_value=SimpleNamespace(results=["undated"]),
         ) as undated_query,
         patch(
@@ -154,7 +154,7 @@ def test_page_index_refresh_roots_reuses_restricted_collection_query():
 
     with (
         patch(
-            "lagniappe.core.entities.index.database.get.pages",
+            "lagniappe.core.entities.index.database_get.pages",
             return_value=SimpleNamespace(results=["page-key"]),
         ) as query,
         patch(
@@ -199,7 +199,7 @@ def test_user_index_refresh_roots_preserves_regular_and_public_modes():
 
     with (
         patch(
-            "lagniappe.core.entities.index.database.get.users",
+            "lagniappe.core.entities.index.database_get.users",
             side_effect=[
                 SimpleNamespace(results=["regular", "public"]),
                 SimpleNamespace(results=["regular", "public"]),

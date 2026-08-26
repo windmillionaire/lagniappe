@@ -1,4 +1,4 @@
-"""Isolated runtime-owned migration and cache actions for data recovery."""
+"""Isolated runtime-owned migration action for data recovery."""
 
 from __future__ import annotations
 
@@ -12,25 +12,13 @@ import sys
 def main(argv=None):
     arguments = list(sys.argv[1:] if argv is None else argv)
     if arguments == ["migrate"]:
-        from lagniappe.core.tools.site.admin import run_site_updates
+        from lagniappe.core.tools.database.migrations import run_data_migrations
 
-        result = run_site_updates()
+        result = run_data_migrations()
         if result.get("status") != "current":
             raise RuntimeError(f"Data migrations did not become current: {result}")
-    elif arguments == ["rebuild-cache"]:
-        from lagniappe.core.tools.site.admin import rebuild_application_cache
-
-        rebuilt = rebuild_application_cache()
-        result = {
-            "rebuilt": rebuilt.rebuilt,
-            "migration_status": rebuilt.migration_status,
-        }
-        if not rebuilt.rebuilt:
-            raise RuntimeError(
-                f"Cache rebuild was blocked: {rebuilt.migration_status}"
-            )
     else:
-        raise RuntimeError("Expected one data-lifecycle action: migrate or rebuild-cache.")
+        raise RuntimeError("Expected the data-lifecycle action: migrate.")
     print(json.dumps(result, sort_keys=True, default=str))
     return 0
 

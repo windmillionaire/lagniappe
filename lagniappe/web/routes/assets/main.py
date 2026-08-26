@@ -3,7 +3,8 @@ from flask import redirect, request
 from lagniappe.core.definitions import Action, AssetTypes, Fetch
 from lagniappe.core.definitions.asset import LARGE_ASSET_BYTES
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database, files as file_tools
+from lagniappe.core.tools.files import ranges as file_ranges
+from lagniappe.core.tools.database import assets as database_assets
 from lagniappe.web.auth import permission
 from lagniappe.web import responses
 
@@ -16,7 +17,7 @@ from . import assets
 def _asset_size(asset):
     if asset.size is not None:
         return asset.size
-    return database.assets.file_size(asset.path, asset.visibility.value)
+    return database_assets.file_size(asset.path, asset.visibility.value)
 
 
 # @testable false
@@ -54,7 +55,7 @@ def _asset_redirect(asset, mimetype):
     disposition = f'inline; filename="{filename}"'
 
     if asset.visibility.value == "private":
-        url = database.assets.get_signed_url(
+        url = database_assets.get_signed_url(
             asset.path,
             response_disposition=disposition,
             response_type=response_type,
@@ -76,12 +77,12 @@ def _file_response(asset, mimetype):
     if range_header:
         size = _asset_size(asset)
         try:
-            byte_range = file_tools.parse_byte_range(range_header, size)
-        except file_tools.UnsatisfiableByteRange:
+            byte_range = file_ranges.parse_byte_range(range_header, size)
+        except file_ranges.UnsatisfiableByteRange:
             return responses.file_range_not_satisfiable(size, mimetype)
 
     if byte_range:
-        content = database.assets.download_file(
+        content = database_assets.download_file(
             asset.path,
             asset.visibility.value,
             start=byte_range.start,

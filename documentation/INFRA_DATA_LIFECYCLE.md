@@ -95,12 +95,19 @@ A mutating restore:
 6. rebinds entity asset descriptors to the copied generations;
 7. discards nonterminal jobs, locks, Scheduler control, and active operation
    pointers;
-8. runs data migrations, relation-aware cache reconstruction, reserved/Owner
-   validation, and a full Redis rebuild;
+8. runs data migrations and relation-aware validation, then clears Redis so no
+   pre-restore cache entry can survive the database merge;
 9. regenerates only task-uncompletion deliveries represented by durable Task
    markers; and
 10. restores traffic and queue/Scheduler state, writes an audit, and deletes
     the safety clone.
+
+After a successful restore, the console directs the Owner to **Admin → Site
+Settings → Maintenance → Refresh Cache**. That explicit application-owned
+rebuild must complete before cache-backed search and navigation are treated as
+verified. The installer clears Redis using the saved setup connection, but it
+does not import Flask or application authorization to rebuild user-scoped cache
+projections.
 
 Cloud Tasks has no atomic list-and-purge receipt; the queue audit is an
 observation after producers are paused. Ordinary purged deliveries are not

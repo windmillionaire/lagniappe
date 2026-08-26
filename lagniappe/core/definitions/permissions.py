@@ -2,7 +2,7 @@
 
 from enum import Enum, auto
 
-from ..tools.auth.context import current_context_user
+from ..restrictions import Restriction
 from .default import DefaultEnum
 
 
@@ -34,34 +34,6 @@ class Action(Enum, metaclass=DefaultEnum):
     def implies(self, action):
         """Check if this action implies (includes) another action."""
         return self.value >= action.value if self.value else False
-
-
-# @testable infrastructure
-class Restriction(Enum):
-    """Sentinel values for permission restriction filters.
-
-    ``UNRESTRICTED`` means no required-access filter should be applied. It is
-    intentionally distinct from an empty list, which means the user has no
-    allowed hashes for that filtered view.
-    """
-
-    UNRESTRICTED = "UNRESTRICTED"
-
-    @classmethod
-    def is_unrestricted(cls, value):
-        return value is cls.UNRESTRICTED
-
-    @classmethod
-    def is_denied(cls, value):
-        return isinstance(value, list) and not value
-
-    @classmethod
-    def from_session(cls, value):
-        return cls.UNRESTRICTED if value == cls.UNRESTRICTED.value else value
-
-    @classmethod
-    def to_session(cls, value):
-        return cls.UNRESTRICTED.value if value is cls.UNRESTRICTED else value
 
 
 # @testable infrastructure
@@ -107,6 +79,8 @@ class Resource(Enum):
     # @matrix permissions : anonymous default-deny resource-gates
     def allowed(self, action, user=None):
         """Check if the user has at least the given action on this resource."""
+        from ..tools.auth.context import current_context_user
+
         user = current_context_user(user)
         if not user:
             return False

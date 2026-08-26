@@ -13,7 +13,8 @@ from testing.definitions import Groups, Projects, SitePages, Users
 from testing.definitions.user_definitions import UserDefinition
 from testing.elements.combobox import Dropdown
 from testing.resources import Project
-from testing.utility import expect_poll_result, expect_successful_response
+from testing.utility.network import expect_successful_response
+from testing.utility.polling import expect_poll_result
 
 
 pytestmark = pytest.mark.e2e

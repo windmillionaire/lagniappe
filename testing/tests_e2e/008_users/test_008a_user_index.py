@@ -19,7 +19,8 @@ from testing.elements import (
     Tabs,
 )
 from testing.resources import Page
-from testing.utility import expect_reconnect_refresh, expect_successful_response
+from testing.utility.network import expect_successful_response
+from testing.utility.reconnect import expect_reconnect_refresh
 
 pytestmark = pytest.mark.e2e
 

@@ -4,7 +4,7 @@ import copy
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 
 from .common import (
     PAGE_FORM_TYPE_ERROR,
@@ -92,7 +92,7 @@ def _stored_reference_key(entity, name):
 def _urlsafe_key_value(value):
     if not value:
         return None
-    encoded = database.get.urlsafe_key(value)
+    encoded = database_get.urlsafe_key(value)
     if encoded:
         return encoded
     legacy = getattr(value, "to_legacy_urlsafe", None)

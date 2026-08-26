@@ -58,7 +58,7 @@ def test_submission_links_internal_top_level_and_table_row(
                 side_effect=_fake_entities_get,
             ),
             patch(
-                "lagniappe.core.mixins.submitter.database.get.datastore_key",
+                "lagniappe.core.mixins.submitter.database_get.datastore_key",
                 side_effect=lambda identifier: f"key:{identifier}",
             ),
         ):

@@ -17,8 +17,7 @@ from lagniappe.core.properties.deferred_job_lifecycle import (
     TERMINAL_STATUSES,
     datetime_value as _datetime,
 )
-from lagniappe.core.tools import database
-from lagniappe.core.tools.database import deferred_jobs as deferred_database
+from lagniappe.core.tools.database import deferred_jobs as database_deferred_jobs
 
 from .common import _error_record, _publish_operation_projection, _utc
 from .errors import DeferredJobInfrastructureError
@@ -35,9 +34,9 @@ class DeferredJobRecovery:
             return self._reconcile_candidates(limit=None)
         jobs = []
         for _attempt in range(max(int(attempts), 1)):
-            snapshot = database.get_deferred_job_scheduler_control()
+            snapshot = database_deferred_jobs.get_deferred_job_scheduler_control()
             jobs = self._reconcile_candidates(limit=None)
-            repair = database.repair_deferred_job_scheduler_control(
+            repair = database_deferred_jobs.repair_deferred_job_scheduler_control(
                 [job.key for job in jobs],
                 snapshot["generation"],
                 now,
@@ -94,7 +93,7 @@ class DeferredJobRecovery:
                     "This operation could not finish after automatic recovery. "
                     "Try again."
                 )
-                claim = database.claim_deferred_job_recovery(
+                claim = database_deferred_jobs.claim_deferred_job_recovery(
                     job.key,
                     int(getattr(job, "status_revision", 0) or 0),
                     now,
@@ -148,14 +147,14 @@ class DeferredJobRecovery:
                         task_suffix=f"reconcile-{revision}",
                     )
                 except Exception:
-                    database.update_deferred_job_recovery_dispatch(
+                    database_deferred_jobs.update_deferred_job_recovery_dispatch(
                         job.key,
                         revision,
                         {"dispatch_state": "pending", "dispatched_at": None},
                         now,
                     )
                     raise
-                database.update_deferred_job_recovery_dispatch(
+                database_deferred_jobs.update_deferred_job_recovery_dispatch(
                     job.key,
                     revision,
                     {
@@ -183,7 +182,7 @@ class DeferredJobRecovery:
     # @testable infrastructure
     # @covered-by lagniappe/core/tools/deferred_jobs/recovery.py::DeferredJobRecovery.reconcile
     def _reconcile_candidates(self, *, limit):
-        records = deferred_database.recovery_records(limit=limit)
+        records = database_deferred_jobs.recovery_records(limit=limit)
         jobs = [Entities.DEFERRED_JOB(record) for record in records]
         return Entities.fetch(*jobs, request=Fetch.direct())
 

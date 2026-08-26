@@ -45,7 +45,7 @@ def test_page_view_access_from_group_views(get_test_entities):
 
     with (
         patch(
-            "lagniappe.core.entities.page.database.get.group_view_access",
+            "lagniappe.core.entities.page.database_get.group_view_access",
             return_value=[g1.key],
         ) as mock_gva,
         patch(
@@ -117,7 +117,7 @@ def test_user_page_uses_users_permissions_not_models_permissions():
 
     with (
         patch(
-            "lagniappe.core.entities.page.database.get.group_view_access",
+            "lagniappe.core.entities.page.database_get.group_view_access",
             return_value=[],
         ) as mock_gva,
         patch("lagniappe.core.entities.page.Entities.fetch", return_value=[]),
@@ -219,7 +219,7 @@ def test_page_tasks_filtered_by_task_allowed(get_test_entities, monkeypatch):
 
     with (
         patch(
-            "lagniappe.core.entities.page.database.get.page_tasks",
+            "lagniappe.core.entities.page.database_get.page_tasks",
             return_value=keys,
         ),
         patch(

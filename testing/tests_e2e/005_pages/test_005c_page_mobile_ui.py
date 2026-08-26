@@ -4,7 +4,7 @@ from playwright.sync_api import expect
 from testing.definitions import Pages, Users
 from testing.elements import FormElements, MobileNav, Tabs
 from testing.resources import Page
-from testing.utility import scoped_browser_route
+from testing.utility.network import scoped_browser_route
 
 pytestmark = pytest.mark.e2e
 

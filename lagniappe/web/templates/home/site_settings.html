@@ -34,7 +34,8 @@
        data-route="{{ url_for('internal.site_settings') }}">
     <div class="{{ styles.form.default }}">
       {% call site_settings_section('maintenance', 'SiteMaintenance', 'Maintenance', 'site_maintenance', 'Cache, updates, and configuration', true) %}
-        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        <div data-role="maintenance-actions"
+             class="grid grid-cols-1 gap-3 {{ 'sm:grid-cols-3' if current_user.is_owner else 'sm:grid-cols-2' }}">
           <button data-role="rebuild-cache"
                   data-kind="delete"
                   class="{{ styles.button.submit }}">

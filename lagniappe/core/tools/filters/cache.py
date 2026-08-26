@@ -5,7 +5,7 @@ from lagniappe import CONFIG
 
 from ...definitions import Action, Fetch, FetchReason, Restriction
 from ...entities import Entities
-from ...tools import database
+from lagniappe.core.tools.database import get as database_get
 from ...tools.database.core import KINDS
 from ...tools.database.filter import Filter, Query
 from ...tools.auth.context import current_context_user
@@ -113,7 +113,7 @@ class FilterCache:
             return
 
         while True:
-            index = database.get.pages(
+            index = database_get.pages(
                 self.entity.key,
                 start_cursor=cursor,
                 limit=100,
@@ -141,7 +141,7 @@ class FilterCache:
             .filter(
                 Filter()
                 .eq("type", "task")
-                .eq("project", database.get.datastore_key(self.entity))
+                .eq("project", database_get.datastore_key(self.entity))
             )
             .order("-modified")
             .fetch_all(),

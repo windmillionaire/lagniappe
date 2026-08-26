@@ -26,7 +26,10 @@ from testing.utility.traceability_common import (
     decode_test_run_snapshots,
     encode_test_run_snapshots,
 )
-from testing.utility import hosted_e2e_job, traceability_common
+from testing.utility import (
+    hosted_e2e_job,
+    traceability_common,
+)
 
 
 pytestmark = pytest.mark.tooling

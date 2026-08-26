@@ -16,7 +16,6 @@ from lagniappe.core.definitions import (
 )
 from lagniappe.core.entities import Entities
 from lagniappe.core.properties.deferred_job_dispatch import TaskIdentity
-from lagniappe.core.tools import database
 from lagniappe.core.tools.services import task_queue
 from lagniappe.core.tools.deferred_jobs import dispatch as deferred_dispatch
 from lagniappe.core.tools.deferred_jobs import service as deferred_service
@@ -75,7 +74,7 @@ def test_cancel_deletes_tasks_and_persists_a_tombstone(
         return {"transitioned": True, "entity": current}
 
     monkeypatch.setattr(
-        database,
+        deferred_database,
         "transition_active_deferred_job",
         transition,
     )

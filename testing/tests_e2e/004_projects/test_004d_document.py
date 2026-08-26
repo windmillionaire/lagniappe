@@ -26,7 +26,7 @@ from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
 from testing.definitions import Projects, Users
 from testing.elements import EditorMenuOptions, EditorToggleOptions, Tabs
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 
 
 MARKDOWN_TABLE_PASTE_FIXTURE = "\n".join(

@@ -50,7 +50,7 @@ def test_message_transactions_are_idempotent_and_keep_exact_unread_counts(monkey
         lambda *_args, **_kwargs: True,
     )
     monkeypatch.setattr(
-        message_service.database,
+        message_service.database_notifications,
         "ensure_notification_aggregate",
         lambda _user: recipient_aggregate,
     )
@@ -249,11 +249,11 @@ def test_user_delete_preserves_or_purges_message_history_by_survivor(monkeypatch
             return [self.rows[key] for key in keys if key in self.rows]
 
     monkeypatch.setattr(
-        "lagniappe.core.mutations.delete.database.message_conversation_keys",
+        "lagniappe.core.mutations.delete.database_messaging.message_conversation_keys",
         lambda _user: [conversation_key],
     )
     monkeypatch.setattr(
-        "lagniappe.core.mutations.delete.database.message_keys",
+        "lagniappe.core.mutations.delete.database_messaging.message_keys",
         lambda _conversation: [message_key],
     )
 

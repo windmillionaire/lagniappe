@@ -434,7 +434,7 @@ if (linkCall?.attributes?.label !== "Link" || linkCall?.attributes?.icon !== "ou
     )
 
 
-# @matrix admin database-migrations : actionable-links audit-error cache-gate current failed pending repairs running version-history
+# @matrix admin database-migrations : actionable-links audit-error cache-gate current failed fresh-install pending repairs running version-history
 # @template home/site_settings.html::site_settings
 def test_site_settings_migration_status_uses_generic_release_states(run_node):
     run_node(
@@ -551,6 +551,21 @@ const completed = {
 
 settings._renderMigrationStatus({
   status: "current",
+  current_version: "0.3.0",
+  cache_refresh_allowed: true,
+  counts: { complete: 3, total: 3 },
+  migrations: [
+    { ...completed, source: "fresh-install" },
+    { ...completed, id: "MSG-001", source: "fresh-install" },
+    { ...completed, id: "AST-001", source: "fresh-install" },
+  ],
+});
+if (summary.textContent !== "Version 0.3.0. No site updates are required." || results.childElementCount) {
+  throw new Error(`Fresh-install baselines were exposed as updates: ${summary.textContent}`);
+}
+
+settings._renderMigrationStatus({
+  status: "current",
   current_version: "0.3",
   cache_refresh_allowed: true,
   counts: { complete: 1, total: 1 },
@@ -596,7 +611,7 @@ settings._renderMigrationStatus({
   counts: { complete: 1, pending: 1, failed: 0, interrupted: 0, blocked: 0 },
   migrations: [completed, pending],
 });
-if (title.textContent !== "Site updates are ready" || summary.textContent !== "Version 0.3. 1 pending, 1 previously completed.") {
+if (title.textContent !== "Site updates are ready" || summary.textContent !== "Version 0.3. 1 pending site update.") {
   throw new Error(`Unexpected pending state: ${title.textContent} / ${summary.textContent}`);
 }
 if (updateButton.disabled || !cacheButton.disabled || results.childElementCount !== 2) {

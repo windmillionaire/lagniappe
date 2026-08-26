@@ -9,7 +9,7 @@ from testing.definitions import Categories, Forms, SitePages, Users
 from testing.elements import Tools
 from testing.resources.form import Builder
 from testing.resources.site import FormIndex
-from testing.utility import manual_mutation_headers
+from testing.utility.network import manual_mutation_headers
 
 pytestmark = pytest.mark.e2e
 

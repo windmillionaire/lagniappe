@@ -19,7 +19,7 @@ from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 from testing.definitions import SitePages, Users
 from testing.elements import List
 from testing.resources import Report
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 from testing.utility.hosted_deferred_jobs import dispatch_hosted_deferred_job
 from testing.utility.organize_submission_eval import load_cases
 

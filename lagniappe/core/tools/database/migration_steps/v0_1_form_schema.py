@@ -2,10 +2,10 @@
 
 import json
 
-from lagniappe.core.properties.schema import (
+from config.form_schema import (
     SCHEMA_FORMAT_VERSION,
     SchemaValidationError,
-    canonicalize_schema,
+    normalize_form_schema as canonicalize_schema,
 )
 
 from .base import MigrationDataError

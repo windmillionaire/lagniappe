@@ -9,7 +9,7 @@ from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
 from testing.definitions import Pages, Users
 from testing.resources import Task
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 
 pytestmark = pytest.mark.e2e
 

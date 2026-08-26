@@ -46,7 +46,7 @@ from testing.elements import (
     DateSelect,
     UserSelect,
 )
-from testing.utility import expect_successful_response
+from testing.utility.network import expect_successful_response
 
 
 SIGNATURE_FIELD_ID = "task-signature-field"

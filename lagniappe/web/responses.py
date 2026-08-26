@@ -22,7 +22,9 @@ from lagniappe.core.definitions import (
     SearchFacets,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import assets as database_assets
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools import cache
 from lagniappe.core.tools.polling.projections import (
     channel_revision,
@@ -167,7 +169,7 @@ def notification_item(notification):
 # @pairs categories:first-batch indexes:rendering reconnect-refresh:root-fingerprint task-index:columns
 def index(name, index, **context):
     fingerprint = (
-        database.site_fingerprint(f"/{name}/index")
+        database_utility.site_fingerprint(f"/{name}/index")
         if name in {"forms", "tasks", "users"}
         else None
     )
@@ -523,7 +525,7 @@ def file_download(file_entity):
 
     if file_entity.large:
         if asset.visibility.value == "private":
-            signed_url = database.assets.get_signed_url(
+            signed_url = database_assets.get_signed_url(
                 asset.path,
                 response_disposition=disposition,
                 response_type=mimetype or "application/octet-stream",
@@ -746,25 +748,34 @@ def home_section(section):
         return get_template_attribute("home/projects.html", "list")(section), 200
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/tasks/main.py::update
+# @reason route response adapter is exercised through its owning task mutation
 def home_task_list():
     home = Entities.HOME()
     template = get_template_attribute("home/tasks.html", "list")
     task_list_html = template(home.section("tasks"))
 
-    task_count = database.get.user_task_count(current_user.page)
+    task_count = database_get.user_task_count(current_user.page)
     count_html = get_template_attribute("common.html", "task_count")(task_count)
 
     return count_html + task_list_html, 200
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/tasks/main.py::update
+# @reason route response adapter is exercised through its owning task mutation
 def home_task(task):
     template = get_template_attribute("home/tasks.html", "task")
-    count = database.get.user_task_count(current_user.page)
+    count = database_get.user_task_count(current_user.page)
     return jsonify({"html": template(task), "count": count}), 200
 
 
+# @testable false
+# @covered-by lagniappe/web/routes/tasks/main.py::update
+# @reason route response adapter is exercised through its owning task mutation
 def home_task_removed():
-    count = database.get.user_task_count(current_user.page)
+    count = database_get.user_task_count(current_user.page)
     return jsonify({"removed": True, "count": count}), 200
 
 
@@ -911,7 +922,7 @@ def delete_entity(entity=None, key=None):
         instances = [
             instance
             for instance in Entities.fetch(
-                *database.get.form_instance_users(entity.key),
+                *database_get.form_instance_users(entity.key),
                 request=Fetch.direct(),
             )
             if isinstance(instance, (Entities.PAGE, Entities.TASK))

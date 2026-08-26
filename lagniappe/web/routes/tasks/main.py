@@ -15,7 +15,8 @@ from lagniappe.core.definitions import (
     enforce_file_consumer,
 )
 from lagniappe.core.entities import Entities, index
-from lagniappe.core.tools import ai, database
+from lagniappe.core.tools import ai
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools import collaboration
 from lagniappe.core.tools.auth.references import (
     SubmittedReferenceResolver,
@@ -837,7 +838,7 @@ def _home_task_response(task):
 def latest_history_submission(key, **kwargs):
     task = kwargs["entity"]
     history = Entities.fetch_one(
-        database.get.latest_task_history(task), request=Fetch.direct()
+        database_get.latest_task_history(task), request=Fetch.direct()
     )
     submission = history.properties.submission.form_value if history else {}
     return responses.json_response({"latest_submission": submission})
@@ -858,7 +859,7 @@ def save_default_field(key, **kwargs):
         return responses.error("A submission field is required")
 
     history = Entities.fetch_one(
-        database.get.latest_task_history(task), request=Fetch.direct()
+        database_get.latest_task_history(task), request=Fetch.direct()
     )
     if not history:
         return responses.error("No task history is available")

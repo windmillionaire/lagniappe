@@ -6,7 +6,8 @@ from flask_login import current_user
 from lagniappe.core.definitions import AI, Action, Fetch, Resource
 from lagniappe.core.entities import Entities
 from lagniappe.core import exceptions
-from lagniappe.core.tools import ai, database
+from lagniappe.core.tools import ai
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.auth.references import SubmittedReferenceResolver
 from lagniappe.web.auth import (
     abort_public_user_action,
@@ -131,7 +132,7 @@ def _update_file_pages(file, form):
     submitted_ids = set(form.getlist("page"))
     submitted_keys = {
         key
-        for key in (database.get.datastore_key(identifier) for identifier in submitted_ids)
+        for key in (database_get.datastore_key(identifier) for identifier in submitted_ids)
         if key
     }
     loaded_pages = Entities.fetch(

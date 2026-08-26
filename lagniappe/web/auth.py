@@ -17,7 +17,8 @@ from flask_login import current_user
 from lagniappe import CONFIG
 from lagniappe.core.definitions import AI, Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 
 LOGIN_USER_KEY = CONFIG.LOGIN_USER_KEY
 LOGIN_USER_PAGE_KEY = CONFIG.LOGIN_USER_PAGE_KEY
@@ -258,7 +259,7 @@ def _load_session_user_context(entity_identifier=None):
         clear_login_session()
         return None, None
 
-    canonical_page_identifier = database.get.urlsafe_key(user.db.get("page"))
+    canonical_page_identifier = database_get.urlsafe_key(user.db.get("page"))
     if canonical_page_identifier != user_page_identifier:
         clear_login_session()
         return None, None
@@ -320,7 +321,7 @@ def permission(resource=None, requested=None):
                 base_fingerprint = (
                     entity.fingerprint
                     if entity
-                    else database.site_fingerprint(request.path)
+                    else database_utility.site_fingerprint(request.path)
                 )
                 g.fingerprint = _etag_fingerprint(base_fingerprint, user)
 
@@ -367,7 +368,7 @@ def home_permission():
                 if kwargs.get("kind") == "starred":
                     base_fingerprint = user.modified.timestamp()
                 else:
-                    site_fingerprint = database.site_fingerprint(request.path)
+                    site_fingerprint = database_utility.site_fingerprint(request.path)
                     user_fingerprint = user.modified.timestamp()
                     base_fingerprint = f"{site_fingerprint}:{user_fingerprint}"
 

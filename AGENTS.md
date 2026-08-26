@@ -21,6 +21,12 @@ These instructions apply to the whole repository unless a more specific
   - `venv/bin/python run.py test setup`
   - `venv/bin/python run.py traceability`
   - `venv/bin/python run.py template-contracts`
+- The repo runner expects the user's gcloud and Application Default
+  Credentials context to be aligned before cloud-aware tests run. If the
+  runner reports an authentication or project mismatch, ask the user for
+  permission before running `venv/bin/python run.py auth`; do not run that
+  interactive, credential-changing command on standing authority or bypass the
+  repo runner with a different test command.
 - Use the shared pytest config at `testing/pytest.ini`.
 - E2E targets automatically enable strict unloaded-relation checks. For other
   suites, use the repo runner flag: `venv/bin/python run.py test --strict

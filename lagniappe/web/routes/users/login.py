@@ -17,7 +17,7 @@ from lagniappe import CONFIG
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Fetch, FetchReason
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.auth import agent_access
 from lagniappe.core.tools.email import smtp as auth_email
 from lagniappe.core.tools.services import identity_platform
@@ -73,7 +73,7 @@ def _owner_requires_first_login():
     if not owner_email:
         return False
 
-    exists = database.get.user(owner_email)
+    exists = database_get.user(owner_email)
     if not exists:
         return True
 
@@ -285,7 +285,7 @@ def _send_auth_action_email(email, action, *, user_ip=None, next_target=None):
 def verify_user(email, name, picture, *, allow_bootstrap_admin=False):
     """Verify and create/update user based on authentication."""
     email = str(email or "").strip().lower()
-    exists = database.get.user(email)
+    exists = database_get.user(email)
 
     owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().lower()
     if not exists and email == owner_email:
@@ -349,7 +349,7 @@ def login():
 
         name = test_user.split("@")[0] or CONFIG.ADMIN_NAME
         remember = _remember_preference(default=True)
-        exists = database.get.user(email)
+        exists = database_get.user(email)
         if exists:
             user = Entities.USER(exists)
         else:
@@ -361,7 +361,7 @@ def login():
         record_login(user, "development")
         return redirect(_login_redirect_url(), code=302)
     elif CONFIG.testing and test_user:
-        exists = database.get.user(test_user)
+        exists = database_get.user(test_user)
         if not exists and test_user == CONFIG.ADMIN_EMAIL:
             user = Entities.USER.create({"email": test_user, "name": CONFIG.ADMIN_NAME})
             user.save()
@@ -483,7 +483,7 @@ def login_google():
         )
         google_email = str(google_claims.get("email") or "").strip().lower()
         owner_email = str(CONFIG.ADMIN_EMAIL or "").strip().lower()
-        registered = bool(database.get.user(google_email))
+        registered = bool(database_get.user(google_email))
         if (
             not registered
             and google_email != owner_email
@@ -779,7 +779,7 @@ def check_user_status():
             return jsonify({"success": False, "error": "Email required"}), 400
 
         next_step = "signin"
-        exists = database.get.user(email)
+        exists = database_get.user(email)
         if exists:
             user = Entities.USER(exists)
             if user.last_login is None:

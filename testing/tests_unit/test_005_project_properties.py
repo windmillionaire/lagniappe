@@ -413,7 +413,7 @@ def test_model_tasks_load_attach_and_order_from_database():
     model_one.db["project"] = project.key
 
     with patch(
-        "lagniappe.core.properties.project.database.get.model_tasks",
+        "lagniappe.core.properties.project.database_get.model_tasks",
         return_value=["model-key", "page-key"],
     ) as get_model_tasks:
         def load_entities(*args, **kwargs):
@@ -472,12 +472,12 @@ def test_model_task_entity_create_update_order_and_save_relations():
     created_db = {}
 
     with patch(
-        "lagniappe.core.entities.entity.database.create_key",
+        "lagniappe.core.entities.entity.database_utility.create_key",
         return_value=SimpleNamespace(parent=project.key),
     ):
-        with patch("lagniappe.core.entities.entity.database.get.entity", return_value=None):
+        with patch("lagniappe.core.entities.entity.database_get.entity", return_value=None):
             with patch(
-                "lagniappe.core.entities.entity.database.create_entity",
+                "lagniappe.core.entities.entity.database_utility.create_entity",
                 return_value=created_db,
             ):
                 model = ModelTask.create(

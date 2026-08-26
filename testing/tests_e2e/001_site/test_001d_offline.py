@@ -18,11 +18,11 @@ Related Files:
 import pytest
 
 from testing.definitions import Projects, SitePages, Users
-from testing.utility import (
+from testing.utility.network import (
     expect_successful_response,
     scoped_browser_route,
-    wait_for_offline_sync_records,
 )
+from testing.utility.offline import wait_for_offline_sync_records
 from playwright.sync_api import expect
 
 pytestmark = pytest.mark.e2e

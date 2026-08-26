@@ -22,7 +22,7 @@ from lagniappe.core.properties.deferred_job_lifecycle import (
     datetime_value as _datetime,
 )
 from lagniappe.core.properties.deferred_job_request import validate_payload as _validate_payload
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import deferred_jobs as database_deferred_jobs
 
 from .common import _error_record, _json_copy, _publish_operation_projection, _utc
 from .context import DeferredJobContext
@@ -64,7 +64,7 @@ class DeferredJobRunner:
     def run(self, job_key, *, now=None):
         now = _utc(now)
         lease_token = uuid.uuid4().hex
-        claim = database.claim_deferred_job(
+        claim = database_deferred_jobs.claim_deferred_job(
             job_key,
             lease_token,
             now + timedelta(seconds=DEFERRED_JOB_LEASE_SECONDS),
@@ -380,7 +380,7 @@ class DeferredJobRunner:
         """Renew without mutating shared entity caches from the guard thread."""
         now = _utc()
         lease_expires = now + timedelta(seconds=DEFERRED_JOB_LEASE_SECONDS)
-        return database.update_claimed_deferred_job(
+        return database_deferred_jobs.update_claimed_deferred_job(
             job.key,
             lease_token,
             {"lease_expires": lease_expires},
@@ -394,7 +394,7 @@ class DeferredJobRunner:
         try:
             now = _utc()
             lease_expires = now + timedelta(seconds=DEFERRED_JOB_LEASE_SECONDS)
-            active = database.update_claimed_deferred_job(
+            active = database_deferred_jobs.update_claimed_deferred_job(
                 job.key,
                 lease_token,
                 {"lease_expires": lease_expires},
@@ -414,7 +414,7 @@ class DeferredJobRunner:
         for name, value in values.items():
             setattr(job, name, value)
         updates = {name: job.db.get(job.properties[name].db_key) for name in values}
-        persisted = database.update_claimed_deferred_job(
+        persisted = database_deferred_jobs.update_claimed_deferred_job(
             job.key,
             claim_token,
             updates,

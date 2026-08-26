@@ -14,7 +14,8 @@ from lagniappe.core.definitions import (
     FileConsumer,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai, database
+from lagniappe.core.tools import ai
+from lagniappe.core.tools.database import utility as database_utility
 
 from .base import DeferredJobAdapter
 
@@ -102,7 +103,7 @@ class EmailIngestAdapter(DeferredJobAdapter):
             identity = hashlib.sha256(
                 f"{parameters.get('event_digest')}:{attachment['id']}".encode("utf-8")
             ).hexdigest()
-            file_key = database.create_named_key("file", f"email-{identity}")
+            file_key = database_utility.create_named_key("file", f"email-{identity}")
             file = attached.get(file_key) or Entities.fetch_one(
                 file_key,
                 request=Fetch.direct(),

@@ -116,7 +116,7 @@ def test_autofill_terminal_cleanup_releases_target_lock(monkeypatch):
         lambda current: f"lock:{getattr(current, 'urlsafe_key', current)}",
     )
     monkeypatch.setattr(
-        autofill_adapters.database,
+        autofill_adapters.database_deferred_jobs,
         "release_deferred_job_lock",
         lambda *values: released.append(values),
     )
@@ -186,7 +186,7 @@ def test_autofill_page_operation_reference_is_persisted_and_compare_cleared(
         lambda current: f"lock:{getattr(current, 'urlsafe_key', current)}",
     )
     monkeypatch.setattr(
-        autofill_adapters.database,
+        autofill_adapters.database_deferred_jobs,
         "release_deferred_job_lock",
         lambda *values: released.append(values),
     )
@@ -294,14 +294,14 @@ def test_autofill_upload_checkpoint_records_durable_attachment(monkeypatch):
         lambda *_args, **_kwargs: upload,
     )
     monkeypatch.setattr(
-        autofill_adapters.database,
+        autofill_adapters.database_utility,
         "create_named_key",
         lambda kind, identifier: (
             named_keys.append((kind, identifier)) or "named-file-key"
         ),
     )
     monkeypatch.setattr(
-        autofill_adapters.database.get,
+        autofill_adapters.database_get,
         "urlsafe_key",
         lambda key: f"encoded:{key}",
     )
@@ -431,7 +431,7 @@ def test_autofill_uploaded_file_is_attached_to_target(monkeypatch, target_kind):
         lambda record, **_kwargs: upload_loads.append(record) or upload,
     )
     monkeypatch.setattr(
-        autofill_adapters.database.get,
+        autofill_adapters.database_get,
         "datastore_key",
         lambda key: "file-key" if key == "encoded-file-key" else None,
     )

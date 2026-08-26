@@ -18,7 +18,8 @@ from ..mixins import (
     DetailsMixin,
     FilterMixin,
 )
-from ..tools import cache, database
+from ..tools import cache
+from lagniappe.core.tools.database import get as database_get
 from ..tools.files.html import strip_tags
 from .base_db import DBProperty
 
@@ -664,7 +665,7 @@ class PublicID(DBProperty):
         unique_id = False
         while not unique_id:
             new_id = short_uuid()
-            entity = database.get.public_pages(new_id)
+            entity = database_get.public_pages(new_id)
             if not entity:
                 unique_id = new_id
 

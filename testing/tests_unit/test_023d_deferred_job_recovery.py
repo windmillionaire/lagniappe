@@ -11,9 +11,9 @@ from lagniappe.core.definitions import (
     DeferredJobType,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
 from lagniappe.core.tools.deferred_jobs.runner import MISSING_INPUT_MESSAGE
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobService
+from lagniappe.core.tools.database import deferred_jobs as database_deferred_jobs
 from testing.utility.deferred_job_fakes import (
     RunnerJob,
 )
@@ -41,7 +41,7 @@ def test_reconciler_redispatches_one_cas_claimed_stale_job(monkeypatch):
         return {"claimed": True, "action": "redispatch", "entity": job}
 
     monkeypatch.setattr(
-        database,
+        database_deferred_jobs,
         "claim_deferred_job_recovery",
         claim,
     )
@@ -57,7 +57,7 @@ def test_reconciler_redispatches_one_cas_claimed_stale_job(monkeypatch):
     )
     finalized = []
     monkeypatch.setattr(
-        database,
+        database_deferred_jobs,
         "update_deferred_job_recovery_dispatch",
         lambda *args: finalized.append(args) or True,
     )

@@ -317,7 +317,7 @@ def test_scheduler_sync_uses_committed_control_hint_when_current(monkeypatch):
         "applied_generation": 8,
     }
     monkeypatch.setattr(
-        deferred_job_scheduler.database,
+        deferred_job_scheduler.database_deferred_jobs,
         "get_deferred_job_scheduler_control",
         lambda: pytest.fail("committed scheduler control was read again"),
     )
@@ -373,7 +373,7 @@ def test_reconciler_repairs_control_before_self_pausing(monkeypatch):
     )
     monkeypatch.setattr(registry, "_reconcile_candidates", lambda limit: [])
     monkeypatch.setattr(
-        deferred_recovery.database,
+        deferred_recovery.database_deferred_jobs,
         "get_deferred_job_scheduler_control",
         lambda: {"generation": 4},
     )
@@ -386,7 +386,7 @@ def test_reconciler_repairs_control_before_self_pausing(monkeypatch):
         }
 
     monkeypatch.setattr(
-        deferred_recovery.database,
+        deferred_recovery.database_deferred_jobs,
         "repair_deferred_job_scheduler_control",
         repair,
     )

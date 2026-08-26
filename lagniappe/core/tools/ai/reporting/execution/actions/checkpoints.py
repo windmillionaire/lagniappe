@@ -3,7 +3,8 @@
 import copy
 
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 
 from .results import (
     _action_attachment_results,
@@ -77,11 +78,11 @@ def _allocate_action_output_key(action, created, context):
                 parent_record.get("idempotency_key")
             )
             if parent is None and parent_record.get("output_key"):
-                parent = database.get.datastore_key(parent_record["output_key"])
+                parent = database_get.datastore_key(parent_record["output_key"])
             if parent is None:
-                parent = database.get.datastore_key(reference)
+                parent = database_get.datastore_key(reference)
 
-    return database.create_key(kind, parent)
+    return database_utility.create_key(kind, parent)
 
 
 # @testable false
@@ -230,21 +231,21 @@ def _prepare_action_checkpoint(action, report, user, created, context, record):
         if not isinstance(existing, Entities.TASK):
             existing = _load_result_entity(before.get("entity"))
         if existing is None:
-            output_key = database.create_key("task", None)
+            output_key = database_utility.create_key("task", None)
         else:
             completed_on = _parse_completed_task_completed_on(_data(action))
             if _completed_event_belongs_in_history(existing, completed_on):
-                output_key = database.create_key("task_history", existing)
+                output_key = database_utility.create_key("task_history", existing)
             elif _should_archive_live_completion(existing):
-                history_key = database.create_key("task_history", existing)
-                record["history_output_key"] = database.get.urlsafe_key(history_key)
+                history_key = database_utility.create_key("task_history", existing)
+                record["history_output_key"] = database_get.urlsafe_key(history_key)
                 context.setdefault("prepared_keys", {})[
                     f"{record['idempotency_key']}:history"
                 ] = history_key
     else:
         output_key = _allocate_action_output_key(action, created, context)
     if output_key is not None:
-        record["output_key"] = database.get.urlsafe_key(output_key)
+        record["output_key"] = database_get.urlsafe_key(output_key)
         context.setdefault("prepared_keys", {})[record["idempotency_key"]] = output_key
     return record
 
@@ -256,7 +257,7 @@ def _assign_preallocated_key(entity, record, context):
     if entity is None or not record.get("output_key"):
         return entity
     key = context.setdefault("prepared_keys", {}).get(record["idempotency_key"])
-    key = key or database.get.datastore_key(record["output_key"])
+    key = key or database_get.datastore_key(record["output_key"])
     if key is None:
         return entity
     entity._key = key

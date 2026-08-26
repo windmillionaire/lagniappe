@@ -56,7 +56,7 @@ RESTORE_JOURNAL_STATE_KEYS = frozenset(
         "target_validated",
         "scheduled_tasks_reconciled",
         "scheduled_task_result",
-        "cache_rebuilt",
+        "cache_invalidated",
         "traffic_restored",
         "queue_resumed",
         "scheduler_resumed",

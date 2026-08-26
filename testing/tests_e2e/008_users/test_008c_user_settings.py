@@ -14,7 +14,7 @@ from config import SETTINGS, recovery
 from lagniappe import CONFIG
 from lagniappe.core.definitions import AI, Action, Fetch, General, Levels, Site
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database import site as site_database
 from testing.definitions import Categories, Groups, SitePages, Submissions, Users
 from testing.definitions.user_definitions import UserDefinition
@@ -1220,7 +1220,7 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
         submit.click()
     assert promotion.value.status == 200
     expect(roster).to_contain_text(managed.email)
-    promoted = Entities.USER(database.get.user(managed.email))
+    promoted = Entities.USER(database_get.user(managed.email))
     assert promoted.is_admin
     assert promoted.invalidate_cache
     assert not promoted.is_owner
@@ -1263,7 +1263,7 @@ def test_site_administrator_roster_and_owner_controls(get_user, browser_failures
         administrator_row.locator("[data-role='demote-administrator']").click()
     assert demotion.value.status == 200
     expect(roster).not_to_contain_text(managed.email)
-    demoted = Entities.USER(database.get.user(managed.email))
+    demoted = Entities.USER(database_get.user(managed.email))
     assert not demoted.is_admin
     assert demoted.invalidate_cache
     managed.entity = demoted
@@ -1296,7 +1296,7 @@ def test_additional_admin_cannot_access_owner_configuration(get_user, browser_fa
     assert promotion["status"] == 200
 
     try:
-        persisted_administrator = Entities.USER(database.get.user(administrator.email))
+        persisted_administrator = Entities.USER(database_get.user(administrator.email))
         assert persisted_administrator.is_admin
         administrator.entity = persisted_administrator
         _acknowledge_user_cache_invalidation(administrator)

@@ -5,7 +5,9 @@ import json
 
 from lagniappe.core import exceptions
 from lagniappe.core.definitions import Action
-from lagniappe.core.tools import cache, database
+from lagniappe.core.tools import cache
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 from lagniappe.core.tools.deferred_jobs.service import DeferredJobs
 
 
@@ -52,7 +54,7 @@ def channel_revision(
     notification_state=None,
 ):
     """Return an opaque durable revision scoped to the supplied viewer."""
-    site_fingerprint = site_fingerprint or database.site_fingerprint
+    site_fingerprint = site_fingerprint or database_utility.site_fingerprint
     entity_revision = getattr(user, "fingerprint", None)
     if not entity_revision:
         modified = getattr(user, "modified", None)
@@ -110,7 +112,7 @@ def channel_revisions(
     paths = tuple(
         dict.fromkeys(path for channel in channels for path in channel_paths(channel))
     )
-    fingerprint_loader = fingerprint_loader or database.site_fingerprints
+    fingerprint_loader = fingerprint_loader or database_utility.site_fingerprints
     fingerprints = fingerprint_loader(paths) if paths else {}
     if "messages" in channels and notification_state is _NOTIFICATION_STATE_UNSET:
         notification_loader = notification_loader or cache.peek_notification_state
@@ -157,9 +159,9 @@ def operation_statuses(
     user_key = getattr(user, "urlsafe_key", None)
     owned = []
     for descriptor in descriptors:
-        key = database.get.datastore_key(descriptor["key"])
+        key = database_get.datastore_key(descriptor["key"])
         parent = getattr(key, "parent", None)
-        owner_key = database.get.urlsafe_key(parent) if parent is not None else None
+        owner_key = database_get.urlsafe_key(parent) if parent is not None else None
         if user_key and owner_key == user_key:
             owned.append(descriptor)
 

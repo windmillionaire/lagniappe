@@ -84,6 +84,11 @@ Setup re-reads provider state after create/update calls and accepts success only
 when the resulting resource matches the saved target. Ambiguous timeouts stop
 with rerun guidance; rerunning discovers and reuses completed resources.
 
+Backup creation and restore run current data migrations through a focused
+runtime adapter using the checkout's validated ADC and target project. That
+adapter imports the migration module directly; installer commands must not
+cross into Flask, request authorization, or broad package export façades.
+
 ## Focused architecture guides
 
 | Guide | Read before changing |

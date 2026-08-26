@@ -9,7 +9,8 @@ from ..definitions import (
     MutationPlan,
 )
 from ..exceptions import capture
-from ..tools import cache, database
+from ..tools import cache
+from lagniappe.core.tools.database import utility as database_utility
 from ..tools.notifications import service as notification_service
 
 
@@ -171,7 +172,7 @@ def execute_post_commit(plan):
     ]
     if blob_effects:
         errors.extend(
-            database.delete_blobs(
+            database_utility.delete_blobs(
                 [
                     effect.path
                     for effect in blob_effects
@@ -220,14 +221,14 @@ def execute_mutation(plan):
     ]
 
     if writes:
-        database.save_mutations(
+        database_utility.save_mutations(
             (effect.entity, effect.property_mask) for effect in writes
         )
         for effect in writes:
             _completed(outcome, effect.effect)
 
     if deletes:
-        database.delete_entities(effect.entity for effect in deletes)
+        database_utility.delete_entities(effect.entity for effect in deletes)
         _completed(outcome, MutationEffectType.DELETE)
 
     consume_mutation_intents(plan)

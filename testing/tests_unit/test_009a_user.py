@@ -11,7 +11,7 @@ import pytest
 
 from lagniappe.core.definitions import Fetch, General, Levels
 from lagniappe.core.entities.page import Page
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from lagniappe.core.tools.database.defaults import DEFAULT_USER_SCHEMA
 from lagniappe.core.tools.http import (
     PROFILE_IMAGE_POLICY,
@@ -769,12 +769,12 @@ def test_user_starred_key_removal_preserves_order():
 @pytest.mark.unit
 def test_user_entity_create_save_load_owner_page_and_groups():
     """User create/save/load handles owner, page, groups, photo import, and reuse."""
-    with patch("lagniappe.core.entities.user.database.get.user") as get_user:
+    with patch("lagniappe.core.entities.user.database_get.user") as get_user:
         with pytest.raises(ValueError, match="name is required"):
             User.create({"email": "missing-name@example.com"})
     get_user.assert_not_called()
 
-    with patch("lagniappe.core.entities.user.database.get.user") as get_user:
+    with patch("lagniappe.core.entities.user.database_get.user") as get_user:
         with pytest.raises(ValueError, match="email is required"):
             User.create({"name": "Missing Email"})
     get_user.assert_not_called()
@@ -784,10 +784,10 @@ def test_user_entity_create_save_load_owner_page_and_groups():
     existing.update({"type": "user", "email": "exists@example.com", "page": "pg009c"})
 
     with patch(
-        "lagniappe.core.entities.user.database.get.user",
+        "lagniappe.core.entities.user.database_get.user",
         return_value=existing,
     ):
-        with patch("lagniappe.core.entities.entity.database.create_key") as create_key:
+        with patch("lagniappe.core.entities.entity.database_utility.create_key") as create_key:
             reused = User.create(
                 {"name": "Existing User", "email": "exists@example.com"}
             )
@@ -817,19 +817,19 @@ def test_user_entity_create_save_load_owner_page_and_groups():
         SimpleNamespace(ADMIN_EMAIL="admin@example.com"),
     ):
         with patch(
-            "lagniappe.core.entities.user.database.get.user",
+            "lagniappe.core.entities.user.database_get.user",
             return_value=None,
         ):
             with patch(
-                "lagniappe.core.entities.entity.database.create_key",
+                "lagniappe.core.entities.entity.database_utility.create_key",
                 return_value=new_key,
             ):
                 with patch(
-                    "lagniappe.core.entities.entity.database.get.entity",
+                    "lagniappe.core.entities.entity.database_get.entity",
                     return_value=None,
                 ):
                     with patch(
-                        "lagniappe.core.entities.entity.database.create_entity",
+                        "lagniappe.core.entities.entity.database_utility.create_entity",
                         return_value=new_entity,
                     ):
                         with patch(
@@ -869,7 +869,7 @@ def test_user_entity_create_save_load_owner_page_and_groups():
     assert created.is_test_user is True
     assert created.groups == [group]
     assert created.db["groups"] == [group.key]
-    assert created.urlsafe_key == database.get.urlsafe_key(created.key)
+    assert created.urlsafe_key == database_get.urlsafe_key(created.key)
     assert created.urlsafe_key != page.urlsafe_key
     assert created.details["id"] == page.urlsafe_key
     assert created.to_cache == {}
@@ -899,7 +899,7 @@ def test_user_entity_create_save_load_owner_page_and_groups():
     raw = SimpleNamespace(key=loaded.key)
 
     with patch(
-        "lagniappe.core.entities.user.database.get.user",
+        "lagniappe.core.entities.user.database_get.user",
         return_value=raw,
     ) as get_user:
         with patch(
@@ -935,19 +935,19 @@ def test_user_create_does_not_leave_initial_cache_invalidation():
         SimpleNamespace(ADMIN_EMAIL="initial-cache@example.test"),
     ):
         with patch(
-            "lagniappe.core.entities.user.database.get.user",
+            "lagniappe.core.entities.user.database_get.user",
             return_value=None,
         ):
             with patch(
-                "lagniappe.core.entities.entity.database.create_key",
+                "lagniappe.core.entities.entity.database_utility.create_key",
                 return_value=new_key,
             ):
                 with patch(
-                    "lagniappe.core.entities.entity.database.get.entity",
+                    "lagniappe.core.entities.entity.database_get.entity",
                     return_value=None,
                 ):
                     with patch(
-                        "lagniappe.core.entities.entity.database.create_entity",
+                        "lagniappe.core.entities.entity.database_utility.create_entity",
                         return_value=new_entity,
                     ):
                         with patch(
@@ -986,19 +986,19 @@ def test_user_create_public_user_assigns_public_group():
     new_entity = Entity(new_key)
 
     with patch(
-        "lagniappe.core.entities.user.database.get.user",
+        "lagniappe.core.entities.user.database_get.user",
         return_value=None,
     ):
         with patch(
-            "lagniappe.core.entities.entity.database.create_key",
+            "lagniappe.core.entities.entity.database_utility.create_key",
             return_value=new_key,
         ):
             with patch(
-                "lagniappe.core.entities.entity.database.get.entity",
+                "lagniappe.core.entities.entity.database_get.entity",
                 return_value=None,
             ):
                 with patch(
-                    "lagniappe.core.entities.entity.database.create_entity",
+                    "lagniappe.core.entities.entity.database_utility.create_entity",
                     return_value=new_entity,
                 ):
                     with patch(

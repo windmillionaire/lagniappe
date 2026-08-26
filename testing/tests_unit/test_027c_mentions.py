@@ -56,13 +56,13 @@ def test_mentions_validate_saved_occurrences_dedupe_and_sanitize(monkeypatch):
         mention_service.Entities, "fetch", lambda *_args, **_kwargs: [recipient]
     )
     monkeypatch.setattr(
-        mention_service.database,
+        mention_service.database_notifications,
         "ensure_notification_aggregate",
         lambda _user: {},
     )
     deliveries = []
     monkeypatch.setattr(
-        mention_service.database,
+        mention_service.database_mentions,
         "create_mention_delivery",
         lambda *args: deliveries.append(args)
         or (True, None, "document-mention-notification-key"),
@@ -138,4 +138,3 @@ def test_mention_delivery_ledger_survives_notification_replay(monkeypatch):
         and row.get("notification_type") == "ordinary"
     ]
     assert len(notification_rows) == 1
-

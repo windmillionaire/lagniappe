@@ -8,7 +8,7 @@ from ..mixins import (
     RelatedEntityListMixin,
     RelatedEntityMixin,
 )
-from ..tools import database
+from lagniappe.core.tools.database import get as database_get
 from .base_db import DBProperty
 from .base_property import Property
 
@@ -179,7 +179,7 @@ class PageFiles(RelatedEntityListMixin, Property):
 
         file_keys = [
             getattr(file, "key", file)
-            for file in database.get.page_files(self.entity.key)
+            for file in database_get.page_files(self.entity.key)
             if getattr(file, "key", file)
         ]
         loaded = (
@@ -224,7 +224,7 @@ class PageUser(RelatedEntityMixin, DBProperty):
 
     @property
     def urlsafe_key(self):
-        return database.get.urlsafe_key(self.entity.db.get(self.id))
+        return database_get.urlsafe_key(self.entity.db.get(self.id))
 
 
 # @testable true

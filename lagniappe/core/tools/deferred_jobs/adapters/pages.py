@@ -12,7 +12,9 @@ from lagniappe.core.definitions import (
     Fetch,
 )
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import ai, database
+from lagniappe.core.tools import ai
+from lagniappe.core.tools.database import get as database_get
+from lagniappe.core.tools.database import utility as database_utility
 
 from .base import DeferredJobAdapter
 
@@ -72,10 +74,10 @@ class PageGenerationAdapter(DeferredJobAdapter):
         generated = ai.generate_pages(prompt, form_schema=form_schema)
         records = []
         for item in generated:
-            key = database.create_key("page", None)
+            key = database_utility.create_key("page", None)
             records.append(
                 {
-                    "key": database.get.urlsafe_key(key),
+                    "key": database_get.urlsafe_key(key),
                     "page": item,
                 }
             )
@@ -124,7 +126,7 @@ class PageGenerationAdapter(DeferredJobAdapter):
                     "description": description,
                 }
             )
-            page._key = database.get.datastore_key(record["key"])
+            page._key = database_get.datastore_key(record["key"])
             if generated.get("document"):
                 page.properties.document.html = generated["document"]
             if form and submission:

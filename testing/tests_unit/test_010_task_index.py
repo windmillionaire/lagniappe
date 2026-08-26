@@ -430,11 +430,11 @@ def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
 
     with patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for):
         with patch(
-            "lagniappe.core.entities.index.database.get.tasks_with_due_dates",
+            "lagniappe.core.entities.index.database_get.tasks_with_due_dates",
             return_value=SimpleNamespace(results=["dated-key"], next_cursor=None),
         ) as dated_query:
             with patch(
-                "lagniappe.core.entities.index.database.get.tasks_without_due_dates"
+                "lagniappe.core.entities.index.database_get.tasks_without_due_dates"
             ) as undated_query:
                 with patch(
                     "lagniappe.core.entities.index.Entities.fetch",
@@ -464,11 +464,11 @@ def test_task_index_paginates_dated_then_undated_tasks_with_restrictions():
 
     with patch("lagniappe.core.entities.index.url_for", side_effect=fake_url_for):
         with patch(
-            "lagniappe.core.entities.index.database.get.tasks_with_due_dates",
+            "lagniappe.core.entities.index.database_get.tasks_with_due_dates",
             return_value=SimpleNamespace(results=[], next_cursor="ignored"),
         ) as dated_query:
             with patch(
-                "lagniappe.core.entities.index.database.get.tasks_without_due_dates",
+                "lagniappe.core.entities.index.database_get.tasks_without_due_dates",
                 return_value=SimpleNamespace(
                     results=["undated-key"], next_cursor="cursor-2"
                 ),

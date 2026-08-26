@@ -16,7 +16,7 @@ import pytest
 
 from lagniappe.core.definitions import Fetch
 from lagniappe.core.entities import Entities
-from lagniappe.core.tools import database
+from lagniappe.core.tools.database import get as database_get
 from testing.definitions import Categories, Forms, SitePages, Uploads, Users
 from testing.elements import IngressWizard, SpinnerButtons
 from testing.resources import File
@@ -80,7 +80,7 @@ def _create_task_target_pages(user):
     existing_names = {
         page.name
         for page in Entities.fetch(
-            *database.get.pages(category.key, limit=None).results,
+            *database_get.pages(category.key, limit=None).results,
             request=Fetch.direct(),
         )
     }

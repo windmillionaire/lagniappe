@@ -251,7 +251,7 @@ def test_users_category_uses_users_scope_not_models_scope():
     )
 
     with patch(
-        "lagniappe.core.entities.category.database.get.reserved",
+        "lagniappe.core.entities.category.database_get.reserved",
         return_value=reserved,
     ) as reserved_get:
         loaded_users_category = Entities.USERS.get()

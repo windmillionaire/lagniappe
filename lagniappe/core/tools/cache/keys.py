@@ -6,7 +6,8 @@ from enum import Enum
 
 from lagniappe import CONFIG
 
-from ...definitions import DefaultEnum, Restriction
+from ...definitions.default import DefaultEnum
+from ...restrictions import Restriction
 
 SEARCH_SCORE_FIELD = "search_score"
 

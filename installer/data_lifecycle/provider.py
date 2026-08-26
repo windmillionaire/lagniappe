@@ -1008,7 +1008,7 @@ class ProviderContext:
 
     def run_runtime_action(self, action: str, database_id: str):
         action = str(action or "").strip()
-        if action not in {"migrate", "rebuild-cache"}:
+        if action != "migrate":
             raise DataLifecycleError("Data-lifecycle runtime action is invalid.")
         runner = self.subprocess_runner or subprocess.run
 
@@ -1042,6 +1042,25 @@ class ProviderContext:
             raise DataLifecycleError(
                 f"Data-lifecycle runtime action {action} returned malformed output."
             ) from error
+
+    # @testable true
+    # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_cache_invalidation_uses_setup_redis_connection
+    # @matrix data-lifecycle : cache-invalidation framework-neutral restore
+    def invalidate_cache(self):
+        """Clear restored installation cache data without importing the web app."""
+        import redis
+
+        from config import SETTINGS
+        from config.redis import redis_client_kwargs
+
+        client = redis.Redis(
+            **redis_client_kwargs(
+                SETTINGS.APP,
+                socket_connect_timeout=10,
+                socket_timeout=30,
+            )
+        )
+        client.flushdb()
 
     def list_objects(self, prefix: str):
         if not prefix or prefix.startswith("/") or ".." in prefix.split("/"):

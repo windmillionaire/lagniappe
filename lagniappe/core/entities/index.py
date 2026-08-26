@@ -3,7 +3,8 @@ from flask import url_for
 from ..definitions import Action, Restriction, Fetch
 from ..entities import Entities
 from ..properties import category, index
-from ..tools import cache, database
+from ..tools import cache
+from lagniappe.core.tools.database import get as database_get
 from ..tools.auth.context import current_context_user
 from ..tools.tasks.ordering import sort_tasks
 from .site import Site
@@ -102,7 +103,7 @@ class TaskIndex(Index):
     # @matrix task-index : pagination restrictions undated
     # @pair task-index:assignee-visibility
     def undated_tasks(self):
-        db = database.get.tasks_without_due_dates(
+        db = database_get.tasks_without_due_dates(
             start_cursor=self.cursor,
             limit=self.limit,
             project=self._project,
@@ -128,7 +129,7 @@ class TaskIndex(Index):
     # @matrix task-index : dated pagination restrictions undated
     # @pair task-index:assignee-visibility
     def dated_tasks(self):
-        db = database.get.tasks_with_due_dates(
+        db = database_get.tasks_with_due_dates(
             start_cursor=self.cursor,
             limit=self.limit,
             project=self._project,
@@ -174,13 +175,13 @@ class TaskIndex(Index):
         refresh reconciler; the root pass owns membership, order, and modified
         timestamps.
         """
-        dated = database.get.tasks_with_due_dates(
+        dated = database_get.tasks_with_due_dates(
             limit=None,
             project=self._project,
             hashes=self._restrictions,
             assigned_to=self._assigned_to,
         )
-        undated = database.get.tasks_without_due_dates(
+        undated = database_get.tasks_without_due_dates(
             limit=None,
             project=self._project,
             hashes=self._restrictions,
@@ -238,7 +239,7 @@ class PageIndex(Index):
         restrictions = self.user.properties.restrictions.unrestricted_pages(self.entity)
         limit = self.limit if not self.cursor else None
 
-        db = database.get.pages(
+        db = database_get.pages(
             self.entity.key,
             start_cursor=self.cursor,
             limit=limit,
@@ -266,7 +267,7 @@ class PageIndex(Index):
     def refresh_roots(self):
         """Return every page in this category at root depth."""
         restrictions = self.user.properties.restrictions.unrestricted_pages(self.entity)
-        db = database.get.pages(
+        db = database_get.pages(
             self.entity.key,
             limit=None,
             hashes=restrictions,
@@ -311,8 +312,8 @@ class FormIndex(Index):
             self._forms = []
             return self._forms
 
-        db = database.get.forms(start_cursor=self.cursor, limit=self.limit)
-        form_users = database.get.form_users(*db.results)
+        db = database_get.forms(start_cursor=self.cursor, limit=self.limit)
+        form_users = database_get.form_users(*db.results)
         entities = Entities.fetch(*db.results, *form_users, request=Fetch.direct())
 
         self._forms = [
@@ -403,7 +404,7 @@ class UserIndex(Index):
     def _load_regular_users(self):
         restrictions = self.user.properties.restrictions.users
 
-        db = database.get.users(
+        db = database_get.users(
             start_cursor=self.cursor, hashes=restrictions, limit=self.limit
         )
         self._users = [
@@ -425,7 +426,7 @@ class UserIndex(Index):
             self._users = []
             return self._users
 
-        db = database.get.users(
+        db = database_get.users(
             start_cursor=self.cursor,
             group=self.public_group.key,
             limit=self.limit,
@@ -453,13 +454,13 @@ class UserIndex(Index):
         if self.mode == self._public_mode:
             if not self.public_users_enabled:
                 return []
-            db = database.get.users(
+            db = database_get.users(
                 group=self.public_group.key,
                 limit=None,
             )
             expected_public = True
         else:
-            db = database.get.users(
+            db = database_get.users(
                 hashes=self.user.properties.restrictions.users,
                 limit=None,
             )
@@ -499,13 +500,13 @@ class UserIndex(Index):
 
         restrictions = self.user.properties.restrictions.users
         if Restriction.is_unrestricted(restrictions):
-            groups = database.get.groups(hashes=restrictions)
+            groups = database_get.groups(hashes=restrictions)
         else:
             restricted = cache.get_details_by_hash(restrictions)
             allowed_groups = {
                 g["id"] for g in restricted.values() if g["kind"] == "group"
             }
-            groups = database.get.groups(hashes=sorted(allowed_groups))
+            groups = database_get.groups(hashes=sorted(allowed_groups))
 
         self._groups = [
             g
