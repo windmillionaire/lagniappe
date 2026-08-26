@@ -246,12 +246,18 @@ def test_lifecycle_requires_completed_asset_generation_migration(monkeypatch):
             return records.get(key)
 
     client = Client()
+    client_arguments = {}
+
+    def client_factory(**kwargs):
+        client_arguments.update(kwargs)
+        return client
+
     context = ProviderContext(
         PROJECT_ID,
         "(default)",
         BUCKET,
         "0.3.0",
-        datastore_client_factory=lambda **_kwargs: client,
+        datastore_client_factory=client_factory,
     )
     monkeypatch.setattr(SETTINGS, "APP", {"PREFIX": "test-"})
     key = (
@@ -261,6 +267,7 @@ def test_lifecycle_requires_completed_asset_generation_migration(monkeypatch):
 
     with pytest.raises(DataLifecycleError, match="select Apply Updates"):
         context.require_asset_generation_migration()
+    assert client_arguments == {"project": PROJECT_ID, "database": ""}
 
     records[key] = {
         "ledger_schema": 1,

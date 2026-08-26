@@ -557,7 +557,8 @@ class ProviderContext:
             from google.cloud import datastore
 
             factory = datastore.Client
-        return factory(project=self.project_id, database=database_id)
+        client_database_id = "" if database_id == "(default)" else database_id
+        return factory(project=self.project_id, database=client_database_id)
 
     # @testable true
     # @tests tests_tooling/test_008_data_lifecycle.py::test_lifecycle_requires_completed_asset_generation_migration
