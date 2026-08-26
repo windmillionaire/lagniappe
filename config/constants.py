@@ -205,6 +205,13 @@ INDEX_YAML = {
         {
             "kind": "instances",
             "properties": [
+                {"name": "categories"},
+                {"name": "modified", "direction": "desc"},
+            ],
+        },
+        {
+            "kind": "instances",
+            "properties": [
                 {"name": "project"},
                 {"name": "modified", "direction": "desc"},
             ],
