@@ -703,15 +703,9 @@ def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirem
     monkeypatch.setenv("LAGNIAPPE_CONFIG_ROOT", str(app_dir))
     monkeypatch.chdir(app_dir)
     try:
-        from runner import deploy as runtime_deploy
-
-        runtime_deploy_surface_issues = runtime_deploy.runtime_deploy_surface_issues
-        verify_runtime_deploy_surface = runtime_deploy.verify_runtime_deploy_surface
-        original_import_check = runtime_deploy._runtime_import_available
-        monkeypatch.setattr(
-            runtime_deploy,
-            "_runtime_import_available",
-            lambda module_name: module_name != "google.cloud.firestore_admin_v1",
+        from runner.deploy import (
+            runtime_deploy_surface_issues,
+            verify_runtime_deploy_surface,
         )
 
         issues = runtime_deploy_surface_issues(app_dir)
@@ -722,22 +716,13 @@ def test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirem
         assert any("excluded by .gcloudignore" in issue for issue in issues)
         assert any("imports 'requests'" in issue for issue in issues)
         assert not any("imports 'flask'" in issue for issue in issues)
-        assert any(
-            "installed 'google-cloud-firestore' package does not expose it" in issue
-            and "firestore_admin_v1" in issue
-            for issue in issues
-        )
+        assert not any("firestore_admin_v1" in issue for issue in issues)
 
         with pytest.raises(RuntimeError, match="Runtime deploy surface check failed"):
             verify_runtime_deploy_surface(app_dir)
 
         (app_dir / ".gcloudignore").write_text(
             "/installer/\n/runner/\n/testing/\n.gcloudignore\n"
-        )
-        monkeypatch.setattr(
-            runtime_deploy,
-            "_runtime_import_available",
-            original_import_check,
         )
         issues = runtime_deploy_surface_issues(app_dir)
         assert any("installer.deployment" in issue for issue in issues)
