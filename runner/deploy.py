@@ -1,5 +1,6 @@
 import ast
 import fnmatch
+import importlib.util
 import json
 from pathlib import Path
 import re
@@ -244,6 +245,25 @@ def _is_stdlib_module(root):
     )
 
 
+# @testable false
+# @covered-by runner/deploy.py::runtime_deploy_surface_issues
+# @reason import target normalization is exercised by deploy surface verification
+def _runtime_import_available(module_name):
+    """Return whether the installer environment exposes the runtime import."""
+    import_name = module_name.split(".", 1)[0]
+    for import_prefix in sorted(PACKAGE_IMPORTS, key=len, reverse=True):
+        if module_name == import_prefix or module_name.startswith(
+            f"{import_prefix}."
+        ):
+            import_name = import_prefix
+            break
+
+    try:
+        return importlib.util.find_spec(import_name) is not None
+    except (ImportError, ModuleNotFoundError, ValueError):
+        return False
+
+
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_runtime_deploy_surface_flags_ignored_local_imports_and_missing_requirements
 # @tests tests_tooling/test_003_config.py::test_runtime_upload_boundary_has_no_local_orchestration_imports
@@ -292,6 +312,13 @@ def runtime_deploy_surface_issues(app_dir=None):
                 issues.append(
                     f"{relative_path}:{line_number}: imports '{module_name}', "
                     f"but '{package_name}' is not in requirements.txt"
+                )
+                continue
+
+            if not _runtime_import_available(module_name):
+                issues.append(
+                    f"{relative_path}:{line_number}: imports '{module_name}', "
+                    f"but the installed '{package_name}' package does not expose it"
                 )
 
     return issues
