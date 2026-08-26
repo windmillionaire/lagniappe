@@ -1082,7 +1082,7 @@ def test_staging_selects_durable_types_and_builds_typed_identity_map(tmp_path):
             _ScanClient(rows),
             state,
             source_project=PROJECT_ID,
-            source_database="source-db",
+            source_database="(default)",
         )
         assert counts["included"] == 1
         assert counts["unknown-kind:future"] == 1

@@ -41,8 +41,17 @@ def validate_database_id(value, *, allow_default=True):
 # @pair database:named-key-encoding
 def encode_urlsafe_key(key):
     """Encode a Datastore Key, retaining a named database when present."""
-    database_id = str(getattr(key, "database", None) or DEFAULT_DATABASE_ID)
+    raw_database_id = getattr(key, "database", None)
+    database_id = str(raw_database_id or DEFAULT_DATABASE_ID)
     if database_id == DEFAULT_DATABASE_ID:
+        if raw_database_id:
+            from google.cloud.datastore import Key
+
+            key = Key(
+                *key.flat_path,
+                project=key.project,
+                namespace=key.namespace,
+            )
         return key.to_legacy_urlsafe().decode("ascii")
     from google.cloud.datastore import Key
     from google.cloud.datastore import key as key_module

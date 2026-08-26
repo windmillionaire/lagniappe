@@ -373,6 +373,19 @@ def test_database_aware_urlsafe_key_round_trip():
     assert decoded.namespace == key.namespace
     assert decoded.database == "current-db"
 
+    explicit_default = Key(
+        "instances",
+        "page-2",
+        project=CONFIG.GOOGLE_CLOUD_PROJECT,
+        namespace="owner-space",
+        database="(default)",
+    )
+    default_decoded = decode_urlsafe_key(encode_urlsafe_key(explicit_default))
+    assert default_decoded.flat_path == explicit_default.flat_path
+    assert default_decoded.project == explicit_default.project
+    assert default_decoded.namespace == explicit_default.namespace
+    assert default_decoded.database is None
+
 
 # @pair database:named-key-encoding
 @pytest.mark.unit
