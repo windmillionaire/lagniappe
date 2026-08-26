@@ -65,6 +65,14 @@ def test_setup_error_classification_and_retry_contract():
         classify_provider_error(subprocess.TimeoutExpired(["gcloud"], 1)),
         ProviderTimeout,
     )
+    stderr_only = subprocess.CalledProcessError(1, ["gcloud", "describe"])
+    assert isinstance(
+        classify_provider_error(
+            stderr_only,
+            message="gcloud describe failed: NOT_FOUND: database does not exist",
+        ),
+        ProviderNotFound,
+    )
 
     calls = []
     delays = []

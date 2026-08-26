@@ -92,7 +92,7 @@ def classify_provider_error(error, *, message=None, status_code=None):
     detail = str(message or error or "Provider operation failed.").strip()
     status = status_code if status_code is not None else _status_code(error)
     name = type(error).__name__.casefold()
-    text = f"{name} {error}".casefold()
+    text = f"{name} {error} {detail}".casefold()
 
     if isinstance(error, (subprocess.TimeoutExpired, TimeoutError)) or (
         "timeout" in name or "timed out" in text
