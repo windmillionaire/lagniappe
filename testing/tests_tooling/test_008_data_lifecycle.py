@@ -1528,7 +1528,7 @@ def test_html_archive_renders_owner_sections_and_local_navigation(tmp_path):
         created_at="2026-08-23T12:00:00Z",
         consistency="eventually consistent",
     ).build(records)
-    assert result["pages"] == 9
+    assert result["pages"] == 12
     index = (tmp_path / "site" / "index.html").read_text()
     search = (tmp_path / "site" / "search-index.js").read_text()
     category_page = (
@@ -1554,6 +1554,9 @@ def test_html_archive_renders_owner_sections_and_local_navigation(tmp_path):
     assert "Pages (1)" in index and "Conversations (private) (1)" in index
     assert "<h2>Tasks (" not in index and "<h2>Files (" not in index
     assert "Users" not in index and "Owner profile" not in index
+    assert (tmp_path / "site" / "users" / "reservedusers" / "index.html").is_file()
+    assert (tmp_path / "site" / "form" / "reservedform1" / "index.html").is_file()
+    assert (tmp_path / "site" / "page" / "profile000001" / "index.html").is_file()
     assert "Task test" in category_page
     assert "Completed page task" in archived_page
     assert "Baseline attachment" in archived_page

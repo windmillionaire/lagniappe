@@ -132,13 +132,15 @@ class OfflineHTMLBuilder:
         self._all_records = {
             self._identity(record): record for record in all_records
         }
-        self._records = [
-            record for record in all_records if self._is_site_record(record)
+        self._records = all_records
+        navigable_records = [
+            record for record in all_records if self._is_navigable_record(record)
         ]
         self._records_by_identity = {
-            self._identity(record): record for record in self._records
+            self._identity(record): record for record in navigable_records
         }
-        self._identity_set = set(self._records_by_identity)
+        self._identity_set = set(self._all_records)
+        navigable_identities = set(self._records_by_identity)
         self._assets = {asset["logical_id"]: asset for asset in assets}
         sections = defaultdict(list)
         search = []
@@ -150,12 +152,14 @@ class OfflineHTMLBuilder:
             relative = PurePosixPath(
                 "site", portable_name(semantic_type), portable_name(identity["id"]), "index.html"
             )
-            sections[semantic_type].append((title, relative.as_posix(), record))
             self._write(
                 relative,
                 self._record_page(record, title, relative.as_posix()),
             )
             pages.append(relative.as_posix())
+            if self._identity(record) not in navigable_identities:
+                continue
+            sections[semantic_type].append((title, relative.as_posix(), record))
             search.append(
                 {
                     "title": title,
@@ -577,7 +581,7 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
         identity = record["identity"]
         return identity.get("namespace") or "", identity["type"], identity["id"]
 
-    def _is_site_record(self, record):
+    def _is_navigable_record(self, record):
         identity = record["identity"]
         properties = record["properties"]
         if identity.get("reserved_role") or properties.get("reserved") is True:
