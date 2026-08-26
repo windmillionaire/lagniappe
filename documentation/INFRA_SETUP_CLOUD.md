@@ -125,6 +125,17 @@ and callback setup validates before registration.
 The runtime/login contract and detailed provider boundaries are in
 [AUTHENTICATION.md](AUTHENTICATION.md).
 
+## Redis Cloud
+
+Redis Cloud remains an operator-created dependency. During a fresh setup, the
+installer names the plan tradeoff before asking for credentials: the free 30 MB
+Essentials database is appropriate for a disposable rehearsal, while
+Lagniappe's configurable Redis TLS option requires paid Essentials/Flex or Pro.
+The database must use Google Cloud in the saved `RESOURCE_REGION`; an existing
+database is reusable only when its provider and region match. Setup then parses
+the copied Redis CLI command, validates the real connection, and saves no
+credential after a failed check.
+
 ## Domains and DNS
 
 `installer/domain/` creates or discovers the exact App Engine domain mapping,

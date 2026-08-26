@@ -112,10 +112,15 @@ def eviction_policy_instructions():
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_cloud_instructions_open_console_and_locate_credentials
-# @matrix setup : browser operator-guidance redis
+# @matrix setup : browser operator-guidance plan-selection provider-region redis redis-tls
 def redis_cloud_instructions():
-    """Open Redis Cloud and explain how to copy its Redis CLI command."""
+    """Open Redis Cloud and guide database placement and credential copying."""
+    from config import SETTINGS, constants
+
     f = FORMATTER.initialize()
+    resource_region = str(
+        SETTINGS.APP.get("RESOURCE_REGION") or constants.DEFAULT_RESOURCE_REGION
+    ).strip()
 
     print(f"\n{f.info('Configure Redis Cloud')}")
     print(
@@ -133,30 +138,46 @@ def redis_cloud_instructions():
     print(wrap_text("\n1. Sign in to Redis Cloud or create an account."))
     print(
         wrap_text(
-            "2. In Redis Cloud, open Databases and create a database or "
-            "select an existing one."
+            "2. Open Databases and create a database. For a disposable "
+            "trial/test installation, select 'Try 30 MB for free'; it is "
+            "sufficient for the rehearsal, but Lagniappe's configurable "
+            "database TLS option is unavailable on the free plan."
         )
     )
     print(
         wrap_text(
-            "3. On the database details page, find Access and click the blue "
-            "Connect button."
+            "3. For production, or to configure Redis TLS during setup, "
+            "select a paid Essentials or Pro plan instead."
         )
     )
     print(
         wrap_text(
-            "4. In the connection panel, expand Redis CLI and keep Internet "
+            "4. Under 'Select cloud provider & region', choose Cloud vendor "
+            f"'Google Cloud' and Region '{resource_region}' to match "
+            "Lagniappe's regional Google Cloud resources. An existing "
+            "database is suitable only when it has that same placement."
+        )
+    )
+    print(
+        wrap_text(
+            "5. Create the database, then find Access on its details page and "
+            "click the blue Connect button."
+        )
+    )
+    print(
+        wrap_text(
+            "6. In the connection panel, expand Redis CLI and keep Internet "
             "(public endpoint) as the connection method."
         )
     )
     print(
         wrap_text(
-            "5. Click the blue Copy button beneath the redis-cli command."
+            "7. Click the blue Copy button beneath the redis-cli command."
         )
     )
     print(
         wrap_text(
-            "6. Return to setup and paste the complete copied command when "
+            "8. Return to setup and paste the complete copied command when "
             "prompted; you do not need to run it."
         )
     )
@@ -292,8 +313,8 @@ def _enable_redis_tls():
     print(
         wrap_text(
             "Redis database TLS is available on paid Redis Cloud "
-            "Essentials/Flex and Pro plans. It is not available on Free "
-            "Essentials plans."
+            "Essentials/Flex and Pro plans. It is not available on the free "
+            "30 MB Essentials plan."
         )
     )
     print(
@@ -463,8 +484,8 @@ def _offer_redis_tls_for_fresh_install():
     print(
         wrap_text(
             "Paid Redis Cloud plans can encrypt application-to-database traffic "
-            "with TLS; Free Essentials plans cannot enable this database "
-            "setting."
+            "with TLS; the free 30 MB Essentials plan cannot enable this "
+            "database setting."
         )
     )
     consent = input(f.info("Configure Redis TLS now? [y/N]: "))

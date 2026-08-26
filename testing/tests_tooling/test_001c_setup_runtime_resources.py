@@ -749,16 +749,18 @@ def test_redis_cli_command_uses_visible_standard_input(monkeypatch, capsys):
     assert "begin with 'redis-cli' or 'redis:'" in output
 
 
-# @matrix setup : browser operator-guidance redis
+# @matrix setup : browser operator-guidance plan-selection provider-region redis redis-tls
 def test_redis_cloud_instructions_open_console_and_locate_credentials(
     monkeypatch,
     capsys,
 ):
+    from config import SETTINGS
     import installer as setup_pkg
     from installer import redis as redis_setup
 
     monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
     monkeypatch.setattr(redis_setup, "FORMATTER", _fake_formatter())
+    monkeypatch.setitem(SETTINGS.APP, "RESOURCE_REGION", "us-central1")
     opened = []
     monkeypatch.setattr(
         redis_setup.webbrowser,
@@ -769,9 +771,15 @@ def test_redis_cloud_instructions_open_console_and_locate_credentials(
     redis_setup.redis_cloud_instructions()
 
     assert opened == [redis_setup.REDIS_CLOUD_CONSOLE_URL]
-    output = capsys.readouterr().out
-    assert "open Databases and create a database" in output
-    assert "find Access and click the blue Connect button" in output
+    output = " ".join(capsys.readouterr().out.split())
+    assert "Try 30 MB for free" in output
+    assert "sufficient for the rehearsal" in output
+    assert "TLS option is unavailable on the free plan" in output
+    assert "paid Essentials or Pro plan" in output
+    assert "Cloud vendor 'Google Cloud'" in output
+    assert "Region 'us-central1'" in output
+    assert "existing database is suitable only when" in output
+    assert "find Access on its details page" in output
     assert "connection panel, expand Redis CLI" in output
     assert "blue Copy button beneath the redis-cli command" in output
     assert "Return to setup and paste the complete copied command" in output

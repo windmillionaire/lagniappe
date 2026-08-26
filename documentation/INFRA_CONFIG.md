@@ -102,7 +102,10 @@ Redis uses `REDIS_TLS`, `REDIS_CA_CERT`, and the normal endpoint/password
 settings. Enabled TLS requires a readable CA PEM and hostname verification;
 invalid TLS configuration never falls back to plaintext. Setup can embed the
 PEM as `REDIS_CA_PEM` in the recovery snapshot and materializes the fixed local
-path during recovery.
+path during recovery. The setup handoff directs operators to create or reuse a
+Redis Cloud database on Google Cloud in this same `RESOURCE_REGION`; its free
+30 MB Essentials choice is for disposable test installations, while the
+installer's configurable TLS flow requires a paid plan.
 
 Authentication settings and their public/secret boundaries are documented in
 [AUTHENTICATION.md](AUTHENTICATION.md). AI email configuration is documented in
