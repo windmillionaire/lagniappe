@@ -672,10 +672,46 @@ def _restore_query_pages(query, *, page_size):
             return
 
 
+# @testable false
+# @covered-by installer/data_lifecycle/restore_support.py::normalize_restored_database
+# @covered-by installer/data_lifecycle/restore_in_place.py::restore_generation_bound_assets
+# @reason provider reads may spell the default database differently from its write client
+def _bind_key_to_client_database(client, key):
+    """Return the same logical key using the client's database spelling."""
+    client_project = getattr(client, "project", key.project)
+    client_database_value = getattr(client, "database", key.database)
+    if str(key.project or "") != str(client_project or ""):
+        raise DataLifecycleError("Datastore write key belongs to another project.")
+    key_database = str(key.database or "")
+    client_database = str(client_database_value or "")
+    if key_database == client_database:
+        return key
+    if {key_database, client_database}.issubset({"", DEFAULT_DATABASE_ID}):
+        return Key(
+            *key.flat_path,
+            project=client_project,
+            namespace=key.namespace,
+            database=client_database_value,
+        )
+    raise DataLifecycleError("Datastore write key belongs to another database.")
+
+
+# @testable false
+# @covered-by installer/data_lifecycle/restore_support.py::normalize_restored_database
+# @covered-by installer/data_lifecycle/restore_in_place.py::restore_generation_bound_assets
+# @reason entity identity rebinding is exercised through the complete restore write paths
+def _bind_entities_to_client_database(client, entities):
+    entities = list(entities)
+    for entity in entities:
+        entity.key = _bind_key_to_client_database(client, entity.key)
+    return entities
+
+
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_normalizes_persisted_keys_before_cache_rebuild
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_discards_deferred_execution_state
-# @matrix data-lifecycle : bounded-restore-scan deferred-state-retirement restore-key-normalization
+# @tests tests_tooling/test_008_data_lifecycle.py::test_restore_default_database_writes_use_client_partition
+# @matrix data-lifecycle : bounded-restore-scan default-database-write-partition deferred-state-retirement restore-key-normalization
 def normalize_restored_database(
     client,
     *,
@@ -729,7 +765,12 @@ def normalize_restored_database(
                     keys = [entity.key for entity in page]
                     counts["entities_scanned"] += len(keys)
                     if keys:
-                        client.delete_multi(keys)
+                        client.delete_multi(
+                            [
+                                _bind_key_to_client_database(client, key)
+                                for key in keys
+                            ]
+                        )
                         counts["deferred_records_deleted"] += len(keys)
                 continue
             for page in _restore_query_pages(query, page_size=page_size):
@@ -757,10 +798,17 @@ def normalize_restored_database(
                     if any(changed.values()):
                         writes.append(entity)
                 if deletes:
-                    client.delete_multi(deletes)
+                    client.delete_multi(
+                        [
+                            _bind_key_to_client_database(client, key)
+                            for key in deletes
+                        ]
+                    )
                     counts["deferred_records_deleted"] += len(deletes)
                 if writes:
-                    client.put_multi(writes)
+                    client.put_multi(
+                        _bind_entities_to_client_database(client, writes)
+                    )
                     counts["entities_written"] += len(writes)
     return counts
 

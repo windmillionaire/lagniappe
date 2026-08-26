@@ -1078,12 +1078,16 @@ def test_restore_assets_rebinds_owner_to_new_generation(monkeypatch):
     recovery.blob(catalog_name).upload_from_string(json.dumps(catalog))
 
     class Client:
+        project = PROJECT_ID
+        database = ""
+
         def get(self, key):
             assert key == owner_key
             return owner
 
         def put_multi(self, entities):
             assert entities == [owner]
+            assert entities[0].key.database == self.database
 
     private_name = storage_bucket_names(SETTINGS.APP)["private"]
     context = SimpleNamespace(
@@ -1102,6 +1106,56 @@ def test_restore_assets_rebinds_owner_to_new_generation(monkeypatch):
     assert result == {"assets": 1, "owners": 1}
     assert owner["assets"]["document"]["generation"] == "10"
     assert target.blob("documents/page.html").payload == b"hello"
+
+
+# @matrix data-lifecycle : default-database-write-partition restore-key-normalization
+def test_restore_default_database_writes_use_client_partition():
+    explicit_default_key = Key(
+        "instances",
+        "page",
+        project=PROJECT_ID,
+        database="(default)",
+    )
+    row = _entity(
+        explicit_default_key,
+        type="page",
+        deferred_job=json.dumps({"key": "stale-job"}),
+    )
+    rows = {
+        ("", "__namespace__"): [
+            _entity(Key("__namespace__", 1, project=PROJECT_ID), value=1)
+        ],
+        ("", "__kind__"): [
+            _entity(Key("__kind__", "instances", project=PROJECT_ID), value="instances")
+        ],
+        ("", "instances"): [row],
+    }
+
+    class RestoreClient(_ScanClient):
+        project = PROJECT_ID
+        database = ""
+
+        def __init__(self, values):
+            super().__init__(values)
+            self.written = []
+
+        def put_multi(self, entities):
+            assert all(entity.key.database == self.database for entity in entities)
+            self.written.extend(entities)
+
+        def delete_multi(self, _keys):
+            raise AssertionError("default-database write fixture should not delete records")
+
+    client = RestoreClient(rows)
+    counts = restore_module.normalize_restored_database(
+        client,
+        project_id=PROJECT_ID,
+        source_database_id="(default)",
+        target_database_id="(default)",
+    )
+    assert counts["entities_written"] == 1
+    assert row.key.database == ""
+    assert "deferred_job" not in row
 
 
 def _entity(key, **values):

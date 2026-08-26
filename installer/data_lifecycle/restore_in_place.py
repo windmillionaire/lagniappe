@@ -23,6 +23,7 @@ from .provider import (
 from .recovery_set import _blob_sha256, inventory_database
 from .restore_support import (
     MirroredRestoreCheckpoint,
+    _bind_entities_to_client_database,
     _compatible_locations,
     _confirm_mutation,
     _hydrate_local_checkpoint,
@@ -365,7 +366,9 @@ def restore_generation_bound_assets(context, plan):
             else definitions
         )
     if owners:
-        client.put_multi(list(owners.values()))
+        client.put_multi(
+            _bind_entities_to_client_database(client, owners.values())
+        )
     return {"assets": len(payload.get("assets") or []), "owners": len(owners)}
 
 
@@ -427,7 +430,7 @@ def reconcile_scheduled_uncomplete_tasks(context, plan, *, now=None):
             )
             queued += 1
     if changed:
-        client.put_multi(changed)
+        client.put_multi(_bind_entities_to_client_database(client, changed))
     return {"queued": queued, "backfilled": backfilled}
 
 
@@ -633,16 +636,23 @@ def restore_backup(
             context.wait_for_operation(operation, database_id=DEFAULT_DATABASE)
         checkpoint.update("import-complete", import_complete=True)
     if not checkpoint.payload.get("assets_restored"):
-        result = restore_generation_bound_assets(context, plan)
+        record_step("restore exact referenced file versions")
+        with _progress(
+            formatter,
+            "Restoring the backup's exact saved file versions",
+        ):
+            result = restore_generation_bound_assets(context, plan)
         checkpoint.update("assets-restored", assets_restored=True, asset_result=result)
     if not checkpoint.payload.get("normalized"):
-        result = normalize_restored_database(
-            context.datastore_client(DEFAULT_DATABASE),
-            project_id=context.project_id,
-            source_database_id=DEFAULT_DATABASE,
-            target_database_id=DEFAULT_DATABASE,
-            kind_prefix=plan["kind_prefix"],
-        )
+        record_step("normalize restored database state")
+        with _progress(formatter, "Normalizing restored database state"):
+            result = normalize_restored_database(
+                context.datastore_client(DEFAULT_DATABASE),
+                project_id=context.project_id,
+                source_database_id=DEFAULT_DATABASE,
+                target_database_id=DEFAULT_DATABASE,
+                kind_prefix=plan["kind_prefix"],
+            )
         checkpoint.update("normalized", normalized=True, normalization=result)
     if not checkpoint.payload.get("target_validated"):
         result = validate_restored_database(
