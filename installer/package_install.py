@@ -23,7 +23,10 @@ _SETUP_DEPENDENCIES = (
     ("certifi", "certifi", "trusted certificate authorities"),
     ("requests", "requests", "provider HTTP requests"),
     ("google.auth", "google-auth", "Google authentication"),
+    ("google.oauth2", "google-auth", "Google OAuth credentials"),
     ("google.api_core", "google-api-core", "Google API error handling"),
+    ("google.protobuf", "protobuf", "Google API message types"),
+    ("google.iam.v1", "google-cloud-iam", "Google IAM policy messages"),
     ("google.cloud.iam_admin_v1", "google-cloud-iam", "service-account setup"),
     (
         "google.cloud.resourcemanager_v3",

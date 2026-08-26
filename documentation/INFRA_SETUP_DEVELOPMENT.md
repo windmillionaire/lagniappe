@@ -55,7 +55,10 @@ passed as argument lists. Setup/config/report files use UTF-8 explicitly.
 
 Installer modes validate exact direct Python pins before importing provider
 clients, install all missing/mismatched pins in one transaction, recheck imports
-and versions, and run `pip check`. Undeclared ad-hoc installs are rejected.
+and versions, and run `pip check`. A third-party installer import must either be
+covered by that bootstrap transaction or be preceded in the same execution
+scope by `install_if_missing` for an exactly pinned distribution. A tooling AST
+contract enforces this boundary. Undeclared ad-hoc installs are rejected.
 
 Python dependency upgrades resolve direct requirements together with eager
 transitive updates, run `pip check`, and write direct pins only after validation.

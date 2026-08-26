@@ -214,6 +214,13 @@ class AssetCollector:
         return descriptors
 
     def _normalize_canonical_documents(self):
+        from installer.package_install import install_if_missing
+
+        install_if_missing(
+            "bs4",
+            "HTML parser for portable archive documents",
+            package_name="beautifulsoup4",
+        )
         from bs4 import BeautifulSoup
 
         documents = list(

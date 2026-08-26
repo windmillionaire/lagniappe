@@ -57,6 +57,13 @@ nav a{margin-right:1rem}.badges span{display:inline-block;border-radius:1rem;bac
 # @matrix portable-archive : html-sanitization no-network
 def sanitize_stored_html(value: str, *, page_path: str, identities: set[tuple[str, str, str]], assets=None) -> str:
     """Keep inert document markup and rewrite known portable links locally."""
+    from installer.package_install import install_if_missing
+
+    install_if_missing(
+        "bs4",
+        "HTML parser for portable archive documents",
+        package_name="beautifulsoup4",
+    )
     from bs4 import BeautifulSoup, Comment
 
     soup = BeautifulSoup(str(value or ""), "html.parser")

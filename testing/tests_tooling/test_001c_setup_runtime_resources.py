@@ -1,5 +1,6 @@
 """Tooling tests for setup runtime, package, and resource helpers."""
 
+import ast
 import builtins
 from contextlib import nullcontext
 import importlib.util
@@ -2901,6 +2902,112 @@ def test_upgrade_restore_ai_settings_continues_when_unavailable(monkeypatch):
     upgrade._update_ai_settings(formatter)
 
     assert settings.APP == {"AI_MODEL": "existing"}
+
+
+# @matrix setup : dependency-pins package-install
+# @source installer/package_install.py::_pinned_requirement
+def test_setup_third_party_imports_are_bootstrapped_or_jit_guarded():
+    from installer import package_install
+
+    repository_root = Path(__file__).parents[2]
+    local_roots = {
+        path.stem
+        for path in repository_root.iterdir()
+        if path.is_file() and path.suffix == ".py"
+    } | {
+        path.name
+        for path in repository_root.iterdir()
+        if path.is_dir() and (path / "__init__.py").exists()
+    }
+    baseline_imports = {
+        import_name
+        for import_name, _package_name, _explanation in package_install._SETUP_DEPENDENCIES
+    }
+
+    def covers(imported_name, dependency_name):
+        return imported_name == dependency_name or imported_name.startswith(
+            f"{dependency_name}."
+        )
+
+    violations = []
+    for path in sorted((repository_root / "installer").rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        parents = {
+            child: parent
+            for parent in ast.walk(tree)
+            for child in ast.iter_child_nodes(parent)
+        }
+
+        def scope(node):
+            current = node
+            while current is not None and not isinstance(
+                current, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef)
+            ):
+                current = parents.get(current)
+            return current
+
+        guards = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            target = node.func
+            if not (
+                (isinstance(target, ast.Name) and target.id == "install_if_missing")
+                or (isinstance(target, ast.Attribute) and target.attr == "install_if_missing")
+            ):
+                continue
+            if not node.args or not isinstance(node.args[0], ast.Constant):
+                violations.append(f"{path.relative_to(repository_root)}:{node.lineno}: dynamic JIT import")
+                continue
+            import_name = node.args[0].value
+            package_name = import_name
+            if len(node.args) >= 3 and isinstance(node.args[2], ast.Constant):
+                package_name = node.args[2].value
+            for keyword in node.keywords:
+                if keyword.arg == "package_name" and isinstance(keyword.value, ast.Constant):
+                    package_name = keyword.value.value
+            try:
+                package_install._pinned_requirement(package_name)
+            except RuntimeError as error:
+                violations.append(
+                    f"{path.relative_to(repository_root)}:{node.lineno}: {error}"
+                )
+            guards.append((str(import_name), scope(node), node.lineno))
+
+        imports = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imports.extend((alias.name, node) for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                imports.extend(
+                    (
+                        node.module
+                        if alias.name == "*"
+                        else f"{node.module}.{alias.name}",
+                        node,
+                    )
+                    for alias in node.names
+                )
+
+        for imported_name, node in imports:
+            root = imported_name.split(".", 1)[0]
+            if root in sys.stdlib_module_names or root in local_roots:
+                continue
+            if any(covers(imported_name, dependency) for dependency in baseline_imports):
+                continue
+            if any(
+                covers(imported_name, dependency)
+                and guard_scope is scope(node)
+                and guard_line < node.lineno
+                for dependency, guard_scope, guard_line in guards
+            ):
+                continue
+            violations.append(
+                f"{path.relative_to(repository_root)}:{node.lineno}: "
+                f"{imported_name} is neither bootstrapped nor JIT guarded"
+            )
+
+    assert violations == []
 
 
 # @matrix setup : dependency-pins package-install
