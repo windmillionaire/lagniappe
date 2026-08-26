@@ -154,7 +154,10 @@ replayed because their durable workflows recover from application records.
 
 ## Failure behavior
 
-`--dry-run` performs reads only and reports overwrite/recreate counts. A
+`--dry-run` performs reads only, reports overwrite/recreate counts, and ends
+with an explicit confirmation that no provider or application resources were
+changed. Its safety-clone collision guard uses the database-list API so the
+expected absence of the proposed clone is not presented as a provider error. A
 mutating run stores local and secret-free remote journal checkpoints and resumes
 only the same project/manual backup.
 

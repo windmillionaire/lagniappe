@@ -8,7 +8,6 @@ import json
 import os
 
 from config.datastore import decode_urlsafe_key, encode_urlsafe_key
-from installer.errors import ProviderNotFound
 from installer.state import record_mutation, record_step
 
 from .backup import CONSISTENCY_NOTICE, load_backup
@@ -72,7 +71,7 @@ def _merge_counts(context, manifest):
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_dry_run_is_deterministic_and_read_only
-# @matrix data-lifecycle : dry-run in-place-merge restore-preflight
+# @matrix data-lifecycle : dry-run in-place-merge restore-preflight safety-collision
 def restore_plan(backup_id, context=None):
     """Perform a read-only preflight for an in-place default-database merge."""
     context = context or ProviderContext.from_settings()
@@ -110,11 +109,21 @@ def restore_plan(backup_id, context=None):
         f"lag-safety-{date}-{identity}", allow_default=False
     )
     maintenance = f"maintenance-{date}-{identity}"
-    try:
-        context.database(safety_database)
-    except ProviderNotFound:
-        pass
-    else:
+    databases = context.json_command(["firestore", "databases", "list"])
+    if not isinstance(databases, list) or any(
+        not isinstance(database, dict) for database in databases
+    ):
+        raise DataLifecycleError("Provider returned a malformed database list.")
+    database_ids = set()
+    for database in databases:
+        database_id = database.get("databaseId") or database.get("database_id")
+        name = str(database.get("name") or "")
+        if not database_id and "/databases/" in name:
+            database_id = name.rsplit("/databases/", 1)[-1]
+        if not database_id:
+            raise DataLifecycleError("Provider returned a malformed database list.")
+        database_ids.add(validate_database_id(database_id))
+    if safety_database in database_ids:
         raise DataLifecycleError(
             f"Proposed safety database already exists: {safety_database}"
         )
@@ -422,9 +431,10 @@ def _completion_record(context, plan, checkpoint):
 
 
 # @testable true
+# @tests tests_tooling/test_008_data_lifecycle.py::test_restore_dry_run_is_deterministic_and_read_only
 # @tests tests_tooling/test_008_data_lifecycle.py::test_in_place_restore_is_confirmed_resumable_and_has_no_rollback
 # @tests tests_tooling/test_008_data_lifecycle.py::test_in_place_restore_rejects_legacy_named_database_checkpoint
-# @matrix data-lifecycle : confirmation in-place-merge legacy-journal-rejection queue-purge-audit remote-journal restore resume
+# @matrix data-lifecycle : confirmation dry-run in-place-merge legacy-journal-rejection queue-purge-audit remote-journal restore resume
 def restore_backup(
     backup_id,
     *,
@@ -439,6 +449,7 @@ def restore_backup(
     if dry_run:
         plan = restore_plan(backup_id, context=context)
         _print_plan(plan)
+        print("Dry run complete. No provider or application resources were changed.")
         return plan
 
     local = checkpoint or LifecycleCheckpoint(context.project_id, ["restore", backup_id])

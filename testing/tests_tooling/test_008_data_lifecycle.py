@@ -1876,13 +1876,16 @@ class _RestoreContext:
     application_version = "0.3.0"
     recovery_bucket = BUCKET
 
+    def __init__(self):
+        self.database_ids = {"(default)"}
+
     def require_asset_generation_migration(self, database_id):
         assert database_id == "(default)"
         return {"migration_id": "AST-001", "state": "complete"}
 
     def database(self, database_id=None):
         if database_id not in {None, "(default)"}:
-            raise ProviderNotFound("absent")
+            raise AssertionError("restore preflight must list databases")
         return {"type": "DATASTORE_MODE", "locationId": "nam5"}
 
     def datastore_client(self, database_id):
@@ -1890,6 +1893,14 @@ class _RestoreContext:
         return SimpleNamespace(get_multi=lambda keys: [])
 
     def json_command(self, arguments):
+        if arguments[:3] == ["firestore", "databases", "list"]:
+            return [
+                {
+                    "name": f"projects/{PROJECT_ID}/databases/{database_id}",
+                    "databaseId": database_id,
+                }
+                for database_id in sorted(self.database_ids)
+            ]
         if arguments[:3] == ["tasks", "queues", "describe"]:
             if arguments[3] == "lagniappe-tasks":
                 return {"state": "RUNNING"}
@@ -2114,8 +2125,8 @@ def test_in_place_restore_rejects_legacy_named_database_checkpoint(tmp_path):
             )
 
 
-# @matrix data-lifecycle : dry-run in-place-merge restore-preflight
-def test_restore_dry_run_is_deterministic_and_read_only(monkeypatch):
+# @matrix data-lifecycle : dry-run in-place-merge restore-preflight safety-collision
+def test_restore_dry_run_is_deterministic_and_read_only(monkeypatch, capsys):
     monkeypatch.setattr(restore_in_place, "load_backup", lambda *_args: (_manifest(), object()))
     monkeypatch.setattr(
         restore_in_place,
@@ -2144,6 +2155,22 @@ def test_restore_dry_run_is_deterministic_and_read_only(monkeypatch):
     assert first["provider_observations"]["reconciler_state"] == "PAUSED"
     assert "target_queue" not in first
     assert any("purge the configured" in step for step in first["sequence"])
+
+    occupied = _RestoreContext()
+    occupied.database_ids.add(first["safety_database"])
+    with pytest.raises(DataLifecycleError, match="safety database already exists"):
+        restore_module.restore_plan(BACKUP_ID, context=occupied)
+
+    result = restore_module.restore_backup(
+        BACKUP_ID,
+        dry_run=True,
+        context=_RestoreContext(),
+    )
+    assert result == first
+    assert (
+        "Dry run complete. No provider or application resources were changed."
+        in capsys.readouterr().out
+    )
 
 
 # @matrix data-lifecycle : owner-invariant restore-validation
