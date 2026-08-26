@@ -10,6 +10,7 @@ pytestmark = pytest.mark.e2e
 
 
 # @matrix admin cache disaster-recovery : no-store status
+# @pair permissions:no-store
 # @template home/admin.html::backups_tab
 def test_backups_tab_reveals_static_status_panel(get_user):
     owner = get_user(Users.OWNER)
@@ -19,6 +20,7 @@ def test_backups_tab_reveals_static_status_panel(get_user):
     ) as response_info:
         owner.go(SitePages.ADMIN)
     assert response_info.value.headers["cache-control"] == "no-store"
+    assert "etag" not in response_info.value.headers
 
     backups = owner.locate("#backups")
     owner.locate("#tabs button[lp-show='backups:active']").click()

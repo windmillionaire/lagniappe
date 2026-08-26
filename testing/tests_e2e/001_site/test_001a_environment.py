@@ -33,6 +33,7 @@ Test Isolation Strategy:
 
 import json
 import os
+from types import SimpleNamespace
 from urllib.parse import urlsplit
 
 import pytest
@@ -331,6 +332,21 @@ def test_authenticated_home_response_headers_include_etag(get_user):
     assert_same_etag(uncached.headers.get("etag"), headers["etag"])
     assert uncached.headers["content-type"].startswith("text/html")
     assert '<div lp-view data-kind="home"' in uncached.text
+
+
+# @matrix cache : deployment-id etag
+def test_dynamic_etag_changes_with_deployment_identity(monkeypatch):
+    """Backend/template-only deploys must invalidate dynamic response ETags."""
+    from lagniappe.web import auth
+
+    user = SimpleNamespace(authorization_fingerprint="viewer")
+    monkeypatch.setenv("GAE_DEPLOYMENT_ID", "deployment-a")
+    first = auth._etag_fingerprint("resource", user)
+
+    monkeypatch.setenv("GAE_DEPLOYMENT_ID", "deployment-b")
+    second = auth._etag_fingerprint("resource", user)
+
+    assert first != second
 
 
 # @matrix location session timezone : atomic-update coordinates validation

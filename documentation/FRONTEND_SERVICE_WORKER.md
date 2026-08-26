@@ -59,6 +59,13 @@ functionally incorrect. `/l/ping` bypasses the worker entirely. Neither caller
 adds request-side `no-store` or `Cache-Control` directives: cacheability is
 server-owned through `g.NO_CACHE` and the application `after_request` hook.
 
+Permission-protected routes that require live content declare
+`@permission(..., no_store=True)`. This establishes `Cache-Control: no-store`
+before conditional request handling, prevents a server-side `304`, and makes
+the worker discard any older response cached for that URL. Setting the policy
+only inside the route handler is too late because the permission decorator may
+complete a matching conditional request without invoking the handler.
+
 Conditional requests are cloned from the original `FetchEvent` request so
 navigation redirect handling is preserved. Redirected and `opaqueredirect`
 responses are returned to the browser but discarded from the service-worker
@@ -79,6 +86,11 @@ ETags travel with cached responses. The flow is:
 3. If the server returns 304, serve the cached body with the unchanged marker
 4. If the server returns 200, replace the cached response
 5. If 304 arrives but no cached response exists (edge case), re-fetch without the ETag
+
+Ordinary dynamic ETags include the App Engine deployment identity as well as
+the frontend `BUILD_ID`. The deployment component invalidates server-rendered
+HTML after backend or template-only deploys; `BUILD_ID` remains the identity of
+the prebuilt frontend artifacts and service worker.
 
 ## Cache Invalidation
 

@@ -15,6 +15,21 @@ fetch scope, HTTP caching, and shared polling. The primary implementation is in
 5. checks `If-None-Match` only after authorization; and
 6. passes the typed entity as `kwargs["entity"]`.
 
+Routes whose responses must never be reused declare that policy at the
+authorization boundary:
+
+```python
+@permission(Resource.SITE, no_store=True)
+def admin():
+    return responses.admin_page()
+```
+
+`no_store=True` sets the response policy before authentication or conditional
+request handling and skips ETag generation. This is required for live provider
+status, dynamic forms, and downloads that must not be served from browser or
+service-worker storage. Do not set `g.NO_CACHE` inside such a handler: an
+`If-None-Match` request can otherwise receive `304` before the handler runs.
+
 The fixed authorization fetch uses the session user, user page, and requested
 entity as explicit roots. One batch resolves missing roots and a second attaches
 one relation level. This supplies groups, starred entities, the user page's
@@ -107,10 +122,18 @@ Datastore mutation or Redis query construction.
 
 ## ETags and collection fingerprints
 
-Entity permission decorators set `g.fingerprint`. The response hook combines
-that fingerprint with `BUILD_ID` and emits an ETag. A subsequent request may
-send `If-None-Match`; the decorator returns `304` only after authenticating and
-authorizing it.
+Entity permission decorators set `g.fingerprint`. The fingerprint combines the
+resource revision, App Engine deployment identity, frontend `BUILD_ID`, and
+viewer's authorization fingerprint before the response hook emits an ETag. A
+subsequent request may send `If-None-Match`; the decorator returns `304` only
+after authenticating and authorizing it. The deployment identity invalidates
+server-rendered HTML after backend or template-only deployments even when the
+publish-only installer correctly reuses the existing frontend build.
+
+Permission routes declared `no_store=True` do not set `g.fingerprint` and never
+answer a conditional request with `304`. Their `Cache-Control: no-store`
+response also causes the service worker to discard any older stored response
+for that URL.
 
 Collection pages use site fingerprints attached by `responses.index()`. These
 drive focused browser refreshes and are separate from HTTP ETags.

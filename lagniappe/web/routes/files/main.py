@@ -52,7 +52,7 @@ def info(key, **kwargs):
 # @matrix file : download filename mimetype
 # @pair file:attached-pages
 @files.route("/<key>/download", methods=["GET"])
-@permission(Resource.FILE, Action.VIEW)
+@permission(Resource.FILE, Action.VIEW, no_store=True)
 def download(key, **kwargs):
     entity = kwargs["entity"]
     if not isinstance(entity, Entities.FILE):

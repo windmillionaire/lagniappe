@@ -1,6 +1,6 @@
 import json
 
-from flask import abort, g, request
+from flask import abort, request
 from flask_login import current_user
 
 from lagniappe.core import exceptions
@@ -183,7 +183,7 @@ def move(key, **kwargs):
 # @matrix task-combine : authorization compatible delta linked-page migrate-history no-model same-model same-page view-page
 # @pair web-headers:no-store
 @tasks.route("<key>/combine", methods=["GET", "PUT"])
-@permission(Resource.TASK, Action.DELETE)
+@permission(Resource.TASK, Action.DELETE, no_store=True)
 def combine(key, **kwargs):
     task = kwargs["entity"]
     page_key = request.args.get("page")
@@ -192,7 +192,6 @@ def combine(key, **kwargs):
         abort(404)
 
     if request.method == "GET":
-        g.NO_CACHE = True
         compatible = task_combine.compatible_tasks(task, page, current_user)
         return responses.task_combine_form(task, compatible)
 

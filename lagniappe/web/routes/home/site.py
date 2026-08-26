@@ -186,9 +186,8 @@ def site_update():
 # @tests tests_e2e/008_users/test_008c_user_settings.py::test_additional_admin_cannot_access_owner_configuration
 # @matrix admin : admin-only metadata public-preview site-settings
 @internal.route("/site-settings", methods=["GET"])
-@permission(Resource.SITE)
+@permission(Resource.SITE, no_store=True)
 def site_settings():
-    g.NO_CACHE = True
     project_id = CONFIG.GOOGLE_CLOUD_PROJECT
     google_console_url = "https://console.cloud.google.com"
 

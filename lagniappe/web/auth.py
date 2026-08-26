@@ -1,14 +1,18 @@
 """Route authorization decorators.
 
-Every decorator follows a common pattern:
+Permission decorators normally follow this pattern:
 1. Check authentication (401 if not logged in)
 2. Load the entity from the URL key (404 if missing)
 3. Set g.fingerprint for ETag caching on GET requests (304 if unchanged)
 4. Check permission (403 if denied)
 5. Pass the loaded entity to the route via ``entity=`` kwarg
+
+Routes declared ``no_store=True`` set the response cache policy before loading
+authorization context and skip ETag handling entirely.
 """
 
 import hashlib
+import os
 from functools import wraps
 
 from flask import abort, current_app, g, request, session
@@ -51,14 +55,22 @@ def verify_google_csrf(response):
 
 # @testable true
 # @tests tests_e2e/001_site/test_001a_environment.py::test_authenticated_home_response_headers_include_etag
+# @tests tests_e2e/001_site/test_001a_environment.py::test_dynamic_etag_changes_with_deployment_identity
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_route_is_forbidden_without_model_or_page_permission
-# @matrix cache : build-id etag permissions
+# @matrix cache : build-id deployment-id etag permissions
 def _etag_fingerprint(base_fingerprint, user):
-    """Hash the resource fingerprint, build id, and viewer authorization."""
+    """Hash resource, deployment, frontend build, and viewer authorization."""
     authorization = getattr(user, "authorization_fingerprint", None)
     if authorization is None:
         authorization = user.permissions_fingerprint
-    value = f"{base_fingerprint}-{CONFIG.BUILD_ID}-{authorization}"
+    deployment_id = (
+        os.environ.get("GAE_DEPLOYMENT_ID")
+        or os.environ.get("GAE_VERSION")
+        or CONFIG.VERSION
+    )
+    value = (
+        f"{base_fingerprint}-{deployment_id}-{CONFIG.BUILD_ID}-{authorization}"
+    )
     return hashlib.md5(value.encode("utf-8")).hexdigest()
 
 
@@ -292,9 +304,10 @@ def _load_request_context(entity_identifier=None):
 
 # @testable true
 # @tests tests_e2e/002_home/test_002h_home_permissions.py::test_one_category_permissions
+# @tests tests_e2e/008_users/test_008d_admin_data_protection.py::test_backups_tab_reveals_static_status_panel
 # @tests tests_e2e/006_tasks/test_006d_task_permissions.py::test_task_route_is_forbidden_without_model_or_page_permission
-# @matrix permissions : authorization-before-cache etag resource-gates
-def permission(resource=None, requested=None):
+# @matrix permissions : authorization-before-cache etag no-store resource-gates
+def permission(resource=None, requested=None, *, no_store=False):
     """Check route access using the fixed direct request-auth graph."""
 
     # @testable false
@@ -306,6 +319,8 @@ def permission(resource=None, requested=None):
         # @reason route wrapper behavior is owned by the parent decorator contract
         @wraps(f)
         def wrapped(*args, **kwargs):
+            if no_store:
+                g.NO_CACHE = True
             user, entity = _load_request_context(kwargs.get("key"))
             if not user.is_authenticated:
                 abort(401)
@@ -317,7 +332,7 @@ def permission(resource=None, requested=None):
             if kwargs.get("key") and not entity:
                 abort(404)
 
-            if request.method == "GET":
+            if request.method == "GET" and not no_store:
                 base_fingerprint = (
                     entity.fingerprint
                     if entity
@@ -333,7 +348,11 @@ def permission(resource=None, requested=None):
             if not allowed:
                 abort(403)
 
-            if request.method == "GET" and _fingerprint_matches_etag():
+            if (
+                request.method == "GET"
+                and not no_store
+                and _fingerprint_matches_etag()
+            ):
                 return "", 304
 
             if entity:
