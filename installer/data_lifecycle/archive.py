@@ -569,7 +569,7 @@ def build_archive(
         ):
             if not operation:
                 operation, _payload = context.start_import(
-                    backup.export_metadata_uri, scratch_database
+                    backup.export_output_prefix, scratch_database
                 )
                 checkpoint.update("scratch-import-started", import_operation=operation)
             context.wait_for_operation(operation, database_id=scratch_database)

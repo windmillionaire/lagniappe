@@ -426,14 +426,14 @@ class ProviderContext:
             raise DataLifecycleError("Provider did not return a valid restore operation name.")
         return name, payload
 
-    def start_import(self, metadata_uri: str, database_id: str):
-        parse_gs_uri(metadata_uri)
+    def start_import(self, output_prefix: str, database_id: str):
+        parse_gs_uri(output_prefix)
         database_id = validate_database_id(database_id)
         payload = self.json_command(
             [
                 "firestore",
                 "import",
-                metadata_uri,
+                output_prefix,
                 f"--database={database_id}",
                 "--async",
             ],

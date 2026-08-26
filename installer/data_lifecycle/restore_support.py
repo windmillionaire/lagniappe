@@ -122,7 +122,7 @@ def _validate_in_place_restore_plan(plan):
         "runtime_service_account",
         "original_traffic",
         "traffic_split_by",
-        "export_metadata_uri",
+        "export_output_prefix",
         "assets_uri",
         "kind_prefix",
         "owner_email",

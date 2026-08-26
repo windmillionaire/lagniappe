@@ -170,7 +170,7 @@ def restore_plan(backup_id, context=None):
         "safety_database": safety_database,
         "backup_source_database": backup.source_database_id,
         "database_location": backup.database_location,
-        "export_metadata_uri": backup.export_metadata_uri,
+        "export_output_prefix": backup.export_output_prefix,
         "assets_uri": backup.assets_uri,
         "queue": queue,
         "queue_location": region,
@@ -547,7 +547,7 @@ def restore_backup(
         operation = checkpoint.payload.get("import_operation")
         if not operation:
             operation, _payload = context.start_import(
-                plan["export_metadata_uri"], DEFAULT_DATABASE
+                plan["export_output_prefix"], DEFAULT_DATABASE
             )
             checkpoint.update("import-started", import_operation=operation)
         context.wait_for_operation(operation, database_id=DEFAULT_DATABASE)

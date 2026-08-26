@@ -466,6 +466,38 @@ def test_database_creation_uses_current_operation_gcloud_contract():
     assert timeout == 120
 
 
+# @matrix data-lifecycle : database-import provider-contract
+def test_database_import_uses_export_output_prefix():
+    calls = []
+
+    def gcloud(arguments, *, timeout):
+        calls.append((arguments, timeout))
+        return {"name": OPERATION}
+
+    context = ProviderContext(
+        PROJECT_ID,
+        "(default)",
+        BUCKET,
+        "0.3.0",
+        gcloud=gcloud,
+    )
+    output_prefix = f"gs://{BUCKET}/recovery-set/datastore/export-1"
+
+    operation, _payload = context.start_import(output_prefix, "scratch-db")
+
+    arguments, timeout = calls[0]
+    assert operation == OPERATION
+    assert arguments[:5] == [
+        "firestore",
+        "import",
+        output_prefix,
+        "--database=scratch-db",
+        "--async",
+    ]
+    assert ".overall_export_metadata" not in arguments[2]
+    assert timeout == 120
+
+
 # @matrix data-lifecycle : private-state resume
 def test_secure_directory_and_checkpoint_exact_resume(tmp_path):
     private = secure_directory(tmp_path / "private")
@@ -1464,7 +1496,9 @@ def test_archive_build_publishes_manifest_last_and_retains_failed_scratch_state(
                 "name": f"projects/{PROJECT_ID}/databases/{database_id}/operations/create-1"
             }
 
-        def start_import(self, *_args, **_kwargs):
+        def start_import(self, uri, database):
+            assert uri == _manifest().export_output_prefix
+            assert database.startswith("lag-archive-")
             return OPERATION, {}
 
         def wait_for_operation(self, *_args, **_kwargs):
@@ -1838,7 +1872,7 @@ def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
         "runtime_service_account": f"runtime@{PROJECT_ID}.iam.gserviceaccount.com",
         "original_traffic": {"current": 1.0},
         "traffic_split_by": "random",
-        "export_metadata_uri": "gs://recovery-demo1/export/metadata",
+        "export_output_prefix": "gs://recovery-demo1/export/output-prefix",
         "assets_uri": "gs://recovery-demo1/assets.json",
         "kind_prefix": "",
         "owner_email": "owner@example.com",
@@ -1998,7 +2032,7 @@ def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
     )
     assert restored == plan
     assert checkpoint.load()["status"] == "complete"
-    assert ("import", plan["export_metadata_uri"], "(default)") in context.calls
+    assert ("import", plan["export_output_prefix"], "(default)") in context.calls
     assert ("resume-queue", "lagniappe-tasks", "us-central1") in context.calls
     assert ("invalidate-cache",) in context.calls
     assert ("delete", "lag-safety-test") in context.calls
