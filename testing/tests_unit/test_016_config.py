@@ -49,7 +49,7 @@ def _disabled_ai_email_config():
     }
 
 
-# @matrix config : ai-email build-id constants public-projection secrets stale-settings
+# @matrix config : ai-email build-id constants optional-providers public-projection secrets stale-settings
 def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
     app_settings = {
         "CONFIG_KIND": "lagniappe-settings",
@@ -101,6 +101,8 @@ def test_config_prefers_tracked_build_id_over_app_settings(monkeypatch):
     assert module.CONFIG.AI_OBSERVABILITY is False
     assert module.CONFIG.GOOGLE_SIGNIN_ENABLED is True
     assert module.CONFIG.GOOGLE_CLIENT_ID == ""
+    assert module.CONFIG.CUSTOM_DOMAIN == ""
+    assert module.CONFIG.CLOUDFLARE_ACCOUNT_ID == ""
     assert module.CONFIG.REDIS_TLS is False
     assert module.CONFIG.REDIS_CA_CERT is None
     assert module.CONFIG.SOURCE_URL == "https://example.test/default-source"

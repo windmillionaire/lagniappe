@@ -47,7 +47,7 @@ def _sample_rate(value, name):
 # @tests tests_unit/test_016_config.py::test_config_honors_ai_observability_setting
 # @tests tests_unit/test_016_config.py::test_config_honors_configured_source_url
 # @tests tests_unit/test_016_config.py::test_config_normalizes_and_validates_sentry_sample_rates
-# @matrix config : build-id constants error-reporting google-signin observability-setting source-link stale-settings
+# @matrix config : build-id constants error-reporting google-signin observability-setting optional-providers source-link stale-settings
 # @pairs ai:observability error-reporting:sampling
 class Config:
     """Application configuration."""
@@ -174,6 +174,12 @@ class Config:
         ).strip().casefold()
         self.GOOGLE_CLIENT_ID = str(
             getattr(self, "GOOGLE_CLIENT_ID", "") or ""
+        ).strip()
+        self.CUSTOM_DOMAIN = str(
+            getattr(self, "CUSTOM_DOMAIN", "") or ""
+        ).strip()
+        self.CLOUDFLARE_ACCOUNT_ID = str(
+            getattr(self, "CLOUDFLARE_ACCOUNT_ID", "") or ""
         ).strip()
         self.AI_OBSERVABILITY = getattr(
             self,
