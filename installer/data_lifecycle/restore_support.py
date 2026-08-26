@@ -859,7 +859,10 @@ def _traffic_observation(service, versions):
 # @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
 # @reason exact typed confirmation is exercised by the public in-place workflow
 def _confirm_mutation(expected, *, confirmation=None):
-    prompt = f"Type exactly '{expected}' to continue: "
+    from installer import FORMATTER
+
+    formatter = FORMATTER.initialize()
+    prompt = formatter.warning(f"Type {expected} to continue: ")
     actual = (confirmation or input)(prompt)
     if str(actual).strip() != expected:
         raise DataLifecycleError("Restore confirmation did not match; nothing changed.")

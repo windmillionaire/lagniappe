@@ -49,7 +49,7 @@ from installer.data_lifecycle.recovery_set import capture_assets, inventory_data
 from installer.data_lifecycle.staging import portable_records, stage_database
 from installer.data_lifecycle.state import ArchiveState, LifecycleCheckpoint, secure_directory
 from installer.data_lifecycle.validation import file_descriptor, validate_archive
-from installer.errors import ProviderNotFound
+from installer.errors import ProviderNotFound, ProviderTimeout
 
 
 pytestmark = pytest.mark.tooling
@@ -244,6 +244,32 @@ def test_provider_context_always_uses_default_database_and_recovery_bucket():
     assert context.recovery_bucket.startswith("test-recovery-")
 
 
+# @matrix data-lifecycle : app-engine-version provider-contract
+def test_maintenance_version_probe_uses_nonfailing_version_list():
+    calls = []
+    versions = [
+        {"id": "current", "servingStatus": "SERVING"},
+        {"id": "maintenance-test", "servingStatus": "SERVING"},
+    ]
+
+    def gcloud(arguments, *, timeout):
+        calls.append((arguments, timeout))
+        return versions
+
+    context = ProviderContext(
+        PROJECT_ID,
+        "(default)",
+        BUCKET,
+        "0.3.0",
+        gcloud=gcloud,
+    )
+
+    assert context.version_exists("maintenance-test") is True
+    assert context.version_exists("missing-version") is False
+    assert all(call[0][:3] == ["app", "versions", "list"] for call in calls)
+    assert all("describe" not in call[0] for call in calls)
+
+
 # @matrix data-lifecycle migrations : read-only asset-generation prerequisite
 def test_lifecycle_requires_completed_asset_generation_migration(monkeypatch):
     from config import SETTINGS
@@ -425,12 +451,33 @@ def test_cutover_waits_for_dispatched_task_attempts_to_settle():
     assert delays == [1]
 
 
-# @matrix data-lifecycle : failure-propagation operation-polling
+# @matrix data-lifecycle : failure-propagation operation-polling transient-retry
 def test_operation_polling_resumes_and_reports_provider_failure(monkeypatch):
-    states = iter([{"done": False}, {"done": True, "metadata": {"common": {"state": "SUCCESSFUL"}}}])
-    context = ProviderContext(PROJECT_ID, "(default)", BUCKET, "0.3", sleep=lambda _delay: None)
-    monkeypatch.setattr(context, "operation", lambda *_args, **_kwargs: next(states))
+    states = iter(
+        [
+            ProviderTimeout("transient poll timeout"),
+            {"done": False},
+            {"done": True, "metadata": {"common": {"state": "SUCCESSFUL"}}},
+        ]
+    )
+    delays = []
+    context = ProviderContext(
+        PROJECT_ID,
+        "(default)",
+        BUCKET,
+        "0.3",
+        sleep=delays.append,
+    )
+
+    def operation(*_args, **_kwargs):
+        result = next(states)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(context, "operation", operation)
     assert context.wait_for_operation(OPERATION)["done"] is True
+    assert delays == [1, 2]
     monkeypatch.setattr(context, "operation", lambda *_args, **_kwargs: {"done": True, "error": {"message": "denied"}})
     with pytest.raises(DataLifecycleError, match="denied"):
         context.wait_for_operation(OPERATION)
@@ -2169,8 +2216,10 @@ def test_restore_dry_run_is_deterministic_and_read_only(monkeypatch, capsys):
     assert result == first
     assert (
         "Dry run complete. No provider or application resources were changed."
-        in capsys.readouterr().out
+        in (dry_run_output := capsys.readouterr().out)
     )
+    assert "Restore Plan" in dry_run_output
+    assert "Proposed Recovery Sequence" in dry_run_output
 
 
 # @matrix data-lifecycle : owner-invariant restore-validation
@@ -2218,9 +2267,9 @@ def test_target_validation_requires_owner_and_reserved_models():
         )
 
 
-# @matrix data-lifecycle : confirmation in-place-merge queue-purge-audit remote-journal restore resume
+# @matrix data-lifecycle : confirmation in-place-merge progress queue-purge-audit remote-journal restore resume
 def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
-    monkeypatch, tmp_path
+    monkeypatch, tmp_path, capsys
 ):
     """The released restore is resumable and has no automatic rollback path."""
     plan = {
@@ -2392,13 +2441,16 @@ def test_in_place_restore_is_confirmed_resumable_and_has_no_rollback(
         )
     assert context.calls == []
 
+    confirmation_prompts = []
     restored = restore_module.restore_backup(
         BACKUP_ID,
         context=context,
         checkpoint=checkpoint,
-        confirmation=lambda _prompt: f"RESTORE {PROJECT_ID} {BACKUP_ID} INTO (default)",
+        confirmation=lambda prompt: confirmation_prompts.append(prompt) or "RESTORE",
     )
     assert restored == plan
+    assert confirmation_prompts == ["Type RESTORE to continue: "]
+    assert "Deploying the restore maintenance version" in capsys.readouterr().out
     assert checkpoint.load()["status"] == "complete"
     assert ("import", plan["export_output_prefix"], "(default)") in context.calls
     assert ("resume-queue", "lagniappe-tasks", "us-central1") in context.calls

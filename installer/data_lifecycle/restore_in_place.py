@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -37,6 +38,20 @@ from .state import LifecycleCheckpoint
 
 
 DEFAULT_DATABASE = "(default)"
+
+
+# @testable false
+# @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
+# @reason terminal animation wraps tested restore phases without changing their contracts
+@contextmanager
+def _progress(formatter, message):
+    with formatter.yaspin(text=formatter.success(message)) as spinner:
+        try:
+            yield spinner
+        except BaseException:
+            spinner.fail(formatter.fail_glyph)
+            raise
+        spinner.ok(formatter.ok_glyph)
 
 
 # @testable false
@@ -216,21 +231,37 @@ def restore_plan(backup_id, context=None):
 # @covered-by installer/data_lifecycle/restore_in_place.py::restore_backup
 # @reason console rendering presents an already validated restore plan
 def _print_plan(plan):
+    from installer import FORMATTER, wrap_text
+
+    formatter = FORMATTER.initialize()
     merge = plan["merge"]
-    print(f"Restore plan: {plan['restore_id']}")
-    print(f"  Manual backup: {plan['backup_id']} ({plan['consistency']})")
-    print("  Database: merge directly into (default)")
+    print(f"\n{formatter.info('Restore Plan')}")
+    print(f"  {formatter.info('Restore ID:')} {plan['restore_id']}")
     print(
-        "  Snapshot keys: "
+        f"  {formatter.info('Manual backup:')} "
+        f"{plan['backup_id']} ({plan['consistency']})"
+    )
+    print(
+        f"  {formatter.info('Database:')} "
+        f"{formatter.warning('merge directly into (default)')}"
+    )
+    print(
+        f"  {formatter.info('Snapshot keys:')} "
         f"{merge['snapshot_entities']} ({merge['overwritten']} overwritten, "
         f"{merge['restored_missing']} restored); live-only keys are preserved"
     )
-    print(f"  Safety clone: {plan['safety_database']} (removed after validation)")
-    print(f"  Queue: {plan['queue']} (paused, audited, purged, then reconciled)")
-    print(f"  {CONSISTENCY_NOTICE}")
-    print("Proposed recovery sequence:")
+    print(
+        f"  {formatter.info('Safety clone:')} {plan['safety_database']} "
+        "(removed after validation)"
+    )
+    print(
+        f"  {formatter.info('Queue:')} {plan['queue']} "
+        f"{formatter.warning('(paused, audited, purged, then reconciled)')}"
+    )
+    print(formatter.warning(wrap_text(CONSISTENCY_NOTICE)))
+    print(f"\n{formatter.info('Proposed Recovery Sequence')}")
     for number, step in enumerate(plan["sequence"], 1):
-        print(f"  {number}. {step}")
+        print(wrap_text(f"  {formatter.info(f'{number}.')} {step}"))
 
 
 # @testable false
@@ -434,7 +465,7 @@ def _completion_record(context, plan, checkpoint):
 # @tests tests_tooling/test_008_data_lifecycle.py::test_restore_dry_run_is_deterministic_and_read_only
 # @tests tests_tooling/test_008_data_lifecycle.py::test_in_place_restore_is_confirmed_resumable_and_has_no_rollback
 # @tests tests_tooling/test_008_data_lifecycle.py::test_in_place_restore_rejects_legacy_named_database_checkpoint
-# @matrix data-lifecycle : confirmation dry-run in-place-merge legacy-journal-rejection queue-purge-audit remote-journal restore resume
+# @matrix data-lifecycle : confirmation dry-run in-place-merge legacy-journal-rejection progress queue-purge-audit remote-journal restore resume
 def restore_backup(
     backup_id,
     *,
@@ -476,8 +507,18 @@ def restore_backup(
     if plan.get("application_version") != context.application_version:
         raise DataLifecycleError("Restore checkpoint belongs to another application version.")
     _print_plan(plan)
-    expected = f"RESTORE {context.project_id} {backup_id} INTO (default)"
-    _confirm_mutation(expected, confirmation=confirmation)
+    from installer import FORMATTER, wrap_text
+
+    formatter = FORMATTER.initialize()
+    print(
+        formatter.warning(
+            wrap_text(
+                "This operation will place the application in maintenance and "
+                "modify live data."
+            )
+        )
+    )
+    _confirm_mutation("RESTORE", confirmation=confirmation)
     checkpoint = MirroredRestoreCheckpoint(local, context)
     if not state:
         checkpoint.start(plan["restore_id"], backup_id=backup_id, plan=plan)
@@ -487,9 +528,15 @@ def restore_backup(
     if not checkpoint.payload.get("maintenance_deployed"):
         record_step("deploy zero-traffic restore maintenance version")
         if not context.version_exists(plan["maintenance_version"]):
-            context.deploy_maintenance_version(
-                plan["maintenance_version"], plan["runtime_service_account"]
-            )
+            with _progress(
+                formatter,
+                "Deploying the restore maintenance version "
+                "(this may take several minutes)",
+            ):
+                context.deploy_maintenance_version(
+                    plan["maintenance_version"],
+                    plan["runtime_service_account"],
+                )
         checkpoint.update("maintenance-deployed", maintenance_deployed=True)
     if not checkpoint.payload.get("scheduler_paused"):
         context.pause_scheduler(plan["reconciler"], plan["queue_location"])
@@ -507,7 +554,12 @@ def restore_backup(
         # App Engine standard requests may continue on their selected version
         # after the traffic switch. Drain one full request deadline before the
         # safety point so no pre-maintenance writer can race the clone/import.
-        context.sleep(65.0)
+        with _progress(
+            formatter,
+            "Waiting for existing application requests to drain "
+            "(about 65 seconds)",
+        ):
+            context.sleep(65.0)
         checkpoint.update("request-drain-complete", request_drain_complete=True)
     if not checkpoint.payload.get("queue_snapshot"):
         checkpoint.update(
@@ -531,7 +583,11 @@ def restore_backup(
     context.wait_for_empty_queue(plan["queue"], plan["queue_location"])
 
     if not checkpoint.payload.get("safety_snapshot_time"):
-        safety_time = _safety_snapshot_time(context)
+        with _progress(
+            formatter,
+            "Selecting a whole-minute safety point (up to about one minute)",
+        ):
+            safety_time = _safety_snapshot_time(context)
         checkpoint.update(
             "safety-time-selected",
             safety_snapshot_time=safety_time.isoformat().replace("+00:00", "Z"),
@@ -540,13 +596,22 @@ def restore_backup(
         checkpoint.payload["safety_snapshot_time"].replace("Z", "+00:00")
     )
     if not checkpoint.payload.get("safety_clone_created"):
-        operation = checkpoint.payload.get("safety_clone_operation")
-        if not operation:
-            operation, _payload = context.start_clone(
-                plan["safety_database"], snapshot_time=safety_time
+        with _progress(
+            formatter,
+            "Creating the temporary safety database "
+            "(this may take several minutes)",
+        ):
+            operation = checkpoint.payload.get("safety_clone_operation")
+            if not operation:
+                operation, _payload = context.start_clone(
+                    plan["safety_database"], snapshot_time=safety_time
+                )
+                checkpoint.update(
+                    "safety-clone-started", safety_clone_operation=operation
+                )
+            context.wait_for_operation(
+                operation, database_id=plan["safety_database"]
             )
-            checkpoint.update("safety-clone-started", safety_clone_operation=operation)
-        context.wait_for_operation(operation, database_id=plan["safety_database"])
         checkpoint.update("safety-clone-created", safety_clone_created=True)
     if not checkpoint.payload.get("safety_assets"):
         checkpoint.update(
@@ -555,13 +620,17 @@ def restore_backup(
         )
 
     if not checkpoint.payload.get("import_complete"):
-        operation = checkpoint.payload.get("import_operation")
-        if not operation:
-            operation, _payload = context.start_import(
-                plan["export_output_prefix"], DEFAULT_DATABASE
-            )
-            checkpoint.update("import-started", import_operation=operation)
-        context.wait_for_operation(operation, database_id=DEFAULT_DATABASE)
+        with _progress(
+            formatter,
+            "Importing the manual backup (this may take several minutes)",
+        ):
+            operation = checkpoint.payload.get("import_operation")
+            if not operation:
+                operation, _payload = context.start_import(
+                    plan["export_output_prefix"], DEFAULT_DATABASE
+                )
+                checkpoint.update("import-started", import_operation=operation)
+            context.wait_for_operation(operation, database_id=DEFAULT_DATABASE)
         checkpoint.update("import-complete", import_complete=True)
     if not checkpoint.payload.get("assets_restored"):
         result = restore_generation_bound_assets(context, plan)

@@ -16,8 +16,10 @@ operator-only recovery bucket.
 ```
 
 Use `setup.cmd` on Windows. Manual-backup deletion prints its exact bucket
-prefix and requires `DELETE`; restore requires its exact printed project,
-backup, and target confirmation.
+prefix and requires `DELETE`. Restore prints its exact project, backup, target,
+safety database, queue, counts, and sequence before requiring the operator to
+type `RESTORE`. Headings and destructive details are visually distinguished,
+and long maintenance deployment work retains a progress indicator.
 
 ## Recovery infrastructure
 
@@ -106,6 +108,13 @@ Interrupted work resumes only for the exact project, command, backup, and
 output. Failed scratch databases and private staging state remain for targeted
 inspection/retry. Successful publication survives cleanup failure; rerunning
 the exact command finishes cleanup.
+
+Long-running Firestore work is polled within the lifecycle operation's bounded
+six-hour budget. Each status request has a short timeout, and transient provider
+or network timeouts are retried from the saved operation name rather than
+aborting an otherwise healthy clone, export, or import. Restore shows progress
+during its fixed request drain, whole-minute safety selection, safety clone,
+and manual-backup import phases.
 
 ## Restore model
 

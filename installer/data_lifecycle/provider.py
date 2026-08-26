@@ -13,7 +13,7 @@ import time
 from typing import Any, Callable
 from urllib.parse import urlsplit
 
-from installer.errors import ProviderNotFound, ProviderTimeout, SetupError
+from installer.errors import ProviderTimeout, ProviderTransientError, SetupError
 
 
 BACKUP_FORMAT = "lagniappe-recovery-set"
@@ -481,17 +481,27 @@ class ProviderContext:
                 name,
                 f"--database={validate_database_id(database_id or self.database_id)}",
             ],
-            timeout=120,
+            timeout=30,
         )
 
     # @testable true
     # @tests tests_tooling/test_008_data_lifecycle.py::test_operation_polling_resumes_and_reports_provider_failure
-    # @matrix data-lifecycle : failure-propagation operation-polling
+    # @matrix data-lifecycle : failure-propagation operation-polling transient-retry
     def wait_for_operation(self, name: str, *, database_id=None, timeout=None):
         deadline = self.monotonic() + (timeout or OPERATION_TIMEOUT_SECONDS)
         attempt = 0
         while True:
-            payload = self.operation(name, database_id=database_id)
+            try:
+                payload = self.operation(name, database_id=database_id)
+            except ProviderTransientError as error:
+                if self.monotonic() >= deadline:
+                    raise ProviderTimeout(
+                        f"Provider operation did not complete: {name}"
+                    ) from error
+                delay = POLL_DELAYS[min(attempt, len(POLL_DELAYS) - 1)]
+                attempt += 1
+                self.sleep(delay)
+                continue
             if payload.get("done"):
                 if payload.get("error"):
                     detail = payload["error"].get("message") if isinstance(payload["error"], dict) else payload["error"]
@@ -928,24 +938,28 @@ class ProviderContext:
             self.sleep(POLL_DELAYS[min(attempt, len(POLL_DELAYS) - 1)])
             attempt += 1
 
+    # @testable true
+    # @tests tests_tooling/test_008_data_lifecycle.py::test_maintenance_version_probe_uses_nonfailing_version_list
+    # @matrix data-lifecycle : app-engine-version provider-contract
     def version_exists(self, version_id: str) -> bool:
-        try:
-            payload = self.json_command(
-                [
-                    "app",
-                    "versions",
-                    "describe",
-                    str(version_id),
-                    "--service=default",
-                ]
+        payload = self.json_command(["app", "versions", "list", "--service=default"])
+        if not isinstance(payload, list) or any(
+            not isinstance(version, dict) for version in payload
+        ):
+            raise DataLifecycleError(
+                "Provider returned a malformed App Engine version list."
             )
-        except SetupError as error:
-            if isinstance(error, ProviderNotFound):
-                return False
-            raise
-        return str(
-            payload.get("servingStatus") or payload.get("serving_status") or ""
-        ).upper() == "SERVING"
+        for version in payload:
+            identifier = str(version.get("id") or version.get("version") or "")
+            if identifier != str(version_id):
+                continue
+            status = str(
+                version.get("servingStatus")
+                or version.get("serving_status")
+                or "SERVING"
+            ).upper()
+            return status == "SERVING"
+        return False
 
     def app_traffic(self):
         payload = self.json_command(["app", "services", "describe", "default"])
