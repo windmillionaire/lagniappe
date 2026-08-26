@@ -218,7 +218,11 @@ def test_ai_model_discovery_falls_back_to_catalog_and_preserves_custom():
     )
 
     assert fallback_options["pricing_url"] == config_ai_models.AI_PRICING_URL
-    assert "gemini-3.5-flash" in config_ai_models.known_model_ids(
+    assert "gemini-3.7-flash" in config_ai_models.known_model_ids(
+        fallback_options,
+        kind="text",
+    )
+    assert "gemini-3.5-flash-lite" in config_ai_models.known_model_ids(
         fallback_options,
         kind="text",
     )

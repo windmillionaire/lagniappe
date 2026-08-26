@@ -119,6 +119,10 @@ Deployed defaults include `AI_MODEL`, `AI_UTILITY_MODEL`, `AI_IMAGE_MODEL`, and
 `AI_LOCATION`. The Datastore `site/ai` row is the live authority for new
 generations and the Administrator form; deployed values are the fallback.
 Each top-level generation resolves one model and pins it through its calls.
+The current defaults are `gemini-3.7-flash` for primary generation,
+`gemini-3.5-flash-lite` for utility work, and `gemini-3.1-flash-image` for image
+generation, using the `global` endpoint. Existing saved `site/ai` choices are
+preserved across update and restore operations rather than silently replaced.
 
 `config/ai_models.py` owns the curated model catalog, live discovery, caching,
 capability filters, and pricing URL. `config/ai_settings.py` validates saved

@@ -1620,6 +1620,7 @@ def test_build_app_settings_refreshes_agent_access_defaults(monkeypatch, tmp_pat
     assert settings.APP["AGENT_ACCESS_EMAIL"] == constants.DEFAULT_AGENT_ACCESS_EMAIL
     assert settings.APP["AGENT_ACCESS_NAME"] == "Review Agent"
     assert settings.APP["AGENT_ACCESS_CODE"] == "generated-agent-code"
+    assert settings.APP["AI_MODEL"] == constants.DEFAULT_AI_MODEL
     assert settings.APP["AI_UTILITY_MODEL"] == constants.DEFAULT_UTILITY_AI_MODEL
     assert settings.APP["AI_IMAGE_MODEL"] == constants.DEFAULT_AI_IMAGE_MODEL
     assert settings.APP["SOURCE_URL"] == constants.DEFAULT_SOURCE_URL

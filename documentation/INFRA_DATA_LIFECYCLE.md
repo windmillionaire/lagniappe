@@ -150,12 +150,13 @@ A mutating restore:
     the safety clone.
 
 After a successful restore, the console directs the Owner to **Admin → Site
-Settings → Maintenance**, where the Owner applies any pending updates and then
-selects **Refresh Cache**. Those explicit application-owned actions must complete
-before cache-backed search and navigation are treated as verified. The installer
-clears Redis using the saved setup connection, but it does not import application
-migrations, Flask, or authorization to transform records or rebuild user-scoped
-cache projections.
+Settings → Maintenance**, where the Owner selects **Refresh Cache**. That
+explicit application-owned action must complete before cache-backed search and
+navigation are treated as verified. **Apply Updates** remains a separate upgrade
+action and is necessary only when the deployed application reports pending data
+migrations. The installer clears Redis using the saved setup connection, but it
+does not import application migrations, Flask, or authorization to transform
+records or rebuild user-scoped cache projections.
 
 Cloud Tasks has no atomic list-and-purge receipt; the queue audit is an
 observation after producers are paused. Ordinary purged deliveries are not

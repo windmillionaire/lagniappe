@@ -14,8 +14,8 @@ UNSUPPORTED_SETTING_KEYS = frozenset(
     }
 )
 DEFAULT_OCR_LOCATION = "us"
-DEFAULT_AI_MODEL = "gemini-3.5-flash"
-DEFAULT_UTILITY_AI_MODEL = "gemini-3.1-flash-lite"
+DEFAULT_AI_MODEL = "gemini-3.7-flash"
+DEFAULT_UTILITY_AI_MODEL = "gemini-3.5-flash-lite"
 DEFAULT_AI_IMAGE_MODEL = "gemini-3.1-flash-image"
 DEFAULT_AI_LOCATION = "global"
 DEFAULT_TASK_QUEUE_NAME = "lagniappe-tasks"

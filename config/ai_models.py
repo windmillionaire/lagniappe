@@ -29,18 +29,32 @@ _LOGGER = logging.getLogger(__name__)
 
 MODEL_CATALOG = [
     {
+        "id": "gemini-3.7-flash",
+        "label": "Gemini 3.7 Flash",
+        "kind": "text",
+        "tier": "primary",
+        "description": "Best default for rich generation, reports, and durable workspace changes.",
+    },
+    {
+        "id": "gemini-3.5-flash-lite",
+        "label": "Gemini 3.5 Flash-Lite",
+        "kind": "text",
+        "tier": "utility",
+        "description": "Lower-cost default for short parsing, classification, and summaries.",
+    },
+    {
         "id": "gemini-3.5-flash",
         "label": "Gemini 3.5 Flash",
         "kind": "text",
         "tier": "primary",
-        "description": "Best default for rich generation, reports, and durable workspace changes.",
+        "description": "Fallback for general text generation at Flash latency and cost.",
     },
     {
         "id": "gemini-3.1-flash-lite",
         "label": "Gemini 3.1 Flash-Lite",
         "kind": "text",
         "tier": "utility",
-        "description": "Lowest-cost default for short parsing, classification, and summaries.",
+        "description": "Earlier low-cost fallback for simple structured outputs.",
     },
     {
         "id": "gemini-2.5-flash",

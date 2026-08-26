@@ -697,8 +697,7 @@ def restore_backup(
     )
     print(
         "Cache data was cleared. Sign in as the Owner, then open "
-        "Admin → Site Settings → Maintenance. Select Apply Updates, then "
-        "Refresh Cache."
+        "Admin → Site Settings → Maintenance and select Refresh Cache."
     )
     return plan
 
