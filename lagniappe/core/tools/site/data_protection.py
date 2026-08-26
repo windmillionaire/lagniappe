@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import json
+import re
 
 from google.protobuf.json_format import MessageToDict
 
@@ -71,12 +72,22 @@ def _schedule(payload):
 # @testable false
 # @covered-by lagniappe/core/tools/site/data_protection.py::data_protection_status
 # @reason backup formatting is exercised by the public status projection
-def _backup(payload):
+def _backup(payload, project_id):
+    resource_name = str(payload.get("name") or "").strip()
+    expected = re.compile(
+        rf"projects/{re.escape(project_id)}/locations/[A-Za-z0-9._-]+/"
+        r"backups/[A-Za-z0-9._-]+"
+    )
     return {
-        "id": str(payload.get("name") or "").rsplit("/", 1)[-1],
+        "id": resource_name.rsplit("/", 1)[-1],
         "state": str(payload.get("state") or "Unknown").removeprefix("STATE_").title(),
         "snapshot_time": _timestamp(payload.get("snapshot_time")),
         "expire_time": _timestamp(payload.get("expire_time")),
+        "prepare_command": (
+            f"./setup.sh backup prepare {resource_name}"
+            if expected.fullmatch(resource_name)
+            else None
+        ),
     }
 
 
@@ -84,7 +95,7 @@ def _backup(payload):
 # @tests tests_unit/test_024_data_protection_status.py::test_data_protection_status_is_sanitized_and_read_only
 # @matrix admin disaster-recovery : human-readable-timestamps native-backups recovery-catalog sanitization schedules
 def data_protection_status(admin_client=None):
-    """Return provider metadata and a URI-free recovery-set catalog."""
+    """Return provider metadata and a sanitized manual-backup catalog."""
     project_id = CONFIG.GOOGLE_CLOUD_PROJECT
     if admin_client is None:
         from google.cloud import firestore_admin_v1
@@ -150,17 +161,10 @@ def data_protection_status(admin_client=None):
         ),
         "earliest_version_time": _timestamp(earliest_version_time),
         "schedules": [_schedule(_message(item)) for item in schedule_values],
-        "native_backups": [_backup(item) for item in backup_payloads],
+        "native_backups": [_backup(item, project_id) for item in backup_payloads],
         "recovery_sets": recovery_sets,
         "instructions": {
-            "create": "./setup.sh backup create",
-            "archive": "./setup.sh archive BACKUP_ID",
-            "preflight": "./setup.sh restore BACKUP_ID --dry-run",
-            "restore": "./setup.sh restore BACKUP_ID",
-            "materialize": (
-                "./setup.sh backup materialize "
-                "projects/PROJECT/locations/LOCATION/backups/BACKUP"
-            ),
+            "create_manual": "./setup.sh backup create",
         },
     }
 

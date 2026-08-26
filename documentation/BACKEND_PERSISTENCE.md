@@ -110,9 +110,9 @@ just seeded an empty database. See [DATA_MIGRATIONS.md](DATA_MIGRATIONS.md).
 ## Runtime versus operator data paths
 
 Runtime code reads and writes only `(default)` and the three application
-buckets. Backup, recovery-set materialization, portable archives, and restore
-are privileged installer workflows using the saved human operator identity and
-the separate recovery bucket. See
+buckets. Manual-backup creation, automatic-backup preparation, portable
+archives, and restore are privileged installer workflows using the saved human
+operator identity and the separate recovery bucket. See
 [INFRA_DATA_LIFECYCLE.md](INFRA_DATA_LIFECYCLE.md).
 
 ## Change checklist

@@ -74,16 +74,16 @@ def _parser():
     )
     backup = commands.add_parser(
         "backup",
-        help="Create, list, materialize, or explicitly delete recovery sets",
+        help="Create, prepare, list, or explicitly delete manual backups",
     )
     backup_commands = backup.add_subparsers(dest="backup_action", required=True)
-    backup_commands.add_parser("create", help="Create or resume a complete v3 recovery set")
-    backup_commands.add_parser("list", help="List valid completed v3 recovery sets")
-    backup_materialize = backup_commands.add_parser(
-        "materialize", help="Convert one native Firestore backup to a v3 recovery set"
+    backup_commands.add_parser("create", help="Create or resume a manual backup")
+    backup_commands.add_parser("list", help="List completed manual backups")
+    backup_prepare = backup_commands.add_parser(
+        "prepare", help="Prepare one automatic Google backup as a manual backup"
     )
-    backup_materialize.add_argument("backup_resource", metavar="BACKUP_RESOURCE")
-    backup_delete = backup_commands.add_parser("delete", help="Delete one exact v3 recovery set")
+    backup_prepare.add_argument("backup_resource", metavar="BACKUP_RESOURCE")
+    backup_delete = backup_commands.add_parser("delete", help="Delete one manual backup")
     backup_delete.add_argument("backup_id", metavar="BACKUP_ID")
 
     archive = commands.add_parser(
@@ -281,8 +281,8 @@ def _dispatch(args):
         prepare_existing_installation()
         if args.backup_action == "create":
             lifecycle_backup.create_backup()
-        elif args.backup_action == "materialize":
-            lifecycle_backup.materialize_native_backup(args.backup_resource)
+        elif args.backup_action == "prepare":
+            lifecycle_backup.prepare_automatic_backup(args.backup_resource)
         else:
             lifecycle_backup.delete_backup(args.backup_id)
         return 0

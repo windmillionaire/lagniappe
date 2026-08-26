@@ -233,10 +233,20 @@ def _blob_sha256(blob, size):
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_capture_recovery_assets_copies_exact_generation_create_only
 # @matrix data-lifecycle storage : asset-generation checksum immutable-copy
-def capture_assets(context, backup_id, assets, runtime_buckets):
+def capture_assets(
+    context,
+    backup_id,
+    assets,
+    runtime_buckets,
+    *,
+    progress=None,
+):
     """Copy exact referenced generations into the recovery-set prefix."""
     captured = []
-    for asset in assets:
+    total = len(assets)
+    for current, asset in enumerate(assets, 1):
+        if progress is not None:
+            progress(current, total)
         source_bucket = runtime_buckets.get(asset["role"])
         if source_bucket is None:
             raise DataLifecycleError(f"Unknown runtime asset role {asset['role']!r}.")

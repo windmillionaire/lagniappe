@@ -51,7 +51,7 @@ class _Admin:
         return SimpleNamespace(
             backups=[
                 {
-                    "name": "projects/test/locations/us/backups/native-id",
+                    "name": "projects/project-1/locations/us/backups/native-id",
                     "state": "READY",
                     "snapshot_time": "2026-08-24T00:00:00Z",
                     "expire_time": "2026-09-07T00:00:00Z",
@@ -90,6 +90,10 @@ def test_data_protection_status_is_sanitized_and_read_only(monkeypatch):
     assert result["native_backups"][0]["snapshot_time"] == (
         "12:00 AM, 24 Aug 2026 UTC"
     )
+    assert result["native_backups"][0]["prepare_command"] == (
+        "./setup.sh backup prepare "
+        "projects/project-1/locations/us/backups/native-id"
+    )
     assert result["pitr"] == "Enabled (7-day point-in-time window)"
     assert result["earliest_version_time"] == "12:00 PM, 17 Aug 2026 UTC"
     assert result["recovery_sets"] == [
@@ -101,12 +105,5 @@ def test_data_protection_status_is_sanitized_and_read_only(monkeypatch):
         }
     ]
     assert result["instructions"] == {
-        "create": "./setup.sh backup create",
-        "archive": "./setup.sh archive BACKUP_ID",
-        "preflight": "./setup.sh restore BACKUP_ID --dry-run",
-        "restore": "./setup.sh restore BACKUP_ID",
-        "materialize": (
-            "./setup.sh backup materialize "
-            "projects/PROJECT/locations/LOCATION/backups/BACKUP"
-        ),
+        "create_manual": "./setup.sh backup create",
     }

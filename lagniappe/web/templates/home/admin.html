@@ -136,37 +136,62 @@
     </section>
     {% if data_protection %}
       <section>
-        <h2 class="text-lg font-semibold">Recent native backups</h2>
+        <h2 class="text-lg font-semibold">Automatic backups</h2>
+        <p class="mt-2 text-sm">
+          Google creates and expires these on the schedules above. They protect the database,
+          but must be prepared as a manual backup before Lagniappe can restore one together with
+          its exact referenced files.
+        </p>
         <ul class="mt-3 space-y-2">
           {% for backup in data_protection.native_backups %}
-            <li><code>{{ backup.id }}</code> · {{ backup.state }} · snapshot {{ backup.snapshot_time or "pending" }}</li>
+            <li>
+              <div><code>{{ backup.id }}</code> · {{ backup.state }} · snapshot {{ backup.snapshot_time or "pending" }}{% if backup.expire_time %} · expires {{ backup.expire_time }}{% endif %}</div>
+              {% if backup.prepare_command %}
+                <div class="mt-1"><span class="font-medium">Prepare as a manual backup:</span> <code>{{ backup.prepare_command }}</code></div>
+              {% endif %}
+            </li>
           {% else %}
-            <li>No native backups were reported yet.</li>
+            <li>No automatic backups were reported yet.</li>
           {% endfor %}
         </ul>
       </section>
       <section>
-        <h2 class="text-lg font-semibold">Recovery sets</h2>
-        <p class="mt-2 text-sm">These exact restore sources can also be converted into separate portable archives with the archive command below.</p>
+        <h2 class="text-lg font-semibold">Manual backups</h2>
+        <p class="mt-2 text-sm">
+          A manual backup contains one exact database snapshot and copies of every referenced
+          file version. It remains available until you delete it. Create one with
+          <code>{{ data_protection.instructions.create_manual }}</code>.
+        </p>
         <ul class="mt-3 space-y-2">
           {% for backup in data_protection.recovery_sets %}
             <li>
-              <code>{{ backup.backup_id }}</code> · {{ backup.snapshot_time }} ·
-              {{ backup.entity_count }} entities · {{ backup.asset_count }} assets
+              <div>
+                <code>{{ backup.backup_id }}</code> · {{ backup.snapshot_time }} ·
+                {{ backup.entity_count }} entities · {{ backup.asset_count }} assets
+              </div>
+              <dl class="ml-4 mt-1 space-y-1 text-sm">
+                <div><dt class="inline font-medium">Check restore:</dt> <dd class="inline"><code>./setup.sh restore {{ backup.backup_id }} --dry-run</code></dd></div>
+                <div><dt class="inline font-medium">Restore:</dt> <dd class="inline"><code>./setup.sh restore {{ backup.backup_id }}</code></dd></div>
+                <div><dt class="inline font-medium">Create portable archive:</dt> <dd class="inline"><code>./setup.sh archive {{ backup.backup_id }}</code></dd></div>
+              </dl>
             </li>
           {% else %}
-            <li>No recovery sets have been materialized yet.</li>
+            <li>No manual backups have been created or prepared yet.</li>
           {% endfor %}
         </ul>
       </section>
       <section>
-        <h2 class="text-lg font-semibold">Operator commands</h2>
-        <p class="mt-2">Run these from the installation checkout. Restores are intentionally unavailable in the web UI.</p>
-        <dl class="mt-3 space-y-2">
-          {% for label, command in data_protection.instructions.items() %}
-            <div><dt class="inline font-medium capitalize">{{ label }}:</dt> <dd class="inline"><code>{{ command }}</code></dd></div>
-          {% endfor %}
-        </dl>
+        <h2 class="text-lg font-semibold">Portable archives and restores</h2>
+        <p class="mt-2 text-sm">
+          Run backup and restore commands from the installation checkout. Restores must be run
+          with the CLI. The check command performs the restore preflight without changing data.
+        </p>
+        <p class="mt-2 text-sm">
+          Point-in-time recovery and automatic backups stay inside Google Cloud and are available
+          only for their retention window. A portable archive is an independent, downloadable copy
+          of a manual backup with portable data, documents, and files. It can be validated without
+          Google access, but it is not itself the source used by the restore command.
+        </p>
       </section>
     {% endif %}
   </div>

@@ -223,9 +223,12 @@ class BackupManifest:
         assets_path = require_uri_below(manifest.assets_uri, exact_root)
         if not metadata_path.endswith(".overall_export_metadata"):
             raise DataLifecycleError("Backup export metadata URI is invalid.")
+        datastore_root = f"{exact_root}/datastore"
         if (
-            not manifest.export_output_prefix.startswith(f"{exact_root}/datastore/")
-            or manifest.export_metadata_uri.rsplit("/", 1)[0]
+            manifest.export_output_prefix != datastore_root
+            and not manifest.export_output_prefix.startswith(f"{datastore_root}/")
+        ) or (
+            manifest.export_metadata_uri.rsplit("/", 1)[0]
             != manifest.export_output_prefix
         ):
             raise DataLifecycleError("Backup export output is outside the datastore child.")
@@ -242,7 +245,7 @@ class BackupManifest:
         if not str(manifest.database_location or "").strip():
             raise DataLifecycleError("Backup database location is missing.")
         if database_id != "(default)":
-            raise DataLifecycleError("Recovery sets must be canonicalized for (default).")
+            raise DataLifecycleError("Manual backups must be canonicalized for (default).")
         try:
             snapshot_time = datetime.fromisoformat(
                 str(manifest.snapshot_time).replace("Z", "+00:00")

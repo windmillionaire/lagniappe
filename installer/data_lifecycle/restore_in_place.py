@@ -209,7 +209,7 @@ def restore_plan(backup_id, context=None):
 def _print_plan(plan):
     merge = plan["merge"]
     print(f"Restore plan: {plan['restore_id']}")
-    print(f"  Recovery set: {plan['backup_id']} ({plan['consistency']})")
+    print(f"  Manual backup: {plan['backup_id']} ({plan['consistency']})")
     print("  Database: merge directly into (default)")
     print(
         "  Snapshot keys: "
@@ -433,7 +433,7 @@ def restore_backup(
     checkpoint=None,
     confirmation=None,
 ):
-    """Merge one exact recovery set into `(default)` under maintenance."""
+    """Merge one exact manual backup into `(default)` under maintenance."""
     context = context or ProviderContext.from_settings()
     backup_id = validate_backup_id(backup_id)
     if dry_run:

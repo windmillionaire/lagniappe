@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 import hashlib
 import json
@@ -31,10 +32,38 @@ from .recovery_set import capture_assets, catalog_descriptor, inventory_database
 
 
 CONSISTENCY_NOTICE = (
-    "This recovery set binds its database inventory and referenced asset "
+    "This manual backup binds its database inventory and referenced asset "
     "generations to one exact point-in-time snapshot."
 )
 RUNTIME_CATALOG_OBJECT = "data-lifecycle/recovery-catalog.json"
+
+
+# @testable false
+# @covered-by installer/data_lifecycle/backup.py::create_backup
+# @reason terminal animation is a presentation wrapper around tested lifecycle phases
+@contextmanager
+def _progress(formatter, message):
+    with formatter.yaspin(text=formatter.success(message)) as spinner:
+        try:
+            yield spinner
+        except BaseException:
+            spinner.fail(formatter.fail_glyph)
+            raise
+        spinner.ok(formatter.ok_glyph)
+
+
+# @testable false
+# @covered-by installer/data_lifecycle/backup.py::create_backup
+# @reason final console rendering presents an already validated manifest
+def _print_backup_summary(formatter, manifest):
+    snapshot = datetime.fromisoformat(
+        manifest.snapshot_time.replace("Z", "+00:00")
+    ).astimezone(timezone.utc)
+    print(formatter.success(f"Backup {manifest.backup_id} is complete."))
+    print(f"  Snapshot: {snapshot:%d %b %Y at %H:%M UTC}")
+    print(f"  Database records: {manifest.entity_count}")
+    print(f"  Referenced file versions: {manifest.asset_count}")
+    print("  This manual backup is self-contained and remains available until deleted.")
 
 
 # @testable false
@@ -133,7 +162,7 @@ def _runtime_buckets(context):
 # @covered-by installer/data_lifecycle/backup.py::create_backup
 # @reason sanitized catalog publication follows validated backup publication
 def _refresh_runtime_catalog(context):
-    """Publish only non-sensitive recovery-set metadata for the admin UI."""
+    """Publish only non-sensitive manual-backup metadata for the admin UI."""
     from config import SETTINGS
     from config.storage import storage_bucket_names
 
@@ -147,7 +176,7 @@ def _refresh_runtime_catalog(context):
             "asset_count": item.asset_count,
             "consistency": item.consistency,
         }
-        for item in list_backups(context)
+        for item in list_backups(context, announce=False)
     ]
     private_name = storage_bucket_names(SETTINGS.APP)["private"]
     blob = context.storage.bucket(private_name).blob(RUNTIME_CATALOG_OBJECT)
@@ -175,7 +204,7 @@ def _try_refresh_runtime_catalog(context):
     try:
         _refresh_runtime_catalog(context)
     except Exception as error:
-        print(f"Warning: recovery set is valid, but the admin catalog was not refreshed: {error}")
+        print(f"Warning: manual backup is valid, but the admin catalog was not refreshed: {error}")
 
 
 # @testable false
@@ -209,7 +238,10 @@ def create_backup(
     source_database_id: str = "(default)",
     point_in_time_read: bool = True,
 ) -> BackupManifest:
-    """Create/resume one exact recovery set and publish its marker last."""
+    """Create/resume one exact manual backup and publish its marker last."""
+    from installer import FORMATTER
+
+    formatter = FORMATTER.initialize()
     context = context or ProviderContext.from_settings()
     command = ["backup", "create"]
     checkpoint = checkpoint or LifecycleCheckpoint(context.project_id, command)
@@ -240,6 +272,10 @@ def create_backup(
             snapshot_time=selected_snapshot.isoformat().replace("+00:00", "Z"),
         )
 
+    action = "Resuming" if state else "Creating"
+    print(formatter.info(f"{action} manual backup {backup_id}"))
+    print("The database and exact versions of referenced files will be saved.")
+
     selected_snapshot = _snapshot_time(
         datetime.fromisoformat(
             str(checkpoint.payload["snapshot_time"]).replace("Z", "+00:00")
@@ -249,42 +285,45 @@ def create_backup(
     exact_root = backup_root_uri(context.recovery_bucket, backup_id)
     datastore_output = f"{exact_root}/datastore"
     operation_name = checkpoint.payload.get("provider_operation")
-    if not operation_name:
-        record_step("start exact point-in-time Datastore export")
-        export_arguments = {
-            "snapshot_time": selected_snapshot if point_in_time_read else None
-        }
-        if source_database_id == "(default)":
-            operation_name, start_payload = context.start_export(
-                datastore_output, **export_arguments
+    record_step("create the point-in-time database backup")
+    with _progress(
+        formatter,
+        "Creating point-in-time database backup (this may take several minutes)",
+    ):
+        if not operation_name:
+            export_arguments = {
+                "snapshot_time": selected_snapshot if point_in_time_read else None
+            }
+            if source_database_id == "(default)":
+                operation_name, start_payload = context.start_export(
+                    datastore_output, **export_arguments
+                )
+            else:
+                operation_name, start_payload = context.start_export(
+                    datastore_output,
+                    database_id=source_database_id,
+                    **export_arguments,
+                )
+            checkpoint.update(
+                "export-started",
+                provider_operation=operation_name,
+                start_payload=start_payload,
             )
-        else:
-            operation_name, start_payload = context.start_export(
-                datastore_output,
-                database_id=source_database_id,
-                **export_arguments,
+            record_mutation(
+                "start Datastore export",
+                action="create",
+                resource="managed-export",
+                identifier=operation_name,
+                details={"backup_id": backup_id},
             )
-        checkpoint.update(
-            "export-started",
-            provider_operation=operation_name,
-            start_payload=start_payload,
-        )
-        record_mutation(
-            "start Datastore export",
-            action="create",
-            resource="managed-export",
-            identifier=operation_name,
-            details={"backup_id": backup_id},
-        )
 
-    record_step("wait for managed Datastore export")
-    completed = (
-        context.wait_for_operation(operation_name)
-        if source_database_id == "(default)"
-        else context.wait_for_operation(
-            operation_name, database_id=source_database_id
+        completed = (
+            context.wait_for_operation(operation_name)
+            if source_database_id == "(default)"
+            else context.wait_for_operation(
+                operation_name, database_id=source_database_id
+            )
         )
-    )
     reported_output_uri = export_output_uri(completed).rstrip("/")
     require_uri_below(reported_output_uri, exact_root)
     objects = context.list_objects(f"{BACKUP_ROOT_PREFIX}/{backup_id}/datastore/")
@@ -309,19 +348,37 @@ def create_backup(
     inventory_name = f"{BACKUP_ROOT_PREFIX}/{backup_id}/inventory.json"
     assets_name = f"{BACKUP_ROOT_PREFIX}/{backup_id}/assets.json"
     if not checkpoint.payload.get("catalogs"):
-        record_step("scan the exact database snapshot and capture referenced generations")
-        inventory, asset_references = inventory_database(
-            context.datastore_client(source_database_id),
-            snapshot_time=selected_snapshot,
-            source_database_id=source_database_id,
-            point_in_time_read=point_in_time_read,
-        )
-        captured_assets = capture_assets(
-            context,
-            backup_id,
-            asset_references,
-            _runtime_buckets(context) if asset_references else {},
-        )
+        record_step("save referenced file versions")
+        with _progress(
+            formatter,
+            "Scanning the database snapshot for referenced files",
+        ):
+            inventory, asset_references = inventory_database(
+                context.datastore_client(source_database_id),
+                snapshot_time=selected_snapshot,
+                source_database_id=source_database_id,
+                point_in_time_read=point_in_time_read,
+            )
+        if asset_references:
+            with _progress(
+                formatter,
+                f"Saving {len(asset_references)} referenced file versions",
+            ) as spinner:
+                captured_assets = capture_assets(
+                    context,
+                    backup_id,
+                    asset_references,
+                    _runtime_buckets(context),
+                    progress=lambda current, total: setattr(
+                        spinner,
+                        "text",
+                        formatter.success(
+                            f"Saving referenced file versions ({current}/{total})"
+                        ),
+                    ),
+                )
+        else:
+            captured_assets = []
         assets_payload = {
             "snapshot_time": inventory["snapshot_time"],
             "asset_count": len(captured_assets),
@@ -406,22 +463,27 @@ def create_backup(
         else:
             checkpoint.update("backup-complete", manifest=existing.as_dict())
         _try_refresh_runtime_catalog(context)
+        _print_backup_summary(formatter, existing)
         return existing
-    record_step("publish v3 recovery-set completion manifest")
+    record_step("publish the completed backup")
     context.upload_json_create_only(manifest_object_name(backup_id), manifest.as_dict())
     _try_refresh_runtime_catalog(context)
     if finish_checkpoint:
         checkpoint.remove()
     else:
         checkpoint.update("backup-complete", manifest=manifest.as_dict())
-    print(f"Backup {backup_id} is complete. {CONSISTENCY_NOTICE}")
+    _print_backup_summary(formatter, manifest)
     return manifest
 
 
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_backup_listing_ignores_invalid_incomplete_and_foreign_objects
 # @matrix data-lifecycle : backup-list manifest
-def list_backups(context: ProviderContext | None = None) -> list[BackupManifest]:
+def list_backups(
+    context: ProviderContext | None = None,
+    *,
+    announce: bool = True,
+) -> list[BackupManifest]:
     context = context or ProviderContext.from_settings()
     manifests = []
     for blob in context.list_objects(f"{BACKUP_ROOT_PREFIX}/"):
@@ -441,12 +503,13 @@ def list_backups(context: ProviderContext | None = None) -> list[BackupManifest]
             continue
         manifests.append(manifest)
     manifests.sort(key=lambda item: (item.export_completed_at, item.backup_id), reverse=True)
-    for manifest in manifests:
-        print(
-            f"{manifest.backup_id}  {manifest.export_completed_at}  "
-            f"database={manifest.source_database_id}  {manifest.consistency}  "
-            f"app={manifest.application_version}"
-        )
+    if announce:
+        for manifest in manifests:
+            print(
+                f"{manifest.backup_id}  {manifest.export_completed_at}  "
+                f"database={manifest.source_database_id}  {manifest.consistency}  "
+                f"app={manifest.application_version}"
+            )
     return manifests
 
 
@@ -503,10 +566,10 @@ def delete_backup(
 
 
 # @testable true
-# @tests tests_tooling/test_008_data_lifecycle.py::test_native_backup_materialization_uses_scratch_then_v3
-# @matrix data-lifecycle : named-scratch-database native-materialization
-def materialize_native_backup(resource_name, context=None):
-    """Convert one provider-native backup into a portable v3 recovery set."""
+# @tests tests_tooling/test_008_data_lifecycle.py::test_automatic_backup_preparation_uses_scratch_then_v3
+# @matrix data-lifecycle : named-scratch-database automatic-backup-preparation
+def prepare_automatic_backup(resource_name, context=None):
+    """Prepare one automatic provider backup as a self-contained manual backup."""
     context = context or ProviderContext.from_settings()
     value = str(resource_name or "").strip()
     match = re.fullmatch(
@@ -517,7 +580,7 @@ def materialize_native_backup(resource_name, context=None):
         raise DataLifecycleError("Native backup must be a full resource name in this project.")
     location, native_id = match.groups()
     checkpoint = LifecycleCheckpoint(
-        context.project_id, ["backup", "materialize", value]
+        context.project_id, ["backup", "prepare", value]
     )
     state = checkpoint.load()
     if state and state.get("status") == "complete":
@@ -594,7 +657,7 @@ def materialize_native_backup(resource_name, context=None):
     context.delete_database(scratch)
     checkpoint.finish()
     checkpoint.remove()
-    print(f"Materialized native backup {value} as recovery set {backup_id}.")
+    print(f"Prepared automatic backup {value} as manual backup {backup_id}.")
     return manifest
 
 
@@ -604,7 +667,7 @@ __all__ = [
     "delete_backup",
     "list_backups",
     "load_backup",
-    "materialize_native_backup",
+    "prepare_automatic_backup",
     "manifest_object_name",
     "new_backup_id",
 ]

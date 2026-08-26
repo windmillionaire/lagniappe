@@ -204,6 +204,19 @@ def test_manifest_validation_rejects_foreign_or_uncontained_artifacts():
         expected_backup_id=BACKUP_ID,
         expected_bucket=BUCKET,
     ).backup_id == BACKUP_ID
+    direct_output = {
+        **valid,
+        "export_output_prefix": f"{valid['root_uri']}/datastore",
+        "export_metadata_uri": (
+            f"{valid['root_uri']}/datastore/datastore.overall_export_metadata"
+        ),
+    }
+    assert BackupManifest.from_dict(
+        direct_output,
+        expected_project=PROJECT_ID,
+        expected_backup_id=BACKUP_ID,
+        expected_bucket=BUCKET,
+    ).export_output_prefix.endswith("/datastore")
     with pytest.raises(DataLifecycleError, match="different Google Cloud project"):
         BackupManifest.from_dict(valid, expected_project="another-proj1")
     escaped = {**valid, "export_metadata_uri": f"gs://{BUCKET}/elsewhere/file.overall_export_metadata"}
@@ -454,9 +467,9 @@ def test_archive_state_is_private_transactional_and_resumable(tmp_path):
 
 
 def _backup_context():
-    root_name = f"{BACKUP_ROOT_PREFIX}/{BACKUP_ID}/datastore/export-1"
-    metadata = _Blob(f"{root_name}/export-1.overall_export_metadata", b"metadata")
-    data = _Blob(f"{root_name}/output-0", b"data")
+    root_name = f"{BACKUP_ROOT_PREFIX}/{BACKUP_ID}/datastore"
+    metadata = _Blob(f"{root_name}/datastore.overall_export_metadata", b"metadata")
+    data = _Blob(f"{root_name}/all_namespaces/all_kinds/output-0", b"data")
     manifest = _Blob(f"{BACKUP_ROOT_PREFIX}/{BACKUP_ID}/manifest.json", exists=False)
     bucket = _Bucket([metadata, data, manifest])
     context = SimpleNamespace(
@@ -605,13 +618,13 @@ def test_backup_delete_requires_typed_confirmation_and_manifest_first():
     assert data_blob.deleted == [{}]
 
 
-# @matrix data-lifecycle : named-scratch-database native-materialization
-def test_native_backup_materialization_uses_scratch_then_v3(monkeypatch, tmp_path):
+# @matrix data-lifecycle : named-scratch-database automatic-backup-preparation
+def test_automatic_backup_preparation_uses_scratch_then_v3(monkeypatch, tmp_path):
     native = f"projects/{PROJECT_ID}/locations/nam5/backups/native-1"
     calls = []
     checkpoint = LifecycleCheckpoint(
         PROJECT_ID,
-        ["backup", "materialize", native],
+        ["backup", "prepare", native],
         state_root=tmp_path / "native-state",
     )
     monkeypatch.setattr(
@@ -652,7 +665,7 @@ def test_native_backup_materialization_uses_scratch_then_v3(monkeypatch, tmp_pat
         def delete_database(self, database_id):
             calls.append(("delete", database_id))
 
-    result = backup_module.materialize_native_backup(native, context=Context())
+    result = backup_module.prepare_automatic_backup(native, context=Context())
 
     scratch = calls[0][2]
     assert result == manifest
@@ -1975,7 +1988,11 @@ def test_lifecycle_cli_routes_nested_commands_and_read_only_boundaries():
     archive_validate = parser.parse_args(["archive", "validate", "bundle.zip"])
     restore_dry = parser.parse_args(["restore", BACKUP_ID, "--dry-run"])
     backup_create = parser.parse_args(["backup", "create"])
+    backup_prepare = parser.parse_args(
+        ["backup", "prepare", "projects/project-1/locations/us/backups/one"]
+    )
     assert _read_only(backup_list)
     assert _read_only(archive_validate) and _local_only(archive_validate)
     assert _read_only(restore_dry)
     assert not _read_only(backup_create)
+    assert not _read_only(backup_prepare)

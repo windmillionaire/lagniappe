@@ -129,7 +129,7 @@ class _RecoveryAssetBucket:
         asset = self.entries.get(key)
         if asset is None:
             raise DataLifecycleError(
-                f"Recovery set has no exact {self.role} asset {name!r} generation {generation!r}."
+                f"Manual backup has no exact {self.role} asset {name!r} generation {generation!r}."
             )
         try:
             return self.context.bucket.blob(
@@ -258,12 +258,12 @@ per-type shards, canonical document payloads, and `data/schema.json` are the
 normative `lagniappe-portable/v1` interchange data.
 
 {CONSISTENCY_NOTICE} Referenced Storage assets were read from the immutable
-recovery copies captured with that recovery set. The portable conversion ran
+recovery copies captured with that manual backup. The portable conversion ran
 from `{asset_window['started_at']}` through `{asset_window['completed_at']}`.
 Missing optional assets make this archive degraded; missing required canonical
 document content prevents publication.
 
-The source recovery set retains provider keys for same-project restore. This
+The source manual backup retains provider keys for same-project restore. This
 portable archive replaces them with typed portable IDs for top-level records
 and parent-scoped keys for task history and messages. Existing entity hashes
 remain ordinary application data; the archive does not create new ones. The

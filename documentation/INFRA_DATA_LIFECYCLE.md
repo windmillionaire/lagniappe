@@ -7,7 +7,7 @@ operator-only recovery bucket.
 ```bash
 ./setup.sh backup create
 ./setup.sh backup list
-./setup.sh backup materialize projects/PROJECT/locations/LOCATION/backups/BACKUP
+./setup.sh backup prepare projects/PROJECT/locations/LOCATION/backups/BACKUP
 ./setup.sh backup delete BACKUP_ID
 ./setup.sh archive [BACKUP_ID] [--output PATH] [--zip]
 ./setup.sh archive validate ARCHIVE_PATH
@@ -34,23 +34,27 @@ The recovery bucket has no browser CORS and no runtime-account access. The
 human installer/deployer has object administration. `GIBBERISH` deterministically
 locates the bucket; keep the encrypted settings snapshot and its key off-machine.
 
-## Recovery sets
+## Automatic and manual backups
 
 `backup create` chooses one whole-minute PITR timestamp, exports every kind and
 namespace from `(default)`, inventories entity asset descriptors at the same
-read time, and copies those exact Storage generations beneath one recovery-set
-prefix. `manifest.json` is create-only and written last, so incomplete prefixes
-are neither listed nor consumed.
+read time, and copies those exact Storage generations into a self-contained
+manual backup. The manual backup remains until explicitly deleted.
+`manifest.json` is create-only and written last, so incomplete prefixes are
+neither listed nor consumed.
 
-`backup materialize` converts a selected native backup into the same
-self-contained recovery-set format. Delete invalidates the manifest before
-removing the exact prefix. A sanitized summary is projected into the private
-runtime bucket for the authenticated Admin view; recovery objects and provider
-URIs remain confined to the operator-only recovery bucket.
+Google's scheduled automatic backups remain provider-managed and expire at the
+end of their configured retention. `backup prepare` converts a selected
+automatic backup into the same self-contained manual-backup format so it can be
+restored with its exact referenced files or converted to a portable archive.
+Delete invalidates the manifest before removing the exact prefix. A sanitized
+summary is projected into the private runtime bucket for the authenticated
+Admin view; backup objects and provider URIs remain confined to the
+operator-only recovery bucket.
 
 ## Portable archives
 
-Archive consumes one complete recovery set. Without an ID it first creates one.
+Archive consumes one complete manual backup. Without an ID it first creates one.
 It imports Datastore into a temporary named database, stages bounded pages in
 owner-only local SQLite, replaces provider keys with typed portable identities,
 and reads only generation-bound recovery copies.
@@ -68,6 +72,12 @@ Publication is atomic; `manifest.json` is the final ZIP entry. `archive
 validate` checks paths, hashes, counts, identities, relations, links, assets,
 and the absence of recognizable Datastore keys without network access.
 
+PITR and automatic backups remain inside Google Cloud and are limited by their
+retention windows. A portable archive is instead an independent, downloadable
+copy containing provider-independent data, rendered documents, and referenced
+files. It can be validated without Google access, but it is not accepted as the
+input to the in-place restore command; restore uses the manual backup ID.
+
 Interrupted work resumes only for the exact project, command, backup, and
 output. Failed scratch databases and private staging state remain for targeted
 inspection/retry. Successful publication survives cleanup failure; rerunning
@@ -75,11 +85,11 @@ the exact command finishes cleanup.
 
 ## Restore model
 
-Restore merges the recovery set into `(default)`:
+Restore merges the manual backup into `(default)`:
 
 - matching keys are overwritten;
-- missing recovery-set keys are recreated; and
-- live keys absent from the recovery set remain.
+- missing manual-backup keys are recreated; and
+- live keys absent from the manual backup remain.
 
 Provider import supplies the exact key-overlay semantics; restore does not
 compare application `modified` timestamps.
@@ -122,7 +132,7 @@ replayed because their durable workflows recover from application records.
 
 `--dry-run` performs reads only and reports overwrite/recreate counts. A
 mutating run stores local and secret-free remote journal checkpoints and resumes
-only the same project/recovery set.
+only the same project/manual backup.
 
 Failure leaves the application in maintenance with the safety clone and asset
 versions available for diagnosis. Restore does not automatically roll back.
@@ -145,7 +155,7 @@ design only as temporary, targeted safety clones and archive scratch databases.
 ## Change checklist
 
 - Keep the recovery bucket outside runtime credentials.
-- Bind every recovery set to one database read time and exact asset generations.
+- Bind every manual backup to one database read time and exact asset generations.
 - Write publication manifests last.
 - Keep archives provider-key-free and validate them offline.
 - Pause producers and capture a safety clone before mutating restore.
