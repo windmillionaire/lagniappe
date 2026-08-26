@@ -9,10 +9,16 @@ from testing.definitions import SitePages, Users
 pytestmark = pytest.mark.e2e
 
 
+# @matrix admin cache disaster-recovery : no-store status
 # @template home/admin.html::backups_tab
 def test_backups_tab_reveals_static_status_panel(get_user):
     owner = get_user(Users.OWNER)
-    owner.go(SitePages.ADMIN)
+    with owner.page.expect_response(
+        lambda response: response.request.method == "GET"
+        and response.url.split("?", 1)[0].rstrip("/").endswith("/admin")
+    ) as response_info:
+        owner.go(SitePages.ADMIN)
+    assert response_info.value.headers["cache-control"] == "no-store"
 
     backups = owner.locate("#backups")
     owner.locate("#tabs button[lp-show='backups:active']").click()

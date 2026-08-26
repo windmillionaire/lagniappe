@@ -540,9 +540,8 @@ def delete_backup(
             expected_backup_id=backup_id,
             expected_bucket=context.recovery_bucket,
         )
-    expected = f"DELETE {context.project_id} {backup_id}"
     print(f"This will permanently delete only gs://{context.recovery_bucket}/{prefix}")
-    if str(confirm(f"Type {expected} to continue: ")).strip() != expected:
+    if str(confirm("Type DELETE to continue: ")).strip() != "DELETE":
         raise DataLifecycleError("Backup deletion cancelled; confirmation did not match.")
     if manifest_blob is not None:
         generation = int(manifest_blob.generation or 0)

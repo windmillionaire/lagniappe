@@ -146,9 +146,54 @@ def _provider_operation(payload):
     return str(payload.get("name") or "").strip() or None
 
 
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason runtime bucket binding is exercised through archive asset collection
+# @testable true
+# @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_asset_bucket_preserves_original_generation_identity
+# @matrix portable-archive : recovery-copy generation-binding
+class _RecoveryAssetBlob:
+    """Read an immutable recovery copy under its original generation identity."""
+
+    def __init__(self, blob, *, source_generation, recovery_generation):
+        self._blob = blob
+        self._source_generation = str(source_generation)
+        self._recovery_generation = str(recovery_generation)
+
+    @property
+    def generation(self):
+        return self._source_generation
+
+    @property
+    def size(self):
+        return self._blob.size
+
+    @property
+    def content_type(self):
+        return self._blob.content_type
+
+    def reload(self):
+        self._blob.reload()
+        if str(self._blob.generation or "") != self._recovery_generation:
+            raise DataLifecycleError(
+                "Manual backup recovery asset generation is no longer available."
+            )
+
+    def download_as_bytes(self, *args, if_generation_match=None, **kwargs):
+        if (
+            if_generation_match is not None
+            and str(if_generation_match) != self._source_generation
+        ):
+            raise DataLifecycleError(
+                "Archive requested an unexpected source asset generation."
+            )
+        return self._blob.download_as_bytes(
+            *args,
+            if_generation_match=int(self._recovery_generation),
+            **kwargs,
+        )
+
+
+# @testable true
+# @tests tests_tooling/test_008_data_lifecycle.py::test_recovery_asset_bucket_preserves_original_generation_identity
+# @matrix portable-archive : recovery-copy generation-binding
 class _RecoveryAssetBucket:
     """Present immutable recovery objects through their original asset identity."""
 
@@ -168,12 +213,17 @@ class _RecoveryAssetBucket:
                 f"Manual backup has no exact {self.role} asset {name!r} generation {generation!r}."
             )
         try:
-            return self.context.bucket.blob(
+            blob = self.context.bucket.blob(
                 asset["recovery_object"],
                 generation=int(asset["recovery_generation"]),
             )
         except TypeError:
-            return self.context.bucket.blob(asset["recovery_object"])
+            blob = self.context.bucket.blob(asset["recovery_object"])
+        return _RecoveryAssetBlob(
+            blob,
+            source_generation=asset["generation"],
+            recovery_generation=asset["recovery_generation"],
+        )
 
 
 # @testable false

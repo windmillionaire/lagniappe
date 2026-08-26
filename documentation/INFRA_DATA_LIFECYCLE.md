@@ -15,8 +15,9 @@ operator-only recovery bucket.
 ./setup.sh restore BACKUP_ID
 ```
 
-Use `setup.cmd` on Windows. Mutating delete and restore commands require the
-exact printed confirmation.
+Use `setup.cmd` on Windows. Manual-backup deletion prints its exact bucket
+prefix and requires `DELETE`; restore requires its exact printed project,
+backup, and target confirmation.
 
 ## Recovery infrastructure
 
@@ -64,6 +65,9 @@ and reads only generation-bound recovery copies. Ordinary content uses its
 stored hash, users use a digest of their case-normalized unique email, and
 hashless reserved models use a key-partition-independent internal identity
 while retaining their explicit reserved role for target mapping.
+Each archive asset retains its original runtime generation as provenance, while
+the recovery catalog's separate generation pins the immutable copied object
+used for every metadata read and byte download.
 
 Output is either `archives/<backup-id>/` or a ZIP. It contains:
 

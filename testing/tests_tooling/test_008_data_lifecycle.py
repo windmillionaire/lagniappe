@@ -674,7 +674,7 @@ def test_backup_delete_requires_typed_confirmation_and_manifest_first():
     assert delete_backup(
         BACKUP_ID,
         context,
-        confirm=lambda _prompt: f"DELETE {PROJECT_ID} {BACKUP_ID}",
+        confirm=lambda _prompt: "DELETE",
     )
     assert manifest_blob.deleted == [{"if_generation_match": 7}]
     assert data_blob.deleted == [{}]
@@ -1323,6 +1323,61 @@ def test_asset_collection_is_generation_bound_resumable_and_deduplicated(tmp_pat
         canonical = (bundle / document["canonical_document"]).read_text()
         assert "source/photo.png" not in canonical
         assert "assets/sha256" in canonical
+
+
+# @matrix portable-archive : recovery-copy generation-binding
+def test_recovery_asset_bucket_preserves_original_generation_identity(tmp_path):
+    class RecoveryBlob(_Blob):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.generation_matches = []
+
+        def download_as_bytes(self, *args, if_generation_match=None, **kwargs):
+            self.generation_matches.append(if_generation_match)
+            return super().download_as_bytes(*args, **kwargs)
+
+    recovery_name = "lagniappe-data/v3/recovery-sets/backup/assets/document"
+    recovery_blob = RecoveryBlob(
+        recovery_name,
+        b"<p>saved document</p>",
+        generation=10,
+        content_type="text/html",
+    )
+    bucket = archive_module._RecoveryAssetBucket(
+        SimpleNamespace(bucket=_Bucket([recovery_blob])),
+        "private",
+        "runtime-private-bucket",
+        {
+            ("documents/page.html", "7"): {
+                "generation": "7",
+                "recovery_generation": "10",
+                "recovery_object": recovery_name,
+            }
+        },
+    )
+    with ArchiveState(tmp_path / "recovery-assets.sqlite3") as state:
+        owner = canonical_json(
+            {"type": "page", "id": "pagehash0001", "namespace": ""}
+        ).decode()
+        state.connection.execute(
+            "INSERT INTO assets(logical_id,state,owner,logical_name,asset_type,required,"
+            "source_role,source_path,generation) "
+            "VALUES(?, 'pending', ?, 'document', 'html', 1, 'private', ?, ?)",
+            ("a" * 64, owner, "documents/page.html", "7"),
+        )
+        state.connection.commit()
+        descriptors, warnings = AssetCollector(
+            state,
+            tmp_path / "recovery-bundle",
+            {"private": bucket},
+        ).collect()
+
+    assert warnings == []
+    assert descriptors[0]["generation"] == "7"
+    assert recovery_blob.generation_matches == [10]
+    assert (
+        tmp_path / "recovery-bundle" / descriptors[0]["path"]
+    ).read_bytes() == b"<p>saved document</p>"
 
 
 # @matrix portable-archive : html-sanitization no-network
