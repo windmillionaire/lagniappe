@@ -67,7 +67,7 @@ class _Admin:
 
 
 # @covers lagniappe.core.tools.site.data_protection::data_protection_status
-# @matrix admin disaster-recovery : native-backups recovery-catalog sanitization schedules
+# @matrix admin disaster-recovery : human-readable-timestamps native-backups recovery-catalog sanitization schedules
 def test_data_protection_status_is_sanitized_and_read_only(monkeypatch):
     monkeypatch.setattr(protection.CONFIG, "GOOGLE_CLOUD_PROJECT", "project-1")
     monkeypatch.setattr(
@@ -87,12 +87,15 @@ def test_data_protection_status_is_sanitized_and_read_only(monkeypatch):
         "98 days",
     ]
     assert result["native_backups"][0]["id"] == "native-id"
+    assert result["native_backups"][0]["snapshot_time"] == (
+        "12:00 AM, 24 Aug 2026 UTC"
+    )
     assert result["pitr"] == "Enabled (7-day point-in-time window)"
-    assert result["earliest_version_time"] == "2026-08-17T12:00:00Z"
+    assert result["earliest_version_time"] == "12:00 PM, 17 Aug 2026 UTC"
     assert result["recovery_sets"] == [
         {
             "backup_id": "20260824T120000Z-deadbeef",
-            "snapshot_time": "2026-08-24T11:59:00Z",
+            "snapshot_time": "11:59 AM, 24 Aug 2026 UTC",
             "entity_count": 12,
             "asset_count": 3,
         }

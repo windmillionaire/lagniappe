@@ -99,8 +99,9 @@ export default class ViewComponent {
 	}
 
 	/**
-	 * @testable false
-	 * @reason foundational view lifecycle plumbing
+	 * @testable true
+	 * @tests tests_js/test_029_core_startup.py::test_static_component_without_default_widget_activates
+	 * @matrix navigation tabs : static-component visibility
 	 */
 	async activate(show) {
 		if (this._destroyed) return false;
@@ -112,7 +113,10 @@ export default class ViewComponent {
 			return false;
 		} else if (["default", "active"].includes(show)) {
 			show = this.default;
-			if (!show) return false;
+			if (!show) {
+				this.active = null;
+				return true;
+			}
 		} else if (show === "nav" && this.nav?.standalone) {
 			this.active = this.nav;
 			return true;

@@ -1154,19 +1154,15 @@ def test_site_settings_requires_administrator(get_user, browser_failures):
 
     admin_url = f"{SETTINGS.test_config['BASE_URL'].rstrip('/')}/admin"
     with browser_failures.expect_http_error(user, status=403, path=admin_url):
-        response = user.page.goto(
-            admin_url,
-            wait_until="domcontentloaded",
-        )
-    assert response.status == 403
+        user.navigate(admin_url)
+    expect(user.locate(admin.SITE_SETTINGS_FORM)).to_have_count(0)
 
     user.entity.is_admin = True
     user.entity.save()
     try:
         _acknowledge_user_cache_invalidation(user)
-        response = user.page.goto(admin_url, wait_until="domcontentloaded")
-        assert response.status == 200
-        expect(user.locate("[data-widget='SiteSettings']")).to_be_visible()
+        admin = user.go(SitePages.ADMIN)
+        expect(user.locate(admin.SITE_SETTINGS_FORM)).to_be_visible()
     finally:
         user.entity = Entities.USER.load(user.email)
         user.entity.is_admin = False

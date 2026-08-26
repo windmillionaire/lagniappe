@@ -625,6 +625,63 @@ Object.defineProperty(view, "offline", {
     )
 
 
+# @covers src/script/views/base/component.mjs::ViewComponent.activate
+# @matrix navigation tabs : static-component visibility
+def test_static_component_without_default_widget_activates(run_node):
+    run_node(
+        r'''
+const fs = require("node:fs");
+const vm = require("node:vm");
+
+const context = {
+  console,
+  CustomEvent: class {},
+  document: { getElementById() { return null; } },
+};
+vm.createContext(context);
+
+let source = fs.readFileSync("src/script/views/base/component.mjs", "utf8");
+source = source.replace(
+  /^import [\s\S]*?(?=\/\*\*)/,
+  `
+const NavElement = class {};
+const showBriefly = () => {};
+const withTransition = async (callback) => await callback();
+const loadWidget = async () => null;
+`,
+);
+source = source.replace("export default class ViewComponent", "class ViewComponent");
+source += "\nglobalThis.ViewComponent = ViewComponent;";
+vm.runInContext(source, context);
+
+(async () => {
+  const component = Object.create(context.ViewComponent.prototype);
+  Object.assign(component, {
+    active: null,
+    _destroyed: false,
+    _nav: null,
+    elt: {
+      dataset: {},
+      querySelector() { return null; },
+    },
+    name: "backups",
+  });
+  component.loadWidget = async () => {
+    throw new Error("A static component must not load a placeholder widget");
+  };
+
+  const activated = await component.activate("active");
+  if (activated !== true || component.active !== null) {
+    throw new Error("A static component without a default widget stayed hidden");
+  }
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
+'''
+    )
+
+
 # @matrix polling : component-render nonblocking subscription-lifecycle
 # @matrix startup : component-render deferred-services nonblocking
 def test_component_render_does_not_wait_for_polling_reconciliation(run_node):

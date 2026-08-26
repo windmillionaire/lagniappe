@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 import json
 
 from google.protobuf.json_format import MessageToDict
@@ -11,6 +12,30 @@ from lagniappe.core.tools.database.core import DATA
 
 
 RUNTIME_CATALOG_OBJECT = "data-lifecycle/recovery-catalog.json"
+
+
+# @testable false
+# @covered-by lagniappe/core/tools/site/data_protection.py::data_protection_status
+# @reason provider timestamp normalization is exercised by the public status projection
+def _timestamp(value):
+    """Return a readable provider timestamp while preserving unknown values."""
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        moment = value
+    else:
+        text = str(value).strip()
+        try:
+            moment = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return text
+
+    suffix = ""
+    if moment.tzinfo is not None:
+        moment = moment.astimezone(timezone.utc)
+        suffix = " UTC"
+    time = moment.strftime("%I:%M %p").lstrip("0")
+    return f"{time}, {moment.strftime('%d %b %Y')}{suffix}"
 
 
 # @testable false
@@ -50,14 +75,14 @@ def _backup(payload):
     return {
         "id": str(payload.get("name") or "").rsplit("/", 1)[-1],
         "state": str(payload.get("state") or "Unknown").removeprefix("STATE_").title(),
-        "snapshot_time": payload.get("snapshot_time"),
-        "expire_time": payload.get("expire_time"),
+        "snapshot_time": _timestamp(payload.get("snapshot_time")),
+        "expire_time": _timestamp(payload.get("expire_time")),
     }
 
 
 # @testable true
 # @tests tests_unit/test_024_data_protection_status.py::test_data_protection_status_is_sanitized_and_read_only
-# @matrix admin disaster-recovery : native-backups recovery-catalog sanitization schedules
+# @matrix admin disaster-recovery : human-readable-timestamps native-backups recovery-catalog sanitization schedules
 def data_protection_status(admin_client=None):
     """Return provider metadata and a URI-free recovery-set catalog."""
     project_id = CONFIG.GOOGLE_CLOUD_PROJECT
@@ -109,6 +134,10 @@ def data_protection_status(admin_client=None):
                 for item in catalog.get("recovery_sets") or []
                 if isinstance(item, dict)
             ]
+            for item in recovery_sets:
+                for key in ("snapshot_time", "completed_at"):
+                    if key in item:
+                        item[key] = _timestamp(item[key])
     except Exception:
         recovery_sets = []
 
@@ -119,7 +148,7 @@ def data_protection_status(admin_client=None):
             if pitr_enabled
             else "Disabled"
         ),
-        "earliest_version_time": earliest_version_time,
+        "earliest_version_time": _timestamp(earliest_version_time),
         "schedules": [_schedule(_message(item)) for item in schedule_values],
         "native_backups": [_backup(item) for item in backup_payloads],
         "recovery_sets": recovery_sets,
