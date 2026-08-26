@@ -284,6 +284,7 @@ def configure_ai_observability():
     """Set the optional owner-only AI generation summary flag."""
     from config import SETTINGS
 
+    f = FORMATTER.initialize()
     existing = SETTINGS.APP.get("AI_OBSERVABILITY")
     if existing is not None:
         existing_enabled = (
@@ -292,13 +293,15 @@ def configure_ai_observability():
             else str(existing).casefold() == "true"
         )
         state = "enabled" if existing_enabled else "disabled"
-        print(f"\nAI generation observability is currently {state}.")
-        preserve = input("Keep this AI observability choice? [Y/n]: ")
+        print(
+            f"\n{f.info(f'AI generation observability is currently {state}.')}"
+        )
+        preserve = input(f.info("Keep this AI observability choice? [Y/n]: "))
         if preserve.casefold() != "n":
-            print("Existing AI observability choice preserved.")
+            print(f.success("Existing AI observability choice preserved."))
             return existing_enabled
 
-    print("\nOptional AI Generation Observability")
+    print(f"\n{f.info('Optional AI Generation Observability')}")
     for paragraph in (
         "When enabled, Lagniappe stores owner-only operational summaries for "
         "text generations, including model, token totals, duration, retry and "
@@ -307,11 +310,12 @@ def configure_ai_observability():
         "arguments/results, file contents, and application identifiers.",
     ):
         print(wrap_text(paragraph))
-    enabled = (
-        input("Enable AI generation observability? [y/N]: ").casefold() == "y"
-    )
+    enabled = input(
+        f"\n{f.info('Enable AI generation observability? [y/N]: ')}"
+    ).casefold() == "y"
     SETTINGS.APP["AI_OBSERVABILITY"] = enabled
-    print(f"AI generation observability {'enabled' if enabled else 'disabled'}.")
+    state = "enabled" if enabled else "disabled"
+    print(f.success(f"AI generation observability {state}."))
     return enabled
 
 

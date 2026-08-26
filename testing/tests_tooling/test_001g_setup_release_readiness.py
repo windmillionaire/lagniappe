@@ -102,6 +102,12 @@ def test_redacted_install_summary_is_allowlisted():
         "APP_ENGINE_LOCATION": "us-central",
         "RESOURCE_REGION": "us-central1",
         "OCR_LOCATION": "us",
+        "AI_MODEL": "gemini-2.5-pro",
+        "AI_UTILITY_MODEL": "gemini-2.5-flash",
+        "AI_IMAGE_MODEL": "gemini-3.1-flash-image",
+        "AI_OBSERVABILITY": False,
+        "CAPTURE_ERRORS": "False",
+        "REDIS_TLS": False,
         "TASK_QUEUE_NAME": "lagniappe-tasks",
         "OCR_PROCESSOR_ID": "projects/demo/locations/us/processors/123",
         "REDIS_HOST": "redis.example.test",
@@ -127,17 +133,29 @@ def test_redacted_install_summary_is_allowlisted():
     )
     text = "\n".join(lines)
 
-    assert "Demo" in text
-    assert "Temporary application Administrator: installer@example.test" in text
-    assert "runtime@demo-project.iam.gserviceaccount.com" in text
-    assert "lagniappe-tasks" in text
-    assert "python314" in text
-    assert "Google sign-in: enabled" in text
-    assert "Optional health check: ./setup.sh doctor" in text
-    assert "Repair if needed: ./setup.sh repair" in text
+    assert "\tApplication:               Demo" in text
+    assert "\tTemporary Administrator:   installer@example.test" in text
+    assert "\tLagniappe version:         0.2" in text
+    assert "\tGoogle sign-in:            enabled" in text
+    assert "\tRedis:                     configured; TLS disabled" in text
+    assert "\tError monitoring:          disabled" in text
+    assert "\tAI observability:          disabled" in text
+    assert "\tAI model:                  gemini-2.5-pro" in text
+    assert "\tDeployment completed:      yes" in text
+    assert "\tHealth check:              ./setup.sh doctor" in text
+    assert "\tRepair if needed:          ./setup.sh repair" in text
+    for omitted_detail in (
+        "runtime@demo-project.iam.gserviceaccount.com",
+        "lagniappe-tasks",
+        "python314",
+        "Signed URL API",
+        "bucket:",
+        "OCR processor",
+        "Identity Platform project",
+    ):
+        assert omitted_detail not in text
     assert lines[-1] == (
-        "Lagniappe has been installed successfully. "
-        "Log in at https://demo.example.test"
+        "\tOpen this installation:    https://demo.example.test"
     )
     for secret in (
         "bucket-source-secret",
@@ -149,6 +167,51 @@ def test_redacted_install_summary_is_allowlisted():
 
     manual_lines = summary.install_summary_lines(settings)
     assert manual_lines[-1] == "After manual deployment: ./setup.sh jobs"
+
+
+# @matrix doctor setup : operator-summary provider-resources secret-redaction
+def test_expected_resource_summary_is_allowlisted():
+    settings = {
+        "APP_NAME": "Demo",
+        "APP_URL": "https://demo.example.test",
+        "GOOGLE_CLOUD_PROJECT": "demo-project",
+        "APP_ENGINE_LOCATION": "us-central",
+        "RESOURCE_REGION": "us-central1",
+        "OCR_LOCATION": "us",
+        "TASK_QUEUE_NAME": "lagniappe-tasks",
+        "OCR_PROCESSOR_ID": "projects/demo/locations/us/processors/123",
+        "REDIS_HOST": "redis.example.test",
+        "REDIS_PORT": 6379,
+        "REDIS_PASSWORD": "redis-secret",
+        "GIBBERISH": "bucket-source-secret",
+        "SECRET_KEY": "flask-secret",
+        "RUNTIME_SERVICE_ACCOUNT_EMAIL": (
+            "runtime@demo-project.iam.gserviceaccount.com"
+        ),
+        "INTERNAL_CALLER_SERVICE_ACCOUNT_EMAIL": (
+            "runtime@demo-project.iam.gserviceaccount.com"
+        ),
+    }
+
+    lines = summary.expected_resource_lines(
+        settings,
+        deploy={"runtime": "python314"},
+        gcloud_config={"PROJECT": "demo-project"},
+    )
+    text = "\n".join(lines)
+
+    assert "Runtime service account: runtime@demo-project" in text
+    assert "Internal caller service account: runtime@demo-project" in text
+    assert "Task queue: lagniappe-tasks" in text
+    assert "OCR processor: projects/demo/locations/us/processors/123" in text
+    assert "App Engine runtime: python314" in text
+    assert "History bucket:" in text
+    for secret in (
+        "bucket-source-secret",
+        "redis-secret",
+        "flask-secret",
+    ):
+        assert secret not in text
 
 
 # @matrix setup : adc doctor keyless-config project-identity

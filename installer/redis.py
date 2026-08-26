@@ -70,9 +70,9 @@ def test_redis_connection(settings=None, *, exit_on_failure=True):
                     close()
 
 
-# @testable false
-# @covered-by installer/redis.py::setup_redis
-# @reason console-only Redis Cloud configuration instructions
+# @testable true
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_redis_eviction_policy_instructions_require_confirmation
+# @matrix setup : interactive-input operator-guidance redis
 def eviction_policy_instructions():
     """Print eviction policy instructions."""
     from installer import FORMATTER
@@ -91,12 +91,29 @@ def eviction_policy_instructions():
     print(
         f.info(
             wrap_text(
-                "This can be set in your Redis Cloud dashboard under "
-                "Configuration → Durability → Data eviction policy"
+                "On the same Redis Cloud database details page, find "
+                "Performance & Availability → Data eviction policy and "
+                "select volatile-ttl."
             )
         )
     )
-    print(f.info("You will need to click 'Edit', make the change, and click 'Save'"))
+    print(
+        f.info(
+            wrap_text(
+                "The selection is only pending until you click 'Review "
+                "changes', review the confirmation modal, and click 'Confirm' "
+                "or 'Confirm & pay' to save it."
+            )
+        )
+    )
+    print(
+        f.info(
+            wrap_text(
+                "Wait for the pending-change indicator to clear, then verify "
+                "the displayed Data eviction policy is still volatile-ttl."
+            )
+        )
+    )
     print(
         f.info(
             wrap_text(
@@ -106,7 +123,7 @@ def eviction_policy_instructions():
         )
     )
     input(
-        f"\n{f.warning('Press Enter after configuring the eviction policy to continue...')}"
+        f"\n{f.warning('Press Enter only after Redis Cloud confirms the eviction policy...')}"
     )
 
 
@@ -160,8 +177,8 @@ def redis_cloud_instructions():
     )
     print(
         wrap_text(
-            "5. Create the database, then find Access on its details page and "
-            "click the blue Connect button."
+            "5. Create the database, then find Access on that same database "
+            "details page and click the blue Connect button."
         )
     )
     print(
@@ -178,7 +195,9 @@ def redis_cloud_instructions():
     print(
         wrap_text(
             "8. Return to setup and paste the complete copied command when "
-            "prompted; you do not need to run it."
+            "prompted; you do not need to run it. Keep the database details "
+            "page open because setup will next guide the required eviction "
+            "policy there."
         )
     )
 

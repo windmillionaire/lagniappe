@@ -27,8 +27,9 @@ def _recovery_file_present(app_dir=None):
 
 # @testable true
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_characterization_starts_empty_and_reaches_all_boundaries
+# @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_only_prints_manual_deployment_steps_when_declined
 # @tests tests_tooling/test_001e_setup_orchestration.py::test_default_install_activates_ai_email_after_deploy_and_jobs
-# @matrix setup : main-install prerequisites virtualenv
+# @matrix setup : explicit-project main-install manual-deploy prerequisites virtualenv
 def install():
     print("Welcome to Lagniappe Setup!")
     if _recovery_file_present():
@@ -145,14 +146,24 @@ def install():
             "2. Run: "
             f"{format_command([GCLOUD_CLI, 'config', 'set', 'project', project])}"
         )
-        print(
-            "3. Run: "
-            f"{format_command([GCLOUD_CLI, 'app', 'deploy', File.INDEX_YAML.value])}"
-        )
-        print(
-            "4. Run: "
-            f"{format_command([GCLOUD_CLI, 'app', 'deploy', File.APP_YAML.value])}"
-        )
+        index_command = [
+            GCLOUD_CLI,
+            "app",
+            "deploy",
+            File.INDEX_YAML.value,
+            "--project",
+            project,
+        ]
+        app_command = [
+            GCLOUD_CLI,
+            "app",
+            "deploy",
+            File.APP_YAML.value,
+            "--project",
+            project,
+        ]
+        print(f"3. Run: {format_command(index_command)}")
+        print(f"4. Run: {format_command(app_command)}")
         print(f"After deployment, run: {setup_command('jobs')}")
         if ai_email_config:
             print(

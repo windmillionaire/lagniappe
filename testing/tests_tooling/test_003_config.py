@@ -1304,8 +1304,12 @@ def test_deploy_version_update_keeps_package_lock_in_sync(monkeypatch, tmp_path)
     assert "\\u2764" not in lock_text
 
 
-# @matrix deploy : app-yaml build index-yaml version
-def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_path):
+# @matrix deploy : app-yaml build capture-output explicit-project failure-output index-yaml progress version
+def test_deploy_modes_separate_dev_build_from_setup_publish(
+    monkeypatch,
+    tmp_path,
+    capsys,
+):
     app_dir = tmp_path / "demo-app"
     config_files_dir = app_dir / "config" / "files"
     config_source_dir = app_dir / "config"
@@ -1352,6 +1356,7 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
         from runner.deploy import deploy as deploy_app
 
         deploy_module = importlib.import_module("runner.deploy")
+        SETTINGS.APP["GOOGLE_CLOUD_PROJECT"] = "demo-project"
         SETTINGS.save()
 
         commands = []
@@ -1393,7 +1398,10 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
             build_assets=False,
             deploy_indexes=True,
             quiet=True,
+            capture_output=True,
+            announce_progress=False,
         )
+        assert capsys.readouterr().out == "Deployment complete!\n"
         assert preflight_snapshots == [
             {"version": "1.23", "chunk_exists": True, "commands": []}
         ]
@@ -1412,8 +1420,10 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
                     "deploy",
                     str(app_dir / "index.yaml"),
                     "--quiet",
+                    "--project",
+                    "demo-project",
                 ],
-                {"check": False, "capture_output": False},
+                {"check": False, "capture_output": True},
             ),
             (
                 [
@@ -1422,8 +1432,10 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
                     "deploy",
                     str(app_dir / "lagniappe.yaml"),
                     "--quiet",
+                    "--project",
+                    "demo-project",
                 ],
-                {"check": False, "capture_output": False},
+                {"check": False, "capture_output": True},
             ),
         ]
         assert build_versions == []
@@ -1465,10 +1477,28 @@ def test_deploy_modes_separate_dev_build_from_setup_publish(monkeypatch, tmp_pat
                     "app",
                     "deploy",
                     str(app_dir / "lagniappe.yaml"),
+                    "--project",
+                    "demo-project",
                 ],
                 {"check": False, "capture_output": False},
             ),
         ]
+
+        def failed_deploy(command, **kwargs):
+            return subprocess.CompletedProcess(
+                command,
+                1,
+                stdout="",
+                stderr="provider permission denied",
+            )
+
+        monkeypatch.setattr(deploy_module, "run_command", failed_deploy)
+        with pytest.raises(RuntimeError, match="provider permission denied"):
+            deploy_app(
+                build_assets=False,
+                capture_output=True,
+                announce_progress=False,
+            )
 
         commands.clear()
         monkeypatch.setattr(

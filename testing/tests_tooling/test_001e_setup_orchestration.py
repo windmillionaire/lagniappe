@@ -290,6 +290,7 @@ def test_default_install_characterization_starts_empty_and_reaches_all_boundarie
     assert "Manual deployment steps:" not in output
 
 
+# @matrix setup : explicit-project manual-deploy
 def test_default_install_only_prints_manual_deployment_steps_when_declined(
     monkeypatch,
     capsys,
@@ -303,6 +304,8 @@ def test_default_install_only_prints_manual_deployment_steps_when_declined(
     output = capsys.readouterr().out
     assert "Manual deployment steps:" in output
     assert "Review the generated YAML files" in output
+    assert "index.yaml --project project-1" in output
+    assert "lagniappe.yaml --project project-1" in output
     assert "Wrapping up installation..." not in output
     assert "deploy_to_app_engine" not in events
 

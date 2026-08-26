@@ -367,25 +367,41 @@ def update_manifest():
 # @testable false
 # @covered-by runner/deploy.py::deploy
 # @reason gcloud deployment adapter is exercised through publish-mode deployment
-def _deploy_app_yaml(file_ref, quiet=False):
+def _deploy_app_yaml(file_ref, quiet=False, *, capture_output=False):
     command = [GCLOUD_CLI, "app", "deploy", str(file_ref.value)]
     if quiet:
         command.append("--quiet")
-    result = run_command(command, check=False, capture_output=False)
+    project = str(
+        SETTINGS.APP.get("GOOGLE_CLOUD_PROJECT")
+        or (getattr(SETTINGS, "GCLOUD_CONFIG", {}) or {}).get("PROJECT")
+        or ""
+    ).strip()
+    if project:
+        command.extend(["--project", project])
+    result = run_command(
+        command,
+        check=False,
+        capture_output=capture_output,
+    )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"gcloud app deploy failed with exit code {result.returncode}."
-        )
+        message = f"gcloud app deploy failed with exit code {result.returncode}."
+        if capture_output:
+            details = str(result.stderr or result.stdout or "").strip()
+            if details:
+                message = f"{message}\n{details}"
+        raise RuntimeError(message)
 
 
 # @testable true
 # @tests tests_tooling/test_003_config.py::test_deploy_modes_separate_dev_build_from_setup_publish
-# @matrix deploy : app-yaml build index-yaml version
+# @matrix deploy : app-yaml build capture-output explicit-project failure-output index-yaml progress version
 def deploy(
     *,
     build_assets=True,
     deploy_indexes=False,
     quiet=False,
+    capture_output=False,
+    announce_progress=True,
     announce_completion=True,
 ):
     """Build frontend assets, refresh generated metadata, and deploy the app."""
@@ -395,8 +411,9 @@ def deploy(
         update_manifest()
         SETTINGS.save()
 
-    if build_assets:
+    if build_assets and announce_progress:
         print("Building static files...")
+    if build_assets:
         run_command([NPM_CLI, "run", "build"], check=True, capture_output=False)
 
     verify_frontend_build(
@@ -405,17 +422,28 @@ def deploy(
         expected_version=str(SETTINGS.APP["VERSION"]),
     )
     verify_generation_manifest()
-    print(
-        "Deployment includes config/files/lagniappe_settings.yaml and, when "
-        "configured, config/files/redis_ca.pem. Keep both files secure."
-    )
+    if announce_progress:
+        print(
+            "Deployment includes config/files/lagniappe_settings.yaml and, when "
+            "configured, config/files/redis_ca.pem. Keep both files secure."
+        )
 
     if deploy_indexes:
-        print("Deploying indexes...")
-        _deploy_app_yaml(File.INDEX_YAML, quiet=quiet)
+        if announce_progress:
+            print("Deploying indexes...")
+        _deploy_app_yaml(
+            File.INDEX_YAML,
+            quiet=quiet,
+            capture_output=capture_output,
+        )
 
-    print("Deploying app...")
-    _deploy_app_yaml(File.APP_YAML, quiet=quiet)
+    if announce_progress:
+        print("Deploying app...")
+    _deploy_app_yaml(
+        File.APP_YAML,
+        quiet=quiet,
+        capture_output=capture_output,
+    )
 
     if announce_completion:
         print("Deployment complete!")

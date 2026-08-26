@@ -133,8 +133,11 @@ Essentials database is appropriate for a disposable rehearsal, while
 Lagniappe's configurable Redis TLS option requires paid Essentials/Flex or Pro.
 The database must use Google Cloud in the saved `RESOURCE_REGION`; an existing
 database is reusable only when its provider and region match. Setup then parses
-the copied Redis CLI command, validates the real connection, and saves no
-credential after a failed check.
+the copied Redis CLI command and directs the operator back to the same database
+page to select the required `volatile-ttl` policy. Redis Cloud treats that
+selection as pending until **Review changes** and the confirmation modal are
+completed; setup pauses until the operator confirms the saved policy. It then
+validates the real connection and saves no credential after a failed check.
 
 ## Domains and DNS
 

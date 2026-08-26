@@ -24,7 +24,10 @@ Installer deployment calls the same helper in publish-only mode. It uses the
 generated assets already present in the checkout and does not run npm or change
 the application version. The same manifest validation runs before any gcloud
 operation, so a missing, partial, corrupt, or stale prebuilt frontend is
-rejected.
+rejected. Every App Engine deploy command also names the saved target project
+explicitly. Interactive setup replaces gcloud's verbose successful-deployment
+transcript with one long-running progress line, retains the provider output on
+failure, and finishes with Lagniappe's exact saved application URL.
 
 ## Release preparation
 

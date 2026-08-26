@@ -9,7 +9,7 @@ import re
 import yaml
 
 from runner.context import REPOSITORY_ROOT, setup_command
-from installer.summary import install_summary_lines
+from installer.summary import expected_resource_lines
 
 
 GENERATED_FILES = (
@@ -333,7 +333,6 @@ def run_doctor(
     documents, local_issues = _local_state(root)
     settings = documents.get("config/files/lagniappe_settings.yaml") or {}
     deploy = documents.get("lagniappe.yaml") or {}
-    node = documents.get("package.json") or {}
     dev = documents.get("config/files/lagniappe_dev.yaml") or {}
     saved_gcloud = dev.get("gcloud_config") or {}
     local_issues.extend(_keyless_identity_issues(settings, deploy))
@@ -419,12 +418,11 @@ def run_doctor(
         print("Identity state: UNAVAILABLE")
 
     print("Expected target and provider resources:")
-    for line in install_summary_lines(
+    for line in expected_resource_lines(
         settings,
         deploy=deploy,
-        node=node,
         gcloud_config=saved_gcloud,
-    )[1:-5]:
+    ):
         print(f"- {line}")
 
     project = settings.get("GOOGLE_CLOUD_PROJECT") or saved_gcloud.get("PROJECT")

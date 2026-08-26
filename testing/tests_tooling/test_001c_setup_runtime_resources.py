@@ -592,22 +592,60 @@ def test_ai_observability_is_an_explicit_preserved_setup_choice(
 
     settings = _fake_settings()
     monkeypatch.setattr(config, "SETTINGS", settings)
+    formatter = types.SimpleNamespace(
+        initialize=lambda: types.SimpleNamespace(
+            info=lambda message: f"<info>{message}</info>",
+            success=lambda message: f"<success>{message}</success>",
+        )
+    )
+    monkeypatch.setattr(optional, "FORMATTER", formatter)
     monkeypatch.setattr(
         optional,
         "wrap_text",
         lambda message: setup_pkg.wrap_text(message, width=53),
     )
-    monkeypatch.setattr("builtins.input", lambda prompt: "y")
+    prompts = []
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: prompts.append(prompt) or "y",
+    )
 
     assert optional.configure_ai_observability()
     assert settings.APP["AI_OBSERVABILITY"] is True
-    output_lines = capsys.readouterr().out.splitlines()
+    first_output = capsys.readouterr().out
+    visible_output = (
+        first_output.replace("<info>", "")
+        .replace("</info>", "")
+        .replace("<success>", "")
+        .replace("</success>", "")
+    )
+    output_lines = visible_output.splitlines()
     assert all(len(line) <= 53 for line in output_lines)
     assert any("token totals," in line for line in output_lines)
+    assert "<info>Optional AI Generation Observability</info>" in first_output
+    assert "<success>AI generation observability enabled.</success>" in first_output
+    assert prompts == [
+        "\n<info>Enable AI generation observability? [y/N]: </info>"
+    ]
 
-    monkeypatch.setattr("builtins.input", lambda prompt: "")
+    prompts.clear()
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: prompts.append(prompt) or "",
+    )
     assert optional.configure_ai_observability()
     assert settings.APP["AI_OBSERVABILITY"] is True
+    preserved_output = capsys.readouterr().out
+    assert (
+        "<info>AI generation observability is currently enabled.</info>"
+        in preserved_output
+    )
+    assert "<success>Existing AI observability choice preserved.</success>" in (
+        preserved_output
+    )
+    assert prompts == [
+        "<info>Keep this AI observability choice? [Y/n]: </info>"
+    ]
 
 
 # @matrix setup : google-oauth optional rerun settings-save
@@ -779,10 +817,42 @@ def test_redis_cloud_instructions_open_console_and_locate_credentials(
     assert "Cloud vendor 'Google Cloud'" in output
     assert "Region 'us-central1'" in output
     assert "existing database is suitable only when" in output
-    assert "find Access on its details page" in output
+    assert "find Access on that same database details page" in output
     assert "connection panel, expand Redis CLI" in output
     assert "blue Copy button beneath the redis-cli command" in output
     assert "Return to setup and paste the complete copied command" in output
+    assert "Keep the database details page open" in output
+
+
+# @matrix setup : interactive-input operator-guidance redis
+def test_redis_eviction_policy_instructions_require_confirmation(
+    monkeypatch,
+    capsys,
+):
+    import installer as setup_pkg
+    from installer import redis as redis_setup
+
+    monkeypatch.setattr(setup_pkg, "FORMATTER", _fake_formatter())
+    monkeypatch.setattr(redis_setup, "FORMATTER", _fake_formatter())
+    prompts = []
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: prompts.append(prompt) or "",
+    )
+
+    redis_setup.eviction_policy_instructions()
+
+    output = " ".join(capsys.readouterr().out.split())
+    assert "Performance & Availability → Data eviction policy" in output
+    assert "select volatile-ttl" in output
+    assert "only pending until you click 'Review changes'" in output
+    assert "confirmation modal" in output
+    assert "'Confirm' or 'Confirm & pay'" in output
+    assert "Wait for the pending-change indicator to clear" in output
+    assert "displayed Data eviction policy is still volatile-ttl" in output
+    assert prompts == [
+        "\nPress Enter only after Redis Cloud confirms the eviction policy..."
+    ]
 
 
 # @matrix setup : failure-isolation redis retry rollback settings-save
@@ -3428,8 +3498,9 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
     ]
 
 
-# @matrix setup : deploy gcloud-command
+# @matrix setup : deploy failure gcloud-command progress
 def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
+    import installer as setup_pkg
     from installer import utils
     from installer.domain import gcp as domain_gcp
 
@@ -3499,8 +3570,22 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
             deploy_commands.append((command, check)) or completed_process(command)
         ),
     )
+    deployment_spinner = SpinnerRecorder()
+    deployment_progress = []
+    initialized_formatter = _fake_formatter(deployment_spinner).initialize()
+    initialized_formatter.yaspin = lambda **kwargs: (
+        deployment_progress.append(kwargs["text"])
+        or nullcontext(deployment_spinner)
+    )
     monkeypatch.setattr(
-        utils, "print_summary", lambda: deploy_commands.append("summary")
+        setup_pkg,
+        "FORMATTER",
+        types.SimpleNamespace(initialize=lambda: initialized_formatter),
+    )
+    monkeypatch.setattr(
+        utils,
+        "print_summary",
+        lambda: deploy_commands.append("summary"),
     )
     monkeypatch.setattr(
         domain_gcp,
@@ -3513,9 +3598,15 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
     )
     monkeypatch.setitem(sys.modules, "runner.deploy", deploy_module)
 
+    capsys.readouterr()
     utils.deploy_to_app_engine()
 
-    assert "may take up to 10 minutes" in capsys.readouterr().out
+    assert capsys.readouterr().out == "Deployment complete!\n"
+    assert deployment_progress == [
+        "Deploy App Engine indexes and application (may take up to 10 minutes)"
+    ]
+    assert deployment_spinner.oks == ["[OK]"]
+    assert deployment_spinner.fails == []
     assert deploy_commands == [
         (
             "deploy",
@@ -3523,12 +3614,22 @@ def test_setup_prerequisite_gcloud_and_deploy_helpers(monkeypatch, capsys):
                 "build_assets": False,
                 "deploy_indexes": True,
                 "quiet": True,
+                "capture_output": True,
+                "announce_progress": False,
                 "announce_completion": False,
             },
         ),
         ("certificate", "app.example.com"),
         "summary",
     ]
+
+    deploy_module.deploy = lambda **kwargs: (_ for _ in ()).throw(
+        RuntimeError("provider deployment failed")
+    )
+    with pytest.raises(RuntimeError, match="provider deployment failed"):
+        utils.deploy_to_app_engine(print_final_summary=False)
+    assert deployment_spinner.oks == ["[OK]"]
+    assert deployment_spinner.fails == ["[X]"]
 
 
 # @matrix deferred-jobs setup : cloud-scheduler iam oidc recovery runtime-isolation

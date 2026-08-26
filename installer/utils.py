@@ -156,21 +156,31 @@ def run_gcloud_command(command, check=True, timeout=GCLOUD_TIMEOUT):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_prerequisite_gcloud_and_deploy_helpers
-# @matrix setup : deploy gcloud-command
+# @matrix setup : deploy failure gcloud-command progress
 def deploy_to_app_engine(*, print_final_summary=True):
     from config import SETTINGS
+    from installer import FORMATTER
     from runner.deploy import deploy
 
-    print(
-        "Deploying the App Engine indexes and application may take up to "
-        "10 minutes. Deployment progress will appear below."
+    f = FORMATTER.initialize()
+    progress = f.success(
+        "Deploy App Engine indexes and application "
+        "(may take up to 10 minutes)"
     )
-    deploy(
-        build_assets=False,
-        deploy_indexes=True,
-        quiet=True,
-        announce_completion=False,
-    )
+    with f.yaspin(text=progress) as spinner:
+        try:
+            deploy(
+                build_assets=False,
+                deploy_indexes=True,
+                quiet=True,
+                capture_output=True,
+                announce_progress=False,
+                announce_completion=False,
+            )
+        except Exception:
+            spinner.fail(f.fail_glyph)
+            raise
+        spinner.ok(f.ok_glyph)
 
     custom_domain = str(SETTINGS.APP.get("CUSTOM_DOMAIN") or "").strip()
     if custom_domain:
