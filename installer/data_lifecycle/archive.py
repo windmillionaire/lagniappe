@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -12,6 +13,7 @@ import tempfile
 import zipfile
 
 from installer.state import record_mutation, record_step
+from installer.errors import ProviderNotFound
 from runner.context import REPOSITORY_ROOT
 
 from .assets import AssetCollector
@@ -40,6 +42,20 @@ PRIVATE_ARCHIVE_NOTICE = (
     "This archive contains private owner-visible content and is not encrypted. "
     "Protect it as sensitive data."
 )
+
+
+# @testable false
+# @covered-by installer/data_lifecycle/archive.py::build_archive
+# @reason terminal animation wraps tested archive phases without changing their contracts
+@contextmanager
+def _progress(formatter, message):
+    with formatter.yaspin(text=formatter.success(message)) as spinner:
+        try:
+            yield spinner
+        except BaseException:
+            spinner.fail(formatter.fail_glyph)
+            raise
+        spinner.ok(formatter.ok_glyph)
 
 
 # @testable false
@@ -99,15 +115,6 @@ def _write_private(path, payload, *, binary=False):
         path.write_text(payload, encoding="utf-8", newline="\n")
     if os.name != "nt":
         os.chmod(path, 0o600)
-
-
-# @testable false
-# @covered-by installer/data_lifecycle/archive.py::build_archive
-# @reason provider response extraction is an internal orchestration adapter
-def _provider_operation(payload):
-    if not isinstance(payload, dict):
-        return None
-    return str(payload.get("name") or "").strip() or None
 
 
 # @testable false
@@ -391,6 +398,9 @@ def build_archive(
     context=None,
 ):
     """Create/resume one portable archive and publish only after validation."""
+    from installer import FORMATTER
+
+    formatter = FORMATTER.initialize()
     context = context or ProviderContext.from_settings()
     explicit_backup = backup_id is not None
     explicit_output = output is not None
@@ -425,7 +435,8 @@ def build_archive(
     if state and state.get("published_path"):
         validate_archive(output)
         try:
-            _cleanup_successful_archive(context, checkpoint, output)
+            with _progress(formatter, "Removing the temporary archive database"):
+                _cleanup_successful_archive(context, checkpoint, output)
         except Exception as error:
             checkpoint.update("cleanup-failed", cleanup_error=str(error))
             raise DataLifecycleError(
@@ -458,35 +469,59 @@ def build_archive(
 
     if not checkpoint.payload.get("scratch_created"):
         record_step("create archive scratch Datastore database")
-        created = context.create_database(
-            scratch_database,
-            backup.database_location,
-            delete_protection=False,
-        )
-        operation = _provider_operation(created)
-        if not operation:
+        created = False
+        try:
+            existing = context.database(scratch_database)
+        except ProviderNotFound:
+            existing = None
+        if existing is None:
+            with _progress(
+                formatter,
+                "Creating the temporary archive database (this may take several minutes)",
+            ):
+                existing = context.create_database(
+                    scratch_database,
+                    backup.database_location,
+                    delete_protection=False,
+                )
+            created = True
+        mode = str(
+            existing.get("type") or existing.get("databaseType") or ""
+        ).casefold().replace("_", "-")
+        location = str(
+            existing.get("locationId") or existing.get("location_id") or ""
+        ).strip()
+        expected_name = f"projects/{context.project_id}/databases/{scratch_database}"
+        if (
+            str(existing.get("name") or "") != expected_name
+            or mode not in {"datastore", "datastore-mode"}
+            or location != backup.database_location
+        ):
             raise DataLifecycleError(
-                "Provider did not return an operation for scratch database creation."
+                "The reserved archive scratch database has unexpected provider settings."
             )
-        checkpoint.update("scratch-create-started", scratch_create_operation=operation)
-        context.wait_for_operation(operation, database_id=scratch_database)
         checkpoint.update("scratch-created", scratch_created=True)
-        record_mutation(
-            "create archive scratch database",
-            action="create",
-            resource="datastore-database",
-            identifier=scratch_database,
-        )
+        if created:
+            record_mutation(
+                "create archive scratch database",
+                action="create",
+                resource="datastore-database",
+                identifier=scratch_database,
+            )
 
     if not checkpoint.payload.get("import_complete"):
         operation = checkpoint.payload.get("import_operation")
-        if not operation:
-            record_step("import managed backup into archive scratch database")
-            operation, _payload = context.start_import(
-                backup.export_metadata_uri, scratch_database
-            )
-            checkpoint.update("scratch-import-started", import_operation=operation)
-        context.wait_for_operation(operation, database_id=scratch_database)
+        record_step("import managed backup into archive scratch database")
+        with _progress(
+            formatter,
+            "Importing the manual backup (this may take several minutes)",
+        ):
+            if not operation:
+                operation, _payload = context.start_import(
+                    backup.export_metadata_uri, scratch_database
+                )
+                checkpoint.update("scratch-import-started", import_operation=operation)
+            context.wait_for_operation(operation, database_id=scratch_database)
         checkpoint.update("scratch-import-complete", import_complete=True)
 
     with ArchiveState(raw_state_path) as archive_state:
@@ -495,64 +530,74 @@ def build_archive(
 
             record_step("scan archive scratch database in bounded pages")
             client = context.datastore_client(scratch_database)
-            stage_database(
-                client,
-                archive_state,
-                source_project=context.project_id,
-                source_database=backup.source_database_id,
-                prefix=str(SETTINGS.APP.get("PREFIX") or ""),
-            )
+            with _progress(formatter, "Scanning the saved database"):
+                stage_database(
+                    client,
+                    archive_state,
+                    source_project=context.project_id,
+                    source_database=backup.source_database_id,
+                    prefix=str(SETTINGS.APP.get("PREFIX") or ""),
+                )
             archive_state.set_metadata("scan_complete", True)
             checkpoint.update("scratch-scan-complete")
-        records = portable_records(archive_state)
-        collector = AssetCollector(
-            archive_state, bundle, _recovery_buckets(context, backup)
-        )
-        assets, _asset_warnings = collector.collect()
-        warnings = _warnings(archive_state)
-        asset_window = {
-            "started_at": collector.started_at,
-            "completed_at": collector.completed_at,
-            "consistency": "recovery-set-generations",
-        }
-        created_at = _now()
-        catalog, html_result = _write_bundle(
-            bundle,
-            backup=backup,
-            records=records,
-            assets=assets,
-            warnings=warnings,
-            asset_window=asset_window,
-            created_at=created_at,
-        )
-        parts = bundle / ".parts"
-        if parts.exists():
-            shutil.rmtree(parts)
-        manifest = _root_manifest(
-            bundle,
-            backup=backup,
-            catalog=catalog,
-            warnings=warnings,
-            html_result=html_result,
-            created_at=created_at,
-        )
-        temporary_manifest = bundle / ".manifest.json.tmp"
-        _write_private(temporary_manifest, json.dumps(manifest, indent=2, sort_keys=True) + "\n")
-        os.replace(temporary_manifest, bundle / "manifest.json")
-        _restrict_tree(bundle)
-        validate_archive(bundle)
+        with _progress(
+            formatter,
+            "Collecting saved files and building the portable archive",
+        ):
+            records = portable_records(archive_state)
+            collector = AssetCollector(
+                archive_state, bundle, _recovery_buckets(context, backup)
+            )
+            assets, _asset_warnings = collector.collect()
+            warnings = _warnings(archive_state)
+            asset_window = {
+                "started_at": collector.started_at,
+                "completed_at": collector.completed_at,
+                "consistency": "recovery-set-generations",
+            }
+            created_at = _now()
+            catalog, html_result = _write_bundle(
+                bundle,
+                backup=backup,
+                records=records,
+                assets=assets,
+                warnings=warnings,
+                asset_window=asset_window,
+                created_at=created_at,
+            )
+            parts = bundle / ".parts"
+            if parts.exists():
+                shutil.rmtree(parts)
+            manifest = _root_manifest(
+                bundle,
+                backup=backup,
+                catalog=catalog,
+                warnings=warnings,
+                html_result=html_result,
+                created_at=created_at,
+            )
+            temporary_manifest = bundle / ".manifest.json.tmp"
+            _write_private(
+                temporary_manifest,
+                json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+            )
+            os.replace(temporary_manifest, bundle / "manifest.json")
+            _restrict_tree(bundle)
+            validate_archive(bundle)
         checkpoint.update("bundle-validated", archive_status=manifest["archive_status"])
 
     record_step("publish validated private archive")
-    if zip_output:
-        _publish_zip(bundle, output, manifest)
-    else:
-        _publish_directory(bundle, output)
-    validate_archive(output)
+    with _progress(formatter, "Publishing and validating the portable archive"):
+        if zip_output:
+            _publish_zip(bundle, output, manifest)
+        else:
+            _publish_directory(bundle, output)
+        validate_archive(output)
     checkpoint.update("archive-published", published_path=str(output))
 
     try:
-        _cleanup_successful_archive(context, checkpoint, output)
+        with _progress(formatter, "Removing the temporary archive database"):
+            _cleanup_successful_archive(context, checkpoint, output)
     except Exception as error:
         checkpoint.update("cleanup-failed", cleanup_error=str(error))
         raise DataLifecycleError(

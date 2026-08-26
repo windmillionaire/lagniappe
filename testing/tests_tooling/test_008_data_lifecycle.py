@@ -436,6 +436,38 @@ def test_operation_polling_resumes_and_reports_provider_failure(monkeypatch):
         context.wait_for_operation(OPERATION)
 
 
+# @matrix data-lifecycle : database-create synchronous-provider-contract
+def test_database_creation_uses_current_synchronous_gcloud_contract():
+    calls = []
+
+    def gcloud(arguments, *, timeout):
+        calls.append((arguments, timeout))
+        return {
+            "name": f"projects/{PROJECT_ID}/databases/scratch-db",
+            "type": "DATASTORE_MODE",
+            "locationId": "nam5",
+        }
+
+    context = ProviderContext(
+        PROJECT_ID,
+        "(default)",
+        BUCKET,
+        "0.3.0",
+        gcloud=gcloud,
+    )
+
+    result = context.create_database(
+        "scratch-db", "nam5", delete_protection=False
+    )
+
+    arguments, timeout = calls[0]
+    assert result["name"].endswith("/databases/scratch-db")
+    assert arguments[:3] == ["firestore", "databases", "create"]
+    assert "--no-delete-protection" in arguments
+    assert "--async" not in arguments
+    assert timeout == 600
+
+
 # @matrix data-lifecycle : private-state resume
 def test_secure_directory_and_checkpoint_exact_resume(tmp_path):
     private = secure_directory(tmp_path / "private")
@@ -1414,9 +1446,21 @@ def test_archive_build_publishes_manifest_last_and_retains_failed_scratch_state(
         project_id = PROJECT_ID
         deleted = False
         fail_cleanup = True
+        database_payload = None
 
-        def create_database(self, *_args, **_kwargs):
-            return {"name": OPERATION}
+        def database(self, database_id):
+            if self.database_payload is None:
+                raise ProviderNotFound("absent")
+            assert self.database_payload["name"].endswith(f"/databases/{database_id}")
+            return self.database_payload
+
+        def create_database(self, database_id, location, **_kwargs):
+            self.database_payload = {
+                "name": f"projects/{PROJECT_ID}/databases/{database_id}",
+                "type": "DATASTORE_MODE",
+                "locationId": location,
+            }
+            return self.database_payload
 
         def start_import(self, *_args, **_kwargs):
             return OPERATION, {}
@@ -1431,6 +1475,7 @@ def test_archive_build_publishes_manifest_last_and_retains_failed_scratch_state(
             if self.fail_cleanup:
                 raise RuntimeError("cleanup unavailable")
             self.deleted = True
+            self.database_payload = None
             return {}
 
     context = Context()

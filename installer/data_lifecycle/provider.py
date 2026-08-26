@@ -509,22 +509,30 @@ class ProviderContext:
             attempt += 1
             self.sleep(delay)
 
+    # @testable true
+    # @tests tests_tooling/test_008_data_lifecycle.py::test_database_creation_uses_current_synchronous_gcloud_contract
+    # @matrix data-lifecycle : database-create synchronous-provider-contract
     def create_database(self, database_id: str, location: str, *, delete_protection=True):
         database_id = validate_database_id(database_id, allow_default=False)
         arguments = [
-                "firestore",
-                "databases",
-                "create",
-                f"--database={database_id}",
-                f"--location={str(location).strip()}",
-                "--type=datastore-mode",
-                "--async",
-            ]
-        arguments.insert(-1, "--delete-protection" if delete_protection else "--no-delete-protection")
-        return self.json_command(
+            "firestore",
+            "databases",
+            "create",
+            f"--database={database_id}",
+            f"--location={str(location).strip()}",
+            "--type=datastore-mode",
+            "--delete-protection" if delete_protection else "--no-delete-protection",
+        ]
+        payload = self.json_command(
             arguments,
-            timeout=120,
+            timeout=600,
         )
+        expected_name = f"projects/{self.project_id}/databases/{database_id}"
+        if not isinstance(payload, dict) or str(payload.get("name") or "") != expected_name:
+            raise DataLifecycleError(
+                "Provider did not return the created scratch database."
+            )
+        return payload
 
     def delete_database(self, database_id: str):
         database_id = validate_database_id(database_id, allow_default=False)
