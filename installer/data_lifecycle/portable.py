@@ -50,6 +50,8 @@ PORTABLE_TYPE_ROLES = {
     "message_conversation": "message_conversations",
 }
 PORTABLE_CHILD_ROLES = {
+    "page": {"document_history": "history"},
+    "project": {"document_history": "history"},
     "task": {"task_history": "history"},
     "message_conversation": {"message": "messages"},
 }
@@ -559,8 +561,12 @@ def validate_entity_record(record: dict[str, Any]) -> PortableIdentity:
 # @tests tests_tooling/test_008_data_lifecycle.py::test_archive_validation_counts_children_without_separate_identity_pages
 # @matrix portable-archive portable-json : owner-scoped-children
 def validate_child_record(child_type: str, child: dict[str, Any]) -> dict[str, Any]:
-    """Validate one task-owned history or conversation-owned message row."""
-    if child_type not in {"task_history", "message"} or not isinstance(child, dict):
+    """Validate one owner-scoped history or message row."""
+    if child_type not in {
+        "task_history",
+        "document_history",
+        "message",
+    } or not isinstance(child, dict):
         raise DataLifecycleError("Portable child type is invalid.")
     if set(child) != {"key", "exclude_from_indexes", "properties"}:
         raise DataLifecycleError("Portable child envelope is invalid.")
@@ -742,7 +748,7 @@ class ImportPlanner:
                 properties = child["properties"]
                 self._resolve(ValueCodec().decode(properties), identities)
                 self._resolve_portable(properties, identities)
-                if child_type == "task_history":
+                if child_type in {"task_history", "document_history"}:
                     suffix = (
                         f"id:{child_key['id']}"
                         if "id" in child_key

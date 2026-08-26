@@ -1083,13 +1083,19 @@ def test_staging_selects_durable_types_and_builds_typed_identity_map(tmp_path):
     excluded = _entity(Key("activity", "notice", project=PROJECT_ID, database="scratch-db"), type="notification")
     unknown = _entity(Key("future", "one", project=PROJECT_ID, database="scratch-db"), type="future")
     meta_project = PROJECT_ID
-    kinds = ["users", "models", "activity", "future"]
+    kinds = ["users", "models", "activity", "analytics", "site", "future"]
     rows = {
         ("", "__namespace__"): [_entity(Key("__namespace__", 1, project=meta_project), value=1)],
         ("", "__kind__"): [_entity(Key("__kind__", kind, project=meta_project), value=kind) for kind in kinds],
         ("", "users"): [user],
         ("", "models"): [reserved_users],
         ("", "activity"): [excluded],
+        ("", "analytics"): [
+            _entity(Key("analytics", "event", project=meta_project), type="analytics")
+        ],
+        ("", "site"): [
+            _entity(Key("site", "settings", project=meta_project), type="settings")
+        ],
         ("", "future"): [unknown],
     }
     with ArchiveState(tmp_path / "stage.sqlite3") as state:
@@ -1102,7 +1108,9 @@ def test_staging_selects_durable_types_and_builds_typed_identity_map(tmp_path):
         assert counts["included"] == 2
         assert "missing-hash:users" not in counts
         assert counts["unknown-kind:future"] == 1
-        assert counts["excluded-type:notification"] == 1
+        assert "unknown-kind:analytics" not in counts
+        assert "unknown-kind:site" not in counts
+        assert "excluded-type:notification" not in counts
         records = portable_records(state)
         assert {record["identity"]["type"] for record in records} == {"user", "users"}
         user_record = next(record for record in records if record["identity"]["type"] == "user")
@@ -1160,7 +1168,10 @@ def test_history_and_messages_are_nested_and_replanned_under_their_owners(tmp_pa
     actor_key = Key("users", "actor", **partition)
     recipient_key = Key("users", "recipient", **partition)
     task_key = Key("instances", "task", **partition)
+    page_key = Key("instances", "page", **partition)
     history_key = Key("instances", "task", "history", 17, **partition)
+    pinned_history_key = Key("instances", "page", "history", 18, **partition)
+    automatic_history_key = Key("instances", "page", "history", 19, **partition)
     conversation_key = Key("message_conversations", "source-thread", **partition)
     message_key = Key(
         "message_conversations", "source-thread", "messages", 4, **partition
@@ -1178,7 +1189,8 @@ def test_history_and_messages_are_nested_and_replanned_under_their_owners(tmp_pa
             _entity(recipient_key, type="user", email="recipient@example.com"),
         ],
         ("", "instances"): [
-            _entity(task_key, type="task", hash="taskhash0001", name="Task")
+            _entity(task_key, type="task", hash="taskhash0001", name="Task"),
+            _entity(page_key, type="page", hash="pagehash0001", name="Page"),
         ],
         ("", "history"): [
             _entity(
@@ -1186,7 +1198,27 @@ def test_history_and_messages_are_nested_and_replanned_under_their_owners(tmp_pa
                 type="task_history",
                 task=task_key,
                 name="Completed task",
-            )
+            ),
+            _entity(
+                pinned_history_key,
+                type="document_history",
+                hash=encode_urlsafe_key(pinned_history_key),
+                name="Approved version",
+                assets={
+                    "document": {
+                        "path": "page/history/approved.html",
+                        "generation": "7",
+                        "visibility": "history",
+                        "type": "html",
+                    }
+                },
+            ),
+            _entity(
+                automatic_history_key,
+                type="document_history",
+                hash=encode_urlsafe_key(automatic_history_key),
+                name="",
+            ),
         ],
         ("", "message_conversations"): [
             _entity(
@@ -1215,6 +1247,7 @@ def test_history_and_messages_are_nested_and_replanned_under_their_owners(tmp_pa
             source_database="source-db",
         )
         records = portable_records(state)
+        assert list(state.connection.execute("SELECT * FROM warnings")) == []
 
     task = next(record for record in records if record["identity"]["type"] == "task")
     conversation = next(
@@ -1222,11 +1255,17 @@ def test_history_and_messages_are_nested_and_replanned_under_their_owners(tmp_pa
         for record in records
         if record["identity"]["type"] == "message_conversation"
     )
+    page = next(record for record in records if record["identity"]["type"] == "page")
     history = task["children"]["task_history"][0]
+    pinned_history = page["children"]["document_history"][0]
     message = conversation["children"]["message"][0]
     assert history["key"] == {"id": 17}
     assert message["key"] == {"id": 4}
     assert "hash" not in history["properties"]
+    assert "hash" not in pinned_history["properties"]
+    assert pinned_history["properties"]["name"] == "Approved version"
+    assert set(pinned_history["properties"]["assets"]) == {"document"}
+    assert len(page["children"]["document_history"]) == 1
     assert "hash" not in message["properties"]
     assert conversation["identity"]["id"].startswith("conversation-")
 
@@ -1237,6 +1276,11 @@ def test_history_and_messages_are_nested_and_replanned_under_their_owners(tmp_pa
     message_plan = next(
         row for row in plan["entities"] if row["identity"].get("type") == "message"
     )
+    document_history_plan = next(
+        row
+        for row in plan["entities"]
+        if row["identity"].get("type") == "document_history"
+    )
     task_plan = next(
         row for row in plan["entities"] if row["identity"].get("type") == "task"
     )
@@ -1245,10 +1289,15 @@ def test_history_and_messages_are_nested_and_replanned_under_their_owners(tmp_pa
         for row in plan["entities"]
         if row["identity"].get("type") == "message_conversation"
     )
+    page_plan = next(
+        row for row in plan["entities"] if row["identity"].get("type") == "page"
+    )
     assert history_plan["target_key"].startswith(task_plan["target_key"] + "/")
     assert message_plan["target_key"].startswith(conversation_plan["target_key"] + "/")
+    assert document_history_plan["target_key"].startswith(page_plan["target_key"] + "/")
     assert history_plan["target_key"].endswith("/test-history:id:17")
-    assert plan["identity_count"] == 6
+    assert document_history_plan["target_key"].endswith("/test-history:id:18")
+    assert plan["identity_count"] == 8
     payload = canonical_json(records).decode()
     assert "source-thread" not in payload
     assert "scratch-db" not in payload and "source-db" not in payload
@@ -1687,12 +1736,29 @@ def test_archive_validation_counts_children_without_separate_identity_pages(tmp_
             ]
         },
     )
-    manifest = _archive_bundle(bundle, records=[task])
-    assert manifest["counts"]["entities"] == 2
-    assert manifest["counts"]["pages"] == 2
-    assert validate_archive(bundle)["entities"] == 2
+    page = _record(
+        "page",
+        "pagehash0001",
+        {"name": "Page"},
+        children={
+            "document_history": [
+                {
+                    "key": {"id": 18},
+                    "exclude_from_indexes": [],
+                    "properties": {"name": "Approved version"},
+                }
+            ]
+        },
+    )
+    manifest = _archive_bundle(bundle, records=[task, page])
+    assert manifest["counts"]["entities"] == 4
+    assert manifest["counts"]["pages"] == 3
+    assert validate_archive(bundle)["entities"] == 4
     task_page = (bundle / "site" / "task" / "taskhash0001" / "index.html").read_text()
+    page_page = (bundle / "site" / "page" / "pagehash0001" / "index.html").read_text()
     assert "Task history (1)" in task_page and "Completed task" in task_page
+    assert "Pinned document versions (1)" in page_page
+    assert "Approved version" in page_page
     assert not (bundle / "site" / "task_history").exists()
 
 

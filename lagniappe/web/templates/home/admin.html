@@ -186,6 +186,7 @@
                 <div><dt class="font-medium">Check the restore without changing data</dt><dd>{{ command_block("./setup.sh restore " ~ backup.backup_id ~ " --dry-run") }}</dd></div>
                 <div><dt class="font-medium">Restore this manual backup</dt><dd>{{ command_block("./setup.sh restore " ~ backup.backup_id) }}</dd></div>
                 <div><dt class="font-medium">Create a portable archive</dt><dd>{{ command_block("./setup.sh archive " ~ backup.backup_id) }}</dd></div>
+                <div><dt class="font-medium">Validate the default portable archive path</dt><dd>{{ command_block('./setup.sh archive validate "archives/' ~ backup.backup_id ~ '"') }}</dd></div>
                 <div><dt class="font-medium">Permanently delete this manual backup</dt><dd>{{ command_block("./setup.sh backup delete " ~ backup.backup_id) }}</dd></div>
               </dl>
             </li>
@@ -206,6 +207,14 @@
           of a manual backup with portable data, documents, and files. It can be validated without
           Google access, but it is not itself the source used by the restore command.
         </p>
+        <p class="mt-3 text-sm text-base-medium">
+          Archive validation is a read-only, offline integrity check. It verifies the manifest and
+          checksums, portable data schema and relationships, local viewer links, and saved-file
+          inventory. Pass the directory or ZIP path printed when the archive was created; replace
+          the default path above when a custom output path was used.
+        </p>
+        <p class="mt-3 font-medium">Validate any portable archive</p>
+        {{ command_block('./setup.sh archive validate "ARCHIVE_PATH"') }}
       {% endcall %}
     {% endif %}
   </div>

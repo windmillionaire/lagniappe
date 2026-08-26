@@ -99,6 +99,7 @@
           "type": "object",
           "properties": {
             "task_history": {"type": "array", "items": {"$ref": "#/$defs/child"}},
+            "document_history": {"type": "array", "items": {"$ref": "#/$defs/child"}},
             "message": {"type": "array", "items": {"$ref": "#/$defs/child"}}
           },
           "additionalProperties": false

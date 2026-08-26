@@ -28,10 +28,17 @@ def test_backups_tab_reveals_static_status_panel(get_user):
     expect(backups).to_contain_text("Data protection")
     expect(backups).to_contain_text("Automatic backups")
     expect(backups).to_contain_text("Manual backups")
+    expect(backups).to_contain_text(
+        "Archive validation is a read-only, offline integrity check"
+    )
     create_command = backups.locator("[data-role='manual-command']").filter(
         has_text="./setup.sh backup create"
     )
     expect(create_command).to_have_count(1)
+    validate_command = backups.locator("[data-role='manual-command']").filter(
+        has_text='./setup.sh archive validate "ARCHIVE_PATH"'
+    )
+    expect(validate_command).to_have_count(1)
     copy_button = create_command.locator(
         "xpath=ancestor::*[@data-role='manual-command-shell']"
     ).locator("[data-role='manual-command-copy']")

@@ -32,13 +32,15 @@ INCLUDED_TYPES = {
     "instances": {"page", "task"},
     "files": {"file"},
     "filters": {"filter"},
-    "history": {"task_history"},
+    "history": {"task_history", "document_history"},
     "activity": {"note", "report"},
     "message_conversations": {"message_conversation"},
     "messages": {"message"},
 }
-NESTED_TYPES = {"task_history", "message"}
+NESTED_TYPES = {"task_history", "document_history", "message"}
 KEY_IDENTIFIED_TYPES = {*NESTED_TYPES, "message_conversation"}
+QUIET_OMITTED_PHYSICAL_ROLES = {"analytics", "site"}
+QUIET_OMITTED_TYPES = {"notification"}
 HASH_PATTERN = re.compile(r"\A[a-z0-9]{6,128}\Z")
 
 
@@ -217,9 +219,13 @@ def stage_database(
     source_database = validate_database_id(source_database)
     counts = Counter()
     known_physical = {f"{prefix}{role}": role for role in INCLUDED_TYPES}
+    quiet_physical = {f"{prefix}{role}" for role in QUIET_OMITTED_PHYSICAL_ROLES}
     for namespace in _namespaces(client):
         for physical_kind in _physical_kinds(client, namespace):
-            if physical_kind not in known_physical:
+            if (
+                physical_kind not in known_physical
+                and physical_kind not in quiet_physical
+            ):
                 query = client.query(kind=physical_kind, namespace=namespace or None)
                 for page in _query_pages(query, page_size=page_size):
                     counts[f"unknown-kind:{physical_kind}"] += len(page)
@@ -234,27 +240,32 @@ def stage_database(
                             or ("user" if role == "users" else "")
                         ).strip()
                         included = semantic_type in INCLUDED_TYPES[role]
+                        if semantic_type == "document_history":
+                            included = included and bool(
+                                str(entity.get("name") or "").strip()
+                            )
+                        quietly_omitted = (
+                            semantic_type in QUIET_OMITTED_TYPES
+                            or semantic_type == "document_history" and not included
+                        )
                         scratch_encoding = _urlsafe(entity.key)
                         source_encoding = _urlsafe(
                             _source_key(entity.key, source_project, source_database)
                         )
                         stored_hash = str(entity.get("hash") or "").strip()
-                        portable_id = (
-                            _user_id(entity)
-                            if included and semantic_type == "user"
-                            else stored_hash
-                        )
-                        if (
-                            not portable_id
-                            and included
-                            and (
-                                semantic_type in KEY_IDENTIFIED_TYPES
-                                or bool(entity.get("reserved"))
-                            )
+                        if included and semantic_type == "user":
+                            portable_id = _user_id(entity)
+                        elif included and (
+                            semantic_type in KEY_IDENTIFIED_TYPES
+                            or bool(entity.get("reserved"))
                         ):
                             portable_id = _partitionless_id(entity.key)
+                        else:
+                            portable_id = stored_hash
                         if (
-                            semantic_type != "user"
+                            included
+                            and semantic_type != "user"
+                            and semantic_type not in KEY_IDENTIFIED_TYPES
                             and stored_hash
                             and not HASH_PATTERN.fullmatch(stored_hash)
                         ):
@@ -264,7 +275,7 @@ def stage_database(
                         if included and not portable_id:
                             status = "required-missing"
                             counts[f"missing-hash:{semantic_type}"] += 1
-                        elif not included:
+                        elif not included and not quietly_omitted:
                             counts[f"excluded-type:{semantic_type or '<missing>'}"] += 1
                         existing = connection.execute(
                             "SELECT 1 FROM entities WHERE source_key=?",
@@ -499,7 +510,7 @@ def _asset_tags(state, owner, raw_assets):
 # @tests tests_tooling/test_008_data_lifecycle.py::test_history_and_messages_are_nested_and_replanned_under_their_owners
 # @matrix portable-json : entity-envelope key-replacement natural-identity owner-scoped-children typed-references
 def portable_records(state: ArchiveState) -> list[dict[str, Any]]:
-    """Build top-level records with task history and messages nested under owners."""
+    """Build top-level records with durable child rows nested under their owners."""
     if state.connection is None:
         raise DataLifecycleError("Archive staging database is not open.")
     resolver = _Resolver(state)
@@ -551,8 +562,12 @@ def portable_records(state: ArchiveState) -> list[dict[str, Any]]:
         parent = resolver.key(entity.key.parent)
         if not isinstance(parent, PortableReference):
             raise DataLifecycleError("Portable child has no included structural parent.")
-        expected_parent = "task" if row["semantic_type"] == "task_history" else "message_conversation"
-        if parent.type != expected_parent:
+        expected_parents = {
+            "task_history": {"task"},
+            "document_history": {"page", "project"},
+            "message": {"message_conversation"},
+        }[row["semantic_type"]]
+        if parent.type not in expected_parents:
             raise DataLifecycleError(
                 f"Portable {row['semantic_type']} has an invalid {parent.type} parent."
             )
@@ -561,7 +576,8 @@ def portable_records(state: ArchiveState) -> list[dict[str, Any]]:
             raise DataLifecycleError("Portable child parent record is unavailable.")
         key = _child_key(entity.key)
         properties = dict(entity)
-        if properties.pop("hash", None):
+        child_hash = properties.pop("hash", None)
+        if child_hash and row["semantic_type"] != "document_history":
             raise DataLifecycleError("Portable child rows must not carry archive-only hashes.")
         owner = {
             "type": row["semantic_type"],
@@ -608,6 +624,8 @@ def normalize_text(state: ArchiveState, value: str) -> str:
 __all__ = [
     "INCLUDED_TYPES",
     "NESTED_TYPES",
+    "QUIET_OMITTED_PHYSICAL_ROLES",
+    "QUIET_OMITTED_TYPES",
     "SCAN_PAGE_SIZE",
     "normalize_text",
     "portable_records",

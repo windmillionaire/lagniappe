@@ -78,9 +78,23 @@ Output is either `archives/<backup-id>/` or a ZIP. It contains:
 - a network-free Owner-oriented site at `site/index.html`.
 
 Archives contain private Owner-visible content and are not encrypted.
+They intentionally omit operational analytics, internal site/configuration
+records, transient notifications, and unnamed automatic document history.
+Named (pinned) document versions are retained with their exact saved document
+asset and shown beneath the page or project that owns them.
 Publication is atomic; `manifest.json` is the final ZIP entry. `archive
 validate` checks paths, hashes, counts, identities, relations, links, assets,
-and the absence of recognizable Datastore keys without network access.
+and the absence of recognizable Datastore keys without network access. It is a
+read-only integrity check: pass either the published archive directory or ZIP
+path, normally the path printed by `archive`. A successful summary reports the
+archive ID plus its portable entity and file counts; it does not modify the
+archive or contact Google Cloud.
+
+Manual and provider-managed backups remain complete restore artifacts rather
+than owner-facing archives. Google-managed automatic backups cannot filter
+individual kinds, and pinned and unnamed document history share one physical
+Datastore kind, so backup creation preserves both. This avoids importing
+history rows whose exact Storage generations were not retained.
 
 PITR and automatic backups remain inside Google Cloud and are limited by their
 retention windows. A portable archive is instead an independent, downloadable

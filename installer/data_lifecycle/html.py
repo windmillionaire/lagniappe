@@ -392,14 +392,20 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
 
     def _render_children(self, record, page_path):
         sections = []
-        labels = {"task_history": "Task history", "message": "Messages"}
+        labels = {
+            "task_history": "Task history",
+            "document_history": "Pinned document versions",
+            "message": "Messages",
+        }
         for child_type, children in sorted((record.get("children") or {}).items()):
             items = []
             for child in children:
                 properties = child["properties"]
-                title = properties.get("name") or (
-                    "Message" if child_type == "message" else "Completed task"
-                )
+                fallback_title = {
+                    "message": "Message",
+                    "document_history": "Pinned document version",
+                }.get(child_type, "Completed task")
+                title = properties.get("name") or fallback_title
                 body = properties.get("body") or properties.get("description")
                 details = []
                 for label, name in (
@@ -408,12 +414,19 @@ const li=document.createElement('li'),a=document.createElement('a');a.href=item.
                     ("Created", "created"),
                 ):
                     if properties.get(name):
-                        details.append((label, self._render_value(properties[name], page_path)))
+                        details.append(
+                            (label, self._render_value(properties[name], page_path))
+                        )
+                document = ""
+                if child_type == "document_history":
+                    document_asset = (properties.get("assets") or {}).get("document")
+                    if document_asset:
+                        document = self._render_value(document_asset, page_path)
                 items.append(
                     f"<article class='nested {'sensitive' if child_type == 'message' else ''}'>"
                     f"<h3>{html_stdlib.escape(str(title))}</h3>"
                     f"{f'<p>{html_stdlib.escape(str(body))}</p>' if body else ''}"
-                    f"{self._details(details)}</article>"
+                    f"{self._details(details)}{document}</article>"
                 )
             sections.append(
                 f"<section class='panel'><h2>{html_stdlib.escape(labels.get(child_type, child_type.replace('_', ' ').title()))} ({len(children)})</h2>"
