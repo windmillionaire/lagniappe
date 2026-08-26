@@ -568,25 +568,31 @@ def delete_backup(
 # @testable true
 # @tests tests_tooling/test_008_data_lifecycle.py::test_automatic_backup_preparation_uses_scratch_then_v3
 # @matrix data-lifecycle : named-scratch-database automatic-backup-preparation
-def prepare_automatic_backup(resource_name, context=None):
+def prepare_automatic_backup(native_backup_id, context=None):
     """Prepare one automatic provider backup as a self-contained manual backup."""
     context = context or ProviderContext.from_settings()
-    value = str(resource_name or "").strip()
-    match = re.fullmatch(
-        rf"projects/{re.escape(context.project_id)}/locations/([^/]+)/backups/([^/]+)",
-        value,
-    )
-    if not match:
-        raise DataLifecycleError("Native backup must be a full resource name in this project.")
-    location, native_id = match.groups()
+    native_id = str(native_backup_id or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", native_id):
+        raise DataLifecycleError("Automatic backup ID is invalid.")
     checkpoint = LifecycleCheckpoint(
-        context.project_id, ["backup", "prepare", value]
+        context.project_id, ["backup", "prepare", native_id]
     )
     state = checkpoint.load()
     if state and state.get("status") == "complete":
         checkpoint.remove()
         state = None
     if state:
+        value = str(state.get("native_backup") or "").strip()
+        match = re.fullmatch(
+            rf"projects/{re.escape(context.project_id)}/locations/([^/]+)/"
+            rf"backups/{re.escape(native_id)}",
+            value,
+        )
+        if not match:
+            raise DataLifecycleError(
+                "Saved automatic-backup checkpoint is invalid or belongs to another project."
+            )
+        location = match.group(1)
         backup_id = validate_backup_id(state["backup_id"])
         scratch = validate_database_id(
             state["scratch_database"], allow_default=False
@@ -595,6 +601,35 @@ def prepare_automatic_backup(resource_name, context=None):
             state["snapshot_time"].replace("Z", "+00:00")
         )
     else:
+        listed = context.json_command(["firestore", "backups", "list"])
+        if not isinstance(listed, list):
+            raise DataLifecycleError("Provider returned an invalid automatic-backup list.")
+        expected_prefix = f"projects/{context.project_id}/locations/"
+        matches = []
+        for candidate in listed:
+            if not isinstance(candidate, dict):
+                continue
+            name = str(candidate.get("name") or "").strip()
+            if (
+                name.startswith(expected_prefix)
+                and name.endswith(f"/backups/{native_id}")
+                and re.fullmatch(
+                    rf"projects/{re.escape(context.project_id)}/locations/"
+                    rf"[^/]+/backups/{re.escape(native_id)}",
+                    name,
+                )
+            ):
+                matches.append(name)
+        if not matches:
+            raise DataLifecycleError(
+                f"Automatic backup {native_id} was not found in project {context.project_id}."
+            )
+        if len(matches) != 1:
+            raise DataLifecycleError(
+                f"Automatic backup ID {native_id} is ambiguous in project {context.project_id}."
+            )
+        value = matches[0]
+        location = value.split("/locations/", 1)[1].split("/", 1)[0]
         described = context.json_command(
             [
                 "firestore",

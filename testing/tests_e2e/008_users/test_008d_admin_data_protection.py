@@ -20,3 +20,14 @@ def test_backups_tab_reveals_static_status_panel(get_user):
     expect(backups).to_have_attribute("data-visible", "true")
     expect(backups).to_have_attribute("data-open", "true")
     expect(backups).to_contain_text("Data protection")
+    expect(backups).to_contain_text("Automatic backups")
+    expect(backups).to_contain_text("Manual backups")
+    create_command = backups.locator("[data-role='manual-command']").filter(
+        has_text="./setup.sh backup create"
+    )
+    expect(create_command).to_have_count(1)
+    copy_button = create_command.locator(
+        "xpath=ancestor::*[@data-role='manual-command-shell']"
+    ).locator("[data-role='manual-command-copy']")
+    copy_button.click()
+    expect(copy_button).to_have_text("Copied!")

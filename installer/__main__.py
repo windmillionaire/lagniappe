@@ -82,7 +82,7 @@ def _parser():
     backup_prepare = backup_commands.add_parser(
         "prepare", help="Prepare one automatic Google backup as a manual backup"
     )
-    backup_prepare.add_argument("backup_resource", metavar="BACKUP_RESOURCE")
+    backup_prepare.add_argument("backup_id", metavar="BACKUP_ID")
     backup_delete = backup_commands.add_parser("delete", help="Delete one manual backup")
     backup_delete.add_argument("backup_id", metavar="BACKUP_ID")
 
@@ -282,7 +282,7 @@ def _dispatch(args):
         if args.backup_action == "create":
             lifecycle_backup.create_backup()
         elif args.backup_action == "prepare":
-            lifecycle_backup.prepare_automatic_backup(args.backup_resource)
+            lifecycle_backup.prepare_automatic_backup(args.backup_id)
         else:
             lifecycle_backup.delete_backup(args.backup_id)
         return 0

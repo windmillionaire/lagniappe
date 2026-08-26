@@ -7,7 +7,7 @@ operator-only recovery bucket.
 ```bash
 ./setup.sh backup create
 ./setup.sh backup list
-./setup.sh backup prepare projects/PROJECT/locations/LOCATION/backups/BACKUP
+./setup.sh backup prepare AUTOMATIC_BACKUP_ID
 ./setup.sh backup delete BACKUP_ID
 ./setup.sh archive [BACKUP_ID] [--output PATH] [--zip]
 ./setup.sh archive validate ARCHIVE_PATH
@@ -47,6 +47,9 @@ Google's scheduled automatic backups remain provider-managed and expire at the
 end of their configured retention. `backup prepare` converts a selected
 automatic backup into the same self-contained manual-backup format so it can be
 restored with its exact referenced files or converted to a portable archive.
+The command accepts the displayed automatic-backup ID and resolves its full
+provider resource only within the saved target project; missing or ambiguous
+IDs fail without creating recovery resources.
 Delete invalidates the manifest before removing the exact prefix. A sanitized
 summary is projected into the private runtime bucket for the authenticated
 Admin view; backup objects and provider URIs remain confined to the

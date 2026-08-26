@@ -624,7 +624,7 @@ def test_automatic_backup_preparation_uses_scratch_then_v3(monkeypatch, tmp_path
     calls = []
     checkpoint = LifecycleCheckpoint(
         PROJECT_ID,
-        ["backup", "prepare", native],
+        ["backup", "prepare", "native-1"],
         state_root=tmp_path / "native-state",
     )
     monkeypatch.setattr(
@@ -645,7 +645,11 @@ def test_automatic_backup_preparation_uses_scratch_then_v3(monkeypatch, tmp_path
         project_id = PROJECT_ID
 
         def json_command(self, arguments):
+            if arguments == ["firestore", "backups", "list"]:
+                return [{"name": native}]
             assert arguments[:3] == ["firestore", "backups", "describe"]
+            assert "--backup=native-1" in arguments
+            assert "--location=nam5" in arguments
             return {
                 "state": "READY",
                 "database": f"projects/{PROJECT_ID}/databases/(default)",
@@ -665,7 +669,7 @@ def test_automatic_backup_preparation_uses_scratch_then_v3(monkeypatch, tmp_path
         def delete_database(self, database_id):
             calls.append(("delete", database_id))
 
-    result = backup_module.prepare_automatic_backup(native, context=Context())
+    result = backup_module.prepare_automatic_backup("native-1", context=Context())
 
     scratch = calls[0][2]
     assert result == manifest
@@ -1988,11 +1992,10 @@ def test_lifecycle_cli_routes_nested_commands_and_read_only_boundaries():
     archive_validate = parser.parse_args(["archive", "validate", "bundle.zip"])
     restore_dry = parser.parse_args(["restore", BACKUP_ID, "--dry-run"])
     backup_create = parser.parse_args(["backup", "create"])
-    backup_prepare = parser.parse_args(
-        ["backup", "prepare", "projects/project-1/locations/us/backups/one"]
-    )
+    backup_prepare = parser.parse_args(["backup", "prepare", "automatic-id"])
     assert _read_only(backup_list)
     assert _read_only(archive_validate) and _local_only(archive_validate)
     assert _read_only(restore_dry)
     assert not _read_only(backup_create)
     assert not _read_only(backup_prepare)
+    assert backup_prepare.backup_id == "automatic-id"

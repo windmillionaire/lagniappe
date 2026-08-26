@@ -14,7 +14,6 @@ export default class Manual extends ShellView {
 	async init() {
 		await super.init();
 		this.endpoints = ENDPOINTS.manual;
-		this.copyResetTimers = new Map();
 
 		if (!this.elt) return;
 
@@ -29,13 +28,6 @@ export default class Manual extends ShellView {
 					(dropdown) => dropdown?.showPanel?.(),
 					mobileNavButton,
 				);
-				return;
-			}
-
-			const copyButton = e.target.closest("[data-role='manual-command-copy']");
-			if (copyButton) {
-				e.preventDefault();
-				this.copyCommand(copyButton);
 				return;
 			}
 
@@ -106,64 +98,6 @@ export default class Manual extends ShellView {
 
 	/**
 	 * @testable true
-	 * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_installation_commands_are_copyable_and_scroll_on_mobile
-	 * @tests tests_js/test_038_startup_specializations.py::test_manual_copy_command_falls_back_when_clipboard_is_unavailable
-	 * @matrix manual : clipboard-fallback command-copy
-	 */
-	async copyCommand(button) {
-		const command = button
-			.closest("[data-role='manual-command-shell']")
-			?.querySelector("[data-role='manual-command'] code")?.textContent;
-		if (!command) return;
-
-		let copied = false;
-		try {
-			if (navigator.clipboard?.writeText) {
-				await navigator.clipboard.writeText(command);
-				copied = true;
-			}
-		} catch {
-			copied = false;
-		}
-
-		if (!copied) {
-			const textarea = document.createElement("textarea");
-			textarea.value = command;
-			textarea.setAttribute("readonly", "");
-			textarea.style.position = "fixed";
-			textarea.style.opacity = "0";
-			document.body.append(textarea);
-			textarea.select();
-			try {
-				copied = document.execCommand("copy");
-			} catch {
-				copied = false;
-			}
-			textarea.remove();
-			button.focus();
-		}
-
-		const resetTimer = this.copyResetTimers.get(button);
-		if (resetTimer) clearTimeout(resetTimer);
-		button.textContent = copied ? "Copied!" : "Copy failed";
-		button.setAttribute(
-			"aria-label",
-			copied ? "Command copied" : "Command could not be copied",
-		);
-		this.copyResetTimers.set(
-			button,
-			setTimeout(() => {
-				if (button.isConnected) {
-					button.textContent = "Copy";
-					button.setAttribute("aria-label", "Copy command");
-				}
-				this.copyResetTimers.delete(button);
-			}, 2000),
-		);
-	}
-
-	/**
-	 * @testable true
 	 * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_ajax_section_navigation_and_popstate
 	 * @matrix manual : popstate section-navigation
 	 */
@@ -192,10 +126,6 @@ export default class Manual extends ShellView {
 	}
 
 	destroy() {
-		for (const timer of this.copyResetTimers?.values() || []) {
-			clearTimeout(timer);
-		}
-		this.copyResetTimers?.clear();
 		if (this._onPopState) {
 			window.removeEventListener("popstate", this._onPopState);
 		}

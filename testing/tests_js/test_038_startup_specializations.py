@@ -79,8 +79,8 @@ const createRoot = () => {
     )
 
 
-# @matrix manual : clipboard-fallback command-copy
-def test_manual_copy_command_falls_back_when_clipboard_is_unavailable(run_node):
+# @matrix manual admin : clipboard-fallback command-copy
+def test_command_copy_falls_back_when_clipboard_is_unavailable(run_node):
     run_node(
         r'''
 const fs = require("node:fs");
@@ -117,13 +117,14 @@ const context = {
 context.globalThis = context;
 vm.createContext(context);
 
-let source = fs.readFileSync("src/script/views/manual.mjs", "utf8");
+let source = fs.readFileSync("src/script/views/base/shell.mjs", "utf8");
 source = source.replace(
-  /^import [\s\S]*?(?=\/\*\*)/,
-  "const ShellView = class {};\n",
+  'import { connectivity } from "../../shared/connectivity";',
+  "",
 );
-source = source.replace("export default class Manual", "class Manual");
-source += "\nglobalThis.Manual = Manual;";
+source = source.replaceAll("export const ", "const ");
+source = source.replace("export default class ShellView", "class ShellView");
+source += "\nglobalThis.ShellView = ShellView;";
 vm.runInContext(source, context);
 
 const shell = {
@@ -137,11 +138,11 @@ const button = {
   setAttribute(name, value) { attributes.set(name, value); },
   textContent: "Copy",
 };
-const manual = Object.create(context.Manual.prototype);
-manual.copyResetTimers = new Map();
+const view = Object.create(context.ShellView.prototype);
+view.copyResetTimers = new Map();
 
 (async () => {
-  await manual.copyCommand(button);
+  await view.copyCommand(button);
   if (copied !== "copy" || textarea?.value !== "gcloud auth login") {
     throw new Error("Clipboard fallback did not copy the command");
   }

@@ -91,8 +91,7 @@ def test_data_protection_status_is_sanitized_and_read_only(monkeypatch):
         "12:00 AM, 24 Aug 2026 UTC"
     )
     assert result["native_backups"][0]["prepare_command"] == (
-        "./setup.sh backup prepare "
-        "projects/project-1/locations/us/backups/native-id"
+        "./setup.sh backup prepare native-id"
     )
     assert result["pitr"] == "Enabled (7-day point-in-time window)"
     assert result["earliest_version_time"] == "12:00 PM, 17 Aug 2026 UTC"

@@ -32,6 +32,9 @@ Concrete views call `publish()` after structural initialization. Publication
 sets `initialized`, stores `_lp_view`, and records `lagniappe:view-ready`.
 Optional private services become ready later. Manual, Results, and Analytics
 can use the shell without the component and authenticated-service stack.
+The shell also delegates copy controls for the Manual command-block component,
+so its padded, scrollable, copyable presentation can be reused in views such as
+Admin without view-specific clipboard code.
 
 ## Core
 

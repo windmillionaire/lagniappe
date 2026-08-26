@@ -53,6 +53,7 @@ export default class ShellView {
 		this._published = false;
 		this.hasDeferredServices = false;
 		this._coldActions = new Map();
+		this.copyResetTimers = new Map();
 		this._pointer = null;
 		this.isDragging = false;
 
@@ -313,10 +314,77 @@ export default class ShellView {
 			this.isDragging = false;
 			return;
 		}
+		const copyButton = event.target?.closest?.(
+			"[data-role='manual-command-copy']",
+		);
+		if (copyButton) {
+			event.preventDefault();
+			void this.copyCommand(copyButton);
+			return;
+		}
 		this._click(event);
 	}
 
 	_click() {}
+
+	/**
+	 * @testable true
+	 * @tests tests_e2e/002_home/test_002f_home_directory.py::test_manual_installation_commands_are_copyable_and_scroll_on_mobile
+	 * @tests tests_e2e/008_users/test_008d_admin_data_protection.py::test_backups_tab_reveals_static_status_panel
+	 * @tests tests_js/test_038_startup_specializations.py::test_command_copy_falls_back_when_clipboard_is_unavailable
+	 * @matrix manual admin : clipboard-fallback command-copy
+	 */
+	async copyCommand(button) {
+		const command = button
+			.closest("[data-role='manual-command-shell']")
+			?.querySelector("[data-role='manual-command'] code")?.textContent;
+		if (!command) return;
+
+		let copied = false;
+		try {
+			if (navigator.clipboard?.writeText) {
+				await navigator.clipboard.writeText(command);
+				copied = true;
+			}
+		} catch {
+			copied = false;
+		}
+
+		if (!copied) {
+			const textarea = document.createElement("textarea");
+			textarea.value = command;
+			textarea.setAttribute("readonly", "");
+			textarea.style.position = "fixed";
+			textarea.style.opacity = "0";
+			document.body.append(textarea);
+			textarea.select();
+			try {
+				copied = document.execCommand("copy");
+			} catch {
+				copied = false;
+			}
+			textarea.remove();
+			button.focus();
+		}
+
+		const resetTimer = this.copyResetTimers.get(button);
+		if (resetTimer) clearTimeout(resetTimer);
+		button.textContent = copied ? "Copied!" : "Copy failed";
+		button.setAttribute(
+			"aria-label",
+			copied ? "Command copied" : "Command could not be copied",
+		);
+		this.copyResetTimers.set(
+			button,
+			setTimeout(() => {
+				if (button.isConnected) {
+					button.textContent = "Copy";
+					button.setAttribute("aria-label", "Copy command");
+				}
+				this.copyResetTimers.delete(button);
+			}, 2000),
+		);
+	}
 
 	_handleSubmit(event) {
 		if (!this.ensureSubmissionManager || event.defaultPrevented) return;
@@ -371,6 +439,8 @@ export default class ShellView {
 
 	destroy() {
 		this._destroyed = true;
+		for (const timer of this.copyResetTimers.values()) clearTimeout(timer);
+		this.copyResetTimers.clear();
 		this._pointerUp();
 		this.elt.removeEventListener("click", this._handleClick);
 		this.elt.removeEventListener("submit", this._handleSubmit);

@@ -1,6 +1,7 @@
 {% set view_entry = "admin" %}
 {% extends "layouts/base.html" %}
 {% from 'home/site_settings.html' import site_settings %}
+{% from 'manual/macros.html' import card as manual_card, code as command_block, subheading as manual_subheading with context %}
 {% import 'home/ingress.html' as ingress %}
 {% import 'controls.html' as controls %}
 
@@ -114,10 +115,10 @@
        data-visible="false"
        data-kind="default"
        data-role="manual-content"
-       class="mt-4 sm:mt-0 p-4 sm:p-6 space-y-6"
+       class="mt-4 sm:mt-0 p-4 sm:p-6"
        data-parent-nav="tabs">
-    <section>
-      <h2 class="text-lg font-semibold">Data protection</h2>
+    {% call manual_card() %}
+      {{ manual_subheading("Data protection") }}
       {% if data_protection_error %}
         <p class="mt-2 text-red-700">Backup status is currently unavailable: {{ data_protection_error }}</p>
       {% else %}
@@ -133,66 +134,68 @@
           {% endfor %}
         </ul>
       {% endif %}
-    </section>
+    {% endcall %}
     {% if data_protection %}
-      <section>
-        <h2 class="text-lg font-semibold">Automatic backups</h2>
-        <p class="mt-2 text-sm">
+      {% call manual_card() %}
+        {{ manual_subheading("Automatic backups") }}
+        <p class="text-sm text-base-medium">
           Google creates and expires these on the schedules above. They protect the database,
           but must be prepared as a manual backup before Lagniappe can restore one together with
           its exact referenced files.
         </p>
-        <ul class="mt-3 space-y-2">
+        <ul class="mt-4 space-y-4">
           {% for backup in data_protection.native_backups %}
-            <li>
+            <li class="rounded-lg bg-base-bg p-4">
               <div><code>{{ backup.id }}</code> · {{ backup.state }} · snapshot {{ backup.snapshot_time or "pending" }}{% if backup.expire_time %} · expires {{ backup.expire_time }}{% endif %}</div>
               {% if backup.prepare_command %}
-                <div class="mt-1"><span class="font-medium">Prepare as a manual backup:</span> <code>{{ backup.prepare_command }}</code></div>
+                <p class="mt-3 font-medium">Prepare as a manual backup</p>
+                {{ command_block(backup.prepare_command) }}
               {% endif %}
             </li>
           {% else %}
             <li>No automatic backups were reported yet.</li>
           {% endfor %}
         </ul>
-      </section>
-      <section>
-        <h2 class="text-lg font-semibold">Manual backups</h2>
-        <p class="mt-2 text-sm">
+      {% endcall %}
+      {% call manual_card() %}
+        {{ manual_subheading("Manual backups") }}
+        <p class="text-sm text-base-medium">
           A manual backup contains one exact database snapshot and copies of every referenced
-          file version. It remains available until you delete it. Create one with
-          <code>{{ data_protection.instructions.create_manual }}</code>.
+          file version. It remains available until you delete it.
         </p>
-        <ul class="mt-3 space-y-2">
+        <p class="mt-3 font-medium">Create a new manual backup</p>
+        {{ command_block(data_protection.instructions.create_manual) }}
+        <ul class="mt-5 space-y-4">
           {% for backup in data_protection.recovery_sets %}
-            <li>
+            <li class="rounded-lg bg-base-bg p-4">
               <div>
                 <code>{{ backup.backup_id }}</code> · {{ backup.snapshot_time }} ·
                 {{ backup.entity_count }} entities · {{ backup.asset_count }} assets
               </div>
-              <dl class="ml-4 mt-1 space-y-1 text-sm">
-                <div><dt class="inline font-medium">Check restore:</dt> <dd class="inline"><code>./setup.sh restore {{ backup.backup_id }} --dry-run</code></dd></div>
-                <div><dt class="inline font-medium">Restore:</dt> <dd class="inline"><code>./setup.sh restore {{ backup.backup_id }}</code></dd></div>
-                <div><dt class="inline font-medium">Create portable archive:</dt> <dd class="inline"><code>./setup.sh archive {{ backup.backup_id }}</code></dd></div>
+              <dl class="mt-4 space-y-4 text-sm">
+                <div><dt class="font-medium">Check the restore without changing data</dt><dd>{{ command_block("./setup.sh restore " ~ backup.backup_id ~ " --dry-run") }}</dd></div>
+                <div><dt class="font-medium">Restore this manual backup</dt><dd>{{ command_block("./setup.sh restore " ~ backup.backup_id) }}</dd></div>
+                <div><dt class="font-medium">Create a portable archive</dt><dd>{{ command_block("./setup.sh archive " ~ backup.backup_id) }}</dd></div>
               </dl>
             </li>
           {% else %}
             <li>No manual backups have been created or prepared yet.</li>
           {% endfor %}
         </ul>
-      </section>
-      <section>
-        <h2 class="text-lg font-semibold">Portable archives and restores</h2>
-        <p class="mt-2 text-sm">
+      {% endcall %}
+      {% call manual_card() %}
+        {{ manual_subheading("Portable archives and restores") }}
+        <p class="text-sm text-base-medium">
           Run backup and restore commands from the installation checkout. Restores must be run
           with the CLI. The check command performs the restore preflight without changing data.
         </p>
-        <p class="mt-2 text-sm">
+        <p class="mt-3 text-sm text-base-medium">
           Point-in-time recovery and automatic backups stay inside Google Cloud and are available
           only for their retention window. A portable archive is an independent, downloadable copy
           of a manual backup with portable data, documents, and files. It can be validated without
           Google access, but it is not itself the source used by the restore command.
         </p>
-      </section>
+      {% endcall %}
     {% endif %}
   </div>
 {% endmacro %}

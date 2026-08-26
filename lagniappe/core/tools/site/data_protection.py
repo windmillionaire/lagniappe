@@ -84,7 +84,7 @@ def _backup(payload, project_id):
         "snapshot_time": _timestamp(payload.get("snapshot_time")),
         "expire_time": _timestamp(payload.get("expire_time")),
         "prepare_command": (
-            f"./setup.sh backup prepare {resource_name}"
+            f"./setup.sh backup prepare {resource_name.rsplit('/', 1)[-1]}"
             if expected.fullmatch(resource_name)
             else None
         ),
