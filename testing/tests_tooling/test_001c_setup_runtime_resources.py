@@ -2005,7 +2005,7 @@ def test_upgrade_refreshes_setup_dependencies_from_replaced_checkout(monkeypatch
     ]
 
 
-# @matrix setup : config-files deferred-jobs post-deploy storage-buckets
+# @matrix setup : config-files deferred-jobs post-deploy provider-apis storage-buckets
 def test_update_reloads_config_and_setup_helpers(monkeypatch):
     import installer as setup_pkg
     from installer import upgrade
@@ -2026,6 +2026,7 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch):
     gcloud_module.create_deferred_job_reconciler = lambda: events.append(
         "deferred-job-reconciler"
     )
+    gcloud_module.enable_gcloud_apis = lambda: events.append("provider-apis")
     gcloud_module.setup_app_engine = lambda: events.append(
         "app-engine-and-runtime-iam"
     )
@@ -2092,6 +2093,7 @@ def test_update_reloads_config_and_setup_helpers(monkeypatch):
         "update_config",
         ("verify_application_config", False),
         "verify-runtime-deploy-surface",
+        "provider-apis",
         "app-engine-and-runtime-iam",
         "storage-buckets",
         "data-protection",
@@ -3309,9 +3311,20 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
 
     calls = []
     mutations = []
+    propagation_delays = []
+    monkeypatch.setattr(
+        gcloud.time,
+        "sleep",
+        lambda delay: propagation_delays.append(delay),
+    )
 
     def run(command, **kwargs):
         calls.append((command, kwargs))
+        if command[:3] == ["services", "list", "--enabled"]:
+            return completed_process(
+                command,
+                stdout="\n".join(constants.REQUIRED_GOOGLE_CLOUD_APIS),
+            )
         return completed_process(command)
 
     monkeypatch.setattr(gcloud, "run_gcloud_command", run)
@@ -3326,6 +3339,23 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
 
     missing = "identitytoolkit.googleapis.com"
     settings._SETUP_ENABLED_GOOGLE_CLOUD_APIS.remove(missing)
+    discovered = iter(
+        [
+            set(constants.REQUIRED_GOOGLE_CLOUD_APIS) - {missing},
+            set(constants.REQUIRED_GOOGLE_CLOUD_APIS),
+        ]
+    )
+
+    def run_with_propagation(command, **kwargs):
+        calls.append((command, kwargs))
+        if command[:3] == ["services", "list", "--enabled"]:
+            return completed_process(
+                command,
+                stdout="\n".join(next(discovered)),
+            )
+        return completed_process(command)
+
+    monkeypatch.setattr(gcloud, "run_gcloud_command", run_with_propagation)
     assert gcloud.enable_gcloud_apis()
     assert calls == [
         (
@@ -3336,8 +3366,29 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
                 "--project=project-1",
             ],
             {"timeout": gcloud.GCLOUD_SERVICE_ENABLE_TIMEOUT},
-        )
+        ),
+        (
+            [
+                "services",
+                "list",
+                "--enabled",
+                "--project=project-1",
+                "--format=value(config.name)",
+            ],
+            {"timeout": gcloud.GCLOUD_SERVICE_DISCOVERY_TIMEOUT},
+        ),
+        (
+            [
+                "services",
+                "list",
+                "--enabled",
+                "--project=project-1",
+                "--format=value(config.name)",
+            ],
+            {"timeout": gcloud.GCLOUD_SERVICE_DISCOVERY_TIMEOUT},
+        ),
     ]
+    assert propagation_delays == [2]
     assert mutations[-1][1]["identifier"] == missing
     assert any(
         "may take up to 5 minutes" in message for message in spinner.messages
@@ -3615,15 +3666,28 @@ def test_setup_data_protection_contract(monkeypatch):
     from installer import gcloud
 
     constants = _load_config_constants()
+    assert "firestore.googleapis.com" in constants.REQUIRED_GOOGLE_CLOUD_APIS
     settings = _fake_settings(gcloud={"PROJECT": "project-1"})
     _install_config_package(monkeypatch, constants, settings=settings)
 
     commands = []
     mutations = []
     schedules = []
+    pitr_attempts = 0
+    propagation_delays = []
+    monkeypatch.setattr(
+        gcloud.time,
+        "sleep",
+        lambda delay: propagation_delays.append(delay),
+    )
 
     def fake_run(command, check=True):
+        nonlocal pitr_attempts
         commands.append((command, check))
+        if command[:3] == ["firestore", "databases", "update"]:
+            pitr_attempts += 1
+            if pitr_attempts == 1:
+                raise RuntimeError("SERVICE_DISABLED: Firestore is propagating")
         if command[:4] == ["firestore", "backups", "schedules", "list"]:
             return completed_process(command, stdout=json.dumps(schedules))
         return completed_process(command)
@@ -3636,6 +3700,8 @@ def test_setup_data_protection_contract(monkeypatch):
     )
 
     assert gcloud.configure_data_protection()
+    assert pitr_attempts == 2
+    assert propagation_delays == [2]
     assert any(
         command[:3] == ["firestore", "databases", "update"]
         and "--enable-pitr" in command

@@ -604,6 +604,7 @@ REQUIRED_GOOGLE_CLOUD_APIS = {
     "cloudtasks.googleapis.com": "Cloud Tasks API",
     "cloudscheduler.googleapis.com": "Cloud Scheduler API",
     "documentai.googleapis.com": "Cloud Document AI API",
+    "firestore.googleapis.com": "Cloud Firestore API",
     "aiplatform.googleapis.com": "AI Platform API",
     "places.googleapis.com": "Places API",
 }

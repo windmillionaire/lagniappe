@@ -27,6 +27,27 @@ APP_ENGINE_RPC_TIMEOUT = 60
 APP_ENGINE_CREATE_TIMEOUT = 300
 
 
+# @testable false
+# @covered-by installer/gcloud.py::enable_gcloud_apis
+# @reason provider listing adapter is exercised through required-API reconciliation
+def _enabled_google_cloud_apis(project_id):
+    result = run_gcloud_command(
+        [
+            "services",
+            "list",
+            "--enabled",
+            f"--project={project_id}",
+            "--format=value(config.name)",
+        ],
+        timeout=GCLOUD_SERVICE_DISCOVERY_TIMEOUT,
+    )
+    return {
+        value.strip()
+        for value in result.stdout.splitlines()
+        if value.strip()
+    }
+
+
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_reuses_confirmed_preflight
 # @matrix setup : gcloud-command preflight provider-apis timeout
@@ -47,23 +68,10 @@ def enable_gcloud_apis():
     with f.yaspin(text=feedback_text) as sp:
         if enabled_apis is None:
             result = retry_provider_call(
-                lambda: run_gcloud_command(
-                    [
-                        "services",
-                        "list",
-                        "--enabled",
-                        f"--project={project_id}",
-                        "--format=value(config.name)",
-                    ],
-                    timeout=GCLOUD_SERVICE_DISCOVERY_TIMEOUT,
-                ),
+                lambda: _enabled_google_cloud_apis(project_id),
                 description="List enabled Google Cloud APIs",
             )
-            enabled_apis = {
-                value.strip()
-                for value in result.stdout.splitlines()
-                if value.strip()
-            }
+            enabled_apis = set(result)
 
         missing_apis = sorted(set(required_apis) - set(enabled_apis))
         if missing_apis:
@@ -93,7 +101,32 @@ def enable_gcloud_apis():
                     identifier=service_name,
                 )
                 sp.write(f.success(f"Enabled {display_name}"))
-            enabled_apis = set(enabled_apis) | set(missing_apis)
+            def verify_enabled_services():
+                discovered = _enabled_google_cloud_apis(project_id)
+                pending = sorted(set(required_apis) - discovered)
+                if pending:
+                    raise ProviderTransientError(
+                        "Required Google Cloud APIs are still propagating: "
+                        + ", ".join(pending)
+                    )
+                return discovered
+
+            def wait_for_services(delay):
+                sp.write(
+                    f.info(
+                        "Google Cloud APIs are still becoming available; "
+                        f"retrying in {delay} seconds..."
+                    )
+                )
+                time.sleep(delay)
+
+            enabled_apis = retry_provider_call(
+                verify_enabled_services,
+                description="Verify required Google Cloud APIs",
+                attempts=GCLOUD_API_PROPAGATION_ATTEMPTS,
+                delays=GCLOUD_API_PROPAGATION_DELAYS,
+                sleep=wait_for_services,
+            )
 
         SETTINGS._SETUP_ENABLED_GOOGLE_CLOUD_APIS = set(enabled_apis)
         sp.ok(f.ok_glyph)
@@ -823,16 +856,22 @@ def configure_data_protection():
 
     project_id = SETTINGS.GCLOUD_CONFIG["PROJECT"]
     database = "(default)"
-    run_gcloud_command(
-        [
-            "firestore",
-            "databases",
-            "update",
-            f"--database={database}",
-            "--enable-pitr",
-            f"--project={project_id}",
-            "--quiet",
-        ]
+    retry_provider_call(
+        lambda: run_gcloud_command(
+            [
+                "firestore",
+                "databases",
+                "update",
+                f"--database={database}",
+                "--enable-pitr",
+                f"--project={project_id}",
+                "--quiet",
+            ]
+        ),
+        description="Enable Firestore point-in-time recovery",
+        attempts=GCLOUD_API_PROPAGATION_ATTEMPTS,
+        delays=GCLOUD_API_PROPAGATION_DELAYS,
+        sleep=time.sleep,
     )
     result = run_gcloud_command(
         [

@@ -69,7 +69,7 @@ def upgrade(branch=None):
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_update_reloads_config_and_setup_helpers
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_upgrade_replaces_source_then_applies_update
-# @matrix setup : config-files deferred-jobs git-upgrade post-deploy storage-buckets
+# @matrix setup : config-files deferred-jobs git-upgrade post-deploy provider-apis storage-buckets
 def _apply_update(*, upgrade):
     """Apply current-checkout generation and app-saved settings."""
 
@@ -96,6 +96,7 @@ def _apply_update(*, upgrade):
     else:
         print(f.success(f"Updating configuration for version {new_version}"))
 
+    gcloud.enable_gcloud_apis()
     gcloud.setup_app_engine()
     gcloud.configure_storage_buckets()
     gcloud.configure_data_protection()

@@ -200,8 +200,9 @@ def _read_adc_identity(
 
 # @testable true
 # @tests tests_tooling/test_001g_setup_release_readiness.py::test_default_doctor_provider_checker_targets_saved_project
-# @matrix setup : doctor operator-permissions project-identity provider-discovery
+# @matrix setup : doctor operator-permissions project-identity provider-apis provider-discovery
 def _default_provider_checker(settings, project):
+    from config import constants
     from installer.iam import inspect_operator_permissions
     from installer.recovery import verify_recovery_resources
     from installer.utils import run_gcloud_command
@@ -229,6 +230,31 @@ def _default_provider_checker(settings, project):
             else "AVAILABLE"
         ),
         "details": missing_permissions,
+        "error": None,
+    }
+    services = run_gcloud_command(
+        [
+            "services",
+            "list",
+            "--enabled",
+            f"--project={project}",
+            "--format=value(config.name)",
+        ],
+        check=False,
+    )
+    if services.returncode != 0:
+        raise RuntimeError("required Google Cloud APIs are unavailable")
+    enabled_apis = {
+        value.strip()
+        for value in str(services.stdout or "").splitlines()
+        if value.strip()
+    }
+    missing_apis = sorted(
+        set(constants.REQUIRED_GOOGLE_CLOUD_APIS) - enabled_apis
+    )
+    report["required-apis"] = {
+        "state": "ABSENT" if missing_apis else "AVAILABLE",
+        "details": {"missing": missing_apis},
         "error": None,
     }
     return report

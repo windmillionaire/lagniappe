@@ -290,12 +290,20 @@ def test_doctor_reads_adc_identity_without_changing_it():
     assert events and "userinfo.email" in events[0][1]
 
 
-# @matrix setup : doctor operator-permissions project-identity provider-discovery
+# @matrix setup : doctor operator-permissions project-identity provider-apis provider-discovery
 def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
     calls = []
 
     def gcloud(command, check=False):
         calls.append((command, check))
+        if command[:3] == ["services", "list", "--enabled"]:
+            from config import constants
+
+            return types.SimpleNamespace(
+                returncode=0,
+                stdout="\n".join(constants.REQUIRED_GOOGLE_CLOUD_APIS),
+                stderr="",
+            )
         return types.SimpleNamespace(
             returncode=0,
             stdout='{"projectNumber": "123456"}',
@@ -328,6 +336,11 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
             "details": {"installer": [], "billing": [], "deployer": []},
             "error": None,
         },
+        "required-apis": {
+            "state": "AVAILABLE",
+            "details": {"missing": []},
+            "error": None,
+        },
     }
     assert calls == [
         (
@@ -341,6 +354,16 @@ def test_default_doctor_provider_checker_targets_saved_project(monkeypatch):
         ),
         (settings, "demo-project", {"projectNumber": "123456"}),
         ("permissions", "demo-project"),
+        (
+            [
+                "services",
+                "list",
+                "--enabled",
+                "--project=demo-project",
+                "--format=value(config.name)",
+            ],
+            False,
+        ),
     ]
 
 

@@ -29,6 +29,11 @@ which are a separate credential used by the Python provider clients. A new
 project is created only after default-no confirmation, then management APIs and
 billing are established before general provider work.
 
+Fresh installation, settings recovery, repair, update, and upgrade all run the
+same required-API reconciler before API-dependent resource work. Doctor audits
+that exact required-service set read-only, so a disabled prerequisite is
+reported as drift before repair or another deployment workflow reaches it.
+
 During delegated setup, the permanent site Owner email must be the exact Google
 account address, not a forwarding alias, and that account must already have a
 direct Project Owner binding. Setup verifies that binding before offering the
