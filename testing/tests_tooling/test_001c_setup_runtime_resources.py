@@ -73,6 +73,13 @@ def test_setup_error_classification_and_retry_contract():
         ),
         ProviderNotFound,
     )
+    assert isinstance(
+        classify_provider_error(
+            stderr_only,
+            message="gcloud create failed: ALREADY_EXISTS: database is being created",
+        ),
+        ProviderConflict,
+    )
 
     calls = []
     delays = []

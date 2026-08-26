@@ -436,16 +436,14 @@ def test_operation_polling_resumes_and_reports_provider_failure(monkeypatch):
         context.wait_for_operation(OPERATION)
 
 
-# @matrix data-lifecycle : database-create synchronous-provider-contract
-def test_database_creation_uses_current_synchronous_gcloud_contract():
+# @matrix data-lifecycle : database-create operation-provider-contract
+def test_database_creation_uses_current_operation_gcloud_contract():
     calls = []
 
     def gcloud(arguments, *, timeout):
         calls.append((arguments, timeout))
         return {
-            "name": f"projects/{PROJECT_ID}/databases/scratch-db",
-            "type": "DATASTORE_MODE",
-            "locationId": "nam5",
+            "name": f"projects/{PROJECT_ID}/databases/scratch-db/operations/create-1",
         }
 
     context = ProviderContext(
@@ -461,11 +459,11 @@ def test_database_creation_uses_current_synchronous_gcloud_contract():
     )
 
     arguments, timeout = calls[0]
-    assert result["name"].endswith("/databases/scratch-db")
+    assert result["name"].endswith("/operations/create-1")
     assert arguments[:3] == ["firestore", "databases", "create"]
     assert "--no-delete-protection" in arguments
     assert "--async" not in arguments
-    assert timeout == 600
+    assert timeout == 120
 
 
 # @matrix data-lifecycle : private-state resume
@@ -1447,6 +1445,8 @@ def test_archive_build_publishes_manifest_last_and_retains_failed_scratch_state(
         deleted = False
         fail_cleanup = True
         database_payload = None
+        monotonic = staticmethod(lambda: 0)
+        sleep = staticmethod(lambda _delay: None)
 
         def database(self, database_id):
             if self.database_payload is None:
@@ -1455,17 +1455,22 @@ def test_archive_build_publishes_manifest_last_and_retains_failed_scratch_state(
             return self.database_payload
 
         def create_database(self, database_id, location, **_kwargs):
-            self.database_payload = {
+            self.pending_database = {
                 "name": f"projects/{PROJECT_ID}/databases/{database_id}",
                 "type": "DATASTORE_MODE",
                 "locationId": location,
             }
-            return self.database_payload
+            return {
+                "name": f"projects/{PROJECT_ID}/databases/{database_id}/operations/create-1"
+            }
 
         def start_import(self, *_args, **_kwargs):
             return OPERATION, {}
 
         def wait_for_operation(self, *_args, **_kwargs):
+            if hasattr(self, "pending_database"):
+                self.database_payload = self.pending_database
+                del self.pending_database
             return {"done": True}
 
         def datastore_client(self, *_args):

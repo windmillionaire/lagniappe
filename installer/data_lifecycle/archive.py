@@ -13,7 +13,7 @@ import tempfile
 import zipfile
 
 from installer.state import record_mutation, record_step
-from installer.errors import ProviderNotFound
+from installer.errors import ProviderConflict, ProviderNotFound
 from runner.context import REPOSITORY_ROOT
 
 from .assets import AssetCollector
@@ -106,6 +106,26 @@ def _scratch_database_id(backup_id, checkpoint_identity):
 
 # @testable false
 # @covered-by installer/data_lifecycle/archive.py::build_archive
+# @reason conflict recovery is exercised through the resumable archive workflow
+def _wait_for_scratch_database(context, database_id, *, timeout=600):
+    """Wait for an already-started scratch creation operation to become visible."""
+    deadline = context.monotonic() + timeout
+    attempt = 0
+    while True:
+        try:
+            return context.database(database_id)
+        except ProviderNotFound:
+            if context.monotonic() >= deadline:
+                raise DataLifecycleError(
+                    "The reserved archive scratch database did not become available."
+                )
+            delays = (1, 2, 4, 8, 15, 30)
+            context.sleep(delays[min(attempt, len(delays) - 1)])
+            attempt += 1
+
+
+# @testable false
+# @covered-by installer/data_lifecycle/archive.py::build_archive
 # @reason private file creation is exercised by archive publication and validation
 def _write_private(path, payload, *, binary=False):
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -115,6 +135,15 @@ def _write_private(path, payload, *, binary=False):
         path.write_text(payload, encoding="utf-8", newline="\n")
     if os.name != "nt":
         os.chmod(path, 0o600)
+
+
+# @testable false
+# @covered-by installer/data_lifecycle/archive.py::build_archive
+# @reason provider response extraction is an internal orchestration adapter
+def _provider_operation(payload):
+    if not isinstance(payload, dict):
+        return None
+    return str(payload.get("name") or "").strip() or None
 
 
 # @testable false
@@ -470,6 +499,7 @@ def build_archive(
     if not checkpoint.payload.get("scratch_created"):
         record_step("create archive scratch Datastore database")
         created = False
+        operation = checkpoint.payload.get("scratch_create_operation")
         try:
             existing = context.database(scratch_database)
         except ProviderNotFound:
@@ -479,12 +509,33 @@ def build_archive(
                 formatter,
                 "Creating the temporary archive database (this may take several minutes)",
             ):
-                existing = context.create_database(
-                    scratch_database,
-                    backup.database_location,
-                    delete_protection=False,
-                )
-            created = True
+                if not operation:
+                    try:
+                        response = context.create_database(
+                            scratch_database,
+                            backup.database_location,
+                            delete_protection=False,
+                        )
+                    except ProviderConflict:
+                        existing = _wait_for_scratch_database(
+                            context, scratch_database
+                        )
+                    else:
+                        operation = _provider_operation(response)
+                        if not operation:
+                            raise DataLifecycleError(
+                                "Provider did not return an operation for scratch database creation."
+                            )
+                        checkpoint.update(
+                            "scratch-create-started",
+                            scratch_create_operation=operation,
+                        )
+                        created = True
+                if existing is None:
+                    context.wait_for_operation(
+                        operation, database_id=scratch_database
+                    )
+                    existing = context.database(scratch_database)
         mode = str(
             existing.get("type") or existing.get("databaseType") or ""
         ).casefold().replace("_", "-")

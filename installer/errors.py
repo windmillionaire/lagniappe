@@ -129,7 +129,9 @@ def classify_provider_error(error, *, message=None, status_code=None):
         or "not_found" in text
     ):
         return ProviderNotFound(detail)
-    if status == 409 or "alreadyexists" in name or "conflict" in text:
+    if status == 409 or "alreadyexists" in name or any(
+        marker in text for marker in ("already_exists", "already exists", "conflict")
+    ):
         return ProviderConflict(detail)
     if status in (400, 422) or any(
         marker in text for marker in ("badrequest", "invalidargument")

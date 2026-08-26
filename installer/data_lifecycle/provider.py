@@ -510,8 +510,8 @@ class ProviderContext:
             self.sleep(delay)
 
     # @testable true
-    # @tests tests_tooling/test_008_data_lifecycle.py::test_database_creation_uses_current_synchronous_gcloud_contract
-    # @matrix data-lifecycle : database-create synchronous-provider-contract
+    # @tests tests_tooling/test_008_data_lifecycle.py::test_database_creation_uses_current_operation_gcloud_contract
+    # @matrix data-lifecycle : database-create operation-provider-contract
     def create_database(self, database_id: str, location: str, *, delete_protection=True):
         database_id = validate_database_id(database_id, allow_default=False)
         arguments = [
@@ -525,12 +525,12 @@ class ProviderContext:
         ]
         payload = self.json_command(
             arguments,
-            timeout=600,
+            timeout=120,
         )
-        expected_name = f"projects/{self.project_id}/databases/{database_id}"
-        if not isinstance(payload, dict) or str(payload.get("name") or "") != expected_name:
+        operation = str((payload or {}).get("name") or "").strip()
+        if not OPERATION_PATTERN.fullmatch(operation):
             raise DataLifecycleError(
-                "Provider did not return the created scratch database."
+                "Provider did not return a scratch database creation operation."
             )
         return payload
 
