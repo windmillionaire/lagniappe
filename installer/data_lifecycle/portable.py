@@ -524,7 +524,11 @@ def validate_entity_record(record: dict[str, Any]) -> PortableIdentity:
         raise DataLifecycleError("Portable index exclusions must be sorted and unique.")
     if not isinstance(record["properties"], dict):
         raise DataLifecycleError("Portable entity properties must be an object.")
-    if "hash" in record["properties"] and record["properties"]["hash"] != identity["id"]:
+    if (
+        identity["type"] != "user"
+        and "hash" in record["properties"]
+        and record["properties"]["hash"] != identity["id"]
+    ):
         raise DataLifecycleError("Portable stored hash disagrees with entity identity.")
     portable_identity = PortableIdentity(
         str(identity["namespace"]),

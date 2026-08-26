@@ -135,6 +135,17 @@ def _partitionless_id(key) -> str:
 
 
 # @testable false
+# @covered-by installer/data_lifecycle/staging.py::stage_database
+# @reason user natural identities are exercised through portable staging references
+def _user_id(entity) -> str:
+    """Return a key-independent portable identity for one unique user email."""
+    email = str(entity.get("email") or "").strip().casefold()
+    if not email:
+        return ""
+    return f"user-email-{hashlib.sha256(email.encode('utf-8')).hexdigest()}"
+
+
+# @testable false
 # @covered-by installer/data_lifecycle/staging.py::portable_records
 # @reason typed child-key tails are exercised through owner-scoped portable records
 def _child_key(key) -> dict[str, Any]:
@@ -228,10 +239,25 @@ def stage_database(
                             _source_key(entity.key, source_project, source_database)
                         )
                         stored_hash = str(entity.get("hash") or "").strip()
-                        portable_id = stored_hash
-                        if not portable_id and included and semantic_type in KEY_IDENTIFIED_TYPES:
+                        portable_id = (
+                            _user_id(entity)
+                            if included and semantic_type == "user"
+                            else stored_hash
+                        )
+                        if (
+                            not portable_id
+                            and included
+                            and (
+                                semantic_type in KEY_IDENTIFIED_TYPES
+                                or bool(entity.get("reserved"))
+                            )
+                        ):
                             portable_id = _partitionless_id(entity.key)
-                        if stored_hash and not HASH_PATTERN.fullmatch(stored_hash):
+                        if (
+                            semantic_type != "user"
+                            and stored_hash
+                            and not HASH_PATTERN.fullmatch(stored_hash)
+                        ):
                             included = False
                             counts[f"invalid-hash:{semantic_type or role}"] += 1
                         status = "included" if included and portable_id else "excluded"
@@ -488,7 +514,11 @@ def portable_records(state: ArchiveState) -> list[dict[str, Any]]:
         entity = pickle.loads(row["raw"])
         identity = PortableIdentity(row["namespace"], row["semantic_type"], row["portable_id"])
         properties = dict(entity)
-        if "hash" in properties and properties["hash"] != identity.id:
+        if (
+            identity.type != "user"
+            and "hash" in properties
+            and properties["hash"] != identity.id
+        ):
             raise DataLifecycleError(f"Stored hash disagrees with portable identity: {identity}")
         raw_assets = properties.pop("assets", None)
         owner = identity.as_dict()

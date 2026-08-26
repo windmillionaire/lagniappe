@@ -1063,17 +1063,32 @@ def _entity(key, **values):
     return row
 
 
+def _user_id(email):
+    normalized = str(email).strip().casefold()
+    return f"user-email-{hashlib.sha256(normalized.encode('utf-8')).hexdigest()}"
+
+
 # @matrix portable-json : bounded-scan entity-envelope entity-selection key-replacement portable-identity typed-references
 def test_staging_selects_durable_types_and_builds_typed_identity_map(tmp_path):
-    user = _entity(Key("users", "owner", project=PROJECT_ID, database="scratch-db"), type="user", hash="userhash0001")
+    user = _entity(
+        Key("users", "owner", project=PROJECT_ID, database="scratch-db"),
+        type="user",
+        email="Owner@Example.com",
+    )
+    reserved_users = _entity(
+        Key("models", 2, project=PROJECT_ID, database="scratch-db"),
+        type="users",
+        reserved=True,
+    )
     excluded = _entity(Key("activity", "notice", project=PROJECT_ID, database="scratch-db"), type="notification")
     unknown = _entity(Key("future", "one", project=PROJECT_ID, database="scratch-db"), type="future")
     meta_project = PROJECT_ID
-    kinds = ["users", "activity", "future"]
+    kinds = ["users", "models", "activity", "future"]
     rows = {
         ("", "__namespace__"): [_entity(Key("__namespace__", 1, project=meta_project), value=1)],
         ("", "__kind__"): [_entity(Key("__kind__", kind, project=meta_project), value=kind) for kind in kinds],
         ("", "users"): [user],
+        ("", "models"): [reserved_users],
         ("", "activity"): [excluded],
         ("", "future"): [unknown],
     }
@@ -1084,10 +1099,16 @@ def test_staging_selects_durable_types_and_builds_typed_identity_map(tmp_path):
             source_project=PROJECT_ID,
             source_database="(default)",
         )
-        assert counts["included"] == 1
+        assert counts["included"] == 2
+        assert "missing-hash:users" not in counts
         assert counts["unknown-kind:future"] == 1
         assert counts["excluded-type:notification"] == 1
-        assert portable_records(state)[0]["identity"]["type"] == "user"
+        records = portable_records(state)
+        assert {record["identity"]["type"] for record in records} == {"user", "users"}
+        user_record = next(record for record in records if record["identity"]["type"] == "user")
+        assert user_record["identity"]["id"] == _user_id("owner@example.com")
+        reserved = next(record for record in records if record["identity"]["type"] == "users")
+        assert reserved["identity"]["reserved_role"] == "users"
 
 
 # @matrix portable-json : entity-envelope key-replacement typed-references
@@ -1095,7 +1116,7 @@ def test_staging_replaces_source_and_scratch_keys_recursively(tmp_path):
     scratch_user = Key("users", "owner", project=PROJECT_ID, database="scratch-db")
     source_user = Key("users", "owner", project=PROJECT_ID, database="source-db")
     scratch_page = Key("instances", "page", project=PROJECT_ID, database="scratch-db")
-    user = _entity(scratch_user, type="user", hash="userhash0001")
+    user = _entity(scratch_user, type="user", email="owner@example.com")
     page = _entity(
         scratch_page,
         type="page",
@@ -1119,12 +1140,13 @@ def test_staging_replaces_source_and_scratch_keys_recursively(tmp_path):
     with ArchiveState(tmp_path / "stage.sqlite3") as state:
         stage_database(_ScanClient(rows), state, source_project=PROJECT_ID, source_database="source-db")
         page_record = next(item for item in portable_records(state) if item["identity"]["type"] == "page")
-        assert page_record["properties"]["owner"] == {"$ref": {"type": "user", "id": "userhash0001"}}
-        assert page_record["properties"]["owner_string"] == {"$ref": {"type": "user", "id": "userhash0001"}}
+        user_id = _user_id("owner@example.com")
+        assert page_record["properties"]["owner"] == {"$ref": {"type": "user", "id": user_id}}
+        assert page_record["properties"]["owner_string"] == {"$ref": {"type": "user", "id": user_id}}
         contract = json.loads(page_record["properties"]["json_contract"])
         assert contract == {
-            "owner": "ref:user:userhash0001",
-            "ref:user:userhash0001": "literal:ref:literal",
+            "owner": f"ref:user:{user_id}",
+            f"ref:user:{user_id}": "literal:ref:literal",
         }
         ImportPlanner().plan(portable_records(state))
         payload = canonical_json(page_record).decode()
@@ -1152,8 +1174,8 @@ def test_history_and_messages_are_nested_and_replanned_under_their_owners(tmp_pa
             for kind in ("users", "instances", "history", "message_conversations", "messages")
         ],
         ("", "users"): [
-            _entity(actor_key, type="user", hash="actorhash001"),
-            _entity(recipient_key, type="user", hash="recipient001"),
+            _entity(actor_key, type="user", email="actor@example.com"),
+            _entity(recipient_key, type="user", email="recipient@example.com"),
         ],
         ("", "instances"): [
             _entity(task_key, type="task", hash="taskhash0001", name="Task")

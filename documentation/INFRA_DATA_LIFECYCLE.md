@@ -60,7 +60,10 @@ operator-only recovery bucket.
 Archive consumes one complete manual backup. Without an ID it first creates one.
 It imports Datastore into a temporary named database, stages bounded pages in
 owner-only local SQLite, replaces provider keys with typed portable identities,
-and reads only generation-bound recovery copies.
+and reads only generation-bound recovery copies. Ordinary content uses its
+stored hash, users use a digest of their case-normalized unique email, and
+hashless reserved models use a key-partition-independent internal identity
+while retaining their explicit reserved role for target mapping.
 
 Output is either `archives/<backup-id>/` or a ZIP. It contains:
 
