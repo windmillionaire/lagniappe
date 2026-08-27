@@ -1,16 +1,16 @@
 import re
 import time
+import webbrowser
 from types import SimpleNamespace
 
 from config import constants
-from installer import FORMATTER
+from installer import FORMATTER, wrap_text
 from installer import iam as iam_access
 from .package_install import install_if_missing
 from .utils import run_gcloud_command
 from .errors import (
     ProviderConflict,
     ProviderNotFound,
-    ProviderTermsNotAccepted,
     ProviderTimeout,
     ProviderTransientError,
     SetupCancelled,
@@ -27,6 +27,81 @@ GCLOUD_API_PROPAGATION_ATTEMPTS = 8
 GCLOUD_API_PROPAGATION_DELAYS = (2, 4, 8, 15, 20, 30, 30)
 APP_ENGINE_RPC_TIMEOUT = 60
 APP_ENGINE_CREATE_TIMEOUT = 300
+
+
+# @testable false
+# @covered-by installer/gcloud.py::enable_gcloud_apis
+# @reason interactive terms recovery is exercised through required-API reconciliation
+def _guide_google_service_terms_acceptance(
+    terms_error,
+    *,
+    account,
+    owner_email,
+    spinner,
+):
+    """Pause API activation for account-scoped Google terms acceptance."""
+    f = FORMATTER.initialize()
+    selected_account = str(account or "").strip()
+    permanent_owner = str(owner_email or "").strip()
+    delegated_maps = (
+        terms_error.terms_id == "maps"
+        and selected_account
+        and permanent_owner
+        and selected_account.casefold() != permanent_owner.casefold()
+    )
+    agreement_name = {
+        "cloud": "Google Cloud service agreement",
+        "maps": "Google Maps Platform agreement",
+    }.get(
+        terms_error.terms_id,
+        f"Google service agreement '{terms_error.terms_id}'",
+    )
+
+    spinner.stop()
+    try:
+        print()
+        print(
+            wrap_text(
+                f"Google requires the active setup account "
+                f"'{selected_account}' to complete "
+                f"the {agreement_name}."
+            )
+        )
+        if delegated_maps:
+            print(
+                wrap_text(
+                    f"Permanent Owner '{permanent_owner}' must first review "
+                    "the Google Maps Platform agreement and authorize the "
+                    "temporary installer to acknowledge it with the "
+                    "business-controlled installer account. The Owner does "
+                    "not need to enable Places API manually; setup will retry "
+                    "and enable it."
+                )
+            )
+        print(
+            wrap_text(
+                "The terms page may first show Google Cloud's welcome "
+                "agreement. Complete every agreement it presents, and confirm "
+                f"the browser profile is '{selected_account}'."
+            )
+        )
+        print(f"Terms page: {terms_error.terms_url}")
+        try:
+            webbrowser.open_new_tab(terms_error.terms_url)
+        except webbrowser.Error:
+            pass
+        answer = input(
+            f.info(
+                "Press Enter after completing the agreement to retry API "
+                "activation, or X to cancel: "
+            )
+        )
+        if answer.strip().casefold() == "x":
+            raise SetupCancelled(
+                "Setup cancelled during Google service-terms acceptance."
+            )
+    finally:
+        spinner.start()
 
 
 # @testable false
@@ -52,8 +127,8 @@ def _enabled_google_cloud_apis(project_id):
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_reuses_confirmed_preflight
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_reports_maps_terms_without_raw_provider_dump
-# @matrix setup : gcloud-command preflight provider-apis timeout
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_guides_maps_terms_then_retries_activation
+# @matrix setup : browser gcloud-command google-service-terms identity interactive-input preflight provider-apis timeout
 def enable_gcloud_apis():
     """Enable only APIs missing from the confirmed target preflight."""
     from config import SETTINGS
@@ -86,63 +161,45 @@ def enable_gcloud_apis():
             # @testable false
             # @covered-by installer/gcloud.py::enable_gcloud_apis
             # @reason local adapter converts captured gcloud failures before retry
+            guided_terms = set()
+
             def enable_missing_services():
-                result = run_gcloud_command(
-                    [
-                        "services",
-                        "enable",
-                        *missing_apis,
-                        f"--project={project_id}",
-                    ],
-                    check=False,
-                    timeout=GCLOUD_SERVICE_ENABLE_TIMEOUT,
-                )
-                if result.returncode == 0:
-                    return result
-                detail = (result.stderr or result.stdout or "").strip()
-                terms_error = google_service_terms_error(
-                    detail,
-                    account=SETTINGS.GCLOUD_CONFIG.get("ACCOUNT"),
-                )
-                if terms_error is not None:
-                    installer_email = str(
-                        SETTINGS.GCLOUD_CONFIG.get("ACCOUNT") or ""
-                    ).strip().casefold()
-                    owner_email = str(
-                        SETTINGS.APP.get("ADMIN_EMAIL") or ""
-                    ).strip().casefold()
-                    if (
-                        terms_error.terms_id == "maps"
-                        and owner_email
-                        and owner_email != installer_email
-                    ):
-                        places_url = (
-                            "https://console.cloud.google.com/apis/library/"
-                            "places.googleapis.com"
-                            f"?project={project_id}"
+                while True:
+                    result = run_gcloud_command(
+                        [
+                            "services",
+                            "enable",
+                            *missing_apis,
+                            f"--project={project_id}",
+                        ],
+                        check=False,
+                        timeout=GCLOUD_SERVICE_ENABLE_TIMEOUT,
+                    )
+                    if result.returncode == 0:
+                        return result
+                    detail = (result.stderr or result.stdout or "").strip()
+                    terms_error = google_service_terms_error(
+                        detail,
+                        account=SETTINGS.GCLOUD_CONFIG.get("ACCOUNT"),
+                    )
+                    if terms_error is not None:
+                        if terms_error.terms_id in guided_terms:
+                            raise terms_error
+                        _guide_google_service_terms_acceptance(
+                            terms_error,
+                            account=SETTINGS.GCLOUD_CONFIG.get("ACCOUNT"),
+                            owner_email=SETTINGS.APP.get("ADMIN_EMAIL"),
+                            spinner=sp,
                         )
-                        raise ProviderTermsNotAccepted(
-                            "Google Maps Platform terms must be accepted by "
-                            f"permanent Owner '{owner_email}' before the "
-                            "Places API can be enabled.",
-                            terms_id=terms_error.terms_id,
-                            terms_url=terms_error.terms_url,
-                            repair_action=(
-                                f"Ask permanent Owner '{owner_email}' to "
-                                f"accept the Maps Platform terms at "
-                                f"{terms_error.terms_url}, then enable Places "
-                                f"API for '{project_id}' at {places_url}. "
-                                f"Rerun setup afterward."
-                            ),
-                        )
-                    raise terms_error
-                raise classify_provider_error(
-                    RuntimeError(detail or "gcloud services enable failed"),
-                    message=(
-                        "gcloud services enable failed: "
-                        f"{detail or 'provider returned no detail'}"
-                    ),
-                )
+                        guided_terms.add(terms_error.terms_id)
+                        continue
+                    raise classify_provider_error(
+                        RuntimeError(detail or "gcloud services enable failed"),
+                        message=(
+                            "gcloud services enable failed: "
+                            f"{detail or 'provider returned no detail'}"
+                        ),
+                    )
 
             retry_provider_call(
                 enable_missing_services,

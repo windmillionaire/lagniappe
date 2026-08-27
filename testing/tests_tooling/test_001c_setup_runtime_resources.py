@@ -68,6 +68,8 @@ def test_setup_error_classification_and_retry_contract():
         classify_provider_error(subprocess.TimeoutExpired(["gcloud"], 1)),
         ProviderTimeout,
     )
+    cancelled = SetupCancelled("operator cancelled")
+    assert classify_provider_error(cancelled) is cancelled
     stderr_only = subprocess.CalledProcessError(1, ["gcloud", "describe"])
     assert isinstance(
         classify_provider_error(
@@ -3646,9 +3648,10 @@ def test_enable_gcloud_apis_reuses_confirmed_preflight(monkeypatch):
     ]
 
 
-# @matrix setup : error-guidance google-service-terms identity provider-apis
-def test_enable_gcloud_apis_reports_maps_terms_without_raw_provider_dump(
+# @matrix setup : browser error-guidance google-service-terms identity interactive-input provider-apis
+def test_enable_gcloud_apis_guides_maps_terms_then_retries_activation(
     monkeypatch,
+    capsys,
 ):
     import installer as setup_pkg
     from installer import gcloud
@@ -3676,28 +3679,60 @@ def test_enable_gcloud_apis_reports_maps_terms_without_raw_provider_dump(
         "reason: UREQ_TOS_NOT_ACCEPTED Help Token: do-not-print"
     )
     calls = []
+    enabled_attempts = 0
+
+    def run(command, **kwargs):
+        nonlocal enabled_attempts
+        calls.append((command, kwargs))
+        if command[:2] == ["services", "enable"]:
+            enabled_attempts += 1
+            if enabled_attempts == 1:
+                return completed_process(
+                    command,
+                    returncode=1,
+                    stderr=provider_detail,
+                )
+            return completed_process(command)
+        return completed_process(
+            command,
+            stdout="\n".join(constants.REQUIRED_GOOGLE_CLOUD_APIS),
+        )
+
     monkeypatch.setattr(
         gcloud,
         "run_gcloud_command",
-        lambda command, **kwargs: calls.append((command, kwargs))
-        or completed_process(command, returncode=1, stderr=provider_detail),
+        run,
+    )
+    opened = []
+    monkeypatch.setattr(
+        gcloud.webbrowser,
+        "open_new_tab",
+        lambda url: opened.append(url) or True,
+    )
+    prompts = []
+    monkeypatch.setattr(
+        "builtins.input",
+        lambda prompt: prompts.append(prompt) or "",
+    )
+    mutations = []
+    monkeypatch.setattr(
+        gcloud,
+        "record_mutation",
+        lambda *args, **kwargs: mutations.append((args, kwargs)),
     )
 
-    with pytest.raises(ProviderTermsNotAccepted) as error:
-        gcloud.enable_gcloud_apis()
-
-    assert str(error.value) == (
-        "Google Maps Platform terms must be accepted by permanent Owner "
-        "'owner@business.example' before the Places API can be enabled."
-    )
-    assert error.value.repair_action == (
-        "Ask permanent Owner 'owner@business.example' to accept the Maps "
-        "Platform terms at https://console.developers.google.com/terms/maps, "
-        "then enable Places API for 'project-1' at "
-        "https://console.cloud.google.com/apis/library/places.googleapis.com"
-        "?project=project-1. Rerun setup afterward."
-    )
-    assert "Help Token" not in str(error.value)
+    assert gcloud.enable_gcloud_apis()
+    output = " ".join(capsys.readouterr().out.split())
+    assert "installer@business.example" in output
+    assert "owner@business.example" in output
+    assert "Owner does not need to enable Places API manually" in output
+    assert "Help Token" not in output
+    assert opened == ["https://console.developers.google.com/terms/maps"]
+    assert len(prompts) == 1
+    assert "retry API activation" in prompts[0]
+    assert spinner.stops == 1
+    assert spinner.starts == 1
+    assert mutations[-1][1]["identifier"] == "places.googleapis.com"
     assert calls == [
         (
             [
@@ -3710,7 +3745,29 @@ def test_enable_gcloud_apis_reports_maps_terms_without_raw_provider_dump(
                 "check": False,
                 "timeout": gcloud.GCLOUD_SERVICE_ENABLE_TIMEOUT,
             },
-        )
+        ),
+        (
+            [
+                "services",
+                "enable",
+                "places.googleapis.com",
+                "--project=project-1",
+            ],
+            {
+                "check": False,
+                "timeout": gcloud.GCLOUD_SERVICE_ENABLE_TIMEOUT,
+            },
+        ),
+        (
+            [
+                "services",
+                "list",
+                "--enabled",
+                "--project=project-1",
+                "--format=value(config.name)",
+            ],
+            {"timeout": gcloud.GCLOUD_SERVICE_DISCOVERY_TIMEOUT},
+        ),
     ]
 
 

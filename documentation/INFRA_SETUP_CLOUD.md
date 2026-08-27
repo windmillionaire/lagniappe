@@ -35,26 +35,33 @@ generic `sqlservice.login` default, but Lagniappe does not use Cloud SQL and
 must not request that scope.
 
 Google Cloud service terms are accepted per human account and are separate
-from gcloud CLI and ADC OAuth consent. A first-time account can load the Cloud
-console without being prompted, then receive `UREQ_TOS_NOT_ACCEPTED` when an
-API is first enabled. Fresh setup defers ADC until the bootstrap management
-APIs have been prepared. It recognizes that provider error, omits the raw help
-token from its own failure, and reports the exact account plus
-`https://console.developers.google.com/terms/cloud` as the repair action. ADC
+from gcloud CLI and ADC OAuth consent. A first-time account may reach some
+Cloud console pages without seeing an agreement, while the ordinary Cloud
+console presents a welcome agreement and API activation can report
+`UREQ_TOS_NOT_ACCEPTED` until it is complete. Fresh setup defers ADC until the
+bootstrap management APIs have been prepared. It recognizes that provider
+error, omits the raw help token from its own failure, and reports the exact
+account plus `https://console.developers.google.com/terms/cloud` as the repair
+action. ADC
 login failures also include that first-use repair action because interactive
 gcloud output cannot be classified reliably after the subprocess exits.
 
 The required Places API is governed by a second, service-specific Google Maps
 Platform agreement at `https://console.developers.google.com/terms/maps`. In a
-delegated installation, the permanent business Owner accepts that agreement
-and enables Places API on the prepared project before the outside installer
-runs setup. This keeps authority to bind the business with its durable Owner.
+delegated installation, the permanent business Owner reviews and accepts that
+agreement, then explicitly authorizes the outside installer to acknowledge it
+with the temporary, business-controlled Workspace account. Google's acceptance
+state is attached to the human account making the API-enable request, so the
+Owner's acceptance does not satisfy a request made through the installer's
+gcloud session. The Owner does not enable Places API manually.
 Required-API enablement captures `UREQ_TOS_NOT_ACCEPTED`, identifies `tos_id`
-(`cloud`, `maps`, or a future provider value), and raises a concise typed error.
-A delegated Maps failure directs the installer back to the permanent Owner and
-the project-specific Places API page; an owner-install failure names the active
-account and agreement URL. Recoverable probes and this known failure do not
-print gcloud's raw diagnostic or Help Token.
+(`cloud`, `maps`, or a future provider value), pauses its progress display,
+opens the agreement page, names the exact active browser account, and waits for
+the operator. After acceptance it retries the same API-enable command and
+continues setup; it never delegates Places activation to a console checklist.
+A delegated Maps prompt also states the Owner authorization boundary.
+Recoverable probes and this known failure do not print gcloud's raw diagnostic
+or Help Token.
 
 Fresh setup first displays the account marked active by gcloud CLI
 authentication and requires default-no confirmation. It verifies that exact

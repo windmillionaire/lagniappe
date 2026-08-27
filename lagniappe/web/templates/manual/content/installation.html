@@ -277,12 +277,12 @@
           the
           {{ link("https://console.developers.google.com/terms/maps", "Google Maps Platform terms page") }}
           and accept those separate terms. Lagniappe uses the Places API for
-          address autocomplete and location verification. With the prepared
-          project selected, open its
-          {{ link("https://console.cloud.google.com/apis/library/places.googleapis.com", "Places API library page") }}
-          and select <strong>Enable</strong>. This keeps acceptance of the
-          business agreement with the permanent Owner instead of the outside
-          installer. Then open
+          address autocomplete and location verification. Explicitly authorize
+          the installer to acknowledge the same agreement later with the
+          temporary, business-controlled Workspace account. Google records
+          acceptance against the account that runs API activation, so this
+          second acknowledgement is technically required; setup will enable
+          Places API itself. Then open
           the {{ link("https://console.cloud.google.com/", "Google Cloud console") }}.
           A Google Workspace subscription does not automatically create a
           Google Cloud billing account. Follow Google's
@@ -378,19 +378,20 @@
             for or use the permanent Owner's password.
           </li>
           <li>
-            In that installer-only browser profile, open Google's
-            {{ link("https://console.developers.google.com/terms/cloud", "Google Cloud service-terms page") }}
-            and complete any agreement it presents for the temporary account.
-            Complete it even if the main Cloud console previously loaded
-            without prompting. Then open the
-            {{ link("https://console.cloud.google.com/", "Google Cloud console") }}
-            and confirm it loads without a <strong>service disabled</strong>
-            message. Do not create a project; the business has already created
-            the intended project. The business should also have enabled Places
-            API. If setup instead reports that Google Maps Platform terms are
-            required, stop and ask the permanent Owner to accept that agreement
-            and enable Places; an outside installer should not accept a business
-            agreement unless explicitly authorized to do so.
+            In that installer-only browser profile, open the
+            {{ link("https://console.cloud.google.com/", "Google Cloud console") }}.
+            If Google displays a welcome agreement, confirm the account shown
+            is the temporary installer, select the business's country, select
+            the agreement checkbox, and choose <strong>Agree and
+            continue</strong>. You do not need to
+            select <strong>Start free</strong>; the business has already linked
+            billing to its project. Do not create a project or manually enable
+            any APIs. If setup later finds another account-specific agreement,
+            it opens the exact terms page, tells you which account must be
+            active, waits for you to complete it, and then retries API
+            activation itself. Complete the Maps acknowledgement only after
+            the permanent Owner has reviewed the agreement and explicitly
+            authorized you to do so.
           </li>
           <li>
             Clone Lagniappe and follow <strong>Authenticate with Google
@@ -540,21 +541,20 @@
         Google client libraries used by setup.
       </p>
       <p class="text-base-medium text-sm mt-2">
-        Provider service terms are separate from both sign-ins. A new Cloud
-        user can reach the console without seeing an agreement, then be blocked
-        when setup enables an API. If you are installing for yourself, open
-        Google's
-        {{ link("https://console.developers.google.com/terms/cloud", "Cloud service-terms page") }}
-        and
-        {{ link("https://console.developers.google.com/terms/maps", "Maps Platform terms page") }}
-        while signed in as the installation account and complete both
-        agreements. The second is required because Lagniappe uses Google Places
-        for location fields. For a delegated installation, the permanent Owner
-        accepts the Maps agreement and enables Places API during business
-        preparation; the outside installer accepts only the general Cloud terms
-        for the temporary account. If setup reports
-        <code>UREQ_TOS_NOT_ACCEPTED</code>, use the exact terms page and account
-        named by setup, then rerun setup.
+        Provider service terms are separate from both sign-ins. In the same
+        browser profile as the installation account, open the
+        {{ link("https://console.cloud.google.com/", "Google Cloud console") }}
+        and complete any welcome agreement it presents. A new Cloud user can
+        otherwise reach part of setup before API activation reports
+        <code>UREQ_TOS_NOT_ACCEPTED</code>. Some services have an additional
+        agreement; Lagniappe uses Google Places, which is governed by the Maps
+        Platform terms. When setup encounters one, it opens the exact terms
+        page, names the required account, waits for acceptance, and retries API
+        activation itself. In a delegated installation, the permanent Owner
+        first reviews and authorizes the Maps agreement as described above;
+        the installer then completes Google's account-specific acknowledgement
+        with the temporary business account. Neither person manually enables
+        Places API.
       </p>
       <p class="text-base-medium text-sm mt-2">
         The second sign-in requests your basic Google account identity and

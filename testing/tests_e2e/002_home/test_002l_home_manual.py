@@ -86,11 +86,11 @@ def test_manual_delegated_installation_separates_owner_and_installer_checklists(
     )
     expect(owner_maps_terms).to_have_count(1)
     expect(owner_maps_terms).to_have_text("Google Maps Platform terms page")
+    expect(owner).to_contain_text("setup will enable Places API itself")
     owner_places_api = owner.locator(
         "a[href='https://console.cloud.google.com/apis/library/places.googleapis.com']"
     )
-    expect(owner_places_api).to_have_count(1)
-    expect(owner_places_api).to_have_text("Places API library page")
+    expect(owner_places_api).to_have_count(0)
 
     owner.locator("summary").click()
     installer.locator("summary").click()
@@ -98,8 +98,10 @@ def test_manual_delegated_installation_separates_owner_and_installer_checklists(
     expect(installer).to_have_attribute("open", "")
     expect(installer.locator("ol")).to_be_visible()
     expect(installer).to_contain_text("separate browser profile")
+    expect(installer).to_contain_text("Agree and continue")
+    expect(installer).to_contain_text("You do not need to select Start free")
     expect(installer).to_contain_text(
-        "even if the main Cloud console previously loaded without prompting"
+        "Do not create a project or manually enable any APIs"
     )
     expect(installer).to_contain_text(
         "it displays the active gcloud CLI email"
@@ -128,15 +130,14 @@ def test_manual_delegated_installation_separates_owner_and_installer_checklists(
     installer_terms = installer.locator(
         "a[href='https://console.developers.google.com/terms/cloud']"
     )
-    expect(installer_terms).to_have_count(1)
-    expect(installer_terms).to_have_text("Google Cloud service-terms page")
+    expect(installer_terms).to_have_count(0)
     installer_maps_terms = installer.locator(
         "a[href='https://console.developers.google.com/terms/maps']"
     )
     expect(installer_maps_terms).to_have_count(0)
     expect(installer).to_contain_text(
-        "an outside installer should not accept a business agreement unless "
-        "explicitly authorized to do so"
+        "only after the permanent Owner has reviewed the agreement and "
+        "explicitly authorized you to do so"
     )
     cloud_console_links = delegated.locator(
         "a[href='https://console.cloud.google.com/']"

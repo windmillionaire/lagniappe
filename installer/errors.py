@@ -87,7 +87,7 @@ _GOOGLE_SERVICE_TERMS_NAMES = {
 
 # @testable true
 # @tests tests_tooling/test_001c_setup_runtime_resources.py::test_setup_error_classification_and_retry_contract
-# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_reports_maps_terms_without_raw_provider_dump
+# @tests tests_tooling/test_001c_setup_runtime_resources.py::test_enable_gcloud_apis_guides_maps_terms_then_retries_activation
 # @matrix setup : error-guidance google-service-terms identity provider-errors
 def google_service_terms_error(detail, *, account=None):
     """Return a concise actionable error for Google's per-service agreements."""
@@ -148,7 +148,7 @@ def _status_code(error):
 # @matrix setup : classification provider-errors
 def classify_provider_error(error, *, message=None, status_code=None):
     """Return one typed provider failure without confusing access with absence."""
-    if isinstance(error, ProviderError):
+    if isinstance(error, SetupError):
         return error
     detail = str(message or error or "Provider operation failed.").strip()
     status = status_code if status_code is not None else _status_code(error)
