@@ -33,7 +33,7 @@ def _parser():
     )
     commands.add_parser(
         "email",
-        help="Configure custom-domain authentication email",
+        help="Replace authentication-email delivery",
     )
     commands.add_parser(
         "oauth",

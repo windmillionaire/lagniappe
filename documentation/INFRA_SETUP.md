@@ -22,7 +22,7 @@ environment exists is `venv/bin/python -m installer ...`.
 | `repair` | Explicit full reconciliation, followed by validation. |
 | `development` | Add test buckets and the local Python/Node/Playwright toolchain. |
 | `url` | Configure an App Engine custom domain and DNS. |
-| `email` | Configure custom-domain authentication email. |
+| `email` | Replace Gmail/Workspace or custom-domain authentication-email delivery. |
 | `oauth` | Configure the Google Sign-In Web client. |
 | `ai` | Configure AI models and observability choice. |
 | `ai-email` | Configure Resend receiving and the AI email webhook. |

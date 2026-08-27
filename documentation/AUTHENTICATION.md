@@ -58,6 +58,13 @@ Custom-domain setup validates the sender and guides SPF, DKIM, and DMARC
 configuration. AI email uses the same sender but separate receive and send
 credentials; see [AI_EMAIL.md](AI_EMAIL.md).
 
+On an existing installation, `./setup.sh email` replaces the active delivery
+configuration transactionally. Without a custom application domain it guides
+a new Gmail or Google Workspace App Password, defaults the sender to the
+permanent Owner, tests delivery before saving, and then offers to deploy. With
+a custom domain it uses the configured SMTP-provider path instead. A failed or
+cancelled test leaves the deployed sender unchanged.
+
 ## Browser/server trust boundary
 
 `GET /l/identity-config` returns the public project ID and Web API key. The

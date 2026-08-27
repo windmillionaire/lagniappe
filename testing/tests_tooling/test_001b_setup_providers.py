@@ -356,6 +356,74 @@ def test_setup_auth_email_saves_generic_gmail_smtp_after_test(monkeypatch, capsy
     assert "only if Gmail explicitly rejects sign-in" in output
 
 
+# @matrix setup : authentication-email interactive-input replacement settings-save smtp
+def test_setup_auth_email_replaces_existing_gmail_sender(monkeypatch):
+    from installer import auth_email
+
+    saves = []
+    settings = types.SimpleNamespace(
+        APP={
+            "ADMIN_EMAIL": "owner@example.test",
+            "APP_NAME": "Demo",
+            "AUTH_EMAIL_CONFIG": {
+                "provider": "smtp",
+                "service": "Gmail",
+                "host": "smtp.gmail.com",
+                "port": 587,
+                "security": "starttls",
+                "username": "installer@example.test",
+                "password": "oldpassword12345",
+                "senderEmail": "installer@example.test",
+                "senderName": "Existing Sender",
+            },
+        },
+        save=lambda: saves.append(True),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "config",
+        types.SimpleNamespace(SETTINGS=settings),
+    )
+    monkeypatch.setattr(
+        auth_email,
+        "FORMATTER",
+        types.SimpleNamespace(
+            initialize=lambda: types.SimpleNamespace(
+                error=lambda message: message,
+                warning=lambda message: message,
+                success=lambda message: message,
+            )
+        ),
+    )
+    monkeypatch.setattr(auth_email, "_print_gmail_instructions", lambda: None)
+    deliveries = []
+    monkeypatch.setattr(
+        auth_email,
+        "test_smtp_delivery",
+        lambda config, recipient: deliveries.append((config.copy(), recipient))
+        or True,
+    )
+    answers = iter(["", "", "abcd efgh ijkl mnop"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+
+    assert auth_email.setup_auth_email(replace=True)
+    assert settings.APP["AUTH_EMAIL_CONFIG"] == {
+        "provider": "smtp",
+        "service": "Gmail",
+        "host": "smtp.gmail.com",
+        "port": 587,
+        "security": "starttls",
+        "username": "owner@example.test",
+        "password": "abcdefghijklmnop",
+        "senderEmail": "owner@example.test",
+        "senderName": "Existing Sender",
+    }
+    assert deliveries == [
+        (settings.APP["AUTH_EMAIL_CONFIG"], "owner@example.test")
+    ]
+    assert saves == [True]
+
+
 # @matrix setup : authentication-email custom-domain interactive-input smtp
 def test_setup_auth_email_uses_custom_domain_provider_path(monkeypatch):
     from installer import auth_email

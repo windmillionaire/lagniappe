@@ -264,12 +264,11 @@ def test_development_cli_routes_to_development_setup(monkeypatch):
     assert events == ["development"]
 
 
-# @matrix setup : authentication-email cli custom-domain smtp
-def test_email_cli_requires_custom_domain(monkeypatch, capsys):
+# @matrix setup : authentication-email cli deploy gmail replacement smtp
+def test_email_cli_replaces_gmail_without_custom_domain(monkeypatch):
     import config
     import installer as setup_pkg
-    from installer import auth_email
-    from installer import verify
+    from installer import auth_email, utils, verify
 
     events = []
     settings = _fake_settings(
@@ -277,7 +276,8 @@ def test_email_cli_requires_custom_domain(monkeypatch, capsys):
             "AUTH_EMAIL_CONFIG": {
                 "provider": "smtp",
                 "service": "Gmail",
-            }
+            },
+            "CUSTOM_DOMAIN": "",
         }
     )
     monkeypatch.setattr(config, "SETTINGS", settings)
@@ -289,13 +289,14 @@ def test_email_cli_requires_custom_domain(monkeypatch, capsys):
     )
     monkeypatch.setattr(
         auth_email,
-        "_setup_provider_auth_email",
-        lambda: events.append("configure") or True,
+        "setup_auth_email",
+        lambda *, replace=False: events.append(("gmail", replace)) or True,
     )
+    monkeypatch.setattr(utils, "deploy_to_app_engine", lambda: events.append("deploy"))
+    monkeypatch.setattr("builtins.input", lambda prompt: "")
 
-    assert auth_email.configure_auth_email() == 1
-    assert events == ["verify"]
-    assert "./setup.sh url" in capsys.readouterr().out
+    assert auth_email.configure_auth_email() == 0
+    assert events == ["verify", ("gmail", True), "deploy"]
 
 
 # @matrix setup : authentication-email cli custom-domain deploy smtp
