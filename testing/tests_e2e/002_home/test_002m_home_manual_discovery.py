@@ -1,6 +1,6 @@
 """Crawler discovery coverage for the optional public manual."""
 
-from urllib.parse import urlparse
+import re
 
 import pytest
 from playwright.sync_api import expect
@@ -36,10 +36,14 @@ def test_public_manual_search_metadata_and_navigation(get_user):
         "content",
         f"Read the Security section of the {CONFIG.APP_NAME} manual.",
     )
-    canonical = anonymous.locate("link[rel='canonical']").get_attribute("href")
-    assert urlparse(canonical).path == "/manual/security"
-    robots = anonymous.locate("meta[name='robots']").get_attribute("content")
-    assert robots in {"index, follow", "noindex, follow"}
+    expect(anonymous.locate("link[rel='canonical']")).to_have_attribute(
+        "href", re.compile(r"/manual/security$")
+    )
+    robots_meta = anonymous.locate("meta[name='robots']")
+    expect(robots_meta).to_have_attribute(
+        "content", re.compile(r"^(?:index|noindex), follow$")
+    )
+    robots = robots_meta.get_attribute("content")
     assert response.headers["x-robots-tag"] == robots
 
     with anonymous.page.expect_response("**/manual/section/forms") as response_info:
@@ -54,8 +58,9 @@ def test_public_manual_search_metadata_and_navigation(get_user):
         "content",
         f"Read the Forms section of the {CONFIG.APP_NAME} manual.",
     )
-    canonical = anonymous.locate("link[rel='canonical']").get_attribute("href")
-    assert urlparse(canonical).path == "/manual/forms"
+    expect(anonymous.locate("link[rel='canonical']")).to_have_attribute(
+        "href", re.compile(r"/manual/forms$")
+    )
 
     with anonymous.page.expect_response("**/manual/section/tasks"):
         anonymous.page.locator("button[data-section='tasks']").first.click()
@@ -70,8 +75,9 @@ def test_public_manual_search_metadata_and_navigation(get_user):
         "content",
         f"Read the Forms section of the {CONFIG.APP_NAME} manual.",
     )
-    canonical = anonymous.locate("link[rel='canonical']").get_attribute("href")
-    assert urlparse(canonical).path == "/manual/forms"
+    expect(anonymous.locate("link[rel='canonical']")).to_have_attribute(
+        "href", re.compile(r"/manual/forms$")
+    )
 
 
 # @matrix manual robots : disabled enabled fragment
