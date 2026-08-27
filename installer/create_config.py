@@ -402,67 +402,65 @@ def _adc_identity():
 
 
 # @testable true
-# @tests tests_tooling/test_001a_setup_validation_config.py::test_setup_config_status_save_and_gcloud_login_helpers
-# @pair setup:gcloud-config
+# @tests tests_tooling/test_001a_setup_validation_config.py::test_gcloud_account_selection_requires_an_explicit_authenticated_identity
+# @matrix setup : gcloud-config gcloud-token interactive-input
 def _get_gcloud_account(account):
-    from installer import FORMATTER
     from runner.gcloud import check_account_authentication
-    from installer.utils import install_if_missing
-
-    install_if_missing(
-        "google.auth", "Google authentication library", package_name="google-auth"
-    )
-    import google.auth
-
-    f = FORMATTER.initialize()
 
     if account:
         check_account_authentication(account)
         return account
 
-    configured_account = _gcloud_debug_value(["config", "get-value", "account"])
-    if configured_account["state"] == GCLOUD_VALUE_SUCCESS:
-        account = configured_account["value"]
-        check_account_authentication(account)
-        return account
-    if configured_account["state"] == GCLOUD_VALUE_ERROR:
-        print(
-            f.error(
-                "Could not determine the active gcloud CLI account: "
-                f"{configured_account['error']}"
-            )
-        )
-        _fail()
-
-    try:
-        run_gcloud_command(["auth", "list"])
-    except subprocess.CalledProcessError:
+    active_result = run_gcloud_command(
+        [
+            "auth",
+            "list",
+            "--filter=status:ACTIVE",
+            "--format=value(account)",
+        ],
+        check=False,
+    )
+    active_accounts = [
+        value.strip()
+        for value in str(active_result.stdout or "").splitlines()
+        if value.strip()
+    ]
+    if active_result.returncode != 0 or len(active_accounts) != 1:
         login_command = format_command([GCLOUD_CLI, "auth", "login"])
-        print(f.error(f"Not logged into gcloud. Run {login_command} first."))
-        _fail()
-    except google.auth.exceptions.DefaultCredentialsError:
-        adc_command = format_command(
-            [GCLOUD_CLI, "auth", "application-default", "login"]
+        raise RuntimeError(
+            "Setup could not identify exactly one active gcloud CLI account. Run "
+            f"{login_command}, then rerun setup."
         )
-        print(
-            f.error(
-                "Application Default Credentials (ADC) not found.\n"
-                f"Please run {adc_command} to set them up.\n"
-                "ADC is required for the script to create and manage Google Cloud resources."
-            )
-        )
-        _fail()
-    except Exception as e:
-        print(f.error(f"Authentication error: {e}"))
-        _fail()
 
-    account = input(
-        f.info("Enter the authenticated gcloud CLI account to use: ")
-    ).strip()
-    if not account:
-        print("Exiting installer.")
-        raise SetupCancelled("Setup cancelled during account selection.")
+    account = active_accounts[0]
+    print(f"\nThe active gcloud CLI account is: {account}")
+    while True:
+        answer = input("Use this account for the installation? [y/N]: ").strip()
+        if answer.casefold() in {"y", "yes"}:
+            break
+        if answer.casefold() in {"", "n", "no", "x", "exit"}:
+            login_command = format_command([GCLOUD_CLI, "auth", "login"])
+            print(
+                "Setup cancelled before project selection. Run "
+                f"{login_command}, choose the installation account, then "
+                "rerun setup."
+            )
+            raise SetupCancelled("Setup cancelled during account confirmation.")
+        print("Enter Y to confirm this account, or N to cancel.")
+
     check_account_authentication(account)
+    token_check = run_gcloud_command(
+        ["auth", "print-access-token", account],
+        check=False,
+        timeout=60,
+    )
+    if token_check.returncode != 0 or not str(token_check.stdout or "").strip():
+        login_command = format_command([GCLOUD_CLI, "auth", "login", account])
+        raise RuntimeError(
+            f"The gcloud CLI login for '{account}' could not be verified. Run "
+            f"{login_command}, then rerun setup."
+        )
+    print(f"[OK] Verified gcloud CLI installation account: {account}")
 
     return account
 

@@ -328,6 +328,12 @@
           Give the installer the project ID and the permanent Lagniappe Owner
           email. <strong>Never give them the Owner's Google password.</strong>
           The installer signs in with the dedicated temporary Google account.
+          Before asking about the installation type, setup displays the active
+          gcloud CLI account's exact email. Confirm it only when it is the
+          temporary installer address. If it is wrong, answer
+          <strong>N</strong>, run <code>gcloud auth login</code> again, choose
+          the temporary installer, and restart setup. Setup verifies that
+          confirmed account's CLI token before showing any project choices.
           When setup asks <strong>Are you installing Lagniappe for a different
           permanent Owner?</strong>, answer <strong>Y</strong>. Setup lists only
           active projects where that authenticated installer has a direct,
@@ -403,14 +409,16 @@
       </li>
       <li>
         <strong>Choose and verify the Google Cloud target.</strong> Setup first
-        asks whether this is a delegated installation. A delegated installer
-        chooses from active projects they own directly; setup never offers to
-        create one for them. For your own installation, setup asks whether the
-        project already exists. Answering yes opens a picker of active projects
-        visible to your account; answering no asks for an installation name and
-        allows setup to create a project. It then checks billing, opens the
-        Application Default Credentials browser sign-in, and verifies that the
-        CLI and local Google clients use the same account and project.
+        displays the active gcloud CLI account, requires you to confirm its
+        exact email, and verifies its login. It then asks whether this is a
+        delegated installation. A delegated installer chooses from active
+        projects they own directly; setup never offers to create one for them.
+        For your own installation, setup asks whether the project already
+        exists. Answering yes opens a picker of active projects visible to your
+        account; answering no asks for an installation name and allows setup to
+        create a project. It then checks billing, opens the Application Default
+        Credentials browser sign-in, and verifies that the CLI and local Google
+        clients use the same account and project.
       </li>
       <li>
         <strong>Show the plan before cloud changes.</strong> Setup writes a
@@ -462,6 +470,14 @@
         for Application Default Credentials; the first authorizes the
         <code>gcloud</code> command, while the second authorizes the local
         Google client libraries used by setup.
+      </p>
+      <p class="text-base-medium text-sm mt-2">
+        At the start of a fresh installation, setup displays the exact account
+        marked active by this gcloud login and asks whether it is correct. Read
+        the email rather than assuming the browser changed it. If it is wrong,
+        answer <strong>N</strong>, rerun the command above, choose the intended
+        installation account, and restart setup. Setup verifies the confirmed
+        account before asking about installation type or listing projects.
       </p>
       {% call callout("warning", False) %}
         If Google shows permission checkboxes or a <strong>Select all</strong>

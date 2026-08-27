@@ -261,6 +261,84 @@ def test_validate_project_id_and_project_state_are_non_mutating(
     }
 
 
+# @matrix setup : gcloud-config gcloud-token interactive-input
+def test_gcloud_account_selection_requires_an_explicit_authenticated_identity(
+    monkeypatch,
+    isolated_setup_config,
+    capsys,
+):
+    from installer import create_config
+    from runner import gcloud
+
+    checked = []
+    commands = []
+    monkeypatch.setattr(
+        gcloud,
+        "check_account_authentication",
+        lambda account: checked.append(account),
+    )
+    def run_gcloud(command, **kwargs):
+        commands.append((command, kwargs))
+        if command[:2] == ["auth", "list"]:
+            return completed_process(command, stdout="installer@example.com\n")
+        return completed_process(command, stdout="short-lived-token")
+
+    monkeypatch.setattr(create_config, "run_gcloud_command", run_gcloud)
+    answers = iter(["maybe", "y"])
+    monkeypatch.setattr("builtins.input", lambda prompt: next(answers))
+
+    assert create_config._get_gcloud_account("") == "installer@example.com"
+    assert checked == ["installer@example.com"]
+    assert commands == [
+        (
+            [
+                "auth",
+                "list",
+                "--filter=status:ACTIVE",
+                "--format=value(account)",
+            ],
+            {"check": False},
+        ),
+        (
+            ["auth", "print-access-token", "installer@example.com"],
+            {"check": False, "timeout": 60},
+        )
+    ]
+    output = capsys.readouterr().out
+    assert "The active gcloud CLI account is: installer@example.com" in output
+    assert "Enter Y to confirm this account" in output
+    assert (
+        "[OK] Verified gcloud CLI installation account: installer@example.com"
+        in output
+    )
+
+    commands.clear()
+    checked.clear()
+    assert create_config._get_gcloud_account("saved@example.com") == (
+        "saved@example.com"
+    )
+    assert checked == ["saved@example.com"]
+    assert commands == []
+
+    monkeypatch.setattr("builtins.input", lambda prompt: "n")
+    with pytest.raises(SetupCancelled, match="account confirmation"):
+        create_config._get_gcloud_account("")
+    assert "gcloud auth login" in capsys.readouterr().out
+
+    monkeypatch.setattr("builtins.input", lambda prompt: "y")
+    monkeypatch.setattr(
+        create_config,
+        "run_gcloud_command",
+        lambda command, **kwargs: (
+            completed_process(command, stdout="installer@example.com\n")
+            if command[:2] == ["auth", "list"]
+            else completed_process(command, returncode=1, stderr="login expired")
+        ),
+    )
+    with pytest.raises(RuntimeError, match="could not be verified"):
+        create_config._get_gcloud_account("")
+
+
 # @matrix setup : interactive-input project-id
 def test_project_id_selection_prefers_requested_name_and_suffixes_collisions(
     monkeypatch,

@@ -51,6 +51,12 @@ def test_manual_delegated_installation_explains_workspace_cloud_access(
         "the Owner line itself must have no entry in Inheritance"
     )
     expect(delegated).to_contain_text(
+        "setup displays the active gcloud CLI account's exact email"
+    )
+    expect(delegated).to_contain_text(
+        "confirmed account's CLI token before showing any project choices"
+    )
+    expect(delegated).to_contain_text(
         "Are you installing Lagniappe for a different permanent Owner?"
     )
     expect(delegated).to_contain_text(
